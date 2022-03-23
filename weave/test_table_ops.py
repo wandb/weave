@@ -142,16 +142,16 @@ def test_map(table_type):
 
 
 @weave.op(
-    name="test_table_ops-op_list",
+    name="test_table_ops-op_list_table",
     input_type={"n": types.Int()},
     output_type=types.Table(types.TypedDict({"a": types.Int(), "b": types.String()})),
 )
-def op_list(n):
+def op_list_table(n):
     return ops.ListTable([{"a": i, "b": str(i)} for i in range(n)])
 
 
 def test_list_returning_op():
-    res = weave.use(op_list(2))
+    res = weave.use(op_list_table(2))
     expected = [{"a": 0, "b": str(0)}, {"a": 1, "b": str(1)}]
     assert res.list == expected
     saved = storage.save(res)
@@ -162,5 +162,25 @@ def test_list_returning_op():
 
 def test_list_map():
     map_fn = weave.define_fn({"row": weave.types.TypedDict({})}, lambda row: row["a"])
-    res = weave.use(op_list(2).map(map_fn))
+    res = weave.use(op_list_table(2).map(map_fn))
     assert res.list == [0, 1]
+
+
+@weave.op(
+    name="test_table_ops-op_list",
+    input_type={"n": types.Int()},
+    output_type=types.List(types.TypedDict({"a": types.Int(), "b": types.String()})),
+)
+def op_list(n):
+    return [{"a": i, "b": str(i)} for i in range(n)]
+
+
+def test_list_get_and_op():
+    l = weave.use(op_list(2))
+    saved = storage.save(l)
+    get_node = ops.get(str(saved))
+
+    # The frontend always sends ops.Table.count() (not the same as get_node.count() right
+    # now!)
+    count_node = ops.Table.count(get_node)
+    assert weave.use(count_node) == 2

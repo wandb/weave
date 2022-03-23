@@ -42,7 +42,16 @@ class BoxedDict(dict):
 
 
 class BoxedList(list):
-    pass
+    # TODO: we shouldn't have methods in these!
+    # But these are necessary to deal with the way the tables stuff
+    # works right now.
+    def count(self):
+        return len(self)
+
+    def index(self, index):
+        if index >= len(self):
+            return None
+        return self.__getitem__(index)
 
 
 # See https://numpy.org/doc/stable/user/basics.subclassing.html
