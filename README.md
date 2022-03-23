@@ -6,7 +6,15 @@ This repository is for pre-release Weave development and internal usage trials.
 
 # Current status
 
-This is a very early release of Weave Jupyter. The example notebooks should work. Trying to do anything beyond what the notebooks do probably not work.
+This is a very early release of Weave Jupyter. The example notebooks should work. Trying to do anything beyond what the notebooks do probably will not work.
+
+The code contained herein is of mixed quality. We are starting a cleanup pass now.
+
+# Getting involved
+
+We'd love for you to start playing with Weave Python! Unfortunately there are currently no docs, or even reasonable explanations of what this is. Sorry about that! Try the setup instructions here, and then run the notebooks.
+
+Please send any and all feedback to Shawn and Danny in the W&B #weave Slack channel. We are happy to take questions, troubleshoot issues, etc.
 
 # Setup instructions
 
