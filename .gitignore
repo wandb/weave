@@ -1,0 +1,9 @@
+.python-version
+.ipynb_checkpoints
+wandb
+__pycache__
+artifacts
+.idea
+local-artifacts
+weave_internal.egg-info
+weave.egg-info/

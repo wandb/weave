@@ -1,0 +1,15 @@
+wandb
+numpy
+pandas
+h5py
+viztracer
+sqlalchemy
+ipython
+flask
+flask_cors
+notebook
+pymysql
+pyarrow==7.0.0
+ipynbname
+pillow
+openai
