@@ -4,6 +4,10 @@ This repository is for pre-release Weave development and internal usage trials.
 
 **Do not share this repo, screenshots, or related information, with anyone outside of W&B unless you have explicit written approval from Shawn.**
 
+# Current status
+
+This is a very early release of Weave Jupyter. The example notebooks should work. Trying to do anything beyond what the notebooks do probably not work.
+
 # Setup instructions
 
 Create a new virtualenv, e.g. `pyenv virtualenv 3.9.7 weave_internal`
@@ -30,3 +34,7 @@ jupyter notebook
 ```
 
 in the root directory, and then use the Jupyter browser to open them.
+
+# Docs
+
+Coming soon
