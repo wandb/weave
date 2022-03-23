@@ -1,0 +1,28 @@
+name: test
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+    
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Setup Python version
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.9
+      - name: Create and start virtual environment
+        run: |
+          python3 -m venv venv
+          source venv/bin/activate
+      - name: Install package
+        run: pip install .
+      - name: Install dev dependencies
+        run: pip install -r requirements.test.txt
+      - name: Run tests
+        run: cd weave && pytest
