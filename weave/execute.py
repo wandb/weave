@@ -20,7 +20,7 @@ def execute_nodes(nodes, no_cache=False):
     nodes = compile.compile(nodes)
     fg = forward_graph.ForwardGraph(nodes)
 
-    with context.in_process_client():
+    with context.execution_client():
         execute_forward(fg, no_cache=no_cache)
 
     return [fg.get_result(n) for n in nodes]
@@ -52,7 +52,7 @@ def async_op_body(run_uri, run_body, inputs):
     from . import api
     from .ops_primitives import file
 
-    with context.in_process_client():
+    with context.execution_client():
         run = file.get(run_uri)
         api.use(run.set_state("running"))
         dereffed_inputs = {}

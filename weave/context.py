@@ -12,12 +12,22 @@ _weave_client: contextvars.ContextVar[
 ] = contextvars.ContextVar("weave_client", default=None)
 
 
+_analytics_enabled: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    "analytics_enabled", default=True
+)
+
+
 @contextlib.contextmanager
-def in_process_client():
+def execution_client():
+    """Returns a client for use by the execution engine and op resolvers."""
+    # Force in process execution
     wc = client.Client(server.InProcessServer())
-    token = _weave_client.set(wc)
+    client_token = _weave_client.set(wc)
+    # Disable analytics
+    analytics_token = _analytics_enabled.set(False)
     yield wc
-    _weave_client.reset(token)
+    _weave_client.reset(client_token)
+    _analytics_enabled.reset(analytics_token)
 
 
 def _make_default_client():
@@ -35,3 +45,11 @@ def get_client():
         c = _make_default_client()
         _weave_client.set(c)
     return c
+
+
+def analytics_enabled():
+    return _analytics_enabled.get()
+
+
+def disable_analytics():
+    return _analytics_enabled.set(False)
