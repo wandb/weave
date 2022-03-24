@@ -7,6 +7,7 @@ from . import errors as _errors
 from . import weave_types as types
 from .decorators import weave_class, op, mutation
 from . import context as _context
+from . import usage_analytics
 
 
 def save(node_or_obj, name=None):
@@ -25,6 +26,8 @@ def get(ref_str):
 
 
 def use(nodes, client=None):
+    usage_analytics.use_called()
+
     if client is None:
         client = _context.get_client()
     # weave_client = client.Client(server.SubprocessServer())
