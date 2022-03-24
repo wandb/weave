@@ -96,9 +96,6 @@ class HttpServerClient(object):
         self.url = url
 
     def execute(self, nodes, no_cache=False):
-        # to_json() on each node is not right, this loses track of any
-        # shared ancestry!
-        # TODO
         serialized = serialize.serialize(nodes)
         r = requests.post(self.url + "/__weave/execute/v2", json={"graphs": serialized})
         response = r.json()["data"]
