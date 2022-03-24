@@ -11,6 +11,7 @@ from . import weave_types as types
 from . import server
 from . import storage
 from . import util
+from . import usage_analytics
 from .ops_primitives.file import get as op_get
 
 
@@ -62,6 +63,7 @@ def _show_params(obj):
 
 
 def show(obj):
+    usage_analytics.show_called()
 
     if not util.is_notebook():
         raise RuntimeError(
