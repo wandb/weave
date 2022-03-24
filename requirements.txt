@@ -13,3 +13,4 @@ pyarrow==7.0.0
 ipynbname
 pillow
 openai
+analytics-python
