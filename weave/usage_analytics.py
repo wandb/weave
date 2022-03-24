@@ -1,6 +1,8 @@
 import analytics
 import subprocess
 
+from . import context
+
 analytics.write_key = "uJ8vZgKqTBVH6ZdhD4GZGZYsR7ucfJmb"
 
 
@@ -11,7 +13,7 @@ def whoami():
 identify_called = False
 
 
-def identify():
+def _identify():
     global identify_called
     if not identify_called:
         who = whoami()
@@ -20,7 +22,9 @@ def identify():
 
 
 def track(action: str, info=None):
-    identify()
+    if not context.analytics_enabled():
+        return
+    _identify()
     if info is None:
         info = {}
     analytics.track(whoami(), action, info)
