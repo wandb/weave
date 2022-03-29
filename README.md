@@ -46,3 +46,12 @@ in the root directory, and then use the Jupyter browser to open them.
 # Docs
 
 Coming soon
+
+# Development
+
+Install pre commit hooks
+
+```
+pip install -r requirements.dev.txt
+pre-commit install
+```
