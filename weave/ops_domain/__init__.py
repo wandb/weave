@@ -13,6 +13,10 @@ class ArtifactVersion(types.Type):
     name = "artifactversion"
 
 
+class RunType(types.BasicType):
+    name = "run"
+
+
 @weave_class(weave_type=Project)
 class ProjectOps(object):
     @op(
@@ -32,6 +36,58 @@ class ProjectOps(object):
             "%s/%s/%s:%s"
             % (project.entity, project.name, artifactName, artifactVersionAlias)
         )
+
+    @op(
+        name="project-runs",
+        input_type={
+            "project": Project(),
+        },
+        output_type=types.List(RunType()),
+    )
+    def runs(project):
+        import wandb
+
+        api = wandb.Api()
+        runs = api.runs(
+            path="%s/%s" % (project.entity, project.name),
+        )
+
+        # limit to 10
+        # TODO: fix
+        res = []
+        for i, run in enumerate(runs):
+            res.append({"id": run.id, "name": run.name, "summary": run.summary_metrics})
+            if i == 10:
+                break
+        return res
+
+    @op(
+        name="project-filtered-runs",
+        input_type={
+            "project": Project(),
+            "filter": types.Any(),
+            "order": types.String(),
+        },
+        output_type=types.List(RunType()),
+    )
+    def filtered_runs(project, filter, order):
+        import wandb
+
+        api = wandb.Api()
+        runs = api.runs(
+            path="%s/%s" % (project.entity, project.name),
+            filters=json.loads(filter),
+            order=order,
+        )
+
+        # limit to 10
+        # TODO: fix
+        res = []
+        for i, run in enumerate(runs):
+            res.append({"id": run.id, "name": run.name, "summary": run.summary_metrics})
+            if i == 10:
+                break
+        return res
 
 
 @op(

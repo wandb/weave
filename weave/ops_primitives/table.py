@@ -262,7 +262,15 @@ def list_indexCheckpoint(obj):
     output_type=types.Any(),
 )
 def limit(arr, limit):
-    return arr[:limit]
+    # So lame, we can't use slice because sometimes we have an ArrowArrayTable here
+    # TODO: fix
+    res = []
+    if limit >= len(arr):
+        limit = len(arr)
+    for i in range(limit):
+        res.append(arr[i])
+    return res
+    # return arr[:limit]
 
 
 @op(

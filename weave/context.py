@@ -39,6 +39,13 @@ def _make_default_client():
         return client.Client(server.InProcessServer())
 
 
+def use_fixed_server_port():
+    """Force Weave server to port 9994 so wandb frontend can talk to it."""
+    s = server.HttpServer(port=9994)
+    s.start()
+    _weave_client.set(server.HttpServerClient(s.url))
+
+
 def get_client():
     c = _weave_client.get()
     if c is None:
