@@ -14,4 +14,4 @@ jobs:
       - uses: psf/black@stable
         with:
           options: "--check --verbose"
-          version: "21.5b1"
+          version: "22.3.0"
