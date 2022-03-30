@@ -8,7 +8,7 @@ from . import weave_types as types
 from .decorators import weave_class, op, mutation
 from . import context as _context
 from . import usage_analytics
-from .context import use_fixed_server_port
+from .context import use_fixed_server_port, use_external_server
 
 
 def save(node_or_obj, name=None):
