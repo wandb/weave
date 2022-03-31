@@ -267,7 +267,7 @@ def path_ext(path):
 
 def path_type(path):
     if not os.path.exists(path):
-        raise FileNotFoundError(f"Specified file or directory does not exist: {path}")
+        raise FileNotFoundError(f"Specified file or directory does not exist: '{path}'")
     elif os.path.isdir(path):
         return DirType()
     else:
