@@ -11,6 +11,8 @@ from . import tags
 
 from . import ops
 
+import pytest
+
 
 def test_dir():
     testdir = ops.local_path("testdata/test_dir")
@@ -23,3 +25,8 @@ def test_dir():
     assert len(dir.dirs["sub_dir"].dirs) == 0
     assert len(dir.dirs["sub_dir"].files) == 1
     assert len(dir.files) == 2
+
+
+def test_nonexistent_file():
+    with pytest.raises(FileNotFoundError):
+        ops.local_path("fake_file_.idontexist")
