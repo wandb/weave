@@ -267,7 +267,7 @@ def path_ext(path):
 
 def path_type(path):
     if not os.path.exists(path):
-        return types.none_type
+        raise FileNotFoundError(f"Specified file or directory does not exist: '{path}'")
     elif os.path.isdir(path):
         return DirType()
     else:
@@ -346,7 +346,7 @@ DirType.instance_class = Dir
 def op_file_open_return_type(input_types):
     path = input_types["path"]
     if not isinstance(path, types.ConstString):
-        return types.UnionType(types.LocalFileType(), DirType(), types.none_type)
+        return types.UnionType(types.LocalFileType(), DirType())
     else:
         return path_type(path.val)
 
