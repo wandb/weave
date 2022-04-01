@@ -21,6 +21,9 @@ from weave.ecosystem import async_demo
 
 # set up logging
 
+wz_logger = logging.getLogger("werkzeug")
+wz_logger.removeHandler(default_handler)
+
 
 def make_app(
     log_filename: typing.Union[str, pathlib.Path] = None, stream_enabled: bool = False
@@ -43,9 +46,8 @@ def make_app(
     app = Flask(__name__, static_folder="frontend")
     app.logger.removeHandler(default_handler)
 
-    wz_logger = logging.getLogger("werkzeug")
     formatter = logging.Formatter(
-        "[%(asctime)s] %(levelname)s in %(module)s: %(message)s"
+        "[%(asctime)s] %(levelname)s in %(module)s (Thread %(thread)s): %(message)s"
     )
 
     if fs_logging_enabled:
@@ -138,9 +140,6 @@ def make_app(
     return app
 
 
-"""
-
 if __name__ == "__main__":
+    app = make_app()
     app.run(ssl_context="adhoc", port=9994)
-
-"""
