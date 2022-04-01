@@ -59,7 +59,7 @@ def make_app(
 
     if stream_enabled:
         handler = logging.StreamHandler(wsgi_errors_stream)
-        handler.setLevel(logging.INFO)
+        handler.setLevel(logging.WARNING)
         handler.setFormatter(formatter)
         app.logger.addHandler(handler)
         wz_logger.addHandler(handler)
