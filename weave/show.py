@@ -52,8 +52,12 @@ def _show_params(obj):
         # weave objects and trigger the path above.
         from weave import ops
 
+        # OpenAI FineTune deme notebook relies on this.
+        ref = storage.save(obj.input_node)
+        node = ops.get(str(ref))
+
         return {
-            "weave_node": obj.input_node,
+            "weave_node": node,
             "panel_id": obj.id,
             "panel_config": obj.config,
         }
@@ -83,6 +87,8 @@ def show(obj):
 
     params = _show_params(obj)
     panel_url = f"{client.url}/__frontend/weave_jupyter/index.html?fullScreen"
+    # Use this to talk to local frontend dev server.
+    # panel_url = f"https://app.wandb.test/__frontend/weave_jupyter/index.html?fullScreen"
     if "weave_node" in params:
         panel_url += "&expNode=%s" % urllib.parse.quote(
             json.dumps(params["weave_node"].to_json())

@@ -46,6 +46,11 @@ def use_fixed_server_port():
     _weave_client.set(server.HttpServerClient(s.url))
 
 
+def use_external_server():
+    """Talk to external server running on 9994"""
+    _weave_client.set(server.HttpServerClient("http://localhost:9994"))
+
+
 def get_client():
     c = _weave_client.get()
     if c is None:
