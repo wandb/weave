@@ -1,6 +1,7 @@
 import os
 from logging.config import dictConfig
 import pathlib
+import typing
 import warnings
 
 from flask import Flask
@@ -20,7 +21,9 @@ from weave.ecosystem import async_demo
 # set up logging
 
 
-def make_app(log_filename=None, stream_enabled=False):
+def make_app(
+    log_filename: typing.Union[str, pathlib.Path] = None, stream_enabled: bool = False
+) -> Flask:
     pid = os.getpid()
     log_file = log_filename or pathlib.Path(f"./.weave/log/{pid}.log")
     fs_logging_enabled = True
