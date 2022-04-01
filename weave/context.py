@@ -30,6 +30,15 @@ def execution_client():
     _analytics_enabled.reset(analytics_token)
 
 
+@contextlib.contextmanager
+def local_http_client():
+    s = server.HttpServer()
+    s.start()
+    client_token = _weave_client.set(server.HttpServerClient(s.url))
+    yield _weave_client.get()
+    _weave_client.reset(client_token)
+
+
 def _make_default_client():
     if util.is_notebook():
         s = server.HttpServer()
