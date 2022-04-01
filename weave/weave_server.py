@@ -1,5 +1,7 @@
-import logging
+import os
+from logging.config import dictConfig
 import pathlib
+import warnings
 
 from flask import Flask
 from flask import request
@@ -15,9 +17,56 @@ from weave import registry_mem
 from weave.ecosystem import openai
 from weave.ecosystem import async_demo
 
-app = Flask(__name__, static_folder="frontend")
-log = logging.getLogger("werkzeug")
-log.setLevel(logging.ERROR)
+# set up logging
+
+
+def make_app(log_filename=None, stream_enabled=False):
+    pid = os.getpid()
+    log_file = log_filename or pathlib.Path(f"./.weave/log/{pid}.log")
+    fs_logging_enabled = True
+
+    try:
+        log_file.parent.mkdir(exist_ok=True, parents=True)
+        log_file.touch(exist_ok=True)
+    except OSError:
+        warnings.warn(
+            f"weave: Unable to touch logfile at '{log_file}'. Filesystem logging will be disabled for "
+            f"the remainder of this session. To enable filesystem logging, ensure the path is writable "
+            f"and restart the server."
+        )
+        fs_logging_enabled = False
+
+    logging_config = {
+        "version": 1,
+        "formatters": {
+            "default": {
+                "format": "[%(asctime)s] %(levelname)s in %(module)s: %(message)s",
+            }
+        },
+        "handlers": {
+            "wsgi_stream": {
+                "class": "logging.StreamHandler",
+                "stream": "ext://flask.logging.wsgi_errors_stream",
+                "formatter": "default",
+            },
+            "wsgi_file": {
+                "class": "logging.FileHandler",
+                "filename": log_file,
+                "formatter": "default",
+            },
+        },
+        "root": {
+            "level": "INFO",
+            "handlers": (["wsgi_file"] if fs_logging_enabled else [])
+            + (["wsgi_stream"] if stream_enabled else []),
+        },
+    }
+
+    dictConfig(logging_config)
+    return Flask(__name__, static_folder="frontend")
+
+
+app = make_app()
 CORS(app)
 
 
