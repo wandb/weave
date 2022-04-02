@@ -943,7 +943,7 @@ class LocalFileType(FileType):
 def python_type_to_type(py_type: type) -> Type:
     weave_types = instance_class_to_potential_type(py_type)
     if not weave_types:
-        raise errors.WeaveDefinitionError("Unknown python type: %s" % py_type)
+        return UnknownType()
     # the last returned Type is the most specific Type (a leaf Type).
     leaf_type = weave_types[-1]
 

@@ -116,6 +116,26 @@ def test_op_callable_output_type_and_return_type_declared():
             return str(a)
 
 
+def test_op_no_arg_type():
+    with pytest.raises(weave.errors.WeaveDefinitionError):
+
+        @weave.op()
+        def op_callable_output_type_and_return_type_declared(a: int):
+            return str(a)
+
+
+class SomeUnknownObj:
+    pass
+
+
+def test_op_unknown_arg_type():
+    with pytest.raises(weave.errors.WeaveDefinitionError):
+
+        @weave.op()
+        def op_callable_output_type_and_return_type_declared(a: SomeUnknownObj):
+            return str(a)
+
+
 def test_op_no_return_type():
     with pytest.raises(weave.errors.WeaveDefinitionError):
 

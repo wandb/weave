@@ -62,6 +62,17 @@ def op(
         if weave_input_type is None:
             # No weave declared input_type, so use the inferred_type
             weave_input_type = inferred_input_type
+            for arg_name in inspect.signature(f).parameters.keys():
+                if arg_name not in inferred_input_type:
+                    raise errors.WeaveDefinitionError(
+                        "type declaration missing for arg: %s" % arg_name
+                    )
+                elif inferred_input_type[arg_name] == types.UnknownType():
+                    raise errors.WeaveDefinitionError(
+                        "Weave type not registered for python type: %s"
+                        % python_input_type[arg_name]
+                    )
+
             # TODO: Detect that all input types are declared!
         else:
             weave_input_type = _create_args_from_op_input_type(weave_input_type)
