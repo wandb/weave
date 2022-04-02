@@ -68,7 +68,10 @@ def op_inferredtype(a: int, b: int) -> str:
 
 
 def test_op_inferred_type():
-    assert op_inferredtype.op_def.input_type == {"a": types.Int(), "b": types.Int()}
+    assert op_inferredtype.op_def.input_type.arg_types == {
+        "a": types.Int(),
+        "b": types.Int(),
+    }
     assert op_inferredtype.op_def.output_type == types.String()
 
 

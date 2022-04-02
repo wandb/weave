@@ -18,7 +18,7 @@ def await_run_outputs(nodes: typing.List[graph.Node]):
     for edge in edit_g.edges:
         actual_input_type = edge.output_of.type
         op_def = registry_mem.memory_registry.get_op(edge.input_to.from_op.name)
-        if op_def.input_type == op_args.OpArgs.VAR_ARGS:
+        if op_def.input_type.kind == op_args.OpArgs.VAR_ARGS:
             # Not correct... we'd want to walk these too!
             # TODO: fix
             continue

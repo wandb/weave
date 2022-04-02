@@ -64,6 +64,33 @@ class OpDef(object):
             # of?
             return self.name
 
+    def to_dict(self):
+        if callable(self.output_type):
+            raise errors.WeaveSerializeError(
+                "serializing op with callable output_type not yet implemented"
+            )
+        if self.input_type.kind != op_args.OpArgs.NAMED_ARGS:
+            raise errors.WeaveSerializeError(
+                "serializing op with non-named-args input_type not yet implemented"
+            )
+
+        input_types = {
+            name: arg_type.to_dict()
+            for name, arg_type in self.input_type.arg_types.items()
+        }
+
+        output_type = self.output_type.to_dict()
+
+        serialized = {
+            "name": self.name,
+            "input_types": input_types,
+            "output_type": output_type,
+        }
+        if self.render_info is not None:
+            serialized["render_info"] = self.render_info
+
+        return serialized
+
     def __str__(self):
         return "<OpDef: %s>" % self.name
 
