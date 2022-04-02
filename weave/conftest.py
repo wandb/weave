@@ -1,5 +1,4 @@
 import os
-import tempfile
 
 from . import context
 
@@ -11,9 +10,13 @@ def pytest_sessionstart(session):
 
 
 @pytest.fixture()
-def isolated_filesystem():
-    cwd = os.getcwd()
-    tmpdir = tempfile.mkdtemp()
-    os.chdir(tmpdir)
+def fresh_server_logfile():
+    def _clearlog():
+        try:
+            os.remove(f"/tmp/weave/log/{os.getpid()}.log")
+        except (OSError, FileNotFoundError):
+            pass
+
+    _clearlog()
     yield
-    os.chdir(cwd)
+    _clearlog()

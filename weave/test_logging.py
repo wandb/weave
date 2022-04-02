@@ -8,14 +8,14 @@ from . import context
 import pytest
 
 
-def test_logfile_created(isolated_filesystem):
+def test_logfile_created(fresh_server_logfile):
 
     with context.local_http_client():
         # run this to kick off a server
         assert api.use(ops.Number.__add__(3, 9)) == 12
 
         # check that the log file was created
-        log_filename = f"./.weave/log/{os.getpid()}.log"
+        log_filename = f"/tmp/weave/log/{os.getpid()}.log"
         assert os.path.exists(log_filename)
 
         with open(log_filename, "r") as f:
@@ -25,7 +25,7 @@ def test_logfile_created(isolated_filesystem):
         assert "execute" in content and "200" in content
 
 
-def test_logfile_captures_error(isolated_filesystem):
+def test_logfile_captures_error(fresh_server_logfile):
     # run this to kick off a server
 
     with context.local_http_client():
@@ -33,7 +33,7 @@ def test_logfile_captures_error(isolated_filesystem):
             api.use(ops.Number.__add__(3, "a"))
 
         # check that the log file was created
-        log_filename = f"./.weave/log/{os.getpid()}.log"
+        log_filename = f"/tmp/weave/log/{os.getpid()}.log"
         assert os.path.exists(log_filename)
 
         with open(log_filename, "r") as f:
@@ -43,7 +43,7 @@ def test_logfile_captures_error(isolated_filesystem):
         assert "execute" in content and "500" in content
 
 
-def test_log_2_app_instances_different_threads(isolated_filesystem):
+def test_log_2_app_instances_different_threads(fresh_server_logfile):
     # kick off two http servers
 
     with context.local_http_client():
@@ -56,7 +56,7 @@ def test_log_2_app_instances_different_threads(isolated_filesystem):
         assert api.use(ops.Number.__add__(3, 9)) == 12
 
     # check that the log file was created
-    log_filename = f"./.weave/log/{os.getpid()}.log"
+    log_filename = f"/tmp/weave/log/{os.getpid()}.log"
     assert os.path.exists(log_filename)
 
     with open(log_filename, "r") as f:
@@ -66,5 +66,5 @@ def test_log_2_app_instances_different_threads(isolated_filesystem):
     assert "execute" in content and "500" in content and "200" in content
     threads = re.findall(r"\(Thread (.+)\)", content)
 
-    assert len(threads) == 2
-    assert threads[0][0] != threads[1][0]
+    assert len(threads) == 3
+    assert threads[-2] != threads[-1]

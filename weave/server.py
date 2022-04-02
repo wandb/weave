@@ -109,7 +109,7 @@ class HttpServer(threading.Thread):
 
         self.host = host
 
-        app = weave_server.make_app()
+        app = weave_server.app
         threading.Thread.__init__(self, daemon=True)
         self.srv = make_server(host, port, app, threaded=True)
 
