@@ -4,6 +4,7 @@ import typing
 
 from . import graph
 from . import registry_mem
+from . import op_def
 from . import storage
 from . import lazy
 from . import errors
@@ -131,14 +132,14 @@ def op(
 
         fq_op_name = name
         if fq_op_name is None:
-            fq_op_name = registry_mem.fully_qualified_opname(f)
+            fq_op_name = op_def.fully_qualified_opname(f)
 
         lazy_call = lazy.make_lazy_call(
             f, fq_op_name, weave_input_type, weave_output_type
         )
         lazy_call.is_weave = True
 
-        lazy_call.op_def = registry_mem.OpDef(
+        lazy_call.op_def = op_def.OpDef(
             fq_op_name,
             weave_input_type,
             weave_output_type,

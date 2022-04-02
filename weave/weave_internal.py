@@ -6,6 +6,7 @@ from . import client
 from . import op_args
 from . import server
 from . import registry_mem
+from . import op_def
 from . import lazy
 
 
@@ -122,9 +123,7 @@ def make_mapped_op(op_name):
         list_ = new_inputs.pop(mapped_param_name)
         return [op.resolve_fn(x, **new_inputs) for x in list_]
 
-    op_def = registry_mem.OpDef(
-        mapped_op_name, input_types, output_type, call_fn, resolve
-    )
-    registry_mem.memory_registry.register_op(op_def)
+    new_op = op_def.OpDef(mapped_op_name, input_types, output_type, call_fn, resolve)
+    registry_mem.memory_registry.register_op(new_op)
 
     return call_fn
