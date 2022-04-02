@@ -40,13 +40,6 @@ class Node:
         return node_expr_str(n)
 
 
-def nodes_equal(n1, n2):
-    # Don't override __eq__ on node! Nodes are mixed in with a class that
-    #     contains weave methods for the given type, some of which need
-    #     to override __eq__
-    return n1.to_json() == n2.to_json()
-
-
 weave_types.Function.instance_classes = Node
 
 

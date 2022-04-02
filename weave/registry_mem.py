@@ -6,6 +6,7 @@ import typing
 import wandb
 
 from . import errors
+from . import op_args
 from . import forward_graph
 from . import weave_types
 from . import lazy
@@ -17,7 +18,7 @@ LOCAL_FILE_SCHEME = "file://"
 
 class OpDef(object):
     name: str
-    input_type: typing.Dict[str, weave_types.Type]
+    input_type: op_args.OpArgs
     output_type: typing.Union[
         weave_types.Type,
         typing.Callable[[typing.Dict[str, weave_types.Type]], weave_types.Type],
@@ -62,11 +63,6 @@ class OpDef(object):
             # This is for builtins, which I think we may just want to get rid
             # of?
             return self.name
-
-    @property
-    def has_varargs(self):
-        # TODO: Fix this, we need a way of propertly typing varargs functions!
-        return list(self.input_type.keys())[0] == "manyX"
 
     def __str__(self):
         return "<OpDef: %s>" % self.name

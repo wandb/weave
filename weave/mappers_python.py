@@ -81,10 +81,7 @@ class ObjectDictToObject(mappers_weave.ObjectMapper):
             result[k] = v
         result_type = self.result_type()
         for prop_name, prop_type in result_type.variable_property_types().items():
-            # TODO: need a base Const type
-            if isinstance(prop_type, types.ConstString) or isinstance(
-                prop_type, types.ConstNumber
-            ):
+            if isinstance(prop_type, types.Const):
                 result[prop_name] = prop_type.val
         return self.result_type().instance_class(**result)
 
@@ -243,6 +240,14 @@ class PyTypeToType(mappers_weave.TypeMapper):
         return types.TypeRegistry.type_from_dict(obj)
 
 
+class ConstToPyConst(mappers_weave.ConstMapper):
+    def result_type(self):
+        return self._type
+
+    def apply(self, obj):
+        return obj
+
+
 py_type = type
 
 
@@ -270,8 +275,8 @@ def map_to_python_(type, mapper, artifact, path=[]):
         return IntToPyInt(type, mapper, artifact, path)
     elif isinstance(type, types.String):
         return StringToPyString(type, mapper, artifact, path)
-    elif isinstance(type, types.ConstString):
-        return None
+    elif isinstance(type, types.Const):
+        return ConstToPyConst(type, mapper, artifact, path)
     elif isinstance(type, types.NoneType):
         return NoneToPyNone(type, mapper, artifact, path)
     elif isinstance(type, types.UnknownType):
@@ -319,6 +324,8 @@ def map_from_python_(type, mapper, artifact, path=[]):
         return IntToPyInt(type, mapper, artifact, path)
     elif isinstance(type, types.String):
         return StringToPyString(type, mapper, artifact, path)
+    elif isinstance(type, types.Const):
+        return ConstToPyConst(type, mapper, artifact, path)
     elif isinstance(type, types.NoneType):
         return NoneToPyNone(type, mapper, artifact, path)
     elif isinstance(type, types.UnknownType):

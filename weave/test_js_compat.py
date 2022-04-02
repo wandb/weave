@@ -11,7 +11,7 @@ from . import weave_types as types
 
 
 def test_const_serialization():
-    f_type = types.FileType(types.ConstString("png"))
+    f_type = types.FileType(types.Const(types.String(), "png"))
     f_type_dict = f_type.to_dict()
     assert f_type_dict == {
         "type": "file",
@@ -19,5 +19,5 @@ def test_const_serialization():
     }
     f_type2 = types.TypeRegistry.type_from_dict(f_type_dict)
     assert isinstance(f_type2, types.FileType)
-    assert isinstance(f_type2.extension, types.ConstString)
+    assert isinstance(f_type2.extension, types.Const)
     assert f_type2.extension.val == "png"

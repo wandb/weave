@@ -1,5 +1,6 @@
 # from . import mappers_python
 # from . import mappers_arrow
+import typing
 import functools
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -18,12 +19,10 @@ def all_subclasses(cls):
     ]
 
 
-@functools.cache
 def get_type_classes():
     return all_subclasses(Type)
 
 
-@functools.cache
 def instance_class_to_potential_type_map():
     res = {}
     type_classes = get_type_classes()
@@ -77,6 +76,7 @@ class TypeRegistry:
             if obj_type is not None:
                 return obj_type
         # Want to raise error here but there are still bugs.
+        # TODO: Fix
         # raise errors.WeaveTypeError("no type for obj: %s" % obj)
         return None
 
@@ -95,7 +95,8 @@ class TypeRegistry:
 
 class Type:
     name = "type"
-    instance_classes = None
+    instance_class: typing.Optional[type]
+    instance_classes: typing.Union[type, typing.List[type], None] = None
 
     @classmethod
     def _instance_classes(cls):
@@ -229,9 +230,9 @@ class Any(BasicType):
 
 class Const(Type):
     name = "const"
-    val_type = None
 
-    def __init__(self, val):
+    def __init__(self, type_, val):
+        self.val_type = type_
         self.val = val
 
     @classmethod
@@ -250,25 +251,18 @@ class Const(Type):
 
     @classmethod
     def from_dict(cls, d):
-        return cls(d["val"])
+        return cls(TypeRegistry.type_from_dict(d["valType"]), d["val"])
 
     def _to_dict(self):
-        return {"val": self.val}
+        return {"valType": self.val_type.to_dict(), "val": self.val}
+
+    def __str__(self):
+        return "<Const %s %s>" % (self.val_type, self.val)
 
 
 class String(BasicType):
     name = "string"
-
-
-class ConstString(Const, String):
-    name = "const-string"
     instance_classes = str
-    val_type = String()
-
-    to_dict = Type.to_dict
-
-    def __repr__(self):
-        return "<ConstString(%s) %s>" % (id(self), self.val)
 
 
 class Number(BasicType):
@@ -281,8 +275,8 @@ class Float(Number):
 
 
 class Int(Number):
-    instance_classes = int
     name = "int"
+    instance_classes = int
 
     @classmethod
     def is_instance(cls, obj):
@@ -870,7 +864,7 @@ def non_none(type_):
 
 
 def string_enum_type(*vals):
-    return UnionType(*[ConstString(v) for v in vals])
+    return UnionType(*[Const(String(), v) for v in vals])
 
 
 RUN_STATE_TYPE = string_enum_type("pending", "running", "finished", "failed")
@@ -915,7 +909,7 @@ class FileType(ObjectType):
         # In the js Weave code, file is a non-standard type that
         # puts a const string at extension as just a plain string.
         d = super()._to_dict()
-        if isinstance(self.extension, ConstString):
+        if isinstance(self.extension, Const):
             d["extension"] = self.extension.val
         return d
 
@@ -925,7 +919,7 @@ class FileType(ObjectType):
         # In the js Weave code, file is a non-standard type that
         # puts a const string at extension as just a plain string.
         d = {i: d[i] for i in d if i != "type"}
-        d["extension"] = {"type": "const-string", "val": d["extension"]}
+        d["extension"] = {"type": "const", "valType": "string", "val": d["extension"]}
         return super().from_dict(d)
 
     def property_types(self):
@@ -944,3 +938,15 @@ class LocalFileType(FileType):
             # TODO: Datetime?
             "mtime": Float(),
         }
+
+
+def python_type_to_type(py_type: type) -> Type:
+    weave_types = instance_class_to_potential_type(py_type)
+    if not weave_types:
+        raise errors.WeaveDefinitionError("Unknown python type: %s" % py_type)
+    # the last returned Type is the most specific Type (a leaf Type).
+    leaf_type = weave_types[-1]
+
+    # This won't work for non-Basic types that need to be initialized!
+    # TODO
+    return leaf_type()

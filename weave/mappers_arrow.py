@@ -79,10 +79,7 @@ class ArrowWeaveFieldToObject(mappers.Mapper):
             result[k] = v
         result_type = self.result_type()
         for prop_name, prop_type in result_type.variable_property_types().items():
-            # TODO: need a base Const type
-            if isinstance(prop_type, types.ConstString) or isinstance(
-                prop_type, types.ConstNumber
-            ):
+            if isinstance(prop_type, types.Const):
                 result[prop_name] = prop_type.val
         return self.result_type().instance_class(**result)
 
@@ -215,7 +212,7 @@ def map_to_arrow_(type, mapper, artifact, path=[]):
         return NoneToArrowNone(type, mapper, artifact, path)
     elif isinstance(type, types.UnknownType):
         return UnknownToArrowNone(type, mapper, artifact, path)
-    elif isinstance(type, types.ConstString):
+    elif isinstance(type, types.Const):
         return None
     else:
         raise Exception("not implemented", type)

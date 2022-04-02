@@ -146,3 +146,12 @@ class TypeMapper(mappers.Mapper):
 
     def close(self):
         pass
+
+
+class ConstMapper(mappers.Mapper):
+    def __init__(self, type_, mapper, artifact, path):
+        self._type = type_
+        self._val_type = mapper(type_.val_type, artifact, path=path)
+
+    def close(self):
+        self._val_type.close()

@@ -3,6 +3,7 @@ from . import graph
 
 from . import weave_types as types
 from . import client
+from . import op_args
 from . import server
 from . import registry_mem
 from . import lazy
@@ -89,12 +90,15 @@ def make_mapped_op(op_name):
     mapped_op_name = "list-%s" % op_name  # TODO: doesn't handle fqn
 
     op = registry_mem.memory_registry.get_op(op_name)
-    op_param_names = list(op.input_type.keys())
+    if op.input_type.kind != op_args.OpArgs.NAMED_ARGS:
+        raise Exception("Can't make mapped op with non-NAMED_ARGS yet")
+    arg_types = op.input_type.arg_types
+    op_param_names = list(arg_types.keys())
     mapped_param_name = op_param_names[0]
 
     # first argument is mapped, everything else is the same
-    input_types = copy.copy(op.input_type)
-    input_types[mapped_param_name] = types.List(op.input_type[mapped_param_name])
+    input_types = copy.copy(arg_types)
+    input_types[mapped_param_name] = types.List(arg_types[mapped_param_name])
 
     if not callable(op.output_type):
         output_type = types.List(op.output_type)

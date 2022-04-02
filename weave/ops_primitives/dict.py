@@ -24,7 +24,7 @@ from .. import weave_types as types
 
 
 def typeddict_pick_output_type(input_types):
-    if not isinstance(input_types["key"], types.ConstString):
+    if not isinstance(input_types["key"], types.Const):
         return types.UnknownType()
     key = input_types["key"].val
     property_types = input_types["obj"].property_types

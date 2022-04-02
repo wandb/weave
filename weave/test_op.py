@@ -1,8 +1,9 @@
+import pytest
 from . import api as weave
-from . import lazy
 from . import graph
 from . import types
 from . import weave_internal
+from . import test_helpers
 
 
 @weave.op(
@@ -17,14 +18,14 @@ def op_simple(a, b):
 def test_op_simple():
     x = op_simple(3, 4)
     assert str(x) == "op_simple(3, 4)"
-    assert graph.nodes_equal(
+    test_helpers.assert_nodes_equal(
         x,
         graph.OutputNode(
             types.String(),
             "test_op-op_simple",
             {
-                "a": weave_internal.make_const_node(types.Int(), 3),
-                "b": weave_internal.make_const_node(types.Int(), 4),
+                "a": weave_internal.make_const_node(types.Const(types.Int(), 3), 3),
+                "b": weave_internal.make_const_node(types.Const(types.Int(), 4), 4),
             },
         ),
     )
@@ -33,9 +34,7 @@ def test_op_simple():
 
 @weave.op(
     name="test_op-op_kwargs",
-    # TODO: how to declare input type properly? Not like this! Should match the
-    # way Python parameter lists can be typed annotated.
-    input_type=types.Dict(types.String(), types.Int),
+    input_type=weave.OpVarArgs(types.Int()),
     output_type=types.String(),
 )
 def op_kwargs(**kwargs):
@@ -49,15 +48,77 @@ def test_op_kwargs():
 
     # This is correct, we can always store keyword args in the call.
     # This should be called an op_call instead of Op
-    assert graph.nodes_equal(
+    test_helpers.assert_nodes_equal(
         x,
         graph.OutputNode(
             types.String(),
             "test_op-op_kwargs",
             {
-                "a": weave_internal.make_const_node(types.Int(), 1),
-                "b": weave_internal.make_const_node(types.Int(), 2),
+                "a": weave_internal.make_const_node(types.Const(types.Int(), 1), 1),
+                "b": weave_internal.make_const_node(types.Const(types.Int(), 2), 2),
             },
         ),
     )
     assert weave.use(x) == {"a": 1, "b": 2}
+
+
+@weave.op()
+def op_inferredtype(a: int, b: int) -> str:
+    return str(a) + str(b)
+
+
+def test_op_inferred_type():
+    assert op_inferredtype.op_def.input_type == {"a": types.Int(), "b": types.Int()}
+    assert op_inferredtype.op_def.output_type == types.String()
+
+
+def test_op_incompatible_return_type():
+    with pytest.raises(weave.errors.WeaveDefinitionError):
+
+        @weave.op(output_type=types.Int())
+        def op_invalid_returntype(a: int, b: int) -> str:
+            return str(a) + str(b)
+
+
+def test_op_incompatible_input_arg_type():
+    with pytest.raises(weave.errors.WeaveDefinitionError):
+
+        @weave.op(
+            input_type={"a": types.String(), "b": types.Int()}, output_type=types.Int()
+        )
+        def op_invalid_input_arg_type(a: int, b: int) -> str:
+            return str(a) + str(b)
+
+
+def test_op_too_few_input_arg_type():
+    with pytest.raises(weave.errors.WeaveDefinitionError):
+
+        @weave.op(input_type={"a": types.Int()}, output_type=types.Int())
+        def op_invalid_too_few(a: int, b: int) -> str:
+            return str(a) + str(b)
+
+
+def test_op_too_many_input_arg_type():
+    with pytest.raises(weave.errors.WeaveDefinitionError):
+
+        @weave.op(
+            input_type={"a": types.Int(), "b": types.Int(), "c": types.Int()},
+        )
+        def op_invalid_too_many(a: int, b: int) -> str:
+            return str(a) + str(b)
+
+
+def test_op_callable_output_type_and_return_type_declared():
+    with pytest.raises(weave.errors.WeaveDefinitionError):
+
+        @weave.op(input_type={"a": types.Int()}, output_type=lambda a: types.String())
+        def op_callable_output_type_and_return_type_declared(a: int) -> str:
+            return str(a)
+
+
+def test_op_no_return_type():
+    with pytest.raises(weave.errors.WeaveDefinitionError):
+
+        @weave.op(input_type={"a": types.Int()})
+        def op_callable_output_type_and_return_type_declared(a: int):
+            return str(a)
