@@ -1,6 +1,7 @@
 import os
 
 from . import context
+from . import weave_server
 
 import pytest
 
@@ -13,7 +14,7 @@ def pytest_sessionstart(session):
 def fresh_server_logfile():
     def _clearlog():
         try:
-            os.remove(f"/tmp/weave/log/{os.getpid()}.log")
+            os.remove(weave_server.default_log_filename)
         except (OSError, FileNotFoundError):
             pass
 

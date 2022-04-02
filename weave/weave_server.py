@@ -21,11 +21,13 @@ from weave.ecosystem import async_demo
 
 # set up logging
 
+pid = os.getpid()
+default_log_filename = pathlib.Path(f"/tmp/weave/log/{pid}.log")
+
 
 def make_app(log_filename=None, stream_logging_enabled=False):
-    pid = os.getpid()
-    log_file = log_filename or pathlib.Path(f"/tmp/weave/log/{pid}.log")
     fs_logging_enabled = True
+    log_file = log_filename or default_log_filename
 
     try:
         log_file.parent.mkdir(exist_ok=True, parents=True)

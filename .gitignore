@@ -7,4 +7,3 @@ artifacts
 local-artifacts
 weave_internal.egg-info
 weave.egg-info/
-.weave
