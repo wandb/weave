@@ -22,6 +22,9 @@ def await_run_outputs(nodes: typing.List[graph.Node]):
             # Not correct... we'd want to walk these too!
             # TODO: fix
             continue
+        # If the Node type is RunType, but the Op argument it is passed to
+        # is not a RunType, insert an await_final_output operation to convert
+        # the Node from a run to the run's output.
         expected_input_type = op_def.input_type.arg_types[edge.input_name]
         if isinstance(actual_input_type, types.RunType) and not isinstance(
             expected_input_type, types.RunType

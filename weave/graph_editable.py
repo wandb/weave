@@ -3,6 +3,8 @@ import typing
 from . import graph
 
 
+# TODO: Switch this to use Node/Op terminolgy
+# Edge should become EditNode, which is output_of an Op, and input_to an Op
 class Edge:
     def __init__(
         self, output_of: graph.OutputNode, input_to: graph.OutputNode, input_name: str
