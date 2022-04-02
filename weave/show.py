@@ -52,9 +52,10 @@ def _show_params(obj):
         # weave objects and trigger the path above.
         from weave import ops
 
-        # OpenAI FineTune deme notebook relies on this.
-        ref = storage.save(obj.input_node)
-        node = ops.get(str(ref))
+        node = obj.input_node
+        if not isinstance(node, graph.Node):
+            ref = storage.save(obj.input_node)
+            node = ops.get(str(ref))
 
         return {
             "weave_node": node,

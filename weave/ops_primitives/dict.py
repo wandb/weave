@@ -1,4 +1,4 @@
-from ..api import op, weave_class, mutation
+from ..api import op, weave_class, mutation, OpVarArgs
 from .. import weave_types as types
 
 # @op(
@@ -99,10 +99,7 @@ class Dict(dict):
 
 @op(
     name="dict",
-    input_type={
-        # TODO: proper variadic functions
-        "manyX": types.Invalid()
-    },
+    input_type=OpVarArgs(types.Any()),
     output_type=types.TypedDict({}),
 )
 def dict_(**d):
