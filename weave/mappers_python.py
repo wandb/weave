@@ -7,7 +7,6 @@ from . import mappers_numpy
 from . import weave_types as types
 from . import types_numpy
 from . import graph
-from . import errors
 
 
 class TypedDictToPyDict(mappers_weave.TypedDictMapper):
