@@ -66,7 +66,8 @@ def save(obj, name=None, type=None, artifact=None):
     with artifact.new_file("_obj.type.json") as f:
         json.dump(saved_type.to_dict(), f)
     artifact.save()
-    ref = refs.LocalArtifactRef(saved_type, artifact.uri("_obj"), obj)
+    uri = refs.LocalArtifactUri(artifact, "_obj")
+    ref = refs.LocalArtifactRef(saved_type, uri, obj)
     refs.put_ref(obj, ref)
     return ref
 

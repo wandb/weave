@@ -119,7 +119,9 @@ class LocalArtifactRef(Ref):
                 # This is ass-backward, have to get the full object to just
                 # get the ref.
                 # TODO
-                obj = self.uri.artifact.get_other_version_ref(version_name)
+                art = self.uri.artifact.get_other_version(version_name)
+                uri = LocalArtifactUri(art, "_obj")
+                obj = uri.get()
                 ref = get_ref(obj)
                 versions.append(ref)
         return versions
