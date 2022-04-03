@@ -248,6 +248,27 @@ class ConstToPyConst(mappers_weave.ConstMapper):
         return obj
 
 
+# Not ready yet
+# TODO: Fix in this PR
+# class AnyTypeToPyAny(mappers.Mapper):
+#     def __init__(self, type_: types.Type, mapper, artifact, path=[]):
+#         self.type = type_
+#         self._artifact = artifact
+#         self._path = path
+
+#     def result_type(self):
+#         # TODO: return ref type
+#         return self.type
+
+#     def apply(self, obj):
+#         # Can import at top level?
+#         from . import storage
+
+#         name = "-".join(self._path)
+#         ref = storage.save(obj, name=name, artifact=self._artifact)
+#         return ref
+
+
 py_type = type
 
 
@@ -289,7 +310,7 @@ def map_to_python_(type, mapper, artifact, path=[]):
         raise errors.WeaveSerializeError("not implemented %s" % type)
 
 
-def map_from_python_(type, mapper, artifact, path=[]):
+def map_from_python_(type: types.Type, mapper, artifact, path=[]):
     if py_type(type) == types.Type:
         # If we're actually serializing a type itself
         return PyTypeToType(type, mapper, artifact, path)
