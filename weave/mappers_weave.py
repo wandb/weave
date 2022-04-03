@@ -85,67 +85,36 @@ class UnionMapper(mappers.Mapper):
 
 
 class IntMapper(mappers.Mapper):
-    def __init__(self, type_, mapper, artifact, path):
-        pass
-
-    def close(self):
-        pass
+    pass
 
 
 class FloatMapper(mappers.Mapper):
-    def __init__(self, type_, mapper, artifact, path):
-        pass
-
-    def close(self):
-        pass
+    pass
 
 
 class StringMapper(mappers.Mapper):
-    def __init__(self, type_, mapper, artifact, path):
-        pass
-
-    def close(self):
-        pass
+    pass
 
 
 class NoneMapper(mappers.Mapper):
-    def __init__(self, type_, mapper, artifact, path):
-        pass
-
-    def close(self):
-        pass
+    pass
 
 
 class UnknownMapper(mappers.Mapper):
-    def __init__(self, type_, mapper, artifact, path):
-        pass
-
-    def close(self):
-        pass
+    pass
 
 
 class FunctionMapper(mappers.Mapper):
-    def __init__(self, type_, mapper, artifact, path):
-        pass
-
-    def close(self):
-        pass
+    pass
 
 
 class RefMapper(mappers.Mapper):
     def __init__(self, type_, mapper, artifact, path=[]):
         self._object_type = type_.object_type
 
-    def close(self):
-        pass
-
 
 class TypeMapper(mappers.Mapper):
-    def __init__(self, type_: types.Type, mapper, artifact, path=[]):
-        pass
-
-    def close(self):
-        pass
+    pass
 
 
 class ConstMapper(mappers.Mapper):

@@ -115,11 +115,7 @@ class IntToArrowInt(mappers_python.IntToPyInt):
 
 
 class ArrowIntMapper(mappers.Mapper):
-    def __init__(self, type_, mapper, artifact, path):
-        pass
-
-    def close(self):
-        pass
+    pass
 
 
 class ArrowIntToInt(ArrowIntMapper):
@@ -136,11 +132,7 @@ class FloatToArrowFloat(mappers_python.FloatToPyFloat):
 
 
 class ArrowFloatMapper(mappers.Mapper):
-    def __init__(self, type_, mapper, artifact, path):
-        pass
-
-    def close(self):
-        pass
+    pass
 
 
 class ArrowFloatToFloat(ArrowFloatMapper):
@@ -157,11 +149,7 @@ class StringToArrowString(mappers_python.StringToPyString):
 
 
 class ArrowStringMapper(mappers.Mapper):
-    def __init__(self, type_, mapper, artifact, path):
-        pass
-
-    def close(self):
-        pass
+    pass
 
 
 class ArrowStringToString(ArrowStringMapper):
