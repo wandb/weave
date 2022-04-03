@@ -259,6 +259,12 @@ class DefaultToPy(mappers.Mapper):
 
     def apply(self, obj):
         name = "-".join(self._path)
+        # TODO: this saves the artifact.
+        #   - we don't want that!
+        #
+        # OK Python saving kinda sorta works.
+        #    Then need to make python loading work
+        # Then arrow saving, with returning ref from save_instance etc
         ref = storage.save(obj, name=name, artifact=self._artifact)
         return str(ref)
 
@@ -293,8 +299,6 @@ def map_to_python_(type, mapper, artifact, path=[]):
         return UnionToPyUnion(type, mapper, artifact, path)
     elif isinstance(type, types.ObjectType):
         return ObjectToPyDict(type, mapper, artifact, path)
-    elif isinstance(type, types_numpy.NumpyArrayType):
-        return mappers_numpy.NumpyArraySaver(type, mapper, artifact, path)
     elif isinstance(type, types.Int):
         return IntToPyInt(type, mapper, artifact, path)
     elif isinstance(type, types.Float):
@@ -321,8 +325,6 @@ def map_from_python_(type: types.Type, mapper, artifact, path=[]):
     if py_type(type) == types.Type:
         # If we're actually serializing a type itself
         return PyTypeToType(type, mapper, artifact, path)
-    elif isinstance(type, types_numpy.NumpyArrayType):
-        return None
     elif isinstance(type, types_numpy.NumpyArrayRefType):
         mapper1 = ObjectDictToObject(type, mapper, artifact, path)
         mapper2 = mappers_numpy.NumpyArrayLoader(
@@ -331,11 +333,6 @@ def map_from_python_(type: types.Type, mapper, artifact, path=[]):
         return mappers.ChainMapper((mapper1, mapper2))
     elif isinstance(type, types.ObjectType):
         return ObjectDictToObject(type, mapper, artifact, path)
-    # elif isinstance(type, dict):
-    #     if arrow_type.metadata is not None and b'weave_type' in arrow_type.metadata:
-    #         return ArrowWeaveFieldToObject(arrow_type, mapper, artifact, path)
-    #     else:
-    #         return mapper(arrow_type.type, artifact, path)
     elif isinstance(type, types.TypedDict):
         return TypedDictToPyDict(type, mapper, artifact, path)
     elif isinstance(type, types.Dict):
