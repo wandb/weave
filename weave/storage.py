@@ -15,37 +15,6 @@ from . import util
 from . import box
 
 
-# stack of contexts
-context = []
-
-
-class WeaveContext(object):
-    def __init__(self, storage_type):
-        if storage_type == "local_file":
-            self.storage = None
-            # self.storage = LocalFileStorage('/tmp')
-        elif storage_type == "hdf5":
-            self.storage = None
-            # self.storage = H5FileStorage('/tmp')
-        self.object_refs = {}
-
-    def __enter__(self):
-        context.append(self)
-
-    def __exit__(self, exc_type, exc_value, exc_traceback):
-        context.pop()
-
-
-def get_context():
-    if not context:
-        context.append(WeaveContext("local_file"))
-    return context[-1]
-
-
-def get_object_ref(obj):
-    return get_context().object_refs.get(id(obj))
-
-
 # From sdk/interface/artifacts.py
 def md5_hash_file(path):
     hash_md5 = hashlib.md5()

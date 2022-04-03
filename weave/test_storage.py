@@ -31,122 +31,99 @@ class SomeObjType(types.Type):
             return SomeObj(json.load(f))
 
 
-# STORAGE_TYPES = ['local_file', 'hdf5']
-STORAGE_TYPES = ["local_file"]
-# STORAGE_TYPES = ['hdf5']
+def test_dict():
+    obj = {"x": 14}
+    obj_id = storage.save(obj, "my-dict")
+    obj2 = storage.get(obj_id)
+    assert obj == obj2
 
 
-@pytest.mark.parametrize("storage_type", STORAGE_TYPES)
-def test_dict(storage_type):
-    with storage.WeaveContext(storage_type):
-        obj = {"x": 14}
-        obj_id = storage.save(obj, "my-dict")
-        obj2 = storage.get(obj_id)
-        assert obj == obj2
+def test_nested_dict():
+    obj = {"a": 1, "b": {"c": 2}}
+    obj_id = storage.save(obj, "my-dict")
+    obj2 = storage.get(obj_id)
+    assert obj == obj2
 
 
-@pytest.mark.parametrize("storage_type", STORAGE_TYPES)
-def test_nested_dict(storage_type):
-    with storage.WeaveContext(storage_type):
-        obj = {"a": 1, "b": {"c": 2}}
-        obj_id = storage.save(obj, "my-dict")
-        obj2 = storage.get(obj_id)
-        assert obj == obj2
+def test_doubly_nested_dict():
+    np_array = np.array([[4, 5], [6, 7]])
+    obj = {"a": np_array, "b": {"c": np_array, "d": 3}}
+    obj_id = storage.save(obj, "my-dict")
+    obj2 = storage.get(obj_id)
+    assert obj.keys() == obj2.keys()
+    assert np.array_equal(obj["a"], obj2["a"])
+    assert np.array_equal(obj["b"]["c"], obj2["b"]["c"])
+    assert obj["b"]["d"] == obj2["b"]["d"]
 
 
-@pytest.mark.parametrize("storage_type", STORAGE_TYPES)
-def test_doubly_nested_dict(storage_type):
-    with storage.WeaveContext(storage_type):
-        np_array = np.array([[4, 5], [6, 7]])
-        obj = {"a": np_array, "b": {"c": np_array, "d": 3}}
-        obj_id = storage.save(obj, "my-dict")
-        obj2 = storage.get(obj_id)
-        assert obj.keys() == obj2.keys()
-        assert np.array_equal(obj["a"], obj2["a"])
-        assert np.array_equal(obj["b"]["c"], obj2["b"]["c"])
-        assert obj["b"]["d"] == obj2["b"]["d"]
+def test_numpy():
+    np_array = np.array([[4, 5], [6, 7]])
+    obj_id = storage.save(np_array, "my-arr")
+    np_array2 = storage.get(obj_id)
+    assert np.array_equal(np_array, np_array2)
 
 
-@pytest.mark.parametrize("storage_type", STORAGE_TYPES)
-def test_numpy(storage_type):
-    with storage.WeaveContext(storage_type):
-        np_array = np.array([[4, 5], [6, 7]])
-        obj_id = storage.save(np_array, "my-arr")
-        np_array2 = storage.get(obj_id)
-        assert np.array_equal(np_array, np_array2)
+def test_custom_obj():
+    obj = SomeObj({"a": 5})
+    obj_id = storage.save(obj, "my-obj")
+    obj2 = storage.get(obj_id)
+    assert obj.obj == obj2.obj
 
 
-@pytest.mark.parametrize("storage_type", STORAGE_TYPES)
-def test_custom_obj(storage_type):
-    with storage.WeaveContext(storage_type):
-        obj = SomeObj({"a": 5})
-        obj_id = storage.save(obj, "my-obj")
-        obj2 = storage.get(obj_id)
-        assert obj.obj == obj2.obj
-
-
-@pytest.mark.parametrize("storage_type", STORAGE_TYPES)
 @pytest.mark.skip(reason="wb table doesnt work right now")
-def test_wandb_table(storage_type):
-    with storage.WeaveContext(storage_type):
-        obj = SomeObj({"a": 5})
-        obj_id = storage.save(obj, "my-obj")
-        obj2 = storage.get(obj_id)
-        assert obj.obj == obj2.obj
-        table = wandb.Table(["x", "y"])
-        table.add_data(1, 2)
-        table_id = storage.save(table, "my-table")
-        table2 = storage.get(table_id)
-        assert table._eq_debug(table2)
+def test_wandb_table():
+    obj = SomeObj({"a": 5})
+    obj_id = storage.save(obj, "my-obj")
+    obj2 = storage.get(obj_id)
+    assert obj.obj == obj2.obj
+    table = wandb.Table(["x", "y"])
+    table.add_data(1, 2)
+    table_id = storage.save(table, "my-table")
+    table2 = storage.get(table_id)
+    assert table._eq_debug(table2)
 
 
-@pytest.mark.parametrize("storage_type", STORAGE_TYPES)
 @pytest.mark.skip(reason="cross obj refs dont work right now")
-def test_cross_obj_ref(storage_type):
-    with storage.WeaveContext(storage_type):
-        d1 = {"a": 5, "b": SomeObj(14)}
-        d1_id = storage.save(d1, "my-d1")
-        d2 = storage.get(d1_id)
-        d3 = {"f": 5, "c": d2["b"]}
-        d3_id = storage.save(d3, "my-d3")
-        d4 = storage.get(d3_id)
-        assert d4.keys() == d3.keys()
-        assert d3["f"] == d4["f"]
-        assert d3["c"].obj == d4["c"].obj
+def test_cross_obj_ref():
+    d1 = {"a": 5, "b": SomeObj(14)}
+    d1_id = storage.save(d1, "my-d1")
+    d2 = storage.get(d1_id)
+    d3 = {"f": 5, "c": d2["b"]}
+    d3_id = storage.save(d3, "my-d3")
+    d4 = storage.get(d3_id)
+    assert d4.keys() == d3.keys()
+    assert d3["f"] == d4["f"]
+    assert d3["c"].obj == d4["c"].obj
 
 
-@pytest.mark.parametrize("storage_type", STORAGE_TYPES)
 @pytest.mark.skip(reason="cross obj refs dont work right now")
-def test_cross_obj_outer_ref(storage_type):
-    with storage.WeaveContext(storage_type):
-        d1 = {"a": 5, "b": SomeObj(14)}
-        d1_id = storage.save(d1, "my-d1")
-        d2 = storage.get(d1_id)
-        d3 = {"f": 5, "c": d2}
-        d3_id = storage.save(d3, "my-d3")
-        d4 = storage.get(d3_id)
-        assert d4.keys() == d3.keys()
-        assert d3["f"] == d4["f"]
-        assert d3["c"]["a"] == d4["c"]["a"]
-        assert d3["c"]["b"].obj == d4["c"]["b"].obj
+def test_cross_obj_outer_ref():
+    d1 = {"a": 5, "b": SomeObj(14)}
+    d1_id = storage.save(d1, "my-d1")
+    d2 = storage.get(d1_id)
+    d3 = {"f": 5, "c": d2}
+    d3_id = storage.save(d3, "my-d3")
+    d4 = storage.get(d3_id)
+    assert d4.keys() == d3.keys()
+    assert d3["f"] == d4["f"]
+    assert d3["c"]["a"] == d4["c"]["a"]
+    assert d3["c"]["b"].obj == d4["c"]["b"].obj
 
 
-@pytest.mark.parametrize("storage_type", STORAGE_TYPES)
-def test_ref_type(storage_type):
-    with storage.WeaveContext(storage_type):
-        obj = {"x": 14}
-        ref = storage.save(obj, "my-dict")
-        python_ref = storage.to_python(ref)
-        assert python_ref == {
-            "_type": {
-                "objectType": {"propertyTypes": {"x": "int"}, "type": "typedDict"},
-                "type": "ref-type",
-            },
-            "_val": "my-dict/6036cbf3a05809f1a3f174a1485b1770",
-        }
-        ref2 = storage.from_python(python_ref)
-        obj2 = storage.deref(ref2)
-        assert obj == obj2
+def test_ref_type():
+    obj = {"x": 14}
+    ref = storage.save(obj, "my-dict")
+    python_ref = storage.to_python(ref)
+    assert python_ref == {
+        "_type": {
+            "objectType": {"propertyTypes": {"x": "int"}, "type": "typedDict"},
+            "type": "ref-type",
+        },
+        "_val": "my-dict/6036cbf3a05809f1a3f174a1485b1770",
+    }
+    ref2 = storage.from_python(python_ref)
+    obj2 = storage.deref(ref2)
+    assert obj == obj2
 
 
 def test_trace():
