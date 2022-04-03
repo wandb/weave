@@ -9,7 +9,7 @@ def test_nparray():
     ref = storage.save(arr)
     arr2 = ref.get()
     assert (arr == arr2).all()
-    arr3 = storage.get(str(ref.uri))
+    arr3 = storage.get(str(ref))
     assert (arr == arr3).all()
 
 

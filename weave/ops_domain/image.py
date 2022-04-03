@@ -142,7 +142,7 @@ class WBImage:
     )
     def url(image):
         # artifact = tags.get_tag(image, "artifact")
-        artifact = storage.get_ref(image).uri.artifact
+        artifact = storage.get_ref(image).artifact
         # TODO: hack: hardcoding latest here, and an actual internal path
         # This is old code and should be updated
         res = "file://" + os.path.abspath(
@@ -157,7 +157,7 @@ class WBImage:
         ref = storage.get_ref(self)
         artifact_path = f"image-{util.rand_string_n(8)}.png"
         if ref is not None:
-            in_artifact = ref.uri.artifact
+            in_artifact = ref.artifact
             artifact_path = self.path
             with in_artifact.open(self.path, binary=True) as f:
                 contents = f.read()

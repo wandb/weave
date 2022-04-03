@@ -35,7 +35,7 @@ def test_local_artifact_ops():
     im = image.WBImage.from_numpy(np.ones((5, 5)))
     ref = storage.save(im)
 
-    la = artifacts.LocalArtifact(ref.uri.artifact._name, ref.uri.artifact.version)
+    la = artifacts.LocalArtifact(ref.artifact._name, ref.artifact.version)
     im2_node = la.get("_obj")
     im2 = api.use(im2_node)
 
@@ -43,7 +43,7 @@ def test_local_artifact_ops():
     #    that means we have to send them all out of the server.
     # Probably better to disallow as in Weave JS
     ref = storage.get_ref(im2)
-    artifact = ref.uri.artifact
+    artifact = ref.artifact
     # artifact = tags.get_tag(im2, "artifact")
     assert artifact is not None
 
