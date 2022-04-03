@@ -1,6 +1,7 @@
 import math
 
 from . import mappers
+from . import storage
 from . import mappers_weave
 from . import mappers_numpy
 from . import weave_types as types
@@ -206,7 +207,7 @@ class PyFunctionToFunction(mappers_weave.FunctionMapper):
 
 class RefToPyRef(mappers_weave.RefMapper):
     def result_type(self):
-        return types.LocalArtifactRefType(self._object_type.result_type())
+        return types.LocalArtifactRefType(self._object_type)
 
     def apply(self, obj):
         return str(obj)
@@ -214,14 +215,12 @@ class RefToPyRef(mappers_weave.RefMapper):
 
 class PyRefToRef(mappers_weave.RefMapper):
     def result_type(self):
-        return types.LocalArtifactRefType(self._object_type.result_type())
+        return types.LocalArtifactRefType(self._object_type)
 
     def apply(self, obj):
         from . import storage
 
-        return storage.refs.LocalArtifactRef.from_str(
-            obj, type=self._object_type.result_type()
-        )
+        return storage.refs.LocalArtifactRef.from_str(obj, type=self._object_type)
 
 
 class TypeToPyType(mappers_weave.TypeMapper):
@@ -250,23 +249,32 @@ class ConstToPyConst(mappers_weave.ConstMapper):
 
 # Not ready yet
 # TODO: Fix in this PR
-# class AnyTypeToPyAny(mappers.Mapper):
-#     def __init__(self, type_: types.Type, mapper, artifact, path=[]):
-#         self.type = type_
-#         self._artifact = artifact
-#         self._path = path
+class DefaultToPy(mappers.Mapper):
+    def __init__(self, type_: types.Type, mapper, artifact, path=[]):
+        self.type = type_
+        self._artifact = artifact
+        self._path = path
 
-#     def result_type(self):
-#         # TODO: return ref type
-#         return self.type
+    def result_type(self):
+        return self.type
 
-#     def apply(self, obj):
-#         # Can import at top level?
-#         from . import storage
+    def apply(self, obj):
+        name = "-".join(self._path)
+        ref = storage.save(obj, name=name, artifact=self._artifact)
+        return str(ref)
 
-#         name = "-".join(self._path)
-#         ref = storage.save(obj, name=name, artifact=self._artifact)
-#         return ref
+
+class DefaultFromPy(mappers.Mapper):
+    def __init__(self, type_: types.Type, mapper, artifact, path=[]):
+        self.type = type_
+        self._artifact = artifact
+        self._path = path
+
+    def result_type(self):
+        return self.type
+
+    def apply(self, obj):
+        return storage.get(obj)
 
 
 py_type = type
@@ -307,7 +315,7 @@ def map_to_python_(type, mapper, artifact, path=[]):
     elif isinstance(type, types.LocalArtifactRefType):
         return RefToPyRef(type, mapper, artifact, path)
     else:
-        raise errors.WeaveSerializeError("not implemented %s" % type)
+        return DefaultToPy(type, mapper, artifact, path)
 
 
 def map_from_python_(type: types.Type, mapper, artifact, path=[]):
@@ -356,7 +364,7 @@ def map_from_python_(type: types.Type, mapper, artifact, path=[]):
     elif isinstance(type, types.LocalArtifactRefType):
         return PyRefToRef(type, mapper, artifact, path)
     else:
-        raise Exception("not implemented", type)
+        return DefaultFromPy(type, mapper, artifact, path)
 
 
 map_to_python = mappers.make_mapper(map_to_python_)
