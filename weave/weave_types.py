@@ -528,6 +528,8 @@ class List(Type):
             pq.write_table(table, f)
 
         # Save any other objects that resulted from serialization
+        # TODO: can get rid of this and then remove close() from mappers entirely
+        # after switching mappers_numpy to use the new generic object saving approach
         serializer.close()
 
     @classmethod
@@ -618,8 +620,6 @@ class TypedDict(Type):
         result = serializer.apply(obj)
         with artifact.new_file(f"{name}.typedDict.json") as f:
             json.dump(result, f, allow_nan=False)
-        # Save any other objects that resulted from serialization
-        serializer.close()
 
     def load_instance(self, artifact, name):
         # with artifact.open(f'{name}.type.json') as f:
@@ -748,8 +748,6 @@ class ObjectType(Type):
         result = serializer.apply(obj)
         with artifact.new_file(f"{name}.object.json") as f:
             json.dump(result, f, allow_nan=False)
-        # Save any other objects that resulted from serialization
-        serializer.close()
 
     def load_instance(self, artifact, name):
         with artifact.open(f"{name}.object.json") as f:
