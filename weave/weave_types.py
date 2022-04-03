@@ -75,10 +75,7 @@ class TypeRegistry:
             obj_type = type_.type_of(obj)
             if obj_type is not None:
                 return obj_type
-        # Want to raise error here but there are still bugs.
-        # TODO: Fix
-        # raise errors.WeaveTypeError("no type for obj: %s" % obj)
-        return None
+        raise errors.WeaveTypeError("no type for obj: %s" % obj)
 
     @staticmethod
     def type_from_dict(d):
@@ -814,7 +811,7 @@ class LocalArtifactRefType(Type):
         return LocalArtifactRefType(obj.type)
 
     def __str__(self):
-        return "<RefType %s>" % self.object_type
+        return "<LocalArtifactRefType %s>" % self.object_type
 
 
 # TODO: placeholders for now, and a place for table.py

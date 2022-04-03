@@ -96,11 +96,6 @@ class Image(Asset):
 class WBImageType(types.ObjectType):
     name = "image_file"
 
-    type_vars = {}
-
-    def __init__(self):
-        pass
-
     def property_types(self):
         return {
             "format": types.String(),

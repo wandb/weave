@@ -134,10 +134,10 @@ class FunctionMapper(mappers.Mapper):
 
 class RefMapper(mappers.Mapper):
     def __init__(self, type_, mapper, artifact, path=[]):
-        self._object_type = mapper(type_.object_type, artifact, path=path)
+        self._object_type = type_.object_type
 
     def close(self):
-        self._object_type.close()
+        pass
 
 
 class TypeMapper(mappers.Mapper):

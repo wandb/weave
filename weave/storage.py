@@ -47,13 +47,10 @@ def save(obj, name=None, type=None, artifact=None):
     # TODO: get rid of this? Always type check?
     wb_type = type
     if wb_type is None:
-        wb_type = types.TypeRegistry.type_of(obj)
-    if wb_type is None:
-        raise errors.WeaveSerializeError("no weave type for object: ", obj)
-    # print("WB_TYPE", wb_type)
-    if not hasattr(wb_type, "save_instance"):
-        print("NO SAVE INSTANCE", wb_type, obj)
-        return obj
+        try:
+            wb_type = types.TypeRegistry.type_of(obj)
+        except errors.WeaveTypeError:
+            raise errors.WeaveSerializeError("no weave type for object: ", obj)
     obj = box.box(obj)
     if name is None:
         obj_names = util.find_names(obj)

@@ -107,8 +107,8 @@ class DataFrameTableType(types.ObjectType):
 class DataFrameTable(table.Table):
     _df: pandas.DataFrame
 
-    def __init__(self, df):
-        self._df = df
+    def __init__(self, _df):
+        self._df = _df
 
     def _to_list_table(self):
         return table.ListTable([self.index(i) for i in range(self.count())])
