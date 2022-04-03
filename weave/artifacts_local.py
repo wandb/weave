@@ -46,11 +46,10 @@ class LocalArtifact:
             raise Exception("artifact must be saved before calling version!")
         return self._version
 
-    def get_other_version_ref(self, version):
+    def get_other_version(self, version):
         if not local_artifact_exists(self._name, version):
             return None
-        art = LocalArtifact(self._name, version)
-        return art.uri().get()
+        return LocalArtifact(self._name, version)
 
     def _setup_dirs(self):
         self._write_dirname = os.path.join(
@@ -130,6 +129,3 @@ class LocalArtifact:
         if os.path.exists(link_name):
             os.remove(link_name)
         os.symlink(self._version, link_name)
-
-    def uri(self, path=None):
-        return refs.LocalArtifactUri(self, path)
