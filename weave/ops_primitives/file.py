@@ -373,7 +373,7 @@ def local_path(path):
 def op_get_return_type(uri):
     from . import storage
 
-    return storage.LocalArtifactUri.from_str(uri).type
+    return storage.refs.LocalArtifactUri.from_str(uri).type
 
 
 def op_get_return_type_from_inputs(inputs):
