@@ -56,6 +56,16 @@ def test_doubly_nested_dict():
     assert obj["b"]["d"] == obj2["b"]["d"]
 
 
+def test_list_with_arrays():
+    obj = [{"a": np.array([4, 5]), "b": "b0"}, {"a": np.array([9, 10]), "b": "b1"}]
+    obj_id = storage.save(obj, "my-list-with-arrays")
+    obj2 = storage.get(obj_id)
+    assert np.array_equal(obj[0]["a"], obj2[0]["a"])
+    assert np.array_equal(obj[1]["a"], obj2[1]["a"])
+    assert obj[0]["b"] == obj[0]["b"]
+    assert obj[1]["b"] == obj[1]["b"]
+
+
 def test_numpy():
     np_array = np.array([[4, 5], [6, 7]])
     obj_id = storage.save(np_array, "my-arr")

@@ -35,6 +35,7 @@ class LocalArtifact:
         self._name = name
         self._version = version
         self._root = os.path.join("local-artifacts", name)
+        self._path_handlers = {}
         os.makedirs(self._root, exist_ok=True)
         self._setup_dirs()
 
@@ -87,7 +88,17 @@ class LocalArtifact:
         yield f
         f.close()
 
+    def get_path_handler(self, path, handler_constructor):
+        handler = self._path_handlers.get(path)
+        if handler is None:
+            handler = handler_constructor()
+            self._path_handlers[path] = handler
+        return handler
+
     def save(self, branch="latest"):
+        for name, handler in self._path_handlers.items():
+            handler.close(self, name)
+        self._path_handlers = {}
         manifest = {}
         if self._read_dirname:
             for dirpath, dnames, fnames in os.walk(self._read_dirname):

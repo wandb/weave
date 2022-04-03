@@ -33,6 +33,22 @@ class NumpyArrayRefType(types.ObjectType):
         }
 
 
+class NumpyArrayMultiHandler:
+    def __init__(self):
+        self._arrays = []
+
+    def add(self, arr):
+        self._arrays.append(arr)
+
+    def close(self, artifact, name):
+        if len(self._arrays) == 1:
+            arr = self._arrays[0]
+        else:
+            arr = np.array(self._arrays)
+        with artifact.new_file(f"{name}.npz", binary=True) as f:
+            np.savez_compressed(f, arr=arr)
+
+
 class NumpyArrayType(types.Type):
     instance_classes = np.ndarray
     name = "ndarray"
@@ -60,9 +76,11 @@ class NumpyArrayType(types.Type):
         return self
 
     def save_instance(self, obj, artifact, name):
-        with artifact.new_file(f"{name}.npz", binary=True) as f:
-            np.savez_compressed(f, arr=obj)
-
+        handler = artifact.get_path_handler(
+            name, handler_constructor=NumpyArrayMultiHandler
+        )
+        handler.add(obj)
+        # TODO: return extra Ref info
         return self
 
     @classmethod
