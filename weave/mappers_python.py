@@ -209,7 +209,7 @@ class RefToPyRef(mappers_weave.RefMapper):
         return types.LocalArtifactRefType(self._object_type.result_type())
 
     def apply(self, obj):
-        return str(obj.uri)
+        return str(obj)
 
 
 class PyRefToRef(mappers_weave.RefMapper):
@@ -219,8 +219,8 @@ class PyRefToRef(mappers_weave.RefMapper):
     def apply(self, obj):
         from . import storage
 
-        return storage.refs.LocalArtifactRef(
-            self._object_type.result_type(), storage.refs.LocalArtifactUri.from_str(obj)
+        return storage.refs.LocalArtifactRef.from_str(
+            obj, type=self._object_type.result_type()
         )
 
 

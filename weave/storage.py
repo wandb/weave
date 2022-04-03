@@ -66,8 +66,7 @@ def save(obj, name=None, type=None, artifact=None):
     with artifact.new_file("_obj.type.json") as f:
         json.dump(saved_type.to_dict(), f)
     artifact.save()
-    uri = refs.LocalArtifactUri(artifact, "_obj")
-    ref = refs.LocalArtifactRef(saved_type, uri, obj)
+    ref = refs.LocalArtifactRef(artifact, path="_obj", type=saved_type, obj=obj)
     refs.put_ref(obj, ref)
     return ref
 
@@ -75,13 +74,8 @@ def save(obj, name=None, type=None, artifact=None):
 def get(uri_s):
     if isinstance(uri_s, refs.Ref):
         return uri_s.get()
-    uri = refs.LocalArtifactUri.from_str(uri_s)
-    with uri.artifact.open("_obj.type.json") as f:
-        type_json = json.load(f)
-    wb_type = types.TypeRegistry.type_from_dict(type_json)
-    ref = refs.LocalArtifactRef(wb_type, uri)
-    obj = ref.get()
-    return obj
+    ref = refs.LocalArtifactRef.from_str(uri_s)
+    return ref.get()
 
 
 def deref(ref):
@@ -108,8 +102,8 @@ def get_version(name, version):
     if not artifacts_local.local_artifact_exists(name, version):
         return None
     art = artifacts_local.LocalArtifact(name, version)
-    art_uri = refs.LocalArtifactUri(art)
-    return get(str(art_uri))
+    ref = refs.LocalArtifactRef(art, path="_obj")
+    return ref.get()
 
 
 def get_obj_creator(obj_ref):
