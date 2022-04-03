@@ -81,7 +81,6 @@ class NumpyArrayType(types.Type):
         )
         handler.add(obj)
         # TODO: return extra Ref info
-        return self
 
     @classmethod
     def load_instance(cls, artifact, name):

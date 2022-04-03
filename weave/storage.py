@@ -58,12 +58,12 @@ def save(obj, name=None, type=None, artifact=None):
         name = f"{wb_type.name}-{obj_names[-1]}"
     if artifact is None:
         artifact = artifacts_local.LocalArtifact(name)
-    saved_type = wb_type.save_instance(obj, artifact, "_obj")
+    wb_type.save_instance(obj, artifact, "_obj")
     # print("SAVED_TYPE", saved_type)
     with artifact.new_file("_obj.type.json") as f:
-        json.dump(saved_type.to_dict(), f)
+        json.dump(wb_type.to_dict(), f)
     artifact.save()
-    ref = refs.LocalArtifactRef(artifact, path="_obj", type=saved_type, obj=obj)
+    ref = refs.LocalArtifactRef(artifact, path="_obj", type=wb_type, obj=obj)
     refs.put_ref(obj, ref)
     return ref
 
