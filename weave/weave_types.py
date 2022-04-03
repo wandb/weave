@@ -157,7 +157,6 @@ class Type:
             )
         with artifact.new_file(f"{name}.object.json") as f:
             json.dump(obj.to_dict(), f)
-        return Type()
 
     def load_instance(self, artifact, name):
         with artifact.open(f"{name}.object.json") as f:
@@ -173,7 +172,6 @@ class BasicType(Type):
     def save_instance(self, obj, artifact, name):
         with artifact.new_file(f"{name}.object.json") as f:
             json.dump(obj, f)
-        return self
 
     def load_instance(self, artifact, name):
         with artifact.open(f"{name}.object.json") as f:
@@ -208,7 +206,6 @@ class NoneType(BasicType):
             obj = obj.val
         with artifact.new_file(f"{name}.object.json") as f:
             json.dump(obj, f)
-        return self
 
 
 # TODO: use this seminal value all the time! We use it in is_optional()
@@ -294,7 +291,6 @@ class Boolean(BasicType):
             obj = obj.val
         with artifact.new_file(f"{name}.object.json") as f:
             json.dump(obj, f)
-        return self
 
 
 class ConstNumber(Type):
@@ -533,7 +529,6 @@ class List(Type):
 
         # Save any other objects that resulted from serialization
         serializer.close()
-        return self
 
     @classmethod
     def load_instance(cls, artifact, name):
@@ -625,7 +620,6 @@ class TypedDict(Type):
             json.dump(result, f, allow_nan=False)
         # Save any other objects that resulted from serialization
         serializer.close()
-        return serializer.result_type()
 
     def load_instance(self, artifact, name):
         # with artifact.open(f'{name}.type.json') as f:
@@ -756,7 +750,6 @@ class ObjectType(Type):
             json.dump(result, f, allow_nan=False)
         # Save any other objects that resulted from serialization
         serializer.close()
-        return serializer.result_type()
 
     def load_instance(self, artifact, name):
         with artifact.open(f"{name}.object.json") as f:

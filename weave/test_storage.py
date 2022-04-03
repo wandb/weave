@@ -23,7 +23,6 @@ class SomeObjType(types.Type):
     def save_instance(self, obj, artifact, name):
         with artifact.new_file(f"{name}.json") as f:
             json.dump(obj.obj, f)
-        return self
 
     @classmethod
     def load_instance(cls, artifact, name):

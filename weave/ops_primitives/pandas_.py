@@ -81,7 +81,6 @@ class DataFrameType(types.Type):
         table = pa.Table.from_pandas(obj)
         with artifact.new_file(f"{name}.parquet", binary=True) as f:
             pq.write_table(table, f)
-        return DataFrameType()
 
     def load_instance(self, artifact, name):
         with artifact.open(f"{name}.parquet", binary=True) as f:
