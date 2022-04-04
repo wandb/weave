@@ -26,8 +26,13 @@ class ObjectToArrowStruct(mappers_python.ObjectToPyDict):
                 fields.append(arrow_util.arrow_field(property_key, prop_result_type))
         arrow_type = pa.struct(fields)
 
-        metadata = {"weave_type": json.dumps(self._obj_type.to_dict())}
-        return arrow_util.arrow_type_with_metadata(arrow_type, metadata)
+        # We should just be able to return pa.struct directly, but if we do that,
+        # a test fails (test_list_nested_lists_with_objs_1missing). There are a few
+        # issues.
+        # - the detected type of arr in that test is wrong. The field with missing
+        #   SomeObj should be detected as nullable but its not..
+        # - we need to handle nullability and unions here in mappers_arrow
+        return arrow_util.arrow_type_with_metadata(arrow_type, {})
 
 
 class ListToArrowArr(mappers_python.ListToPyList):
@@ -67,8 +72,7 @@ class DefaultToArrow(mappers.Mapper):
         self._path = path
 
     def result_type(self):
-        metadata = {"weave_ref_type": json.dumps(self.type.to_dict())}
-        return arrow_util.arrow_type_with_metadata(pa.string(), metadata)
+        return pa.string()
 
     def apply(self, obj):
         name = "-".join(self._path)

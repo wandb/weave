@@ -175,6 +175,13 @@ def test_list_nested_lists_with_objs_1missing():
     arr2 = ref.get()
     assert arr2[0]["b"][0]["x"] == arr[0]["b"][0]["x"]
     assert arr2[0]["b"][1]["y"] == arr[0]["b"][1]["y"]
+    assert arr2[1]["b"][0]["x"] == arr[1]["b"][0]["x"]
+    assert arr2[1]["b"][1]["x"] == arr[1]["b"][1]["x"]
+
+    # TODO: this is broken!
+    # assert "y" not in arr2[1]["b"][0]
+
+    assert arr2[1]["b"][1]["y"] == arr[1]["b"][1]["y"]
 
 
 def test_serializers():
