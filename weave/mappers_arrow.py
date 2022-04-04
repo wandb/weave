@@ -202,11 +202,7 @@ class DefaultFromArrow(mappers.Mapper):
 
 
 def map_to_arrow_(type, mapper, artifact, path=[]):
-    if isinstance(type, pa.DataType) or isinstance(
-        type, arrow_util.ArrowTypeWithFieldInfo
-    ):
-        return None
-    elif isinstance(type, types.TypedDict):
+    if isinstance(type, types.TypedDict):
         return TypedDictToArrowStruct(type, mapper, artifact, path)
     elif isinstance(type, types.List):
         return ListToArrowArr(type, mapper, artifact, path)
@@ -224,16 +220,12 @@ def map_to_arrow_(type, mapper, artifact, path=[]):
         return NoneToArrowNone(type, mapper, artifact, path)
     elif isinstance(type, types.UnknownType):
         return UnknownToArrowNone(type, mapper, artifact, path)
-    elif isinstance(type, types.Const):
-        return None
     else:
         return DefaultToArrow(type, mapper, artifact, path)
 
 
 def map_from_arrow_(arrow_type, mapper, artifact, path=[]):
-    if isinstance(arrow_type, types.Type):
-        return None
-    elif isinstance(arrow_type, pa.Field):
+    if isinstance(arrow_type, pa.Field):
         if arrow_type.metadata is not None and b"weave_type" in arrow_type.metadata:
             return ArrowWeaveFieldToObject(arrow_type, mapper, artifact, path)
         elif (
