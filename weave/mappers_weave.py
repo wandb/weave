@@ -34,18 +34,6 @@ class ObjectMapper(mappers.Mapper):
         self._property_serializers = prop_serializers
 
 
-class ObjectDictMapper(mappers.Mapper):
-    def __init__(self, type_, mapper, artifact, path=[]):
-        prop_serializers = {}
-        for property_key, property_type in type_.property_types().items():
-            prop_serializer = mapper(
-                property_type, artifact, path=path + [property_key]
-            )
-            prop_serializers[property_key] = prop_serializer
-        self._obj_type = type_
-        self._property_serializers = prop_serializers
-
-
 class ListMapper(mappers.Mapper):
     def __init__(self, type_, mapper, artifact, path=[]):
         self._object_type = mapper(type_.object_type, artifact, path=path)
