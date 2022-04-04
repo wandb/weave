@@ -414,7 +414,7 @@ class ArrowTableList(Iterable):
     def __init__(self, arrow_table, mapper, artifact):
         self._arrow_table = arrow_table
         self._artifact = artifact
-        self._deserializer = mapper(self._arrow_table.schema, artifact)
+        self._deserializer = mapper
 
     def __getitem__(self, index):
         if index >= self._arrow_table.num_rows:
@@ -504,6 +504,7 @@ class List(Type):
         from . import mappers_arrow
 
         serializer = mappers_arrow.map_to_arrow(obj_type, artifact)
+        print("SERIALIZER", serializer)
 
         pyarrow_type = serializer.result_type()
 
@@ -527,8 +528,7 @@ class List(Type):
                 )
             pq.write_table(table, f)
 
-    @classmethod
-    def load_instance(cls, artifact, name, extra=None):
+    def load_instance(self, artifact, name, extra=None):
         from . import mappers_arrow
 
         with artifact.open(f"{name}.parquet", binary=True) as f:
@@ -539,9 +539,8 @@ class List(Type):
             ):
                 return ArrowArrayList(table.column("_singleton"))
 
-            atl = ArrowTableList(
-                pq.read_table(f), mappers_arrow.map_from_arrow, artifact
-            )
+            mapper = mappers_arrow.map_from_arrow(self.object_type, artifact)
+            atl = ArrowTableList(pq.read_table(f), mapper, artifact)
 
             # Convert back to pure python. We're jumping through a lot of
             # hoops to get to get this point. What we actually want is for
