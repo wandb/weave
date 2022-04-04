@@ -9,12 +9,6 @@ from . import graph
 
 
 class TypedDictToPyDict(mappers_weave.TypedDictMapper):
-    def result_type(self):
-        property_types = {}
-        for k, v in self._property_serializers.items():
-            property_types[k] = v.result_type()
-        return types.TypedDict(property_types)
-
     def apply(self, obj):
         result = {}
         for k, v in obj.items():
@@ -24,11 +18,6 @@ class TypedDictToPyDict(mappers_weave.TypedDictMapper):
 
 
 class DictToPyDict(mappers_weave.DictMapper):
-    def result_type(self):
-        return types.Dict(
-            self.key_serializer.result_type(), self.value_serializer.result_type()
-        )
-
     def apply(self, obj):
         result = {}
         for k, v in obj.items():
@@ -39,16 +28,6 @@ class DictToPyDict(mappers_weave.DictMapper):
 
 
 class ObjectToPyDict(mappers_weave.ObjectMapper):
-    def result_type(self):
-        property_types = {}
-        for k, type_var_type in self._obj_type.variable_property_types().items():
-            property_serializer = self._property_serializers[k]
-            if property_serializer is None:
-                property_types[k] = type_var_type
-            else:
-                property_types[k] = property_serializer.result_type()
-        return self._obj_type.__class__(**property_types)
-
     def apply(self, obj):
         try:
             obj.save_to_artifact(self._artifact)
@@ -63,42 +42,24 @@ class ObjectToPyDict(mappers_weave.ObjectMapper):
 
 
 class ObjectDictToObject(mappers_weave.ObjectMapper):
-    def result_type(self):
-        property_types = {}
-        for k, type_var_type in self._obj_type.variable_property_types().items():
-            property_serializer = self._property_serializers[k]
-            if property_serializer is None:
-                property_types[k] = type_var_type
-            else:
-                property_types[k] = property_serializer.result_type()
-        return self._obj_type.__class__(**property_types)
-
     def apply(self, obj):
         result = obj
         for k, serializer in self._property_serializers.items():
             v = serializer.apply(obj[k])
             result[k] = v
-        result_type = self.result_type()
+        result_type = self._obj_type
         for prop_name, prop_type in result_type.variable_property_types().items():
             if isinstance(prop_type, types.Const):
                 result[prop_name] = prop_type.val
-        return self.result_type().instance_class(**result)
+        return result_type.instance_class(**result)
 
 
 class ListToPyList(mappers_weave.ListMapper):
-    def result_type(self):
-        return types.List(self._object_type.result_type())
-
     def apply(self, obj):
         return [self._object_type.apply(item) for item in obj]
 
 
 class UnionToPyUnion(mappers_weave.UnionMapper):
-    def result_type(self):
-        return types.UnionType(
-            *[mem_mapper.result_type() for mem_mapper in self._member_mappers]
-        )
-
     def apply(self, obj):
         obj_type = types.TypeRegistry.type_of(obj)
         for i, (member_type, member_mapper) in enumerate(
@@ -115,11 +76,6 @@ class UnionToPyUnion(mappers_weave.UnionMapper):
 
 
 class PyUnionToUnion(mappers_weave.UnionMapper):
-    def result_type(self):
-        return types.UnionType(
-            *[mem_mapper.result_type() for mem_mapper in self._member_mappers]
-        )
-
     def apply(self, obj):
         member_index = obj["_union_id"]
         if "_val" in obj:
@@ -130,17 +86,11 @@ class PyUnionToUnion(mappers_weave.UnionMapper):
 
 
 class IntToPyInt(mappers_weave.IntMapper):
-    def result_type(self):
-        return types.Int()
-
     def apply(self, obj):
         return obj
 
 
 class FloatToPyFloat(mappers_weave.FloatMapper):
-    def result_type(self):
-        return types.Float()
-
     def apply(self, obj):
         if math.isnan(obj):
             return "nan"
@@ -148,9 +98,6 @@ class FloatToPyFloat(mappers_weave.FloatMapper):
 
 
 class PyFloatToFloat(mappers_weave.FloatMapper):
-    def result_type(self):
-        return types.Float()
-
     def apply(self, obj):
         if isinstance(obj, str):
             if obj == "nan":
@@ -159,25 +106,16 @@ class PyFloatToFloat(mappers_weave.FloatMapper):
 
 
 class StringToPyString(mappers_weave.StringMapper):
-    def result_type(self):
-        return types.String()
-
     def apply(self, obj):
         return obj
 
 
 class NoneToPyNone(mappers_weave.NoneMapper):
-    def result_type(self):
-        return types.none_type
-
     def apply(self, obj):
         return None
 
 
 class UnknownToPyUnknown(mappers_weave.NoneMapper):
-    def result_type(self):
-        return types.UnknownType()
-
     def apply(self, obj):
         # This should never be called. Unknown for the object type
         # of empty lists
@@ -185,36 +123,23 @@ class UnknownToPyUnknown(mappers_weave.NoneMapper):
 
 
 class FunctionToPyFunction(mappers_weave.FunctionMapper):
-    def result_type(self):
-        return types.String()
-
     def apply(self, obj):
         # Obj is graph.Node
         return obj.to_json()
 
 
 class PyFunctionToFunction(mappers_weave.FunctionMapper):
-    def result_type(self):
-        # TODO: seems wrong to have Any() here
-        return types.Function(types.Any(), types.Any())
-
     def apply(self, obj):
         # Obj is graph.Node
         return graph.Node.node_from_json(obj)
 
 
 class RefToPyRef(mappers_weave.RefMapper):
-    def result_type(self):
-        return types.LocalArtifactRefType(self._object_type)
-
     def apply(self, obj):
         return str(obj)
 
 
 class PyRefToRef(mappers_weave.RefMapper):
-    def result_type(self):
-        return types.LocalArtifactRefType(self._object_type)
-
     def apply(self, obj):
         from . import storage
 
@@ -222,25 +147,16 @@ class PyRefToRef(mappers_weave.RefMapper):
 
 
 class TypeToPyType(mappers_weave.TypeMapper):
-    def result_type(self):
-        return types.Type()
-
     def apply(self, obj):
         return obj.to_dict()
 
 
 class PyTypeToType(mappers_weave.TypeMapper):
-    def result_type(self):
-        return types.Type()
-
     def apply(self, obj):
         return types.TypeRegistry.type_from_dict(obj)
 
 
 class ConstToPyConst(mappers_weave.ConstMapper):
-    def result_type(self):
-        return self._type
-
     def apply(self, obj):
         return obj
 
@@ -250,9 +166,6 @@ class DefaultToPy(mappers.Mapper):
         self.type = type_
         self._artifact = artifact
         self._path = path
-
-    def result_type(self):
-        return self.type
 
     def apply(self, obj):
         name = "-".join(self._path)
@@ -268,9 +181,6 @@ class DefaultFromPy(mappers.Mapper):
         self.type = type_
         self._artifact = artifact
         self._path = path
-
-    def result_type(self):
-        return self.type
 
     def apply(self, obj):
         return refs.LocalArtifactRef.from_local_ref(
