@@ -3,10 +3,10 @@ import pyarrow as pa
 
 from . import mappers
 from . import mappers_python
-from . import mappers_numpy
 from . import arrow_util
 from . import weave_types as types
-from . import types_numpy
+from . import storage
+from . import refs
 
 
 class TypedDictToArrowStruct(mappers_python.TypedDictToPyDict):
@@ -175,6 +175,43 @@ class UnknownToArrowNone(mappers_python.UnknownToPyUnknown):
         return pa.null()
 
 
+class DefaultToArrow(mappers.Mapper):
+    def __init__(self, type_: types.Type, mapper, artifact, path=[]):
+        self.type = type_
+        self._artifact = artifact
+        self._path = path
+
+    def result_type(self):
+        metadata = {"weave_ref_type": json.dumps(self.type.to_dict())}
+        return arrow_util.arrow_type_with_metadata(pa.string(), metadata)
+
+    def apply(self, obj):
+        name = "-".join(self._path)
+        ref = storage.save_to_artifact(
+            obj, artifact=self._artifact, name=name, type_=self.type
+        )
+        local_ref_str = ref.local_ref_str()
+        return local_ref_str
+
+
+class DefaultFromArrow(mappers.Mapper):
+    def __init__(self, type_, mapper, artifact, path=[]):
+        self.type = type_
+        self._result_type = types.TypeRegistry.type_from_dict(
+            json.loads(type_.metadata[b"weave_ref_type"])
+        )
+        self._artifact = artifact
+        self._path = path
+
+    def result_type(self):
+        return self._result_type
+
+    def apply(self, obj):
+        return refs.LocalArtifactRef.from_local_ref(
+            self._artifact, obj, self._result_type
+        ).get()
+
+
 def map_to_arrow_(type, mapper, artifact, path=[]):
     if isinstance(type, pa.DataType) or isinstance(
         type, arrow_util.ArrowTypeWithFieldInfo
@@ -186,8 +223,8 @@ def map_to_arrow_(type, mapper, artifact, path=[]):
         return ListToArrowArr(type, mapper, artifact, path)
     elif isinstance(type, types.ObjectType):
         return ObjectToArrowStruct(type, mapper, artifact, path)
-    elif isinstance(type, types_numpy.NumpyArrayType):
-        return mappers_numpy.NumpyArraySaver(type, mapper, artifact, path)
+    # elif isinstance(type, types_numpy.NumpyArrayType):
+    #     return mappers_numpy.NumpyArraySaver(type, mapper, artifact, path)
     elif isinstance(type, types.Int):
         return IntToArrowInt(type, mapper, artifact, path)
     elif isinstance(type, types.Float):
@@ -203,17 +240,19 @@ def map_to_arrow_(type, mapper, artifact, path=[]):
     elif isinstance(type, types.Const):
         return None
     else:
-        raise Exception("not implemented", type)
+        return DefaultToArrow(type, mapper, artifact, path)
 
 
 def map_from_arrow_(arrow_type, mapper, artifact, path=[]):
     if isinstance(arrow_type, types.Type):
-        if isinstance(arrow_type, types_numpy.NumpyArrayRefType):
-            return mappers_numpy.NumpyArrayLoader(arrow_type, mapper, artifact, path)
         return None
     elif isinstance(arrow_type, pa.Field):
         if arrow_type.metadata is not None and b"weave_type" in arrow_type.metadata:
             return ArrowWeaveFieldToObject(arrow_type, mapper, artifact, path)
+        elif (
+            arrow_type.metadata is not None and b"weave_ref_type" in arrow_type.metadata
+        ):
+            return DefaultFromArrow(arrow_type, mapper, artifact, path)
         else:
             return mapper(arrow_type.type, artifact, path)
     elif isinstance(arrow_type, pa.Schema) or pa.types.is_struct(arrow_type):

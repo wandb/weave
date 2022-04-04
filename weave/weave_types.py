@@ -938,3 +938,7 @@ def python_type_to_type(py_type: type) -> Type:
     # This won't work for non-Basic types that need to be initialized!
     # TODO
     return leaf_type()
+
+
+# Ensure numpy types are loaded
+from . import types_numpy

@@ -245,8 +245,6 @@ class ConstToPyConst(mappers_weave.ConstMapper):
         return obj
 
 
-# Not ready yet
-# TODO: Fix in this PR
 class DefaultToPy(mappers.Mapper):
     def __init__(self, type_: types.Type, mapper, artifact, path=[]):
         self.type = type_
