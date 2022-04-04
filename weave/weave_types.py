@@ -527,11 +527,6 @@ class List(Type):
                 )
             pq.write_table(table, f)
 
-        # Save any other objects that resulted from serialization
-        # TODO: can get rid of this and then remove close() from mappers entirely
-        # after switching mappers_numpy to use the new generic object saving approach
-        serializer.close()
-
     @classmethod
     def load_instance(cls, artifact, name, extra=None):
         from . import mappers_arrow

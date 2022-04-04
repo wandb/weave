@@ -25,10 +25,6 @@ class ArrowStructMapper(mappers.Mapper):
             prop_serializers[field.name] = mapper(field, artifact, path)
         self._property_serializers = prop_serializers
 
-    def close(self):
-        for ser in self._property_serializers.values():
-            ser.close()
-
 
 class ArrowStructToTypedDict(ArrowStructMapper):
     def result_type(self):
@@ -68,10 +64,6 @@ class ArrowWeaveFieldToObject(mappers.Mapper):
     def result_type(self):
         return types.TypeRegistry.type_from_dict(self._type_dict)
 
-    def close(self):
-        # TODO: This needs to call close on children
-        pass
-
     def apply(self, obj):
         result = {}
         for k, v in obj.items():
@@ -96,9 +88,6 @@ class ArrowListMapper(mappers.Mapper):
         if value_field.metadata is not None and b"weave_type" in value_field.metadata:
             object_type = ArrowWeaveFieldToObject(value_field, mapper, artifact, path)
         self._object_type = object_type
-
-    def close(self):
-        self._object_type.close()
 
 
 class ArrowArrToList(ArrowListMapper):

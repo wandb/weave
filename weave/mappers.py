@@ -8,9 +8,6 @@ class Mapper:
     def apply(self, obj):
         return obj
 
-    def close(self):
-        pass
-
 
 class ChainMapper(Mapper):
     def __init__(self, serializers):
@@ -18,10 +15,6 @@ class ChainMapper(Mapper):
 
     def result_type(self):
         return self._serializers[-1].result_type()
-
-    def close(self):
-        for serializer in self._serializers:
-            serializer.close()
 
     def apply(self, obj):
         for serializer in self._serializers:
