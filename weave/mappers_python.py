@@ -4,9 +4,7 @@ from . import mappers
 from . import storage
 from . import refs
 from . import mappers_weave
-from . import mappers_numpy
 from . import weave_types as types
-from . import types_numpy
 from . import graph
 
 
@@ -325,12 +323,6 @@ def map_from_python_(type: types.Type, mapper, artifact, path=[]):
     if py_type(type) == types.Type:
         # If we're actually serializing a type itself
         return PyTypeToType(type, mapper, artifact, path)
-    elif isinstance(type, types_numpy.NumpyArrayRefType):
-        mapper1 = ObjectDictToObject(type, mapper, artifact, path)
-        mapper2 = mappers_numpy.NumpyArrayLoader(
-            mapper1.result_type(), mapper, artifact, path
-        )
-        return mappers.ChainMapper((mapper1, mapper2))
     elif isinstance(type, types.ObjectType):
         return ObjectDictToObject(type, mapper, artifact, path)
     elif isinstance(type, types.TypedDict):
