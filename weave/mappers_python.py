@@ -81,19 +81,19 @@ class PyUnionToUnion(mappers_weave.UnionMapper):
         return self._member_mappers[member_index].apply(obj)
 
 
-class IntToPyInt(mappers_weave.IntMapper):
+class IntToPyInt(mappers.Mapper):
     def apply(self, obj):
         return obj
 
 
-class FloatToPyFloat(mappers_weave.FloatMapper):
+class FloatToPyFloat(mappers.Mapper):
     def apply(self, obj):
         if math.isnan(obj):
             return "nan"
         return obj
 
 
-class PyFloatToFloat(mappers_weave.FloatMapper):
+class PyFloatToFloat(mappers.Mapper):
     def apply(self, obj):
         if isinstance(obj, str):
             if obj == "nan":
@@ -101,30 +101,30 @@ class PyFloatToFloat(mappers_weave.FloatMapper):
         return obj
 
 
-class StringToPyString(mappers_weave.StringMapper):
+class StringToPyString(mappers.Mapper):
     def apply(self, obj):
         return obj
 
 
-class NoneToPyNone(mappers_weave.NoneMapper):
+class NoneToPyNone(mappers.Mapper):
     def apply(self, obj):
         return None
 
 
-class UnknownToPyUnknown(mappers_weave.NoneMapper):
+class UnknownToPyUnknown(mappers.Mapper):
     def apply(self, obj):
         # This should never be called. Unknown for the object type
         # of empty lists
         raise Exception("invalid")
 
 
-class FunctionToPyFunction(mappers_weave.FunctionMapper):
+class FunctionToPyFunction(mappers.Mapper):
     def apply(self, obj):
         # Obj is graph.Node
         return obj.to_json()
 
 
-class PyFunctionToFunction(mappers_weave.FunctionMapper):
+class PyFunctionToFunction(mappers.Mapper):
     def apply(self, obj):
         # Obj is graph.Node
         return graph.Node.node_from_json(obj)
@@ -142,12 +142,12 @@ class PyRefToRef(mappers_weave.RefMapper):
         return storage.refs.LocalArtifactRef.from_str(obj, type=self._object_type)
 
 
-class TypeToPyType(mappers_weave.TypeMapper):
+class TypeToPyType(mappers.Mapper):
     def apply(self, obj):
         return obj.to_dict()
 
 
-class PyTypeToType(mappers_weave.TypeMapper):
+class PyTypeToType(mappers.Mapper):
     def apply(self, obj):
         return types.TypeRegistry.type_from_dict(obj)
 

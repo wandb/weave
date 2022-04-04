@@ -59,37 +59,9 @@ class UnionMapper(mappers.Mapper):
         ]
 
 
-class IntMapper(mappers.Mapper):
-    pass
-
-
-class FloatMapper(mappers.Mapper):
-    pass
-
-
-class StringMapper(mappers.Mapper):
-    pass
-
-
-class NoneMapper(mappers.Mapper):
-    pass
-
-
-class UnknownMapper(mappers.Mapper):
-    pass
-
-
-class FunctionMapper(mappers.Mapper):
-    pass
-
-
 class RefMapper(mappers.Mapper):
     def __init__(self, type_, mapper, artifact, path=[]):
         self._object_type = type_.object_type
-
-
-class TypeMapper(mappers.Mapper):
-    pass
 
 
 class ConstMapper(mappers.Mapper):
