@@ -94,8 +94,6 @@ def map_to_arrow_(type, mapper, artifact, path=[]):
         return IntToArrowInt(type, mapper, artifact, path)
     elif isinstance(type, types.Float):
         return FloatToArrowFloat(type, mapper, artifact, path)
-    elif isinstance(type, types.Number):
-        return IntToArrowInt(type, mapper, artifact, path)
     elif isinstance(type, types.String):
         return StringToArrowString(type, mapper, artifact, path)
     elif isinstance(type, types.NoneType):
@@ -117,8 +115,6 @@ def map_from_arrow_(type, mapper, artifact, path=[]):
         return mappers_python.IntToPyInt(type, mapper, artifact, path)
     elif isinstance(type, types.Float):
         return mappers_python.FloatToPyFloat(type, mapper, artifact, path)
-    elif isinstance(type, types.Number):
-        return mappers_python.IntToPyInt(type, mapper, artifact, path)
     elif isinstance(type, types.String):
         return mappers_python.StringToPyString(type, mapper, artifact, path)
     elif isinstance(type, types.NoneType):

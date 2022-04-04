@@ -94,7 +94,7 @@ class WBImageType(types.ObjectType):
             "format": types.String(),
             "path": types.String(),
             "sha256": types.String(),
-            "size": types.Number(),
+            "size": types.Int(),
             # TODO: either mark optional, or have a different version
             #     of this object when its actually saved
             # But doing this forces an artifact ref on all serialized WBImage
