@@ -29,10 +29,6 @@ class DictToPyDict(mappers_weave.DictMapper):
 
 class ObjectToPyDict(mappers_weave.ObjectMapper):
     def apply(self, obj):
-        try:
-            obj.save_to_artifact(self._artifact)
-        except AttributeError:
-            pass
         result = {}
         for prop_name, prop_serializer in self._property_serializers.items():
             if prop_serializer is not None:
