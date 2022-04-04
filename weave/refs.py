@@ -1,3 +1,4 @@
+from collections.abc import Iterable
 import typing
 import os
 import json
@@ -5,6 +6,7 @@ from urllib.parse import urlparse
 
 from . import artifacts_local
 from . import weave_types as types
+from . import errors
 from . import box
 
 
@@ -30,13 +32,16 @@ def put_ref(obj, ref):
 class LocalArtifactRef(Ref):
     artifact: "artifacts_local.LocalArtifact"
 
-    def __init__(self, artifact, path=None, type=None, obj=None):
+    def __init__(self, artifact, path, type=None, obj=None, extra=None):
         self.artifact = artifact
         self.path = path
+        if "/" in self.path:
+            raise errors.WeaveInternalError('"/" in path not yet supported')
         if self.path is None:
-            self.path = "_obj"
+            raise errors.WeaveInternalError("path must not be None")
         self._type = type
         self.obj = obj
+        self.extra = extra
 
     @property
     def type(self):
@@ -48,7 +53,7 @@ class LocalArtifactRef(Ref):
         return self._type
 
     def get(self) -> typing.Any:
-        obj = self.type.load_instance(self.artifact, self.path)
+        obj = self.type.load_instance(self.artifact, self.path, extra=self.extra)
         obj = box.box(obj)
         put_ref(obj, self)
         return obj
@@ -81,34 +86,63 @@ class LocalArtifactRef(Ref):
         # if url.scheme != "local-artifact":
         #     raise Exception("invalid")
         # artifact_root, path = split_path_dotfile(url.path, ".wandb-artifact")
+
         if "/" not in s:
             return cls(artifacts_local.LocalArtifact(s), path="_obj", type=type)
+
         parts = s.split("/", 2)
-        if len(parts) == 2:
-            return cls(
-                artifacts_local.LocalArtifact(parts[0], version=parts[1]),
-                path="_obj",
-                type=type,
-            )
+        if len(parts) == 3:
+            path_extra_part = parts[2]
+        else:
+            path_extra_part = "_obj"
+        path, extra = cls.parse_local_ref_str(path_extra_part)
         return cls(
             artifacts_local.LocalArtifact(parts[0], version=parts[1]),
-            path=parts[2],
+            path=path,
             type=type,
+            extra=extra,
         )
+
+    @classmethod
+    def from_local_ref(cls, artifact, s, type):
+        path, extra = cls.parse_local_ref_str(s)
+        return cls(artifact, path=path, extra=extra, type=type)
+
+    @classmethod
+    def parse_local_ref_str(cls, s):
+        parts = s.split("/")
+        path = parts[0]
+        if len(parts) == 1:
+            extra = None
+        elif len(parts) == 2:
+            extra = parts[1]
+        else:
+            extra = parts[1:]
+        return path, extra
+
+    def local_ref_str(self):
+        parts = []
+        if self.path != "_obj" or self.extra is not None:
+            parts.append(self.path)
+        if self.extra is not None:
+            if isinstance(self.extra, Iterable):
+                for comp in self.extra:
+                    parts.append(str(comp))
+            else:
+                parts.append(str(self.extra))
+        return "/".join(parts)
 
     def __str__(self):
         # TODO: this is no good! We always refer to "latest"
         #    but we should actually refer to specific versions.
         # But then when we're mutating, we need to know which branch to
         #    mutate...
-        artifact_version = self.artifact._name + "/" + self.artifact.version
-        if self.path == "_obj":
-            return artifact_version
-        return artifact_version + "/" + self.path
-        # artifact_uri = f"local-artifact://{self.artifact.abs_root}"
-        # if self.path is not None:
-        #     return f"{artifact_uri}/{self.path}"
-        # return artifact_uri
+        # TODO: Use full URI
+        components = [self.artifact._name, self.artifact.version]
+        path = self.local_ref_str()
+        if path:
+            components.append(path)
+        return "/".join(components)
 
 
 types.LocalArtifactRefType.instance_class = LocalArtifactRef

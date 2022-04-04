@@ -33,20 +33,31 @@ class NumpyArrayRefType(types.ObjectType):
         }
 
 
-class NumpyArrayMultiHandler:
-    def __init__(self):
+class NumpyArraySaver:
+    def __init__(self, artifact, name):
+        self._artifact = artifact
+        self._name = name
         self._arrays = []
 
     def add(self, arr):
         self._arrays.append(arr)
+        return len(self._arrays) - 1
 
-    def close(self, artifact, name):
-        if len(self._arrays) == 1:
-            arr = self._arrays[0]
-        else:
-            arr = np.array(self._arrays)
-        with artifact.new_file(f"{name}.npz", binary=True) as f:
+    def close(self):
+        arr = np.array(self._arrays)
+        with self._artifact.new_file(f"{self._name}.npz", binary=True) as f:
             np.savez_compressed(f, arr=arr)
+
+
+class NumpyArrayLoader:
+    def __init__(self, artifact, name):
+        self._artifact = artifact
+        self._name = name
+        with artifact.open(f"{name}.npz", binary=True) as f:
+            self._arr = np.load(f)["arr"]
+
+    def get(self, index):
+        return self._arr[index]
 
 
 class NumpyArrayType(types.Type):
@@ -76,16 +87,15 @@ class NumpyArrayType(types.Type):
         return self
 
     def save_instance(self, obj, artifact, name):
-        handler = artifact.get_path_handler(
-            name, handler_constructor=NumpyArrayMultiHandler
-        )
-        handler.add(obj)
-        # TODO: return extra Ref info
+        handler = artifact.get_path_handler(name, handler_constructor=NumpyArraySaver)
+        index = handler.add(obj)
+        return index
 
     @classmethod
-    def load_instance(cls, artifact, name):
-        with artifact.open(f"{name}.npz", binary=True) as f:
-            return np.load(f)["arr"]
+    def load_instance(cls, artifact, name, extra=None):
+        index = int(extra)
+        handler = artifact.get_path_handler(name, handler_constructor=NumpyArrayLoader)
+        return handler.get(index)
 
     def __str__(self):
         return "<NumpyArrayType %s %s>" % (self.dtype, self.shape)

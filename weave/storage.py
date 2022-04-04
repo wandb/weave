@@ -43,7 +43,16 @@ def save_mem(obj, name):
     return MemRef(name)
 
 
-def save(obj, name=None, type=None, artifact=None):
+def save_to_artifact(obj, artifact, name, type_):
+    ref_extra = type_.save_instance(obj, artifact, name)
+    with artifact.new_file(f"{name}.type.json") as f:
+        json.dump(type_.to_dict(), f)
+    return refs.LocalArtifactRef(
+        artifact, path=name, type=type_, obj=obj, extra=ref_extra
+    )
+
+
+def save(obj, name=None, type=None):
     # TODO: get rid of this? Always type check?
     wb_type = type
     if wb_type is None:
@@ -56,14 +65,9 @@ def save(obj, name=None, type=None, artifact=None):
         obj_names = util.find_names(obj)
         # name = f"{wb_type.name}-{obj_names[-1]}-{util.rand_string_n(10)}"
         name = f"{wb_type.name}-{obj_names[-1]}"
-    if artifact is None:
-        artifact = artifacts_local.LocalArtifact(name)
-    wb_type.save_instance(obj, artifact, "_obj")
-    # print("SAVED_TYPE", saved_type)
-    with artifact.new_file("_obj.type.json") as f:
-        json.dump(wb_type.to_dict(), f)
+    artifact = artifacts_local.LocalArtifact(name)
+    ref = save_to_artifact(obj, artifact, "_obj", wb_type)
     artifact.save()
-    ref = refs.LocalArtifactRef(artifact, path="_obj", type=wb_type, obj=obj)
     refs.put_ref(obj, ref)
     return ref
 

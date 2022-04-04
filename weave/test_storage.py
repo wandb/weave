@@ -25,7 +25,7 @@ class SomeObjType(types.Type):
             json.dump(obj.obj, f)
 
     @classmethod
-    def load_instance(cls, artifact, name):
+    def load_instance(cls, artifact, name, extra=None):
         with artifact.open(f"{name}.json") as f:
             return SomeObj(json.load(f))
 
