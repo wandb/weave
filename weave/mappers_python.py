@@ -205,8 +205,6 @@ def map_to_python_(type, mapper, artifact, path=[]):
         return IntToPyInt(type, mapper, artifact, path)
     elif isinstance(type, types.Float):
         return FloatToPyFloat(type, mapper, artifact, path)
-    elif isinstance(type, types.Number):
-        return IntToPyInt(type, mapper, artifact, path)
     elif isinstance(type, types.String):
         return StringToPyString(type, mapper, artifact, path)
     elif isinstance(type, types.Const):
@@ -241,8 +239,6 @@ def map_from_python_(type: types.Type, mapper, artifact, path=[]):
         return IntToPyInt(type, mapper, artifact, path)
     elif isinstance(type, types.Float):
         return PyFloatToFloat(type, mapper, artifact, path)
-    elif isinstance(type, types.Number):
-        return IntToPyInt(type, mapper, artifact, path)
     elif isinstance(type, types.String):
         return StringToPyString(type, mapper, artifact, path)
     elif isinstance(type, types.Const):
