@@ -158,7 +158,7 @@ class Type:
         with artifact.new_file(f"{name}.object.json") as f:
             json.dump(obj.to_dict(), f)
 
-    def load_instance(self, artifact, name):
+    def load_instance(self, artifact, name, extra=None):
         with artifact.open(f"{name}.object.json") as f:
             result = json.load(f)
         return TypeRegistry.type_from_dict(result)
@@ -173,7 +173,7 @@ class BasicType(Type):
         with artifact.new_file(f"{name}.object.json") as f:
             json.dump(obj, f)
 
-    def load_instance(self, artifact, name):
+    def load_instance(self, artifact, name, extra=None):
         with artifact.open(f"{name}.object.json") as f:
             return json.load(f)
 
@@ -533,7 +533,7 @@ class List(Type):
         serializer.close()
 
     @classmethod
-    def load_instance(cls, artifact, name):
+    def load_instance(cls, artifact, name, extra=None):
         from . import mappers_arrow
 
         with artifact.open(f"{name}.parquet", binary=True) as f:
@@ -621,7 +621,7 @@ class TypedDict(Type):
         with artifact.new_file(f"{name}.typedDict.json") as f:
             json.dump(result, f, allow_nan=False)
 
-    def load_instance(self, artifact, name):
+    def load_instance(self, artifact, name, extra=None):
         # with artifact.open(f'{name}.type.json') as f:
         #     obj_type = TypeRegistry.type_from_dict(json.load(f))
         with artifact.open(f"{name}.typedDict.json") as f:
@@ -749,7 +749,7 @@ class ObjectType(Type):
         with artifact.new_file(f"{name}.object.json") as f:
             json.dump(result, f, allow_nan=False)
 
-    def load_instance(self, artifact, name):
+    def load_instance(self, artifact, name, extra=None):
         with artifact.open(f"{name}.object.json") as f:
             result = json.load(f)
         from . import mappers_python

@@ -91,13 +91,13 @@ class LocalArtifact:
     def get_path_handler(self, path, handler_constructor):
         handler = self._path_handlers.get(path)
         if handler is None:
-            handler = handler_constructor()
+            handler = handler_constructor(self, path)
             self._path_handlers[path] = handler
         return handler
 
     def save(self, branch="latest"):
-        for name, handler in self._path_handlers.items():
-            handler.close(self, name)
+        for handler in self._path_handlers.values():
+            handler.close()
         self._path_handlers = {}
         manifest = {}
         if self._read_dirname:

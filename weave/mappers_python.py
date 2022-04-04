@@ -2,6 +2,7 @@ import math
 
 from . import mappers
 from . import storage
+from . import refs
 from . import mappers_weave
 from . import mappers_numpy
 from . import weave_types as types
@@ -259,14 +260,11 @@ class DefaultToPy(mappers.Mapper):
 
     def apply(self, obj):
         name = "-".join(self._path)
-        # TODO: this saves the artifact.
-        #   - we don't want that!
-        #
-        # OK Python saving kinda sorta works.
-        #    Then need to make python loading work
-        # Then arrow saving, with returning ref from save_instance etc
-        ref = storage.save(obj, name=name, artifact=self._artifact)
-        return str(ref)
+        ref = storage.save_to_artifact(
+            obj, artifact=self._artifact, name=name, type_=self.type
+        )
+        local_ref_str = ref.local_ref_str()
+        return local_ref_str
 
 
 class DefaultFromPy(mappers.Mapper):
@@ -279,7 +277,9 @@ class DefaultFromPy(mappers.Mapper):
         return self.type
 
     def apply(self, obj):
-        return storage.get(obj)
+        return refs.LocalArtifactRef.from_local_ref(
+            self._artifact, obj, self.type
+        ).get()
 
 
 py_type = type
