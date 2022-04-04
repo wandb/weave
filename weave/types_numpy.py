@@ -2,37 +2,6 @@ import numpy as np
 from . import weave_types as types
 
 
-class NumpyArrayRef:
-    def __init__(self, path, index):
-        self.path = path
-        self.index = index
-
-
-class NumpyArrayRefType(types.ObjectType):
-    name = "numpyarrayref"
-    instance_classes = NumpyArrayRef
-    instance_class = NumpyArrayRef
-
-    type_vars = {
-        # This is not NumpyArrayType!
-        #   its Type<NumpyArrayType> Or something like that
-        # Have recursion here with result_type, need to fix
-        # 'result_type': Type(),
-        "path": types.String(),
-    }
-
-    def __init__(self, path):
-        # self.result_type = result_type
-        self.path = path
-
-    def property_types(self):
-        return {
-            # 'result_type': self.result_type,
-            "path": self.path,
-            "index": types.Number(),
-        }
-
-
 class NumpyArraySaver:
     def __init__(self, artifact, name):
         self._artifact = artifact
