@@ -212,8 +212,6 @@ def map_to_arrow_(type, mapper, artifact, path=[]):
         return ListToArrowArr(type, mapper, artifact, path)
     elif isinstance(type, types.ObjectType):
         return ObjectToArrowStruct(type, mapper, artifact, path)
-    # elif isinstance(type, types_numpy.NumpyArrayType):
-    #     return mappers_numpy.NumpyArraySaver(type, mapper, artifact, path)
     elif isinstance(type, types.Int):
         return IntToArrowInt(type, mapper, artifact, path)
     elif isinstance(type, types.Float):
