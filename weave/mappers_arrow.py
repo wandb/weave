@@ -45,9 +45,20 @@ class IntToArrowInt(mappers_python.IntToPyInt):
         return pa.int64()
 
 
-class FloatToArrowFloat(mappers_python.FloatToPyFloat):
+class FloatToArrowFloat(mappers.Mapper):
     def result_type(self):
         return pa.float64()
+
+    def apply(self, obj):
+        return obj
+
+
+class ArrowFloatToFloat(mappers.Mapper):
+    def result_type(self):
+        return types.Float()
+
+    def apply(self, obj):
+        return obj
 
 
 class StringToArrowString(mappers_python.StringToPyString):
@@ -114,7 +125,7 @@ def map_from_arrow_(type, mapper, artifact, path=[]):
     elif isinstance(type, types.Int):
         return mappers_python.IntToPyInt(type, mapper, artifact, path)
     elif isinstance(type, types.Float):
-        return mappers_python.FloatToPyFloat(type, mapper, artifact, path)
+        return ArrowFloatToFloat(type, mapper, artifact, path)
     elif isinstance(type, types.String):
         return mappers_python.StringToPyString(type, mapper, artifact, path)
     elif isinstance(type, types.NoneType):
