@@ -1,5 +1,9 @@
+import os
 import logging
+from logging.config import dictConfig
+from logging.handlers import WatchedFileHandler
 import pathlib
+import warnings
 
 from flask import Flask
 from flask import request
@@ -12,14 +16,73 @@ from weave import registry_mem
 from weave import op_args
 from weave import errors
 
+from flask.logging import wsgi_errors_stream
+
 # Ensure we register the openai ops so we can tell the
 # app about them with list_ops
 from weave.ecosystem import openai
 from weave.ecosystem import async_demo
 
-app = Flask(__name__, static_folder="frontend")
-log = logging.getLogger("werkzeug")
-log.setLevel(logging.ERROR)
+# set up logging
+
+pid = os.getpid()
+default_log_filename = pathlib.Path(f"/tmp/weave/log/{pid}.log")
+log_format = "[%(asctime)s] %(levelname)s in %(module)s (Thread Name: %(threadName)s): %(message)s"
+
+
+def enable_stream_logging(level=logging.INFO):
+    logger = logging.getLogger("root")
+    stream_handler = logging.StreamHandler(wsgi_errors_stream)
+    stream_handler.setLevel(level)
+    formatter = logging.Formatter(log_format)
+    stream_handler.setFormatter(formatter)
+    logger.addHandler(stream_handler)
+
+
+def make_app(log_filename=None, stream_logging_enabled=False):
+    fs_logging_enabled = True
+    log_file = log_filename or default_log_filename
+
+    try:
+        log_file.parent.mkdir(exist_ok=True, parents=True)
+        log_file.touch(exist_ok=True)
+    except OSError:
+        warnings.warn(
+            f"weave: Unable to touch logfile at '{log_file}'. Filesystem logging will be disabled for "
+            f"the remainder of this session. To enable filesystem logging, ensure the path is writable "
+            f"and restart the server."
+        )
+        fs_logging_enabled = False
+
+    logging_config = {
+        "version": 1,
+        "formatters": {
+            "default": {
+                "format": log_format,
+            }
+        },
+        "handlers": {
+            "wsgi_file": {
+                "class": "logging.handlers.WatchedFileHandler",
+                "filename": log_file,
+                "formatter": "default",
+            },
+        },
+        "root": {
+            "level": "INFO",
+            "handlers": ["wsgi_file"] if fs_logging_enabled else [],
+        },
+    }
+
+    dictConfig(logging_config)
+
+    if stream_logging_enabled:
+        enable_stream_logging()
+
+    return Flask(__name__, static_folder="frontend")
+
+
+app = make_app()
 CORS(app)
 
 
