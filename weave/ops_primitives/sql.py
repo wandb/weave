@@ -27,6 +27,10 @@ class SqlConnection(object):
         return SqlTable(self, self.meta.tables[name])
 
 
+SqlConnectionType.instance_class = SqlConnection
+SqlConnectionType.instance_classes = SqlConnection
+
+
 def filter_fn_to_sql_filter(table, filter_fn_node):
     if isinstance(filter_fn_node, graph.ConstNode):
         return filter_fn_node.val

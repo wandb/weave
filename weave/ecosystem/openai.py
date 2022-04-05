@@ -69,7 +69,7 @@ class Gpt3DatasetType(StoredFileType):
     type_vars = {}
 
     def __init__(self):
-        self.purpose = weave.types.ConstString("fine-tune")
+        self.purpose = weave.types.Const(weave.types.String(), "fine-tune")
 
 
 # TODO: we can make a storage manager for OpenAI Files that
@@ -104,7 +104,7 @@ class Gpt3FineTuneResultsType(StoredFileType):
     type_vars = {}
 
     def __init__(self):
-        self.purpose = weave.types.ConstString("fine-tune-results")
+        self.purpose = weave.types.Const(weave.types.String(), "fine-tune-results")
 
 
 # TODO: we can make a storage manager for OpenAI Files that
@@ -211,6 +211,16 @@ class Gpt3Model:
         ),
     )
     def complete(self, prompt):
+        sleep = 1
+        for _ in range(5):
+            try:
+                return openai.Completion.create(model=self.id, prompt=prompt)
+            except openai.error.RateLimitError:
+                # This error occurs if a model is newly trained or hasn't
+                # been queried for awhile, while the OpenAI backend loads
+                # it up.
+                time.sleep(sleep)
+                sleep *= 2
         return openai.Completion.create(model=self.id, prompt=prompt)
 
 
@@ -246,7 +256,7 @@ class Gpt3FineTune:
     @weave.mutation
     def update(self):
         fine_tune = openai.FineTune.retrieve(id=self.id)
-        print("FINE_TUNE", fine_tune)
+        # print("FINE_TUNE", fine_tune)
         self.status = fine_tune["status"]
         self.fine_tuned_model = fine_tune["fine_tuned_model"]
         self.result_file = None
@@ -266,49 +276,6 @@ class Gpt3FineTune:
 
 Gpt3FineTuneType.instance_classes = Gpt3FineTune
 Gpt3FineTuneType.instance_class = Gpt3FineTune
-
-
-def do_finetune_gpt3_run(run, config):
-    print("!!! RUNNING FINE TUNE CREATE !!!")
-    run.print("Creating fine tune")
-    resp = openai.FineTune.create(**config["create_args"])
-    fine_tune = Gpt3FineTune(
-        id=resp["id"],
-        status=resp["status"],
-        fine_tuned_model=resp["fine_tuned_model"],
-        result_file=None,
-    )
-    while True:
-        fine_tune.update()
-        time.sleep(3)
-        run.print("Fine_tune status: %s" % fine_tune.status)
-        if fine_tune.status == "succeeded":
-            break
-    run.set_output(fine_tune)
-
-
-# TODO: this should probably output the model directly
-def do_finetune_gpt3_run_demo(run, config):
-    print("!!! USING FINE TUNE DEMO STUB, NOT REALLY FINE-TUNING !!!")
-    run.print("Creating fine tune")
-    resp = {"id": "asdf", "status": "running", "fine_tuned_model": None}
-    fine_tune = Gpt3FineTune(
-        id=resp["id"],
-        status=resp["status"],
-        fine_tuned_model=resp["fine_tuned_model"],
-        result_file=None,
-    )
-    i = 0
-    while True:
-        run.print("Fine_tune status: running")
-        i += 1
-        if i == 6:
-            fine_tune.fine_tuned_model = "ada:ft-wandb-2021-10-05-23-25-22"
-            fine_tune.status = "succeeded"
-            run.print("Fine_tune status: succeeded")
-            break
-        time.sleep(3)
-    run.set_output(fine_tune)
 
 
 @weave.op(
@@ -336,7 +303,53 @@ def do_finetune_gpt3_run_demo(run, config):
 def finetune_gpt3(training_dataset, hyperparameters, _run=None):
     from .. import api
 
-    print("!!! USING FINE TUNE DEMO STUB, NOT REALLY FINE-TUNING !!!")
+    uploaded = weave.use(upload_gpt3_dataset(training_dataset))
+    create_args = {"training_file": uploaded.id}
+    for k, v in hyperparameters.items():
+        create_args[k] = v
+    api.use(_run.print_("Creating fine tune"))
+    resp = openai.FineTune.create(**create_args)
+    fine_tune = Gpt3FineTune(
+        id=resp["id"],
+        status=resp["status"],
+        fine_tuned_model=resp["fine_tuned_model"],
+        result_file=None,
+    )
+    while True:
+        fine_tune.update()
+        time.sleep(3)
+        api.use(_run.print_("Fine_tune status: %s" % fine_tune.status))
+        if fine_tune.status == "succeeded":
+            break
+    api.use(_run.set_output(fine_tune))
+
+
+@weave.op(
+    render_info={"type": "function"},
+    name="openai-finetunegpt3",
+    input_type={
+        "training_dataset": weave.types.List(
+            weave.types.TypedDict(
+                {"prompt": weave.types.String(), "completion": weave.types.String()}
+            )
+        ),
+        "hyperparameters": weave.types.TypedDict(
+            {
+                "n_epochs": weave.types.Int(),
+                # "learning_rate_multiplier": weave.types.Float(),
+            }
+        ),
+    },
+    output_type=weave.types.RunType(
+        weave.types.TypedDict({}),
+        weave.types.List(weave.types.Any()),
+        Gpt3FineTuneType(),
+    ),
+)
+def finetune_gpt3_demo(training_dataset, hyperparameters, _run=None):
+    from .. import api
+
+    print("!!! FINE TUNE DEMO, NOT REALLY FINE-TUNING !!!")
     api.use(_run.print_("Creating fine tune"))
     resp = {
         "id": str(training_dataset._ref) + str(json.dumps(hyperparameters)),

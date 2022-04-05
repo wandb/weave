@@ -13,6 +13,8 @@ from flask import send_from_directory
 
 from weave import server
 from weave import registry_mem
+from weave import op_args
+from weave import errors
 
 from flask.logging import wsgi_errors_stream
 
@@ -89,24 +91,10 @@ def list_ops():
     ops = registry_mem.memory_registry.list_ops()
     ret = []
     for op in ops:
-        if callable(op.output_type):
-            # print("NOT registering op: ", op.name)
-            # skip these for now. add back in later.
-            continue
-        # print("Registering op: ", op.name)
-
-        input_types = {key: op.input_type[key].to_dict() for key in op.input_type}
-
-        output_type = op.output_type.to_dict()
-
-        serialized = {
-            "name": op.name,
-            "input_types": input_types,
-            "output_type": output_type,
-        }
-        if op.render_info is not None:
-            serialized["render_info"] = op.render_info
-        ret.append(serialized)
+        try:
+            ret.append(op.to_dict())
+        except errors.WeaveSerializeError:
+            pass
     return {"data": ret}
 
 

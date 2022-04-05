@@ -25,7 +25,8 @@ def test_show_simple_call():
                             "path": {
                                 "nodeType": "const",
                                 "type": {
-                                    "type": "const-string",
+                                    "type": "const",
+                                    "valType": "string",
                                     "val": "/tmp/cereal.csv",
                                 },
                                 "val": "/tmp/cereal.csv",
@@ -49,12 +50,17 @@ def test_show_simple_call():
 
 EXPECTED_SHOW_PARAMS_FINE_TUNE_WEAVE_NODE = {
     "fromOp": {
+        "name": "openai-finetunegpt3",
         "inputs": {
             "hyperparameters": {
                 "nodeType": "const",
                 "type": {
-                    "propertyTypes": {"n_epochs": "int"},
-                    "type": "typedDict",
+                    "type": "const",
+                    "valType": {
+                        "type": "typedDict",
+                        "propertyTypes": {"n_epochs": "int"},
+                    },
+                    "val": {"n_epochs": 2},
                 },
                 "val": {"n_epochs": 2},
             },
@@ -64,7 +70,8 @@ EXPECTED_SHOW_PARAMS_FINE_TUNE_WEAVE_NODE = {
                         "uri": {
                             "nodeType": "const",
                             "type": {
-                                "type": "const-string",
+                                "type": "const",
+                                "valType": "string",
                                 "val": "list-dataset/5826f76113017729abd9aeeef0a14831",
                             },
                             "val": "list-dataset/5826f76113017729abd9aeeef0a14831",
@@ -86,7 +93,6 @@ EXPECTED_SHOW_PARAMS_FINE_TUNE_WEAVE_NODE = {
                 },
             },
         },
-        "name": "openai-finetunegpt3",
     },
     "nodeType": "output",
     "type": {
@@ -111,6 +117,8 @@ def test_large_const_node():
     storage.save(dataset)
     fine_tune = openai.finetune_gpt3(dataset, {"n_epochs": 2})
     show_fine_tune_params = _show_params(fine_tune)
+
+    print("JSON", show_fine_tune_params["weave_node"].to_json())
 
     assert (
         show_fine_tune_params["weave_node"].to_json()

@@ -4,21 +4,15 @@ from .. import weave_types as types
 
 @op(
     name="root-string",
-    input_type={
-        "v": types.String(),
-    },
-    output_type=types.String(),
 )
-def string(v):
+def string(v: str) -> str:
     return v
 
 
 @op(
     name="string-lastLetter",
-    input_type={"v": types.String()},
-    output_type=types.String(),
 )
-def lastLetter(v):
+def lastLetter(v: str) -> str:
     return v[-1]
 
 

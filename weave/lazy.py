@@ -9,12 +9,7 @@ def _ensure_node(v):
     if not isinstance(v, graph.Node):
         val_type = types.TypeRegistry.type_of(v)
         # TODO: should type-check v here.
-        # TODO: make all Const nodes into Const Types!
-        # TODO: need to do this in api as well
-        if isinstance(val_type, types.String):
-            v = graph.ConstNode(types.ConstString(v), v)
-        else:
-            v = graph.ConstNode(val_type, v)
+        v = graph.ConstNode(types.Const(val_type, v), v)
     return v
 
 

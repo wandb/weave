@@ -272,7 +272,7 @@ def path_type(path):
         return DirType()
     else:
         ext = path_ext(path)
-        return types.LocalFileType(extension=types.ConstString(ext))
+        return types.LocalFileType(extension=types.Const(types.String(), ext))
 
 
 def open_(path):
@@ -345,7 +345,7 @@ DirType.instance_class = Dir
 
 def op_file_open_return_type(input_types):
     path = input_types["path"]
-    if not isinstance(path, types.ConstString):
+    if not isinstance(path, types.Const):
         return types.UnionType(types.LocalFileType(), DirType())
     else:
         return path_type(path.val)
@@ -373,7 +373,7 @@ def local_path(path):
 def op_get_return_type(uri):
     from . import storage
 
-    return storage.LocalArtifactUri.from_str(uri).type
+    return storage.refs.LocalArtifactRef.from_str(uri).type
 
 
 def op_get_return_type_from_inputs(inputs):

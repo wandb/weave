@@ -38,7 +38,7 @@ def test_run():
     assert saved_output == "some-output"
 
 
-@pytest.mark.timeout(3)
+@pytest.mark.timeout(1.5)
 def test_automatic_await():
     import shutil
 
@@ -52,7 +52,7 @@ def test_automatic_await():
     assert api.use(twenty_four.await_final_output()) == 24
 
 
-@pytest.mark.timeout(3)
+@pytest.mark.timeout(1.5)
 def test_stable_when_fetching_input():
     import shutil
 
@@ -72,7 +72,7 @@ def test_stable_when_fetching_input():
     assert run_id1 == run_id2
 
 
-@pytest.mark.timeout(3)
+@pytest.mark.timeout(1.5)
 def test_run_ops():
     twelve = async_demo.slowmult(3, 4, 0.01)
 
@@ -81,7 +81,7 @@ def test_run_ops():
     api.use(twelve + 9) == 21
 
 
-@pytest.mark.timeout(3)
+@pytest.mark.timeout(1.5)
 def test_async_op_expr():
     import shutil
 
@@ -98,5 +98,5 @@ def test_async_op_expr():
     version0 = api.versions(saved_model)[0]
     assert (
         str(api.expr(version0))
-        == 'get("list-dataset/1214862bae4cb3c78b12af10412b29eb").train().trainresult-model().save("model")'
+        == 'get("list-dataset/9af42f7b9600f6f2636be8959e5f1ab8").train().trainresult-model().save("model")'
     )

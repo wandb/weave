@@ -1,23 +1,18 @@
 from . import weave_types as types
 
 
-def test_typeof_const_string():
+def test_typeof_string():
     t = types.TypeRegistry.type_of("x")
-    assert t == types.ConstString("x")
+    assert t == types.String()
 
 
 def test_typeof_list_const_string():
     t = types.TypeRegistry.type_of(["x"])
-    assert t == types.List(types.ConstString("x"))
-
-
-def test_typeof_list_string():
-    t = types.TypeRegistry.type_of(["x", "y"])
     assert t == types.List(types.String())
 
 
 def test_serialize_const_string():
-    t = types.ConstString("x")
+    t = types.Const(types.String(), "x")
     ser = t.to_dict()
     deser = types.TypeRegistry.type_from_dict(ser)
     assert t == deser

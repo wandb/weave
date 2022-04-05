@@ -12,6 +12,10 @@ _weave_client: contextvars.ContextVar[
     typing.Optional[client.Client]
 ] = contextvars.ContextVar("weave_client", default=None)
 
+_frontend_url: contextvars.ContextVar[typing.Optional[str]] = contextvars.ContextVar(
+    "frontend_url", default=None
+)
+
 
 _analytics_enabled: contextvars.ContextVar[bool] = contextvars.ContextVar(
     "analytics_enabled", default=True
@@ -56,7 +60,13 @@ def use_fixed_server_port():
     _weave_client.set(server.HttpServerClient(s.url))
 
 
-def enable_devmode(log_level=logging.INFO):
+def use_frontend_devmode():
+    """Talk to external server running on 9994"""
+    _weave_client.set(server.HttpServerClient("http://localhost:9994"))
+    _frontend_url.set("https://app.wandb.test")
+
+
+def capture_weave_server_logs(log_level=logging.INFO):
     from . import weave_server
 
     weave_server.enable_stream_logging(log_level)
@@ -68,6 +78,13 @@ def get_client():
         c = _make_default_client()
         _weave_client.set(c)
     return c
+
+
+def get_frontend_url():
+    url = _frontend_url.get()
+    if url is None:
+        url = get_client().url
+    return url
 
 
 def analytics_enabled():

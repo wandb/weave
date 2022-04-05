@@ -52,8 +52,13 @@ def _show_params(obj):
         # weave objects and trigger the path above.
         from weave import ops
 
+        node = obj.input_node
+        if not isinstance(node, graph.Node):
+            ref = storage.save(obj.input_node)
+            node = ops.get(str(ref))
+
         return {
-            "weave_node": obj.input_node,
+            "weave_node": node,
             "panel_id": obj.id,
             "panel_config": obj.config,
         }
@@ -71,18 +76,10 @@ def show(obj):
             "a weave node, try `weave.use()`."
         )
 
-    # Must call this for its side-effect of starting an http server
-    # for us!
-    client = context.get_client()
-
-    if not isinstance(client, server.HttpServerClient):
-        raise RuntimeError(
-            "`weave.show()` can only be called within environments with a backing "
-            "HTTP weave server."
-        )
-
     params = _show_params(obj)
-    panel_url = f"{client.url}/__frontend/weave_jupyter/index.html?fullScreen"
+    panel_url = (
+        f"{context.get_frontend_url()}/__frontend/weave_jupyter/index.html?fullScreen"
+    )
     if "weave_node" in params:
         panel_url += "&expNode=%s" % urllib.parse.quote(
             json.dumps(params["weave_node"].to_json())

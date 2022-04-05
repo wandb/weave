@@ -2,7 +2,7 @@ from collections.abc import Mapping
 import json
 import hashlib
 import typing
-from . import registry_mem
+from . import op_def
 from . import storage
 import random
 
@@ -14,7 +14,7 @@ def value_id(val):
     return hash.hexdigest()
 
 
-def make_run_id(op_def: registry_mem.OpDef, inputs_refs: Mapping[str, typing.Any]):
+def make_run_id(op_def: op_def.OpDef, inputs_refs: Mapping[str, typing.Any]):
     if not op_def.pure:
         hash_val = random.random()
     else:

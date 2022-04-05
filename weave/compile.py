@@ -1,5 +1,6 @@
 import typing
 
+from . import op_args
 from . import weave_types as types
 from . import graph
 from . import graph_editable
@@ -17,10 +18,14 @@ def await_run_outputs(nodes: typing.List[graph.Node]):
     for edge in edit_g.edges:
         actual_input_type = edge.output_of.type
         op_def = registry_mem.memory_registry.get_op(edge.input_to.from_op.name)
-        if op_def.has_varargs:
-            # TODO: This is not
+        if op_def.input_type.kind != op_args.OpArgs.NAMED_ARGS:
+            # Not correct... we'd want to walk these too!
+            # TODO: fix
             continue
-        expected_input_type = op_def.input_type[edge.input_name]
+        # If the Node type is RunType, but the Op argument it is passed to
+        # is not a RunType, insert an await_final_output operation to convert
+        # the Node from a run to the run's output.
+        expected_input_type = op_def.input_type.arg_types[edge.input_name]
         if isinstance(actual_input_type, types.RunType) and not isinstance(
             expected_input_type, types.RunType
         ):
