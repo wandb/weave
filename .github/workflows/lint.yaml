@@ -11,7 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - uses: psf/black@stable
+      - uses: actions/setup-python@v3
         with:
-          options: "--check --verbose"
-          version: "22.3.0"
+          python-version: '3.9'
+
+      - run: pip install -r requirements.dev.txt && pre-commit run --all-files
