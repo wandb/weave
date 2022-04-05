@@ -12,7 +12,7 @@ from . import test_helpers
     output_type=types.String(),
 )
 def op_simple(a, b):
-    return (a, b)
+    return str(a) + str(b)
 
 
 def test_op_simple():
@@ -29,7 +29,7 @@ def test_op_simple():
             },
         ),
     )
-    assert weave.use(x) == (3, 4)
+    assert weave.use(x) == "34"
 
 
 @weave.op(

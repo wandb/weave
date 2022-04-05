@@ -1,12 +1,13 @@
 import json
 import math
 import pandas
+import pyarrow as pa
+import pyarrow.parquet as pq
 import numpy
 
-from ..api import op
+from ..api import op, weave_class
 from .. import weave_types as types
 from . import table
-from . import file
 from .. import graph
 
 # Hack hack hack
@@ -68,11 +69,45 @@ def numpy_val_to_python(val):
     return val
 
 
-class DataFrame(table.Table):
+class DataFrameType(types.Type):
+    instance_classes = pandas.DataFrame
+    name = "dataframe"
+
+    @classmethod
+    def type_of_instance(cls, obj):
+        return cls()
+
+    def save_instance(self, obj, artifact, name):
+        table = pa.Table.from_pandas(obj)
+        with artifact.new_file(f"{name}.parquet", binary=True) as f:
+            pq.write_table(table, f)
+
+    def load_instance(self, artifact, name, extra=None):
+        with artifact.open(f"{name}.parquet", binary=True) as f:
+            table = pq.read_table(f)
+        return table.to_pandas()
+
+
+class DataFrameTableType(types.ObjectType):
+    name = "dataframeTable"
+
+    type_vars = {"_df": DataFrameType()}
+
+    def __init__(self, _df):
+        self._df = _df
+
+    def property_types(self):
+        return {
+            "_df": self._df,
+        }
+
+
+@weave_class(weave_type=DataFrameTableType)
+class DataFrameTable(table.Table):
     _df: pandas.DataFrame
 
-    def __init__(self, df):
-        self._df = df
+    def __init__(self, _df):
+        self._df = _df
 
     def _to_list_table(self):
         return table.ListTable([self.index(i) for i in range(self.count())])
@@ -95,7 +130,7 @@ class DataFrame(table.Table):
         return self._to_list_table().map(mapFn)
 
     def filter(self, filterFn):
-        return DataFrame(self._df[filter_fn_to_pandas_filter(self._df, filterFn)])
+        return DataFrameTable(self._df[filter_fn_to_pandas_filter(self._df, filterFn)])
 
     def groupby(self, groupByFn):
         group_keys = None
@@ -126,6 +161,10 @@ class DataFrame(table.Table):
         # return self._to_list_table().groupby(groupByFn)
 
 
+DataFrameTableType.instance_classes = DataFrameTable
+DataFrameTableType.instance_class = DataFrameTable
+
+
 @op(
     name="file-pandasreadcsv",
     input_type={"file": types.FileType()},
@@ -136,6 +175,6 @@ def file_pandasreadcsv(file):
     local_path = file.get_local_path()
     # Warning, terrible hack to make demo work
     try:
-        return DataFrame(pandas.read_csv(local_path))
+        return DataFrameTable(pandas.read_csv(local_path))
     except:
-        return DataFrame(pandas.read_csv(local_path, delimiter=";"))
+        return DataFrameTable(pandas.read_csv(local_path, delimiter=";"))

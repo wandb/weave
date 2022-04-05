@@ -2,35 +2,31 @@ import numpy as np
 from . import weave_types as types
 
 
-class NumpyArrayRef:
-    def __init__(self, path, index):
-        self.path = path
-        self.index = index
+class NumpyArraySaver:
+    def __init__(self, artifact, name):
+        self._artifact = artifact
+        self._name = name
+        self._arrays = []
+
+    def add(self, arr):
+        self._arrays.append(arr)
+        return len(self._arrays) - 1
+
+    def close(self):
+        arr = np.array(self._arrays)
+        with self._artifact.new_file(f"{self._name}.npz", binary=True) as f:
+            np.savez_compressed(f, arr=arr)
 
 
-class NumpyArrayRefType(types.ObjectType):
-    name = "numpyarrayref"
-    instance_classes = NumpyArrayRef
-    instance_class = NumpyArrayRef
+class NumpyArrayLoader:
+    def __init__(self, artifact, name):
+        self._artifact = artifact
+        self._name = name
+        with artifact.open(f"{name}.npz", binary=True) as f:
+            self._arr = np.load(f)["arr"]
 
-    type_vars = {
-        # This is not NumpyArrayType!
-        #   its Type<NumpyArrayType> Or something like that
-        # Have recursion here with result_type, need to fix
-        # 'result_type': Type(),
-        "path": types.String(),
-    }
-
-    def __init__(self, path):
-        # self.result_type = result_type
-        self.path = path
-
-    def property_types(self):
-        return {
-            # 'result_type': self.result_type,
-            "path": self.path,
-            "index": types.Number(),
-        }
+    def get(self, index):
+        return self._arr[index]
 
 
 class NumpyArrayType(types.Type):
@@ -60,15 +56,15 @@ class NumpyArrayType(types.Type):
         return self
 
     def save_instance(self, obj, artifact, name):
-        with artifact.new_file(f"{name}.npz", binary=True) as f:
-            np.savez_compressed(f, arr=obj)
-
-        return self
+        handler = artifact.get_path_handler(name, handler_constructor=NumpyArraySaver)
+        index = handler.add(obj)
+        return index
 
     @classmethod
-    def load_instance(cls, artifact, name):
-        with artifact.open(f"{name}.npz", binary=True) as f:
-            return np.load(f)["arr"]
+    def load_instance(cls, artifact, name, extra=None):
+        index = int(extra)
+        handler = artifact.get_path_handler(name, handler_constructor=NumpyArrayLoader)
+        return handler.get(index)
 
     def __str__(self):
         return "<NumpyArrayType %s %s>" % (self.dtype, self.shape)

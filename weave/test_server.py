@@ -40,6 +40,7 @@ def client(server_type):
 
 
 @pytest.mark.parametrize("server_type", SERVER_TYPES)
+@pytest.mark.timeout(3)
 def test_basic(server_type):
     with client(server_type) as wc:
         nine = make_const_node(weave.types.Number(), 9)
@@ -48,14 +49,13 @@ def test_basic(server_type):
 
 # copied from test_image
 @pytest.mark.parametrize("server_type", SERVER_TYPES)
+@pytest.mark.timeout(3)
 def test_local_artifact_ops(server_type):
     with client(server_type) as wc:
         im = ops.image.WBImage.from_numpy(np.ones((5, 5)))
         ref = storage.save(im)
 
-        la = ops.artifacts.local_artifact(
-            ref.uri.artifact._name, ref.uri.artifact.version
-        )
+        la = ops.artifacts.local_artifact(ref.artifact._name, ref.artifact.version)
         im2_node = la.get("_obj")
 
         url_node = im2_node.url()
@@ -66,6 +66,7 @@ def test_local_artifact_ops(server_type):
 
 
 @pytest.mark.parametrize("server_type", SERVER_TYPES)
+@pytest.mark.timeout(3)
 def test_type_returning_op(server_type):
     with client(server_type) as wc:
         csv_type = weave.use(

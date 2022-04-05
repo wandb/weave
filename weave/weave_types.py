@@ -75,10 +75,7 @@ class TypeRegistry:
             obj_type = type_.type_of(obj)
             if obj_type is not None:
                 return obj_type
-        # Want to raise error here but there are still bugs.
-        # TODO: Fix
-        # raise errors.WeaveTypeError("no type for obj: %s" % obj)
-        return None
+        raise errors.WeaveTypeError("no type for obj: %s" % obj)
 
     @staticmethod
     def type_from_dict(d):
@@ -160,9 +157,8 @@ class Type:
             )
         with artifact.new_file(f"{name}.object.json") as f:
             json.dump(obj.to_dict(), f)
-        return Type()
 
-    def load_instance(self, artifact, name):
+    def load_instance(self, artifact, name, extra=None):
         with artifact.open(f"{name}.object.json") as f:
             result = json.load(f)
         return TypeRegistry.type_from_dict(result)
@@ -176,9 +172,8 @@ class BasicType(Type):
     def save_instance(self, obj, artifact, name):
         with artifact.new_file(f"{name}.object.json") as f:
             json.dump(obj, f)
-        return self
 
-    def load_instance(self, artifact, name):
+    def load_instance(self, artifact, name, extra=None):
         with artifact.open(f"{name}.object.json") as f:
             return json.load(f)
 
@@ -211,7 +206,6 @@ class NoneType(BasicType):
             obj = obj.val
         with artifact.new_file(f"{name}.object.json") as f:
             json.dump(obj, f)
-        return self
 
 
 # TODO: use this seminal value all the time! We use it in is_optional()
@@ -297,7 +291,6 @@ class Boolean(BasicType):
             obj = obj.val
         with artifact.new_file(f"{name}.object.json") as f:
             json.dump(obj, f)
-        return self
 
 
 class ConstNumber(Type):
@@ -421,7 +414,7 @@ class ArrowTableList(Iterable):
     def __init__(self, arrow_table, mapper, artifact):
         self._arrow_table = arrow_table
         self._artifact = artifact
-        self._deserializer = mapper(self._arrow_table.schema, artifact)
+        self._deserializer = mapper
 
     def __getitem__(self, index):
         if index >= self._arrow_table.num_rows:
@@ -511,6 +504,7 @@ class List(Type):
         from . import mappers_arrow
 
         serializer = mappers_arrow.map_to_arrow(obj_type, artifact)
+        print("SERIALIZER", serializer)
 
         pyarrow_type = serializer.result_type()
 
@@ -534,12 +528,7 @@ class List(Type):
                 )
             pq.write_table(table, f)
 
-        # Save any other objects that resulted from serialization
-        serializer.close()
-        return self
-
-    @classmethod
-    def load_instance(cls, artifact, name):
+    def load_instance(self, artifact, name, extra=None):
         from . import mappers_arrow
 
         with artifact.open(f"{name}.parquet", binary=True) as f:
@@ -550,9 +539,8 @@ class List(Type):
             ):
                 return ArrowArrayList(table.column("_singleton"))
 
-            atl = ArrowTableList(
-                pq.read_table(f), mappers_arrow.map_from_arrow, artifact
-            )
+            mapper = mappers_arrow.map_from_arrow(self.object_type, artifact)
+            atl = ArrowTableList(pq.read_table(f), mapper, artifact)
 
             # Convert back to pure python. We're jumping through a lot of
             # hoops to get to get this point. What we actually want is for
@@ -626,11 +614,8 @@ class TypedDict(Type):
         result = serializer.apply(obj)
         with artifact.new_file(f"{name}.typedDict.json") as f:
             json.dump(result, f, allow_nan=False)
-        # Save any other objects that resulted from serialization
-        serializer.close()
-        return serializer.result_type()
 
-    def load_instance(self, artifact, name):
+    def load_instance(self, artifact, name, extra=None):
         # with artifact.open(f'{name}.type.json') as f:
         #     obj_type = TypeRegistry.type_from_dict(json.load(f))
         with artifact.open(f"{name}.typedDict.json") as f:
@@ -757,11 +742,8 @@ class ObjectType(Type):
         result = serializer.apply(obj)
         with artifact.new_file(f"{name}.object.json") as f:
             json.dump(result, f, allow_nan=False)
-        # Save any other objects that resulted from serialization
-        serializer.close()
-        return serializer.result_type()
 
-    def load_instance(self, artifact, name):
+    def load_instance(self, artifact, name, extra=None):
         with artifact.open(f"{name}.object.json") as f:
             result = json.load(f)
         from . import mappers_python
@@ -814,7 +796,7 @@ class LocalArtifactRefType(Type):
         return LocalArtifactRefType(obj.type)
 
     def __str__(self):
-        return "<RefType %s>" % self.object_type
+        return "<LocalArtifactRefType %s>" % self.object_type
 
 
 # TODO: placeholders for now, and a place for table.py
@@ -950,3 +932,7 @@ def python_type_to_type(py_type: type) -> Type:
     # This won't work for non-Basic types that need to be initialized!
     # TODO
     return leaf_type()
+
+
+# Ensure numpy types are loaded
+from . import types_numpy
