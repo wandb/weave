@@ -212,7 +212,7 @@ class SubDirType(types.ObjectType):
     # TODO doesn't match frontend
     name = "subdir"
 
-    type_vars = {}
+    type_vars: dict[str, types.Type] = {}
 
     def __init__(self):
         pass
@@ -313,10 +313,6 @@ class Dir(object):
 
     def get_local_path(self):
         return self.path
-
-    @op(name="file-dir", input_type={"file": DirType()}, output_type=DirType())
-    def size(file):
-        return file
 
     @op(name="dir-size", input_type={"dir": DirType()}, output_type=types.Number())
     def size(dir):
