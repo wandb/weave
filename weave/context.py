@@ -1,5 +1,6 @@
 import contextvars
 import contextlib
+import logging
 import typing
 
 from . import client
@@ -53,6 +54,12 @@ def use_fixed_server_port():
     s = server.HttpServer(port=9994)
     s.start()
     _weave_client.set(server.HttpServerClient(s.url))
+
+
+def enable_devmode(log_level=logging.INFO):
+    from . import weave_server
+
+    weave_server.enable_stream_logging(log_level)
 
 
 def get_client():

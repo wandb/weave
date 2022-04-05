@@ -14,6 +14,8 @@ from flask import send_from_directory
 from weave import server
 from weave import registry_mem
 
+from flask.logging import wsgi_errors_stream
+
 # Ensure we register the openai ops so we can tell the
 # app about them with list_ops
 from weave.ecosystem import openai
@@ -23,6 +25,16 @@ from weave.ecosystem import async_demo
 
 pid = os.getpid()
 default_log_filename = pathlib.Path(f"/tmp/weave/log/{pid}.log")
+log_format = "[%(asctime)s] %(levelname)s in %(module)s (Thread Name: %(threadName)s): %(message)s"
+
+
+def enable_stream_logging(level=logging.INFO):
+    logger = logging.getLogger("root")
+    stream_handler = logging.StreamHandler(wsgi_errors_stream)
+    stream_handler.setLevel(level)
+    formatter = logging.Formatter(log_format)
+    stream_handler.setFormatter(formatter)
+    logger.addHandler(stream_handler)
 
 
 def make_app(log_filename=None, stream_logging_enabled=False):
@@ -40,20 +52,14 @@ def make_app(log_filename=None, stream_logging_enabled=False):
         )
         fs_logging_enabled = False
 
-    format = "[%(asctime)s] %(levelname)s in %(module)s (Thread Name: %(threadName)s): %(message)s"
     logging_config = {
         "version": 1,
         "formatters": {
             "default": {
-                "format": format,
+                "format": log_format,
             }
         },
         "handlers": {
-            "wsgi_stream": {
-                "class": "logging.StreamHandler",
-                "stream": "ext://flask.logging.wsgi_errors_stream",
-                "formatter": "default",
-            },
             "wsgi_file": {
                 "class": "logging.handlers.WatchedFileHandler",
                 "filename": log_file,
@@ -62,12 +68,15 @@ def make_app(log_filename=None, stream_logging_enabled=False):
         },
         "root": {
             "level": "INFO",
-            "handlers": (["wsgi_file"] if fs_logging_enabled else [])
-            + (["wsgi_stream"] if stream_logging_enabled else []),
+            "handlers": ["wsgi_file"] if fs_logging_enabled else [],
         },
     }
 
     dictConfig(logging_config)
+
+    if stream_logging_enabled:
+        enable_stream_logging()
+
     return Flask(__name__, static_folder="frontend")
 
 
