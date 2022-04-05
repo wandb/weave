@@ -28,11 +28,13 @@ def python_type_to_type(
     py_type: typing.Union[types.GenericAlias, type]
 ) -> weave_types.Type:
     if isinstance(py_type, types.GenericAlias):
-        weave_type = simple_python_type_to_type(py_type.__origin__)
-        if weave_type == weave_types.UnknownType():
-            return weave_type
         args = [python_type_to_type(a) for a in py_type.__args__]
-        return weave_type(*args)
+        if py_type.__origin__ == list:
+            return weave_types.List(*args)
+        elif py_type.__origin__ == dict:
+            return weave_types.Dict(*args)
+        else:
+            return weave_types.UnknownType()
     elif is_typed_dict_like(py_type):
         return weave_types.TypedDict(
             {
