@@ -69,7 +69,7 @@ class Gpt3DatasetType(StoredFileType):
     type_vars = {}
 
     def __init__(self):
-        self.purpose = weave.types.ConstString("fine-tune")
+        self.purpose = weave.types.Const(weave.types.String(), "fine-tune")
 
 
 # TODO: we can make a storage manager for OpenAI Files that
@@ -104,7 +104,7 @@ class Gpt3FineTuneResultsType(StoredFileType):
     type_vars = {}
 
     def __init__(self):
-        self.purpose = weave.types.ConstString("fine-tune-results")
+        self.purpose = weave.types.Const(weave.types.String(), "fine-tune-results")
 
 
 # TODO: we can make a storage manager for OpenAI Files that

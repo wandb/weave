@@ -1,4 +1,4 @@
-from ..api import op, weave_class, mutation
+from ..api import op, weave_class, mutation, OpVarArgs
 from .. import weave_types as types
 
 # @op(
@@ -24,7 +24,7 @@ from .. import weave_types as types
 
 
 def typeddict_pick_output_type(input_types):
-    if not isinstance(input_types["key"], types.ConstString):
+    if not isinstance(input_types["key"], types.Const):
         return types.UnknownType()
     key = input_types["key"].val
     property_types = input_types["obj"].property_types
@@ -99,10 +99,7 @@ class Dict(dict):
 
 @op(
     name="dict",
-    input_type={
-        # TODO: proper variadic functions
-        "manyX": types.Invalid()
-    },
+    input_type=OpVarArgs(types.Any()),
     output_type=types.TypedDict({}),
 )
 def dict_(**d):

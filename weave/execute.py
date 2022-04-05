@@ -8,6 +8,7 @@ import typing
 # agent, that doesn't have the same memory registry
 from . import errors
 from . import registry_mem
+from . import op_def
 from . import execute_ids
 from . import storage
 from . import weave_types as types
@@ -44,7 +45,7 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False):
                     to_run.add(downstream_forward_node)
 
 
-def is_async_op(op_def: registry_mem.OpDef):
+def is_async_op(op_def: op_def.OpDef):
     return not callable(op_def.output_type) and op_def.output_type.name == "run-type"
 
 
@@ -63,7 +64,7 @@ def async_op_body(run_uri, run_body, inputs):
 
 
 def execute_async_op(
-    op_def: registry_mem.OpDef, inputs: Mapping[str, typing.Any], run_id: str
+    op_def: op_def.OpDef, inputs: Mapping[str, typing.Any], run_id: str
 ):
     art_name = "run-%s" % run_id
     job = threading.Thread(
@@ -73,7 +74,7 @@ def execute_async_op(
 
 
 def execute_sync_op(
-    op_def: registry_mem.OpDef,
+    op_def: op_def.OpDef,
     inputs: Mapping[str, typing.Any],
 ):
     return op_def.resolve_fn(**inputs)

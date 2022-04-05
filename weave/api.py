@@ -5,10 +5,12 @@ from . import errors as _errors
 
 # exposed as part of api
 from . import weave_types as types
+from . import errors
 from .decorators import weave_class, op, mutation
+from .op_args import OpVarArgs
 from . import context as _context
 from . import usage_analytics
-from .context import use_fixed_server_port, use_external_server
+from .context import use_fixed_server_port, use_frontend_devmode
 
 
 def save(node_or_obj, name=None):

@@ -13,7 +13,9 @@ class NumpyArraySaver(mappers.Mapper):
         self._path = path
 
     def result_type(self):
-        return types_numpy.NumpyArrayRefType(types.ConstString("-".join(self._path)))
+        return types_numpy.NumpyArrayRefType(
+            types.Const(types.String(), "-".join(self._path))
+        )
         # return NumpyArrayRefType(self.type, self._path)
 
     def close(self):

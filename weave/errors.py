@@ -12,3 +12,7 @@ class WeaveApiError(Exception):
 
 class WeaveTypeError(Exception):
     pass
+
+
+class WeaveDefinitionError(Exception):
+    pass

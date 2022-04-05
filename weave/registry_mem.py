@@ -1,106 +1,15 @@
-import inspect
-import os
 import sys
 import typing
 
 import wandb
 
-from . import errors
-from . import forward_graph
+from . import op_def
 from . import weave_types
 from . import lazy
 
 
 WANDB_ARTIFACT_SCHEME = "wandb-artifact://"
 LOCAL_FILE_SCHEME = "file://"
-
-
-class OpDef(object):
-    name: str
-    input_type: typing.Dict[str, weave_types.Type]
-    output_type: typing.Union[
-        weave_types.Type,
-        typing.Callable[[typing.Dict[str, weave_types.Type]], weave_types.Type],
-    ]
-    setter = str
-
-    def __init__(
-        self,
-        name,
-        input_type,
-        output_type,
-        call_fn,
-        resolve_fn,
-        setter=None,
-        render_info=None,
-        pure=True,
-    ):
-        self.name = name
-        self.input_type = input_type
-        self.output_type = output_type
-        self.call_fn = call_fn
-        self.resolve_fn = resolve_fn
-        self.setter = setter
-        self.render_info = render_info
-        self.pure = pure
-
-    @property
-    def simple_name(self):
-        # We need this to get around the run job_type 64 char limit, and artifact name limitations.
-        # TODO: This function will need to be stable! Let's make sure we like what we're doing here.
-        if self.name.startswith("file://"):
-            # Shorten because local file paths tend to blow out the 64 char job_type limit (we need
-            # to fix that probably)
-            return self.name.rsplit("/", 1)[1]
-        elif self.name.startswith("wandb-artifact://"):
-            return (
-                self.name[len("wandb-artifact://") :]
-                .replace(":", ".")
-                .replace("/", "_")
-            )
-        else:
-            # This is for builtins, which I think we may just want to get rid
-            # of?
-            return self.name
-
-    @property
-    def has_varargs(self):
-        # TODO: Fix this, we need a way of propertly typing varargs functions!
-        return list(self.input_type.keys())[0] == "manyX"
-
-    def __str__(self):
-        return "<OpDef: %s>" % self.name
-
-
-class LookaheadOpDef(OpDef):
-    def __str__(self):
-        return "<LookaheadOpDef: %s>" % self.name
-
-    def resolve(self, params, node: forward_graph.ForwardNode):
-        return self.resolve_fn(params, node)
-
-
-# TODO: this should be in execute or shared with the code there. (need to
-# refactor it a bit to do this.)
-
-
-def get_input_values(output_node):
-    inputs = {}
-    for param_name, param_node in output_node.from_op.inputs.items():
-        try:
-            inputs[param_name] = param_node.val
-        except AttributeError:
-            raise errors.WeaveInternalError("invalid node type: %s" % param_node)
-    return inputs
-
-
-def fully_qualified_opname(wrap_fn):
-    op_module_file = os.path.abspath(inspect.getfile(wrap_fn))
-    if op_module_file.endswith(".py"):
-        op_module_file = op_module_file[:-3]
-    elif op_module_file.endswith(".pyc"):
-        op_module_file = op_module_file[:-4]
-    return "file://" + op_module_file + "." + wrap_fn.__name__
 
 
 def fetch_op(path):
@@ -142,7 +51,7 @@ def fetch_op(path):
         found_op_def.resolve_fn, path, found_op_def.input_type, found_op_def.output_type
     )
     memory_registry.register_op(
-        OpDef(
+        op_def.OpDef(
             path,
             found_op_def.input_type,
             found_op_def.output_type,
@@ -156,13 +65,13 @@ def fetch_op(path):
 
 class Registry(object):
     _types: typing.Dict[str, weave_types.Type]
-    _ops: typing.Dict[str, OpDef]
+    _ops: typing.Dict[str, op_def.OpDef]
 
     def __init__(self):
         self._types = {}
         self._ops = {}
 
-    def register_op(self, op: OpDef):
+    def register_op(self, op: op_def.OpDef):
         self._ops[op.name] = op
 
     def unregister_op(self, op_name):
@@ -181,7 +90,7 @@ class Registry(object):
                 return op_def
         raise Exception("Op def doesn't exist for %s" % lazy_local_fn)
 
-    def list_ops(self) -> typing.List[OpDef]:
+    def list_ops(self) -> typing.List[op_def.OpDef]:
         return list(self._ops.values())
 
     # def register_type(self, type: weave_types.Type):
