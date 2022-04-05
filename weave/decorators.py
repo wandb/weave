@@ -10,6 +10,7 @@ from . import lazy
 from . import errors
 from . import op_args
 from . import weave_types as types
+from . import infer_types
 
 
 def weave_class(weave_type):
@@ -56,7 +57,7 @@ def op(
         if "return" in python_input_type:
             python_input_type.pop("return")
         inferred_input_type = {
-            input_name: types.python_type_to_type(input_type)
+            input_name: infer_types.python_type_to_type(input_type)
             for input_name, input_type in python_input_type.items()
         }
         weave_input_type = input_type
@@ -105,12 +106,18 @@ def op(
         if python_return_type is None:
             inferred_output_type = types.UnknownType()
         else:
-            inferred_output_type = types.python_type_to_type(python_return_type)
+            inferred_output_type = infer_types.python_type_to_type(python_return_type)
+            if inferred_output_type == types.UnknownType():
+                raise errors.WeaveDefinitionError(
+                    "Could not infer Weave Type from declared Python return type"
+                )
 
         weave_output_type = output_type
         if weave_output_type is None:
+            # weave output type is not declared, use type inferred from Python
             weave_output_type = inferred_output_type
         else:
+            # Weave output_type was declared. Ensure compatibility with Python type.
             if callable(weave_output_type):
                 if inferred_output_type != types.UnknownType():
                     raise errors.WeaveDefinitionError(
