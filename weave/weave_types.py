@@ -1,6 +1,7 @@
 # from . import mappers_python
 # from . import mappers_arrow
 import typing
+import types
 import functools
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -922,16 +923,38 @@ class LocalFileType(FileType):
         }
 
 
-def python_type_to_type(py_type: type) -> Type:
+class TypedDictLike:
+    __required_keys__: frozenset[str]
+
+
+def python_type_to_type(
+    py_type: typing.Union[types.GenericAlias, TypedDictLike]
+) -> Type:
+    print("PY_TYPE", py_type, type(py_type), type(type(py_type)))
+    args = []
+    origin: type
+    if isinstance(py_type, types.GenericAlias):
+        origin = py_type.__origin__
+        args = [python_type_to_type(a) for a in py_type.__args__]
+    elif hasattr(py_type, "__required_keys__"):
+        origin = dict
+        args = [
+            {
+                k: python_type_to_type(py_type.__annotations__[k])
+                for k in py_type.__required_keys__
+            }
+        ]
+    else:
+        origin = py_type
+    # TODO: TypedDict is special I guess, so write a manual mapping for that
+
     weave_types = instance_class_to_potential_type(py_type)
     if not weave_types:
         return UnknownType()
     # the last returned Type is the most specific Type (a leaf Type).
     leaf_type = weave_types[-1]
 
-    # This won't work for non-Basic types that need to be initialized!
-    # TODO
-    return leaf_type()
+    return leaf_type(*args)
 
 
 # Ensure numpy types are loaded

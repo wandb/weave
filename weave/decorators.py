@@ -106,11 +106,17 @@ def op(
             inferred_output_type = types.UnknownType()
         else:
             inferred_output_type = types.python_type_to_type(python_return_type)
+            if inferred_output_type == types.UnknownType():
+                raise errors.WeaveDefinitionError(
+                    "Could not infer Weave Type from declared Python return type"
+                )
 
         weave_output_type = output_type
         if weave_output_type is None:
+            # weave output type is not declared, use type inferred from Python
             weave_output_type = inferred_output_type
         else:
+            # Weave output_type was declared. Ensure compatibility with Python type.
             if callable(weave_output_type):
                 if inferred_output_type != types.UnknownType():
                     raise errors.WeaveDefinitionError(

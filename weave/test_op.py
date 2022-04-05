@@ -1,3 +1,4 @@
+import typing
 import pytest
 from . import api as weave
 from . import graph
@@ -145,3 +146,21 @@ def test_op_no_return_type():
         @weave.op(input_type={"a": types.Int()})
         def op_callable_output_type_and_return_type_declared(a: int):
             return str(a)
+
+
+def test_op_inferred_list_return():
+    @weave.op()
+    def op_under_test(a: int) -> list[int]:
+        return [a, 2 * a, 3 * a]
+
+    assert op_under_test.op_def.output_type == types.List(types.Int())
+
+
+def test_op_inferred_typeddict_return():
+    @weave.op()
+    def op_under_test(a: int) -> typing.TypedDict("OpReturn", {"x": int, "y": str}):
+        return {"a": 1, "y": "x"}
+
+    assert op_under_test.op_def.output_type == types.TypedDict(
+        {"x": types.Int(), "y": types.String()}
+    )
