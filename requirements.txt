@@ -5,7 +5,7 @@ h5py
 viztracer
 sqlalchemy
 ipython
-flask
+flask>=2.1
 flask_cors
 notebook
 pymysql
