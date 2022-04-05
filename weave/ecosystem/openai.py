@@ -1,3 +1,4 @@
+import typing
 import json
 import openai
 import os
@@ -171,13 +172,27 @@ def upload_gpt3_dataset(items):
 
 class Gpt3ModelType(weave.types.ObjectType):
     name = "gpt3-model"
-    type_vars = {}
 
     def __init__(self):
         pass
 
     def property_types(self):
         return {"id": weave.types.String(), "version": weave.types.String()}
+
+
+class Gpt3ModelCompleteReturnChoices(typing.TypedDict):
+    text: str
+    index: int
+    logprobs: None
+    finish_reason: str
+
+
+class Gpt3ModelCompleteReturn(typing.TypedDict):
+    id: str
+    object: str
+    created: int
+    model: str
+    choices: list[Gpt3ModelCompleteReturnChoices]
 
 
 @weave.weave_class(weave_type=Gpt3ModelType)
@@ -190,27 +205,8 @@ class Gpt3Model:
 
     @weave.op(
         name="gpt3model-complete",
-        input_type={"self": Gpt3ModelType(), "prompt": weave.types.String()},
-        output_type=weave.types.TypedDict(
-            {
-                "id": weave.types.String(),
-                "object": weave.types.String(),
-                "created": weave.types.Int(),  # TODO: date
-                "model": weave.types.String(),  # TODO: date
-                "choices": weave.types.List(
-                    weave.types.TypedDict(
-                        {
-                            "text": weave.types.String(),
-                            "index": weave.types.Int(),
-                            "logprobs": weave.types.none_type,
-                            "finish_reason": weave.types.String(),
-                        }
-                    )
-                ),
-            }
-        ),
     )
-    def complete(self, prompt):
+    def complete(self, prompt: str) -> Gpt3ModelCompleteReturn:
         sleep = 1
         for _ in range(5):
             try:

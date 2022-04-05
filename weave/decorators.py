@@ -15,6 +15,14 @@ from . import infer_types
 
 def weave_class(weave_type):
     def wrap(target):
+        # add self type to input_types if its not already defined.
+        for _, method in inspect.getmembers(target):
+            if is_op(method):
+                self_type = method.op_def.input_type.arg_types.get("self")
+
+                if self_type is not None and self_type == types.UnknownType():
+                    method.op_def.input_type.arg_types["self"] = weave_type()
+
         weave_type.NodeMethodsClass = target
         return target
 
@@ -32,6 +40,10 @@ def _create_args_from_op_input_type(input_type):
                 "input_type must be dict[str, Type] but %s is %s" % (k, v)
             )
     return op_args.OpNamedArgs(input_type)
+
+
+def is_op(f):
+    return hasattr(f, "op_def")
 
 
 def op(
@@ -64,7 +76,13 @@ def op(
         if weave_input_type is None:
             # No weave declared input_type, so use the inferred_type
             for arg_name in inspect.signature(f).parameters.keys():
-                if arg_name not in inferred_input_type:
+                if arg_name == "self":
+                    # Special case if the arg is called self. We allow it to be Unknown.
+                    # We'll detect its type later when the weave_class() decorator runs.
+                    # (method decorators run before the class is created, then the class decorators
+                    # run)
+                    inferred_input_type["self"] = types.UnknownType()
+                elif arg_name not in inferred_input_type:
                     raise errors.WeaveDefinitionError(
                         "type declaration missing for arg: %s" % arg_name
                     )

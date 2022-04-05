@@ -156,7 +156,7 @@ def test_op_inferred_list_return():
     assert op_under_test.op_def.output_type == types.List(types.Int())
 
 
-def test_op_inferred_typeddict_return():
+def test_op_inferred_typeddict_return() -> None:
     @weave.op()
     def op_under_test(a: int) -> typing.TypedDict("OpReturn", {"x": int, "y": str}):
         return {"a": 1, "y": "x"}
@@ -176,3 +176,20 @@ def test_op_inferred_list_typeddict_return():
     assert op_under_test.op_def.output_type == types.List(
         types.TypedDict({"x": types.Int(), "y": types.String()})
     )
+
+
+def test_op_method_inferred_self():
+    class SomeWeaveType(types.Type):
+        name = "SomeWeaveType"
+
+    @weave.weave_class(weave_type=SomeWeaveType)
+    class SomeWeaveObj:
+        @weave.op()
+        def my_op(self, a: int) -> str:
+            pass
+
+    assert SomeWeaveObj.my_op.op_def.input_type.arg_types == {
+        "self": SomeWeaveType(),
+        "a": types.Int(),
+    }
+    assert SomeWeaveObj.my_op.op_def.output_type == types.String()
