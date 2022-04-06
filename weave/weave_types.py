@@ -1,6 +1,8 @@
 # from . import mappers_python
 # from . import mappers_arrow
 import typing
+import typing_extensions
+import types
 import functools
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -920,18 +922,6 @@ class LocalFileType(FileType):
             # TODO: Datetime?
             "mtime": Float(),
         }
-
-
-def python_type_to_type(py_type: type) -> Type:
-    weave_types = instance_class_to_potential_type(py_type)
-    if not weave_types:
-        return UnknownType()
-    # the last returned Type is the most specific Type (a leaf Type).
-    leaf_type = weave_types[-1]
-
-    # This won't work for non-Basic types that need to be initialized!
-    # TODO
-    return leaf_type()
 
 
 # Ensure numpy types are loaded
