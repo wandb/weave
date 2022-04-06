@@ -110,7 +110,7 @@ NumberPanelType.instance_class = Number
 class ContainerConfigType(types.ObjectType):
     name = "container_config_type"
 
-    type_vars: dict[str, types.Type] = {
+    type_vars = {
         "variables": types.TypedDict({}),
         "panels": types.List(PanelType()),
     }
