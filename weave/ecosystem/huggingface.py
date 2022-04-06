@@ -4,7 +4,6 @@ import weave
 
 class HFDatasetType(weave.types.ObjectType):
     name = "hf-dataset"
-    type_vars: dict[str, weave.types.Type] = {}
 
     def property_types(self):
         return {"name": weave.types.String()}

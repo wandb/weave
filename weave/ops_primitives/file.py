@@ -212,8 +212,6 @@ class SubDirType(types.ObjectType):
     # TODO doesn't match frontend
     name = "subdir"
 
-    type_vars: dict[str, types.Type] = {}
-
     def __init__(self):
         pass
 
@@ -245,8 +243,6 @@ class DirType(types.ObjectType):
     # TODO: We actually want to be localdir here. But then the
     # frontend needs to use a different mechanism for type checking
     name = "dir"
-
-    type_vars: dict[str, types.Type] = {}
 
     def __init__(self):
         pass
