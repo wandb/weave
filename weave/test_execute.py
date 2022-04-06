@@ -1,6 +1,8 @@
 from . import api
 from . import weave_types as types
+from . import weave_internal
 from . import ops
+from . import execute
 
 execute_test_count_op_run_count = 0
 
@@ -30,3 +32,9 @@ def test_local_file_pure_cached():
     count2 = api.use(execute_test_count_op(ops.local_path("/tmp/cereal.csv").readcsv()))
     assert count1 == count2
     assert execute_test_count_op_run_count == 1
+
+
+def test_execute_no_cache():
+    nine = weave_internal.make_const_node(types.Number(), 9)
+    res = execute.execute_nodes([nine + 3], no_cache=True)
+    assert res == [12]
