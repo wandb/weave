@@ -246,7 +246,7 @@ class DirType(types.ObjectType):
     # frontend needs to use a different mechanism for type checking
     name = "dir"
 
-    type_vars = {}
+    type_vars: dict[str, types.Type] = {}
 
     def __init__(self):
         pass
