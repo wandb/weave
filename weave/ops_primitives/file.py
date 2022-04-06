@@ -323,7 +323,7 @@ class Dir(object):
         input_type={"dir": DirType(), "path": types.String()},
         output_type=types.Type(),
     )
-    def open(dir, path):
+    def path_return_type(dir, path):
         return path_type(os.path.join(dir.fullPath, path))
 
     @op(
