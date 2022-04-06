@@ -78,6 +78,9 @@ def make_app(log_filename=None, stream_logging_enabled=False):
 
     if stream_logging_enabled:
         enable_stream_logging()
+    else:
+        # ensure that errors / exceptions go to stderr
+        enable_stream_logging(level=logging.ERROR)
 
     return Flask(__name__, static_folder="frontend")
 
