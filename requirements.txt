@@ -15,3 +15,5 @@ pillow
 openai
 analytics-python
 typing_extensions
+matplotlib
+
