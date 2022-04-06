@@ -8,8 +8,6 @@ from ..weave_internal import make_var_node
 class PanelType(types.ObjectType):
     name = "panel_type"
 
-    type_vars = {}
-
     def __init__(self):
         pass
 
@@ -23,8 +21,6 @@ class PanelType(types.ObjectType):
 
 class SliderConfigType(types.ObjectType):
     name = "slider_config_type"
-
-    type_vars = {}
 
     def __init__(self):
         pass
@@ -51,8 +47,6 @@ SliderConfigType.instance_class = SliderConfig
 
 class SliderPanelType(types.ObjectType):
     name = "slider_panel_type"
-
-    type_vars = {}
 
     def __init__(self):
         pass
@@ -91,8 +85,6 @@ SliderPanelType.instance_class = Slider
 class NumberPanelType(types.ObjectType):
     name = "number_panel_type"
 
-    type_vars = {}
-
     def __init__(self):
         pass
 
@@ -118,7 +110,10 @@ NumberPanelType.instance_class = Number
 class ContainerConfigType(types.ObjectType):
     name = "container_config_type"
 
-    type_vars = {"variables": types.TypedDict({}), "panels": types.List(PanelType())}
+    type_vars = {
+        "variables": types.TypedDict({}),
+        "panels": types.List(PanelType()),
+    }
 
     def __init__(self, variables, panels):
         self.variables = variables

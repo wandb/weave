@@ -2,11 +2,25 @@
 # needlessly adds an entry for nodes and ops. It'd be simpler to just encode
 # nodes and inline the ops in their respective output nodes.
 
+import typing
+
 from . import graph
 from . import weave_types as types
 
 
-def _serialize_node(node, serialized_nodes):
+NodeOrOp = typing.Union[graph.Node, graph.Op]
+
+# TODO(dg): Replace Any
+SerializedNode = typing.Any
+MapNodeOrOpToSerialized = typing.Dict[NodeOrOp, typing.Tuple[SerializedNode, int]]
+
+
+class SerializedReturnType(typing.TypedDict):
+    nodes: typing.List[SerializedNode]
+    rootNodes: typing.List[int]
+
+
+def _serialize_node(node: NodeOrOp, serialized_nodes: MapNodeOrOpToSerialized) -> int:
     if node in serialized_nodes:
         return serialized_nodes[node][1]
 
@@ -47,9 +61,11 @@ def _serialize_node(node, serialized_nodes):
         serialized_nodes[node] = (node.to_json(), node_id)
         return node_id
 
+    raise ValueError(f"Could not serialize node: {node}")
 
-def serialize(graphs: "list[graph.Node]"):
-    serialized = {}
+
+def serialize(graphs: typing.List[graph.Node]) -> SerializedReturnType:
+    serialized: MapNodeOrOpToSerialized = {}
     root_nodes = [_serialize_node(n, serialized) for n in graphs]
     nodes = list(range(len(serialized)))
     for node_json, node_id in serialized.values():
@@ -57,10 +73,16 @@ def serialize(graphs: "list[graph.Node]"):
     return {"nodes": nodes, "rootNodes": root_nodes}
 
 
-def _deserialize_node(index, nodes, parsed_nodes):
+def _deserialize_node(
+    index: int,
+    nodes: typing.List[SerializedNode],
+    parsed_nodes: typing.MutableMapping[int, graph.Node],
+) -> graph.Node:
     if index in parsed_nodes:
         return parsed_nodes[index]
     node = nodes[index]
+
+    parsed_node: graph.Node
     if node["nodeType"] == "const":
         if isinstance(node["type"], dict) and node["type"]["type"] == "function":
             op = nodes[node["val"]["fromOp"]]
@@ -96,12 +118,12 @@ def _deserialize_node(index, nodes, parsed_nodes):
     return parsed_node
 
 
-def deserialize(serialized) -> "list[graph.Node]":
+def deserialize(serialized: SerializedReturnType) -> "list[graph.Node]":
     # For some reason what javascript sends isn't guaranteed to be sorted
     # along the graph topology. If it were we could do an easy linear
     # implementation. But its not so we recurse for now.
     nodes = serialized["nodes"]
     root_nodes = serialized["rootNodes"]
-    parsed_nodes = {}
+    parsed_nodes: dict[int, graph.Node] = {}
 
     return [_deserialize_node(i, nodes, parsed_nodes) for i in root_nodes]

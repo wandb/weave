@@ -5,6 +5,7 @@ import typing
 from . import op_def
 from . import storage
 import random
+import typing
 
 
 def value_id(val):
@@ -15,6 +16,7 @@ def value_id(val):
 
 
 def make_run_id(op_def: op_def.OpDef, inputs_refs: Mapping[str, typing.Any]):
+    hash_val: typing.Any
     if not op_def.pure:
         hash_val = random.random()
     else:

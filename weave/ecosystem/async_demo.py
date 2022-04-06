@@ -31,7 +31,6 @@ def slowmult(a, b, sleep, _run=None):
 
 class AsyncDemoModelType(weave.types.ObjectType):
     name = "asyncdemo-model"
-    type_vars = {}
 
     def __init__(self):
         pass
@@ -60,7 +59,6 @@ AsyncDemoModelType.instance_class = AsyncDemoModel
 
 class AsyncDemoTrainResultType(weave.types.ObjectType):
     name = "asyncdemo-trainresult"
-    type_vars = {}
 
     def __init__(self):
         pass

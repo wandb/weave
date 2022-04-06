@@ -13,8 +13,6 @@ class SizedString(panel.Panel):
 class SizedStringConfigType(types.ObjectType):
     name = "sized_string_config"
 
-    type_vars = {}
-
     def __init__(self):
         pass
 

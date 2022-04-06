@@ -212,8 +212,6 @@ class SubDirType(types.ObjectType):
     # TODO doesn't match frontend
     name = "subdir"
 
-    type_vars = {}
-
     def __init__(self):
         pass
 
@@ -245,8 +243,6 @@ class DirType(types.ObjectType):
     # TODO: We actually want to be localdir here. But then the
     # frontend needs to use a different mechanism for type checking
     name = "dir"
-
-    type_vars = {}
 
     def __init__(self):
         pass
@@ -314,10 +310,6 @@ class Dir(object):
     def get_local_path(self):
         return self.path
 
-    @op(name="file-dir", input_type={"file": DirType()}, output_type=DirType())
-    def size(file):
-        return file
-
     @op(name="dir-size", input_type={"dir": DirType()}, output_type=types.Number())
     def size(dir):
         return dir.size
@@ -327,7 +319,7 @@ class Dir(object):
         input_type={"dir": DirType(), "path": types.String()},
         output_type=types.Type(),
     )
-    def open(dir, path):
+    def path_return_type(dir, path):
         return path_type(os.path.join(dir.fullPath, path))
 
     @op(

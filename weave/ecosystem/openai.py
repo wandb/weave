@@ -67,7 +67,6 @@ StoredFileType.instance_class = StoredFile
 
 class Gpt3DatasetType(StoredFileType):
     name = "gpt3-dataset"
-    type_vars = {}
 
     def __init__(self):
         self.purpose = weave.types.Const(weave.types.String(), "fine-tune")
@@ -102,7 +101,6 @@ Gpt3DatasetType.instance_class = Gpt3Dataset
 
 class Gpt3FineTuneResultsType(StoredFileType):
     name = "gpt3-fine-tune-results-type"
-    type_vars = {}
 
     def __init__(self):
         self.purpose = weave.types.Const(weave.types.String(), "fine-tune-results")
@@ -226,7 +224,6 @@ Gpt3ModelType.instance_class = Gpt3Model
 
 class Gpt3FineTuneType(weave.types.ObjectType):
     name = "gpt3-fine-tune-type"
-    type_vars = {}
 
     def __init__(self):
         pass

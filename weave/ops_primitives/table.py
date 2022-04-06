@@ -251,7 +251,7 @@ def list_indexCheckpoint(arr):
     input_type={"obj": types.Any()},
     output_type=types.Number(),
 )
-def list_indexCheckpoint(obj):
+def tag_indexCheckpoint(obj):
     # TODO. Do we really need this?
     return 0
 

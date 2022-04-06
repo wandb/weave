@@ -883,7 +883,7 @@ class RunType(ObjectType):
 class FileType(ObjectType):
     name = "file"
 
-    type_vars: dict[str, Type] = {"extension": String()}
+    type_vars = {"extension": String()}
 
     def __init__(self, extension=String()):
         self.extension = extension
