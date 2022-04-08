@@ -156,7 +156,7 @@ def op(
 
         fq_op_name = name
         if fq_op_name is None:
-            fq_op_name = "root-%s" % f.__name__
+            fq_op_name = "op-%s" % f.__name__
             # Don't use fully qualified names (which are URIs) for
             # now.
             # Ah crap this isn't right yet.
