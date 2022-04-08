@@ -3,10 +3,11 @@ from . import table_state
 
 
 class Table(panel.Panel):
-    def __init__(self, input_node):
-        self.id = "table"
-        self.input_node = input_node
-        self._table_state = table_state.TableState()
+    id = "table"
+
+    def __init__(self, *args):
+        super().__init__(*args)
+        self._table_state = table_state.TableState(self.input_node)
 
     @property
     def table_query(self):

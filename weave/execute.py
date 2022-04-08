@@ -92,6 +92,7 @@ def execute_forward_node(
     forward_node: forward_graph.ForwardNode,
     no_cache=False,
 ):
+    use_cache = not no_cache
     node = forward_node.node
     if isinstance(node, graph.ConstNode):
         # node_id = storage.save(node.val)
@@ -114,19 +115,20 @@ def execute_forward_node(
     # Compute the run ID, which is deterministic if the op is pure
     run_id = execute_ids.make_run_id(op_def, input_refs)
     run_artifact_name = f"run-{run_id}"
-    run = storage.get_version(run_artifact_name, "latest")
 
-    if op_def.pure and run is not None:
-        # Watch out, we handle loading async runs in different ways.
-        if is_async_op(op_def):
-            forward_node.set_result(run)
-            return
-        else:
-            if run._output is not None:
-                forward_node.set_result(run._output)
+    if use_cache and op_def.pure:
+        run = storage.get_version(run_artifact_name, "latest")
+        if run is not None:
+            # Watch out, we handle loading async runs in different ways.
+            if is_async_op(op_def):
+                forward_node.set_result(run)
                 return
-            # otherwise, the run's output was not saveable, so we need
-            # to recompute it.
+            else:
+                if run._output is not None:
+                    forward_node.set_result(run._output)
+                    return
+                # otherwise, the run's output was not saveable, so we need
+                # to recompute it.
 
     run = run_obj.Run(run_id, op_def.name)
 
@@ -153,22 +155,23 @@ def execute_forward_node(
             # calculation
             result = ref
         else:
-            # If an op is impure, its output is saved to a name that does not
-            # include run ID. This means consuming pure runs will hit cache if
-            # the output of an impure op is the same as it was last time.
-            # However that also means we can traceback through impure ops if we want
-            # to see the actual query that run for a given object.
-            # TODO: revisit this behavior
-            output_name = None
-            if op_def.pure:
-                output_name = "%s-output" % run_artifact_name
-            try:
-                result = storage.save(result, name=output_name)
-            except errors.WeaveSerializeError:
-                # Not everything can be serialized currently. But instead of storing
-                # the result directly here, we save a MemRef with the same run_artifact_name.
-                # This is required to make downstream run_ids path dependent.
-                result = storage.save_mem(result, name=output_name)
+            if use_cache:
+                # If an op is impure, its output is saved to a name that does not
+                # include run ID. This means consuming pure runs will hit cache if
+                # the output of an impure op is the same as it was last time.
+                # However that also means we can traceback through impure ops if we want
+                # to see the actual query that run for a given object.
+                # TODO: revisit this behavior
+                output_name = None
+                if op_def.pure:
+                    output_name = "%s-output" % run_artifact_name
+                try:
+                    result = storage.save(result, name=output_name)
+                except errors.WeaveSerializeError:
+                    # Not everything can be serialized currently. But instead of storing
+                    # the result directly here, we save a MemRef with the same run_artifact_name.
+                    # This is required to make downstream run_ids path dependent.
+                    result = storage.save_mem(result, name=output_name)
         run._output = result
 
         forward_node.set_result(result)
@@ -177,7 +180,7 @@ def execute_forward_node(
         # TODO: This actually should work correctly, but mutation tracing
         #    does not really work yet. (mutated objects set their run output
         #    as the original ref rather than the new ref, which causes problems)
-        if not is_run_op(node.from_op):
+        if use_cache and not is_run_op(node.from_op):
             try:
                 storage.save(run, name=run_artifact_name)
             except errors.WeaveSerializeError:
