@@ -7,7 +7,8 @@ from .. import weave_internal
 
 
 class TableState(object):
-    def __init__(self):
+    def __init__(self, input_node):
+        self._input_node = input_node
         self._auto_columns = False
         self._columns = {}
         self._pre_filter_function = graph.VoidNode()
@@ -28,11 +29,10 @@ class TableState(object):
         col_id = self._new_col_id()
         self._columns[col_id] = {"panel_id": "", "panel_config": None}
         self._column_names[col_id] = ""
-        # TODO: VarNode is row type
+
+        obj_type = self._input_node.type.object_type
         self._column_select_functions[col_id] = select_expr(
-            weave_internal.make_var_node(
-                weave_types.Dict(weave_types.String(), weave_types.Number()), "row"
-            )
+            weave_internal.make_var_node(obj_type, "row")
         )
         self._order.append(col_id)
         return col_id

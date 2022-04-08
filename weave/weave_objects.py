@@ -41,4 +41,4 @@ class List(list):
             new_shape = (len(self._items),) + self._obj_type.shape
             return types_numpy.NumpyArrayType(self._obj_type.dtype, new_shape)
         else:
-            return List(self._obj_type)
+            return types.List(self._obj_type)

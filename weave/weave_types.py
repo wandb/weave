@@ -506,7 +506,6 @@ class List(Type):
         from . import mappers_arrow
 
         serializer = mappers_arrow.map_to_arrow(obj_type, artifact)
-        print("SERIALIZER", serializer)
 
         pyarrow_type = serializer.result_type()
 

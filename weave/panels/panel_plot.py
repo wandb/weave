@@ -5,10 +5,11 @@ from .. import graph
 
 
 class Plot(panel.Panel):
-    def __init__(self, input_node):
-        self.id = "plot"
-        self.input_node = input_node
-        self._table_state = table_state.TableState()
+    id = "plot"
+
+    def __init__(self, *args):
+        super().__init__(*args)
+        self._table_state = table_state.TableState(self.input_node)
         self._dims = {
             "x": self._table_state.add_column(lambda row: graph.VoidNode()),
             "y": self._table_state.add_column(lambda row: graph.VoidNode()),
@@ -26,6 +27,9 @@ class Plot(panel.Panel):
 
     def set_y(self, expr):
         self._table_state.update_col(self._dims["y"], expr)
+
+    def set_label(self, expr):
+        self._table_state.update_col(self._dims["label"], expr)
 
     @property
     def config(self):

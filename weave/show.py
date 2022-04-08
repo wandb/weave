@@ -47,18 +47,9 @@ def _show_params(obj):
         return {"weave_node": node}
 
     elif isinstance(obj, panel.Panel):
-        # TODO: This is only needed for old-style panel code
-        # (panel_table and panel_plot currently). New panels are
-        # weave objects and trigger the path above.
-        from weave import ops
-
-        node = obj.input_node
-        if not isinstance(node, graph.Node):
-            ref = storage.save(obj.input_node)
-            node = ops.get(str(ref))
 
         return {
-            "weave_node": node,
+            "weave_node": obj.input_node,
             "panel_id": obj.id,
             "panel_config": obj.config,
         }
