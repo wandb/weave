@@ -19,7 +19,6 @@ def weave_class(weave_type):
         for _, method in inspect.getmembers(target):
             if is_op(method):
                 self_type = method.op_def.input_type.arg_types.get("self")
-
                 if self_type is not None and self_type == types.UnknownType():
                     method.op_def.input_type.arg_types["self"] = weave_type()
 
@@ -157,7 +156,11 @@ def op(
 
         fq_op_name = name
         if fq_op_name is None:
-            fq_op_name = op_def.fully_qualified_opname(f)
+            fq_op_name = "root-%s" % f.__name__
+            # Don't use fully qualified names (which are URIs) for
+            # now.
+            # Ah crap this isn't right yet.
+            # fq_op_name = op_def.fully_qualified_opname(f)
 
         lazy_call = lazy.make_lazy_call(
             f, fq_op_name, weave_input_type, weave_output_type
