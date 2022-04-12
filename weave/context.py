@@ -12,6 +12,10 @@ _weave_client: contextvars.ContextVar[
     typing.Optional[client.Client]
 ] = contextvars.ContextVar("weave_client", default=None)
 
+_http_server: contextvars.ContextVar[
+    typing.Optional[server.HttpServer]
+] = contextvars.ContextVar("http_server", default=None)
+
 _frontend_url: contextvars.ContextVar[typing.Optional[str]] = contextvars.ContextVar(
     "frontend_url", default=None
 )
@@ -39,18 +43,26 @@ def execution_client():
 def local_http_client():
     s = server.HttpServer()
     s.start()
+    server_token = _http_server.set(s)
     client_token = _weave_client.set(server.HttpServerClient(s.url))
     yield _weave_client.get()
     _weave_client.reset(client_token)
+    _http_server.reset(server_token)
 
 
 def _make_default_client():
     if util.is_notebook():
-        s = server.HttpServer()
-        s.start()
-        return server.HttpServerClient(s.url)
-    else:
-        return client.Client(server.InProcessServer())
+        serv = _http_server.get()
+        if serv is None:
+            serv = server.HttpServer()
+            serv.start()
+            _http_server.set(serv)
+
+    # we are returning a client that does not talk to the http server we just created because
+    # the http server only communicates with the frontend. we create it above so that there is
+    # a running server for the frontend to talk to as soon as we call use() or show().
+    # python code can use the in process server by default.
+    return client.Client(server.InProcessServer())
 
 
 def use_fixed_server_port():
@@ -83,7 +95,15 @@ def get_client():
 def get_frontend_url():
     url = _frontend_url.get()
     if url is None:
-        url = get_client().url
+        client = get_client()
+        if isinstance(client, server.HttpServerClient):
+            url = client.url
+        else:
+            s = _http_server.get()
+            if s is not None:
+                url = s.url
+            else:
+                raise RuntimeError("Frontend server is not running")
     return url
 
 
