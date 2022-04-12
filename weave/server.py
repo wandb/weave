@@ -10,7 +10,6 @@ import viztracer
 from . import graph, util as _util, client as _client
 from . import serialize
 from . import forward_graph
-from . import execute
 from . import storage
 
 
@@ -18,6 +17,8 @@ is_tracing = True
 
 
 def handle_request(request, deref=False):
+    from . import execute
+
     global is_tracing
     start_time = time.time()
     request_trace = not is_tracing
@@ -88,6 +89,8 @@ class InProcessServer(object):
         pass
 
     def execute(self, nodes, no_cache=False):
+        from . import execute
+
         return execute.execute_nodes(nodes, no_cache=no_cache)
 
 
