@@ -5,6 +5,7 @@ from . import weave_types as types
 from . import graph
 from . import graph_editable
 from . import registry_mem
+from . import errors
 
 
 def await_run_outputs(nodes: typing.List[graph.Node]):
@@ -25,7 +26,12 @@ def await_run_outputs(nodes: typing.List[graph.Node]):
         # If the Node type is RunType, but the Op argument it is passed to
         # is not a RunType, insert an await_final_output operation to convert
         # the Node from a run to the run's output.
-        expected_input_type = op_def.input_type.arg_types[edge.input_name]
+        try:
+            expected_input_type = op_def.input_type.arg_types[edge.input_name]
+        except KeyError:
+            raise errors.WeaveInternalError(
+                "OpDef (%s) missing input_name: %s" % (op_def.name, edge.input_name)
+            )
         if isinstance(actual_input_type, types.RunType) and not isinstance(
             expected_input_type, types.RunType
         ):

@@ -1,4 +1,6 @@
 class WeaveInternalError(Exception):
+    """Internal Weave Error (a programming error)"""
+
     pass
 
 
