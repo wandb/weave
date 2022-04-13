@@ -17,11 +17,11 @@ def filter_fn_to_pandas_filter(df, filter_fn_node):
     if isinstance(filter_fn_node, graph.ConstNode):
         return filter_fn_node.val
     elif isinstance(filter_fn_node, graph.OutputNode):
-        if filter_fn_node.from_op.name == "number-greater":
+        if filter_fn_node.from_op.shortname == "number-greater":
             return filter_fn_to_pandas_filter(
                 df, filter_fn_node.from_op.inputs["lhs"]
             ) > filter_fn_to_pandas_filter(df, filter_fn_node.from_op.inputs["rhs"])
-        if filter_fn_node.from_op.name == "pick":
+        if filter_fn_node.from_op.shortname == "pick":
             return filter_fn_to_pandas_filter(df, filter_fn_node.from_op.inputs["obj"])[
                 filter_fn_to_pandas_filter(df, filter_fn_node.from_op.inputs["key"])
             ]
@@ -36,15 +36,15 @@ def groupby_fn_to_pandas_filter(df, filter_fn_node):
     if isinstance(filter_fn_node, graph.ConstNode):
         return filter_fn_node.val
     elif isinstance(filter_fn_node, graph.OutputNode):
-        if filter_fn_node.from_op.name == "number-greater":
+        if filter_fn_node.from_op.shortname == "number-greater":
             return groupby_fn_to_pandas_filter(
                 df, filter_fn_node.from_op.inputs["lhs"]
             ) > groupby_fn_to_pandas_filter(df, filter_fn_node.from_op.inputs["rhs"])
-        elif filter_fn_node.from_op.name == "pick":
+        elif filter_fn_node.from_op.shortname == "pick":
             return groupby_fn_to_pandas_filter(
                 df, filter_fn_node.from_op.inputs["obj"]
             )[groupby_fn_to_pandas_filter(df, filter_fn_node.from_op.inputs["key"])]
-        elif filter_fn_node.from_op.name == "dict":
+        elif filter_fn_node.from_op.shortname == "dict":
             # Return as list... though we'll need to keep track of that
             # we did this and remap the result keys.
             # TODO

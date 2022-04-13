@@ -6,7 +6,6 @@ import json
 import shutil
 
 from . import util
-from . import refs
 
 # From sdk/interface/artifacts.py
 def md5_hash_file(path):
@@ -65,9 +64,8 @@ class LocalArtifact:
                 self._version = os.path.basename(os.path.realpath(self._read_dirname))
                 self._read_dirname = os.path.join(self._root, self._version)
 
-    @property
-    def abs_root(self):
-        return os.path.abspath(self._dir_name)
+    def path(self, name):
+        return os.path.join(self._read_dirname, name)
 
     @contextlib.contextmanager
     def new_file(self, path, binary=False):

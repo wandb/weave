@@ -1,27 +1,32 @@
+import textwrap
 import inspect
 import os
 import typing
+import sys
 
 from . import errors
 from . import op_args
-from . import weave_types
+from . import weave_types as types
 
 
-class OpDef(object):
+class OpDef:
     name: str
+    version: typing.Optional[str]
     input_type: op_args.OpArgs
     output_type: typing.Union[
-        weave_types.Type,
-        typing.Callable[[typing.Dict[str, weave_types.Type]], weave_types.Type],
+        types.Type,
+        typing.Callable[[typing.Dict[str, types.Type]], types.Type],
     ]
     setter = str
 
     def __init__(
         self,
-        name,
-        input_type,
-        output_type,
-        call_fn,
+        name: str,
+        input_type: op_args.OpArgs,
+        output_type: typing.Union[
+            types.Type,
+            typing.Callable[[typing.Dict[str, types.Type]], types.Type],
+        ],
         resolve_fn,
         setter=None,
         render_info=None,
@@ -30,11 +35,12 @@ class OpDef(object):
         self.name = name
         self.input_type = input_type
         self.output_type = output_type
-        self.call_fn = call_fn
         self.resolve_fn = resolve_fn
         self.setter = setter
         self.render_info = render_info
         self.pure = pure
+        self.call_fn = None
+        self.version = None
 
     @property
     def simple_name(self):
@@ -84,6 +90,40 @@ class OpDef(object):
 
     def __str__(self):
         return "<OpDef: %s>" % self.name
+
+
+class OpDefType(types.Type):
+    name = "op-def"
+    instance_class = OpDef
+    instance_classes = OpDef
+
+    def __init__(self):
+        # TODO: actually this should maybe be the function's type?
+        pass
+
+    def assign_type(self, other):
+        return types.InvalidType()
+
+    def save_instance(self, obj: OpDef, artifact, name):
+        code = "import weave\n" "\n"
+        code += textwrap.dedent(inspect.getsource(obj.resolve_fn))
+        # TODO: not respecting name!
+        with artifact.new_file(f"{name}.py") as f:
+            f.write(code)
+
+    def load_instance(cls, artifact, name, extra=None):
+        path = artifact.path(f"{name}")
+
+        module_dir, module_name = path.rsplit("/", 1)
+        sys.path.insert(0, module_dir)
+        # This has a side effect of registering the op
+        __import__(module_name)
+        sys.path.pop(0)
+        from .registry_mem import memory_registry
+
+        # TODO: Very ugly to rely on artifact name here
+        op_name = artifact._name.split("-", 1)[1]
+        return memory_registry.get_op(op_name + ":" + artifact.version)
 
 
 def fully_qualified_opname(wrap_fn):

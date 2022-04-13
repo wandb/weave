@@ -11,6 +11,7 @@ from . import storage
 from . import panels
 from .show import _show_params
 from .ecosystem import openai
+from . import test_helpers
 
 
 def test_show_simple_call():
@@ -32,7 +33,7 @@ def test_show_simple_call():
                                 "val": "/tmp/cereal.csv",
                             }
                         },
-                        "name": "localpath",
+                        "name": test_helpers.RegexMatcher("localpath:.*"),
                     },
                     "nodeType": "output",
                     "type": {
@@ -41,7 +42,7 @@ def test_show_simple_call():
                     },
                 }
             },
-            "name": "file-readcsv",
+            "name": test_helpers.RegexMatcher("file-readcsv:.*"),
         },
         "nodeType": "output",
         "type": {"type": "table"},
@@ -50,7 +51,7 @@ def test_show_simple_call():
 
 EXPECTED_SHOW_PARAMS_FINE_TUNE_WEAVE_NODE = {
     "fromOp": {
-        "name": "openai-finetunegpt3",
+        "name": test_helpers.RegexMatcher("openai-finetunegpt3"),
         "inputs": {
             "hyperparameters": {
                 "nodeType": "const",
@@ -77,7 +78,7 @@ EXPECTED_SHOW_PARAMS_FINE_TUNE_WEAVE_NODE = {
                             "val": "list-dataset/5826f76113017729abd9aeeef0a14831",
                         }
                     },
-                    "name": "get",
+                    "name": test_helpers.RegexMatcher("get:.*"),
                 },
                 "nodeType": "output",
                 "type": {

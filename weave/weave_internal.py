@@ -123,7 +123,7 @@ def make_mapped_op(op_name):
         list_ = new_inputs.pop(mapped_param_name)
         return [op.resolve_fn(x, **new_inputs) for x in list_]
 
-    new_op = op_def.OpDef(mapped_op_name, input_types, output_type, call_fn, resolve)
+    new_op = op_def.OpDef(mapped_op_name, input_types, output_type, resolve)
     registry_mem.memory_registry.register_op(new_op)
 
     return call_fn

@@ -1,6 +1,7 @@
 import numpy as np
 import json
 import pytest
+import re
 
 import wandb
 
@@ -141,10 +142,7 @@ def test_trace():
     assert res == 48
     mult_run = storage.get_obj_creator(storage._get_ref(res))
     assert mult_run._op_name == "number-mult"
-    assert (
-        str(mult_run._inputs["lhs"])
-        == "run-number-add-0160f0cff26fd543021cf0b6c12e4fe6-output/6298d0a1e1f13057a03865a1c4512981"
-    )
+    assert re.match("run-number-add-.*-output/.*$", str(mult_run._inputs["lhs"]))
     assert mult_run._inputs["rhs"] == 4
     add_run = storage.get_obj_creator(mult_run._inputs["lhs"])
     assert add_run._op_name == "number-add"

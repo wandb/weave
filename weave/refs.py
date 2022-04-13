@@ -44,6 +44,10 @@ class LocalArtifactRef(Ref):
         self.extra = extra
 
     @property
+    def version(self):
+        return self.artifact.version
+
+    @property
     def type(self):
         if self._type is not None:
             return self._type
