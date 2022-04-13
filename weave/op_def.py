@@ -119,17 +119,22 @@ class OpDefType(types.Type):
 
     def load_instance(cls, artifact, name, extra=None):
         path = artifact.path(f"{name}")
+        parts = path.split("/")
+        module_path = ".".join(parts)
 
-        module_dir, module_name = path.rsplit("/", 1)
-        sys.path.insert(0, module_dir)
         # This has a side effect of registering the op
-        __import__(module_name)
-        sys.path.pop(0)
-        from .registry_mem import memory_registry
-
-        # TODO: Very ugly to rely on artifact name here
-        op_name = artifact._name.split("-", 1)[1]
-        return memory_registry.get_op(op_name + ":" + artifact.version)
+        mod = __import__(module_path)
+        # We justed imported e.g. 'local-artifacts.op-number-add.xaybjaa._obj'. Navigate from
+        # mod down to _obj.
+        for part in parts[1:]:
+            mod = getattr(mod, part)
+        module_functions = inspect.getmembers(mod, inspect.isfunction)
+        if len(module_functions) != 1:
+            raise errors.WeaveInternalError(
+                "Unexpected Weave module saved in: %s" % path
+            )
+        _, op_call_fn = module_functions[0]
+        return op_call_fn.op_def
 
 
 def fully_qualified_opname(wrap_fn):
