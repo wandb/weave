@@ -16,17 +16,13 @@ def test_op_versioning():
     # should not hit memoized cache.
     assert weave.use(versioned_op(1, 2)) == -1
 
-    # TODO: make it so you don't have to access op_def
     v0_ref = weave.versions(versioned_op.op_def)[0]
-    # TODO: probably nicer if I don't have to call .get() here?
     v0 = v0_ref.get()
-    # TODO: make OpDef callable
     assert weave.use(v0.call_fn(1, 2)) == 3
 
     v1_ref = weave.versions(versioned_op.op_def)[1]
     v1 = v1_ref.get()
     assert weave.use(v1.call_fn(1, 2)) == -1
 
-    # TODO:
-    # - test that previous versions hit memoize cache correctly
-    # TODO: show that you can use weave.get(<op_name>/<version>) to get an op as well.
+    v0_again = weave.use(weave.get("op-op-versioned_op/" + v0.version))
+    assert weave.use(v0_again.call_fn(5, 6)) == 11
