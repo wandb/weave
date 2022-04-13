@@ -118,7 +118,6 @@ class OpDefType(types.Type):
     def save_instance(self, obj: OpDef, artifact, name):
         code = "import weave\n" "\n"
         code += textwrap.dedent(inspect.getsource(obj.resolve_fn))
-        # TODO: not respecting name!
         with artifact.new_file(f"{name}.py") as f:
             f.write(code)
 
