@@ -79,7 +79,7 @@ class LocalArtifactRef(Ref):
                 # obj = uri.get()
                 # ref = get_ref(obj)
                 versions.append(ref)
-        return versions
+        return sorted(versions, key=lambda v: v.artifact.created_at)
 
     @classmethod
     def from_str(cls, s, type=None):
