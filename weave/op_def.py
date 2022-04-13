@@ -11,6 +11,11 @@ from . import weave_types as types
 
 
 class OpDef:
+    """An Op Definition.
+
+    Must be immediately passed to Register.register_op() after construction.
+    """
+
     name: str
     input_type: op_args.OpArgs
     output_type: typing.Union[
