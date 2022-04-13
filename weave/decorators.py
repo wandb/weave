@@ -172,23 +172,8 @@ def op(
             pure=pure,
         )
 
-        # Always save OpDefs any time they are declared
-        from . import storage
-
-        ref = storage.save(op, name=f"op-{op.name}")
-        op.version = ref.version
-
-        fq_op_name += f":{op.version}"
-
-        lazy_call = lazy.make_lazy_call(
-            f, fq_op_name, weave_input_type, weave_output_type
-        )
-        lazy_call.op_def = op
-        lazy_call.is_weave = True
-        op.call_fn = lazy_call
-
-        registry_mem.memory_registry.register_op(lazy_call.op_def)
-        return lazy_call
+        op_version = registry_mem.memory_registry.register_op(op)
+        return op_version.call_fn
 
     return wrap
 

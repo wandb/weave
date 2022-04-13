@@ -1,3 +1,4 @@
+import copy
 import textwrap
 import inspect
 import os
@@ -11,13 +12,14 @@ from . import weave_types as types
 
 class OpDef:
     name: str
-    version: typing.Optional[str]
     input_type: op_args.OpArgs
     output_type: typing.Union[
         types.Type,
         typing.Callable[[typing.Dict[str, types.Type]], types.Type],
     ]
     setter = str
+    call_fn: typing.Any
+    version: typing.Optional[str]
 
     def __init__(
         self,
@@ -39,8 +41,12 @@ class OpDef:
         self.setter = setter
         self.render_info = render_info
         self.pure = pure
-        self.call_fn = None
         self.version = None
+        self.call_fn = None
+
+    @property
+    def fullname(self):
+        return self.name + ":" + self.version
 
     @property
     def simple_name(self):
