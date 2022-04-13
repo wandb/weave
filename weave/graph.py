@@ -51,12 +51,6 @@ class Op:
         self.name = name
         self.inputs = inputs
 
-    @property
-    def shortname(self):
-        if ":" in self.name:
-            return self.name.split(":")[0]
-        return self.name
-
     def to_json(self):
         json_inputs = {}
         for k, v in self.inputs.items():
@@ -169,6 +163,12 @@ def for_each(graph: Node, visitor):
         for param_name, param_node in graph.from_op.inputs.items():
             for_each(param_node, visitor)
     visitor(graph)
+
+
+def opname_without_version(op):
+    if ":" in op.name:
+        return op.name.split(":")[0]
+    return op.name
 
 
 def opname_expr_str(op_name):

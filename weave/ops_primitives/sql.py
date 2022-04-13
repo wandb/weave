@@ -35,17 +35,18 @@ def filter_fn_to_sql_filter(table, filter_fn_node):
     if isinstance(filter_fn_node, graph.ConstNode):
         return filter_fn_node.val
     elif isinstance(filter_fn_node, graph.OutputNode):
-        if filter_fn_node.from_op.shortname == "number-greater":
+        op_name = graph.opname_without_version(filter_fn_node.from_op)
+        if op_name == "number-greater":
             return filter_fn_to_sql_filter(
                 table, filter_fn_node.from_op.inputs["lhs"]
             ) > filter_fn_to_sql_filter(table, filter_fn_node.from_op.inputs["rhs"])
-        if filter_fn_node.from_op.shortname == "pick":
+        if op_name == "pick":
             return filter_fn_to_sql_filter(
                 table, filter_fn_node.from_op.inputs["obj"]
             ).columns[
                 filter_fn_to_sql_filter(table, filter_fn_node.from_op.inputs["key"])
             ]
-        raise Exception("unhandled op name", filter_fn_node.from_op.shortname)
+        raise Exception("unhandled op name", op_name)
     elif isinstance(filter_fn_node, graph.VarNode):
         if filter_fn_node.name == "row":
             return table

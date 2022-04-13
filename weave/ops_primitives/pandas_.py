@@ -17,15 +17,16 @@ def filter_fn_to_pandas_filter(df, filter_fn_node):
     if isinstance(filter_fn_node, graph.ConstNode):
         return filter_fn_node.val
     elif isinstance(filter_fn_node, graph.OutputNode):
-        if filter_fn_node.from_op.shortname == "number-greater":
+        op_name = graph.opname_without_version(filter_fn_node.from_op)
+        if op_name == "number-greater":
             return filter_fn_to_pandas_filter(
                 df, filter_fn_node.from_op.inputs["lhs"]
             ) > filter_fn_to_pandas_filter(df, filter_fn_node.from_op.inputs["rhs"])
-        if filter_fn_node.from_op.shortname == "pick":
+        if op_name == "pick":
             return filter_fn_to_pandas_filter(df, filter_fn_node.from_op.inputs["obj"])[
                 filter_fn_to_pandas_filter(df, filter_fn_node.from_op.inputs["key"])
             ]
-        raise Exception("unhandled op name", filter_fn_node.from_op.name)
+        raise Exception("unhandled op name", op_name)
     elif isinstance(filter_fn_node, graph.VarNode):
         if filter_fn_node.name == "row":
             return df
@@ -36,15 +37,16 @@ def groupby_fn_to_pandas_filter(df, filter_fn_node):
     if isinstance(filter_fn_node, graph.ConstNode):
         return filter_fn_node.val
     elif isinstance(filter_fn_node, graph.OutputNode):
-        if filter_fn_node.from_op.shortname == "number-greater":
+        op_name = graph.opname_without_version(filter_fn_node.from_op)
+        if op_name == "number-greater":
             return groupby_fn_to_pandas_filter(
                 df, filter_fn_node.from_op.inputs["lhs"]
             ) > groupby_fn_to_pandas_filter(df, filter_fn_node.from_op.inputs["rhs"])
-        elif filter_fn_node.from_op.shortname == "pick":
+        elif op_name == "pick":
             return groupby_fn_to_pandas_filter(
                 df, filter_fn_node.from_op.inputs["obj"]
             )[groupby_fn_to_pandas_filter(df, filter_fn_node.from_op.inputs["key"])]
-        elif filter_fn_node.from_op.shortname == "dict":
+        elif op_name == "dict":
             # Return as list... though we'll need to keep track of that
             # we did this and remap the result keys.
             # TODO
@@ -52,7 +54,7 @@ def groupby_fn_to_pandas_filter(df, filter_fn_node):
                 groupby_fn_to_pandas_filter(df, n)
                 for n in filter_fn_node.from_op.inputs.values()
             )
-        raise Exception("unhandled op name", filter_fn_node.from_op.name)
+        raise Exception("unhandled op name", op_name)
     elif isinstance(filter_fn_node, graph.VarNode):
         if filter_fn_node.name == "row":
             return df
