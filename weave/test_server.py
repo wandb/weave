@@ -9,6 +9,8 @@ from . import storage
 from . import client as _client
 from . import server as _server
 
+import requests
+
 SERVER_TYPES = ["inprocess", "subprocess", "http"]
 
 # Python seems to take forever to spin up a new Process (maybe
@@ -73,3 +75,18 @@ def test_type_returning_op(server_type):
             ops.local_path_return_type("testdata/cereal.csv"), client=wc
         )
         assert csv_type.name == "local_file"
+
+
+@pytest.mark.timeout(3)
+def test_500_does_raise_jsondecode_error_from_http_server():
+    with client("http") as wc:
+
+        @weave.op()
+        def custom_op_that_should_return_500(x: str) -> str:
+            if x == "abcd":
+                raise ValueError("returning 500")
+            return x + "a"
+
+        # should not raise json decoder error, but an HTTP error insteard
+        with pytest.raises(requests.exceptions.HTTPError):
+            weave.use(custom_op_that_should_return_500("abcd"), client=wc)

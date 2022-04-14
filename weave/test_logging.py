@@ -1,6 +1,6 @@
 import os
 import re
-import json
+import requests
 from . import api
 from . import ops
 from . import context
@@ -29,7 +29,7 @@ def test_logfile_captures_error(fresh_server_logfile):
     # run this to kick off a server
 
     with context.local_http_client():
-        with pytest.raises(json.JSONDecodeError):
+        with pytest.raises(requests.exceptions.HTTPError):
             api.use(ops.Number.__add__(3, "a"))
 
         # check that the log file was created
@@ -47,7 +47,7 @@ def test_log_2_app_instances_different_threads(fresh_server_logfile):
 
     with context.local_http_client():
         with context.local_http_client():
-            with pytest.raises(json.JSONDecodeError):
+            with pytest.raises(requests.exceptions.HTTPError):
                 # this one is run by server 2
                 api.use(ops.Number.__add__(3, "a"))
 

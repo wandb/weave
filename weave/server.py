@@ -101,6 +101,8 @@ class HttpServerClient(object):
     def execute(self, nodes, no_cache=False):
         serialized = serialize.serialize(nodes)
         r = requests.post(self.url + "/__weave/execute/v2", json={"graphs": serialized})
+        r.raise_for_status()
+
         response = r.json()["data"]
         deserialized = [storage.from_python(r) for r in response]
         return [storage.deref(r) for r in deserialized]
