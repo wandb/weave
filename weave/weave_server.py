@@ -8,6 +8,7 @@ import warnings
 from flask import Flask
 from flask import request
 from flask import abort
+from flask import jsonify
 from flask_cors import CORS
 from flask import send_from_directory
 
@@ -17,6 +18,8 @@ from weave import op_args
 from weave import errors
 
 from flask.logging import wsgi_errors_stream
+
+from werkzeug.exceptions import InternalServerError
 
 # Ensure we register the openai ops so we can tell the
 # app about them with list_ops
@@ -87,6 +90,11 @@ def make_app(log_filename=None, stream_logging_enabled=False):
 
 app = make_app()
 CORS(app)
+
+
+@app.errorhandler(InternalServerError)
+def internal_server_error_handler(e: InternalServerError):
+    return jsonify({"data": e, "code": 500})
 
 
 @app.route("/__weave/ops", methods=["GET"])
