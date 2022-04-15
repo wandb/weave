@@ -114,7 +114,7 @@ class HttpServer(threading.Thread):
 
         app = weave_server.app
         threading.Thread.__init__(self, daemon=True)
-        self.srv = make_server(host, port, app, threaded=True)
+        self.srv = make_server(host, port, app, threaded=False)
 
         # if the passed port is zero then a randomly allocated port will be used. this
         # gets the value of the port that was assigned
