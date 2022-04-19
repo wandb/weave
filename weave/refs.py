@@ -44,6 +44,10 @@ class LocalArtifactRef(Ref):
         self.extra = extra
 
     @property
+    def version(self):
+        return self.artifact.version
+
+    @property
     def type(self):
         if self._type is not None:
             return self._type
@@ -75,7 +79,7 @@ class LocalArtifactRef(Ref):
                 # obj = uri.get()
                 # ref = get_ref(obj)
                 versions.append(ref)
-        return versions
+        return sorted(versions, key=lambda v: v.artifact.created_at)
 
     @classmethod
     def from_str(cls, s, type=None):

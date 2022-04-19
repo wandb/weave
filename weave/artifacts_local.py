@@ -4,9 +4,9 @@ import os
 import pathlib
 import json
 import shutil
+from datetime import datetime
 
 from . import util
-from . import refs
 
 # From sdk/interface/artifacts.py
 def md5_hash_file(path):
@@ -47,6 +47,10 @@ class LocalArtifact:
             raise Exception("artifact must be saved before calling version!")
         return self._version
 
+    @property
+    def created_at(self):
+        return self.read_metadata()["created_at"]
+
     def get_other_version(self, version):
         if not local_artifact_exists(self._name, version):
             return None
@@ -65,9 +69,8 @@ class LocalArtifact:
                 self._version = os.path.basename(os.path.realpath(self._read_dirname))
                 self._read_dirname = os.path.join(self._root, self._version)
 
-    @property
-    def abs_root(self):
-        return os.path.abspath(self._dir_name)
+    def path(self, name):
+        return os.path.join(self._read_dirname, name)
 
     @contextlib.contextmanager
     def new_file(self, path, binary=False):
@@ -95,6 +98,16 @@ class LocalArtifact:
             self._path_handlers[path] = handler
         return handler
 
+    def read_metadata(self):
+        with open(os.path.join(self._read_dirname, ".artifact-version.json")) as f:
+            obj = json.load(f)
+            obj["created_at"] = datetime.fromisoformat(obj["created_at"])
+            return obj
+
+    def write_metadata(self, dirname):
+        with open(os.path.join(dirname, ".artifact-version.json"), "w") as f:
+            json.dump({"created_at": datetime.now().isoformat()}, f)
+
     def save(self, branch="latest"):
         for handler in self._path_handlers.values():
             handler.close()
@@ -117,6 +130,7 @@ class LocalArtifact:
         else:
             new_dirname = os.path.join(self._root, commit_hash)
             os.makedirs(new_dirname, exist_ok=True)
+            self.write_metadata(new_dirname)
             if self._read_dirname:
                 for path in os.listdir(self._read_dirname):
                     src_path = os.path.join(self._read_dirname, path)

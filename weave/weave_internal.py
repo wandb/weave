@@ -1,4 +1,5 @@
 import copy
+import inspect
 from . import graph
 
 from . import weave_types as types
@@ -114,16 +115,16 @@ def make_mapped_op(op_name):
 
         output_type = make_output_type
 
-    call_fn = lazy.make_lazy_call(
-        op.resolve_fn, mapped_op_name, input_types, output_type
-    )
-
     def resolve(**inputs):
         new_inputs = copy.copy(inputs)
         list_ = new_inputs.pop(mapped_param_name)
         return [op.resolve_fn(x, **new_inputs) for x in list_]
 
-    new_op = op_def.OpDef(mapped_op_name, input_types, output_type, call_fn, resolve)
-    registry_mem.memory_registry.register_op(new_op)
+    # Use the function signature of the original op to compute the signature
+    # of the lazy call
+    resolve.sig = inspect.signature(op.resolve_fn)
 
-    return call_fn
+    new_op = op_def.OpDef(mapped_op_name, input_types, output_type, resolve)
+    op_version = registry_mem.memory_registry.register_op(new_op)
+
+    return op_version.call_fn

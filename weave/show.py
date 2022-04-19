@@ -8,7 +8,7 @@ from . import context
 from . import graph
 from . import panel
 from . import weave_types as types
-from . import server
+from . import weavejs_fixes
 from . import storage
 from . import util
 from . import usage_analytics
@@ -29,12 +29,12 @@ def make_refs(node: graph.Node):
 # Broken out into to separate function for testing
 def _show_params(obj):
     if isinstance(obj, graph.Node):
-        return {"weave_node": make_refs(obj)}
+        return {"weave_node": weavejs_fixes.remove_opcall_versions_node(make_refs(obj))}
     elif isinstance(obj, storage.Ref):
         from weave import ops
 
         node = ops.get(str(obj))
-        return {"weave_node": node}
+        return {"weave_node": weavejs_fixes.remove_opcall_versions_node(node)}
 
     elif types.TypeRegistry.has_type(obj):
         from weave import ops
@@ -44,14 +44,13 @@ def _show_params(obj):
         ref = storage.save(obj, name=names[-1])
         node = ops.get(str(ref))
 
-        return {"weave_node": node}
+        return {"weave_node": weavejs_fixes.remove_opcall_versions_node(node)}
 
     elif isinstance(obj, panel.Panel):
-
         return {
-            "weave_node": obj.input_node,
+            "weave_node": weavejs_fixes.remove_opcall_versions_node(obj.input_node),
             "panel_id": obj.id,
-            "panel_config": obj.config,
+            "panel_config": weavejs_fixes.remove_opcall_versions_data(obj.config),
         }
 
     else:
