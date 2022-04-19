@@ -218,8 +218,34 @@ def node_expr_str(node: Node):
         return node.name
 
 
-def map_nodes(node: Node, map_fn: typing.Callable[[Node], Node]) -> Node:
+def _map_nodes(
+    node: Node, map_fn: typing.Callable[[Node], Node], already_mapped: dict[Node, Node]
+) -> Node:
+    if node in already_mapped:
+        return already_mapped[node]
     if isinstance(node, OutputNode):
-        inputs = {k: map_nodes(n, map_fn) for k, n in node.from_op.inputs.items()}
+        inputs = {
+            k: _map_nodes(n, map_fn, already_mapped)
+            for k, n in node.from_op.inputs.items()
+        }
         node = OutputNode(node.type, node.from_op.name, inputs)
-    return map_fn(node)
+    mapped_node = map_fn(node)
+    already_mapped[node] = mapped_node
+    return mapped_node
+
+
+def map_nodes(node: Node, map_fn: typing.Callable[[Node], Node]) -> Node:
+    return _map_nodes(node, map_fn, {})
+
+
+def _all_nodes(node: Node) -> set[Node]:
+    if not isinstance(node, OutputNode):
+        return set((node,))
+    res: set[Node] = set((node,))
+    for input in node.from_op.inputs.values():
+        res.update(_all_nodes(input))
+    return res
+
+
+def count(node: Node) -> int:
+    return len(_all_nodes(node))
