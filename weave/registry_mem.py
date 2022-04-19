@@ -82,17 +82,23 @@ class Registry:
         # Always save OpDefs any time they are declared
         from . import storage
 
-        ref = storage.save(op, name=f"op-{op.name}")
-        op.version = ref.version
+        version = op_def.get_loading_op_verison()
+        if version is None:
+            # if we're not loading an existing op, save it.
+            ref = storage.save(op, name=f"op-{op.name}")
+            version = ref.version
+        op.version = version
 
-        full_name = op.name + ":" + ref.version
+        full_name = op.name + ":" + version
         op.call_fn = lazy.make_lazy_call(
             op.resolve_fn, full_name, op.input_type, op.output_type
         )
         op.call_fn.op_def = op
 
+        # TODO this is latest
         self._ops[op.name] = op
-        self._op_versions[(op.name, ref.version)] = op
+
+        self._op_versions[(op.name, version)] = op
         return op
 
     def get_op(self, name: str) -> op_def.OpDef:

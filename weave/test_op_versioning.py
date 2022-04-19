@@ -20,6 +20,10 @@ def test_op_versioning():
     v0 = v0_ref.get()
     assert weave.use(v0.call_fn(1, 2)) == 3
 
+    # This should refer to v1, even though we just loaded v0
+    v_latest = weave.use(weave.get("op-op-versioned_op/latest"))
+    assert weave.use(v_latest.call_fn(4, 20)) == -16
+
     v1_ref = weave.versions(versioned_op.op_def)[1]
     v1 = v1_ref.get()
     assert weave.use(v1.call_fn(1, 2)) == -1
