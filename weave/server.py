@@ -108,25 +108,90 @@ class HttpServerClient(object):
         return [storage.deref(r) for r in deserialized]
 
 
-class HttpServer(threading.Thread):
+class ServerInterface(object):
+    def start(self):
+        raise NotImplementedError()
+
+    def shutdown(self):
+        raise NotImplementedError()
+
+    @property
+    def url(self):
+        raise NotImplementedError()
+
+
+class HttpServerInternal(object):
     def __init__(self, port=0, host="127.0.0.1"):
         from . import weave_server
 
         self.host = host
 
         app = weave_server.app
-        threading.Thread.__init__(self, daemon=True)
+
         self.srv = make_server(host, port, app, threaded=False)
 
         # if the passed port is zero then a randomly allocated port will be used. this
         # gets the value of the port that was assigned
         self.port = self.srv.socket.getsockname()[1]
 
-    def run(self):
+    def serve(self):
         self.srv.serve_forever()
 
     def shutdown(self):
         self.srv.shutdown()
+
+    @property
+    def url(self):
+        url = f"http://{self.host}"
+        if self.port is not None:
+            url = f"{url}:{self.port}"
+        return url
+
+
+class HttpServerThread(threading.Thread, ServerInterface):
+    def __init__(self, port=0, host="127.0.0.1"):
+        threading.Thread.__init__(self, daemon=True)
+        self.server = HttpServerInternal(port, host)
+
+    def run(self):
+        self.server.serve()
+
+    def shutdown(self):
+        self.server.shutdown()
+
+    @property
+    def url(self):
+        return self.server.url
+
+
+def server_proc(port, host):
+    server = HttpServerInternal(port, host)
+    server.serve()
+    return server
+
+
+class HttpServer(ServerInterface):
+    def __init__(self, port=0, host="127.0.0.1"):
+        if port == 0:
+            port = 1234
+        self.port = port
+        self.host = host
+        self.proc = multiprocessing.Process(
+            target=server_proc,
+            args=(
+                self.port,
+                self.host,
+            ),
+        )
+
+    def start(self):
+        self.proc.start()
+        # TODO: stop being lazy
+        time.sleep(3)
+
+    def shutdown(self):
+        server = self.proc.join()
+        server.shutdown()
 
     @property
     def url(self):
