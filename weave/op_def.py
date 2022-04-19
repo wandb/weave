@@ -122,16 +122,11 @@ class OpDefType(types.Type):
 
     def load_instance(cls, artifact, name, extra=None):
         path = artifact.path(f"{name}")
-        parts = path.split("/")[
-            1:
-        ]  # drop local-artifacts, we'll insert that to sys.path
+        # drop local-artifacts, we'll insert that to sys.path
+        parts = path.split("/")[1:]
         module_path = ".".join(parts)
 
         # This has a side effect of registering the op
-        import os
-
-        print("LS", os.listdir())
-        print("MODULE_PATH", module_path)
         sys.path.insert(0, "local-artifacts")
         mod = __import__(module_path)
         sys.path.pop(0)
