@@ -55,7 +55,7 @@ class TypedDict(dict):
             # surfaces an error
             # TODO: totally not right, need to figure out mappped ops
             return obj.pick(key)
-        return super().__getitem__(key)
+        return dict.__getitem__(obj, key)
 
 
 @weave_class(weave_type=types.Dict)

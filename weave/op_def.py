@@ -1,27 +1,58 @@
+import textwrap
+import contextlib
+import contextvars
 import inspect
 import os
 import typing
+import sys
 
 from . import errors
 from . import op_args
-from . import weave_types
+from . import weave_types as types
 
 
-class OpDef(object):
+# Set to the op version if we're in the process of loading
+# an op from an artifact.
+_loading_op_version: contextvars.ContextVar[
+    typing.Optional[str]
+] = contextvars.ContextVar("loading_op_version", default=None)
+
+
+@contextlib.contextmanager
+def loading_op_version(version):
+    token = _loading_op_version.set(version)
+    yield _loading_op_version.get()
+    _loading_op_version.reset(token)
+
+
+def get_loading_op_version():
+    return _loading_op_version.get()
+
+
+class OpDef:
+    """An Op Definition.
+
+    Must be immediately passed to Register.register_op() after construction.
+    """
+
     name: str
     input_type: op_args.OpArgs
     output_type: typing.Union[
-        weave_types.Type,
-        typing.Callable[[typing.Dict[str, weave_types.Type]], weave_types.Type],
+        types.Type,
+        typing.Callable[[typing.Dict[str, types.Type]], types.Type],
     ]
     setter = str
+    call_fn: typing.Any
+    version: typing.Optional[str]
 
     def __init__(
         self,
-        name,
-        input_type,
-        output_type,
-        call_fn,
+        name: str,
+        input_type: op_args.OpArgs,
+        output_type: typing.Union[
+            types.Type,
+            typing.Callable[[typing.Dict[str, types.Type]], types.Type],
+        ],
         resolve_fn,
         setter=None,
         render_info=None,
@@ -30,11 +61,16 @@ class OpDef(object):
         self.name = name
         self.input_type = input_type
         self.output_type = output_type
-        self.call_fn = call_fn
         self.resolve_fn = resolve_fn
         self.setter = setter
         self.render_info = render_info
         self.pure = pure
+        self.version = None
+        self.call_fn = None
+
+    @property
+    def fullname(self):
+        return self.name + ":" + self.version
 
     @property
     def simple_name(self):
@@ -84,6 +120,48 @@ class OpDef(object):
 
     def __str__(self):
         return "<OpDef: %s>" % self.name
+
+
+class OpDefType(types.Type):
+    name = "op-def"
+    instance_class = OpDef
+    instance_classes = OpDef
+
+    def __init__(self):
+        # TODO: actually this should maybe be the function's type?
+        pass
+
+    def assign_type(self, other):
+        return types.InvalidType()
+
+    def save_instance(self, obj: OpDef, artifact, name):
+        code = "import weave\n" "\n"
+        code += textwrap.dedent(inspect.getsource(obj.resolve_fn))
+        with artifact.new_file(f"{name}.py") as f:
+            f.write(code)
+
+    def load_instance(cls, artifact, name, extra=None):
+        path = artifact.path(f"{name}")
+        # drop local-artifacts, we'll insert that to sys.path
+        parts = path.split("/")[1:]
+        module_path = ".".join(parts)
+
+        # This has a side effect of registering the op
+        sys.path.insert(0, "local-artifacts")
+        with loading_op_version(artifact.version):
+            mod = __import__(module_path)
+        sys.path.pop(0)
+        # We justed imported e.g. 'op-number-add.xaybjaa._obj'. Navigate from
+        # mod down to _obj.
+        for part in parts[1:]:
+            mod = getattr(mod, part)
+        module_functions = inspect.getmembers(mod, inspect.isfunction)
+        if len(module_functions) != 1:
+            raise errors.WeaveInternalError(
+                "Unexpected Weave module saved in: %s" % path
+            )
+        _, op_call_fn = module_functions[0]
+        return op_call_fn.op_def
 
 
 def fully_qualified_opname(wrap_fn):

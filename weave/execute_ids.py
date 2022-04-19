@@ -27,7 +27,11 @@ def make_run_id(op_def: op_def.OpDef, inputs_refs: Mapping[str, typing.Any]):
                 hashable_inputs[name] = str(ref)
             else:
                 hashable_inputs[name] = value_id(obj)
-        hash_val = {"op_name": op_def.name, "inputs": hashable_inputs}
+        hash_val = {
+            "op_name": op_def.name,
+            "op_version": op_def.version,
+            "inputs": hashable_inputs,
+        }
     hash = hashlib.md5()
     hash.update(json.dumps(hash_val).encode())
 

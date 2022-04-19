@@ -11,6 +11,7 @@ from . import storage
 from . import panels
 from .show import _show_params
 from .ecosystem import openai
+from . import test_helpers
 
 
 def test_show_simple_call():

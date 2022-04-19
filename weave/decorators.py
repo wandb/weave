@@ -162,23 +162,18 @@ def op(
             # Ah crap this isn't right yet.
             # fq_op_name = op_def.fully_qualified_opname(f)
 
-        lazy_call = lazy.make_lazy_call(
-            f, fq_op_name, weave_input_type, weave_output_type
-        )
-        lazy_call.is_weave = True
-
-        lazy_call.op_def = op_def.OpDef(
+        op = op_def.OpDef(
             fq_op_name,
             weave_input_type,
             weave_output_type,
-            lazy_call,
             f,
             setter=setter,
             render_info=render_info,
             pure=pure,
         )
-        registry_mem.memory_registry.register_op(lazy_call.op_def)
-        return lazy_call
+
+        op_version = registry_mem.memory_registry.register_op(op)
+        return op_version.call_fn
 
     return wrap
 
