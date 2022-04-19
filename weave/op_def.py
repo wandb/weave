@@ -25,7 +25,7 @@ def loading_op_version(version):
     _loading_op_version.reset(token)
 
 
-def get_loading_op_verison():
+def get_loading_op_version():
     return _loading_op_version.get()
 
 

@@ -71,6 +71,7 @@ class Registry:
     # TODO: Get rid of this! Always use versioning! This is a temporary
     # state.
     _ops: typing.Dict[str, op_def.OpDef]
+
     _op_versions: typing.Dict[tuple[str, str], op_def.OpDef]
 
     def __init__(self):
@@ -82,7 +83,8 @@ class Registry:
         # Always save OpDefs any time they are declared
         from . import storage
 
-        version = op_def.get_loading_op_verison()
+        version = op_def.get_loading_op_version()
+        is_loading = version is not None
         if version is None:
             # if we're not loading an existing op, save it.
             ref = storage.save(op, name=f"op-{op.name}")
@@ -95,8 +97,8 @@ class Registry:
         )
         op.call_fn.op_def = op
 
-        # TODO this is latest
-        self._ops[op.name] = op
+        if not is_loading:
+            self._ops[op.name] = op
 
         self._op_versions[(op.name, version)] = op
         return op
