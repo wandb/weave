@@ -1,8 +1,8 @@
 import textwrap
 import inspect
-import pathlib
 import os
 import typing
+import sys
 
 from . import errors
 from . import op_args
@@ -122,7 +122,9 @@ class OpDefType(types.Type):
 
     def load_instance(cls, artifact, name, extra=None):
         path = artifact.path(f"{name}")
-        parts = path.split("/")
+        parts = path.split("/")[
+            1:
+        ]  # drop local-artifacts, we'll insert that to sys.path
         module_path = ".".join(parts)
 
         # This has a side effect of registering the op
@@ -130,8 +132,10 @@ class OpDefType(types.Type):
 
         print("LS", os.listdir())
         print("MODULE_PATH", module_path)
+        sys.path.insert(0, "local-artifacts")
         mod = __import__(module_path)
-        # We justed imported e.g. 'local-artifacts.op-number-add.xaybjaa._obj'. Navigate from
+        sys.path.pop(0)
+        # We justed imported e.g. 'op-number-add.xaybjaa._obj'. Navigate from
         # mod down to _obj.
         for part in parts[1:]:
             mod = getattr(mod, part)
