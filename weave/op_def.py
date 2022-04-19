@@ -125,8 +125,11 @@ class OpDefType(types.Type):
         parts = path.split("/")
         module_path = ".".join(parts)
 
-        pathlib.Path("local-artifacts/__init__.py").touch()
         # This has a side effect of registering the op
+        import os
+
+        print("LS", os.listdir())
+        print("MODULE_PATH", module_path)
         mod = __import__(module_path)
         # We justed imported e.g. 'local-artifacts.op-number-add.xaybjaa._obj'. Navigate from
         # mod down to _obj.
