@@ -66,11 +66,14 @@ bash weave_server.sh
 
 - Run a frontend dev server on 3000:
 
+Using the W&B core repo (for now, later we'll move this out to a new repo).
+
 ```
 cd core/frontends/app/weave-ui && yarn dev
 ```
 
 - Enable frontend dev mode in python
+
 ```
 weave.enable_frontend_devmode()
 ```
@@ -84,6 +87,7 @@ cd core/frontends/app/weave-ui && yarn build
 ```
 
 Copy it over to weave-python
+
 ```
-rm -rf $WEAVE_ROOT/weave-internal/weave/frontend && cp -r build/ $WEAVE_ROOT/weave-internal/weave/frontend  
+rm -rf $WEAVE_ROOT/weave-internal/weave/frontend && cp -r build/ $WEAVE_ROOT/weave-internal/weave/frontend
 ```
