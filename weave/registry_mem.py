@@ -86,8 +86,7 @@ class Registry:
 
         version = op_def.get_loading_op_version()
         is_loading = version is not None
-        is_builtin = False  # TODO: figure this out
-        should_save = not is_loading and not is_builtin
+        should_save = not is_loading and not op.is_builtin
         if should_save:
             # if we're not loading an existing op, save it.
             ref = storage.save(op, name=op.name)

@@ -1,3 +1,4 @@
+from imp import is_builtin
 import textwrap
 import contextlib
 import contextvars
@@ -17,6 +18,12 @@ _loading_op_version: contextvars.ContextVar[
     typing.Optional[str]
 ] = contextvars.ContextVar("loading_op_version", default=None)
 
+# Set to the op version if we're in the process of loading
+# an op from an artifact.
+_loading_built_ins: contextvars.ContextVar[
+    typing.Optional[bool]
+] = contextvars.ContextVar("loading_builtins", default=None)
+
 
 @contextlib.contextmanager
 def loading_op_version(version):
@@ -27,6 +34,14 @@ def loading_op_version(version):
 
 def get_loading_op_version():
     return _loading_op_version.get()
+
+
+def set_loading_built_ins(currently: bool):
+    _loading_built_ins.set(currently)
+
+
+def get_loading_built_ins():
+    return _loading_built_ins.get()
 
 
 class OpDef:
@@ -44,6 +59,7 @@ class OpDef:
     setter = str
     call_fn: typing.Any
     version: typing.Optional[str]
+    is_builtin: bool = False
 
     def __init__(
         self,
@@ -57,6 +73,7 @@ class OpDef:
         setter=None,
         render_info=None,
         pure=True,
+        is_builtin: typing.Optional[bool] = None,
     ):
         self.name = name
         self.input_type = input_type
@@ -65,6 +82,9 @@ class OpDef:
         self.setter = setter
         self.render_info = render_info
         self.pure = pure
+        self.is_builtin = (
+            is_builtin if is_builtin is not None else get_loading_built_ins()
+        )
         self.version = None
         self.call_fn = None
 

@@ -136,7 +136,7 @@ class ConstNode(Node):
         from .ops_domain import file
 
         if ref is not None:
-            val = file.get(str(ref)).to_json()
+            val = file.get(str(ref.uri())).to_json()
             return val
 
         return {"nodeType": "const", "type": self.type.to_dict(), "val": val}
