@@ -55,3 +55,35 @@ Install pre commit hooks
 pip install -r requirements.dev.txt
 pre-commit install
 ```
+
+### Enable frontend devmode
+
+- Run a weave server at 9994:
+
+```
+bash weave_server.sh
+```
+
+- Run a frontend dev server on 3000:
+
+```
+cd core/frontends/app/weave-ui && yarn dev
+```
+
+- Enable frontend dev mode in python
+```
+weave.enable_frontend_devmode()
+```
+
+### Build the bundle for production
+
+Go to the weave ui directory and build the bundle
+
+```
+cd core/frontends/app/weave-ui && yarn build
+```
+
+Copy it over to weave-python
+```
+rm -rf $WEAVE_ROOT/weave-internal/weave/frontend && cp -r build/ $WEAVE_ROOT/weave-internal/weave/frontend  
+```
