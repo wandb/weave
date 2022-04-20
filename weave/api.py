@@ -1,3 +1,4 @@
+from re import A
 from . import graph as _graph
 from . import storage as _storage
 from . import weave_internal as _weave_internal
@@ -16,7 +17,6 @@ from .context import (
     capture_weave_server_logs,
 )
 
-
 def save(node_or_obj, name=None):
     if isinstance(node_or_obj, _graph.Node):
         from .ops_primitives import file as file_ops
@@ -28,7 +28,8 @@ def save(node_or_obj, name=None):
 
 def publish(node_or_obj, name=None):
     if getattr(node_or_obj, 'is_weave', False):
-        ref = _storage.publish(node_or_obj.op_def, name if name else f"op-{node_or_obj.op_def.name}")
+        ref = _storage.publish(node_or_obj.op_def, name if name else node_or_obj.op_def.name)
+        return ref
     else:
         raise Error("unimplemented")
 
