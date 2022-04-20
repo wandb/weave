@@ -31,8 +31,8 @@ def put_ref(obj, ref):
 
 
 class WandbArtifactRef(Ref):
-    def __init__(self, artifact_string, path, type=None, obj=None):
-        self.artifact = wandb.Api().artifact(artifact_string)
+    def __init__(self, artifact, path, type=None, obj=None):
+        self.artifact = artifact
         self.path = path
         self._type = type
         self.obj = obj
@@ -46,10 +46,13 @@ class WandbArtifactRef(Ref):
     def type(self):
         if self._type is not None:
             return self._type
-        with open(self.artifact.get_path(f"{self.path}.type.json", "r")) as f:
+        with open(self.artifact.open(f"{self.path}.type.json", "r")) as f:
             type_json = json.load(f)
         self._type = types.TypeRegistry.type_from_dict(type_json)
         return self._type
+
+    def uri(self):
+        pass
 
     def get(self):
         if self.obj:
@@ -60,6 +63,9 @@ class WandbArtifactRef(Ref):
         self.obj = obj
         return obj
         
+    @classmethod
+    def from_str(cls, s):
+        pass
 
 class LocalArtifactRef(Ref):
     artifact: "artifacts_local.LocalArtifact"

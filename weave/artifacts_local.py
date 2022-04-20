@@ -160,43 +160,54 @@ class WandbArtifact:
 
     def __init__(self, name, version=None, type=None):
         self.writeable_artifact = wandb.Artifact(name, type="op_def" if type is None else type)
+        self.saved_artifact = None
         
 
     @property
     def version(self):
-        raise Error("unimplemented")
+        if not self.saved_artifact:
+            raise Exception("cannot get version of an unsaved artifact")
+        return self.writeable_artifact.version
 
     @property
     def created_at(self):
-        raise Error("unimplemented")
+        raise Exception("unimplemented")
 
     def get_other_version(self, version):
-        raise Error("unimplemented")
+        raise Exception("unimplemented")
 
     def path(self, name):
-        raise Error("unimplemented")
+        raise Exception("unimplemented")
 
     @contextlib.contextmanager
     def new_file(self, path, binary=False):
         mode = "w"
         if binary:
             mode = "wb"
-        with self.artifact.new_file(path, mode) as f:
+        with self.writeable_artifact.new_file(path, mode) as f:
             yield f
 
     @contextlib.contextmanager
     def open(self, path, binary=False):
-        i
-
-
+        if not self.saved_artifact:
+            raise Exception("cannot load data from an unsaved artifact")
+        with open(self.saved_artifact.get_path(path).download(), 'r') as f:
+            yield f
+        
     def get_path_handler(self, path, handler_constructor):
-        raise Error("unimplemented")
+        raise Exception("unimplemented")
 
     def read_metadata(self):
-        raise Error("unimplemented")
+        raise Exception("unimplemented")
 
     def write_metadata(self, dirname):
-        raise Error("unimplemented")
+        raise Exception("unimplemented")
 
     def save(self, branch="latest"):
-        self.artifact.save()
+        # TODO: technically save should be sufficient but we need the run to grab the entity name and project name
+        # TODO: what project should we put weave ops in???
+        run = wandb.init(project="weave_ops")
+        self.writeable_artifact.save()
+        self.writeable_artifact.wait()
+
+        self.saved_artifact = wandb.Api().artifact(f"{run.entity}/weave_ops/{self.writeable_artifact.name}")

@@ -56,7 +56,7 @@ def save_to_remote(obj, artifact, name, type_):
     type_.save_instance(obj, artifact, name)
     with artifact.new_file(f"{name}.type.json") as f:
         json.dump(type_.to_dict(), f)
-    return refs.WandbArtifactRef(f"{artifact.entity}/{artifact.name}", name=name, type=type_, obj=obj)
+    return refs.WandbArtifactRef(artifact, path=name, type=type_, obj=obj)
 
 def publish(obj, name=None, type=None):
     wb_type = type
@@ -72,7 +72,6 @@ def publish(obj, name=None, type=None):
     artifact = artifacts_local.WandbArtifact(name, type=wb_type.name)
     ref = save_to_remote(obj, artifact, name, wb_type)
     artifact.save("weave_ops")
-    refs.put_ref(obj, ref)
     return ref
 
 def save(obj, name=None, type=None):
@@ -90,7 +89,6 @@ def save(obj, name=None, type=None):
     artifact = artifacts_local.LocalArtifact(name)
     ref = save_to_local(obj, artifact, "_obj", wb_type)
     artifact.save()
-    refs.put_ref(obj, ref)
     return ref
 
 def get(uri_s):
