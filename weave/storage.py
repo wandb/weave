@@ -118,6 +118,16 @@ def get_obj_creator(obj_ref):
         ):
             run = get("%s/latest" % art_name)
             if isinstance(run._output, refs.Ref) and str(run._output) == str(obj_ref):
+                # If any input is also the ref, this run did not create obj, since
+                # the obj already existed. This fixes an infinite loop where list-indexCheckpoint
+                # which just returns its input would be treated as a the obj creator
+                # TODO: This whole thing is a pile of hacks, not production ready! Fix! We should
+                #     not need heuristics.
+                # TODO: for one, if we order all the artifacts by created_at, then
+                #     the first one will be the creator. Can't do that in this branch
+                #     since it doesn't have the created at change.
+                if any(str(input) == str(obj_ref) for input in run._inputs.values()):
+                    continue
                 return run
     return None
 

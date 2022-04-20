@@ -83,3 +83,20 @@ def test_csv_saveload_type():
     ref = storage.save(csv)
     new_csv = storage.get(str(ref))
     assert isinstance(new_csv, ops.Csv)
+
+
+def test_skips_list_indexcheckpoint():
+    try:
+        shutil.rmtree("local-artifacts")
+    except FileNotFoundError:
+        pass
+    shutil.copy("testdata/cereal.csv", "/tmp/cereal.csv")
+
+    csv = ops.local_path("/tmp/cereal.csv").readcsv()
+    assert weave.use(csv[-1]["type"]) == "C"  # value before set is 'C'
+
+    row = ops.Table.__getitem__(ops.list_indexCheckpoint(csv), -1)
+    weave.use(row["type"].set("XXXX"))
+
+    csv = ops.local_path("/tmp/cereal.csv").readcsv()
+    assert weave.use(csv[-1]["type"]) == "XXXX"
