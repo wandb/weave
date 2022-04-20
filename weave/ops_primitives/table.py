@@ -240,7 +240,7 @@ GroupResultType.instance_class = GroupResult
 @op(
     name="list-indexCheckpoint",
     input_type={"arr": types.List(types.Any())},
-    output_type=types.Any(),
+    output_type=lambda input_types: input_types["arr"],
 )
 def list_indexCheckpoint(arr):
     return arr

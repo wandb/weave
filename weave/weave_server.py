@@ -8,7 +8,7 @@ import warnings
 from flask import Flask
 from flask import request
 from flask import abort
-from flask_cors import CORS
+from flask_cors import CORS, cross_origin
 from flask import send_from_directory
 
 from weave import server
@@ -22,6 +22,7 @@ from flask.logging import wsgi_errors_stream
 # app about them with list_ops
 from weave.ecosystem import openai
 from weave.ecosystem import async_demo
+from weave import run_obj
 
 # set up logging
 
@@ -86,7 +87,7 @@ def make_app(log_filename=None, stream_logging_enabled=False):
 
 
 app = make_app()
-CORS(app)
+CORS(app, supports_credentials=True)
 
 
 @app.route("/__weave/ops", methods=["GET"])

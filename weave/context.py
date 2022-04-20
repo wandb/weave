@@ -75,7 +75,7 @@ def use_fixed_server_port():
 def use_frontend_devmode():
     """Talk to external server running on 9994"""
     _weave_client.set(server.HttpServerClient("http://localhost:9994"))
-    _frontend_url.set("https://app.wandb.test")
+    _frontend_url.set("http://localhost:3000")
 
 
 def capture_weave_server_logs(log_level=logging.INFO):
@@ -104,6 +104,7 @@ def get_frontend_url():
                 url = s.url
             else:
                 raise RuntimeError("Frontend server is not running")
+        url += "/__frontend/weave_jupyter"
     return url
 
 
