@@ -68,11 +68,11 @@ class OpDef:
         self.version = None
         self.call_fn = None
 
-    @property
-    def fullname(self):
-        return self.name + ":" + self.version
+    # @property
+    # def fullname(self):
+    #     return self.name + ":" + self.version
 
-    @property
+    # @property
     def simple_name(self):
         # We need this to get around the run job_type 64 char limit, and artifact name limitations.
         # TODO: This function will need to be stable! Let's make sure we like what we're doing here.
@@ -90,6 +90,13 @@ class OpDef:
             # This is for builtins, which I think we may just want to get rid
             # of?
             return self.name
+
+    def uri_name(self):
+        if hasattr(self, "_ref") and hasattr(self._ref, "uri"):
+            return self._ref.uri()
+        if self.version is not None:
+            return self.name + ":" + self.version
+        return self.name
 
     def to_dict(self):
         if callable(self.output_type):
@@ -109,7 +116,7 @@ class OpDef:
         output_type = self.output_type.to_dict()
 
         serialized = {
-            "name": self.name,
+            "name": self.uri_name(),
             "input_types": input_types,
             "output_type": output_type,
         }

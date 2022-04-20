@@ -86,18 +86,16 @@ class Registry:
 
         version = op_def.get_loading_op_version()
         is_loading = version is not None
-        object_uri = WeaveObjectURI.parsestr(op.name)
-        object_key = object_uri.uri()
-        op_id = op.name
-        if not is_loading and object_uri.scheme:
+        is_builtin = False  # TODO: figure this out
+        should_save = not is_loading and not is_builtin
+        if should_save:
             # if we're not loading an existing op, save it.
-            ref = storage.save(op, name=op_id)
+            ref = storage.save(op, name=op.name)
             version = ref.version
-            op_id = ref.artifact.uri()
-            print("op_id", op_id)
         op.version = version
 
-        op_full_id = op_id + ":" + version
+        op_full_id = op.uri_name()
+        op_full_name = op_full_id.split(":", 1)[0] if ":" in op_full_id else op_full_id
         op.call_fn = lazy.make_lazy_call(
             op.resolve_fn, op_full_id, op.input_type, op.output_type
         )
@@ -105,9 +103,9 @@ class Registry:
         op.call_fn.is_weave = True
 
         if not is_loading:
-            self._ops[op_id] = op
+            self._ops[op_full_name] = op
 
-        self._op_versions[(op_id, version)] = op
+        self._op_versions[op_full_id] = op
         return op
 
     def get_op(self, uri: str) -> op_def.OpDef:
@@ -119,7 +117,7 @@ class Registry:
             if object_key in self._op_versions:
                 res = self._op_versions[object_key]
             else:
-                res = storage.get(uri)
+                res = storage.get(object_key)
                 self._op_versions[object_key] = res
         elif uri in self._ops:
             res = self._ops[uri]

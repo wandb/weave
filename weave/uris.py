@@ -27,7 +27,7 @@ class WeaveObjectURI:
         elif self.scheme == Scheme.ARTIFACT:
             return "wandb-artifact://"
         else:
-            raise Exception("Invalid scheme")
+            raise Exception("Invalid scheme", self.scheme)
 
     def uri(self):
         return f"{self._scheme_str()}{self.path}/{self.name}:{self.version if self.version is not None else 'latest'}"
@@ -36,14 +36,14 @@ class WeaveObjectURI:
     def parsestr(cls, s: str):
         url = urlparse(s)
         scheme = None
-        if url.scheme is None:
+        if url.scheme is None or url.scheme == "":
             scheme = Scheme.BUILTIN
         elif url.scheme == "file":
             scheme = Scheme.LOCAL_FILE
         elif url.scheme == "wandb-artifact":
             scheme = Scheme.ARTIFACT
         else:
-            raise Exception("Invalid scheme")
+            raise Exception("Invalid scheme", url.scheme)
 
         parts = url.path.split("/")
         if len(parts) == 1:

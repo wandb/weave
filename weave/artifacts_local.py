@@ -98,6 +98,8 @@ class LocalArtifact:
         mode = "r"
         if binary:
             mode = "rb"
+        print("self._read_dirname", self._read_dirname)
+        print("path", path)
         f = open(os.path.join(self._read_dirname, path), mode)
         yield f
         f.close()

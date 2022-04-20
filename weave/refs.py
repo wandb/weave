@@ -4,6 +4,7 @@ import os
 import json
 from urllib.parse import urlparse
 import wandb
+from weave.uris import Scheme, WeaveObjectURI
 
 from . import artifacts_local
 from . import weave_types as types
@@ -59,7 +60,7 @@ class WandbArtifactRef(Ref):
         put_ref(obj, self)
         self.obj = obj
         return obj
-        
+
 
 class LocalArtifactRef(Ref):
     artifact: "artifacts_local.LocalArtifact"
@@ -73,8 +74,11 @@ class LocalArtifactRef(Ref):
             raise errors.WeaveInternalError("path must not be None")
         self._type = type
         self.obj = obj
-        put_ref(obj, self)
+        # put_ref(obj, self)
         self.extra = extra
+
+    def uri(self):
+        return self.artifact.uri()
 
     @property
     def version(self):
@@ -122,26 +126,28 @@ class LocalArtifactRef(Ref):
         # Commented out the more complicated full URI so that
         # the demo looks nicer
         # TODO: fix.
-        # url = urlparse(s)
-        # if url.scheme != "local-artifact":
-        #     raise Exception("invalid")
-        # artifact_root, path = split_path_dotfile(url.path, ".wandb-artifact")
-
-        if "/" not in s:
-            return cls(artifacts_local.LocalArtifact(s), path="_obj", type=type)
-
-        parts = s.split("/", 2)
-        if len(parts) == 3:
-            path_extra_part = parts[2]
-        else:
-            path_extra_part = "_obj"
-        path, extra = cls.parse_local_ref_str(path_extra_part)
+        uri = WeaveObjectURI.parsestr(s)
+        if uri.scheme != Scheme.LOCAL_FILE:
+            raise Exception("invalid scheme ", s)
         return cls(
-            artifacts_local.LocalArtifact(parts[0], version=parts[1]),
-            path=path,
-            type=type,
-            extra=extra,
+            artifacts_local.LocalArtifact(uri.name, uri.version), path="_obj", type=type
         )
+
+        # if "/" not in s:
+        #     return cls(artifacts_local.LocalArtifact(uri.name, uri.version), path="_obj", type=type)
+
+        # parts = s.split("/", 2)
+        # if len(parts) == 3:
+        #     path_extra_part = parts[2]
+        # else:
+        #     path_extra_part = "_obj"
+        # path, extra = cls.parse_local_ref_str(path_extra_part)
+        # return cls(
+        #     artifacts_local.LocalArtifact(parts[0], version=parts[1]),
+        #     path=path,
+        #     type=type,
+        #     extra=extra,
+        # )
 
     @classmethod
     def from_local_ref(cls, artifact, s, type):
