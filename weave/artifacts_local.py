@@ -6,6 +6,8 @@ import json
 import shutil
 from datetime import datetime
 
+from weave import uris
+
 from . import util
 
 # From sdk/interface/artifacts.py
@@ -71,6 +73,14 @@ class LocalArtifact:
 
     def path(self, name):
         return os.path.join(self._read_dirname, name)
+
+    def uri(self):
+        return uris.WeaveObjectURI(
+            uris.Scheme.LOCAL_FILE,
+            os.path.abspath(self._read_dirname),
+            self._name,
+            self._version,
+        ).uri()
 
     @contextlib.contextmanager
     def new_file(self, path, binary=False):

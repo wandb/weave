@@ -4,6 +4,8 @@ import json
 import typing
 from urllib.parse import urlparse
 
+from weave.uris import WeaveObjectURI
+
 from . import errors
 from . import artifacts_local
 from . import weave_types as types
@@ -72,7 +74,7 @@ def save(obj, name=None, type=None):
     return ref
 
 
-def get(uri_s):
+def get(uri_s):  # WeaveObjectURI
     if isinstance(uri_s, refs.Ref):
         return uri_s.get()
     ref = refs.LocalArtifactRef.from_str(uri_s)

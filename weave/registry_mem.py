@@ -2,6 +2,7 @@ import sys
 import typing
 
 import wandb
+from weave.uris import WeaveObjectURI
 
 from . import op_def
 from . import weave_types
@@ -85,31 +86,47 @@ class Registry:
 
         version = op_def.get_loading_op_version()
         is_loading = version is not None
-        if version is None:
+        object_uri = WeaveObjectURI.parsestr(op.name)
+        object_key = object_uri.uri()
+        op_id = op.name
+        if not is_loading and object_uri.scheme:
             # if we're not loading an existing op, save it.
-            ref = storage.save(op, name=f"op-{op.name}")
+            ref = storage.save(op, name=op_id)
             version = ref.version
+            op_id = ref.artifact.uri()
+            print("op_id", op_id)
         op.version = version
 
-        full_name = op.name + ":" + version
+        op_full_id = op_id + ":" + version
         op.call_fn = lazy.make_lazy_call(
-            op.resolve_fn, full_name, op.input_type, op.output_type
+            op.resolve_fn, op_full_id, op.input_type, op.output_type
         )
         op.call_fn.op_def = op
 
         if not is_loading:
-            self._ops[op.name] = op
+            self._ops[op_id] = op
 
-        self._op_versions[(op.name, version)] = op
+        self._op_versions[(op_id, version)] = op
         return op
 
-    def get_op(self, name: str) -> op_def.OpDef:
-        if ":" in name:
-            name, version = name.split(":", 1)
-            return self._op_versions[(name, version)]
-        if name in self._ops:
-            return self._ops[name]
-        raise errors.WeaveInternalError("Op not registered: %s" % name)
+    def get_op(self, uri: str) -> op_def.OpDef:
+        from . import storage
+
+        object_uri = WeaveObjectURI.parsestr(uri)
+        object_key = object_uri.uri()
+        if object_uri.version is not None:
+            if object_key in self._op_versions:
+                res = self._op_versions[object_key]
+            else:
+                res = storage.get(uri)
+                self._op_versions[object_key] = res
+        elif uri in self._ops:
+            res = self._ops[uri]
+        else:
+            res = storage.get(object_key)
+        if res is None:
+            raise errors.WeaveInternalError("Op not registered: %s" % uri)
+        return res
 
     def find_op_by_fn(self, lazy_local_fn):
         for op_def in self._op_versions.values():
