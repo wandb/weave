@@ -3,6 +3,7 @@ import os
 import json
 import typing
 from urllib.parse import urlparse
+import wandb
 
 from weave.uris import WeaveObjectURI
 
@@ -45,13 +46,40 @@ def save_mem(obj, name):
     return MemRef(name)
 
 
-def save_to_artifact(obj, artifact, name, type_):
+def save_to_local(obj, artifact, name, type_):
     ref_extra = type_.save_instance(obj, artifact, name)
     with artifact.new_file(f"{name}.type.json") as f:
         json.dump(type_.to_dict(), f)
     return refs.LocalArtifactRef(
         artifact, path=name, type=type_, obj=obj, extra=ref_extra
     )
+
+
+def save_to_remote(obj, artifact, name, type_):
+    type_.save_instance(obj, artifact, name)
+    with artifact.new_file(f"{name}.type.json") as f:
+        json.dump(type_.to_dict(), f)
+    return refs.WandbArtifactRef(
+        f"{artifact.entity}/{artifact.name}", name=name, type=type_, obj=obj
+    )
+
+
+def publish(obj, name=None, type=None):
+    wb_type = type
+    if wb_type is None:
+        try:
+            wb_type = types.TypeRegistry.type_of(obj)
+        except errors.WeaveTypeError:
+            raise errors.WeaveSerializeError("no weave type for object: ", obj)
+    obj = box.box(obj)
+    if name is None:
+        obj_names = util.find_names(obj)
+        name = f"{wb_type.name}-{obj_names[-1]}"
+    artifact = artifacts_local.WandbArtifact(name, type=wb_type.name)
+    ref = save_to_remote(obj, artifact, name, wb_type)
+    artifact.save("weave_ops")
+    refs.put_ref(obj, ref)
+    return ref
 
 
 def save(obj, name=None, type=None):
@@ -65,10 +93,9 @@ def save(obj, name=None, type=None):
     obj = box.box(obj)
     if name is None:
         obj_names = util.find_names(obj)
-        # name = f"{wb_type.name}-{obj_names[-1]}-{util.rand_string_n(10)}"
         name = f"{wb_type.name}-{obj_names[-1]}"
     artifact = artifacts_local.LocalArtifact(name)
-    ref = save_to_artifact(obj, artifact, "_obj", wb_type)
+    ref = save_to_local(obj, artifact, "_obj", wb_type)
     artifact.save()
     refs.put_ref(obj, ref)
     return ref

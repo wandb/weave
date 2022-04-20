@@ -102,6 +102,7 @@ class Registry:
             op.resolve_fn, op_full_id, op.input_type, op.output_type
         )
         op.call_fn.op_def = op
+        op.call_fn.is_weave = True
 
         if not is_loading:
             self._ops[op_id] = op

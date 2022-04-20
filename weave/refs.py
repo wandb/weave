@@ -3,6 +3,7 @@ import typing
 import os
 import json
 from urllib.parse import urlparse
+import wandb
 
 from . import artifacts_local
 from . import weave_types as types
@@ -29,6 +30,37 @@ def put_ref(obj, ref):
     obj._ref = ref
 
 
+class WandbArtifactRef(Ref):
+    def __init__(self, artifact_string, path, type=None, obj=None):
+        self.artifact = wandb.Api().artifact(artifact_string)
+        self.path = path
+        self._type = type
+        self.obj = obj
+        put_ref(obj, self)
+
+    @property
+    def version(self):
+        return self.artifact.version
+
+    @property
+    def type(self):
+        if self._type is not None:
+            return self._type
+        with open(self.artifact.get_path(f"{self.path}.type.json", "r")) as f:
+            type_json = json.load(f)
+        self._type = types.TypeRegistry.type_from_dict(type_json)
+        return self._type
+
+    def get(self):
+        if self.obj:
+            return self.obj
+        obj = self.type.load_instance(self.artifact, self.path, extra=self.extra)
+        obj = box.box(obj)
+        put_ref(obj, self)
+        self.obj = obj
+        return obj
+        
+
 class LocalArtifactRef(Ref):
     artifact: "artifacts_local.LocalArtifact"
 
@@ -41,6 +73,7 @@ class LocalArtifactRef(Ref):
             raise errors.WeaveInternalError("path must not be None")
         self._type = type
         self.obj = obj
+        put_ref(obj, self)
         self.extra = extra
 
     @property
@@ -57,9 +90,12 @@ class LocalArtifactRef(Ref):
         return self._type
 
     def get(self) -> typing.Any:
+        if self.obj:
+            return self.obj
         obj = self.type.load_instance(self.artifact, self.path, extra=self.extra)
         obj = box.box(obj)
         put_ref(obj, self)
+        self.obj = obj
         return obj
 
     def versions(self):
