@@ -45,4 +45,6 @@ def python_type_to_type(
     weave_type = simple_python_type_to_type(py_type)
     if weave_type == weave_types.UnknownType():
         return weave_type
+    elif weave_type == weave_types.List:
+        return weave_type(weave_types.Any())
     return weave_type()
