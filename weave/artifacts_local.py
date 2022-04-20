@@ -7,6 +7,7 @@ import shutil
 from datetime import datetime
 
 from . import util
+import wandb
 
 # From sdk/interface/artifacts.py
 def md5_hash_file(path):
@@ -154,3 +155,48 @@ class LocalArtifact:
         if os.path.exists(link_name):
             os.remove(link_name)
         os.symlink(self._version, link_name)
+
+class WandbArtifact:
+
+    def __init__(self, name, version=None, type=None):
+        self.writeable_artifact = wandb.Artifact(name, type="op_def" if type is None else type)
+        
+
+    @property
+    def version(self):
+        raise Error("unimplemented")
+
+    @property
+    def created_at(self):
+        raise Error("unimplemented")
+
+    def get_other_version(self, version):
+        raise Error("unimplemented")
+
+    def path(self, name):
+        raise Error("unimplemented")
+
+    @contextlib.contextmanager
+    def new_file(self, path, binary=False):
+        mode = "w"
+        if binary:
+            mode = "wb"
+        with self.artifact.new_file(path, mode) as f:
+            yield f
+
+    @contextlib.contextmanager
+    def open(self, path, binary=False):
+        i
+
+
+    def get_path_handler(self, path, handler_constructor):
+        raise Error("unimplemented")
+
+    def read_metadata(self):
+        raise Error("unimplemented")
+
+    def write_metadata(self, dirname):
+        raise Error("unimplemented")
+
+    def save(self, branch="latest"):
+        self.artifact.save()
