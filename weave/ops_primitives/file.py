@@ -139,7 +139,7 @@ class FileOps(object):
 
     @op(
         name="file-directUrlAsOf",
-        input_type={"file": types.FileType(), "asOf": types.Number()},
+        input_type={"file": types.FileType(), "asOf": types.Int()},
         output_type=types.String(),
     )
     def direct_url_as_of(file, asOf):
@@ -171,7 +171,7 @@ class FileOps(object):
 #     return result_type
 
 
-@op(name="file-size", input_type={"file": types.FileType()}, output_type=types.Number())
+@op(name="file-size", input_type={"file": types.FileType()}, output_type=types.Int())
 def file_size(file):
     # file is an artifact manifest entry for now.
     return 10
@@ -218,7 +218,7 @@ class SubDirType(types.ObjectType):
     def property_types(self):
         return {
             "fullPath": types.String(),
-            "size": types.Number(),
+            "size": types.Int(),
             "dirs": types.Dict(types.String(), types.Int()),
             # TODO: this should actually be just FileType
             "files": types.Dict(types.String(), types.Int()),
@@ -250,7 +250,7 @@ class DirType(types.ObjectType):
     def property_types(self):
         return {
             "fullPath": types.String(),
-            "size": types.Number(),
+            "size": types.Int(),
             "dirs": types.Dict(types.String(), SubDirType()),
             # TODO: this should actually be just FileType
             "files": types.Dict(types.String(), types.LocalFileType()),
@@ -310,7 +310,11 @@ class Dir(object):
     def get_local_path(self):
         return self.path
 
-    @op(name="dir-size", input_type={"dir": DirType()}, output_type=types.Number())
+    @op(name="file-dir", input_type={"file": DirType()}, output_type=DirType())
+    def file_dir(file):
+        return file
+
+    @op(name="dir-size", input_type={"dir": DirType()}, output_type=types.Int())
     def size(dir):
         return dir.size
 
