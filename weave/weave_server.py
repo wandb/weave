@@ -22,6 +22,7 @@ from flask.logging import wsgi_errors_stream
 # app about them with list_ops
 from weave.ecosystem import openai
 from weave.ecosystem import async_demo
+from weave import run_obj
 
 # set up logging
 
