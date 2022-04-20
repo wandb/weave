@@ -81,7 +81,7 @@ class LocalArtifactRef(Ref):
             raise errors.WeaveInternalError("path must not be None")
         self._type = type
         self.obj = obj
-        # put_ref(obj, self)
+        put_ref(obj, self)
         self.extra = extra
 
     def uri(self):
