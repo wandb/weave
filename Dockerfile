@@ -8,8 +8,6 @@ ENV CONDA_VERSION=4.9.2 \
     PATH=/opt/conda/bin/:/opt/conda/envs/base/:$PATH \
     WEAVE_LOCAL_ARTIFACT_DIR=/local-artifacts
 
-RUN mkdir /local-artifacts
-
 # We do the following all in one block:
 # - Create user and group weave
 # - Install miniconda install dependencies
@@ -45,6 +43,7 @@ WORKDIR /weave
 ADD . .
 
 RUN pip install -r requirements.txt
+RUN mkdir /local-artifacts
 
 EXPOSE 8080
 
