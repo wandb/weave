@@ -86,12 +86,13 @@ class Registry:
 
         location = op_def.get_loading_op_location()
         is_loading = location is not None
-        version = location.version if location is not None else None
         should_save = not is_loading and not op.is_builtin
         if should_save:
             # if we're not loading an existing op, save it.
             ref = storage.save(op, name=op.name)
             version = ref.version
+            location = ref.artifact.location
+        version = location.version if location is not None else None
         op.version = version
         op_full_id = location.uri if location is not None else op.name
         op_full_name = op_full_id.split(":", 1)[0] if ":" in op_full_id else op_full_id
