@@ -1,7 +1,9 @@
+import os
 import sys
 import typing
 
 import wandb
+from weave.artifacts_local import LOCAL_ARTIFACT_DIR
 from weave.uris import WeaveObjectLocation
 
 from . import op_def
@@ -31,6 +33,11 @@ def fetch_op(path):
         path, op_path = path.rsplit("/", 1)
     else:
         raise Exception("Tried to fetch invalid op: " + path)
+
+    return fetch_op_from_local_path(path)
+
+
+def fetch_op_from_local_path(path):
 
     # dynamic import
     sys.path.append(path)
@@ -63,6 +70,13 @@ def fetch_op(path):
     )
     memory_registry.unregister_op(found_op_def.name)
     return lazy_call
+
+
+def update_registry_from_local():
+    for name in os.listdir(LOCAL_ARTIFACT_DIR):
+        if name.startswith("op-"):
+            path = os.path.realpath(os.path.join(LOCAL_ARTIFACT_DIR, name, "latest"))
+            print(path)
 
 
 class Registry:
@@ -153,3 +167,4 @@ class Registry:
 
 # Processes have a singleton MemoryRegistry
 memory_registry = Registry()
+# update_registry_from_local()
