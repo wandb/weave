@@ -66,7 +66,7 @@ def save_to_remote(obj, artifact, name, type_):
     return refs.WandbArtifactRef(artifact, path=name, type=type_, obj=obj)
 
 
-def publish(obj, name=None, type=None):
+def publish(obj, name=None, type=None, cache=False):
     wb_type = type
     if wb_type is None:
         try:

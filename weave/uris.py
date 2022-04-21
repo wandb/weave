@@ -2,7 +2,6 @@ from typing import ClassVar, Optional, Type
 from urllib.parse import urlparse
 from enum import Enum
 
-
 class WeaveObjectLocation:
     # classvar to identify the ObjectLocation type
     scheme: ClassVar[str]
@@ -100,6 +99,10 @@ class WeaveLocalArtifactObjectLocation(WeaveObjectLocation):
         if query is not None and "extra=" in query:
             self.extra = query.split("extra=", 1)[1].split("/")
 
+    def to_ref(self):
+        from .refs import LocalArtifactRef
+        return LocalArtifactRef.from_str(self.uri)
+
     @classmethod
     def from_parts(
         cls: Type["WeaveLocalArtifactObjectLocation"],
@@ -150,6 +153,10 @@ class WeaveArtifactObjectLocation(WeaveObjectLocation):
         self._friendly_name = parts[2]
         self._version = all_parts[1]
         self.extra = parts[3:]
+
+    def to_ref(self):
+        from .refs import WandbArtifactRef
+        return WandbArtifactRef.from_str(self.uri)
 
     @classmethod
     def from_parts(

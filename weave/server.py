@@ -13,6 +13,7 @@ from . import serialize
 from . import forward_graph
 from . import storage
 from . import refs
+from . import types
 
 
 is_tracing = True
@@ -41,7 +42,7 @@ def handle_request(request, deref=False, publish=False):
             if isinstance(r, refs.Ref):
                 # publish refs to remote storage
                 remote_ref = storage.publish(r.get())
-                new_results.append(remote_ref.uri())
+                new_results.append(remote_ref)
             else:
                 new_results.append(r)
         result = new_results
@@ -116,6 +117,7 @@ class HttpServerClient(object):
         r.raise_for_status()
 
         response = r.json()["data"]
+        #print(response)
         deserialized = [storage.from_python(r) for r in response]
         return [storage.deref(r) for r in deserialized]
 

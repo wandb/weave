@@ -20,6 +20,10 @@ class Ref:
 
         return show(self)
 
+    @property
+    def name(self) -> str:
+        raise Exception("unimplemented")
+
     def uri(self):
         raise Exception("unimplemented")
 
@@ -61,13 +65,18 @@ class WandbArtifactRef(Ref):
         self._type = types.TypeRegistry.type_from_dict(type_json)
         return self._type
 
+    @property
+    def name(self) -> str:
+        return self.artifact.location.friendly_name
+
     def uri(self):
         return self.artifact.uri()
+
 
     def get(self):
         if self.obj:
             return self.obj
-        obj = self.type.load_instance(self.artifact, f"{self.path}.py", extra=None)
+        obj = self.type.load_instance(self.artifact, self.path, extra=None)
         obj = box.box(obj)
         put_ref(obj, self)
         self.obj = obj
@@ -119,6 +128,10 @@ class LocalArtifactRef(Ref):
             type_json = json.load(f)
         self._type = types.TypeRegistry.type_from_dict(type_json)
         return self._type
+
+    @property
+    def name(self) -> str:
+        return self.artifact.location.friendly_name
 
     def get(self) -> typing.Any:
         if self.obj:
