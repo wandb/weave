@@ -63,7 +63,7 @@ class LocalArtifact:
 
     def _setup_dirs(self):
         self._write_dirname = os.path.join(
-            self._root, "working-%s" % util.rand_string_n(12)
+            "/tmp", self._root, "working-%s" % util.rand_string_n(12)
         )
         self._read_dirname = None
         if self._version:

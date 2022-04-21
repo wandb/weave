@@ -72,18 +72,23 @@ def use_fixed_server_port():
     _weave_client.set(server.HttpServerClient(s.url))
 
 
-def use_frontend_devmode():
-    """Talk to external server running on 9994"""
-    _weave_client.set(server.HttpServerClient("http://localhost:9994"))
-    _frontend_url.set("https://app.wandb.test")
-
-
 def use_frontend_url(url):
     _frontend_url.set(url)
 
 
 def use_weave_client(url):
     _frontend_url.set(server.HttpServerClient(url))
+
+
+def use_frontend_devmode():
+    """Talk to external server running on 9994"""
+    _weave_client.set(server.HttpServerClient("http://localhost:9994"))
+    _frontend_url.set("https://app.wandb.test")
+
+
+def use_local_devmode():
+    use_weave_client(server.HttpServerClient("http://localhost:9994"))
+    use_frontend_url("http://localhost:3000")
 
 
 def capture_weave_server_logs(log_level=logging.INFO):
