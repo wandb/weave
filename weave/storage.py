@@ -4,6 +4,11 @@ import json
 import typing
 from urllib.parse import urlparse
 import wandb
+from weave.uris import (
+    WeaveLocalArtifactObjectLocation,
+    WeaveObjectLocation,
+    WeaveArtifactObjectLocation,
+)
 
 from . import errors
 from . import artifacts_local
@@ -101,7 +106,13 @@ def get(uri_s):
     if isinstance(uri_s, refs.Ref):
         return uri_s.get()
     # TODO: Switch this on the server side to pickup from remote
-    ref = refs.LocalArtifactRef.from_str(uri_s)
+    location = WeaveObjectLocation.parse(uri_s)
+    if isinstance(location, WeaveLocalArtifactObjectLocation):
+        ref = refs.LocalArtifactRef.from_str(uri_s)
+    elif isinstance(location, WeaveArtifactObjectLocation):
+        ref = refs.WandbArtifactRef.from_str(uri_s)
+    else:
+        raise Exception("NOT IMPLEMENTED", uri_s)
     return ref.get()
 
 
