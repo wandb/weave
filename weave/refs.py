@@ -72,7 +72,6 @@ class WandbArtifactRef(Ref):
     def uri(self):
         return self.artifact.uri()
 
-
     def get(self):
         if self.obj:
             return self.obj

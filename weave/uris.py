@@ -2,6 +2,7 @@ from typing import ClassVar, Optional, Type
 from urllib.parse import urlparse
 from enum import Enum
 
+
 class WeaveObjectLocation:
     # classvar to identify the ObjectLocation type
     scheme: ClassVar[str]
@@ -101,6 +102,7 @@ class WeaveLocalArtifactObjectLocation(WeaveObjectLocation):
 
     def to_ref(self):
         from .refs import LocalArtifactRef
+
         return LocalArtifactRef.from_str(self.uri)
 
     @classmethod
@@ -156,6 +158,7 @@ class WeaveArtifactObjectLocation(WeaveObjectLocation):
 
     def to_ref(self):
         from .refs import WandbArtifactRef
+
         return WandbArtifactRef.from_str(self.uri)
 
     @classmethod

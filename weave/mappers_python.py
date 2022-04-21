@@ -139,7 +139,7 @@ class RefToPyRef(mappers_weave.RefMapper):
 class PyRefToRef(mappers_weave.RefMapper):
     def apply(self, obj):
         from . import storage
-        
+
         ref = uris.WeaveObjectLocation.parse(obj).to_ref()
         return ref
         # return storage.refs.LocalArtifactRef.from_str(obj, type=self._object_type)

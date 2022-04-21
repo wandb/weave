@@ -17,6 +17,7 @@ from .context import (
     capture_weave_server_logs,
 )
 
+
 def save(node_or_obj, name=None):
     if isinstance(node_or_obj, _graph.Node):
         from .ops_primitives import file as file_ops
@@ -26,13 +27,17 @@ def save(node_or_obj, name=None):
         ref = _storage.save(node_or_obj, name=name)
         return _weave_internal.make_const_node(ref.type, ref.obj)
 
+
 def publish(node_or_obj, name=None):
-    if getattr(node_or_obj, 'is_weave', False):
-        ref = _storage.publish(node_or_obj.op_def, name if name else node_or_obj.op_def.name)
+    if getattr(node_or_obj, "is_weave", False):
+        ref = _storage.publish(
+            node_or_obj.op_def, name if name else node_or_obj.op_def.name
+        )
         return ref
     else:
         ref = _storage.publish(node_or_obj, name)
         return ref
+
 
 def get(ref_str):
     obj = _storage.get(ref_str)
