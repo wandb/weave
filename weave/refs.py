@@ -20,6 +20,12 @@ class Ref:
 
         return show(self)
 
+    def uri(self):
+        raise Exception("unimplemented")
+
+    def get(self):
+        raise Exception("unimplemented")
+
 
 def get_ref(obj):
     if hasattr(obj, "_ref"):

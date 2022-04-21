@@ -7,16 +7,18 @@ import requests
 import traceback
 import viztracer
 
+
 from . import graph, util as _util, client as _client
 from . import serialize
 from . import forward_graph
 from . import storage
+from . import refs
 
 
 is_tracing = True
 
 
-def handle_request(request, deref=False):
+def handle_request(request, deref=False, publish=False):
     from . import execute
 
     global is_tracing
@@ -33,7 +35,17 @@ def handle_request(request, deref=False):
         print(graph.node_expr_str(node))
     """
     result = execute.execute_nodes(nodes)
-    if deref:
+    if publish:
+        new_results = []
+        for r in result:
+            if isinstance(r, refs.Ref):
+                # publish refs to remote storage
+                remote_ref = storage.publish(r.get())
+                new_results.append(remote_ref.uri())
+            else:
+                new_results.append(r)
+        result = new_results
+    elif deref:
         result = [storage.deref(r) for r in result]
     # print("Server request %s (%0.5fs): %s..." % (start_time,
     #                                              time.time() - start_time, [n.from_op.name for n in nodes[:3]]))

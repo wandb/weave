@@ -31,7 +31,8 @@ def publish(node_or_obj, name=None):
         ref = _storage.publish(node_or_obj.op_def, name if name else node_or_obj.op_def.name)
         return ref
     else:
-        raise Error("unimplemented")
+        ref = _storage.publish(node_or_obj, name)
+        return ref
 
 def get(ref_str):
     obj = _storage.get(ref_str)
