@@ -12,6 +12,8 @@ from weave import uris
 from . import util
 import wandb
 
+LOCAL_ARTIFACT_DIR = os.path.join("/tmp", "local-artifacts")
+
 # From sdk/interface/artifacts.py
 def md5_hash_file(path):
     hash_md5 = hashlib.md5()
@@ -28,7 +30,7 @@ def md5_string(string: str) -> str:
 
 
 def local_artifact_exists(name, branch):
-    return os.path.exists(os.path.join("local-artifacts", name, branch))
+    return os.path.exists(os.path.join(LOCAL_ARTIFACT_DIR, name, branch))
 
 
 # This is a prototype implementation. Chock full of races, and other
@@ -39,7 +41,7 @@ class LocalArtifact:
     def __init__(self, name, version=None):
         self._name = name
         self._version = version
-        self._root = os.path.join("local-artifacts", name)
+        self._root = os.path.join(LOCAL_ARTIFACT_DIR, name)
         self._path_handlers = {}
         os.makedirs(self._root, exist_ok=True)
         self._setup_dirs()
@@ -80,7 +82,7 @@ class LocalArtifact:
     @property
     def location(self):
         return uris.WeaveLocalArtifactObjectLocation.from_parts(
-            os.path.abspath("local-artifacts"), self._name, self.version
+            os.path.abspath(LOCAL_ARTIFACT_DIR), self._name, self.version
         )
 
     def uri(self) -> str:
@@ -105,6 +107,7 @@ class LocalArtifact:
         mode = "r"
         if binary:
             mode = "rb"
+        print(os.path.abspath(os.path.join(self._read_dirname, path)))
         f = open(os.path.join(self._read_dirname, path), mode)
         yield f
         f.close()

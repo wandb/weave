@@ -2,11 +2,12 @@ import shutil
 
 from . import api as weave
 from .show import _show_params
+from .artifacts_local import LOCAL_ARTIFACT_DIR
 
 
 def test_print_save_val():
     try:
-        shutil.rmtree("local-artifacts")
+        shutil.rmtree(LOCAL_ARTIFACT_DIR)
     except FileNotFoundError:
         pass
 
@@ -54,7 +55,7 @@ def test_print_save_val():
 
 def test_save_val_ops():
     try:
-        shutil.rmtree("local-artifacts")
+        shutil.rmtree(LOCAL_ARTIFACT_DIR)
     except FileNotFoundError:
         pass
 

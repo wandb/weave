@@ -41,7 +41,7 @@ def execution_client():
 
 @contextlib.contextmanager
 def local_http_client():
-    s = server.HttpServer()
+    s = server.HttpServerThread()
     s.start()
     server_token = _http_server.set(s)
     client_token = _weave_client.set(server.HttpServerClient(s.url))
@@ -67,7 +67,7 @@ def _make_default_client():
 
 def use_fixed_server_port():
     """Force Weave server to port 9994 so wandb frontend can talk to it."""
-    s = server.HttpServer(port=9994)
+    s = server.HttpServerThread(port=9994)
     s.start()
     _weave_client.set(server.HttpServerClient(s.url))
 
@@ -76,8 +76,8 @@ def use_frontend_url(url):
     _frontend_url.set(url)
 
 
-def use_weave_client(url):
-    _frontend_url.set(server.HttpServerClient(url))
+def use_weave_client_url(url):
+    _weave_client.set(server.HttpServerClient(url))
 
 
 def use_frontend_devmode():
@@ -87,7 +87,7 @@ def use_frontend_devmode():
 
 
 def use_local_devmode():
-    use_weave_client(server.HttpServerClient("http://localhost:9994"))
+    use_weave_client_url("http://localhost:9994")
     use_frontend_url("http://localhost:3000")
 
 

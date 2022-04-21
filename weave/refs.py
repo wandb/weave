@@ -102,7 +102,7 @@ class LocalArtifactRef(Ref):
     def uri(self):
         # todo: this is wrong
         return WeaveLocalArtifactObjectLocation.make_uri(
-            os.path.abspath("local-artifacts"),
+            os.path.abspath(artifacts_local.LOCAL_ARTIFACT_DIR),
             self.artifact._name,
             self.artifact._version,
         )
@@ -130,7 +130,9 @@ class LocalArtifactRef(Ref):
         return obj
 
     def versions(self):
-        artifact_path = os.path.join("local-artifacts", self.artifact._name)
+        artifact_path = os.path.join(
+            artifacts_local.LOCAL_ARTIFACT_DIR, self.artifact._name
+        )
         versions = []
         for version_name in os.listdir(artifact_path):
             if (

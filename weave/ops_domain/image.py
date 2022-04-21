@@ -11,6 +11,8 @@ from ..api import op, weave_class
 from .. import weave_types as types
 from ..ops_primitives import file
 from . import ArtifactVersion
+from ..artifacts_local import LOCAL_ARTIFACT_DIR
+
 
 from .. import storage
 from .. import tags
@@ -134,7 +136,7 @@ class WBImage:
         # TODO: hack: hardcoding latest here, and an actual internal path
         # This is old code and should be updated
         res = "file://" + os.path.abspath(
-            os.path.join("local-artifacts", artifact._name, "latest", image.path)
+            os.path.join(LOCAL_ARTIFACT_DIR, artifact._name, "latest", image.path)
         )
         return res
 

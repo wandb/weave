@@ -8,6 +8,7 @@ from weave.uris import WeaveLocalArtifactObjectLocation
 from ..api import op, mutation, weave_class
 from .. import weave_types as types
 from . import table
+from ..artifacts_local import LOCAL_ARTIFACT_DIR
 
 _py_open = open
 
@@ -190,7 +191,7 @@ def file_contents(file):
 
     artifact = tags.get_tag(file, "artifact")
     if artifact is not None:
-        local_path = os.path.join("local-artifacts", artifact.path, file.path)
+        local_path = os.path.join(LOCAL_ARTIFACT_DIR, artifact.path, file.path)
     else:
         local_path = file.path
     # file is an artifact manifest entry for now.

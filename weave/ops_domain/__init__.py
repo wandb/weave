@@ -3,6 +3,7 @@
 from ..api import op, weave_class
 from .. import weave_types as types
 from ..ops_primitives import file
+from ..artifacts_local import LOCAL_ARTIFACT_DIR
 
 
 class Project(types.Type):
@@ -111,7 +112,7 @@ class ArtifactVersionOps(object):
     )
     def file(artifactVersion, path):
         local_path = os.path.abspath(
-            os.path.join("local-artifacts", artifactVersion.path, path)
+            os.path.join(LOCAL_ARTIFACT_DIR, artifactVersion.path, path)
         )
         return file.LocalFile(local_path)
 
