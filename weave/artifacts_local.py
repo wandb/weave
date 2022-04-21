@@ -12,7 +12,9 @@ from weave import uris
 from . import util
 import wandb
 
-LOCAL_ARTIFACT_DIR = os.path.join("/tmp", "local-artifacts")
+LOCAL_ARTIFACT_DIR = os.environ.get("WEAVE_LOCAL_ARTIFACT_DIR") or os.path.join(
+    "/tmp", "local-artifacts"
+)
 
 # From sdk/interface/artifacts.py
 def md5_hash_file(path):
