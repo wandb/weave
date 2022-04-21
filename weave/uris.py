@@ -55,6 +55,19 @@ class WeaveObjectLocation:
         raise Exception("invalid scheme ", uri)
 
 
+# <<<<<<< HEAD
+# =======
+#         parts = url.path.strip("/").split("/")
+#         if len(parts) == 1:
+#             path = url.netloc
+#             name = parts[0]
+#         else:
+#             path = "/".join(parts[:-1])
+#             if url.netloc:
+#                 path = "/".join([url.netloc, path])
+#             name = parts[len(parts) - 1]
+# >>>>>>> weavehouse/process-server
+
 # Used when the Weave object is constructed at runtime (eg. weave-builtins or user-defined objects)
 class WeaveRuntimeObjectLocation(WeaveObjectLocation):
     scheme = ""
