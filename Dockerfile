@@ -6,7 +6,7 @@ ENV CONDA_VERSION=4.9.2 \
     PYTHON_VERSION=39 \
     PYTHONDONTWRITEBYTECODE=true \
     PATH=/opt/conda/bin/:/opt/conda/envs/base/:$PATH
-    WEAVE_LOCAL_ARTIFACTS_DIR=/local-artifacts
+    WEAVE_LOCAL_ARTIFACT_DIR=/local-artifacts
 
 RUN mkdir /local-artifacts
 
