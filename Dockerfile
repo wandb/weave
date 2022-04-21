@@ -47,4 +47,4 @@ RUN pip install -r requirements.txt
 EXPOSE 8080
 
 ENTRYPOINT [ "tini", "-g", "--" ]
-CMD ["gunicorn", "weave.weave_server:make_app(stream_logging_enabled=True)"]
+CMD ["gunicorn", "weave.weave_server:app"]
