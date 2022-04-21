@@ -82,6 +82,10 @@ def use_frontend_url(url):
     _frontend_url.set(url)
 
 
+def use_weave_client(url):
+    _frontend_url.set(server.HttpServerClient(url))
+
+
 def capture_weave_server_logs(log_level=logging.INFO):
     from . import weave_server
 
