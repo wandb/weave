@@ -9,6 +9,8 @@ import typing
 import sys
 from pathlib import Path
 
+from weave.uris import WeaveObjectLocation
+
 from . import errors
 from . import op_args
 from . import weave_types as types
@@ -16,9 +18,9 @@ from . import weave_types as types
 
 # Set to the op version if we're in the process of loading
 # an op from an artifact.
-_loading_op_version: contextvars.ContextVar[
-    typing.Optional[str]
-] = contextvars.ContextVar("loading_op_version", default=None)
+_loading_op_location: contextvars.ContextVar[
+    typing.Optional[WeaveObjectLocation]
+] = contextvars.ContextVar("loading_op_location", default=None)
 
 # Set to the op version if we're in the process of loading
 # an op from an artifact.
@@ -28,14 +30,14 @@ _loading_built_ins: contextvars.ContextVar[
 
 
 @contextlib.contextmanager
-def loading_op_version(version):
-    token = _loading_op_version.set(version)
-    yield _loading_op_version.get()
-    _loading_op_version.reset(token)
+def loading_op_location(location):
+    token = _loading_op_location.set(location)
+    yield _loading_op_location.get()
+    _loading_op_location.reset(token)
 
 
-def get_loading_op_version():
-    return _loading_op_version.get()
+def get_loading_op_location():
+    return _loading_op_location.get()
 
 
 def set_loading_built_ins(currently: bool):
@@ -184,7 +186,7 @@ class OpDefType(types.Type):
         module_path = ".".join(parts)
         # This has a side effect of registering the op
         sys.path.insert(0, sys_mod)
-        with loading_op_version(artifact.version):
+        with loading_op_location(artifact.location):
             mod = importlib.import_module(module_path)
         sys.path.pop(0)
         # We justed imported e.g. 'op-number-add.xaybjaa._obj'. Navigate from

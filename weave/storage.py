@@ -100,6 +100,7 @@ def save(obj, name=None, type=None):
 def get(uri_s):
     if isinstance(uri_s, refs.Ref):
         return uri_s.get()
+    # TODO: Switch this on the server side to pickup from remote
     ref = refs.LocalArtifactRef.from_str(uri_s)
     return ref.get()
 

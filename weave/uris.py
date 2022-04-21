@@ -100,6 +100,16 @@ class WeaveLocalArtifactObjectLocation(WeaveObjectLocation):
         if query is not None and "extra=" in query:
             self.extra = query.split("extra=", 1)[1].split("/")
 
+    @classmethod
+    def from_parts(
+        cls: Type["WeaveLocalArtifactObjectLocation"],
+        root: str,
+        friendly_name: str,
+        version: Optional[str] = None,
+        extra: Optional[list[str]] = None,
+    ) -> "WeaveLocalArtifactObjectLocation":
+        return cls(cls.make_uri(root, friendly_name, version, extra))
+
     @staticmethod
     def make_uri(
         root: str,
@@ -140,6 +150,19 @@ class WeaveArtifactObjectLocation(WeaveObjectLocation):
         self._friendly_name = parts[2]
         self._version = all_parts[1]
         self.extra = parts[3:]
+
+    @classmethod
+    def from_parts(
+        cls,
+        entity_name: str,
+        project_name: str,
+        artifact_name: str,
+        version: str,
+        extra: Optional[list[str]] = None,
+    ):
+        return cls(
+            cls.make_uri(entity_name, project_name, artifact_name, version, extra)
+        )
 
     @staticmethod
     def make_uri(

@@ -77,10 +77,14 @@ class LocalArtifact:
     def path(self, name):
         return os.path.join(self._read_dirname, name)
 
-    def uri(self) -> str:
-        return uris.WeaveLocalArtifactObjectLocation.make_uri(
+    @property
+    def location(self):
+        return uris.WeaveLocalArtifactObjectLocation.from_parts(
             os.path.abspath("local-artifacts"), self._name, self.version
         )
+
+    def uri(self) -> str:
+        return self.location.uri
 
     def load(self, name):
         # noop, all local artifacts already exist on disk, just return the path
@@ -216,16 +220,20 @@ class WandbArtifact:
         self._local_path[name] = path_safe
         return path_safe
 
-    def uri(self):
-        if not self._saved_artifact:
-            raise Exception("cannot get uri of an unsaved artifact")
-        # TODO: should we include server URL here?
-        return uris.WeaveArtifactObjectLocation.make_uri(
+    @property
+    def location(self):
+        return uris.WeaveArtifactObjectLocation.from_parts(
             self._saved_artifact.entity,
             self._saved_artifact.project,
             self._name,
             self._saved_artifact.version,
         )
+
+    def uri(self):
+        if not self._saved_artifact:
+            raise Exception("cannot get uri of an unsaved artifact")
+        # TODO: should we include server URL here?
+        return self.location.uri
 
     @contextlib.contextmanager
     def new_file(self, path, binary=False):
