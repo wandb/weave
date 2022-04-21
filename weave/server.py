@@ -36,18 +36,20 @@ def handle_request(request, deref=False, publish=False):
         print(graph.node_expr_str(node))
     """
     result = execute.execute_nodes(nodes)
+    if deref:
+        result = [storage.deref(r) for r in result]
+
+    # TODO: this should probably live in the mapper layer and be intelligent about object size and typ
     if publish:
         new_results = []
         for r in result:
-            if isinstance(r, refs.Ref):
+            if isinstance(r, refs.LocalArtifactRef):
                 # publish refs to remote storage
                 remote_ref = storage.publish(r.get())
                 new_results.append(remote_ref)
             else:
                 new_results.append(r)
         result = new_results
-    elif deref:
-        result = [storage.deref(r) for r in result]
     # print("Server request %s (%0.5fs): %s..." % (start_time,
     #                                              time.time() - start_time, [n.from_op.name for n in nodes[:3]]))
     if request_trace:
@@ -117,7 +119,6 @@ class HttpServerClient(object):
         r.raise_for_status()
 
         response = r.json()["data"]
-        #print(response)
         deserialized = [storage.from_python(r) for r in response]
         return [storage.deref(r) for r in deserialized]
 

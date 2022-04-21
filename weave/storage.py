@@ -183,6 +183,5 @@ def to_python(obj):
 def from_python(obj):
     wb_type = types.TypeRegistry.type_from_dict(obj["_type"])
     mapper = mappers_python.map_from_python(wb_type, None)
-    # raise Exception(wb_type)
     res = mapper.apply(obj["_val"])
     return res

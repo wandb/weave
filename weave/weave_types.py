@@ -815,7 +815,7 @@ class WandbArtifactRefType(Type):
 
     @classmethod
     def type_of_instance(cls, obj):
-        return LocalArtifactRefType(obj.type)
+        return WandbArtifactRefType(obj.type)
 
     def __str__(self):
         return "<WandbArtifactRefType %s>" % self.object_type
