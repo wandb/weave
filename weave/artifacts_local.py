@@ -171,18 +171,16 @@ class LocalArtifact:
 
 
 class WandbArtifact:
-    def __init__(self, name, type=None, uri=None):
+    def __init__(self, name, type=None, uri: uris.WeaveArtifactObjectLocation = None):
         self._name = name
         if not uri:
             self._writeable_artifact = wandb.Artifact(
                 name, type="op_def" if type is None else type
             )
         else:
-            # load an existin artifact, this should be read only
-            self._saved_artifact = wandb.Api().artifact(
-                f"{uri.path}/{uri.name}:{uri.version}"
-            )
-        self._local_path = {}
+            # load an existing artifact, this should be read only
+            self._saved_artifact = wandb.Api().artifact(uri.make_path())
+        self._local_path: dict[str, str] = {}
 
     @property
     def version(self):
@@ -222,12 +220,12 @@ class WandbArtifact:
         if not self._saved_artifact:
             raise Exception("cannot get uri of an unsaved artifact")
         # TODO: should we include server URL here?
-        return uris.WeaveObjectURI(
-            uris.Scheme.ARTIFACT,
-            f"{self._saved_artifact.entity}/{self._saved_artifact.project}",
+        return uris.WeaveArtifactObjectLocation.make_uri(
+            self._saved_artifact.entity,
+            self._saved_artifact.project,
             self._name,
             self._saved_artifact.version,
-        ).uri()
+        )
 
     @contextlib.contextmanager
     def new_file(self, path, binary=False):

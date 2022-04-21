@@ -24,7 +24,7 @@ class WeaveObjectLocation:
         parsed = urlparse(uri)
         if parsed.scheme != self.scheme:
             raise Exception("invalid scheme ", uri)
-        self.path = parsed.netloc + "/" + parsed.path
+        self.path = parsed.netloc.strip("/") + "/" + parsed.path.strip("/")
 
     # URI of the object. Roughly:
     #  [scheme://][domain]/[friendly_name]/[version]/[extra]
@@ -140,3 +140,29 @@ class WeaveArtifactObjectLocation(WeaveObjectLocation):
         self._friendly_name = parts[2]
         self._version = all_parts[1]
         self.extra = parts[3:]
+
+    @staticmethod
+    def make_uri(
+        entity_name: str,
+        project_name: str,
+        artifact_name: str,
+        version: str,
+        extra: Optional[list[str]] = None,
+    ):
+        uri = (
+            WeaveArtifactObjectLocation.scheme
+            + "://"
+            + entity_name
+            + "/"
+            + project_name
+            + "/"
+            + artifact_name
+            + ":"
+            + version
+        )
+        if extra is not None:
+            uri += "/".join(extra)
+        return uri
+
+    def make_path(self) -> str:
+        return f"{self._entity_name}/{self._project_name}/{self._artifact_name}:{self._version}"

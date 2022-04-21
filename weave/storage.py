@@ -72,6 +72,7 @@ def publish(obj, name=None, type=None):
     if name is None:
         obj_names = util.find_names(obj)
         name = f"{wb_type.name}-{obj_names[-1]}"
+    # TODO: Potentially add entity and project to namespace the artifact explicitly.
     artifact = artifacts_local.WandbArtifact(name, type=wb_type.name)
     ref = save_to_remote(obj, artifact, name, wb_type)
     artifact.save("weave_ops")
@@ -96,7 +97,7 @@ def save(obj, name=None, type=None):
     return ref
 
 
-def get(uri_s):  # WeaveObjectURI
+def get(uri_s):
     if isinstance(uri_s, refs.Ref):
         return uri_s.get()
     ref = refs.LocalArtifactRef.from_str(uri_s)

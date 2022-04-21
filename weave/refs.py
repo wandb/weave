@@ -4,7 +4,7 @@ import os
 import json
 from urllib.parse import urlparse
 import wandb
-from weave.uris import WeaveLocalArtifactObjectLocation
+from weave.uris import WeaveArtifactObjectLocation, WeaveLocalArtifactObjectLocation
 
 from . import artifacts_local
 from . import weave_types as types
@@ -69,10 +69,12 @@ class WandbArtifactRef(Ref):
 
     @classmethod
     def from_str(cls, s):
-        uri = WeaveObjectURI.parsestr(s)
-        if uri.scheme != Scheme.ARTIFACT:
-            raise Exception("invalid scheme ", s)
-        return cls(artifacts_local.WandbArtifact(uri.name, uri=uri), path=uri.name)
+        uri = WeaveArtifactObjectLocation(s)
+        # TODO: potentially need to pass full entity/project/name instead
+        return cls(
+            artifacts_local.WandbArtifact(uri.friendly_name, uri=uri),
+            path=uri.friendly_name,
+        )
 
 
 class LocalArtifactRef(Ref):

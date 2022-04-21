@@ -92,7 +92,6 @@ class Registry:
             ref = storage.save(op, name=op.name)
             version = ref.version
         op.version = version
-
         op_full_id = op.uri_name()
         op_full_name = op_full_id.split(":", 1)[0] if ":" in op_full_id else op_full_id
         op.call_fn = lazy.make_lazy_call(
