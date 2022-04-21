@@ -4,7 +4,7 @@ import os
 import json
 from urllib.parse import urlparse
 import wandb
-from weave.uris import Scheme, WeaveObjectURI
+from weave.uris import WeaveLocalArtifactObjectLocation
 
 from . import artifacts_local
 from . import weave_types as types
@@ -86,7 +86,12 @@ class LocalArtifactRef(Ref):
         self.extra = extra
 
     def uri(self):
-        return self.artifact.uri()
+        # todo: this is wrong
+        return WeaveLocalArtifactObjectLocation.make_uri(
+            os.path.abspath("local-artifacts"),
+            self.artifact.name,
+            self.artifact.version,
+        )
 
     @property
     def version(self):
@@ -134,11 +139,9 @@ class LocalArtifactRef(Ref):
         # Commented out the more complicated full URI so that
         # the demo looks nicer
         # TODO: fix.
-        uri = WeaveObjectURI.parsestr(s)
-        if uri.scheme != Scheme.LOCAL_FILE:
-            raise Exception("invalid scheme ", s)
+        loc = WeaveLocalArtifactObjectLocation(s)
         return cls(
-            artifacts_local.LocalArtifact(uri.name, uri.version), path="_obj", type=type
+            artifacts_local.LocalArtifact(loc.name, loc.version), path="_obj", type=type
         )
 
         # if "/" not in s:

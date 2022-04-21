@@ -5,8 +5,6 @@ import typing
 from urllib.parse import urlparse
 import wandb
 
-from weave.uris import WeaveObjectURI
-
 from . import errors
 from . import artifacts_local
 from . import weave_types as types

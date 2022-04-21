@@ -20,7 +20,7 @@ def make_refs(node: graph.Node):
         if isinstance(node, graph.ConstNode):
             ref = storage.get_ref(node.val)
             if ref is not None:
-                return op_get(str(ref))
+                return op_get(str(ref.uri()))
         return node
 
     return graph.map_nodes(node, make_ref)

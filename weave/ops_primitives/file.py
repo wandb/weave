@@ -3,6 +3,8 @@ import json
 import pandas
 import os
 
+from weave.uris import WeaveLocalArtifactObjectLocation
+
 from ..api import op, mutation, weave_class
 from .. import weave_types as types
 from . import table

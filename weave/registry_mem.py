@@ -2,7 +2,7 @@ import sys
 import typing
 
 import wandb
-from weave.uris import WeaveObjectURI
+from weave.uris import WeaveObjectLocation
 
 from . import op_def
 from . import weave_types
@@ -73,7 +73,7 @@ class Registry:
     # state.
     _ops: typing.Dict[str, op_def.OpDef]
 
-    _op_versions: typing.Dict[tuple[str, str], op_def.OpDef]
+    _op_versions: typing.Dict[str, op_def.OpDef]
 
     def __init__(self):
         self._types = {}
@@ -110,8 +110,8 @@ class Registry:
     def get_op(self, uri: str) -> op_def.OpDef:
         from . import storage
 
-        object_uri = WeaveObjectURI.parsestr(uri)
-        object_key = object_uri.uri()
+        object_uri = WeaveObjectLocation.parse(uri)
+        object_key = object_uri.uri
         if object_uri.version is not None:
             if object_key in self._op_versions:
                 res = self._op_versions[object_key]

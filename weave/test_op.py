@@ -18,6 +18,7 @@ def op_simple(a, b):
 
 def test_op_simple():
     x = op_simple(3, 4)
+    print(x.to_json())
     assert str(x) == "op_simple(3, 4)"
     test_helpers.assert_nodes_equal(
         x,
