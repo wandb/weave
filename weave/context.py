@@ -62,7 +62,7 @@ def _make_default_client():
     # the http server only communicates with the frontend. we create it above so that there is
     # a running server for the frontend to talk to as soon as we call use() or show().
     # python code can use the in process server by default.
-    return client.Client(server.InProcessServer())
+    return server.HttpServerClient("http://" + serv.host + ":" + str(serv.port))
 
 
 def use_fixed_server_port():
