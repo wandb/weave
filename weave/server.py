@@ -173,7 +173,7 @@ def server_proc(port, host):
 class HttpServer(ServerInterface):
     def __init__(self, port=0, host="127.0.0.1"):
         if port == 0:
-            port = 1234
+            port = 9994
         self.port = port
         self.host = host
         self.proc = multiprocessing.Process(

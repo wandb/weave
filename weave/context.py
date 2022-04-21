@@ -78,6 +78,10 @@ def use_frontend_devmode():
     _frontend_url.set("https://app.wandb.test")
 
 
+def use_frontend_url(url):
+    _frontend_url.set(url)
+
+
 def capture_weave_server_logs(log_level=logging.INFO):
     from . import weave_server
 
