@@ -89,8 +89,8 @@ class LocalArtifactRef(Ref):
         # todo: this is wrong
         return WeaveLocalArtifactObjectLocation.make_uri(
             os.path.abspath("local-artifacts"),
-            self.artifact.name,
-            self.artifact.version,
+            self.artifact._name,
+            self.artifact._version,
         )
 
     @property
@@ -141,7 +141,9 @@ class LocalArtifactRef(Ref):
         # TODO: fix.
         loc = WeaveLocalArtifactObjectLocation(s)
         return cls(
-            artifacts_local.LocalArtifact(loc.name, loc.version), path="_obj", type=type
+            artifacts_local.LocalArtifact(loc.friendly_name, loc.version),
+            path="_obj",
+            type=type,
         )
 
         # if "/" not in s:
