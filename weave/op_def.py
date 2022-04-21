@@ -172,7 +172,7 @@ class OpDefType(types.Type):
             f.write(code)
 
     def load_instance(cls, artifact, name, extra=None):
-        loaded = artifact.load(f"{name}")
+        loaded = artifact.load(f"{name}.py")
         if loaded is None:
             raise Exception(f"cannot load {name} from artifact")
         path = Path(loaded)

@@ -268,6 +268,7 @@ class WandbArtifact:
     def save(self, branch="latest"):
         # TODO: technically save should be sufficient but we need the run to grab the entity name and project name
         # TODO: what project should we put weave ops in???
+        os.environ["WANDB_SILENT"] = "true"
         run = wandb.init(project="weave_ops")
         self._writeable_artifact.save()
         self._writeable_artifact.wait()

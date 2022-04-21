@@ -6,6 +6,7 @@ from . import refs
 from . import mappers_weave
 from . import weave_types as types
 from . import graph
+from . import uris
 
 
 class TypedDictToPyDict(mappers_weave.TypedDictMapper):
@@ -132,14 +133,16 @@ class PyFunctionToFunction(mappers.Mapper):
 
 class RefToPyRef(mappers_weave.RefMapper):
     def apply(self, obj):
-        return str(obj)
+        return obj.uri()
 
 
 class PyRefToRef(mappers_weave.RefMapper):
     def apply(self, obj):
         from . import storage
-
-        return storage.refs.LocalArtifactRef.from_str(obj, type=self._object_type)
+        
+        ref = uris.WeaveObjectLocation.parse(obj).to_ref()
+        return ref
+        # return storage.refs.LocalArtifactRef.from_str(obj, type=self._object_type)
 
 
 class TypeToPyType(mappers.Mapper):
@@ -217,6 +220,8 @@ def map_to_python_(type, mapper, artifact, path=[]):
         return FunctionToPyFunction(type, mapper, artifact, path)
     elif isinstance(type, types.LocalArtifactRefType):
         return RefToPyRef(type, mapper, artifact, path)
+    elif isinstance(type, types.WandbArtifactRefType):
+        return RefToPyRef(type, mapper, artifact, path)
     else:
         return DefaultToPy(type, mapper, artifact, path)
 
@@ -250,6 +255,8 @@ def map_from_python_(type: types.Type, mapper, artifact, path=[]):
     elif isinstance(type, types.Function):
         return PyFunctionToFunction(type, mapper, artifact, path)
     elif isinstance(type, types.LocalArtifactRefType):
+        return PyRefToRef(type, mapper, artifact, path)
+    elif isinstance(type, types.WandbArtifactRefType):
         return PyRefToRef(type, mapper, artifact, path)
     else:
         return DefaultFromPy(type, mapper, artifact, path)

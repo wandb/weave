@@ -128,7 +128,6 @@ def execute_v2():
         abort(400)
     response = server.handle_request(request.json, publish=True)
     # print("RESPONSE BEFORE SERI", response)
-
     return {"data": response}
 
 
