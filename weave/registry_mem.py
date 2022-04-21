@@ -94,7 +94,6 @@ class Registry:
             version = ref.version
         op.version = version
         op_full_id = location.uri if location is not None else op.name
-        print(op_full_id, location, op.name)
         op_full_name = op_full_id.split(":", 1)[0] if ":" in op_full_id else op_full_id
         op.call_fn = lazy.make_lazy_call(
             op.resolve_fn, op_full_id, op.input_type, op.output_type
