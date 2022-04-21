@@ -1,4 +1,5 @@
 from imp import is_builtin
+import importlib
 import textwrap
 import contextlib
 import contextvars
@@ -6,6 +7,7 @@ import inspect
 import os
 import typing
 import sys
+from pathlib import Path
 
 from . import errors
 from . import op_args
@@ -168,20 +170,25 @@ class OpDefType(types.Type):
             f.write(code)
 
     def load_instance(cls, artifact, name, extra=None):
-        path = artifact.path(f"{name}")
-        # drop local-artifacts, we'll insert that to sys.path
-        parts = path.split("/")[1:]
-        module_path = ".".join(parts)
+        loaded = artifact.load(f"{name}")
+        if loaded is None:
+            raise Exception(f"cannot load {name} from artifact")
+        path = Path(loaded)
+        sys_mod = path.parts[0]
+        if path.is_file():
+            parts = list(path.parts[1:-1])
+            parts.append(path.stem)
+        else:
+            parts = path.parts[1:]
 
+        module_path = ".".join(parts)
         # This has a side effect of registering the op
-        sys.path.insert(0, "local-artifacts")
+        sys.path.insert(0, sys_mod)
         with loading_op_version(artifact.version):
-            mod = __import__(module_path)
+            mod = importlib.import_module(module_path)
         sys.path.pop(0)
         # We justed imported e.g. 'op-number-add.xaybjaa._obj'. Navigate from
         # mod down to _obj.
-        for part in parts[1:]:
-            mod = getattr(mod, part)
         module_functions = inspect.getmembers(mod, inspect.isfunction)
         if len(module_functions) != 1:
             raise errors.WeaveInternalError(

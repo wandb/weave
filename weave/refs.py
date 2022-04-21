@@ -32,12 +32,15 @@ def put_ref(obj, ref):
 
 
 class WandbArtifactRef(Ref):
+    artifact : "artifacts_local.WandbArtifact"
+
     def __init__(self, artifact, path, type=None, obj=None):
         self.artifact = artifact
         self.path = path
         self._type = type
         self.obj = obj
-        put_ref(obj, self)
+        if obj:
+            put_ref(obj, self)
 
     @property
     def version(self):
@@ -47,18 +50,18 @@ class WandbArtifactRef(Ref):
     def type(self):
         if self._type is not None:
             return self._type
-        with open(self.artifact.open(f"{self.path}.type.json", "r")) as f:
+        with self.artifact.open(f"{self.path}.type.json") as f:
             type_json = json.load(f)
         self._type = types.TypeRegistry.type_from_dict(type_json)
         return self._type
 
     def uri(self):
-        pass
+        return self.artifact.uri()
 
     def get(self):
         if self.obj:
             return self.obj
-        obj = self.type.load_instance(self.artifact, self.path, extra=self.extra)
+        obj = self.type.load_instance(self.artifact, f"{self.path}.py", extra=None)
         obj = box.box(obj)
         put_ref(obj, self)
         self.obj = obj
@@ -66,7 +69,11 @@ class WandbArtifactRef(Ref):
 
     @classmethod
     def from_str(cls, s):
-        pass
+        uri = WeaveObjectURI.parsestr(s)
+        if uri.scheme != Scheme.ARTIFACT:
+            raise Exception("invalid scheme ", s)
+        return cls(
+            artifacts_local.WandbArtifact(uri.name, uri=uri), path=uri.name)
 
 
 class LocalArtifactRef(Ref):
@@ -81,9 +88,9 @@ class LocalArtifactRef(Ref):
             raise errors.WeaveInternalError("path must not be None")
         self._type = type
         self.obj = obj
-        if obj != None:
-            put_ref(obj, self)
         self.extra = extra
+        if obj:
+            put_ref(obj, self)
 
     def uri(self):
         return self.artifact.uri()
@@ -201,3 +208,5 @@ class LocalArtifactRef(Ref):
 
 types.LocalArtifactRefType.instance_class = LocalArtifactRef
 types.LocalArtifactRefType.instance_classes = LocalArtifactRef
+types.WandbArtifactRefType.instance_class = WandbArtifactRef
+types.WandbArtifactRefType.instance_classes = WandbArtifactRef

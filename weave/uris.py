@@ -45,12 +45,14 @@ class WeaveObjectURI:
         else:
             raise Exception("Invalid scheme", url.scheme)
 
-        parts = url.path.split("/")
+        parts = url.path.strip("/").split("/")
         if len(parts) == 1:
-            path = ""
+            path = url.netloc
             name = parts[0]
         else:
             path = "/".join(parts[:-1])
+            if url.netloc:
+                path = "/".join([url.netloc, path])
             name = parts[len(parts) - 1]
 
         if ":" not in name:

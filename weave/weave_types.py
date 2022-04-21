@@ -780,7 +780,7 @@ class Function(Type):
 
 
 class LocalArtifactRefType(Type):
-    name = "ref-type"
+    name = "local-ref-type"
 
     def __init__(self, object_type):
         self.object_type = object_type
@@ -798,6 +798,27 @@ class LocalArtifactRefType(Type):
 
     def __str__(self):
         return "<LocalArtifactRefType %s>" % self.object_type
+
+
+class WandbArtifactRefType(Type):
+    name = "wandb-ref-type"
+
+    def __init__(self, object_type):
+        self.object_type = object_type
+
+    def _to_dict(self):
+        return {"objectType": self.object_type.to_dict()}
+
+    @classmethod
+    def from_dict(cls, d):
+        return cls(TypeRegistry.type_from_dict(d["objectType"]))
+
+    @classmethod
+    def type_of_instance(cls, obj):
+        return LocalArtifactRefType(obj.type)
+
+    def __str__(self):
+        return "<WandbArtifactRefType %s>" % self.object_type
 
 
 # TODO: placeholders for now, and a place for table.py
