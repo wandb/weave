@@ -88,7 +88,7 @@ class TypeRegistry:
             return Type()
         type_ = type_name_to_type(type_name)
         if type_ is None:
-            return Invalid()
+            raise errors.WeaveSerializeError("Can't deserialize type from: %s" % d)
         return type_.from_dict(d)
 
 
