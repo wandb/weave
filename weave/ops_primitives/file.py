@@ -1,75 +1,13 @@
-import pandas
 import os
 
 from ..api import op, mutation, weave_class
 from .. import weave_types as types
-from . import table
 
 _py_open = open
 
 
-@weave_class(weave_type=types.LocalFileType)
-class LocalFile:
-    def __init__(self, path, mtime=None, extension=None):
-        self.extension = extension
-        if self.extension is None:
-            self.extension = path_ext(path)
-        self.path = path
-        # Include mtime so that pure ops can consume us and hit cache
-        # if the file has not been updated.
-        self.mtime = mtime
-        if self.mtime is None:
-            self.mtime = os.path.getmtime(path)
-
-    @property
-    def changes_path(self):
-        return f"{self.path}.weave_changes.json"
-
-    def get_local_path(self):
-        return self.path
-
-    @op(
-        name="file-directUrl",
-        input_type={"file": types.FileType(types.String())},
-        output_type=types.String(),
-    )
-    def direct_url(file):
-        return "/__weave/file/%s" % os.path.abspath(file.path)
-
-    @mutation
-    def writecsv(self, csv):
-        csv.save(self.path)
-
-    # TODO: Move to File object, but does inheritance work?? Probably.
-    @op(
-        # TODO: I had to mark pure=False
-        # But that's not true! We need to know if the file we're reading is
-        # immutable (inside an artifact) or not (on a filesystem).
-        setter=writecsv,
-        name="file-readcsv",
-        input_type={"self": types.FileType(types.String())},
-        output_type=types.Table(types.Dict(types.String(), types.String())),
-    )
-    def readcsv(self):
-        # TODO: shouldn't need to do this, we can know the type of the file
-        # we're opening and just return that type directly.
-
-        # file is an artifact manifest entry for now.
-        from . import csv_
-
-        local_path = self.get_local_path()
-        obj = csv_.Csv([])  # TODO: weird
-        obj.load(local_path)
-
-        return obj
-
-
-types.LocalFileType.instance_classes = LocalFile
-types.LocalFileType.instance_class = LocalFile
-
-
 @weave_class(weave_type=types.FileType)
-class FileOps(object):
+class FileOps:
     @op(
         name="file-table",
         input_type={"file": types.FileType()},
@@ -140,37 +78,7 @@ def file_contents(file):
     return _py_open(local_path, encoding="ISO-8859-1").read()
 
 
-@op(
-    name="file-readcsvpandas",
-    input_type={"file": types.FileType()},
-    output_type=types.Table(),
-)
-def file_readpandascsv(file):
-    local_path = file.get_local_path()
-    try:
-        return pandas.read_csv(local_path)
-    except:
-        return pandas.read_csv(local_path, delimiter=";")
-
-
-class SubDirType(types.ObjectType):
-    # TODO doesn't match frontend
-    name = "subdir"
-
-    def __init__(self):
-        pass
-
-    def property_types(self):
-        return {
-            "fullPath": types.String(),
-            "size": types.Int(),
-            "dirs": types.Dict(types.String(), types.Int()),
-            # TODO: this should actually be just FileType
-            "files": types.Dict(types.String(), types.Int()),
-        }
-
-
-@weave_class(weave_type=SubDirType)
+@weave_class(weave_type=types.SubDirType)
 class SubDir(object):
     def __init__(self, fullPath, size, dirs, files):
         self.fullPath = fullPath
@@ -179,72 +87,11 @@ class SubDir(object):
         self.files = files
 
 
-SubDirType.instance_classes = SubDir
-SubDirType.instance_class = SubDir
+types.SubDirType.instance_classes = SubDir
+types.SubDirType.instance_class = SubDir
 
 
-class DirType(types.ObjectType):
-    # Fronend src/model/types.ts switches on this (and PanelDir)
-    # TODO: We actually want to be localdir here. But then the
-    # frontend needs to use a different mechanism for type checking
-    name = "dir"
-
-    def __init__(self):
-        pass
-
-    def property_types(self):
-        return {
-            "fullPath": types.String(),
-            "size": types.Int(),
-            "dirs": types.Dict(types.String(), SubDirType()),
-            # TODO: this should actually be just FileType
-            "files": types.Dict(types.String(), types.LocalFileType()),
-        }
-
-
-def path_ext(path):
-    return os.path.splitext(path)[1].strip(".")
-
-
-def path_type(path):
-    if not os.path.exists(path):
-        raise FileNotFoundError(f"Specified file or directory does not exist: '{path}'")
-    elif os.path.isdir(path):
-        return DirType()
-    else:
-        ext = path_ext(path)
-        return types.LocalFileType(extension=types.Const(types.String(), ext))
-
-
-def open_(path):
-    if not os.path.exists(path):
-        return None
-    elif os.path.isdir(path):
-        sub_dirs = {}
-        sub_files = {}
-        for fname in os.listdir(path):
-            full_path = os.path.join(path, fname)
-            if os.path.isdir(full_path):
-                subdir_dirs = {}
-                subdir_files = {}
-                for sub_fname in os.listdir(full_path):
-                    sub_full_path = os.path.join(full_path, sub_fname)
-                    if os.path.isdir(sub_full_path):
-                        subdir_dirs[sub_fname] = 1
-                    else:
-                        subdir_files[sub_fname] = 1
-                sub_dir = SubDir(full_path, 10, subdir_dirs, subdir_files)  # TODO: size
-                sub_dirs[fname] = sub_dir
-            else:
-                # sub_file = LocalFile(full_path, os.path.getsize(full_path), {}, {})
-                sub_file = LocalFile(full_path)
-                sub_files[fname] = sub_file
-        return Dir(path, 111, sub_dirs, sub_files)
-    else:
-        return LocalFile(path)
-
-
-@weave_class(weave_type=DirType)
+@weave_class(weave_type=types.DirType)
 class Dir(object):
     def __init__(self, fullPath, size, dirs, files):
         self.fullPath = fullPath
@@ -255,60 +102,57 @@ class Dir(object):
     def get_local_path(self):
         return self.path
 
-    @op(name="file-dir", input_type={"file": DirType()}, output_type=DirType())
+    @op(
+        name="file-type", input_type={"file": types.DirType()}, output_type=types.Type()
+    )
+    def file_type(file):
+        print("FILE", file, flush=True)
+        if isinstance(file, Dir):
+            return types.DirType()
+        else:
+            parts = file.path.split(".")
+            ext = ""
+            if len(parts) != 1:
+                ext = parts[-1]
+            return types.LocalFileType(extension=types.Const(types.String(), ext))
+
+    @op(
+        name="file-dir",
+        input_type={"file": types.DirType()},
+        output_type=types.DirType(),
+    )
     def file_dir(file):
         return file
 
-    @op(name="dir-size", input_type={"dir": DirType()}, output_type=types.Int())
+    @op(name="dir-size", input_type={"dir": types.DirType()}, output_type=types.Int())
     def size(dir):
         return dir.size
 
     @op(
         name="dir-pathReturnType",
-        input_type={"dir": DirType(), "path": types.String()},
+        input_type={"dir": types.DirType(), "path": types.String()},
         output_type=types.Type(),
     )
     def path_return_type(dir, path):
-        return path_type(os.path.join(dir.fullPath, path))
+        from . import local_file
+
+        return local_file.path_type(os.path.join(dir.fullPath, path))
 
     @op(
         name="dir-path",
-        input_type={"dir": DirType(), "path": types.String()},
-        output_type=types.UnionType(types.LocalFileType(), DirType(), types.none_type),
+        input_type={"dir": types.DirType(), "path": types.String()},
+        output_type=types.UnionType(
+            types.LocalFileType(), types.DirType(), types.none_type
+        ),
     )
     def open(dir, path):
-        return open_(os.path.join(dir.fullPath, path))
+        from . import local_file
+
+        return local_file.open_(os.path.join(dir.fullPath, path))
 
 
-DirType.instance_classes = Dir
-DirType.instance_class = Dir
-
-
-def op_file_open_return_type(input_types):
-    path = input_types["path"]
-    if not isinstance(path, types.Const):
-        return types.UnionType(types.LocalFileType(), DirType())
-    else:
-        return path_type(path.val)
-
-
-@op(
-    name="localpathReturnType",
-    input_type={"path": types.String()},
-    output_type=types.Type(),
-)
-def local_path_return_type(path):
-    return path_type(path)
-
-
-@op(
-    name="localpath",
-    input_type={"path": types.String()},
-    output_type=op_file_open_return_type,
-    pure=False,
-)
-def local_path(path):
-    return open_(path)
+types.DirType.instance_classes = Dir
+types.DirType.instance_class = Dir
 
 
 def op_get_return_type(uri):

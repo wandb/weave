@@ -33,3 +33,9 @@ def remove_opcall_versions_data(data):
             d["name"] = data["name"].split(":")[0]
         return {k: remove_opcall_versions_data(v) for k, v in d.items()}
     return data
+
+
+def unwrap_tag_type(serialized_type):
+    if isinstance(serialized_type, dict) and serialized_type.get("type") == "tagged":
+        return serialized_type["value"]
+    return serialized_type

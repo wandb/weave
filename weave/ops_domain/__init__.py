@@ -4,35 +4,93 @@ from ..api import op, weave_class
 from .. import weave_types as types
 from ..ops_primitives import file
 
+from wandb.apis import public as wandb_api
+from wandb.sdk.interface import artifacts as wandb_artifacts
 
-class Project(types.Type):
+
+class ProjectType(types.Type):
     name = "project"
+    instance_classes = wandb_api.Project
+    instance_class = wandb_api.Project
+
+    def instance_to_dict(self, obj):
+        return {"entity_name": obj.entity, "project_name": obj.name}
+
+    def instance_from_dict(self, d):
+        api = wandb_api.Api()
+        return api.project(name=d["project_name"], entity=d["entity_name"])
 
 
-class ArtifactVersion(types.Type):
-    name = "artifactversion"
+class ArtifactVersionType(types.Type):
+    name = "artifactVersion"
+    instance_classes = wandb_api.Artifact
+    instance_class = wandb_api.Artifact
+
+    def instance_to_dict(self, obj):
+        return {
+            "entity_name": obj.entity,
+            "project_name": obj.project,
+            "artifact_name": obj._sequence_name,
+            "artifact_version": obj.version,
+        }
+
+    def instance_from_dict(self, d):
+        api = wandb_api.Api()
+        return api.artifact(
+            "%s/%s/%s:%s"
+            % (
+                d["entity_name"],
+                d["project_name"],
+                d["artifact_name"],
+                d["artifact_version"],
+            )
+        )
+
+
+class ArtifactVersionFileType(types.Type):
+    name = "artifactversion-path"
+    instance_classes = wandb_artifacts.ArtifactEntry
+
+    def instance_to_dict(self, obj):
+        art = obj.parent_artifact()
+        return {
+            "entity_name": art.entity,
+            "project_name": art.project,
+            "artifact_name": art._sequence_name,
+            "artifact_version": art.version,
+            "path": obj.name,
+        }
+
+    def instance_from_dict(self, d):
+        api = wandb_api.Api()
+        return api.artifact(
+            "%s/%s/%s:%s"
+            % (
+                d["entity_name"],
+                d["project_name"],
+                d["artifact_name"],
+                d["artifact_version"],
+            )
+        ).get_path(d["path"])
 
 
 class RunType(types.BasicType):
     name = "run"
 
 
-@weave_class(weave_type=Project)
-class ProjectOps(object):
+@weave_class(weave_type=ProjectType)
+class Project:
     @op(
         name="project-artifactVersion",
         input_type={
-            "project": Project(),
+            "project": ProjectType(),
             "artifactName": types.String(),
             "artifactVersionAlias": types.String(),
         },
-        output_type=ArtifactVersion(),
+        output_type=ArtifactVersionType(),
     )
     def artifactVersion(project, artifactName, artifactVersionAlias):
-        import wandb
-
-        api = wandb.Api()
-        return api.artifact(
+        return wandb_api.Api().artifact(
             "%s/%s/%s:%s"
             % (project.entity, project.name, artifactName, artifactVersionAlias)
         )
@@ -40,7 +98,7 @@ class ProjectOps(object):
     @op(
         name="project-runs",
         input_type={
-            "project": Project(),
+            "project": ProjectType(),
         },
         output_type=types.List(RunType()),
     )
@@ -64,7 +122,7 @@ class ProjectOps(object):
     @op(
         name="project-filtered-runs",
         input_type={
-            "project": Project(),
+            "project": ProjectType(),
             "filter": types.Any(),
             "order": types.String(),
         },
@@ -93,27 +151,53 @@ class ProjectOps(object):
 @op(
     name="root-project",
     input_type={"entityName": types.String(), "projectName": types.String()},
-    output_type=Project(),
+    output_type=ProjectType(),
 )
 def project(entityName, projectName):
-    import wandb
-
-    api = wandb.Api()
-    return api.project(name=projectName, entity=entityName)
+    return wandb_api.Api().project(name=projectName, entity=entityName)
 
 
-@weave_class(weave_type=ArtifactVersion)
-class ArtifactVersionOps(object):
+@weave_class(weave_type=ArtifactVersionType)
+class ArtifactVersion:
     @op(
         name="artifactVersion-file",
-        input_type={"artifactVersion": ArtifactVersion(), "path": types.String()},
-        output_type=types.FileType(),
+        input_type={"artifactVersion": ArtifactVersionType(), "path": types.String()},
+        output_type=ArtifactVersionFileType(),
     )
+    # TODO: This function should probably be called path, but it return Dir or File.
+    # ok...
     def file(artifactVersion, path):
-        local_path = os.path.abspath(
-            os.path.join("local-artifacts", artifactVersion.path, path)
-        )
-        return file.LocalFile(local_path)
+        if path == "":
+            # print(
+            #     "MANIFEST",
+            #     artifactVersion.manifest.entries,
+            #     flush=True,
+            # )
+            files = {}
+            dirs = {}
+            # TODO: fix this code up.
+            for path, ent in artifactVersion.manifest.entries.items():
+                parts = path.split("/")
+                if len(parts) == 1:
+                    file_parts = path.split(".")
+                    ext = ""
+                    if len(file_parts) > 1:
+                        ext = file_parts[-1]
+                    files[path] = file.LocalFile(path, mtime=1, extension=ext)
+            return file.Dir("", 5, dirs, files)
+        return artifactVersion.get_path(path)
+
+
+@weave_class(weave_type=ArtifactVersionFileType)
+class ArtifactVersionFile(file.FileOps):
+    @op(
+        name="artifactVersionPath-contents",
+        input_type={"artifactVersionPath": ArtifactVersionFileType()},
+        output_type=types.String(),
+    )
+    def contents(artifactVersionPath):
+        local_path = artifactVersionPath.download()
+        return open(local_path, encoding="ISO-8859-1").read()
 
 
 @weave_class(weave_type=types.WBTable)

@@ -10,7 +10,7 @@ import numpy
 from ..api import op, weave_class
 from .. import weave_types as types
 from ..ops_primitives import file
-from . import ArtifactVersion
+from . import ArtifactVersionType
 
 from .. import storage
 from .. import tags
@@ -28,7 +28,7 @@ class Asset(object):
         input_type={"asset": types.Any()},
         # TODO: ArtifactVersion()
         # and return a FakeStorageArtifact ??
-        output_type=ArtifactVersion(),
+        output_type=ArtifactVersionType(),
     )
     def artifactVersion(asset):
         from . import tags
