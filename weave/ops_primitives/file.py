@@ -134,9 +134,9 @@ class Dir(object):
         output_type=types.Type(),
     )
     def path_return_type(dir, path):
-        from . import local_file
+        from . import file_local
 
-        return local_file.path_type(os.path.join(dir.fullPath, path))
+        return file_local.path_type(os.path.join(dir.fullPath, path))
 
     @op(
         name="dir-path",
@@ -146,9 +146,9 @@ class Dir(object):
         ),
     )
     def open(dir, path):
-        from . import local_file
+        from . import file_local
 
-        return local_file.open_(os.path.join(dir.fullPath, path))
+        return file_local.open_(os.path.join(dir.fullPath, path))
 
 
 types.DirType.instance_classes = Dir
