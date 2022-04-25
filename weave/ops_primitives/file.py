@@ -106,7 +106,6 @@ class Dir(object):
         name="file-type", input_type={"file": types.DirType()}, output_type=types.Type()
     )
     def file_type(file):
-        print("FILE", file, flush=True)
         if isinstance(file, Dir):
             return types.DirType()
         else:
@@ -114,7 +113,7 @@ class Dir(object):
             ext = ""
             if len(parts) != 1:
                 ext = parts[-1]
-            return types.LocalFileType(extension=types.Const(types.String(), ext))
+            return types.FileType(extension=types.Const(types.String(), ext))
 
     @op(
         name="file-dir",
@@ -134,21 +133,15 @@ class Dir(object):
         output_type=types.Type(),
     )
     def path_return_type(dir, path):
-        from . import file_local
-
-        return file_local.path_type(os.path.join(dir.fullPath, path))
+        return dir._path_return_type(path)
 
     @op(
         name="dir-path",
         input_type={"dir": types.DirType(), "path": types.String()},
-        output_type=types.UnionType(
-            types.LocalFileType(), types.DirType(), types.none_type
-        ),
+        output_type=types.UnionType(types.FileType(), types.DirType(), types.none_type),
     )
     def open(dir, path):
-        from . import file_local
-
-        return file_local.open_(os.path.join(dir.fullPath, path))
+        return dir._path(path)
 
 
 types.DirType.instance_classes = Dir

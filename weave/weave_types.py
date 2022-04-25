@@ -961,20 +961,7 @@ class DirType(ObjectType):
             "fullPath": String(),
             "size": Int(),
             "dirs": Dict(String(), SubDirType()),
-            # TODO: this should actually be just FileType
-            "files": Dict(String(), LocalFileType()),
-        }
-
-
-class LocalFileType(FileType):
-    name = "local_file"
-
-    def property_types(self):
-        return {
-            "extension": self.extension,
-            "path": String(),
-            # TODO: Datetime?
-            "mtime": Float(),
+            "files": Dict(String(), FileType()),
         }
 
 

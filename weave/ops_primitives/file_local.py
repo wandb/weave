@@ -2,15 +2,27 @@ import os
 
 from ..api import op, mutation, weave_class
 from .. import weave_types as types
-from . import file
+from . import file as weave_file
 
 
 def path_ext(path):
     return os.path.splitext(path)[1].strip(".")
 
 
-@weave_class(weave_type=types.LocalFileType)
-class LocalFile:
+class LocalFileType(types.FileType):
+    name = "local_file"
+
+    def property_types(self):
+        return {
+            "extension": self.extension,
+            "path": types.String(),
+            # TODO: Datetime?
+            "mtime": types.Float(),
+        }
+
+
+@weave_class(weave_type=LocalFileType)
+class LocalFile(weave_file.File):
     def __init__(self, path, mtime=None, extension=None):
         self.extension = extension
         if self.extension is None:
@@ -65,18 +77,49 @@ class LocalFile:
         return obj
 
 
-types.LocalFileType.instance_classes = LocalFile
-types.LocalFileType.instance_class = LocalFile
+LocalFileType.instance_classes = LocalFile
+LocalFileType.instance_class = LocalFile
+
+
+# This is exactly types.DirType except it uses LocalFileType in .files.
+# TODO: Make a more general mechanism to do this, with less boilerplate.
+# We want something like `type LocalDir = Dir<LocalFile>`
+class LocalDirType(types.ObjectType):
+    name = "localdir"
+
+    def __init__(self):
+        pass
+
+    def property_types(self):
+        return {
+            "fullPath": types.String(),
+            "size": types.Int(),
+            "dirs": types.Dict(types.String(), types.SubDirType()),
+            "files": types.Dict(types.String(), LocalFileType()),
+        }
+
+
+@weave_class(weave_type=LocalDirType)
+class LocalDir(weave_file.Dir):
+    def _path_return_type(self, path):
+        return path_type(os.path.join(self.fullPath, path))
+
+    def _path(self, path):
+        return open_(os.path.join(self.fullPath, path))
+
+
+LocalDirType.instance_classes = LocalDir
+LocalDirType.instance_class = LocalDir
 
 
 def path_type(path):
     if not os.path.exists(path):
         raise FileNotFoundError(f"Specified file or directory does not exist: '{path}'")
     elif os.path.isdir(path):
-        return types.DirType()
+        return LocalDirType()
     else:
         ext = path_ext(path)
-        return types.LocalFileType(extension=types.Const(types.String(), ext))
+        return LocalFileType(extension=types.Const(types.String(), ext))
 
 
 def open_(path):
@@ -96,7 +139,7 @@ def open_(path):
                         subdir_dirs[sub_fname] = 1
                     else:
                         subdir_files[sub_fname] = 1
-                sub_dir = file.SubDir(
+                sub_dir = weave_file.SubDir(
                     full_path, 10, subdir_dirs, subdir_files
                 )  # TODO: size
                 sub_dirs[fname] = sub_dir
@@ -104,15 +147,15 @@ def open_(path):
                 # sub_file = LocalFile(full_path, os.path.getsize(full_path), {}, {})
                 sub_file = LocalFile(full_path)
                 sub_files[fname] = sub_file
-        return file.Dir(path, 111, sub_dirs, sub_files)
+        return LocalDir(path, 111, sub_dirs, sub_files)
     else:
         return LocalFile(path)
 
 
-def op_file_open_return_type(input_types):
+def op_local_path_return_type(input_types):
     path = input_types["path"]
     if not isinstance(path, types.Const):
-        return types.UnionType(types.LocalFileType(), types.DirType())
+        return types.UnionType(LocalFileType(), LocalDirType())
     else:
         return path_type(path.val)
 
@@ -129,7 +172,7 @@ def local_path_return_type(path):
 @op(
     name="localpath",
     input_type={"path": types.String()},
-    output_type=op_file_open_return_type,
+    output_type=op_local_path_return_type,
     pure=False,
 )
 def local_path(path):
