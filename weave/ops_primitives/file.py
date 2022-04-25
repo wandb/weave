@@ -7,7 +7,7 @@ _py_open = open
 
 
 @weave_class(weave_type=types.FileType)
-class FileOps:
+class File:
     @op(
         name="file-table",
         input_type={"file": types.FileType()},

@@ -1,11 +1,11 @@
 # TODO: split this into multiple files like we do in the JS version
 
+from wandb.apis import public as wandb_api
+
 from ..api import op, weave_class
 from .. import weave_types as types
 from ..ops_primitives import file
-
-from wandb.apis import public as wandb_api
-from wandb.sdk.interface import artifacts as wandb_artifacts
+from . import file_wbartifact
 
 
 class ProjectType(types.Type):
@@ -45,33 +45,6 @@ class ArtifactVersionType(types.Type):
                 d["artifact_version"],
             )
         )
-
-
-class ArtifactVersionFileType(types.Type):
-    name = "artifactversion-path"
-    instance_classes = wandb_artifacts.ArtifactEntry
-
-    def instance_to_dict(self, obj):
-        art = obj.parent_artifact()
-        return {
-            "entity_name": art.entity,
-            "project_name": art.project,
-            "artifact_name": art._sequence_name,
-            "artifact_version": art.version,
-            "path": obj.name,
-        }
-
-    def instance_from_dict(self, d):
-        api = wandb_api.Api()
-        return api.artifact(
-            "%s/%s/%s:%s"
-            % (
-                d["entity_name"],
-                d["project_name"],
-                d["artifact_name"],
-                d["artifact_version"],
-            )
-        ).get_path(d["path"])
 
 
 class RunType(types.BasicType):
@@ -162,7 +135,7 @@ class ArtifactVersion:
     @op(
         name="artifactVersion-file",
         input_type={"artifactVersion": ArtifactVersionType(), "path": types.String()},
-        output_type=ArtifactVersionFileType(),
+        output_type=file_wbartifact.ArtifactVersionFileType(),
     )
     # TODO: This function should probably be called path, but it return Dir or File.
     # ok...
@@ -186,18 +159,6 @@ class ArtifactVersion:
                     files[path] = file.LocalFile(path, mtime=1, extension=ext)
             return file.Dir("", 5, dirs, files)
         return artifactVersion.get_path(path)
-
-
-@weave_class(weave_type=ArtifactVersionFileType)
-class ArtifactVersionFile(file.FileOps):
-    @op(
-        name="artifactVersionPath-contents",
-        input_type={"artifactVersionPath": ArtifactVersionFileType()},
-        output_type=types.String(),
-    )
-    def contents(artifactVersionPath):
-        local_path = artifactVersionPath.download()
-        return open(local_path, encoding="ISO-8859-1").read()
 
 
 @weave_class(weave_type=types.WBTable)
