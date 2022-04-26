@@ -37,7 +37,7 @@ RUN mkdir /weave \
     && /opt/conda/bin/conda clean -afy \
     && apk del wget bzip2
 
-ENV PORT 443
+ENV PORT 9239
 
 WORKDIR /weave
 ADD . .
@@ -45,7 +45,7 @@ ADD . .
 RUN pip install -r requirements.txt
 RUN mkdir /local-artifacts
 
-EXPOSE 443
+EXPOSE 9239
 
 ENTRYPOINT [ "tini", "-g", "--" ]
 CMD ["gunicorn", "weave.weave_server:app"]
