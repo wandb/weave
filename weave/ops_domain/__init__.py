@@ -139,26 +139,8 @@ class ArtifactVersion:
     )
     # TODO: This function should probably be called path, but it return Dir or File.
     # ok...
-    def file(artifactVersion, path):
-        if path == "":
-            # print(
-            #     "MANIFEST",
-            #     artifactVersion.manifest.entries,
-            #     flush=True,
-            # )
-            files = {}
-            dirs = {}
-            # TODO: fix this code up.
-            for path, ent in artifactVersion.manifest.entries.items():
-                parts = path.split("/")
-                if len(parts) == 1:
-                    file_parts = path.split(".")
-                    ext = ""
-                    if len(file_parts) > 1:
-                        ext = file_parts[-1]
-                    files[path] = file.LocalFile(path, mtime=1, extension=ext)
-            return file.Dir("", 5, dirs, files)
-        return artifactVersion.get_path(path)
+    def path(artifactVersion, path):
+        return file_wbartifact.artifact_version_path(artifactVersion, path)
 
 
 @weave_class(weave_type=types.WBTable)

@@ -934,16 +934,17 @@ class SubDirType(ObjectType):
     # TODO doesn't match frontend
     name = "subdir"
 
-    def __init__(self):
-        pass
+    type_vars = {"file_type": FileType()}
+
+    def __init__(self, file_type):
+        self.file_type = file_type
 
     def property_types(self):
         return {
             "fullPath": String(),
             "size": Int(),
             "dirs": Dict(String(), Int()),
-            # TODO: this should actually be just FileType
-            "files": Dict(String(), Int()),
+            "files": Dict(String(), self.file_type),
         }
 
 

@@ -5,10 +5,6 @@ from .. import weave_types as types
 from . import file as weave_file
 
 
-def path_ext(path):
-    return os.path.splitext(path)[1].strip(".")
-
-
 class LocalFileType(types.FileType):
     name = "local_file"
 
@@ -26,7 +22,7 @@ class LocalFile(weave_file.File):
     def __init__(self, path, mtime=None, extension=None):
         self.extension = extension
         if self.extension is None:
-            self.extension = path_ext(path)
+            self.extension = weave_file.path_ext(path)
         self.path = path
         # Include mtime so that pure ops can consume us and hit cache
         # if the file has not been updated.
@@ -94,7 +90,7 @@ class LocalDirType(types.ObjectType):
         return {
             "fullPath": types.String(),
             "size": types.Int(),
-            "dirs": types.Dict(types.String(), types.SubDirType()),
+            "dirs": types.Dict(types.String(), types.SubDirType(LocalFileType())),
             "files": types.Dict(types.String(), LocalFileType()),
         }
 
@@ -118,7 +114,7 @@ def path_type(path):
     elif os.path.isdir(path):
         return LocalDirType()
     else:
-        ext = path_ext(path)
+        ext = weave_file.path_ext(path)
         return LocalFileType(extension=types.Const(types.String(), ext))
 
 
@@ -138,7 +134,7 @@ def open_(path):
                     if os.path.isdir(sub_full_path):
                         subdir_dirs[sub_fname] = 1
                     else:
-                        subdir_files[sub_fname] = 1
+                        subdir_files[sub_fname] = LocalFile(full_path)
                 sub_dir = weave_file.SubDir(
                     full_path, 10, subdir_dirs, subdir_files
                 )  # TODO: size

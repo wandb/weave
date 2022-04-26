@@ -6,6 +6,10 @@ from .. import weave_types as types
 _py_open = open
 
 
+def path_ext(path):
+    return os.path.splitext(path)[1].strip(".")
+
+
 @weave_class(weave_type=types.FileType)
 class File:
     @op(
