@@ -1,6 +1,6 @@
 import os
 
-from ..api import op, weave_class
+from ..api import op, mutation, weave_class
 from .. import weave_types as types
 
 _py_open = open
@@ -58,7 +58,12 @@ class File:
         return 10
         return file.size
 
+    @mutation
+    def file_contents_set(self, val):
+        return self._file_contents_set(val)
+
     @op(
+        setter=file_contents_set,
         name="file-contents",
         input_type={"file": types.FileType()},
         output_type=types.String(),

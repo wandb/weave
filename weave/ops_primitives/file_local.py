@@ -30,6 +30,11 @@ class LocalFile(weave_file.File):
         if self.mtime is None:
             self.mtime = os.path.getmtime(path)
 
+    def _file_contents_set(self, val):
+        with open(self.path, "w") as f:
+            f.write(val)
+        return self
+
     def _contents(self):
         return open(self.path, encoding="ISO-8859-1").read()
 

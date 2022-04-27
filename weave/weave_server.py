@@ -87,7 +87,7 @@ def make_app(log_filename=None, stream_logging_enabled=False):
 
 
 app = make_app()
-CORS(app, supports_credentials=True)
+CORS(app, send_wildcard=True)
 
 
 @app.route("/__weave/ops", methods=["GET"])
