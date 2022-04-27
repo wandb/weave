@@ -8,6 +8,11 @@ from datetime import datetime
 
 from . import util
 
+
+LOCAL_ARTIFACT_DIR = os.environ.get("WEAVE_LOCAL_ARTIFACT_DIR") or os.path.join(
+    "/tmp", "local-artifacts"
+)
+
 # From sdk/interface/artifacts.py
 def md5_hash_file(path):
     hash_md5 = hashlib.md5()
@@ -24,7 +29,7 @@ def md5_string(string: str) -> str:
 
 
 def local_artifact_exists(name, branch):
-    return os.path.exists(os.path.join("local-artifacts", name, branch))
+    return os.path.exists(os.path.join(LOCAL_ARTIFACT_DIR, name, branch))
 
 
 # This is a prototype implementation. Chock full of races, and other
@@ -34,7 +39,7 @@ class LocalArtifact:
     def __init__(self, name, version=None):
         self._name = name
         self._version = version
-        self._root = os.path.join("local-artifacts", name)
+        self._root = os.path.join(LOCAL_ARTIFACT_DIR, name)
         self._path_handlers = {}
         os.makedirs(self._root, exist_ok=True)
         self._setup_dirs()

@@ -2,6 +2,7 @@ import shutil
 from . import api as weave
 from . import graph
 from . import storage
+from .artifacts_local import LOCAL_ARTIFACT_DIR
 
 from .weave_internal import make_const_node
 
@@ -25,7 +26,7 @@ def test_node_expr():
 
 def test_versions():
     try:
-        shutil.rmtree("local-artifacts")
+        shutil.rmtree(LOCAL_ARTIFACT_DIR)
     except FileNotFoundError:
         pass
 

@@ -19,7 +19,7 @@ def test_save():
     # The image should be stored inside the artifact. This is a weak check
     # for that.
     # TODO: currently failing
-    # assert "local-artifacts" in url
+    # assert LOCAL_ARTIFACT_DIR in url
 
     assert im.format == im2.format
     assert im.path == im2.path

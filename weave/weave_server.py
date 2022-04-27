@@ -86,7 +86,7 @@ def make_app(log_filename=None, stream_logging_enabled=False):
     return Flask(__name__, static_folder="frontend")
 
 
-app = make_app()
+app = make_app(stream_logging_enabled=True)
 CORS(app, send_wildcard=True)
 
 
