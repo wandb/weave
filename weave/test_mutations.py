@@ -4,6 +4,7 @@ import shutil
 from . import ops
 from . import storage
 from . import api as weave
+from .artifacts_local import LOCAL_ARTIFACT_DIR
 
 
 def test_autocommit():

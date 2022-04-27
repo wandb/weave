@@ -1,6 +1,7 @@
 import shutil
 
 from . import api as weave
+from .artifacts_local import LOCAL_ARTIFACT_DIR
 from .show import _show_params
 
 

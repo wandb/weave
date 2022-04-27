@@ -12,6 +12,7 @@ from . import graph
 from . import util
 from . import box
 from . import refs
+from .artifacts_local import LOCAL_ARTIFACT_DIR
 
 Ref = refs.Ref
 

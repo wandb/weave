@@ -11,8 +11,12 @@ from . import op_args
 from . import weave_types as types
 
 
+from .artifacts_local import LOCAL_ARTIFACT_DIR
+
+
 # Set to the op version if we're in the process of loading
 # an op from an artifact.
+
 _loading_op_version: contextvars.ContextVar[
     typing.Optional[str]
 ] = contextvars.ContextVar("loading_op_version", default=None)

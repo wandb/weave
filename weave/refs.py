@@ -8,6 +8,7 @@ from . import artifacts_local
 from . import weave_types as types
 from . import errors
 from . import box
+from .artifacts_local import LOCAL_ARTIFACT_DIR
 
 
 class Ref:

@@ -3,6 +3,7 @@ from . import weave_types as types
 from . import weave_internal
 from . import ops
 from . import execute
+from .artifacts_local import LOCAL_ARTIFACT_DIR
 
 execute_test_count_op_run_count = 0
 

@@ -1,3 +1,4 @@
+from .artifacts_local import LOCAL_ARTIFACT_DIR
 from .ecosystem import async_demo
 from . import compile
 
