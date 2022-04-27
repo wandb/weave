@@ -25,7 +25,7 @@ def test_node_expr():
 
 def test_versions():
     try:
-        shutil.rmtree("local-artifacts")
+        shutil.rmtree(LOCAL_ARTIFACT_DIR)
     except FileNotFoundError:
         pass
 

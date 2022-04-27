@@ -147,7 +147,7 @@ class OpDefType(types.Type):
         module_path = ".".join(parts)
 
         # This has a side effect of registering the op
-        sys.path.insert(0, "local-artifacts")
+        sys.path.insert(0, LOCAL_ARTIFACT_DIR)
         with loading_op_version(artifact.version):
             mod = __import__(module_path)
         sys.path.pop(0)

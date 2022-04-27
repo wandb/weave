@@ -63,7 +63,7 @@ class LocalArtifactRef(Ref):
         return obj
 
     def versions(self):
-        artifact_path = os.path.join("local-artifacts", self.artifact._name)
+        artifact_path = os.path.join(LOCAL_ARTIFACT_DIR, self.artifact._name)
         versions = []
         for version_name in os.listdir(artifact_path):
             if (

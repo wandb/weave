@@ -20,7 +20,7 @@ def test_local_file_pure_cached():
     import shutil
 
     try:
-        shutil.rmtree("local-artifacts")
+        shutil.rmtree(LOCAL_ARTIFACT_DIR)
     except FileNotFoundError:
         pass
     shutil.copy("testdata/cereal.csv", "/tmp/cereal.csv")

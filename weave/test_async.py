@@ -11,7 +11,7 @@ def test_run():
     import shutil
 
     try:
-        shutil.rmtree("local-artifacts")
+        shutil.rmtree(LOCAL_ARTIFACT_DIR)
     except FileNotFoundError:
         pass
 
@@ -43,7 +43,7 @@ def test_automatic_await():
     import shutil
 
     try:
-        shutil.rmtree("local-artifacts")
+        shutil.rmtree(LOCAL_ARTIFACT_DIR)
     except FileNotFoundError:
         pass
 
@@ -57,7 +57,7 @@ def test_stable_when_fetching_input():
     import shutil
 
     try:
-        shutil.rmtree("local-artifacts")
+        shutil.rmtree(LOCAL_ARTIFACT_DIR)
     except FileNotFoundError:
         pass
 
@@ -86,7 +86,7 @@ def test_async_op_expr():
     import shutil
 
     try:
-        shutil.rmtree("local-artifacts")
+        shutil.rmtree(LOCAL_ARTIFACT_DIR)
     except FileNotFoundError:
         pass
 

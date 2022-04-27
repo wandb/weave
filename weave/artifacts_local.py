@@ -29,7 +29,7 @@ def md5_string(string: str) -> str:
 
 
 def local_artifact_exists(name, branch):
-    return os.path.exists(os.path.join("local-artifacts", name, branch))
+    return os.path.exists(os.path.join(LOCAL_ARTIFACT_DIR, name, branch))
 
 
 # This is a prototype implementation. Chock full of races, and other
