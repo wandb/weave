@@ -39,7 +39,7 @@ class LocalArtifact:
     def __init__(self, name, version=None):
         self._name = name
         self._version = version
-        self._root = os.path.join("local-artifacts", name)
+        self._root = os.path.join(LOCAL_ARTIFACT_DIR, name)
         self._path_handlers = {}
         os.makedirs(self._root, exist_ok=True)
         self._setup_dirs()
