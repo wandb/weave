@@ -9,12 +9,9 @@ import numpy
 
 from ..api import op, weave_class
 from .. import weave_types as types
-from ..ops_primitives import file
-from . import ArtifactVersionType
+from .wbartifact import ArtifactVersionType
 
 from .. import storage
-from .. import tags
-from .. import util
 
 
 class AssetType(types.Type):
