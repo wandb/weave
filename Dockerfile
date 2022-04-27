@@ -5,8 +5,8 @@ ENV CONDA_VERSION=4.9.2 \
     CONDA_MD5=b4e46fcc8029e2cfa731b788f25b1d36 \
     PYTHON_VERSION=39 \
     PYTHONDONTWRITEBYTECODE=true \
-    PATH=/opt/conda/bin/:/opt/conda/envs/base/:$PATH
-
+    PATH=/opt/conda/bin/:/opt/conda/envs/base/:$PATH \
+    WEAVE_LOCAL_ARTIFACT_DIR=/local-artifacts
 
 # We do the following all in one block:
 # - Create user and group weave
@@ -37,14 +37,15 @@ RUN mkdir /weave \
     && /opt/conda/bin/conda clean -afy \
     && apk del wget bzip2
 
-ENV PORT 8080
+ENV PORT 9239
 
 WORKDIR /weave
 ADD . .
 
 RUN pip install -r requirements.txt
+RUN mkdir /local-artifacts
 
-EXPOSE 8080
+EXPOSE 9239
 
 ENTRYPOINT [ "tini", "-g", "--" ]
 CMD ["gunicorn", "weave.weave_server:app"]

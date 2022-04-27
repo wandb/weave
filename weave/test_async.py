@@ -1,6 +1,7 @@
 from . import api
 from . import storage
 from . import ops
+from .artifacts_local import LOCAL_ARTIFACT_DIR
 from .ecosystem import async_demo
 import pytest
 from . import weave_objects
@@ -11,7 +12,7 @@ def test_run():
     import shutil
 
     try:
-        shutil.rmtree("local-artifacts")
+        shutil.rmtree(LOCAL_ARTIFACT_DIR)
     except FileNotFoundError:
         pass
 
@@ -43,7 +44,7 @@ def test_automatic_await():
     import shutil
 
     try:
-        shutil.rmtree("local-artifacts")
+        shutil.rmtree(LOCAL_ARTIFACT_DIR)
     except FileNotFoundError:
         pass
 
@@ -57,7 +58,7 @@ def test_stable_when_fetching_input():
     import shutil
 
     try:
-        shutil.rmtree("local-artifacts")
+        shutil.rmtree(LOCAL_ARTIFACT_DIR)
     except FileNotFoundError:
         pass
 
@@ -86,7 +87,7 @@ def test_async_op_expr():
     import shutil
 
     try:
-        shutil.rmtree("local-artifacts")
+        shutil.rmtree(LOCAL_ARTIFACT_DIR)
     except FileNotFoundError:
         pass
 

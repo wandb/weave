@@ -3,6 +3,7 @@ from . import weave_types as types
 from . import weave_internal
 from . import ops
 from . import execute
+from .artifacts_local import LOCAL_ARTIFACT_DIR
 
 execute_test_count_op_run_count = 0
 
@@ -20,7 +21,7 @@ def test_local_file_pure_cached():
     import shutil
 
     try:
-        shutil.rmtree("local-artifacts")
+        shutil.rmtree(LOCAL_ARTIFACT_DIR)
     except FileNotFoundError:
         pass
     shutil.copy("testdata/cereal.csv", "/tmp/cereal.csv")

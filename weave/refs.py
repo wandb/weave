@@ -8,6 +8,7 @@ from . import artifacts_local
 from . import weave_types as types
 from . import errors
 from . import box
+from .artifacts_local import LOCAL_ARTIFACT_DIR
 
 
 class Ref:
@@ -63,7 +64,7 @@ class LocalArtifactRef(Ref):
         return obj
 
     def versions(self):
-        artifact_path = os.path.join("local-artifacts", self.artifact._name)
+        artifact_path = os.path.join(LOCAL_ARTIFACT_DIR, self.artifact._name)
         versions = []
         for version_name in os.listdir(artifact_path):
             if (

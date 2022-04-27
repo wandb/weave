@@ -12,6 +12,7 @@ from . import graph
 from . import util
 from . import box
 from . import refs
+from .artifacts_local import LOCAL_ARTIFACT_DIR
 
 Ref = refs.Ref
 
@@ -110,7 +111,7 @@ def get_version(name, version):
 def get_obj_creator(obj_ref):
     # Extremely inefficient!
     # TODO
-    for art_name in os.listdir("local-artifacts"):
+    for art_name in os.listdir(LOCAL_ARTIFACT_DIR):
         if (
             art_name.startswith("run-")
             and not art_name.endswith("-output")

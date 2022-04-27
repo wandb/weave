@@ -4,11 +4,12 @@ import shutil
 from . import ops
 from . import storage
 from . import api as weave
+from .artifacts_local import LOCAL_ARTIFACT_DIR
 
 
 def test_autocommit():
     try:
-        shutil.rmtree("local-artifacts")
+        shutil.rmtree(LOCAL_ARTIFACT_DIR)
     except FileNotFoundError:
         pass
     shutil.copy("testdata/cereal.csv", "/tmp/cereal.csv")
@@ -29,7 +30,7 @@ def test_autocommit():
 
 def test_nonconst():
     try:
-        shutil.rmtree("local-artifacts")
+        shutil.rmtree(LOCAL_ARTIFACT_DIR)
     except FileNotFoundError:
         pass
     shutil.copy("testdata/cereal.csv", "/tmp/cereal.csv")
@@ -49,7 +50,7 @@ def test_nonconst():
 
 def test_mutate_with_use():
     try:
-        shutil.rmtree("local-artifacts")
+        shutil.rmtree(LOCAL_ARTIFACT_DIR)
     except FileNotFoundError:
         pass
     shutil.copy("testdata/cereal.csv", "/tmp/cereal.csv")
@@ -63,7 +64,7 @@ def test_mutate_with_use():
 
 def test_mutate_artifact():
     try:
-        shutil.rmtree("local-artifacts")
+        shutil.rmtree(LOCAL_ARTIFACT_DIR)
     except FileNotFoundError:
         pass
     storage.save({"a": 5, "b": 6}, "my-dict")
@@ -74,7 +75,7 @@ def test_mutate_artifact():
 
 def test_csv_saveload_type():
     try:
-        shutil.rmtree("local-artifacts")
+        shutil.rmtree(LOCAL_ARTIFACT_DIR)
     except FileNotFoundError:
         pass
     shutil.copy("testdata/cereal.csv", "/tmp/cereal.csv")
@@ -87,7 +88,7 @@ def test_csv_saveload_type():
 
 def test_skips_list_indexcheckpoint():
     try:
-        shutil.rmtree("local-artifacts")
+        shutil.rmtree(LOCAL_ARTIFACT_DIR)
     except FileNotFoundError:
         pass
     shutil.copy("testdata/cereal.csv", "/tmp/cereal.csv")

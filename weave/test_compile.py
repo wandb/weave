@@ -1,3 +1,4 @@
+from .artifacts_local import LOCAL_ARTIFACT_DIR
 from .ecosystem import async_demo
 from . import compile
 
@@ -6,7 +7,7 @@ def test_automatic_await_compile():
     import shutil
 
     try:
-        shutil.rmtree("local-artifacts")
+        shutil.rmtree(LOCAL_ARTIFACT_DIR)
     except FileNotFoundError:
         pass
 

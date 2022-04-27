@@ -11,8 +11,12 @@ from . import op_args
 from . import weave_types as types
 
 
+from .artifacts_local import LOCAL_ARTIFACT_DIR
+
+
 # Set to the op version if we're in the process of loading
 # an op from an artifact.
+
 _loading_op_version: contextvars.ContextVar[
     typing.Optional[str]
 ] = contextvars.ContextVar("loading_op_version", default=None)
@@ -141,13 +145,14 @@ class OpDefType(types.Type):
             f.write(code)
 
     def load_instance(cls, artifact, name, extra=None):
-        path = artifact.path(f"{name}")
-        # drop local-artifacts, we'll insert that to sys.path
-        parts = path.split("/")[1:]
+        path = os.path.relpath(artifact.path(f"{name}"), start=LOCAL_ARTIFACT_DIR)
+
+        # convert filename into module path
+        parts = path.split("/")
         module_path = ".".join(parts)
 
         # This has a side effect of registering the op
-        sys.path.insert(0, "local-artifacts")
+        sys.path.insert(0, LOCAL_ARTIFACT_DIR)
         with loading_op_version(artifact.version):
             mod = __import__(module_path)
         sys.path.pop(0)
