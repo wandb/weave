@@ -12,7 +12,7 @@ from . import weavejs_fixes
 from . import storage
 from . import util
 from . import usage_analytics
-from .ops_primitives.file import get as op_get
+from .ops_primitives.storage import get as op_get
 
 
 def make_refs(node: graph.Node):

@@ -19,9 +19,9 @@ from .context import (
 
 def save(node_or_obj, name=None):
     if isinstance(node_or_obj, _graph.Node):
-        from .ops_primitives import file as file_ops
+        from .ops_primitives.storage import save as op_save
 
-        return file_ops.save(node_or_obj, name=name)
+        return op_save(node_or_obj, name=name)
     else:
         ref = _storage.save(node_or_obj, name=name)
         return _weave_internal.make_const_node(ref.type, ref.obj)

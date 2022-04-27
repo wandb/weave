@@ -3,6 +3,7 @@ from .number import *
 from .dict import *
 from .file import *
 from .file_local import *
+from .storage import *
 from .pandas_ import *
 from .csv_ import *
 from .sql import *
