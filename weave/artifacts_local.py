@@ -7,7 +7,7 @@ import shutil
 from datetime import datetime
 
 from . import util
-import wandb
+
 
 LOCAL_ARTIFACT_DIR = os.environ.get("WEAVE_LOCAL_ARTIFACT_DIR") or os.path.join(
     "/tmp", "local-artifacts"
