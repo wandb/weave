@@ -10,6 +10,33 @@ def path_ext(path):
     return os.path.splitext(path)[1].strip(".")
 
 
+##### These are actually path ops, but they are called file for legacy reason
+
+
+@op(name="file-type", input_type={"file": types.DirType()}, output_type=types.Type())
+def file_type(file):
+    if isinstance(file, Dir):
+        return types.DirType()
+    else:
+        parts = file.path.split(".")
+        ext = ""
+        if len(parts) != 1:
+            ext = parts[-1]
+        return types.FileType(extension=types.Const(types.String(), ext))
+
+
+@op(
+    name="file-dir",
+    input_type={"file": types.DirType()},
+    output_type=types.DirType(),
+)
+def file_dir(file):
+    return file
+
+
+##### End path ops
+
+
 @weave_class(weave_type=types.FileType)
 class File:
     @op(
@@ -35,6 +62,22 @@ class File:
         local_path = file.path
         return "/__weave/file/%s" % local_path
 
+    @op(
+        name="file-size", input_type={"file": types.FileType()}, output_type=types.Int()
+    )
+    def file_size(file):
+        # file is an artifact manifest entry for now.
+        return 10
+        return file.size
+
+    @op(
+        name="file-contents",
+        input_type={"file": types.FileType()},
+        output_type=types.String(),
+    )
+    def file_contents(file):
+        return file._contents()
+
 
 # Question, should all tables be lazy? That would mean we can serialize
 #     and hand them between processes.... How would the user choose to
@@ -56,30 +99,6 @@ class File:
 #             "type": parts[-2],
 #         }
 #     return result_type
-
-
-@op(name="file-size", input_type={"file": types.FileType()}, output_type=types.Int())
-def file_size(file):
-    # file is an artifact manifest entry for now.
-    return 10
-    return file.size
-
-
-@op(
-    name="file-contents",
-    input_type={"file": types.FileType()},
-    output_type=types.String(),
-)
-def file_contents(file):
-    from . import tags
-
-    artifact = tags.get_tag(file, "artifact")
-    if artifact is not None:
-        local_path = os.path.join("local-artifacts", artifact.path, file.path)
-    else:
-        local_path = file.path
-    # file is an artifact manifest entry for now.
-    return _py_open(local_path, encoding="ISO-8859-1").read()
 
 
 @weave_class(weave_type=types.SubDirType)
@@ -105,27 +124,6 @@ class Dir(object):
 
     def get_local_path(self):
         return self.path
-
-    @op(
-        name="file-type", input_type={"file": types.DirType()}, output_type=types.Type()
-    )
-    def file_type(file):
-        if isinstance(file, Dir):
-            return types.DirType()
-        else:
-            parts = file.path.split(".")
-            ext = ""
-            if len(parts) != 1:
-                ext = parts[-1]
-            return types.FileType(extension=types.Const(types.String(), ext))
-
-    @op(
-        name="file-dir",
-        input_type={"file": types.DirType()},
-        output_type=types.DirType(),
-    )
-    def file_dir(file):
-        return file
 
     @op(name="dir-size", input_type={"dir": types.DirType()}, output_type=types.Int())
     def size(dir):

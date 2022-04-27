@@ -40,13 +40,21 @@ class ArtifactVersionFile(weave_file.File):
         if self.extension is None:
             self.extension = weave_file.path_ext(path)
 
-    @op(
-        name="artifactVersionPath-contents",
-        input_type={"artifactVersionPath": ArtifactVersionFileType()},
-        output_type=types.String(),
-    )
-    def contents(artifactVersionPath):
-        local_path = artifactVersionPath.download()
+    def _contents(self):
+        entry = (
+            wandb_api.Api()
+            .artifact(
+                "%s/%s/%s:%s"
+                % (
+                    self.entity_name,
+                    self.project_name,
+                    self.artifact_name,
+                    self.artifact_version,
+                )
+            )
+            .get_path(self.path)
+        )
+        local_path = entry.download()
         return open(local_path, encoding="ISO-8859-1").read()
 
 

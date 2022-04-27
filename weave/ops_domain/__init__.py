@@ -135,6 +135,7 @@ class ArtifactVersion:
     @op(
         name="artifactVersion-file",
         input_type={"artifactVersion": ArtifactVersionType(), "path": types.String()},
+        # TODO: This Type is not complete (missing DirType())
         output_type=file_wbartifact.ArtifactVersionFileType(),
     )
     # TODO: This function should probably be called path, but it return Dir or File.

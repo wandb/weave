@@ -30,6 +30,9 @@ class LocalFile(weave_file.File):
         if self.mtime is None:
             self.mtime = os.path.getmtime(path)
 
+    def _contents(self):
+        return open(self.path, encoding="ISO-8859-1").read()
+
     @property
     def changes_path(self):
         return f"{self.path}.weave_changes.json"
