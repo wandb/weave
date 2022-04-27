@@ -34,9 +34,26 @@ class ArtifactVersionType(types.Type):
 @weave_class(weave_type=ArtifactVersionType)
 class ArtifactVersion:
     @op(
+        name="artifactVersion-fileReturnType",
+        input_type={"artifactVersion": ArtifactVersionType(), "path": types.String()},
+        output_type=types.Type(),
+    )
+    def path_type(artifactVersion, path):
+        try:
+            artifactVersion.get_path(path)
+        except KeyError:
+            return types.DirType()
+        parts = path.split(".")
+        ext = ""
+        if len(parts) != 1:
+            ext = parts[-1]
+        return types.FileType(extension=types.Const(types.String(), ext))
+
+    @op(
         name="artifactVersion-file",
         input_type={"artifactVersion": ArtifactVersionType(), "path": types.String()},
         # TODO: This Type is not complete (missing DirType())
+        # TODO: This needs to call ArtifactVersion.path_type()
         output_type=file_wbartifact.ArtifactVersionFileType(),
     )
     # TODO: This function should probably be called path, but it return Dir or File.

@@ -921,7 +921,12 @@ class FileType(ObjectType):
         # In the js Weave code, file is a non-standard type that
         # puts a const string at extension as just a plain string.
         d = {i: d[i] for i in d if i != "type"}
-        d["extension"] = {"type": "const", "valType": "string", "val": d["extension"]}
+        if "extension" in d:
+            d["extension"] = {
+                "type": "const",
+                "valType": "string",
+                "val": d["extension"],
+            }
         return super().from_dict(d)
 
     def property_types(self):

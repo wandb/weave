@@ -13,18 +13,6 @@ def path_ext(path):
 ##### These are actually path ops, but they are called file for legacy reason
 
 
-@op(name="file-type", input_type={"file": types.DirType()}, output_type=types.Type())
-def file_type(file):
-    if isinstance(file, Dir):
-        return types.DirType()
-    else:
-        parts = file.path.split(".")
-        ext = ""
-        if len(parts) != 1:
-            ext = parts[-1]
-        return types.FileType(extension=types.Const(types.String(), ext))
-
-
 @op(
     name="file-dir",
     input_type={"file": types.DirType()},
