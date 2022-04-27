@@ -145,9 +145,10 @@ class OpDefType(types.Type):
             f.write(code)
 
     def load_instance(cls, artifact, name, extra=None):
-        path = artifact.path(f"{name}")
-        # drop local-artifacts, we'll insert that to sys.path
-        parts = path.split("/")[1:]
+        path = os.path.relpath(artifact.path(f"{name}"), start=LOCAL_ARTIFACT_DIR)
+
+        # convert filename into module path
+        parts = path.split("/")
         module_path = ".".join(parts)
 
         # This has a side effect of registering the op
