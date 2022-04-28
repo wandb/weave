@@ -127,7 +127,7 @@ def execute_v2():
     # print('REQUEST', request, request.json)
     if not request.json or "graphs" not in request.json:
         abort(400)
-    response = server.handle_request(request.json)
+    response = server.handle_request(request.json, deref=True)
     # print("RESPONSE BEFORE SERI", response)
 
     return {"data": response}
