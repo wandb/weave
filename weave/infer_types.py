@@ -27,6 +27,10 @@ def simple_python_type_to_type(py_type: type):
 def python_type_to_type(
     py_type: typing.Union[types.GenericAlias, type]
 ) -> weave_types.Type:
+    # Allow any
+    # TODO: Keep this in the PR? Shouldn't allow when publishing at least.
+    if py_type == typing.Any:
+        return weave_types.Any()
     if isinstance(py_type, types.GenericAlias):
         args = [python_type_to_type(a) for a in py_type.__args__]
         if py_type.__origin__ == list:

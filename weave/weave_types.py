@@ -150,7 +150,11 @@ class Type:
     #     return show(self)
 
     def __eq__(self, other):
-        return self.name == other.name and self.__dict__ == other.__dict__
+        return (
+            isinstance(other, Type)
+            and self.name == other.name
+            and self.__dict__ == other.__dict__
+        )
 
     # save_instance/load_instance on Type are used to save/load actual Types
     # since type_of(types.Int()) == types.Type()
@@ -218,7 +222,7 @@ class UnknownType(BasicType):
 
 class NoneType(BasicType):
     name = "none"
-    instance_classes = type(None)
+    instance_classes = [type(None), box.BoxedNone]
 
     def save_instance(self, obj, artifact, name):
         # BoxedNone is actually a box, not a subclass of bool, since

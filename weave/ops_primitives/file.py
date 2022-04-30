@@ -72,6 +72,10 @@ class File:
         return file._contents()
 
 
+types.FileType.instance_class = File
+types.FileType.instance_classes = File
+
+
 # Question, should all tables be lazy? That would mean we can serialize
 #     and hand them between processes.... How would the user choose to
 #     save a serialized version of a given table?

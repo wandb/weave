@@ -177,6 +177,8 @@ def file_pandasreadcsv(file):
     local_path = file.get_local_path()
     # Warning, terrible hack to make demo work
     try:
-        return DataFrameTable(pandas.read_csv(local_path))
+        return DataFrameTable(pandas.read_csv(local_path, low_memory=False))
     except:
-        return DataFrameTable(pandas.read_csv(local_path, delimiter=";"))
+        return DataFrameTable(
+            pandas.read_csv(local_path, delimiter=";", low_memory=False)
+        )
