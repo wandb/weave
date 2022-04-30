@@ -150,7 +150,13 @@ def get_obj_expr(obj):
 def to_python(obj):
     wb_type = types.TypeRegistry.type_of(obj)
     mapper = mappers_python.map_to_python(wb_type, None)
-    val = mapper.apply(obj)
+    try:
+        val = mapper.apply(obj)
+    except AttributeError:
+        # Hack to make frontend work, for some reason it requests the whole
+        # table, which can't be serialized when its a dataframe
+        # DO NOT MERGE!
+        val = []
     return {"_type": wb_type.to_dict(), "_val": val}
 
 

@@ -4,7 +4,6 @@ from . import ops
 from .artifacts_local import LOCAL_ARTIFACT_DIR
 from .ecosystem import async_demo
 import pytest
-from . import weave_objects
 from . import run_obj
 
 
@@ -62,7 +61,7 @@ def test_stable_when_fetching_input():
     except FileNotFoundError:
         pass
 
-    dataset = weave_objects.List([{"prompt": "a", "completion": "5"}])
+    dataset = [{"prompt": "a", "completion": "5"}]
     ref = storage.save(dataset)
     get_dataset = ops.get(str(ref))
     # We're going to fetch a new in memory dataset object for both of these.
@@ -91,7 +90,7 @@ def test_async_op_expr():
     except FileNotFoundError:
         pass
 
-    dataset = weave_objects.List([{"prompt": "a", "completion": "5"}])
+    dataset = [{"prompt": "a", "completion": "5"}]
 
     train_result = async_demo.train(dataset)
     model = train_result.model()
@@ -99,5 +98,5 @@ def test_async_op_expr():
     version0 = api.versions(saved_model)[0]
     assert (
         str(api.expr(version0))
-        == 'get("list-dataset/9af42f7b9600f6f2636be8959e5f1ab8").train().trainresult-model().save("model")'
+        == 'get("list-obj/9af42f7b9600f6f2636be8959e5f1ab8").train().trainresult-model().save("model")'
     )

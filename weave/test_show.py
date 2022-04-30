@@ -5,7 +5,6 @@
 import json
 
 from . import api as weave
-from . import weave_objects
 from . import ops
 from . import storage
 from . import panels
@@ -73,9 +72,9 @@ EXPECTED_SHOW_PARAMS_FINE_TUNE_WEAVE_NODE = {
                             "type": {
                                 "type": "const",
                                 "valType": "string",
-                                "val": "list-dataset/5826f76113017729abd9aeeef0a14831",
+                                "val": "list-obj/5826f76113017729abd9aeeef0a14831",
                             },
-                            "val": "list-dataset/5826f76113017729abd9aeeef0a14831",
+                            "val": "list-obj/5826f76113017729abd9aeeef0a14831",
                         }
                     },
                     "name": "get",
@@ -114,12 +113,12 @@ def test_large_const_node():
         data.append(
             {"id": i, "prompt": "%s + %s =" % (a, b), "completion": " %s<end>" % r}
         )
-    dataset = weave_objects.List(data)
-    storage.save(dataset)
+    dataset = storage.save(data)
+    # storage.save(dataset)
     fine_tune = openai.finetune_gpt3(dataset, {"n_epochs": 2})
     show_fine_tune_params = _show_params(fine_tune)
 
-    print("JSON", show_fine_tune_params["weave_node"].to_json())
+    # print("JSON", show_fine_tune_params["weave_node"].to_json())
 
     assert (
         show_fine_tune_params["weave_node"].to_json()
@@ -127,7 +126,7 @@ def test_large_const_node():
     )
 
     model = openai.Gpt3FineTune.model(fine_tune)
-    panel = panels.Table(weave_objects.List(["1 + 9 =", "2 + 14 ="]))
+    panel = panels.Table(["1 + 9 =", "2 + 14 ="])
     panel.table_query.add_column(lambda row: row)
     panel.table_query.add_column(lambda row: model.complete(row)["choices"][0]["text"])
     show_panel_params = _show_params(panel)
@@ -138,4 +137,4 @@ def test_large_const_node():
     table_state = panel_config["tableState"]
     col_select_fns = table_state["columnSelectFunctions"]
     col_sel_fn2 = list(col_select_fns.values())[1]
-    assert "list-dataset/5826f76113017729abd9aeeef0a14831" in json.dumps(col_sel_fn2)
+    assert "list-obj/5826f76113017729abd9aeeef0a14831" in json.dumps(col_sel_fn2)
