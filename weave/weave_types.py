@@ -374,41 +374,6 @@ class UnionType(Type):
         return "<UnionType %s>" % " | ".join((str(m) for m in self.members))
 
 
-class ConcreteList(list):
-    def __init__(self, items=None):
-        self._obj_type = UnknownType()
-        if items is not None:
-            for item in items:
-                self.add(item)
-
-    # TODO: do type checking on any list manipulation!? interesting...
-    #     is it better to just compute the type when .type() is called instead?
-    #     that certainly makes this class easier to implement as we don't have
-    #     to ensure we find other possible way of updating a list. but we'd
-    #     probably want to cache that result and invalidate on update so...
-    # But maybe we don't need this class at all, just put all the logic in the
-    #   List save() method
-    def add(self, obj):
-        self.append(obj)
-        obj_type = TypeRegistry.type_of(obj)
-        if obj_type is None:
-            raise Exception("can't detect type for object: %s" % obj)
-        next_type = self._obj_type.assign_type(obj_type)
-        if isinstance(next_type, Invalid):
-            next_type = UnionType(self._obj_type, obj_type)
-        self._obj_type = next_type
-
-    @property
-    def type(self):
-        from . import types_numpy
-
-        if isinstance(self._obj_type, types_numpy.NumpyArrayType):
-            new_shape = (len(self._items),) + self._obj_type.shape
-            return types_numpy.NumpyArrayType(self._obj_type.dtype, new_shape)
-        else:
-            return List(self._obj_type)
-
-
 # TODO: move these to weave_objects.
 #     also, weave objects should actually all use the ObjectType stuff I think.
 #     (maybe not ones that inherit from builtins. But everything else.)
@@ -497,15 +462,9 @@ class ArrowArrayList(Iterable):
     count = __len__
 
 
-# TODO:
-#   this List stuff is f'd, need to convert to
-#   mappers and get rid of save_instance() and dependencies on
-#   arrow and numpy here.
-
-
 class List(Type):
     name = "list"
-    instance_classes = [set, list, ConcreteList]
+    instance_classes = [set, list]
 
     def __init__(self, object_type):
         self.object_type = object_type
@@ -519,9 +478,16 @@ class List(Type):
 
     @classmethod
     def type_of_instance(cls, obj):
-        if not isinstance(obj, ConcreteList):
-            obj = ConcreteList(obj)
-        return obj.type
+        list_obj_type = UnknownType()
+        for item in obj:
+            obj_type = TypeRegistry.type_of(item)
+            if obj_type is None:
+                raise Exception("can't detect type for object: %s" % item)
+            next_type = list_obj_type.assign_type(obj_type)
+            if isinstance(next_type, Invalid):
+                next_type = UnionType(list_obj_type, obj_type)
+            list_obj_type = next_type
+        return cls(list_obj_type)
 
     def save_instance(self, obj, artifact, name):
         obj_type = self.object_type
@@ -535,11 +501,6 @@ class List(Type):
         py_objs = (serializer.apply(o) for o in obj)
 
         with artifact.new_file(f"{name}.parquet", binary=True) as f:
-            # OK, this all works fine, because we compute the type first
-            # and then let pyarrow handle serialization
-            # When we read it back, we need to put an interface on top
-            # of the returned stuff, that returns our correct types, including
-            # class/object types that map to dicts
             arr = pa.array(py_objs, type=pyarrow_type)
             if pa.types.is_struct(arr.type):
                 rb = pa.RecordBatch.from_struct_array(
