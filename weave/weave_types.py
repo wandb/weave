@@ -464,7 +464,7 @@ class ArrowArrayList(Iterable):
 
 class List(Type):
     name = "list"
-    instance_classes = [set, list]
+    instance_classes = [set, list, ArrowTableList]
 
     def __init__(self, object_type):
         self.object_type = object_type
@@ -526,6 +526,7 @@ class List(Type):
 
             mapper = mappers_arrow.map_from_arrow(self.object_type, artifact)
             atl = ArrowTableList(pq.read_table(f), mapper, artifact)
+            return atl
 
             # Convert back to pure python. We're jumping through a lot of
             # hoops to get to get this point. What we actually want is for
@@ -544,7 +545,7 @@ class List(Type):
 
 class TypedDict(Type):
     name = "typedDict"
-    instance_classes = dict
+    instance_classes = [dict, ArrowTableRowDict]
 
     def __init__(self, property_types):
         self.property_types = property_types

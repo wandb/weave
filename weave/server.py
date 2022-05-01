@@ -36,7 +36,7 @@ def handle_request(request, deref=False):
         tracer = viztracer.VizTracer()
         tracer.start()
     nodes = serialize.deserialize(request["graphs"])
-    eprint("Server request running nodes")
+    # eprint("Server request running %s nodes" % len(nodes))
     # """
     for node in nodes:
         eprint(graph.node_expr_str(node))
@@ -104,15 +104,31 @@ class InProcessServer(object):
 
 
 class HttpServerClient(object):
-    def __init__(self, url):
+    def __init__(self, url, emulate_weavejs=False):
+        """Constructor.
+
+        Args:
+            url: The server base url
+            emulate_weavejs: For testing only, should not be used from user code.
+        """
         self.url = url
+
+        self.emulate_weavejs = emulate_weavejs
+        self.execute_endpoint = "/__weave/execute/v2"
+        if emulate_weavejs:
+            self.execute_endpoint = "/__weave/execute"
 
     def execute(self, nodes, no_cache=False):
         serialized = serialize.serialize(nodes)
-        r = requests.post(self.url + "/__weave/execute/v2", json={"graphs": serialized})
+        r = requests.post(self.url + self.execute_endpoint, json={"graphs": serialized})
         r.raise_for_status()
 
         response = r.json()["data"]
+
+        if self.emulate_weavejs:
+            # When emulating weavejs, just return the server's json response.
+            return response
+
         deserialized = [storage.from_python(r) for r in response]
         return [storage.deref(r) for r in deserialized]
 

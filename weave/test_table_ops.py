@@ -5,6 +5,7 @@ from . import api as weave
 from . import weave_types as types
 from . import ops
 from . import storage
+from . import context
 
 TABLE_TYPES = ["list", "pandas", "sql"]
 
@@ -184,3 +185,9 @@ def test_list_get_and_op():
     # now!)
     count_node = ops.Table.count(get_node)
     assert weave.use(count_node) == 2
+
+
+def test_list_save_and_use():
+    saved = storage.save([{"a": 5, "b": 6}], "test-list")
+    with context.weavejs_client():
+        assert weave.use(ops.get(str(saved))) == [{"a": 5, "b": 6}]

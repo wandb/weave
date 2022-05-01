@@ -204,22 +204,34 @@ class Gpt3Model:
     @weave.op(
         name="gpt3model-complete",
     )
-    def complete(self, prompt: str) -> Gpt3ModelCompleteReturn:
+    def complete(self, prompt: str, seed: int = 0) -> Gpt3ModelCompleteReturn:
         sleep = 1
+        completion_params = {
+            "model": self.id,
+            "prompt": prompt,
+            "max_tokens": 256,
+            "n": 3,
+            "temperature": 0.9,
+        }
         for _ in range(5):
             try:
-                return openai.Completion.create(model=self.id, prompt=prompt)
+                return openai.Completion.create(**completion_params)
             except openai.error.RateLimitError:
                 # This error occurs if a model is newly trained or hasn't
                 # been queried for awhile, while the OpenAI backend loads
                 # it up.
                 time.sleep(sleep)
                 sleep *= 2
-        return openai.Completion.create(model=self.id, prompt=prompt)
+        return openai.Completion.create(**completion_params)
 
 
 Gpt3ModelType.instance_classes = Gpt3Model
 Gpt3ModelType.instance_class = Gpt3Model
+
+
+@weave.op()
+def gpt3_davinci_2() -> Gpt3Model:
+    return Gpt3Model("text-davinci-002", "text-davinci-002")
 
 
 class Gpt3FineTuneType(weave.types.ObjectType):

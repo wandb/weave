@@ -104,6 +104,7 @@ def list_ops():
 
 @app.route("/__weave/execute", methods=["POST"])
 def execute():
+    """Execute endpoint used by WeaveJS"""
     # print('REQUEST', request, request.json)
     if not request.json or "graphs" not in request.json:
         abort(400)
@@ -124,6 +125,7 @@ def execute():
 
 @app.route("/__weave/execute/v2", methods=["POST"])
 def execute_v2():
+    """Execute endpoint used by Weave Python"""
     # print('REQUEST', request, request.json)
     if not request.json or "graphs" not in request.json:
         abort(400)

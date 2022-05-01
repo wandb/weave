@@ -50,6 +50,19 @@ def local_http_client():
     _http_server.reset(server_token)
 
 
+@contextlib.contextmanager
+def weavejs_client():
+    s = server.HttpServer()
+    s.start()
+    server_token = _http_server.set(s)
+    client_token = _weave_client.set(
+        server.HttpServerClient(s.url, emulate_weavejs=True)
+    )
+    yield _weave_client.get()
+    _weave_client.reset(client_token)
+    _http_server.reset(server_token)
+
+
 def _make_default_client():
     if util.is_notebook():
         serv = _http_server.get()
