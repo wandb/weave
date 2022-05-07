@@ -12,7 +12,7 @@ execute_test_count_op_run_count = 0
 def execute_test_count_op(x):
     global execute_test_count_op_run_count
     execute_test_count_op_run_count += 1
-    return len(x.list)
+    return len(x)
 
 
 def test_local_file_pure_cached():

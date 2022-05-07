@@ -278,6 +278,9 @@ class Const(Type):
     def __str__(self):
         return "<Const %s %s>" % (self.val_type, self.val)
 
+    def __repr__(self):
+        return "<Const %s %s>" % (self.val_type, self.val)
+
 
 class String(BasicType):
     name = "string"
@@ -374,32 +377,6 @@ class UnionType(Type):
         return "<UnionType %s>" % " | ".join((str(m) for m in self.members))
 
 
-# TODO: move these to weave_objects.
-#     also, weave objects should actually all use the ObjectType stuff I think.
-#     (maybe not ones that inherit from builtins. But everything else.)
-#     But maybe we just shouldn't be inheriting from builtins... that's bad.
-
-
-class ArrowTableRowDict(Mapping):
-    def __init__(self, arrow_table, deserializer, index, artifact):
-        self._arrow_table = arrow_table
-        self._deserializer = deserializer
-        self._index = index
-        self._artifact = artifact
-
-    def __getitem__(self, key):
-        val = self._arrow_table.column(key)[self._index].as_py()
-        return self._deserializer._property_serializers[key].apply(val)
-
-    pick = __getitem__
-
-    def __iter__(self):
-        return iter(self._arrow_table.column_names)
-
-    def __len__(self):
-        return self._arrow_table.num_columns
-
-
 class ArrowTableList(Iterable):
     def __init__(self, arrow_table, mapper, artifact):
         self._arrow_table = arrow_table
@@ -409,9 +386,14 @@ class ArrowTableList(Iterable):
     def __getitem__(self, index):
         if index >= self._arrow_table.num_rows:
             return None
-        return ArrowTableRowDict(
-            self._arrow_table, self._deserializer, index, self._artifact
-        )
+        # Very inefficient, we always read the whole row!
+        # TODO: We need to make this column access lazy. But we also want
+        #     vectorize access generally, which probably happens in a compile
+        #     pass. Need to think about it.
+        row_dict = {}
+        for column in self._arrow_table.column_names:
+            row_dict[column] = self._arrow_table.column(column)[index].as_py()
+        return self._deserializer.apply(row_dict)
 
     def __iter__(self):
         for i in range(len(self)):
@@ -528,24 +510,13 @@ class List(Type):
             atl = ArrowTableList(pq.read_table(f), mapper, artifact)
             return atl
 
-            # Convert back to pure python. We're jumping through a lot of
-            # hoops to get to get this point. What we actually want is for
-            # Weave to operate on the arrow structs, but I need a big refactor
-            # to fix a bunch of stuff with how tables works. For now I just
-            # want to get something working.
-            # TODO
-            res = []
-            for row in atl:
-                res.append(dict(row))
-            return res
-
     def __str__(self):
         return "<ListType %s>" % self.object_type
 
 
 class TypedDict(Type):
     name = "typedDict"
-    instance_classes = [dict, ArrowTableRowDict]
+    instance_classes = [dict]
 
     def __init__(self, property_types):
         self.property_types = property_types

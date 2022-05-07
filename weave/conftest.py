@@ -2,12 +2,23 @@ import os
 
 from . import context
 from . import weave_server
+from .artifacts_local import LOCAL_ARTIFACT_DIR
 
 import pytest
+import shutil
 
 
 def pytest_sessionstart(session):
     context.disable_analytics()
+
+
+@pytest.fixture(autouse=True)
+def pre_post_each_test():
+    try:
+        shutil.rmtree(LOCAL_ARTIFACT_DIR)
+    except (FileNotFoundError, OSError):
+        pass
+    yield
 
 
 @pytest.fixture()

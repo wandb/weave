@@ -1,8 +1,11 @@
+# TODO: rename this file to op_call.py
 import collections
 import inspect
 
 from . import graph
 from . import weave_types as types
+from . import context
+from . import api
 
 
 def _ensure_node(v):
@@ -74,3 +77,21 @@ def make_lazy_call(f, fq_op_name, input_type, output_type):
         return _make_output_node(fq_op_name, bound_params, output_type)
 
     return lazy_call
+
+
+def make_eager_call(lazy_call):
+    def eager_call(*args, **kwargs):
+        output_node = lazy_call(*args, **kwargs)
+        return api.use(output_node)
+
+    return eager_call
+
+
+def make_call(eager_call, lazy_call):
+    def call(*args, **kwargs):
+        if context.eager_mode():
+            return eager_call(*args, **kwargs)
+        else:
+            return lazy_call(*args, **kwargs)
+
+    return call

@@ -1,13 +1,16 @@
 import json
 import math
 import pandas
+import errors
+import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
 import numpy
 
-from ..api import op, weave_class
+from ..api import op, weave_class, use
 from .. import weave_types as types
 from . import table
+from . import list_
 from .. import graph
 
 # Hack hack hack
@@ -75,9 +78,32 @@ class DataFrameType(types.Type):
     instance_classes = pandas.DataFrame
     name = "dataframe"
 
+    def __init__(self, object_type):
+        self.object_type = object_type
+
+    def _to_dict(self):
+        return {"objectType": self.object_type.to_dict()}
+
+    @classmethod
+    def from_dict(cls, d):
+        return cls(types.TypeRegistry.type_from_dict(d["objectType"]))
+
     @classmethod
     def type_of_instance(cls, obj):
-        return cls()
+        obj_prop_types = {}
+        for col_name, dtype in obj.dtypes.items():
+            if dtype == np.dtype("object"):
+                weave_type = types.String()
+            elif dtype == np.dtype("int64"):
+                weave_type = types.Int()
+            elif dtype == np.dtype("float64"):
+                weave_type = types.Float()
+            else:
+                raise errors.WeaveTypeError(
+                    "Type conversion not implemented for dtype: %s" % dtype
+                )
+            obj_prop_types[col_name] = weave_type
+        return cls(types.TypedDict(obj_prop_types))
 
     def save_instance(self, obj, artifact, name):
         table = pa.Table.from_pandas(obj)
@@ -93,7 +119,7 @@ class DataFrameType(types.Type):
 class DataFrameTableType(types.ObjectType):
     name = "dataframeTable"
 
-    type_vars = {"_df": DataFrameType()}
+    type_vars = {"_df": DataFrameType(types.Any())}
 
     def __init__(self, _df):
         self._df = _df
@@ -103,9 +129,23 @@ class DataFrameTableType(types.ObjectType):
             "_df": self._df,
         }
 
+    @property
+    def object_type(self):
+        return self._df.object_type
+
+
+def index_output_type(input_types):
+    # THIS IS NO GOOD
+    # TODO: need to fix Const type so we don't need this.
+    self_type = input_types["self"]
+    if isinstance(self_type, types.Const):
+        return self_type.val_type.object_type
+    else:
+        return self_type.object_type
+
 
 @weave_class(weave_type=DataFrameTableType)
-class DataFrameTable(table.Table):
+class DataFrameTable:
     _df: pandas.DataFrame
 
     def __init__(self, _df):
@@ -114,10 +154,24 @@ class DataFrameTable(table.Table):
     def _to_list_table(self):
         return table.ListTable([self.index(i) for i in range(self.count())])
 
-    def count(self):
+    def _count(self):
         return len(self._df)
 
-    def index(self, index):
+    @op(
+        input_type={"self": DataFrameTableType(types.Any())},
+        output_type=types.Int(),
+    )
+    def count(self):
+        return self._count()
+
+    @op(
+        input_type={"self": DataFrameTableType(types.Any()), "index": types.Int()},
+        output_type=index_output_type,
+    )
+    def __getitem__(self, index):
+        return self._index(index)
+
+    def _index(self, index):
         try:
             # TODO
             # to_json and back to dict then back to json :(
@@ -128,17 +182,38 @@ class DataFrameTable(table.Table):
     def pick(self, key):
         return self._to_list_table().pick(key)
 
-    def map(self, mapFn):
-        return self._to_list_table().map(mapFn)
+    @op(
+        input_type={"self": DataFrameTableType(types.Any()), "filter_fn": types.Any()},
+        output_type=lambda input_types: input_types["self"],
+    )
+    def filter(self, filter_fn):
+        return DataFrameTable(self._df[filter_fn_to_pandas_filter(self._df, filter_fn)])
 
-    def filter(self, filterFn):
-        return DataFrameTable(self._df[filter_fn_to_pandas_filter(self._df, filterFn)])
+    @op(
+        input_type={"self": DataFrameTableType(types.Any()), "map_fn": types.Any()},
+        output_type=lambda input_types: types.List(input_types["self"].object_type),
+    )
+    def map(self, map_fn):
+        self_list = []
+        for i in range(self._count()):
+            self_list.append(self._index(i))
+        res = list_.List.map.op_def.resolve_fn(self_list, map_fn)
+        return res
 
-    def groupby(self, groupByFn):
+    @op(
+        input_type={
+            "self": DataFrameTableType(types.Any()),
+            "group_by_fn": types.Any(),
+        },
+        output_type=lambda input_types: types.List(
+            list_.GroupResultType(types.List(input_types["self"].object_type))
+        ),
+    )
+    def groupby(self, group_by_fn):
         group_keys = None
-        if groupByFn.from_op.name == "dict":
-            group_keys = list(groupByFn.from_op.inputs.keys())
-        pandas_gb = groupby_fn_to_pandas_filter(self._df, groupByFn)
+        if group_by_fn.from_op.name == "dict":
+            group_keys = list(group_by_fn.from_op.inputs.keys())
+        pandas_gb = groupby_fn_to_pandas_filter(self._df, group_by_fn)
         grouped = self._df.groupby(pandas_gb)
         df = grouped.agg(list)
         result = []
@@ -158,9 +233,8 @@ class DataFrameTable(table.Table):
                 if not isinstance(group_key_vals, tuple):
                     group_key_vals = (group_key_vals,)
                 group_key = dict(zip(group_keys, group_key_vals))
-            result.append(table.GroupResult(row_result, group_key))
-        return table.ListTable(result)
-        # return self._to_list_table().groupby(groupByFn)
+            result.append(list_.GroupResult(row_result, group_key))
+        return result
 
 
 DataFrameTableType.instance_classes = DataFrameTable
@@ -171,7 +245,7 @@ DataFrameTableType.instance_class = DataFrameTable
     name="file-pandasreadcsv",
     input_type={"file": types.FileType()},
     # TODO: we should have a DataFrame table that extends Table!
-    output_type=types.Table(),
+    output_type=DataFrameTableType(DataFrameType(types.Any())),
 )
 def file_pandasreadcsv(file):
     local_path = file.get_local_path()

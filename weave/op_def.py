@@ -70,6 +70,8 @@ class OpDef:
         self.render_info = render_info
         self.pure = pure
         self.version = None
+        self.lazy_call = None
+        self.eager_call = None
         self.call_fn = None
 
     @property
@@ -94,6 +96,10 @@ class OpDef:
             # This is for builtins, which I think we may just want to get rid
             # of?
             return self.name
+
+    @property
+    def is_mutation(self):
+        return getattr(self.resolve_fn, "is_mutation", False)
 
     def to_dict(self):
         if callable(self.output_type):

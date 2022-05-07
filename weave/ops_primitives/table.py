@@ -4,20 +4,6 @@ from .. import weave_internal
 from .. import graph
 
 
-@weave_class(weave_type=types.List)
-class List(list):
-    @op(
-        name="index",
-        input_type={"arr": types.List(types.Any()), "index": types.Int()},
-        output_type=lambda input_types: input_types["arr"].object_type,
-    )
-    def __getitem__(arr, index):
-        try:
-            return arr[index]
-        except IndexError:
-            return None
-
-
 @weave_class(weave_type=types.Table)
 class Table:
     @op(
@@ -235,65 +221,3 @@ class GroupResult(ListTable):
 
 GroupResultType.instance_classes = GroupResult
 GroupResultType.instance_class = GroupResult
-
-
-@op(
-    name="list-indexCheckpoint",
-    input_type={"arr": types.List(types.Any())},
-    output_type=lambda input_types: input_types["arr"],
-)
-def list_indexCheckpoint(arr):
-    return arr
-
-
-@op(
-    name="tag-indexCheckpoint",
-    input_type={"obj": types.Any()},
-    output_type=types.Number(),
-)
-def tag_indexCheckpoint(obj):
-    # TODO. Do we really need this?
-    return 0
-
-
-@op(
-    name="limit",
-    input_type={"arr": types.List(types.Any()), "limit": types.Number()},
-    output_type=types.Any(),
-)
-def limit(arr, limit):
-    # So lame, we can't use slice because sometimes we have an ArrowArrayTable here
-    # TODO: fix
-    res = []
-    if limit >= len(arr):
-        limit = len(arr)
-    for i in range(limit):
-        res.append(arr[i])
-    return res
-    # return arr[:limit]
-
-
-@op(
-    name="flatten", input_type={"arr": types.List(types.Any())}, output_type=types.Any()
-)
-def flatten(arr):
-    # TODO: probably doesn't match js implementation
-    result = []
-    for row in arr:
-        if isinstance(row, list):
-            for o in row:
-                result.append(o)
-        else:
-            result.append(row)
-    return result
-
-
-@op(
-    name="unnest",
-    input_type={"arr": types.List(types.TypedDict({}))},
-    output_type=lambda input_types: input_types["arr"],
-)
-def unnest(arr):
-    if isinstance(arr, Table):
-        return arr.unnest()
-    return arr

@@ -44,7 +44,10 @@ def test_show_simple_call():
             "name": "file-readcsv",
         },
         "nodeType": "output",
-        "type": {"type": "table"},
+        "type": {
+            "objectType": {"keyType": "string", "objectType": "string", "type": "dict"},
+            "type": "list",
+        },
     }
 
 
