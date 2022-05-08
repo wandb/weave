@@ -7,15 +7,11 @@ from . import ops
 from . import storage
 from . import context
 
-TABLE_TYPES = ["list", "list-table", "pandas", "sql"]
+TABLE_TYPES = ["list", "pandas", "sql"]
 
 
 def get_test_table(table_type):
     if table_type == "list":
-        csv = ops.Csv([])
-        csv.load(os.path.join("testdata", "cereal.csv"))
-        return ops.get(str(storage.save(csv.list)))
-    elif table_type == "list-table":
         f = ops.local_path(os.path.join("testdata", "cereal.csv"))
         return f.readcsv()
     elif table_type == "pandas":
@@ -103,7 +99,7 @@ def test_groupby(table_type):
     ]
 
 
-@pytest.mark.parametrize("table_type", ["list-table", "sql"])
+@pytest.mark.parametrize("table_type", ["list", "sql"])
 def test_groupby_list(table_type):
     table = get_test_table(table_type)
     groupby_fn = weave.define_fn(
