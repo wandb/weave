@@ -199,8 +199,7 @@ class DataFrameTable:
         self_list = []
         for i in range(self._count()):
             self_list.append(self._index(i))
-        res = list_.List.map.op_def.resolve_fn(self_list, map_fn)
-        return res
+        return list_.List.map.op_def.resolve_fn(self_list, map_fn)
 
     @op(
         output_type=lambda input_types: types.List(

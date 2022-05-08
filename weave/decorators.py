@@ -21,6 +21,12 @@ def weave_class(weave_type):
                 self_type = method.op_def.input_type.arg_types.get("self")
                 if self_type is not None and self_type == types.UnknownType():
                     method.op_def.input_type.arg_types["self"] = weave_type()
+                # Replace function op names with method op names
+                if method.op_def.name.startswith("op-"):
+                    method.op_def.name = "%s-%s" % (
+                        weave_type.name,
+                        method.op_def.name[3:],
+                    )
 
         weave_type.NodeMethodsClass = target
         return target

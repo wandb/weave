@@ -52,29 +52,6 @@ class BoxedList(list):
             return None
         return self.__getitem__(index)
 
-    # Augh, we shouldn't need this here. Will be fixed when I finally fix the
-    # proliferation of tables and lists.
-    # TODO: Fix.
-    def map(self, mapFn):
-        from . import weave_internal
-        from . import graph
-        from . import weave_types as types
-        from .ops_primitives import table
-
-        calls = []
-        for i, row in enumerate(self):
-            calls.append(
-                weave_internal.call_fn(
-                    mapFn,
-                    {
-                        "row": graph.ConstNode(types.Any(), row),
-                        "index": graph.ConstNode(types.Number(), i),
-                    },
-                )
-            )
-        result = weave_internal.use_internal(calls)
-        return table.ListTable(result)
-
 
 # See https://numpy.org/doc/stable/user/basics.subclassing.html
 class BoxedNDArray(np.ndarray):
