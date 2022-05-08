@@ -52,6 +52,12 @@ def test_index(table_type):
 
 
 @pytest.mark.parametrize("table_type", TABLE_TYPES)
+def test_pick(table_type):
+    table = get_test_table(table_type)
+    assert len(weave.use(table.pick("type"))) == 77
+
+
+@pytest.mark.parametrize("table_type", TABLE_TYPES)
 def test_filter(table_type):
     table = get_test_table(table_type)
     filter_fn = weave.define_fn(

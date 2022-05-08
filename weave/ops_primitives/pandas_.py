@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+import typing
 import json
 import math
 import pandas
@@ -7,9 +9,8 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import numpy
 
-from ..api import op, weave_class, use
+from ..api import op, weave_class
 from .. import weave_types as types
-from . import table
 from . import list_
 from .. import graph
 
@@ -78,8 +79,13 @@ class DataFrameType(types.Type):
     instance_classes = pandas.DataFrame
     name = "dataframe"
 
+    object_type: types.Type
+
     def __init__(self, object_type):
         self.object_type = object_type
+
+    def __str__(self):
+        return "<DataFrameType %s>" % self.object_type
 
     def _to_dict(self):
         return {"objectType": self.object_type.to_dict()}
@@ -121,7 +127,7 @@ class DataFrameTableType(types.ObjectType):
 
     type_vars = {"_df": DataFrameType(types.Any())}
 
-    def __init__(self, _df):
+    def __init__(self, _df=DataFrameType(types.Any())):
         self._df = _df
 
     def property_types(self):
@@ -144,6 +150,16 @@ def index_output_type(input_types):
         return self_type.object_type
 
 
+def pick_output_type(input_types):
+    if not isinstance(input_types["key"], types.Const):
+        return types.UnknownType()
+    key = input_types["key"].val
+    prop_type = input_types["self"]._df.object_type.property_types.get(key)
+    if prop_type is None:
+        return types.Invalid()
+    return prop_type
+
+
 @weave_class(weave_type=DataFrameTableType)
 class DataFrameTable:
     _df: pandas.DataFrame
@@ -151,25 +167,12 @@ class DataFrameTable:
     def __init__(self, _df):
         self._df = _df
 
-    def _to_list_table(self):
-        return table.ListTable([self.index(i) for i in range(self.count())])
-
     def _count(self):
         return len(self._df)
 
-    @op(
-        input_type={"self": DataFrameTableType(types.Any())},
-        output_type=types.Int(),
-    )
-    def count(self):
+    @op()
+    def count(self) -> int:
         return self._count()
-
-    @op(
-        input_type={"self": DataFrameTableType(types.Any()), "index": types.Int()},
-        output_type=index_output_type,
-    )
-    def __getitem__(self, index):
-        return self._index(index)
 
     def _index(self, index):
         try:
@@ -179,21 +182,20 @@ class DataFrameTable:
         except IndexError:
             return None
 
-    def pick(self, key):
-        return self._to_list_table().pick(key)
+    @op(output_type=index_output_type)
+    def __getitem__(self, index: int):
+        return self._index(index)
 
-    @op(
-        input_type={"self": DataFrameTableType(types.Any()), "filter_fn": types.Any()},
-        output_type=lambda input_types: input_types["self"],
-    )
-    def filter(self, filter_fn):
+    @op(output_type=pick_output_type)
+    def pick(self, key: str):
+        return self._df[key]
+
+    @op(output_type=lambda input_types: input_types["self"])
+    def filter(self, filter_fn: typing.Any):
         return DataFrameTable(self._df[filter_fn_to_pandas_filter(self._df, filter_fn)])
 
-    @op(
-        input_type={"self": DataFrameTableType(types.Any()), "map_fn": types.Any()},
-        output_type=lambda input_types: types.List(input_types["self"].object_type),
-    )
-    def map(self, map_fn):
+    @op(output_type=lambda input_types: types.List(input_types["self"].object_type))
+    def map(self, map_fn: typing.Any):
         self_list = []
         for i in range(self._count()):
             self_list.append(self._index(i))
@@ -201,15 +203,11 @@ class DataFrameTable:
         return res
 
     @op(
-        input_type={
-            "self": DataFrameTableType(types.Any()),
-            "group_by_fn": types.Any(),
-        },
         output_type=lambda input_types: types.List(
             list_.GroupResultType(types.List(input_types["self"].object_type))
         ),
     )
-    def groupby(self, group_by_fn):
+    def groupby(self, group_by_fn: typing.Any):
         group_keys = None
         if group_by_fn.from_op.name == "dict":
             group_keys = list(group_by_fn.from_op.inputs.keys())
@@ -244,8 +242,9 @@ DataFrameTableType.instance_class = DataFrameTable
 @op(
     name="file-pandasreadcsv",
     input_type={"file": types.FileType()},
-    # TODO: we should have a DataFrame table that extends Table!
-    output_type=DataFrameTableType(DataFrameType(types.Any())),
+    # TODO: This needs to be implemented. It needs to read the file to
+    #     determine what the type will be.
+    output_type=DataFrameTableType(DataFrameType(types.TypedDict({}))),
 )
 def file_pandasreadcsv(file):
     local_path = file.get_local_path()

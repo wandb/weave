@@ -1,6 +1,4 @@
 import csv
-from ..api import weave_class
-from . import table
 
 
 def load_csv(path):

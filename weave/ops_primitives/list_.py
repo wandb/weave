@@ -34,6 +34,19 @@ class List:
             return None
 
     @op(
+        name="list-pick",
+        input_type={"self": types.List(types.Any()), "key": types.String()},
+        # TODO: pick() is not actually part of the list interface. Its
+        # only valid if the objects contained in the list are Dict/TypedDict.
+        # WeaveJS makes most ops "mapped", ie they can be called on lists of the
+        # object type upon which they are declared. We need to implement the same
+        # behavior here, and move this out.
+        output_type=types.Any(),
+    )
+    def pick(self, key):
+        return [row.get(key) for row in self]
+
+    @op(
         name="list-filter",
         input_type={"self": types.List(types.Any()), "filter_fn": types.Any()},
         output_type=lambda input_types: input_types["self"],

@@ -60,6 +60,11 @@ class Table:
     #
     # Hmm, I think there is a nicer way to implement mapped operations though??
 
+    @op(
+        name="table-pick",
+        input_type={"arr": types.List(types.Any()), "key": types.String()},
+        output_type=types.Any(),
+    )
     def pick(arr, key):
         # TODO: This is not right, need to figure out mapped ops. But it works
         # for the moment
