@@ -68,8 +68,8 @@ def test_filter(table_type):
     filter_fn = weave.define_fn(
         {"row": weave.types.TypedDict({})}, lambda row: row["potass"] > 280
     )
-    filtered = table.filter(filter_fn)
-    assert weave.use(filtered.count()) == 2
+    assert weave.use(table.filter(filter_fn).count()) == 2
+    assert weave.use(ops.WeaveJSListInterface.filter(table, filter_fn).count()) == 2
 
 
 # WARNING: Separating tests for group by, because

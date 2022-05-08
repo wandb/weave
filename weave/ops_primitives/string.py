@@ -2,16 +2,12 @@ from ..api import op, mutation, weave_class
 from .. import weave_types as types
 
 
-@op(
-    name="root-string",
-)
+@op(name="root-string")
 def string(v: str) -> str:
     return v
 
 
-@op(
-    name="string-lastLetter",
-)
+@op(name="string-lastLetter")
 def lastLetter(v: str) -> str:
     return v[-1]
 
@@ -26,6 +22,10 @@ class String:
     @mutation
     def set(self, val):
         return val
+
+    @op(name="string-equal")
+    def __eq__(lhs: str, rhs: str) -> bool:  # type: ignore
+        return lhs == rhs
 
 
 types.String.instance_class = String

@@ -305,3 +305,8 @@ class WeaveJSListInterface:
     def pick(obj, key):  # type: ignore
         type_class = types.TypeRegistry.type_class_of(obj)
         return type_class.NodeMethodsClass.pick.resolve_fn(obj, key)
+
+    @op(name="filter", output_type=lambda input_types: input_types["arr"])
+    def filter(arr: list[typing.Any], filterFn: typing.Any):  # type: ignore
+        type_class = types.TypeRegistry.type_class_of(arr)
+        return type_class.NodeMethodsClass.filter.resolve_fn(arr, filterFn)
