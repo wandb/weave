@@ -188,6 +188,10 @@ class SqlTable:
         return list_.List.groupby.op_def.resolve_fn(self._to_list_table(), group_by_fn)
 
 
+SqlTableType.instance_class = SqlTable
+SqlTableType.instance_classes = SqlTable
+
+
 @op(
     name="local-sqlconnection",
     input_type={"path": types.String()},

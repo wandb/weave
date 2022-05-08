@@ -3,7 +3,6 @@ import typing
 import json
 import math
 import pandas
-import errors
 import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -13,6 +12,7 @@ from ..api import op, weave_class
 from .. import weave_types as types
 from . import list_
 from .. import graph
+from .. import errors
 
 # Hack hack hack
 # TODO: we can do this with Weave instead of writing a giant switch statement

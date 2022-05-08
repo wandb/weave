@@ -25,13 +25,15 @@ def get_test_table(table_type):
 @pytest.mark.parametrize("table_type", TABLE_TYPES)
 def test_count(table_type):
     table = get_test_table(table_type)
-    assert weave.use(table.count()) == 77
+    expected = 77
+    assert weave.use(table.count()) == expected
+    assert weave.use(ops.WeaveJSListInterface.count(table)) == expected
 
 
 @pytest.mark.parametrize("table_type", TABLE_TYPES)
 def test_index(table_type):
     table = get_test_table(table_type)
-    assert weave.use(table[0]) == {
+    expected = {
         "name": "100% Bran",
         "mfr": "N",
         "type": "C",
@@ -49,6 +51,8 @@ def test_index(table_type):
         "cups": 0.33,
         "rating": 68.402973,
     }
+    assert weave.use(table[0]) == expected
+    assert weave.use(ops.WeaveJSListInterface.index(table, 0)) == expected
 
 
 @pytest.mark.parametrize("table_type", TABLE_TYPES)

@@ -233,8 +233,23 @@ def unnest(arr):
     return arr
 
 
+def index_output_type(input_types):
+    # THIS IS NO GOOD
+    # TODO: need to fix Const type so we don't need this.
+    self_type = input_types["arr"]
+    if isinstance(self_type, types.Const):
+        return self_type.val_type.object_type
+    else:
+        return self_type.object_type
+
+
 class WeaveJSListInterface:
     @op(name="count")
     def count(arr: list[typing.Any]) -> int:  # type: ignore
         type_class = types.TypeRegistry.type_class_of(arr)
         return type_class.NodeMethodsClass.count.op_def.resolve_fn(arr)
+
+    @op(name="index", output_type=index_output_type)
+    def index(arr: list[typing.Any], index: int):  # type: ignore
+        type_class = types.TypeRegistry.type_class_of(arr)
+        return type_class.NodeMethodsClass.__getitem__.op_def.resolve_fn(arr, index)

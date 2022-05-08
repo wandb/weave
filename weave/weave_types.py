@@ -68,7 +68,10 @@ class TypeRegistry:
 
     @staticmethod
     def type_class_of(obj):
-        return instance_class_to_potential_type(type(obj))[-1]
+        type_classes = instance_class_to_potential_type(type(obj))
+        if not type_classes:
+            raise errors.WeaveTypeError("no Type for obj: %s" % obj)
+        return type_classes[-1]
 
     @staticmethod
     def type_of(obj):
@@ -81,7 +84,7 @@ class TypeRegistry:
             obj_type = type_.type_of(obj)
             if obj_type is not None:
                 return obj_type
-        raise errors.WeaveTypeError("no type for obj: %s" % obj)
+        raise errors.WeaveTypeError("no Type for obj: %s" % obj)
 
     @staticmethod
     def type_from_dict(d):
