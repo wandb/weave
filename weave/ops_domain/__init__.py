@@ -108,7 +108,7 @@ class WBTableOps(object):
     @op(
         name="table-rows",
         input_type={"table": types.WBTable()},
-        output_type=types.Table(),
+        output_type=types.List(types.TypedDict({})),
     )
     def rows(table):
         rows = []

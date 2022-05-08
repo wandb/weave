@@ -9,5 +9,4 @@ from .pandas_ import *
 from .csv_ import *
 from .sql import *
 from .artifacts import *
-from .table import *
 from .random_junk import *

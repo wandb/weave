@@ -67,6 +67,10 @@ class TypeRegistry:
         return bool(instance_class_to_potential_type(type(obj)))
 
     @staticmethod
+    def type_class_of(obj):
+        return instance_class_to_potential_type(type(obj))[-1]
+
+    @staticmethod
     def type_of(obj):
         if isinstance(obj, Type):
             return Type()
@@ -754,19 +758,6 @@ class LocalArtifactRefType(Type):
 
     def __str__(self):
         return "<LocalArtifactRefType %s>" % self.object_type
-
-
-# TODO: placeholders for now, and a place for table.py
-#     to attach its methods. But we probably don't want this
-#     to be in the core basic types file.
-
-
-class Table(Type):
-    name = "table"
-    # TODO: don't default to Any?
-
-    def __init__(self, object_type=Any()):
-        self.object_type = object_type
 
 
 class WBTable(Type):

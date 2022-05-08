@@ -115,18 +115,16 @@ class Gpt3FineTuneResults(StoredFile):
         input_type={
             "self": StoredFileType(),
         },
-        output_type=weave.ops.ListTableType(
-            weave.types.List(
-                weave.types.TypedDict(
-                    {
-                        "step": weave.types.Int(),
-                        "elapsed_tokens": weave.types.Float(),
-                        "elapsed_examples": weave.types.Float(),
-                        "training_loss": weave.types.Float(),
-                        "training_sequence_accuracy": weave.types.Float(),
-                        "training_token_accuracy": weave.types.Float(),
-                    }
-                )
+        output_type=weave.types.List(
+            weave.types.TypedDict(
+                {
+                    "step": weave.types.Int(),
+                    "elapsed_tokens": weave.types.Float(),
+                    "elapsed_examples": weave.types.Float(),
+                    "training_loss": weave.types.Float(),
+                    "training_sequence_accuracy": weave.types.Float(),
+                    "training_token_accuracy": weave.types.Float(),
+                }
             )
         ),
     )
@@ -135,9 +133,7 @@ class Gpt3FineTuneResults(StoredFile):
         with tempfile.NamedTemporaryFile() as f:
             f.write(contents)
             f.seek(0)
-            csv = weave.ops.Csv([])
-            csv.load(f.name)
-        return csv
+            return weave.ops.csv_.load_csv(f.name)
 
 
 Gpt3FineTuneResultsType.instance_classes = Gpt3FineTuneResults

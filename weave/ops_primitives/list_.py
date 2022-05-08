@@ -1,3 +1,4 @@
+import typing
 from .. import weave_types as types
 from ..api import op, mutation, weave_class
 from .. import weave_internal
@@ -88,7 +89,7 @@ class List:
     @op(
         name="list-groupby",
         input_type={"self": types.List(types.Any()), "group_by_fn": types.Any()},
-        output_type=lambda input_types: types.Table(
+        output_type=lambda input_types: types.List(
             GroupResultType(input_types["self"])
         ),
     )
@@ -230,3 +231,10 @@ def unnest(arr):
     if isinstance(arr, Table):
         return arr.unnest()
     return arr
+
+
+class WeaveJSListInterface:
+    @op(name="count")
+    def count(arr: list[typing.Any]) -> int:  # type: ignore
+        type_class = types.TypeRegistry.type_class_of(arr)
+        return type_class.NodeMethodsClass.count.op_def.resolve_fn(arr)
