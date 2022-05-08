@@ -56,7 +56,7 @@ def filter_fn_to_sql_filter(table, filter_fn_node):
             return filter_fn_to_sql_filter(
                 table, filter_fn_node.from_op.inputs["lhs"]
             ) > filter_fn_to_sql_filter(table, filter_fn_node.from_op.inputs["rhs"])
-        if op_name == "pick":
+        if op_name.endswith("pick"):
             return filter_fn_to_sql_filter(
                 table, filter_fn_node.from_op.inputs["obj"]
             ).columns[
@@ -167,11 +167,11 @@ class SqlTable:
 
     @op(output_type=pick_output_type)
     def pick(self, key: str):
-        return list_.List.pick.op_def.resolve_fn(self._to_list_table(), key)
+        return list_.List.pick.resolve_fn(self._to_list_table(), key)
 
     @op(output_type=lambda input_types: types.List(input_types["self"].object_type))
     def map(self, map_fn: typing.Any):
-        return list_.List.map.op_def.resolve_fn(self._to_list_table(), map_fn)
+        return list_.List.map.resolve_fn(self._to_list_table(), map_fn)
 
     @op(output_type=lambda input_types: input_types["self"])
     def filter(self, filter_fn: typing.Any):
@@ -185,7 +185,7 @@ class SqlTable:
         ),
     )
     def groupby(self, group_by_fn: typing.Any):
-        return list_.List.groupby.op_def.resolve_fn(self._to_list_table(), group_by_fn)
+        return list_.List.groupby.resolve_fn(self._to_list_table(), group_by_fn)
 
 
 SqlTableType.instance_class = SqlTable

@@ -26,7 +26,7 @@ def filter_fn_to_pandas_filter(df, filter_fn_node):
             return filter_fn_to_pandas_filter(
                 df, filter_fn_node.from_op.inputs["lhs"]
             ) > filter_fn_to_pandas_filter(df, filter_fn_node.from_op.inputs["rhs"])
-        if op_name == "pick":
+        if op_name.endswith("pick"):
             return filter_fn_to_pandas_filter(df, filter_fn_node.from_op.inputs["obj"])[
                 filter_fn_to_pandas_filter(df, filter_fn_node.from_op.inputs["key"])
             ]
@@ -46,7 +46,7 @@ def groupby_fn_to_pandas_filter(df, filter_fn_node):
             return groupby_fn_to_pandas_filter(
                 df, filter_fn_node.from_op.inputs["lhs"]
             ) > groupby_fn_to_pandas_filter(df, filter_fn_node.from_op.inputs["rhs"])
-        elif op_name == "pick":
+        elif op_name.endswith("pick"):
             return groupby_fn_to_pandas_filter(
                 df, filter_fn_node.from_op.inputs["obj"]
             )[groupby_fn_to_pandas_filter(df, filter_fn_node.from_op.inputs["key"])]
@@ -199,7 +199,7 @@ class DataFrameTable:
         self_list = []
         for i in range(self._count()):
             self_list.append(self._index(i))
-        return list_.List.map.op_def.resolve_fn(self_list, map_fn)
+        return list_.List.map.resolve_fn(self_list, map_fn)
 
     @op(
         output_type=lambda input_types: types.List(

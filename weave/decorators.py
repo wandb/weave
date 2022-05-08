@@ -16,16 +16,21 @@ from . import infer_types
 def weave_class(weave_type):
     def wrap(target):
         # add self type to input_types if its not already defined.
-        for _, method in inspect.getmembers(target):
-            if is_op(method):
-                self_type = method.op_def.input_type.arg_types.get("self")
+        for _, member in inspect.getmembers(target):
+            if isinstance(member, op_def.OpDef):
+                opdef = member
+                self_type = opdef.input_type.arg_types.get("self")
                 if self_type is not None and self_type == types.UnknownType():
-                    method.op_def.input_type.arg_types["self"] = weave_type()
+                    opdef.input_type.arg_types["self"] = weave_type()
                 # Replace function op names with method op names
-                if method.op_def.name.startswith("op-"):
-                    method.op_def.name = "%s-%s" % (
-                        weave_type.name,
-                        method.op_def.name[3:],
+                if opdef.name.startswith("op-"):
+                    registry_mem.memory_registry.rename_op(
+                        opdef.name,
+                        "%s-%s"
+                        % (
+                            weave_type.name,
+                            opdef.name[3:],
+                        ),
                     )
 
         weave_type.NodeMethodsClass = target
@@ -179,7 +184,7 @@ def op(
         )
 
         op_version = registry_mem.memory_registry.register_op(op)
-        return op_version.call_fn
+        return op_version
 
     return wrap
 

@@ -28,6 +28,14 @@ class Registry:
         self._ops = {}
         self._op_versions = {}
 
+    def _make_op_calls(self, op: op_def.OpDef, version: str):
+        full_name = op.name + ":" + version
+        op.lazy_call = lazy.make_lazy_call(
+            op.resolve_fn, full_name, op.input_type, op.output_type
+        )
+        op.eager_call = lazy.make_eager_call(op.lazy_call)
+        op.call_fn = lazy.make_call(op.eager_call, op.lazy_call)
+
     def register_op(self, op: op_def.OpDef):
         # Always save OpDefs any time they are declared
         from . import storage
@@ -40,13 +48,7 @@ class Registry:
             version = ref.version
         op.version = version
 
-        full_name = op.name + ":" + version
-        op.lazy_call = lazy.make_lazy_call(
-            op.resolve_fn, full_name, op.input_type, op.output_type
-        )
-        op.eager_call = lazy.make_eager_call(op.lazy_call)
-        op.call_fn = lazy.make_call(op.eager_call, op.lazy_call)
-        op.call_fn.op_def = op
+        self._make_op_calls(op, version)
 
         if not is_loading:
             self._ops[op.name] = op
@@ -73,6 +75,15 @@ class Registry:
         # be the last one we loaded() [rather than the last one the user declared] which
         # is incorrect behavior
         return list(self._ops.values())
+
+    def rename_op(self, name, new_name):
+        """Internal use only, used during op bootstrapping at decorator time"""
+        op = self._ops.pop(name)
+        op.name = new_name
+        self._ops[new_name] = op
+        self._op_versions.pop((name, op.version))
+        self._op_versions[(new_name, op.version)] = op
+        self._make_op_calls(op, op.version)
 
     # def register_type(self, type: weave_types.Type):
     #    self._types[type.name] = type

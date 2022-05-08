@@ -7,7 +7,7 @@ def test_function_op_name():
     def my_op(a: int, b: int) -> int:
         return a + b
 
-    assert my_op.op_def.name == "op-my_op"
+    assert my_op.name == "op-my_op"
 
 
 def test_method_op_name():
@@ -20,4 +20,4 @@ def test_method_op_name():
         def my_op(self: int, b: int) -> int:
             return self + b
 
-    assert MyObj.my_op.op_def.name == "test-decorators-my-obj-my_op"
+    assert MyObj.my_op.name == "test-decorators-my-obj-my_op"

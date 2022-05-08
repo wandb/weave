@@ -3,6 +3,7 @@ from .. import weave_types as types
 from ..api import op, mutation, weave_class
 from .. import weave_internal
 from .. import graph
+from .. import errors
 
 
 @weave_class(weave_type=types.List)
@@ -161,7 +162,7 @@ class GroupResult:
         output_type=group_result_index_output_type,
     )
     def __getitem__(self, index):
-        return List.__getitem__.op_def.resolve_fn(self.list, index)
+        return List.__getitem__.resolve_fn(self.list, index)
 
 
 GroupResultType.instance_class = GroupResult
@@ -243,13 +244,64 @@ def index_output_type(input_types):
         return self_type.object_type
 
 
+def pick_output_type(input_types):
+    # This is heinous. It handles mapped pick as well as regular pick.
+    # Doesn't support all the fancy stuff with '*' that the frontend does yet.
+    # TODO: fix, probably by a better mapped op implementation, and possible some
+    # clearner way of implementing nice type logic.
+    if not isinstance(input_types["key"], types.Const):
+        return types.UnknownType()
+    key = input_types["key"].val
+    self_type = input_types["obj"]
+    object_type = self_type
+    is_list = False
+    # Ew, this is the best way to determine if a Type looks like a list
+    # (like pandas, sql list types).
+    # TODO: fix
+    if hasattr(self_type, "object_type"):
+        object_type = self_type.object_type
+        is_list = True
+    if isinstance(object_type, types.Dict):
+        output_type = object_type.value_type
+    elif isinstance(object_type, types.TypedDict):
+        property_types = object_type.property_types
+        output_type = property_types.get(key)
+        if output_type is None:
+            output_type = types.none_type
+    else:
+        raise errors.WeaveInternalError(
+            "pick received invalid input types: %s" % input_types
+        )
+    if is_list:
+        output_type = types.List(output_type)
+    return output_type
+
+
 class WeaveJSListInterface:
     @op(name="count")
     def count(arr: list[typing.Any]) -> int:  # type: ignore
         type_class = types.TypeRegistry.type_class_of(arr)
-        return type_class.NodeMethodsClass.count.op_def.resolve_fn(arr)
+        return type_class.NodeMethodsClass.count.resolve_fn(arr)
 
     @op(name="index", output_type=index_output_type)
     def index(arr: list[typing.Any], index: int):  # type: ignore
         type_class = types.TypeRegistry.type_class_of(arr)
-        return type_class.NodeMethodsClass.__getitem__.op_def.resolve_fn(arr, index)
+        return type_class.NodeMethodsClass.__getitem__.resolve_fn(arr, index)
+
+    # This should not actually be part of the list interface, as its
+    # only valid when contained items are lists. However, this is the
+    # best place to adapt to frontend behavior, which expects a single
+    # pick op that does mapping as well as TypedDict lookups.
+    @op(
+        name="pick",
+        input_type={
+            "obj": types.UnionType(
+                types.TypedDict({}), types.List(types.TypedDict({}))
+            ),
+            "key": types.String(),
+        },
+        output_type=pick_output_type,
+    )
+    def pick(obj, key):  # type: ignore
+        type_class = types.TypeRegistry.type_class_of(obj)
+        return type_class.NodeMethodsClass.pick.resolve_fn(obj, key)
