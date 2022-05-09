@@ -4,4 +4,7 @@ from . import ops
 from . import panels
 from .show import show
 from .api import *
-from .weave_objects import *
+
+# Need to import this to ensure we attach the NodeMethods
+# TODO: fix
+from . import run_obj as _run_obj

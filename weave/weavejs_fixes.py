@@ -3,8 +3,50 @@
 TODO: this file is not complete. We should try to put all compability fixes here.
     Grep for "js_compat" to find other instances.
 """
+import typing
 import copy
 from . import graph
+
+
+def convert_specific_opname_to_generic_opname(
+    name: str, inputs: dict[str, typing.Any]
+) -> tuple[str, dict[str, typing.Any]]:
+    new_inputs = copy.copy(inputs)
+    if name == "typedDict-pick" or name == "dict-pick":
+        new_inputs["obj"] = new_inputs.pop("self")
+        return "pick", new_inputs
+    elif name == "list-__getitem__":
+        new_inputs["arr"] = new_inputs.pop("self")
+        return "index", new_inputs
+    return name, inputs
+
+
+def convert_specific_ops_to_generic_ops_node(node: graph.Node) -> graph.Node:
+    """Converts specific ops like typedDict-pick to generic ops like pick"""
+
+    def convert_specific_op_to_generic_op(node: graph.Node):
+        if not isinstance(node, graph.OutputNode):
+            return node
+        name, inputs = convert_specific_opname_to_generic_opname(
+            node.from_op.name, node.from_op.inputs
+        )
+        return graph.OutputNode(node.type, name, inputs)
+
+    return graph.map_nodes(node, convert_specific_op_to_generic_op)
+
+
+def convert_specific_ops_to_generic_ops_data(data):
+    """Fix op call names for serialized objects containing graphs"""
+    if isinstance(data, list):
+        return [convert_specific_ops_to_generic_ops_data(d) for d in data]
+    elif isinstance(data, dict):
+        d = data
+        if "name" in data and "inputs" in data:
+            d["name"], d["inputs"] = convert_specific_opname_to_generic_opname(
+                d["name"], d["inputs"]
+            )
+        return {k: convert_specific_ops_to_generic_ops_data(v) for k, v in d.items()}
+    return data
 
 
 def remove_opcall_versions_node(node: graph.Node) -> graph.Node:
@@ -33,6 +75,16 @@ def remove_opcall_versions_data(data):
             d["name"] = data["name"].split(":")[0]
         return {k: remove_opcall_versions_data(v) for k, v in d.items()}
     return data
+
+
+def fixup_node(node: graph.Node) -> graph.Node:
+    node = remove_opcall_versions_node(node)
+    return convert_specific_ops_to_generic_ops_node(node)
+
+
+def fixup_data(data):
+    data = remove_opcall_versions_data(data)
+    return convert_specific_ops_to_generic_ops_data(data)
 
 
 def unwrap_tag_type(serialized_type):

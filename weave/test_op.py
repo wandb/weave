@@ -69,11 +69,11 @@ def op_inferredtype(a: int, b: int) -> str:
 
 
 def test_op_inferred_type():
-    assert op_inferredtype.op_def.input_type.arg_types == {
+    assert op_inferredtype.input_type.arg_types == {
         "a": types.Int(),
         "b": types.Int(),
     }
-    assert op_inferredtype.op_def.output_type == types.String()
+    assert op_inferredtype.output_type == types.String()
 
 
 def test_op_incompatible_return_type():
@@ -153,7 +153,7 @@ def test_op_inferred_list_return():
     def op_under_test(a: int) -> list[int]:
         return [a, 2 * a, 3 * a]
 
-    assert op_under_test.op_def.output_type == types.List(types.Int())
+    assert op_under_test.output_type == types.List(types.Int())
 
 
 def test_op_inferred_typeddict_return():
@@ -161,7 +161,7 @@ def test_op_inferred_typeddict_return():
     def op_under_test(a: int) -> typing.TypedDict("OpReturn", {"x": int, "y": str}):
         return {"a": 1, "y": "x"}
 
-    assert op_under_test.op_def.output_type == types.TypedDict(
+    assert op_under_test.output_type == types.TypedDict(
         {"x": types.Int(), "y": types.String()}
     )
 
@@ -173,7 +173,7 @@ def test_op_inferred_list_typeddict_return():
     ) -> list[typing.TypedDict("OpReturn", {"x": int, "y": str})]:
         return [{"a": 1, "y": "x"}]
 
-    assert op_under_test.op_def.output_type == types.List(
+    assert op_under_test.output_type == types.List(
         types.TypedDict({"x": types.Int(), "y": types.String()})
     )
 
@@ -183,7 +183,7 @@ def test_op_inferred_dict_return() -> None:
     def op_under_test(a: int) -> dict[str, list[int]]:
         return {"a": [5]}
 
-    assert op_under_test.op_def.output_type == types.Dict(
+    assert op_under_test.output_type == types.Dict(
         types.String(), types.List(types.Int())
     )
 
@@ -198,8 +198,8 @@ def test_op_method_inferred_self():
         def my_op(self, a: int) -> str:
             pass
 
-    assert SomeWeaveObj.my_op.op_def.input_type.arg_types == {
+    assert SomeWeaveObj.my_op.input_type.arg_types == {
         "self": SomeWeaveType(),
         "a": types.Int(),
     }
-    assert SomeWeaveObj.my_op.op_def.output_type == types.String()
+    assert SomeWeaveObj.my_op.output_type == types.String()

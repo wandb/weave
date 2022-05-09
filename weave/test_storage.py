@@ -11,15 +11,34 @@ from . import storage
 from .weave_internal import make_const_node
 
 
-class SomeObj(object):
+class SomeObj:
+    def __init__(self, some_int, some_str):
+        self.some_int = some_int
+        self.some_str = some_str
+
+
+class SomeObjType(weave.types.ObjectType):
+    instance_class = SomeObj
+    instance_classes = SomeObj
+
+    name = "test-storage-someobj"
+
+    def property_types(self):
+        return {
+            "some_int": weave.types.Int(),
+            "some_str": weave.types.String(),
+        }
+
+
+class SomeCustomObj:
     def __init__(self, obj):
         self.obj = obj
 
 
-class SomeObjType(types.Type):
-    name = "test-storage-some-obj"
-    instance_classes = SomeObj
-    instance_class = SomeObj
+class SomeCustomObjType(types.Type):
+    name = "test-storage-somecustomobj"
+    instance_classes = SomeCustomObj
+    instance_class = SomeCustomObj
 
     def save_instance(self, obj, artifact, name):
         with artifact.new_file(f"{name}.json") as f:
@@ -28,7 +47,7 @@ class SomeObjType(types.Type):
     @classmethod
     def load_instance(cls, artifact, name, extra=None):
         with artifact.open(f"{name}.json") as f:
-            return SomeObj(json.load(f))
+            return SomeCustomObj(json.load(f))
 
 
 def test_dict():
@@ -74,7 +93,7 @@ def test_numpy():
 
 
 def test_custom_obj():
-    obj = SomeObj({"a": 5})
+    obj = SomeCustomObj({"a": 5})
     obj_id = storage.save(obj, "my-obj")
     obj2 = storage.get(obj_id)
     assert obj.obj == obj2.obj
@@ -82,7 +101,7 @@ def test_custom_obj():
 
 @pytest.mark.skip(reason="wb table doesnt work right now")
 def test_wandb_table():
-    obj = SomeObj({"a": 5})
+    obj = SomeCustomObj({"a": 5})
     obj_id = storage.save(obj, "my-obj")
     obj2 = storage.get(obj_id)
     assert obj.obj == obj2.obj
@@ -95,7 +114,7 @@ def test_wandb_table():
 
 @pytest.mark.skip(reason="cross obj refs dont work right now")
 def test_cross_obj_ref():
-    d1 = {"a": 5, "b": SomeObj(14)}
+    d1 = {"a": 5, "b": SomeCustomObj(14)}
     d1_id = storage.save(d1, "my-d1")
     d2 = storage.get(d1_id)
     d3 = {"f": 5, "c": d2["b"]}
@@ -108,7 +127,7 @@ def test_cross_obj_ref():
 
 @pytest.mark.skip(reason="cross obj refs dont work right now")
 def test_cross_obj_outer_ref():
-    d1 = {"a": 5, "b": SomeObj(14)}
+    d1 = {"a": 5, "b": SomeCustomObj(14)}
     d1_id = storage.save(d1, "my-d1")
     d2 = storage.get(d1_id)
     d3 = {"f": 5, "c": d2}
@@ -162,3 +181,13 @@ def test_saveload_type():
     ref = storage.save(t)
     t2 = ref.get()
     assert t == t2
+
+
+def test_list_obj():
+    list_obj = [SomeObj(1, "a"), SomeObj(2, "b")]
+    ref = storage.save(list_obj, "my-listobj")
+    list_obj2 = storage.get(ref)
+    assert list_obj[0].some_int == list_obj2[0].some_int
+    assert list_obj[0].some_str == list_obj2[0].some_str
+    assert list_obj[1].some_int == list_obj2[1].some_int
+    assert list_obj[1].some_str == list_obj2[1].some_str

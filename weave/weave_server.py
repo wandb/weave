@@ -86,7 +86,9 @@ def make_app(log_filename=None, stream_logging_enabled=False):
     return Flask(__name__, static_folder="frontend")
 
 
-app = make_app(stream_logging_enabled=True)
+# This makes all server logs go into the notebook
+# app = make_app(stream_logging_enabled=True)
+app = make_app()
 CORS(app, send_wildcard=True)
 
 
@@ -104,6 +106,7 @@ def list_ops():
 
 @app.route("/__weave/execute", methods=["POST"])
 def execute():
+    """Execute endpoint used by WeaveJS"""
     # print('REQUEST', request, request.json)
     if not request.json or "graphs" not in request.json:
         abort(400)
@@ -124,6 +127,7 @@ def execute():
 
 @app.route("/__weave/execute/v2", methods=["POST"])
 def execute_v2():
+    """Execute endpoint used by Weave Python"""
     # print('REQUEST', request, request.json)
     if not request.json or "graphs" not in request.json:
         abort(400)

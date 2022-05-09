@@ -1,16 +1,13 @@
-# from . import mappers_python
-# from . import mappers_arrow
 import typing
-import typing_extensions
-import types
 import functools
 import pyarrow as pa
 import pyarrow.parquet as pq
 import json
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable
 
 from . import box
 from . import errors
+from . import arrow_util
 
 
 def all_subclasses(cls):
@@ -67,6 +64,13 @@ class TypeRegistry:
         return bool(instance_class_to_potential_type(type(obj)))
 
     @staticmethod
+    def type_class_of(obj):
+        type_classes = instance_class_to_potential_type(type(obj))
+        if not type_classes:
+            raise errors.WeaveTypeError("no Type for obj: %s" % obj)
+        return type_classes[-1]
+
+    @staticmethod
     def type_of(obj):
         if isinstance(obj, Type):
             return Type()
@@ -77,7 +81,7 @@ class TypeRegistry:
             obj_type = type_.type_of(obj)
             if obj_type is not None:
                 return obj_type
-        raise errors.WeaveTypeError("no type for obj: %s" % obj)
+        raise errors.WeaveTypeError("no Type for obj: %s" % obj)
 
     @staticmethod
     def type_from_dict(d):
@@ -150,7 +154,11 @@ class Type:
     #     return show(self)
 
     def __eq__(self, other):
-        return self.name == other.name and self.__dict__ == other.__dict__
+        return (
+            isinstance(other, Type)
+            and self.name == other.name
+            and self.__dict__ == other.__dict__
+        )
 
     # save_instance/load_instance on Type are used to save/load actual Types
     # since type_of(types.Int()) == types.Type()
@@ -218,7 +226,7 @@ class UnknownType(BasicType):
 
 class NoneType(BasicType):
     name = "none"
-    instance_classes = type(None)
+    instance_classes = [type(None), box.BoxedNone]
 
     def save_instance(self, obj, artifact, name):
         # BoxedNone is actually a box, not a subclass of bool, since
@@ -272,6 +280,9 @@ class Const(Type):
         return {"valType": self.val_type.to_dict(), "val": self.val}
 
     def __str__(self):
+        return "<Const %s %s>" % (self.val_type, self.val)
+
+    def __repr__(self):
         return "<Const %s %s>" % (self.val_type, self.val)
 
 
@@ -370,138 +381,9 @@ class UnionType(Type):
         return "<UnionType %s>" % " | ".join((str(m) for m in self.members))
 
 
-class ConcreteList(list):
-    def __init__(self, items=None):
-        self._obj_type = UnknownType()
-        if items is not None:
-            for item in items:
-                self.add(item)
-
-    # TODO: do type checking on any list manipulation!? interesting...
-    #     is it better to just compute the type when .type() is called instead?
-    #     that certainly makes this class easier to implement as we don't have
-    #     to ensure we find other possible way of updating a list. but we'd
-    #     probably want to cache that result and invalidate on update so...
-    # But maybe we don't need this class at all, just put all the logic in the
-    #   List save() method
-    def add(self, obj):
-        self.append(obj)
-        obj_type = TypeRegistry.type_of(obj)
-        if obj_type is None:
-            raise Exception("can't detect type for object: %s" % obj)
-        next_type = self._obj_type.assign_type(obj_type)
-        if isinstance(next_type, Invalid):
-            next_type = UnionType(self._obj_type, obj_type)
-        self._obj_type = next_type
-
-    @property
-    def type(self):
-        from . import types_numpy
-
-        if isinstance(self._obj_type, types_numpy.NumpyArrayType):
-            new_shape = (len(self._items),) + self._obj_type.shape
-            return types_numpy.NumpyArrayType(self._obj_type.dtype, new_shape)
-        else:
-            return List(self._obj_type)
-
-
-# TODO: move these to weave_objects.
-#     also, weave objects should actually all use the ObjectType stuff I think.
-#     (maybe not ones that inherit from builtins. But everything else.)
-#     But maybe we just shouldn't be inheriting from builtins... that's bad.
-
-
-class ArrowTableRowDict(Mapping):
-    def __init__(self, arrow_table, deserializer, index, artifact):
-        self._arrow_table = arrow_table
-        self._deserializer = deserializer
-        self._index = index
-        self._artifact = artifact
-
-    def __getitem__(self, key):
-        val = self._arrow_table.column(key)[self._index].as_py()
-        return self._deserializer._property_serializers[key].apply(val)
-
-    pick = __getitem__
-
-    def __iter__(self):
-        return iter(self._arrow_table.column_names)
-
-    def __len__(self):
-        return self._arrow_table.num_columns
-
-
-class ArrowTableList(Iterable):
-    def __init__(self, arrow_table, mapper, artifact):
-        self._arrow_table = arrow_table
-        self._artifact = artifact
-        self._deserializer = mapper
-
-    def __getitem__(self, index):
-        if index >= self._arrow_table.num_rows:
-            return None
-        return ArrowTableRowDict(
-            self._arrow_table, self._deserializer, index, self._artifact
-        )
-
-    def __iter__(self):
-        for i in range(len(self)):
-            yield self[i]
-
-    index = __getitem__
-
-    def __len__(self):
-        return self._arrow_table.num_rows
-
-    count = __len__
-
-    def __eq__(self, other):
-        if len(self) != len(other):
-            return False
-        for x, y in zip(iter(self), iter(other)):
-            if x != y:
-                return False
-        return True
-
-
-class ArrowArrayList(Iterable):
-    def __init__(self, arrow_array):
-        self._arrow_array = arrow_array
-
-    def __getitem__(self, index):
-        if index >= len(self._arrow_array):
-            return None
-        return self._arrow_array[index].as_py()
-
-    index = __getitem__
-
-    def __iter__(self):
-        for i in range(len(self)):
-            yield self[i]
-
-    def __eq__(self, other):
-        if len(self) != len(other):
-            return False
-        for s, o in zip(self, other):
-            if s != o:
-                return False
-        return True
-
-    def __len__(self):
-        return len(self._arrow_array)
-
-    count = __len__
-
-
-# TODO:
-#   this List stuff is f'd, need to convert to
-#   mappers and get rid of save_instance() and dependencies on
-#   arrow and numpy here.
-
-
 class List(Type):
     name = "list"
-    instance_classes = [set, list, ConcreteList]
+    instance_classes = [set, list, arrow_util.ArrowTableList, arrow_util.ArrowArrayList]
 
     def __init__(self, object_type):
         self.object_type = object_type
@@ -515,9 +397,16 @@ class List(Type):
 
     @classmethod
     def type_of_instance(cls, obj):
-        if not isinstance(obj, ConcreteList):
-            obj = ConcreteList(obj)
-        return obj.type
+        list_obj_type = UnknownType()
+        for item in obj:
+            obj_type = TypeRegistry.type_of(item)
+            if obj_type is None:
+                raise Exception("can't detect type for object: %s" % item)
+            next_type = list_obj_type.assign_type(obj_type)
+            if isinstance(next_type, Invalid):
+                next_type = UnionType(list_obj_type, obj_type)
+            list_obj_type = next_type
+        return cls(list_obj_type)
 
     def save_instance(self, obj, artifact, name):
         obj_type = self.object_type
@@ -531,11 +420,6 @@ class List(Type):
         py_objs = (serializer.apply(o) for o in obj)
 
         with artifact.new_file(f"{name}.parquet", binary=True) as f:
-            # OK, this all works fine, because we compute the type first
-            # and then let pyarrow handle serialization
-            # When we read it back, we need to put an interface on top
-            # of the returned stuff, that returns our correct types, including
-            # class/object types that map to dicts
             arr = pa.array(py_objs, type=pyarrow_type)
             if pa.types.is_struct(arr.type):
                 rb = pa.RecordBatch.from_struct_array(
@@ -557,21 +441,11 @@ class List(Type):
                 table.schema.metadata is not None
                 and b"singleton" in table.schema.metadata
             ):
-                return ArrowArrayList(table.column("_singleton"))
+                return arrow_util.ArrowArrayList(table.column("_singleton"))
 
             mapper = mappers_arrow.map_from_arrow(self.object_type, artifact)
-            atl = ArrowTableList(pq.read_table(f), mapper, artifact)
-
-            # Convert back to pure python. We're jumping through a lot of
-            # hoops to get to get this point. What we actually want is for
-            # Weave to operate on the arrow structs, but I need a big refactor
-            # to fix a bunch of stuff with how tables works. For now I just
-            # want to get something working.
-            # TODO
-            res = []
-            for row in atl:
-                res.append(dict(row))
-            return res
+            atl = arrow_util.ArrowTableList(pq.read_table(f), mapper, artifact)
+            return atl
 
     def __str__(self):
         return "<ListType %s>" % self.object_type
@@ -579,7 +453,7 @@ class List(Type):
 
 class TypedDict(Type):
     name = "typedDict"
-    instance_classes = dict
+    instance_classes = [dict]
 
     def __init__(self, property_types):
         self.property_types = property_types
@@ -817,19 +691,6 @@ class LocalArtifactRefType(Type):
 
     def __str__(self):
         return "<LocalArtifactRefType %s>" % self.object_type
-
-
-# TODO: placeholders for now, and a place for table.py
-#     to attach its methods. But we probably don't want this
-#     to be in the core basic types file.
-
-
-class Table(Type):
-    name = "table"
-    # TODO: don't default to Any?
-
-    def __init__(self, object_type=Any()):
-        self.object_type = object_type
 
 
 class WBTable(Type):

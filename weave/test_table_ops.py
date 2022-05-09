@@ -5,6 +5,7 @@ from . import api as weave
 from . import weave_types as types
 from . import ops
 from . import storage
+from . import context
 
 TABLE_TYPES = ["list", "pandas", "sql"]
 
@@ -15,7 +16,7 @@ def get_test_table(table_type):
         return f.readcsv()
     elif table_type == "pandas":
         f = ops.local_path(os.path.join("testdata", "cereal.csv"))
-        return ops.file_pandasreadcsv(f)
+        return ops.pandasreadcsv(f)
     elif table_type == "sql":
         c = ops.local_sqlconnection("sqlite:///testdata/cereal.db")
         return ops.sqlconnection_table(c, "cereal")
@@ -24,13 +25,15 @@ def get_test_table(table_type):
 @pytest.mark.parametrize("table_type", TABLE_TYPES)
 def test_count(table_type):
     table = get_test_table(table_type)
-    assert weave.use(table.count()) == 77
+    expected = 77
+    assert weave.use(table.count()) == expected
+    assert weave.use(ops.WeaveJSListInterface.count(table)) == expected
 
 
 @pytest.mark.parametrize("table_type", TABLE_TYPES)
 def test_index(table_type):
     table = get_test_table(table_type)
-    assert weave.use(table[0]) == {
+    expected = {
         "name": "100% Bran",
         "mfr": "N",
         "type": "C",
@@ -48,6 +51,15 @@ def test_index(table_type):
         "cups": 0.33,
         "rating": 68.402973,
     }
+    assert weave.use(table[0]) == expected
+    assert weave.use(ops.WeaveJSListInterface.index(table, 0)) == expected
+
+
+@pytest.mark.parametrize("table_type", TABLE_TYPES)
+def test_pick(table_type):
+    table = get_test_table(table_type)
+    assert len(weave.use(table.pick("type"))) == 77
+    assert len(weave.use(ops.WeaveJSListInterface.pick(table, "type"))) == 77
 
 
 @pytest.mark.parametrize("table_type", TABLE_TYPES)
@@ -56,8 +68,8 @@ def test_filter(table_type):
     filter_fn = weave.define_fn(
         {"row": weave.types.TypedDict({})}, lambda row: row["potass"] > 280
     )
-    filtered = table.filter(filter_fn)
-    assert weave.use(filtered.count()) == 2
+    assert weave.use(table.filter(filter_fn).count()) == 2
+    assert weave.use(ops.WeaveJSListInterface.filter(table, filter_fn).count()) == 2
 
 
 # WARNING: Separating tests for group by, because
@@ -69,14 +81,10 @@ def test_groupby(table_type):
     groupby_fn = weave.define_fn(
         {"row": weave.types.TypedDict({})}, lambda row: row["type"]
     )
-    grouped = table.groupby(groupby_fn)
-    group0 = grouped[0]
-    group0key = group0.key()
-    group00 = group0[0]
     # TODO: add a pick here to check that it works.
     # TODO: add a pick test for the array case
     # TODO: add some kind of test that relies on type refinement
-    assert weave.use((group0key, group00)) == [
+    expected = [
         "C",
         {
             "name": "100% Bran",
@@ -96,6 +104,10 @@ def test_groupby(table_type):
             "rating": 68.402973,
         },
     ]
+    grouped = table.groupby(groupby_fn)
+    assert weave.use((grouped[0].key(), grouped[0][0])) == expected
+    grouped_js = ops.WeaveJSListInterface.groupby(table, groupby_fn)
+    assert weave.use((grouped_js[0].key(), grouped_js[0][0])) == expected
 
 
 @pytest.mark.parametrize("table_type", ["list", "sql"])
@@ -144,26 +156,26 @@ def test_map(table_type):
 @weave.op(
     name="test_table_ops-op_list_table",
     input_type={"n": types.Int()},
-    output_type=types.Table(types.TypedDict({"a": types.Int(), "b": types.String()})),
+    output_type=types.List(types.TypedDict({"a": types.Int(), "b": types.String()})),
 )
 def op_list_table(n):
-    return ops.ListTable([{"a": i, "b": str(i)} for i in range(n)])
+    return [{"a": i, "b": str(i)} for i in range(n)]
 
 
 def test_list_returning_op():
     res = weave.use(op_list_table(2))
     expected = [{"a": 0, "b": str(0)}, {"a": 1, "b": str(1)}]
-    assert res.list == expected
+    assert res == expected
     saved = storage.save(res)
     loaded = storage.deref(saved)
-    py = storage.to_python(loaded)["_val"]["list"]
+    py = storage.to_python(loaded)["_val"]
     assert py == expected
 
 
 def test_list_map():
     map_fn = weave.define_fn({"row": weave.types.TypedDict({})}, lambda row: row["a"])
     res = weave.use(op_list_table(2).map(map_fn))
-    assert res.list == [0, 1]
+    assert res == [0, 1]
 
 
 @weave.op(
@@ -182,5 +194,11 @@ def test_list_get_and_op():
 
     # The frontend always sends ops.Table.count() (not the same as get_node.count() right
     # now!)
-    count_node = ops.Table.count(get_node)
+    count_node = ops.WeaveJSListInterface.count(get_node)
     assert weave.use(count_node) == 2
+
+
+def test_list_save_and_use():
+    saved = storage.save([{"a": 5, "b": 6}], "test-list")
+    with context.weavejs_client():
+        assert weave.use(ops.get(str(saved))) == [{"a": 5, "b": 6}]

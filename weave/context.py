@@ -25,6 +25,10 @@ _analytics_enabled: contextvars.ContextVar[bool] = contextvars.ContextVar(
     "analytics_enabled", default=True
 )
 
+_eager_mode: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    "_eager_mode", default=False
+)
+
 
 @contextlib.contextmanager
 def execution_client():
@@ -32,11 +36,15 @@ def execution_client():
     # Force in process execution
     wc = client.Client(server.InProcessServer())
     client_token = _weave_client.set(wc)
+    # eager_token = _eager_mode.set(True)
     # Disable analytics
     analytics_token = _analytics_enabled.set(False)
-    yield wc
-    _weave_client.reset(client_token)
-    _analytics_enabled.reset(analytics_token)
+    try:
+        yield wc
+    finally:
+        _analytics_enabled.reset(analytics_token)
+        # _eager_mode.reset(eager_token)
+        _weave_client.reset(client_token)
 
 
 @contextlib.contextmanager
@@ -45,9 +53,26 @@ def local_http_client():
     s.start()
     server_token = _http_server.set(s)
     client_token = _weave_client.set(server.HttpServerClient(s.url))
-    yield _weave_client.get()
-    _weave_client.reset(client_token)
-    _http_server.reset(server_token)
+    try:
+        yield _weave_client.get()
+    finally:
+        _weave_client.reset(client_token)
+        _http_server.reset(server_token)
+
+
+@contextlib.contextmanager
+def weavejs_client():
+    s = server.HttpServer()
+    s.start()
+    server_token = _http_server.set(s)
+    client_token = _weave_client.set(
+        server.HttpServerClient(s.url, emulate_weavejs=True)
+    )
+    try:
+        yield _weave_client.get()
+    finally:
+        _weave_client.reset(client_token)
+        _http_server.reset(server_token)
 
 
 def _make_default_client():
@@ -106,6 +131,10 @@ def get_frontend_url():
                 raise RuntimeError("Frontend server is not running")
         url += "/__frontend/weave_jupyter"
     return url
+
+
+def eager_mode():
+    return _eager_mode.get()
 
 
 def analytics_enabled():

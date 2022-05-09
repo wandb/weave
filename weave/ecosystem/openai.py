@@ -115,18 +115,16 @@ class Gpt3FineTuneResults(StoredFile):
         input_type={
             "self": StoredFileType(),
         },
-        output_type=weave.ops.ListTableType(
-            weave.types.List(
-                weave.types.TypedDict(
-                    {
-                        "step": weave.types.Int(),
-                        "elapsed_tokens": weave.types.Float(),
-                        "elapsed_examples": weave.types.Float(),
-                        "training_loss": weave.types.Float(),
-                        "training_sequence_accuracy": weave.types.Float(),
-                        "training_token_accuracy": weave.types.Float(),
-                    }
-                )
+        output_type=weave.types.List(
+            weave.types.TypedDict(
+                {
+                    "step": weave.types.Int(),
+                    "elapsed_tokens": weave.types.Float(),
+                    "elapsed_examples": weave.types.Float(),
+                    "training_loss": weave.types.Float(),
+                    "training_sequence_accuracy": weave.types.Float(),
+                    "training_token_accuracy": weave.types.Float(),
+                }
             )
         ),
     )
@@ -135,9 +133,7 @@ class Gpt3FineTuneResults(StoredFile):
         with tempfile.NamedTemporaryFile() as f:
             f.write(contents)
             f.seek(0)
-            csv = weave.ops.Csv([])
-            csv.load(f.name)
-        return csv
+            return weave.ops.csv_.load_csv(f.name)
 
 
 Gpt3FineTuneResultsType.instance_classes = Gpt3FineTuneResults
@@ -204,22 +200,34 @@ class Gpt3Model:
     @weave.op(
         name="gpt3model-complete",
     )
-    def complete(self, prompt: str) -> Gpt3ModelCompleteReturn:
+    def complete(self, prompt: str, seed: int = 0) -> Gpt3ModelCompleteReturn:
         sleep = 1
+        completion_params = {
+            "model": self.id,
+            "prompt": prompt,
+            "max_tokens": 256,
+            "n": 3,
+            "temperature": 0.9,
+        }
         for _ in range(5):
             try:
-                return openai.Completion.create(model=self.id, prompt=prompt)
+                return openai.Completion.create(**completion_params)
             except openai.error.RateLimitError:
                 # This error occurs if a model is newly trained or hasn't
                 # been queried for awhile, while the OpenAI backend loads
                 # it up.
                 time.sleep(sleep)
                 sleep *= 2
-        return openai.Completion.create(model=self.id, prompt=prompt)
+        return openai.Completion.create(**completion_params)
 
 
 Gpt3ModelType.instance_classes = Gpt3Model
 Gpt3ModelType.instance_class = Gpt3Model
+
+
+@weave.op()
+def gpt3_davinci_2() -> Gpt3Model:
+    return Gpt3Model("text-davinci-002", "text-davinci-002")
 
 
 class Gpt3FineTuneType(weave.types.ObjectType):

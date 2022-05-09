@@ -4,7 +4,6 @@ from . import ops
 from .artifacts_local import LOCAL_ARTIFACT_DIR
 from .ecosystem import async_demo
 import pytest
-from . import weave_objects
 from . import run_obj
 
 
@@ -62,15 +61,19 @@ def test_stable_when_fetching_input():
     except FileNotFoundError:
         pass
 
-    dataset = weave_objects.List([{"prompt": "a", "completion": "5"}])
+    dataset = [{"prompt": "a", "completion": "5"}]
     ref = storage.save(dataset)
     get_dataset = ops.get(str(ref))
     # We're going to fetch a new in memory dataset object for both of these.
     # But we should get the same run ID back because the datasets are the same
     # (which we know by checking that they come from the same ref in the code)
-    run_id1 = api.use(async_demo.train(get_dataset).id())
-    run_id2 = api.use(async_demo.train(get_dataset).id())
+    train1 = async_demo.train(get_dataset)
+    train2 = async_demo.train(get_dataset)
+    run_id1 = api.use(train1.id())
+    run_id2 = api.use(train2.id())
     assert run_id1 == run_id2
+    api.use(train1.await_final_output())
+    api.use(train2.await_final_output())
 
 
 @pytest.mark.timeout(1.5)
@@ -91,7 +94,7 @@ def test_async_op_expr():
     except FileNotFoundError:
         pass
 
-    dataset = weave_objects.List([{"prompt": "a", "completion": "5"}])
+    dataset = [{"prompt": "a", "completion": "5"}]
 
     train_result = async_demo.train(dataset)
     model = train_result.model()
@@ -99,5 +102,5 @@ def test_async_op_expr():
     version0 = api.versions(saved_model)[0]
     assert (
         str(api.expr(version0))
-        == 'get("list-dataset/9af42f7b9600f6f2636be8959e5f1ab8").train().trainresult-model().save("model")'
+        == 'get("list-obj/9af42f7b9600f6f2636be8959e5f1ab8").train().trainresult-model().save("model")'
     )

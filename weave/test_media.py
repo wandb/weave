@@ -1,3 +1,4 @@
+import pytest
 import numpy as np
 
 from . import storage
@@ -166,6 +167,7 @@ def test_list_nested_lists_with_objs():
     assert arr2[0]["b"][1]["y"] == arr[0]["b"][1]["y"]
 
 
+@pytest.mark.skip("Need union support in mappers_arrow")
 def test_list_nested_lists_with_objs_1missing():
     arr = [
         {"a": 5, "b": [{"x": 4, "y": SomeObj(9, 99)}, {"x": 5, "y": SomeObj(14, 13)}]},

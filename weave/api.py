@@ -2,13 +2,13 @@ from . import graph as _graph
 from . import storage as _storage
 from . import weave_internal as _weave_internal
 from . import errors as _errors
+from . import context as _context
 
 # exposed as part of api
 from . import weave_types as types
 from . import errors
 from .decorators import weave_class, op, mutation
 from .op_args import OpVarArgs
-from . import context as _context
 from . import usage_analytics
 from .context import (
     use_fixed_server_port,
@@ -40,10 +40,8 @@ def use(nodes, client=None):
     # weave_client = client.Client(server.SubprocessServer())
     # weave_client = client.Client(server.HttpServer('http://127.0.0.1:9994'))
     single = True
-    if (
-        not isinstance(nodes, _graph.OutputNode)
-        and isinstance(nodes, list)
-        or isinstance(nodes, tuple)
+    if not isinstance(nodes, _graph.Node) and (
+        isinstance(nodes, list) or isinstance(nodes, tuple)
     ):
         single = False
     if single:
@@ -55,6 +53,11 @@ def use(nodes, client=None):
     # TODO: Fix
     actual_nodes = []
     for node in nodes:
+        if not isinstance(node, _graph.Node):
+            if _context.eager_mode():
+                raise errors.WeaveApiError("use not allowed in eager mode.")
+            else:
+                raise errors.WeaveApiError("non-Node passed to use().")
         actual_nodes.append(_graph.Node.node_from_json(node.to_json()))
 
     result = client.execute(actual_nodes)

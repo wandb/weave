@@ -27,7 +27,7 @@ def typeddict_pick_output_type(input_types):
     if not isinstance(input_types["key"], types.Const):
         return types.UnknownType()
     key = input_types["key"].val
-    property_types = input_types["obj"].property_types
+    property_types = input_types["self"].property_types
     output_type = property_types.get(key)
     if output_type is None:
         # TODO is types.Invalid() right?
@@ -44,18 +44,25 @@ def typeddict_pick_output_type(input_types):
 
 @weave_class(weave_type=types.TypedDict)
 class TypedDict(dict):
+    @mutation
+    def __setitem__(self, k, v):
+        dict.__setitem__(self, k, v)
+        return self
+
     @op(
-        name="pick",
-        input_type={"obj": types.TypedDict(types.Any()), "key": types.String()},
+        setter=__setitem__,
+        input_type={"self": types.TypedDict(types.Any()), "key": types.String()},
         output_type=typeddict_pick_output_type,
     )
-    def __getitem__(obj, key):
-        if not isinstance(obj, dict):
+    def pick(self, key):
+        if not isinstance(self, dict):
             # won't need this when we fix type-checking, but for now it
             # surfaces an error
             # TODO: totally not right, need to figure out mappped ops
-            return obj.pick(key)
-        return dict.__getitem__(obj, key)
+            return self.pick(key)
+        return dict.__getitem__(self, key)
+
+    __getitem__ = pick
 
 
 @weave_class(weave_type=types.Dict)
@@ -67,20 +74,21 @@ class Dict(dict):
 
     @op(
         setter=__setitem__,
-        name="pick",
         input_type={
-            "obj": types.Dict(types.String(), types.Any()),
+            "self": types.Dict(types.String(), types.Any()),
             "key": types.String(),
         },
-        output_type=lambda input_types: input_types["obj"].value_type,
+        output_type=lambda input_types: input_types["self"].value_type,
     )
-    def __getitem__(obj, key):
-        if not isinstance(obj, dict):
+    def pick(self, key):
+        if not isinstance(self, dict):
             # won't need this when we fix type-checking, but for now it
             # surfaces an error
             # TODO: totally not right, need to figure out mappped ops
-            return obj.pick(key)
-        return obj.get(key)
+            return self.pick(key)
+        return self.get(key)
+
+    __getitem__ = pick
 
 
 # @weave_class(weave_type=types.TypedDict)

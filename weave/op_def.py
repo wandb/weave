@@ -70,7 +70,21 @@ class OpDef:
         self.render_info = render_info
         self.pure = pure
         self.version = None
+        self.lazy_call = None
+        self.eager_call = None
         self.call_fn = None
+        self.instance = None
+
+    def __get__(self, instance, owner):
+        # This is part of Python's descriptor protocol, and when this op_def
+        # is fetched as a member of a class
+        self.instance = instance
+        return self
+
+    def __call__(self, *args, **kwargs):
+        if self.instance is not None:
+            return self.call_fn(self.instance, *args, **kwargs)
+        return self.call_fn(*args, **kwargs)
 
     @property
     def fullname(self):
@@ -94,6 +108,10 @@ class OpDef:
             # This is for builtins, which I think we may just want to get rid
             # of?
             return self.name
+
+    @property
+    def is_mutation(self):
+        return getattr(self.resolve_fn, "is_mutation", False)
 
     def to_dict(self):
         if callable(self.output_type):
@@ -124,6 +142,10 @@ class OpDef:
 
     def __str__(self):
         return "<OpDef: %s>" % self.name
+
+
+def is_op_def(obj):
+    return isinstance(obj, OpDef)
 
 
 class OpDefType(types.Type):
@@ -160,13 +182,14 @@ class OpDefType(types.Type):
         # mod down to _obj.
         for part in parts[1:]:
             mod = getattr(mod, part)
-        module_functions = inspect.getmembers(mod, inspect.isfunction)
-        if len(module_functions) != 1:
+
+        op_defs = inspect.getmembers(mod, is_op_def)
+        if len(op_defs) != 1:
             raise errors.WeaveInternalError(
                 "Unexpected Weave module saved in: %s" % path
             )
-        _, op_call_fn = module_functions[0]
-        return op_call_fn.op_def
+        _, od = op_defs[0]
+        return od
 
 
 def fully_qualified_opname(wrap_fn):

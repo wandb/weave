@@ -1,11 +1,12 @@
 import copy
 import math
 import sqlalchemy
+import typing
 from sqlalchemy import orm
 
-from ..api import op
+from ..api import op, weave_class
 from .. import weave_types as types
-from . import table
+from . import list_
 from . import graph
 
 
@@ -15,6 +16,21 @@ class SqlConnectionType(types.Type):
 
 class SqlTableType(types.Type):
     name = "sqltable"
+
+    object_type: types.Type
+
+    def __init__(self, object_type=types.TypedDict({})):
+        self.object_type = object_type
+
+    def __str__(self):
+        return "<SqlTableType %s>" % self.object_type
+
+    def _to_dict(self):
+        return {"objectType": self.object_type.to_dict()}
+
+    @classmethod
+    def from_dict(cls, d):
+        return cls(types.TypeRegistry.type_from_dict(d["objectType"]))
 
 
 class SqlConnection(object):
@@ -40,9 +56,15 @@ def filter_fn_to_sql_filter(table, filter_fn_node):
             return filter_fn_to_sql_filter(
                 table, filter_fn_node.from_op.inputs["lhs"]
             ) > filter_fn_to_sql_filter(table, filter_fn_node.from_op.inputs["rhs"])
-        if op_name == "pick":
+        elif op_name == "pick":
             return filter_fn_to_sql_filter(
                 table, filter_fn_node.from_op.inputs["obj"]
+            ).columns[
+                filter_fn_to_sql_filter(table, filter_fn_node.from_op.inputs["key"])
+            ]
+        elif op_name == "typedDict-pick":
+            return filter_fn_to_sql_filter(
+                table, filter_fn_node.from_op.inputs["self"]
             ).columns[
                 filter_fn_to_sql_filter(table, filter_fn_node.from_op.inputs["key"])
             ]
@@ -53,7 +75,28 @@ def filter_fn_to_sql_filter(table, filter_fn_node):
         raise Exception("unhandled var name")
 
 
-class SqlTable(table.Table):
+def index_output_type(input_types):
+    # THIS IS NO GOOD
+    # TODO: need to fix Const type so we don't need this.
+    self_type = input_types["self"]
+    if isinstance(self_type, types.Const):
+        return self_type.val_type.object_type
+    else:
+        return self_type.object_type
+
+
+def pick_output_type(input_types):
+    if not isinstance(input_types["key"], types.Const):
+        return types.UnknownType()
+    key = input_types["key"].val
+    prop_type = input_types["self"].object_type.property_types.get(key)
+    if prop_type is None:
+        return types.Invalid()
+    return prop_type
+
+
+@weave_class(weave_type=SqlTableType)
+class SqlTable:
     PAGE_SIZE = 100
 
     def __init__(self, conn, table):
@@ -66,7 +109,10 @@ class SqlTable(table.Table):
         self._filter_fn = None
 
     def _to_list_table(self):
-        return table.ListTable([self.index(i) for i in range(self.count())])
+        self_list = []
+        for i in range(self._count()):
+            self_list.append(self._index(i))
+        return self_list
 
     def copy(self):
         new_obj = self.__class__(self.conn, self.table)
@@ -92,10 +138,14 @@ class SqlTable(table.Table):
             query = query.filter(filter_fn_to_sql_filter(self.table, self._filter_fn))
         return query
 
-    def count(self):
+    def _count(self):
         return self.query.count()
 
-    def index(self, index):
+    @op()
+    def count(self) -> int:
+        return self._count()
+
+    def _index(self, index: int):
         row = self._cached_row(index)
         if row is not None:
             return row
@@ -107,7 +157,6 @@ class SqlTable(table.Table):
         results = query.offset(page * self.PAGE_SIZE).limit(SqlTable.PAGE_SIZE)
         # print('RESULTS QUERY', results)
         rows = []
-        print("MAKING QUERY for page", page)
         for row in results.all():
             row = {k: getattr(row, k) for k in row.keys()}
             rows.append(row)
@@ -117,19 +166,35 @@ class SqlTable(table.Table):
         except IndexError:
             return None
 
-    def pick(self, key):
-        return self._to_list_table().pick(key)
+    @op(output_type=index_output_type)
+    def __getitem__(self, index: int):
+        return self._index(index)
 
-    def map(self, mapFn):
-        return self._to_list_table().map(mapFn)
+    @op(output_type=pick_output_type)
+    def pick(self, key: str):
+        return list_.List.pick.resolve_fn(self._to_list_table(), key)
 
-    def filter(self, filterFn):
+    @op(output_type=lambda input_types: types.List(input_types["self"].object_type))
+    def map(self, map_fn: typing.Any):
+        return list_.List.map.resolve_fn(self._to_list_table(), map_fn)
+
+    @op(output_type=lambda input_types: input_types["self"])
+    def filter(self, filter_fn: typing.Any):
         new_obj = self.copy()
-        new_obj._filter_fn = filterFn
+        new_obj._filter_fn = filter_fn
         return new_obj
 
-    def groupby(self, groupByFn):
-        return self._to_list_table().groupby(groupByFn)
+    @op(
+        output_type=lambda input_types: types.List(
+            list_.GroupResultType(types.List(input_types["self"].object_type))
+        ),
+    )
+    def groupby(self, group_by_fn: typing.Any):
+        return list_.List.groupby.resolve_fn(self._to_list_table(), group_by_fn)
+
+
+SqlTableType.instance_class = SqlTable
+SqlTableType.instance_classes = SqlTable
 
 
 @op(
@@ -193,7 +258,7 @@ def sqlconnection_tables_type(conn):
 @op(
     name="sqlconnection-table",
     input_type={"conn": SqlConnectionType(), "name": types.String()},
-    output_type=types.Table(),
+    output_type=SqlTableType(types.TypedDict({})),
 )
 def sqlconnection_table(conn, name):
     return conn.table(name)

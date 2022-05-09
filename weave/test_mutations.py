@@ -80,10 +80,8 @@ def test_csv_saveload_type():
         pass
     shutil.copy("testdata/cereal.csv", "/tmp/cereal.csv")
     csv = weave.use(ops.local_path("/tmp/cereal.csv").readcsv())
-    assert isinstance(csv, ops.Csv)
     ref = storage.save(csv)
-    new_csv = storage.get(str(ref))
-    assert isinstance(new_csv, ops.Csv)
+    storage.get(str(ref))
 
 
 def test_skips_list_indexcheckpoint():
@@ -96,7 +94,7 @@ def test_skips_list_indexcheckpoint():
     csv = ops.local_path("/tmp/cereal.csv").readcsv()
     assert weave.use(csv[-1]["type"]) == "C"  # value before set is 'C'
 
-    row = ops.Table.__getitem__(ops.list_indexCheckpoint(csv), -1)
+    row = ops.List.__getitem__(ops.list_indexCheckpoint(csv), -1)
     weave.use(row["type"].set("XXXX"))
 
     csv = ops.local_path("/tmp/cereal.csv").readcsv()

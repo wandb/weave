@@ -1,57 +1,48 @@
 import csv
-from ..api import weave_class
-from . import table
 
 
-class CsvType(table.ListTableType):
-    name = "csv"
+def load_csv(path):
+    with open(path) as csvfile:
+        dialect = csv.Sniffer().sniff(csvfile.read(1024), delimiters=";,")
+        csvfile.seek(0)
+        reader = csv.reader(csvfile, dialect)
+        header = next(reader)
+        col_types = {}
+        for key in header:
+            col_types[key] = int
 
-
-@weave_class(weave_type=CsvType)
-class Csv(table.ListTable):
-    # TODO: should take uri instead of path?
-    def load(self, path):
-        with open(path) as csvfile:
-            dialect = csv.Sniffer().sniff(csvfile.read(1024), delimiters=";,")
-            csvfile.seek(0)
-            reader = csv.reader(csvfile, dialect)
-            header = next(reader)
-            col_types = {}
-            for key in header:
-                col_types[key] = int
-
-            # shitty type guessing
-            rows = []
-            for raw_row in reader:
-                rows.append(raw_row)
-                for key, val in zip(header, raw_row):
-                    cur_col_type = col_types[key]
+        # shitty type guessing
+        rows = []
+        for raw_row in reader:
+            rows.append(raw_row)
+            for key, val in zip(header, raw_row):
+                cur_col_type = col_types[key]
+                try:
+                    val = int(val)
+                except ValueError:
                     try:
-                        val = int(val)
+                        val = float(val)
+                        if cur_col_type == int:
+                            col_types[key] = float
                     except ValueError:
-                        try:
-                            val = float(val)
-                            if cur_col_type == int:
-                                col_types[key] = float
-                        except ValueError:
-                            if cur_col_type != str:
-                                col_types[key] = str
-            final_rows = []
-            for raw_row in rows:
-                row = {}
-                for key, val in zip(header, raw_row):
-                    row[key] = col_types[key](val)
-                final_rows.append(row)
-            self.list = final_rows
-
-    def save(self, path):
-        field_names = list(self.list[0].keys())
-        with open(path, "w") as f:
-            writer = csv.DictWriter(f, field_names, delimiter=";")
-            writer.writeheader()
-            for row in self.list:
-                writer.writerow(row)
+                        if cur_col_type != str:
+                            col_types[key] = str
+        final_rows = []
+        for raw_row in rows:
+            row = {}
+            for key, val in zip(header, raw_row):
+                row[key] = col_types[key](val)
+            final_rows.append(row)
+        return final_rows
 
 
-CsvType.instance_classes = Csv
-CsvType.instance_class = Csv
+def save_csv(path, csv_data):
+    if not csv_data:
+        field_names = []
+    else:
+        field_names = list(csv_data[0].keys())
+    with open(path, "w") as f:
+        writer = csv.DictWriter(f, field_names, delimiter=";")
+        writer.writeheader()
+        for row in csv_data:
+            writer.writerow(row)

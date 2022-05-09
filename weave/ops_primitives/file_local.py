@@ -54,8 +54,10 @@ class LocalFile(weave_file.File):
         return "/__weave/file/%s" % os.path.abspath(file.path)
 
     @mutation
-    def writecsv(self, csv):
-        csv.save(self.path)
+    def writecsv(self, csv_data):
+        from . import csv_
+
+        csv_.save_csv(self.get_local_path(), csv_data)
 
     # TODO: Move to File object, but does inheritance work?? Probably.
     @op(
@@ -65,7 +67,7 @@ class LocalFile(weave_file.File):
         setter=writecsv,
         name="file-readcsv",
         input_type={"self": types.FileType(types.String())},
-        output_type=types.Table(types.Dict(types.String(), types.String())),
+        output_type=types.List(types.Dict(types.String(), types.String())),
     )
     def readcsv(self):
         # TODO: shouldn't need to do this, we can know the type of the file
@@ -74,11 +76,7 @@ class LocalFile(weave_file.File):
         # file is an artifact manifest entry for now.
         from . import csv_
 
-        local_path = self.get_local_path()
-        obj = csv_.Csv([])  # TODO: weird
-        obj.load(local_path)
-
-        return obj
+        return csv_.load_csv(self.get_local_path())
 
 
 LocalFileType.instance_classes = LocalFile
