@@ -56,9 +56,15 @@ def filter_fn_to_sql_filter(table, filter_fn_node):
             return filter_fn_to_sql_filter(
                 table, filter_fn_node.from_op.inputs["lhs"]
             ) > filter_fn_to_sql_filter(table, filter_fn_node.from_op.inputs["rhs"])
-        if op_name.endswith("pick"):
+        elif op_name == "pick":
             return filter_fn_to_sql_filter(
                 table, filter_fn_node.from_op.inputs["obj"]
+            ).columns[
+                filter_fn_to_sql_filter(table, filter_fn_node.from_op.inputs["key"])
+            ]
+        elif op_name == "typedDict-pick":
+            return filter_fn_to_sql_filter(
+                table, filter_fn_node.from_op.inputs["self"]
             ).columns[
                 filter_fn_to_sql_filter(table, filter_fn_node.from_op.inputs["key"])
             ]

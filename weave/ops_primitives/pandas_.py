@@ -25,10 +25,14 @@ def filter_fn_to_pandas_filter(df, filter_fn_node):
             return filter_fn_to_pandas_filter(
                 df, filter_fn_node.from_op.inputs["lhs"]
             ) > filter_fn_to_pandas_filter(df, filter_fn_node.from_op.inputs["rhs"])
-        if op_name.endswith("pick"):
+        elif op_name == "pick":
             return filter_fn_to_pandas_filter(df, filter_fn_node.from_op.inputs["obj"])[
                 filter_fn_to_pandas_filter(df, filter_fn_node.from_op.inputs["key"])
             ]
+        elif op_name == "typedDict-pick":
+            return filter_fn_to_pandas_filter(
+                df, filter_fn_node.from_op.inputs["self"]
+            )[filter_fn_to_pandas_filter(df, filter_fn_node.from_op.inputs["key"])]
         raise Exception("unhandled op name", op_name)
     elif isinstance(filter_fn_node, graph.VarNode):
         if filter_fn_node.name == "row":
@@ -45,9 +49,13 @@ def groupby_fn_to_pandas_filter(df, filter_fn_node):
             return groupby_fn_to_pandas_filter(
                 df, filter_fn_node.from_op.inputs["lhs"]
             ) > groupby_fn_to_pandas_filter(df, filter_fn_node.from_op.inputs["rhs"])
-        elif op_name.endswith("pick"):
+        elif op_name == "pick":
             return groupby_fn_to_pandas_filter(
                 df, filter_fn_node.from_op.inputs["obj"]
+            )[groupby_fn_to_pandas_filter(df, filter_fn_node.from_op.inputs["key"])]
+        elif op_name == "typedDict-pick":
+            return groupby_fn_to_pandas_filter(
+                df, filter_fn_node.from_op.inputs["self"]
             )[groupby_fn_to_pandas_filter(df, filter_fn_node.from_op.inputs["key"])]
         elif op_name == "dict":
             # Return as list... though we'll need to keep track of that

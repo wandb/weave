@@ -25,7 +25,6 @@ class List:
 
     @op(
         setter=__setitem__,
-        name="list-getitem",
         input_type={"self": types.List(types.Any()), "index": types.Int()},
         output_type=lambda input_types: input_types["self"].object_type,
     )
@@ -36,7 +35,6 @@ class List:
             return None
 
     @op(
-        name="list-pick",
         input_type={"self": types.List(types.Any()), "key": types.String()},
         # TODO: pick() is not actually part of the list interface. Its
         # only valid if the objects contained in the list are Dict/TypedDict.
@@ -49,7 +47,6 @@ class List:
         return [row.get(key) for row in self]
 
     @op(
-        name="list-filter",
         input_type={"self": types.List(types.Any()), "filter_fn": types.Any()},
         output_type=lambda input_types: input_types["self"],
     )
@@ -68,7 +65,6 @@ class List:
         return result
 
     @op(
-        name="list-map",
         input_type={"self": types.List(types.Any()), "map_fn": types.Any()},
         output_type=lambda input_types: input_types["self"],
     )
@@ -88,7 +84,6 @@ class List:
         return result
 
     @op(
-        name="list-groupby",
         input_type={"self": types.List(types.Any()), "group_by_fn": types.Any()},
         output_type=lambda input_types: types.List(
             GroupResultType(input_types["self"])
