@@ -222,8 +222,7 @@ def flatten(arr):
     output_type=lambda input_types: input_types["arr"],
 )
 def unnest(arr):
-    if isinstance(arr, Table):
-        return arr.unnest()
+    # TODO this doesn't do anything! Need to actually unnest.
     return arr
 
 
@@ -303,6 +302,11 @@ class WeaveJSListInterface:
     def filter(arr: list[typing.Any], filterFn: typing.Any):  # type: ignore
         type_class = types.TypeRegistry.type_class_of(arr)
         return type_class.NodeMethodsClass.filter.resolve_fn(arr, filterFn)
+
+    @op(name="map", output_type=types.Any())
+    def map(arr: list[typing.Any], mapFn: typing.Any):  # type: ignore
+        type_class = types.TypeRegistry.type_class_of(arr)
+        return type_class.NodeMethodsClass.map.resolve_fn(arr, mapFn)
 
     @op(
         name="groupby",

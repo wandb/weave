@@ -86,7 +86,9 @@ def make_app(log_filename=None, stream_logging_enabled=False):
     return Flask(__name__, static_folder="frontend")
 
 
-app = make_app(stream_logging_enabled=True)
+# This makes all server logs go into the notebook
+# app = make_app(stream_logging_enabled=True)
+app = make_app()
 CORS(app, send_wildcard=True)
 
 
