@@ -17,7 +17,7 @@ def test_method_op_name():
     @weave.weave_class(weave_type=MyObjType)
     class MyObj:
         @weave.op()
-        def my_op(self: int, b: int) -> int:
+        def my_op(self: int, b: int) -> int:  # type: ignore
             return self + b
 
     assert MyObj.my_op.name == "test-decorators-my-obj-my_op"
