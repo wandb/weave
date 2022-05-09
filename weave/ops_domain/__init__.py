@@ -1,38 +1,42 @@
 # TODO: split this into multiple files like we do in the JS version
 
+from wandb.apis import public as wandb_api
+
 from ..api import op, weave_class
 from .. import weave_types as types
-from ..ops_primitives import file
+from . import wbartifact
 
 
-class Project(types.Type):
+class ProjectType(types.Type):
     name = "project"
+    instance_classes = wandb_api.Project
+    instance_class = wandb_api.Project
 
+    def instance_to_dict(self, obj):
+        return {"entity_name": obj.entity, "project_name": obj.name}
 
-class ArtifactVersion(types.Type):
-    name = "artifactversion"
+    def instance_from_dict(self, d):
+        api = wandb_api.Api()
+        return api.project(name=d["project_name"], entity=d["entity_name"])
 
 
 class RunType(types.BasicType):
     name = "run"
 
 
-@weave_class(weave_type=Project)
-class ProjectOps(object):
+@weave_class(weave_type=ProjectType)
+class Project:
     @op(
         name="project-artifactVersion",
         input_type={
-            "project": Project(),
+            "project": ProjectType(),
             "artifactName": types.String(),
             "artifactVersionAlias": types.String(),
         },
-        output_type=ArtifactVersion(),
+        output_type=wbartifact.ArtifactVersionType(),
     )
     def artifactVersion(project, artifactName, artifactVersionAlias):
-        import wandb
-
-        api = wandb.Api()
-        return api.artifact(
+        return wandb_api.Api().artifact(
             "%s/%s/%s:%s"
             % (project.entity, project.name, artifactName, artifactVersionAlias)
         )
@@ -40,7 +44,7 @@ class ProjectOps(object):
     @op(
         name="project-runs",
         input_type={
-            "project": Project(),
+            "project": ProjectType(),
         },
         output_type=types.List(RunType()),
     )
@@ -64,7 +68,7 @@ class ProjectOps(object):
     @op(
         name="project-filtered-runs",
         input_type={
-            "project": Project(),
+            "project": ProjectType(),
             "filter": types.Any(),
             "order": types.String(),
         },
@@ -93,27 +97,10 @@ class ProjectOps(object):
 @op(
     name="root-project",
     input_type={"entityName": types.String(), "projectName": types.String()},
-    output_type=Project(),
+    output_type=ProjectType(),
 )
 def project(entityName, projectName):
-    import wandb
-
-    api = wandb.Api()
-    return api.project(name=projectName, entity=entityName)
-
-
-@weave_class(weave_type=ArtifactVersion)
-class ArtifactVersionOps(object):
-    @op(
-        name="artifactVersion-file",
-        input_type={"artifactVersion": ArtifactVersion(), "path": types.String()},
-        output_type=types.FileType(),
-    )
-    def file(artifactVersion, path):
-        local_path = os.path.abspath(
-            os.path.join("local-artifacts", artifactVersion.path, path)
-        )
-        return file.LocalFile(local_path)
+    return wandb_api.Api().project(name=projectName, entity=entityName)
 
 
 @weave_class(weave_type=types.WBTable)

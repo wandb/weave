@@ -133,10 +133,10 @@ class ConstNode(Node):
         from . import storage
 
         ref = storage._get_ref(val)
-        from .ops_domain import file
+        from .ops_primitives.storage import get as op_get
 
         if ref is not None:
-            val = file.get(str(ref)).to_json()
+            val = op_get(str(ref)).to_json()
             return val
 
         return {"nodeType": "const", "type": self.type.to_dict(), "val": val}
@@ -145,10 +145,10 @@ class ConstNode(Node):
         from . import storage
 
         ref = storage._get_ref(self.val)
-        from .ops_domain import file
+        from .ops_primitives.storage import get as op_get
 
         if ref is not None:
-            return str(file.get(str(ref)))
+            return str(op_get(str(ref)))
         return str(self.val)
         # return "<ConstNode %s %s>" % (self.type, self.val)
 

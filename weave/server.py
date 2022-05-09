@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 from flask import current_app
 from werkzeug.serving import make_server
 import multiprocessing
@@ -11,6 +13,13 @@ from . import graph, util as _util, client as _client
 from . import serialize
 from . import forward_graph
 from . import storage
+
+
+import sys
+
+
+def eprint(*args, **kwargs):
+    print(*args, file=sys.stderr, **kwargs)
 
 
 is_tracing = True
@@ -27,11 +36,11 @@ def handle_request(request, deref=False):
         tracer = viztracer.VizTracer()
         tracer.start()
     nodes = serialize.deserialize(request["graphs"])
-    # print("Server request running nodes")
-    """
+    eprint("Server request running nodes")
+    # """
     for node in nodes:
-        print(graph.node_expr_str(node))
-    """
+        eprint(graph.node_expr_str(node))
+    # """
     result = execute.execute_nodes(nodes)
     if deref:
         result = [storage.deref(r) for r in result]

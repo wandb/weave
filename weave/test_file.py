@@ -30,3 +30,24 @@ def test_dir():
 def test_nonexistent_file():
     with pytest.raises(FileNotFoundError):
         ops.local_path("fake_file_.idontexist")
+
+
+# def test_wbartifact_file_table():
+#     proj = ops.project("shawn", "show-test")
+#     av = proj.artifactVersion("show", "v14")
+#     file = av.file("obj.table.json")
+#     table = file.table()
+#     assert table[0]["total"] == 46
+
+
+# def test_localartifact_file_table():
+#     av = ops.local_artifact_version("my-table-artifact", "xasdfj")
+#     file = av.file("obj.table.json")
+#     table = file.table()
+#     assert table[0]["total"] == 46
+
+
+# def test_localfile_table():
+#     file = ops.local_path("testdata/obj.table.json")
+#     table = file.table()
+#     assert table[0]["total"] == 46

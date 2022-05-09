@@ -51,10 +51,10 @@ def is_async_op(op_def: op_def.OpDef):
 
 def async_op_body(run_uri, run_body, inputs):
     from . import api
-    from .ops_primitives import file
+    from .ops_primitives.storage import get as op_get
 
     with context.execution_client():
-        run = file.get(run_uri)
+        run = op_get(run_uri)
         api.use(run.set_state("running"))
         dereffed_inputs = {}
         for input_name, input in inputs.items():

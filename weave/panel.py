@@ -1,6 +1,6 @@
 from . import graph
 from . import storage
-from .ops_primitives.file import get as op_get
+from .ops_primitives.storage import get as op_get
 
 
 class Panel:

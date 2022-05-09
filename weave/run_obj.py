@@ -59,6 +59,7 @@ class Run:
     )
     @mutation
     def print_(self, s):
+        print("PRINT s", s)
         self._prints.append(s)
         return self
 
@@ -116,10 +117,10 @@ class Run:
     def await_final_output(self):
         sleep_mult = 1
         while self._state == "pending" or self._state == "running":
-            from .ops_primitives import file
+            from .ops_primitives.storage import get as op_get
             from .api import use
 
-            self = use(file.get("run-%s/latest" % self._id))
+            self = use(op_get("run-%s/latest" % self._id))
 
             sleep_mult *= 2
             sleep_time = 0.02 * sleep_mult

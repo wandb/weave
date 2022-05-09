@@ -81,6 +81,9 @@ class TypeRegistry:
 
     @staticmethod
     def type_from_dict(d):
+        from . import weavejs_fixes
+
+        d = weavejs_fixes.unwrap_tag_type(d)
         # The javascript code sends simple types as just strings
         # instead of {'type': 'string'} for example
         type_name = d["type"] if isinstance(d, dict) else d
@@ -88,7 +91,7 @@ class TypeRegistry:
             return Type()
         type_ = type_name_to_type(type_name)
         if type_ is None:
-            return Invalid()
+            raise errors.WeaveSerializeError("Can't deserialize type from: %s" % d)
         return type_.from_dict(d)
 
 
@@ -152,18 +155,34 @@ class Type:
     # save_instance/load_instance on Type are used to save/load actual Types
     # since type_of(types.Int()) == types.Type()
     def save_instance(self, obj, artifact, name):
-        if not isinstance(obj, Type):
+        d = None
+        if self.__class__ == Type:
+            d = obj.to_dict()
+        else:
+            try:
+                d = self.instance_to_dict(obj)
+            except NotImplementedError:
+                pass
+        if d is None:
             raise errors.WeaveSerializeError(
-                "Base Type save_instance called on non-Type. You should provide a save_instance method on your Type subclass: %s"
-                % obj
+                "Object is not serializable. Provide instance_<to/from>_dict or <save/load>_instance methods on Type: %s"
+                % self
             )
         with artifact.new_file(f"{name}.object.json") as f:
-            json.dump(obj.to_dict(), f)
+            json.dump(d, f)
 
     def load_instance(self, artifact, name, extra=None):
         with artifact.open(f"{name}.object.json") as f:
-            result = json.load(f)
-        return TypeRegistry.type_from_dict(result)
+            d = json.load(f)
+        if self.__class__ == Type:
+            return TypeRegistry.type_from_dict(d)
+        return self.instance_from_dict(d)
+
+    def instance_to_dict(self, obj):
+        raise NotImplementedError
+
+    def instance_from_dict(self, d):
+        raise NotImplementedError
 
 
 class BasicType(Type):
@@ -902,7 +921,12 @@ class FileType(ObjectType):
         # In the js Weave code, file is a non-standard type that
         # puts a const string at extension as just a plain string.
         d = {i: d[i] for i in d if i != "type"}
-        d["extension"] = {"type": "const", "valType": "string", "val": d["extension"]}
+        if "extension" in d:
+            d["extension"] = {
+                "type": "const",
+                "valType": "string",
+                "val": d["extension"],
+            }
         return super().from_dict(d)
 
     def property_types(self):
@@ -911,15 +935,39 @@ class FileType(ObjectType):
         }
 
 
-class LocalFileType(FileType):
-    name = "local_file"
+class SubDirType(ObjectType):
+    # TODO doesn't match frontend
+    name = "subdir"
+
+    type_vars = {"file_type": FileType()}
+
+    def __init__(self, file_type):
+        self.file_type = file_type
 
     def property_types(self):
         return {
-            "extension": self.extension,
-            "path": String(),
-            # TODO: Datetime?
-            "mtime": Float(),
+            "fullPath": String(),
+            "size": Int(),
+            "dirs": Dict(String(), Int()),
+            "files": Dict(String(), self.file_type),
+        }
+
+
+class DirType(ObjectType):
+    # Fronend src/model/types.ts switches on this (and PanelDir)
+    # TODO: We actually want to be localdir here. But then the
+    # frontend needs to use a different mechanism for type checking
+    name = "dir"
+
+    def __init__(self):
+        pass
+
+    def property_types(self):
+        return {
+            "fullPath": String(),
+            "size": Int(),
+            "dirs": Dict(String(), SubDirType()),
+            "files": Dict(String(), FileType()),
         }
 
 

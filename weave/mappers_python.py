@@ -164,6 +164,10 @@ class DefaultToPy(mappers.Mapper):
         self._path = path
 
     def apply(self, obj):
+        try:
+            return self.type.instance_to_dict(obj)
+        except NotImplementedError:
+            pass
         name = "-".join(self._path)
         ref = storage.save_to_artifact(
             obj, artifact=self._artifact, name=name, type_=self.type
@@ -179,6 +183,9 @@ class DefaultFromPy(mappers.Mapper):
         self._path = path
 
     def apply(self, obj):
+        if isinstance(obj, dict):
+            return self.type.instance_from_dict(obj)
+        # else its a ref string
         return refs.LocalArtifactRef.from_local_ref(
             self._artifact, obj, self.type
         ).get()
