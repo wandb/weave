@@ -99,7 +99,9 @@ def use_fixed_server_port():
 
 def use_frontend_devmode():
     """Talk to external server running on 9994"""
-    _weave_client.set(server.HttpServerClient("http://localhost:9994"))
+    use_fixed_server_port()
+
+    # point frontend to vite server
     _frontend_url.set("http://localhost:3000")
 
 
