@@ -151,7 +151,6 @@ class SqlTable:
         results = query.offset(page * self.PAGE_SIZE).limit(SqlTable.PAGE_SIZE)
         # print('RESULTS QUERY', results)
         rows = []
-        print("MAKING QUERY for page", page)
         for row in results.all():
             row = {k: getattr(row, k) for k in row.keys()}
             rows.append(row)
