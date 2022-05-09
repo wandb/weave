@@ -118,15 +118,16 @@ class List:
 
 
 class GroupResultType(types.ObjectType):
-    name = "groupresult2"
+    name = "groupresult"
 
-    type_vars = {"list": types.List(types.Any())}
+    type_vars = {"list": types.List(types.Any()), "key": types.Any()}
 
-    def __init__(self, list):
+    def __init__(self, list=types.List(types.Any()), key=types.Any()):
         self.list = list
+        self.key = key
 
     def property_types(self):
-        return {"key": types.String(), "list": self.list}
+        return {"list": self.list, "key": self.key}
 
 
 def group_result_index_output_type(input_types):
@@ -147,21 +148,18 @@ class GroupResult:
 
     @op(
         name="group-groupkey",
-        input_type={"obj": GroupResultType(types.List(types.Any()))},
+        input_type={"obj": GroupResultType()},
         output_type=types.Any(),
     )
     def key(obj):
         return obj.key
 
-    @op(
-        name="group-getitem",
-        input_type={
-            "self": GroupResultType(types.List(types.Any())),
-            "index": types.Int(),
-        },
-        output_type=group_result_index_output_type,
-    )
-    def __getitem__(self, index):
+    @op(output_type=types.Any())
+    def pick(self, key: str):
+        return List.pick.resolve_fn(self.list, key)
+
+    @op(output_type=group_result_index_output_type)
+    def __getitem__(self, index: int):
         return List.__getitem__.resolve_fn(self.list, index)
 
 
@@ -310,3 +308,13 @@ class WeaveJSListInterface:
     def filter(arr: list[typing.Any], filterFn: typing.Any):  # type: ignore
         type_class = types.TypeRegistry.type_class_of(arr)
         return type_class.NodeMethodsClass.filter.resolve_fn(arr, filterFn)
+
+    @op(
+        name="groupby",
+        output_type=lambda input_types: types.List(
+            GroupResultType(types.List(input_types["arr"].object_type), types.Any())
+        ),
+    )
+    def groupby(arr: list[typing.Any], groupByFn: typing.Any):  # type: ignore
+        type_class = types.TypeRegistry.type_class_of(arr)
+        return type_class.NodeMethodsClass.groupby.resolve_fn(arr, groupByFn)

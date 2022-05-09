@@ -81,14 +81,10 @@ def test_groupby(table_type):
     groupby_fn = weave.define_fn(
         {"row": weave.types.TypedDict({})}, lambda row: row["type"]
     )
-    grouped = table.groupby(groupby_fn)
-    group0 = grouped[0]
-    group0key = group0.key()
-    group00 = group0[0]
     # TODO: add a pick here to check that it works.
     # TODO: add a pick test for the array case
     # TODO: add some kind of test that relies on type refinement
-    assert weave.use((group0key, group00)) == [
+    expected = [
         "C",
         {
             "name": "100% Bran",
@@ -108,6 +104,10 @@ def test_groupby(table_type):
             "rating": 68.402973,
         },
     ]
+    grouped = table.groupby(groupby_fn)
+    assert weave.use((grouped[0].key(), grouped[0][0])) == expected
+    grouped_js = ops.WeaveJSListInterface.groupby(table, groupby_fn)
+    assert weave.use((grouped_js[0].key(), grouped_js[0][0])) == expected
 
 
 @pytest.mark.parametrize("table_type", ["list", "sql"])
