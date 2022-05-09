@@ -16,7 +16,7 @@ def get_test_table(table_type):
         return f.readcsv()
     elif table_type == "pandas":
         f = ops.local_path(os.path.join("testdata", "cereal.csv"))
-        return ops.file_pandasreadcsv(f)
+        return ops.pandasreadcsv(f)
     elif table_type == "sql":
         c = ops.local_sqlconnection("sqlite:///testdata/cereal.db")
         return ops.sqlconnection_table(c, "cereal")

@@ -244,7 +244,7 @@ DataFrameTableType.instance_class = DataFrameTable
     #     determine what the type will be.
     output_type=DataFrameTableType(DataFrameType(types.TypedDict({}))),
 )
-def file_pandasreadcsv(file):
+def pandasreadcsv(file):
     local_path = file.get_local_path()
     # Warning, terrible hack to make demo work
     try:
