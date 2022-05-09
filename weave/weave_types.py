@@ -406,12 +406,8 @@ class ArrowTableList(Iterable):
         for i in range(len(self)):
             yield self[i]
 
-    index = __getitem__
-
     def __len__(self):
         return self._arrow_table.num_rows
-
-    count = __len__
 
     def __eq__(self, other):
         if len(self) != len(other):
@@ -431,8 +427,6 @@ class ArrowArrayList(Iterable):
             return None
         return self._arrow_array[index].as_py()
 
-    index = __getitem__
-
     def __iter__(self):
         for i in range(len(self)):
             yield self[i]
@@ -447,8 +441,6 @@ class ArrowArrayList(Iterable):
 
     def __len__(self):
         return len(self._arrow_array)
-
-    count = __len__
 
 
 class List(Type):
