@@ -59,7 +59,7 @@ class Run:
     )
     @mutation
     def print_(self, s):
-        print("PRINT s", s)
+        # print("PRINT s", s)
         self._prints.append(s)
         return self
 
