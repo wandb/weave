@@ -1,16 +1,13 @@
-# from . import mappers_python
-# from . import mappers_arrow
 import typing
-import typing_extensions
-import types
 import functools
 import pyarrow as pa
 import pyarrow.parquet as pq
 import json
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable
 
 from . import box
 from . import errors
+from . import arrow_util
 
 
 def all_subclasses(cls):
@@ -384,68 +381,9 @@ class UnionType(Type):
         return "<UnionType %s>" % " | ".join((str(m) for m in self.members))
 
 
-class ArrowTableList(Iterable):
-    def __init__(self, arrow_table, mapper, artifact):
-        self._arrow_table = arrow_table
-        self._artifact = artifact
-        self._deserializer = mapper
-
-    def __getitem__(self, index):
-        if index >= self._arrow_table.num_rows:
-            return None
-        # Very inefficient, we always read the whole row!
-        # TODO: We need to make this column access lazy. But we also want
-        #     vectorize access generally, which probably happens in a compile
-        #     pass. Need to think about it.
-        row_dict = {}
-        for column in self._arrow_table.column_names:
-            row_dict[column] = self._arrow_table.column(column)[index].as_py()
-        return self._deserializer.apply(row_dict)
-
-    def __iter__(self):
-        for i in range(len(self)):
-            yield self[i]
-
-    def __len__(self):
-        return self._arrow_table.num_rows
-
-    def __eq__(self, other):
-        if len(self) != len(other):
-            return False
-        for x, y in zip(iter(self), iter(other)):
-            if x != y:
-                return False
-        return True
-
-
-class ArrowArrayList(Iterable):
-    def __init__(self, arrow_array):
-        self._arrow_array = arrow_array
-
-    def __getitem__(self, index):
-        if index >= len(self._arrow_array):
-            return None
-        return self._arrow_array[index].as_py()
-
-    def __iter__(self):
-        for i in range(len(self)):
-            yield self[i]
-
-    def __eq__(self, other):
-        if len(self) != len(other):
-            return False
-        for s, o in zip(self, other):
-            if s != o:
-                return False
-        return True
-
-    def __len__(self):
-        return len(self._arrow_array)
-
-
 class List(Type):
     name = "list"
-    instance_classes = [set, list, ArrowTableList, ArrowArrayList]
+    instance_classes = [set, list, arrow_util.ArrowTableList, arrow_util.ArrowArrayList]
 
     def __init__(self, object_type):
         self.object_type = object_type
@@ -503,10 +441,10 @@ class List(Type):
                 table.schema.metadata is not None
                 and b"singleton" in table.schema.metadata
             ):
-                return ArrowArrayList(table.column("_singleton"))
+                return arrow_util.ArrowArrayList(table.column("_singleton"))
 
             mapper = mappers_arrow.map_from_arrow(self.object_type, artifact)
-            atl = ArrowTableList(pq.read_table(f), mapper, artifact)
+            atl = arrow_util.ArrowTableList(pq.read_table(f), mapper, artifact)
             return atl
 
     def __str__(self):
