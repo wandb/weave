@@ -20,11 +20,13 @@ def test_convert_specific_op_to_generic_op_node():
     node = weavejs_fixes.fixup_node(node)
     assert node.from_op.name == "pick"
     assert "self" not in node.from_op.inputs
+    # Convert inputs to list to ensure we didn't screw up order
+    assert list(node.from_op.inputs.keys())[0] == "obj"
     assert "obj" in node.from_op.inputs
     dict_node = node.from_op.inputs["obj"]
     assert dict_node.from_op.name == "index"
     assert "self" not in dict_node.from_op.inputs
-    assert "arr" in dict_node.from_op.inputs
+    assert list(dict_node.from_op.inputs.keys())[0] == "arr"
 
 
 def test_convert_specific_op_to_generic_op_data():
@@ -32,8 +34,8 @@ def test_convert_specific_op_to_generic_op_data():
     node = weavejs_fixes.fixup_data(node.to_json())
     assert node["fromOp"]["name"] == "pick"
     assert "self" not in node["fromOp"]["inputs"]
-    assert "obj" in node["fromOp"]["inputs"]
+    assert list(node["fromOp"]["inputs"].keys())[0] == "obj"
     dict_node = node["fromOp"]["inputs"]["obj"]
     assert dict_node["fromOp"]["name"] == "index"
     assert "self" not in dict_node["fromOp"]["inputs"]
-    assert "arr" in dict_node["fromOp"]["inputs"]
+    assert list(dict_node["fromOp"]["inputs"].keys())[0] == "arr"

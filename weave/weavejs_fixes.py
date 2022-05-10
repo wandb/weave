@@ -11,13 +11,10 @@ from . import graph
 def convert_specific_opname_to_generic_opname(
     name: str, inputs: dict[str, typing.Any]
 ) -> tuple[str, dict[str, typing.Any]]:
-    new_inputs = copy.copy(inputs)
     if name == "typedDict-pick" or name == "dict-pick":
-        new_inputs["obj"] = new_inputs.pop("self")
-        return "pick", new_inputs
+        return "pick", {"obj": inputs["self"], "key": inputs["key"]}
     elif name == "list-__getitem__":
-        new_inputs["arr"] = new_inputs.pop("self")
-        return "index", new_inputs
+        return "index", {"arr": inputs["self"], "index": inputs["index"]}
     return name, inputs
 
 
