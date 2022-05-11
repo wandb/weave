@@ -153,6 +153,10 @@ class GroupResult:
     def pick(self, key: str):
         return List.pick.resolve_fn(self.list, key)
 
+    @op()
+    def count(self) -> int:
+        return len(self.list)
+
     @op(output_type=group_result_index_output_type)
     def __getitem__(self, index: int):
         return List.__getitem__.resolve_fn(self.list, index)
@@ -199,6 +203,20 @@ def limit(arr, limit):
         res.append(arr[i])
     return res
     # return arr[:limit]
+
+
+@op(
+    name="offset",
+    input_type={"arr": types.List(types.Any()), "offset": types.Number()},
+    output_type=types.Any(),
+)
+def offset(arr, offset):
+    # So lame, we can't use slice because sometimes we have an ArrowArrayTable here
+    # TODO: fix
+    res = []
+    for i in range(offset, len(arr)):
+        res.append(arr[i])
+    return res
 
 
 @op(
@@ -316,4 +334,10 @@ class WeaveJSListInterface:
     )
     def groupby(arr: list[typing.Any], groupByFn: typing.Any):  # type: ignore
         type_class = types.TypeRegistry.type_class_of(arr)
-        return type_class.NodeMethodsClass.groupby.resolve_fn(arr, groupByFn)
+        try:
+            return type_class.NodeMethodsClass.groupby.resolve_fn(arr, groupByFn)
+        except AttributeError:
+            groupby_res = List.groupby.resolve_fn(arr, groupByFn)
+            for group in groupby_res:
+                print("GB RES", group.list, group.key)
+            return groupby_res

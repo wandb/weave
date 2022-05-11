@@ -20,6 +20,7 @@ from flask.logging import wsgi_errors_stream
 
 # Ensure we register the openai ops so we can tell the
 # app about them with list_ops
+from weave import ops
 from weave.ecosystem import openai
 from weave.ecosystem import async_demo
 from weave import run_obj

@@ -6,7 +6,7 @@ from . import serialize
 
 def test_serialize():
     proj = ops.project("shawn", "show-test")
-    av = proj.artifactVersion("show", "v14")
+    av = proj.artifact_version("show", "v14")
     file = av.path("obj.table.json")
     table = file.table()
     rows = table.rows()

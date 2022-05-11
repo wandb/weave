@@ -199,6 +199,10 @@ class BasicType(Type):
         return self.name
 
     def save_instance(self, obj, artifact, name):
+        if artifact is None:
+            raise errors.WeaveSerializeError(
+                "save_instance invalid when artifact is None for type: %s" % self
+            )
         with artifact.new_file(f"{name}.object.json") as f:
             json.dump(obj, f)
 
@@ -299,6 +303,13 @@ class Float(Number):
     instance_classes = float
     name = "float"
 
+    def assign_type(self, other_type: Type):
+        # Float if either side is a number
+        if isinstance(other_type, Float) or isinstance(other_type, Int):
+            return Float()
+        else:
+            return Invalid()
+
 
 class Int(Number):
     name = "int"
@@ -310,6 +321,15 @@ class Int(Number):
         if type(obj) == bool:
             return False
         return super().is_instance(obj)
+
+    def assign_type(self, other_type: Type):
+        # Become Float if rhs is Float
+        if isinstance(other_type, Float):
+            return Float()
+        elif isinstance(other_type, Int):
+            return Int()
+        else:
+            return Invalid()
 
 
 class Boolean(BasicType):
@@ -348,20 +368,21 @@ class UnionType(Type):
         all_members = []
         for mem in members:
             if isinstance(mem, UnionType):
-                all_members += mem.members
+                for memmem in mem.members:
+                    if memmem not in all_members:
+                        all_members.append(memmem)
             else:
-                all_members.append(mem)
+                if mem not in all_members:
+                    all_members.append(mem)
         self.members = all_members
 
     def assign_type(self, other):
         if isinstance(other, UnionType):
             # TODO: implement me. (We've done this in _dtypes and in js so refer there)
             raise NotImplementedError
-        for member in self.members:
-            assigned = member.assign_type(other)
-            if assigned != Invalid():
-                return assigned
-        return Invalid()
+        if any(member.assign_type(other) == Invalid() for member in self.members):
+            return Invalid()
+        return self
 
     # def instance_to_py(self, obj):
     #     # Figure out which union member this obj is, and delegate to that
@@ -417,7 +438,7 @@ class List(Type):
 
         pyarrow_type = serializer.result_type()
 
-        py_objs = (serializer.apply(o) for o in obj)
+        py_objs = list(serializer.apply(o) for o in obj)
 
         with artifact.new_file(f"{name}.parquet", binary=True) as f:
             arr = pa.array(py_objs, type=pyarrow_type)

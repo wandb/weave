@@ -36,11 +36,11 @@ def handle_request(request, deref=False):
         tracer = viztracer.VizTracer()
         tracer.start()
     nodes = serialize.deserialize(request["graphs"])
-    # eprint("Server request running %s nodes" % len(nodes))
-    """
+    eprint("Server request running %s nodes" % len(nodes))
+    # """
     for node in nodes:
         eprint(graph.node_expr_str(node))
-    """
+    # """
     result = execute.execute_nodes(nodes)
     if deref:
         result = [storage.deref(r) for r in result]

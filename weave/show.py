@@ -28,6 +28,8 @@ def make_refs(node: graph.Node):
 
 # Broken out into to separate function for testing
 def _show_params(obj):
+    if obj is None:
+        return {"weave_node": graph.VoidNode()}
     if isinstance(obj, graph.Node):
         return {"weave_node": weavejs_fixes.fixup_node(make_refs(obj))}
     elif isinstance(obj, storage.Ref):
@@ -57,7 +59,7 @@ def _show_params(obj):
         raise Exception("pass a weave.Node or weave.Panel")
 
 
-def show(obj):
+def show(obj=None):
     usage_analytics.show_called()
 
     if not util.is_notebook():
