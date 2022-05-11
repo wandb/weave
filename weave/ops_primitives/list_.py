@@ -111,6 +111,36 @@ class List:
             grs.append(GroupResult(group_result[1], group_result[0]))
         return grs
 
+    @op(
+        name="offset",
+        input_type={"arr": types.List(types.Any()), "offset": types.Number()},
+        output_type=lambda input_types: input_types["arr"],
+    )
+    def offset(arr, offset):
+        # So lame, we can't use slice because sometimes we have an ArrowArrayTable here
+        # TODO: fix
+        res = []
+        for i in range(offset, len(arr)):
+            print("OFFSET %s" % i)
+            res.append(arr[i])
+        return res
+
+    @op(
+        name="limit",
+        input_type={"arr": types.List(types.Any()), "limit": types.Number()},
+        output_type=lambda input_types: input_types["arr"],
+    )
+    def limit(arr, limit):
+        # So lame, we can't use slice because sometimes we have an ArrowArrayTable here
+        # TODO: fix
+        res = []
+        if limit >= len(arr):
+            limit = len(arr)
+        for i in range(limit):
+            res.append(arr[i])
+        return res
+        # return arr[:limit]
+
 
 class GroupResultType(types.ObjectType):
     name = "groupresult"
@@ -186,37 +216,6 @@ def list_indexCheckpoint(arr):
 def tag_indexCheckpoint(obj):
     # TODO. Do we really need this?
     return 0
-
-
-@op(
-    name="limit",
-    input_type={"arr": types.List(types.Any()), "limit": types.Number()},
-    output_type=types.Any(),
-)
-def limit(arr, limit):
-    # So lame, we can't use slice because sometimes we have an ArrowArrayTable here
-    # TODO: fix
-    res = []
-    if limit >= len(arr):
-        limit = len(arr)
-    for i in range(limit):
-        res.append(arr[i])
-    return res
-    # return arr[:limit]
-
-
-@op(
-    name="offset",
-    input_type={"arr": types.List(types.Any()), "offset": types.Number()},
-    output_type=types.Any(),
-)
-def offset(arr, offset):
-    # So lame, we can't use slice because sometimes we have an ArrowArrayTable here
-    # TODO: fix
-    res = []
-    for i in range(offset, len(arr)):
-        res.append(arr[i])
-    return res
 
 
 @op(
@@ -338,6 +337,4 @@ class WeaveJSListInterface:
             return type_class.NodeMethodsClass.groupby.resolve_fn(arr, groupByFn)
         except AttributeError:
             groupby_res = List.groupby.resolve_fn(arr, groupByFn)
-            for group in groupby_res:
-                print("GB RES", group.list, group.key)
             return groupby_res

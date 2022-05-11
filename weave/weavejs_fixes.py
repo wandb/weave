@@ -13,6 +13,8 @@ def convert_specific_opname_to_generic_opname(
 ) -> tuple[str, dict[str, typing.Any]]:
     if name == "typedDict-pick" or name == "dict-pick":
         return "pick", {"obj": inputs["self"], "key": inputs["key"]}
+    elif name == "projectArtifactVersions-count":
+        return "count", {"arr": inputs["self"]}
     elif name == "list-__getitem__":
         return "index", {"arr": inputs["self"], "index": inputs["index"]}
     return name, inputs

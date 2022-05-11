@@ -6,6 +6,7 @@ from wandb.apis import public as wandb_api
 from ..api import op, weave_class
 from .. import weave_types as types
 from . import wbartifact
+from .. import errors
 
 
 class ProjectType(types.Type):
@@ -35,8 +36,56 @@ class RunType(types.Type):
         }
 
     def instance_from_dict(self, d):
+        import time
+
+        print("%s: RUN INSTANCE FROM DICT" % time.time())
         api = wandb_api.Api()
-        return api.run("{entity_name}/{project_name}/{run_id}".format(**d))
+        res = api.run("{entity_name}/{project_name}/{run_id}".format(**d))
+        print("%s: DONE RUN INSTANCE FROM DICT" % time.time())
+        return res
+
+
+class ArtifactType(types.Type):
+    name = "artifact"
+    instance_classes = wandb_api.ArtifactCollection
+    instance_class = wandb_api.ArtifactCollection
+
+    def instance_to_dict(self, obj):
+        # TODO: I'm here, trying to serialize/deserialize Artifact
+        return {
+            "entity_name": obj.entity,
+            "project_name": obj.project,
+            "artifact_type_name": obj.type,
+            "artifact_name": obj.name,
+        }
+
+    def instance_from_dict(self, d):
+        api = wandb_api.Api()
+        return api.artifact_type(
+            d["artifact_type_name"], project=f"{d['entity_name']}/{d['project_name']}"
+        ).collection(d["artifact_name"])
+
+
+class ArtifactVersionsType(types.Type):
+    name = "projectArtifactVersions"
+    instance_classes = wandb_api.ArtifactVersions
+    instance_class = wandb_api.ArtifactVersions
+
+    def instance_to_dict(self, obj):
+        # TODO: I'm here, trying to serialize/deserialize Artifact
+        return {
+            "entity_name": obj.entity,
+            "project_name": obj.project,
+            "artifact_type_name": obj.type,
+            "artifact_name": obj.collection_name,
+        }
+
+    def instance_from_dict(self, d):
+        api = wandb_api.Api()
+        return api.artifact_versions(
+            d["artifact_type_name"],
+            f"{d['entity_name']}/{d['project_name']}/{d['artifact_name']}",
+        )
 
 
 @weave_class(weave_type=RunType)
@@ -53,6 +102,10 @@ class RunsType(types.Type):
     instance_classes = wandb_api.Runs
     instance_class = wandb_api.Runs
 
+    @property
+    def object_type(self):
+        return RunType()
+
     def instance_to_dict(self, obj):
         return {
             "entity_name": obj.entity,
@@ -61,7 +114,7 @@ class RunsType(types.Type):
 
     def instance_from_dict(self, d):
         api = wandb_api.Api()
-        return api.runs("{entity_name}/{project_name}".format(**d))
+        return api.runs("{entity_name}/{project_name}".format(**d), per_page=500)
 
 
 @weave_class(weave_type=RunsType)
@@ -69,6 +122,53 @@ class RunsOps:
     @op()
     def count(self: wandb_api.Runs) -> int:
         return len(self)
+
+
+class ArtifactsType(types.Type):
+    name = "artifacts"
+    instance_classes = wandb_api.ProjectArtifactCollections
+    instance_class = wandb_api.ProjectArtifactCollections
+
+    @property
+    def object_type(self):
+        return ArtifactType()
+
+    def instance_to_dict(self, obj):
+        return {
+            "entity_name": obj.entity,
+            "project_name": obj.project,
+            "artifact_type_name": obj.type_name,
+        }
+
+    def instance_from_dict(self, d):
+        api = wandb_api.Api()
+        return api.artifact_type(
+            d["artifact_type_name"], project=f"{d['entity_name']}/{d['project_name']}"
+        ).collections()
+
+
+@weave_class(weave_type=ArtifactsType)
+class ArtifactsOps:
+    @op()
+    def count(self: wandb_api.ProjectArtifactCollections) -> int:
+        return len(self)
+
+    @op()
+    def __getitem__(
+        self: wandb_api.ProjectArtifactCollections, index: int
+    ) -> wandb_api.ArtifactCollection:
+        return self[index]
+
+
+@weave_class(weave_type=ArtifactVersionsType)
+class ArtifactVersionsOps:
+    @op()
+    def count(self: wandb_api.ArtifactVersions) -> int:
+        return len(self)
+
+    @op()
+    def __getitem__(self: wandb_api.ArtifactVersions, index: int) -> wandb_api.Artifact:
+        return self[index]
 
 
 class ArtifactTypeType(types.Type):
@@ -95,64 +195,56 @@ class ArtifactTypeType(types.Type):
 class ArtifactTypeOps:
     @op(name="artifactType-name")
     def name(artifactType: wandb_api.ArtifactType) -> str:
+        if isinstance(artifactType, wandb_api.ProjectArtifactTypes):
+            return [at.name for at in artifactType]
         return artifactType.type
 
+    @op(name="artifactType-artifacts")
+    def artifacts(
+        artifactType: wandb_api.ArtifactType,
+    ) -> wandb_api.ProjectArtifactCollections:
+        return artifactType.collections()
 
-class ArtifactType(types.Type):
-    name = "artifact"
-    instance_classes = wandb_api.ArtifactCollection
-    instance_class = wandb_api.ArtifactCollection
+
+class ProjectArtifactTypesType(types.Type):
+    name = "projectArtifactTypes"
+
+    instance_classes = wandb_api.ProjectArtifactTypes
+    instance_class = wandb_api.ProjectArtifactTypes
+
+    @property
+    def object_type(self):
+        return RunType()
 
     def instance_to_dict(self, obj):
-        # TODO: I'm here, trying to serialize/deserialize Artifact
         return {
             "entity_name": obj.entity,
             "project_name": obj.project,
-            "artifact_type_name": obj.type,
-            "artifact_name": obj.name,
         }
 
     def instance_from_dict(self, d):
         api = wandb_api.Api()
-        return api.artifact_type(
-            d["artifact_type_name"], project=f"{d['entity_name']}/{d['project_name']}"
-        ).collection(d["artifact_name"])
+        return api.project("{entity_name}/{project_name}".format(**d)).artifacts_types()
 
 
 @weave_class(weave_type=ArtifactType)
 class ArtifactOps:
-    @op()
-    def type(artifact: wandb_api.ArtifactCollection) -> wandb_api.ArtifactType:
+    @op(name="artifact-type")
+    def type_(artifact: wandb_api.ArtifactCollection) -> wandb_api.ArtifactType:
         api = wandb_api.Api()
         return api.artifact_type(
             artifact.type, project=f"{artifact.entity}/{artifact.project}"
         )
 
+    # :( Since we mixin with nodes (include VarNode), name collides.
+    # TODO: Fix this is no good.
+    @op(name="artifact-name")
+    def name_(artifact: wandb_api.ArtifactCollection) -> str:
+        return artifact.name
 
-class ArtifactsType(types.Type):
-    name = "artifacts"
-    instance_classes = wandb_api.ProjectArtifactCollections
-    instance_class = wandb_api.ProjectArtifactCollections
-
-    def instance_to_dict(self, obj):
-        return {
-            "entity_name": obj.entity,
-            "project_name": obj.project,
-            "artifact_type_name": obj.type_name,
-        }
-
-    def instance_from_dict(self, d):
-        api = wandb_api.Api()
-        return api.artifact_type(
-            d["artifact_type_name"], project=f"{d['entity_name']}/{d['project_name']}"
-        ).collections()
-
-
-@weave_class(weave_type=ArtifactsType)
-class ArtifactsOps:
-    @op()
-    def count(self: wandb_api.ProjectArtifactCollections) -> int:
-        return len(self)
+    @op(name="artifact-versions")
+    def versions(artifact: wandb_api.ArtifactCollection) -> wandb_api.ArtifactVersions:
+        return artifact.versions()
 
 
 @weave_class(weave_type=ProjectType)
@@ -160,18 +252,29 @@ class Project:
     @op()
     # @staticmethod  # TODO: doesn't work
     def name(project: wandb_api.Project) -> str:
-        print("Project", project)
         return project.name
 
     @op()
     def artifacts(
         project: wandb_api.Project,
     ) -> typing.List[wandb_api.ArtifactCollection]:
-        print("Project", project)
         api = wandb_api.Api()
         return api.artifact_type(
             "test_results", project=f"{project.entity}/{project.name}"
         ).collections()
+
+    @op(name="project-artifactTypes")
+    def artifact_types(project: wandb_api.Project) -> wandb_api.ProjectArtifactTypes:
+        return project.artifacts_types()
+
+    @op(name="project-artifactType")
+    def artifact_type(
+        project: wandb_api.Project, artifactType: str
+    ) -> wandb_api.ArtifactType:
+        api = wandb_api.Api()
+        return api.artifact_type(
+            artifactType, project=f"{project.entity}/{project.name}"
+        )
 
     @op(name="project-artifactVersion")
     def artifact_version(
@@ -187,9 +290,7 @@ class Project:
         import wandb
 
         api = wandb.Api()
-        return api.runs(
-            path="%s/%s" % (project.entity, project.name),
-        )
+        return api.runs(path="%s/%s" % (project.entity, project.name), per_page=500)
 
     @op(name="project-filtered-runs")
     def filtered_runs(
@@ -202,6 +303,7 @@ class Project:
             path="%s/%s" % (project.entity, project.name),
             filters=json.loads(filter),
             order=order,
+            per_page=500,
         )
 
 
