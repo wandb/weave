@@ -86,6 +86,11 @@ class IntToPyInt(mappers.Mapper):
         return obj
 
 
+class BoolToPyBool(mappers.Mapper):
+    def apply(self, obj):
+        return obj
+
+
 class FloatToPyFloat(mappers.Mapper):
     def apply(self, obj):
         if math.isnan(obj):
@@ -208,6 +213,8 @@ def map_to_python_(type, mapper, artifact, path=[]):
         return UnionToPyUnion(type, mapper, artifact, path)
     elif isinstance(type, types.ObjectType):
         return ObjectToPyDict(type, mapper, artifact, path)
+    elif isinstance(type, types.Boolean):
+        return BoolToPyBool(type, mapper, artifact, path)
     elif isinstance(type, types.Int):
         return IntToPyInt(type, mapper, artifact, path)
     elif isinstance(type, types.Float):
@@ -242,6 +249,8 @@ def map_from_python_(type: types.Type, mapper, artifact, path=[]):
         return ListToPyList(type, mapper, artifact, path)
     elif isinstance(type, types.UnionType):
         return PyUnionToUnion(type, mapper, artifact, path)
+    elif isinstance(type, types.Boolean):
+        return BoolToPyBool(type, mapper, artifact, path)
     elif isinstance(type, types.Int):
         return IntToPyInt(type, mapper, artifact, path)
     elif isinstance(type, types.Float):

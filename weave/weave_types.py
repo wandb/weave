@@ -785,8 +785,9 @@ class FileType(ObjectType):
 
     type_vars = {"extension": String()}
 
-    def __init__(self, extension=String()):
+    def __init__(self, extension=String(), wb_object_type=String()):
         self.extension = extension
+        self.wb_object_type = wb_object_type
 
     def _to_dict(self):
         # NOTE: js_compat
@@ -795,6 +796,8 @@ class FileType(ObjectType):
         d = super()._to_dict()
         if isinstance(self.extension, Const):
             d["extension"] = self.extension.val
+        if isinstance(self.wb_object_type, Const):
+            d["wbObjectType"] = {"type": self.wb_object_type.val}
         return d
 
     @classmethod
@@ -809,11 +812,19 @@ class FileType(ObjectType):
                 "valType": "string",
                 "val": d["extension"],
             }
+        if "wbObjectType" in d:
+            d["wb_object_type"] = {
+                "type": "const",
+                "valType": "string",
+                "val": d["wbObjectType"]["type"],
+            }
+            d.pop("wbObjectType")
         return super().from_dict(d)
 
     def property_types(self):
         return {
             "extension": self.extension,
+            "wb_object_type": self.extension,
         }
 
 

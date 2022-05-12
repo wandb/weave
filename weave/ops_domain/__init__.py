@@ -5,7 +5,7 @@ from wandb.apis import public as wandb_api
 
 from ..api import op, weave_class
 from .. import weave_types as types
-from . import wbartifact
+from . import wbartifact, wbtable
 from .. import errors
 
 
@@ -195,6 +195,8 @@ class ArtifactTypeType(types.Type):
 class ArtifactTypeOps:
     @op(name="artifactType-name")
     def name(artifactType: wandb_api.ArtifactType) -> str:
+        # Hacking to support mapped call here. WeaveJS autosuggest uses it
+        # TODO: True mapped call support
         if isinstance(artifactType, wandb_api.ProjectArtifactTypes):
             return [at.name for at in artifactType]
         return artifactType.type

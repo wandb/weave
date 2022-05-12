@@ -33,8 +33,7 @@ class File:
         output_type=types.WBTable(),
     )
     def table(file):
-        # file is an artifact manifest entry for now.
-        local_path = file.download()
+        local_path = file.get_local_path()
         import json
 
         return json.loads(_py_open(local_path).read())

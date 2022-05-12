@@ -45,9 +45,14 @@ class ArtifactVersion:
             return types.DirType()
         parts = path.split(".")
         ext = ""
+        wb_object_type = types.NoneType()
         if len(parts) != 1:
             ext = parts[-1]
-        return types.FileType(extension=types.Const(types.String(), ext))
+        if len(parts) > 2 and ext == "json":
+            wb_object_type = types.Const(types.String(), parts[-2])
+        return types.FileType(
+            extension=types.Const(types.String(), ext), wb_object_type=wb_object_type
+        )
 
     @op(
         name="artifactVersion-file",
