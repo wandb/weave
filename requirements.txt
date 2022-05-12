@@ -1,4 +1,4 @@
-wandb
+wandb >0.12.16,
 numpy
 pandas
 h5py

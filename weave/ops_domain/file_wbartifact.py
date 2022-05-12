@@ -2,6 +2,7 @@ import os
 from ..api import op, weave_class
 from .. import weave_types as types
 from ..ops_primitives import file as weave_file
+from ..context import _wandb_api_key
 
 from wandb.apis import public as wandb_api
 
@@ -42,7 +43,7 @@ class ArtifactVersionFile(weave_file.File):
 
     def _contents(self):
         entry = (
-            wandb_api.Api()
+            wandb_api.Api(api_key=_wandb_api_key.get())
             .artifact(
                 "%s/%s/%s:%s"
                 % (
