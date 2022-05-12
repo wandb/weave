@@ -1,4 +1,4 @@
-git+https://github.com/wandb/client@0a23a028b8a8c58d18d6e5e80589fa487251a32c
+wandb @ git+https://github.com/wandb/client@0a23a028b8a8c58d18d6e5e80589fa487251a32c
 numpy
 pandas
 h5py
