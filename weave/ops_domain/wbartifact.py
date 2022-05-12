@@ -3,6 +3,7 @@ from wandb.apis import public as wandb_api
 from ..api import op, weave_class
 from .. import weave_types as types
 from . import file_wbartifact
+from ..context import _wandb_api_key
 
 
 class ArtifactVersionType(types.Type):
@@ -19,7 +20,7 @@ class ArtifactVersionType(types.Type):
         }
 
     def instance_from_dict(self, d):
-        api = wandb_api.Api()
+        api = wandb_api.Api(api_key=_wandb_api_key.get())
         return api.artifact(
             "%s/%s/%s:%s"
             % (

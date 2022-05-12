@@ -32,9 +32,9 @@ _wandb_api_key: contextvars.ContextVar[typing.Optional[str]] = contextvars.Conte
     "_wandb_api_key", default=None
 )
 
-_cache_namespace_token: contextvars.ContextVar[typing.Optional[str]] = contextvars.ContextVar(
-    "_cache_namespace_token", default=None
-)
+_cache_namespace_token: contextvars.ContextVar[
+    typing.Optional[str]
+] = contextvars.ContextVar("_cache_namespace_token", default=None)
 
 
 @contextlib.contextmanager
