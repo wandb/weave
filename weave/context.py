@@ -20,7 +20,6 @@ _frontend_url: contextvars.ContextVar[typing.Optional[str]] = contextvars.Contex
     "frontend_url", default=None
 )
 
-
 _analytics_enabled: contextvars.ContextVar[bool] = contextvars.ContextVar(
     "analytics_enabled", default=True
 )
@@ -28,6 +27,14 @@ _analytics_enabled: contextvars.ContextVar[bool] = contextvars.ContextVar(
 _eager_mode: contextvars.ContextVar[bool] = contextvars.ContextVar(
     "_eager_mode", default=False
 )
+
+_wandb_api_key: contextvars.ContextVar[typing.Optional[str]] = contextvars.ContextVar(
+    "_wandb_api_key", default=None
+)
+
+_cache_namespace_token: contextvars.ContextVar[
+    typing.Optional[str]
+] = contextvars.ContextVar("_cache_namespace_token", default=None)
 
 
 @contextlib.contextmanager
