@@ -5,7 +5,7 @@ from wandb.apis import public as wandb_api
 from ..api import op, weave_class
 from .. import weave_types as types
 from . import wbartifact
-from ..context import _wandb_api_key
+from ..wandb_api import make_wandb_public_api
 
 
 class ProjectType(types.Type):
@@ -17,7 +17,7 @@ class ProjectType(types.Type):
         return {"entity_name": obj.entity, "project_name": obj.name}
 
     def instance_from_dict(self, d):
-        api = wandb_api.Api(api_key=_wandb_api_key.get())
+        api = make_wandb_public_api()
         return api.project(name=d["project_name"], entity=d["entity_name"])
 
 
@@ -37,7 +37,7 @@ class Project:
         output_type=wbartifact.ArtifactVersionType(),
     )
     def artifactVersion(project, artifactName, artifactVersionAlias):
-        return wandb_api.Api(api_key=_wandb_api_key.get()).artifact(
+        return make_wandb_public_api().artifact(
             "%s/%s/%s:%s"
             % (project.entity, project.name, artifactName, artifactVersionAlias)
         )
@@ -50,9 +50,8 @@ class Project:
         output_type=types.List(RunType()),
     )
     def runs(project):
-        import wandb
 
-        api = wandb.Api(api_key=_wandb_api_key.get())
+        api = make_wandb_public_api()
         runs = api.runs(
             path="%s/%s" % (project.entity, project.name),
         )
@@ -76,9 +75,8 @@ class Project:
         output_type=types.List(RunType()),
     )
     def filtered_runs(project, filter, order):
-        import wandb
 
-        api = wandb.Api(api_key=_wandb_api_key.get())
+        api = make_wandb_public_api()
         runs = api.runs(
             path="%s/%s" % (project.entity, project.name),
             filters=json.loads(filter),
@@ -101,9 +99,7 @@ class Project:
     output_type=ProjectType(),
 )
 def project(entityName, projectName):
-    return wandb_api.Api(api_key=_wandb_api_key.get()).project(
-        name=projectName, entity=entityName
-    )
+    return make_wandb_public_api().project(name=projectName, entity=entityName)
 
 
 @weave_class(weave_type=types.WBTable)
