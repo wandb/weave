@@ -46,6 +46,8 @@ class LocalArtifact:
 
         pathlib.Path(os.path.join(self._root, ".wandb-artifact")).touch()
 
+        self._last_write_path = None
+
     @property
     def version(self):
         if self._version is None:
@@ -79,6 +81,8 @@ class LocalArtifact:
 
     @contextlib.contextmanager
     def new_file(self, path, binary=False):
+        self._last_write_path = path
+
         os.makedirs(self._write_dirname, exist_ok=True)
         mode = "w"
         if binary:
@@ -86,6 +90,22 @@ class LocalArtifact:
         f = open(os.path.join(self._write_dirname, path), mode)
         yield f
         f.close()
+
+    def make_last_file_content_addressed(self):
+        # Warning: This function is really bad and a terrible smell!
+        # We need to fix the type saving API so we don't need to do this!!!!
+        # It also causes double hashing.
+        # TODO: fix
+        # DO NOT MERGE
+        last_write_path = self._last_write_path
+        if last_write_path is None:
+            return
+        self._last_write_path = None
+        orig_full_path = os.path.join(self._write_dirname, last_write_path)
+        hash = md5_hash_file(orig_full_path)
+        target_name = f"{hash}-{last_write_path}"
+        os.rename(orig_full_path, os.path.join(self._write_dirname, target_name))
+        return hash
 
     @contextlib.contextmanager
     def open(self, path, binary=False):

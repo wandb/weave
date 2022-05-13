@@ -129,7 +129,7 @@ class DefaultToArrow(mappers.Mapper):
                     pa.field("artifact_name", pa.string()),
                 )
             )
-        elif self.type.name == "ndarray":
+        elif self.type.name == "ndarray" or self.type.name == "pil-image":
             # Ref type
             return pa.string()
 

@@ -44,10 +44,23 @@ def save_mem(obj, name):
     return MemRef(name)
 
 
-def save_to_artifact(obj, artifact, name, type_):
+def save_to_artifact(obj, artifact: artifacts_local.LocalArtifact, name, type_):
+    # Tell types what name to use if not obj
+    # We need to fix the save/load API so this is unnecessary.
+    # TODO: Fix
+    # DO NOT MERGE
+    if not name:
+        name = type_.name
     ref_extra = type_.save_instance(obj, artifact, name)
-    with artifact.new_file(f"{name}.type.json") as f:
-        json.dump(type_.to_dict(), f)
+    if name != "_obj":
+        # Warning: This is hacks to force files to be content addressed
+        # If the type saved a file, rename with its content hash included
+        #     in its name.
+        # TODO: fix
+        # DO NOT MERGE
+        hash = artifact.make_last_file_content_addressed()
+        if hash is not None:
+            name = f"{hash}-{name}"
     return refs.LocalArtifactRef(
         artifact, path=name, type=type_, obj=obj, extra=ref_extra
     )
@@ -59,8 +72,11 @@ def save(obj, name=None, type=None):
     if wb_type is None:
         try:
             wb_type = types.TypeRegistry.type_of(obj)
-        except errors.WeaveTypeError:
-            raise errors.WeaveSerializeError("no weave type for object: ", obj)
+        except errors.WeaveTypeError as e:
+            raise errors.WeaveSerializeError(
+                "weave type error during serialization for object: %s. %s"
+                % (obj, str(e.args))
+            )
     obj = box.box(obj)
     if name is None:
         obj_names = util.find_names(obj)
@@ -68,6 +84,8 @@ def save(obj, name=None, type=None):
         name = f"{wb_type.name}-{obj_names[-1]}"
     artifact = artifacts_local.LocalArtifact(name)
     ref = save_to_artifact(obj, artifact, "_obj", wb_type)
+    with artifact.new_file(f"_obj.type.json") as f:
+        json.dump(wb_type.to_dict(), f)
     artifact.save()
     refs.put_ref(obj, ref)
     return ref
@@ -149,7 +167,8 @@ def get_obj_expr(obj):
 
 def to_python(obj):
     wb_type = types.TypeRegistry.type_of(obj)
-    mapper = mappers_python.map_to_python(wb_type, None)
+    artifact = artifacts_local.LocalArtifact("to-python-%s" % wb_type.name)
+    mapper = mappers_python.map_to_python(wb_type, artifact)
     val = mapper.apply(obj)
     return {"_type": wb_type.to_dict(), "_val": val}
 

@@ -73,13 +73,15 @@ class ArrowTableList(Iterable):
 
 
 class ArrowArrayList(Iterable):
-    def __init__(self, arrow_array):
+    def __init__(self, arrow_array, mapper, artifact):
         self._arrow_array = arrow_array
+        self._artifact = artifact
+        self._deserializer = mapper
 
     def __getitem__(self, index):
         if index >= len(self._arrow_array):
             return None
-        return self._arrow_array[index].as_py()
+        return self._deserializer.apply(self._arrow_array[index].as_py())
 
     def __iter__(self):
         for i in range(len(self)):

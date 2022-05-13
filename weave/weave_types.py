@@ -458,14 +458,17 @@ class List(Type):
 
         with artifact.open(f"{name}.parquet", binary=True) as f:
             table = pq.read_table(f)
+            mapper = mappers_arrow.map_from_arrow(self.object_type, artifact)
+
             if (
                 table.schema.metadata is not None
                 and b"singleton" in table.schema.metadata
             ):
-                return arrow_util.ArrowArrayList(table.column("_singleton"))
+                return arrow_util.ArrowArrayList(
+                    table.column("_singleton"), mapper, artifact
+                )
 
-            mapper = mappers_arrow.map_from_arrow(self.object_type, artifact)
-            atl = arrow_util.ArrowTableList(pq.read_table(f), mapper, artifact)
+            atl = arrow_util.ArrowTableList(table, mapper, artifact)
             return atl
 
     def __str__(self):
