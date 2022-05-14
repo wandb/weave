@@ -1,6 +1,10 @@
+import io
 import PIL
 import PIL.Image
+import base64
+import binascii
 
+from .. import api as weave
 from .. import weave_types as types
 from .. import errors
 
@@ -30,7 +34,7 @@ class PILImageType(types.Type):
     # TODO: format is enum?
     # Hmm, even format is part of a saved image file, not part of a PIL Image
     # But dimensions and whatnot should be part of this definition
-    def __init__(self, width: int, height: int, mode: str):
+    def __init__(self, width: int = 5, height: int = 5, mode: str = "L"):
         self.width = width
         self.height = height
         self.mode = mode  # TODO: enum
@@ -70,3 +74,14 @@ class PILImageType(types.Type):
             im = PIL.Image.open(f)
             im.load()
             return im
+
+
+@weave.weave_class(weave_type=PILImageType)
+class PILImageOps:
+    # TODO: should not need to hardcode type constants!
+    @weave.op(input_type={"self": PILImageType(5, 5, "L")})
+    def image_bytes(self) -> str:
+        f = io.BytesIO()
+        self.save(f, format="png")
+        f.seek(0)
+        return binascii.hexlify(f.read()).decode("ISO-8859-1")
