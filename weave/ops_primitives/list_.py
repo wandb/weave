@@ -1,6 +1,7 @@
+import pandas
 import typing
 from .. import weave_types as types
-from ..api import op, mutation, weave_class
+from ..api import op, mutation, weave_class, OpVarArgs
 from .. import weave_internal
 from .. import graph
 from .. import errors
@@ -121,7 +122,6 @@ class List:
         # TODO: fix
         res = []
         for i in range(offset, len(arr)):
-            print("OFFSET %s" % i)
             res.append(arr[i])
         return res
 
@@ -239,8 +239,18 @@ def flatten(arr):
     output_type=lambda input_types: input_types["arr"],
 )
 def unnest(arr):
-    # TODO this doesn't do anything! Need to actually unnest.
-    return arr
+    if not arr:
+        return arr
+    list_cols = []
+    # Very expensive to recompute type here. We already have it!
+    # TODO: need a way to get argument types inside of resolver bodies.
+    arr_type = types.TypeRegistry.type_of(arr)
+    for k, v_type in arr_type.object_type.property_types.items():
+        if types.is_list_like(v_type):
+            list_cols.append(k)
+    if not list_cols:
+        return arr
+    return pandas.DataFrame(arr).explode(list_cols).to_dict("records")
 
 
 def index_output_type(input_types):
@@ -338,3 +348,22 @@ class WeaveJSListInterface:
         except AttributeError:
             groupby_res = List.groupby.resolve_fn(arr, groupByFn)
             return groupby_res
+
+
+def list_return_type(input_types):
+    its = []
+    for input_type in input_types.values():
+        if isinstance(input_type, types.Const):
+            input_type = input_type.val_type
+        its.append(input_type)
+    ret = types.List(types.union(*its))
+    return ret
+
+
+@op(
+    name="list",
+    input_type=OpVarArgs(types.Any()),
+    output_type=list_return_type,
+)
+def make_list(**l):
+    return list(l.values())
