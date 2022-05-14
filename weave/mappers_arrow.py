@@ -68,6 +68,11 @@ class IntToArrowInt(mappers_python.IntToPyInt):
         return pa.int64()
 
 
+class BoolToArrowBool(mappers_python.BoolToPyBool):
+    def result_type(self):
+        return pa.bool_()
+
+
 class FloatToArrowFloat(mappers.Mapper):
     def result_type(self):
         return pa.float64()
@@ -161,6 +166,8 @@ def map_to_arrow_(type, mapper, artifact, path=[]):
         return ObjectToArrowStruct(type, mapper, artifact, path)
     elif isinstance(type, types.Int):
         return IntToArrowInt(type, mapper, artifact, path)
+    elif isinstance(type, types.Boolean):
+        return BoolToArrowBool(type, mapper, artifact, path)
     elif isinstance(type, types.Float):
         return FloatToArrowFloat(type, mapper, artifact, path)
     elif isinstance(type, types.String):
@@ -184,6 +191,8 @@ def map_from_arrow_(type, mapper, artifact, path=[]):
         return mappers_python.ObjectDictToObject(type, mapper, artifact, path)
     elif isinstance(type, types.Int):
         return mappers_python.IntToPyInt(type, mapper, artifact, path)
+    elif isinstance(type, types.Boolean):
+        return mappers_python.BoolToPyBool(type, mapper, artifact, path)
     elif isinstance(type, types.Float):
         return ArrowFloatToFloat(type, mapper, artifact, path)
     elif isinstance(type, types.String):

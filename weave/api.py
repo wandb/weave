@@ -1,7 +1,9 @@
+import typing
 from . import graph as _graph
 from . import storage as _storage
 from . import weave_internal as _weave_internal
 from . import errors as _errors
+from . import ops as _ops
 from . import context as _context
 
 # exposed as part of api
@@ -97,3 +99,7 @@ def define_fn(parameters, body):
     varNodes = {k: _weave_internal.make_var_node(t, k) for k, t in parameters.items()}
     fnNode = body(**varNodes)
     return _graph.ConstNode(types.Function(parameters, fnNode.type), fnNode)
+
+
+def type_of(obj: typing.Any) -> types.Type:
+    return types.TypeRegistry.type_of(obj)

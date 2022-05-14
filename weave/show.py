@@ -11,6 +11,7 @@ from . import weave_types as types
 from . import weavejs_fixes
 from . import storage
 from . import util
+from . import errors
 from . import usage_analytics
 from .ops_primitives.storage import get as op_get
 
@@ -56,10 +57,12 @@ def _show_params(obj):
         }
 
     else:
-        raise Exception("pass a weave.Node or weave.Panel")
+        raise errors.WeaveTypeError(
+            "%s not yet supported. Create a weave.Type to add support." % type(obj)
+        )
 
 
-def show(obj=None):
+def show(obj=None, height=400):
     usage_analytics.show_called()
 
     if not util.is_notebook():
@@ -81,5 +84,5 @@ def show(obj=None):
             json.dumps(params["panel_config"])
         )
 
-    iframe = IFrame(panel_url, "100%", "300px")
+    iframe = IFrame(panel_url, "100%", "%spx" % height)
     return display(iframe)
