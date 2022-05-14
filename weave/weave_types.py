@@ -869,3 +869,14 @@ class DirType(ObjectType):
 
 # Ensure numpy types are loaded
 from . import types_numpy
+
+
+def union(*members: list[Type]) -> Type:
+    t = UnionType(*members)
+    if len(t.members) == 1:
+        return t.members[0]
+    return t
+
+
+def is_list_like(t: Type) -> bool:
+    return isinstance(non_none(t), List)
