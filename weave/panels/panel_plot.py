@@ -17,6 +17,7 @@ class Plot(panel.Panel):
             "label": self._table_state.add_column(lambda row: graph.VoidNode()),
             "tooltip": self._table_state.add_column(lambda row: graph.VoidNode()),
         }
+        self._mark = None
 
     @property
     def table_query(self):
@@ -31,6 +32,13 @@ class Plot(panel.Panel):
     def set_label(self, expr):
         self._table_state.update_col(self._dims["label"], expr)
 
+    def set_mark(self, mark_option):
+        self._mark = mark_option
+
     @property
     def config(self):
-        return {"table": self._table_state.to_json(), "dims": self._dims}
+        return {
+            "table": self._table_state.to_json(),
+            "dims": self._dims,
+            "mark": self._mark,
+        }
