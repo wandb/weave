@@ -4,6 +4,7 @@ import string
 from .. import graph
 from .. import weave_types
 from .. import weave_internal
+from .. import ops
 
 
 class TableState(object):
@@ -37,12 +38,24 @@ class TableState(object):
         self._order.append(col_id)
         return col_id
 
+    def set_groupby(self, col_ids):
+        self._group_by = col_ids
+
     def update_col(self, col_id, select_expr):
-        self._column_select_functions[col_id] = select_expr(
-            weave_internal.make_var_node(
-                weave_types.Dict(weave_types.String(), weave_types.Number()), "row"
-            )
-        )
+        object_type = self._input_node.type.object_type
+        if self._group_by and col_id not in self._group_by:
+            object_type = weave_types.List(object_type)
+        selected = select_expr(weave_internal.make_var_node(object_type, "row"))
+
+        # TOTAL HACK HERE THIS IS NOT GENERAL!
+        # TODO: abstract this behavior. We need to do this wherever we encounter a list
+        # of Nodes. I think probably in lazy_call().
+        if isinstance(selected, list):
+            make_list_args = {}
+            for i, item in enumerate(selected):
+                make_list_args["i%s" % i] = item
+            selected = ops.make_list(**make_list_args)
+        self._column_select_functions[col_id] = selected
 
     def to_json(self):
         # TODO: its annoying that we have to manually rename everything to fix js
