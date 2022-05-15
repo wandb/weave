@@ -110,7 +110,7 @@ class HttpServerClient(object):
         Args:
             url: The server base url
             emulate_weavejs: For testing only, should not be used from user code.
-            auth:
+            auth (optional): auth argument to `requests.post`
         """
         self.url = url
         self.emulate_weavejs = emulate_weavejs
