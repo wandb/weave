@@ -1,7 +1,5 @@
 from __future__ import print_function
 
-import typing
-
 from flask import current_app
 from werkzeug.serving import make_server
 import multiprocessing
