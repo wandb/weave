@@ -1,5 +1,7 @@
 from __future__ import print_function
 
+import typing
+
 from flask import current_app
 from werkzeug.serving import make_server
 import multiprocessing
@@ -104,23 +106,28 @@ class InProcessServer(object):
 
 
 class HttpServerClient(object):
-    def __init__(self, url, emulate_weavejs=False):
+    def __init__(self, url, emulate_weavejs=False, auth=None):
         """Constructor.
 
         Args:
             url: The server base url
             emulate_weavejs: For testing only, should not be used from user code.
+            auth:
         """
         self.url = url
-
         self.emulate_weavejs = emulate_weavejs
         self.execute_endpoint = "/__weave/execute/v2"
+        self.auth = auth
         if emulate_weavejs:
             self.execute_endpoint = "/__weave/execute"
 
     def execute(self, nodes, no_cache=False):
         serialized = serialize.serialize(nodes)
-        r = requests.post(self.url + self.execute_endpoint, json={"graphs": serialized})
+        r = requests.post(
+            self.url + self.execute_endpoint,
+            json={"graphs": serialized},
+            auth=self.auth,
+        )
         r.raise_for_status()
 
         response = r.json()["data"]
