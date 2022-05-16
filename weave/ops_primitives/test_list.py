@@ -18,3 +18,9 @@ def test_unnest():
 def test_op_list():
     node = list_.make_list(a=1, b=2, c=3)
     assert node.type == types.List(types.Int())
+
+
+def test_typeof_groupresult():
+    assert types.TypeRegistry.type_of(
+        list_.GroupResult([1, 2, 3], "a")
+    ) == list_.GroupResultType(types.Int(), types.String())

@@ -611,7 +611,6 @@ class ObjectType(Type):
         raise NotImplementedError
 
     def variable_property_types(self):
-        # TODO: must be a subset of property_types
         result = {}
         for property_name in self.type_vars:
             property_val = getattr(self, property_name)

@@ -85,6 +85,7 @@ def _deserialize_node(
     parsed_node: graph.Node
     if node["nodeType"] == "const":
         if isinstance(node["type"], dict) and node["type"]["type"] == "function":
+            print("PARSE CONST FUNCTION", node)
             op = nodes[node["val"]["fromOp"]]
             params = {}
             for param_name, param_node_index in op["inputs"].items():

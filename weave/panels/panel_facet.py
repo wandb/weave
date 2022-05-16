@@ -1,5 +1,7 @@
 from .. import panel
 from . import table_state
+from .. import weave_internal
+from .. import ops
 
 from .. import graph
 
@@ -17,6 +19,12 @@ class Facet(panel.Panel):
             "detail": self._table_state.add_column(lambda row: graph.VoidNode()),
         }
         self._table_state.set_groupby([self._dims["x"], self._dims["y"]])
+
+    @property
+    def var_cell_input(self):
+        return weave_internal.make_var_node(
+            ops.GroupResultType(self.input_node.type.object_type), "row"
+        )
 
     @property
     def table_query(self):

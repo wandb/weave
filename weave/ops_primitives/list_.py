@@ -87,10 +87,11 @@ class List:
     @op(
         input_type={"self": types.List(types.Any()), "group_by_fn": types.Any()},
         output_type=lambda input_types: types.List(
-            GroupResultType(input_types["self"])
+            GroupResultType(input_types["self"].object_type)
         ),
     )
     def groupby(self, group_by_fn):
+        print("GROUP BY RESOLVER", group_by_fn)
         calls = []
         for row in self:
             calls.append(
@@ -145,14 +146,31 @@ class List:
 class GroupResultType(types.ObjectType):
     name = "groupresult"
 
-    type_vars = {"list": types.List(types.Any()), "key": types.Any()}
+    type_vars = {"object_type": types.Any(), "key": types.Any()}
 
-    def __init__(self, list=types.List(types.Any()), key=types.Any()):
-        self.list = list
+    def __init__(self, object_type=types.Any(), key=types.Any()):
+        self.object_type = object_type
         self.key = key
 
+    def _to_dict(self):
+        return {"objectType": self.object_type.to_dict(), "key": self.key.to_dict()}
+
+    @classmethod
+    def from_dict(cls, d):
+        return cls(
+            types.TypeRegistry.type_from_dict(d["objectType"]),
+            types.TypeRegistry.type_from_dict(d["key"]),
+        )
+
+    @classmethod
+    def type_of_instance(cls, obj):
+        return cls(
+            types.TypeRegistry.type_of(obj.list).object_type,
+            types.TypeRegistry.type_of(obj.key),
+        )
+
     def property_types(self):
-        return {"list": self.list, "key": self.key}
+        return {"list": types.List(self.object_type), "key": self.key}
 
 
 def group_result_index_output_type(input_types):
@@ -160,9 +178,9 @@ def group_result_index_output_type(input_types):
     # TODO: need to fix Const type so we don't need this.
     self_type = input_types["self"]
     if isinstance(self_type, types.Const):
-        return self_type.val_type.list.object_type
+        return self_type.val_type.object_type
     else:
-        return self_type.list.object_type
+        return self_type.object_type
 
 
 @weave_class(weave_type=GroupResultType)
@@ -170,6 +188,10 @@ class GroupResult:
     def __init__(self, list, key):
         self.list = list
         self.key = key
+
+    @property
+    def var_item(self):
+        return weave_internal.make_var_node(self.type.object_type, "row")
 
     @op(
         name="group-groupkey",
@@ -190,6 +212,18 @@ class GroupResult:
     @op(output_type=group_result_index_output_type)
     def __getitem__(self, index: int):
         return List.__getitem__.resolve_fn(self.list, index)
+
+    @op()
+    def map(self, map_fn: typing.Any) -> typing.Any:
+        return List.map.resolve_fn(self.list, map_fn)
+
+    @op(
+        output_type=lambda input_types: types.List(
+            GroupResultType(input_types["self"].object_type)
+        ),
+    )
+    def groupby(self, group_fn: typing.Any):
+        return List.groupby.resolve_fn(self.list, group_fn)
 
 
 GroupResultType.instance_class = GroupResult
@@ -338,7 +372,7 @@ class WeaveJSListInterface:
     @op(
         name="groupby",
         output_type=lambda input_types: types.List(
-            GroupResultType(types.List(input_types["arr"].object_type), types.Any())
+            GroupResultType(input_types["arr"].object_type, types.Any())
         ),
     )
     def groupby(arr: list[typing.Any], groupByFn: typing.Any):  # type: ignore

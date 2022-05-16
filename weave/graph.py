@@ -1,6 +1,7 @@
 import json
 import typing
 
+from . import errors
 from . import weave_types
 
 
@@ -139,6 +140,9 @@ class ConstNode(Node):
             val = op_get(str(ref)).to_json()
             return val
 
+        if isinstance(val, OutputNode):
+            val = val.to_json()
+
         return {"nodeType": "const", "type": self.type.to_dict(), "val": val}
 
     def __str__(self):
@@ -198,14 +202,26 @@ def node_expr_str(node: Node):
             )
         if not param_names:
             return "%s()" % opname_expr_str(node.from_op.name)
-        return "%s.%s(%s)" % (
-            node_expr_str(node.from_op.inputs[param_names[0]]),
-            opname_expr_str(node.from_op.name),
-            ", ".join(node_expr_str(node.from_op.inputs[n]) for n in param_names[1:]),
-        )
+        try:
+            arg_strs = [node_expr_str(node.from_op.inputs[n]) for n in param_names[1:]]
+            print("ARG STRS", arg_strs)
+            return "%s.%s(%s)" % (
+                node_expr_str(node.from_op.inputs[param_names[0]]),
+                opname_expr_str(node.from_op.name),
+                ", ".join(arg_strs),
+            )
+        except TypeError:
+            print(
+                "NODE BEFORE ERROR",
+                type(node),
+                param_names,
+                node.from_op.inputs["groupByFn"].type,
+            )
+            raise
     elif isinstance(node, ConstNode):
         if isinstance(node.type, weave_types.Function):
-            return node_expr_str(node.val)
+            res = node_expr_str(node.val)
+            return res
         try:
             return json.dumps(node.val)
         except TypeError:
@@ -216,6 +232,8 @@ def node_expr_str(node: Node):
             return str(node.val)
     elif isinstance(node, VarNode):
         return node.name
+    else:
+        return "**PARSE_ERROR**"
 
 
 def _map_nodes(

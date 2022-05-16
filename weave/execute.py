@@ -93,6 +93,7 @@ def execute_forward_node(
     no_cache=False,
 ):
     use_cache = not no_cache
+    # use_cache = False
     node = forward_node.node
     if isinstance(node, graph.ConstNode):
         # node_id = storage.save(node.val)
@@ -101,6 +102,8 @@ def execute_forward_node(
         return
     elif isinstance(node, graph.VarNode):
         raise errors.WeaveInternalError("cannot execute VarNode: %s" % node)
+
+    print("EXECUTING NODE", node)
 
     op_def = registry_mem.memory_registry.get_op(node.from_op.name)
     input_nodes = node.from_op.inputs

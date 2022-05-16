@@ -18,6 +18,11 @@ class Plot(panel.Panel):
             "tooltip": self._table_state.add_column(lambda row: graph.VoidNode()),
         }
         self._mark = None
+        self._axis_settings = {
+            "x": {},
+            "y": {},
+        }
+        self._legend_settings = {}
 
     @property
     def table_query(self):
@@ -28,6 +33,23 @@ class Plot(panel.Panel):
 
     def set_y(self, expr):
         self._table_state.update_col(self._dims["y"], expr)
+
+    def set_no_axes(self):
+        self._axis_settings["x"] = {
+            "noLabels": True,
+            "noTitle": True,
+            "noTicks": True,
+        }
+        self._axis_settings["y"] = {"noLabels": True, "noTitle": True, "noTicks": True}
+
+    def set_x_domain_range(self, min, max):
+        self._axis_settings["x"]["scale"] = {"domainMin": min, "domainMax": max}
+
+    def set_y_domain(self, domain):
+        self._axis_settings["y"]["scale"] = {"domain": domain}
+
+    def set_no_legend(self):
+        self._legend_settings["color"] = {"noLegend": True}
 
     def set_label(self, expr):
         self._table_state.update_col(self._dims["label"], expr)
@@ -41,4 +63,6 @@ class Plot(panel.Panel):
             "table": self._table_state.to_json(),
             "dims": self._dims,
             "mark": self._mark,
+            "axisSettings": self._axis_settings,
+            "legendSettings": self._legend_settings,
         }

@@ -2,6 +2,7 @@ import contextvars
 import contextlib
 import logging
 import typing
+from urllib.parse import urljoin
 
 from . import client
 from . import server
@@ -92,9 +93,10 @@ def _make_default_client():
 
 def use_fixed_server_port():
     """Force Weave server to port 9994 so wandb frontend can talk to it."""
-    s = server.HttpServer(port=9994)
-    s.start()
-    _weave_client.set(server.HttpServerClient(s.url))
+    # s = server.HttpServer(port=9994)
+    # s.start()
+    # _weave_client.set(server.HttpServerClient(s.url))
+    _weave_client.set(server.HttpServerClient("http://localhost:9994"))
 
 
 def use_frontend_devmode():
