@@ -1,4 +1,5 @@
-import pandas
+import numpy as np
+import pandas as pd
 import typing
 from .. import weave_types as types
 from ..api import op, mutation, weave_class, OpVarArgs
@@ -284,7 +285,19 @@ def unnest(arr):
             list_cols.append(k)
     if not list_cols:
         return arr
-    return pandas.DataFrame(arr).explode(list_cols).to_dict("records")
+    return pd.DataFrame(arr).explode(list_cols).to_dict("records")
+
+
+@op(
+    name="unique",
+    input_type={"arr": types.List(types.Any())},
+    output_type=lambda input_types: input_types["arr"],
+)
+def unique(arr):
+    if not arr:
+        return arr
+    res = np.unique(arr)
+    return res.tolist()
 
 
 def index_output_type(input_types):

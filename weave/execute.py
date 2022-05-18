@@ -103,7 +103,7 @@ def execute_forward_node(
     elif isinstance(node, graph.VarNode):
         raise errors.WeaveInternalError("cannot execute VarNode: %s" % node)
 
-    print("EXECUTING NODE", node)
+    # print("EXECUTING NODE", node)
 
     op_def = registry_mem.memory_registry.get_op(node.from_op.name)
     input_nodes = node.from_op.inputs

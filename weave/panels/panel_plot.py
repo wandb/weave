@@ -31,8 +31,17 @@ class Plot(panel.Panel):
     def set_x(self, expr):
         self._table_state.update_col(self._dims["x"], expr)
 
+    def groupby_x(self):
+        self._table_state.enable_groupby(self._dims["x"])
+
     def set_y(self, expr):
         self._table_state.update_col(self._dims["y"], expr)
+
+    def groupby_y(self):
+        self._table_state.enable_groupby(self._dims["y"])
+
+    def groupby_label(self):
+        self._table_state.enable_groupby(self._dims["label"])
 
     def set_no_axes(self):
         self._axis_settings["x"] = {

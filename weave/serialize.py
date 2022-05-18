@@ -6,6 +6,7 @@ import typing
 
 from . import graph
 from . import weave_types as types
+from . import errors
 
 
 NodeOrOp = typing.Union[graph.Node, graph.Op]
@@ -85,21 +86,28 @@ def _deserialize_node(
     parsed_node: graph.Node
     if node["nodeType"] == "const":
         if isinstance(node["type"], dict) and node["type"]["type"] == "function":
-            print("PARSE CONST FUNCTION", node)
-            op = nodes[node["val"]["fromOp"]]
-            params = {}
-            for param_name, param_node_index in op["inputs"].items():
-                params[param_name] = _deserialize_node(
-                    param_node_index, nodes, parsed_nodes
-                )
-            parsed_node = graph.ConstNode(
-                types.TypeRegistry.type_from_dict(node["type"]),
-                graph.OutputNode(
+            fn_body_node = node["val"]
+            if fn_body_node["nodeType"] == "var":
+                parsed_fn_body_node = graph.VarNode.from_json(fn_body_node)
+            elif fn_body_node["nodeType"] == "output":
+                op = nodes[fn_body_node["fromOp"]]
+                params = {}
+                for param_name, param_node_index in op["inputs"].items():
+                    params[param_name] = _deserialize_node(
+                        param_node_index, nodes, parsed_nodes
+                    )
+                parsed_fn_body_node = graph.OutputNode(
                     # TODO!!!! What does the javascript client do here? It sends a blank type :(
                     types.Any(),
                     op["name"],
                     params,
-                ),
+                )
+            else:
+                raise errors.WeaveInternalError(
+                    "invalid function node encountered in deserialize"
+                )
+            parsed_node = graph.ConstNode(
+                types.TypeRegistry.type_from_dict(node["type"]), parsed_fn_body_node
             )
         else:
             parsed_node = graph.ConstNode.from_json(node)

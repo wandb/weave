@@ -42,6 +42,14 @@ class TableState(object):
     def set_groupby(self, col_ids):
         self._group_by = col_ids
 
+    def enable_groupby(self, col_id):
+        if col_id not in self._group_by:
+            self._group_by.append(col_id)
+
+    def disable_groupby(self, col_id):
+        if col_id in self._group_by:
+            self._group_by.remove(col_id)
+
     def update_col(self, col_id, select_expr):
         object_type = self._input_node.type.object_type
         if self._group_by and col_id not in self._group_by:

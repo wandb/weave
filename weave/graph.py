@@ -204,7 +204,6 @@ def node_expr_str(node: Node):
             return "%s()" % opname_expr_str(node.from_op.name)
         try:
             arg_strs = [node_expr_str(node.from_op.inputs[n]) for n in param_names[1:]]
-            print("ARG STRS", arg_strs)
             return "%s.%s(%s)" % (
                 node_expr_str(node.from_op.inputs[param_names[0]]),
                 opname_expr_str(node.from_op.name),
