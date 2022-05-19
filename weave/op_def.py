@@ -1,36 +1,15 @@
 import textwrap
-import contextlib
-import contextvars
 import inspect
 import os
 import typing
 import sys
 
+from . import artifacts_local
 from . import errors
 from . import op_args
+from . import context
 from . import weave_types as types
-
-
-from .artifacts_local import LOCAL_ARTIFACT_DIR
-
-
-# Set to the op version if we're in the process of loading
-# an op from an artifact.
-
-_loading_op_version: contextvars.ContextVar[
-    typing.Optional[str]
-] = contextvars.ContextVar("loading_op_version", default=None)
-
-
-@contextlib.contextmanager
-def loading_op_version(version):
-    token = _loading_op_version.set(version)
-    yield _loading_op_version.get()
-    _loading_op_version.reset(token)
-
-
-def get_loading_op_version():
-    return _loading_op_version.get()
+from . import uris
 
 
 class OpDef:
@@ -48,6 +27,7 @@ class OpDef:
     setter = str
     call_fn: typing.Any
     version: typing.Optional[str]
+    is_builtin: bool = False
 
     def __init__(
         self,
@@ -61,6 +41,7 @@ class OpDef:
         setter=None,
         render_info=None,
         pure=True,
+        is_builtin: typing.Optional[bool] = None,
     ):
         self.name = name
         self.input_type = input_type
@@ -69,6 +50,9 @@ class OpDef:
         self.setter = setter
         self.render_info = render_info
         self.pure = pure
+        self.is_builtin = (
+            is_builtin if is_builtin is not None else context.get_loading_built_ins()
+        )
         self.version = None
         self.lazy_call = None
         self.eager_call = None
@@ -87,27 +71,12 @@ class OpDef:
         return self.call_fn(*args, **kwargs)
 
     @property
-    def fullname(self):
-        return self.name + ":" + self.version
+    def uri(self):
+        return self.name
 
     @property
     def simple_name(self):
-        # We need this to get around the run job_type 64 char limit, and artifact name limitations.
-        # TODO: This function will need to be stable! Let's make sure we like what we're doing here.
-        if self.name.startswith("file://"):
-            # Shorten because local file paths tend to blow out the 64 char job_type limit (we need
-            # to fix that probably)
-            return self.name.rsplit("/", 1)[1]
-        elif self.name.startswith("wandb-artifact://"):
-            return (
-                self.name[len("wandb-artifact://") :]
-                .replace(":", ".")
-                .replace("/", "_")
-            )
-        else:
-            # This is for builtins, which I think we may just want to get rid
-            # of?
-            return self.name
+        return uris.WeaveURI.parse(self.name).full_name
 
     @property
     def is_mutation(self):
@@ -122,16 +91,11 @@ class OpDef:
             raise errors.WeaveSerializeError(
                 "serializing op with non-named-args input_type not yet implemented"
             )
-
-        input_types = {
-            name: arg_type.to_dict()
-            for name, arg_type in self.input_type.arg_types.items()
-        }
-
+        input_types = self.input_type.to_dict()
         output_type = self.output_type.to_dict()
 
         serialized = {
-            "name": self.name,
+            "name": self.uri,
             "input_types": input_types,
             "output_type": output_type,
         }
@@ -153,9 +117,36 @@ class OpDefType(types.Type):
     instance_class = OpDef
     instance_classes = OpDef
 
-    def __init__(self):
+    input_type: op_args.OpArgs
+    output_type: types.Type
+
+    def __init__(self, input_type: op_args.OpArgs, output_type: types.Type):
         # TODO: actually this should maybe be the function's type?
-        pass
+        if callable(output_type):
+            raise errors.WeaveTypeError(
+                "OpDefType does not support Callable output_type yet"
+            )
+
+        self.input_type = input_type
+        self.output_type = output_type
+
+    def _to_dict(self):
+        return {
+            "input_type": self.input_type.to_dict(),
+            "output_type": self.output_type.to_dict(),
+        }
+
+    @classmethod
+    def from_dict(cls, d: typing.Any):
+        input_type = op_args.OpArgs.from_dict(d["input_type"])
+        output_type = types.TypeRegistry.type_from_dict(d["output_type"])
+
+        return cls(input_type, output_type)
+
+    @classmethod
+    def type_of_instance(cls, obj: OpDef):
+        # TODO: fix output_type to support callable
+        return cls(obj.input_type, obj.output_type)  # type: ignore
 
     def assign_type(self, other):
         return types.InvalidType()
@@ -167,15 +158,18 @@ class OpDefType(types.Type):
             f.write(code)
 
     def load_instance(cls, artifact, name, extra=None):
-        path = os.path.relpath(artifact.path(f"{name}"), start=LOCAL_ARTIFACT_DIR)
-
+        path_with_ext = os.path.relpath(
+            artifact.path(f"{name}.py"), start=artifacts_local.LOCAL_ARTIFACT_DIR
+        )
+        # remove the .py extension
+        path = os.path.splitext(path_with_ext)[0]
         # convert filename into module path
         parts = path.split("/")
         module_path = ".".join(parts)
 
-        # This has a side effect of registering the op
-        sys.path.insert(0, LOCAL_ARTIFACT_DIR)
-        with loading_op_version(artifact.version):
+        sys.path.insert(0, artifacts_local.LOCAL_ARTIFACT_DIR)
+        with context.loading_op_location(artifact.location):
+            # This has a side effect of registering the op
             mod = __import__(module_path)
         sys.path.pop(0)
         # We justed imported e.g. 'op-number-add.xaybjaa._obj'. Navigate from

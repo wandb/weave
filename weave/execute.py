@@ -1,6 +1,7 @@
 from collections.abc import Mapping
 from . import graph
 from . import forward_graph
+from . import artifacts_local
 import threading
 import typing
 
@@ -15,6 +16,7 @@ from . import weave_types as types
 from . import run_obj
 from . import compile
 from . import context
+from . import uris
 
 
 def execute_nodes(nodes, no_cache=False):
@@ -66,9 +68,13 @@ def async_op_body(run_uri, run_body, inputs):
 def execute_async_op(
     op_def: op_def.OpDef, inputs: Mapping[str, typing.Any], run_id: str
 ):
+    # TODO: should this be configurable with remote artifacts
     art_name = "run-%s" % run_id
+    art_uri = uris.WeaveLocalArtifactURI.make_uri(
+        artifacts_local.LOCAL_ARTIFACT_DIR, art_name, "latest"
+    )
     job = threading.Thread(
-        target=async_op_body, args=("%s/latest" % art_name, op_def.resolve_fn, inputs)
+        target=async_op_body, args=(art_uri, op_def.resolve_fn, inputs)
     )
     job.start()
 
@@ -145,7 +151,6 @@ def execute_forward_node(
         forward_node.set_result(run)
     else:
         run._inputs = input_refs
-
         result = execute_sync_op(op_def, inputs)
         ref = storage._get_ref(result)
         if ref is not None:

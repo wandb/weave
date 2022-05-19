@@ -9,6 +9,7 @@ from . import weave_types as types
 from . import errors
 from .decorators import weave_class, op, mutation
 from .op_args import OpVarArgs
+from .op_def import OpDef
 from . import usage_analytics
 from .context import (
     use_fixed_server_port,
@@ -25,6 +26,11 @@ def save(node_or_obj, name=None):
     else:
         ref = _storage.save(node_or_obj, name=name)
         return _weave_internal.make_const_node(ref.type, ref.obj)
+
+
+def publish(node_or_obj, name=None):
+    ref = _storage.publish(node_or_obj, name)
+    return _weave_internal.make_const_node(ref.type, ref.obj)
 
 
 def get(ref_str):

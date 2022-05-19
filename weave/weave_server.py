@@ -11,7 +11,7 @@ from flask import abort
 from flask_cors import CORS, cross_origin
 from flask import send_from_directory
 
-from weave import server
+from weave import server, storage
 from weave import registry_mem
 from weave import op_args
 from weave import errors
@@ -20,9 +20,9 @@ from flask.logging import wsgi_errors_stream
 
 # Ensure we register the openai ops so we can tell the
 # app about them with list_ops
+
 from weave.ecosystem import openai
 from weave.ecosystem import async_demo
-from weave import run_obj
 
 # set up logging
 

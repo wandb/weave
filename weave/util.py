@@ -25,6 +25,8 @@ def rand_string_n(n):
 
 
 def find_names(obj):
+    if hasattr(obj, "name"):
+        return [obj.name]
     frame = inspect.currentframe()
     for frame in iter(lambda: frame.f_back, None):
         frame.f_locals

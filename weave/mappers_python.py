@@ -6,6 +6,7 @@ from . import refs
 from . import mappers_weave
 from . import weave_types as types
 from . import graph
+from . import uris
 
 
 class TypedDictToPyDict(mappers_weave.TypedDictMapper):
@@ -132,14 +133,14 @@ class PyFunctionToFunction(mappers.Mapper):
 
 class RefToPyRef(mappers_weave.RefMapper):
     def apply(self, obj):
-        return str(obj)
+        return obj.uri
 
 
 class PyRefToRef(mappers_weave.RefMapper):
     def apply(self, obj):
         from . import storage
 
-        return storage.refs.LocalArtifactRef.from_str(obj, type=self._object_type)
+        return uris.WeaveURI.parse(obj).to_ref()
 
 
 class TypeToPyType(mappers.Mapper):
@@ -169,11 +170,8 @@ class DefaultToPy(mappers.Mapper):
         except NotImplementedError:
             pass
         name = "-".join(self._path)
-        ref = storage.save_to_artifact(
-            obj, artifact=self._artifact, name=name, type_=self.type
-        )
-        local_ref_str = ref.local_ref_str()
-        return local_ref_str
+        ref = storage.save_to_artifact(obj, self._artifact, name, self.type)
+        return ref.uri
 
 
 class DefaultFromPy(mappers.Mapper):
@@ -186,9 +184,8 @@ class DefaultFromPy(mappers.Mapper):
         if isinstance(obj, dict):
             return self.type.instance_from_dict(obj)
         # else its a ref string
-        return refs.LocalArtifactRef.from_local_ref(
-            self._artifact, obj, self.type
-        ).get()
+        # TODO: this does not use self.artifact, can we just drop it?
+        return uris.WeaveURI.parse(obj).to_ref().get()
 
 
 py_type = type
@@ -222,7 +219,7 @@ def map_to_python_(type, mapper, artifact, path=[]):
         return UnknownToPyUnknown(type, mapper, artifact, path)
     elif isinstance(type, types.Function):
         return FunctionToPyFunction(type, mapper, artifact, path)
-    elif isinstance(type, types.LocalArtifactRefType):
+    elif isinstance(type, types.RefType):
         return RefToPyRef(type, mapper, artifact, path)
     else:
         return DefaultToPy(type, mapper, artifact, path)
@@ -256,7 +253,7 @@ def map_from_python_(type: types.Type, mapper, artifact, path=[]):
         return UnknownToPyUnknown(type, mapper, artifact, path)
     elif isinstance(type, types.Function):
         return PyFunctionToFunction(type, mapper, artifact, path)
-    elif isinstance(type, types.LocalArtifactRefType):
+    elif isinstance(type, types.RefType):
         return PyRefToRef(type, mapper, artifact, path)
     else:
         return DefaultFromPy(type, mapper, artifact, path)

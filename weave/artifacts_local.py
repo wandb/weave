@@ -5,8 +5,12 @@ import pathlib
 import json
 import shutil
 from datetime import datetime
+import pathlib
 
+from . import uris
 from . import util
+from . import errors
+import wandb
 
 
 LOCAL_ARTIFACT_DIR = os.environ.get("WEAVE_LOCAL_ARTIFACT_DIR") or os.path.join(
@@ -35,6 +39,7 @@ def local_artifact_exists(name, branch):
 # This is a prototype implementation. Chock full of races, and other
 # problems
 # Do not use in prod!
+# local-artifact://[path][asdfdsa][asdf]
 class LocalArtifact:
     def __init__(self, name, version=None):
         self._name = name
@@ -49,7 +54,9 @@ class LocalArtifact:
     @property
     def version(self):
         if self._version is None:
-            raise Exception("artifact must be saved before calling version!")
+            raise errors.WeaveInternalError(
+                "artifact must be saved before calling version!"
+            )
         return self._version
 
     @property
@@ -76,6 +83,15 @@ class LocalArtifact:
 
     def path(self, name):
         return os.path.join(self._read_dirname, name)
+
+    @property
+    def location(self) -> uris.WeaveURI:
+        return uris.WeaveLocalArtifactURI.from_parts(
+            os.path.abspath(LOCAL_ARTIFACT_DIR), self._name, self.version
+        )
+
+    def uri(self) -> str:
+        return self.location.uri
 
     @contextlib.contextmanager
     def new_file(self, path, binary=False):
@@ -159,3 +175,104 @@ class LocalArtifact:
         if os.path.exists(link_name):
             os.remove(link_name)
         os.symlink(self._version, link_name)
+
+
+class WandbArtifact:
+    def __init__(self, name, type=None, uri: uris.WeaveWBArtifactURI = None):
+        self._name = name
+        if not uri:
+            self._writeable_artifact = wandb.Artifact(
+                name, type="op_def" if type is None else type
+            )
+        else:
+            # load an existing artifact, this should be read only,
+            # TODO: we could technically support writable artifacts by creating a new version?
+            self._saved_artifact = wandb.Api().artifact(uri.make_path())
+        self._local_path: dict[str, str] = {}
+
+    @property
+    def version(self):
+        if not self._saved_artifact:
+            raise errors.WeaveInternalError("cannot get version of an unsaved artifact")
+        return self._saved_artifact.version
+
+    @property
+    def created_at(self):
+        raise NotImplementedError()
+
+    def get_other_version(self, version):
+        raise NotImplementedError()
+
+    def path(self, name):
+        # TODO: this is not thread safe if used with a shared filesystem, maybe we should use a local tmp dir?
+        if not self._saved_artifact:
+            raise errors.WeaveInternalError("cannot download of an unsaved artifact")
+        if name in self._local_path:
+            return self._local_path[name]
+        path = self._saved_artifact.get_path(name).download(
+            os.path.join(LOCAL_ARTIFACT_DIR, self._name, self._saved_artifact.version)
+        )
+        # python module loading does not support colons
+        path_safe = path.replace(":", "_")
+        pathlib.Path(path_safe).parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(path, path_safe)
+        self._local_path[name] = path_safe
+        return path_safe
+
+    @property
+    def location(self):
+        return uris.WeaveWBArtifactURI.from_parts(
+            self._saved_artifact.entity,
+            self._saved_artifact.project,
+            self._name,
+            self._saved_artifact.version,
+        )
+
+    def uri(self):
+        if not self._saved_artifact:
+            raise errors.WeaveInternalError("cannot get uri of an unsaved artifact")
+        # TODO: should we include server URL here?
+        return self.location.uri
+
+    @contextlib.contextmanager
+    def new_file(self, path, binary=False):
+        if not self._writeable_artifact:
+            raise errors.WeaveInternalError("cannot add new file to readonly artifact")
+        mode = "w"
+        if binary:
+            mode = "wb"
+        with self._writeable_artifact.new_file(path, mode) as f:
+            yield f
+
+    @contextlib.contextmanager
+    def open(self, path, binary=False):
+        if not self._saved_artifact:
+            raise errors.WeaveInternalError("cannot load data from an unsaved artifact")
+        mode = "r"
+        if binary:
+            mode = "rb"
+        p = self.path(path)
+        with open(p, mode) as f:
+            yield f
+
+    def get_path_handler(self, path, handler_constructor):
+        raise NotImplementedError()
+
+    def read_metadata(self):
+        raise NotImplementedError()
+
+    def write_metadata(self, dirname):
+        raise NotImplementedError()
+
+    def save(self, project: str = "weave_ops"):
+        # TODO: technically save should be sufficient but we need the run to grab the entity name and project name
+        # TODO: what project should we put weave ops in???
+        os.environ["WANDB_SILENT"] = "true"
+        run = wandb.init(project=project)
+        self._writeable_artifact.save()
+        self._writeable_artifact.wait()
+        run.finish()
+
+        self._saved_artifact = wandb.Api().artifact(
+            f"{run.entity}/{project}/{self._writeable_artifact.name}"
+        )

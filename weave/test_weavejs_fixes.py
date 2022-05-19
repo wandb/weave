@@ -1,18 +1,21 @@
 import os
 
-from . import weave_internal
 from . import weave_types as types
 from . import weavejs_fixes
 
 from . import ops
-from . import graph
+from . import api
 
 
-def test_remove_opcall_versions():
-    n = weave_internal.make_const_node(types.Int(), 3) + 9
-    assert ":" in n.from_op.name
+def test_clean_opcall_str():
+    @api.op(input_type={"x": types.Number()}, output_type=types.Number())
+    def test_inc(x):
+        return x + 1
+
+    n = test_inc(5)
+    assert "local-artifact://" in n.from_op.name
     fixed_n = weavejs_fixes.remove_opcall_versions_node(n)
-    assert fixed_n.from_op.name == "number-add"
+    assert fixed_n.from_op.name == "op-test_inc"
 
 
 def test_convert_specific_op_to_generic_op_node():

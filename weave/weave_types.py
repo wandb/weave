@@ -162,7 +162,7 @@ class Type:
 
     # save_instance/load_instance on Type are used to save/load actual Types
     # since type_of(types.Int()) == types.Type()
-    def save_instance(self, obj, artifact, name):
+    def save_instance(self, obj, artifact, name) -> typing.Optional[list[str]]:
         d = None
         if self.__class__ == Type:
             d = obj.to_dict()
@@ -178,6 +178,7 @@ class Type:
             )
         with artifact.new_file(f"{name}.object.json") as f:
             json.dump(d, f)
+        return None
 
     def load_instance(self, artifact, name, extra=None):
         with artifact.open(f"{name}.object.json") as f:
@@ -672,10 +673,9 @@ class Function(Type):
         return {"inputTypes": input_types, "outputType": self.output_type.to_dict()}
 
 
-class LocalArtifactRefType(Type):
-    name = "ref-type"
-
-    def __init__(self, object_type):
+class RefType(Type):
+    def __init__(self, ref_type_name, object_type):
+        self.ref_type_name = ref_type_name
         self.object_type = object_type
 
     def _to_dict(self):
@@ -687,10 +687,32 @@ class LocalArtifactRefType(Type):
 
     @classmethod
     def type_of_instance(cls, obj):
-        return LocalArtifactRefType(obj.type)
+        raise NotImplemented()
 
     def __str__(self):
-        return "<LocalArtifactRefType %s>" % self.object_type
+        return f"<{self.ref_type_name} {self.object_type}>"
+
+
+class LocalArtifactRefType(RefType):
+    name = "local-ref-type"
+
+    def __init__(self, object_type):
+        super().__init__(LocalArtifactRefType.name, object_type)
+
+    @classmethod
+    def type_of_instance(cls, obj):
+        return LocalArtifactRefType(obj.type)
+
+
+class WandbArtifactRefType(RefType):
+    name = "wandb-ref-type"
+
+    def __init__(self, object_type):
+        super().__init__(WandbArtifactRefType.name, object_type)
+
+    @classmethod
+    def type_of_instance(cls, obj):
+        return WandbArtifactRefType(obj.type)
 
 
 class WBTable(Type):

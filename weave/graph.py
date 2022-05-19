@@ -2,6 +2,7 @@ import json
 import typing
 
 from . import weave_types
+from . import uris
 
 
 class Node:
@@ -48,6 +49,7 @@ class Op:
     inputs: typing.Dict[str, Node]
 
     def __init__(self, name, inputs):
+        # TODO: refactor this variable to be "uri"
         self.name = name
         self.inputs = inputs
 
@@ -136,7 +138,7 @@ class ConstNode(Node):
         from .ops_primitives.storage import get as op_get
 
         if ref is not None:
-            val = op_get(str(ref)).to_json()
+            val = op_get(ref.uri).to_json()
             return val
 
         return {"nodeType": "const", "type": self.type.to_dict(), "val": val}
@@ -148,9 +150,8 @@ class ConstNode(Node):
         from .ops_primitives.storage import get as op_get
 
         if ref is not None:
-            return str(op_get(str(ref)))
+            return str(op_get(ref.uri))
         return str(self.val)
-        # return "<ConstNode %s %s>" % (self.type, self.val)
 
 
 class VoidNode(Node):
@@ -165,20 +166,18 @@ def for_each(graph: Node, visitor):
     visitor(graph)
 
 
-def opname_without_version(op):
-    if ":" in op.name:
-        return op.name.split(":")[0]
-    return op.name
+def opuri_full_name(op_uri: str):
+    uri = uris.WeaveURI.parse(op_uri)
+    return uri.full_name
 
 
-def opname_expr_str(op_name):
-    parts = op_name.split("-", 1)
-    if len(parts) > 1:
-        op_name = parts[1]
-    parts = op_name.split(":")
-    if len(parts) == 1:
-        return op_name
-    return parts[0]
+def op_full_name(op: Op):
+    return opuri_full_name(op.name)
+
+
+def opuri_expr_str(op_uri: str) -> str:
+    # TODO(jason): maybe this should return something different compared to opname_without_version??
+    return uris.WeaveURI.parse(op_uri).friendly_name
 
 
 def node_expr_str(node: Node):
@@ -193,14 +192,14 @@ def node_expr_str(node: Node):
             )
         elif all([not isinstance(n, OutputNode) for n in node.from_op.inputs.values()]):
             return "%s(%s)" % (
-                opname_expr_str(node.from_op.name),
+                opuri_expr_str(node.from_op.name),
                 ", ".join(node_expr_str(node.from_op.inputs[n]) for n in param_names),
             )
         if not param_names:
-            return "%s()" % opname_expr_str(node.from_op.name)
+            return "%s()" % opuri_expr_str(node.from_op.name)
         return "%s.%s(%s)" % (
             node_expr_str(node.from_op.inputs[param_names[0]]),
-            opname_expr_str(node.from_op.name),
+            opuri_expr_str(node.from_op.name),
             ", ".join(node_expr_str(node.from_op.inputs[n]) for n in param_names[1:]),
         )
     elif isinstance(node, ConstNode):

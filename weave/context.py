@@ -6,6 +6,40 @@ import typing
 from . import client
 from . import server
 from . import util
+from . import uris
+
+
+# Set to the op uri if we're in the process of loading
+# an op from an artifact.
+_loading_op_location: contextvars.ContextVar[
+    typing.Optional[uris.WeaveURI]
+] = contextvars.ContextVar("loading_op_location", default=None)
+
+
+# Set to true if we're in the process of loading builtin functions
+# this prevents us from storing the op as an artifact
+_loading_built_ins: contextvars.ContextVar[
+    typing.Optional[bool]
+] = contextvars.ContextVar("loading_builtins", default=None)
+
+
+@contextlib.contextmanager
+def loading_op_location(location):
+    token = _loading_op_location.set(location)
+    yield _loading_op_location.get()
+    _loading_op_location.reset(token)
+
+
+def get_loading_op_location():
+    return _loading_op_location.get()
+
+
+def set_loading_built_ins(currently: bool):
+    _loading_built_ins.set(currently)
+
+
+def get_loading_built_ins():
+    return _loading_built_ins.get()
 
 
 _weave_client: contextvars.ContextVar[

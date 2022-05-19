@@ -19,7 +19,9 @@ class ForwardNode(object):
     def __str__(self):
         return "<ForwardNode(%s): %s input_to %s>" % (
             id(self),
-            self.node.from_op.name,
+            self.node.from_op.name
+            if isinstance(self.node, graph.OutputNode)
+            else self.node.val,
             " ".join([str(id(fn)) for fn in self.input_to]),
         )
 

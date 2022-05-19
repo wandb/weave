@@ -51,7 +51,7 @@ def filter_fn_to_sql_filter(table, filter_fn_node):
     if isinstance(filter_fn_node, graph.ConstNode):
         return filter_fn_node.val
     elif isinstance(filter_fn_node, graph.OutputNode):
-        op_name = graph.opname_without_version(filter_fn_node.from_op)
+        op_name = graph.op_full_name(filter_fn_node.from_op)
         if op_name == "number-greater":
             return filter_fn_to_sql_filter(
                 table, filter_fn_node.from_op.inputs["lhs"]

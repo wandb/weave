@@ -23,7 +23,7 @@ def test_op_simple():
         x,
         graph.OutputNode(
             types.String(),
-            test_helpers.RegexMatcher("test_op-op_simple:.*"),
+            test_helpers.RegexMatcher(".*test_op-op_simple.*"),
             {
                 "a": weave_internal.make_const_node(types.Const(types.Int(), 3), 3),
                 "b": weave_internal.make_const_node(types.Const(types.Int(), 4), 4),
@@ -53,7 +53,7 @@ def test_op_kwargs():
         x,
         graph.OutputNode(
             types.String(),
-            test_helpers.RegexMatcher("test_op-op_kwargs:.*"),
+            test_helpers.RegexMatcher(".*test_op-op_kwargs.*"),
             {
                 "a": weave_internal.make_const_node(types.Const(types.Int(), 1), 1),
                 "b": weave_internal.make_const_node(types.Const(types.Int(), 2), 2),

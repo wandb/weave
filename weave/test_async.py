@@ -1,17 +1,17 @@
 from . import api
 from . import storage
 from . import ops
-from .artifacts_local import LOCAL_ARTIFACT_DIR
 from .ecosystem import async_demo
 import pytest
 from . import run_obj
+from . import artifacts_local
 
 
 def test_run():
     import shutil
 
     try:
-        shutil.rmtree(LOCAL_ARTIFACT_DIR)
+        shutil.rmtree(artifacts_local.LOCAL_ARTIFACT_DIR)
     except FileNotFoundError:
         pass
 
@@ -20,7 +20,9 @@ def test_run():
     run_name = "run-%s" % run_id
     storage.save(run, name=run_name)
 
-    run_node = ops.get("%s/latest" % run_name)
+    run_node = ops.get(
+        f"local-artifact://{artifacts_local.LOCAL_ARTIFACT_DIR}/{run_name}/latest"
+    )
     # run = api.use(run_node)
     assert api.use(run_node.state()) == "pending"
     api.use(run_node.set_state("running"))
@@ -43,7 +45,7 @@ def test_automatic_await():
     import shutil
 
     try:
-        shutil.rmtree(LOCAL_ARTIFACT_DIR)
+        shutil.rmtree(artifacts_local.LOCAL_ARTIFACT_DIR)
     except FileNotFoundError:
         pass
 
@@ -57,13 +59,13 @@ def test_stable_when_fetching_input():
     import shutil
 
     try:
-        shutil.rmtree(LOCAL_ARTIFACT_DIR)
+        shutil.rmtree(artifacts_local.LOCAL_ARTIFACT_DIR)
     except FileNotFoundError:
         pass
 
     dataset = [{"prompt": "a", "completion": "5"}]
     ref = storage.save(dataset)
-    get_dataset = ops.get(str(ref))
+    get_dataset = ops.get(ref.uri)
     # We're going to fetch a new in memory dataset object for both of these.
     # But we should get the same run ID back because the datasets are the same
     # (which we know by checking that they come from the same ref in the code)
@@ -90,7 +92,7 @@ def test_async_op_expr():
     import shutil
 
     try:
-        shutil.rmtree(LOCAL_ARTIFACT_DIR)
+        shutil.rmtree(artifacts_local.LOCAL_ARTIFACT_DIR)
     except FileNotFoundError:
         pass
 
@@ -102,5 +104,5 @@ def test_async_op_expr():
     version0 = api.versions(saved_model)[0]
     assert (
         str(api.expr(version0))
-        == 'get("list-obj/9af42f7b9600f6f2636be8959e5f1ab8").train().trainresult-model().save("model")'
+        == f'get("local-artifact://{artifacts_local.LOCAL_ARTIFACT_DIR}/list-obj/9af42f7b9600f6f2636be8959e5f1ab8").train().model().save("model")'
     )

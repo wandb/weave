@@ -124,7 +124,8 @@ def make_mapped_op(op_name):
     # of the lazy call
     resolve.sig = inspect.signature(op.resolve_fn)
 
-    new_op = op_def.OpDef(mapped_op_name, input_types, output_type, resolve)
+    named_input_types = op_args.OpNamedArgs(input_types)
+    new_op = op_def.OpDef(mapped_op_name, named_input_types, output_type, resolve)
     op_version = registry_mem.memory_registry.register_op(new_op)
 
     return op_version.call_fn
