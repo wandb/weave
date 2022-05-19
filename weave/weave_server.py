@@ -23,6 +23,7 @@ from flask.logging import wsgi_errors_stream
 from weave import ops
 from weave.ecosystem import openai
 from weave.ecosystem import async_demo
+from weave.ecosystem import demos
 from weave import run_obj
 
 # set up logging
@@ -90,6 +91,9 @@ def make_app(log_filename=None, stream_logging_enabled=False):
 # This makes all server logs go into the notebook
 # app = make_app(stream_logging_enabled=True)
 app = make_app()
+
+# Very important! We rely on key ordering on both sides!
+app.config["JSON_SORT_KEYS"] = False
 CORS(app, send_wildcard=True)
 
 
