@@ -4,7 +4,9 @@ from . import api as weave
 from . import graph
 from . import types
 from . import weave_internal
+from . import storage
 from . import test_helpers
+from . import uris
 
 
 @weave.op(
@@ -203,3 +205,17 @@ def test_op_method_inferred_self():
         "a": types.Int(),
     }
     assert SomeWeaveObj.my_op.output_type == types.String()
+
+
+def test_load_op_from_artifact():
+    @weave.op()
+    def op_to_int(a: str) -> int:
+        return int(a)
+
+    ref = storage.save(op_to_int)
+
+    # load op from uri
+    loaded_op = uris.WeaveURI.parse(ref.uri).to_ref().get()
+
+    # test calling from loaded op works
+    assert 3 == weave.use(loaded_op("3"))
