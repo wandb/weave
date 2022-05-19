@@ -49,7 +49,12 @@ class List:
         return [row.get(key) for row in self]
 
     @op(
-        input_type={"self": types.List(types.Any()), "filter_fn": types.Any()},
+        input_type={
+            "self": types.List(types.Any()),
+            "filter_fn": lambda input_types: types.Function(
+                {"row": input_types["self"].object_type}, types.Any()
+            ),
+        },
         output_type=lambda input_types: input_types["self"],
     )
     def filter(self, filter_fn):
@@ -86,13 +91,17 @@ class List:
         return result
 
     @op(
-        input_type={"self": types.List(types.Any()), "group_by_fn": types.Any()},
+        input_type={
+            "self": types.List(types.Any()),
+            "group_by_fn": lambda input_types: types.Function(
+                {"row": input_types["self"].object_type}, types.Any()
+            ),
+        },
         output_type=lambda input_types: types.List(
             GroupResultType(input_types["self"].object_type)
         ),
     )
     def groupby(self, group_by_fn):
-        print("GROUP BY RESOLVER", group_by_fn)
         calls = []
         for row in self:
             calls.append(
@@ -219,11 +228,17 @@ class GroupResult:
         return List.map.resolve_fn(self.list, map_fn)
 
     @op(
+        input_type={
+            "self": types.List(types.Any()),
+            "group_fn": lambda input_types: types.Function(
+                {"row": input_types["self"].object_type}, types.Any()
+            ),
+        },
         output_type=lambda input_types: types.List(
             GroupResultType(input_types["self"].object_type)
         ),
     )
-    def groupby(self, group_fn: typing.Any):
+    def groupby(self, group_fn):
         return List.groupby.resolve_fn(self.list, group_fn)
 
 
@@ -395,8 +410,17 @@ class WeaveJSListInterface:
         type_class = types.TypeRegistry.type_class_of(obj)
         return type_class.NodeMethodsClass.pick.resolve_fn(obj, key)
 
-    @op(name="filter", output_type=lambda input_types: input_types["arr"])
-    def filter(arr: list[typing.Any], filterFn: typing.Any):  # type: ignore
+    @op(
+        name="filter",
+        input_type={
+            "arr": types.List(types.Any()),
+            "filterFn": lambda input_types: types.Function(
+                {"row": input_types["arr"].object_type}, types.Any()
+            ),
+        },
+        output_type=lambda input_types: input_types["arr"],
+    )
+    def filter(arr, filterFn):  # type: ignore
         type_class = types.TypeRegistry.type_class_of(arr)
         return type_class.NodeMethodsClass.filter.resolve_fn(arr, filterFn)
 

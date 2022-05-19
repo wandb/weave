@@ -67,7 +67,7 @@ class LocalFile(weave_file.File):
         setter=writecsv,
         name="file-readcsv",
         input_type={"self": types.FileType(types.String())},
-        output_type=types.List(types.Dict(types.String(), types.String())),
+        output_type=types.List(types.TypedDict({})),
     )
     def readcsv(self):
         # TODO: shouldn't need to do this, we can know the type of the file

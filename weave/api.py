@@ -18,6 +18,8 @@ from .context import (
     capture_weave_server_logs,
 )
 
+from .weave_internal import define_fn
+
 
 def save(node_or_obj, name=None):
     if isinstance(node_or_obj, _graph.Node):
@@ -90,15 +92,6 @@ def versions(obj):
 def expr(obj):
     ref = _get_ref(obj)
     return _storage.get_obj_expr(ref)
-
-
-# TODO: this shouldn't be here, you should be able to call
-#    .filter() etc on whatever table and pass in a lambda
-#    (like we can do now for adding columns to panel_table)
-def define_fn(parameters, body):
-    varNodes = {k: _weave_internal.make_var_node(t, k) for k, t in parameters.items()}
-    fnNode = body(**varNodes)
-    return _graph.ConstNode(types.Function(parameters, fnNode.type), fnNode)
 
 
 def type_of(obj: typing.Any) -> types.Type:

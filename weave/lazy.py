@@ -6,10 +6,21 @@ from . import graph
 from . import weave_types as types
 from . import context
 from . import api
+from . import weave_internal
+from . import errors
 
 
-def _ensure_node(v):
+def _ensure_node(v, input_type, already_bound_params):
+    if callable(input_type):
+        already_bound_types = {k: n.type for k, n in already_bound_params.items()}
+        input_type = input_type(already_bound_types)
     if not isinstance(v, graph.Node):
+        if callable(v):
+            if not isinstance(input_type, types.Function):
+                raise errors.WeaveInternalError(
+                    "callable passed as argument, but type is not Function"
+                )
+            return weave_internal.define_fn(input_type.input_types, v)
         val_type = types.TypeRegistry.type_of(v)
         # TODO: should type-check v here.
         v = graph.ConstNode(types.Const(val_type, v), v)
@@ -23,9 +34,11 @@ def _bind_params(sig, args, kwargs, input_type):
         param = sig.parameters[k]
         if param.kind == inspect.Parameter.VAR_KEYWORD:
             for sub_k, sub_v in v.items():
-                bound_params_with_constants[sub_k] = _ensure_node(sub_v)
+                bound_params_with_constants[sub_k] = _ensure_node(sub_v, None, None)
         else:
-            bound_params_with_constants[k] = _ensure_node(v)
+            bound_params_with_constants[k] = _ensure_node(
+                v, input_type.arg_types[k], bound_params_with_constants
+            )
     return bound_params_with_constants
 
 

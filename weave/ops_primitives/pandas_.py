@@ -197,8 +197,16 @@ class DataFrameTable:
     def pick(self, key: str):
         return self._df[key]
 
-    @op(output_type=lambda input_types: input_types["self"])
-    def filter(self, filter_fn: typing.Any):
+    @op(
+        input_type={
+            "self": types.List(types.Any()),
+            "filter_fn": lambda input_types: types.Function(
+                {"row": input_types["self"].object_type}, types.Any()
+            ),
+        },
+        output_type=lambda input_types: input_types["self"],
+    )
+    def filter(self, filter_fn):
         return DataFrameTable(self._df[filter_fn_to_pandas_filter(self._df, filter_fn)])
 
     @op(output_type=lambda input_types: types.List(input_types["self"].object_type))

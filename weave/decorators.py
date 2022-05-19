@@ -45,7 +45,7 @@ def _create_args_from_op_input_type(input_type):
     if not isinstance(input_type, dict):
         raise errors.WeaveDefinitionError("input_type must be OpArgs or a dict")
     for k, v in input_type.items():
-        if not isinstance(v, types.Type):
+        if not isinstance(v, types.Type) and not callable(v):
             raise errors.WeaveDefinitionError(
                 "input_type must be dict[str, Type] but %s is %s" % (k, v)
             )

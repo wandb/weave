@@ -26,8 +26,8 @@ def test_show_simple_call():
                                 "nodeType": "const",
                                 "type": {
                                     "type": "const",
-                                    "valType": "string",
                                     "val": "/tmp/cereal.csv",
+                                    "valType": "string",
                                 },
                                 "val": "/tmp/cereal.csv",
                             }
@@ -35,17 +35,14 @@ def test_show_simple_call():
                         "name": "localpath",
                     },
                     "nodeType": "output",
-                    "type": {
-                        "extension": "csv",
-                        "type": "local_file",
-                    },
+                    "type": {"extension": "csv", "type": "local_file"},
                 }
             },
             "name": "file-readcsv",
         },
         "nodeType": "output",
         "type": {
-            "objectType": {"keyType": "string", "objectType": "string", "type": "dict"},
+            "objectType": {"propertyTypes": {}, "type": "typedDict"},
             "type": "list",
         },
     }

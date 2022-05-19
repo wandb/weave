@@ -69,7 +69,7 @@ class Run:
             "self": types.RunType(
                 types.TypedDict({}), types.List(types.Any()), types.Any()
             ),
-            "s": types.Any(),
+            "v": types.Any(),
         },
         # can't return run because then we'll think this is an async op!
         output_type=types.Invalid(),
