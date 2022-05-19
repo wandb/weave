@@ -197,7 +197,7 @@ class GroupResult:
     @op(
         name="group-groupkey",
         input_type={"obj": GroupResultType()},
-        output_type=types.Any(),
+        output_type=lambda input_types: input_types["obj"].key,
     )
     def key(obj):
         return obj.key
@@ -253,19 +253,42 @@ def tag_indexCheckpoint(obj):
     return 0
 
 
+def flatten_type(list_type):
+    obj_type = list_type.object_type
+    if hasattr(obj_type, "object_type"):
+        return flatten_type(obj_type)
+    return types.List(obj_type)
+
+
+def flatten_return_type(input_types):
+    return flatten_type(input_types["arr"])
+
+
+def _flatten(l):
+    if isinstance(l, list):
+        return sum((_flatten(o) for o in l), [])
+    elif isinstance(l, GroupResult):
+        return sum((_flatten(o) for o in l.list), [])
+    else:
+        return [l]
+
+
 @op(
-    name="flatten", input_type={"arr": types.List(types.Any())}, output_type=types.Any()
+    name="flatten",
+    input_type={"arr": types.List(types.Any())},
+    output_type=flatten_return_type,
 )
 def flatten(arr):
-    # TODO: probably doesn't match js implementation
-    result = []
-    for row in arr:
-        if isinstance(row, list):
-            for o in row:
-                result.append(o)
-        else:
-            result.append(row)
-    return result
+    return _flatten(list(arr))
+
+
+@op(
+    name="dropna",
+    input_type={"arr": types.List(types.Any())},
+    output_type=lambda input_types: input_types["arr"],
+)
+def dropna(arr):
+    return [i for i in arr if i is not None]
 
 
 @op(
@@ -377,7 +400,10 @@ class WeaveJSListInterface:
         type_class = types.TypeRegistry.type_class_of(arr)
         return type_class.NodeMethodsClass.filter.resolve_fn(arr, filterFn)
 
-    @op(name="map", output_type=types.Any())
+    @op(
+        name="map",
+        output_type=lambda input_types: types.List(input_types["mapFn"].output_type),
+    )
     def map(arr: list[typing.Any], mapFn: typing.Any):  # type: ignore
         type_class = types.TypeRegistry.type_class_of(arr)
         return type_class.NodeMethodsClass.map.resolve_fn(arr, mapFn)

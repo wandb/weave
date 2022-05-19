@@ -9,8 +9,8 @@ from .. import graph
 class Facet(panel.Panel):
     id = "facet"
 
-    def __init__(self, *args):
-        super().__init__(*args)
+    def __init__(self, input_node, **config):
+        super().__init__(input_node)
         self._table_state = table_state.TableState(self.input_node)
         self._dims = {
             "x": self._table_state.add_column(lambda row: graph.VoidNode()),
@@ -19,6 +19,18 @@ class Facet(panel.Panel):
             "detail": self._table_state.add_column(lambda row: graph.VoidNode()),
         }
         self._table_state.set_groupby([self._dims["x"], self._dims["y"]])
+
+        if "x" in config:
+            self.set_x(config["x"])
+
+        if "y" in config:
+            self.set_y(config["y"])
+
+        if "select" in config:
+            self.set_select(config["select"])
+
+        if "detail" in config:
+            self.set_detail(config["detail"])
 
     @property
     def var_cell_input(self):

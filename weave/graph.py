@@ -121,15 +121,16 @@ class ConstNode(Node):
 
     @classmethod
     def from_json(cls, obj):
-        return cls(
-            weave_types.TypeRegistry.type_from_dict(obj["type"]),
-            obj["val"],
-        )
+        val = obj["val"]
+        if isinstance(val, dict) and "nodeType" in val:
+            val = Node.node_from_json(val)
+        return cls(weave_types.TypeRegistry.type_from_dict(obj["type"]), val)
 
-    def to_json(self):
+    def equivalent_output_node(self):
         # This is a hack to ensure we don't send huge const nodes to the frontend.
         # TODO: find a better place for this logic.
         # - currently tested in test_show.py:test_large_const_node
+
         val = self.val
         from . import storage
 
@@ -137,12 +138,18 @@ class ConstNode(Node):
         from .ops_primitives.storage import get as op_get
 
         if ref is not None:
-            val = op_get(str(ref)).to_json()
-            return val
+            return op_get(str(ref))
 
-        if isinstance(val, OutputNode):
+        return False
+
+    def to_json(self):
+        equiv_output_node = self.equivalent_output_node()
+        if equiv_output_node:
+            return equiv_output_node.to_json()
+
+        val = self.val
+        if isinstance(self.type, weave_types.Function):
             val = val.to_json()
-
         return {"nodeType": "const", "type": self.type.to_dict(), "val": val}
 
     def __str__(self):

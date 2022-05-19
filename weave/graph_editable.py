@@ -37,7 +37,6 @@ class EditGraph:
         self.input_edges[(input_to, input_name)] = edge
 
     def add_node(self, node: graph.Node):
-        print("NODE", node)
         if node in self.nodes:
             return
         if not isinstance(node, graph.OutputNode):

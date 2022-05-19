@@ -33,6 +33,9 @@ def _serialize_node(node: NodeOrOp, serialized_nodes: MapNodeOrOpToSerialized) -
         serialized_nodes[node] = ({"name": node.name, "inputs": param_indexes}, op_id)
         return op_id
     if isinstance(node, graph.ConstNode):
+        equiv_output_node = node.equivalent_output_node()
+        if equiv_output_node:
+            return _serialize_node(equiv_output_node, serialized_nodes)
         if isinstance(node.type, types.Function):
             op_id = _serialize_node(node.val.from_op, serialized_nodes)
             node_id = len(serialized_nodes)
@@ -47,7 +50,10 @@ def _serialize_node(node: NodeOrOp, serialized_nodes: MapNodeOrOpToSerialized) -
             return node_id
         else:
             node_id = len(serialized_nodes)
-            serialized_nodes[node] = (node.to_json(), node_id)
+            serialized_nodes[node] = (
+                {"nodeType": "const", "type": node.type.to_dict(), "val": node.val},
+                node_id,
+            )
             return node_id
     elif isinstance(node, graph.OutputNode):
         op_id = _serialize_node(node.from_op, serialized_nodes)

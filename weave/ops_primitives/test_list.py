@@ -4,6 +4,7 @@ from .. import api as weave
 from .. import weave_types as types
 from . import list_
 from . import dict
+from . import number
 
 
 def test_unnest():
@@ -30,27 +31,64 @@ def test_typeof_groupresult():
 
 
 def test_sequence1():
-    rotate_choices = list(range(5))
-    shear_choices = list(range(5))
-    l = []
-    for i in range(200):
-        l.append(
-            {
-                "rotate": random.choice(rotate_choices),
-                "shear": random.choice(shear_choices),
-                "y": random.choice(["a", "b", "c"]),
-            }
-        )
+    l = [
+        {"a": 0, "b": 0, "y": "x"},
+        {"a": 0, "b": 0, "y": "y"},
+        {"a": 0, "b": 1, "y": "x"},
+        {"a": 0, "b": 1, "y": "y"},
+        {"a": 0, "b": 1, "y": "y"},
+        {"a": 1, "b": 1, "y": "y"},
+        {"a": 2, "b": 1, "y": "y"},
+    ]
     saved = weave.save(l)
+
+    # PanelFacet GroupBy
     groupby1_fn = weave.define_fn(
         {"row": types.TypeRegistry.type_of(l).object_type},
         lambda row: dict.dict_(
             **{
-                "rotate": row["rotate"],
-                "rotate": row["rotate"],
+                "a": row["a"],
+                "b": row["b"],
             }
         ),
     )
     res = list_.WeaveJSListInterface.groupby(saved, groupby1_fn)
-    print("RESESDFSDf", weave.use(res))
-    assert 1 == 2
+
+    # Input to PanelPlot
+    map1_fn = weave.define_fn({"row": res.type.object_type}, lambda row: row)
+    res = list_.WeaveJSListInterface.map(res, map1_fn)
+
+    inner_groupby_fn = weave.define_fn(
+        {"row": res.type.object_type.object_type},
+        lambda row: dict.dict_(**{"y": row["y"]}),
+    )
+    map2_fn = weave.define_fn(
+        {"row": res.type.object_type},
+        lambda row: row.groupby(inner_groupby_fn).map(
+            weave.define_fn(
+                {
+                    "row": list_.GroupResultType(
+                        res.type.object_type.object_type,
+                        types.TypedDict({"y": types.String()}),
+                    )
+                },
+                lambda row: row.key()["y"],
+            )
+        ),
+    )
+    res = list_.WeaveJSListInterface.map(res, map2_fn)
+    res = list_.flatten(res)
+    res = list_.unique(res)
+    assert list(weave.use(res)) == ["x", "y"]
+
+
+def test_nested_functions():
+    rows = weave.save([{"a": [1, 2]}])
+    map_fn = weave.define_fn(
+        {"row": types.TypedDict({"a": types.List(types.Int())})},
+        lambda row: number.avg(
+            row["a"].map(weave.define_fn({"row": types.Int()}, lambda row: row + 1))
+        ),
+    )
+    mapped = rows.map(map_fn)
+    assert weave.use(mapped) == [2.5]

@@ -7,8 +7,8 @@ from .. import graph
 class Plot(panel.Panel):
     id = "plot"
 
-    def __init__(self, *args):
-        super().__init__(*args)
+    def __init__(self, input_node, **config):
+        super().__init__(input_node)
         self._table_state = table_state.TableState(self.input_node)
         self._dims = {
             "x": self._table_state.add_column(lambda row: graph.VoidNode()),
@@ -24,10 +24,39 @@ class Plot(panel.Panel):
         }
         self._legend_settings = {}
 
+        # TODO: handle all this stuff generically!
+        if "x" in config:
+            self.set_x(config["x"])
+
+        if config.get("groupby_x"):
+            self.groupby_x(config["groupby_x"])
+
+        if "y" in config:
+            self.set_y(config["y"])
+
+        if config.get("groupby_y"):
+            self.groupby_y(config["groupby_y"])
+
+        if "label" in config:
+            self.set_label(config["label"])
+
+        if config.get("groupby_label"):
+            self.groupby_label(config["groupby_label"])
+
+        if config.get("no_axes"):
+            self.set_no_axes()
+
+        if config.get("no_legend"):
+            self.set_no_legend()
+
+        if config.get("mark"):
+            self.set_mark(config["mark"])
+
     @property
     def table_query(self):
         return self._table_state
 
+    # TODO: These should be settable properties. Would be very nice.
     def set_x(self, expr):
         self._table_state.update_col(self._dims["x"], expr)
 
@@ -40,7 +69,12 @@ class Plot(panel.Panel):
     def groupby_y(self):
         self._table_state.enable_groupby(self._dims["y"])
 
+    def set_label(self, expr):
+        self._table_state.update_col(self._dims["label"], expr)
+
     def groupby_label(self):
+        self._table_state.enable_groupby(self._dims["color"])
+
         self._table_state.enable_groupby(self._dims["label"])
 
     def set_no_axes(self):
@@ -51,17 +85,8 @@ class Plot(panel.Panel):
         }
         self._axis_settings["y"] = {"noLabels": True, "noTitle": True, "noTicks": True}
 
-    def set_x_domain_range(self, min, max):
-        self._axis_settings["x"]["scale"] = {"domainMin": min, "domainMax": max}
-
-    def set_y_domain(self, domain):
-        self._axis_settings["y"]["scale"] = {"domain": domain}
-
     def set_no_legend(self):
         self._legend_settings["color"] = {"noLegend": True}
-
-    def set_label(self, expr):
-        self._table_state.update_col(self._dims["label"], expr)
 
     def set_mark(self, mark_option):
         self._mark = mark_option

@@ -77,7 +77,19 @@ class TypeRegistry:
 
         # use reversed instance_class_to_potential_type so our result
         # is the most specific type.
-        for type_ in reversed(instance_class_to_potential_type(type(obj))):
+
+        # The type of graph.Node objects is Function, but we also mixin
+        # NodeMethodsClass with Node, which may also have a Weave type.
+        # Therefore we have multiple valid types. But we need type_of() to
+        # be function in that case. Ie when a Node is mixed in, its lazy
+        # representation of whatever the type is, not the actual type.
+        #
+        # TODO: Its a small that we need to hardcode here. Fix this.
+        potential_types = instance_class_to_potential_type(type(obj))
+        if "function" in (t.name for t in potential_types):
+            potential_types = [Function]
+
+        for type_ in reversed(potential_types):
             obj_type = type_.type_of(obj)
             if obj_type is not None:
                 return obj_type
