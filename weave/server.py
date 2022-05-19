@@ -1,5 +1,7 @@
 from __future__ import print_function
 
+import typing
+
 from flask import current_app
 from werkzeug.serving import make_server
 import multiprocessing
@@ -23,6 +25,11 @@ def eprint(*args, **kwargs):
 
 
 is_tracing = True
+
+OptionalAuthType = typing.Optional[
+    typing.Tuple[str, str],
+    requests.models.HTTPBasicAuth
+]
 
 
 def handle_request(request, deref=False):
@@ -104,7 +111,7 @@ class InProcessServer(object):
 
 
 class HttpServerClient(object):
-    def __init__(self, url, emulate_weavejs=False, auth=None):
+    def __init__(self, url, emulate_weavejs=False, auth: OptionalAuthType = None):
         """Constructor.
 
         Args:
