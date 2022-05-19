@@ -27,8 +27,7 @@ def eprint(*args, **kwargs):
 is_tracing = True
 
 OptionalAuthType = typing.Optional[
-    typing.Tuple[str, str],
-    requests.models.HTTPBasicAuth
+    typing.Union[typing.Tuple[str, str], requests.models.HTTPBasicAuth]
 ]
 
 
