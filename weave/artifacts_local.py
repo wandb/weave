@@ -1,7 +1,6 @@
 import contextlib
 import hashlib
 import os
-import pathlib
 import json
 import shutil
 from datetime import datetime
@@ -10,6 +9,7 @@ import pathlib
 from . import uris
 from . import util
 from . import errors
+from . import wandb_api
 import wandb
 
 
@@ -187,7 +187,9 @@ class WandbArtifact:
         else:
             # load an existing artifact, this should be read only,
             # TODO: we could technically support writable artifacts by creating a new version?
-            self._saved_artifact = wandb.Api().artifact(uri.make_path())
+            self._saved_artifact = wandb_api.wandb_public_api().artifact(
+                uri.make_path()
+            )
         self._local_path: dict[str, str] = {}
 
     @property
@@ -273,6 +275,6 @@ class WandbArtifact:
         self._writeable_artifact.wait()
         run.finish()
 
-        self._saved_artifact = wandb.Api().artifact(
+        self._saved_artifact = wandb_api.wandb_public_api().artifact(
             f"{run.entity}/{project}/{self._writeable_artifact.name}"
         )
