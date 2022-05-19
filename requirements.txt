@@ -1,4 +1,4 @@
-wandb==0.13.0rc1
+wandb>=0.13.0rc1
 numpy
 pandas
 h5py
