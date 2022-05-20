@@ -48,13 +48,12 @@ class ForwardGraph:
                 return
             forward_node = ForwardNode(node)
             self._node_to_forward_node[node] = forward_node
-            is_root = not any(
-                isinstance(n, graph.OutputNode) for n in node.from_op.inputs.values()
-            )
+            is_root = True
             for param_node in node.from_op.inputs.values():
                 self.add_node(param_node)
                 if isinstance(param_node, graph.OutputNode):
                     self._node_to_forward_node[param_node].input_to.add(forward_node)
+                    is_root = False
             if is_root:
                 self.roots.add(forward_node)
         elif not isinstance(node, graph.ConstNode):

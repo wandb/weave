@@ -33,7 +33,8 @@ def save(node_or_obj, name=None):
 
 def get(ref_str):
     obj = _storage.get(ref_str)
-    return _weave_internal.make_const_node(types.TypeRegistry.type_of(obj), obj)
+    ref = _storage._get_ref(obj)
+    return _weave_internal.make_const_node(ref.type, obj)
 
 
 def use(nodes, client=None):

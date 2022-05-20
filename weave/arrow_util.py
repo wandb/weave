@@ -57,8 +57,8 @@ class ArrowTableList(Iterable):
         return self._deserializer.apply(row_dict)
 
     def __iter__(self):
-        for i in range(len(self)):
-            yield self[i]
+        for row in self._arrow_table.to_pylist():
+            yield self._deserializer.apply(row)
 
     def __len__(self):
         return self._arrow_table.num_rows

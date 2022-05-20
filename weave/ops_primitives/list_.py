@@ -114,8 +114,9 @@ class List:
                     group_by_fn, {"row": graph.ConstNode(types.Any(), row)}
                 )
             )
+        call_results = weave_internal.use_internal(calls)
         result = {}
-        for row, group_key_items in zip(self, weave_internal.use_internal(calls)):
+        for row, group_key_items in zip(self, call_results):
             import json
 
             group_key_s = json.dumps(group_key_items)
