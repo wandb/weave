@@ -1,10 +1,13 @@
 import typing
 
 from . import graph
+from . import errors
+
+ExecutableNode = typing.Union[graph.OutputNode, graph.ConstNode]
 
 
-class ForwardNode(object):
-    node: typing.Union[graph.OutputNode, graph.ConstNode]
+class ForwardNode:
+    node: graph.OutputNode[ExecutableNode]
     input_to: typing.Set["ForwardNode"]
     result: typing.Any
     has_result: bool
@@ -28,7 +31,8 @@ class ForwardNode(object):
         self.result = result
 
 
-class ForwardGraph(object):
+class ForwardGraph:
+    roots: set[ForwardNode]
     _node_to_forward_node: typing.Dict[graph.Node, ForwardNode]
 
     def __init__(self, nodes):
@@ -38,25 +42,37 @@ class ForwardGraph(object):
         for node in nodes:
             self.add_node(node)
 
-    def add_node(self, node):
-        if node in self._node_to_forward_node:
-            return
-        forward_node = ForwardNode(node)
-        self._node_to_forward_node[node] = forward_node
+    def add_node(self, node: graph.Node):
         if isinstance(node, graph.OutputNode):
-            if not node.from_op.inputs:
-                self.roots.add(forward_node)
-            else:
-                for param_node in node.from_op.inputs.values():
-                    self.add_node(param_node)
+            if node in self._node_to_forward_node:
+                return
+            forward_node = ForwardNode(node)
+            self._node_to_forward_node[node] = forward_node
+            is_root = not any(
+                isinstance(n, graph.OutputNode) for n in node.from_op.inputs.values()
+            )
+            for param_node in node.from_op.inputs.values():
+                self.add_node(param_node)
+                if isinstance(param_node, graph.OutputNode):
                     self._node_to_forward_node[param_node].input_to.add(forward_node)
-        else:
-            self.roots.add(forward_node)
+            if is_root:
+                self.roots.add(forward_node)
+        elif not isinstance(node, graph.ConstNode):
+            raise errors.WeaveInternalError(
+                "Found unexecutable node when constructing ForwardGraph: %s" % node
+            )
 
     def get_forward_node(self, node: graph.OutputNode):
         return self._node_to_forward_node[node]
 
-    def get_result(self, node: graph.Node):
+    def has_result(self, node: ExecutableNode):
+        if isinstance(node, graph.ConstNode):
+            return True
+        return self._node_to_forward_node[node].has_result
+
+    def get_result(self, node: ExecutableNode):
+        if isinstance(node, graph.ConstNode):
+            return node.val
         return self._node_to_forward_node[node].result
 
     def __str__(self):

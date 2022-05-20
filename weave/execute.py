@@ -1,6 +1,8 @@
 from collections.abc import Mapping
 from . import graph
 from . import forward_graph
+import pprint
+import time
 import threading
 import typing
 
@@ -17,32 +19,62 @@ from . import compile
 from . import context
 
 
+class ExecuteStats:
+    def __init__(self):
+        self.node_stats = []
+
+    def add_node(self, node, execution_time):
+        self.node_stats.append((node, execution_time))
+
+    def summary(self):
+        op_counts = {}
+        for node, t in self.node_stats:
+            if isinstance(node, graph.OutputNode):
+                op_counts.setdefault(node.from_op.name, {"count": 0, "total_time": 0})
+                op_counts[node.from_op.name]["count"] += 1
+                op_counts[node.from_op.name]["total_time"] += t
+        for stats in op_counts.values():
+            stats["avg_time"] = stats["total_time"] / stats["count"]
+        sortable_stats = [(k, v) for k, v in op_counts.items()]
+
+        return dict(
+            list(reversed(sorted(sortable_stats, key=lambda s: s[1]["total_time"])))
+        )
+
+
 def execute_nodes(nodes, no_cache=False):
     nodes = compile.compile(nodes)
     fg = forward_graph.ForwardGraph(nodes)
 
     with context.execution_client():
-        execute_forward(fg, no_cache=no_cache)
+        stats = execute_forward(fg, no_cache=no_cache)
+    print("EXECUTION SUMMARY")
+    summary = stats.summary()
+    pprint.pprint(summary)
 
     return [fg.get_result(n) for n in nodes]
 
 
-def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False):
-    to_run = fg.roots
+def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteStats:
+    to_run: set[forward_graph.ForwardNode] = fg.roots
+
+    stats = ExecuteStats()
     while len(to_run):
         running_now = to_run.copy()
         to_run = set()
         for forward_node in running_now:
+            start_time = time.time()
             execute_forward_node(fg, forward_node, no_cache=no_cache)
+            stats.add_node(forward_node.node, time.time() - start_time)
         for forward_node in running_now:
             for downstream_forward_node in forward_node.input_to:
                 ready_to_run = True
                 for param_node in downstream_forward_node.node.from_op.inputs.values():
-                    param_forward_node = fg.get_forward_node(param_node)
-                    if not param_forward_node.has_result:
+                    if not fg.has_result(param_node):
                         ready_to_run = False
                 if ready_to_run:
                     to_run.add(downstream_forward_node)
+    return stats
 
 
 def is_async_op(op_def: op_def.OpDef):
@@ -96,9 +128,6 @@ def execute_forward_node(
     # use_cache = False
     node = forward_node.node
     if isinstance(node, graph.ConstNode):
-        # node_id = storage.save(node.val)
-        obj = node.val
-        forward_node.set_result(obj)
         return
     elif isinstance(node, graph.VarNode):
         raise errors.WeaveInternalError("cannot execute VarNode: %s" % node)

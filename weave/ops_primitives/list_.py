@@ -72,7 +72,12 @@ class List:
         return result
 
     @op(
-        input_type={"self": types.List(types.Any()), "map_fn": types.Any()},
+        input_type={
+            "self": types.List(types.Any()),
+            "map_fn": lambda input_types: types.Function(
+                {"row": input_types["self"].object_type}, types.Any()
+            ),
+        },
         output_type=lambda input_types: input_types["self"],
     )
     def map(self, map_fn):
@@ -151,6 +156,14 @@ class List:
             res.append(arr[i])
         return res
         # return arr[:limit]
+
+    @op(
+        name="dropna",
+        input_type={"arr": types.List(types.Any())},
+        output_type=lambda input_types: input_types["arr"],
+    )
+    def dropna(arr):
+        return [i for i in arr if i is not None]
 
 
 class GroupResultType(types.ObjectType):
@@ -298,15 +311,6 @@ def flatten(arr):
 
 
 @op(
-    name="dropna",
-    input_type={"arr": types.List(types.Any())},
-    output_type=lambda input_types: input_types["arr"],
-)
-def dropna(arr):
-    return [i for i in arr if i is not None]
-
-
-@op(
     name="unnest",
     input_type={"arr": types.List(types.TypedDict({}))},
     output_type=lambda input_types: input_types["arr"],
@@ -426,9 +430,15 @@ class WeaveJSListInterface:
 
     @op(
         name="map",
+        input_type={
+            "arr": types.List(types.Any()),
+            "mapFn": lambda input_types: types.Function(
+                {"row": input_types["arr"].object_type}, types.Any()
+            ),
+        },
         output_type=lambda input_types: types.List(input_types["mapFn"].output_type),
     )
-    def map(arr: list[typing.Any], mapFn: typing.Any):  # type: ignore
+    def map(arr, mapFn):  # type: ignore
         type_class = types.TypeRegistry.type_class_of(arr)
         return type_class.NodeMethodsClass.map.resolve_fn(arr, mapFn)
 

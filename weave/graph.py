@@ -43,10 +43,12 @@ class Node:
 
 weave_types.Function.instance_classes = Node
 
+OpInputNodeT = typing.TypeVar("OpInputNodeT")
 
-class Op:
+
+class Op(typing.Generic[OpInputNodeT]):
     name: str
-    inputs: typing.Dict[str, Node]
+    inputs: typing.Dict[str, OpInputNodeT]
 
     def __init__(self, name, inputs):
         self.name = name
@@ -59,8 +61,8 @@ class Op:
         return {"name": self.name, "inputs": json_inputs}
 
 
-class OutputNode(Node):
-    from_op: Op
+class OutputNode(Node, typing.Generic[OpInputNodeT]):
+    from_op: Op[OpInputNodeT]
     val: typing.Any
 
     def __init__(self, type, op_name, op_inputs):
