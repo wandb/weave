@@ -144,9 +144,10 @@ def execute_forward_node(
         input_name: storage.deref(input) for input_name, input in input_refs.items()
     }
 
-    # Compute the run ID, which is deterministic if the op is pure
-    run_id = execute_ids.make_run_id(op_def, input_refs)
-    run_artifact_name = f"run-{run_id}"
+    if use_cache or is_async_op(op_def):
+        # Compute the run ID, which is deterministic if the op is pure
+        run_id = execute_ids.make_run_id(op_def, input_refs)
+        run_artifact_name = f"run-{run_id}"
 
     if use_cache and op_def.pure:
         run = storage.get_version(run_artifact_name, "latest")
@@ -162,9 +163,8 @@ def execute_forward_node(
                 # otherwise, the run's output was not saveable, so we need
                 # to recompute it.
 
-    run = run_obj.Run(run_id, op_def.name)
-
     if is_async_op(op_def):
+        run = run_obj.Run(run_id, op_def.name)
         input_refs = {}
         for input_name, input in inputs.items():
             ref = storage.get_ref(input)
@@ -176,8 +176,6 @@ def execute_forward_node(
         execute_async_op(op_def, input_refs, run_id)
         forward_node.set_result(run)
     else:
-        run._inputs = input_refs
-
         result = execute_sync_op(op_def, inputs)
         ref = storage._get_ref(result)
         if ref is not None:
@@ -204,7 +202,6 @@ def execute_forward_node(
                     # the result directly here, we save a MemRef with the same run_artifact_name.
                     # This is required to make downstream run_ids path dependent.
                     result = storage.save_mem(result, name=output_name)
-        run._output = result
 
         forward_node.set_result(result)
 
@@ -213,6 +210,9 @@ def execute_forward_node(
         #    does not really work yet. (mutated objects set their run output
         #    as the original ref rather than the new ref, which causes problems)
         if use_cache and not is_run_op(node.from_op):
+            run = run_obj.Run(run_id, op_def.name)
+            run._inputs = input_refs
+            run._output = result
             try:
                 storage.save(run, name=run_artifact_name)
             except errors.WeaveSerializeError:
