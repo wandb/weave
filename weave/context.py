@@ -21,7 +21,6 @@ _frontend_url: contextvars.ContextVar[typing.Optional[str]] = contextvars.Contex
     "frontend_url", default=None
 )
 
-
 _analytics_enabled: contextvars.ContextVar[bool] = contextvars.ContextVar(
     "analytics_enabled", default=True
 )
@@ -29,6 +28,14 @@ _analytics_enabled: contextvars.ContextVar[bool] = contextvars.ContextVar(
 _eager_mode: contextvars.ContextVar[bool] = contextvars.ContextVar(
     "_eager_mode", default=False
 )
+
+_wandb_api_key: contextvars.ContextVar[typing.Optional[str]] = contextvars.ContextVar(
+    "_wandb_api_key", default=None
+)
+
+_cache_namespace_token: contextvars.ContextVar[
+    typing.Optional[str]
+] = contextvars.ContextVar("_cache_namespace_token", default=None)
 
 
 @contextlib.contextmanager
@@ -101,7 +108,9 @@ def use_fixed_server_port():
 
 def use_frontend_devmode():
     """Talk to external server running on 9994"""
-    _weave_client.set(server.HttpServerClient("http://localhost:9994"))
+    use_fixed_server_port()
+
+    # point frontend to vite server
     _frontend_url.set("http://localhost:3000")
 
 
