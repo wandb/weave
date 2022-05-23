@@ -102,5 +102,5 @@ def test_async_op_expr():
     version0 = api.versions(saved_model)[0]
     assert (
         str(api.expr(version0))
-        == 'get("list-obj/9af42f7b9600f6f2636be8959e5f1ab8").train().trainresult-model().save("model")'
+        == 'get("list-obj/2f43b6207d36e570fa8859de7e4a0b95").train().trainresult-model().save("model")'
     )

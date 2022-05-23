@@ -20,14 +20,26 @@ class Ref:
         return show(self)
 
 
+# We store REFS here if we can't attach them directly to the object
+REFS: dict[str, typing.Any] = {}
+
+
 def get_ref(obj):
     if hasattr(obj, "_ref"):
         return obj._ref
+    try:
+        if obj in REFS:
+            return REFS[id(obj)]
+    except TypeError:
+        pass
     return None
 
 
 def put_ref(obj, ref):
-    obj._ref = ref
+    try:
+        obj._ref = ref
+    except AttributeError:
+        REFS[id(obj)] = ref
 
 
 class LocalArtifactRef(Ref):

@@ -196,6 +196,10 @@ def execute_forward_node(
                 if op_def.pure:
                     output_name = "%s-output" % run_artifact_name
                 try:
+                    # Passing the node.type through here will really speed things up!
+                    # But we can't do it yet because Weave Python function aren't all
+                    # correctly typed, and WeaveJS sends down different types (like TagValues)
+                    # TODO: Fix
                     result = storage.save(result, name=output_name)
                 except errors.WeaveSerializeError:
                     # Not everything can be serialized currently. But instead of storing

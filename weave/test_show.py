@@ -72,9 +72,9 @@ EXPECTED_SHOW_PARAMS_FINE_TUNE_WEAVE_NODE = {
                             "type": {
                                 "type": "const",
                                 "valType": "string",
-                                "val": "list-obj/5826f76113017729abd9aeeef0a14831",
+                                "val": test_helpers.RegexMatcher("list-obj/.*"),
                             },
-                            "val": "list-obj/5826f76113017729abd9aeeef0a14831",
+                            "val": test_helpers.RegexMatcher("list-obj/.*"),
                         }
                     },
                     "name": "get",
@@ -137,4 +137,4 @@ def test_large_const_node():
     table_state = panel_config["tableState"]
     col_select_fns = table_state["columnSelectFunctions"]
     col_sel_fn2 = list(col_select_fns.values())[1]
-    assert "list-obj/5826f76113017729abd9aeeef0a14831" in json.dumps(col_sel_fn2)
+    assert "list-obj/" in json.dumps(col_sel_fn2)

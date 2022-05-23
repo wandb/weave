@@ -115,6 +115,9 @@ def execute():
     # print('REQUEST', request, request.json)
     if not request.json or "graphs" not in request.json:
         abort(400)
+    # Simulate browser/server latency
+    # import time
+    # time.sleep(0.1)
     response = server.handle_request(request.json, deref=True)
 
     # MAJOR HACKING HERE

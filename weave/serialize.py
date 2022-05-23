@@ -3,6 +3,8 @@
 # nodes and inline the ops in their respective output nodes.
 
 import typing
+import hashlib
+import json
 
 from . import graph
 from . import weave_types as types
@@ -80,10 +82,33 @@ def serialize(graphs: typing.List[graph.Node]) -> SerializedReturnType:
     return {"nodes": nodes, "rootNodes": root_nodes}
 
 
+def node_id(node: graph.Node):
+    hashable = {"type": node.type.to_dict()}
+    if isinstance(node, graph.OutputNode):
+        hashable["op_name"] = node.from_op.name
+        hashable["inputs"] = {
+            arg_name: node_id(arg_node)
+            for arg_name, arg_node in node.from_op.inputs.items()
+        }
+    elif isinstance(node, graph.VarNode):
+        hashable["name"] = node.name
+    elif isinstance(node, graph.ConstNode):
+        if isinstance(node.val, graph.OutputNode):
+            hashable["val"] = node.val.to_json()
+        else:
+            hashable["val"] = node.val
+    else:
+        raise errors.WeaveInternalError("invalid node encountered: %s" % node)
+    hash = hashlib.md5()
+    hash.update(json.dumps(hashable).encode())
+    return hash.hexdigest()
+
+
 def _deserialize_node(
     index: int,
     nodes: typing.List[SerializedNode],
     parsed_nodes: typing.MutableMapping[int, graph.Node],
+    hashed_nodes: typing.MutableMapping[str, graph.Node],
 ) -> graph.Node:
     if index in parsed_nodes:
         return parsed_nodes[index]
@@ -100,7 +125,7 @@ def _deserialize_node(
                 params = {}
                 for param_name, param_node_index in op["inputs"].items():
                     params[param_name] = _deserialize_node(
-                        param_node_index, nodes, parsed_nodes
+                        param_node_index, nodes, parsed_nodes, hashed_nodes
                     )
                 parsed_fn_body_node = graph.OutputNode(
                     # TODO!!!! What does the javascript client do here? It sends a blank type :(
@@ -122,13 +147,18 @@ def _deserialize_node(
         params = {}
         for param_name, param_node_index in op["inputs"].items():
             params[param_name] = _deserialize_node(
-                param_node_index, nodes, parsed_nodes
+                param_node_index, nodes, parsed_nodes, hashed_nodes
             )
         parsed_node = graph.OutputNode(
             types.TypeRegistry.type_from_dict(node["type"]), op["name"], params
         )
     elif node["nodeType"] == "var":
         parsed_node = graph.VarNode.from_json(node)
+    id_ = node_id(parsed_node)
+    if id_ in hashed_nodes:
+        parsed_node = hashed_nodes[id_]
+    else:
+        hashed_nodes[id_] = parsed_node
     parsed_nodes[index] = parsed_node
     return parsed_node
 
@@ -140,5 +170,8 @@ def deserialize(serialized: SerializedReturnType) -> "list[graph.Node]":
     nodes = serialized["nodes"]
     root_nodes = serialized["rootNodes"]
     parsed_nodes: dict[int, graph.Node] = {}
+    # WeaveJS does not do a good job deduplicating nodes currently, so we do it here.
+    # This ensures we don't execute the same node many times.
+    hashed_nodes: dict[str, graph.Node] = {}
 
-    return [_deserialize_node(i, nodes, parsed_nodes) for i in root_nodes]
+    return [_deserialize_node(i, nodes, parsed_nodes, hashed_nodes) for i in root_nodes]

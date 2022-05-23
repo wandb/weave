@@ -13,10 +13,12 @@ def convert_specific_opname_to_generic_opname(
 ) -> tuple[str, dict[str, typing.Any]]:
     if name == "typedDict-pick" or name == "dict-pick":
         return "pick", {"obj": inputs["self"], "key": inputs["key"]}
-    if name == "groupresult-groupby":
+    elif name == "groupresult-groupby":
         return "groupby", {"arr": inputs["self"], "groupByFn": inputs["group_fn"]}
     elif name == "groupresult-count" or name == "projectArtifactVersions-count":
         return "count", {"arr": inputs["self"]}
+    elif name == "groupresult-key":
+        return "group-groupkey", {"obj": inputs["self"]}
     elif (
         name == "list-__getitem__"
         or name == "groupresult-__getitem__"

@@ -60,6 +60,14 @@ class TypedDict(dict):
             return self.pick(key)
         return dict.__getitem__(self, key)
 
+    @op(
+        name="merge",
+        input_type={"lhs": types.TypedDict({}), "rhs": types.TypedDict({})},
+        output_type=types.TypedDict({}),
+    )
+    def merge(lhs, rhs):
+        return {**lhs, **rhs}
+
     __getitem__ = pick
 
 
@@ -106,16 +114,7 @@ class Dict(dict):
 @op(
     name="dict",
     input_type=OpVarArgs(types.Any()),
-    output_type=types.TypedDict({}),
+    output_type=lambda input_types: types.TypedDict(input_types),
 )
 def dict_(**d):
     return d
-
-
-@op(
-    name="merge",
-    input_type={"lhs": types.TypedDict({}), "rhs": types.TypedDict({})},
-    output_type=types.TypedDict({}),
-)
-def merge(lhs, rhs):
-    return {**lhs, **rhs}

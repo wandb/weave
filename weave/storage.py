@@ -166,6 +166,15 @@ def get_obj_expr(obj):
 
 
 def to_python(obj):
+    # Arrow hacks for WeaveJS. We want to send the raw Python data
+    # to the frontend for these objects. But this will break querying them in Weave
+    # Python when not using InProcessServer.
+    # TODO: Remove!
+    if hasattr(obj, "to_pylist"):
+        return obj.to_pylist()
+    elif hasattr(obj, "as_py"):
+        return obj.as_py()
+
     wb_type = types.TypeRegistry.type_of(obj)
     artifact = artifacts_local.LocalArtifact("to-python-%s" % wb_type.name)
     mapper = mappers_python.map_to_python(wb_type, artifact)

@@ -9,7 +9,7 @@ flask>=2.1
 flask_cors
 notebook
 pymysql
-pyarrow==7.0.0
+pyarrow==8.0.0
 ipynbname
 pillow
 openai

@@ -78,7 +78,7 @@ class List:
                 {"row": input_types["self"].object_type}, types.Any()
             ),
         },
-        output_type=lambda input_types: input_types["self"],
+        output_type=lambda input_types: types.List(input_types["map_fn"].output_type),
     )
     def map(self, map_fn):
         calls = []
@@ -103,7 +103,9 @@ class List:
             ),
         },
         output_type=lambda input_types: types.List(
-            GroupResultType(input_types["self"].object_type)
+            GroupResultType(
+                input_types["self"].object_type, input_types["group_by_fn"].output_type
+            )
         ),
     )
     def groupby(self, group_by_fn):
@@ -217,13 +219,9 @@ class GroupResult:
     def var_item(self):
         return weave_internal.make_var_node(self.type.object_type, "row")
 
-    @op(
-        name="group-groupkey",
-        input_type={"obj": GroupResultType()},
-        output_type=lambda input_types: input_types["obj"].key,
-    )
-    def key(obj):
-        return obj.key
+    @op(output_type=lambda input_types: input_types["self"].key)
+    def key(self):
+        return self.key
 
     @op(output_type=types.Any())
     def pick(self, key: str):
@@ -386,6 +384,17 @@ def pick_output_type(input_types):
     return output_type
 
 
+class WeaveGroupResultInterface:
+    @op(
+        name="group-groupkey",
+        input_type={"obj": GroupResultType()},
+        output_type=lambda input_types: input_types["obj"].key,
+    )
+    def key(obj):
+        type_class = types.TypeRegistry.type_class_of(obj)
+        return type_class.NodeMethodsClass.key.resolve_fn(obj)
+
+
 class WeaveJSListInterface:
     @op(name="count")
     def count(arr: list[typing.Any]) -> int:  # type: ignore
@@ -445,11 +454,19 @@ class WeaveJSListInterface:
 
     @op(
         name="groupby",
+        input_type={
+            "arr": types.List(types.Any()),
+            "groupByFn": lambda input_types: types.Function(
+                {"row": input_types["arr"].object_type}, types.Any()
+            ),
+        },
         output_type=lambda input_types: types.List(
-            GroupResultType(input_types["arr"].object_type, types.Any())
+            GroupResultType(
+                input_types["arr"].object_type, input_types["groupByFn"].output_type
+            )
         ),
     )
-    def groupby(arr: list[typing.Any], groupByFn: typing.Any):  # type: ignore
+    def groupby(arr, groupByFn):  # type: ignore
         type_class = types.TypeRegistry.type_class_of(arr)
         try:
             return type_class.NodeMethodsClass.groupby.resolve_fn(arr, groupByFn)
