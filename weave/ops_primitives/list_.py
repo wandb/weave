@@ -240,8 +240,16 @@ class GroupResult:
     def __getitem__(self, index: int):
         return List.__getitem__.resolve_fn(self.list, index)
 
-    @op()
-    def map(self, map_fn: typing.Any) -> typing.Any:
+    @op(
+        input_type={
+            "self": GroupResultType(),
+            "map_fn": lambda input_types: types.Function(
+                {"row": input_types["self"].object_type}, types.Any()
+            ),
+        },
+        output_type=lambda input_types: types.List(input_types["map_fn"].output_type),
+    )
+    def map(self, map_fn):
         return List.map.resolve_fn(self.list, map_fn)
 
     @op(

@@ -43,6 +43,9 @@ class Plot(panel.Panel):
         if config.get("groupby_label"):
             self.groupby_label(config["groupby_label"])
 
+        if "tooltip" in config:
+            self.set_tooltip(config["tooltip"])
+
         if config.get("no_axes"):
             self.set_no_axes()
 
@@ -76,6 +79,9 @@ class Plot(panel.Panel):
         self._table_state.enable_groupby(self._dims["color"])
 
         self._table_state.enable_groupby(self._dims["label"])
+
+    def set_tooltip(self, expr):
+        self._table_state.update_col(self._dims["tooltip"], expr)
 
     def set_no_axes(self):
         self._axis_settings["x"] = {
