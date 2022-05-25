@@ -273,5 +273,10 @@ def _all_nodes(node: Node) -> set[Node]:
     return res
 
 
+def filter_nodes(node: Node, filter_fn: typing.Callable[[Node], Node]) -> list[Node]:
+    nodes = _all_nodes(node)
+    return [n for n in nodes if filter_fn(n)]
+
+
 def count(node: Node) -> int:
     return len(_all_nodes(node))

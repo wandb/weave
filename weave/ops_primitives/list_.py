@@ -4,8 +4,8 @@ import typing
 from .. import weave_types as types
 from ..api import op, mutation, weave_class, OpVarArgs
 from .. import weave_internal
-from .. import graph
 from .. import errors
+from .. import execute_fast
 
 
 @weave_class(weave_type=types.List)
@@ -62,15 +62,9 @@ class List:
         output_type=lambda input_types: input_types["self"],
     )
     def filter(self, filter_fn):
-        calls = []
-        for row in self:
-            calls.append(
-                weave_internal.call_fn(
-                    filter_fn, {"row": graph.ConstNode(types.Any(), row)}
-                )
-            )
+        call_results = execute_fast.fast_map_fn(self, filter_fn)
         result = []
-        for row, keep in zip(self, weave_internal.use_internal(calls)):
+        for row, keep in zip(self, call_results):
             if keep:
                 result.append(row)
         return result
@@ -85,20 +79,7 @@ class List:
         output_type=lambda input_types: types.List(input_types["map_fn"].output_type),
     )
     def map(self, map_fn):
-        print("SELF MAP_FN", self, map_fn)
-        calls = []
-        for i, row in enumerate(self):
-            calls.append(
-                weave_internal.call_fn(
-                    map_fn,
-                    {
-                        "row": graph.ConstNode(types.Any(), row),
-                        "index": graph.ConstNode(types.Number(), i),
-                    },
-                )
-            )
-        result = weave_internal.use_internal(calls)
-        return result
+        return execute_fast.fast_map_fn(self, map_fn)
 
     @op(
         input_type={
@@ -114,14 +95,7 @@ class List:
         ),
     )
     def groupby(self, group_by_fn):
-        calls = []
-        for row in self:
-            calls.append(
-                weave_internal.call_fn(
-                    group_by_fn, {"row": graph.ConstNode(types.Any(), row)}
-                )
-            )
-        call_results = weave_internal.use_internal(calls)
+        call_results = execute_fast.fast_map_fn(self, group_by_fn)
         result = {}
         for row, group_key_items in zip(self, call_results):
             import json

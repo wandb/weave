@@ -86,6 +86,18 @@ def test_run_ops():
 
 
 @pytest.mark.timeout(1.5)
+def test_run_ops_mapped():
+    input = api.save([1, 2])
+    result = input.map(
+        lambda item: async_demo.slowmult(item, 4, 0.01).await_final_output()
+    )
+
+    # We can call any ops that are available on the run's output type.
+    # So this should not fail!
+    api.use(result) == [5, 6]
+
+
+@pytest.mark.timeout(1.5)
 def test_async_op_expr():
     import shutil
 
