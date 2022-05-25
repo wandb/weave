@@ -23,6 +23,7 @@ class DictMapper(mappers.Mapper):
 
 class ObjectMapper(mappers.Mapper):
     def __init__(self, type_, mapper, artifact, path=[]):
+        self.type = type_
         self._artifact = artifact
         prop_serializers = {}
         for property_key, property_type in type_.property_types().items():

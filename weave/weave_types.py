@@ -41,12 +41,21 @@ def instance_class_to_potential_type(cls):
     return result
 
 
+def type_class_type_name(type_class):
+    try:
+        return type_class.__dict__["name"]
+    except KeyError:
+        pass
+    if hasattr(type_class, "class_type_name"):
+        return type_class.class_type_name()
+
+
 @functools.cache
 def type_name_to_type_map():
     res = {}
     type_classes = get_type_classes()
     for type_class in type_classes:
-        name = type_class.__dict__.get("name")
+        name = type_class_type_name(type_class)
         if name is not None:
             res[name] = type_class
     return res
@@ -93,7 +102,7 @@ class TypeRegistry:
             obj_type = type_.type_of(obj)
             if obj_type is not None:
                 return obj_type
-        raise errors.WeaveTypeError("no Type for obj: %s" % obj)
+        raise errors.WeaveTypeError("no Type for obj: (%s) %s" % (type(obj), obj))
 
     @staticmethod
     def type_from_dict(d):
@@ -273,6 +282,9 @@ class Const(Type):
     def __init__(self, type_, val):
         self.val_type = type_
         self.val = val
+
+    def __getattr__(self, attr):
+        return getattr(self.val_type, attr)
 
     @classmethod
     def type_of_instance(cls, obj):
@@ -463,10 +475,30 @@ class List(Type):
                 table = pa.Table.from_arrays(
                     [arr], names=["_singleton"], metadata={"singleton": "1"}
                 )
+            # if isinstance(pyarrow_type, mappers_arrow.ArrowWeaveType):
+            #     storage_array = pa.array(py_objs, pyarrow_type.storage_type)
+            #     arr = pa.ExtensionArray.from_storage(pyarrow_type, storage_array)
+            #     table = pa.Table.from_arrays(
+            #         [arr], names=["_singleton"], metadata={"singleton": "1"}
+            #     )
+            # elif pa.types.is_struct(pyarrow_type):
+            #     print("PYARROW TYPE", pyarrow_type)
+            #     arr = pa.array(py_objs, type=pyarrow_type)
+            #     rb = pa.RecordBatch.from_struct_array(
+            #         arr
+            #     )  # this pivots to columnar layout
+            #     table = pa.Table.from_batches([rb])
+            # else:
+            #     arr = pa.array(py_objs, type=pyarrow_type)
+            #     table = pa.Table.from_arrays(
+            #         [arr], names=["_singleton"], metadata={"singleton": "1"}
+            #     )
             pq.write_table(table, f)
 
     def load_instance(self, artifact, name, extra=None):
         from . import mappers_arrow
+
+        from .ops_primitives.arrow import ArrowArrayList, ArrowTableList
 
         with artifact.open(f"{name}.parquet", binary=True) as f:
             table = pq.read_table(f)
@@ -476,12 +508,14 @@ class List(Type):
                 table.schema.metadata is not None
                 and b"singleton" in table.schema.metadata
             ):
+                # return ArrowArrayList(table.column)
                 return arrow_util.ArrowArrayList(
                     table.column("_singleton"), mapper, artifact
                 )
 
             atl = arrow_util.ArrowTableList(table, mapper, artifact)
             return atl
+            return ArrowTableList(table)
 
     def __str__(self):
         return "<ListType %s>" % self.object_type
@@ -614,8 +648,16 @@ class Dict(Type):
 
 
 class ObjectType(Type):
-    # TODO: This is not a leaf type so we don't really want this name maybe?
-    name = "object_type"
+    # This needs to match the name property
+    # TODO: there has to be a better way to do this (have a property-like
+    # thing that is accessible at class time instead of object time)
+    @classmethod
+    def class_type_name(cls):
+        return cls.__name__.removesuffix("Type")
+
+    @property
+    def name(self):
+        return self.__class__.__name__.removesuffix("Type")
 
     type_vars: dict[str, Type] = {}
 

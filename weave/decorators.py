@@ -28,12 +28,15 @@ def weave_class(weave_type):
                         opdef.name,
                         "%s-%s"
                         % (
-                            weave_type.name,
+                            types.type_class_type_name(weave_type),
                             opdef.name[3:],
                         ),
                     )
 
         weave_type.NodeMethodsClass = target
+        if weave_type.instance_classes == None:
+            weave_type.instance_classes = target
+            weave_type.instance_class = target
         return target
 
     return wrap
@@ -137,7 +140,8 @@ def op(
             inferred_output_type = infer_types.python_type_to_type(python_return_type)
             if inferred_output_type == types.UnknownType():
                 raise errors.WeaveDefinitionError(
-                    "Could not infer Weave Type from declared Python return type"
+                    "Could not infer Weave Type from declared Python return type: %s"
+                    % python_return_type
                 )
 
         weave_output_type = output_type

@@ -1,3 +1,4 @@
+import json
 import pyarrow as pa
 import typing
 
@@ -18,6 +19,30 @@ class TypedDictToArrowStruct(mappers_python.TypedDictToPyDict):
             fields.append(arrow_util.arrow_field(property_key, prop_result_type))
         return pa.struct(fields)
 
+    # def apply(self, obj):
+    #     print("APPLY", obj)
+    #     res = pa.scalar(obj, self.result_type())
+    #     print("RES", res)
+    #     return res
+
+
+class ArrowWeaveType(pa.ExtensionType):
+    weave_type: types.Type
+
+    def __init__(self, weave_type, storage_type):
+        self.weave_type = weave_type
+        pa.ExtensionType.__init__(self, storage_type, "weave_object")
+
+    def __arrow_ext_serialize__(self):
+        return json.dumps(self.weave_type.to_dict()).encode()
+
+    @classmethod
+    def __arrow_ext_deserialize__(cls, storage_type, serialized):
+        # return an instance of this subclass given the serialized
+        # metadata.
+        weave_type = types.TypeRegistry.type_from_dict(json.loads(serialized.decode()))
+        return ArrowWeaveType(weave_type, storage_type)
+
 
 class ObjectToArrowStruct(mappers_python.ObjectToPyDict):
     def result_type(self):
@@ -27,11 +52,21 @@ class ObjectToArrowStruct(mappers_python.ObjectToPyDict):
                 prop_result_type = property_serializer.result_type()
                 fields.append(arrow_util.arrow_field(property_key, prop_result_type))
         return pa.struct(fields)
+        storage_type = pa.struct(fields)
+        return ArrowWeaveType(self.type, storage_type)
+
+        # TODO: should encode with arrow buffer instead of json, for style if
+        # nothing else.
+        metadata = {"weave_type": json.dumps(self._obj_type.to_dict())}
+        return arrow_util.arrow_type_with_metadata(arrow_type, metadata)
 
 
 class ListToArrowArr(mappers_python.ListToPyList):
     def result_type(self):
         return pa.list_(arrow_util.arrow_field("x", self._object_type.result_type()))
+
+    # def apply(self, obj):
+    #     return pa.scalar(obj, self.result_type())
 
 
 class UnionToArrowUnion(mappers_weave.UnionMapper):

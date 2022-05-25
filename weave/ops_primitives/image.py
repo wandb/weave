@@ -76,6 +76,15 @@ class PILImageType(types.Type):
             return im
 
 
+# I think I can fix PilImage To be a Weave Object instead of a custom type.
+# The self._to_dict() method:
+#   - by default saves any public, typed attributes on the class.
+#   - you can override this and return a different dict.
+#   - OR!
+#   - you can return a Ref object, with extra attributes attached!
+#   - That ref object itself will be converted to a dict.
+
+
 @weave.weave_class(weave_type=PILImageType)
 class PILImageOps:
     # TODO: should not need to hardcode type constants!
@@ -85,3 +94,7 @@ class PILImageOps:
         self.save(f, format="png")
         f.seek(0)
         return binascii.hexlify(f.read()).decode("ISO-8859-1")
+
+    @weave.op()
+    def width(self) -> int:
+        return self.width

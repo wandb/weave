@@ -10,6 +10,10 @@ from .. import errors
 
 @weave_class(weave_type=types.List)
 class List:
+    @op(input_type={"self": types.List(types.Any())}, output_type=types.Float())
+    def sum(self):
+        return sum(self)
+
     @op(
         input_type={"self": types.List(types.Any())},
         output_type=types.Int(),
@@ -81,6 +85,7 @@ class List:
         output_type=lambda input_types: types.List(input_types["map_fn"].output_type),
     )
     def map(self, map_fn):
+        print("SELF MAP_FN", self, map_fn)
         calls = []
         for i, row in enumerate(self):
             calls.append(

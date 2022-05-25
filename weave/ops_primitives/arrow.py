@@ -6,8 +6,49 @@ from .. import weave_internal
 
 from ..api import op, weave_class
 from .. import weave_types as types
+from .. import mappers_arrow
 from .. import graph
 from .. import errors
+from .. import registry_mem
+
+
+class ArrowArrayVectorizer:
+    def __init__(self, arr):
+        self.arr = arr
+
+    def __getattr__(self, attr):
+        return ArrowArrayVectorizer(self.arr.field(attr))
+
+    def __len__(self):
+        return len(self.arr)
+
+    def __getitem__(self, key):
+        return ArrowArrayVectorizer(self.arr[key])
+
+    def __add__(self, other):
+        if isinstance(other, ArrowArrayVectorizer):
+            other = other.arr
+        return ArrowArrayVectorizer(pc.add(self.arr, other))
+
+    def __sub__(self, other):
+        if isinstance(other, ArrowArrayVectorizer):
+            other = other.arr
+        return ArrowArrayVectorizer(pc.subtract(self.arr, other))
+
+    def __mult__(self, other):
+        if isinstance(other, ArrowArrayVectorizer):
+            other = other.arr
+        return ArrowArrayVectorizer(pc.divide(self.arr, other))
+
+    def __truediv__(self, other):
+        if isinstance(other, ArrowArrayVectorizer):
+            other = other.arr
+        return ArrowArrayVectorizer(pc.divide(self.arr, other))
+
+    def __pow__(self, other):
+        if isinstance(other, ArrowArrayVectorizer):
+            other = other.arr
+        return ArrowArrayVectorizer(pc.power(self.arr, other))
 
 
 def mapped_fn_to_arrow(arrow_table, node):
@@ -15,47 +56,39 @@ def mapped_fn_to_arrow(arrow_table, node):
         return node.val
     elif isinstance(node, graph.OutputNode):
         op_name = graph.opname_without_version(node.from_op)
-        if op_name == "number-add":
-            return pc.add(
-                mapped_fn_to_arrow(arrow_table, node.from_op.inputs["lhs"]),
-                mapped_fn_to_arrow(arrow_table, node.from_op.inputs["rhs"]),
-            )
-        if op_name == "number-greater":
-            return mapped_fn_to_arrow(
-                arrow_table, node.from_op.inputs["lhs"]
-            ) > mapped_fn_to_arrow(arrow_table, node.from_op.inputs["rhs"])
-        elif op_name == "pick":
-            return mapped_fn_to_arrow(arrow_table, node.from_op.inputs["obj"])[
-                mapped_fn_to_arrow(arrow_table, node.from_op.inputs["key"])
-            ]
+        inputs = {
+            k: mapped_fn_to_arrow(arrow_table, i)
+            for k, i in node.from_op.inputs.items()
+        }
+        if op_name == "pick":
+            return inputs["obj"][inputs["key"]]
         elif op_name == "typedDict-pick":
-            return mapped_fn_to_arrow(arrow_table, node.from_op.inputs["self"])[
-                mapped_fn_to_arrow(arrow_table, node.from_op.inputs["key"])
-            ]
+            return inputs["self"][inputs["key"]]
         elif op_name == "dict":
-            dict_args = node.from_op.inputs
-            table_cols = {}
-            for k, node in dict_args.items():
-                table_cols[k] = mapped_fn_to_arrow(arrow_table, node)
-            return pa.table(table_cols)
+            for k, v in inputs.items():
+                if isinstance(v, ArrowArrayVectorizer):
+                    inputs[k] = v.arr
+            return pa.table(inputs)
         elif op_name == "merge":
-            lhs = mapped_fn_to_arrow(arrow_table, node.from_op.inputs["lhs"])
-            rhs = mapped_fn_to_arrow(arrow_table, node.from_op.inputs["rhs"])
+            lhs = inputs["lhs"]
+            rhs = inputs["rhs"]
             t = rhs
             for col_name, column in zip(lhs.column_names, lhs.columns):
                 t.append_column(col_name, column)
             return t
-        raise Exception("unhandled op name", op_name)
+        op_def = registry_mem.memory_registry.get_op(op_name)
+        return op_def.resolve_fn(**inputs)
     elif isinstance(node, graph.VarNode):
         if node.name == "row":
-            return arrow_table
+            # return arrow_table
+            return ArrowArrayVectorizer(arrow_table)
         elif node.name == "index":
             return np.arange(len(arrow_table))
         raise Exception("unhandled var name", node.name)
 
 
 class ArrowArrayType(types.Type):
-    instance_classes = pa.ChunkedArray
+    instance_classes = [pa.ChunkedArray, pa.ExtensionArray, pa.Array]
     name = "ArrowArray"
 
     object_type: types.Type
@@ -76,7 +109,9 @@ class ArrowArrayType(types.Type):
     @classmethod
     def type_of_instance(cls, obj: pa.Array):
         weave_type: types.Type
-        if obj.type == pa.string():
+        if isinstance(obj.type, mappers_arrow.ArrowWeaveType):
+            weave_type = obj.type.weave_type
+        elif obj.type == pa.string():
             weave_type = types.String()
         elif obj.type == pa.int64():
             weave_type = types.Int()
@@ -340,6 +375,8 @@ class ArrowTableGroupResult:
         table = self._table
         mapped = mapped_fn_to_arrow(table, group_by_fn)
         group_cols = []
+        if isinstance(mapped, ArrowArrayVectorizer):
+            mapped = mapped.arr
         if isinstance(mapped, pa.Table):
             for name, column in zip(mapped.column_names, mapped.columns):
                 group_col_name = "group_key_" + name
@@ -392,6 +429,10 @@ class ArrowArrayList:
         self._array = _array
 
     @op()
+    def sum(self) -> float:
+        return pa.compute.sum(self._array)
+
+    @op()
     def count(self) -> int:
         return len(self._array)
 
@@ -432,6 +473,8 @@ class ArrowArrayList:
             return ArrowTableList(res)
         elif isinstance(res, pa.ChunkedArray):
             return ArrowArrayList(res)
+        elif isinstance(res, ArrowArrayVectorizer):
+            return ArrowArrayList(res.arr)
         else:
             raise errors.WeaveInternalError("Unexpected type: %s" % res)
 
@@ -556,6 +599,8 @@ class ArrowTableList:
             return ArrowTableList(res)
         elif isinstance(res, pa.ChunkedArray):
             return ArrowArrayList(res)
+        elif isinstance(res, ArrowArrayVectorizer):
+            return ArrowArrayList(res.arr)
         else:
             raise errors.WeaveInternalError("Unexpected type: %s" % res)
 

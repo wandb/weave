@@ -1,13 +1,16 @@
 from collections.abc import Mapping
+import pyarrow as pa
 import os
 import json
 import typing
 from urllib.parse import urlparse
 
 from . import errors
+from . import arrow_util
 from . import artifacts_local
 from . import weave_types as types
 from . import mappers_python
+from . import mappers_arrow
 from . import graph
 from . import util
 from . import box
@@ -185,5 +188,40 @@ def to_python(obj):
 def from_python(obj):
     wb_type = types.TypeRegistry.type_from_dict(obj["_type"])
     mapper = mappers_python.map_from_python(wb_type, None)
+    res = mapper.apply(obj["_val"])
+    return res
+
+
+def to_arrow(obj):
+    wb_type = types.TypeRegistry.type_of(obj)
+    artifact = artifacts_local.LocalArtifact("to-arrow-%s" % wb_type.name)
+    if isinstance(wb_type, types.List):
+        mapper = mappers_arrow.map_to_arrow(wb_type.object_type, artifact)
+        pyarrow_type = mapper.result_type()
+        print("PYARROW_TYPE", pyarrow_type, type(pyarrow_type))
+        py_objs = (mapper.apply(o) for o in obj)
+        # if isinstance(pyarrow_type, arrow_util.ArrowTypeWithFieldInfo):
+        #     return pa.array(py_objs, arrow_util.arrow_field("x", pyarrow_type))
+        #     raise errors.WeaveInternalError(
+        #         "to_arrow not implemented for: %s" % pyarrow_type
+        #     )
+        # if isinstance(pyarrow_type, mappers_arrow.ArrowWeaveType):
+        #     storage_array = pa.array(py_objs, pyarrow_type.storage_type)
+        #     return pa.ExtensionArray.from_storage(pyarrow_type, storage_array)
+        if isinstance(wb_type.object_type, types.ObjectType):
+            return pa.array(py_objs, pyarrow_type)
+        elif pa.types.is_struct(pyarrow_type):
+            print("YES STRUCT")
+            arr = pa.array(py_objs, type=pyarrow_type)
+            rb = pa.RecordBatch.from_struct_array(arr)  # this pivots to columnar layout
+            return pa.Table.from_batches([rb])
+        else:
+            return pa.array(py_objs, pyarrow_type)
+    raise errors.WeaveInternalError("to_arrow not implemented for: %s" % obj)
+
+
+def from_arrow(obj):
+    wb_type = types.TypeRegistry.type_from_dict(obj["_type"])
+    mapper = mappers_arrow.map_from_arrow(wb_type, None)
     res = mapper.apply(obj["_val"])
     return res

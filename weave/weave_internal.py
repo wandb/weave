@@ -89,8 +89,8 @@ def make_output_node(type_, op_name, op_inputs):
 
 
 def define_fn(parameters, body):
-    varNodes = {k: make_var_node(t, k) for k, t in parameters.items()}
-    fnNode = body(**varNodes)
+    var_nodes = [make_var_node(t, k) for k, t in parameters.items()]
+    fnNode = body(*var_nodes)
     return graph.ConstNode(types.Function(parameters, fnNode.type), fnNode)
 
 

@@ -1,3 +1,4 @@
+import math
 import pyarrow as pa
 from . import mappers_arrow
 from . import weave_types as types
@@ -63,7 +64,9 @@ def test_map_list_with_nan():
         )
     )
     d2 = m.apply(d)
-    assert d == d2
+    assert d[0]["a"] == d2[0]["a"]
+    assert math.isnan(d2[0]["b"])
     m2 = mappers_arrow.map_from_arrow(d_type, None)
     d3 = m2.apply(d2)
-    assert d2 == d3
+    assert d2[0]["a"] == d3[0]["a"]
+    assert math.isnan(d3[0]["b"])
