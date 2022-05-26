@@ -69,7 +69,7 @@ def save_to_artifact(obj, artifact: artifacts_local.LocalArtifact, name, type_):
     )
 
 
-def save(obj, name=None, type=None):
+def save(obj, name=None, type=None, artifact=None):
     # TODO: get rid of this? Always type check?
     wb_type = type
     if wb_type is None:
@@ -81,11 +81,12 @@ def save(obj, name=None, type=None):
                 % (obj, str(e.args))
             )
     obj = box.box(obj)
-    if name is None:
-        obj_names = util.find_names(obj)
-        # name = f"{wb_type.name}-{obj_names[-1]}-{util.rand_string_n(10)}"
-        name = f"{wb_type.name}-{obj_names[-1]}"
-    artifact = artifacts_local.LocalArtifact(name)
+    if artifact is None:
+        if name is None:
+            obj_names = util.find_names(obj)
+            # name = f"{wb_type.name}-{obj_names[-1]}-{util.rand_string_n(10)}"
+            name = f"{wb_type.name}-{obj_names[-1]}"
+        artifact = artifacts_local.LocalArtifact(name)
     ref = save_to_artifact(obj, artifact, "_obj", wb_type)
     with artifact.new_file(f"_obj.type.json") as f:
         json.dump(wb_type.to_dict(), f)
@@ -192,31 +193,56 @@ def from_python(obj):
     return res
 
 
+def wrap_arrow_obj(obj, demapper):
+    from .ops_primitives import arrow
+
+    if isinstance(obj, pa.Table):
+        return arrow.ArrowTableList(obj, demapper)
+    elif isinstance(obj, pa.ChunkedArray):
+        return arrow.ArrowArrayList(obj)
+    else:
+        raise errors.WeaveInternalError("not supported: %s" % type(obj))
+
+
 def to_arrow(obj):
     wb_type = types.TypeRegistry.type_of(obj)
     artifact = artifacts_local.LocalArtifact("to-arrow-%s" % wb_type.name)
     if isinstance(wb_type, types.List):
-        mapper = mappers_arrow.map_to_arrow(wb_type.object_type, artifact)
+        object_type = wb_type.object_type
+
+        # Convert to arrow, serializing Custom objects to the artifact
+        mapper = mappers_arrow.map_to_arrow(object_type, artifact)
         pyarrow_type = mapper.result_type()
-        print("PYARROW_TYPE", pyarrow_type, type(pyarrow_type))
         py_objs = (mapper.apply(o) for o in obj)
-        # if isinstance(pyarrow_type, arrow_util.ArrowTypeWithFieldInfo):
-        #     return pa.array(py_objs, arrow_util.arrow_field("x", pyarrow_type))
-        #     raise errors.WeaveInternalError(
-        #         "to_arrow not implemented for: %s" % pyarrow_type
-        #     )
-        # if isinstance(pyarrow_type, mappers_arrow.ArrowWeaveType):
-        #     storage_array = pa.array(py_objs, pyarrow_type.storage_type)
-        #     return pa.ExtensionArray.from_storage(pyarrow_type, storage_array)
-        if isinstance(wb_type.object_type, types.ObjectType):
-            return pa.array(py_objs, pyarrow_type)
-        elif pa.types.is_struct(pyarrow_type):
-            print("YES STRUCT")
+
+        # TODO: do I need this branch? Does it work now?
+        # if isinstance(wb_type.object_type, types.ObjectType):
+        #     arrow_obj = pa.array(py_objs, pyarrow_type)
+        from .ops_primitives import arrow
+
+        if pa.types.is_struct(pyarrow_type):
             arr = pa.array(py_objs, type=pyarrow_type)
             rb = pa.RecordBatch.from_struct_array(arr)  # this pivots to columnar layout
-            return pa.Table.from_batches([rb])
+            arrow_obj = pa.Table.from_batches([rb])
+            weave_obj = arrow.ArrowTableList(arrow_obj, object_type, artifact)
+            weave_type = arrow.ArrowTableListType(
+                arrow.ArrowTableType(wb_type.object_type)
+            )
         else:
-            return pa.array(py_objs, pyarrow_type)
+            arrow_obj = pa.array(py_objs, pyarrow_type)
+            weave_obj = arrow.ArrowArrayList(arrow_obj, object_type, artifact)
+            weave_type = arrow.ArrowArrayListType(
+                arrow.ArrowArrayType(wb_type.object_type)
+            )
+
+        # # Wrap the resulting arrow object in the appropriate Weave interface
+        # weave_obj = wrap_arrow_obj(arrow_obj, demapper)
+
+        # Save the weave object to the artifact
+        ref = save(weave_obj, artifact=artifact, type=weave_type)
+
+        return ref.obj
+
     raise errors.WeaveInternalError("to_arrow not implemented for: %s" % obj)
 
 

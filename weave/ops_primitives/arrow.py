@@ -16,8 +16,14 @@ class ArrowArrayVectorizer:
     def __init__(self, arr):
         self.arr = arr
 
+    def _get_col(self, key):
+        col = self.arr._get_col(key)
+        if isinstance(col, list):
+            return col
+        return ArrowArrayVectorizer(col)
+
     def __getattr__(self, attr):
-        return ArrowArrayVectorizer(self.arr.field(attr))
+        return self._get_col(attr)
 
     def __len__(self):
         return len(self.arr)
@@ -61,9 +67,9 @@ def mapped_fn_to_arrow(arrow_table, node):
             for k, i in node.from_op.inputs.items()
         }
         if op_name == "pick":
-            return inputs["obj"][inputs["key"]]
+            return inputs["obj"]._get_col(inputs["key"])
         elif op_name == "typedDict-pick":
-            return inputs["self"][inputs["key"]]
+            return inputs["self"]._get_col(inputs["key"])
         elif op_name == "dict":
             for k, v in inputs.items():
                 if isinstance(v, ArrowArrayVectorizer):
@@ -77,7 +83,26 @@ def mapped_fn_to_arrow(arrow_table, node):
                 t.append_column(col_name, column)
             return t
         op_def = registry_mem.memory_registry.get_op(op_name)
-        return op_def.resolve_fn(**inputs)
+        if list(inputs.keys())[0] == "self" and isinstance(
+            list(inputs.values())[0], list
+        ):
+            import copy
+
+            row_inputs = copy.copy(inputs)
+            res = []
+            for row in list(inputs.values())[0]:
+                row_inputs["self"] = row
+                res.append(op_def.resolve_fn(**row_inputs))
+            return ArrowArrayVectorizer(pa.array(res))
+        result = op_def.resolve_fn(**inputs)
+        if isinstance(node.type, types.ObjectType):
+            cols = {}
+            for k in node.type.property_types():
+                cols[k] = getattr(result, k)
+                if isinstance(cols[k], ArrowArrayVectorizer):
+                    cols[k] = cols[k].arr
+            return pa.table(cols)
+        return result
     elif isinstance(node, graph.VarNode):
         if node.name == "row":
             # return arrow_table
@@ -241,9 +266,10 @@ class ArrowTableGroupByType(types.ObjectType):
 
 @weave_class(weave_type=ArrowTableGroupByType)
 class ArrowTableGroupBy:
-    def __init__(self, _table, _group_keys):
+    def __init__(self, _table, _group_keys, mapper):
         self._table = _table
         self._group_keys = _group_keys
+        self._mapper = mapper
 
     @op()
     def count(self) -> int:
@@ -276,7 +302,7 @@ class ArrowTableGroupBy:
             group[col_name.removesuffix("_list")] = column[0].values
         group_table = pa.table(group)
 
-        return ArrowTableGroupResult(group_table, group_key)
+        return ArrowTableGroupResult(group_table, group_key, self._mapper)
 
     @op(
         input_type={
@@ -335,9 +361,22 @@ class ArrowTableGroupResultType(types.ObjectType):
 
 @weave_class(weave_type=ArrowTableGroupResultType)
 class ArrowTableGroupResult:
-    def __init__(self, _table, _key):
+    def __init__(self, _table, _key, mapper):
         self._table = _table
         self._key = _key
+        self._mapper = mapper
+
+    def _get_col(self, name):
+        from .. import mappers_python
+
+        col = self._table[name]
+        if isinstance(
+            self._mapper._property_serializers[name], mappers_python.DefaultFromPy
+        ):
+            return [
+                self._mapper._property_serializers[name].apply(i.as_py()) for i in col
+            ]
+        return self._mapper._property_serializers[name].apply(col)
 
     @op()
     def count(self) -> int:
@@ -373,7 +412,7 @@ class ArrowTableGroupResult:
     def groupby(self, group_by_fn):
         # replace_schema_metadata does a shallow copy
         table = self._table
-        mapped = mapped_fn_to_arrow(table, group_by_fn)
+        mapped = mapped_fn_to_arrow(self, group_by_fn)
         group_cols = []
         if isinstance(mapped, ArrowArrayVectorizer):
             mapped = mapped.arr
@@ -395,7 +434,7 @@ class ArrowTableGroupResult:
         for column_name in self._table.column_names:
             aggs.append((column_name, "list"))
         agged = grouped.aggregate(aggs)
-        return ArrowTableGroupBy(agged, group_cols)
+        return ArrowTableGroupBy(agged, group_cols, self._mapper)
 
 
 ArrowTableGroupResultType.instance_classes = ArrowTableGroupResult
@@ -425,8 +464,15 @@ class ArrowArrayList:
     def to_pylist(self):
         return self._array.to_pylist()
 
-    def __init__(self, _array):
+    def __init__(self, _array, object_type=None, artifact=None):
         self._array = _array
+        self.object_type = object_type
+        if self.object_type is None:
+            self.object_type = types.TypeRegistry.type_of(self._array).object_type
+        self._artifact = artifact
+        from .. import mappers_arrow
+
+        self._mapper = mappers_arrow.map_from_arrow(self.object_type, self._artifact)
 
     @op()
     def sum(self) -> float:
@@ -506,7 +552,7 @@ class ArrowArrayList:
         grouped = table.group_by(group_cols)
         aggs = (("array", "list"),)
         agged = grouped.aggregate(aggs)
-        return ArrowTableGroupBy(agged, group_cols)
+        return ArrowTableGroupBy(agged, group_cols, self._mapper)
 
 
 ArrowArrayListType.instance_classes = ArrowArrayList
@@ -516,27 +562,32 @@ ArrowArrayListType.instance_class = ArrowArrayList
 class ArrowTableListType(types.ObjectType):
     name = "ArrowTableList"
 
-    type_vars = {"_table": ArrowTableType(types.Any())}
+    type_vars = {"_table": ArrowTableType(types.Any()), "object_type": types.Type()}
 
-    def __init__(self, _table=ArrowTableType(types.Any())):
+    def __init__(self, _table=ArrowTableType(types.Any()), object_type=types.Type()):
         self._table = _table
+        self.object_type = object_type
+
+    @classmethod
+    def type_of_instance(cls, obj):
+        return cls(types.TypeRegistry.type_of(obj._table), obj.object_type)
 
     def _to_dict(self):
+        # TODO: annoying. we need to write these methods to switch to snakeCase
         return {
-            "objectType": self.object_type.to_dict(),
             "_table": self._table.to_dict(),
+            "objectType": self.object_type.to_dict(),
         }
 
     @classmethod
     def from_dict(cls, d):
-        return cls(types.TypeRegistry.type_from_dict(d["_table"]))
+        return cls(
+            types.TypeRegistry.type_from_dict(d["_table"]),
+            types.TypeRegistry.type_from_dict(d["objectType"]),
+        )
 
     def property_types(self):
-        return {"_table": self._table}
-
-    @property
-    def object_type(self):
-        return self._table.object_type
+        return {"_table": self._table, "object_type": types.Type()}
 
 
 @weave_class(weave_type=ArrowTableListType)
@@ -546,8 +597,16 @@ class ArrowTableList:
     def to_pylist(self):
         return self._table.to_pylist()
 
-    def __init__(self, _table):
+    def __init__(self, _table, object_type=None, artifact=None):
         self._table = _table
+        self.object_type = object_type
+        if self.object_type is None:
+            self.object_type = types.TypeRegistry.type_of(self._table).object_type
+        self._artifact = artifact
+        from .. import mappers_arrow
+
+        self._mapper = mappers_arrow.map_from_arrow(self.object_type, self._artifact)
+        # TODO: construct mapper
 
     def _count(self):
         return len(self._table)
@@ -557,12 +616,24 @@ class ArrowTableList:
         print("SELF", self)
         return self._count()
 
+    def _get_col(self, name):
+        from .. import mappers_python
+
+        col = self._table[name]
+        if isinstance(
+            self._mapper._property_serializers[name], mappers_python.DefaultFromPy
+        ):
+            return [
+                self._mapper._property_serializers[name].apply(i.as_py()) for i in col
+            ]
+        return self._mapper._property_serializers[name].apply(col)
+
     def _index(self, index):
         try:
             row = self._table.slice(index, 1)
         except IndexError:
             return None
-        return row.to_pylist()[0]
+        return self._mapper.apply(row.to_pylist()[0])
 
     @op(output_type=index_output_type)
     def __getitem__(self, index: int):
@@ -594,13 +665,15 @@ class ArrowTableList:
         output_type=map_output_type,
     )
     def map(self, map_fn):
-        res = mapped_fn_to_arrow(self._table, map_fn)
+        res = mapped_fn_to_arrow(self, map_fn)
         if isinstance(res, pa.Table):
             return ArrowTableList(res)
         elif isinstance(res, pa.ChunkedArray):
             return ArrowArrayList(res)
         elif isinstance(res, ArrowArrayVectorizer):
             return ArrowArrayList(res.arr)
+        elif isinstance(res, list):
+            return res
         else:
             raise errors.WeaveInternalError("Unexpected type: %s" % res)
 
@@ -618,7 +691,7 @@ class ArrowTableList:
     def groupby(self, group_by_fn):
         # replace_schema_metadata does a shallow copy
         table = self._table
-        mapped = mapped_fn_to_arrow(table, group_by_fn)
+        mapped = mapped_fn_to_arrow(self, group_by_fn)
         group_cols = []
         if isinstance(mapped, pa.Table):
             for name, column in zip(mapped.column_names, mapped.columns):
@@ -632,7 +705,7 @@ class ArrowTableList:
         for column_name in self._table.column_names:
             aggs.append((column_name, "list"))
         agged = grouped.aggregate(aggs)
-        return ArrowTableGroupBy(agged, group_cols)
+        return ArrowTableGroupBy(agged, group_cols, self._mapper)
 
 
 ArrowTableListType.instance_classes = ArrowTableList

@@ -1,8 +1,8 @@
 import itertools
 import hashlib
-import math
 import pyarrow as pa
 import random
+from PIL import Image
 
 from .. import storage
 from .. import api as weave
@@ -91,3 +91,27 @@ def test_table_string_histogram():
         .count()
     )
     assert weave.use(node) == 3
+
+
+def test_custom_types():
+    data_node = storage.to_arrow(
+        [
+            {"a": 5, "im": Image.linear_gradient("L").rotate(0)},
+            {"a": 6, "im": Image.linear_gradient("L").rotate(4)},
+        ]
+    )
+    assert weave.use(data_node[0]["im"].width()) == 256
+
+    assert weave.use(data_node.map(lambda row: row["im"].width())).to_pylist() == [
+        256,
+        256,
+    ]
+
+
+def test_custom_saveload():
+    data = [
+        {"a": 5, "im": Image.linear_gradient("L").rotate(0)},
+        {"a": 6, "im": Image.linear_gradient("L").rotate(4)},
+    ]
+    ref = storage.save(data)
+    storage.get(str(ref))

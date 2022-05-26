@@ -73,18 +73,6 @@ def make_const_node(type_, val):
     return return_type(type_, val)
 
 
-def make_output_node(type_, op_name, op_inputs):
-    if hasattr(type_, "NodeMethodsClass"):
-        return_type = type(
-            "OutputNode%s" % type_.__class__.__name__,
-            (graph.OutputNode, type_.NodeMethodsClass),
-            {},
-        )
-    else:
-        return_type = graph.OutputNode
-    return return_type(type_, op_name, op_inputs)
-
-
 # Given a registered op, make a mapped version of it.
 
 

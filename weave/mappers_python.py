@@ -1,3 +1,4 @@
+import inspect
 import math
 
 from . import mappers
@@ -47,6 +48,10 @@ class ObjectDictToObject(mappers_weave.ObjectMapper):
         for prop_name, prop_type in result_type.variable_property_types().items():
             if isinstance(prop_type, types.Const):
                 result[prop_name] = prop_type.val
+
+        constructor_sig = inspect.signature(result_type.instance_class)
+        if "artifact" in constructor_sig.parameters:
+            result["artifact"] = self._artifact
         return result_type.instance_class(**result)
 
 

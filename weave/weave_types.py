@@ -515,7 +515,6 @@ class List(Type):
 
             atl = arrow_util.ArrowTableList(table, mapper, artifact)
             return atl
-            return ArrowTableList(table)
 
     def __str__(self):
         return "<ListType %s>" % self.object_type
