@@ -30,8 +30,8 @@ def test_mapped_method_on_custom_type():
         ]
     )
     lens = weave.use(segments.map(lambda seg: seg.length()))
-    assert weave.use(lens[0]).as_py() == 1.81
-    assert weave.use(lens[1]).as_py() == pytest.approx(0.97)
+    assert weave.use(lens[0]) == 1.81
+    assert weave.use(lens[1]) == pytest.approx(0.97)
 
     # mid = weave.use(segments.midpoint())
     # mid = weave.use(segments.map(lambda seg: seg.midpoint()))

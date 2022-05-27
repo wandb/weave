@@ -79,6 +79,11 @@ class ArrowArrayList(Iterable):
         self._deserializer = mapper
 
     def __getitem__(self, index):
+        if isinstance(index, slice):
+            return [
+                self._deserializer.apply(o)
+                for o in self._arrow_array[index].to_pylist()
+            ]
         if index >= len(self._arrow_array):
             return None
         return self._deserializer.apply(self._arrow_array[index].as_py())

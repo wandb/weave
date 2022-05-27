@@ -70,6 +70,10 @@ def save_to_artifact(obj, artifact: artifacts_local.LocalArtifact, name, type_):
 
 
 def save(obj, name=None, type=None, artifact=None):
+    ref = _get_ref(obj)
+    if ref is not None:
+        if name is None or ref.artifact._name == name:
+            return ref
     # TODO: get rid of this? Always type check?
     wb_type = type
     if wb_type is None:
@@ -112,6 +116,10 @@ def _get_ref(obj):
     if isinstance(obj, refs.Ref):
         return obj
     return refs.get_ref(obj)
+
+
+def clear_ref(obj):
+    refs.clear_ref(obj)
 
 
 get_ref = _get_ref
@@ -225,21 +233,15 @@ def to_arrow(obj):
             rb = pa.RecordBatch.from_struct_array(arr)  # this pivots to columnar layout
             arrow_obj = pa.Table.from_batches([rb])
             weave_obj = arrow.ArrowTableList(arrow_obj, object_type, artifact)
-            weave_type = arrow.ArrowTableListType(
-                arrow.ArrowTableType(wb_type.object_type)
-            )
         else:
             arrow_obj = pa.array(py_objs, pyarrow_type)
             weave_obj = arrow.ArrowArrayList(arrow_obj, object_type, artifact)
-            weave_type = arrow.ArrowArrayListType(
-                arrow.ArrowArrayType(wb_type.object_type)
-            )
 
         # # Wrap the resulting arrow object in the appropriate Weave interface
         # weave_obj = wrap_arrow_obj(arrow_obj, demapper)
 
         # Save the weave object to the artifact
-        ref = save(weave_obj, artifact=artifact, type=weave_type)
+        ref = save(weave_obj, artifact=artifact)
 
         return ref.obj
 

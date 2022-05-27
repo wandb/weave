@@ -48,6 +48,9 @@ class LocalArtifact:
 
         self._last_write_path = None
 
+    def __repr__(self):
+        return "<LocalArtifact(%s) %s %s>" % (id(self), self._name, self._version)
+
     @property
     def version(self):
         if self._version is None:

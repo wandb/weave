@@ -111,33 +111,18 @@ class List:
         return grs
 
     @op(
-        name="offset",
         input_type={"arr": types.List(types.Any()), "offset": types.Number()},
         output_type=lambda input_types: input_types["arr"],
     )
     def offset(arr, offset):
-        # So lame, we can't use slice because sometimes we have an ArrowArrayTable here
-        # TODO: fix
-        res = []
-        for i in range(offset, len(arr)):
-            res.append(arr[i])
-        return res
+        return arr[offset:]
 
     @op(
-        name="limit",
         input_type={"arr": types.List(types.Any()), "limit": types.Number()},
         output_type=lambda input_types: input_types["arr"],
     )
     def limit(arr, limit):
-        # So lame, we can't use slice because sometimes we have an ArrowArrayTable here
-        # TODO: fix
-        res = []
-        if limit >= len(arr):
-            limit = len(arr)
-        for i in range(limit):
-            res.append(arr[i])
-        return res
-        # return arr[:limit]
+        return arr[:limit]
 
     @op(
         name="dropna",
@@ -460,6 +445,24 @@ class WeaveJSListInterface:
         except AttributeError:
             groupby_res = List.groupby.resolve_fn(arr, groupByFn)
             return groupby_res
+
+    @op(
+        name="offset",
+        input_type={"arr": types.List(types.Any()), "offset": types.Number()},
+        output_type=lambda input_types: input_types["arr"],
+    )
+    def offset(arr, offset):
+        type_class = types.TypeRegistry.type_class_of(arr)
+        return type_class.NodeMethodsClass.offset.resolve_fn(arr, offset)
+
+    @op(
+        name="limit",
+        input_type={"arr": types.List(types.Any()), "limit": types.Number()},
+        output_type=lambda input_types: input_types["arr"],
+    )
+    def limit(arr, limit):
+        type_class = types.TypeRegistry.type_class_of(arr)
+        return type_class.NodeMethodsClass.limit.resolve_fn(arr, limit)
 
 
 def list_return_type(input_types):

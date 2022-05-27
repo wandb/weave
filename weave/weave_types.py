@@ -673,6 +673,8 @@ class ObjectType(Type):
     def __str__(self):
         result = []
         for k, v in self.property_types().items():
+            if type(v) == Type:
+                v = getattr(self, k)
             result.append("%s: %s" % (k, v))
         return "<%s {%s}>" % (self.__class__.__name__, ", ".join(result))
 

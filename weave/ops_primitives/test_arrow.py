@@ -1,7 +1,9 @@
+import pytest
 import itertools
 import hashlib
 import pyarrow as pa
 import random
+import string
 from PIL import Image
 
 from .. import storage
@@ -13,32 +15,30 @@ def simple_hash(n, b):
     return int.from_bytes(hashlib.sha256(str(n).encode()).digest(), "little") % b
 
 
-def create_arrow_data(n_rows):
+def create_arrow_data(n_rows, n_extra_cols=0, images=False):
     inner_count = int(n_rows / 25)
-    rotates = []
-    shears = []
-    x = []
-    y = []
-    x_choices = ["a", "b", "c"]
-    random.seed(0)
+    base_im = Image.linear_gradient("L")
+    x_choices = string.ascii_lowercase
+    extra_cols = [chr(ord("a") + i) for i in range(n_extra_cols)]
+    ims = []
     for i, (rotate, shear, _) in enumerate(
         itertools.product(range(5), range(5), range(inner_count))
     ):
-        rotates.append(rotate)
-        shears.append(shear)
-        x.append(x_choices[simple_hash(i**13, 3)])
-        y.append(simple_hash(i, 10))
-    table = pa.table(
-        {
-            "rotate": rotates,
-            "shear": shears,
-            "x": x,
-            "y": y,
+        im = {
+            "rotate": rotate,
+            "shear": shear,
+            "x": x_choices[simple_hash(i**13, 3)],
+            "y": simple_hash(i, 10),
         }
-    )
-    table_list = ops.ArrowTableList(table)
-
-    return storage.save(table_list)
+        if images:
+            im["image"] = base_im.rotate(rotate * 4).transform(
+                (256, 256), Image.AFFINE, (1, shear / 10, 0, 0, 1, 0), Image.BICUBIC
+            )
+        for j, col in enumerate(extra_cols):
+            im[col] = x_choices[simple_hash(i * 13**j, 11)]
+        ims.append(im)
+    arr = storage.to_arrow(ims)
+    return storage.save(arr)
 
 
 def test_groupby_index_count():
@@ -53,10 +53,11 @@ def test_groupby_index_count():
 
 def test_map_scalar_map():
     ref = create_arrow_data(1000)
+    print("REF TYPE", ref.type)
 
     node = weave.get(ref).map(lambda row: row["y"] + 1).map(lambda row: row + 9)
-    assert weave.use(node[0]).as_py() == 15
-    assert weave.use(node[4]).as_py() == 17
+    assert weave.use(node[0]) == 15
+    assert weave.use(node[4]) == 17
 
 
 def test_complicated():
@@ -109,9 +110,37 @@ def test_custom_types():
 
 
 def test_custom_saveload():
-    data = [
-        {"a": 5, "im": Image.linear_gradient("L").rotate(0)},
-        {"a": 6, "im": Image.linear_gradient("L").rotate(4)},
-    ]
+    data = storage.to_arrow(
+        [
+            {"a": 5, "im": Image.linear_gradient("L").rotate(0)},
+            {"a": 6, "im": Image.linear_gradient("L").rotate(4)},
+        ]
+    )
     ref = storage.save(data)
-    storage.get(str(ref))
+    data2 = storage.get(str(ref))
+    print("data2", data2._artifact)
+    assert weave.use(data2[0]["im"].width()) == 256
+
+
+@pytest.mark.skip()
+def test_custom_groupby():
+    data = storage.to_arrow(
+        [
+            {"a": 5, "im": Image.linear_gradient("L").rotate(0)},
+            {"a": 6, "im": Image.linear_gradient("L").rotate(4)},
+        ]
+    )
+    print(
+        "TYPE",
+        data.groupby(lambda row: ops.dict_(a=row["a"]))[0].pick("im").offset(0).type,
+    )
+
+    assert (
+        weave.use(
+            data.groupby(lambda row: ops.dict_(a=row["a"]))[0]
+            .pick("im")
+            .offset(0)[0]
+            .width()
+        )
+        == 256
+    )

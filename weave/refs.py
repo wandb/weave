@@ -28,7 +28,7 @@ def get_ref(obj):
     if hasattr(obj, "_ref"):
         return obj._ref
     try:
-        if obj in REFS:
+        if id(obj) in REFS:
             return REFS[id(obj)]
     except TypeError:
         pass
@@ -40,6 +40,15 @@ def put_ref(obj, ref):
         obj._ref = ref
     except AttributeError:
         REFS[id(obj)] = ref
+
+
+def clear_ref(obj):
+    try:
+        delattr(obj, "_ref")
+    except AttributeError:
+        pass
+    if id(obj) in REFS:
+        REFS.pop(id(obj))
 
 
 class LocalArtifactRef(Ref):

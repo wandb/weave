@@ -36,6 +36,9 @@ def _save(name, obj):
     obj_name, version = name.split("/")
     from . import storage
 
+    # Clear the ref, otherwise save will immediately return
+    # the result instead of saving the mutated result
+    storage.clear_ref(obj)
     storage.save(obj, name=obj_name)
 
 

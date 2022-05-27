@@ -22,6 +22,10 @@ class ArrowArrayVectorizer:
             return col
         return ArrowArrayVectorizer(col)
 
+    def items(self):
+        for col_name in self.arr._table.column_names:
+            yield col_name, self._get_col(col_name)
+
     def __getattr__(self, attr):
         return self._get_col(attr)
 
@@ -233,7 +237,7 @@ def map_output_type(input_types):
     if isinstance(object_type, types.TypedDict):
         return ArrowTableListType(ArrowTableType(object_type))
     else:
-        return ArrowArrayListType(ArrowArrayType(object_type))
+        return ArrowArrayListType(ArrowArrayType(object_type), object_type)
 
 
 class ArrowTableGroupByType(types.ObjectType):
@@ -390,13 +394,17 @@ class ArrowTableGroupResult:
         output_type=lambda input_types: ArrowArrayListType(
             ArrowArrayType(
                 input_types["self"].object_type.property_types[input_types["key"].val]
-            )
+            ),
+            input_types["self"].object_type.property_types[input_types["key"].val],
         )
     )
     def pick(self, key: str):
         # TODO: Don't do to_pylist() here! Stay in arrow til as late
         #     as possible
-        return ArrowArrayList(self._table[key])
+        object_type = self._mapper.type
+        return ArrowArrayList(
+            self._table[key], object_type.property_types[key], self._mapper._artifact
+        )
 
     @op(
         input_type={
@@ -444,17 +452,32 @@ ArrowTableGroupResultType.instance_class = ArrowTableGroupResult
 class ArrowArrayListType(types.ObjectType):
     name = "ArrowArrayList"
 
-    type_vars = {"_array": ArrowArrayType(types.Any())}
+    type_vars = {"_array": ArrowArrayType(types.Any()), "object_type": types.Type()}
 
-    def __init__(self, _array=ArrowArrayType(types.Any())):
+    def __init__(self, _array=ArrowArrayType(types.Any()), object_type=types.Type()):
         self._array = _array
+        self.object_type = object_type
+
+    @classmethod
+    def type_of_instance(cls, obj):
+        return cls(types.TypeRegistry.type_of(obj._array), obj.object_type)
+
+    def _to_dict(self):
+        # TODO: annoying. we need to write these methods to switch to snakeCase
+        return {
+            "_array": self._array.to_dict(),
+            "objectType": self.object_type.to_dict(),
+        }
+
+    @classmethod
+    def from_dict(cls, d):
+        return cls(
+            types.TypeRegistry.type_from_dict(d["_array"]),
+            types.TypeRegistry.type_from_dict(d["objectType"]),
+        )
 
     def property_types(self):
-        return {"_array": self._array}
-
-    @property
-    def object_type(self):
-        return self._array.object_type
+        return {"_array": self._array, "object_type": types.Type()}
 
 
 @weave_class(weave_type=ArrowArrayListType)
@@ -484,7 +507,7 @@ class ArrowArrayList:
 
     def _index(self, index):
         try:
-            return self._array[index]
+            return self._mapper.apply(self._array[index].as_py())
         except IndexError:
             return None
 
@@ -539,7 +562,6 @@ class ArrowArrayList:
         # replace_schema_metadata does a shallow copy
         array = self._array
         mapped = mapped_fn_to_arrow(array, group_by_fn)
-        print("MAPPED", mapped)
         group_cols = []
         table = pa.table({"array": array})
         if isinstance(mapped, pa.Table):
@@ -553,6 +575,14 @@ class ArrowArrayList:
         aggs = (("array", "list"),)
         agged = grouped.aggregate(aggs)
         return ArrowTableGroupBy(agged, group_cols, self._mapper)
+
+    @op(output_type=lambda input_types: input_types["self"])
+    def offset(self, offset: int):
+        return ArrowArrayList(self._array[offset:], self.object_type, self._artifact)
+
+    @op(output_type=lambda input_types: input_types["self"])
+    def limit(self, limit: int):
+        return ArrowArrayList(self._array[:limit], self.object_type, self._artifact)
 
 
 ArrowArrayListType.instance_classes = ArrowArrayList
@@ -589,6 +619,13 @@ class ArrowTableListType(types.ObjectType):
     def property_types(self):
         return {"_table": self._table, "object_type": types.Type()}
 
+    # def save_instance(self, obj, artifact, name):
+    #     super().save_instance(obj, artifact, name)
+    #     mapper = mappers_arrow.map_to_arrow(self.object_type, artifact)
+    #     mapper.apply(ArrowArrayVectorizer(obj))
+    #     print("SAVE", self, obj, artifact, name)
+    #     pass
+
 
 @weave_class(weave_type=ArrowTableListType)
 class ArrowTableList:
@@ -613,7 +650,6 @@ class ArrowTableList:
 
     @op()
     def count(self) -> int:
-        print("SELF", self)
         return self._count()
 
     def _get_col(self, name):
