@@ -46,11 +46,20 @@ class ArrowTableProxy:
     def __init__(self, arrow_table, mapper, artifact):
         self._arrow_table = arrow_table
         self._artifact = artifact
-        self._deserializer = mapper
+        self._mapper = mapper
 
     def __getattr__(self, attr):
-        res = self._arrow_table[attr]
-        return res
+        print("GETATTR", attr)
+        if isinstance(self._arrow_table, pa.Table):
+            res = self._arrow_table[attr]
+        else:
+            res = self._arrow_table.combine_chunks().field(attr)
+        print("TYPE RES", type(res), res.type)
+        return ArrowTableProxy(res, self._mapper, self._artifact)
+
+
+# Maybe I could do all this Mapper / Proxy logic in Mappers Arrow?
+# Or just do it here. But how do we make sure all cases are covered?
 
 
 class ArrowTableList(Iterable, typing.Generic[ObjectT]):
@@ -88,6 +97,10 @@ class ArrowTableList(Iterable, typing.Generic[ObjectT]):
         return True
 
     def map(self, map_fn: typing.Callable[[ObjectT], Output]) -> list[Output]:
+        # output = map_fn(
+        #     ArrowTableProxy(self._arrow_table, self._mapper, self._artifact)
+        # )
+        # return output._arrow_table.to_pylist()
         return [map_fn(row) for row in self]
 
 

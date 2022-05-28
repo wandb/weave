@@ -30,13 +30,13 @@ def test_method_op_name():
     assert MyObj.my_op.name == "test-decorators-my-obj-my_op"
 
 
-@weave.obj()
+@weave.type()
 class Point:
     x: float
     y: float
 
 
-@weave.obj()
+@weave.type()
 class LineSegment:
     start: Point
     end: Point

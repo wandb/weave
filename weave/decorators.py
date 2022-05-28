@@ -241,13 +241,16 @@ def mutation(f):
     return call
 
 
-def obj():
+_py_type = type
+
+
+def type():
     def wrap(target):
         dc = dataclasses.dataclass(target)
         fields = dataclasses.fields(dc)
         target_name = target.__name__
 
-        TargetType = type(f"{target_name}Type", (types.ObjectType,), {})
+        TargetType = _py_type(f"{target_name}Type", (types.ObjectType,), {})
         TargetType.name = target_name
         TargetType.instance_classes = target
         TargetType.instance_class = target
@@ -266,7 +269,6 @@ def obj():
 
         TargetType.property_types = property_types
         dc.WeaveType = TargetType
-        print("HERE")
         return dc
 
     return wrap
