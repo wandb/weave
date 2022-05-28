@@ -1,12 +1,12 @@
 import copy
 import inspect
 import typing
+import dataclasses
 
 from . import graph
 from . import registry_mem
 from . import op_def
 from . import storage
-from . import lazy
 from . import errors
 from . import op_args
 from . import weave_types as types
@@ -239,3 +239,34 @@ def mutation(f):
     # Attach the signature so additional decorators (@op) can use it.
     call.sig = inspect.signature(f)
     return call
+
+
+def obj():
+    def wrap(target):
+        dc = dataclasses.dataclass(target)
+        fields = dataclasses.fields(dc)
+        target_name = target.__name__
+
+        TargetType = type(f"{target_name}Type", (types.ObjectType,), {})
+        TargetType.name = target_name
+        TargetType.instance_classes = target
+        TargetType.instance_class = target
+
+        def __init__(self):
+            for field in fields:
+                setattr(self, field.name)
+
+        # TargetType.__init__ = __init__
+
+        def property_types(self):
+            return {
+                field.name: infer_types.python_type_to_type(field.type)
+                for field in fields
+            }
+
+        TargetType.property_types = property_types
+        dc.WeaveType = TargetType
+        print("HERE")
+        return dc
+
+    return wrap

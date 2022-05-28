@@ -1,3 +1,4 @@
+import typing
 import pyarrow as pa
 from collections.abc import Iterable
 
@@ -37,12 +38,26 @@ def arrow_field(name, type_):
 
 ##### Arrow adapters
 
+ObjectT = typing.TypeVar("ObjectT")
+Output = typing.TypeVar("Output")
 
-class ArrowTableList(Iterable):
+
+class ArrowTableProxy:
     def __init__(self, arrow_table, mapper, artifact):
         self._arrow_table = arrow_table
         self._artifact = artifact
         self._deserializer = mapper
+
+    def __getattr__(self, attr):
+        res = self._arrow_table[attr]
+        return res
+
+
+class ArrowTableList(Iterable, typing.Generic[ObjectT]):
+    def __init__(self, arrow_table, mapper, artifact):
+        self._arrow_table = arrow_table
+        self._artifact = artifact
+        self._mapper = mapper
 
     def __getitem__(self, index):
         if index >= self._arrow_table.num_rows:
@@ -54,11 +69,11 @@ class ArrowTableList(Iterable):
         row_dict = {}
         for column in self._arrow_table.column_names:
             row_dict[column] = self._arrow_table.column(column)[index].as_py()
-        return self._deserializer.apply(row_dict)
+        return self._mapper.apply(row_dict)
 
     def __iter__(self):
         for row in self._arrow_table.to_pylist():
-            yield self._deserializer.apply(row)
+            yield self._mapper.apply(row)
 
     def __len__(self):
         return self._arrow_table.num_rows
@@ -67,9 +82,13 @@ class ArrowTableList(Iterable):
         if len(self) != len(other):
             return False
         for x, y in zip(iter(self), iter(other)):
+            print("X", x, "Y", y)
             if x != y:
                 return False
         return True
+
+    def map(self, map_fn: typing.Callable[[ObjectT], Output]) -> list[Output]:
+        return [map_fn(row) for row in self]
 
 
 class ArrowArrayList(Iterable):

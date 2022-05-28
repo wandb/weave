@@ -9,7 +9,7 @@ from . import context as _context
 # exposed as part of api
 from . import weave_types as types
 from . import errors
-from .decorators import weave_class, op, mutation
+from .decorators import weave_class, op, mutation, obj
 from .op_args import OpVarArgs
 from . import usage_analytics
 from .context import (
