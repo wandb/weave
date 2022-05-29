@@ -55,6 +55,8 @@ def test_map_scalar_map():
     ref = create_arrow_data(1000)
     print("REF TYPE", ref.type)
 
+    n1 = weave.get(ref).map(lambda row: row["y"] + 1)
+    print("n1 type", n1.type)
     node = weave.get(ref).map(lambda row: row["y"] + 1).map(lambda row: row + 9)
     assert weave.use(node[0]) == 15
     assert weave.use(node[4]) == 17

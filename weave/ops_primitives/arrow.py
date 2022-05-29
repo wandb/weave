@@ -239,9 +239,9 @@ def pick_output_type(input_types):
 def map_output_type(input_types):
     object_type = input_types["map_fn"].output_type
     if isinstance(object_type, types.TypedDict):
-        return ArrowTableListType(ArrowTableType(object_type))
+        return ArrowTableListType(object_type, ArrowTableType(object_type))
     else:
-        return ArrowArrayListType(ArrowArrayType(object_type), object_type)
+        return ArrowArrayListType(object_type, ArrowArrayType(object_type))
 
 
 class ArrowTableGroupByType(types.ObjectType):
@@ -457,12 +457,12 @@ ArrowTableGroupResultType.instance_class = ArrowTableGroupResult
 class ArrowArrayListType(types.ObjectType):
     name = "ArrowArrayList"
 
-    _array: ArrowArrayType = ArrowArrayType(types.Any())
     object_type: types.Type = types.Type()
+    _array: ArrowArrayType = ArrowArrayType(types.Any())
 
     @classmethod
     def type_of_instance(cls, obj):
-        return cls(types.TypeRegistry.type_of(obj._array), obj.object_type)
+        return cls(obj.object_type, types.TypeRegistry.type_of(obj._array))
 
     def property_types(self):
         return {"_array": self._array, "object_type": types.Type()}
@@ -582,12 +582,12 @@ ArrowArrayListType.instance_class = ArrowArrayList
 class ArrowTableListType(types.ObjectType):
     name = "ArrowTableList"
 
-    _table: ArrowTableType = ArrowTableType(types.Any)
     object_type: types.Type = types.Type()
+    _table: ArrowTableType = ArrowTableType(types.Any)
 
     @classmethod
     def type_of_instance(cls, obj):
-        return cls(types.TypeRegistry.type_of(obj._table), obj.object_type)
+        return cls(obj.object_type, types.TypeRegistry.type_of(obj._table))
 
     def property_types(self):
         return {"_table": self._table, "object_type": types.Type()}
