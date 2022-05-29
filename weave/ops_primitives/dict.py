@@ -58,7 +58,10 @@ class TypedDict(dict):
             # surfaces an error
             # TODO: totally not right, need to figure out mappped ops
             return self.pick(key)
-        return dict.__getitem__(self, key)
+        try:
+            return dict.__getitem__(self, key)
+        except KeyError:
+            return None
 
     @op(
         name="merge",

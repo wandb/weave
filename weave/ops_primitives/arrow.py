@@ -166,6 +166,20 @@ class ArrowArrayType(types.Type):
             return pq.read_table(f)["arr"]
 
 
+def arrow_field_weave_type(field: pa.Field) -> types.Type:
+    if field.type == pa.string():
+        return types.String()
+    elif field.type == pa.int64():
+        return types.Int()
+    elif field.type == pa.float64():
+        return types.Float()
+    # elif pa.types.is_list(field.type):
+    #     return types.List(arrow_field_weave_type(field.type.value_field))
+    raise errors.WeaveTypeError(
+        "Type conversion not implemented for arrow type: %s" % field.type
+    )
+
+
 class ArrowTableType(types.Type):
     instance_classes = pa.Table
     name = "ArrowTable"
@@ -189,18 +203,7 @@ class ArrowTableType(types.Type):
     def type_of_instance(cls, obj: pa.Table):
         obj_prop_types = {}
         for field in obj.schema:
-            weave_type: types.Type
-            if field.type == pa.string():
-                weave_type = types.String()
-            elif field.type == pa.int64():
-                weave_type = types.Int()
-            elif field.type == pa.float64():
-                weave_type = types.Float()
-            else:
-                raise errors.WeaveTypeError(
-                    "Type conversion not implemented for arrow type: %s" % field.type
-                )
-            obj_prop_types[field.name] = weave_type
+            obj_prop_types[field.name] = arrow_field_weave_type(field)
         return cls(types.TypedDict(obj_prop_types))
 
     def save_instance(self, obj, artifact, name):
@@ -623,9 +626,9 @@ class ArrowTableListType(types.ObjectType):
     # def save_instance(self, obj, artifact, name):
     #     super().save_instance(obj, artifact, name)
     #     mapper = mappers_arrow.map_to_arrow(self.object_type, artifact)
-    #     mapper.apply(ArrowArrayVectorizer(obj))
-    #     print("SAVE", self, obj, artifact, name)
-    #     pass
+    #     if obj._artifact._version:
+    #         for i in range(obj._count()):
+    #             mapper.apply(ArrowArrayVectorizer(obj._index(i)))
 
 
 @weave_class(weave_type=ArrowTableListType)

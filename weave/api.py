@@ -16,6 +16,7 @@ from .context import (
     use_fixed_server_port,
     use_frontend_devmode,
     capture_weave_server_logs,
+    eager_execution,
 )
 
 from .weave_internal import define_fn

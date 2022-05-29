@@ -3,7 +3,7 @@ import csv
 
 def load_csv(path):
     with open(path) as csvfile:
-        dialect = csv.Sniffer().sniff(csvfile.read(1024), delimiters=";,")
+        dialect = csv.Sniffer().sniff(csvfile.read(10240), delimiters=";,")
         csvfile.seek(0)
         reader = csv.reader(csvfile, dialect)
         header = next(reader)

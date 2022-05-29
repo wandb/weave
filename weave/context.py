@@ -76,6 +76,15 @@ def weavejs_client():
         _http_server.reset(server_token)
 
 
+@contextlib.contextmanager
+def eager_execution():
+    eager_token = _eager_mode.set(True)
+    try:
+        yield
+    finally:
+        _eager_mode.reset(eager_token)
+
+
 def _make_default_client():
     if util.is_notebook():
         serv = _http_server.get()

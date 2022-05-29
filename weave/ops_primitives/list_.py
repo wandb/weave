@@ -425,6 +425,23 @@ class WeaveJSListInterface:
         return type_class.NodeMethodsClass.map.resolve_fn(arr, mapFn)
 
     @op(
+        name="sort",
+        input_type={
+            "arr": types.List(types.Any()),
+            "compFn": lambda input_types: types.Function(
+                {"row": input_types["arr"].object_type}, types.Any()
+            ),
+            "columnDirs": types.Any(),
+        },
+        output_type=lambda input_types: types.List(input_types["sortFn"].output_type),
+    )
+    def sort(arr, compFn, columnDirs):  # type: ignore
+        # TODO: not implemented
+        # type_class = types.TypeRegistry.type_class_of(arr)
+        # return type_class.NodeMethodsClass.sort.resolve_fn(arr, sortFn)
+        return arr
+
+    @op(
         name="groupby",
         input_type={
             "arr": types.List(types.Any()),
