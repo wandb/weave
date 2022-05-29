@@ -390,20 +390,6 @@ class Boolean(BasicType):
             json.dump(obj, f)
 
 
-class ConstNumber(Type):
-    name = "constnumber"
-
-    def __init__(self, val):
-        self.val = val
-
-    @classmethod
-    def from_dict(cls, d):
-        return cls(d["val"])
-
-    def _to_dict(self):
-        return {"val": self.val}
-
-
 class UnionType(Type):
     name = "union"
 
