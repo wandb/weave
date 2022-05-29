@@ -85,6 +85,13 @@ def test_table_string_histogram():
     # .map(lambda row: row.key().merge(ops.dict_(count=row.count())))
     #     .count()
     # )
+    n1 = (
+        weave.get(ref)
+        .groupby(lambda row: ops.dict_(rotate=row["rotate"]))[0]
+        .pick("x")
+        .groupby(lambda row: ops.dict_(row=row))
+    )
+    print("N1 type", n1.type)
     node = (
         weave.get(ref)
         .groupby(lambda row: ops.dict_(rotate=row["rotate"]))[0]

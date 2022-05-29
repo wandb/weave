@@ -230,10 +230,10 @@ def pick_output_type(input_types):
     if not isinstance(input_types["key"], types.Const):
         return types.UnknownType()
     key = input_types["key"].val
-    prop_type = input_types["self"]._df.object_type.property_types.get(key)
+    prop_type = input_types["self"].object_type.property_types.get(key)
     if prop_type is None:
         return types.Invalid()
-    return prop_type
+    return ArrowArrayListType(prop_type, ArrowArrayType(prop_type))
 
 
 def map_output_type(input_types):
@@ -244,14 +244,12 @@ def map_output_type(input_types):
         return ArrowArrayListType(object_type, ArrowArrayType(object_type))
 
 
+@dataclasses.dataclass
 class ArrowTableGroupByType(types.ObjectType):
     name = "ArrowTableGroupBy"
 
-    type_vars = {"object_type": types.Any(), "key": types.Any()}
-
-    def __init__(self, object_type=types.Any(), key=types.Any()):
-        self.object_type = object_type
-        self.key = key
+    object_type: types.Type = types.Any()
+    key: types.String = types.String()
 
     @classmethod
     def type_of_instance(cls, obj):
@@ -274,10 +272,13 @@ class ArrowTableGroupByType(types.ObjectType):
 
 @weave_class(weave_type=ArrowTableGroupByType)
 class ArrowTableGroupBy:
-    def __init__(self, _table, _group_keys, mapper):
+    def __init__(self, _table, _group_keys, object_type, artifact):
         self._table = _table
         self._group_keys = _group_keys
-        self._mapper = mapper
+        self.object_type = object_type
+        if self.object_type is None:
+            self.object_type = types.TypeRegistry.type_of(self._table).object_type
+        self._artifact = artifact
 
     @op()
     def count(self) -> int:
@@ -285,7 +286,9 @@ class ArrowTableGroupBy:
 
     @op(
         output_type=lambda input_types: ArrowTableGroupResultType(
-            input_types["self"].object_type, input_types["self"].key
+            input_types["self"].object_type,
+            types.Any(),
+            input_types["self"].key,
         )
     )
     def __getitem__(self, index: int):
@@ -310,7 +313,9 @@ class ArrowTableGroupBy:
             group[col_name.removesuffix("_list")] = column[0].values
         group_table = pa.table(group)
 
-        return ArrowTableGroupResult(group_table, group_key, self._mapper)
+        return ArrowTableGroupResult(
+            group_table, group_key, self.object_type, self._artifact
+        )
 
     @op(
         input_type={
@@ -318,7 +323,9 @@ class ArrowTableGroupBy:
             "map_fn": lambda input_types: types.Function(
                 {
                     "row": ArrowTableGroupResultType(
-                        input_types["self"].object_type, input_types["self"].key
+                        input_types["self"].object_type,
+                        types.Any(),
+                        input_types["self"].key,
                     )
                 },
                 types.Any(),
@@ -345,112 +352,6 @@ class ArrowTableGroupBy:
 
 ArrowTableGroupByType.instance_classes = ArrowTableGroupBy
 ArrowTableGroupByType.instance_class = ArrowTableGroupBy
-
-
-class ArrowTableGroupResultType(types.ObjectType):
-    name = "ArrowTableGroupResult"
-
-    type_vars = {"object_type": types.Any(), "key": types.Any()}
-
-    def __init__(self, object_type=types.Any(), key=types.Any()):
-        self.object_type = object_type
-        self.key = key
-
-    @classmethod
-    def type_of_instance(cls, obj):
-        return cls(
-            types.TypeRegistry.type_of(obj._table).object_type,
-            types.TypeRegistry.type_of(obj._key),
-        )
-
-    def property_types(self):
-        return {"_table": ArrowTableListType(self.object_type), "key": self.key}
-
-
-@weave_class(weave_type=ArrowTableGroupResultType)
-class ArrowTableGroupResult:
-    def __init__(self, _table, _key, mapper):
-        self._table = _table
-        self._key = _key
-        self._mapper = mapper
-
-    def _get_col(self, name):
-        from .. import mappers_python
-
-        col = self._table[name]
-        if isinstance(
-            self._mapper._property_serializers[name], mappers_python.DefaultFromPy
-        ):
-            return [
-                self._mapper._property_serializers[name].apply(i.as_py()) for i in col
-            ]
-        return self._mapper._property_serializers[name].apply(col)
-
-    @op()
-    def count(self) -> int:
-        return len(self._table)
-
-    @op(output_type=lambda input_types: input_types["self"].key)
-    def key(self):
-        return self._key.as_py()
-
-    @op(
-        output_type=lambda input_types: ArrowArrayListType(
-            ArrowArrayType(
-                input_types["self"].object_type.property_types[input_types["key"].val]
-            ),
-            input_types["self"].object_type.property_types[input_types["key"].val],
-        )
-    )
-    def pick(self, key: str):
-        # TODO: Don't do to_pylist() here! Stay in arrow til as late
-        #     as possible
-        object_type = self._mapper.type
-        return ArrowArrayList(
-            self._table[key], object_type.property_types[key], self._mapper._artifact
-        )
-
-    @op(
-        input_type={
-            "self": ArrowTableGroupResultType(),
-            "group_by_fn": lambda input_types: types.Function(
-                {"row": input_types["self"].object_type}, types.Any()
-            ),
-        },
-        output_type=lambda input_types: ArrowTableGroupByType(
-            input_types["self"].object_type, input_types["group_by_fn"].output_type
-        ),
-    )
-    def groupby(self, group_by_fn):
-        # replace_schema_metadata does a shallow copy
-        table = self._table
-        mapped = mapped_fn_to_arrow(self, group_by_fn)
-        group_cols = []
-        if isinstance(mapped, ArrowArrayVectorizer):
-            mapped = mapped.arr
-        if isinstance(mapped, pa.Table):
-            for name, column in zip(mapped.column_names, mapped.columns):
-                group_col_name = "group_key_" + name
-                table = table.append_column(group_col_name, column)
-                group_cols.append(group_col_name)
-        elif isinstance(mapped, pa.ChunkedArray):
-            group_col_name = "group_key"
-            table = table.append_column(group_col_name, mapped)
-            group_cols.append(group_col_name)
-        else:
-            raise errors.WeaveInternalError(
-                "Arrow groupby not yet support for map result: %s" % type(mapped)
-            )
-        grouped = table.group_by(group_cols)
-        aggs = []
-        for column_name in self._table.column_names:
-            aggs.append((column_name, "list"))
-        agged = grouped.aggregate(aggs)
-        return ArrowTableGroupBy(agged, group_cols, self._mapper)
-
-
-ArrowTableGroupResultType.instance_classes = ArrowTableGroupResult
-ArrowTableGroupResultType.instance_class = ArrowTableGroupResult
 
 
 @dataclasses.dataclass
@@ -506,18 +407,6 @@ class ArrowArrayList:
     @op(
         input_type={
             "self": types.List(types.Any()),
-            "filter_fn": lambda input_types: types.Function(
-                {"row": input_types["self"].object_type}, types.Any()
-            ),
-        },
-        output_type=lambda input_types: input_types["self"],
-    )
-    def filter(self, filter_fn):
-        return ArrowArrayList(self._df[filter_fn_to_pandas_filter(self._df, filter_fn)])
-
-    @op(
-        input_type={
-            "self": types.List(types.Any()),
             "map_fn": lambda input_types: types.Function(
                 {"row": input_types["self"].object_type}, types.Any()
             ),
@@ -562,7 +451,7 @@ class ArrowArrayList:
         grouped = table.group_by(group_cols)
         aggs = (("array", "list"),)
         agged = grouped.aggregate(aggs)
-        return ArrowTableGroupBy(agged, group_cols, self._mapper)
+        return ArrowTableGroupBy(agged, group_cols, self.object_type, self._artifact)
 
     @op(output_type=lambda input_types: input_types["self"])
     def offset(self, offset: int):
@@ -650,19 +539,13 @@ class ArrowTableList:
 
     @op(output_type=pick_output_type)
     def pick(self, key: str):
-        return self._table[key]
-
-    @op(
-        input_type={
-            "self": types.List(types.Any()),
-            "filter_fn": lambda input_types: types.Function(
-                {"row": input_types["self"].object_type}, types.Any()
-            ),
-        },
-        output_type=lambda input_types: input_types["self"],
-    )
-    def filter(self, filter_fn):
-        return ArrowTableList(self._df[filter_fn_to_pandas_filter(self._df, filter_fn)])
+        # return self._table[key]
+        # TODO: Don't do to_pylist() here! Stay in arrow til as late
+        #     as possible
+        object_type = self.object_type
+        return ArrowArrayList(
+            self._table[key], object_type.property_types[key], self._artifact
+        )
 
     @op(
         input_type={
@@ -702,20 +585,71 @@ class ArrowTableList:
         table = self._table
         mapped = mapped_fn_to_arrow(self, group_by_fn)
         group_cols = []
+        if isinstance(mapped, ArrowArrayVectorizer):
+            mapped = mapped.arr
         if isinstance(mapped, pa.Table):
             for name, column in zip(mapped.column_names, mapped.columns):
                 group_col_name = "group_key_" + name
                 table = table.append_column(group_col_name, column)
                 group_cols.append(group_col_name)
+        elif isinstance(mapped, pa.ChunkedArray):
+            group_col_name = "group_key"
+            table = table.append_column(group_col_name, mapped)
+            group_cols.append(group_col_name)
         else:
-            raise errors.WeaveInternalError("not supported")
+            raise errors.WeaveInternalError(
+                "Arrow groupby not yet support for map result: %s" % type(mapped)
+            )
         grouped = table.group_by(group_cols)
         aggs = []
         for column_name in self._table.column_names:
             aggs.append((column_name, "list"))
         agged = grouped.aggregate(aggs)
-        return ArrowTableGroupBy(agged, group_cols, self._mapper)
+        return ArrowTableGroupBy(agged, group_cols, self.object_type, self._artifact)
 
 
 ArrowTableListType.instance_classes = ArrowTableList
 ArrowTableListType.instance_class = ArrowTableList
+
+
+@dataclasses.dataclass
+class ArrowTableGroupResultType(ArrowTableListType):
+    name = "ArrowTableGroupResult"
+
+    key: types.Type = types.Any()
+
+    @classmethod
+    def type_of_instance(cls, obj):
+        return cls(
+            types.TypeRegistry.type_of(obj._table).object_type,
+            types.TypeRegistry.type_of(obj._key),
+        )
+
+    def property_types(self):
+        return {"_table": ArrowTableListType(self.object_type), "key": self.key}
+
+
+def key_result_type(input_types):
+    return input_types["self"].key
+
+
+@weave_class(weave_type=ArrowTableGroupResultType)
+class ArrowTableGroupResult(ArrowTableList):
+    def __init__(self, _table, _key, object_type=None, artifact=None):
+        self._table = _table
+        self._key = _key
+        self.object_type = object_type
+        if self.object_type is None:
+            self.object_type = types.TypeRegistry.type_of(self._table).object_type
+        self._artifact = artifact
+        from .. import mappers_arrow
+
+        self._mapper = mappers_arrow.map_from_arrow(self.object_type, self._artifact)
+
+    @op(output_type=key_result_type)
+    def key(self):
+        return self._key.as_py()
+
+
+ArrowTableGroupResultType.instance_classes = ArrowTableGroupResult
+ArrowTableGroupResultType.instance_class = ArrowTableGroupResult
