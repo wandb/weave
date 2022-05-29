@@ -1,3 +1,4 @@
+import typing
 import dataclasses
 import numpy as np
 import pyarrow as pa
@@ -7,7 +8,6 @@ from .. import weave_internal
 
 from ..api import op, weave_class
 from .. import weave_types as types
-from .. import mappers_arrow
 from .. import graph
 from .. import errors
 from .. import registry_mem
@@ -66,7 +66,7 @@ class ArrowArrayVectorizer:
         return ArrowArrayVectorizer(col)
 
     def items(self):
-        for col_name in self.arr._table.column_names:
+        for col_name in self.arr._arrow_data.column_names:
             yield col_name, self._get_col(col_name)
 
     def __getattr__(self, attr):
@@ -153,9 +153,9 @@ def mapped_fn_to_arrow(arrow_table, node):
     elif isinstance(node, graph.VarNode):
         if node.name == "row":
             if isinstance(arrow_table, ArrowWeaveList) and isinstance(
-                arrow_table._table, pa.ChunkedArray
+                arrow_table._arrow_data, pa.ChunkedArray
             ):
-                return ArrowArrayVectorizer(arrow_table._table)
+                return ArrowArrayVectorizer(arrow_table._arrow_data)
 
             return ArrowArrayVectorizer(arrow_table)
         elif node.name == "index":
@@ -371,7 +371,7 @@ class ArrowWeaveListType(types.ObjectType):
 
     def property_types(self):
         return {
-            "_table": types.union(ArrowTableType(), ArrowArrayType()),
+            "_arrow_data": types.union(ArrowTableType(), ArrowArrayType()),
             "object_type": types.Type(),
         }
 
@@ -385,16 +385,16 @@ class ArrowWeaveListType(types.ObjectType):
 
 @weave_class(weave_type=ArrowWeaveListType)
 class ArrowWeaveList:
-    _table: pa.Table
+    _arrow_data: typing.Union[pa.Table, pa.ChunkedArray]
 
     def to_pylist(self):
-        return self._table.to_pylist()
+        return self._arrow_data.to_pylist()
 
-    def __init__(self, _table, object_type=None, artifact=None):
-        self._table = _table
+    def __init__(self, _arrow_data, object_type=None, artifact=None):
+        self._arrow_data = _arrow_data
         self.object_type = object_type
         if self.object_type is None:
-            self.object_type = types.TypeRegistry.type_of(self._table).object_type
+            self.object_type = types.TypeRegistry.type_of(self._arrow_data).object_type
         self._artifact = artifact
         from .. import mappers_arrow
 
@@ -404,10 +404,10 @@ class ArrowWeaveList:
     # TODO: doesn't belong here
     @op()
     def sum(self) -> float:
-        return pa.compute.sum(self._table)
+        return pa.compute.sum(self._arrow_data)
 
     def _count(self):
-        return len(self._table)
+        return len(self._arrow_data)
 
     @op()
     def count(self) -> int:
@@ -416,7 +416,7 @@ class ArrowWeaveList:
     def _get_col(self, name):
         from .. import mappers_python
 
-        col = self._table[name]
+        col = self._arrow_data[name]
         if isinstance(
             self._mapper._property_serializers[name], mappers_python.DefaultFromPy
         ):
@@ -426,7 +426,7 @@ class ArrowWeaveList:
         return self._mapper._property_serializers[name].apply(col)
 
     def _index(self, index):
-        return common_index(self._table, index, self._mapper)
+        return common_index(self._arrow_data, index, self._mapper)
 
     @op(output_type=index_output_type)
     def __getitem__(self, index: int):
@@ -439,7 +439,7 @@ class ArrowWeaveList:
         #     as possible
         object_type = self.object_type
         return ArrowWeaveList(
-            self._table[key], object_type.property_types[key], self._artifact
+            self._arrow_data[key], object_type.property_types[key], self._artifact
         )
 
     @op(
@@ -466,10 +466,12 @@ class ArrowWeaveList:
         ),
     )
     def groupby(self, group_by_fn):
-        if isinstance(self._table, pa.ChunkedArray):
-            return common_groupby(self, pa.table({"self": self._table}), group_by_fn)
+        if isinstance(self._arrow_data, pa.ChunkedArray):
+            return common_groupby(
+                self, pa.table({"self": self._arrow_data}), group_by_fn
+            )
         else:
-            return common_groupby(self, self._table, group_by_fn)
+            return common_groupby(self, self._arrow_data, group_by_fn)
 
 
 ArrowWeaveListType.instance_classes = ArrowWeaveList
@@ -485,12 +487,12 @@ class ArrowTableGroupResultType(ArrowWeaveListType):
     @classmethod
     def type_of_instance(cls, obj):
         return cls(
-            types.TypeRegistry.type_of(obj._table).object_type,
+            types.TypeRegistry.type_of(obj._arrow_data).object_type,
             types.TypeRegistry.type_of(obj._key),
         )
 
     def property_types(self):
-        return {"_table": ArrowWeaveListType(self.object_type), "key": self.key}
+        return {"_arrow_data": ArrowWeaveListType(self.object_type), "key": self.key}
 
 
 def key_result_type(input_types):
@@ -499,8 +501,8 @@ def key_result_type(input_types):
 
 @weave_class(weave_type=ArrowTableGroupResultType)
 class ArrowTableGroupResult(ArrowWeaveList):
-    def __init__(self, _table, _key, object_type=None, artifact=None):
-        self._table = _table
+    def __init__(self, _arrow_data, _key, object_type=None, artifact=None):
+        self._arrow_data = _arrow_data
         self._key = _key
         self.object_type = object_type
         if self.object_type is None:
