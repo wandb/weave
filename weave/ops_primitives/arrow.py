@@ -13,6 +13,14 @@ from .. import errors
 from .. import registry_mem
 
 
+def common_index(arr, index, mapper):
+    try:
+        row = arr.slice(index, 1)
+    except IndexError:
+        return None
+    return mapper.apply(row.to_pylist()[0])
+
+
 def common_map(self, map_fn):
     res = mapped_fn_to_arrow(self, map_fn)
     if isinstance(res, pa.Table):
@@ -397,10 +405,7 @@ class ArrowArrayList:
         return len(self._array)
 
     def _index(self, index):
-        try:
-            return self._mapper.apply(self._array[index].as_py())
-        except IndexError:
-            return None
+        return common_index(self._array, index, self._mapper)
 
     @op(output_type=index_output_type)
     def __getitem__(self, index: int):
@@ -505,11 +510,7 @@ class ArrowTableList:
         return self._mapper._property_serializers[name].apply(col)
 
     def _index(self, index):
-        try:
-            row = self._table.slice(index, 1)
-        except IndexError:
-            return None
-        return self._mapper.apply(row.to_pylist()[0])
+        return common_index(self._table, index, self._mapper)
 
     @op(output_type=index_output_type)
     def __getitem__(self, index: int):
