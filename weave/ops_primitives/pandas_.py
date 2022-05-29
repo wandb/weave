@@ -1,3 +1,4 @@
+import dataclasses
 import typing
 import json
 import math
@@ -129,13 +130,11 @@ class DataFrameType(types.Type):
         return table.to_pandas()
 
 
+@dataclasses.dataclass
 class DataFrameTableType(types.ObjectType):
     name = "dataframeTable"
 
-    type_vars = {"_df": DataFrameType(types.Any())}
-
-    def __init__(self, _df=DataFrameType(types.Any())):
-        self._df = _df
+    _df: DataFrameType = DataFrameType(types.Any())
 
     def property_types(self):
         return {

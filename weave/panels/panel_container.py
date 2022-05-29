@@ -1,3 +1,4 @@
+import dataclasses
 from .. import panel
 from .. import graph
 from .. import weave_types as types
@@ -7,9 +8,6 @@ from ..weave_internal import make_var_node
 
 class PanelType(types.ObjectType):
     name = "panel_type"
-
-    def __init__(self):
-        pass
 
     def property_types(self):
         return {
@@ -21,9 +19,6 @@ class PanelType(types.ObjectType):
 
 class SliderConfigType(types.ObjectType):
     name = "slider_config_type"
-
-    def __init__(self):
-        pass
 
     def property_types(self):
         return {
@@ -47,9 +42,6 @@ SliderConfigType.instance_class = SliderConfig
 
 class SliderPanelType(types.ObjectType):
     name = "slider_panel_type"
-
-    def __init__(self):
-        pass
 
     def property_types(self):
         return {
@@ -107,17 +99,13 @@ NumberPanelType.instance_classes = Number
 NumberPanelType.instance_class = Number
 
 
+@dataclasses.dataclass
 class ContainerConfigType(types.ObjectType):
     name = "container_config_type"
 
-    type_vars = {
-        "variables": types.TypedDict({}),
-        "panels": types.List(PanelType()),
-    }
-
-    def __init__(self, variables, panels):
-        self.variables = variables
-        self.panels = panels
+    variables: types.TypedDict = types.TypedDict({})
+    # TODO: should be types.List[PanelType]
+    panels: types.List = types.List(PanelType())
 
     def property_types(self):
         return {"variables": self.variables, "panels": self.panels}
@@ -144,7 +132,7 @@ class ContainerConfig:
         setter=set_variables,
         name="panelContainerConfig-variables",
         input_type={
-            "self": ContainerConfigType(types.Any(), types.Any()),
+            "self": ContainerConfigType(),
         },
         output_type=types.TypedDict({}),
     )
@@ -154,7 +142,7 @@ class ContainerConfig:
     @op(
         name="panelContainerConfig-panels",
         input_type={
-            "self": ContainerConfigType(types.Any(), types.Any()),
+            "self": ContainerConfigType(),
         },
         output_type=types.List(PanelType()),
     )
@@ -166,18 +154,17 @@ ContainerConfigType.instance_classes = ContainerConfig
 ContainerConfigType.instance_class = ContainerConfig
 
 
+@dataclasses.dataclass
 class ContainerPanelType(types.ObjectType):
     name = "container_panel_type"
 
-    type_vars = {
-        "config": ContainerConfigType(types.TypedDict({}), types.List(PanelType()))
-    }
-
-    def __init__(self, config):
-        self.config = config
+    config: ContainerConfigType = ContainerConfigType()
 
     def property_types(self):
-        return {"id": types.Const(types.String(), "container"), "config": self.config}
+        return {
+            "id": types.Const(types.String(), "container"),
+            "config": self.config,
+        }
 
 
 class Container(panel.Panel):
@@ -197,9 +184,9 @@ class Container(panel.Panel):
         setter=set_config,
         name="containerpanel-config",
         input_type={
-            "self": ContainerPanelType(ContainerConfigType(types.Any(), types.Any())),
+            "self": ContainerPanelType(),
         },
-        output_type=ContainerConfigType(types.Any(), types.Any()),
+        output_type=ContainerConfigType(),
     )
     def panel_config(self):
         return self.config

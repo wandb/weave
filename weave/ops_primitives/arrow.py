@@ -1,3 +1,4 @@
+import dataclasses
 import numpy as np
 import pyarrow as pa
 import pyarrow.compute as pc
@@ -452,32 +453,16 @@ ArrowTableGroupResultType.instance_classes = ArrowTableGroupResult
 ArrowTableGroupResultType.instance_class = ArrowTableGroupResult
 
 
+@dataclasses.dataclass
 class ArrowArrayListType(types.ObjectType):
     name = "ArrowArrayList"
 
-    type_vars = {"_array": ArrowArrayType(types.Any()), "object_type": types.Type()}
-
-    def __init__(self, _array=ArrowArrayType(types.Any()), object_type=types.Type()):
-        self._array = _array
-        self.object_type = object_type
+    _array: ArrowArrayType = ArrowArrayType(types.Any())
+    object_type: types.Type = types.Type()
 
     @classmethod
     def type_of_instance(cls, obj):
         return cls(types.TypeRegistry.type_of(obj._array), obj.object_type)
-
-    def _to_dict(self):
-        # TODO: annoying. we need to write these methods to switch to snakeCase
-        return {
-            "_array": self._array.to_dict(),
-            "objectType": self.object_type.to_dict(),
-        }
-
-    @classmethod
-    def from_dict(cls, d):
-        return cls(
-            types.TypeRegistry.type_from_dict(d["_array"]),
-            types.TypeRegistry.type_from_dict(d["objectType"]),
-        )
 
     def property_types(self):
         return {"_array": self._array, "object_type": types.Type()}
@@ -593,32 +578,16 @@ ArrowArrayListType.instance_class = ArrowArrayList
 
 
 # It seems like this should inherit from types.ListType...
+@dataclasses.dataclass
 class ArrowTableListType(types.ObjectType):
     name = "ArrowTableList"
 
-    type_vars = {"_table": ArrowTableType(types.Any()), "object_type": types.Type()}
-
-    def __init__(self, _table=ArrowTableType(types.Any()), object_type=types.Type()):
-        self._table = _table
-        self.object_type = object_type
+    _table: ArrowTableType = ArrowTableType(types.Any)
+    object_type: types.Type = types.Type()
 
     @classmethod
     def type_of_instance(cls, obj):
         return cls(types.TypeRegistry.type_of(obj._table), obj.object_type)
-
-    def _to_dict(self):
-        # TODO: annoying. we need to write these methods to switch to snakeCase
-        return {
-            "_table": self._table.to_dict(),
-            "objectType": self.object_type.to_dict(),
-        }
-
-    @classmethod
-    def from_dict(cls, d):
-        return cls(
-            types.TypeRegistry.type_from_dict(d["_table"]),
-            types.TypeRegistry.type_from_dict(d["objectType"]),
-        )
 
     def property_types(self):
         return {"_table": self._table, "object_type": types.Type()}

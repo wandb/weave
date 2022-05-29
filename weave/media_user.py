@@ -1,3 +1,4 @@
+import dataclasses
 import pyarrow as pa
 
 from . import weave_types as types
@@ -27,20 +28,15 @@ class Image:
         self.data = data
 
 
+@dataclasses.dataclass
 class ImageType(types.ObjectType):
     name = "image"
     # TODO: require at least 2 dimensions, no more than 3
     instance_classes = Image
     instance_class = Image
 
-    type_vars = {
-        "channel_mode": types.Int(),
-        "data": types_numpy.NumpyArrayType(types.Any(), types.Any()),
-    }
-
-    def __init__(self, channel_mode, data):
-        self.channel_mode = channel_mode
-        self.data = data
+    channel_mode: types.Int
+    data: types_numpy.NumpyArrayType
 
     def property_types(self):
         return {"channel_mode": self.channel_mode, "data": self.data}
@@ -76,18 +72,13 @@ class ImageWithMetadata(object):
     #     self._masks.append(mask)
 
 
+@dataclasses.dataclass
 class ImageWithMetadataType(types.ObjectType):
     name = "imagewithmetadata"
     instance_classes = ImageWithMetadata
     instance_class = ImageWithMetadata
 
-    type_vars = {
-        # TODO get rid of any, these should be defaults in ImageType()
-        "image": ImageType(types.Any(), types.Any())
-    }
-
-    def __init__(self, image):
-        self.image = image
+    image: ImageType
 
     def property_types(self):
         return {

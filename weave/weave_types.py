@@ -147,6 +147,14 @@ class Type:
         return (cls.instance_classes,)
 
     @classmethod
+    def type_vars(cls):
+        type_vars = {}
+        for field in dataclasses.fields(cls):
+            if issubclass(field.type, Type):
+                type_vars[field.name] = field.type
+        return type_vars
+
+    @classmethod
     def is_instance(cls, obj):
         for ic in cls._instance_classes():
             if isinstance(obj, ic):
@@ -395,7 +403,7 @@ class Boolean(BasicType):
 class UnionType(Type):
     name = "union"
 
-    members: Type
+    members: list[Type]
 
     def __init__(self, *members):
         all_members = []
@@ -624,6 +632,7 @@ class Dict(Type):
         return cls(String(), value_type)
 
 
+@dataclasses.dataclass
 class ObjectType(Type):
     # This needs to match the name property
     # TODO: there has to be a better way to do this (have a property-like
@@ -636,45 +645,16 @@ class ObjectType(Type):
     def name(self):
         return self.__class__.__name__.removesuffix("Type")
 
-    type_vars: dict[str, Type] = {}
-
     def property_types(self):
         raise NotImplementedError
 
     def variable_property_types(self):
-        result = {}
-        for property_name in self.type_vars:
-            property_val = getattr(self, property_name)
-            result[property_name] = property_val
-        return result
-
-    def __str__(self):
-        result = []
-        for k, v in self.property_types().items():
-            if type(v) == Type:
-                v = getattr(self, k)
-            result.append("%s: %s" % (k, v))
-        return "<%s {%s}>" % (self.__class__.__name__, ", ".join(result))
-
-    def _to_dict(self):
-        return {
-            prop: prop_type.to_dict()
-            for prop, prop_type in self.variable_property_types().items()
-        }
-
-    @classmethod
-    def from_dict(cls, d):
-        d = {i: d[i] for i in d if i != "type"}
-        type_args = {
-            prop: TypeRegistry.type_from_dict(prop_type)
-            for prop, prop_type in d.items()
-        }
-        return cls(**type_args)
+        return self.type_vars()
 
     @classmethod
     def type_of_instance(cls, obj):
         variable_prop_types = {}
-        for prop_name in cls.type_vars:
+        for prop_name in cls.type_vars():
             prop_type = TypeRegistry.type_of(getattr(obj, prop_name))
             # print("TYPE_OF", cls, prop_name, prop_type, type(getattr(obj, prop_name)))
             variable_prop_types[prop_name] = prop_type
@@ -790,18 +770,12 @@ RUN_STATE_TYPE = string_enum_type("pending", "running", "finished", "failed")
 
 # TODO: get rid of all the underscores. This is another
 #    conflict with making ops automatically lazy
+@dataclasses.dataclass
 class RunType(ObjectType):
     name = "run-type"
-    type_vars = {
-        "_inputs": TypedDict({}),
-        "_history": List(Any()),
-        "_output": Any(),
-    }
-
-    def __init__(self, _inputs, _history, _output):
-        self._inputs = _inputs
-        self._history = _history
-        self._output = _output
+    _inputs: TypedDict
+    _history: List
+    _output: Any
 
     def property_types(self):
         return {
@@ -815,14 +789,12 @@ class RunType(ObjectType):
         }
 
 
+@dataclasses.dataclass
 class FileType(ObjectType):
     name = "file"
 
-    type_vars = {"extension": String()}
-
-    def __init__(self, extension=String(), wb_object_type=String()):
-        self.extension = extension
-        self.wb_object_type = wb_object_type
+    extension: String = String()
+    wb_object_type: dataclasses.InitVar[String] = String()
 
     def _to_dict(self):
         # NOTE: js_compat
@@ -863,11 +835,12 @@ class FileType(ObjectType):
         }
 
 
+@dataclasses.dataclass
 class SubDirType(ObjectType):
     # TODO doesn't match frontend
     name = "subdir"
 
-    type_vars = {"file_type": FileType()}
+    file_type: FileType
 
     def __init__(self, file_type):
         self.file_type = file_type

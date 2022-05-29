@@ -1,3 +1,4 @@
+import dataclasses
 import numpy as np
 import pandas as pd
 import typing
@@ -133,24 +134,13 @@ class List:
         return [i for i in arr if i is not None]
 
 
+
+@dataclasses.dataclass
 class GroupResultType(types.ObjectType):
     name = "groupresult"
 
-    type_vars = {"object_type": types.Any(), "key": types.Any()}
-
-    def __init__(self, object_type=types.Any(), key=types.Any()):
-        self.object_type = object_type
-        self.key = key
-
-    def _to_dict(self):
-        return {"objectType": self.object_type.to_dict(), "key": self.key.to_dict()}
-
-    @classmethod
-    def from_dict(cls, d):
-        return cls(
-            types.TypeRegistry.type_from_dict(d["objectType"]),
-            types.TypeRegistry.type_from_dict(d["key"]),
-        )
+    object_type: types.Type = types.Any()
+    key: types.Type = types.Any()
 
     @classmethod
     def type_of_instance(cls, obj):
