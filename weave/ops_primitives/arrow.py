@@ -183,17 +183,7 @@ class ArrowTableType(types.Type):
             return pq.read_table(f)
 
 
-def index_output_type(input_types):
-    # THIS IS NO GOOD
-    # TODO: need to fix Const type so we don't need this.
-    self_type = input_types["self"]
-    if isinstance(self_type, types.Const):
-        return self_type.val_type.object_type
-    else:
-        return self_type.object_type
-
-
-def pick_output_type(input_types):
+def _pick_output_type(input_types):
     if not isinstance(input_types["key"], types.Const):
         return types.UnknownType()
     key = input_types["key"].val
@@ -201,11 +191,6 @@ def pick_output_type(input_types):
     if prop_type is None:
         return types.Invalid()
     return ArrowWeaveListType(prop_type)
-
-
-def map_output_type(input_types):
-    object_type = input_types["map_fn"].output_type
-    return ArrowWeaveListType(object_type)
 
 
 @dataclasses.dataclass
@@ -390,11 +375,11 @@ class ArrowWeaveList:
             return None
         return self._mapper.apply(row.to_pylist()[0])
 
-    @op(output_type=index_output_type)
+    @op(output_type=lambda input_types: input_types["self"].object_type)
     def __getitem__(self, index: int):
         return self._index(index)
 
-    @op(output_type=pick_output_type)
+    @op(output_type=_pick_output_type)
     def pick(self, key: str):
         # return self._table[key]
         # TODO: Don't do to_pylist() here! Stay in arrow til as late
@@ -411,7 +396,9 @@ class ArrowWeaveList:
                 {"row": input_types["self"].object_type}, types.Any()
             ),
         },
-        output_type=map_output_type,
+        output_type=lambda input_types: ArrowWeaveListType(
+            input_types["map_fn"].output_type
+        ),
     )
     def map(self, map_fn):
         res = mapped_fn_to_arrow(self, map_fn)
@@ -486,10 +473,6 @@ class ArrowTableGroupResultType(ArrowWeaveListType):
         return {"_arrow_data": ArrowWeaveListType(self.object_type), "key": self.key}
 
 
-def key_result_type(input_types):
-    return input_types["self"].key
-
-
 @weave_class(weave_type=ArrowTableGroupResultType)
 class ArrowTableGroupResult(ArrowWeaveList):
     def __init__(self, _arrow_data, _key, object_type=None, artifact=None):
@@ -503,7 +486,7 @@ class ArrowTableGroupResult(ArrowWeaveList):
 
         self._mapper = mappers_arrow.map_from_arrow(self.object_type, self._artifact)
 
-    @op(output_type=key_result_type)
+    @op(output_type=lambda input_types: input_types["self"].key)
     def key(self):
         return self._key.as_py()
 
