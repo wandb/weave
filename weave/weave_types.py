@@ -14,6 +14,8 @@ from . import arrow_util
 def to_weavejs_typekey(k: str) -> str:
     if k == "object_type":
         return "objectType"
+    elif k == "property_types":
+        return "propertyTypes"
     return k
 
 
@@ -517,12 +519,11 @@ class List(Type):
             return atl
 
 
+@dataclasses.dataclass
 class TypedDict(Type):
     name = "typedDict"
     instance_classes = [dict]
-
-    def __init__(self, property_types):
-        self.property_types = property_types
+    property_types: dict[str, Type]
 
     def assign_type(self, other_type):
         if not isinstance(other_type, TypedDict):
@@ -585,24 +586,20 @@ class TypedDict(Type):
         mapper = mappers_python.map_from_python(self, artifact)
         return mapper.apply(result)
 
-    def __str__(self):
-        property_types = {}
-        for key, type_ in self.property_types.items():
-            property_types[key] = str(type_)
-        return "<TypedDict %s>" % property_types
 
-
+@dataclasses.dataclass
 class Dict(Type):
     name = "dict"
 
-    def __init__(self, key_type, value_type):
+    key_type: Type
+    value_type: Type
+
+    def __post_init__(self):
         # Note this differs from Python's Dict in that keys are always strings!
         # TODO: consider if we can / should accept key_type. Would make JS side
         # harder since js objects can only have string keys.
-        if not isinstance(key_type, String):
+        if not isinstance(self.key_type, String):
             raise Exception("Dict only supports string keys!")
-        self.key_type = key_type
-        self.value_type = value_type
 
     def assign_type(self, other_type):
         if isinstance(other_type, Dict):
@@ -617,19 +614,6 @@ class Dict(Type):
 
             return Invalid()
 
-    def _to_dict(self):
-        return {
-            "keyType": self.key_type.to_dict(),
-            "objectType": self.value_type.to_dict(),
-        }
-
-    @classmethod
-    def from_dict(cls, d):
-        return cls(
-            TypeRegistry.type_from_dict(d["keyType"]),
-            TypeRegistry.type_from_dict(d["objectType"]),
-        )
-
     @classmethod
     def type_of_instance(cls, obj):
         value_type = UnknownType()
@@ -638,9 +622,6 @@ class Dict(Type):
                 raise Exception("Dict only supports string keys!")
             value_type = value_type.assign_type(TypeRegistry.type_of(v))
         return cls(String(), value_type)
-
-    def __str__(self):
-        return "<Dict %s>" % self.value_type
 
 
 class ObjectType(Type):
