@@ -25,7 +25,7 @@ def common_map(self, map_fn):
     res = mapped_fn_to_arrow(self, map_fn)
     if isinstance(res, ArrowArrayVectorizer):
         res = res.arr
-    return ArrowTableList(res)
+    return ArrowWeaveList(res)
 
 
 def common_groupby(self, table, group_by_fn):
@@ -152,7 +152,7 @@ def mapped_fn_to_arrow(arrow_table, node):
         return result
     elif isinstance(node, graph.VarNode):
         if node.name == "row":
-            if isinstance(arrow_table, ArrowTableList) and isinstance(
+            if isinstance(arrow_table, ArrowWeaveList) and isinstance(
                 arrow_table._table, pa.ChunkedArray
             ):
                 return ArrowArrayVectorizer(arrow_table._table)
@@ -242,12 +242,12 @@ def pick_output_type(input_types):
     prop_type = input_types["self"].object_type.property_types.get(key)
     if prop_type is None:
         return types.Invalid()
-    return ArrowTableListType(prop_type)
+    return ArrowWeaveListType(prop_type)
 
 
 def map_output_type(input_types):
     object_type = input_types["map_fn"].output_type
-    return ArrowTableListType(object_type)
+    return ArrowWeaveListType(object_type)
 
 
 @dataclasses.dataclass
@@ -360,8 +360,8 @@ ArrowTableGroupByType.instance_class = ArrowTableGroupBy
 
 # It seems like this should inherit from types.ListType...
 @dataclasses.dataclass
-class ArrowTableListType(types.ObjectType):
-    name = "ArrowTableList"
+class ArrowWeaveListType(types.ObjectType):
+    name = "ArrowWeaveList"
 
     object_type: types.Type = types.Type()
 
@@ -383,8 +383,8 @@ class ArrowTableListType(types.ObjectType):
     #             mapper.apply(ArrowArrayVectorizer(obj._index(i)))
 
 
-@weave_class(weave_type=ArrowTableListType)
-class ArrowTableList:
+@weave_class(weave_type=ArrowWeaveListType)
+class ArrowWeaveList:
     _table: pa.Table
 
     def to_pylist(self):
@@ -438,7 +438,7 @@ class ArrowTableList:
         # TODO: Don't do to_pylist() here! Stay in arrow til as late
         #     as possible
         object_type = self.object_type
-        return ArrowTableList(
+        return ArrowWeaveList(
             self._table[key], object_type.property_types[key], self._artifact
         )
 
@@ -456,7 +456,7 @@ class ArrowTableList:
 
     @op(
         input_type={
-            "self": ArrowTableListType(ArrowTableType(types.Any())),
+            "self": ArrowWeaveListType(ArrowTableType(types.Any())),
             "group_by_fn": lambda input_types: types.Function(
                 {"row": input_types["self"].object_type}, types.Any()
             ),
@@ -472,12 +472,12 @@ class ArrowTableList:
             return common_groupby(self, self._table, group_by_fn)
 
 
-ArrowTableListType.instance_classes = ArrowTableList
-ArrowTableListType.instance_class = ArrowTableList
+ArrowWeaveListType.instance_classes = ArrowWeaveList
+ArrowWeaveListType.instance_class = ArrowWeaveList
 
 
 @dataclasses.dataclass
-class ArrowTableGroupResultType(ArrowTableListType):
+class ArrowTableGroupResultType(ArrowWeaveListType):
     name = "ArrowTableGroupResult"
 
     key: types.Type = types.Any()
@@ -490,7 +490,7 @@ class ArrowTableGroupResultType(ArrowTableListType):
         )
 
     def property_types(self):
-        return {"_table": ArrowTableListType(self.object_type), "key": self.key}
+        return {"_table": ArrowWeaveListType(self.object_type), "key": self.key}
 
 
 def key_result_type(input_types):
@@ -498,7 +498,7 @@ def key_result_type(input_types):
 
 
 @weave_class(weave_type=ArrowTableGroupResultType)
-class ArrowTableGroupResult(ArrowTableList):
+class ArrowTableGroupResult(ArrowWeaveList):
     def __init__(self, _table, _key, object_type=None, artifact=None):
         self._table = _table
         self._key = _key

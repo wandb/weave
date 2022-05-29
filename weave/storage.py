@@ -201,17 +201,6 @@ def from_python(obj):
     return res
 
 
-def wrap_arrow_obj(obj, demapper):
-    from .ops_primitives import arrow
-
-    if isinstance(obj, pa.Table):
-        return arrow.ArrowTableList(obj, demapper)
-    elif isinstance(obj, pa.ChunkedArray):
-        return arrow.ArrowArrayList(obj)
-    else:
-        raise errors.WeaveInternalError("not supported: %s" % type(obj))
-
-
 def to_arrow(obj):
     wb_type = types.TypeRegistry.type_of(obj)
     artifact = artifacts_local.LocalArtifact("to-arrow-%s" % wb_type.name)
@@ -232,13 +221,9 @@ def to_arrow(obj):
             arr = pa.array(py_objs, type=pyarrow_type)
             rb = pa.RecordBatch.from_struct_array(arr)  # this pivots to columnar layout
             arrow_obj = pa.Table.from_batches([rb])
-            weave_obj = arrow.ArrowTableList(arrow_obj, object_type, artifact)
         else:
             arrow_obj = pa.array(py_objs, pyarrow_type)
-            weave_obj = arrow.ArrowArrayList(arrow_obj, object_type, artifact)
-
-        # # Wrap the resulting arrow object in the appropriate Weave interface
-        # weave_obj = wrap_arrow_obj(arrow_obj, demapper)
+        weave_obj = arrow.ArrowWeaveList(arrow_obj, object_type, artifact)
 
         # Save the weave object to the artifact
         ref = save(weave_obj, artifact=artifact)

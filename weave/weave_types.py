@@ -508,8 +508,6 @@ class List(Type):
     def load_instance(self, artifact, name, extra=None):
         from . import mappers_arrow
 
-        from .ops_primitives.arrow import ArrowTableList
-
         with artifact.open(f"{name}.parquet", binary=True) as f:
             table = pq.read_table(f)
             mapper = mappers_arrow.map_from_arrow(self.object_type, artifact)
