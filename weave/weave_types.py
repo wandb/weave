@@ -1,3 +1,4 @@
+import dataclasses
 import typing
 import functools
 import pyarrow as pa
@@ -8,6 +9,12 @@ from collections.abc import Iterable
 from . import box
 from . import errors
 from . import arrow_util
+
+
+def to_weavejs_typekey(k: str) -> str:
+    if k == "object_type":
+        return "objectType"
+    return k
 
 
 def all_subclasses(cls):
@@ -120,10 +127,13 @@ class TypeRegistry:
         return type_.from_dict(d)
 
 
+@dataclasses.dataclass
 class Type:
-    name = "type"
-    instance_class: typing.Optional[type]
-    instance_classes: typing.Union[type, typing.List[type], None] = None
+    name: typing.ClassVar[str] = "type"
+    instance_class: typing.ClassVar[typing.Optional[type]]
+    instance_classes: typing.ClassVar[
+        typing.Union[type, typing.List[type], None]
+    ] = None
 
     @classmethod
     def _instance_classes(cls):
@@ -162,13 +172,24 @@ class Type:
         d.update(self._to_dict())
         return d
 
+    def _to_dict(self):
+        fields = dataclasses.fields(self.__class__)
+        type_props = {}
+        for field in fields:
+            type_props[to_weavejs_typekey(field.name)] = getattr(
+                self, field.name
+            ).to_dict()
+        return type_props
+
     @classmethod
     def from_dict(cls, d):
-        return cls()
-
-    # To be overridden
-    def _to_dict(self):
-        return {}
+        fields = dataclasses.fields(cls)
+        type_attrs = {}
+        for field in fields:
+            type_attrs[field.name] = TypeRegistry.type_from_dict(
+                d[to_weavejs_typekey(field.name)]
+            )
+        return cls(**type_attrs)
 
     # def _ipython_display_(self):
     #     from . import show
@@ -426,19 +447,12 @@ class UnionType(Type):
         return "<UnionType %s>" % " | ".join((str(m) for m in self.members))
 
 
+@dataclasses.dataclass
 class List(Type):
     name = "list"
     instance_classes = [set, list, arrow_util.ArrowTableList, arrow_util.ArrowArrayList]
 
-    def __init__(self, object_type):
-        self.object_type = object_type
-
-    def _to_dict(self):
-        return {"objectType": self.object_type.to_dict()}
-
-    @classmethod
-    def from_dict(cls, d):
-        return cls(TypeRegistry.type_from_dict(d["objectType"]))
+    object_type: Type
 
     @classmethod
     def type_of_instance(cls, obj):
@@ -515,9 +529,6 @@ class List(Type):
 
             atl = arrow_util.ArrowTableList(table, mapper, artifact)
             return atl
-
-    def __str__(self):
-        return "<ListType %s>" % self.object_type
 
 
 class TypedDict(Type):
