@@ -181,24 +181,12 @@ def arrow_field_weave_type(field: pa.Field) -> types.Type:
     )
 
 
+@dataclasses.dataclass
 class ArrowTableType(types.Type):
     instance_classes = pa.Table
     name = "ArrowTable"
 
-    object_type: types.Type
-
-    def __init__(self, object_type):
-        self.object_type = object_type
-
-    def __str__(self):
-        return "<ArrowTableType %s>" % self.object_type
-
-    def _to_dict(self):
-        return {"objectType": self.object_type.to_dict()}
-
-    @classmethod
-    def from_dict(cls, d):
-        return cls(types.TypeRegistry.type_from_dict(d["objectType"]))
+    object_type: types.Type = types.Any()
 
     @classmethod
     def type_of_instance(cls, obj: pa.Table):
@@ -287,7 +275,6 @@ class ArrowTableGroupBy:
     @op(
         output_type=lambda input_types: ArrowTableGroupResultType(
             input_types["self"].object_type,
-            types.Any(),
             input_types["self"].key,
         )
     )
@@ -324,7 +311,6 @@ class ArrowTableGroupBy:
                 {
                     "row": ArrowTableGroupResultType(
                         input_types["self"].object_type,
-                        types.Any(),
                         input_types["self"].key,
                     )
                 },
@@ -472,14 +458,13 @@ class ArrowTableListType(types.ObjectType):
     name = "ArrowTableList"
 
     object_type: types.Type = types.Type()
-    _table: ArrowTableType = ArrowTableType(types.Any)
 
     @classmethod
     def type_of_instance(cls, obj):
-        return cls(obj.object_type, types.TypeRegistry.type_of(obj._table))
+        return cls(obj.object_type)
 
     def property_types(self):
-        return {"_table": self._table, "object_type": types.Type()}
+        return {"_table": ArrowTableType(), "object_type": types.Type()}
 
     # def save_instance(self, obj, artifact, name):
     #     super().save_instance(obj, artifact, name)
