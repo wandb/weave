@@ -13,33 +13,6 @@ from .. import errors
 from .. import registry_mem
 
 
-def common_groupby(self, table, group_by_fn):
-    # replace_schema_metadata does a shallow copy
-    mapped = mapped_fn_to_arrow(self, group_by_fn)
-    group_cols = []
-    if isinstance(mapped, ArrowArrayVectorizer):
-        mapped = mapped.arr
-    if isinstance(mapped, pa.Table):
-        for name, column in zip(mapped.column_names, mapped.columns):
-            group_col_name = "group_key_" + name
-            table = table.append_column(group_col_name, column)
-            group_cols.append(group_col_name)
-    elif isinstance(mapped, pa.ChunkedArray):
-        group_col_name = "group_key"
-        table = table.append_column(group_col_name, mapped)
-        group_cols.append(group_col_name)
-    else:
-        raise errors.WeaveInternalError(
-            "Arrow groupby not yet support for map result: %s" % type(mapped)
-        )
-    grouped = table.group_by(group_cols)
-    aggs = []
-    for column_name in table.column_names:
-        aggs.append((column_name, "list"))
-    agged = grouped.aggregate(aggs)
-    return ArrowTableGroupBy(agged, group_cols, self.object_type, self._artifact)
-
-
 class ArrowArrayVectorizer:
     def __init__(self, arr):
         self.arr = arr
@@ -459,11 +432,37 @@ class ArrowWeaveList:
     )
     def groupby(self, group_by_fn):
         if isinstance(self._arrow_data, pa.ChunkedArray):
-            return common_groupby(
-                self, pa.table({"self": self._arrow_data}), group_by_fn
+            return self._groupby_table(
+                pa.table({"self": self._arrow_data}), group_by_fn
             )
         else:
-            return common_groupby(self, self._arrow_data, group_by_fn)
+            return self._groupby_table(self._arrow_data, group_by_fn)
+
+    def _groupby_table(self, table, group_by_fn):
+        # replace_schema_metadata does a shallow copy
+        mapped = mapped_fn_to_arrow(self, group_by_fn)
+        group_cols = []
+        if isinstance(mapped, ArrowArrayVectorizer):
+            mapped = mapped.arr
+        if isinstance(mapped, pa.Table):
+            for name, column in zip(mapped.column_names, mapped.columns):
+                group_col_name = "group_key_" + name
+                table = table.append_column(group_col_name, column)
+                group_cols.append(group_col_name)
+        elif isinstance(mapped, pa.ChunkedArray):
+            group_col_name = "group_key"
+            table = table.append_column(group_col_name, mapped)
+            group_cols.append(group_col_name)
+        else:
+            raise errors.WeaveInternalError(
+                "Arrow groupby not yet support for map result: %s" % type(mapped)
+            )
+        grouped = table.group_by(group_cols)
+        aggs = []
+        for column_name in table.column_names:
+            aggs.append((column_name, "list"))
+        agged = grouped.aggregate(aggs)
+        return ArrowTableGroupBy(agged, group_cols, self.object_type, self._artifact)
 
 
 ArrowWeaveListType.instance_classes = ArrowWeaveList
