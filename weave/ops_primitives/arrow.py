@@ -23,14 +23,9 @@ def common_index(arr, index, mapper):
 
 def common_map(self, map_fn):
     res = mapped_fn_to_arrow(self, map_fn)
-    if isinstance(res, pa.Table):
-        return ArrowTableList(res)
-    elif isinstance(res, pa.ChunkedArray):
-        return ArrowArrayList(res)
-    elif isinstance(res, ArrowArrayVectorizer):
-        return ArrowArrayList(res.arr)
-    else:
-        raise errors.WeaveInternalError("Unexpected type: %s" % res)
+    if isinstance(res, ArrowArrayVectorizer):
+        res = res.arr
+    return ArrowTableList(res)
 
 
 def common_groupby(self, table, group_by_fn):
@@ -157,9 +152,11 @@ def mapped_fn_to_arrow(arrow_table, node):
         return result
     elif isinstance(node, graph.VarNode):
         if node.name == "row":
-            # return arrow_table
-            if isinstance(arrow_table, ArrowArrayList):
-                return ArrowArrayVectorizer(arrow_table._array)
+            if isinstance(arrow_table, ArrowTableList) and isinstance(
+                arrow_table._table, pa.ChunkedArray
+            ):
+                return ArrowArrayVectorizer(arrow_table._table)
+
             return ArrowArrayVectorizer(arrow_table)
         elif node.name == "index":
             return np.arange(len(arrow_table))
@@ -185,7 +182,7 @@ class ArrowArrayType(types.Type):
     instance_classes = [pa.ChunkedArray, pa.ExtensionArray, pa.Array]
     name = "ArrowArray"
 
-    object_type: types.Type
+    object_type: types.Type = types.Any()
 
     @classmethod
     def type_of_instance(cls, obj: pa.Array):
@@ -245,15 +242,12 @@ def pick_output_type(input_types):
     prop_type = input_types["self"].object_type.property_types.get(key)
     if prop_type is None:
         return types.Invalid()
-    return ArrowArrayListType(prop_type, ArrowArrayType(prop_type))
+    return ArrowTableListType(prop_type)
 
 
 def map_output_type(input_types):
     object_type = input_types["map_fn"].output_type
-    if isinstance(object_type, types.TypedDict):
-        return ArrowTableListType(object_type, ArrowTableType(object_type))
-    else:
-        return ArrowArrayListType(object_type, ArrowArrayType(object_type))
+    return ArrowTableListType(object_type)
 
 
 @dataclasses.dataclass
@@ -364,92 +358,6 @@ ArrowTableGroupByType.instance_classes = ArrowTableGroupBy
 ArrowTableGroupByType.instance_class = ArrowTableGroupBy
 
 
-@dataclasses.dataclass
-class ArrowArrayListType(types.ObjectType):
-    name = "ArrowArrayList"
-
-    object_type: types.Type = types.Type()
-    _array: ArrowArrayType = ArrowArrayType(types.Any())
-
-    @classmethod
-    def type_of_instance(cls, obj):
-        return cls(obj.object_type, types.TypeRegistry.type_of(obj._array))
-
-    def property_types(self):
-        return {"_array": self._array, "object_type": types.Type()}
-
-
-@weave_class(weave_type=ArrowArrayListType)
-class ArrowArrayList:
-    _array: pa.ChunkedArray
-
-    def to_pylist(self):
-        return self._array.to_pylist()
-
-    def __init__(self, _array, object_type=None, artifact=None):
-        self._array = _array
-        self.object_type = object_type
-        if self.object_type is None:
-            self.object_type = types.TypeRegistry.type_of(self._array).object_type
-        self._artifact = artifact
-        from .. import mappers_arrow
-
-        self._mapper = mappers_arrow.map_from_arrow(self.object_type, self._artifact)
-
-    @op()
-    def sum(self) -> float:
-        return pa.compute.sum(self._array)
-
-    @op()
-    def count(self) -> int:
-        return len(self._array)
-
-    def _index(self, index):
-        return common_index(self._array, index, self._mapper)
-
-    @op(output_type=index_output_type)
-    def __getitem__(self, index: int):
-        return self._index(index)
-
-    @op(
-        input_type={
-            "self": types.List(types.Any()),
-            "map_fn": lambda input_types: types.Function(
-                {"row": input_types["self"].object_type}, types.Any()
-            ),
-        },
-        output_type=map_output_type,
-    )
-    def map(self, map_fn):
-        return common_map(self, map_fn)
-
-    @op(
-        input_type={
-            "self": ArrowArrayListType(ArrowArrayType(types.Any())),
-            "group_by_fn": lambda input_types: types.Function(
-                {"row": input_types["self"]}, types.Any()
-            ),
-        },
-        output_type=lambda input_types: ArrowTableGroupByType(
-            input_types["self"], input_types["group_by_fn"].output_type
-        ),
-    )
-    def groupby(self, group_by_fn):
-        return common_groupby(self, pa.table({"array": self._array}), group_by_fn)
-
-    @op(output_type=lambda input_types: input_types["self"])
-    def offset(self, offset: int):
-        return ArrowArrayList(self._array[offset:], self.object_type, self._artifact)
-
-    @op(output_type=lambda input_types: input_types["self"])
-    def limit(self, limit: int):
-        return ArrowArrayList(self._array[:limit], self.object_type, self._artifact)
-
-
-ArrowArrayListType.instance_classes = ArrowArrayList
-ArrowArrayListType.instance_class = ArrowArrayList
-
-
 # It seems like this should inherit from types.ListType...
 @dataclasses.dataclass
 class ArrowTableListType(types.ObjectType):
@@ -462,7 +370,10 @@ class ArrowTableListType(types.ObjectType):
         return cls(obj.object_type)
 
     def property_types(self):
-        return {"_table": ArrowTableType(), "object_type": types.Type()}
+        return {
+            "_table": types.union(ArrowTableType(), ArrowArrayType()),
+            "object_type": types.Type(),
+        }
 
     # def save_instance(self, obj, artifact, name):
     #     super().save_instance(obj, artifact, name)
@@ -489,6 +400,11 @@ class ArrowTableList:
 
         self._mapper = mappers_arrow.map_from_arrow(self.object_type, self._artifact)
         # TODO: construct mapper
+
+    # TODO: doesn't belong here
+    @op()
+    def sum(self) -> float:
+        return pa.compute.sum(self._table)
 
     def _count(self):
         return len(self._table)
@@ -522,7 +438,7 @@ class ArrowTableList:
         # TODO: Don't do to_pylist() here! Stay in arrow til as late
         #     as possible
         object_type = self.object_type
-        return ArrowArrayList(
+        return ArrowTableList(
             self._table[key], object_type.property_types[key], self._artifact
         )
 
@@ -550,7 +466,10 @@ class ArrowTableList:
         ),
     )
     def groupby(self, group_by_fn):
-        return common_groupby(self, self._table, group_by_fn)
+        if isinstance(self._table, pa.ChunkedArray):
+            return common_groupby(self, pa.table({"self": self._table}), group_by_fn)
+        else:
+            return common_groupby(self, self._table, group_by_fn)
 
 
 ArrowTableListType.instance_classes = ArrowTableList
