@@ -13,21 +13,6 @@ from .. import errors
 from .. import registry_mem
 
 
-def common_index(arr, index, mapper):
-    try:
-        row = arr.slice(index, 1)
-    except IndexError:
-        return None
-    return mapper.apply(row.to_pylist()[0])
-
-
-def common_map(self, map_fn):
-    res = mapped_fn_to_arrow(self, map_fn)
-    if isinstance(res, ArrowArrayVectorizer):
-        res = res.arr
-    return ArrowWeaveList(res)
-
-
 def common_groupby(self, table, group_by_fn):
     # replace_schema_metadata does a shallow copy
     mapped = mapped_fn_to_arrow(self, group_by_fn)
@@ -426,7 +411,11 @@ class ArrowWeaveList:
         return self._mapper._property_serializers[name].apply(col)
 
     def _index(self, index):
-        return common_index(self._arrow_data, index, self._mapper)
+        try:
+            row = self._arrow_data.slice(index, 1)
+        except IndexError:
+            return None
+        return self._mapper.apply(row.to_pylist()[0])
 
     @op(output_type=index_output_type)
     def __getitem__(self, index: int):
@@ -452,7 +441,10 @@ class ArrowWeaveList:
         output_type=map_output_type,
     )
     def map(self, map_fn):
-        return common_map(self, map_fn)
+        res = mapped_fn_to_arrow(self, map_fn)
+        if isinstance(res, ArrowArrayVectorizer):
+            res = res.arr
+        return ArrowWeaveList(res)
 
     @op(
         input_type={
