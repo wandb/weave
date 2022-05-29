@@ -117,41 +117,30 @@ def mapped_fn_to_arrow(arrow_table, node):
         raise Exception("unhandled var name", node.name)
 
 
+def arrow_type_to_weave_type(pa_type) -> types.Type:
+    if pa_type == pa.string():
+        return types.String()
+    elif pa_type == pa.int64():
+        return types.Int()
+    elif pa_type == pa.float64():
+        return types.Float()
+    # elif pa.types.is_list(field.type):
+    #     return types.List(arrow_field_weave_type(field.type.value_field))
+    raise errors.WeaveTypeError(
+        "Type conversion not implemented for arrow type: %s" % pa_type
+    )
+
+
+@dataclasses.dataclass
 class ArrowArrayType(types.Type):
     instance_classes = [pa.ChunkedArray, pa.ExtensionArray, pa.Array]
     name = "ArrowArray"
 
     object_type: types.Type
 
-    def __init__(self, object_type):
-        self.object_type = object_type
-
-    def __str__(self):
-        return "<ArrowArrowType %s>" % self.object_type
-
-    def _to_dict(self):
-        return {"objectType": self.object_type.to_dict()}
-
-    @classmethod
-    def from_dict(cls, d):
-        return cls(types.TypeRegistry.type_from_dict(d["objectType"]))
-
     @classmethod
     def type_of_instance(cls, obj: pa.Array):
-        weave_type: types.Type
-        if isinstance(obj.type, mappers_arrow.ArrowWeaveType):
-            weave_type = obj.type.weave_type
-        elif obj.type == pa.string():
-            weave_type = types.String()
-        elif obj.type == pa.int64():
-            weave_type = types.Int()
-        elif obj.type == pa.float64():
-            weave_type = types.Float()
-        else:
-            raise errors.WeaveTypeError(
-                "Type conversion not implemented for arrow type: %s" % obj.type
-            )
-        return cls(weave_type)
+        return cls(arrow_type_to_weave_type(obj.type))
 
     def save_instance(self, obj, artifact, name):
         # Could use the arrow format instead. I think it supports memory
@@ -167,20 +156,6 @@ class ArrowArrayType(types.Type):
             return pq.read_table(f)["arr"]
 
 
-def arrow_field_weave_type(field: pa.Field) -> types.Type:
-    if field.type == pa.string():
-        return types.String()
-    elif field.type == pa.int64():
-        return types.Int()
-    elif field.type == pa.float64():
-        return types.Float()
-    # elif pa.types.is_list(field.type):
-    #     return types.List(arrow_field_weave_type(field.type.value_field))
-    raise errors.WeaveTypeError(
-        "Type conversion not implemented for arrow type: %s" % field.type
-    )
-
-
 @dataclasses.dataclass
 class ArrowTableType(types.Type):
     instance_classes = pa.Table
@@ -192,7 +167,7 @@ class ArrowTableType(types.Type):
     def type_of_instance(cls, obj: pa.Table):
         obj_prop_types = {}
         for field in obj.schema:
-            obj_prop_types[field.name] = arrow_field_weave_type(field)
+            obj_prop_types[field.name] = arrow_type_to_weave_type(field.type)
         return cls(types.TypedDict(obj_prop_types))
 
     def save_instance(self, obj, artifact, name):
