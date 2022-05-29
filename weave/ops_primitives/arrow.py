@@ -589,6 +589,7 @@ ArrowArrayListType.instance_classes = ArrowArrayList
 ArrowArrayListType.instance_class = ArrowArrayList
 
 
+# It seems like this should inherit from types.ListType...
 class ArrowTableListType(types.ObjectType):
     name = "ArrowTableList"
 
