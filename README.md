@@ -58,12 +58,6 @@ pre-commit install
 
 ### Enable frontend devmode
 
-- Run a weave server at 9994:
-
-```
-bash weave_server.sh
-```
-
 - Run a frontend dev server on 3000:
 
 In the W&B core repo (for now, later we'll move this out to a new repo):

@@ -7,6 +7,44 @@ from urllib.parse import urljoin
 from . import client
 from . import server
 from . import util
+from . import uris
+
+
+# Set to the op uri if we're in the process of loading
+# an op from an artifact.
+_loading_op_location: contextvars.ContextVar[
+    typing.Optional[uris.WeaveURI]
+] = contextvars.ContextVar("loading_op_location", default=None)
+
+
+# Set to true if we're in the process of loading builtin functions
+# this prevents us from storing the op as an artifact
+_loading_built_ins: contextvars.ContextVar[
+    typing.Optional[bool]
+] = contextvars.ContextVar("loading_builtins", default=None)
+
+
+@contextlib.contextmanager
+def loading_op_location(location):
+    token = _loading_op_location.set(location)
+    yield _loading_op_location.get()
+    _loading_op_location.reset(token)
+
+
+def get_loading_op_location():
+    return _loading_op_location.get()
+
+
+def set_loading_built_ins():
+    return _loading_built_ins.set(True)
+
+
+def clear_loading_built_ins(token):
+    _loading_built_ins.reset(token)
+
+
+def get_loading_built_ins():
+    return _loading_built_ins.get()
 
 
 _weave_client: contextvars.ContextVar[
@@ -21,7 +59,6 @@ _frontend_url: contextvars.ContextVar[typing.Optional[str]] = contextvars.Contex
     "frontend_url", default=None
 )
 
-
 _analytics_enabled: contextvars.ContextVar[bool] = contextvars.ContextVar(
     "analytics_enabled", default=True
 )
@@ -29,6 +66,14 @@ _analytics_enabled: contextvars.ContextVar[bool] = contextvars.ContextVar(
 _eager_mode: contextvars.ContextVar[bool] = contextvars.ContextVar(
     "_eager_mode", default=False
 )
+
+_wandb_api_key: contextvars.ContextVar[typing.Optional[str]] = contextvars.ContextVar(
+    "_wandb_api_key", default=None
+)
+
+_cache_namespace_token: contextvars.ContextVar[
+    typing.Optional[str]
+] = contextvars.ContextVar("_cache_namespace_token", default=None)
 
 
 @contextlib.contextmanager
@@ -110,7 +155,9 @@ def use_fixed_server_port():
 
 def use_frontend_devmode():
     """Talk to external server running on 9994"""
-    _weave_client.set(server.HttpServerClient("http://localhost:9994"))
+    use_fixed_server_port()
+
+    # point frontend to vite server
     _frontend_url.set("http://localhost:3000")
 
 

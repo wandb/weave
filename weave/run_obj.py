@@ -1,7 +1,12 @@
 import time
 
 from . import weave_types as types
+from . import context
+from . import artifacts_local
+from . import uris
 from .decorators import weave_class, op, mutation
+
+_loading_builtins_token = context.set_loading_built_ins()
 
 
 @weave_class(weave_type=types.RunType)
@@ -120,7 +125,11 @@ class Run:
             from .ops_primitives.storage import get as op_get
             from .api import use
 
-            self = use(op_get("run-%s/latest" % self._id))
+            # TODO: this should support full URIS instead of hard coding
+            uri = uris.WeaveLocalArtifactURI.make_uri(
+                artifacts_local.LOCAL_ARTIFACT_DIR, f"run-{self._id}", "latest"
+            )
+            self = use(op_get(uri))
 
             sleep_mult *= 2
             sleep_time = 0.02 * sleep_mult
@@ -189,3 +198,5 @@ class Run:
 
 types.RunType.instance_classes = Run
 types.RunType.instance_class = Run
+
+context.clear_loading_built_ins(_loading_builtins_token)

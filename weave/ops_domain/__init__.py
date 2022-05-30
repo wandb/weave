@@ -7,6 +7,8 @@ from ..api import op, weave_class
 from .. import weave_types as types
 from . import wbartifact, wbtable
 from .. import errors
+from .. import artifacts_local
+from ..wandb_api import wandb_public_api
 
 
 class ProjectType(types.Type):
@@ -18,7 +20,7 @@ class ProjectType(types.Type):
         return {"entity_name": obj.entity, "project_name": obj.name}
 
     def instance_from_dict(self, d):
-        api = wandb_api.Api()
+        api = wandb_public_api()
         return api.project(name=d["project_name"], entity=d["entity_name"])
 
 
@@ -39,7 +41,7 @@ class RunType(types.Type):
         import time
 
         print("%s: RUN INSTANCE FROM DICT" % time.time())
-        api = wandb_api.Api()
+        api = wandb_public_api()
         res = api.run("{entity_name}/{project_name}/{run_id}".format(**d))
         print("%s: DONE RUN INSTANCE FROM DICT" % time.time())
         return res
@@ -60,7 +62,7 @@ class ArtifactType(types.Type):
         }
 
     def instance_from_dict(self, d):
-        api = wandb_api.Api()
+        api = wandb_public_api()
         return api.artifact_type(
             d["artifact_type_name"], project=f"{d['entity_name']}/{d['project_name']}"
         ).collection(d["artifact_name"])
@@ -81,7 +83,7 @@ class ArtifactVersionsType(types.Type):
         }
 
     def instance_from_dict(self, d):
-        api = wandb_api.Api()
+        api = wandb_public_api()
         return api.artifact_versions(
             d["artifact_type_name"],
             f"{d['entity_name']}/{d['project_name']}/{d['artifact_name']}",
@@ -113,7 +115,7 @@ class RunsType(types.Type):
         }
 
     def instance_from_dict(self, d):
-        api = wandb_api.Api()
+        api = wandb_public_api()
         return api.runs("{entity_name}/{project_name}".format(**d), per_page=500)
 
 
@@ -141,7 +143,7 @@ class ArtifactsType(types.Type):
         }
 
     def instance_from_dict(self, d):
-        api = wandb_api.Api()
+        api = wandb_public_api()
         return api.artifact_type(
             d["artifact_type_name"], project=f"{d['entity_name']}/{d['project_name']}"
         ).collections()
@@ -185,7 +187,7 @@ class ArtifactTypeType(types.Type):
         }
 
     def instance_from_dict(self, d):
-        api = wandb_api.Api()
+        api = wandb_public_api()
         return api.artifact_type(
             d["artifact_type_name"], project=f"{d['entity_name']}/{d['project_name']}"
         )
@@ -225,7 +227,7 @@ class ProjectArtifactTypesType(types.Type):
         }
 
     def instance_from_dict(self, d):
-        api = wandb_api.Api()
+        api = wandb_public_api()
         return api.project("{entity_name}/{project_name}".format(**d)).artifacts_types()
 
 
@@ -233,7 +235,7 @@ class ProjectArtifactTypesType(types.Type):
 class ArtifactOps:
     @op(name="artifact-type")
     def type_(artifact: wandb_api.ArtifactCollection) -> wandb_api.ArtifactType:
-        api = wandb_api.Api()
+        api = wandb_public_api()
         return api.artifact_type(
             artifact.type, project=f"{artifact.entity}/{artifact.project}"
         )
@@ -260,7 +262,7 @@ class Project:
     def artifacts(
         project: wandb_api.Project,
     ) -> typing.List[wandb_api.ArtifactCollection]:
-        api = wandb_api.Api()
+        api = wandb_public_api()
         return api.artifact_type(
             "test_results", project=f"{project.entity}/{project.name}"
         ).collections()
@@ -273,7 +275,7 @@ class Project:
     def artifact_type(
         project: wandb_api.Project, artifactType: str
     ) -> wandb_api.ArtifactType:
-        api = wandb_api.Api()
+        api = wandb_public_api()
         return api.artifact_type(
             artifactType, project=f"{project.entity}/{project.name}"
         )

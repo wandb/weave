@@ -1,9 +1,7 @@
-from collections.abc import Mapping
 import pyarrow as pa
 import os
 import json
 import typing
-from urllib.parse import urlparse
 
 from . import errors
 from . import artifacts_local
@@ -13,8 +11,9 @@ from . import mappers_arrow
 from . import graph
 from . import util
 from . import box
+from . import errors
 from . import refs
-from .artifacts_local import LOCAL_ARTIFACT_DIR
+from . import uris
 
 Ref = refs.Ref
 
@@ -32,7 +31,11 @@ MEM_OBJS: typing.Dict[str, typing.Any] = {}
 
 class MemRef(refs.Ref):
     def __init__(self, name):
-        self.name = name
+        self._name = name
+
+    @property
+    def name(self):
+        return self._name
 
     def get(self):
         return MEM_OBJS[self.name]
@@ -67,16 +70,23 @@ def save_to_artifact(obj, artifact: artifacts_local.LocalArtifact, name, type_):
         hash = artifact.make_last_file_content_addressed()
         if hash is not None:
             name = f"{hash}-{name}"
-    return refs.LocalArtifactRef(
-        artifact, path=name, type=type_, obj=obj, extra=ref_extra
+    with artifact.new_file(f"{name}.type.json") as f:
+        json.dump(type_.to_dict(), f)
+    ref_cls = (
+        refs.WandbArtifactRef
+        if isinstance(artifact, artifacts_local.WandbArtifact)
+        else refs.LocalArtifactRef
     )
+    artifact.save()
+    return ref_cls(artifact, path=name, type=type_, obj=obj, extra=ref_extra)
 
 
-def save(obj, name=None, type=None, artifact=None):
-    ref = _get_ref(obj)
-    if ref is not None:
-        if name is None or ref.artifact._name == name:
-            return ref
+def _get_name(wb_type: types.Type, obj: typing.Any) -> str:
+    obj_names = util.find_names(obj)
+    return f"{wb_type.name}-{obj_names[-1]}"
+
+
+def _save_or_publish(obj, name=None, type=None, publish: bool = False, artifact=None):
     # TODO: get rid of this? Always type check?
     wb_type = type
     if wb_type is None:
@@ -90,22 +100,45 @@ def save(obj, name=None, type=None, artifact=None):
     obj = box.box(obj)
     if artifact is None:
         if name is None:
-            obj_names = util.find_names(obj)
-            # name = f"{wb_type.name}-{obj_names[-1]}-{util.rand_string_n(10)}"
-            name = f"{wb_type.name}-{obj_names[-1]}"
-        artifact = artifacts_local.LocalArtifact(name)
+            name = _get_name(wb_type, obj)
+        # TODO: refactor types to artifacts have a common base class
+        if publish:
+            # TODO: Potentially add entity and project to namespace the artifact explicitly.
+            artifact = artifacts_local.WandbArtifact(name, type=wb_type.name)
+        else:
+            artifact = artifacts_local.LocalArtifact(name)
     ref = save_to_artifact(obj, artifact, "_obj", wb_type)
-    with artifact.new_file(f"_obj.type.json") as f:
-        json.dump(wb_type.to_dict(), f)
-    artifact.save()
     refs.put_ref(obj, ref)
     return ref
+
+
+def publish(obj, name=None, type=None):
+    # TODO: should we only expose save for our API with a "remote" flag or something
+    return _save_or_publish(obj, name, type, True)
+
+
+def save(obj, name=None, type=None, artifact=None):
+    ref = _get_ref(obj)
+    if ref is not None:
+        if name is None or ref.artifact._name == name:
+            return ref
+    return _save_or_publish(obj, name, type, False, artifact=artifact)
 
 
 def get(uri_s):
     if isinstance(uri_s, refs.Ref):
         return uri_s.get()
-    ref = refs.LocalArtifactRef.from_str(uri_s)
+    location = uris.WeaveURI.parse(uri_s)
+    # TODO: refactor mem ref with runtimeobject location and use a single branch
+    # here on the base ref/uri class
+    if isinstance(location, uris.WeaveLocalArtifactURI):
+        ref = location.to_ref()
+    elif isinstance(location, uris.WeaveWBArtifactURI):
+        ref = location.to_ref()
+    elif isinstance(location, uris.WeaveRuntimeURI):
+        ref = MemRef(uri_s)
+    else:
+        raise errors.WeaveInternalError(f"Unsupported URI str: {uri_s}")
     return ref.get()
 
 
@@ -144,13 +177,16 @@ def get_version(name, version):
 def get_obj_creator(obj_ref):
     # Extremely inefficient!
     # TODO
-    for art_name in os.listdir(LOCAL_ARTIFACT_DIR):
+    for art_name in os.listdir(artifacts_local.LOCAL_ARTIFACT_DIR):
         if (
             art_name.startswith("run-")
             and not art_name.endswith("-output")
             and artifacts_local.local_artifact_exists(art_name, "latest")
         ):
-            run = get("%s/latest" % art_name)
+            local_uri = uris.WeaveLocalArtifactURI.make_uri(
+                artifacts_local.LOCAL_ARTIFACT_DIR, art_name, "latest"
+            )
+            run = get(local_uri)
             if isinstance(run._output, refs.Ref) and str(run._output) == str(obj_ref):
                 # If any input is also the ref, this run did not create obj, since
                 # the obj already existed. This fixes an infinite loop where list-indexCheckpoint
@@ -191,15 +227,18 @@ def to_python(obj):
         return obj.as_py()
 
     wb_type = types.TypeRegistry.type_of(obj)
-    artifact = artifacts_local.LocalArtifact("to-python-%s" % wb_type.name)
-    mapper = mappers_python.map_to_python(wb_type, artifact)
+    mapper = mappers_python.map_to_python(
+        wb_type, artifacts_local.LocalArtifact(_get_name(wb_type, obj))
+    )
     val = mapper.apply(obj)
     return {"_type": wb_type.to_dict(), "_val": val}
 
 
 def from_python(obj):
     wb_type = types.TypeRegistry.type_from_dict(obj["_type"])
-    mapper = mappers_python.map_from_python(wb_type, None)
+    mapper = mappers_python.map_from_python(
+        wb_type, artifacts_local.LocalArtifact(_get_name(wb_type, obj))
+    )
     res = mapper.apply(obj["_val"])
     return res
 

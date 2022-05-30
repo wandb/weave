@@ -3,9 +3,9 @@ from .. import weave_types as types
 
 
 def op_get_return_type(uri):
-    from . import storage
+    from .. import uris
 
-    return storage.refs.LocalArtifactRef.from_str(uri).type
+    return uris.WeaveURI.parse(uri).to_ref().type
 
 
 def op_get_return_type_from_inputs(inputs):
@@ -33,13 +33,15 @@ def save(obj, name):
 
 @mutation
 def _save(name, obj):
-    obj_name, version = name.split("/")
     from . import storage
+    from .. import uris
+
+    obj_uri = uris.WeaveURI.parse(name)
 
     # Clear the ref, otherwise save will immediately return
     # the result instead of saving the mutated result
     storage.clear_ref(obj)
-    storage.save(obj, name=obj_name)
+    storage.save(obj, name=obj_uri.full_name)
 
 
 @op(

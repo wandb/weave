@@ -11,7 +11,7 @@ from flask import abort
 from flask_cors import CORS, cross_origin
 from flask import send_from_directory
 
-from weave import server
+from weave import server, storage
 from weave import registry_mem
 from weave import op_args
 from weave import errors

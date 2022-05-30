@@ -21,7 +21,7 @@ def make_refs(node: graph.Node):
         if isinstance(node, graph.ConstNode):
             ref = storage.get_ref(node.val)
             if ref is not None:
-                return op_get(str(ref))
+                return op_get(str(ref.uri))
         return node
 
     return graph.map_nodes(node, make_ref)
@@ -44,7 +44,7 @@ def _show_params(obj):
     elif isinstance(obj, storage.Ref):
         from weave import ops
 
-        node = ops.get(str(obj))
+        node = ops.get(obj.uri)
         return {"weave_node": weavejs_fixes.fixup_node(node)}
 
     elif types.TypeRegistry.has_type(obj):
@@ -53,7 +53,7 @@ def _show_params(obj):
         names = util.find_names(obj)
 
         ref = storage.save(obj, name=names[-1])
-        node = ops.get(str(ref))
+        node = ops.get(ref.uri)
 
         return {"weave_node": weavejs_fixes.fixup_node(node)}
 
@@ -73,7 +73,7 @@ def show(obj=None, height=400):
         )
 
     params = _show_params(obj)
-    panel_url = f"{context.get_frontend_url()}/index.html?fullScreen"
+    panel_url = f"{context.get_frontend_url()}/__frontend/weave_jupyter?fullScreen"
     if "weave_node" in params:
         panel_url += "&expNode=%s" % urllib.parse.quote(
             json.dumps(params["weave_node"].to_json())

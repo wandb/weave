@@ -66,7 +66,7 @@ def mapped_fn_to_arrow(arrow_table, node):
     if isinstance(node, graph.ConstNode):
         return node.val
     elif isinstance(node, graph.OutputNode):
-        op_name = graph.opname_without_version(node.from_op)
+        op_name = graph.op_full_name(node.from_op)
         inputs = {
             k: mapped_fn_to_arrow(arrow_table, i)
             for k, i in node.from_op.inputs.items()

@@ -51,6 +51,7 @@ class UnionMapper(mappers.Mapper):
 
 class RefMapper(mappers.Mapper):
     def __init__(self, type_, mapper, artifact, path=[]):
+        self.type_ = type_
         self._object_type = type_.object_type
 
 

@@ -1,5 +1,6 @@
 import numpy as np
 from . import weave_types as types
+from . import errors
 
 
 class NumpyArraySaver:
@@ -58,10 +59,15 @@ class NumpyArrayType(types.Type):
     def save_instance(self, obj, artifact, name):
         handler = artifact.get_path_handler(name, handler_constructor=NumpyArraySaver)
         index = handler.add(obj)
-        return index
+        return [str(index)]
 
     @classmethod
     def load_instance(cls, artifact, name, extra=None):
+        if extra is None or not isinstance(extra, list):
+            raise errors.WeaveInternalError(
+                f"Received unexpect 'extra' param - {extra}. Expected a singleton list of integer."
+            )
+        extra = extra[0]
         index = int(extra)
         handler = artifact.get_path_handler(name, handler_constructor=NumpyArrayLoader)
         return handler.get(index)

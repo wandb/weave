@@ -1,16 +1,13 @@
-import sys
 import typing
 
-import wandb
 
 from . import op_def
 from . import weave_types
 from . import lazy
 from . import errors
-
-
-WANDB_ARTIFACT_SCHEME = "wandb-artifact://"
-LOCAL_FILE_SCHEME = "file://"
+from . import context
+from . import storage
+from . import uris
 
 
 class Registry:
@@ -21,48 +18,62 @@ class Registry:
     # state.
     _ops: typing.Dict[str, op_def.OpDef]
 
-    _op_versions: typing.Dict[tuple[str, str], op_def.OpDef]
+    _op_versions: typing.Dict[typing.Tuple[str, str], op_def.OpDef]
 
     def __init__(self):
         self._types = {}
         self._ops = {}
         self._op_versions = {}
 
-    def _make_op_calls(self, op: op_def.OpDef, version: str):
-        full_name = op.name + ":" + version
+    def _make_op_calls(
+        self, op: op_def.OpDef, uri: typing.Optional[uris.WeaveURI] = None
+    ):
+        op_uri = uri.uri if uri is not None else op.uri
         op.lazy_call = lazy.make_lazy_call(
-            op.resolve_fn, full_name, op.input_type, op.output_type
+            op.resolve_fn, op_uri, op.input_type, op.output_type
         )
         op.eager_call = lazy.make_eager_call(op.lazy_call)
         op.call_fn = lazy.make_call(op.eager_call, op.lazy_call)
 
     def register_op(self, op: op_def.OpDef):
         # Always save OpDefs any time they are declared
-        from . import storage
 
-        version = op_def.get_loading_op_version()
-        is_loading = version is not None
-        if version is None:
+        location = context.get_loading_op_location()
+        is_loading = location is not None
+        # do not save built-in ops today
+        should_save = not is_loading and not op.is_builtin
+        print("SHOULD SAVE", op.name, should_save, is_loading, op.is_builtin)
+        if should_save:
             # if we're not loading an existing op, save it.
-            ref = storage.save(op, name=f"op-{op.name}")
+            ref = storage.save(op, name=op.name)
             version = ref.version
+            location = ref.artifact.location
+        version = location.version if location is not None else None
         op.version = version
 
-        self._make_op_calls(op, version)
-
+        self._make_op_calls(op, location)
         if not is_loading:
             self._ops[op.name] = op
-
-        self._op_versions[(op.name, version)] = op
+        if version:
+            self._op_versions[(op.name, version)] = op
         return op
 
-    def get_op(self, name: str) -> op_def.OpDef:
-        if ":" in name:
-            name, version = name.split(":", 1)
-            return self._op_versions[(name, version)]
-        if name in self._ops:
-            return self._ops[name]
-        raise errors.WeaveInternalError("Op not registered: %s" % name)
+    def get_op(self, uri: str) -> op_def.OpDef:
+        object_uri = uris.WeaveURI.parse(uri)
+        if object_uri.version is not None:
+            object_key = (object_uri.full_name, object_uri.version)
+            if object_key in self._op_versions:
+                res = self._op_versions[object_key]
+            else:
+                res = storage.get(uri)
+                self._op_versions[object_key] = res
+        elif object_uri.full_name in self._ops:
+            res = self._ops[object_uri.full_name]
+        else:
+            res = storage.get(uri)
+        if res is None:
+            raise errors.WeaveInternalError("Op not registered: %s" % uri)
+        return res
 
     def find_op_by_fn(self, lazy_local_fn):
         for op_def in self._op_versions.values():
@@ -81,9 +92,10 @@ class Registry:
         op = self._ops.pop(name)
         op.name = new_name
         self._ops[new_name] = op
-        self._op_versions.pop((name, op.version))
-        self._op_versions[(new_name, op.version)] = op
-        self._make_op_calls(op, op.version)
+        if op.version is not None:
+            self._op_versions.pop((name, op.version))
+            self._op_versions[(new_name, op.version)] = op
+        self._make_op_calls(op)
 
     # def register_type(self, type: weave_types.Type):
     #    self._types[type.name] = type

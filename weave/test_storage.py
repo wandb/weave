@@ -8,6 +8,7 @@ import re
 import wandb
 
 from . import api as weave
+from . import artifacts_local
 from . import weave_types as types
 from . import storage
 from .weave_internal import make_const_node
@@ -135,9 +136,9 @@ def test_ref_type():
     assert python_ref == {
         "_type": {
             "objectType": {"propertyTypes": {"x": "int"}, "type": "typedDict"},
-            "type": "ref-type",
+            "type": "local-ref-type",
         },
-        "_val": "my-dict/6036cbf3a05809f1a3f174a1485b1770",
+        "_val": f"local-artifact://{artifacts_local.LOCAL_ARTIFACT_DIR}/my-dict/6036cbf3a05809f1a3f174a1485b1770",
     }
     ref2 = storage.from_python(python_ref)
     obj2 = storage.deref(ref2)
@@ -150,7 +151,9 @@ def test_trace():
     assert res == 48
     mult_run = storage.get_obj_creator(storage._get_ref(res))
     assert mult_run._op_name == "number-mult"
-    assert re.match("run-number-add-.*-output/.*$", str(mult_run._inputs["lhs"]))
+    assert re.match(
+        "^local-artifact://.*run-number-add-.*-output/.*$", str(mult_run._inputs["lhs"])
+    )
     assert mult_run._inputs["rhs"] == 4
     add_run = storage.get_obj_creator(mult_run._inputs["lhs"])
     assert add_run._op_name == "number-add"

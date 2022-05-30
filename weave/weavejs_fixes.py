@@ -67,7 +67,7 @@ def remove_opcall_versions_node(node: graph.Node) -> graph.Node:
             return node
         return graph.OutputNode(
             node.type,
-            graph.opname_without_version(node.from_op),
+            graph.op_full_name(node.from_op),
             node.from_op.inputs,
         )
 
@@ -82,7 +82,7 @@ def remove_opcall_versions_data(data):
         d = data
         if "name" in data and ":" in data["name"]:
             d = copy.copy(data)
-            d["name"] = data["name"].split(":")[0]
+            d["name"] = graph.opuri_full_name(data["name"])
         return {k: remove_opcall_versions_data(v) for k, v in d.items()}
     return data
 
