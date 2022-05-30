@@ -391,13 +391,10 @@ class ArrowWeaveList:
         from .. import mappers_python
 
         col = self._arrow_data[name]
-        if isinstance(
-            self._mapper._property_serializers[name], mappers_python.DefaultFromPy
-        ):
-            return [
-                self._mapper._property_serializers[name].apply(i.as_py()) for i in col
-            ]
-        return self._mapper._property_serializers[name].apply(col)
+        col_mapper = self._mapper._property_serializers[name]
+        if isinstance(col_mapper, mappers_python.DefaultFromPy):
+            return [col_mapper.apply(i.as_py()) for i in col]
+        return col_mapper.apply(col)
 
     def _index(self, index):
         try:
