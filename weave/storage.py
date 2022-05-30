@@ -85,8 +85,13 @@ def save_to_artifact(obj, artifact: artifacts_local.LocalArtifact, name, type_):
 
 
 def _get_name(wb_type: types.Type, obj: typing.Any) -> str:
-    obj_names = util.find_names(obj)
-    return f"{wb_type.name}-{obj_names[-1]}"
+    return wb_type.name
+    # This tries to figure out which variable references obj.
+    # But it is slow when there are a lot of references. If we want to do
+    # something like this, we'll need to do it somewhere closer to user
+    # interaction.
+    # obj_names = util.find_names(obj)
+    # return f"{wb_type.name}-{obj_names[-1]}"
 
 
 def _save_or_publish(obj, name=None, type=None, publish: bool = False, artifact=None):

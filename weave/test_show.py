@@ -74,9 +74,9 @@ EXPECTED_SHOW_PARAMS_FINE_TUNE_WEAVE_NODE = {
                             "type": {
                                 "type": "const",
                                 "valType": "string",
-                                "val": test_helpers.RegexMatcher(".*list-obj/.*"),
+                                "val": test_helpers.RegexMatcher(".*list/.*"),
                             },
-                            "val": test_helpers.RegexMatcher(".*list-obj/.*"),
+                            "val": test_helpers.RegexMatcher(".*list/.*"),
                         }
                     },
                     "name": "get",
@@ -139,12 +139,12 @@ def test_large_const_node():
     table_state = panel_config["tableState"]
     col_select_fns = table_state["columnSelectFunctions"]
     col_sel_fn2 = list(col_select_fns.values())[1]
-    assert "list-obj/" in json.dumps(col_sel_fn2)
+    assert "list/" in json.dumps(col_sel_fn2)
 
     col_sel_fn2_node = graph.Node.node_from_json(col_sel_fn2)
 
     # Asserting that weavejs_fixes.remove_opcall_versions_data works
     assert (
         graph.node_expr_str(col_sel_fn2_node)
-        == 'get("local-artifact:///tmp/local-artifacts/list-obj/feb305b61c6337e4430ac4d869581adb").finetunegpt3({"n_epochs": 2}).model().complete(row).pick("choices").index(0).pick("text")'
+        == 'get("local-artifact:///tmp/local-artifacts/list/feb305b61c6337e4430ac4d869581adb").finetunegpt3({"n_epochs": 2}).model().complete(row).pick("choices").index(0).pick("text")'
     )
