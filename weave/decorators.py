@@ -12,6 +12,9 @@ from . import op_args
 from . import weave_types as types
 from . import infer_types
 
+py_type = type
+from .decorator_type import type
+
 
 def weave_class(weave_type):
     def wrap(target):
@@ -70,7 +73,7 @@ def op(
     """Decorator for declaring an op.
 
     Decorated functions must be typed, either with Python types or by declaring
-    input_type, output_Type as arguments to op (Python types preferred).
+    input_type, output_type as arguments to op (Python types preferred).
     """
 
     def wrap(f):
@@ -239,36 +242,3 @@ def mutation(f):
     # Attach the signature so additional decorators (@op) can use it.
     call.sig = inspect.signature(f)
     return call
-
-
-_py_type = type
-
-
-def type():
-    def wrap(target):
-        dc = dataclasses.dataclass(target)
-        fields = dataclasses.fields(dc)
-        target_name = target.__name__
-
-        TargetType = _py_type(f"{target_name}Type", (types.ObjectType,), {})
-        TargetType.name = target_name
-        TargetType.instance_classes = target
-        TargetType.instance_class = target
-
-        def __init__(self):
-            for field in fields:
-                setattr(self, field.name)
-
-        # TargetType.__init__ = __init__
-
-        def property_types(self):
-            return {
-                field.name: infer_types.python_type_to_type(field.type)
-                for field in fields
-            }
-
-        TargetType.property_types = property_types
-        dc.WeaveType = TargetType
-        return dc
-
-    return wrap
