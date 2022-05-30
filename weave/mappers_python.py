@@ -12,9 +12,8 @@ from . import graph
 class TypedDictToPyDict(mappers_weave.TypedDictMapper):
     def apply(self, obj):
         result = {}
-        for k, v in obj.items():
-            v = self._property_serializers[k].apply(v)
-            result[k] = v
+        for k, prop_serializer in self._property_serializers.items():
+            result[k] = prop_serializer.apply(obj[k])
         return result
 
 

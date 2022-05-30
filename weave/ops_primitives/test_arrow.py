@@ -53,10 +53,7 @@ def test_groupby_index_count():
 
 def test_map_scalar_map():
     ref = create_arrow_data(1000)
-    print("REF TYPE", ref.type)
 
-    n1 = weave.get(ref).map(lambda row: row["y"] + 1)
-    print("n1 type", n1.type)
     node = weave.get(ref).map(lambda row: row["y"] + 1).map(lambda row: row + 9)
     assert weave.use(node[0]) == 15
     assert weave.use(node[4]) == 17
@@ -76,22 +73,6 @@ def test_complicated():
 
 def test_table_string_histogram():
     ref = create_arrow_data(1000)
-    # node = (
-    #     weave.get(ref)
-    #     .groupby(lambda row: ops.dict_(rotate=row["rotate"]))[0]
-    #     .pick("x")
-    #     .groupby(lambda row: ops.dict_(row=row))
-    #     # .map(lambda row: row.key.merge(ops.dict_(count=row.count()), _index: index}))
-    # .map(lambda row: row.key().merge(ops.dict_(count=row.count())))
-    #     .count()
-    # )
-    n1 = (
-        weave.get(ref)
-        .groupby(lambda row: ops.dict_(rotate=row["rotate"]))[0]
-        .pick("x")
-        .groupby(lambda row: ops.dict_(row=row))
-    )
-    print("N1 type", n1.type)
     node = (
         weave.get(ref)
         .groupby(lambda row: ops.dict_(rotate=row["rotate"]))[0]
@@ -131,7 +112,7 @@ def test_custom_saveload():
     assert weave.use(data2[0]["im"].width()) == 256
 
 
-@pytest.mark.skip()
+# @pytest.mark.skip()
 def test_custom_groupby():
     data = storage.to_arrow(
         [
@@ -153,3 +134,34 @@ def test_custom_groupby():
         )
         == 256
     )
+
+
+def test_map_array():
+    data = storage.to_arrow([1, 2, 3])
+    assert weave.use(data.map(lambda i: i + 1)).to_pylist() == [2, 3, 4]
+
+
+def test_map_typeddict():
+    data = storage.to_arrow([{"a": 1, "b": 2}, {"a": 3, "b": 5}])
+    assert weave.use(data.map(lambda row: row["a"])).to_pylist() == [1, 3]
+
+
+@weave.type()
+class Point2:
+    x: float
+    y: float
+
+    @weave.op()
+    def get_x(self) -> float:
+        return self.x
+
+
+def test_map_object():
+    data = storage.to_arrow([Point2(1, 2), Point2(5, 6)])
+    assert weave.use(data.map(lambda row: row.get_x())).to_pylist() == [1, 5]
+
+
+@pytest.mark.skip("not working yet")
+def test_map_typeddict_object():
+    data = storage.to_arrow([{"a": 0, "p": Point2(1, 2)}, {"a": 3, "p": Point2(9, 12)}])
+    assert weave.use(data.map(lambda row: row["p"])).to_pylist() == []

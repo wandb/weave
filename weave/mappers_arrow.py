@@ -169,8 +169,15 @@ class DefaultToArrow(mappers.Mapper):
                     pa.field("artifact_name", pa.string()),
                 )
             )
-        elif self.type.name == "ndarray" or self.type.name == "pil-image":
+        elif (
+            self.type.name == "ndarray"
+            or self.type.name == "pil-image"
+            or self.type.name == "ArrowArray"
+            or self.type.name == "ArrowTable"
+        ):
             # Ref type
+            return pa.string()
+        elif self.type.name == "type":
             return pa.string()
 
         raise errors.WeaveInternalError(
@@ -203,7 +210,7 @@ def map_to_arrow_(type, mapper, artifact, path=[]):
         return IntToArrowInt(type, mapper, artifact, path)
     elif isinstance(type, types.Boolean):
         return BoolToArrowBool(type, mapper, artifact, path)
-    elif isinstance(type, types.Float):
+    elif isinstance(type, types.Float) or isinstance(type, types.Number):
         return FloatToArrowFloat(type, mapper, artifact, path)
     elif isinstance(type, types.String):
         return StringToArrowString(type, mapper, artifact, path)
@@ -228,7 +235,7 @@ def map_from_arrow_(type, mapper, artifact, path=[]):
         return mappers_python.IntToPyInt(type, mapper, artifact, path)
     elif isinstance(type, types.Boolean):
         return mappers_python.BoolToPyBool(type, mapper, artifact, path)
-    elif isinstance(type, types.Float):
+    elif isinstance(type, types.Float) or isinstance(type, types.Number):
         return ArrowFloatToFloat(type, mapper, artifact, path)
     elif isinstance(type, types.String):
         return mappers_python.StringToPyString(type, mapper, artifact, path)

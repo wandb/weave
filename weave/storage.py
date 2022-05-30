@@ -50,9 +50,13 @@ def save_mem(obj, name):
 def save_to_artifact(obj, artifact: artifacts_local.LocalArtifact, name, type_):
     # Tell types what name to use if not obj
     # We need to fix the save/load API so this is unnecessary.
+    # This is also necessary to prevent saving the same obj at different
+    # key paths (as the Default mappers try to do now). That breaks saving
+    # references in new objects currently. Will be fixed when we make saving
+    # references to existing artifacts work.
     # TODO: Fix
     # DO NOT MERGE
-    if not name:
+    if name != "_obj":
         name = type_.name
     ref_extra = type_.save_instance(obj, artifact, name)
     if name != "_obj":

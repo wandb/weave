@@ -50,11 +50,10 @@ def test_mapped_method_returning_custom_type():
     )
     mid = weave.use(segments.map(lambda seg: seg.midpoint()))
 
-    # TODO: not right! mid[0] is a TypedDict, not our Point2d object!
-    assert weave.use(mid[0]["x"]) == 0.45
-    assert weave.use(mid[0]["y"]) == 0.6
-    assert weave.use(mid[1]["x"]) == 0.2
-    assert weave.use(mid[1]["y"]) == pytest.approx(0.65)
+    assert weave.use(mid[0].get_x()) == 0.45
+    assert weave.use(mid[0].get_y()) == 0.6
+    assert weave.use(mid[1].get_x()) == 0.2
+    assert weave.use(mid[1].get_y()) == pytest.approx(0.65)
 
 
 def test_mapped_on_fully_custom_type():

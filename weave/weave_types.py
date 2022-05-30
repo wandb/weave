@@ -663,10 +663,6 @@ class ObjectType(Type):
 
         serializer = mappers_python.map_to_python(self, artifact)
 
-        # TODO: do we inject the artifact here?
-        #    Or maybe we do it in the mapper, and add the artifact
-        #    prop to the object there as well?
-        obj.artifact = artifact  # ??
         result = serializer.apply(obj)
         with artifact.new_file(f"{name}.object.json") as f:
             json.dump(result, f, allow_nan=False)

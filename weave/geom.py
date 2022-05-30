@@ -17,6 +17,15 @@ class Point2d:
         self.x = x
         self.y = y
 
+    # TODO: we need properties!
+    @weave.op()
+    def get_x(self) -> float:
+        return self.x
+
+    @weave.op()
+    def get_y(self) -> float:
+        return self.y
+
     # Would be really nice to be able to compare this to a dict
     # so compare would do self.as_type(type_of(other)).__equal__
     # Type-casting is the really nice type behavior I want.
