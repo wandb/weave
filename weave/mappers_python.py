@@ -180,7 +180,7 @@ class DefaultToPy(mappers.Mapper):
             pass
         name = "-".join(self._path)
         ref = storage.save_to_artifact(obj, self._artifact, name, self.type)
-        return ref.uri
+        return ref.local_ref_str()
 
 
 class DefaultFromPy(mappers.Mapper):
@@ -192,10 +192,11 @@ class DefaultFromPy(mappers.Mapper):
     def apply(self, obj):
         if isinstance(obj, dict):
             return self.type.instance_from_dict(obj)
-        print("REF STRING", obj)
         # else its a ref string
         # TODO: this does not use self.artifact, can we just drop it?
-        return uris.WeaveURI.parse(obj).to_ref().get()
+        return refs.LocalArtifactRef.from_local_ref(
+            self._artifact, obj, self.type
+        ).get()
 
 
 py_type = type

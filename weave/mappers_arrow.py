@@ -193,7 +193,7 @@ class DefaultToArrow(mappers.Mapper):
         ref = storage.save_to_artifact(
             obj, artifact=self._artifact, name=name, type_=self.type
         )
-        return ref.uri
+        return ref.local_ref_str()
 
 
 def map_to_arrow_(type, mapper, artifact, path=[]):

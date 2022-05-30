@@ -57,7 +57,7 @@ def test_laref_artifact_version_path_extra1():
     assert parsed_ref.extra == ["5"]
 
     assert ref.local_ref_str() == "x.txt/5"
-    assert refs.LocalArtifactRef.parse_local_ref_str("x.txt/5") == ("x.txt", "5")
+    assert refs.LocalArtifactRef.parse_local_ref_str("x.txt/5") == ("x.txt", ["5"])
 
 
 def test_laref_artifact_version_path_obj_extra1():
@@ -77,7 +77,7 @@ def test_laref_artifact_version_path_obj_extra1():
     assert parsed_ref.extra == ["5"]
 
     assert ref.local_ref_str() == "_obj/5"
-    assert refs.LocalArtifactRef.parse_local_ref_str("_obj/5") == ("_obj", "5")
+    assert refs.LocalArtifactRef.parse_local_ref_str("_obj/5") == ("_obj", ["5"])
 
 
 def test_laref_artifact_version_path_extra2():

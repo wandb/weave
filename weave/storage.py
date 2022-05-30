@@ -70,15 +70,18 @@ def save_to_artifact(obj, artifact: artifacts_local.LocalArtifact, name, type_):
         hash = artifact.make_last_file_content_addressed()
         if hash is not None:
             name = f"{hash}-{name}"
-    with artifact.new_file(f"{name}.type.json") as f:
-        json.dump(type_.to_dict(), f)
-    ref_cls = (
-        refs.WandbArtifactRef
-        if isinstance(artifact, artifacts_local.WandbArtifact)
-        else refs.LocalArtifactRef
+    return refs.LocalArtifactRef(
+        artifact, path=name, type=type_, obj=obj, extra=ref_extra
     )
-    artifact.save()
-    return ref_cls(artifact, path=name, type=type_, obj=obj, extra=ref_extra)
+    # Jason's code does this, however, we can't do that, since save_to_artifact()
+    # needs to return an artifact local ref (the artifact is not yet saved at this
+    # point).
+    # ref_cls = (
+    #     refs.WandbArtifactRef
+    #     if isinstance(artifact, artifacts_local.WandbArtifact)
+    #     else refs.LocalArtifactRef
+    # )
+    # return ref_cls(artifact, path=name, type=type_, obj=obj, extra=ref_extra)
 
 
 def _get_name(wb_type: types.Type, obj: typing.Any) -> str:
@@ -108,6 +111,9 @@ def _save_or_publish(obj, name=None, type=None, publish: bool = False, artifact=
         else:
             artifact = artifacts_local.LocalArtifact(name)
     ref = save_to_artifact(obj, artifact, "_obj", wb_type)
+    with artifact.new_file(f"_obj.type.json") as f:
+        json.dump(wb_type.to_dict(), f)
+    artifact.save()
     refs.put_ref(obj, ref)
     return ref
 
