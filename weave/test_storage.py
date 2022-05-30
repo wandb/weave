@@ -1,3 +1,5 @@
+import dataclasses
+import typing
 import numpy as np
 import json
 import pytest
@@ -11,28 +13,15 @@ from . import storage
 from .weave_internal import make_const_node
 
 
+@weave.type()
 class SomeObj:
-    def __init__(self, some_int, some_str):
-        self.some_int = some_int
-        self.some_str = some_str
+    some_int: int
+    some_str: str
 
 
-class SomeObjType(weave.types.ObjectType):
-    instance_class = SomeObj
-    instance_classes = SomeObj
-
-    name = "test-storage-someobj"
-
-    def property_types(self):
-        return {
-            "some_int": weave.types.Int(),
-            "some_str": weave.types.String(),
-        }
-
-
+@dataclasses.dataclass
 class SomeCustomObj:
-    def __init__(self, obj):
-        self.obj = obj
+    obj: typing.Any
 
 
 class SomeCustomObjType(types.Type):
@@ -191,3 +180,10 @@ def test_list_obj():
     assert list_obj[0].some_str == list_obj2[0].some_str
     assert list_obj[1].some_int == list_obj2[1].some_int
     assert list_obj[1].some_str == list_obj2[1].some_str
+
+
+def test_cross_artifact_ref():
+    owner = {"a": 1, "b": {"c": SomeCustomObj(2)}}
+    node = weave.save(owner, "owner-obj")
+    assert weave.use(node["b"]) == {"c": SomeCustomObj(2)}
+    # TODO: assert that ref is to original object

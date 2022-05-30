@@ -6,7 +6,6 @@ import typing
 from urllib.parse import urlparse
 
 from . import errors
-from . import arrow_util
 from . import artifacts_local
 from . import weave_types as types
 from . import mappers_python
