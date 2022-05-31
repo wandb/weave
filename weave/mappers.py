@@ -1,6 +1,6 @@
 class Mapper:
     def __init__(self, type_, mapper, artifact, path):
-        pass
+        self.type = type_
 
     def result_type(self):
         raise NotImplementedError

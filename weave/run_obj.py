@@ -6,7 +6,7 @@ from . import artifacts_local
 from . import uris
 from .decorators import weave_class, op, mutation
 
-context.set_loading_built_ins(True)
+_loading_builtins_token = context.set_loading_built_ins()
 
 
 @weave_class(weave_type=types.RunType)
@@ -74,7 +74,7 @@ class Run:
             "self": types.RunType(
                 types.TypedDict({}), types.List(types.Any()), types.Any()
             ),
-            "s": types.Any(),
+            "v": types.Any(),
         },
         # can't return run because then we'll think this is an async op!
         output_type=types.Invalid(),
@@ -199,4 +199,4 @@ class Run:
 types.RunType.instance_classes = Run
 types.RunType.instance_class = Run
 
-context.set_loading_built_ins(False)
+context.clear_loading_built_ins(_loading_builtins_token)

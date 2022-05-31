@@ -1,16 +1,19 @@
 import copy
 import inspect
 import typing
+import dataclasses
 
 from . import graph
 from . import registry_mem
 from . import op_def
 from . import storage
-from . import lazy
 from . import errors
 from . import op_args
 from . import weave_types as types
 from . import infer_types
+
+py_type = type
+from .decorator_type import type
 
 
 def weave_class(weave_type):
@@ -28,12 +31,15 @@ def weave_class(weave_type):
                         opdef.name,
                         "%s-%s"
                         % (
-                            weave_type.name,
+                            types.type_class_type_name(weave_type),
                             opdef.name[3:],
                         ),
                     )
 
         weave_type.NodeMethodsClass = target
+        if weave_type.instance_classes == None:
+            weave_type.instance_classes = target
+            weave_type.instance_class = target
         return target
 
     return wrap
@@ -45,7 +51,7 @@ def _create_args_from_op_input_type(input_type):
     if not isinstance(input_type, dict):
         raise errors.WeaveDefinitionError("input_type must be OpArgs or a dict")
     for k, v in input_type.items():
-        if not isinstance(v, types.Type):
+        if not isinstance(v, types.Type) and not callable(v):
             raise errors.WeaveDefinitionError(
                 "input_type must be dict[str, Type] but %s is %s" % (k, v)
             )
@@ -67,7 +73,7 @@ def op(
     """Decorator for declaring an op.
 
     Decorated functions must be typed, either with Python types or by declaring
-    input_type, output_Type as arguments to op (Python types preferred).
+    input_type, output_type as arguments to op (Python types preferred).
     """
 
     def wrap(f):
@@ -137,7 +143,8 @@ def op(
             inferred_output_type = infer_types.python_type_to_type(python_return_type)
             if inferred_output_type == types.UnknownType():
                 raise errors.WeaveDefinitionError(
-                    "Could not infer Weave Type from declared Python return type"
+                    "Could not infer Weave Type from declared Python return type: %s"
+                    % python_return_type
                 )
 
         weave_output_type = output_type

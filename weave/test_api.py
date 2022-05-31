@@ -19,18 +19,18 @@ def test_print_save_val():
     # converting to string should give us an expression
     assert (
         str(ref)
-        == 'get("local-artifact:///tmp/local-artifacts/my-data/533a3c62299bbf524aa6cf8c883c26c3")'
+        == 'get("local-artifact:///tmp/local-artifacts/my-data/d45d5e33e1fe6cdad9ea76f90cd717cd")'
     )
 
     # show should use the same expression
     assert (
         str(_show_params(ref)["weave_node"])
-        == 'get("local-artifact:///tmp/local-artifacts/my-data/533a3c62299bbf524aa6cf8c883c26c3")'
+        == 'get("local-artifact:///tmp/local-artifacts/my-data/d45d5e33e1fe6cdad9ea76f90cd717cd")'
     )
 
     versions = weave.versions(ref)
     assert len(versions) == 1
-    assert str(versions[0].version) == "533a3c62299bbf524aa6cf8c883c26c3"
+    assert str(versions[0].version) == "d45d5e33e1fe6cdad9ea76f90cd717cd"
 
     data = [
         {"val": 1941, "label": "cat"},
@@ -41,21 +41,19 @@ def test_print_save_val():
 
     assert (
         str(ref)
-        == 'get("local-artifact:///tmp/local-artifacts/my-data/5e7a9d2f08e8f585f543b10708a7ce91")'
+        == 'get("local-artifact:///tmp/local-artifacts/my-data/88fdc3e0ef9724be8565a3e710f6389c")'
     )
     assert (
         str(_show_params(ref)["weave_node"])
-        == 'get("local-artifact:///tmp/local-artifacts/my-data/5e7a9d2f08e8f585f543b10708a7ce91")'
+        == 'get("local-artifact:///tmp/local-artifacts/my-data/88fdc3e0ef9724be8565a3e710f6389c")'
     )
 
     versions = weave.versions(ref)
     assert len(versions) == 2
 
-    # Versions are randomly ordered right now! :(
-    # TODO: fix
     version_strings = [str(v.version) for v in versions]
-    assert "5e7a9d2f08e8f585f543b10708a7ce91" in version_strings
-    assert "533a3c62299bbf524aa6cf8c883c26c3" in version_strings
+    assert version_strings[0] == "d45d5e33e1fe6cdad9ea76f90cd717cd"
+    assert version_strings[1] == "88fdc3e0ef9724be8565a3e710f6389c"
 
 
 def test_save_val_ops():

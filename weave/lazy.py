@@ -6,26 +6,42 @@ from . import graph
 from . import weave_types as types
 from . import context
 from . import api
+from . import weave_internal
+from . import errors
 
 
-def _ensure_node(v):
+def _ensure_node(fq_op_name, v, input_type, already_bound_params):
+    if callable(input_type):
+        already_bound_types = {k: n.type for k, n in already_bound_params.items()}
+        input_type = input_type(already_bound_types)
     if not isinstance(v, graph.Node):
+        if callable(v):
+            if not isinstance(input_type, types.Function):
+                raise errors.WeaveInternalError(
+                    "callable passed as argument, but type is not Function. Op: %s"
+                    % fq_op_name
+                )
+            return weave_internal.define_fn(input_type.input_types, v)
         val_type = types.TypeRegistry.type_of(v)
         # TODO: should type-check v here.
         v = graph.ConstNode(types.Const(val_type, v), v)
     return v
 
 
-def _bind_params(sig, args, kwargs, input_type):
+def _bind_params(fq_op_name, sig, args, kwargs, input_type):
     bound_params = sig.bind(*args, **kwargs)
     bound_params_with_constants = collections.OrderedDict()
     for k, v in bound_params.arguments.items():
         param = sig.parameters[k]
         if param.kind == inspect.Parameter.VAR_KEYWORD:
             for sub_k, sub_v in v.items():
-                bound_params_with_constants[sub_k] = _ensure_node(sub_v)
+                bound_params_with_constants[sub_k] = _ensure_node(
+                    fq_op_name, sub_v, None, None
+                )
         else:
-            bound_params_with_constants[k] = _ensure_node(v)
+            bound_params_with_constants[k] = _ensure_node(
+                fq_op_name, v, input_type.arg_types[k], bound_params_with_constants
+            )
     return bound_params_with_constants
 
 
@@ -73,7 +89,7 @@ def make_lazy_call(f, fq_op_name, input_type, output_type):
         sig = inspect.signature(f)
 
     def lazy_call(*args, **kwargs):
-        bound_params = _bind_params(sig, args, kwargs, input_type)
+        bound_params = _bind_params(fq_op_name, sig, args, kwargs, input_type)
         return _make_output_node(fq_op_name, bound_params, output_type)
 
     return lazy_call

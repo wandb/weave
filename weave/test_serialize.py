@@ -6,7 +6,7 @@ from . import serialize
 
 def test_serialize():
     proj = ops.project("shawn", "show-test")
-    av = proj.artifactVersion("show", "v14")
+    av = proj.artifact_version("show", "v14")
     file = av.path("obj.table.json")
     table = file.table()
     rows = table.rows()
@@ -14,6 +14,23 @@ def test_serialize():
         {"row": types.TypedDict({})}, lambda row: row["new"] > 100
     )
     filtered = rows.filter(filter_fn)
+
+    ser = serialize.serialize([filtered])
+    deser = serialize.deserialize(ser)
+    ser2 = serialize.serialize(deser)
+    assert ser == ser2
+
+
+def test_serialize_nested_function():
+    rows = api.save([{"a": [1, 2]}])
+    filtered = rows.filter(
+        api.define_fn(
+            {"row": types.TypedDict({"a": types.List(types.Int())})},
+            lambda row: ops.avg(
+                row["a"].map(api.define_fn({"row": types.Int()}, lambda row: row + 1))
+            ),
+        )
+    )
 
     ser = serialize.serialize([filtered])
     deser = serialize.deserialize(ser)

@@ -1,3 +1,4 @@
+import inspect
 import math
 
 from . import mappers
@@ -7,14 +8,14 @@ from . import mappers_weave
 from . import weave_types as types
 from . import graph
 from . import uris
+from . import errors
 
 
 class TypedDictToPyDict(mappers_weave.TypedDictMapper):
     def apply(self, obj):
         result = {}
-        for k, v in obj.items():
-            v = self._property_serializers[k].apply(v)
-            result[k] = v
+        for k, prop_serializer in self._property_serializers.items():
+            result[k] = prop_serializer.apply(obj[k])
         return result
 
 
@@ -48,6 +49,10 @@ class ObjectDictToObject(mappers_weave.ObjectMapper):
         for prop_name, prop_type in result_type.variable_property_types().items():
             if isinstance(prop_type, types.Const):
                 result[prop_name] = prop_type.val
+
+        constructor_sig = inspect.signature(result_type.instance_class)
+        if "artifact" in constructor_sig.parameters:
+            result["artifact"] = self._artifact
         return result_type.instance_class(**result)
 
 
@@ -83,6 +88,11 @@ class PyUnionToUnion(mappers_weave.UnionMapper):
 
 
 class IntToPyInt(mappers.Mapper):
+    def apply(self, obj):
+        return obj
+
+
+class BoolToPyBool(mappers.Mapper):
     def apply(self, obj):
         return obj
 
@@ -165,13 +175,24 @@ class DefaultToPy(mappers.Mapper):
         self._path = path
 
     def apply(self, obj):
+        existing_ref = storage._get_ref(obj)
+        if existing_ref:
+            if existing_ref.is_saved:
+                # TODO: should we assert type compatibility here or are they
+                #     guaranteed to be equal already?
+                return existing_ref.uri
+            elif existing_ref.artifact != self._artifact:
+                raise errors.WeaveInternalError(
+                    "Can't save cross-artifact reference to unsaved artifact. This error was triggered when saving obj %s of type: %s"
+                    % (self.obj, self.type)
+                )
         try:
             return self.type.instance_to_dict(obj)
         except NotImplementedError:
             pass
         name = "-".join(self._path)
         ref = storage.save_to_artifact(obj, self._artifact, name, self.type)
-        return ref.uri
+        return ref.local_ref_str()
 
 
 class DefaultFromPy(mappers.Mapper):
@@ -185,7 +206,18 @@ class DefaultFromPy(mappers.Mapper):
             return self.type.instance_from_dict(obj)
         # else its a ref string
         # TODO: this does not use self.artifact, can we just drop it?
-        return uris.WeaveURI.parse(obj).to_ref().get()
+        # Do we need the type so we can load here? No...
+        if ":" in obj:
+            ref = uris.WeaveURI.parse(obj).to_ref()
+            # Note: we are forcing type here, because we already know it
+            # We don't save the types for every file in a remote artifact!
+            # But you can still reference them, because you have to get that
+            # file through an op, and therefore we know the type?
+            ref._type = self.type
+            return ref.get()
+        return refs.LocalArtifactRef.from_local_ref(
+            self._artifact, obj, self.type
+        ).get()
 
 
 py_type = type
@@ -205,6 +237,8 @@ def map_to_python_(type, mapper, artifact, path=[]):
         return UnionToPyUnion(type, mapper, artifact, path)
     elif isinstance(type, types.ObjectType):
         return ObjectToPyDict(type, mapper, artifact, path)
+    elif isinstance(type, types.Boolean):
+        return BoolToPyBool(type, mapper, artifact, path)
     elif isinstance(type, types.Int):
         return IntToPyInt(type, mapper, artifact, path)
     elif isinstance(type, types.Float):
@@ -239,6 +273,8 @@ def map_from_python_(type: types.Type, mapper, artifact, path=[]):
         return ListToPyList(type, mapper, artifact, path)
     elif isinstance(type, types.UnionType):
         return PyUnionToUnion(type, mapper, artifact, path)
+    elif isinstance(type, types.Boolean):
+        return BoolToPyBool(type, mapper, artifact, path)
     elif isinstance(type, types.Int):
         return IntToPyInt(type, mapper, artifact, path)
     elif isinstance(type, types.Float):

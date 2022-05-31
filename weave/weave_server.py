@@ -20,9 +20,11 @@ from flask.logging import wsgi_errors_stream
 
 # Ensure we register the openai ops so we can tell the
 # app about them with list_ops
-
+from weave import ops
 from weave.ecosystem import openai
 from weave.ecosystem import async_demo
+from weave.ecosystem import demos
+from weave import run_obj
 
 # set up logging
 
@@ -89,6 +91,9 @@ def make_app(log_filename=None, stream_logging_enabled=False):
 # This makes all server logs go into the notebook
 # app = make_app(stream_logging_enabled=True)
 app = make_app()
+
+# Very important! We rely on key ordering on both sides!
+app.config["JSON_SORT_KEYS"] = False
 CORS(app, send_wildcard=True)
 
 
@@ -110,6 +115,9 @@ def execute():
     # print('REQUEST', request, request.json)
     if not request.json or "graphs" not in request.json:
         abort(400)
+    # Simulate browser/server latency
+    # import time
+    # time.sleep(0.1)
     response = server.handle_request(request.json, deref=True)
 
     # MAJOR HACKING HERE
