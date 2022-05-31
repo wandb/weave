@@ -575,6 +575,12 @@ class ArrowWeaveList:
             self._arrow_data.slice(offset), self.object_type, self._artifact
         )
 
+    @op(output_type=lambda input_types: input_types["self"])
+    def limit(self, limit: int):
+        return ArrowWeaveList(
+            self._arrow_data.slice(0, limit), self.object_type, self._artifact
+        )
+
 
 ArrowWeaveListType.instance_classes = ArrowWeaveList
 ArrowWeaveListType.instance_class = ArrowWeaveList
