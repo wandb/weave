@@ -42,7 +42,6 @@ class Registry:
         is_loading = location is not None
         # do not save built-in ops today
         should_save = not is_loading and not op.is_builtin
-        print("SHOULD SAVE", op.name, should_save, is_loading, op.is_builtin)
         if should_save:
             # if we're not loading an existing op, save it.
             ref = storage.save(op, name=op.name)

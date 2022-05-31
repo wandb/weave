@@ -1,3 +1,4 @@
+import copy
 import typing
 import dataclasses
 import numpy as np
@@ -197,6 +198,87 @@ def _pick_output_type(input_types):
     return ArrowWeaveListType(prop_type)
 
 
+def rewrite_weavelist_refs(arrow_data, object_type, artifact):
+    # TODO: Handle unions
+
+    if isinstance(object_type, types.TypedDict) or isinstance(
+        object_type, types.ObjectType
+    ):
+        prop_types = object_type.property_types
+        if callable(prop_types):
+            prop_types = prop_types()
+        arrays = {}
+        for col_name, col_type in prop_types.items():
+            column = arrow_data[col_name]
+            arrays[col_name] = rewrite_weavelist_refs(column, col_type, artifact)
+        return pa.table(arrays)
+    else:
+        if isinstance(object_type, types.BasicType):
+            return arrow_data
+
+        # # We have a column of refs
+        from .. import uris
+        from .. import refs
+
+        new_refs = []
+        for ref_str in arrow_data:
+            ref_str = ref_str.as_py()
+            if ":" in ref_str:
+                new_refs.append(ref_str)
+            else:
+                ref = refs.LocalArtifactRef.from_local_ref(
+                    artifact, ref_str, object_type
+                )
+                new_refs.append(str(ref.uri))
+        return pa.array(new_refs)
+
+
+def rewrite_groupby_refs(table, group_keys, object_type, artifact):
+    # TODO: Handle unions
+
+    # hmm... we should just iterate over table columns instead!
+    # This would be a nested iterate
+    if isinstance(object_type, types.TypedDict) or isinstance(
+        object_type, types.ObjectType
+    ):
+        prop_types = object_type.property_types
+        if callable(prop_types):
+            prop_types = prop_types()
+        arrays = {}
+        for group_key in group_keys:
+            arrays[group_key] = table[group_key]
+        for col_name, col_type in prop_types.items():
+            col_name = col_name + "_list"
+            column = table[col_name]
+            arrays[col_name] = rewrite_groupby_refs(
+                column, group_keys, col_type, artifact
+            )
+        return pa.table(arrays)
+    else:
+        if isinstance(object_type, types.BasicType):
+            return table
+
+        # We have a column of refs
+        from .. import uris
+        from .. import refs
+
+        new_refs = []
+        for ref_str_list in table:
+            ref_str_list = ref_str_list.as_py()
+            new_ref_str_list = []
+            for ref_str in ref_str_list:
+                if ":" in ref_str:
+                    new_ref_str_list.append(ref_str)
+                    # ref = uris.WeaveURI.parse(ref_str).to_ref()
+                else:
+                    ref = refs.LocalArtifactRef.from_local_ref(
+                        artifact, ref_str, object_type
+                    )
+                    new_ref_str_list.append(str(ref.uri))
+            new_refs.append(new_ref_str_list)
+        return pa.array(new_refs)
+
+
 @dataclasses.dataclass
 class ArrowTableGroupByType(types.ObjectType):
     name = "ArrowTableGroupBy"
@@ -224,18 +306,17 @@ class ArrowTableGroupByType(types.ObjectType):
         }
 
     def save_instance(self, obj, artifact, name):
-        super().save_instance(obj, artifact, name)
-        from .. import mappers_arrow
+        if obj._artifact == artifact:
+            super().save_instance(obj, artifact, name)
+            return
+        new_table = rewrite_groupby_refs(
+            obj._table, obj._group_keys, self.object_type, obj._artifact
+        )
+        import copy
 
-        # Hacks to save any references objects in the previous artifact
-        mapper = mappers_arrow.map_to_arrow(self.object_type, artifact)
-        if obj._artifact._version:
-            for i in range(len(obj._table)):
-                gr = obj.__getitem__.resolve_fn(obj, i)
-                for j in range(len(gr._arrow_data)):
-                    row = gr._arrow_data.slice(j, 1).to_pylist()[0]
-                    unmapped = obj._mapper.apply(row)
-                    mapper.apply(unmapped)
+        new_obj = copy.copy(obj)
+        new_obj._table = new_table
+        super().save_instance(new_obj, artifact, name)
 
 
 @weave_class(weave_type=ArrowTableGroupByType)
@@ -345,15 +426,16 @@ class ArrowWeaveListType(types.ObjectType):
         }
 
     def save_instance(self, obj, artifact, name):
-        super().save_instance(obj, artifact, name)
-        from .. import mappers_arrow
+        if obj._artifact == artifact:
+            super().save_instance(obj, artifact, name)
+            return
+        arrow_data = rewrite_weavelist_refs(
+            obj._arrow_data, self.object_type, obj._artifact
+        )
 
-        # Hacks to save referenced objects in the previous artifact
-        # TODO: implement cross artifact references
-        mapper = mappers_arrow.map_to_arrow(self.object_type, artifact)
-        if obj._artifact._version:
-            for i in range(obj._count()):
-                mapper.apply(obj._index(i))
+        new_obj = copy.copy(obj)
+        new_obj._arrow_data = arrow_data
+        super().save_instance(new_obj, artifact, name)
 
 
 @weave_class(weave_type=ArrowWeaveListType)
@@ -412,10 +494,18 @@ class ArrowWeaveList:
         # return self._table[key]
         # TODO: Don't do to_pylist() here! Stay in arrow til as late
         #     as possible
+
         object_type = self.object_type
-        return ArrowWeaveList(
-            self._arrow_data[key], object_type.property_types[key], self._artifact
-        )
+        if isinstance(object_type, types.TypedDict):
+            col_type = object_type.property_types[key]
+        elif isinstance(object_type, types.ObjectType):
+            col_type = object_type.property_types()[key]
+        else:
+            raise errors.WeaveInternalError(
+                "unexpected type for pick: %s" % object_type
+            )
+
+        return ArrowWeaveList(self._arrow_data[key], col_type, self._artifact)
 
     @op(
         input_type={

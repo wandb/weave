@@ -8,6 +8,7 @@ from . import mappers_weave
 from . import weave_types as types
 from . import graph
 from . import uris
+from . import errors
 
 
 class TypedDictToPyDict(mappers_weave.TypedDictMapper):
@@ -174,6 +175,17 @@ class DefaultToPy(mappers.Mapper):
         self._path = path
 
     def apply(self, obj):
+        existing_ref = storage._get_ref(obj)
+        if existing_ref:
+            if existing_ref.is_saved:
+                # TODO: should we assert type compatibility here or are they
+                #     guaranteed to be equal already?
+                return existing_ref.uri
+            elif existing_ref.artifact != self._artifact:
+                raise errors.WeaveInternalError(
+                    "Can't save cross-artifact reference to unsaved artifact. This error was triggered when saving obj %s of type: %s"
+                    % (self.obj, self.type)
+                )
         try:
             return self.type.instance_to_dict(obj)
         except NotImplementedError:
@@ -194,6 +206,15 @@ class DefaultFromPy(mappers.Mapper):
             return self.type.instance_from_dict(obj)
         # else its a ref string
         # TODO: this does not use self.artifact, can we just drop it?
+        # Do we need the type so we can load here? No...
+        if ":" in obj:
+            ref = uris.WeaveURI.parse(obj).to_ref()
+            # Note: we are forcing type here, because we already know it
+            # We don't save the types for every file in a remote artifact!
+            # But you can still reference them, because you have to get that
+            # file through an op, and therefore we know the type?
+            ref._type = self.type
+            return ref.get()
         return refs.LocalArtifactRef.from_local_ref(
             self._artifact, obj, self.type
         ).get()

@@ -63,7 +63,10 @@ def test_mapped_on_fully_custom_type():
     ]
     arrow_arr = storage.to_arrow(data)
 
-    lens = weave.use(arrow_arr.map(lambda row: row["im"].width()))
+    assert weave.use(arrow_arr.map(lambda row: row["im"].width())).to_pylist() == [
+        256,
+        256,
+    ]
 
 
 def test_mapped_pick():

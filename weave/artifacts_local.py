@@ -57,8 +57,12 @@ class LocalArtifact:
         return "<LocalArtifact(%s) %s %s>" % (id(self), self._name, self._version)
 
     @property
+    def is_saved(self):
+        return self._version is not None
+
+    @property
     def version(self):
-        if self._version is None:
+        if not self.is_saved:
             raise errors.WeaveInternalError(
                 "artifact must be saved before calling version!"
             )
@@ -117,7 +121,6 @@ class LocalArtifact:
         # TODO: fix
         # DO NOT MERGE
         last_write_path = self._last_write_path
-        print("LAST WRITE PATH", last_write_path)
         if last_write_path is None:
             return
         self._last_write_path = None

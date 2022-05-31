@@ -139,7 +139,7 @@ class UnknownToArrowNone(mappers_python.UnknownToPyUnknown):
         return pa.null()
 
 
-class DefaultToArrow(mappers.Mapper):
+class DefaultToArrow(mappers_python.DefaultToPy):
     def __init__(self, type_: types.Type, mapper, artifact, path=[]):
         self.type = type_
         self._artifact = artifact
@@ -183,17 +183,6 @@ class DefaultToArrow(mappers.Mapper):
         raise errors.WeaveInternalError(
             "Type not yet handled by mappers_arrow: %s" % self.type
         )
-
-    def apply(self, obj):
-        try:
-            return self.type.instance_to_dict(obj)
-        except NotImplementedError:
-            pass
-        name = "-".join(self._path)
-        ref = storage.save_to_artifact(
-            obj, artifact=self._artifact, name=name, type_=self.type
-        )
-        return ref.local_ref_str()
 
 
 def map_to_arrow_(type, mapper, artifact, path=[]):

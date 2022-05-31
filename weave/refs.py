@@ -1,10 +1,7 @@
-from asyncio.format_helpers import extract_stack
 from collections.abc import Iterable
 import typing
 import os
 import json
-from urllib.parse import urlparse
-import wandb
 
 from . import artifacts_local
 from . import weave_types as types
@@ -56,6 +53,8 @@ def put_ref(obj, ref):
     try:
         obj._ref = ref
     except AttributeError:
+        if isinstance(obj, (int, float, str, list, dict, set)):
+            return
         REFS[id(obj)] = ref
 
 
@@ -145,6 +144,13 @@ class LocalArtifactRef(Ref):
         self._type = type
         self.obj = obj
         self.extra = extra
+        if obj is not None:
+            obj = box.box(obj)
+            put_ref(obj, self)
+
+    @property
+    def is_saved(self):
+        return self.artifact.is_saved
 
     @property
     def uri(self) -> str:

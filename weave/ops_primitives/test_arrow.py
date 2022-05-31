@@ -9,6 +9,7 @@ from PIL import Image
 from .. import storage
 from .. import api as weave
 from .. import ops
+from .. import artifacts_local
 
 
 def simple_hash(n, b):
@@ -120,10 +121,6 @@ def test_custom_groupby():
             {"a": 6, "im": Image.linear_gradient("L").rotate(4)},
         ]
     )
-    print(
-        "TYPE",
-        data.groupby(lambda row: ops.dict_(a=row["a"]))[0].pick("im").offset(0).type,
-    )
 
     assert (
         weave.use(
@@ -134,6 +131,22 @@ def test_custom_groupby():
         )
         == 256
     )
+
+
+def test_custom_groupby_intermediate_save():
+    data = storage.to_arrow(
+        [
+            {"a": 5, "im": Image.linear_gradient("L").rotate(0)},
+            {"a": 6, "im": Image.linear_gradient("L").rotate(4)},
+        ]
+    )
+    node = data.groupby(lambda row: ops.dict_(a=row["a"]))[0]
+    saved_node = weave.save(node, "test_custom_groupby_intermediate_save")
+    weave.use(saved_node)
+    loaded_node = ops.get(
+        f"local-artifact://{artifacts_local.LOCAL_ARTIFACT_DIR}/test_custom_groupby_intermediate_save/latest"
+    )
+    assert weave.use(loaded_node.pick("im").offset(0)[0].width()) == 256
 
 
 def test_map_array():
