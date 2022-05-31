@@ -1,6 +1,8 @@
 from collections.abc import Mapping
 from . import graph
 from . import forward_graph
+import pprint
+import time
 from . import artifacts_local
 import threading
 import typing
@@ -19,32 +21,62 @@ from . import context
 from . import uris
 
 
+class ExecuteStats:
+    def __init__(self):
+        self.node_stats = []
+
+    def add_node(self, node, execution_time):
+        self.node_stats.append((node, execution_time))
+
+    def summary(self):
+        op_counts = {}
+        for node, t in self.node_stats:
+            if isinstance(node, graph.OutputNode):
+                op_counts.setdefault(node.from_op.name, {"count": 0, "total_time": 0})
+                op_counts[node.from_op.name]["count"] += 1
+                op_counts[node.from_op.name]["total_time"] += t
+        for stats in op_counts.values():
+            stats["avg_time"] = stats["total_time"] / stats["count"]
+        sortable_stats = [(k, v) for k, v in op_counts.items()]
+
+        return dict(
+            list(reversed(sorted(sortable_stats, key=lambda s: s[1]["total_time"])))
+        )
+
+
 def execute_nodes(nodes, no_cache=False):
     nodes = compile.compile(nodes)
     fg = forward_graph.ForwardGraph(nodes)
 
     with context.execution_client():
-        execute_forward(fg, no_cache=no_cache)
+        stats = execute_forward(fg, no_cache=no_cache)
+    print("EXECUTION SUMMARY")
+    summary = stats.summary()
+    pprint.pprint(summary)
 
     return [fg.get_result(n) for n in nodes]
 
 
-def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False):
-    to_run = fg.roots
+def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteStats:
+    to_run: set[forward_graph.ForwardNode] = fg.roots
+
+    stats = ExecuteStats()
     while len(to_run):
         running_now = to_run.copy()
         to_run = set()
         for forward_node in running_now:
+            start_time = time.time()
             execute_forward_node(fg, forward_node, no_cache=no_cache)
+            stats.add_node(forward_node.node, time.time() - start_time)
         for forward_node in running_now:
             for downstream_forward_node in forward_node.input_to:
                 ready_to_run = True
                 for param_node in downstream_forward_node.node.from_op.inputs.values():
-                    param_forward_node = fg.get_forward_node(param_node)
-                    if not param_forward_node.has_result:
+                    if not fg.has_result(param_node):
                         ready_to_run = False
                 if ready_to_run:
                     to_run.add(downstream_forward_node)
+    return stats
 
 
 def is_async_op(op_def: op_def.OpDef):
@@ -99,14 +131,14 @@ def execute_forward_node(
     no_cache=False,
 ):
     use_cache = not no_cache
+    # use_cache = False
     node = forward_node.node
     if isinstance(node, graph.ConstNode):
-        # node_id = storage.save(node.val)
-        obj = node.val
-        forward_node.set_result(obj)
         return
     elif isinstance(node, graph.VarNode):
         raise errors.WeaveInternalError("cannot execute VarNode: %s" % node)
+
+    # print("EXECUTING NODE", node)
 
     op_def = registry_mem.memory_registry.get_op(node.from_op.name)
     input_nodes = node.from_op.inputs
@@ -118,9 +150,10 @@ def execute_forward_node(
         input_name: storage.deref(input) for input_name, input in input_refs.items()
     }
 
-    # Compute the run ID, which is deterministic if the op is pure
-    run_id = execute_ids.make_run_id(op_def, input_refs)
-    run_artifact_name = f"run-{run_id}"
+    if use_cache or is_async_op(op_def):
+        # Compute the run ID, which is deterministic if the op is pure
+        run_id = execute_ids.make_run_id(op_def, input_refs)
+        run_artifact_name = f"run-{run_id}"
 
     if use_cache and op_def.pure:
         run = storage.get_version(run_artifact_name, "latest")
@@ -136,9 +169,8 @@ def execute_forward_node(
                 # otherwise, the run's output was not saveable, so we need
                 # to recompute it.
 
-    run = run_obj.Run(run_id, op_def.name)
-
     if is_async_op(op_def):
+        run = run_obj.Run(run_id, op_def.name)
         input_refs = {}
         for input_name, input in inputs.items():
             ref = storage.get_ref(input)
@@ -150,7 +182,6 @@ def execute_forward_node(
         execute_async_op(op_def, input_refs, run_id)
         forward_node.set_result(run)
     else:
-        run._inputs = input_refs
         result = execute_sync_op(op_def, inputs)
         ref = storage._get_ref(result)
         if ref is not None:
@@ -171,13 +202,16 @@ def execute_forward_node(
                 if op_def.pure:
                     output_name = "%s-output" % run_artifact_name
                 try:
+                    # Passing the node.type through here will really speed things up!
+                    # But we can't do it yet because Weave Python function aren't all
+                    # correctly typed, and WeaveJS sends down different types (like TagValues)
+                    # TODO: Fix
                     result = storage.save(result, name=output_name)
                 except errors.WeaveSerializeError:
                     # Not everything can be serialized currently. But instead of storing
                     # the result directly here, we save a MemRef with the same run_artifact_name.
                     # This is required to make downstream run_ids path dependent.
                     result = storage.save_mem(result, name=output_name)
-        run._output = result
 
         forward_node.set_result(result)
 
@@ -186,6 +220,9 @@ def execute_forward_node(
         #    does not really work yet. (mutated objects set their run output
         #    as the original ref rather than the new ref, which causes problems)
         if use_cache and not is_run_op(node.from_op):
+            run = run_obj.Run(run_id, op_def.name)
+            run._inputs = input_refs
+            run._output = result
             try:
                 storage.save(run, name=run_artifact_name)
             except errors.WeaveSerializeError:

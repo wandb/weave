@@ -1,10 +1,7 @@
-from asyncio.format_helpers import extract_stack
 from collections.abc import Iterable
 import typing
 import os
 import json
-from urllib.parse import urlparse
-import wandb
 
 from . import artifacts_local
 from . import weave_types as types
@@ -37,14 +34,37 @@ class Ref:
         return self.uri
 
 
+# We store REFS here if we can't attach them directly to the object
+REFS: dict[str, typing.Any] = {}
+
+
 def get_ref(obj):
     if hasattr(obj, "_ref"):
         return obj._ref
+    try:
+        if id(obj) in REFS:
+            return REFS[id(obj)]
+    except TypeError:
+        pass
     return None
 
 
 def put_ref(obj, ref):
-    obj._ref = ref
+    try:
+        obj._ref = ref
+    except AttributeError:
+        if isinstance(obj, (int, float, str, list, dict, set)):
+            return
+        REFS[id(obj)] = ref
+
+
+def clear_ref(obj):
+    try:
+        delattr(obj, "_ref")
+    except AttributeError:
+        pass
+    if id(obj) in REFS:
+        REFS.pop(id(obj))
 
 
 class WandbArtifactRef(Ref):
@@ -124,6 +144,13 @@ class LocalArtifactRef(Ref):
         self._type = type
         self.obj = obj
         self.extra = extra
+        if obj is not None:
+            obj = box.box(obj)
+            put_ref(obj, self)
+
+    @property
+    def is_saved(self):
+        return self.artifact.is_saved
 
     @property
     def uri(self) -> str:
@@ -153,8 +180,10 @@ class LocalArtifactRef(Ref):
         return self.artifact.location.full_name
 
     def get(self) -> typing.Any:
-        if self.obj is not None:
-            return self.obj
+        # Can't do this, when you save a list, you get a different
+        # representation back which test_decorators.py depend on right now
+        # if self.obj is not None:
+        #     return self.obj
         obj = self.type.load_instance(self.artifact, self.path, extra=self.extra)
         obj = box.box(obj)
         put_ref(obj, self)
@@ -204,8 +233,6 @@ class LocalArtifactRef(Ref):
         path = parts[0]
         if len(parts) == 1:
             extra = None
-        elif len(parts) == 2:
-            extra = parts[1]
         else:
             extra = parts[1:]
         return path, extra

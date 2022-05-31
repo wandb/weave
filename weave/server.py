@@ -10,6 +10,7 @@ import time
 import requests
 import traceback
 import viztracer
+import time
 
 from . import graph, util as _util, client as _client
 from . import serialize
@@ -18,10 +19,6 @@ from . import storage
 
 
 import sys
-
-
-def eprint(*args, **kwargs):
-    print(*args, file=sys.stderr, **kwargs)
 
 
 is_tracing = True
@@ -42,11 +39,13 @@ def handle_request(request, deref=False):
         tracer = viztracer.VizTracer()
         tracer.start()
     nodes = serialize.deserialize(request["graphs"])
-    # eprint("Server request running %s nodes" % len(nodes))
-    """
+
+    start_time = time.time()
+    print("Server request running %s nodes" % len(nodes))
+    # """
     for node in nodes:
-        eprint(graph.node_expr_str(node))
-    """
+        print(graph.node_expr_str(node))
+    # """
     result = execute.execute_nodes(nodes)
     if deref:
         result = [storage.deref(r) for r in result]
@@ -57,6 +56,7 @@ def handle_request(request, deref=False):
         tracer.stop()
         tracer.save(output_file="request_%s.json" % time.time())
     result = [storage.to_python(r) for r in result]
+    print("Server request done in: %ss" % (time.time() - start_time))
     return result
 
 

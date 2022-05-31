@@ -1,13 +1,15 @@
+import typing
 from . import graph as _graph
 from . import storage as _storage
 from . import weave_internal as _weave_internal
 from . import errors as _errors
+from . import ops as _ops
 from . import context as _context
 
 # exposed as part of api
 from . import weave_types as types
 from . import errors
-from .decorators import weave_class, op, mutation
+from .decorators import weave_class, op, mutation, type
 from .op_args import OpVarArgs
 from .op_def import OpDef
 from . import usage_analytics
@@ -15,7 +17,10 @@ from .context import (
     use_fixed_server_port,
     use_frontend_devmode,
     capture_weave_server_logs,
+    eager_execution,
 )
+
+from .weave_internal import define_fn
 
 
 def save(node_or_obj, name=None):
@@ -35,7 +40,8 @@ def publish(node_or_obj, name=None):
 
 def get(ref_str):
     obj = _storage.get(ref_str)
-    return _weave_internal.make_const_node(types.TypeRegistry.type_of(obj), obj)
+    ref = _storage._get_ref(obj)
+    return _weave_internal.make_const_node(ref.type, obj)
 
 
 def use(nodes, client=None):
@@ -96,10 +102,5 @@ def expr(obj):
     return _storage.get_obj_expr(ref)
 
 
-# TODO: this shouldn't be here, you should be able to call
-#    .filter() etc on whatever table and pass in a lambda
-#    (like we can do now for adding columns to panel_table)
-def define_fn(parameters, body):
-    varNodes = {k: _weave_internal.make_var_node(t, k) for k, t in parameters.items()}
-    fnNode = body(**varNodes)
-    return _graph.ConstNode(types.Function(parameters, fnNode.type), fnNode)
+def type_of(obj: typing.Any) -> types.Type:
+    return types.TypeRegistry.type_of(obj)

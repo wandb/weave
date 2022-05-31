@@ -65,11 +65,16 @@ def test_pick(table_type):
 @pytest.mark.parametrize("table_type", TABLE_TYPES)
 def test_filter(table_type):
     table = get_test_table(table_type)
-    filter_fn = weave.define_fn(
-        {"row": weave.types.TypedDict({})}, lambda row: row["potass"] > 280
+    # Use the lambda passing convention here.
+    assert weave.use(table.filter(lambda row: row["potass"] > 280).count()) == 2
+    assert (
+        weave.use(
+            ops.WeaveJSListInterface.filter(
+                table, lambda row: row["potass"] > 280
+            ).count()
+        )
+        == 2
     )
-    assert weave.use(table.filter(filter_fn).count()) == 2
-    assert weave.use(ops.WeaveJSListInterface.filter(table, filter_fn).count()) == 2
 
 
 # WARNING: Separating tests for group by, because

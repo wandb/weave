@@ -1,6 +1,7 @@
 import json
 import typing
 
+from . import errors
 from . import weave_types
 from . import uris
 
@@ -43,10 +44,12 @@ class Node:
 
 weave_types.Function.instance_classes = Node
 
+OpInputNodeT = typing.TypeVar("OpInputNodeT")
 
-class Op:
+
+class Op(typing.Generic[OpInputNodeT]):
     name: str
-    inputs: typing.Dict[str, Node]
+    inputs: typing.Dict[str, OpInputNodeT]
 
     def __init__(self, name, inputs):
         # TODO: refactor this variable to be "uri"
@@ -60,8 +63,8 @@ class Op:
         return {"name": self.name, "inputs": json_inputs}
 
 
-class OutputNode(Node):
-    from_op: Op
+class OutputNode(Node, typing.Generic[OpInputNodeT]):
+    from_op: Op[OpInputNodeT]
     val: typing.Any
 
     def __init__(self, type, op_name, op_inputs):
@@ -122,15 +125,16 @@ class ConstNode(Node):
 
     @classmethod
     def from_json(cls, obj):
-        return cls(
-            weave_types.TypeRegistry.type_from_dict(obj["type"]),
-            obj["val"],
-        )
+        val = obj["val"]
+        if isinstance(val, dict) and "nodeType" in val:
+            val = Node.node_from_json(val)
+        return cls(weave_types.TypeRegistry.type_from_dict(obj["type"]), val)
 
-    def to_json(self):
+    def equivalent_output_node(self):
         # This is a hack to ensure we don't send huge const nodes to the frontend.
         # TODO: find a better place for this logic.
         # - currently tested in test_show.py:test_large_const_node
+
         val = self.val
         from . import storage
 
@@ -138,9 +142,18 @@ class ConstNode(Node):
         from .ops_primitives.storage import get as op_get
 
         if ref is not None:
-            val = op_get(ref.uri).to_json()
-            return val
+            return op_get(ref.uri)
 
+        return False
+
+    def to_json(self):
+        equiv_output_node = self.equivalent_output_node()
+        if equiv_output_node:
+            return equiv_output_node.to_json()
+
+        val = self.val
+        if isinstance(self.type, weave_types.Function):
+            val = val.to_json()
         return {"nodeType": "const", "type": self.type.to_dict(), "val": val}
 
     def __str__(self):
@@ -204,7 +217,8 @@ def node_expr_str(node: Node):
         )
     elif isinstance(node, ConstNode):
         if isinstance(node.type, weave_types.Function):
-            return node_expr_str(node.val)
+            res = node_expr_str(node.val)
+            return res
         try:
             return json.dumps(node.val)
         except TypeError:
@@ -215,6 +229,8 @@ def node_expr_str(node: Node):
             return str(node.val)
     elif isinstance(node, VarNode):
         return node.name
+    else:
+        return "**PARSE_ERROR**"
 
 
 def _map_nodes(
@@ -244,6 +260,11 @@ def _all_nodes(node: Node) -> set[Node]:
     for input in node.from_op.inputs.values():
         res.update(_all_nodes(input))
     return res
+
+
+def filter_nodes(node: Node, filter_fn: typing.Callable[[Node], Node]) -> list[Node]:
+    nodes = _all_nodes(node)
+    return [n for n in nodes if filter_fn(n)]
 
 
 def count(node: Node) -> int:

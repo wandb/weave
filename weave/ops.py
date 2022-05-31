@@ -1,7 +1,7 @@
 # These are imported to expose them to the user
 from . import context as _context
 
-_context.set_loading_built_ins(True)
+_loading_builtins_token = _context.set_loading_built_ins()
 
 from .ops_primitives import *
 from .ops_domain import *
@@ -10,4 +10,4 @@ from .ops_domain import *
 # TODO: fix
 from . import run_obj as _run_obj
 
-_context.set_loading_built_ins(False)
+_context.clear_loading_built_ins(_loading_builtins_token)

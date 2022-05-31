@@ -40,7 +40,7 @@ class ArtifactVersionFile(weave_file.File):
         if self.extension is None:
             self.extension = weave_file.path_ext(path)
 
-    def _contents(self):
+    def get_local_path(self):
         entry = (
             wandb_public_api()
             .artifact(
@@ -54,8 +54,10 @@ class ArtifactVersionFile(weave_file.File):
             )
             .get_path(self.path)
         )
-        local_path = entry.download()
-        return open(local_path, encoding="ISO-8859-1").read()
+        return entry.download()
+
+    def _contents(self):
+        return open(self.get_local_path(), encoding="ISO-8859-1").read()
 
 
 ArtifactVersionFileType.instance_class = ArtifactVersionFile

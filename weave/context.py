@@ -2,6 +2,7 @@ import contextvars
 import contextlib
 import logging
 import typing
+from urllib.parse import urljoin
 
 from . import client
 from . import server
@@ -34,8 +35,12 @@ def get_loading_op_location():
     return _loading_op_location.get()
 
 
-def set_loading_built_ins(currently: bool):
-    _loading_built_ins.set(currently)
+def set_loading_built_ins():
+    return _loading_built_ins.set(True)
+
+
+def clear_loading_built_ins(token):
+    _loading_built_ins.reset(token)
 
 
 def get_loading_built_ins():
@@ -116,6 +121,15 @@ def weavejs_client():
         _http_server.reset(server_token)
 
 
+@contextlib.contextmanager
+def eager_execution():
+    eager_token = _eager_mode.set(True)
+    try:
+        yield
+    finally:
+        _eager_mode.reset(eager_token)
+
+
 def _make_default_client():
     if util.is_notebook():
         serv = _http_server.get()
@@ -133,9 +147,10 @@ def _make_default_client():
 
 def use_fixed_server_port():
     """Force Weave server to port 9994 so wandb frontend can talk to it."""
-    s = server.HttpServer(port=9994)
-    s.start()
-    _weave_client.set(server.HttpServerClient(s.url))
+    # s = server.HttpServer(port=9994)
+    # s.start()
+    # _weave_client.set(server.HttpServerClient(s.url))
+    _weave_client.set(server.HttpServerClient("http://localhost:9994"))
 
 
 def use_frontend_devmode():

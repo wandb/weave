@@ -11,6 +11,7 @@ from . import weave_types as types
 from . import weavejs_fixes
 from . import storage
 from . import util
+from . import errors
 from . import usage_analytics
 from .ops_primitives.storage import get as op_get
 
@@ -28,8 +29,18 @@ def make_refs(node: graph.Node):
 
 # Broken out into to separate function for testing
 def _show_params(obj):
+    if obj is None:
+        return {"weave_node": graph.VoidNode()}
     if isinstance(obj, graph.Node):
         return {"weave_node": weavejs_fixes.fixup_node(make_refs(obj))}
+
+    elif isinstance(obj, panel.Panel):
+        return {
+            "weave_node": weavejs_fixes.fixup_node(obj.input_node),
+            "panel_id": obj.id,
+            "panel_config": weavejs_fixes.fixup_data(obj.config),
+        }
+
     elif isinstance(obj, storage.Ref):
         from weave import ops
 
@@ -46,18 +57,13 @@ def _show_params(obj):
 
         return {"weave_node": weavejs_fixes.fixup_node(node)}
 
-    elif isinstance(obj, panel.Panel):
-        return {
-            "weave_node": weavejs_fixes.fixup_node(obj.input_node),
-            "panel_id": obj.id,
-            "panel_config": weavejs_fixes.fixup_data(obj.config),
-        }
-
     else:
-        raise Exception("pass a weave.Node or weave.Panel")
+        raise errors.WeaveTypeError(
+            "%s not yet supported. Create a weave.Type to add support." % type(obj)
+        )
 
 
-def show(obj):
+def show(obj=None, height=400):
     usage_analytics.show_called()
 
     if not util.is_notebook():
@@ -79,5 +85,5 @@ def show(obj):
             json.dumps(params["panel_config"])
         )
 
-    iframe = IFrame(panel_url, "100%", "300px")
+    iframe = IFrame(panel_url, "100%", "%spx" % height)
     return display(iframe)

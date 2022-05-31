@@ -1,3 +1,4 @@
+import dataclasses
 import pytest
 import numpy as np
 
@@ -103,15 +104,13 @@ class SomeGenericObj:
         return self.x == other.x and self.y == other.y
 
 
+@dataclasses.dataclass
 class SomeGenericObjType(types.ObjectType):
     instance_classes = SomeGenericObj
     instance_class = SomeGenericObj
     name = "somegenericobj"
 
-    type_vars = {"x": types.Any()}
-
-    def __init__(self, x):
-        self.x = x
+    x: types.Any
 
     def property_types(self):
         return {"x": self.x, "y": types.Int()}
