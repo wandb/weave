@@ -110,6 +110,9 @@ class ArrowArrayList(Iterable):
         self._artifact = artifact
         self._deserializer = mapper
 
+    def to_pylist(self):
+        return self._arrow_array.to_pylist()
+
     def __getitem__(self, index):
         if isinstance(index, slice):
             return [
