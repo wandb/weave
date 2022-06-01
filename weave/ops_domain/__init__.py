@@ -5,7 +5,7 @@ from wandb.apis import public as wandb_api
 
 from ..api import op, weave_class
 from .. import weave_types as types
-from . import wbartifact, wbtable
+from . import wbartifact
 from .. import errors
 from .. import artifacts_local
 from ..wandb_api import wandb_public_api
@@ -170,7 +170,8 @@ class ArtifactVersionsOps:
 
     @op()
     def __getitem__(self: wandb_api.ArtifactVersions, index: int) -> wandb_api.Artifact:
-        return self[index]
+        wb_artifact = self[index]
+        return artifacts_local.WandbArtifact.from_wb_artifact(wb_artifact)
 
 
 class ArtifactTypeType(types.Type):
@@ -314,23 +315,3 @@ class Project:
 @op(name="root-project")
 def project(entityName: str, projectName: str) -> wandb_api.Project:
     return wandb_api.Api().project(name=projectName, entity=entityName)
-
-
-@weave_class(weave_type=types.WBTable)
-class WBTableOps(object):
-    @op(
-        name="table-rows",
-        input_type={"table": types.WBTable()},
-        output_type=types.List(types.TypedDict({})),
-    )
-    def rows(table):
-        rows = []
-        for row in table["data"]:
-            row_result = {}
-            for col_name, val in zip(table["columns"], row):
-                row_result[col_name] = val
-            rows.append(row_result)
-        return rows
-
-
-from .image import *

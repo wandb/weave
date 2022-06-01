@@ -254,6 +254,60 @@ def from_python(obj):
     return res
 
 
+# This will be a faster version fo to_arrow (below). Its
+# used in op file-table, to convert from a wandb Table to Weave
+# (that code is very experimental and not totally working yet)
+def to_arrow_new(obj, weave_type=None):
+    if weave_type is None:
+        weave_type = types.TypeRegistry.type_of(obj)
+    if isinstance(weave_type, types.List):
+        object_type = weave_type.object_type
+        import time
+
+        artifact = artifacts_local.LocalArtifact("to-arrow-%s" % weave_type.name)
+
+        start_time = time.time()
+        # Convert to arrow, serializing Custom objects to the artifact
+        mapper = mappers_arrow.map_to_arrow(object_type, artifact)
+        pyarrow_type = mapper.result_type()
+        # py_objs = (mapper.apply(o) for o in obj)
+        print("Construct mapper time: %s" % (time.time() - start_time))
+        start_time = time.time()
+
+        # TODO: do I need this branch? Does it work now?
+        # if isinstance(wb_type.object_type, types.ObjectType):
+        #     arrow_obj = pa.array(py_objs, pyarrow_type)
+        from .ops_primitives import arrow
+
+        import time
+
+        if pa.types.is_struct(pyarrow_type):
+            fields = list(pyarrow_type)
+            schema = pa.schema(fields)
+            arrow_obj = pa.Table.from_pylist(obj, schema=schema)
+            # arr = pa.array(py_objs, type=pyarrow_type)
+            # rb = pa.RecordBatch.from_struct_array(arr)  # this pivots to columnar layout
+            # arrow_obj = pa.Table.from_batches([rb])
+        else:
+            arrow_obj = pa.array(obj, pyarrow_type)
+        print("arrow_obj time: %s" % (time.time() - start_time))
+        start_time = time.time()
+        weave_obj = arrow.ArrowWeaveList(arrow_obj, object_type, artifact)
+        print("ArrowWeaveList time: %s" % (time.time() - start_time))
+        start_time = time.time()
+
+        # Save the weave object to the artifact
+        ref = save(weave_obj, artifact=artifact)
+        print("save time: %s" % (time.time() - start_time))
+        start_time = time.time()
+
+        return ref.obj
+
+    raise errors.WeaveInternalError(
+        "to_arrow not implemented for: %s" % type(weave_type)
+    )
+
+
 def to_arrow(obj):
     wb_type = types.TypeRegistry.type_of(obj)
     artifact = artifacts_local.LocalArtifact("to-arrow-%s" % wb_type.name)

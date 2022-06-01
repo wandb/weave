@@ -95,6 +95,7 @@ ArtifactVersionDirType.instance_class = ArtifactVersionDir
 
 
 def artifact_version_path(av: wandb_api.Artifact, path: str):
+    av = av._saved_artifact
     manifest = av.manifest
     manifest_entry = manifest.get_entry_by_path(path)
     if manifest_entry is not None:

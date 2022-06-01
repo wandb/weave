@@ -49,24 +49,6 @@ def test_basic(server_type):
         assert weave.use(nine + 3, client=wc) == 12
 
 
-# copied from test_image
-@pytest.mark.parametrize("server_type", SERVER_TYPES)
-@pytest.mark.timeout(3)
-def test_local_artifact_ops(server_type):
-    with client(server_type) as wc:
-        im = ops.image.WBImage.from_numpy(np.ones((5, 5)))
-        ref = storage.save(im)
-
-        la = ops.artifacts.local_artifact(ref.artifact._name, ref.artifact.version)
-        im2_node = la.get("_obj")
-
-        url_node = im2_node.url()
-        url = weave.use(url_node, client=wc)
-        without_prefix = url[len("file://") :]
-
-        assert os.path.exists(without_prefix)
-
-
 @pytest.mark.parametrize("server_type", SERVER_TYPES)
 @pytest.mark.timeout(3)
 def test_type_returning_op(server_type):

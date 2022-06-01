@@ -65,4 +65,13 @@ class ArtifactVersion:
     # TODO: This function should probably be called path, but it return Dir or File.
     # ok...
     def path(artifactVersion, path):
-        return file_wbartifact.artifact_version_path(artifactVersion, path)
+        return artifactVersion.read_path(path)
+
+
+@op(
+    name="asset-artifactVersion",
+    input_type={"asset": types.Any()},
+    output_type=ArtifactVersionType(),
+)
+def artifactVersion(asset):
+    return asset.artifact

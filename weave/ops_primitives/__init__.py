@@ -12,3 +12,4 @@ from .sql import *
 from .artifacts import *
 from .random_junk import *
 from .image import *
+from .imagefile import *

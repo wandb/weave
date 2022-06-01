@@ -69,6 +69,16 @@ class ArrowTableList(Iterable, typing.Generic[ObjectT]):
         self._mapper = mapper
 
     def __getitem__(self, index):
+        if isinstance(index, slice):
+            if index.start is None:
+                return [
+                    self._mapper.apply(o)
+                    for o in self._arrow_table.slice(index.stop).to_pylist()
+                ]
+            return [
+                self._mapper.apply(o)
+                for o in self._arrow_table.slice(index.start, index.stop).to_pylist()
+            ]
         if index >= self._arrow_table.num_rows:
             return None
         # Very inefficient, we always read the whole row!

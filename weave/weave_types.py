@@ -440,7 +440,7 @@ class UnionType(Type):
     def _to_dict(self):
         return {"members": [mem.to_dict() for mem in self.members]}
 
-    def __str__(self):
+    def __repr__(self):
         return "<UnionType %s>" % " | ".join((str(m) for m in self.members))
 
 
@@ -901,3 +901,13 @@ def union(*members: list[Type]) -> Type:
 
 def is_list_like(t: Type) -> bool:
     return isinstance(non_none(t), List)
+
+
+def is_custom_type(t: Type) -> bool:
+    return not (
+        isinstance(t, BasicType)
+        or isinstance(t, ObjectType)
+        or isinstance(t, TypedDict)
+        or isinstance(t, List)
+        or isinstance(t, UnionType)
+    )

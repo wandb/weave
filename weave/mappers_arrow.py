@@ -70,6 +70,15 @@ class ListToArrowArr(mappers_python.ListToPyList):
 
 
 class UnionToArrowUnion(mappers_weave.UnionMapper):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        non_none_members = [
+            m for m in self._member_mappers if not isinstance(m.type, types.NoneType)
+        ]
+        if len(non_none_members) != 1:
+            raise errors.WeaveInternalError("Unions not yet supported in Weave arrow")
+        self._member_mapper = non_none_members[0]
+
     def result_type(self):
         nullable = False
         non_null_mappers: typing.List[mappers.Mapper] = []
@@ -86,16 +95,11 @@ class UnionToArrowUnion(mappers_weave.UnionMapper):
         return arrow_util.arrow_type_with_nullable(non_null_mappers[0].result_type())
 
     def apply(self, obj):
-        # TODO: when implementing for real unions, look at the mappers_python
-        # implementation.
-        return obj
+        return self._member_mapper.apply(obj)
 
 
-class ArrowUnionToUnion(mappers_weave.UnionMapper):
-    def apply(self, obj):
-        # TODO: when implementing for real unions, look at the mappers_python
-        # implementation.
-        return obj
+class ArrowUnionToUnion(UnionToArrowUnion):
+    pass
 
 
 class IntToArrowInt(mappers_python.IntToPyInt):

@@ -212,12 +212,17 @@ def rewrite_weavelist_refs(arrow_data, object_type, artifact):
             column = arrow_data[col_name]
             arrays[col_name] = rewrite_weavelist_refs(column, col_type, artifact)
         return pa.table(arrays)
+    elif isinstance(object_type, types.UnionType):
+        if any(types.is_custom_type(m) for m in object_type.members):
+            raise errors.WeaveInternalError(
+                "Unions of custom types not yet support in Weave arrow"
+            )
+        return arrow_data
     else:
         if isinstance(object_type, types.BasicType):
             return arrow_data
 
         # # We have a column of refs
-        from .. import uris
         from .. import refs
 
         new_refs = []
@@ -233,7 +238,7 @@ def rewrite_weavelist_refs(arrow_data, object_type, artifact):
         return pa.array(new_refs)
 
 
-def rewrite_groupby_refs(table, group_keys, object_type, artifact):
+def rewrite_groupby_refs(arrow_data, group_keys, object_type, artifact):
     # TODO: Handle unions
 
     # hmm... we should just iterate over table columns instead!
@@ -246,24 +251,29 @@ def rewrite_groupby_refs(table, group_keys, object_type, artifact):
             prop_types = prop_types()
         arrays = {}
         for group_key in group_keys:
-            arrays[group_key] = table[group_key]
+            arrays[group_key] = arrow_data[group_key]
         for col_name, col_type in prop_types.items():
             col_name = col_name + "_list"
-            column = table[col_name]
+            column = arrow_data[col_name]
             arrays[col_name] = rewrite_groupby_refs(
                 column, group_keys, col_type, artifact
             )
         return pa.table(arrays)
+    elif isinstance(object_type, types.UnionType):
+        if any(types.is_custom_type(m) for m in object_type.members):
+            raise errors.WeaveInternalError(
+                "Unions of custom types not yet support in Weave arrow"
+            )
+        return arrow_data
     else:
         if isinstance(object_type, types.BasicType):
-            return table
+            return arrow_data
 
         # We have a column of refs
-        from .. import uris
         from .. import refs
 
         new_refs = []
-        for ref_str_list in table:
+        for ref_str_list in arrow_data:
             ref_str_list = ref_str_list.as_py()
             new_ref_str_list = []
             for ref_str in ref_str_list:

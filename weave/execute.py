@@ -146,9 +146,6 @@ def execute_forward_node(
     input_refs = {}
     for input_name, input_node in input_nodes.items():
         input_refs[input_name] = fg.get_result(input_node)
-    inputs = {
-        input_name: storage.deref(input) for input_name, input in input_refs.items()
-    }
 
     if use_cache or is_async_op(op_def):
         # Compute the run ID, which is deterministic if the op is pure
@@ -168,6 +165,9 @@ def execute_forward_node(
                     return
                 # otherwise, the run's output was not saveable, so we need
                 # to recompute it.
+    inputs = {
+        input_name: storage.deref(input) for input_name, input in input_refs.items()
+    }
 
     if is_async_op(op_def):
         run = run_obj.Run(run_id, op_def.name)
