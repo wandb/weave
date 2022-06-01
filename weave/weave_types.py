@@ -486,24 +486,6 @@ class List(Type):
                 table = pa.Table.from_arrays(
                     [arr], names=["_singleton"], metadata={"singleton": "1"}
                 )
-            # if isinstance(pyarrow_type, mappers_arrow.ArrowWeaveType):
-            #     storage_array = pa.array(py_objs, pyarrow_type.storage_type)
-            #     arr = pa.ExtensionArray.from_storage(pyarrow_type, storage_array)
-            #     table = pa.Table.from_arrays(
-            #         [arr], names=["_singleton"], metadata={"singleton": "1"}
-            #     )
-            # elif pa.types.is_struct(pyarrow_type):
-            #     print("PYARROW TYPE", pyarrow_type)
-            #     arr = pa.array(py_objs, type=pyarrow_type)
-            #     rb = pa.RecordBatch.from_struct_array(
-            #         arr
-            #     )  # this pivots to columnar layout
-            #     table = pa.Table.from_batches([rb])
-            # else:
-            #     arr = pa.array(py_objs, type=pyarrow_type)
-            #     table = pa.Table.from_arrays(
-            #         [arr], names=["_singleton"], metadata={"singleton": "1"}
-            #     )
             pq.write_table(table, f)
 
     def load_instance(self, artifact, name, extra=None):
