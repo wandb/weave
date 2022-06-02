@@ -63,7 +63,7 @@ pre-commit install
 In the W&B core repo (for now, later we'll move this out to a new repo):
 
 ```
-git checkout weave-python/weave-ui-changes
+git checkout weave-python/weave-ui-changes2
 cd frontends/app/weave-ui && yarn dev
 ```
 
