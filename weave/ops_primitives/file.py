@@ -2,6 +2,9 @@ import os
 
 from ..api import op, mutation, weave_class
 from .. import weave_types as types
+from .. import wandb_util
+from . import arrow
+
 
 _py_open = open
 
@@ -25,19 +28,87 @@ def file_dir(file):
 ##### End path ops
 
 
+#### TODO: Table does not belong here!
+
+
+class TableType(types.ObjectType):
+    def property_types(self):
+        return {"_rows": arrow.ArrowWeaveListType(types.TypedDict({}))}
+
+
+@weave_class(weave_type=TableType)
+class Table:
+    def __init__(self, _rows):
+        self._rows = _rows
+
+    @op(
+        name="table-rowsType",
+        input_type={"table": TableType()},
+        output_type=types.Type(),
+    )
+    def rows_type(table):
+        ttype = types.TypeRegistry.type_of(table._rows)
+        return ttype
+
+    @op(
+        name="table-rows",
+        input_type={"table": types.WBTable()},
+        output_type=types.List(types.TypedDict({})),
+    )
+    def rows(table):
+        return table._rows
+
+
 @weave_class(weave_type=types.FileType)
 class File:
     @op(
         name="file-table",
         input_type={"file": types.FileType()},
-        output_type=types.WBTable(),
+        output_type=TableType(),
     )
     def table(file):
-        # file is an artifact manifest entry for now.
-        local_path = file.download()
+        local_path = file.get_local_path()
         import json
 
-        return json.loads(_py_open(local_path).read())
+        import time
+
+        start_time = time.time()
+        data = json.loads(_py_open(local_path).read())
+        print("data columns", data["columns"])
+        if len(data) > 0:
+            print("data row0", data["data"][0])
+
+        weave_type = wandb_util.weave0_type_json_to_weave1_type(data["column_types"])
+        print("Json parse time: %s" % (time.time() - start_time))
+        start_time = time.time()
+        # cols = zip(*data["data"])
+        # named_cols = {col_name: col for col_name, col in zip(data["columns"], cols)}
+        # print("Transpose time: %s" % (time.time() - start_time))
+        # start_time = time.time()
+
+        # TODO: this will need to recursively convert dicts to Objects in some
+        # cases.
+        rows = []
+        for data_row in data["data"]:
+            row = {}
+            for col_name, val in zip(data["columns"], data_row):
+                row[col_name] = val
+                # if isinstance(val, dict) and val.get("_type") == "image-file":
+                #     row[col_name] = imagefile.ImageFile(**val)
+                # else:
+                #     row[col_name] = val
+            # row = {col_name: val for col_name, val in zip(data["columns"], data_row)}
+            rows.append(row)
+        from .. import storage
+
+        print("Dicts time: %s" % (time.time() - start_time))
+        start_time = time.time()
+
+        print("Weave type:", weave_type)
+        res = storage.to_arrow_new(rows, weave_type=types.List(weave_type))
+        print("Arrow time: %s" % (time.time() - start_time))
+        start_time = time.time()
+        return Table(res)
 
     @op(
         name="file-directUrlAsOf",
@@ -81,21 +152,21 @@ types.FileType.instance_classes = File
 #     save a serialized version of a given table?
 
 
-# @op(name="file-type", input_type={"file": types.FileType()}, output_type=types.Type())
-# def file_type(file):
-#     # file is an artifact manifest entry for now.
-#     path = file.path
-#     parts = path.split(".")
-#     extension = None
-#     if len(parts) > 1:
-#         extension = parts[-1]
-#     result_type = {"type": "file", "extension": extension}
-#     if len(parts) > 2 and extension == "json":
-#         # TODO: validate. I'm sure there is existing logic for this in wandb
-#         result_type["wbObjectType"] = {
-#             "type": parts[-2],
-#         }
-#     return result_type
+@op(name="file-type", input_type={"file": types.FileType()}, output_type=types.Type())
+def file_type(file):
+    # file is an artifact manifest entry for now.
+    path = file.path
+    parts = path.split(".")
+    extension = None
+    if len(parts) > 1:
+        extension = parts[-1]
+    result_type = {"type": "file", "extension": extension}
+    if len(parts) > 2 and extension == "json":
+        # TODO: validate. I'm sure there is existing logic for this in wandb
+        result_type["wbObjectType"] = {
+            "type": parts[-2],
+        }
+    return result_type
 
 
 @weave_class(weave_type=types.SubDirType)

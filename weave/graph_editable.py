@@ -65,7 +65,7 @@ class EditGraph:
             consumer = output_edge.input_to
             new_inputs = dict(consumer.from_op.inputs)
             new_inputs[output_edge.input_name] = replace_with
-            new_consumer = graph.OutputNode(
+            new_consumer: graph.OutputNode[graph.Node] = graph.OutputNode(
                 consumer.type, consumer.from_op.name, new_inputs
             )
             self.replace(consumer, new_consumer)

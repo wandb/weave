@@ -94,6 +94,33 @@ class Number(object):
         return lhs >= rhs
 
 
+@op(
+    name="numbers-avg",
+    input_type={"numbers": types.List(types.Number())},
+    output_type=types.Number(),
+)
+def avg(numbers):
+    return sum(numbers) / len(numbers)
+
+
+@op(
+    name="numbers-min",
+    input_type={"numbers": types.List(types.Number())},
+    output_type=types.Number(),
+)
+def numbers_min(numbers):
+    return min(numbers)
+
+
+@op(
+    name="numbers-max",
+    input_type={"numbers": types.List(types.Number())},
+    output_type=types.Number(),
+)
+def numbers_max(numbers):
+    return max(numbers)
+
+
 # @weave_class(weave_type=types.Int)
 # class Int:
 #     @op(

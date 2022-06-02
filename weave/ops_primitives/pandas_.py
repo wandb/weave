@@ -1,3 +1,4 @@
+import dataclasses
 import typing
 import json
 import math
@@ -129,13 +130,11 @@ class DataFrameType(types.Type):
         return table.to_pandas()
 
 
+@dataclasses.dataclass
 class DataFrameTableType(types.ObjectType):
     name = "dataframeTable"
 
-    type_vars = {"_df": DataFrameType(types.Any())}
-
-    def __init__(self, _df=DataFrameType(types.Any())):
-        self._df = _df
+    _df: DataFrameType = DataFrameType(types.Any())
 
     def property_types(self):
         return {
@@ -197,8 +196,16 @@ class DataFrameTable:
     def pick(self, key: str):
         return self._df[key]
 
-    @op(output_type=lambda input_types: input_types["self"])
-    def filter(self, filter_fn: typing.Any):
+    @op(
+        input_type={
+            "self": types.List(types.Any()),
+            "filter_fn": lambda input_types: types.Function(
+                {"row": input_types["self"].object_type}, types.Any()
+            ),
+        },
+        output_type=lambda input_types: input_types["self"],
+    )
+    def filter(self, filter_fn):
         return DataFrameTable(self._df[filter_fn_to_pandas_filter(self._df, filter_fn)])
 
     @op(output_type=lambda input_types: types.List(input_types["self"].object_type))
@@ -210,7 +217,7 @@ class DataFrameTable:
 
     @op(
         output_type=lambda input_types: types.List(
-            list_.GroupResultType(types.List(input_types["self"].object_type))
+            list_.GroupResultType(input_types["self"].object_type)
         ),
     )
     def groupby(self, group_by_fn: typing.Any):

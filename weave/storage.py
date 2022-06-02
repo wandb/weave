@@ -1,3 +1,4 @@
+import pyarrow as pa
 import os
 import json
 import typing
@@ -6,6 +7,7 @@ from . import errors
 from . import artifacts_local
 from . import weave_types as types
 from . import mappers_python
+from . import mappers_arrow
 from . import graph
 from . import util
 from . import box
@@ -47,44 +49,76 @@ def save_mem(obj, name):
     return MemRef(name)
 
 
-def save_to_artifact(obj, artifact, name, type_):
+def save_to_artifact(obj, artifact: artifacts_local.LocalArtifact, name, type_):
+    # Tell types what name to use if not obj
+    # We need to fix the save/load API so this is unnecessary.
+    # This is also necessary to prevent saving the same obj at different
+    # key paths (as the Default mappers try to do now). That breaks saving
+    # references in new objects currently. Will be fixed when we make saving
+    # references to existing artifacts work.
+    # TODO: Fix
+    # DO NOT MERGE
+    if name != "_obj":
+        name = type_.name
     ref_extra = type_.save_instance(obj, artifact, name)
-    with artifact.new_file(f"{name}.type.json") as f:
-        json.dump(type_.to_dict(), f)
-
-    ref_cls = (
-        refs.WandbArtifactRef
-        if isinstance(artifact, artifacts_local.WandbArtifact)
-        else refs.LocalArtifactRef
+    if name != "_obj":
+        # Warning: This is hacks to force files to be content addressed
+        # If the type saved a file, rename with its content hash included
+        #     in its name.
+        # TODO: fix
+        # DO NOT MERGE
+        hash = artifact.make_last_file_content_addressed()
+        if hash is not None:
+            name = f"{hash}-{name}"
+    return refs.LocalArtifactRef(
+        artifact, path=name, type=type_, obj=obj, extra=ref_extra
     )
-    artifact.save()
-    return ref_cls(artifact, path=name, type=type_, obj=obj, extra=ref_extra)
+    # Jason's code does this, however, we can't do that, since save_to_artifact()
+    # needs to return an artifact local ref (the artifact is not yet saved at this
+    # point).
+    # ref_cls = (
+    #     refs.WandbArtifactRef
+    #     if isinstance(artifact, artifacts_local.WandbArtifact)
+    #     else refs.LocalArtifactRef
+    # )
+    # return ref_cls(artifact, path=name, type=type_, obj=obj, extra=ref_extra)
 
 
 def _get_name(wb_type: types.Type, obj: typing.Any) -> str:
-    obj_names = util.find_names(obj)
-    return f"{wb_type.name}-{obj_names[-1]}"
+    return wb_type.name
+    # This tries to figure out which variable references obj.
+    # But it is slow when there are a lot of references. If we want to do
+    # something like this, we'll need to do it somewhere closer to user
+    # interaction.
+    # obj_names = util.find_names(obj)
+    # return f"{wb_type.name}-{obj_names[-1]}"
 
 
-def _save_or_publish(obj, name=None, type=None, publish: bool = False):
+def _save_or_publish(obj, name=None, type=None, publish: bool = False, artifact=None):
     # TODO: get rid of this? Always type check?
     wb_type = type
     if wb_type is None:
         try:
             wb_type = types.TypeRegistry.type_of(obj)
-        except errors.WeaveTypeError:
-            raise errors.WeaveSerializeError("no weave type for object: ", obj)
+        except errors.WeaveTypeError as e:
+            raise errors.WeaveSerializeError(
+                "weave type error during serialization for object: %s. %s"
+                % (obj, str(e.args))
+            )
     obj = box.box(obj)
-    if name is None:
-        name = _get_name(wb_type, obj)
-    # TODO: refactor types to artifacts have a common base class
-    artifact: typing.Any = None
-    if publish:
-        # TODO: Potentially add entity and project to namespace the artifact explicitly.
-        artifact = artifacts_local.WandbArtifact(name, type=wb_type.name)
-    else:
-        artifact = artifacts_local.LocalArtifact(name)
+    if artifact is None:
+        if name is None:
+            name = _get_name(wb_type, obj)
+        # TODO: refactor types to artifacts have a common base class
+        if publish:
+            # TODO: Potentially add entity and project to namespace the artifact explicitly.
+            artifact = artifacts_local.WandbArtifact(name, type=wb_type.name)
+        else:
+            artifact = artifacts_local.LocalArtifact(name)
     ref = save_to_artifact(obj, artifact, "_obj", wb_type)
+    with artifact.new_file(f"_obj.type.json") as f:
+        json.dump(wb_type.to_dict(), f)
+    artifact.save()
     refs.put_ref(obj, ref)
     return ref
 
@@ -94,8 +128,12 @@ def publish(obj, name=None, type=None):
     return _save_or_publish(obj, name, type, True)
 
 
-def save(obj, name=None, type=None):
-    return _save_or_publish(obj, name, type, False)
+def save(obj, name=None, type=None, artifact=None):
+    ref = _get_ref(obj)
+    if ref is not None:
+        if name is None or ref.artifact._name == name:
+            return ref
+    return _save_or_publish(obj, name, type, False, artifact=artifact)
 
 
 def get(uri_s):
@@ -125,6 +163,10 @@ def _get_ref(obj):
     if isinstance(obj, refs.Ref):
         return obj
     return refs.get_ref(obj)
+
+
+def clear_ref(obj):
+    refs.clear_ref(obj)
 
 
 get_ref = _get_ref
@@ -186,6 +228,15 @@ def get_obj_expr(obj):
 
 
 def to_python(obj):
+    # Arrow hacks for WeaveJS. We want to send the raw Python data
+    # to the frontend for these objects. But this will break querying them in Weave
+    # Python when not using InProcessServer.
+    # TODO: Remove!
+    if hasattr(obj, "to_pylist"):
+        return obj.to_pylist()
+    elif hasattr(obj, "as_py"):
+        return obj.as_py()
+
     wb_type = types.TypeRegistry.type_of(obj)
     mapper = mappers_python.map_to_python(
         wb_type, artifacts_local.LocalArtifact(_get_name(wb_type, obj))
@@ -199,5 +250,98 @@ def from_python(obj):
     mapper = mappers_python.map_from_python(
         wb_type, artifacts_local.LocalArtifact(_get_name(wb_type, obj))
     )
+    res = mapper.apply(obj["_val"])
+    return res
+
+
+# This will be a faster version fo to_arrow (below). Its
+# used in op file-table, to convert from a wandb Table to Weave
+# (that code is very experimental and not totally working yet)
+def to_arrow_new(obj, weave_type=None):
+    if weave_type is None:
+        weave_type = types.TypeRegistry.type_of(obj)
+    if isinstance(weave_type, types.List):
+        object_type = weave_type.object_type
+        import time
+
+        artifact = artifacts_local.LocalArtifact("to-arrow-%s" % weave_type.name)
+
+        start_time = time.time()
+        # Convert to arrow, serializing Custom objects to the artifact
+        mapper = mappers_arrow.map_to_arrow(object_type, artifact)
+        pyarrow_type = mapper.result_type()
+        # py_objs = (mapper.apply(o) for o in obj)
+        print("Construct mapper time: %s" % (time.time() - start_time))
+        start_time = time.time()
+
+        # TODO: do I need this branch? Does it work now?
+        # if isinstance(wb_type.object_type, types.ObjectType):
+        #     arrow_obj = pa.array(py_objs, pyarrow_type)
+        from .ops_primitives import arrow
+
+        import time
+
+        if pa.types.is_struct(pyarrow_type):
+            fields = list(pyarrow_type)
+            schema = pa.schema(fields)
+            arrow_obj = pa.Table.from_pylist(obj, schema=schema)
+            # arr = pa.array(py_objs, type=pyarrow_type)
+            # rb = pa.RecordBatch.from_struct_array(arr)  # this pivots to columnar layout
+            # arrow_obj = pa.Table.from_batches([rb])
+        else:
+            arrow_obj = pa.array(obj, pyarrow_type)
+        print("arrow_obj time: %s" % (time.time() - start_time))
+        start_time = time.time()
+        weave_obj = arrow.ArrowWeaveList(arrow_obj, object_type, artifact)
+        print("ArrowWeaveList time: %s" % (time.time() - start_time))
+        start_time = time.time()
+
+        # Save the weave object to the artifact
+        ref = save(weave_obj, artifact=artifact)
+        print("save time: %s" % (time.time() - start_time))
+        start_time = time.time()
+
+        return ref.obj
+
+    raise errors.WeaveInternalError(
+        "to_arrow not implemented for: %s" % type(weave_type)
+    )
+
+
+def to_arrow(obj):
+    wb_type = types.TypeRegistry.type_of(obj)
+    artifact = artifacts_local.LocalArtifact("to-arrow-%s" % wb_type.name)
+    if isinstance(wb_type, types.List):
+        object_type = wb_type.object_type
+
+        # Convert to arrow, serializing Custom objects to the artifact
+        mapper = mappers_arrow.map_to_arrow(object_type, artifact)
+        pyarrow_type = mapper.result_type()
+        py_objs = (mapper.apply(o) for o in obj)
+
+        # TODO: do I need this branch? Does it work now?
+        # if isinstance(wb_type.object_type, types.ObjectType):
+        #     arrow_obj = pa.array(py_objs, pyarrow_type)
+        from .ops_primitives import arrow
+
+        if pa.types.is_struct(pyarrow_type):
+            arr = pa.array(py_objs, type=pyarrow_type)
+            rb = pa.RecordBatch.from_struct_array(arr)  # this pivots to columnar layout
+            arrow_obj = pa.Table.from_batches([rb])
+        else:
+            arrow_obj = pa.array(py_objs, pyarrow_type)
+        weave_obj = arrow.ArrowWeaveList(arrow_obj, object_type, artifact)
+
+        # Save the weave object to the artifact
+        ref = save(weave_obj, artifact=artifact)
+
+        return ref.obj
+
+    raise errors.WeaveInternalError("to_arrow not implemented for: %s" % obj)
+
+
+def from_arrow(obj):
+    wb_type = types.TypeRegistry.type_from_dict(obj["_type"])
+    mapper = mappers_arrow.map_from_arrow(wb_type, None)
     res = mapper.apply(obj["_val"])
     return res

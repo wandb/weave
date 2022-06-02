@@ -1,13 +1,20 @@
+import dataclasses
+import numpy as np
+import pandas as pd
 import typing
 from .. import weave_types as types
-from ..api import op, mutation, weave_class
+from ..api import op, mutation, weave_class, OpVarArgs
 from .. import weave_internal
-from .. import graph
 from .. import errors
+from .. import execute_fast
 
 
 @weave_class(weave_type=types.List)
 class List:
+    @op(input_type={"self": types.List(types.Any())}, output_type=types.Float())
+    def sum(self):
+        return sum(self)
+
     @op(
         input_type={"self": types.List(types.Any())},
         output_type=types.Int(),
@@ -47,58 +54,51 @@ class List:
         return [row.get(key) for row in self]
 
     @op(
-        input_type={"self": types.List(types.Any()), "filter_fn": types.Any()},
+        input_type={
+            "self": types.List(types.Any()),
+            "filter_fn": lambda input_types: types.Function(
+                {"row": input_types["self"].object_type}, types.Any()
+            ),
+        },
         output_type=lambda input_types: input_types["self"],
     )
     def filter(self, filter_fn):
-        calls = []
-        for row in self:
-            calls.append(
-                weave_internal.call_fn(
-                    filter_fn, {"row": graph.ConstNode(types.Any(), row)}
-                )
-            )
+        call_results = execute_fast.fast_map_fn(self, filter_fn)
         result = []
-        for row, keep in zip(self, weave_internal.use_internal(calls)):
+        for row, keep in zip(self, call_results):
             if keep:
                 result.append(row)
         return result
 
     @op(
-        input_type={"self": types.List(types.Any()), "map_fn": types.Any()},
-        output_type=lambda input_types: input_types["self"],
+        input_type={
+            "self": types.List(types.Any()),
+            "map_fn": lambda input_types: types.Function(
+                {"row": input_types["self"].object_type}, types.Any()
+            ),
+        },
+        output_type=lambda input_types: types.List(input_types["map_fn"].output_type),
     )
     def map(self, map_fn):
-        calls = []
-        for i, row in enumerate(self):
-            calls.append(
-                weave_internal.call_fn(
-                    map_fn,
-                    {
-                        "row": graph.ConstNode(types.Any(), row),
-                        "index": graph.ConstNode(types.Number(), i),
-                    },
-                )
-            )
-        result = weave_internal.use_internal(calls)
-        return result
+        return execute_fast.fast_map_fn(self, map_fn)
 
     @op(
-        input_type={"self": types.List(types.Any()), "group_by_fn": types.Any()},
+        input_type={
+            "self": types.List(types.Any()),
+            "group_by_fn": lambda input_types: types.Function(
+                {"row": input_types["self"].object_type}, types.Any()
+            ),
+        },
         output_type=lambda input_types: types.List(
-            GroupResultType(input_types["self"])
+            GroupResultType(
+                input_types["self"].object_type, input_types["group_by_fn"].output_type
+            )
         ),
     )
     def groupby(self, group_by_fn):
-        calls = []
-        for row in self:
-            calls.append(
-                weave_internal.call_fn(
-                    group_by_fn, {"row": graph.ConstNode(types.Any(), row)}
-                )
-            )
+        call_results = execute_fast.fast_map_fn(self, group_by_fn)
         result = {}
-        for row, group_key_items in zip(self, weave_internal.use_internal(calls)):
+        for row, group_key_items in zip(self, call_results):
             import json
 
             group_key_s = json.dumps(group_key_items)
@@ -111,18 +111,45 @@ class List:
             grs.append(GroupResult(group_result[1], group_result[0]))
         return grs
 
+    @op(
+        input_type={"arr": types.List(types.Any()), "offset": types.Number()},
+        output_type=lambda input_types: input_types["arr"],
+    )
+    def offset(arr, offset):
+        return arr[offset:]
 
+    @op(
+        input_type={"arr": types.List(types.Any()), "limit": types.Number()},
+        output_type=lambda input_types: input_types["arr"],
+    )
+    def limit(arr, limit):
+        return arr[:limit]
+
+    @op(
+        name="dropna",
+        input_type={"arr": types.List(types.Any())},
+        output_type=lambda input_types: input_types["arr"],
+    )
+    def dropna(arr):
+        return [i for i in arr if i is not None]
+
+
+@dataclasses.dataclass
 class GroupResultType(types.ObjectType):
     name = "groupresult"
 
-    type_vars = {"list": types.List(types.Any()), "key": types.Any()}
+    object_type: types.Type = types.Any()
+    key: types.Type = types.Any()
 
-    def __init__(self, list=types.List(types.Any()), key=types.Any()):
-        self.list = list
-        self.key = key
+    @classmethod
+    def type_of_instance(cls, obj):
+        return cls(
+            types.TypeRegistry.type_of(obj.list).object_type,
+            types.TypeRegistry.type_of(obj.key),
+        )
 
     def property_types(self):
-        return {"list": self.list, "key": self.key}
+        return {"list": types.List(self.object_type), "key": self.key}
 
 
 def group_result_index_output_type(input_types):
@@ -130,9 +157,9 @@ def group_result_index_output_type(input_types):
     # TODO: need to fix Const type so we don't need this.
     self_type = input_types["self"]
     if isinstance(self_type, types.Const):
-        return self_type.val_type.list.object_type
+        return self_type.val_type.object_type
     else:
-        return self_type.list.object_type
+        return self_type.object_type
 
 
 @weave_class(weave_type=GroupResultType)
@@ -141,21 +168,51 @@ class GroupResult:
         self.list = list
         self.key = key
 
-    @op(
-        name="group-groupkey",
-        input_type={"obj": GroupResultType()},
-        output_type=types.Any(),
-    )
-    def key(obj):
-        return obj.key
+    @property
+    def var_item(self):
+        return weave_internal.make_var_node(self.type.object_type, "row")
+
+    @op(output_type=lambda input_types: input_types["self"].key)
+    def key(self):
+        return self.key
 
     @op(output_type=types.Any())
     def pick(self, key: str):
         return List.pick.resolve_fn(self.list, key)
 
+    @op()
+    def count(self) -> int:
+        return len(self.list)
+
     @op(output_type=group_result_index_output_type)
     def __getitem__(self, index: int):
         return List.__getitem__.resolve_fn(self.list, index)
+
+    @op(
+        input_type={
+            "self": GroupResultType(),
+            "map_fn": lambda input_types: types.Function(
+                {"row": input_types["self"].object_type}, types.Any()
+            ),
+        },
+        output_type=lambda input_types: types.List(input_types["map_fn"].output_type),
+    )
+    def map(self, map_fn):
+        return List.map.resolve_fn(self.list, map_fn)
+
+    @op(
+        input_type={
+            "self": types.List(types.Any()),
+            "group_fn": lambda input_types: types.Function(
+                {"row": input_types["self"].object_type}, types.Any()
+            ),
+        },
+        output_type=lambda input_types: types.List(
+            GroupResultType(input_types["self"].object_type)
+        ),
+    )
+    def groupby(self, group_fn):
+        return List.groupby.resolve_fn(self.list, group_fn)
 
 
 GroupResultType.instance_class = GroupResult
@@ -184,36 +241,33 @@ def tag_indexCheckpoint(obj):
     return 0
 
 
-@op(
-    name="limit",
-    input_type={"arr": types.List(types.Any()), "limit": types.Number()},
-    output_type=types.Any(),
-)
-def limit(arr, limit):
-    # So lame, we can't use slice because sometimes we have an ArrowArrayTable here
-    # TODO: fix
-    res = []
-    if limit >= len(arr):
-        limit = len(arr)
-    for i in range(limit):
-        res.append(arr[i])
-    return res
-    # return arr[:limit]
+def flatten_type(list_type):
+    obj_type = list_type.object_type
+    if hasattr(obj_type, "object_type"):
+        return flatten_type(obj_type)
+    return types.List(obj_type)
+
+
+def flatten_return_type(input_types):
+    return flatten_type(input_types["arr"])
+
+
+def _flatten(l):
+    if isinstance(l, list):
+        return sum((_flatten(o) for o in l), [])
+    elif isinstance(l, GroupResult):
+        return sum((_flatten(o) for o in l.list), [])
+    else:
+        return [l]
 
 
 @op(
-    name="flatten", input_type={"arr": types.List(types.Any())}, output_type=types.Any()
+    name="flatten",
+    input_type={"arr": types.List(types.Any())},
+    output_type=flatten_return_type,
 )
 def flatten(arr):
-    # TODO: probably doesn't match js implementation
-    result = []
-    for row in arr:
-        if isinstance(row, list):
-            for o in row:
-                result.append(o)
-        else:
-            result.append(row)
-    return result
+    return _flatten(list(arr))
 
 
 @op(
@@ -222,8 +276,30 @@ def flatten(arr):
     output_type=lambda input_types: input_types["arr"],
 )
 def unnest(arr):
-    # TODO this doesn't do anything! Need to actually unnest.
-    return arr
+    if not arr:
+        return arr
+    list_cols = []
+    # Very expensive to recompute type here. We already have it!
+    # TODO: need a way to get argument types inside of resolver bodies.
+    arr_type = types.TypeRegistry.type_of(arr)
+    for k, v_type in arr_type.object_type.property_types.items():
+        if types.is_list_like(v_type):
+            list_cols.append(k)
+    if not list_cols:
+        return arr
+    return pd.DataFrame(arr).explode(list_cols).to_dict("records")
+
+
+@op(
+    name="unique",
+    input_type={"arr": types.List(types.Any())},
+    output_type=lambda input_types: input_types["arr"],
+)
+def unique(arr):
+    if not arr:
+        return arr
+    res = np.unique(arr)
+    return res.tolist()
 
 
 def index_output_type(input_types):
@@ -269,6 +345,17 @@ def pick_output_type(input_types):
     return output_type
 
 
+class WeaveGroupResultInterface:
+    @op(
+        name="group-groupkey",
+        input_type={"obj": GroupResultType()},
+        output_type=lambda input_types: input_types["obj"].key,
+    )
+    def key(obj):
+        type_class = types.TypeRegistry.type_class_of(obj)
+        return type_class.NodeMethodsClass.key.resolve_fn(obj)
+
+
 class WeaveJSListInterface:
     @op(name="count")
     def count(arr: list[typing.Any]) -> int:  # type: ignore
@@ -298,22 +385,106 @@ class WeaveJSListInterface:
         type_class = types.TypeRegistry.type_class_of(obj)
         return type_class.NodeMethodsClass.pick.resolve_fn(obj, key)
 
-    @op(name="filter", output_type=lambda input_types: input_types["arr"])
-    def filter(arr: list[typing.Any], filterFn: typing.Any):  # type: ignore
+    @op(
+        name="filter",
+        input_type={
+            "arr": types.List(types.Any()),
+            "filterFn": lambda input_types: types.Function(
+                {"row": input_types["arr"].object_type}, types.Any()
+            ),
+        },
+        output_type=lambda input_types: input_types["arr"],
+    )
+    def filter(arr, filterFn):  # type: ignore
         type_class = types.TypeRegistry.type_class_of(arr)
         return type_class.NodeMethodsClass.filter.resolve_fn(arr, filterFn)
 
-    @op(name="map", output_type=types.Any())
-    def map(arr: list[typing.Any], mapFn: typing.Any):  # type: ignore
+    @op(
+        name="map",
+        input_type={
+            "arr": types.List(types.Any()),
+            "mapFn": lambda input_types: types.Function(
+                {"row": input_types["arr"].object_type}, types.Any()
+            ),
+        },
+        output_type=lambda input_types: types.List(input_types["mapFn"].output_type),
+    )
+    def map(arr, mapFn):  # type: ignore
         type_class = types.TypeRegistry.type_class_of(arr)
         return type_class.NodeMethodsClass.map.resolve_fn(arr, mapFn)
 
     @op(
+        name="sort",
+        input_type={
+            "arr": types.List(types.Any()),
+            "compFn": lambda input_types: types.Function(
+                {"row": input_types["arr"].object_type}, types.Any()
+            ),
+            "columnDirs": types.Any(),
+        },
+        output_type=lambda input_types: types.List(input_types["sortFn"].output_type),
+    )
+    def sort(arr, compFn, columnDirs):  # type: ignore
+        # TODO: not implemented
+        # type_class = types.TypeRegistry.type_class_of(arr)
+        # return type_class.NodeMethodsClass.sort.resolve_fn(arr, sortFn)
+        return arr
+
+    @op(
         name="groupby",
+        input_type={
+            "arr": types.List(types.Any()),
+            "groupByFn": lambda input_types: types.Function(
+                {"row": input_types["arr"].object_type}, types.Any()
+            ),
+        },
         output_type=lambda input_types: types.List(
-            GroupResultType(types.List(input_types["arr"].object_type), types.Any())
+            GroupResultType(
+                input_types["arr"].object_type, input_types["groupByFn"].output_type
+            )
         ),
     )
-    def groupby(arr: list[typing.Any], groupByFn: typing.Any):  # type: ignore
+    def groupby(arr, groupByFn):  # type: ignore
         type_class = types.TypeRegistry.type_class_of(arr)
-        return type_class.NodeMethodsClass.groupby.resolve_fn(arr, groupByFn)
+        try:
+            return type_class.NodeMethodsClass.groupby.resolve_fn(arr, groupByFn)
+        except AttributeError:
+            groupby_res = List.groupby.resolve_fn(arr, groupByFn)
+            return groupby_res
+
+    @op(
+        name="offset",
+        input_type={"arr": types.List(types.Any()), "offset": types.Number()},
+        output_type=lambda input_types: input_types["arr"],
+    )
+    def offset(arr, offset):
+        type_class = types.TypeRegistry.type_class_of(arr)
+        return type_class.NodeMethodsClass.offset.resolve_fn(arr, offset)
+
+    @op(
+        name="limit",
+        input_type={"arr": types.List(types.Any()), "limit": types.Number()},
+        output_type=lambda input_types: input_types["arr"],
+    )
+    def limit(arr, limit):
+        type_class = types.TypeRegistry.type_class_of(arr)
+        return type_class.NodeMethodsClass.limit.resolve_fn(arr, limit)
+
+
+def list_return_type(input_types):
+    its = []
+    for input_type in input_types.values():
+        if isinstance(input_type, types.Const):
+            input_type = input_type.val_type
+        its.append(input_type)
+    ret = types.List(types.union(*its))
+    return ret
+
+
+@op(
+    name="list",
+    input_type=OpVarArgs(types.Any()),
+    output_type=list_return_type,
+)
+def make_list(**l):
+    return list(l.values())

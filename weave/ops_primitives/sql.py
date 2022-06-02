@@ -178,15 +178,23 @@ class SqlTable:
     def map(self, map_fn: typing.Any):
         return list_.List.map.resolve_fn(self._to_list_table(), map_fn)
 
-    @op(output_type=lambda input_types: input_types["self"])
-    def filter(self, filter_fn: typing.Any):
+    @op(
+        input_type={
+            "self": types.List(types.Any()),
+            "filter_fn": lambda input_types: types.Function(
+                {"row": input_types["self"].object_type}, types.Any()
+            ),
+        },
+        output_type=lambda input_types: input_types["self"],
+    )
+    def filter(self, filter_fn):
         new_obj = self.copy()
         new_obj._filter_fn = filter_fn
         return new_obj
 
     @op(
         output_type=lambda input_types: types.List(
-            list_.GroupResultType(types.List(input_types["self"].object_type))
+            list_.GroupResultType(input_types["self"].object_type)
         ),
     )
     def groupby(self, group_by_fn: typing.Any):

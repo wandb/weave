@@ -2,7 +2,6 @@ from hashlib import sha256
 import numpy as np
 import os
 
-from .ops_domain import image
 from . import weave_types as types
 from . import storage
 from . import api

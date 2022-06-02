@@ -1,3 +1,4 @@
+import dataclasses
 import typing
 import functools
 import pyarrow as pa
@@ -8,6 +9,14 @@ from collections.abc import Iterable
 from . import box
 from . import errors
 from . import arrow_util
+
+
+def to_weavejs_typekey(k: str) -> str:
+    if k == "object_type":
+        return "objectType"
+    elif k == "property_types":
+        return "propertyTypes"
+    return k
 
 
 def all_subclasses(cls):
@@ -41,12 +50,21 @@ def instance_class_to_potential_type(cls):
     return result
 
 
+def type_class_type_name(type_class):
+    try:
+        return type_class.__dict__["name"]
+    except KeyError:
+        pass
+    if hasattr(type_class, "class_type_name"):
+        return type_class.class_type_name()
+
+
 @functools.cache
 def type_name_to_type_map():
     res = {}
     type_classes = get_type_classes()
     for type_class in type_classes:
-        name = type_class.__dict__.get("name")
+        name = type_class_type_name(type_class)
         if name is not None:
             res[name] = type_class
     return res
@@ -77,11 +95,23 @@ class TypeRegistry:
 
         # use reversed instance_class_to_potential_type so our result
         # is the most specific type.
-        for type_ in reversed(instance_class_to_potential_type(type(obj))):
+
+        # The type of graph.Node objects is Function, but we also mixin
+        # NodeMethodsClass with Node, which may also have a Weave type.
+        # Therefore we have multiple valid types. But we need type_of() to
+        # be function in that case. Ie when a Node is mixed in, its lazy
+        # representation of whatever the type is, not the actual type.
+        #
+        # TODO: Its a small that we need to hardcode here. Fix this.
+        potential_types = instance_class_to_potential_type(type(obj))
+        if "function" in (t.name for t in potential_types):
+            potential_types = [Function]
+
+        for type_ in reversed(potential_types):
             obj_type = type_.type_of(obj)
             if obj_type is not None:
                 return obj_type
-        raise errors.WeaveTypeError("no Type for obj: %s" % obj)
+        raise errors.WeaveTypeError("no Type for obj: (%s) %s" % (type(obj), obj))
 
     @staticmethod
     def type_from_dict(d):
@@ -99,10 +129,13 @@ class TypeRegistry:
         return type_.from_dict(d)
 
 
+@dataclasses.dataclass
 class Type:
-    name = "type"
-    instance_class: typing.Optional[type]
-    instance_classes: typing.Union[type, typing.List[type], None] = None
+    name: typing.ClassVar[str] = "type"
+    instance_class: typing.ClassVar[typing.Optional[type]]
+    instance_classes: typing.ClassVar[
+        typing.Union[type, typing.List[type], None]
+    ] = None
 
     @classmethod
     def _instance_classes(cls):
@@ -112,6 +145,14 @@ class Type:
         if isinstance(cls.instance_classes, Iterable):
             return cls.instance_classes
         return (cls.instance_classes,)
+
+    @classmethod
+    def type_vars(cls):
+        type_vars = {}
+        for field in dataclasses.fields(cls):
+            if issubclass(field.type, Type):
+                type_vars[field.name] = field.type
+        return type_vars
 
     @classmethod
     def is_instance(cls, obj):
@@ -141,13 +182,24 @@ class Type:
         d.update(self._to_dict())
         return d
 
+    def _to_dict(self):
+        fields = dataclasses.fields(self.__class__)
+        type_props = {}
+        for field in fields:
+            type_props[to_weavejs_typekey(field.name)] = getattr(
+                self, field.name
+            ).to_dict()
+        return type_props
+
     @classmethod
     def from_dict(cls, d):
-        return cls()
-
-    # To be overridden
-    def _to_dict(self):
-        return {}
+        fields = dataclasses.fields(cls)
+        type_attrs = {}
+        for field in fields:
+            type_attrs[field.name] = TypeRegistry.type_from_dict(
+                d[to_weavejs_typekey(field.name)]
+            )
+        return cls(**type_attrs)
 
     # def _ipython_display_(self):
     #     from . import show
@@ -200,6 +252,10 @@ class BasicType(Type):
         return self.name
 
     def save_instance(self, obj, artifact, name):
+        if artifact is None:
+            raise errors.WeaveSerializeError(
+                "save_instance invalid when artifact is None for type: %s" % self
+            )
         with artifact.new_file(f"{name}.object.json") as f:
             json.dump(obj, f)
 
@@ -259,6 +315,9 @@ class Const(Type):
         self.val_type = type_
         self.val = val
 
+    def __getattr__(self, attr):
+        return getattr(self.val_type, attr)
+
     @classmethod
     def type_of_instance(cls, obj):
         return cls(obj)
@@ -300,6 +359,13 @@ class Float(Number):
     instance_classes = float
     name = "float"
 
+    def assign_type(self, other_type: Type):
+        # Float if either side is a number
+        if isinstance(other_type, Float) or isinstance(other_type, Int):
+            return Float()
+        else:
+            return Invalid()
+
 
 class Int(Number):
     name = "int"
@@ -311,6 +377,15 @@ class Int(Number):
         if type(obj) == bool:
             return False
         return super().is_instance(obj)
+
+    def assign_type(self, other_type: Type):
+        # Become Float if rhs is Float
+        if isinstance(other_type, Float):
+            return Float()
+        elif isinstance(other_type, Int):
+            return Int()
+        else:
+            return Invalid()
 
 
 class Boolean(BasicType):
@@ -326,43 +401,30 @@ class Boolean(BasicType):
             json.dump(obj, f)
 
 
-class ConstNumber(Type):
-    name = "constnumber"
-
-    def __init__(self, val):
-        self.val = val
-
-    @classmethod
-    def from_dict(cls, d):
-        return cls(d["val"])
-
-    def _to_dict(self):
-        return {"val": self.val}
-
-
 class UnionType(Type):
     name = "union"
 
-    members: Type
+    members: list[Type]
 
     def __init__(self, *members):
         all_members = []
         for mem in members:
             if isinstance(mem, UnionType):
-                all_members += mem.members
+                for memmem in mem.members:
+                    if memmem not in all_members:
+                        all_members.append(memmem)
             else:
-                all_members.append(mem)
+                if mem not in all_members:
+                    all_members.append(mem)
         self.members = all_members
 
     def assign_type(self, other):
         if isinstance(other, UnionType):
             # TODO: implement me. (We've done this in _dtypes and in js so refer there)
             raise NotImplementedError
-        for member in self.members:
-            assigned = member.assign_type(other)
-            if assigned != Invalid():
-                return assigned
-        return Invalid()
+        if any(member.assign_type(other) == Invalid() for member in self.members):
+            return Invalid()
+        return self
 
     # def instance_to_py(self, obj):
     #     # Figure out which union member this obj is, and delegate to that
@@ -378,23 +440,16 @@ class UnionType(Type):
     def _to_dict(self):
         return {"members": [mem.to_dict() for mem in self.members]}
 
-    def __str__(self):
+    def __repr__(self):
         return "<UnionType %s>" % " | ".join((str(m) for m in self.members))
 
 
+@dataclasses.dataclass
 class List(Type):
     name = "list"
     instance_classes = [set, list, arrow_util.ArrowTableList, arrow_util.ArrowArrayList]
 
-    def __init__(self, object_type):
-        self.object_type = object_type
-
-    def _to_dict(self):
-        return {"objectType": self.object_type.to_dict()}
-
-    @classmethod
-    def from_dict(cls, d):
-        return cls(TypeRegistry.type_from_dict(d["objectType"]))
+    object_type: Type
 
     @classmethod
     def type_of_instance(cls, obj):
@@ -418,7 +473,7 @@ class List(Type):
 
         pyarrow_type = serializer.result_type()
 
-        py_objs = (serializer.apply(o) for o in obj)
+        py_objs = list(serializer.apply(o) for o in obj)
 
         with artifact.new_file(f"{name}.parquet", binary=True) as f:
             arr = pa.array(py_objs, type=pyarrow_type)
@@ -438,26 +493,26 @@ class List(Type):
 
         with artifact.open(f"{name}.parquet", binary=True) as f:
             table = pq.read_table(f)
+            mapper = mappers_arrow.map_from_arrow(self.object_type, artifact)
+
             if (
                 table.schema.metadata is not None
                 and b"singleton" in table.schema.metadata
             ):
-                return arrow_util.ArrowArrayList(table.column("_singleton"))
+                # return ArrowArrayList(table.column)
+                return arrow_util.ArrowArrayList(
+                    table.column("_singleton"), mapper, artifact
+                )
 
-            mapper = mappers_arrow.map_from_arrow(self.object_type, artifact)
-            atl = arrow_util.ArrowTableList(pq.read_table(f), mapper, artifact)
+            atl = arrow_util.ArrowTableList(table, mapper, artifact)
             return atl
 
-    def __str__(self):
-        return "<ListType %s>" % self.object_type
 
-
+@dataclasses.dataclass
 class TypedDict(Type):
     name = "typedDict"
     instance_classes = [dict]
-
-    def __init__(self, property_types):
-        self.property_types = property_types
+    property_types: dict[str, Type]
 
     def assign_type(self, other_type):
         if not isinstance(other_type, TypedDict):
@@ -520,24 +575,20 @@ class TypedDict(Type):
         mapper = mappers_python.map_from_python(self, artifact)
         return mapper.apply(result)
 
-    def __str__(self):
-        property_types = {}
-        for key, type_ in self.property_types.items():
-            property_types[key] = str(type_)
-        return "<TypedDict %s>" % property_types
 
-
+@dataclasses.dataclass
 class Dict(Type):
     name = "dict"
 
-    def __init__(self, key_type, value_type):
+    key_type: Type
+    value_type: Type
+
+    def __post_init__(self):
         # Note this differs from Python's Dict in that keys are always strings!
         # TODO: consider if we can / should accept key_type. Would make JS side
         # harder since js objects can only have string keys.
-        if not isinstance(key_type, String):
+        if not isinstance(self.key_type, String):
             raise Exception("Dict only supports string keys!")
-        self.key_type = key_type
-        self.value_type = value_type
 
     def assign_type(self, other_type):
         if isinstance(other_type, Dict):
@@ -552,19 +603,6 @@ class Dict(Type):
 
             return Invalid()
 
-    def _to_dict(self):
-        return {
-            "keyType": self.key_type.to_dict(),
-            "objectType": self.value_type.to_dict(),
-        }
-
-    @classmethod
-    def from_dict(cls, d):
-        return cls(
-            TypeRegistry.type_from_dict(d["keyType"]),
-            TypeRegistry.type_from_dict(d["objectType"]),
-        )
-
     @classmethod
     def type_of_instance(cls, obj):
         value_type = UnknownType()
@@ -574,52 +612,30 @@ class Dict(Type):
             value_type = value_type.assign_type(TypeRegistry.type_of(v))
         return cls(String(), value_type)
 
-    def __str__(self):
-        return "<Dict %s>" % self.value_type
 
-
+@dataclasses.dataclass
 class ObjectType(Type):
-    # TODO: This is not a leaf type so we don't really want this name maybe?
-    name = "object_type"
+    # This needs to match the name property
+    # TODO: there has to be a better way to do this (have a property-like
+    # thing that is accessible at class time instead of object time)
+    @classmethod
+    def class_type_name(cls):
+        return cls.__name__.removesuffix("Type")
 
-    type_vars: dict[str, Type] = {}
+    @property
+    def name(self):
+        return self.__class__.__name__.removesuffix("Type")
 
     def property_types(self):
         raise NotImplementedError
 
     def variable_property_types(self):
-        # TODO: must be a subset of property_types
-        result = {}
-        for property_name in self.type_vars:
-            property_val = getattr(self, property_name)
-            result[property_name] = property_val
-        return result
-
-    def __str__(self):
-        result = []
-        for k, v in self.property_types().items():
-            result.append("%s: %s" % (k, v))
-        return "<%s {%s}>" % (self.__class__.__name__, ", ".join(result))
-
-    def _to_dict(self):
-        return {
-            prop: prop_type.to_dict()
-            for prop, prop_type in self.variable_property_types().items()
-        }
-
-    @classmethod
-    def from_dict(cls, d):
-        d = {i: d[i] for i in d if i != "type"}
-        type_args = {
-            prop: TypeRegistry.type_from_dict(prop_type)
-            for prop, prop_type in d.items()
-        }
-        return cls(**type_args)
+        return self.type_vars()
 
     @classmethod
     def type_of_instance(cls, obj):
         variable_prop_types = {}
-        for prop_name in cls.type_vars:
+        for prop_name in cls.type_vars():
             prop_type = TypeRegistry.type_of(getattr(obj, prop_name))
             # print("TYPE_OF", cls, prop_name, prop_type, type(getattr(obj, prop_name)))
             variable_prop_types[prop_name] = prop_type
@@ -630,10 +646,6 @@ class ObjectType(Type):
 
         serializer = mappers_python.map_to_python(self, artifact)
 
-        # TODO: do we inject the artifact here?
-        #    Or maybe we do it in the mapper, and add the artifact
-        #    prop to the object there as well?
-        obj.artifact = artifact  # ??
         result = serializer.apply(obj)
         with artifact.new_file(f"{name}.object.json") as f:
             json.dump(result, f, allow_nan=False)
@@ -756,18 +768,12 @@ RUN_STATE_TYPE = string_enum_type("pending", "running", "finished", "failed")
 
 # TODO: get rid of all the underscores. This is another
 #    conflict with making ops automatically lazy
+@dataclasses.dataclass
 class RunType(ObjectType):
     name = "run-type"
-    type_vars = {
-        "_inputs": TypedDict({}),
-        "_history": List(Any()),
-        "_output": Any(),
-    }
-
-    def __init__(self, _inputs, _history, _output):
-        self._inputs = _inputs
-        self._history = _history
-        self._output = _output
+    _inputs: TypedDict
+    _history: List
+    _output: Type
 
     def property_types(self):
         return {
@@ -781,13 +787,12 @@ class RunType(ObjectType):
         }
 
 
+@dataclasses.dataclass
 class FileType(ObjectType):
     name = "file"
 
-    type_vars = {"extension": String()}
-
-    def __init__(self, extension=String()):
-        self.extension = extension
+    extension: String = String()
+    wb_object_type: dataclasses.InitVar[String] = String()
 
     def _to_dict(self):
         # NOTE: js_compat
@@ -796,6 +801,8 @@ class FileType(ObjectType):
         d = super()._to_dict()
         if isinstance(self.extension, Const):
             d["extension"] = self.extension.val
+        if isinstance(self.wb_object_type, Const):
+            d["wbObjectType"] = {"type": self.wb_object_type.val}
         return d
 
     @classmethod
@@ -810,19 +817,28 @@ class FileType(ObjectType):
                 "valType": "string",
                 "val": d["extension"],
             }
+        if "wbObjectType" in d:
+            d["wb_object_type"] = {
+                "type": "const",
+                "valType": "string",
+                "val": d["wbObjectType"]["type"],
+            }
+            d.pop("wbObjectType")
         return super().from_dict(d)
 
     def property_types(self):
         return {
             "extension": self.extension,
+            "wb_object_type": self.extension,
         }
 
 
+@dataclasses.dataclass
 class SubDirType(ObjectType):
     # TODO doesn't match frontend
     name = "subdir"
 
-    type_vars = {"file_type": FileType()}
+    file_type: FileType
 
     def __init__(self, file_type):
         self.file_type = file_type
@@ -856,3 +872,24 @@ class DirType(ObjectType):
 
 # Ensure numpy types are loaded
 from . import types_numpy
+
+
+def union(*members: list[Type]) -> Type:
+    t = UnionType(*members)
+    if len(t.members) == 1:
+        return t.members[0]
+    return t
+
+
+def is_list_like(t: Type) -> bool:
+    return isinstance(non_none(t), List)
+
+
+def is_custom_type(t: Type) -> bool:
+    return not (
+        isinstance(t, BasicType)
+        or isinstance(t, ObjectType)
+        or isinstance(t, TypedDict)
+        or isinstance(t, List)
+        or isinstance(t, UnionType)
+    )

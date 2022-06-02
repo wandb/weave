@@ -73,19 +73,13 @@ def make_const_node(type_, val):
     return return_type(type_, val)
 
 
-def make_output_node(type_, op_name, op_inputs):
-    if hasattr(type_, "NodeMethodsClass"):
-        return_type = type(
-            "OutputNode%s" % type_.__class__.__name__,
-            (graph.OutputNode, type_.NodeMethodsClass),
-            {},
-        )
-    else:
-        return_type = graph.OutputNode
-    return return_type(type_, op_name, op_inputs)
-
-
 # Given a registered op, make a mapped version of it.
+
+
+def define_fn(parameters, body):
+    var_nodes = [make_var_node(t, k) for k, t in parameters.items()]
+    fnNode = body(*var_nodes)
+    return graph.ConstNode(types.Function(parameters, fnNode.type), fnNode)
 
 
 def make_mapped_op(op_name):
@@ -124,8 +118,9 @@ def make_mapped_op(op_name):
     # of the lazy call
     resolve.sig = inspect.signature(op.resolve_fn)
 
-    named_input_types = op_args.OpNamedArgs(input_types)
-    new_op = op_def.OpDef(mapped_op_name, named_input_types, output_type, resolve)
+    new_op = op_def.OpDef(
+        mapped_op_name, op_args.OpNamedArgs(input_types), output_type, resolve
+    )
     op_version = registry_mem.memory_registry.register_op(new_op)
 
     return op_version.call_fn

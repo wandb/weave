@@ -46,9 +46,14 @@ class ArtifactVersion:
             return types.DirType()
         parts = path.split(".")
         ext = ""
+        wb_object_type = types.NoneType()
         if len(parts) != 1:
             ext = parts[-1]
-        return types.FileType(extension=types.Const(types.String(), ext))
+        if len(parts) > 2 and ext == "json":
+            wb_object_type = types.Const(types.String(), parts[-2])
+        return types.FileType(
+            extension=types.Const(types.String(), ext), wb_object_type=wb_object_type
+        )
 
     @op(
         name="artifactVersion-file",
@@ -60,4 +65,13 @@ class ArtifactVersion:
     # TODO: This function should probably be called path, but it return Dir or File.
     # ok...
     def path(artifactVersion, path):
-        return file_wbartifact.artifact_version_path(artifactVersion, path)
+        return artifactVersion.read_path(path)
+
+
+@op(
+    name="asset-artifactVersion",
+    input_type={"asset": types.Any()},
+    output_type=ArtifactVersionType(),
+)
+def artifactVersion(asset):
+    return asset.artifact

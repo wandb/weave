@@ -30,11 +30,9 @@ def typeddict_pick_output_type(input_types):
     property_types = input_types["self"].property_types
     output_type = property_types.get(key)
     if output_type is None:
-        # TODO is types.Invalid() right?
-        # return types.Invalid()
-        # TODO: we hack this to types.Number() for now as a demonstration
-        # but its really Invalid until we do an async refineType (not
-        # yet supported in Weave Python)
+        # TODO: we hack this to types.Number() for now! This is relied
+        # on by tests because readcsv() doesn't properly return a full
+        # type right now. Super janky
         return types.Number()
     return output_type
 
@@ -51,7 +49,7 @@ class TypedDict(dict):
 
     @op(
         setter=__setitem__,
-        input_type={"self": types.TypedDict(types.Any()), "key": types.String()},
+        input_type={"self": types.TypedDict({}), "key": types.String()},
         output_type=typeddict_pick_output_type,
     )
     def pick(self, key):
@@ -60,7 +58,18 @@ class TypedDict(dict):
             # surfaces an error
             # TODO: totally not right, need to figure out mappped ops
             return self.pick(key)
-        return dict.__getitem__(self, key)
+        try:
+            return dict.__getitem__(self, key)
+        except KeyError:
+            return None
+
+    @op(
+        name="merge",
+        input_type={"lhs": types.TypedDict({}), "rhs": types.TypedDict({})},
+        output_type=types.TypedDict({}),
+    )
+    def merge(lhs, rhs):
+        return {**lhs, **rhs}
 
     __getitem__ = pick
 
@@ -108,16 +117,7 @@ class Dict(dict):
 @op(
     name="dict",
     input_type=OpVarArgs(types.Any()),
-    output_type=types.TypedDict({}),
+    output_type=lambda input_types: types.TypedDict(input_types),
 )
 def dict_(**d):
     return d
-
-
-@op(
-    name="merge",
-    input_type={"lhs": types.TypedDict({}), "rhs": types.TypedDict({})},
-    output_type=types.TypedDict({}),
-)
-def merge(lhs, rhs):
-    return {**lhs, **rhs}

@@ -29,7 +29,9 @@ def python_type_to_type(
 ) -> weave_types.Type:
     if py_type == typing.Any:
         return weave_types.Any()
-    if isinstance(py_type, types.GenericAlias):
+    if isinstance(py_type, types.GenericAlias) or isinstance(
+        py_type, typing._GenericAlias  # type: ignore
+    ):
         args = [python_type_to_type(a) for a in py_type.__args__]
         if py_type.__origin__ == list:
             return weave_types.List(*args)
