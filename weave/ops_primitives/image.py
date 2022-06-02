@@ -91,7 +91,7 @@ class PILImageOps:
     @weave.op(input_type={"self": PILImageType(5, 5, "L")})
     def image_bytes(self) -> str:
         f = io.BytesIO()
-        self.save(f, format="png")
+        self.save(f, format="png")  # type: ignore
         f.seek(0)
         return binascii.hexlify(f.read()).decode("ISO-8859-1")
 

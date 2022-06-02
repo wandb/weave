@@ -1,4 +1,5 @@
 # TODO: split this into multiple files like we do in the JS version
+import json
 import typing
 
 from wandb.apis import public as wandb_api
@@ -201,7 +202,7 @@ class ArtifactTypeOps:
         # Hacking to support mapped call here. WeaveJS autosuggest uses it
         # TODO: True mapped call support
         if isinstance(artifactType, wandb_api.ProjectArtifactTypes):
-            return [at.name for at in artifactType]
+            return [at.name for at in artifactType]  # type: ignore
         return artifactType.type
 
     @op(name="artifactType-artifacts")
@@ -305,7 +306,7 @@ class Project:
 
         api = wandb.Api()
         return api.runs(
-            path="%s/%s" % (project.entity, project.name),
+            path="%s/%s" % (project.entity, project.name),  # type: ignore
             filters=json.loads(filter),
             order=order,
             per_page=500,

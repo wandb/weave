@@ -134,7 +134,6 @@ class List:
         return [i for i in arr if i is not None]
 
 
-
 @dataclasses.dataclass
 class GroupResultType(types.ObjectType):
     name = "groupresult"

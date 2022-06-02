@@ -773,7 +773,7 @@ class RunType(ObjectType):
     name = "run-type"
     _inputs: TypedDict
     _history: List
-    _output: Any
+    _output: Type
 
     def property_types(self):
         return {
