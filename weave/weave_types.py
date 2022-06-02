@@ -205,13 +205,6 @@ class Type:
     #     from . import show
     #     return show(self)
 
-    def __eq__(self, other):
-        return (
-            isinstance(other, Type)
-            and self.name == other.name
-            and self.__dict__ == other.__dict__
-        )
-
     # save_instance/load_instance on Type are used to save/load actual Types
     # since type_of(types.Int()) == types.Type()
     def save_instance(self, obj, artifact, name) -> typing.Optional[list[str]]:
