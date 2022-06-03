@@ -34,7 +34,7 @@ def _convert_type(old_type: wandb_dtypes.Type) -> types.Type:
         # TODO: should we try to figure out if its an Int?
         return types.String()
     elif isinstance(old_type, wandb_data_types._ImageFileType):
-        return ops.ImageFileType()
+        return ops.ImageFile.WeaveType()
         print("OLD TYPE", old_type)
         raise NotImplementedError
     else:

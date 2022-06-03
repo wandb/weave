@@ -236,6 +236,10 @@ class WandbArtifact:
         return cls(art._sequence_name, uri=uri)
 
     @property
+    def is_saved(self):
+        return hasattr(self, "_saved_artifact")
+
+    @property
     def version(self):
         if not self._saved_artifact:
             raise errors.WeaveInternalError("cannot get version of an unsaved artifact")

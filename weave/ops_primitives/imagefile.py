@@ -1,44 +1,32 @@
 import dataclasses
 import typing
 from .. import types
+from .. import api as weave
 
 
 class ArtifactFileType(types.Type):
-    def save_instance(self, obj, artifact, name):
-        pass
-
     def load_instance(self, artifact, name, extra=None):
         return ArtifactFile(artifact, name)
 
 
 @dataclasses.dataclass
 class ArtifactFile:
-    artifact: typing.Any
+    artifact: typing.Any  # Artifact
     path: str
 
 
-class ImageFileType(types.ObjectType):
-    name = "image-file"
-
-    def property_types(self):
-        return {
-            "path": ArtifactFileType(),
-            "format": types.String(),
-            "height": types.Int(),
-            "width": types.Int(),
-            "sha256": types.String(),
-        }
+ArtifactFileType.instance_classes = ArtifactFile
+ArtifactFileType.instance_class = ArtifactFile
 
 
-@dataclasses.dataclass
+@weave.type(__override_name="image-file")
 class ImageFile:
-    path: ArtifactFile
+    path: ArtifactFile  # TODO: just file
     format: str
     height: int
     width: int
     sha256: str
-    artifact: typing.Any
 
-
-ImageFileType.instance_class = ImageFile
-ImageFileType.instance_classes = ImageFile
+    @property
+    def artifact(self):
+        return self.path.artifact

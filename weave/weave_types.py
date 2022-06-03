@@ -186,9 +186,12 @@ class Type:
         fields = dataclasses.fields(self.__class__)
         type_props = {}
         for field in fields:
-            type_props[to_weavejs_typekey(field.name)] = getattr(
-                self, field.name
-            ).to_dict()
+            # TODO: I really don't like this change. Only needed because
+            # FileType has optional fields... Remove?
+            attr = getattr(self, field.name)
+            if not attr:
+                continue
+            type_props[to_weavejs_typekey(field.name)] = attr.to_dict()
         return type_props
 
     @classmethod
@@ -694,7 +697,7 @@ class RefType(Type):
     def type_of_instance(cls, obj):
         raise NotImplemented()
 
-    def __str__(self):
+    def __repr__(self):
         return f"<{self.ref_type_name} {self.object_type}>"
 
 
@@ -804,20 +807,25 @@ class FileType(ObjectType):
         # In the js Weave code, file is a non-standard type that
         # puts a const string at extension as just a plain string.
         d = {i: d[i] for i in d if i != "type"}
+        extension = None
         if "extension" in d:
-            d["extension"] = {
-                "type": "const",
-                "valType": "string",
-                "val": d["extension"],
-            }
+            extension = TypeRegistry.type_from_dict(
+                {
+                    "type": "const",
+                    "valType": "string",
+                    "val": d["extension"],
+                }
+            )
+        wb_object_type = None
         if "wbObjectType" in d:
-            d["wb_object_type"] = {
-                "type": "const",
-                "valType": "string",
-                "val": d["wbObjectType"]["type"],
-            }
-            d.pop("wbObjectType")
-        return super().from_dict(d)
+            wb_object_type = TypeRegistry.type_from_dict(
+                {
+                    "type": "const",
+                    "valType": "string",
+                    "val": d["wbObjectType"]["type"],
+                }
+            )
+        return cls(extension, wb_object_type)
 
     def property_types(self):
         return {

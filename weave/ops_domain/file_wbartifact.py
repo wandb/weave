@@ -3,6 +3,7 @@ from ..api import op, weave_class
 from .. import weave_types as types
 from ..ops_primitives import file as weave_file
 from ..wandb_api import wandb_public_api
+from .. import artifacts_local
 from wandb.apis import public as wandb_api
 
 
@@ -39,6 +40,19 @@ class ArtifactVersionFile(weave_file.File):
         self.path = path
         if self.extension is None:
             self.extension = weave_file.path_ext(path)
+
+    @property
+    def artifact(self):
+        wb_artifact = wandb_public_api().artifact(
+            "%s/%s/%s:%s"
+            % (
+                self.entity_name,
+                self.project_name,
+                self.artifact_name,
+                self.artifact_version,
+            )
+        )
+        return artifacts_local.WandbArtifact.from_wb_artifact(wb_artifact)
 
     def get_local_path(self):
         entry = (

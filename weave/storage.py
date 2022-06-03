@@ -50,6 +50,7 @@ def save_mem(obj, name):
 
 
 def save_to_artifact(obj, artifact: artifacts_local.LocalArtifact, name, type_):
+    # print("SAVE TO ARTIFACT", obj, artifact, name, type_)
     # Tell types what name to use if not obj
     # We need to fix the save/load API so this is unnecessary.
     # This is also necessary to prevent saving the same obj at different
@@ -70,6 +71,8 @@ def save_to_artifact(obj, artifact: artifacts_local.LocalArtifact, name, type_):
         hash = artifact.make_last_file_content_addressed()
         if hash is not None:
             name = f"{hash}-{name}"
+    with artifact.new_file(f"{name}.type.json") as f:
+        json.dump(type_.to_dict(), f)
     return refs.LocalArtifactRef(
         artifact, path=name, type=type_, obj=obj, extra=ref_extra
     )
@@ -116,8 +119,6 @@ def _save_or_publish(obj, name=None, type=None, publish: bool = False, artifact=
         else:
             artifact = artifacts_local.LocalArtifact(name)
     ref = save_to_artifact(obj, artifact, "_obj", wb_type)
-    with artifact.new_file(f"_obj.type.json") as f:
-        json.dump(wb_type.to_dict(), f)
     artifact.save()
     refs.put_ref(obj, ref)
     return ref
@@ -129,10 +130,11 @@ def publish(obj, name=None, type=None):
 
 
 def save(obj, name=None, type=None, artifact=None):
-    ref = _get_ref(obj)
-    if ref is not None:
-        if name is None or ref.artifact._name == name:
-            return ref
+    # print("STORAGE SAVE", name, obj, type, artifact)
+    # ref = _get_ref(obj)
+    # if ref is not None:
+    #     if name is None or ref.artifact._name == name:
+    #         return ref
     return _save_or_publish(obj, name, type, False, artifact=artifact)
 
 
@@ -254,58 +256,44 @@ def from_python(obj):
     return res
 
 
+# Converting table algorithm
+# construct the parquet file
+#     first, determine type of raw table data
+#        this is done by mapping weave type to arrow type
+#     then write
+# Then construct a WeaveList, with the weave type and which artifact it came from
+# Then save the WeaveList...
+# So we don't actually have to save it.
+
 # This will be a faster version fo to_arrow (below). Its
 # used in op file-table, to convert from a wandb Table to Weave
 # (that code is very experimental and not totally working yet)
-def to_arrow_new(obj, weave_type=None):
-    if weave_type is None:
-        weave_type = types.TypeRegistry.type_of(obj)
-    if isinstance(weave_type, types.List):
-        object_type = weave_type.object_type
-        import time
+def to_arrow_from_list_and_artifact(obj, object_type, artifact):
+    import time
 
-        artifact = artifacts_local.LocalArtifact("to-arrow-%s" % weave_type.name)
+    start_time = time.time()
 
-        start_time = time.time()
-        # Convert to arrow, serializing Custom objects to the artifact
-        mapper = mappers_arrow.map_to_arrow(object_type, artifact)
-        pyarrow_type = mapper.result_type()
-        # py_objs = (mapper.apply(o) for o in obj)
-        print("Construct mapper time: %s" % (time.time() - start_time))
-        start_time = time.time()
+    # Get what the parquet type will be.
+    mapper = mappers_arrow.map_to_arrow(object_type, artifact)
+    pyarrow_type = mapper.result_type()
 
-        # TODO: do I need this branch? Does it work now?
-        # if isinstance(wb_type.object_type, types.ObjectType):
-        #     arrow_obj = pa.array(py_objs, pyarrow_type)
-        from .ops_primitives import arrow
+    # TODO: do I need this branch? Does it work now?
+    # if isinstance(wb_type.object_type, types.ObjectType):
+    #     arrow_obj = pa.array(py_objs, pyarrow_type)
+    from .ops_primitives import arrow
 
-        import time
+    import time
 
-        if pa.types.is_struct(pyarrow_type):
-            fields = list(pyarrow_type)
-            schema = pa.schema(fields)
-            arrow_obj = pa.Table.from_pylist(obj, schema=schema)
-            # arr = pa.array(py_objs, type=pyarrow_type)
-            # rb = pa.RecordBatch.from_struct_array(arr)  # this pivots to columnar layout
-            # arrow_obj = pa.Table.from_batches([rb])
-        else:
-            arrow_obj = pa.array(obj, pyarrow_type)
-        print("arrow_obj time: %s" % (time.time() - start_time))
-        start_time = time.time()
-        weave_obj = arrow.ArrowWeaveList(arrow_obj, object_type, artifact)
-        print("ArrowWeaveList time: %s" % (time.time() - start_time))
-        start_time = time.time()
-
-        # Save the weave object to the artifact
-        ref = save(weave_obj, artifact=artifact)
-        print("save time: %s" % (time.time() - start_time))
-        start_time = time.time()
-
-        return ref.obj
-
-    raise errors.WeaveInternalError(
-        "to_arrow not implemented for: %s" % type(weave_type)
-    )
+    if pa.types.is_struct(pyarrow_type):
+        fields = list(pyarrow_type)
+        schema = pa.schema(fields)
+        arrow_obj = pa.Table.from_pylist(obj, schema=schema)
+    else:
+        arrow_obj = pa.array(obj, pyarrow_type)
+    print("arrow_obj time: %s" % (time.time() - start_time))
+    start_time = time.time()
+    weave_obj = arrow.ArrowWeaveList(arrow_obj, object_type, artifact)
+    return weave_obj
 
 
 def to_arrow(obj):

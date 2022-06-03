@@ -1,6 +1,7 @@
 import copy
 import typing
 import dataclasses
+import json
 import numpy as np
 import pyarrow as pa
 import pyarrow.compute as pc
@@ -199,6 +200,7 @@ def _pick_output_type(input_types):
 
 
 def rewrite_weavelist_refs(arrow_data, object_type, artifact):
+    print("REWRITING REFS", object_type, type(arrow_data))
     # TODO: Handle unions
 
     if isinstance(object_type, types.TypedDict) or isinstance(
@@ -207,17 +209,30 @@ def rewrite_weavelist_refs(arrow_data, object_type, artifact):
         prop_types = object_type.property_types
         if callable(prop_types):
             prop_types = prop_types()
-        arrays = {}
-        for col_name, col_type in prop_types.items():
-            column = arrow_data[col_name]
-            arrays[col_name] = rewrite_weavelist_refs(column, col_type, artifact)
-        return pa.table(arrays)
+        if isinstance(arrow_data, pa.Table):
+            arrays = {}
+            for col_name, col_type in prop_types.items():
+                column = arrow_data[col_name]
+                arrays[col_name] = rewrite_weavelist_refs(column, col_type, artifact)
+            return pa.table(arrays)
+        elif isinstance(arrow_data, pa.ChunkedArray):
+            arrays = {}
+            unchunked = arrow_data.combine_chunks()
+            for col_name, col_type in prop_types.items():
+                column = unchunked.field(col_name)
+                arrays[col_name] = rewrite_weavelist_refs(column, col_type, artifact)
+            print("ARRAYS", arrays)
+            print("ARRAY LENS", {k: len(v) for k, v in arrays.items()})
+            return pa.StructArray.from_arrays(arrays.values(), names=arrays.keys())
     elif isinstance(object_type, types.UnionType):
-        if any(types.is_custom_type(m) for m in object_type.members):
+        non_none_members = [
+            m for m in object_type.members if not isinstance(m, types.NoneType)
+        ]
+        if len(non_none_members) > 1:
             raise errors.WeaveInternalError(
-                "Unions of custom types not yet support in Weave arrow"
+                "Unions not fully supported yet in Weave arrow"
             )
-        return arrow_data
+        return rewrite_weavelist_refs(arrow_data, types.non_none(object_type), artifact)
     else:
         if isinstance(object_type, types.BasicType):
             return arrow_data
@@ -231,9 +246,7 @@ def rewrite_weavelist_refs(arrow_data, object_type, artifact):
             if ":" in ref_str:
                 new_refs.append(ref_str)
             else:
-                ref = refs.LocalArtifactRef.from_local_ref(
-                    artifact, ref_str, object_type
-                )
+                ref = refs.Ref.from_local_ref(artifact, ref_str, object_type)
                 new_refs.append(str(ref.uri))
         return pa.array(new_refs)
 
@@ -320,7 +333,7 @@ class ArrowTableGroupByType(types.ObjectType):
             super().save_instance(obj, artifact, name)
             return
         new_table = rewrite_groupby_refs(
-            obj._table, obj._group_keys, self.object_type, obj._artifact
+            obj._table, obj._group_keys, obj.object_type, obj._artifact
         )
         import copy
 
@@ -419,8 +432,22 @@ ArrowTableGroupByType.instance_class = ArrowTableGroupBy
 
 
 # It seems like this should inherit from types.ListType...
+
+# Alright. The issue is...
+#   we're saving ArrowWeaveList inside of a Table object.
+#   so we're using mappers to save ArrowWeaveList instead of the custom
+#   save_instance implementation below.
+#
+# What we actually want here:
+#   - ArrowWeaveList can be represented as a TypedDict, so we want to
+#     convert to that so it can be nested (like ObjectType)
+#   - But we want to provide custom saving logic so we can convert inner refs
+#     in a totally custom way.
+#   - We have custom type_of_instance logic
+
+
 @dataclasses.dataclass
-class ArrowWeaveListType(types.ObjectType):
+class ArrowWeaveListType(types.Type):
     name = "ArrowWeaveList"
 
     object_type: types.Type = types.Type()
@@ -429,23 +456,68 @@ class ArrowWeaveListType(types.ObjectType):
     def type_of_instance(cls, obj):
         return cls(obj.object_type)
 
-    def property_types(self):
-        return {
-            "_arrow_data": types.union(ArrowTableType(), ArrowArrayType()),
-            "object_type": types.Type(),
-        }
-
     def save_instance(self, obj, artifact, name):
-        if obj._artifact == artifact:
-            super().save_instance(obj, artifact, name)
-            return
+        print()
+        print()
+        print()
+        print("ArrowWeaveList save_instance")
+        print()
+        # TODO: why do we need this check?
+        # if obj._artifact == artifact:
+        #     super().save_instance(obj, artifact, name)
+        #     return
+        print("Object source artifact: ", obj._artifact)
+        print("Target artifact: ", artifact)
         arrow_data = rewrite_weavelist_refs(
-            obj._arrow_data, self.object_type, obj._artifact
+            obj._arrow_data, obj.object_type, obj._artifact
         )
+        print("Source data: ", obj._arrow_data)
+        print("Result data: ", arrow_data)
+        print()
+        print()
+        print()
 
-        new_obj = copy.copy(obj)
-        new_obj._arrow_data = arrow_data
-        super().save_instance(new_obj, artifact, name)
+        # new_obj = copy.copy(obj)
+        # new_obj._arrow_data = arrow_data
+
+        d = {"_arrow_data": arrow_data, "object_type": obj.object_type}
+        type_of_d = types.TypedDict(
+            {
+                "_arrow_data": types.union(ArrowTableType(), ArrowArrayType()),
+                "object_type": types.Type(),
+            }
+        )
+        if hasattr(self, "key"):
+            d["key"] = obj.key
+            type_of_d.property_types["key"] = self.key
+
+        from .. import mappers_python
+
+        serializer = mappers_python.map_to_python(type_of_d, artifact)
+        result_d = serializer.apply(d)
+
+        with artifact.new_file(f"{name}.ArrowWeaveList.json") as f:
+            json.dump(result_d, f)
+
+    def load_instance(self, artifact, name, extra=None):
+        print("LOADING ARROW")
+        with artifact.open(f"{name}.ArrowWeaveList.json") as f:
+            result = json.load(f)
+        type_of_d = types.TypedDict(
+            {
+                "_arrow_data": types.union(ArrowTableType(), ArrowArrayType()),
+                "object_type": types.Type(),
+            }
+        )
+        if hasattr(self, "key"):
+            type_of_d.property_types["key"] = self.key
+        from .. import mappers_python
+
+        mapper = mappers_python.map_from_python(type_of_d, artifact)
+        res = mapper.apply(result)
+        print("LOADED ARROW", res)
+        # TODO: This won't work for Grouped result!
+        return ArrowWeaveList(res["_arrow_data"], res["object_type"], artifact)
 
 
 @weave_class(weave_type=ArrowWeaveListType)
@@ -493,7 +565,9 @@ class ArrowWeaveList:
             row = self._arrow_data.slice(index, 1)
         except IndexError:
             return None
-        return self._mapper.apply(row.to_pylist()[0])
+        res = self._mapper.apply(row.to_pylist()[0])
+        print("ARROW WEAVE TABLE INDEX", res)
+        return res
 
     @op(output_type=lambda input_types: input_types["self"].object_type)
     def __getitem__(self, index: int):
@@ -609,12 +683,12 @@ class ArrowTableGroupResultType(ArrowWeaveListType):
             types.TypeRegistry.type_of(obj._key),
         )
 
-    def property_types(self):
-        return {
-            "_arrow_data": types.union(ArrowTableType(), ArrowArrayType()),
-            "object_type": types.Type(),
-            "_key": self.key,
-        }
+    # def property_types(self):
+    #     return {
+    #         "_arrow_data": types.union(ArrowTableType(), ArrowArrayType()),
+    #         "object_type": types.Type(),
+    #         "_key": self.key,
+    #     }
 
 
 @weave_class(weave_type=ArrowTableGroupResultType)

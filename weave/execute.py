@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Mapping
 from . import graph
 from . import forward_graph
@@ -6,6 +7,7 @@ import time
 from . import artifacts_local
 import threading
 import typing
+from ddtrace import tracer
 
 # TODO: this won't be valid in a real scenario. We need to forward to an
 # agent, that doesn't have the same memory registry
@@ -66,7 +68,14 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
         to_run = set()
         for forward_node in running_now:
             start_time = time.time()
+            span = None
+            if isinstance(forward_node.node, graph.OutputNode):
+                span = tracer.trace(
+                    "op.%s" % graph.op_full_name(forward_node.node.from_op)
+                )
             execute_forward_node(fg, forward_node, no_cache=no_cache)
+            if span is not None:
+                span.finish()
             stats.add_node(forward_node.node, time.time() - start_time)
         for forward_node in running_now:
             for downstream_forward_node in forward_node.input_to:
@@ -135,10 +144,8 @@ def execute_forward_node(
     node = forward_node.node
     if isinstance(node, graph.ConstNode):
         return
-    elif isinstance(node, graph.VarNode):
-        raise errors.WeaveInternalError("cannot execute VarNode: %s" % node)
 
-    # print("EXECUTING NODE", node)
+    logging.info("Executing node: %s" % node)
 
     op_def = registry_mem.memory_registry.get_op(node.from_op.name)
     input_nodes = node.from_op.inputs
@@ -151,25 +158,32 @@ def execute_forward_node(
         # Compute the run ID, which is deterministic if the op is pure
         run_id = execute_ids.make_run_id(op_def, input_refs)
         run_artifact_name = f"run-{run_id}"
+    # print("RUN_ART NAME", run_artifact_name)
 
     if use_cache and op_def.pure:
         run = storage.get_version(run_artifact_name, "latest")
         if run is not None:
+            logging.info("Cache hit, returning")
             # Watch out, we handle loading async runs in different ways.
             if is_async_op(op_def):
                 forward_node.set_result(run)
                 return
             else:
                 if run._output is not None:
+                    print("SETTING RESULT TO RUN OUTPUT", run, type(run._output))
+                    # if isinstance(run._output, artifacts_local.LocalArtifact):
+                    #     print('OUTPUT REF TYPE OBJ TYPE', )
                     forward_node.set_result(run._output)
                     return
-                # otherwise, the run's output was not saveable, so we need
-                # to recompute it.
+            logging.info("Actually nevermind, didnt return")
+            # otherwise, the run's output was not saveable, so we need
+            # to recompute it.
     inputs = {
         input_name: storage.deref(input) for input_name, input in input_refs.items()
     }
 
     if is_async_op(op_def):
+        logging.info("Executing async op")
         run = run_obj.Run(run_id, op_def.name)
         input_refs = {}
         for input_name, input in inputs.items():
@@ -182,9 +196,11 @@ def execute_forward_node(
         execute_async_op(op_def, input_refs, run_id)
         forward_node.set_result(run)
     else:
+        logging.info("Executing sync op")
         result = execute_sync_op(op_def, inputs)
         ref = storage._get_ref(result)
         if ref is not None:
+            logging.info("Op resulted in ref")
             # If the op produced an object which has a ref (as in the case of get())
             # the result is the ref. This enables memoization after impure ops. E.g.
             # if get('x:latest') produces version x:1, we use x:1 for our make_run_id
@@ -192,6 +208,7 @@ def execute_forward_node(
             result = ref
         else:
             if use_cache:
+                logging.info("Saving result")
                 # If an op is impure, its output is saved to a name that does not
                 # include run ID. This means consuming pure runs will hit cache if
                 # the output of an impure op is the same as it was last time.
