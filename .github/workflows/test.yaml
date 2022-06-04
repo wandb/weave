@@ -23,6 +23,13 @@ jobs:
         run: pip install .
       - name: Install dev dependencies
         run: pip install -r requirements.test.txt
+      - name: Env
+        env:
+          DD_CIVISIBILITY_AGENTLESS_ENABLED: true
+          DD_API_KEY: ${{ secrets.DD_API_KEY }}
+          DD_SERVICE: weave-python
+          DD_ENV: ci
+        run: env
       - name: Run tests
         env:
           DD_CIVISIBILITY_AGENTLESS_ENABLED: true
