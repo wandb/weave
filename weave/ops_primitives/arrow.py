@@ -457,28 +457,15 @@ class ArrowWeaveListType(types.Type):
         return cls(obj.object_type)
 
     def save_instance(self, obj, artifact, name):
-        print()
-        print()
-        print()
-        print("ArrowWeaveList save_instance")
-        print()
         # TODO: why do we need this check?
-        # if obj._artifact == artifact:
-        #     super().save_instance(obj, artifact, name)
-        #     return
-        print("Object source artifact: ", obj._artifact)
-        print("Target artifact: ", artifact)
-        arrow_data = rewrite_weavelist_refs(
-            obj._arrow_data, obj.object_type, obj._artifact
-        )
-        print("Source data: ", obj._arrow_data)
-        print("Result data: ", arrow_data)
-        print()
-        print()
-        print()
-
-        # new_obj = copy.copy(obj)
-        # new_obj._arrow_data = arrow_data
+        if obj._artifact == artifact:
+            arrow_data = obj._arrow_data
+        else:
+            # super().save_instance(obj, artifact, name)
+            # return
+            arrow_data = rewrite_weavelist_refs(
+                obj._arrow_data, obj.object_type, obj._artifact
+            )
 
         d = {"_arrow_data": arrow_data, "object_type": obj.object_type}
         type_of_d = types.TypedDict(
@@ -500,7 +487,6 @@ class ArrowWeaveListType(types.Type):
             json.dump(result_d, f)
 
     def load_instance(self, artifact, name, extra=None):
-        print("LOADING ARROW")
         with artifact.open(f"{name}.ArrowWeaveList.json") as f:
             result = json.load(f)
         type_of_d = types.TypedDict(
@@ -515,7 +501,6 @@ class ArrowWeaveListType(types.Type):
 
         mapper = mappers_python.map_from_python(type_of_d, artifact)
         res = mapper.apply(result)
-        print("LOADED ARROW", res)
         # TODO: This won't work for Grouped result!
         return ArrowWeaveList(res["_arrow_data"], res["object_type"], artifact)
 
