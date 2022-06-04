@@ -11,9 +11,9 @@ def test_serialize():
     table = file.table()
     rows = table.rows()
     filter_fn = api.define_fn(
-        {"row": types.TypedDict({})}, lambda row: row["new"] > 100
+        {"row": types.TypedDict({})}, lambda row: row["new"] + 100
     )
-    filtered = rows.filter(filter_fn)
+    filtered = rows.map(filter_fn)
 
     ser = serialize.serialize([filtered])
     deser = serialize.deserialize(ser)
