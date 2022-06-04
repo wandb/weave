@@ -19,7 +19,7 @@ ArtifactFileType.instance_classes = ArtifactFile
 ArtifactFileType.instance_class = ArtifactFile
 
 
-@weave.type(__override_name="image-file")
+@weave.type(__override_name="image-file")  # type: ignore
 class ImageFile:
     path: ArtifactFile  # TODO: just file
     format: str
