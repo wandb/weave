@@ -84,7 +84,6 @@ def test_table_call():
         .direct_url_as_of(1654358491562)
     )
     image0_url = weave.use(image0_url_node)
-    assert (
-        image0_url
-        == "http://localhost:9994/__weave/file//Users/shawn/go/src/github.com/wandb/core/services/weave-internal/weave/testdata/wb_artifacts/test_res_1fwmcd3q:v0/media/images/8f65e54dc684f7675aec.png"
+    assert image0_url.endswith(
+        "testdata/wb_artifacts/test_res_1fwmcd3q:v0/media/images/8f65e54dc684f7675aec.png"
     )
