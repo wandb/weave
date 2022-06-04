@@ -61,11 +61,15 @@ def test_log_2_app_instances_different_threads(fresh_server_logfile):
         content = f.read()
 
     # check that it has a record of executing one call
-    assert "execute" in content and "500" in content and "200" in content
-    threads = re.findall(r"\(Thread (.+)\)", content)
+    assert "execute" in content
+    assert "200" in content
 
-    assert len(threads) == 3
-    assert threads[-2] != threads[-1]
+    # and we have an error
+    assert "500" in content
+
+    # check that there are two threads logged
+    threads = set(re.findall(r"\(Thread (.+?)\)", content))
+    assert len(threads) == 2
 
 
 def test_capture_server_logs_captures_server_logs(fresh_server_logfile, capsys):
