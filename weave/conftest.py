@@ -18,7 +18,6 @@ def make_fake_tracer():
 
 from . import engine_trace
 
-engine_trace.tracer = make_fake_tracer
 
 ### End disable datadog engine tracing
 
@@ -31,9 +30,11 @@ def guard(*args, **kwargs):
     raise Exception("I told you not to use the Internet!")
 
 
-socket.socket = guard
-
 ### End disable internet access
+
+# Uncomment these two lines to disable internet access entirely.
+# engine_trace.tracer = make_fake_tracer
+# socket.socket = guard
 
 
 def pytest_sessionstart(session):

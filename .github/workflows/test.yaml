@@ -6,7 +6,12 @@ on:
       - master
   pull_request:
 
-    
+env:
+  DD_CIVISIBILITY_AGENTLESS_ENABLED: True
+  DD_API_KEY: ${{ secrets.DD_API_KEY }}
+  DD_SERVICE: weave-python
+  DD_ENV: ci
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -25,4 +30,4 @@ jobs:
       - name: Install dev dependencies
         run: pip install -r requirements.test.txt
       - name: Run tests
-        run: cd weave && pytest
+        run: cd weave && pytest --ddtrace

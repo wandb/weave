@@ -1,4 +1,3 @@
-import copy
 import typing
 import dataclasses
 import json
@@ -474,9 +473,9 @@ class ArrowWeaveListType(types.Type):
                 "object_type": types.Type(),
             }
         )
-        if hasattr(self, "key"):
-            d["key"] = obj.key
-            type_of_d.property_types["key"] = self.key
+        if hasattr(self, "_key"):
+            d["_key"] = obj._key
+            type_of_d.property_types["_key"] = self._key
 
         from .. import mappers_python
 
@@ -495,8 +494,8 @@ class ArrowWeaveListType(types.Type):
                 "object_type": types.Type(),
             }
         )
-        if hasattr(self, "key"):
-            type_of_d.property_types["key"] = self.key
+        if hasattr(self, "_key"):
+            type_of_d.property_types["_key"] = self._key
         from .. import mappers_python
 
         mapper = mappers_python.map_from_python(type_of_d, artifact)
@@ -659,7 +658,7 @@ ArrowWeaveListType.instance_class = ArrowWeaveList
 class ArrowTableGroupResultType(ArrowWeaveListType):
     name = "ArrowTableGroupResult"
 
-    key: types.Type = types.Any()
+    _key: types.Type = types.Any()
 
     @classmethod
     def type_of_instance(cls, obj):
@@ -689,7 +688,7 @@ class ArrowTableGroupResult(ArrowWeaveList):
 
         self._mapper = mappers_arrow.map_from_arrow(self.object_type, self._artifact)
 
-    @op(output_type=lambda input_types: input_types["self"].key)
+    @op(output_type=lambda input_types: input_types["self"]._key)
     def key(self):
         return self._key
 
