@@ -1,15 +1,48 @@
 import os
 
-from . import context
-from . import weave_server
-from .artifacts_local import LOCAL_ARTIFACT_DIR
-
 import pytest
 import shutil
 
 
+### Disable datadog engine tracing
+
+
+class FakeTracer:
+    def trace(*args, **kwargs):
+        pass
+
+
+def make_fake_tracer():
+    return FakeTracer()
+
+
+from . import engine_trace
+
+engine_trace.tracer = make_fake_tracer
+
+### End disable datadog engine tracing
+
+### disable internet access
+
+import socket
+
+
+def guard(*args, **kwargs):
+    raise Exception("I told you not to use the Internet!")
+
+
+socket.socket = guard
+
+### End disable internet access
+
+
 def pytest_sessionstart(session):
     context.disable_analytics()
+
+
+from . import context
+from . import weave_server
+from .artifacts_local import LOCAL_ARTIFACT_DIR
 
 
 @pytest.fixture(autouse=True)

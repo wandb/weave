@@ -7,7 +7,7 @@ import time
 from . import artifacts_local
 import threading
 import typing
-from ddtrace import tracer
+from . import engine_trace
 
 # TODO: this won't be valid in a real scenario. We need to forward to an
 # agent, that doesn't have the same memory registry
@@ -63,6 +63,7 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
     to_run: set[forward_graph.ForwardNode] = fg.roots
 
     stats = ExecuteStats()
+    tracer = engine_trace.tracer()
     while len(to_run):
         running_now = to_run.copy()
         to_run = set()

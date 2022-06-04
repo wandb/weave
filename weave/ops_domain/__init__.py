@@ -286,7 +286,7 @@ class Project:
     def artifact_version(
         project: wandb_api.Project, artifactName: str, artifactVersionAlias: str
     ) -> wandb_api.Artifact:
-        return wandb_api.Api().artifact(
+        return wandb_public_api().artifact(
             "%s/%s/%s:%s"
             % (project.entity, project.name, artifactName, artifactVersionAlias)
         )
@@ -315,4 +315,4 @@ class Project:
 
 @op(name="root-project")
 def project(entityName: str, projectName: str) -> wandb_api.Project:
-    return wandb_api.Api().project(name=projectName, entity=entityName)
+    return wandb_public_api().project(name=projectName, entity=entityName)
