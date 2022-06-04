@@ -73,6 +73,7 @@ def save_to_artifact(obj, artifact: artifacts_local.LocalArtifact, name, type_):
             name = f"{hash}-{name}"
     with artifact.new_file(f"{name}.type.json") as f:
         json.dump(type_.to_dict(), f)
+        artifact._last_write_path = None
     return refs.LocalArtifactRef(
         artifact, path=name, type=type_, obj=obj, extra=ref_extra
     )
