@@ -14,8 +14,6 @@ jobs:
         with:
           api_key: ${{ secrets.DD_API_KEY }}
       - uses: actions/checkout@v2
-      - run: make tests
-      - uses: actions/checkout@v2
       - name: Setup Python version
         uses: actions/setup-python@v2
         with:
