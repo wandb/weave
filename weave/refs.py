@@ -33,14 +33,10 @@ class Ref:
 
     @classmethod
     def parse_local_ref_str(cls, s):
-        return s, None
-        parts = s.split("/")
-        path = parts[0]
-        if len(parts) == 1:
-            extra = None
-        else:
-            extra = parts[1:]
-        return path, extra
+        if "#" not in s:
+            return s, None
+        path, extra = s.split("#", 1)
+        return path, extra.split("/")
 
     @property
     def name(self) -> str:
@@ -249,16 +245,10 @@ class LocalArtifactRef(Ref):
         )
 
     def local_ref_str(self):
-        parts = []
-        if self.path != "_obj" or self.extra is not None:
-            parts.append(self.path)
+        s = self.path
         if self.extra is not None:
-            if isinstance(self.extra, Iterable):
-                for comp in self.extra:
-                    parts.append(str(comp))
-            else:
-                parts.append(str(self.extra))
-        return "/".join(parts)
+            s += "#%s" % "/".join(self.extra)
+        return s
 
 
 types.LocalArtifactRefType.instance_class = LocalArtifactRef
