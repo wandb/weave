@@ -107,6 +107,15 @@ class TypeRegistry:
         if "function" in (t.name for t in potential_types):
             potential_types = [Function]
 
+        # FileType and ArtifactFileVersionFileType are peers because
+        # one is an ObjectType and one is a base type, and we don't
+        # know python class hierarchy. This is a major major hack
+        # to force ArtifactVersionFile in that case.
+        # TODO: fix in refactor!!
+        for t in potential_types:
+            if t.name == "ArtifactVersionFile":
+                return t()
+
         for type_ in reversed(potential_types):
             obj_type = type_.type_of(obj)
             if obj_type is not None:

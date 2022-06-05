@@ -225,6 +225,9 @@ class WandbArtifact:
             )
         self._local_path: dict[str, str] = {}
 
+    def __repr__(self):
+        return "<WandbArtifact %s>" % self._name
+
     @classmethod
     def from_wb_artifact(cls, art):
         uri = uris.WeaveWBArtifactURI.from_parts(
@@ -258,13 +261,12 @@ class WandbArtifact:
             raise errors.WeaveInternalError("cannot download of an unsaved artifact")
         if name in self._local_path:
             return self._local_path[name]
-        path = self._saved_artifact.get_path(name).download(
-            os.path.join(LOCAL_ARTIFACT_DIR, self._name, self._saved_artifact.version)
-        )
+        path = self._saved_artifact.get_path(name).download()
         # python module loading does not support colons
+        # TODO: This is an extremely expensive fix!
         path_safe = path.replace(":", "_")
         pathlib.Path(path_safe).parent.mkdir(parents=True, exist_ok=True)
-        shutil.move(path, path_safe)
+        shutil.copy2(path, path_safe)
         self._local_path[name] = path_safe
         return path_safe
 
@@ -278,9 +280,7 @@ class WandbArtifact:
         manifest_entry = manifest.get_entry_by_path(path)
         if manifest_entry is not None:
             # This is a file
-            return ArtifactVersionFile(
-                av.entity, av.project, av._sequence_name, av.version, path
-            )
+            return ArtifactVersionFile(self, path)
         # This is not a file, assume its a directory. If not, we'll return an empty result.
         cur_dir = (
             path  # give better name so the rest of this code block is more readable

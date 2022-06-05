@@ -195,7 +195,10 @@ class DefaultToPy(mappers.Mapper):
             pass
         name = "-".join(self._path)
         ref = storage.save_to_artifact(obj, self._artifact, name, self.type)
-        return ref.local_ref_str()
+        if ref.artifact == self._artifact:
+            return ref.local_ref_str()
+        else:
+            return ref.uri
 
 
 class DefaultFromPy(mappers.Mapper):

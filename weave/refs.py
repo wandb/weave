@@ -104,8 +104,21 @@ class WandbArtifactRef(Ref):
     def type(self):
         if self._type is not None:
             return self._type
-        with self.artifact.open(f"{self.path}.type.json") as f:
-            type_json = json.load(f)
+        if self.path is None:
+            # If there's no path, this is a Ref directly to an ArtifactVersion
+            # TODO: refactor
+            from .ops_domain import wbartifact
+
+            return wbartifact.ArtifactVersionType()
+        try:
+            with self.artifact.open(f"{self.path}.type.json") as f:
+                type_json = json.load(f)
+        except (FileNotFoundError, KeyError):
+            # If there's no type file, this is a Ref to the file itself
+            # TODO: refactor
+            from .ops_domain import file_wbartifact
+
+            return file_wbartifact.ArtifactVersionFileType()
         self._type = types.TypeRegistry.type_from_dict(type_json)
         return self._type
 
@@ -130,6 +143,8 @@ class WandbArtifactRef(Ref):
     def get(self):
         if self.obj is not None:
             return self.obj
+        if self.path is None:
+            return self.artifact
         obj = self.type.load_instance(self.artifact, self.path, extra=None)
         obj = box.box(obj)
         put_ref(obj, self)

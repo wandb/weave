@@ -62,6 +62,10 @@ def save_to_artifact(obj, artifact: artifacts_local.LocalArtifact, name, type_):
     if name != "_obj":
         name = type_.name
     ref_extra = type_.save_instance(obj, artifact, name)
+    # If save_instance returned a Ref, return that directly.
+    # TODO: refactor
+    if isinstance(ref_extra, refs.Ref):
+        return ref_extra
     if name != "_obj":
         # Warning: This is hacks to force files to be content addressed
         # If the type saved a file, rename with its content hash included
@@ -74,6 +78,7 @@ def save_to_artifact(obj, artifact: artifacts_local.LocalArtifact, name, type_):
     with artifact.new_file(f"{name}.type.json") as f:
         json.dump(type_.to_dict(), f)
         artifact._last_write_path = None
+    # TODO: return ObjectRootRef (ArtifactRootRef?) here
     return refs.LocalArtifactRef(
         artifact, path=name, type=type_, obj=obj, extra=ref_extra
     )
@@ -120,8 +125,13 @@ def _save_or_publish(obj, name=None, type=None, publish: bool = False, artifact=
         else:
             artifact = artifacts_local.LocalArtifact(name)
     ref = save_to_artifact(obj, artifact, "_obj", wb_type)
-    artifact.save()
-    refs.put_ref(obj, ref)
+
+    # Only save if we have a ref into the artifact we created above. Otherwise
+    #     nothing new was created, so just return the existing ref.
+    if ref.artifact == artifact:
+        artifact.save()
+        refs.put_ref(obj, ref)
+
     return ref
 
 

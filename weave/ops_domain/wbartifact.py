@@ -3,34 +3,22 @@ from wandb.apis import public as wandb_api
 from ..api import op, weave_class
 from .. import weave_types as types
 from . import file_wbartifact
-from ..wandb_api import wandb_public_api
-from .. import errors
+from .. import artifacts_local
+from .. import refs
 
 
 class ArtifactVersionType(types.Type):
     name = "artifactVersion"
-    instance_classes = wandb_api.Artifact
-    instance_class = wandb_api.Artifact
+    instance_classes = artifacts_local.WandbArtifact
+    instance_class = artifacts_local.WandbArtifact
 
-    def instance_to_dict(self, obj):
-        return {
-            "entity_name": obj.entity,
-            "project_name": obj.project,
-            "artifact_name": obj._sequence_name,
-            "artifact_version": obj.version,
-        }
+    # TODO: what should these do?
+    #   return an ArtifactRef
+    def save_instance(self, obj, artifact, name):
+        return refs.WandbArtifactRef(obj, None)
 
-    def instance_from_dict(self, d):
-        api = wandb_public_api()
-        return api.artifact(
-            "%s/%s/%s:%s"
-            % (
-                d["entity_name"],
-                d["project_name"],
-                d["artifact_name"],
-                d["artifact_version"],
-            )
-        )
+    def load_instance(self, artifact, name, extra=None):
+        raise Exception("not implemented yet")
 
 
 @weave_class(weave_type=ArtifactVersionType)
