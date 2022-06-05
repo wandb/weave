@@ -52,9 +52,8 @@ def execute_nodes(nodes, no_cache=False):
 
     with context.execution_client():
         stats = execute_forward(fg, no_cache=no_cache)
-    print("EXECUTION SUMMARY")
     summary = stats.summary()
-    pprint.pprint(summary)
+    logging.info("Execution summary\n%s" % pprint.pformat(summary))
 
     return [fg.get_result(n) for n in nodes]
 
