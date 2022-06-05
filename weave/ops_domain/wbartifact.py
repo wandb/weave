@@ -18,7 +18,7 @@ class ArtifactVersionType(types.Type):
         return refs.WandbArtifactRef(obj, None)
 
     def load_instance(self, artifact, name, extra=None):
-        raise Exception("not implemented yet")
+        return artifact
 
 
 @weave_class(weave_type=ArtifactVersionType)
