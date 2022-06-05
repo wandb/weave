@@ -159,7 +159,6 @@ def execute_forward_node(
         # Compute the run ID, which is deterministic if the op is pure
         run_id = execute_ids.make_run_id(op_def, input_refs)
         run_artifact_name = f"run-{run_id}"
-    # print("RUN_ART NAME", run_artifact_name)
 
     if use_cache and op_def.pure:
         run = storage.get_version(run_artifact_name, "latest")
@@ -171,7 +170,6 @@ def execute_forward_node(
                 return
             else:
                 if run._output is not None:
-                    print("SETTING RESULT TO RUN OUTPUT", run, type(run._output))
                     # if isinstance(run._output, artifacts_local.LocalArtifact):
                     #     print('OUTPUT REF TYPE OBJ TYPE', )
                     forward_node.set_result(run._output)

@@ -1,4 +1,5 @@
 import contextlib
+import functools
 import hashlib
 import os
 import json
@@ -11,6 +12,11 @@ from . import util
 from . import errors
 from . import wandb_api
 import wandb
+
+
+@functools.lru_cache(1000)
+def get_wandb_read_artifact(path):
+    return wandb_api.wandb_public_api().artifact(path)
 
 
 LOCAL_ARTIFACT_DIR = os.environ.get("WEAVE_LOCAL_ARTIFACT_DIR") or os.path.join(
@@ -220,9 +226,7 @@ class WandbArtifact:
         else:
             # load an existing artifact, this should be read only,
             # TODO: we could technically support writable artifacts by creating a new version?
-            self._saved_artifact = wandb_api.wandb_public_api().artifact(
-                uri.make_path()
-            )
+            self._saved_artifact = get_wandb_read_artifact(uri.make_path())
         self._local_path: dict[str, str] = {}
 
     def __repr__(self):

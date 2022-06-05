@@ -199,7 +199,6 @@ def _pick_output_type(input_types):
 
 
 def rewrite_weavelist_refs(arrow_data, object_type, artifact):
-    print("REWRITING REFS", object_type, type(arrow_data))
     # TODO: Handle unions
 
     if isinstance(object_type, types.TypedDict) or isinstance(
@@ -220,8 +219,6 @@ def rewrite_weavelist_refs(arrow_data, object_type, artifact):
             for col_name, col_type in prop_types.items():
                 column = unchunked.field(col_name)
                 arrays[col_name] = rewrite_weavelist_refs(column, col_type, artifact)
-            print("ARRAYS", arrays)
-            print("ARRAY LENS", {k: len(v) for k, v in arrays.items()})
             return pa.StructArray.from_arrays(arrays.values(), names=arrays.keys())
     elif isinstance(object_type, types.UnionType):
         non_none_members = [
@@ -550,7 +547,6 @@ class ArrowWeaveList:
         except IndexError:
             return None
         res = self._mapper.apply(row.to_pylist()[0])
-        print("ARROW WEAVE TABLE INDEX", res)
         return res
 
     @op(output_type=lambda input_types: input_types["self"].object_type)

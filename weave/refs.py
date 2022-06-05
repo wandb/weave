@@ -219,8 +219,8 @@ class LocalArtifactRef(Ref):
     def get(self) -> typing.Any:
         # Can't do this, when you save a list, you get a different
         # representation back which test_decorators.py depend on right now
-        # if self.obj is not None:
-        #     return self.obj
+        if self.obj is not None:
+            return self.obj
         obj = self.type.load_instance(self.artifact, self.path, extra=self.extra)
         obj = box.box(obj)
         put_ref(obj, self)

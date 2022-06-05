@@ -4,6 +4,11 @@ from logging.config import dictConfig
 from logging.handlers import WatchedFileHandler
 import pathlib
 import warnings
+import json_log_formatter
+
+import ddtrace
+
+ddtrace.patch(logging=True)
 
 from flask import Flask
 from flask import request
@@ -31,6 +36,20 @@ from weave import run_obj
 pid = os.getpid()
 default_log_filename = pathlib.Path(f"/tmp/weave/log/{pid}.log")
 log_format = "[%(asctime)s] %(levelname)s in %(module)s (Thread Name: %(threadName)s): %(message)s"
+
+
+def enable_datadog_logging():
+    log_format = (
+        "%(asctime)s %(levelname)s [%(name)s] [%(filename)s:%(lineno)d] "
+        "[dd.service=%(dd.service)s dd.env=%(dd.env)s dd.version=%(dd.version)s dd.trace_id=%(dd.trace_id)s dd.span_id=%(dd.span_id)s] "
+        "- %(message)s"
+    )
+    formatter = json_log_formatter.JSONFormatter(log_format)
+    json_handler = logging.FileHandler(filename="/tmp/weave/log/weave-server.log")
+    json_handler.setFormatter(formatter)
+    logger = logging.getLogger("root")
+    logger.addHandler(json_handler)
+    logger.setLevel(logging.INFO)
 
 
 def enable_stream_logging(level=logging.INFO):
@@ -84,6 +103,9 @@ def make_app(log_filename=None, stream_logging_enabled=False):
     else:
         # ensure that errors / exceptions go to stderr
         enable_stream_logging(level=logging.ERROR)
+
+    if os.getenv("DD_ENV"):
+        enable_datadog_logging()
 
     return Flask(__name__, static_folder="frontend")
 

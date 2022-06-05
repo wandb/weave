@@ -1,5 +1,6 @@
 git+https://github.com/wandb/client.git@dtypes/safer_image_restore#egg=wandb
 ddtrace
+json_log_formatter
 numpy
 pandas
 h5py
