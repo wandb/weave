@@ -301,13 +301,10 @@ class WandbArtifact:
             rel_path_parts = rel_path.split("/")
             if len(rel_path_parts) == 1:
                 # Its a file within cur_dir
+                # TODO: I haven't tested this since changin ArtifactVersionFile implementation
                 files[entry_path] = ArtifactVersionFile(
-                    av.entity,
-                    av.project,
-                    av._sequence_name,
-                    av.version,
+                    self,
                     entry_path,
-                    extension=weave_file.path_ext(path),
                 )
             else:
                 dir_name = rel_path_parts[0]
@@ -316,13 +313,10 @@ class WandbArtifact:
                     sub_dirs[dir_name] = dir_
                 dir_ = sub_dirs[dir_name]
                 if len(rel_path_parts) == 2:
+                    # TODO: I haven't tested this since changin ArtifactVersionFile implementation
                     dir_.files[rel_path_parts[1]] = ArtifactVersionFile(
-                        av.entity,
-                        av.project,
-                        av._sequence_name,
-                        av.version,
+                        self,
                         entry_path,
-                        extension=weave_file.path_ext(entry_path),
                     )
                 else:
                     dir_.dirs[rel_path_parts[1]] = 1
