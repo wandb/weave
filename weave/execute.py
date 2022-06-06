@@ -73,9 +73,16 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
                 span = tracer.trace(
                     "op.%s" % graph.op_full_name(forward_node.node.from_op)
                 )
-            execute_forward_node(fg, forward_node, no_cache=no_cache)
-            if span is not None:
-                span.finish()
+            try:
+                execute_forward_node(fg, forward_node, no_cache=no_cache)
+            except:
+                logging.error(
+                    "Exception during execution of: %s" % str(forward_node.node)
+                )
+                raise
+            finally:
+                if span is not None:
+                    span.finish()
             stats.add_node(forward_node.node, time.time() - start_time)
         for forward_node in running_now:
             for downstream_forward_node in forward_node.input_to:
