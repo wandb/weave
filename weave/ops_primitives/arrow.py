@@ -1,6 +1,6 @@
-import copy
 import typing
 import dataclasses
+import json
 import numpy as np
 import pyarrow as pa
 import pyarrow.compute as pc
@@ -207,17 +207,28 @@ def rewrite_weavelist_refs(arrow_data, object_type, artifact):
         prop_types = object_type.property_types
         if callable(prop_types):
             prop_types = prop_types()
-        arrays = {}
-        for col_name, col_type in prop_types.items():
-            column = arrow_data[col_name]
-            arrays[col_name] = rewrite_weavelist_refs(column, col_type, artifact)
-        return pa.table(arrays)
+        if isinstance(arrow_data, pa.Table):
+            arrays = {}
+            for col_name, col_type in prop_types.items():
+                column = arrow_data[col_name]
+                arrays[col_name] = rewrite_weavelist_refs(column, col_type, artifact)
+            return pa.table(arrays)
+        elif isinstance(arrow_data, pa.ChunkedArray):
+            arrays = {}
+            unchunked = arrow_data.combine_chunks()
+            for col_name, col_type in prop_types.items():
+                column = unchunked.field(col_name)
+                arrays[col_name] = rewrite_weavelist_refs(column, col_type, artifact)
+            return pa.StructArray.from_arrays(arrays.values(), names=arrays.keys())
     elif isinstance(object_type, types.UnionType):
-        if any(types.is_custom_type(m) for m in object_type.members):
+        non_none_members = [
+            m for m in object_type.members if not isinstance(m, types.NoneType)
+        ]
+        if len(non_none_members) > 1:
             raise errors.WeaveInternalError(
-                "Unions of custom types not yet support in Weave arrow"
+                "Unions not fully supported yet in Weave arrow"
             )
-        return arrow_data
+        return rewrite_weavelist_refs(arrow_data, types.non_none(object_type), artifact)
     else:
         if isinstance(object_type, types.BasicType):
             return arrow_data
@@ -231,9 +242,7 @@ def rewrite_weavelist_refs(arrow_data, object_type, artifact):
             if ":" in ref_str:
                 new_refs.append(ref_str)
             else:
-                ref = refs.LocalArtifactRef.from_local_ref(
-                    artifact, ref_str, object_type
-                )
+                ref = refs.Ref.from_local_ref(artifact, ref_str, object_type)
                 new_refs.append(str(ref.uri))
         return pa.array(new_refs)
 
@@ -290,7 +299,7 @@ def rewrite_groupby_refs(arrow_data, group_keys, object_type, artifact):
 
 
 @dataclasses.dataclass
-class ArrowTableGroupByType(types.ObjectType):
+class ArrowTableGroupByType(types.Type):
     name = "ArrowTableGroupBy"
 
     object_type: types.Type = types.Any()
@@ -298,45 +307,72 @@ class ArrowTableGroupByType(types.ObjectType):
 
     @classmethod
     def type_of_instance(cls, obj):
-        table_object_type = types.TypeRegistry.type_of(obj._table).object_type
-        key_prop_types = {}
-        group_prop_types = {}
-        for k, t in table_object_type.property_types.items():
-            if k in obj._group_keys:
-                key_prop_types[k] = t
-            else:
-                group_prop_types[k] = t
-        return cls(obj.object_type, types.TypedDict(key_prop_types))
-
-    def property_types(self):
-        return {
-            "_table": ArrowTableType(self.object_type),
-            "_group_keys": types.List(types.String()),
-            "object_type": types.Type(),
-        }
+        return cls(obj.object_type, obj.key_type)
 
     def save_instance(self, obj, artifact, name):
         if obj._artifact == artifact:
-            super().save_instance(obj, artifact, name)
-            return
-        new_table = rewrite_groupby_refs(
-            obj._table, obj._group_keys, self.object_type, obj._artifact
+            raise errors.WeaveInternalError("not yet implemented")
+        table = rewrite_weavelist_refs(obj._table, obj.object_type, obj._artifact)
+        d = {
+            "_table": table,
+            "_groups": obj._groups,
+            "_group_keys": obj._group_keys,
+            "object_type": obj.object_type,
+            "key_type": obj.key_type,
+        }
+        type_of_d = types.TypedDict(
+            {
+                "_table": types.union(ArrowTableType(), ArrowArrayType()),
+                "_groups": types.union(ArrowTableType(), ArrowArrayType()),
+                "_group_keys": types.List(types.String()),
+                "object_type": types.Type(),
+                "key_type": types.Type(),
+            }
         )
-        import copy
+        from .. import mappers_python
 
-        new_obj = copy.copy(obj)
-        new_obj._table = new_table
-        super().save_instance(new_obj, artifact, name)
+        serializer = mappers_python.map_to_python(type_of_d, artifact)
+        result_d = serializer.apply(d)
+
+        with artifact.new_file(f"{name}.ArrowTableGroupBy.json") as f:
+            json.dump(result_d, f)
+
+    def load_instance(self, artifact, name, extra=None):
+        with artifact.open(f"{name}.ArrowTableGroupBy.json") as f:
+            result = json.load(f)
+        type_of_d = types.TypedDict(
+            {
+                "_table": types.union(ArrowTableType(), ArrowArrayType()),
+                "_groups": types.union(ArrowTableType(), ArrowArrayType()),
+                "_group_keys": types.List(types.String()),
+                "object_type": types.Type(),
+                "key_type": types.Type(),
+            }
+        )
+        from .. import mappers_python
+
+        mapper = mappers_python.map_from_python(type_of_d, artifact)
+        res = mapper.apply(result)
+        return ArrowTableGroupBy(
+            res["_table"],
+            res["_groups"],
+            res["_group_keys"],
+            res["object_type"],
+            res["key_type"],
+            artifact,
+        )
 
 
 @weave_class(weave_type=ArrowTableGroupByType)
 class ArrowTableGroupBy:
-    def __init__(self, _table, _group_keys, object_type, artifact):
+    def __init__(self, _table, _groups, _group_keys, object_type, key_type, artifact):
         self._table = _table
+        self._groups = _groups
         self._group_keys = _group_keys
         self.object_type = object_type
-        if self.object_type is None:
-            self.object_type = types.TypeRegistry.type_of(self._table).object_type
+        self.key_type = key_type
+        # if self.object_type is None:
+        #     self.object_type = types.TypeRegistry.type_of(self._table).object_type
         self._artifact = artifact
         from .. import mappers_arrow
 
@@ -344,7 +380,7 @@ class ArrowTableGroupBy:
 
     @op()
     def count(self) -> int:
-        return len(self._table)
+        return len(self._groups)
 
     @op(
         output_type=lambda input_types: ArrowTableGroupResultType(
@@ -354,7 +390,7 @@ class ArrowTableGroupBy:
     )
     def __getitem__(self, index: int):
         try:
-            row = self._table.slice(index, 1)
+            row = self._groups.slice(index, 1)
         except pa.ArrowIndexError:
             return None
 
@@ -366,13 +402,9 @@ class ArrowTableGroupBy:
             for col_name, column in zip(row_key.column_names, row_key.columns):
                 key[col_name.removeprefix("group_key_")] = column.combine_chunks()
             group_key = pa.StructArray.from_arrays(key.values(), key.keys())[0]
-        # key_struct = pa.scalar(key)  # , pa.struct(key_type))
 
-        row_group = row.drop(self._group_keys)
-        group = {}
-        for col_name, column in zip(row_group.column_names, row_group.columns):
-            group[col_name.removesuffix("_list")] = column[0].values
-        group_table = pa.table(group)
+        group_indexes = row["_index_list"].combine_chunks()[0].values
+        group_table = self._table.take(group_indexes)
 
         return ArrowTableGroupResult(
             # TODO: remove as_py() from group_key. Stay in arrow!
@@ -399,7 +431,7 @@ class ArrowTableGroupBy:
     )
     def map(self, map_fn):
         calls = []
-        for i in range(self.count.resolve_fn(self)):
+        for i in range(len(self._groups)):
             row = self.__getitem__.resolve_fn(self, i)
             calls.append(
                 weave_internal.call_fn(
@@ -419,8 +451,22 @@ ArrowTableGroupByType.instance_class = ArrowTableGroupBy
 
 
 # It seems like this should inherit from types.ListType...
+
+# Alright. The issue is...
+#   we're saving ArrowWeaveList inside of a Table object.
+#   so we're using mappers to save ArrowWeaveList instead of the custom
+#   save_instance implementation below.
+#
+# What we actually want here:
+#   - ArrowWeaveList can be represented as a TypedDict, so we want to
+#     convert to that so it can be nested (like ObjectType)
+#   - But we want to provide custom saving logic so we can convert inner refs
+#     in a totally custom way.
+#   - We have custom type_of_instance logic
+
+
 @dataclasses.dataclass
-class ArrowWeaveListType(types.ObjectType):
+class ArrowWeaveListType(types.Type):
     name = "ArrowWeaveList"
 
     object_type: types.Type = types.Type()
@@ -429,23 +475,53 @@ class ArrowWeaveListType(types.ObjectType):
     def type_of_instance(cls, obj):
         return cls(obj.object_type)
 
-    def property_types(self):
-        return {
-            "_arrow_data": types.union(ArrowTableType(), ArrowArrayType()),
-            "object_type": types.Type(),
-        }
-
     def save_instance(self, obj, artifact, name):
+        # TODO: why do we need this check?
         if obj._artifact == artifact:
-            super().save_instance(obj, artifact, name)
-            return
-        arrow_data = rewrite_weavelist_refs(
-            obj._arrow_data, self.object_type, obj._artifact
-        )
+            arrow_data = obj._arrow_data
+        else:
+            # super().save_instance(obj, artifact, name)
+            # return
+            arrow_data = rewrite_weavelist_refs(
+                obj._arrow_data, obj.object_type, obj._artifact
+            )
 
-        new_obj = copy.copy(obj)
-        new_obj._arrow_data = arrow_data
-        super().save_instance(new_obj, artifact, name)
+        d = {"_arrow_data": arrow_data, "object_type": obj.object_type}
+        type_of_d = types.TypedDict(
+            {
+                "_arrow_data": types.union(ArrowTableType(), ArrowArrayType()),
+                "object_type": types.Type(),
+            }
+        )
+        if hasattr(self, "_key"):
+            d["_key"] = obj._key
+            type_of_d.property_types["_key"] = self._key
+
+        from .. import mappers_python
+
+        serializer = mappers_python.map_to_python(type_of_d, artifact)
+        result_d = serializer.apply(d)
+
+        with artifact.new_file(f"{name}.ArrowWeaveList.json") as f:
+            json.dump(result_d, f)
+
+    def load_instance(self, artifact, name, extra=None):
+        with artifact.open(f"{name}.ArrowWeaveList.json") as f:
+            result = json.load(f)
+        type_of_d = types.TypedDict(
+            {
+                "_arrow_data": types.union(ArrowTableType(), ArrowArrayType()),
+                "object_type": types.Type(),
+            }
+        )
+        if hasattr(self, "_key"):
+            type_of_d.property_types["_key"] = self._key
+        from .. import mappers_python
+
+        mapper = mappers_python.map_from_python(type_of_d, artifact)
+        res = mapper.apply(result)
+        # TODO: This won't work for Grouped result!
+        return ArrowWeaveList(res["_arrow_data"], res["object_type"], artifact)
 
 
 @weave_class(weave_type=ArrowWeaveListType)
@@ -493,7 +569,8 @@ class ArrowWeaveList:
             row = self._arrow_data.slice(index, 1)
         except IndexError:
             return None
-        return self._mapper.apply(row.to_pylist()[0])
+        res = self._mapper.apply(row.to_pylist()[0])
+        return res
 
     @op(output_type=lambda input_types: input_types["self"].object_type)
     def __getitem__(self, index: int):
@@ -554,30 +631,31 @@ class ArrowWeaveList:
             return self._groupby_table(self._arrow_data, group_by_fn)
 
     def _groupby_table(self, table, group_by_fn):
-        # replace_schema_metadata does a shallow copy
-        mapped = mapped_fn_to_arrow(self, group_by_fn)
-        group_cols = []
-        if isinstance(mapped, ArrowArrayVectorizer):
-            mapped = mapped.arr
-        if isinstance(mapped, pa.Table):
-            for name, column in zip(mapped.column_names, mapped.columns):
-                group_col_name = "group_key_" + name
-                table = table.append_column(group_col_name, column)
-                group_cols.append(group_col_name)
-        elif isinstance(mapped, pa.ChunkedArray):
-            group_col_name = "group_key"
-            table = table.append_column(group_col_name, mapped)
-            group_cols.append(group_col_name)
+        group_table = mapped_fn_to_arrow(self, group_by_fn)
+        if isinstance(group_table, ArrowArrayVectorizer):
+            group_table = group_table.arr
+        if isinstance(group_table, pa.Table):
+            group_cols = group_table.column_names
+        elif isinstance(group_table, pa.ChunkedArray):
+            group_table = pa.table({"group_key": group_table})
+            group_cols = ["group_key"]
         else:
             raise errors.WeaveInternalError(
-                "Arrow groupby not yet support for map result: %s" % type(mapped)
+                "Arrow groupby not yet support for map result: %s" % type(group_table)
             )
-        grouped = table.group_by(group_cols)
-        aggs = []
-        for column_name in table.column_names:
-            aggs.append((column_name, "list"))
-        agged = grouped.aggregate(aggs)
-        return ArrowTableGroupBy(agged, group_cols, self.object_type, self._artifact)
+        group_table = group_table.append_column(
+            "_index", pa.array(np.arange(len(group_table)))
+        )
+        grouped = group_table.group_by(group_cols)
+        agged = grouped.aggregate([("_index", "list")])
+        return ArrowTableGroupBy(
+            table,
+            agged,
+            group_cols,
+            self.object_type,
+            group_by_fn.type,
+            self._artifact,
+        )
 
     @op(output_type=lambda input_types: input_types["self"])
     def offset(self, offset: int):
@@ -600,7 +678,7 @@ ArrowWeaveListType.instance_class = ArrowWeaveList
 class ArrowTableGroupResultType(ArrowWeaveListType):
     name = "ArrowTableGroupResult"
 
-    key: types.Type = types.Any()
+    _key: types.Type = types.Any()
 
     @classmethod
     def type_of_instance(cls, obj):
@@ -609,12 +687,12 @@ class ArrowTableGroupResultType(ArrowWeaveListType):
             types.TypeRegistry.type_of(obj._key),
         )
 
-    def property_types(self):
-        return {
-            "_arrow_data": types.union(ArrowTableType(), ArrowArrayType()),
-            "object_type": types.Type(),
-            "_key": self.key,
-        }
+    # def property_types(self):
+    #     return {
+    #         "_arrow_data": types.union(ArrowTableType(), ArrowArrayType()),
+    #         "object_type": types.Type(),
+    #         "_key": self.key,
+    #     }
 
 
 @weave_class(weave_type=ArrowTableGroupResultType)
@@ -630,7 +708,7 @@ class ArrowTableGroupResult(ArrowWeaveList):
 
         self._mapper = mappers_arrow.map_from_arrow(self.object_type, self._artifact)
 
-    @op(output_type=lambda input_types: input_types["self"].key)
+    @op(output_type=lambda input_types: input_types["self"]._key)
     def key(self):
         return self._key
 

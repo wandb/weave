@@ -6,11 +6,13 @@ from . import infer_types
 _py_type = type
 
 
-def type():
+def type(__override_name: str = None):
     def wrap(target):
         dc = dataclasses.dataclass(target)
         fields = dataclasses.fields(dc)
         target_name = target.__name__
+        if __override_name is not None:
+            target_name = __override_name
 
         TargetType = _py_type(f"{target_name}Type", (types.ObjectType,), {})
         TargetType.name = target_name

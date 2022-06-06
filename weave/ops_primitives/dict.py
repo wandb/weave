@@ -56,7 +56,7 @@ class TypedDict(dict):
         if not isinstance(self, dict):
             # won't need this when we fix type-checking, but for now it
             # surfaces an error
-            # TODO: totally not right, need to figure out mappped ops
+            # TODO: totally not right, need to figure out mapped ops
             return self.pick(key)
         try:
             return dict.__getitem__(self, key)

@@ -1,6 +1,7 @@
 from __future__ import print_function
 
 import typing
+import logging
 
 from flask import current_app
 from werkzeug.serving import make_server
@@ -41,11 +42,10 @@ def handle_request(request, deref=False):
     nodes = serialize.deserialize(request["graphs"])
 
     start_time = time.time()
-    print("Server request running %s nodes" % len(nodes))
-    # """
-    for node in nodes:
-        print(graph.node_expr_str(node))
-    # """
+    logging.info(
+        "Server request running %s nodes.\n%s"
+        % (len(nodes), "\n".join(graph.node_expr_str(n) for n in nodes))
+    )
     result = execute.execute_nodes(nodes)
     if deref:
         result = [storage.deref(r) for r in result]
@@ -56,7 +56,7 @@ def handle_request(request, deref=False):
         tracer.stop()
         tracer.save(output_file="request_%s.json" % time.time())
     result = [storage.to_python(r) for r in result]
-    print("Server request done in: %ss" % (time.time() - start_time))
+    logging.info("Server request done in: %ss" % (time.time() - start_time))
     return result
 
 

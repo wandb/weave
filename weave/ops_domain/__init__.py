@@ -170,7 +170,9 @@ class ArtifactVersionsOps:
         return len(self)
 
     @op()
-    def __getitem__(self: wandb_api.ArtifactVersions, index: int) -> wandb_api.Artifact:
+    def __getitem__(
+        self: wandb_api.ArtifactVersions, index: int
+    ) -> artifacts_local.WandbArtifact:
         wb_artifact = self[index]
         return artifacts_local.WandbArtifact.from_wb_artifact(wb_artifact)
 
@@ -285,11 +287,12 @@ class Project:
     @op(name="project-artifactVersion")
     def artifact_version(
         project: wandb_api.Project, artifactName: str, artifactVersionAlias: str
-    ) -> wandb_api.Artifact:
-        return wandb_api.Api().artifact(
+    ) -> artifacts_local.WandbArtifact:
+        wb_artifact = wandb_public_api().artifact(
             "%s/%s/%s:%s"
             % (project.entity, project.name, artifactName, artifactVersionAlias)
         )
+        return artifacts_local.WandbArtifact.from_wb_artifact(wb_artifact)
 
     @op()
     def runs(project: wandb_api.Project) -> wandb_api.Runs:
@@ -315,4 +318,4 @@ class Project:
 
 @op(name="root-project")
 def project(entityName: str, projectName: str) -> wandb_api.Project:
-    return wandb_api.Api().project(name=projectName, entity=entityName)
+    return wandb_public_api().project(name=projectName, entity=entityName)

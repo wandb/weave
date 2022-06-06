@@ -20,6 +20,25 @@ class Ref:
         return show(self)
 
     @property
+    def is_saved(self):
+        return self.artifact.is_saved
+
+    @classmethod
+    def from_local_ref(cls, artifact, s, type):
+        path, extra = cls.parse_local_ref_str(s)
+        if isinstance(artifact, artifacts_local.LocalArtifact):
+            return LocalArtifactRef(artifact, path=path, extra=extra, type=type)
+        elif isinstance(artifact, artifacts_local.WandbArtifact):
+            return WandbArtifactRef(artifact, path=path, extra=extra, type=type)
+
+    @classmethod
+    def parse_local_ref_str(cls, s):
+        if "#" not in s:
+            return s, None
+        path, extra = s.split("#", 1)
+        return path, extra.split("/")
+
+    @property
     def name(self) -> str:
         raise NotImplementedError()
 
@@ -85,8 +104,21 @@ class WandbArtifactRef(Ref):
     def type(self):
         if self._type is not None:
             return self._type
-        with self.artifact.open(f"{self.path}.type.json") as f:
-            type_json = json.load(f)
+        if self.path is None:
+            # If there's no path, this is a Ref directly to an ArtifactVersion
+            # TODO: refactor
+            from .ops_domain import wbartifact
+
+            return wbartifact.ArtifactVersionType()
+        try:
+            with self.artifact.open(f"{self.path}.type.json") as f:
+                type_json = json.load(f)
+        except (FileNotFoundError, KeyError):
+            # If there's no type file, this is a Ref to the file itself
+            # TODO: refactor
+            from .ops_domain import file_wbartifact
+
+            return file_wbartifact.ArtifactVersionFileType()
         self._type = types.TypeRegistry.type_from_dict(type_json)
         return self._type
 
@@ -111,6 +143,8 @@ class WandbArtifactRef(Ref):
     def get(self):
         if self.obj is not None:
             return self.obj
+        if self.path is None:
+            return self.artifact
         obj = self.type.load_instance(self.artifact, self.path, extra=None)
         obj = box.box(obj)
         put_ref(obj, self)
@@ -138,7 +172,9 @@ class LocalArtifactRef(Ref):
         self.artifact = artifact
         self.path = path
         if "/" in self.path:
-            raise errors.WeaveInternalError('"/" in path not yet supported')
+            raise errors.WeaveInternalError(
+                '"/" in path not yet supported: %s' % self.path
+            )
         if self.path is None:
             raise errors.WeaveInternalError("path must not be None")
         self._type = type
@@ -147,10 +183,6 @@ class LocalArtifactRef(Ref):
         if obj is not None:
             obj = box.box(obj)
             put_ref(obj, self)
-
-    @property
-    def is_saved(self):
-        return self.artifact.is_saved
 
     @property
     def uri(self) -> str:
@@ -170,6 +202,11 @@ class LocalArtifactRef(Ref):
     def type(self):
         if self._type is not None:
             return self._type
+        # if self.path != "_obj":
+        #     raise errors.WeaveInternalError(
+        #         "Trying to load type from a non-root object. Ref should be instantiated with a type for this object: %s %s"
+        #         % (self.artifact, self.path)
+        #     )
         with self.artifact.open(f"{self.path}.type.json") as f:
             type_json = json.load(f)
         self._type = types.TypeRegistry.type_from_dict(type_json)
@@ -182,8 +219,8 @@ class LocalArtifactRef(Ref):
     def get(self) -> typing.Any:
         # Can't do this, when you save a list, you get a different
         # representation back which test_decorators.py depend on right now
-        # if self.obj is not None:
-        #     return self.obj
+        if self.obj is not None:
+            return self.obj
         obj = self.type.load_instance(self.artifact, self.path, extra=self.extra)
         obj = box.box(obj)
         put_ref(obj, self)
@@ -222,32 +259,11 @@ class LocalArtifactRef(Ref):
             extra=loc.extra,
         )
 
-    @classmethod
-    def from_local_ref(cls, artifact, s, type):
-        path, extra = cls.parse_local_ref_str(s)
-        return cls(artifact, path=path, extra=extra, type=type)
-
-    @classmethod
-    def parse_local_ref_str(cls, s):
-        parts = s.split("/")
-        path = parts[0]
-        if len(parts) == 1:
-            extra = None
-        else:
-            extra = parts[1:]
-        return path, extra
-
     def local_ref_str(self):
-        parts = []
-        if self.path != "_obj" or self.extra is not None:
-            parts.append(self.path)
+        s = self.path
         if self.extra is not None:
-            if isinstance(self.extra, Iterable):
-                for comp in self.extra:
-                    parts.append(str(comp))
-            else:
-                parts.append(str(self.extra))
-        return "/".join(parts)
+            s += "#%s" % "/".join(self.extra)
+        return s
 
 
 types.LocalArtifactRefType.instance_class = LocalArtifactRef

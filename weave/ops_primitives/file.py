@@ -53,7 +53,7 @@ class Table:
     @op(
         name="table-rows",
         input_type={"table": types.WBTable()},
-        output_type=types.List(types.TypedDict({})),
+        output_type=arrow.ArrowWeaveListType(types.TypedDict({})),
     )
     def rows(table):
         return table._rows
@@ -67,6 +67,7 @@ class File:
         output_type=TableType(),
     )
     def table(file):
+        print("TABLE FILE", file)
         local_path = file.get_local_path()
         import json
 
@@ -78,7 +79,7 @@ class File:
         if len(data) > 0:
             print("data row0", data["data"][0])
 
-        weave_type = wandb_util.weave0_type_json_to_weave1_type(data["column_types"])
+        object_type = wandb_util.weave0_type_json_to_weave1_type(data["column_types"])
         print("Json parse time: %s" % (time.time() - start_time))
         start_time = time.time()
         # cols = zip(*data["data"])
@@ -104,10 +105,12 @@ class File:
         print("Dicts time: %s" % (time.time() - start_time))
         start_time = time.time()
 
-        print("Weave type:", weave_type)
-        res = storage.to_arrow_new(rows, weave_type=types.List(weave_type))
+        print("Weave type:", object_type)
+        print("PASSING ARTIFACT", file.artifact)
+        res = storage.to_arrow_from_list_and_artifact(rows, object_type, file.artifact)
         print("Arrow time: %s" % (time.time() - start_time))
         start_time = time.time()
+        # I Don't think I need Table now. We won't parse again
         return Table(res)
 
     @op(
@@ -118,8 +121,8 @@ class File:
     def direct_url_as_of(file, asOf):
         # TODO: This should depend on whether its local or an artifact
         #    etc
-        local_path = file.path
-        return "/__weave/file/%s" % local_path
+        local_path = os.path.abspath(file.get_local_path())
+        return "http://localhost:9994/__weave/file/%s" % local_path
 
     @op(
         name="file-size", input_type={"file": types.FileType()}, output_type=types.Int()

@@ -53,7 +53,10 @@ class ObjectDictToObject(mappers_weave.ObjectMapper):
         constructor_sig = inspect.signature(result_type.instance_class)
         if "artifact" in constructor_sig.parameters:
             result["artifact"] = self._artifact
-        return result_type.instance_class(**result)
+        res = result_type.instance_class(**result)
+        if not hasattr(res, "artifact"):
+            res.artifact = self._artifact
+        return res
 
 
 class ListToPyList(mappers_weave.ListMapper):
@@ -192,7 +195,10 @@ class DefaultToPy(mappers.Mapper):
             pass
         name = "-".join(self._path)
         ref = storage.save_to_artifact(obj, self._artifact, name, self.type)
-        return ref.local_ref_str()
+        if ref.artifact == self._artifact:
+            return ref.local_ref_str()
+        else:
+            return ref.uri
 
 
 class DefaultFromPy(mappers.Mapper):

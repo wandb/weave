@@ -6,11 +6,13 @@ on:
       - master
   pull_request:
 
-    
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
+      - uses: datadog/agent-github-action@v1.3
+        with:
+          api_key: ${{ secrets.DD_API_KEY }}
       - uses: actions/checkout@v2
       - name: Setup Python version
         uses: actions/setup-python@v2
@@ -25,4 +27,7 @@ jobs:
       - name: Install dev dependencies
         run: pip install -r requirements.test.txt
       - name: Run tests
-        run: cd weave && pytest
+        env:
+          DD_SERVICE: weave-python
+          DD_ENV: ci
+        run: cd weave && pytest --ddtrace

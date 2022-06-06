@@ -1,4 +1,5 @@
 import contextlib
+import functools
 import hashlib
 import os
 import json
@@ -11,6 +12,11 @@ from . import util
 from . import errors
 from . import wandb_api
 import wandb
+
+
+@functools.lru_cache(1000)
+def get_wandb_read_artifact(path):
+    return wandb_api.wandb_public_api().artifact(path)
 
 
 LOCAL_ARTIFACT_DIR = os.environ.get("WEAVE_LOCAL_ARTIFACT_DIR") or os.path.join(
@@ -220,10 +226,11 @@ class WandbArtifact:
         else:
             # load an existing artifact, this should be read only,
             # TODO: we could technically support writable artifacts by creating a new version?
-            self._saved_artifact = wandb_api.wandb_public_api().artifact(
-                uri.make_path()
-            )
+            self._saved_artifact = get_wandb_read_artifact(uri.make_path())
         self._local_path: dict[str, str] = {}
+
+    def __repr__(self):
+        return "<WandbArtifact %s>" % self._name
 
     @classmethod
     def from_wb_artifact(cls, art):
@@ -234,6 +241,10 @@ class WandbArtifact:
             art.version,
         )
         return cls(art._sequence_name, uri=uri)
+
+    @property
+    def is_saved(self):
+        return hasattr(self, "_saved_artifact")
 
     @property
     def version(self):
@@ -254,13 +265,12 @@ class WandbArtifact:
             raise errors.WeaveInternalError("cannot download of an unsaved artifact")
         if name in self._local_path:
             return self._local_path[name]
-        path = self._saved_artifact.get_path(name).download(
-            os.path.join(LOCAL_ARTIFACT_DIR, self._name, self._saved_artifact.version)
-        )
+        path = self._saved_artifact.get_path(name).download()
         # python module loading does not support colons
+        # TODO: This is an extremely expensive fix!
         path_safe = path.replace(":", "_")
         pathlib.Path(path_safe).parent.mkdir(parents=True, exist_ok=True)
-        shutil.move(path, path_safe)
+        shutil.copy2(path, path_safe)
         self._local_path[name] = path_safe
         return path_safe
 
@@ -274,9 +284,7 @@ class WandbArtifact:
         manifest_entry = manifest.get_entry_by_path(path)
         if manifest_entry is not None:
             # This is a file
-            return ArtifactVersionFile(
-                av.entity, av.project, av._sequence_name, av.version, path
-            )
+            return ArtifactVersionFile(self, path)
         # This is not a file, assume its a directory. If not, we'll return an empty result.
         cur_dir = (
             path  # give better name so the rest of this code block is more readable
@@ -293,13 +301,10 @@ class WandbArtifact:
             rel_path_parts = rel_path.split("/")
             if len(rel_path_parts) == 1:
                 # Its a file within cur_dir
+                # TODO: I haven't tested this since changin ArtifactVersionFile implementation
                 files[entry_path] = ArtifactVersionFile(
-                    av.entity,
-                    av.project,
-                    av._sequence_name,
-                    av.version,
+                    self,
                     entry_path,
-                    extension=weave_file.path_ext(path),
                 )
             else:
                 dir_name = rel_path_parts[0]
@@ -308,13 +313,10 @@ class WandbArtifact:
                     sub_dirs[dir_name] = dir_
                 dir_ = sub_dirs[dir_name]
                 if len(rel_path_parts) == 2:
+                    # TODO: I haven't tested this since changin ArtifactVersionFile implementation
                     dir_.files[rel_path_parts[1]] = ArtifactVersionFile(
-                        av.entity,
-                        av.project,
-                        av._sequence_name,
-                        av.version,
+                        self,
                         entry_path,
-                        extension=weave_file.path_ext(entry_path),
                     )
                 else:
                     dir_.dirs[rel_path_parts[1]] = 1

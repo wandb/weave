@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Mapping
 from . import graph
 from . import forward_graph
@@ -6,6 +7,7 @@ import time
 from . import artifacts_local
 import threading
 import typing
+from . import engine_trace
 
 # TODO: this won't be valid in a real scenario. We need to forward to an
 # agent, that doesn't have the same memory registry
@@ -50,9 +52,8 @@ def execute_nodes(nodes, no_cache=False):
 
     with context.execution_client():
         stats = execute_forward(fg, no_cache=no_cache)
-    print("EXECUTION SUMMARY")
     summary = stats.summary()
-    pprint.pprint(summary)
+    logging.info("Execution summary\n%s" % pprint.pformat(summary))
 
     return [fg.get_result(n) for n in nodes]
 
@@ -61,12 +62,27 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
     to_run: set[forward_graph.ForwardNode] = fg.roots
 
     stats = ExecuteStats()
+    tracer = engine_trace.tracer()
     while len(to_run):
         running_now = to_run.copy()
         to_run = set()
         for forward_node in running_now:
             start_time = time.time()
-            execute_forward_node(fg, forward_node, no_cache=no_cache)
+            span = None
+            if isinstance(forward_node.node, graph.OutputNode):
+                span = tracer.trace(
+                    "op.%s" % graph.op_full_name(forward_node.node.from_op)
+                )
+            try:
+                execute_forward_node(fg, forward_node, no_cache=no_cache)
+            except:
+                logging.error(
+                    "Exception during execution of: %s" % str(forward_node.node)
+                )
+                raise
+            finally:
+                if span is not None:
+                    span.finish()
             stats.add_node(forward_node.node, time.time() - start_time)
         for forward_node in running_now:
             for downstream_forward_node in forward_node.input_to:
@@ -135,10 +151,8 @@ def execute_forward_node(
     node = forward_node.node
     if isinstance(node, graph.ConstNode):
         return
-    elif isinstance(node, graph.VarNode):
-        raise errors.WeaveInternalError("cannot execute VarNode: %s" % node)
 
-    # print("EXECUTING NODE", node)
+    logging.debug("Executing node: %s" % node)
 
     op_def = registry_mem.memory_registry.get_op(node.from_op.name)
     input_nodes = node.from_op.inputs
@@ -155,21 +169,26 @@ def execute_forward_node(
     if use_cache and op_def.pure:
         run = storage.get_version(run_artifact_name, "latest")
         if run is not None:
+            logging.debug("Cache hit, returning")
             # Watch out, we handle loading async runs in different ways.
             if is_async_op(op_def):
                 forward_node.set_result(run)
                 return
             else:
                 if run._output is not None:
+                    # if isinstance(run._output, artifacts_local.LocalArtifact):
+                    #     print('OUTPUT REF TYPE OBJ TYPE', )
                     forward_node.set_result(run._output)
                     return
-                # otherwise, the run's output was not saveable, so we need
-                # to recompute it.
+            logging.debug("Actually nevermind, didnt return")
+            # otherwise, the run's output was not saveable, so we need
+            # to recompute it.
     inputs = {
         input_name: storage.deref(input) for input_name, input in input_refs.items()
     }
 
     if is_async_op(op_def):
+        logging.debug("Executing async op")
         run = run_obj.Run(run_id, op_def.name)
         input_refs = {}
         for input_name, input in inputs.items():
@@ -182,9 +201,11 @@ def execute_forward_node(
         execute_async_op(op_def, input_refs, run_id)
         forward_node.set_result(run)
     else:
+        logging.debug("Executing sync op")
         result = execute_sync_op(op_def, inputs)
         ref = storage._get_ref(result)
         if ref is not None:
+            logging.debug("Op resulted in ref")
             # If the op produced an object which has a ref (as in the case of get())
             # the result is the ref. This enables memoization after impure ops. E.g.
             # if get('x:latest') produces version x:1, we use x:1 for our make_run_id
@@ -192,6 +213,7 @@ def execute_forward_node(
             result = ref
         else:
             if use_cache:
+                logging.debug("Saving result")
                 # If an op is impure, its output is saved to a name that does not
                 # include run ID. This means consuming pure runs will hit cache if
                 # the output of an impure op is the same as it was last time.
@@ -220,6 +242,7 @@ def execute_forward_node(
         #    does not really work yet. (mutated objects set their run output
         #    as the original ref rather than the new ref, which causes problems)
         if use_cache and not is_run_op(node.from_op):
+            logging.debug("Saving run")
             run = run_obj.Run(run_id, op_def.name)
             run._inputs = input_refs
             run._output = result
@@ -227,3 +250,4 @@ def execute_forward_node(
                 storage.save(run, name=run_artifact_name)
             except errors.WeaveSerializeError:
                 pass
+        logging.debug("Done executing node: %s" % node)

@@ -1,44 +1,37 @@
 import dataclasses
 import typing
 from .. import types
+from .. import api as weave
+
+# Artifact entries implement a File interface.
 
 
-class ArtifactFileType(types.Type):
-    def save_instance(self, obj, artifact, name):
-        pass
-
+# A file versioned by an artifact, either inside or a bucket Ref
+class ArtifactEntryType(types.Type):
     def load_instance(self, artifact, name, extra=None):
-        return ArtifactFile(artifact, name)
+        return ArtifactEntry(artifact, name)
 
 
 @dataclasses.dataclass
-class ArtifactFile:
-    artifact: typing.Any
+class ArtifactEntry:
+    artifact: typing.Any  # Artifact
     path: str
 
 
-class ImageFileType(types.ObjectType):
-    name = "image-file"
-
-    def property_types(self):
-        return {
-            "path": ArtifactFileType(),
-            "format": types.String(),
-            "height": types.Int(),
-            "width": types.Int(),
-            "sha256": types.String(),
-        }
+ArtifactEntryType.instance_classes = ArtifactEntry
+ArtifactEntryType.instance_class = ArtifactEntry
 
 
-@dataclasses.dataclass
-class ImageFile:
-    path: ArtifactFile
+@weave.type(__override_name="image-file")  # type: ignore
+class ImageArtifactEntry:
+    # TODO: just File? No, because the frontend is going to call .artifactVersion()
+    #     on us. So we need to be ImageArtifactEntry
+    path: ArtifactEntry  # This should be a Ref<File<ImageExtensions>>
     format: str
     height: int
     width: int
     sha256: str
-    artifact: typing.Any
 
-
-ImageFileType.instance_class = ImageFile
-ImageFileType.instance_classes = ImageFile
+    @property
+    def artifact(self):
+        return self.path.artifact
