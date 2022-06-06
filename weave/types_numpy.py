@@ -34,7 +34,7 @@ class NumpyArrayType(types.Type):
     instance_classes = np.ndarray
     name = "ndarray"
 
-    def __init__(self, dtype, shape):
+    def __init__(self, dtype=types.Any(), shape=types.Any()):
         self.dtype = dtype
         self.shape = shape
 

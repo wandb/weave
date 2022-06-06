@@ -1,7 +1,6 @@
 import copy
 import inspect
 import typing
-import dataclasses
 
 from . import graph
 from . import registry_mem
@@ -14,35 +13,7 @@ from . import infer_types
 
 py_type = type
 from .decorator_type import type
-
-
-def weave_class(weave_type):
-    def wrap(target):
-        # add self type to input_types if its not already defined.
-        for _, member in inspect.getmembers(target):
-            if isinstance(member, op_def.OpDef):
-                opdef = member
-                self_type = opdef.input_type.arg_types.get("self")
-                if self_type is not None and self_type == types.UnknownType():
-                    opdef.input_type.arg_types["self"] = weave_type()
-                # Replace function op names with method op names
-                if opdef.name.startswith("op-"):
-                    registry_mem.memory_registry.rename_op(
-                        opdef.name,
-                        "%s-%s"
-                        % (
-                            types.type_class_type_name(weave_type),
-                            opdef.name[3:],
-                        ),
-                    )
-
-        weave_type.NodeMethodsClass = target
-        if weave_type.instance_classes == None:
-            weave_type.instance_classes = target
-            weave_type.instance_class = target
-        return target
-
-    return wrap
+from .decorator_class import weave_class
 
 
 def _create_args_from_op_input_type(input_type):

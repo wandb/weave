@@ -2,6 +2,7 @@ import dataclasses
 
 from . import types
 from . import infer_types
+from . import decorator_class
 
 _py_type = type
 
@@ -34,6 +35,7 @@ def type(__override_name: str = None):
 
         TargetType.property_types = property_types
         dc.WeaveType = TargetType
+        decorator_class.weave_class(weave_type=TargetType)(dc)
         return dc
 
     return wrap
