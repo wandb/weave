@@ -29,6 +29,7 @@ from weave import ops
 from weave.ecosystem import openai
 from weave.ecosystem import async_demo
 from weave.ecosystem import demos
+from weave.ecosystem import shap
 from weave import run_obj
 
 # set up logging

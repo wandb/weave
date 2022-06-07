@@ -1,7 +1,8 @@
 import dataclasses
 
-from . import types
+from . import weave_types as types
 from . import infer_types
+from . import decorator_class
 
 _py_type = type
 
@@ -20,20 +21,29 @@ def type(__override_name: str = None):
         TargetType.instance_class = target
         TargetType.NodeMethodsClass = dc
 
-        def __init__(self):
-            for field in fields:
-                setattr(self, field.name)
+        property_types = {
+            field.name: infer_types.python_type_to_type(field.type) for field in fields
+        }
 
-        # TargetType.__init__ = __init__
+        # If there are any variable type properties, make them variable
+        # in the type we are creating.
+        for name, prop_type in property_types.items():
+            prop_type_vars = prop_type.type_vars
+            if callable(prop_type_vars):
+                prop_type_vars = prop_type_vars()
+            if len(prop_type_vars):
+                setattr(TargetType, name, prop_type)
+                setattr(TargetType, "__annotations__", {})
+                TargetType.__dict__["__annotations__"][name] = types.Type
 
-        def property_types(self):
-            return {
-                field.name: infer_types.python_type_to_type(field.type)
-                for field in fields
-            }
+        def property_types_method(self):
+            return property_types
 
-        TargetType.property_types = property_types
+        TargetType.property_types = property_types_method
+        TargetType = dataclasses.dataclass(TargetType)
+
         dc.WeaveType = TargetType
+        decorator_class.weave_class(weave_type=TargetType)(dc)
         return dc
 
     return wrap
