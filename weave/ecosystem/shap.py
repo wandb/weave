@@ -37,7 +37,7 @@ class ShapValues:
         output_type=weave.types.FileType(weave.types.Const(weave.types.String(), "png"))  # type: ignore
     )
     def summary_plot(self):
-        plot = shap.summary_plot(self.values, show=False)
+        shap.summary_plot(self.values, show=False)
         path = "/tmp/shap-%s.png" % random.randrange(0, 1000000)
         plt.savefig(path)
         plt.close()
