@@ -21,7 +21,17 @@ def _ensure_node(fq_op_name, v, input_type, already_bound_params):
                     "callable passed as argument, but type is not Function. Op: %s"
                     % fq_op_name
                 )
-            return weave_internal.define_fn(input_type.input_types, v)
+
+            # Allow passing in functions with fewer arguments then the op
+            # declares. E.g. for List.map I pass either of these:
+            #    lambda row, index: ...
+            #    lambda row: ...
+            sig = inspect.signature(v)
+            vars = {}
+            for name in list(input_type.input_types.keys())[: len(sig.parameters)]:
+                vars[name] = input_type.input_types[name]
+
+            return weave_internal.define_fn(vars, v)
         val_type = types.TypeRegistry.type_of(v)
         # TODO: should type-check v here.
         v = graph.ConstNode(types.Const(val_type, v), v)

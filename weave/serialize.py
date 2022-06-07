@@ -128,8 +128,7 @@ def _deserialize_node(
                         param_node_index, nodes, parsed_nodes, hashed_nodes
                     )
                 parsed_fn_body_node = graph.OutputNode(
-                    # TODO!!!! What does the javascript client do here? It sends a blank type :(
-                    types.Any(),
+                    types.TypeRegistry.type_from_dict(node["type"]).output_type,
                     op["name"],
                     params,
                 )

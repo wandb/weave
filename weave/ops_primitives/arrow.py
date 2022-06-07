@@ -118,7 +118,7 @@ def mapped_fn_to_arrow(arrow_table, node):
 
             return ArrowArrayVectorizer(arrow_table)
         elif node.name == "index":
-            return np.arange(len(arrow_table))
+            return np.arange(arrow_table._count())
         raise Exception("unhandled var name", node.name)
 
 
@@ -598,7 +598,8 @@ class ArrowWeaveList:
         input_type={
             "self": ArrowWeaveListType(),
             "map_fn": lambda input_types: types.Function(
-                {"row": input_types["self"].object_type}, types.Any()
+                {"row": input_types["self"].object_type, "index": types.Int()},
+                types.Any(),
             ),
         },
         output_type=lambda input_types: ArrowWeaveListType(
@@ -715,3 +716,7 @@ class ArrowTableGroupResult(ArrowWeaveList):
 
 ArrowTableGroupResultType.instance_classes = ArrowTableGroupResult
 ArrowTableGroupResultType.instance_class = ArrowTableGroupResult
+
+
+def dataframe_to_arrow(df):
+    return ArrowWeaveList(pa.Table.from_pandas(df))
