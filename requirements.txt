@@ -19,3 +19,4 @@ analytics-python
 typing_extensions
 matplotlib
 shap
+xgboost
