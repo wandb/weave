@@ -269,3 +269,10 @@ def filter_nodes(node: Node, filter_fn: typing.Callable[[Node], Node]) -> list[N
 
 def count(node: Node) -> int:
     return len(_all_nodes(node))
+
+
+def make_node(v: typing.Any) -> Node:
+    if isinstance(v, Node):
+        return v
+    node_type = weave_types.TypeRegistry.type_of(v)
+    return ConstNode(node_type, v)
