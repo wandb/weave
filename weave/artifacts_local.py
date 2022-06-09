@@ -242,6 +242,9 @@ class WandbArtifact:
         )
         return cls(art._sequence_name, uri=uri)
 
+    def make_last_file_content_addressed(self):
+        return None
+
     @property
     def is_saved(self):
         return hasattr(self, "_saved_artifact")
@@ -371,6 +374,7 @@ class WandbArtifact:
         # TODO: technically save should be sufficient but we need the run to grab the entity name and project name
         # TODO: what project should we put weave ops in???
         os.environ["WANDB_SILENT"] = "true"
+        wandb.require("service")  # speeds things up
         run = wandb.init(project=project)
         self._writeable_artifact.save()
         self._writeable_artifact.wait()

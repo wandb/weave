@@ -29,12 +29,25 @@ class PanelType(types.Type):
 class Panel:
     id: str
     config: dict[str, typing.Any]
+    input_node = graph.VoidNode()
 
-    def __init__(self, input_node):
+    def _ipython_display_(self):
+        from . import show
+
+        return show(self)
+
+    def __init__(self, input_node=graph.VoidNode()):
         if not isinstance(input_node, graph.Node):
             ref = storage.save(input_node)
             input_node = op_get(ref.uri)
         self.input_node = input_node
+
+    def to_json(self):
+        return {
+            "panelInputExpr": self.input_node.to_json(),
+            "panelId": self.id,
+            "panelConfig": self.config,
+        }
 
 
 PanelType.instance_classes = Panel

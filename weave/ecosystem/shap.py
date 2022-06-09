@@ -62,12 +62,16 @@ class XGBoostModelType(weave.types.Type):
 
 
 @weave.weave_class(weave_type=XGBoostModelType)
-class XGBoostMdelOps:
+class XGBoostModelOps:
     @weave.op()
     def shap_explain(self: xgboost.core.Booster, data: typing.Any) -> ShapValues:
         explainer = shap.TreeExplainer(self)
         shap_values = explainer.shap_values(data)
         return ShapValues(shap_values)
+
+    @weave.op()
+    def predict(self, data: typing.Any) -> typing.Any:
+        return self.predict(xgboost.DMatrix(data))
 
 
 class XGBoostHyperparams(typing.TypedDict):

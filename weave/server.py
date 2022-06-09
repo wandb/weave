@@ -12,6 +12,7 @@ import requests
 import traceback
 import viztracer
 import time
+import cProfile
 
 from . import graph, util as _util, client as _client
 from . import serialize
@@ -22,6 +23,8 @@ from . import storage
 import sys
 
 
+PROFILE = False
+
 is_tracing = True
 
 OptionalAuthType = typing.Optional[
@@ -29,7 +32,7 @@ OptionalAuthType = typing.Optional[
 ]
 
 
-def handle_request(request, deref=False):
+def _handle_request(request, deref=False):
     from . import execute
 
     global is_tracing
@@ -58,6 +61,15 @@ def handle_request(request, deref=False):
     result = [storage.to_python(r) for r in result]
     logging.info("Server request done in: %ss" % (time.time() - start_time))
     return result
+
+
+def handle_request(request, deref=False):
+    if not PROFILE:
+        return _handle_request(request, deref=deref)
+    with cProfile.Profile() as pr:
+        res = _handle_request(request, deref=deref)
+    pr.dump_stats("/tmp/weave/profile-%s" % time.time())
+    return res
 
 
 class SubprocessServer(multiprocessing.Process):
