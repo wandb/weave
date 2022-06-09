@@ -1,4 +1,4 @@
-git+https://github.com/wandb/client.git@dtypes/safer_image_restore#egg=wandb
+git+https://github.com/wandb/client.git@master#egg=wandb
 ddtrace
 json_log_formatter
 numpy
