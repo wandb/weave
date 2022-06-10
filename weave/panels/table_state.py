@@ -30,7 +30,7 @@ class TableState(object):
     def add_column(self, select_expr, name=""):
         col_id = self._new_col_id()
         self._columns[col_id] = {"panel_id": "", "panel_config": None}
-        self._column_names[col_id] = ""
+        self._column_names[col_id] = name
 
         obj_type = self._input_node.type.object_type
         self._column_select_functions[col_id] = select_expr(
