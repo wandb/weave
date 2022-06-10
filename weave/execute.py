@@ -74,7 +74,8 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
                     "op.%s" % graph.op_full_name(forward_node.node.from_op)
                 )
             try:
-                execute_forward_node(fg, forward_node, no_cache=no_cache)
+                with context.lazy_execution():
+                    execute_forward_node(fg, forward_node, no_cache=no_cache)
             except:
                 logging.error(
                     "Exception during execution of: %s" % str(forward_node.node)
@@ -93,10 +94,6 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
                 if ready_to_run:
                     to_run.add(downstream_forward_node)
     return stats
-
-
-def is_async_op(op_def: op_def.OpDef):
-    return not callable(op_def.output_type) and op_def.output_type.name == "run-type"
 
 
 def async_op_body(run_uri, run_body, inputs):
@@ -131,7 +128,8 @@ def execute_sync_op(
     op_def: op_def.OpDef,
     inputs: Mapping[str, typing.Any],
 ):
-    return op_def.resolve_fn(**inputs)
+    with context.eager_execution():
+        return op_def.resolve_fn(**inputs)
 
 
 def is_run_op(op_call: graph.Op):
@@ -147,7 +145,8 @@ def execute_forward_node(
     no_cache=False,
 ):
     use_cache = not no_cache
-    # use_cache = False
+    if context.eager_mode():
+        use_cache = False
     node = forward_node.node
     if isinstance(node, graph.ConstNode):
         return
@@ -161,7 +160,7 @@ def execute_forward_node(
     for input_name, input_node in input_nodes.items():
         input_refs[input_name] = fg.get_result(input_node)
 
-    if use_cache or is_async_op(op_def):
+    if use_cache or op_def.is_async:
         # Compute the run ID, which is deterministic if the op is pure
         run_id = execute_ids.make_run_id(op_def, input_refs)
         run_artifact_name = f"run-{run_id}"
@@ -171,7 +170,7 @@ def execute_forward_node(
         if run is not None:
             logging.debug("Cache hit, returning")
             # Watch out, we handle loading async runs in different ways.
-            if is_async_op(op_def):
+            if op_def.is_async:
                 forward_node.set_result(run)
                 return
             else:
@@ -187,7 +186,7 @@ def execute_forward_node(
         input_name: storage.deref(input) for input_name, input in input_refs.items()
     }
 
-    if is_async_op(op_def):
+    if op_def.is_async:
         logging.debug("Executing async op")
         run = run_obj.Run(run_id, op_def.name)
         input_refs = {}

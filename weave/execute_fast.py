@@ -1,6 +1,5 @@
 from . import graph
 from . import registry_mem
-from . import execute
 from . import weave_internal
 from . import weave_types as types
 from . import errors
@@ -33,7 +32,7 @@ def _can_fast_map(map_fn):
     async_op_nodes = graph.filter_nodes(
         map_fn,
         lambda n: isinstance(n, graph.OutputNode)
-        and execute.is_async_op(registry_mem.memory_registry.get_op(n.from_op.name)),
+        and registry_mem.memory_registry.get_op(n.from_op.name).is_async,
     )
     return len(async_op_nodes) == 0
 

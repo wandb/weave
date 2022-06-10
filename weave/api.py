@@ -18,6 +18,7 @@ from .context import (
     use_frontend_devmode,
     capture_weave_server_logs,
     eager_execution,
+    lazy_execution,
 )
 
 from .weave_internal import define_fn
@@ -70,7 +71,7 @@ def use(nodes, client=None):
                 raise errors.WeaveApiError("use not allowed in eager mode.")
             else:
                 raise errors.WeaveApiError("non-Node passed to use().")
-        actual_nodes.append(_graph.Node.node_from_json(node.to_json()))
+        actual_nodes.append(node)
 
     result = client.execute(actual_nodes)
 

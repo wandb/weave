@@ -1,3 +1,4 @@
+from ..panel import Panel
 from .panel_table import Table
 from .panel_plot import Plot
 from .panel_facet import Facet

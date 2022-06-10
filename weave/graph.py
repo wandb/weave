@@ -17,6 +17,10 @@ class Node:
             return OutputNode.from_json(obj)
         elif obj["nodeType"] == "var":
             return VarNode.from_json(obj)
+        elif obj["nodeType"] == "void":
+            return VoidNode()
+        else:
+            raise errors.WeaveInternalError("invalid node type: %s" % obj)
 
     # def _repr_html_(self):
     # return show.weave_panel_iframe(self)
