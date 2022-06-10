@@ -111,8 +111,9 @@ def mapped_fn_to_arrow(arrow_table, node):
         return result
     elif isinstance(node, graph.VarNode):
         if node.name == "row":
-            if isinstance(arrow_table, ArrowWeaveList) and isinstance(
-                arrow_table._arrow_data, pa.ChunkedArray
+            if isinstance(arrow_table, ArrowWeaveList) and (
+                isinstance(arrow_table._arrow_data, pa.ChunkedArray)
+                or isinstance(arrow_table._arrow_data, pa.Array)
             ):
                 return ArrowArrayVectorizer(arrow_table._arrow_data)
 

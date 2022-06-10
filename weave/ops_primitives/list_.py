@@ -382,6 +382,8 @@ class WeaveJSListInterface:
         output_type=pick_output_type,
     )
     def pick(obj, key):  # type: ignore
+        if obj == None:
+            return obj
         type_class = types.TypeRegistry.type_class_of(obj)
         return type_class.NodeMethodsClass.pick.resolve_fn(obj, key)
 

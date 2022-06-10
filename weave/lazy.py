@@ -105,12 +105,20 @@ def make_lazy_call(f, fq_op_name, input_type, output_type):
     return lazy_call
 
 
-def make_eager_call(lazy_call):
-    def eager_call(*args, **kwargs):
-        output_node = lazy_call(*args, **kwargs)
-        return api.use(output_node)
+def make_eager_call(lazy_call, op_def):
+    if op_def.is_async:
 
-    return eager_call
+        def eager_call_async(*args, **kwargs):
+            output_node = lazy_call(*args, **kwargs)
+            return api.use(output_node)
+
+        return eager_call_async
+    else:
+
+        def eager_call_sync(*args, **kwargs):
+            return op_def.resolve_fn(*args, **kwargs)
+
+        return eager_call_sync
 
 
 def make_call(eager_call, lazy_call):

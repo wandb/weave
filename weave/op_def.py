@@ -82,6 +82,10 @@ class OpDef:
     def is_mutation(self):
         return getattr(self.resolve_fn, "is_mutation", False)
 
+    @property
+    def is_async(self):
+        return not callable(self.output_type) and self.output_type.name == "run-type"
+
     def to_dict(self):
         if callable(self.output_type):
             raise errors.WeaveSerializeError(

@@ -130,6 +130,15 @@ def eager_execution():
         _eager_mode.reset(eager_token)
 
 
+@contextlib.contextmanager
+def lazy_execution():
+    eager_token = _eager_mode.set(False)
+    try:
+        yield
+    finally:
+        _eager_mode.reset(eager_token)
+
+
 def _make_default_client():
     if util.is_notebook():
         serv = _http_server.get()
