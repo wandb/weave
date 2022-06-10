@@ -85,17 +85,48 @@ class MapPlot:
         )
         plt.setp(ax, xticks=[], yticks=[])
         plt.title(plot_title, fontsize=18)
-        path = f"/tmp/umap-{random.randrange(0, 1000000)}.png"
+        path = f"/tmp/umap-plot-{random.randrange(0, 1000000)}.png"
         plt.savefig(path)
         plt.close()
         return weave.ops.LocalFile(path)
 
 
+@weave.type()
+class EmbeddingTable:
+    embedding: np.ndarray
+    labels: pd.DataFrame
+
+    @weave.op(
+        output_type=weave.ops_primitives.pandas_.DataFrameTableType(
+            weave.ops_primitives.pandas_.DataFrameType(weave.types.TypedDict({}))
+        ),
+    )
+    def table_embed(self):
+        self.embedding[:, 0], self.embedding[:, 1]
+        path = f"/tmp/umap-table-{random.randrange(0, 1000000)}.csv"
+        pd.concat(
+            [
+                pd.DataFrame(
+                    self.embedding,
+                    columns=[f"umap_{i}" for i in range(self.embedding.shape[1])],
+                ),
+                self.labels,
+            ],
+            axis=1,
+        ).to_csv(path)
+        print(path)
+        return weave.ops_primitives.pandas_.DataFrameTable(
+            pd.read_csv(path, low_memory=False)
+        )  # weave.ops.pandasreadcsv(weave.ops.local_path(path))
+
+
 @weave.weave_class(weave_type=UMAPReducer)
 class UMAPOps:
     @weave.op()
-    def transform(self: umap.umap_.UMAP, data: typing.Any) -> np.ndarray:
-        return self.transform(data)
+    def transform_to_table(
+        self: umap.umap_.UMAP, data: typing.Any, labels: pd.DataFrame
+    ) -> EmbeddingTable:
+        return EmbeddingTable(self.transform(data), labels)
 
     @weave.op()
     def transform_plot_2d(
