@@ -1,4 +1,5 @@
 from .. import panel
+from .. import panel_util
 
 
 class Group(panel.Panel):
@@ -19,6 +20,6 @@ class Group(panel.Panel):
     @property
     def config(self):
         return {
-            "items": [i.to_json() for i in self._items],
+            "items": [panel_util.child_item(i).to_json() for i in self._items],
             "preferHorizontal": self._prefer_horizontal,
         }

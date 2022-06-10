@@ -1,0 +1,9 @@
+{
+  "include": [
+    "weave"
+  ],
+  
+  "exclude": [
+    "weave/frontend"
+  ]
+}

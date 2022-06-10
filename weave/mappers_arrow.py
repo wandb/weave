@@ -139,6 +139,14 @@ class DefaultToArrow(mappers_python.DefaultToPy):
                     pa.field("artifact_name", pa.string()),
                 )
             )
+        elif self.type.name == "panel":
+            return pa.struct(
+                (
+                    pa.field("id", pa.string()),
+                    pa.field("input", pa.string()),
+                    pa.field("config", pa.string()),
+                )
+            )
         elif (
             self.type.name == "ndarray"
             or self.type.name == "pil-image"
@@ -154,6 +162,23 @@ class DefaultToArrow(mappers_python.DefaultToPy):
         raise errors.WeaveInternalError(
             "Type not yet handled by mappers_arrow: %s" % self.type
         )
+
+    def apply(self, obj):
+        # Hacking... when its a panel, we need to json dump the node and config
+        res = super().apply(obj)
+        if self.type.name == "panel":
+            res["input"] = json.dumps(res["input"])
+            res["config"] = json.dumps(res["config"])
+        return res
+
+
+class DefaultFromArrow(mappers_python.DefaultFromPy):
+    def apply(self, obj):
+        # Hacking... when its a panel, we need to json load the node and config
+        if self.type.name == "panel":
+            obj["input"] = json.loads(obj["input"])
+            obj["config"] = json.loads(obj["config"])
+        return super().apply(obj)
 
 
 def map_to_arrow_(type, mapper, artifact, path=[]):
@@ -203,7 +228,7 @@ def map_from_arrow_(type, mapper, artifact, path=[]):
     elif isinstance(type, types.UnknownType):
         return UnknownToArrowNone(type, mapper, artifact, path)
     else:
-        return mappers_python.DefaultFromPy(type, mapper, artifact, path)
+        return DefaultFromArrow(type, mapper, artifact, path)
 
 
 map_to_arrow = mappers.make_mapper(map_to_arrow_)

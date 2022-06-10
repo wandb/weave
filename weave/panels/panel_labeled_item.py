@@ -1,7 +1,7 @@
 import typing
 
 from .. import panel
-from .. import graph
+from .. import panel_util
 
 
 class LabeledItem(panel.Panel):
@@ -23,4 +23,7 @@ class LabeledItem(panel.Panel):
     @property
     def config(self):
         # TODO: handle item being a Panel!
-        return {"label": self._label, "item": graph.make_node(self._item).to_json()}
+        return {
+            "label": self._label,
+            "item": panel_util.child_item(self._item).to_json(),
+        }

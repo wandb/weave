@@ -40,3 +40,6 @@ class OpNamedArgs(OpArgs):
 
     def to_dict(self) -> typing.Dict:
         return {key: val.to_dict() for key, val in self.arg_types.items()}
+
+    def __repr__(self):
+        return "<OpNamedArgs %s>" % self.arg_types

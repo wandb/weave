@@ -32,7 +32,7 @@ class Registry:
         op.lazy_call = lazy.make_lazy_call(
             op.resolve_fn, op_uri, op.input_type, op.output_type
         )
-        op.eager_call = lazy.make_eager_call(op.lazy_call)
+        op.eager_call = lazy.make_eager_call(op.lazy_call, op)
         op.call_fn = lazy.make_call(op.eager_call, op.lazy_call)
 
     def register_op(self, op: op_def.OpDef):
