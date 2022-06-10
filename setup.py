@@ -7,14 +7,16 @@ def convert_git_requirement(req):
     # convert it to "wandb @ git+https://github.com/wandb/client.git@dtypes/safer_image_restore#egg=wandb""
     if ":/" in req:
         _, package_name = req.split("egg=", 1)
+        # print(f"{package_name} @ {req}")
         return f"{package_name} @ {req}"
+
     return req
 
 
 with open("requirements.txt") as requirements_file:
     requirements = requirements_file.read().splitlines()
 requirements = [convert_git_requirement(req) for req in requirements]
-
+# print(requirements)
 
 setup(
     name="weave",
