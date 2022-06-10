@@ -136,6 +136,9 @@ class DataFrameTableType(types.ObjectType):
 
     _df: DataFrameType = DataFrameType(types.Any())
 
+    def _to_dict(self):
+        return {"_df": self._df.to_dict(), "objectType": self.object_type.to_dict()}
+
     def property_types(self):
         return {
             "_df": self._df,

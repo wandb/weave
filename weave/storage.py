@@ -246,9 +246,9 @@ def to_python(obj):
     # Python when not using InProcessServer.
     # TODO: Remove!
     if hasattr(obj, "to_pylist"):
-        return obj.to_pylist()
+        obj = obj.to_pylist()
     elif hasattr(obj, "as_py"):
-        return obj.as_py()
+        obj = obj.as_py()
 
     wb_type = types.TypeRegistry.type_of(obj)
     mapper = mappers_python.map_to_python(

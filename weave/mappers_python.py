@@ -129,7 +129,7 @@ class UnknownToPyUnknown(mappers.Mapper):
     def apply(self, obj):
         # This should never be called. Unknown for the object type
         # of empty lists
-        raise Exception("invalid")
+        raise Exception("invalid %s" % obj)
 
 
 class FunctionToPyFunction(mappers.Mapper):
@@ -178,6 +178,10 @@ class DefaultToPy(mappers.Mapper):
         self._path = path
 
     def apply(self, obj):
+        try:
+            return self.type.instance_to_dict(obj)
+        except NotImplementedError:
+            pass
         existing_ref = storage._get_ref(obj)
         if existing_ref:
             if existing_ref.is_saved:
@@ -189,10 +193,6 @@ class DefaultToPy(mappers.Mapper):
                     "Can't save cross-artifact reference to unsaved artifact. This error was triggered when saving obj %s of type: %s"
                     % (self.obj, self.type)
                 )
-        try:
-            return self.type.instance_to_dict(obj)
-        except NotImplementedError:
-            pass
         name = "-".join(self._path)
         ref = storage.save_to_artifact(obj, self._artifact, name, self.type)
         if ref.artifact == self._artifact:

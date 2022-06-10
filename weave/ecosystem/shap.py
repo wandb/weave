@@ -47,7 +47,7 @@ class XGBoostModelType(
         model_xgb.load_model(f)
         return model_xgb
 
-
+      
 class XGBoostHyperparams(typing.TypedDict):
     learning_rate: float
 
