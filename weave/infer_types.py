@@ -5,6 +5,7 @@ Functions for inferring Weave Types from Python types.
 import types
 import typing
 import typing_extensions
+import pandas as pd
 
 from . import weave_types
 
@@ -27,11 +28,14 @@ def simple_python_type_to_type(py_type: type):
 def python_type_to_type(
     py_type: typing.Union[types.GenericAlias, type]
 ) -> weave_types.Type:
+    from .ops_primitives import pandas_
+
     if py_type == typing.Any:
         return weave_types.Any()
     if isinstance(py_type, types.GenericAlias) or isinstance(
         py_type, typing._GenericAlias  # type: ignore
     ):
+
         args = [python_type_to_type(a) for a in py_type.__args__]
         if py_type.__origin__ == list:
             return weave_types.List(*args)
@@ -39,6 +43,8 @@ def python_type_to_type(
             return weave_types.Dict(*args)
         else:
             return weave_types.UnknownType()
+    elif py_type == pd.DataFrame:
+        return pandas_.DataFrameType(weave_types.TypedDict({}))
     elif is_typed_dict_like(py_type):
         return weave_types.TypedDict(
             {
