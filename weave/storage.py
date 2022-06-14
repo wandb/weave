@@ -104,6 +104,10 @@ def _get_name(wb_type: types.Type, obj: typing.Any) -> str:
 
 
 def _save_or_publish(obj, name=None, type=None, publish: bool = False, artifact=None):
+    # HAX for W&B publishing.
+    project = None
+    if name is not None and "/" in name:
+        project, name = name.split("/")
     # TODO: get rid of this? Always type check?
     wb_type = type
     if wb_type is None:
@@ -129,7 +133,10 @@ def _save_or_publish(obj, name=None, type=None, publish: bool = False, artifact=
     # Only save if we have a ref into the artifact we created above. Otherwise
     #     nothing new was created, so just return the existing ref.
     if ref.artifact == artifact:
-        artifact.save()
+        if project is not None:
+            artifact.save(project)
+        else:
+            artifact.save()
         refs.put_ref(obj, ref)
 
     return ref

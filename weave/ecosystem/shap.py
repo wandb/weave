@@ -11,6 +11,7 @@ import weave
 
 
 @weave.op(
+    name="shap-ca_housing_dataset",
     render_info={"type": "function"},
     output_type=weave.ops.DataFrameType(weave.types.TypedDict({})),
 )

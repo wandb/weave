@@ -129,7 +129,7 @@ class Run:
             uri = uris.WeaveLocalArtifactURI.make_uri(
                 artifacts_local.LOCAL_ARTIFACT_DIR, f"run-{self._id}", "latest"
             )
-            self = op_get(uri)
+            self = use(op_get(uri))
 
             sleep_mult *= 2
             sleep_time = 0.02 * sleep_mult

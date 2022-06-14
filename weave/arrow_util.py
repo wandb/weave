@@ -98,6 +98,8 @@ class ArrowTableList(Iterable, typing.Generic[ObjectT]):
         return self._arrow_table.num_rows
 
     def __eq__(self, other):
+        if not isinstance(other, Iterable):
+            return False
         if len(self) != len(other):
             return False
         for x, y in zip(iter(self), iter(other)):

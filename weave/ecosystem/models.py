@@ -66,17 +66,3 @@ def model_card_panel(model_card: ModelCard) -> panels.Card:
             ),
         ],
     )
-
-
-# @weave.op()
-# def table_summary(table: typing.Any) -> list[weave.panels.Panel]:
-#     if not table:
-#         # TODO: type
-#         return
-#     col_names = list(table[0].keys())
-#     with weave.lazy_execution():
-#         cols = {col_name: table.pick(col_name) for col_name in col_names}
-#     panels = []
-#     for col_name, col_values in cols.items():
-#         panels.append(weave.panels.LabeledItem(item=col_values, label=col_name))
-#     return panels

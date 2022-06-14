@@ -35,6 +35,9 @@ def save(node_or_obj, name=None):
 
 
 def publish(node_or_obj, name=None):
+    if isinstance(node_or_obj, _graph.Node):
+        node_or_obj = use(node_or_obj)
+
     ref = _storage.publish(node_or_obj, name)
     return _weave_internal.make_const_node(ref.type, ref.obj)
 

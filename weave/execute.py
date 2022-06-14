@@ -74,8 +74,7 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
                     "op.%s" % graph.op_full_name(forward_node.node.from_op)
                 )
             try:
-                with context.lazy_execution():
-                    execute_forward_node(fg, forward_node, no_cache=no_cache)
+                execute_forward_node(fg, forward_node, no_cache=no_cache)
             except:
                 logging.error(
                     "Exception during execution of: %s" % str(forward_node.node)
@@ -128,8 +127,7 @@ def execute_sync_op(
     op_def: op_def.OpDef,
     inputs: Mapping[str, typing.Any],
 ):
-    with context.eager_execution():
-        return op_def.resolve_fn(**inputs)
+    return op_def.resolve_fn(**inputs)
 
 
 def is_run_op(op_call: graph.Op):
@@ -145,8 +143,7 @@ def execute_forward_node(
     no_cache=False,
 ):
     use_cache = not no_cache
-    if context.eager_mode():
-        use_cache = False
+    # use_cache = False
     node = forward_node.node
     if isinstance(node, graph.ConstNode):
         return
