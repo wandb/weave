@@ -146,5 +146,5 @@ def test_large_const_node():
     # Asserting that weavejs_fixes.remove_opcall_versions_data works
     assert (
         graph.node_expr_str(col_sel_fn2_node)
-        == 'get("local-artifact:///tmp/local-artifacts/list/feb305b61c6337e4430ac4d869581adb").finetunegpt3({"n_epochs": 2}).model().complete(row).pick("choices").index(0).pick("text")'
+        == 'get("local-artifact:///tmp/local-artifacts/list/4cf1abf0d040d897276e4be3c6aa90df").finetunegpt3({"n_epochs": 2}).model().complete(row).pick("choices").index(0).pick("text")'
     )

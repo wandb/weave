@@ -8,7 +8,6 @@ from collections.abc import Iterable
 
 from . import box
 from . import errors
-from . import arrow_util
 
 
 def to_weavejs_typekey(k: str) -> str:
@@ -452,7 +451,7 @@ class UnionType(Type):
 @dataclasses.dataclass
 class List(Type):
     name = "list"
-    instance_classes = [set, list, arrow_util.ArrowTableList, arrow_util.ArrowArrayList]
+    instance_classes = [set, list]
 
     object_type: Type
 
@@ -470,47 +469,20 @@ class List(Type):
         return cls(list_obj_type)
 
     def save_instance(self, obj, artifact, name):
-        obj_type = self.object_type
+        from . import mappers_python
 
-        from . import mappers_arrow
-
-        serializer = mappers_arrow.map_to_arrow(obj_type, artifact)
-
-        pyarrow_type = serializer.result_type()
-
-        py_objs = list(serializer.apply(o) for o in obj)
-
-        with artifact.new_file(f"{name}.parquet", binary=True) as f:
-            arr = pa.array(py_objs, type=pyarrow_type)
-            if pa.types.is_struct(arr.type):
-                rb = pa.RecordBatch.from_struct_array(
-                    arr
-                )  # this pivots to columnar layout
-                table = pa.Table.from_batches([rb])
-            else:
-                table = pa.Table.from_arrays(
-                    [arr], names=["_singleton"], metadata={"singleton": "1"}
-                )
-            pq.write_table(table, f)
+        serializer = mappers_python.map_to_python(self, artifact)
+        result = serializer.apply(obj)
+        with artifact.new_file(f"{name}.list.json") as f:
+            json.dump(result, f, allow_nan=False)
 
     def load_instance(self, artifact, name, extra=None):
-        from . import mappers_arrow
+        with artifact.open(f"{name}.list.json") as f:
+            result = json.load(f)
+        from . import mappers_python
 
-        with artifact.open(f"{name}.parquet", binary=True) as f:
-            table = pq.read_table(f)
-            mapper = mappers_arrow.map_from_arrow(self.object_type, artifact)
-
-            if (
-                table.schema.metadata is not None
-                and b"singleton" in table.schema.metadata
-            ):
-                # return ArrowArrayList(table.column)
-                return arrow_util.ArrowArrayList(
-                    table.column("_singleton"), mapper, artifact
-                )
-
-            atl = arrow_util.ArrowTableList(table, mapper, artifact)
-            return atl
+        mapper = mappers_python.map_from_python(self, artifact)
+        return mapper.apply(result)
 
 
 @dataclasses.dataclass

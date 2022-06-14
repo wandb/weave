@@ -116,5 +116,5 @@ def test_async_op_expr():
     version0 = api.versions(saved_model)[0]
     assert (
         str(api.expr(version0))
-        == f'get("local-artifact://{artifacts_local.LOCAL_ARTIFACT_DIR}/list/2f43b6207d36e570fa8859de7e4a0b95").train().model().save("model")'
+        == f'get("local-artifact://{artifacts_local.LOCAL_ARTIFACT_DIR}/list/6b6c14ba4268dc8c0bd47d5ee549721b").train().model().save("model")'
     )

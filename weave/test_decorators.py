@@ -1,11 +1,6 @@
-import pytest
-
 from . import api as weave
 from . import weave_types as types
 from . import storage
-from . import arrow_util
-
-import typing
 
 
 def test_function_op_name():
@@ -83,24 +78,3 @@ def test_list_nested_weave_obj():
     ref = storage.save(lines)
     lines2 = ref.get()
     assert lines2 == lines
-
-
-# This test relies on saving a list returning a different type
-#     (arrow_util types).
-# LocalArtifactRef.get automatically returns its associated object
-#     if it has one, which breaks this behavior.
-@pytest.mark.skip("relies on save returning different type")
-def test_list_nested_weave_obj_map_attr():
-    lines = make_lines()
-    ref = storage.save(lines)
-    lines = ref.get()
-    assert lines.map(lambda line: line.start.x) == [0.0, 1.0]
-
-
-@pytest.mark.skip("relies on save returning different type")
-def test_list_nested_weave_obj_map_method():
-    lines = make_lines()
-    ref = storage.save(lines)
-    lines: arrow_util.ArrowTableList[LineSegment] = ref.get()
-    mapped = lines.map(lambda line: line.mid())
-    assert mapped == [Point(0.0, 1.5), Point(1.5, 3.0)]
