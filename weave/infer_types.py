@@ -2,6 +2,7 @@
 Functions for inferring Weave Types from Python types.
 """
 
+import collections
 import types
 import typing
 import typing_extensions
@@ -33,7 +34,7 @@ def python_type_to_type(
         py_type, typing._GenericAlias  # type: ignore
     ):
         args = [python_type_to_type(a) for a in py_type.__args__]
-        if py_type.__origin__ == list:
+        if py_type.__origin__ == list or py_type.__origin__ == collections.abc.Sequence:
             return weave_types.List(*args)
         elif py_type.__origin__ == dict:
             return weave_types.Dict(*args)
