@@ -122,6 +122,12 @@ class Run:
     def await_final_output(self):
         sleep_mult = 1
         while self._state == "pending" or self._state == "running":
+
+            sleep_time = 0.01 * sleep_mult
+            if sleep_time > 1:
+                sleep_time = 1
+            sleep_mult *= 1.3
+
             from .ops_primitives.storage import get as op_get
             from .api import use
 
@@ -130,12 +136,6 @@ class Run:
                 artifacts_local.LOCAL_ARTIFACT_DIR, f"run-{self._id}", "latest"
             )
             self = use(op_get(uri))
-
-            sleep_mult *= 2
-            sleep_time = 0.02 * sleep_mult
-            if sleep_time > 1:
-                sleep_time = 1
-            time.sleep(sleep_time)
 
         return self._output
 
