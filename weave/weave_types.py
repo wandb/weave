@@ -139,11 +139,21 @@ class TypeRegistry:
 
 @dataclasses.dataclass
 class Type:
-    name: typing.ClassVar[str] = "type"
+
     instance_class: typing.ClassVar[typing.Optional[type]]
     instance_classes: typing.ClassVar[
         typing.Union[type, typing.List[type], None]
     ] = None
+
+    @classmethod
+    def class_type_name(cls):
+        if cls == Type:
+            return "type"
+        return cls.__name__.removesuffix("Type")
+
+    @property
+    def name(self):
+        return self.class_type_name()
 
     @classmethod
     def _instance_classes(cls):
@@ -592,17 +602,6 @@ class Dict(Type):
 
 @dataclasses.dataclass
 class ObjectType(Type):
-    # This needs to match the name property
-    # TODO: there has to be a better way to do this (have a property-like
-    # thing that is accessible at class time instead of object time)
-    @classmethod
-    def class_type_name(cls):
-        return cls.__name__.removesuffix("Type")
-
-    @property
-    def name(self):
-        return self.__class__.__name__.removesuffix("Type")
-
     def property_types(self):
         raise NotImplementedError
 
