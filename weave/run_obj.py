@@ -133,7 +133,7 @@ class Run:
 
             # TODO: this should support full URIS instead of hard coding
             uri = uris.WeaveLocalArtifactURI.make_uri(
-                artifacts_local.LOCAL_ARTIFACT_DIR, f"run-{self._id}", "latest"
+                artifacts_local.local_artifact_dir(), f"run-{self._id}", "latest"
             )
             self = use(op_get(uri))
 

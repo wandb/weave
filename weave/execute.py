@@ -115,7 +115,7 @@ def execute_async_op(
     # TODO: should this be configurable with remote artifacts
     art_name = "run-%s" % run_id
     art_uri = uris.WeaveLocalArtifactURI.make_uri(
-        artifacts_local.LOCAL_ARTIFACT_DIR, art_name, "latest"
+        artifacts_local.local_artifact_dir(), art_name, "latest"
     )
     job = threading.Thread(
         target=async_op_body, args=(art_uri, op_def.resolve_fn, inputs)

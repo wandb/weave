@@ -2,6 +2,7 @@ import os
 
 import pytest
 import shutil
+import tempfile
 
 
 ### Disable datadog engine tracing
@@ -43,16 +44,18 @@ def pytest_sessionstart(session):
 
 from . import context
 from . import weave_server
-from .artifacts_local import LOCAL_ARTIFACT_DIR
 
 
 @pytest.fixture(autouse=True)
 def pre_post_each_test():
+    test_artifact_dir = "/tmp/weave/pytest/%s" % os.environ.get("PYTEST_CURRENT_TEST")
     try:
-        shutil.rmtree(LOCAL_ARTIFACT_DIR)
+        shutil.rmtree(test_artifact_dir)
     except (FileNotFoundError, OSError):
         pass
+    os.environ["WEAVE_LOCAL_ARTIFACT_DIR"] = test_artifact_dir
     yield
+    del os.environ["WEAVE_LOCAL_ARTIFACT_DIR"]
 
 
 @pytest.fixture()
@@ -66,3 +69,11 @@ def fresh_server_logfile():
     _clearlog()
     yield
     _clearlog()
+
+
+@pytest.fixture()
+def cereal_csv():
+    with tempfile.TemporaryDirectory() as d:
+        cereal_path = os.path.join(d, "cereal.csv")
+        shutil.copy("testdata/cereal.csv", cereal_path)
+        yield cereal_path

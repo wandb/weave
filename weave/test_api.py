@@ -7,11 +7,6 @@ from .show import _show_params
 
 
 def test_print_save_val():
-    try:
-        shutil.rmtree(artifacts_local.LOCAL_ARTIFACT_DIR)
-    except FileNotFoundError:
-        pass
-
     data = [
         {"val": 1941, "label": "cat"},
         {"val": 2195, "label": "dog"},
@@ -20,13 +15,15 @@ def test_print_save_val():
     # converting to string should give us an expression
     assert (
         str(ref)
-        == 'get("local-artifact:///tmp/local-artifacts/my-data/d0bff26d12fc15741c0c2bbbb5e533e9")'
+        == 'get("local-artifact://%s/my-data/d0bff26d12fc15741c0c2bbbb5e533e9")'
+        % artifacts_local.local_artifact_dir()
     )
 
     # show should use the same expression
     assert (
         str(_show_params(ref)["weave_node"])
-        == 'get("local-artifact:///tmp/local-artifacts/my-data/d0bff26d12fc15741c0c2bbbb5e533e9")'
+        == 'get("local-artifact://%s/my-data/d0bff26d12fc15741c0c2bbbb5e533e9")'
+        % artifacts_local.local_artifact_dir()
     )
 
     versions = weave.versions(ref)
@@ -42,11 +39,13 @@ def test_print_save_val():
 
     assert (
         str(ref)
-        == 'get("local-artifact:///tmp/local-artifacts/my-data/d1b57c599f4114978e882cb4544b4b4c")'
+        == 'get("local-artifact://%s/my-data/d1b57c599f4114978e882cb4544b4b4c")'
+        % artifacts_local.local_artifact_dir()
     )
     assert (
         str(_show_params(ref)["weave_node"])
-        == 'get("local-artifact:///tmp/local-artifacts/my-data/d1b57c599f4114978e882cb4544b4b4c")'
+        == 'get("local-artifact://%s/my-data/d1b57c599f4114978e882cb4544b4b4c")'
+        % artifacts_local.local_artifact_dir()
     )
 
     versions = weave.versions(ref)
@@ -58,14 +57,10 @@ def test_print_save_val():
 
 
 def test_save_val_ops():
-    try:
-        shutil.rmtree(artifacts_local.LOCAL_ARTIFACT_DIR)
-    except FileNotFoundError:
-        pass
-
     ref = weave.save(5, "my-num")
     result = (ref + 2) * 3
     assert (
         (str(result))
-        == 'get("local-artifact:///tmp/local-artifacts/my-num/3af13035d6c49b15d283b6b1482a7341").add(2).mult(3)'
+        == 'get("local-artifact://%s/my-num/3af13035d6c49b15d283b6b1482a7341").add(2).mult(3)'
+        % artifacts_local.local_artifact_dir()
     )

@@ -4,13 +4,6 @@ from . import artifacts_local
 
 
 def test_automatic_await_compile():
-    import shutil
-
-    try:
-        shutil.rmtree(artifacts_local.LOCAL_ARTIFACT_DIR)
-    except FileNotFoundError:
-        pass
-
     twelve = async_demo.slowmult(3, 4, 0.01)
     twenty_four = async_demo.slowmult(2, twelve, 0.01)
     result = compile.compile([twenty_four])

@@ -3,7 +3,7 @@ from . import weave_types as types
 from . import weave_internal
 from . import ops
 from . import execute
-from .artifacts_local import LOCAL_ARTIFACT_DIR
+import shutil
 
 execute_test_count_op_run_count = 0
 
@@ -15,22 +15,14 @@ def execute_test_count_op(x):
     return len(x)
 
 
-def test_local_file_pure_cached():
+def test_local_file_pure_cached(cereal_csv):
     # local_path() is impure, but the operations thereafter are pure
     # this test confirms that pure ops that come after impure ops hit cache
-    import shutil
-
-    try:
-        shutil.rmtree(LOCAL_ARTIFACT_DIR)
-    except FileNotFoundError:
-        pass
-    shutil.copy("testdata/cereal.csv", "/tmp/cereal.csv")
-
     global execute_test_count_op_run_count
     execute_test_count_op_run_count = 0
     # We should only execute execute_test_count_op once.
-    count1 = api.use(execute_test_count_op(ops.local_path("/tmp/cereal.csv").readcsv()))
-    count2 = api.use(execute_test_count_op(ops.local_path("/tmp/cereal.csv").readcsv()))
+    count1 = api.use(execute_test_count_op(ops.local_path(cereal_csv).readcsv()))
+    count2 = api.use(execute_test_count_op(ops.local_path(cereal_csv).readcsv()))
     assert count1 == count2
     assert execute_test_count_op_run_count == 1
 

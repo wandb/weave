@@ -138,7 +138,7 @@ def test_ref_type():
             "objectType": {"propertyTypes": {"x": "int"}, "type": "typedDict"},
             "type": "local-ref-type",
         },
-        "_val": f"local-artifact://{artifacts_local.LOCAL_ARTIFACT_DIR}/my-dict/6036cbf3a05809f1a3f174a1485b1770",
+        "_val": f"local-artifact://{artifacts_local.local_artifact_dir()}/my-dict/6036cbf3a05809f1a3f174a1485b1770",
     }
     ref2 = storage.from_python(python_ref)
     obj2 = storage.deref(ref2)

@@ -15,8 +15,8 @@ from . import test_helpers
 from . import artifacts_local
 
 
-def test_show_simple_call():
-    csv = ops.local_path("/tmp/cereal.csv").readcsv()
+def test_show_simple_call(cereal_csv):
+    csv = ops.local_path(cereal_csv).readcsv()
     show_params = _show_params(csv)
     assert show_params["weave_node"].to_json() == {
         "fromOp": {
@@ -28,10 +28,10 @@ def test_show_simple_call():
                                 "nodeType": "const",
                                 "type": {
                                     "type": "const",
-                                    "val": "/tmp/cereal.csv",
+                                    "val": cereal_csv,
                                     "valType": "string",
                                 },
-                                "val": "/tmp/cereal.csv",
+                                "val": cereal_csv,
                             }
                         },
                         "name": "localpath",
@@ -146,5 +146,6 @@ def test_large_const_node():
     # Asserting that weavejs_fixes.remove_opcall_versions_data works
     assert (
         graph.node_expr_str(col_sel_fn2_node)
-        == 'get("local-artifact:///tmp/local-artifacts/list/4cf1abf0d040d897276e4be3c6aa90df").finetunegpt3({"n_epochs": 2}).model().complete(row).pick("choices").index(0).pick("text")'
+        == 'get("local-artifact://%s/list/4cf1abf0d040d897276e4be3c6aa90df").finetunegpt3({"n_epochs": 2}).model().complete(row).pick("choices").index(0).pick("text")'
+        % artifacts_local.local_artifact_dir()
     )
