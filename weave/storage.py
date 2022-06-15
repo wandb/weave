@@ -208,14 +208,14 @@ def get_version(name, version):
 def get_obj_creator(obj_ref):
     # Extremely inefficient!
     # TODO
-    for art_name in os.listdir(artifacts_local.LOCAL_ARTIFACT_DIR):
+    for art_name in os.listdir(artifacts_local.local_artifact_dir()):
         if (
             art_name.startswith("run-")
             and not art_name.endswith("-output")
             and artifacts_local.local_artifact_exists(art_name, "latest")
         ):
             local_uri = uris.WeaveLocalArtifactURI.make_uri(
-                artifacts_local.LOCAL_ARTIFACT_DIR, art_name, "latest"
+                artifacts_local.local_artifact_dir(), art_name, "latest"
             )
             run = get(local_uri)
             if isinstance(run._output, refs.Ref) and str(run._output) == str(obj_ref):

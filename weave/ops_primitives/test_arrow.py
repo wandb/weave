@@ -144,7 +144,7 @@ def test_custom_groupby_intermediate_save():
     saved_node = weave.save(node, "test_custom_groupby_intermediate_save")
     weave.use(saved_node)
     loaded_node = ops.get(
-        f"local-artifact://{artifacts_local.LOCAL_ARTIFACT_DIR}/test_custom_groupby_intermediate_save/latest"
+        f"local-artifact://{artifacts_local.local_artifact_dir()}/test_custom_groupby_intermediate_save/latest"
     )
     assert weave.use(loaded_node.pick("im").offset(0)[0].width()) == 256
 

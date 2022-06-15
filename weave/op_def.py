@@ -163,7 +163,7 @@ class OpDefType(types.Type):
 
     def load_instance(cls, artifact, name, extra=None):
         path_with_ext = os.path.relpath(
-            artifact.path(f"{name}.py"), start=artifacts_local.LOCAL_ARTIFACT_DIR
+            artifact.path(f"{name}.py"), start=artifacts_local.local_artifact_dir()
         )
         # remove the .py extension
         path = os.path.splitext(path_with_ext)[0]
@@ -171,7 +171,7 @@ class OpDefType(types.Type):
         parts = path.split("/")
         module_path = ".".join(parts)
 
-        sys.path.insert(0, artifacts_local.LOCAL_ARTIFACT_DIR)
+        sys.path.insert(0, artifacts_local.local_artifact_dir())
         with context.loading_op_location(artifact.location):
             # This has a side effect of registering the op
             mod = __import__(module_path)

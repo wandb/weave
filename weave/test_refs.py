@@ -7,7 +7,7 @@ def test_laref_artifact_version():
     ref = refs.LocalArtifactRef(art, "_obj")
     assert (
         str(ref)
-        == "local-artifact://" + artifacts_local.LOCAL_ARTIFACT_DIR + "/my-art/v19"
+        == "local-artifact://" + artifacts_local.local_artifact_dir() + "/my-art/v19"
     )
 
     parsed_ref = refs.LocalArtifactRef.from_str(str(ref))
@@ -26,7 +26,7 @@ def test_laref_artifact_version_path():
     assert (
         str(ref)
         == "local-artifact://"
-        + artifacts_local.LOCAL_ARTIFACT_DIR
+        + artifacts_local.local_artifact_dir()
         + "/my-art/v19?file=x.txt"
     )
 
@@ -46,7 +46,7 @@ def test_laref_artifact_version_path_extra1():
     assert (
         str(ref)
         == "local-artifact://"
-        + artifacts_local.LOCAL_ARTIFACT_DIR
+        + artifacts_local.local_artifact_dir()
         + "/my-art/v19?extra=5&file=x.txt"
     )
 
@@ -66,7 +66,7 @@ def test_laref_artifact_version_path_obj_extra1():
     assert (
         str(ref)
         == "local-artifact://"
-        + artifacts_local.LOCAL_ARTIFACT_DIR
+        + artifacts_local.local_artifact_dir()
         + "/my-art/v19?extra=5"
     )
 
@@ -86,7 +86,7 @@ def test_laref_artifact_version_path_extra2():
     assert (
         str(ref)
         == "local-artifact://"
-        + artifacts_local.LOCAL_ARTIFACT_DIR
+        + artifacts_local.local_artifact_dir()
         + "/my-art/v19?extra=5&extra=a&file=x.txt"
     )
 

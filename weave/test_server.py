@@ -13,26 +13,15 @@ import requests
 
 SERVER_TYPES = ["inprocess", "subprocess", "http"]
 
-# Python seems to take forever to spin up a new Process (maybe
-# pytest slows it down?). So just spin up the subprocess server once
-subprocess_server = None
-
-
-def setup_module():
-    global subprocess_server
-    subprocess_server = _server.SubprocessServerClient()
-
-
-def teardown_module():
-    subprocess_server.shutdown()
-
 
 @contextlib.contextmanager
 def client(server_type):
     if server_type == "inprocess":
         yield _client.Client(_server.InProcessServer())
     elif server_type == "subprocess":
+        subprocess_server = _server.SubprocessServerClient()
         yield _client.Client(subprocess_server)
+        subprocess_server.shutdown()
     elif server_type == "http":
         port = 9995
         server = _server.HttpServer(port)
@@ -51,11 +40,9 @@ def test_basic(server_type):
 
 @pytest.mark.parametrize("server_type", SERVER_TYPES)
 @pytest.mark.timeout(3)
-def test_type_returning_op(server_type):
+def test_type_returning_op(server_type, cereal_csv):
     with client(server_type) as wc:
-        csv_type = weave.use(
-            ops.local_path_return_type("testdata/cereal.csv"), client=wc
-        )
+        csv_type = weave.use(ops.local_path_return_type(cereal_csv), client=wc)
         assert csv_type.name == "local_file"
 
 

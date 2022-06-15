@@ -4,11 +4,6 @@ from . import artifacts_local
 
 
 def test_op_versioning():
-    try:
-        shutil.rmtree(artifacts_local.LOCAL_ARTIFACT_DIR)
-    except FileNotFoundError:
-        pass
-
     @weave.op()
     def versioned_op(a: int, b: int) -> int:
         return a + b
@@ -30,7 +25,7 @@ def test_op_versioning():
     # This should refer to v1, even though we just loaded v0
     v_latest = weave.use(
         weave.get(
-            f"local-artifact://{artifacts_local.LOCAL_ARTIFACT_DIR}/op-versioned_op/latest"
+            f"local-artifact://{artifacts_local.local_artifact_dir()}/op-versioned_op/latest"
         )
     )
     assert weave.use(v_latest.call_fn(4, 20)) == -16
@@ -41,7 +36,7 @@ def test_op_versioning():
 
     v0_again = weave.use(
         weave.get(
-            f"local-artifact://{artifacts_local.LOCAL_ARTIFACT_DIR}/op-versioned_op/"
+            f"local-artifact://{artifacts_local.local_artifact_dir()}/op-versioned_op/"
             + v0.version
         )
     )

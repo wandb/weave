@@ -8,20 +8,13 @@ from . import artifacts_local
 
 
 def test_run():
-    import shutil
-
-    try:
-        shutil.rmtree(artifacts_local.LOCAL_ARTIFACT_DIR)
-    except FileNotFoundError:
-        pass
-
     run_id = "TESTRUN"
     run = run_obj.Run(_id=run_id, _op_name="test-run")
     run_name = "run-%s" % run_id
     storage.save(run, name=run_name)
 
     run_node = ops.get(
-        f"local-artifact://{artifacts_local.LOCAL_ARTIFACT_DIR}/{run_name}/latest"
+        f"local-artifact://{artifacts_local.local_artifact_dir()}/{run_name}/latest"
     )
     # run = api.use(run_node)
     assert api.use(run_node.state()) == "pending"
@@ -42,13 +35,6 @@ def test_run():
 
 @pytest.mark.timeout(1.5)
 def test_automatic_await():
-    import shutil
-
-    try:
-        shutil.rmtree(artifacts_local.LOCAL_ARTIFACT_DIR)
-    except FileNotFoundError:
-        pass
-
     twelve = async_demo.slowmult(3, 4, 0.01)
     twenty_four = async_demo.slowmult(2, twelve, 0.01)
     assert api.use(twenty_four.await_final_output()) == 24
@@ -56,13 +42,6 @@ def test_automatic_await():
 
 @pytest.mark.timeout(1.5)
 def test_stable_when_fetching_input():
-    import shutil
-
-    try:
-        shutil.rmtree(artifacts_local.LOCAL_ARTIFACT_DIR)
-    except FileNotFoundError:
-        pass
-
     dataset = [{"prompt": "a", "completion": "5"}]
     ref = storage.save(dataset)
     get_dataset = ops.get(ref.uri)
@@ -101,13 +80,6 @@ def test_run_ops_mapped():
 
 @pytest.mark.timeout(1.5)
 def test_async_op_expr():
-    import shutil
-
-    try:
-        shutil.rmtree(artifacts_local.LOCAL_ARTIFACT_DIR)
-    except FileNotFoundError:
-        pass
-
     dataset = [{"prompt": "a", "completion": "5"}]
 
     train_result = async_demo.train(dataset)
@@ -116,5 +88,5 @@ def test_async_op_expr():
     version0 = api.versions(saved_model)[0]
     assert (
         str(api.expr(version0))
-        == f'get("local-artifact://{artifacts_local.LOCAL_ARTIFACT_DIR}/list/2f43b6207d36e570fa8859de7e4a0b95").train().model().save("model")'
+        == f'get("local-artifact://{artifacts_local.local_artifact_dir()}/list/6b6c14ba4268dc8c0bd47d5ee549721b").train().model().save("model")'
     )

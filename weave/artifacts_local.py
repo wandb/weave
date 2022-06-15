@@ -6,6 +6,7 @@ import json
 import shutil
 from datetime import datetime
 import pathlib
+import tempfile
 
 from . import uris
 from . import util
@@ -19,9 +20,11 @@ def get_wandb_read_artifact(path):
     return wandb_api.wandb_public_api().artifact(path)
 
 
-LOCAL_ARTIFACT_DIR = os.environ.get("WEAVE_LOCAL_ARTIFACT_DIR") or os.path.join(
-    "/tmp", "local-artifacts"
-)
+def local_artifact_dir():
+    return os.environ.get("WEAVE_LOCAL_ARTIFACT_DIR") or os.path.join(
+        "/tmp", "local-artifacts"
+    )
+
 
 # From sdk/interface/artifacts.py
 def md5_hash_file(path):
@@ -39,7 +42,7 @@ def md5_string(string: str) -> str:
 
 
 def local_artifact_exists(name, branch):
-    return os.path.exists(os.path.join(LOCAL_ARTIFACT_DIR, name, branch))
+    return os.path.exists(os.path.join(local_artifact_dir(), name, branch))
 
 
 # This is a prototype implementation. Chock full of races, and other
@@ -50,7 +53,7 @@ class LocalArtifact:
     def __init__(self, name, version=None):
         self._name = name
         self._version = version
-        self._root = os.path.join(LOCAL_ARTIFACT_DIR, name)
+        self._root = os.path.join(local_artifact_dir(), name)
         self._path_handlers = {}
         os.makedirs(self._root, exist_ok=True)
         self._setup_dirs()
@@ -108,7 +111,7 @@ class LocalArtifact:
     @property
     def location(self) -> uris.WeaveURI:
         return uris.WeaveLocalArtifactURI.from_parts(
-            os.path.abspath(LOCAL_ARTIFACT_DIR), self._name, self.version
+            os.path.abspath(local_artifact_dir()), self._name, self.version
         )
 
     def uri(self) -> str:
@@ -211,9 +214,10 @@ class LocalArtifact:
 
         # Example of one of many races here
         link_name = os.path.join(self._root, branch)
-        if os.path.exists(link_name):
-            os.remove(link_name)
-        os.symlink(self._version, link_name)
+        with tempfile.TemporaryDirectory() as d:
+            temp_path = os.path.join(d, "tmplink")
+            os.symlink(self._version, temp_path)
+            os.rename(temp_path, link_name)
 
 
 class WandbArtifact:

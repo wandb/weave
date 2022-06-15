@@ -229,7 +229,7 @@ class LocalArtifactRef(Ref):
 
     def versions(self):
         artifact_path = os.path.join(
-            artifacts_local.LOCAL_ARTIFACT_DIR, self.artifact._name
+            artifacts_local.local_artifact_dir(), self.artifact._name
         )
         versions = []
         for version_name in os.listdir(artifact_path):
