@@ -568,7 +568,7 @@ class Dict(Type):
     name = "dict"
 
     key_type: Type
-    value_type: Type
+    object_type: Type
 
     def __post_init__(self):
         # Note this differs from Python's Dict in that keys are always strings!
@@ -582,9 +582,9 @@ class Dict(Type):
             next_key_type = self.key_type.assign_type(other_type.key_type)
             if isinstance(next_key_type, Invalid):
                 next_key_type = UnionType(self.key_type, other_type.key_type)
-            next_value_type = self.value_type.assign_type(other_type.value_type)
+            next_value_type = self.object_type.assign_type(other_type.object_type)
             if isinstance(next_value_type, Invalid):
-                next_value_type = UnionType(self.value_type, other_type.value_type)
+                next_value_type = UnionType(self.object_type, other_type.object_type)
         else:
             # TODO: we could handle TypedDict here.
 

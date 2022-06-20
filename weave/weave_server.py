@@ -30,7 +30,6 @@ from weave.ecosystem import openai
 from weave.ecosystem import async_demo
 from weave.ecosystem import hackdemo
 from weave.ecosystem import shap
-from weave.ecosystem import models
 from weave.ecosystem import mnist
 from weave import run_obj
 

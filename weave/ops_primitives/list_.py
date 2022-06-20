@@ -330,7 +330,7 @@ def pick_output_type(input_types):
         object_type = self_type.object_type
         is_list = True
     if isinstance(object_type, types.Dict):
-        output_type = object_type.value_type
+        output_type = object_type.object_type
     elif isinstance(object_type, types.TypedDict):
         property_types = object_type.property_types
         output_type = property_types.get(key)

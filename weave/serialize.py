@@ -118,8 +118,13 @@ def _deserialize_node(
     if node["nodeType"] == "const":
         if isinstance(node["type"], dict) and node["type"]["type"] == "function":
             fn_body_node = node["val"]
+            from . import weave_internal
+
             if fn_body_node["nodeType"] == "var":
-                parsed_fn_body_node = graph.VarNode.from_json(fn_body_node)
+                parsed_fn_body_node = weave_internal.make_var_node(
+                    types.TypeRegistry.type_from_dict(fn_body_node["type"]),
+                    fn_body_node["name"],
+                )
             elif fn_body_node["nodeType"] == "output":
                 op = nodes[fn_body_node["fromOp"]]
                 params = {}
@@ -127,7 +132,8 @@ def _deserialize_node(
                     params[param_name] = _deserialize_node(
                         param_node_index, nodes, parsed_nodes, hashed_nodes
                     )
-                parsed_fn_body_node = graph.OutputNode(
+
+                parsed_fn_body_node = weave_internal.make_output_node(
                     types.TypeRegistry.type_from_dict(node["type"]).output_type,
                     op["name"],
                     params,

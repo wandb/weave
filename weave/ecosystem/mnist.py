@@ -3,71 +3,69 @@
 # TODO:
 #   - Doesn't use the much faster ArrowWeaveList
 
+from typing import TypeVar
 import typing
 import weave
+from weave import infer_types
 from weave import panels
 import PIL.Image
 
 from torchvision import datasets
 
 
-class MnistExample(typing.TypedDict):
-    image: PIL.Image.Image  # TODO: size constraints
-    label: int  # TODO: enum?
+ExampleType = TypeVar("ExampleType")
 
 
-# TODO: How is this better than TypedDict? we can attach ops... but... is that better?
-@weave.type()
-class MnistSplits:
-    train: list[MnistExample]
-    test: list[MnistExample]
-
-    @weave.op()
-    def get_train(self) -> list[MnistExample]:
-        return self.train
-
-    @weave.op()
-    def get_test(self) -> list[MnistExample]:
-        return self.test
+class TypedDictAny(typing.TypedDict):
+    pass
 
 
-# TODO: inherit from base Dataset
-@weave.type()
-class MnistDataset:
+class TorchVisionDataset(typing.TypedDict):
     name: str
     description: str
-    data: MnistSplits
-
-    @weave.op()
-    def get_data(self) -> MnistSplits:
-        return self.data
+    data: dict[str, list[TypedDictAny]]
 
 
-@weave.op(render_info={"type": "function"})
-# TODO: 0-argument functions don't work in WeaveJS at the moment
-def mnist(limit: int = -1) -> MnistDataset:
-    torch_mnist_train = datasets.MNIST(".", train=True, download=True)
-    mnist_train = []
-    for im, label in list(torch_mnist_train)[:limit]:
-        mnist_train.append(MnistExample(image=im, label=label))
-
-    torch_mnist_test = datasets.MNIST(".", train=False, download=True)
-    mnist_test = []
-    for im, label in list(torch_mnist_test)[:limit]:
-        mnist_test.append(MnistExample(image=im, label=label))
-
-    return MnistDataset(
-        name="MNIST",
-        description="The famous MNIST dataset",
-        data=MnistSplits(mnist_train, mnist_test),
-    )
+def make_torchvision_splits(
+    dataset_fn, limit, split_specs, example_keys, example_constructor
+):
+    splits = {}
+    for split_name, dataset_fn_kwargs in split_specs:
+        raw_data = dataset_fn(".", download=True, **dataset_fn_kwargs)
+        examples = []
+        for _, row in zip(range(limit), raw_data):
+            example = example_constructor(**dict(zip(example_keys, row)))
+            examples.append(example)
+        splits[split_name] = examples
+    return splits
 
 
-# TODO: This should be generic
-@weave.op()
-def mnist_dataset_card(dataset: MnistDataset) -> panels.Card:
+@weave.op(
+    input_type={
+        "dataset": weave.types.Function(
+            {}, infer_types.python_type_to_type(TorchVisionDataset)
+        )
+    }
+)
+def torch_vision_dataset_card(dataset) -> panels.Card:
+    # TODO: split should be chosen from dropdown rather than via tab.
+    #   - or ideally, it should look like one big table with a "split" column.
+    dataset_type = dataset.type
+    splits_type = dataset_type.property_types["data"]
+    split_names = splits_type.property_types.keys()
+    split_tabs = []
+    for split_name in split_names:
+        split_data = dataset["data"][split_name]
+        split_tabs.append(
+            panels.CardTab(
+                name=f"{split_name} split",
+                content=panels.LabeledItem(
+                    item=split_data, height=500, label=f"{split_name} split"
+                ),
+            ),
+        )
     return panels.Card(
-        title=dataset.name,
+        title=dataset["name"],
         subtitle="",
         content=[
             panels.CardTab(
@@ -75,7 +73,7 @@ def mnist_dataset_card(dataset: MnistDataset) -> panels.Card:
                 content=panels.Group(
                     items=[
                         panels.LabeledItem(
-                            item=dataset.description, label="Description"
+                            item=dataset["description"], label="Description"
                         ),
                     ]
                 ),
@@ -84,18 +82,65 @@ def mnist_dataset_card(dataset: MnistDataset) -> panels.Card:
                 name="Limitations & Use",
                 content=panels.LabeledItem(item="tab2", label="tab2-label"),
             ),
-            # TODO: show both splits in a Data panel with a drop down picker
-            panels.CardTab(
-                name="Train split",
-                content=panels.LabeledItem(
-                    item=dataset.get_data().get_train(), height=500, label="Train split"
-                ),
-            ),
-            panels.CardTab(
-                name="Test split",
-                content=panels.LabeledItem(
-                    item=dataset.get_data().get_test(), height=500, label="Test split"
-                ),
-            ),
+            *split_tabs,
         ],
+    )
+
+
+class ImageLabelExample(typing.TypedDict):
+    image: PIL.Image.Image  # TODO: size constraints
+    label: int  # TODO: enum?
+
+
+class MnistSplits(typing.TypedDict):
+    train: list[ImageLabelExample]
+    test: list[ImageLabelExample]
+
+
+class MnistDataset(TorchVisionDataset):
+    data: MnistSplits
+
+
+@weave.op(render_info={"type": "function"})
+# TODO: 0-argument functions don't work in WeaveJS at the moment
+def mnist(limit: int = -1) -> MnistDataset:
+    return MnistDataset(
+        name="MNIST",
+        description="The famous MNIST dataset",
+        data=MnistSplits(
+            make_torchvision_splits(
+                datasets.MNIST,
+                limit,
+                [("train", {"train": True}), ("test", {"train": False})],
+                ("image", "label"),
+                ImageLabelExample,
+            )
+        ),
+    )
+
+
+class Food101Splits(typing.TypedDict):
+    train: list[ImageLabelExample]
+    test: list[ImageLabelExample]
+
+
+class Food101Dataset(TorchVisionDataset):
+    data: Food101Splits
+
+
+@weave.op(render_info={"type": "function"})
+# TODO: 0-argument functions don't work in WeaveJS at the moment
+def food101(limit: int = -1) -> Food101Dataset:
+    return Food101Dataset(
+        name="Food101",
+        description="The Food-101 is a challenging data set of 101 food categories, with 101’000 images. For each class, 250 manually reviewed test images are provided as well as 750 training images. On purpose, the training images were not cleaned, and thus still contain some amount of noise. This comes mostly in the form of intense colors and sometimes wrong labels. All images were rescaled to have a maximum side length of 512 pixels.",
+        data=Food101Splits(
+            make_torchvision_splits(
+                datasets.Food101,
+                limit,
+                [("train", {"split": "train"}), ("test", {"split": "test"})],
+                ("image", "label"),
+                ImageLabelExample,
+            )
+        ),
     )

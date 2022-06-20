@@ -8,7 +8,6 @@ from . import op_args
 from . import server
 from . import registry_mem
 from . import op_def
-from . import lazy
 
 
 def map_nodes(node, map_fn):
@@ -71,6 +70,18 @@ def make_const_node(type_, val):
     else:
         return_type = graph.ConstNode
     return return_type(type_, val)
+
+
+def make_output_node(type_, op_name, op_params):
+    if hasattr(type_, "NodeMethodsClass"):
+        return_type = type(
+            "OutputNode%s" % type_.__class__.__name__,
+            (graph.OutputNode, type_.NodeMethodsClass),
+            {},
+        )
+    else:
+        return_type = graph.OutputNode
+    return return_type(type_, op_name, op_params)
 
 
 # Given a registered op, make a mapped version of it.
