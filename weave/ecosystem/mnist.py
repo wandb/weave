@@ -28,7 +28,7 @@ class TorchVisionDataset(typing.TypedDict):
 
 def make_torchvision_splits(
     dataset_fn, limit, split_specs, example_keys, example_constructor
-):
+) -> dict:
     splits = {}
     for split_name, dataset_fn_kwargs in split_specs:
         raw_data = dataset_fn(".", download=True, **dataset_fn_kwargs)

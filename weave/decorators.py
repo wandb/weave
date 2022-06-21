@@ -33,6 +33,12 @@ def is_op(f):
     return hasattr(f, "op_def")
 
 
+def get_signature(f):
+    if hasattr(f, "sig"):
+        return f.sig
+    return inspect.signature(f)
+
+
 def op(
     input_type=None,
     output_type=None,
@@ -55,55 +61,59 @@ def op(
         python_input_type = copy.copy(type_hints)
         if "return" in python_input_type:
             python_input_type.pop("return")
-        inferred_input_type = {
-            input_name: infer_types.python_type_to_type(input_type)
-            for input_name, input_type in python_input_type.items()
-        }
-        weave_input_type = input_type
-        if weave_input_type is None:
-            # No weave declared input_type, so use the inferred_type
-            for arg_name in inspect.signature(f).parameters.keys():
-                if arg_name == "self":
-                    # Special case if the arg is called self. We allow it to be Unknown.
-                    # We'll detect its type later when the weave_class() decorator runs.
-                    # (method decorators run before the class is created, then the class decorators
-                    # run)
-                    inferred_input_type["self"] = types.UnknownType()
-                elif arg_name not in inferred_input_type:
-                    raise errors.WeaveDefinitionError(
-                        "type declaration missing for arg: %s" % arg_name
-                    )
-                elif inferred_input_type[arg_name] == types.UnknownType():
-                    raise errors.WeaveDefinitionError(
-                        "Weave type not registered for python type: %s"
-                        % python_input_type[arg_name]
-                    )
-            weave_input_type = op_args.OpNamedArgs(inferred_input_type)
 
-            # TODO: Detect that all input types are declared!
+        declared_input_type = input_type
+        if declared_input_type is None:
+            declared_input_type = {}
+        weave_input_type = _create_args_from_op_input_type(declared_input_type)
+
+        if weave_input_type.kind == op_args.OpArgs.NAMED_ARGS:
+            arg_types = copy.copy(weave_input_type.arg_types)
+
+            # Add any arguments that have Python types to the Weave type.
+            for input_name, input_type_ in python_input_type.items():
+                inferred_type = infer_types.python_type_to_type(input_type_)
+                if inferred_type == types.UnknownType():
+                    raise errors.WeaveDefinitionError(
+                        "Weave Type could not be determined from Python type (%s) for arg: %s."
+                        % (input_type_, input_name)
+                    )
+                existing_weave_type = arg_types.get(input_name)
+                if existing_weave_type:
+                    raise errors.WeaveDefinitionError(
+                        "Python type (%s) and Weave Type (%s) declared for arg: %s. Remove one of them to fix."
+                        % (inferred_type, existing_weave_type, input_name)
+                    )
+                arg_types[input_name] = inferred_type
+
+            arg_names = set(get_signature(f).parameters.keys())
+
+            # if this is a method, and we haven't figured out a type for it yet,
+            # mark it Unknown and the weave_class decorator will add it later.
+            if "self" in arg_names and "self" not in arg_types:
+                arg_types["self"] = types.UnknownType()
+            if "_run" in arg_names and "_run" not in arg_types:
+                arg_types["_run"] = types.UnknownType()
+
+            # validate there aren't extra declared Weave types
+            weave_type_extra_arg_names = set(arg_types.keys()) - arg_names
+            if weave_type_extra_arg_names:
+                raise errors.WeaveDefinitionError(
+                    "Weave Types declared for non-existent args: %s."
+                    % weave_type_extra_arg_names
+                )
+
+            # validate there aren't missing Weave types
+            weave_type_missing_arg_names = arg_names - set(arg_types.keys())
+            if weave_type_missing_arg_names:
+                raise errors.WeaveDefinitionError(
+                    "Missing Weave Types for args: %s." % weave_type_missing_arg_names
+                )
+
+            weave_input_type = op_args.OpNamedArgs(arg_types)
         else:
-            weave_input_type = _create_args_from_op_input_type(weave_input_type)
-            # Weave input_type was declared. Ensure compatibility with Python type.
-            if inferred_input_type:
-                if weave_input_type.kind == op_args.OpArgs.NAMED_ARGS:
-                    arg_types = weave_input_type.arg_types
-                    if set(inferred_input_type.keys()) != set(arg_types.keys()):
-                        raise errors.WeaveDefinitionError(
-                            "Weave input_type length must match op function arglist length"
-                        )
-
-                    for input_name, inferred_type in inferred_input_type.items():
-                        if (
-                            arg_types[input_name].assign_type(inferred_type)
-                            == types.Invalid()
-                        ):
-                            raise errors.WeaveDefinitionError(
-                                "Python type incompatible with with Weave type for arg: %s"
-                                % input_name
-                            )
-                else:
-                    # TODO: handle varargs!
-                    pass
+            # TODO: no validation here...
+            pass
 
         ##### Output type processing
 
