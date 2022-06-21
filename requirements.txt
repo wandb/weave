@@ -20,3 +20,5 @@ typing_extensions
 matplotlib
 shap
 xgboost
+torch
+torchvision
