@@ -52,7 +52,25 @@ class Model:
 
     @weave.op(
         input_type={"X": lambda input_type: input_type["self"].input_type},
-        output_type=lambda input_type: input_type["self"].output_type,
+        # TODO
+        # output_type=lambda input_type: weave.types.List(
+        #     weave.types.TypedDict(
+        #         {
+        #             "X": input_type["self"].input_type.object_type,
+        #             "y": input_type["self"].output_type.object_type,
+        #         }
+        #     )
+        # ),
+        # I hardcoded the output_type of predict and train just to show the example
+        # working.
+        output_type=weave.types.List(
+            weave.types.TypedDict(
+                {
+                    "X": weave.ops.image.PILImageType(),
+                    "y": weave.types.Int(),
+                }
+            )
+        ),
     )
     def predict(self, X):
         # Note, this is a copy of the transform in TorchMnistDataset!
@@ -60,10 +78,14 @@ class Model:
             [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
         )
         inputs = [transform(x) for x in X]
-        # inputs = [input_dset[i][0] for i in range(len(input_dset))]
         class_preds = self.pred_fn(torch.stack(inputs))
         _, final_preds = torch.max(class_preds.data, 1)
-        return final_preds
+        final_preds = final_preds.tolist()
+        # TODO: do a faster column-oriented version
+        rows = []
+        for x, y in zip(X, final_preds):
+            rows.append({"X": x, "y": y})
+        return rows
 
 
 ModelType.instance_class = Model
@@ -119,11 +141,14 @@ def train_epoch(network, loader, optimizer):
 
 
 @weave.op(
+    render_info={"type": "function"},
     input_type={
         "X": weave.types.List(weave.ops.image.PILImageType("any", "any")),
-        "y": weave.types.List(weave.types.Int()),  # TODO: enum
+        "y": weave.types.List(weave.types.Int()),  # TODO: class enum?
     },
-    output_type=lambda input_type: ModelType(input_type["X"], input_type["y"]),
+    # TODO: WeaveJS doesn't support callable output type yet.
+    # output_type=lambda input_type: ModelType(input_type["X"], input_type["y"]),
+    output_type=ModelType(),
 )
 def train(X, y, config: TorchMnistTrainConfig):
     loader = torch.utils.data.DataLoader(

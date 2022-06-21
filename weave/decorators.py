@@ -68,43 +68,50 @@ def op(
         weave_input_type = _create_args_from_op_input_type(declared_input_type)
 
         if weave_input_type.kind == op_args.OpArgs.NAMED_ARGS:
-            arg_types = copy.copy(weave_input_type.arg_types)
-
-            # Add any arguments that have Python types to the Weave type.
-            for input_name, input_type_ in python_input_type.items():
-                inferred_type = infer_types.python_type_to_type(input_type_)
-                if inferred_type == types.UnknownType():
-                    raise errors.WeaveDefinitionError(
-                        "Weave Type could not be determined from Python type (%s) for arg: %s."
-                        % (input_type_, input_name)
-                    )
-                existing_weave_type = arg_types.get(input_name)
-                if existing_weave_type:
-                    raise errors.WeaveDefinitionError(
-                        "Python type (%s) and Weave Type (%s) declared for arg: %s. Remove one of them to fix."
-                        % (inferred_type, existing_weave_type, input_name)
-                    )
-                arg_types[input_name] = inferred_type
-
-            arg_names = set(get_signature(f).parameters.keys())
-
-            # if this is a method, and we haven't figured out a type for it yet,
-            # mark it Unknown and the weave_class decorator will add it later.
-            if "self" in arg_names and "self" not in arg_types:
-                arg_types["self"] = types.UnknownType()
-            if "_run" in arg_names and "_run" not in arg_types:
-                arg_types["_run"] = types.UnknownType()
+            arg_names = get_signature(f).parameters.keys()
 
             # validate there aren't extra declared Weave types
-            weave_type_extra_arg_names = set(arg_types.keys()) - arg_names
+            weave_type_extra_arg_names = set(weave_input_type.arg_types.keys()) - set(
+                arg_names
+            )
             if weave_type_extra_arg_names:
                 raise errors.WeaveDefinitionError(
                     "Weave Types declared for non-existent args: %s."
                     % weave_type_extra_arg_names
                 )
 
+            arg_types = {}
+
+            # iterate through function args in order. The function determines
+            # the order of arg_types, which is relied on everywhere.
+            for input_name in arg_names:
+                python_type = python_input_type.get(input_name)
+                existing_weave_type = weave_input_type.arg_types.get(input_name)
+                if python_type is not None:
+                    inferred_type = infer_types.python_type_to_type(python_type)
+                    if inferred_type == types.UnknownType():
+                        raise errors.WeaveDefinitionError(
+                            "Weave Type could not be determined from Python type (%s) for arg: %s."
+                            % (python_type, input_name)
+                        )
+                    if existing_weave_type:
+                        raise errors.WeaveDefinitionError(
+                            "Python type (%s) and Weave Type (%s) declared for arg: %s. Remove one of them to fix."
+                            % (inferred_type, existing_weave_type, input_name)
+                        )
+                    arg_types[input_name] = inferred_type
+                elif existing_weave_type:
+                    arg_types[input_name] = existing_weave_type
+                else:
+                    arg_types[input_name] = types.UnknownType()
+
             # validate there aren't missing Weave types
-            weave_type_missing_arg_names = arg_names - set(arg_types.keys())
+            unknown_type_args = set(
+                arg_name
+                for arg_name, at in arg_types.items()
+                if at == types.UnknownType()
+            )
+            weave_type_missing_arg_names = unknown_type_args - {"self", "_run"}
             if weave_type_missing_arg_names:
                 raise errors.WeaveDefinitionError(
                     "Missing Weave Types for args: %s." % weave_type_missing_arg_names
