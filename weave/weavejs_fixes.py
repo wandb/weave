@@ -11,7 +11,7 @@ from . import graph
 def convert_specific_opname_to_generic_opname(
     name: str, inputs: dict[str, typing.Any]
 ) -> tuple[str, dict[str, typing.Any]]:
-    if name == "typedDict-pick" or name == "dict-pick":
+    if name == "typedDict-pick" or name == "dict-pick" or name == "list-pick":
         return "pick", {"obj": inputs["self"], "key": inputs["key"]}
     elif name == "groupresult-map":
         return "map", {"arr": inputs["self"], "mapFn": inputs["map_fn"]}

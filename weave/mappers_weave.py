@@ -19,7 +19,7 @@ class DictMapper(mappers.Mapper):
     def __init__(self, type_: types.Dict, mapper, artifact, path=[]):
         self.type = type_
         self.key_serializer = mapper(type_.key_type, artifact, path)
-        self.value_serializer = mapper(type_.value_type, artifact, path)
+        self.value_serializer = mapper(type_.object_type, artifact, path)
 
 
 class ObjectMapper(mappers.Mapper):

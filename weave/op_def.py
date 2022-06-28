@@ -1,3 +1,4 @@
+import copy
 import textwrap
 import inspect
 import os
@@ -87,16 +88,27 @@ class OpDef:
         return not callable(self.output_type) and self.output_type.name == "run-type"
 
     def to_dict(self):
+        output_type = self.output_type
         if callable(self.output_type):
             raise errors.WeaveSerializeError(
                 "serializing op with callable output_type not yet implemented"
             )
-        if self.input_type.kind != op_args.OpArgs.NAMED_ARGS:
+        # No callable output_type still
+        # if callable(output_type):
+        #     output_type = types.Any()
+        output_type = output_type.to_dict()
+
+        # Make callable input_type args into types.Any() for now.
+        input_type = self.input_type
+        if not isinstance(input_type, op_args.OpNamedArgs):
             raise errors.WeaveSerializeError(
                 "serializing op with non-named-args input_type not yet implemented"
             )
-        input_types = self.input_type.to_dict()
-        output_type = self.output_type.to_dict()
+        arg_types = copy.copy(input_type.arg_types)
+        for arg_name, arg_type in arg_types.items():
+            if callable(arg_type):
+                arg_types[arg_name] = types.Any()
+        input_types = op_args.OpNamedArgs(arg_types).to_dict()
 
         serialized = {
             "name": self.uri,

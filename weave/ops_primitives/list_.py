@@ -8,6 +8,8 @@ from .. import weave_internal
 from .. import errors
 from .. import execute_fast
 
+from . import dict as dict_ops
+
 
 @weave_class(weave_type=types.List)
 class List:
@@ -48,7 +50,11 @@ class List:
         # WeaveJS makes most ops "mapped", ie they can be called on lists of the
         # object type upon which they are declared. We need to implement the same
         # behavior here, and move this out.
-        output_type=types.Any(),
+        output_type=lambda input_types: types.List(
+            dict_ops.typeddict_pick_output_type(
+                {"self": input_types["self"].object_type, "key": input_types["key"]}
+            )
+        ),
     )
     def pick(self, key):
         return [row.get(key) for row in self]
@@ -330,7 +336,7 @@ def pick_output_type(input_types):
         object_type = self_type.object_type
         is_list = True
     if isinstance(object_type, types.Dict):
-        output_type = object_type.value_type
+        output_type = object_type.object_type
     elif isinstance(object_type, types.TypedDict):
         property_types = object_type.property_types
         output_type = property_types.get(key)

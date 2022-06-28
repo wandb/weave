@@ -139,11 +139,21 @@ class TypeRegistry:
 
 @dataclasses.dataclass
 class Type:
-    name: typing.ClassVar[str] = "type"
+
     instance_class: typing.ClassVar[typing.Optional[type]]
     instance_classes: typing.ClassVar[
         typing.Union[type, typing.List[type], None]
     ] = None
+
+    @classmethod
+    def class_type_name(cls):
+        if cls == Type:
+            return "type"
+        return cls.__name__.removesuffix("Type")
+
+    @property
+    def name(self):
+        return self.class_type_name()
 
     @classmethod
     def _instance_classes(cls):
@@ -558,7 +568,7 @@ class Dict(Type):
     name = "dict"
 
     key_type: Type
-    value_type: Type
+    object_type: Type
 
     def __post_init__(self):
         # Note this differs from Python's Dict in that keys are always strings!
@@ -572,9 +582,9 @@ class Dict(Type):
             next_key_type = self.key_type.assign_type(other_type.key_type)
             if isinstance(next_key_type, Invalid):
                 next_key_type = UnionType(self.key_type, other_type.key_type)
-            next_value_type = self.value_type.assign_type(other_type.value_type)
+            next_value_type = self.object_type.assign_type(other_type.object_type)
             if isinstance(next_value_type, Invalid):
-                next_value_type = UnionType(self.value_type, other_type.value_type)
+                next_value_type = UnionType(self.object_type, other_type.object_type)
         else:
             # TODO: we could handle TypedDict here.
 
@@ -592,17 +602,6 @@ class Dict(Type):
 
 @dataclasses.dataclass
 class ObjectType(Type):
-    # This needs to match the name property
-    # TODO: there has to be a better way to do this (have a property-like
-    # thing that is accessible at class time instead of object time)
-    @classmethod
-    def class_type_name(cls):
-        return cls.__name__.removesuffix("Type")
-
-    @property
-    def name(self):
-        return self.__class__.__name__.removesuffix("Type")
-
     def property_types(self):
         raise NotImplementedError
 

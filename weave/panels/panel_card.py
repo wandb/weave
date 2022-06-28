@@ -36,7 +36,7 @@ class Card(panel.Panel):
     @property
     def config(self):
         return {
-            "title": self._title,
+            "title": self._title.to_json(),
             "subtitle": self._subtitle,
             "content": [item.to_json() for item in self._content],
         }
