@@ -12,6 +12,18 @@ from .. import artifacts_local
 from ..wandb_api import wandb_public_api
 
 
+class OrgType(types.Type):
+    name = "org"
+
+
+class EntityType(types.Type):
+    name = "entity"
+
+
+class ArtifactMembershipType(types.Type):
+    name = "artifactMembership"
+
+
 class ProjectType(types.Type):
     name = "project"
     instance_classes = wandb_api.Project

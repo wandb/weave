@@ -93,7 +93,9 @@ def node_id(node: graph.Node):
     elif isinstance(node, graph.VarNode):
         hashable["name"] = node.name
     elif isinstance(node, graph.ConstNode):
-        if isinstance(node.val, graph.OutputNode):
+        if isinstance(node.val, graph.OutputNode) or isinstance(
+            node.val, graph.VarNode
+        ):
             hashable["val"] = node.val.to_json()
         else:
             hashable["val"] = node.val

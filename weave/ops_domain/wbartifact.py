@@ -55,13 +55,16 @@ class ArtifactVersion:
     # ok...
     def path(artifactVersion, path):
         if ":" in path:
+            # This is a URI
+
             from .. import uris
 
             uri = uris.WeaveURI.parse(path)
             ref = uri.to_ref()
             artifactVersion = ref.artifact
-            path = uri.file
-            # raise errors.WeaveInternalError("Received URI for artifact path")
+
+            # TODO: fix this hack!
+            path = uri.file + ".html"
 
         return artifactVersion.read_path(path)
 

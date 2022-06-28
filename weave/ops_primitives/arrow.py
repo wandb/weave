@@ -47,6 +47,9 @@ class ArrowArrayVectorizer:
             other = other.arr
         return ArrowArrayVectorizer(pc.subtract(self.arr, other))
 
+    def __gt__(self, other):
+        return ArrowArrayVectorizer(pc.greater(self.arr, other))
+
     def __mult__(self, other):
         if isinstance(other, ArrowArrayVectorizer):
             other = other.arr
@@ -130,6 +133,8 @@ def arrow_type_to_weave_type(pa_type) -> types.Type:
         return types.Int()
     elif pa_type == pa.float64():
         return types.Float()
+    elif pa_type == pa.bool_():
+        return types.Boolean()
     elif pa.types.is_list(pa_type):
         return types.List(arrow_type_to_weave_type(pa_type.value_field.type))
     elif pa.types.is_struct(pa_type):

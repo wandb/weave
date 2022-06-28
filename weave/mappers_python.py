@@ -9,6 +9,7 @@ from . import weave_types as types
 from . import graph
 from . import uris
 from . import errors
+from . import box
 
 
 class TypedDictToPyDict(mappers_weave.TypedDictMapper):
@@ -50,10 +51,11 @@ class ObjectDictToObject(mappers_weave.ObjectMapper):
             if isinstance(prop_type, types.Const):
                 result[prop_name] = prop_type.val
 
-        constructor_sig = inspect.signature(result_type.instance_class)
+        instance_class = result_type._instance_classes()[0]
+        constructor_sig = inspect.signature(instance_class)
         if "artifact" in constructor_sig.parameters:
             result["artifact"] = self._artifact
-        res = result_type.instance_class(**result)
+        res = instance_class(**result)
         if not hasattr(res, "artifact"):
             res.artifact = self._artifact
         return res
@@ -97,6 +99,8 @@ class IntToPyInt(mappers.Mapper):
 
 class BoolToPyBool(mappers.Mapper):
     def apply(self, obj):
+        if isinstance(obj, box.BoxedBool):
+            return obj.val
         return obj
 
 

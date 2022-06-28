@@ -308,7 +308,6 @@ def to_arrow_from_list_and_artifact(obj, object_type, artifact):
         arrow_obj = pa.Table.from_pylist(obj, schema=schema)
     else:
         arrow_obj = pa.array(obj, pyarrow_type)
-    print("arrow_obj time: %s" % (time.time() - start_time))
     start_time = time.time()
     weave_obj = arrow.ArrowWeaveList(arrow_obj, object_type, artifact)
     return weave_obj

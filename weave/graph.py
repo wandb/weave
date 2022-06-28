@@ -233,6 +233,8 @@ def node_expr_str(node: Node):
             return str(node.val)
     elif isinstance(node, VarNode):
         return node.name
+    elif isinstance(node, VoidNode):
+        return "<void>"
     else:
         return "**PARSE_ERROR**"
 

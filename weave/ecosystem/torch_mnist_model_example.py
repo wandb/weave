@@ -9,23 +9,12 @@ import typing
 import weave
 from .. import context as _context
 
+from . import pytorch
+
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # TODO: ...
 _loading_builtins_token = _context.set_loading_built_ins()
-
-
-class TorchModelType(weave.types.Type):
-    instance_classes = torch.nn.Sequential
-    instance_class = torch.nn.Sequential
-
-    def save_instance(self, obj, artifact, name):
-        with artifact.new_file(f"{name}.pt", binary=True) as f:
-            torch.save(obj, f)
-
-    def load_instance(self, artifact, name, extra=None):
-        with artifact.open(f"{name}.pt", binary=True) as f:
-            return torch.load(f)
 
 
 @dataclasses.dataclass
@@ -38,7 +27,7 @@ class ModelType(weave.types.ObjectType):
         return {
             "input_type": self.input_type,
             "output_type": self.output_type,
-            "pred_fn": TorchModelType(),
+            "pred_fn": pytorch.TorchModelType(),
         }
 
 
