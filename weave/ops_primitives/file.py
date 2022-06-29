@@ -32,6 +32,8 @@ def file_dir(file):
 
 
 class TableType(types.ObjectType):
+    name = "table"
+
     def property_types(self):
         return {"_rows": arrow.ArrowWeaveListType(types.TypedDict({}))}
 
