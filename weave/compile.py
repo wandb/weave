@@ -97,7 +97,7 @@ def execute_nodes(nodes: typing.List[graph.Node]):
                     % (actual_input_type, expected_input_type)
                 )
             new_inputs = dict(edge.input_to.from_op.inputs)
-            from .ops_primitives.storage import execute
+            from .ops_primitives.weave_api import execute
 
             new_inputs[edge.input_name] = execute(edge.output_of)
             edit_g.replace(

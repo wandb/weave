@@ -26,7 +26,7 @@ from .weave_internal import define_fn
 
 def save(node_or_obj, name=None):
     if isinstance(node_or_obj, _graph.Node):
-        from .ops_primitives.storage import save as op_save
+        from .ops_primitives.weave_api import save as op_save
 
         return op_save(node_or_obj, name=name)
     else:

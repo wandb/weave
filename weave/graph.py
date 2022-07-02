@@ -152,7 +152,7 @@ class ConstNode(Node):
         from . import storage
 
         ref = storage._get_ref(val)
-        from .ops_primitives.storage import get as op_get
+        from .ops_primitives.weave_api import get as op_get
 
         if ref is not None:
             return op_get(ref.uri)
@@ -173,7 +173,7 @@ class ConstNode(Node):
         from . import storage
 
         ref = storage._get_ref(self.val)
-        from .ops_primitives.storage import get as op_get
+        from .ops_primitives.weave_api import get as op_get
 
         if ref is not None:
             return str(op_get(ref.uri))

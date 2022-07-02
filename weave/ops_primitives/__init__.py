@@ -4,7 +4,7 @@ from .dict import *
 from .list_ import *
 from .file import *
 from .file_local import *
-from .storage import *
+from .weave_api import *
 from .arrow import *
 from .pandas_ import *
 from .csv_ import *

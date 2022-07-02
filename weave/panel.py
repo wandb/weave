@@ -4,7 +4,7 @@ from . import graph
 from . import storage
 from . import weave_types as types
 from . import weavejs_fixes
-from .ops_primitives.storage import get as op_get
+from .ops_primitives.weave_api import get as op_get
 
 
 class PanelType(types.Type):

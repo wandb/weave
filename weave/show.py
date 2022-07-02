@@ -13,7 +13,7 @@ from . import storage
 from . import util
 from . import errors
 from . import usage_analytics
-from .ops_primitives.storage import get as op_get
+from .ops_primitives.weave_api import get as op_get
 
 
 def make_refs(node: graph.Node):

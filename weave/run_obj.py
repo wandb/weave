@@ -128,7 +128,7 @@ class Run:
                 sleep_time = 1
             sleep_mult *= 1.3
 
-            from .ops_primitives.storage import get as op_get
+            from .ops_primitives.weave_api import get as op_get
             from .api import use
 
             # TODO: this should support full URIS instead of hard coding

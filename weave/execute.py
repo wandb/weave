@@ -97,7 +97,7 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
 
 def async_op_body(run_uri, run_body, inputs):
     from . import api
-    from .ops_primitives.storage import get as op_get
+    from .ops_primitives.weave_api import get as op_get
 
     with context.execution_client():
         run = op_get(run_uri)
