@@ -45,6 +45,15 @@ class Node:
         n = self.node_from_json(self.to_json())
         return node_expr_str(n)
 
+    # Experimental: make Node.__eq__ behave eagerly
+    # def __eq__(self, other):
+    #     # TODO: This should only use if there is no var node in the graph!
+    #     # print("SELF mro", self.__class__.mro())
+    #     called_eq = super().__eq__(other)
+    #     from . import api
+
+    #     return api.use(called_eq)
+
 
 weave_types.Function.instance_classes = Node
 

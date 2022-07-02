@@ -639,12 +639,12 @@ class ObjectType(Type):
         return mapper.apply(result)
 
 
+@dataclasses.dataclass
 class Function(Type):
     name = "function"
 
-    def __init__(self, input_types, output_type):
-        self.input_types = input_types
-        self.output_type = output_type
+    input_types: dict[str, Type]
+    output_type: Type
 
     @classmethod
     def type_of_instance(cls, obj):

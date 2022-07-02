@@ -55,3 +55,18 @@ def get(uri):
     from . import storage
 
     return storage.get(uri)
+
+
+@op(
+    # TODO: purity is a function of arguments in this special case.
+    # E.g. if argument is "3 + 1", executing it is pure. If this matters
+    # in practice, we can just hardcode in the engine.
+    pure=False,
+    name="execute",
+    input_type={"node": types.Function({}, types.Any())},
+    output_type=lambda input_type: input_type["node"].output_type,
+)
+def execute(node):
+    from .. import weave_internal
+
+    return weave_internal.use_internal(node)
