@@ -185,6 +185,10 @@ class VoidNode(Node):
         return {"nodeType": "void", "type": "invalid"}
 
 
+def nodes_equal(n1: Node, n2: Node):
+    return n1.to_json() == n2.to_json()
+
+
 def for_each(graph: Node, visitor):
     if isinstance(graph, OutputNode):
         for param_name, param_node in graph.from_op.inputs.items():
@@ -282,6 +286,11 @@ def filter_nodes(node: Node, filter_fn: typing.Callable[[Node], Node]) -> list[N
     return [n for n in nodes if filter_fn(n)]
 
 
+def is_open(node: Node) -> bool:
+    """A Node is 'open' (as in open function) if there are one or more VarNodes"""
+    return len(filter_nodes(node, lambda n: isinstance(n, VarNode))) > 0
+
+
 def count(node: Node) -> int:
     return len(_all_nodes(node))
 
@@ -291,3 +300,13 @@ def make_node(v: typing.Any) -> Node:
         return v
     node_type = weave_types.TypeRegistry.type_of(v)
     return ConstNode(node_type, v)
+
+
+def linearize(node: Node) -> typing.Optional[list[OutputNode]]:
+    """Return a list of the nodes by walking 0th argument."""
+    if not isinstance(node, OutputNode):
+        return None
+    arg0 = next(iter(node.from_op.inputs.values()))
+    if not isinstance(arg0, OutputNode):
+        return [node]
+    return linearize(arg0) + [node]

@@ -149,6 +149,19 @@ def test_list_of_ref_to_item_in_list():
     assert weave.use(d_node[1]["c"] == 7) == True
 
 
+def test_arrow_list_of_ref_to_item_in_list():
+    l = [{"a": 5, "b": 6}, {"a": 7, "b": 9}]
+    l_node = weave.save(l, "my-l")
+
+    list_dict_with_ref = storage.to_arrow(
+        [{"c": l_node[0]["a"]}, {"c": l_node[1]["a"]}]
+    )
+    d_node = weave.save(list_dict_with_ref, "my-dict_with_ref")
+
+    assert weave.use(d_node[0]["c"] == 5) == True
+    assert weave.use(d_node[1]["c"] == 7) == True
+
+
 def test_ref_type():
     obj = {"x": 14}
     ref = storage.save(obj, "my-dict")

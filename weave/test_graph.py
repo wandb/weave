@@ -31,3 +31,16 @@ def test_map_dag_produces_same_len():
         mapped_d.from_op.inputs["rhs"].from_op.inputs["lhs"]
     )
     assert graph.count(mapped_d) == 6
+
+
+def test_linearize():
+    a = weave_internal.make_var_node(types.Int(), "a")
+    dag = ((a + 1) * 2) + 3
+    linear = graph.linearize(dag)
+    assert len(linear) == 3
+    assert linear[0].from_op.name == "number-add"
+    assert list(linear[0].from_op.inputs.values())[1].val == 1
+    assert linear[1].from_op.name == "number-mult"
+    assert list(linear[1].from_op.inputs.values())[1].val == 2
+    assert linear[2].from_op.name == "number-add"
+    assert list(linear[2].from_op.inputs.values())[1].val == 3

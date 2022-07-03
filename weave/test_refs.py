@@ -1,5 +1,7 @@
 from . import artifacts_local
 from . import refs
+from . import graph
+from . import api as weave
 
 
 def test_laref_artifact_version():
@@ -101,3 +103,15 @@ def test_laref_artifact_version_path_extra2():
         "x.txt",
         ["5", "a"],
     )
+
+
+def test_node_to_ref():
+    l = [{"a": 5, "b": 6}, {"a": 7, "b": 9}]
+    l_node = weave.save(l, "my-l")
+    node = l_node[0]["a"]
+    ref = refs.node_to_ref(node)
+    assert ref.name == "my-l"
+    assert ref.extra == ["0", "a"]
+
+    node2 = refs.ref_to_node(ref)
+    assert graph.nodes_equal(node2, node)
