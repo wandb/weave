@@ -22,3 +22,4 @@ shap
 xgboost
 torch
 torchvision
+bertviz
