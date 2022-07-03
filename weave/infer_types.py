@@ -8,6 +8,7 @@ import typing
 import typing_extensions
 
 from . import weave_types
+from . import graph
 
 
 class TypedDictLike:
@@ -38,6 +39,8 @@ def python_type_to_type(
             return weave_types.List(*args)
         elif py_type.__origin__ == dict:
             return weave_types.Dict(*args)
+        elif py_type.__origin__ == graph.Node:
+            return weave_types.Function({}, args[0])
         else:
             return weave_types.UnknownType()
     elif is_typed_dict_like(py_type):

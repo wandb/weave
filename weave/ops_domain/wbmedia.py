@@ -1,4 +1,4 @@
-# Implements backward compatibilty for existin W&B Media types.
+# Implements backward compatibilty for existing W&B Media types.
 
 import copy
 import dataclasses

@@ -5,8 +5,12 @@ from . import errors
 from . import weave_types
 from . import uris
 
+T = typing.TypeVar("T")
 
-class Node:
+
+# The Generic here is currently only used in op definitions, its not actually
+# applied within the class. See infer_types.py for usage.
+class Node(typing.Generic[T]):
     type: weave_types.Type
 
     @classmethod

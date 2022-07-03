@@ -94,7 +94,7 @@ def op(
                             "Weave Type could not be determined from Python type (%s) for arg: %s."
                             % (python_type, input_name)
                         )
-                    if existing_weave_type:
+                    if existing_weave_type and existing_weave_type != inferred_type:
                         raise errors.WeaveDefinitionError(
                             "Python type (%s) and Weave Type (%s) declared for arg: %s. Remove one of them to fix."
                             % (inferred_type, existing_weave_type, input_name)
