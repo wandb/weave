@@ -1,4 +1,5 @@
 from collections.abc import Iterable
+import copy
 import typing
 import os
 import json
@@ -350,6 +351,7 @@ def ref_to_node(ref: Ref) -> graph.Node:
     if ref.extra is None:
         return None
     extra = ref.extra
+    ref = copy.copy(ref)
     ref.extra = []
 
     node = op_get(str(ref))

@@ -62,9 +62,7 @@ class ArtifactVersion:
             uri = uris.WeaveURI.parse(path)
             ref = uri.to_ref()
             artifactVersion = ref.artifact
-
-            # TODO: fix this hack!
-            path = uri.file + ".html"
+            path = uri.file
 
         return artifactVersion.read_path(path)
 

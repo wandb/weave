@@ -34,7 +34,7 @@ def _convert_type(old_type: wandb_dtypes.Type) -> types.Type:
         # TODO: should we try to figure out if its an Int?
         return types.String()
     elif isinstance(old_type, wandb_data_types._ImageFileType):
-        return ops.ImageArtifactEntry.WeaveType()  # type: ignore
+        return ops.ImageArtifactFileRef.WeaveType()  # type: ignore
     else:
         raise errors.WeaveInternalError(
             "converting old Weave type not yet implemented: %s" % type(old_type)

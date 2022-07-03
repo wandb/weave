@@ -1,12 +1,17 @@
+# Implements backward compatibilty for existin W&B Media types.
+
+import copy
 import dataclasses
 import typing
 from .. import types
 from .. import api as weave
+from ..ops_primitives import html
 
-# Artifact entries implement a File interface.
+
+## This is an ArtifactRefii, that lets us get access to the ref
+# artifact/path during loading.
 
 
-# A file versioned by an artifact, either inside or a bucket Ref
 class ArtifactEntryType(types.Type):
     def save_instance(self, obj, artifact, name):
         # No-op, this is already a saved ArtifactEntry!
@@ -27,7 +32,7 @@ ArtifactEntryType.instance_class = ArtifactEntry
 
 
 @weave.type(__override_name="image-file")  # type: ignore
-class ImageArtifactEntry:
+class ImageArtifactFileRef:
     # TODO: just File? No, because the frontend is going to call .artifactVersion()
     #     on us. So we need to be ImageArtifactEntry
     path: ArtifactEntry  # This should be a Ref<File<ImageExtensions>>
@@ -41,45 +46,20 @@ class ImageArtifactEntry:
         return self.path.artifact
 
 
-class HtmlType(types.Type):
-    def save_instance(self, obj, artifact, name):
-        with artifact.new_file(f"{name}.html") as f:
-            f.write(obj.html)
-
-    def load_instance(self, artifact, name, extra=None):
-        with artifact.open(f"{name}.html", binary=True) as f:
-            return Html(f.read())
-
-
-@weave.weave_class(weave_type=HtmlType)
-@dataclasses.dataclass
-class Html:
-    html: str
-
-
-HtmlType.instance_classes = Html
-
-
 @weave.type(__override_name="html-file")  # type: ignore
-class HtmlFile:
-    path: str  # This should be a Ref<File<ImageExtensions>>
+class HtmlArtifactFileRef:
+    path: ArtifactEntry
 
 
+# This shows a pattern for how to convert an in memory object (Html)
+# to a W&B media type style FileRef, so that the existing frontend
+# code can work with it.
 @weave.op()
-def html_file(html: Html) -> HtmlFile:
+def html_file(html: html.Html) -> HtmlArtifactFileRef:
     from weave import storage
 
     # This is a ref to the html object
     ref = storage.save(html)
-    return HtmlFile(ref)
-
-    # TODO
-    # convert it to a FileRef, hmm... but how do we distinguish
-    #    between a FileRef and Ref when looking at a URI
-
-    # OK so somehow here we need to get a Ref to the underlying file
-    # instead of a Ref to the object.
-    # Or have some way to translate between those.
-
-    return HtmlFile(ref.artifact, ref.name + ".html")
-    # return HtmlFile(ArtifactEntry(ref.artifact, ref.name))
+    ref = copy.copy(ref)
+    ref.path += ".html"
+    return HtmlArtifactFileRef(ref)
