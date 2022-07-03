@@ -62,13 +62,24 @@ HtmlType.instance_classes = Html
 
 @weave.type(__override_name="html-file")  # type: ignore
 class HtmlFile:
-    path: ArtifactEntry  # This should be a Ref<File<ImageExtensions>>
+    path: str  # This should be a Ref<File<ImageExtensions>>
 
 
 @weave.op()
 def html_file(html: Html) -> HtmlFile:
     from weave import storage
 
+    # This is a ref to the html object
     ref = storage.save(html)
     return HtmlFile(ref)
+
+    # TODO
+    # convert it to a FileRef, hmm... but how do we distinguish
+    #    between a FileRef and Ref when looking at a URI
+
+    # OK so somehow here we need to get a Ref to the underlying file
+    # instead of a Ref to the object.
+    # Or have some way to translate between those.
+
+    return HtmlFile(ref.artifact, ref.name + ".html")
     # return HtmlFile(ArtifactEntry(ref.artifact, ref.name))

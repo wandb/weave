@@ -72,17 +72,9 @@ class File:
         local_path = file.get_local_path()
         import json
 
-        import time
-
-        start_time = time.time()
         data = json.loads(_py_open(local_path).read())
 
         object_type = wandb_util.weave0_type_json_to_weave1_type(data["column_types"])
-        start_time = time.time()
-        # cols = zip(*data["data"])
-        # named_cols = {col_name: col for col_name, col in zip(data["columns"], cols)}
-        # print("Transpose time: %s" % (time.time() - start_time))
-        # start_time = time.time()
 
         # TODO: this will need to recursively convert dicts to Objects in some
         # cases.
@@ -91,18 +83,10 @@ class File:
             row = {}
             for col_name, val in zip(data["columns"], data_row):
                 row[col_name] = val
-                # if isinstance(val, dict) and val.get("_type") == "image-file":
-                #     row[col_name] = imagefile.ImageFile(**val)
-                # else:
-                #     row[col_name] = val
-            # row = {col_name: val for col_name, val in zip(data["columns"], data_row)}
             rows.append(row)
         from .. import storage
 
-        start_time = time.time()
-
         res = storage.to_arrow_from_list_and_artifact(rows, object_type, file.artifact)
-        start_time = time.time()
         # I Don't think I need Table now. We won't parse again
         return Table(res)
 
