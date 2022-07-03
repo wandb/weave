@@ -190,7 +190,7 @@ class Type:
     def name(self):
         return self.class_type_name()
 
-    @property
+    @property  # type: ignore
     def instance_class(self):
         return self._instance_classes()[-1]
 

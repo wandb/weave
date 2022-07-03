@@ -98,10 +98,13 @@ class HFModel:
 
     @weave.op(output_type=BaseModelOutputType())
     def call(self, inputs: str):
+        # TODO: these take awhile to load. We should create them on init, and
+        #     ensure auto-caching of MemRefs works.
         tokenizer = transformers.AutoTokenizer.from_pretrained(self.name)
         model = transformers.AutoModel.from_pretrained(
             self.name, output_attentions=True
         )
+
         model_input = tokenizer.encode(inputs, return_tensors="pt")
         model_output = model(model_input)
         return BaseModelOutput(self, model_input, model_output)

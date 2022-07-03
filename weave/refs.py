@@ -14,7 +14,7 @@ from . import graph
 
 
 class Ref:
-    pass
+    extra: list[str]
 
     def _ipython_display_(self):
         from . import show
@@ -344,7 +344,7 @@ def node_to_ref(node: graph.Node) -> typing.Optional[Ref]:
     return ref
 
 
-def ref_to_node(ref: Ref) -> graph.Node:
+def ref_to_node(ref: Ref) -> typing.Optional[graph.Node]:
     """Inverse of node_to_ref, see docstring for node_to_ref."""
     from .ops_primitives.weave_api import get as op_get
 
@@ -355,9 +355,10 @@ def ref_to_node(ref: Ref) -> graph.Node:
     ref.extra = []
 
     node = op_get(str(ref))
-    for key in extra:
+    for str_key in extra:
+        key: typing.Union[str, int] = str_key
         try:
-            key = int(key)
+            key = int(str_key)
         except ValueError:
             pass
         if hasattr(node, "__getitem__"):
@@ -365,5 +366,5 @@ def ref_to_node(ref: Ref) -> graph.Node:
         elif hasattr(node, "pick"):
             node = node.pick(key)
         else:
-            return False
+            return None
     return node

@@ -26,6 +26,9 @@ class Node(typing.Generic[T]):
         else:
             raise errors.WeaveInternalError("invalid node type: %s" % obj)
 
+    def to_json(self):
+        raise NotImplementedError
+
     # def _repr_html_(self):
     # return show.weave_panel_iframe(self)
     def _ipython_display_(self):
@@ -285,7 +288,7 @@ def _all_nodes(node: Node) -> set[Node]:
     return res
 
 
-def filter_nodes(node: Node, filter_fn: typing.Callable[[Node], Node]) -> list[Node]:
+def filter_nodes(node: Node, filter_fn: typing.Callable[[Node], bool]) -> list[Node]:
     nodes = _all_nodes(node)
     return [n for n in nodes if filter_fn(n)]
 
@@ -306,11 +309,15 @@ def make_node(v: typing.Any) -> Node:
     return ConstNode(node_type, v)
 
 
+def _linearize(node: OutputNode) -> list[OutputNode]:
+    arg0 = next(iter(node.from_op.inputs.values()))
+    if not isinstance(arg0, OutputNode):
+        return [node]
+    return _linearize(arg0) + [node]
+
+
 def linearize(node: Node) -> typing.Optional[list[OutputNode]]:
     """Return a list of the nodes by walking 0th argument."""
     if not isinstance(node, OutputNode):
         return None
-    arg0 = next(iter(node.from_op.inputs.values()))
-    if not isinstance(arg0, OutputNode):
-        return [node]
-    return linearize(arg0) + [node]
+    return _linearize(node)

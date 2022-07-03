@@ -29,7 +29,7 @@ class LinearModelType(weave.types.ObjectType):
 class Model:
     input_type: weave.types.Type
     output_type: weave.types.Type
-    model_coefs: weave.types.List(weave.types.Float())
+    model_coefs: list[float]
 
     @weave.op(
         input_type={"X": lambda input_type: input_type["self"].input_type},
