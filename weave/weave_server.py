@@ -123,6 +123,7 @@ def before_first_request():
     from weave.ecosystem import shap
     from weave.ecosystem import mnist
     from weave.ecosystem import torch_mnist_model_example
+    from weave.ecosystem import craiyon
 
 
 @app.route("/__weave/ops", methods=["GET"])
