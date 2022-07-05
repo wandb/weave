@@ -23,6 +23,8 @@ from .context import (
 
 from .weave_internal import define_fn
 
+Node = _graph.Node
+
 
 def save(node_or_obj, name=None):
     if isinstance(node_or_obj, _graph.Node):

@@ -200,6 +200,8 @@ class Type:
         return Invalid()
 
     def to_dict(self):
+        if self.__class__ == Type:
+            return "type"
         d = {"type": self.name}
         d.update(self._to_dict())
         return d

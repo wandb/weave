@@ -1,5 +1,8 @@
-from ..api import op, mutation
+import typing
+from ..api import op, mutation, Node
 from .. import weave_types as types
+from .. import op_def
+from .. import panels
 
 
 def op_get_return_type(uri):
@@ -70,3 +73,65 @@ def execute(node):
     from .. import weave_internal
 
     return weave_internal.use_internal(node)
+
+
+class EcosystemTypedDict(typing.TypedDict):
+    orgs: list[typing.Any]
+    packages: list[typing.Any]
+    datasets: list[typing.Any]
+    models: list[typing.Any]
+    ops: list[op_def.OpDef]
+
+
+@op(render_info={"type": "function"})
+def ecosystem() -> EcosystemTypedDict:
+    from .. import registry_mem
+
+    return {
+        "orgs": [],
+        "packages": [],
+        "datasets": [],
+        "models": [],
+        "ops": registry_mem.memory_registry.list_ops(),
+    }
+
+
+@op()
+def ecosystem_render(
+    ecosystem: Node[EcosystemTypedDict],
+) -> panels.Card:
+    return panels.Card(
+        title="Weave ecosystem",
+        subtitle="",
+        content=[
+            # Have to do lots of type: ignore, because what we have here is a Node>
+            # But it behaves like a TypedDict, because we mixin NodeMethodsClass for the
+            # target type.
+            # TODO: need to figure out a way to do this without breaking python types
+            panels.CardTab(
+                name="Organizations",
+                content=panels.Table(ecosystem["orgs"]),  # type: ignore
+            ),
+            panels.CardTab(
+                name="Packages",
+                content=panels.Table(ecosystem["packages"]),  # type: ignore
+            ),
+            panels.CardTab(
+                name="Datasets",
+                content=panels.Table(ecosystem["datasets"]),  # type: ignore
+            ),
+            panels.CardTab(
+                name="Models", content=panels.Table(ecosystem["models"])  # type: ignore
+            ),
+            panels.CardTab(
+                name="Ops",
+                content=panels.Table(
+                    ecosystem["ops"],  # type: ignore
+                    columns=[
+                        lambda op: op.op_name(),  # unfortunate, this is a VarNode attr
+                        lambda op: op.output_type(),
+                    ],
+                ),
+            ),
+        ],
+    )

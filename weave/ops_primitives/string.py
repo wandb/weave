@@ -27,5 +27,9 @@ class String:
     def __eq__(lhs: str, rhs: str) -> bool:  # type: ignore
         return lhs == rhs
 
+    @op(name="string-upper")
+    def upper(str: str) -> str:  # type: ignore
+        return str.upper()
+
 
 types.String.instance_class = String

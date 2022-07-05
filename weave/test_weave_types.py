@@ -39,5 +39,5 @@ def test_typeof_type():
 
 
 def test_type_tofromdict():
-    assert types.Type().to_dict() == {"type": "type"}
-    assert types.TypeRegistry.type_from_dict({"type": "type"}) == types.Type()
+    assert types.Type().to_dict() == "type"
+    assert types.TypeRegistry.type_from_dict("type") == types.Type()

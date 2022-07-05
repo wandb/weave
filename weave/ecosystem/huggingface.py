@@ -132,3 +132,18 @@ class ModelOutputAttention:
 @weave.op(render_info={"type": "function"})
 def model(name: str) -> HFModel:
     return HFModel(name)
+
+
+### Trying out a "module" pattern here. Not quite right...
+
+
+# @weave.type()
+# class HuggingFaceModule:
+#     @weave.op()
+#     def model(self, name: str) -> HFModel:
+#         return HFModel(name)
+
+
+# @weave.op(render_info={"type": "function"})
+# def huggingface() -> HuggingFaceModule:
+#     return HuggingFaceModule()

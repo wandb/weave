@@ -1,5 +1,6 @@
 import copy
 import textwrap
+import json
 import inspect
 import os
 import typing
@@ -129,51 +130,30 @@ def is_op_def(obj):
 
 
 class OpDefType(types.Type):
-    name = "op-def"
     instance_class = OpDef
     instance_classes = OpDef
 
-    input_type: op_args.OpArgs
-    output_type: types.Type
-
-    def __init__(self, input_type: op_args.OpArgs, output_type: types.Type):
-        # TODO: actually this should maybe be the function's type?
-        if callable(output_type):
-            raise errors.WeaveTypeError(
-                "OpDefType does not support Callable output_type yet"
-            )
-
-        self.input_type = input_type
-        self.output_type = output_type
-
-    def _to_dict(self):
-        return {
-            "input_type": self.input_type.to_dict(),
-            "output_type": self.output_type.to_dict(),
-        }
-
-    @classmethod
-    def from_dict(cls, d: typing.Any):
-        input_type = op_args.OpArgs.from_dict(d["input_type"])
-        output_type = types.TypeRegistry.type_from_dict(d["output_type"])
-
-        return cls(input_type, output_type)
-
-    @classmethod
-    def type_of_instance(cls, obj: OpDef):
-        # TODO: fix output_type to support callable
-        return cls(obj.input_type, obj.output_type)  # type: ignore
-
-    def assign_type(self, other):
-        return types.InvalidType()
-
     def save_instance(self, obj: OpDef, artifact, name):
-        code = "import weave\n" "\n"
-        code += textwrap.dedent(inspect.getsource(obj.resolve_fn))
-        with artifact.new_file(f"{name}.py") as f:
-            f.write(code)
+
+        if obj.is_builtin:
+            with artifact.new_file(f"{name}.json") as f:
+                json.dump({"name": obj.name}, f)
+        else:
+            code = "import weave\n" "\n"
+            code += textwrap.dedent(inspect.getsource(obj.resolve_fn))
+            with artifact.new_file(f"{name}.py") as f:
+                f.write(code)
 
     def load_instance(cls, artifact, name, extra=None):
+        try:
+            with artifact.open(f"{name}.json") as f:
+                op_spec = json.load(f)
+            from . import registry_mem
+
+            return registry_mem.memory_registry._ops[op_spec["name"]]
+        except FileNotFoundError:
+            pass
+
         path_with_ext = os.path.relpath(
             artifact.path(f"{name}.py"), start=artifacts_local.local_artifact_dir()
         )

@@ -19,12 +19,9 @@ from flask import send_from_directory, send_file
 from weave import server
 from weave import registry_mem
 from weave import errors
+from weave import context
 
 from flask.logging import wsgi_errors_stream
-
-# Ensure these are imported and registered
-from weave import ops
-from weave import run_obj
 
 # set up logging
 
@@ -115,7 +112,14 @@ CORS(app, send_wildcard=True)
 
 @app.before_first_request
 def before_first_request():
+
+    # Ensure these are imported and registered
+    from weave import ops
+
     # Load and register the ecosystem ops
+    # These are all treated as builtins for now.
+    loading_builtins_token = context.set_loading_built_ins()
+
     from weave.ecosystem import openai
     from weave.ecosystem import bertviz_
     from weave.ecosystem import async_demo
@@ -123,6 +127,9 @@ def before_first_request():
     from weave.ecosystem import shap
     from weave.ecosystem import mnist
     from weave.ecosystem import torch_mnist_model_example
+    from weave.ecosystem import craiyon
+
+    context.clear_loading_built_ins(loading_builtins_token)
 
 
 @app.route("/__weave/ops", methods=["GET"])

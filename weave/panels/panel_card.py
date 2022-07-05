@@ -1,4 +1,5 @@
 from .. import panel
+from .. import panel_util
 
 
 class CardTab:
@@ -25,7 +26,7 @@ class Card(panel.Panel):
         self.set_content(config["content"])
 
     def set_title(self, title):
-        self._title = title
+        self._title = panel_util.make_node(title)
 
     def set_subtitle(self, subtitle):
         self._subtitle = subtitle
