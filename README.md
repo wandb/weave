@@ -84,5 +84,5 @@ cd core/frontends/app/weave-ui && yarn build
 Copy it over to weave-python
 
 ```
-rm -rf $WEAVE_ROOT/weave-internal/weave/frontend && cp -r build/ $WEAVE_ROOT/weave-internal/weave/frontend
+rm -rf $WEAVE_ROOT/weave-internal/weave/frontend && cp -r build/ $WEAVE_ROOT/weave-internal/weave/frontend && cp -R ../public/tree-sitter.wasm $WEAVE_ROOT/weave-internal/weave/frontend
 ```
