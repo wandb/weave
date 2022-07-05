@@ -14,7 +14,7 @@ from flask import Flask
 from flask import request
 from flask import abort
 from flask_cors import CORS, cross_origin
-from flask import send_from_directory
+from flask import send_from_directory, send_file
 
 from weave import server
 from weave import registry_mem
@@ -187,6 +187,11 @@ def frontend(path):
         return send_from_directory(app.static_folder, path)
     else:
         return send_from_directory(app.static_folder, "index.html")
+
+
+@app.route("/tree-sitter.wasm")
+def tree_sitter_wasm():
+    return send_file(pathlib.Path(app.static_folder) / "tree-sitter.wasm")
 
 
 @app.route("/__weave/hello")
