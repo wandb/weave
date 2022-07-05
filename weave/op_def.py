@@ -133,9 +133,6 @@ class OpDefType(types.Type):
     instance_class = OpDef
     instance_classes = OpDef
 
-    input_type: op_args.OpArgs
-    output_type: types.Type
-
     def save_instance(self, obj: OpDef, artifact, name):
 
         if obj.is_builtin:
