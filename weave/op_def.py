@@ -29,7 +29,7 @@ class OpDef:
     setter = str
     call_fn: typing.Any
     version: typing.Optional[str]
-    is_builtin: bool = True
+    is_builtin: bool = False
 
     def __init__(
         self,
@@ -143,7 +143,6 @@ class OpDefType(types.Type):
                 json.dump({"name": obj.name}, f)
         else:
             code = "import weave\n" "\n"
-            code = "from weave import op\n" "\n"
             code += textwrap.dedent(inspect.getsource(obj.resolve_fn))
             with artifact.new_file(f"{name}.py") as f:
                 f.write(code)
