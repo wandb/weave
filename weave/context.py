@@ -22,7 +22,7 @@ _loading_op_location: contextvars.ContextVar[
 # this prevents us from storing the op as an artifact
 _loading_built_ins: contextvars.ContextVar[
     typing.Optional[bool]
-] = contextvars.ContextVar("loading_builtins", default=None)
+] = contextvars.ContextVar("loading_builtins", default=True)
 
 
 @contextlib.contextmanager

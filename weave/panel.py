@@ -4,7 +4,6 @@ from . import graph
 from . import storage
 from . import weave_types as types
 from . import weavejs_fixes
-from .ops_primitives.weave_api import get as op_get
 
 
 class PanelType(types.Type):
@@ -37,6 +36,8 @@ class Panel:
         return show(self)
 
     def __init__(self, input_node=graph.VoidNode()):
+        from .ops_primitives.weave_api import get as op_get
+
         if not isinstance(input_node, graph.Node):
             ref = storage.save(input_node)
             input_node = op_get(ref.uri)

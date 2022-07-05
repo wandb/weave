@@ -13,3 +13,4 @@ from .artifacts import *
 from .random_junk import *
 from .image import *
 from .html import *
+from .op_def import *

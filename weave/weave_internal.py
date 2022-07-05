@@ -6,8 +6,6 @@ from . import weave_types as types
 from . import client
 from . import op_args
 from . import server
-from . import registry_mem
-from . import op_def
 
 
 def map_nodes(node, map_fn):
@@ -94,6 +92,9 @@ def define_fn(parameters, body):
 
 
 def make_mapped_op(op_name):
+    from . import registry_mem
+    from . import op_def
+
     mapped_op_name = "list-%s" % op_name  # TODO: doesn't handle fqn
 
     op = registry_mem.memory_registry.get_op(op_name)
