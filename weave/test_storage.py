@@ -102,7 +102,6 @@ def test_wandb_table():
     assert table._eq_debug(table2)
 
 
-@pytest.mark.skip(reason="cross obj refs dont work right now")
 def test_cross_obj_ref():
     d1 = {"a": 5, "b": SomeCustomObj(14)}
     d1_id = storage.save(d1, "my-d1")
@@ -115,18 +114,52 @@ def test_cross_obj_ref():
     assert d3["c"].obj == d4["c"].obj
 
 
-@pytest.mark.skip(reason="cross obj refs dont work right now")
 def test_cross_obj_outer_ref():
     d1 = {"a": 5, "b": SomeCustomObj(14)}
     d1_id = storage.save(d1, "my-d1")
     d2 = storage.get(d1_id)
     d3 = {"f": 5, "c": d2}
     d3_id = storage.save(d3, "my-d3")
-    d4 = storage.get(d3_id)
+    d4 = storage.get(str(d3_id))
     assert d4.keys() == d3.keys()
     assert d3["f"] == d4["f"]
     assert d3["c"]["a"] == d4["c"]["a"]
     assert d3["c"]["b"].obj == d4["c"]["b"].obj
+
+
+def test_ref_to_item_in_list():
+    l = [{"a": 5, "b": 6}]
+    l_node = weave.save(l, "my-l")
+    l_node = l_node[0]["a"]
+
+    dict_with_ref = {"c": l_node}
+    d_node = weave.save(dict_with_ref, "my-dict_with_ref")
+
+    assert weave.use(d_node["c"] == 5) == True
+
+
+def test_list_of_ref_to_item_in_list():
+    l = [{"a": 5, "b": 6}, {"a": 7, "b": 9}]
+    l_node = weave.save(l, "my-l")
+
+    list_dict_with_ref = [{"c": l_node[0]["a"]}, {"c": l_node[1]["a"]}]
+    d_node = weave.save(list_dict_with_ref, "my-dict_with_ref")
+
+    assert weave.use(d_node[0]["c"] == 5) == True
+    assert weave.use(d_node[1]["c"] == 7) == True
+
+
+def test_arrow_list_of_ref_to_item_in_list():
+    l = [{"a": 5, "b": 6}, {"a": 7, "b": 9}]
+    l_node = weave.save(l, "my-l")
+
+    list_dict_with_ref = storage.to_arrow(
+        [{"c": l_node[0]["a"]}, {"c": l_node[1]["a"]}]
+    )
+    d_node = weave.save(list_dict_with_ref, "my-dict_with_ref")
+
+    assert weave.use(d_node[0]["c"] == 5) == True
+    assert weave.use(d_node[1]["c"] == 7) == True
 
 
 def test_ref_type():

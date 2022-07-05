@@ -151,10 +151,6 @@ class Type:
             return "type"
         return cls.__name__.removesuffix("Type")
 
-    @property
-    def name(self):
-        return self.class_type_name()
-
     @classmethod
     def _instance_classes(cls):
         """Helper to get instance_classes as iterable."""
@@ -189,6 +185,14 @@ class Type:
     def type_of_instance(cls, obj):
         # Default implementation for Types that take no arguments.
         return cls()
+
+    @property
+    def name(self):
+        return self.class_type_name()
+
+    @property  # type: ignore
+    def instance_class(self):
+        return self._instance_classes()[-1]
 
     def assign_type(self, next_type):
         if isinstance(next_type, self.__class__):
@@ -403,7 +407,7 @@ class Int(Number):
 
 
 class Boolean(BasicType):
-    instance_classes = bool
+    instance_classes = [bool, box.BoxedBool]
     name = "boolean"
 
     def save_instance(self, obj, artifact, name):
@@ -635,12 +639,12 @@ class ObjectType(Type):
         return mapper.apply(result)
 
 
+@dataclasses.dataclass
 class Function(Type):
     name = "function"
 
-    def __init__(self, input_types, output_type):
-        self.input_types = input_types
-        self.output_type = output_type
+    input_types: dict[str, Type]
+    output_type: Type
 
     @classmethod
     def type_of_instance(cls, obj):

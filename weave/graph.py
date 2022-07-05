@@ -5,8 +5,12 @@ from . import errors
 from . import weave_types
 from . import uris
 
+T = typing.TypeVar("T")
 
-class Node:
+
+# The Generic here is currently only used in op definitions, its not actually
+# applied within the class. See infer_types.py for usage.
+class Node(typing.Generic[T]):
     type: weave_types.Type
 
     @classmethod
@@ -21,6 +25,9 @@ class Node:
             return VoidNode()
         else:
             raise errors.WeaveInternalError("invalid node type: %s" % obj)
+
+    def to_json(self):
+        raise NotImplementedError
 
     # def _repr_html_(self):
     # return show.weave_panel_iframe(self)
@@ -44,6 +51,15 @@ class Node:
     def __str__(self):
         n = self.node_from_json(self.to_json())
         return node_expr_str(n)
+
+    # Experimental: make Node.__eq__ behave eagerly
+    # def __eq__(self, other):
+    #     # TODO: This should only use if there is no var node in the graph!
+    #     # print("SELF mro", self.__class__.mro())
+    #     called_eq = super().__eq__(other)
+    #     from . import api
+
+    #     return api.use(called_eq)
 
 
 weave_types.Function.instance_classes = Node
@@ -143,7 +159,7 @@ class ConstNode(Node):
         from . import storage
 
         ref = storage._get_ref(val)
-        from .ops_primitives.storage import get as op_get
+        from .ops_primitives.weave_api import get as op_get
 
         if ref is not None:
             return op_get(ref.uri)
@@ -164,7 +180,7 @@ class ConstNode(Node):
         from . import storage
 
         ref = storage._get_ref(self.val)
-        from .ops_primitives.storage import get as op_get
+        from .ops_primitives.weave_api import get as op_get
 
         if ref is not None:
             return str(op_get(ref.uri))
@@ -174,6 +190,10 @@ class ConstNode(Node):
 class VoidNode(Node):
     def to_json(self):
         return {"nodeType": "void", "type": "invalid"}
+
+
+def nodes_equal(n1: Node, n2: Node):
+    return n1.to_json() == n2.to_json()
 
 
 def for_each(graph: Node, visitor):
@@ -233,6 +253,8 @@ def node_expr_str(node: Node):
             return str(node.val)
     elif isinstance(node, VarNode):
         return node.name
+    elif isinstance(node, VoidNode):
+        return "<void>"
     else:
         return "**PARSE_ERROR**"
 
@@ -266,9 +288,14 @@ def _all_nodes(node: Node) -> set[Node]:
     return res
 
 
-def filter_nodes(node: Node, filter_fn: typing.Callable[[Node], Node]) -> list[Node]:
+def filter_nodes(node: Node, filter_fn: typing.Callable[[Node], bool]) -> list[Node]:
     nodes = _all_nodes(node)
     return [n for n in nodes if filter_fn(n)]
+
+
+def is_open(node: Node) -> bool:
+    """A Node is 'open' (as in open function) if there are one or more VarNodes"""
+    return len(filter_nodes(node, lambda n: isinstance(n, VarNode))) > 0
 
 
 def count(node: Node) -> int:
@@ -280,3 +307,17 @@ def make_node(v: typing.Any) -> Node:
         return v
     node_type = weave_types.TypeRegistry.type_of(v)
     return ConstNode(node_type, v)
+
+
+def _linearize(node: OutputNode) -> list[OutputNode]:
+    arg0 = next(iter(node.from_op.inputs.values()))
+    if not isinstance(arg0, OutputNode):
+        return [node]
+    return _linearize(arg0) + [node]
+
+
+def linearize(node: Node) -> typing.Optional[list[OutputNode]]:
+    """Return a list of the nodes by walking 0th argument."""
+    if not isinstance(node, OutputNode):
+        return None
+    return _linearize(node)

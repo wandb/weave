@@ -1,10 +1,4 @@
-from typing import Tuple, Union, Callable, Any, TypeVar
-
-from . import types
-
-# Because we are going to declare weave.type, but we need to call
-# Python's type.
-_pytype = type
+from typing import Tuple, Union, Callable, Any, TypeVar, Type
 
 _T = TypeVar("_T")
 
@@ -15,7 +9,7 @@ def __dataclass_transform__(
     eq_default: bool = True,
     order_default: bool = False,
     kw_only_default: bool = False,
-    field_descriptors: Tuple[Union[_pytype, Callable[..., Any]], ...] = (()),
+    field_descriptors: Tuple[Union[Type, Callable[..., Any]], ...] = (()),
 ) -> Callable[[_T], _T]: ...
 @__dataclass_transform__()
 def type(__override_name: str = None) -> Callable[[_T], _T]: ...

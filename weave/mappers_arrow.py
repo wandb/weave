@@ -6,8 +6,9 @@ from . import mappers
 from . import mappers_python
 from . import mappers_weave
 from . import arrow_util
+from . import refs
 from . import weave_types as types
-from . import storage
+from . import uris
 from . import errors
 
 
@@ -87,9 +88,6 @@ class FloatToArrowFloat(mappers.Mapper):
 
 
 class ArrowFloatToFloat(mappers.Mapper):
-    def result_type(self):
-        return types.Float()
-
     def apply(self, obj):
         return obj
 
@@ -97,6 +95,21 @@ class ArrowFloatToFloat(mappers.Mapper):
 class StringToArrowString(mappers_python.StringToPyString):
     def result_type(self):
         return pa.string()
+
+
+class FunctionToArrowFunction(mappers.Mapper):
+    def result_type(self):
+        return pa.string()
+
+    def apply(self, obj):
+        ref = refs.node_to_ref(obj)
+        return str(ref)
+
+
+class ArrowFunctionToFunction(mappers.Mapper):
+    def apply(self, obj):
+        ref = uris.WeaveURI.parse(obj).to_ref()
+        return refs.ref_to_node(ref)
 
 
 class NoneToArrowNone(mappers.Mapper):
@@ -199,6 +212,8 @@ def map_to_arrow_(type, mapper, artifact, path=[]):
         return FloatToArrowFloat(type, mapper, artifact, path)
     elif isinstance(type, types.String):
         return StringToArrowString(type, mapper, artifact, path)
+    elif isinstance(type, types.Function):
+        return FunctionToArrowFunction(type, mapper, artifact, path)
     elif isinstance(type, types.NoneType):
         return NoneToArrowNone(type, mapper, artifact, path)
     elif isinstance(type, types.UnknownType):
@@ -224,6 +239,8 @@ def map_from_arrow_(type, mapper, artifact, path=[]):
         return ArrowFloatToFloat(type, mapper, artifact, path)
     elif isinstance(type, types.String):
         return mappers_python.StringToPyString(type, mapper, artifact, path)
+    elif isinstance(type, types.Function):
+        return ArrowFunctionToFunction(type, mapper, artifact, path)
     elif isinstance(type, types.NoneType):
         return mappers_python.NoneToPyNone(type, mapper, artifact, path)
     elif isinstance(type, types.UnknownType):

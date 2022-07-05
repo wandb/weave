@@ -43,7 +43,6 @@ def pytest_sessionstart(session):
 
 
 from . import context
-from . import weave_server
 
 
 @pytest.fixture(autouse=True)
@@ -62,6 +61,8 @@ def pre_post_each_test():
 def fresh_server_logfile():
     def _clearlog():
         try:
+            from . import weave_server
+
             os.remove(weave_server.default_log_filename)
         except (OSError, FileNotFoundError):
             pass

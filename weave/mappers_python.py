@@ -9,6 +9,7 @@ from . import weave_types as types
 from . import graph
 from . import uris
 from . import errors
+from . import box
 
 
 class TypedDictToPyDict(mappers_weave.TypedDictMapper):
@@ -50,10 +51,11 @@ class ObjectDictToObject(mappers_weave.ObjectMapper):
             if isinstance(prop_type, types.Const):
                 result[prop_name] = prop_type.val
 
-        constructor_sig = inspect.signature(result_type.instance_class)
+        instance_class = result_type._instance_classes()[0]
+        constructor_sig = inspect.signature(instance_class)
         if "artifact" in constructor_sig.parameters:
             result["artifact"] = self._artifact
-        res = result_type.instance_class(**result)
+        res = instance_class(**result)
         if not hasattr(res, "artifact"):
             res.artifact = self._artifact
         return res
@@ -97,6 +99,8 @@ class IntToPyInt(mappers.Mapper):
 
 class BoolToPyBool(mappers.Mapper):
     def apply(self, obj):
+        if isinstance(obj, box.BoxedBool):
+            return obj.val
         return obj
 
 
@@ -133,13 +137,27 @@ class UnknownToPyUnknown(mappers.Mapper):
 
 
 class FunctionToPyFunction(mappers.Mapper):
-    def apply(self, obj):
-        # Obj is graph.Node
-        return obj.to_json()
+    def apply(self, obj: graph.Node):
+        # TODO: This should be a check on input type rather than a value check!
+        #   As implemented it might be possible to save in two different formats
+        #   for the save input type, which is bad.
+        if not graph.is_open(obj):
+            equivalent_ref = refs.node_to_ref(obj)
+            if equivalent_ref is None:
+                raise errors.WeaveInternalError(
+                    "Saving non-Ref closed functions not allowed (yet?)"
+                )
+            return equivalent_ref.uri
+        else:
+            # Obj is graph.Node
+            return obj.to_json()
 
 
 class PyFunctionToFunction(mappers.Mapper):
     def apply(self, obj):
+        if isinstance(obj, str):
+            ref = uris.WeaveURI.parse(obj).to_ref()
+            return refs.ref_to_node(ref)
         # Obj is graph.Node
         return graph.Node.node_from_json(obj)
 

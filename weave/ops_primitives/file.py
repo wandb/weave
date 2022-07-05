@@ -32,6 +32,8 @@ def file_dir(file):
 
 
 class TableType(types.ObjectType):
+    name = "table"
+
     def property_types(self):
         return {"_rows": arrow.ArrowWeaveListType(types.TypedDict({}))}
 
@@ -67,25 +69,12 @@ class File:
         output_type=TableType(),
     )
     def table(file):
-        print("TABLE FILE", file)
         local_path = file.get_local_path()
         import json
 
-        import time
-
-        start_time = time.time()
         data = json.loads(_py_open(local_path).read())
-        print("data columns", data["columns"])
-        if len(data) > 0:
-            print("data row0", data["data"][0])
 
         object_type = wandb_util.weave0_type_json_to_weave1_type(data["column_types"])
-        print("Json parse time: %s" % (time.time() - start_time))
-        start_time = time.time()
-        # cols = zip(*data["data"])
-        # named_cols = {col_name: col for col_name, col in zip(data["columns"], cols)}
-        # print("Transpose time: %s" % (time.time() - start_time))
-        # start_time = time.time()
 
         # TODO: this will need to recursively convert dicts to Objects in some
         # cases.
@@ -94,22 +83,10 @@ class File:
             row = {}
             for col_name, val in zip(data["columns"], data_row):
                 row[col_name] = val
-                # if isinstance(val, dict) and val.get("_type") == "image-file":
-                #     row[col_name] = imagefile.ImageFile(**val)
-                # else:
-                #     row[col_name] = val
-            # row = {col_name: val for col_name, val in zip(data["columns"], data_row)}
             rows.append(row)
         from .. import storage
 
-        print("Dicts time: %s" % (time.time() - start_time))
-        start_time = time.time()
-
-        print("Weave type:", object_type)
-        print("PASSING ARTIFACT", file.artifact)
         res = storage.to_arrow_from_list_and_artifact(rows, object_type, file.artifact)
-        print("Arrow time: %s" % (time.time() - start_time))
-        start_time = time.time()
         # I Don't think I need Table now. We won't parse again
         return Table(res)
 

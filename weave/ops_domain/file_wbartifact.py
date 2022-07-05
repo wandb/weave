@@ -47,9 +47,9 @@ class ArtifactVersionDirType(types.ObjectType):
             "fullPath": types.String(),
             "size": types.Int(),
             "dirs": types.Dict(
-                types.String(), types.SubDirType(ArtifactVersionFile.WeaveType())
+                types.String(), types.SubDirType(ArtifactVersionFileType())
             ),
-            "files": types.Dict(types.String(), ArtifactVersionFile.WeaveType()),
+            "files": types.Dict(types.String(), ArtifactVersionFileType()),
         }
 
 

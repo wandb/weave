@@ -61,22 +61,31 @@ def _make_output_node(fq_op_name, bound_params, output_type_):
         new_input_type = {k: n.type for k, n in bound_params.items()}
         output_type = output_type(new_input_type)
 
+    name = "OutputNode"
+    bases = [graph.OutputNode]
+
+    # Mixin Node methods
     if hasattr(output_type, "NodeMethodsClass"):
-        name = "OutputNode%s" % output_type.__class__.__name__
-        bases = [graph.OutputNode, output_type.NodeMethodsClass]
+        name += output_type.__class__.__name__
+        bases.append(output_type.NodeMethodsClass)
 
-        # If the output type is a run, mixin the Run's output type
-        # as well. execute.py automatic inserts await_output operations
-        # as needed.
-        if isinstance(output_type, types.RunType) and hasattr(
-            output_type._output, "NodeMethodsClass"
-        ):
-            name += output_type._output.__class__.__name__
-            bases.append(output_type._output.NodeMethodsClass)
+    # If the output type is a run, mixin the Run's output type
+    # as well. execute.py automatic inserts await_output operations
+    # as needed.
+    if isinstance(output_type, types.RunType) and hasattr(
+        output_type._output, "NodeMethodsClass"
+    ):
+        name += output_type._output.__class__.__name__
+        bases.append(output_type._output.NodeMethodsClass)
 
-        return_type = type(name, tuple(bases), {})
-    else:
-        return_type = graph.OutputNode
+    # Mixin function output type Node methods
+    if isinstance(output_type, types.Function) and hasattr(
+        output_type.output_type, "NodeMethodsClass"
+    ):
+        name += output_type.output_type.__class__.__name__
+        bases.append(output_type.output_type.NodeMethodsClass)
+
+    return_type = type(name, tuple(bases), {})
     return return_type(output_type, fq_op_name, bound_params)
 
 
