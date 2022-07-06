@@ -302,13 +302,6 @@ def count(node: Node) -> int:
     return len(_all_nodes(node))
 
 
-def make_node(v: typing.Any) -> Node:
-    if isinstance(v, Node):
-        return v
-    node_type = weave_types.TypeRegistry.type_of(v)
-    return ConstNode(node_type, v)
-
-
 def _linearize(node: OutputNode) -> list[OutputNode]:
     arg0 = next(iter(node.from_op.inputs.values()))
     if not isinstance(arg0, OutputNode):

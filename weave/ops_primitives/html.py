@@ -10,7 +10,7 @@ class HtmlType(types.Type):
             f.write(obj.html)
 
     def load_instance(self, artifact, name, extra=None):
-        with artifact.open(f"{name}.html", binary=True) as f:
+        with artifact.open(f"{name}.html") as f:
             return Html(f.read())
 
 

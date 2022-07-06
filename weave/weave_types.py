@@ -713,9 +713,15 @@ class WBTable(Type):
     name = "wbtable"
 
 
-# :( resolve circular imports by doing these at the bottom
-# TODO: keep considering removing save_instance/load_instance from
-# types themselves, and move to serializers/mappers somehow
+def is_json_compatible(type_):
+    if isinstance(type_, List):
+        return is_json_compatible(type_.object_type)
+    elif isinstance(type_, Dict):
+        return is_json_compatible(type_.object_type)
+    elif isinstance(type_, TypedDict):
+        return all(t for t in type_.property_types.values())
+    else:
+        return isinstance(type_, BasicType)
 
 
 def optional(type_):
