@@ -1,4 +1,5 @@
-from urllib.parse import urlparse
+# This demonstrates how to create asynchronous Weave ops.
+
 import time
 
 import weave
@@ -19,7 +20,7 @@ import weave
     ),
 )
 def slowmult(a, b, sleep, _run=None):
-    from .. import api
+    from . import api
 
     res = b
     for i in range(a - 1):
@@ -102,7 +103,7 @@ AsyncDemoTrainResultType.instance_class = AsyncDemoTrainResult
     ),
 )
 def train(dataset, _run=None):
-    from .. import api
+    from . import api
 
     api.use(_run.print_("starting"))
     api.use(_run.set_output(AsyncDemoTrainResult(dataset[0]["prompt"])))

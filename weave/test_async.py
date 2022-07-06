@@ -1,7 +1,7 @@
 from . import api
 from . import storage
 from . import ops
-from .ecosystem import async_demo
+from . import async_demo
 import pytest
 from . import run_obj
 from . import artifacts_local

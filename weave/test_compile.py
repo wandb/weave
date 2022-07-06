@@ -1,6 +1,5 @@
-from .ecosystem import async_demo
+from . import async_demo
 from . import compile
-from . import artifacts_local
 
 
 def test_automatic_await_compile():
