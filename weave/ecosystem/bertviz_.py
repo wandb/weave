@@ -7,19 +7,41 @@ from . import huggingface
 
 @weave.op()
 def head_view(attention: huggingface.ModelOutputAttention) -> weave.ops.Html:
+    # All the information we need is attached to the ModelOutputAttention object.
+    # This is important. In Weave, types should "stand alone", meaning they should
+    # contain references to any information that is necessary for their use.
+
+    # we can walk to model_output from attention
     model_output = attention.model_output
+
+    # we can walk to model_input from model_output
     model_input = model_output.model_input
+
+    # we can walk to the model
     model = model_output.model
+
     tokens = model.tokenizer().convert_ids_to_tokens(model_input[0])
+
+    # Finally call bertviz, which gives us back html.
     html = bertviz.head_view(attention.attention, tokens, html_action="return")
+
+    # The .data attribute contains the html string. Wrap it in the weave Html type.
+
+    # TODO: this would read better as weave.types.Html I think.
     return weave.ops.Html(html.data)
 
 
+# An op that returns a panel is treated by the WeaveUI code as a panel. It will
+# show up in the panel choices if the current expressoins' output type matches
+# the type of the panel input (the first argument in the op declaration.)
 @weave.op()
 def head_view_panel_render(
     attention: weave.Node[huggingface.ModelOutputAttention],
 ) -> weave.panels.Html:
+    # This is a lazy call! It doesn't execute anything
     html = head_view(attention)
-    # TODO: get rid of html_file. It should be auto-converted for us
-    # somehow...
-    return weave.panels.Html(input_node=weave.ops.html_file(html))
+
+    # We add the lazy call as input to the returned Html panel. Nothing has been
+    # computed so far. The UI's Html panel will perform a useNodeValue operation on its
+    # input node. Only then will the head_view function finally be called.
+    return weave.panels.Html(html)

@@ -1,20 +1,20 @@
 # Weave internal
 
-This repository is for pre-release Weave development and internal usage trials.
+This repository is for pre-release Weave development and internal W&B usage.
 
 **Do not share this repo, screenshots, or related information, with anyone outside of W&B unless you have explicit written approval from Shawn.**
 
-# Current status
+# Q3 2022 Goals
 
-This is a very early release of Weave Jupyter. The example notebooks should work. Trying to do anything beyond what the notebooks do probably will not work.
+Our Q3 goal for Weave is to enable ML engineers at W&B to start making new W&B experiences (gated behind feature flags for now)!
 
-The code contained herein is of mixed quality. We are starting a cleanup pass now.
+# Support
 
-# Getting involved
+Please send questions, feedback & issues in the W&B #weave Slack channel.
 
-We'd love for you to start playing with Weave Python! Unfortunately there are currently no docs, or even reasonable explanations of what this is. Sorry about that! Try the setup instructions here, and then run the notebooks.
+# Documentation
 
-Please send any and all feedback to Shawn and Danny in the W&B #weave Slack channel. We are happy to take questions, troubleshoot issues, etc.
+Weave documentation is currently maintained in our internal W&B notion: https://www.notion.so/wandbai/Weave-Python-b4a5ccade5ed460ba0d6ca03e7b82bf2
 
 # Setup instructions
 
@@ -31,6 +31,13 @@ This will install weave and its dependencies in your weave_internal pyenv. It al
 
 Now you can use any of the notebooks in this repository's root directory or the examples/ directory, or `import weave` anywhere else on your system when using the weave_internal pyenv.
 
+If you are going to submit PRs to weave-internal, please also install the pre-commit hooks:
+
+```
+pip install -r requirements.dev.txt
+pre-commit install
+```
+
 # Example notebooks
 
 Demo notebooks can be found in / and /examples.
@@ -42,47 +49,3 @@ jupyter notebook
 ```
 
 in the root directory, and then use the Jupyter browser to open them.
-
-# Docs
-
-Coming soon
-
-# Development
-
-Install pre commit hooks
-
-```
-pip install -r requirements.dev.txt
-pre-commit install
-```
-
-### Enable frontend devmode
-
-- Run a frontend dev server on 3000:
-
-In the W&B core repo (for now, later we'll move this out to a new repo):
-
-```
-git checkout weave-python/master
-cd frontends/app/weave-ui && yarn dev
-```
-
-- Enable frontend dev mode in python
-
-```
-weave.enable_frontend_devmode()
-```
-
-### Build the bundle for production
-
-Go to the weave ui directory and build the bundle
-
-```
-cd core/frontends/app/weave-ui && yarn build
-```
-
-Copy it over to weave-python
-
-```
-rm -rf $WEAVE_ROOT/weave-internal/weave/frontend && cp -r build/ $WEAVE_ROOT/weave-internal/weave/frontend && cp -R ../public/tree-sitter.wasm $WEAVE_ROOT/weave-internal/weave/frontend
-```
