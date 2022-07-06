@@ -6,6 +6,8 @@ import typing
 from .. import types
 from .. import api as weave
 from ..ops_primitives import html
+from ..ops_primitives import markdown
+from . import file_wbartifact
 
 
 ## This is an ArtifactRefii, that lets us get access to the ref
@@ -63,3 +65,22 @@ def html_file(html: html.Html) -> HtmlArtifactFileRef:
     ref = copy.copy(ref)
     ref.path += ".html"
     return HtmlArtifactFileRef(ref)
+
+
+# Yet another pattern for returning a file inside an artifact!
+# In this case, the WeaveJS Markdown panel expects a 'file' type
+# (with extension in the type).
+# TODO: merge all these patterns!!!!
+@weave.op(
+    # Oof, returning a different type than the op returns. Ugly
+    # Still haven't nailed type interfaces
+    # TODO: fix
+    output_type=weave.types.FileType(
+        weave.types.Const(weave.types.String(), "md")  # type: ignore
+    )
+)
+def markdown_file(md: markdown.Markdown):
+    from weave import storage
+
+    ref = storage.save(md)
+    return file_wbartifact.ArtifactVersionFile(ref.artifact, ref.path + ".md")

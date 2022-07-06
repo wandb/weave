@@ -21,6 +21,7 @@ from . import run_obj
 from . import compile
 from . import context
 from . import uris
+from . import box
 
 
 class ExecuteStats:
@@ -198,7 +199,26 @@ def execute_forward_node(
         forward_node.set_result(run)
     else:
         logging.debug("Executing sync op")
-        result = execute_sync_op(op_def, inputs)
+
+        # Hacking... this is nullability of ops
+        # We should do this as a compile pass instead of hard-coding in engine.
+        # That means we need an op called like "handle_null" that takes a function
+        # as its second argument. Function is the op we want to execute if non-null.
+        # TODO: fix
+        # TODO: not implemented for async ops
+        force_none_result = False
+        if inputs:
+            input_name0 = list(inputs.keys())[0]
+            input0 = list(inputs.values())[0]
+            if input0 is None or isinstance(input0, box.BoxedNone):
+                input0_type = node.from_op.inputs[input_name0]
+                if not types.is_optional(input0_type):
+                    force_none_result = True
+        if force_none_result:
+            result = None
+        else:
+            result = execute_sync_op(op_def, inputs)
+
         ref = storage._get_ref(result)
         if ref is not None:
             logging.debug("Op resulted in ref")

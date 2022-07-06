@@ -7,6 +7,7 @@ from wandb.apis import public as wandb_api
 from ..api import op, weave_class
 from .. import weave_types as types
 from . import wbartifact
+from . import file_wbartifact
 from .wbmedia import *
 from .. import errors
 from .. import artifacts_local
