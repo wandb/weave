@@ -20,6 +20,4 @@ def head_view_panel_render(
     attention: weave.Node[huggingface.ModelOutputAttention],
 ) -> weave.panels.Html:
     html = head_view(attention)
-    # TODO: get rid of html_file. It should be auto-converted for us
-    # somehow...
-    return weave.panels.Html(input_node=weave.ops.html_file(html))
+    return weave.panels.Html(html)

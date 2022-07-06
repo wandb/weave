@@ -122,7 +122,6 @@ def before_first_request():
 
     from weave.ecosystem import openai
     from weave.ecosystem import bertviz_
-    from weave.ecosystem import hackdemo
     from weave.ecosystem import shap
     from weave.ecosystem import mnist
     from weave.ecosystem import torch_mnist_model_example
