@@ -99,7 +99,7 @@ class File:
         # TODO: This should depend on whether its local or an artifact
         #    etc
         local_path = os.path.abspath(file.get_local_path())
-        return "http://localhost:9994/__weave/file/%s" % local_path
+        return "/__weave/file/%s" % local_path
 
     @op(
         name="file-size", input_type={"file": types.FileType()}, output_type=types.Int()
