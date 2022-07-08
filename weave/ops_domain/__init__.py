@@ -14,19 +14,19 @@ from .. import artifacts_local
 from ..wandb_api import wandb_public_api
 
 
-class OrgType(types.Type):
+class OrgType(types._PlainStringNamedType):
     name = "org"
 
 
-class EntityType(types.Type):
+class EntityType(types._PlainStringNamedType):
     name = "entity"
 
 
-class ArtifactMembershipType(types.Type):
+class ArtifactMembershipType(types._PlainStringNamedType):
     name = "artifactMembership"
 
 
-class ProjectType(types.Type):
+class ProjectType(types._PlainStringNamedType):
     name = "project"
     instance_classes = wandb_api.Project
     instance_class = wandb_api.Project
@@ -39,7 +39,7 @@ class ProjectType(types.Type):
         return api.project(name=d["project_name"], entity=d["entity_name"])
 
 
-class RunType(types.Type):
+class RunType(types._PlainStringNamedType):
     name = "run"
 
     instance_classes = wandb_api.Run
@@ -62,7 +62,7 @@ class RunType(types.Type):
         return res
 
 
-class ArtifactType(types.Type):
+class ArtifactType(types._PlainStringNamedType):
     name = "artifact"
     instance_classes = wandb_api.ArtifactCollection
     instance_class = wandb_api.ArtifactCollection
@@ -191,7 +191,7 @@ class ArtifactVersionsOps:
         return artifacts_local.WandbArtifact.from_wb_artifact(wb_artifact)
 
 
-class ArtifactTypeType(types.Type):
+class ArtifactTypeType(types._PlainStringNamedType):
     name = "artifactType"
     instance_classes = wandb_api.ArtifactType
     instance_class = wandb_api.ArtifactType
@@ -281,9 +281,11 @@ class Project:
         project: wandb_api.Project,
     ) -> typing.List[wandb_api.ArtifactCollection]:
         api = wandb_public_api()
-        return api.artifact_type(
-            "test_results", project=f"{project.entity}/{project.name}"
-        ).collections()
+        return [
+            col
+            for at in api.artifact_types(project=f"{project.entity}/{project.name}")
+            for col in at.collections()
+        ]
 
     @op(name="project-artifactTypes")
     def artifact_types(project: wandb_api.Project) -> wandb_api.ProjectArtifactTypes:

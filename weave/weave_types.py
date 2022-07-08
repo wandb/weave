@@ -266,11 +266,15 @@ class Type:
         raise NotImplementedError
 
 
-class BasicType(Type):
+# _PlainStringNamedType should only be used for backward compatibility with
+# legacy WeaveJS code.
+class _PlainStringNamedType(Type):
     def to_dict(self):
         # A basic type is serialized as just its string name.
         return self.name
 
+
+class BasicType(_PlainStringNamedType):
     def save_instance(self, obj, artifact, name):
         if artifact is None:
             raise errors.WeaveSerializeError(

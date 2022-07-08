@@ -7,7 +7,7 @@ from .. import artifacts_local
 from .. import refs
 
 
-class ArtifactVersionType(types.Type):
+class ArtifactVersionType(types._PlainStringNamedType):
     name = "artifactVersion"
     instance_classes = artifacts_local.WandbArtifact
     instance_class = artifacts_local.WandbArtifact
