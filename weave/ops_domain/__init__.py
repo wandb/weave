@@ -309,16 +309,12 @@ class Project:
         )
         return artifacts_local.WandbArtifact.from_wb_artifact(wb_artifact)
 
-    # TODO: put this back to wandb_api.Runs
     @op()
-    def runs(project: wandb_api.Project) -> list[wandb_api.Run]:
+    def runs(project: wandb_api.Project) -> wandb_api.Runs:
         import wandb
 
         api = wandb.Api()
-        try:
-            return list(api.runs(path="%s/%s" % (project.entity, project.name), per_page=500))
-        except:
-            return []
+        return list(api.runs(path="%s/%s" % (project.entity, project.name), per_page=500))
 
     @op(name="project-filtered-runs")
     def filtered_runs(
@@ -335,11 +331,7 @@ class Project:
         )
 
 
-# TODO: Investigate why we need to explicity put the union on the return
 @op(name="root-project")
-def project(entityName: str, projectName: str) -> typing.Union[None, wandb_api.Project]:
-    try:
-        return wandb_public_api().project(name=projectName, entity=entityName)
-    except:
-        return None
+def project(entityName: str, projectName: str) -> wandb_api.Project:
+    return wandb_public_api().project(name=projectName, entity=entityName)
 
