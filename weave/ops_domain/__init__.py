@@ -281,7 +281,11 @@ class Project:
         project: wandb_api.Project,
     ) -> typing.List[wandb_api.ArtifactCollection]:
         api = wandb_public_api()
-        return [col for at in api.artifact_types(project=f"{project.entity}/{project.name}") for col in at.collections()]
+        return [
+            col
+            for at in api.artifact_types(project=f"{project.entity}/{project.name}")
+            for col in at.collections()
+        ]
 
     @op(name="project-artifactTypes")
     def artifact_types(project: wandb_api.Project) -> wandb_api.ProjectArtifactTypes:
