@@ -139,9 +139,7 @@ class Run:
 
         return self._output
 
-
     @op(
-        name="run-id",
         input_type={
             "self": types.RunType(
                 types.TypedDict({}), types.List(types.Any()), types.Any()

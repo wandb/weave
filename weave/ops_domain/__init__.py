@@ -331,4 +331,3 @@ class Project:
 @op(name="root-project")
 def project(entityName: str, projectName: str) -> wandb_api.Project:
     return wandb_public_api().project(name=projectName, entity=entityName)
-
