@@ -140,19 +140,17 @@ class Run:
         return self._output
 
 
-    # todo: replace `self` with run - this is 
-    # temp hack to get WeaveJS compat
     @op(
         name="run-id",
         input_type={
-            "run": types.RunType(
+            "self": types.RunType(
                 types.TypedDict({}), types.List(types.Any()), types.Any()
             ),
         },
         output_type=types.String(),
     )
-    def id(run):
-        return run._id
+    def id(self):
+        return self._id
 
     @op(
         input_type={
