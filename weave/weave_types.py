@@ -266,7 +266,8 @@ class Type:
         raise NotImplementedError
 
 
-# This should only be used for JS compatability
+# _PlainStringNamedType should only be used for backward compatibility with
+# legacy WeaveJS code.
 class _PlainStringNamedType(Type):
     def to_dict(self):
         # A basic type is serialized as just its string name.
