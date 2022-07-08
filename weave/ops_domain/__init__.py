@@ -113,15 +113,14 @@ class Run:
         return run.jobType
 
 
+@dataclasses.dataclass
 class RunsType(types.Type):
     name = "runs"
 
     instance_classes = wandb_api.Runs
     instance_class = wandb_api.Runs
 
-    @property
-    def object_type(self):
-        return RunType()
+    object_type: types.Type = RunType()
 
     def instance_to_dict(self, obj):
         return {
