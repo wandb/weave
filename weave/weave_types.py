@@ -265,11 +265,13 @@ class Type:
     def instance_from_dict(self, d):
         raise NotImplementedError
 
-
-class BasicType(Type):
+# This should only be used for JS compatability
+class _PlainStringNamedType(Type):
     def to_dict(self):
         # A basic type is serialized as just its string name.
         return self.name
+
+class BasicType(_PlainStringNamedType):
 
     def save_instance(self, obj, artifact, name):
         if artifact is None:

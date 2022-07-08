@@ -26,7 +26,7 @@ class ArtifactMembershipType(types.Type):
     name = "artifactMembership"
 
 
-class ProjectType(types.Type):
+class ProjectType(types._PlainStringNamedType):
     name = "project"
     instance_classes = wandb_api.Project
     instance_class = wandb_api.Project
