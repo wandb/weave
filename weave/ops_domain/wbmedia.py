@@ -52,6 +52,10 @@ class ImageArtifactFileRef:
 class HtmlArtifactFileRef:
     path: ArtifactEntry
 
+    @property
+    def artifact(self):
+        return self.path.artifact
+
 
 # This shows a pattern for how to convert an in memory object (Html)
 # to a W&B media type style FileRef, so that the existing frontend

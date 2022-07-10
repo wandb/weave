@@ -1,57 +1,87 @@
 import dataclasses
 import pickle
+import huggingface_hub
 import datasets as hf_datasets
 import transformers
 import torch
+import typing
 
 import weave
 from . import pytorch
 
 
-class HFDatasetType(weave.types.ObjectType):
-    name = "hf-dataset"
+class HFDatasetInfoTypedDict(typing.TypedDict):
+    id: str
+    lastModified: str
+    tags: list[str]
+    description: str
+    # citation: str
+    # sha: str
+    # downloads: int
 
-    def property_types(self):
-        return {"name": weave.types.String()}
 
-
-@weave.weave_class(weave_type=HFDatasetType)
-class HFDataset:
-    def __init__(self, name):
-        self.name = name
-
-    @weave.op(
-        input_type={
-            "self": HFDatasetType(),
-        },
-        output_type=weave.types.TypedDict(
-            {
-                "description": weave.types.String(),
-                "homepage": weave.types.String(),
-                "download_size": weave.types.Int(),
-                "version": weave.types.String(),
-            }
-        ),
-    )
-    def info(self):
-        dataset_builder = hf_datasets.load_dataset_builder(self.name)
-        info = dataset_builder.info
-        # TODO: this could use a mapper
-        return {
-            "description": info.description,
-            "homepage": info.homepage,
-            "download_size": info.download_size,
-            "version": info.version,
+@weave.op(render_info={"type": "function"})
+def datasets() -> list[HFDatasetInfoTypedDict]:
+    api = huggingface_hub.HfApi()
+    return [
+        {
+            "id": dataset_info.id,
+            "lastModified": dataset_info.lastModified,
+            "tags": dataset_info.tags or [],
+            "description": dataset_info.description,
+            # "downloads": dataset_info.downloads,
         }
+        for dataset_info in api.list_datasets()
+    ]
 
 
-HFDatasetType.instance_classes = HFDataset
-HFDatasetType.instance_class = HFDataset
+# TODO: we really need finer grained numeric types!
+def hf_feature_type_to_type(type_):
+    if isinstance(type_, dict):
+        prop_types = {}
+        for key, type_ in type_.items():
+            prop_types[key] = hf_feature_type_to_type(type_)
+        return weave.types.TypedDict(prop_types)
+    elif isinstance(type_, hf_datasets.features.features.Sequence):
+        return weave.types.List(hf_feature_type_to_type(type_.feature))
+    elif isinstance(type_, hf_datasets.features.features.Image):
+        return weave.ops.PILImageType()
+    elif isinstance(type_, hf_datasets.features.features.ClassLabel):
+        # TODO: this should be a classes type!!!!!
+        return weave.types.Int()
+    else:
+        dtype = type_.dtype
+        if dtype == "int32":
+            return weave.types.Int()
+        elif dtype == "int64":
+            return weave.types.Int()
+        elif dtype == "float32":
+            return weave.types.Float()
+        elif dtype == "string":
+            return weave.types.String()
+    raise weave.errors.WeaveTypeError("unhandled hf type: %s" % type_)
 
 
-@weave.op(input_type={}, output_type=weave.types.List(HFDatasetType()))
-def datasets():
-    return weave.List([HFDataset(name) for name in hf_datasets.list_datasets()])
+@weave.op(render_info={"type": "function"})
+def dataset_refine_output_type(name: str) -> weave.types.Type:
+    ds = hf_datasets.load_dataset(name, split="train", streaming=True)
+    prop_types = {}
+    for key, type_ in ds.features.items():
+        prop_types[key] = hf_feature_type_to_type(type_)
+    return weave.types.List(weave.types.TypedDict(prop_types))
+
+
+@weave.op(
+    render_info={"type": "function"},
+    output_type=weave.types.List(weave.types.TypedDict({})),
+)
+def dataset(name: str):
+    ds = hf_datasets.load_dataset(name, split="train", streaming=True)
+
+    rows = []
+    for _, row in zip(range(100), iter(ds)):
+        rows.append(row)
+    return rows
 
 
 class HFInternalBaseModelOutputType(weave.types.Type):
@@ -75,7 +105,8 @@ class BaseModelOutputType(weave.types.ObjectType):
     def property_types(self):
         return {
             "model": HFModelType(),
-            "model_input": pytorch.TorchTensorType(),
+            "model_input": weave.types.String(),
+            "encoded_model_input": pytorch.TorchTensorType(),
             "model_output": HFInternalBaseModelOutputType(),
         }
 
@@ -96,8 +127,24 @@ class HFModel:
     def tokenizer(self):
         return transformers.AutoTokenizer.from_pretrained(self.name)
 
+    @property
+    def pipeline(self):
+        # Hard-coded hacks. Does not respect types!
+        # This makes the Shap example work, but won't work for many other cases.
+        # TODO: Fix, we need more specific types.
+        tokenizer = transformers.AutoTokenizer.from_pretrained(self.name, use_fast=True)
+        model = transformers.AutoModelForSequenceClassification.from_pretrained(
+            self.name
+        )
+        return transformers.pipeline(
+            "text-classification",
+            model=model,
+            tokenizer=tokenizer,
+            return_all_scores=True,
+        )
+
     @weave.op(output_type=BaseModelOutputType())
-    def call(self, inputs: str):
+    def call(self, input: str):
         # TODO: these take awhile to load. We should create them on init, and
         #     ensure auto-caching of MemRefs works.
         tokenizer = transformers.AutoTokenizer.from_pretrained(self.name)
@@ -105,16 +152,17 @@ class HFModel:
             self.name, output_attentions=True
         )
 
-        model_input = tokenizer.encode(inputs, return_tensors="pt")
-        model_output = model(model_input)
-        return BaseModelOutput(self, model_input, model_output)
+        encoded_input = tokenizer.encode(input, return_tensors="pt")
+        model_output = model(encoded_input)
+        return BaseModelOutput(self, input, encoded_input, model_output)
 
 
 @weave.weave_class(weave_type=BaseModelOutputType)
 @dataclasses.dataclass
 class BaseModelOutput:
     model: HFModel
-    model_input: torch.Tensor
+    model_input: str
+    encoded_model_input: torch.Tensor
     model_output: transformers.modeling_outputs.BaseModelOutput
 
     @weave.op(output_type=ModelOutputAttentionType())
