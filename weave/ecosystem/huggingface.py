@@ -127,22 +127,6 @@ class HFModel:
     def tokenizer(self):
         return transformers.AutoTokenizer.from_pretrained(self.name)
 
-    @property
-    def pipeline(self):
-        # Hard-coded hacks. Does not respect types!
-        # This makes the Shap example work, but won't work for many other cases.
-        # TODO: Fix, we need more specific types.
-        tokenizer = transformers.AutoTokenizer.from_pretrained(self.name, use_fast=True)
-        model = transformers.AutoModelForSequenceClassification.from_pretrained(
-            self.name
-        )
-        return transformers.pipeline(
-            "text-classification",
-            model=model,
-            tokenizer=tokenizer,
-            return_all_scores=True,
-        )
-
     @weave.op(output_type=BaseModelOutputType())
     def call(self, input: str):
         # TODO: these take awhile to load. We should create them on init, and

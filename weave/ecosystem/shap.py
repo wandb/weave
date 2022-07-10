@@ -9,6 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.datasets import fetch_california_housing
 import weave
+import transformers
 
 from . import huggingface as hf
 
@@ -104,7 +105,13 @@ class ShapExplanationType(weave.types.Type):
 
 @weave.op()
 def shap_explain(modeloutput: hf.BaseModelOutput) -> shap.Explanation:
-    explainer = shap.Explainer(modeloutput.model.pipeline)
+    # TODO: this is very hard-coded implementation. It won't work for other tasks,
+    # and there are ways to tune shap to (scaling to logits which is an option
+    # in the shap docs? that may produce better results)
+    pipeline = transformers.pipeline(
+        "text-classification", model=modeloutput.model.name, return_all_scores=True
+    )
+    explainer = shap.Explainer(pipeline)
     return explainer([modeloutput.model_input])
 
 
