@@ -103,7 +103,9 @@ class ShapExplanationType(weave.types.Type):
 
 
 @weave.op()
-def shap_explain(pipeline_output: hf.PipelineOutput) -> shap.Explanation:
+def shap_explain(
+    pipeline_output: hf.FullTextClassificationPipelineOutput,
+) -> shap.Explanation:
     # TODO: shap has some options, like computing logits is better in some cases?
     # TODO: does shap work for all task styles?
     pipeline = pipeline_output.model.pipeline(return_all_scores=True)
