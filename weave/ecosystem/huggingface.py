@@ -98,7 +98,15 @@ class HFInternalBaseModelOutputType(weave.types.Type):
 
 class HFModelType(weave.types.ObjectType):
     def property_types(self):
-        return {"name": weave.types.String()}
+        return {
+            "id": weave.types.String(),
+            "sha": weave.types.String(),
+            "pipeline_tag": weave.types.String(),
+            "tags": weave.types.List(weave.types.String()),
+            "downloads": weave.types.Int(),
+            "likes": weave.types.Int(),
+            "library_name": weave.types.optional(weave.types.String()),
+        }
 
 
 class BaseModelOutputType(weave.types.ObjectType):
@@ -119,26 +127,66 @@ class ModelOutputAttentionType(weave.types.ObjectType):
         }
 
 
+# TODO
+#  - do we need to declare a new Object here?
+#  - or can we just attached to existing model info?
+
+
 @weave.weave_class(weave_type=HFModelType)
 @dataclasses.dataclass
 class HFModel:
-    name: str
+    id: str
+    sha: str
+    pipeline_tag: str
+
+    # TODO: we need a Tag type
+    tags: list[str]
+
+    # Skip siblings for now, for models it seems to be a list of files associated
+    # with the model
+    # siblings: list[typing.Any]
+
+    # Skip author, its just the org prefix before the slash in id?
+    # author: str
+    downloads: int
+    likes: int
+    library_name: typing.Optional[str]
+
+    # TODO: version
+    # No...
 
     def tokenizer(self):
-        return transformers.AutoTokenizer.from_pretrained(self.name)
+        return transformers.AutoTokenizer.from_pretrained(self.id)
+
+    def pipeline(self, return_all_scores=False):
+        return transformers.pipeline(
+            self.pipeline_tag,
+            model=self.id,
+            return_all_scores=return_all_scores,
+        )
+
+    @weave.op()
+    def get_id(self) -> str:
+        return self.id
+
+    @weave.op()
+    def get_pipeline_tag(self) -> str:
+        return self.pipeline_tag
 
     @weave.op(output_type=BaseModelOutputType())
     def call(self, input: str):
         # TODO: these take awhile to load. We should create them on init, and
         #     ensure auto-caching of MemRefs works.
-        tokenizer = transformers.AutoTokenizer.from_pretrained(self.name)
-        model = transformers.AutoModel.from_pretrained(
-            self.name, output_attentions=True
-        )
+        tokenizer = transformers.AutoTokenizer.from_pretrained(self.id)
+        model = transformers.AutoModel.from_pretrained(self.id)
+        # model = transformers.AutoModel.from_pretrained(self.id, output_attentions=True)
 
         encoded_input = tokenizer.encode(input, return_tensors="pt")
         model_output = model(encoded_input)
         return BaseModelOutput(self, input, encoded_input, model_output)
+
+
+HFModelType.instance_classes = HFModel
 
 
 @weave.weave_class(weave_type=BaseModelOutputType)
@@ -161,9 +209,79 @@ class ModelOutputAttention:
     attention: list[torch.Tensor]
 
 
+class HFModelInfoTypedDict(typing.TypedDict):
+    id: str
+    pipeline_tag: str
+    tags: list[str]
+
+    # citation: str
+    # sha: str
+    # downloads: int
+
+
+def full_model_info_to_hfmodel(info: huggingface_hub.hf_api.ModelInfo) -> HFModel:
+    return HFModel(
+        id=info.modelId,
+        sha=info.sha,
+        pipeline_tag=info.pipeline_tag,
+        tags=info.tags,
+        downloads=getattr(info, "downloads", 0),
+        likes=getattr(info, "likes", 0),
+        library_name=getattr(info, "library_name", None),
+    )
+
+
 @weave.op(render_info={"type": "function"})
-def model(name: str) -> HFModel:
-    return HFModel(name)
+def models() -> list[HFModel]:
+    api = huggingface_hub.HfApi()
+    return [full_model_info_to_hfmodel(info) for info in api.list_models(full=True)]
+
+
+@weave.op()
+def models_render(
+    models: weave.Node[list[HFModel]],
+) -> weave.panels.Table:
+    return weave.panels.Table(
+        models,
+        columns=[
+            lambda model: model.get_id(),
+            lambda model: model.get_pipeline_tag(),
+        ],
+    )
+
+
+@weave.op(render_info={"type": "function"})
+def model(id: str) -> HFModel:
+    api = huggingface_hub.HfApi()
+    info = api.model_info(id)
+    return full_model_info_to_hfmodel(info)
+
+
+@weave.op()
+def model_render(
+    model_node: weave.Node[HFModel],
+) -> weave.panels.Card:
+    # All methods callable on X are callable on weave.Node[X], but
+    # the types arent' setup properly, so cast to tell the type-checker
+    # TODO: Fix!
+    model = typing.cast(HFModel, model_node)
+    return weave.panels.Card(
+        title=model.get_id(),
+        subtitle="HuggingFace Hub Model",
+        content=[
+            weave.panels.CardTab(
+                name="Overview",
+                content=weave.panels.Group(
+                    items=[
+                        weave.panels.LabeledItem(item=model.get_id(), label="ID"),
+                        weave.panels.LabeledItem(
+                            item=model.get_pipeline_tag(), label="Pipeline tag"
+                        ),
+                    ]
+                ),
+            ),
+        ],
+    )
 
 
 ### Trying out a "module" pattern here. Not quite right...
