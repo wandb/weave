@@ -36,12 +36,21 @@ def instance_class_to_potential_type_map():
     for type_class in type_classes:
         for instance_class in type_class._instance_classes():
             res.setdefault(instance_class, []).append(type_class)
+
+    # These are errors and we should fix them
+    # TODO
+    # for ic, tcs in res.items():
+    #     if len(tcs) > 1:
+    #         print("LONG TC", ic, tcs)
     return res
 
 
 @functools.cache
 def instance_class_to_potential_type(cls):
     mapping = instance_class_to_potential_type_map()
+    exact_type_classes = mapping.get(cls)
+    if exact_type_classes is not None:
+        return exact_type_classes
     result = []
     for instance_class, type_classes in mapping.items():
         if issubclass(cls, instance_class):
@@ -612,6 +621,9 @@ class Dict(Type):
 
 @dataclasses.dataclass
 class ObjectType(Type):
+    # TODO: Maybe this belongs on Type?
+    _base_type: typing.ClassVar[Type] = Invalid()
+
     def property_types(self):
         raise NotImplementedError
 
@@ -626,6 +638,16 @@ class ObjectType(Type):
             # print("TYPE_OF", cls, prop_name, prop_type, type(getattr(obj, prop_name)))
             variable_prop_types[prop_name] = prop_type
         return cls(**variable_prop_types)
+
+    def _to_dict(self):
+        d = super()._to_dict()
+        if not isinstance(self._base_type, Invalid):
+            d["_base_type"] = self._base_type.to_dict()
+        return d
+
+    # def assign_type(self):
+    #     # TODO
+    #     pass
 
     def save_instance(self, obj, artifact, name):
         from . import mappers_python

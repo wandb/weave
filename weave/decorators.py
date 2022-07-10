@@ -42,6 +42,7 @@ def get_signature(f):
 def op(
     input_type=None,
     output_type=None,
+    refine_output_type=None,
     name=None,
     setter=None,
     render_info=None,
@@ -173,6 +174,7 @@ def op(
             weave_input_type,
             weave_output_type,
             f,
+            refine_output_type=refine_output_type,
             setter=setter,
             render_info=render_info,
             pure=pure,

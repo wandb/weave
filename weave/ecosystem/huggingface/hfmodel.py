@@ -93,10 +93,6 @@ class BaseModelOutput:
     encoded_model_input: torch.Tensor
     model_output: transformers.modeling_outputs.BaseModelOutput
 
-    @weave.op(output_type=ModelOutputAttentionType())
-    def attention(self):
-        return ModelOutputAttention(self, self.model_output[-1])
-
 
 @weave.weave_class(weave_type=ModelOutputAttentionType)
 @dataclasses.dataclass

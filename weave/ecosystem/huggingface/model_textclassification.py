@@ -7,14 +7,20 @@ import weave
 from . import hfmodel
 
 
+# We have to forward-declare the Weave types to avoid circular reference
+# issues that weave.type() can't resolve yet.
+
+
 class HFModelTextClassificationType(hfmodel.HFModelType):
-    pass
+    _base_type = hfmodel.HFModelType()
 
 
-class FullTextClassificationPipelineOutputType(hfmodel.FullPipelineOutputType):
+class FullTextClassificationPipelineOutputType(weave.types.ObjectType):
+    _base_type = hfmodel.FullPipelineOutputType()
+
     def property_types(self):
         return {
-            "model": hfmodel.HFModelType(),
+            "model": HFModelTextClassificationType(),
             "model_input": weave.types.String(),
             "model_output": weave.types.List(
                 weave.types.TypedDict(
@@ -38,6 +44,33 @@ class FullTextClassificationPipelineOutput(hfmodel.FullPipelineOutput):
     model: "HFModelTextClassification"
     model_input: str
     model_output: TextClassificationPipelineOutput
+
+    @weave.op()
+    def get_model_input(self) -> str:
+        return self.model_input
+
+    @weave.op()
+    def get_model_output(self) -> TextClassificationPipelineOutput:
+        return self.model_output
+
+
+FullTextClassificationPipelineOutputType.instance_classes = (
+    FullTextClassificationPipelineOutput
+)
+
+
+@weave.op()
+def full_text_classification_output_render(
+    output_node: weave.Node[FullTextClassificationPipelineOutput],
+) -> weave.panels.Group:
+    output = typing.cast(FullTextClassificationPipelineOutput, output_node)
+    return weave.panels.Group(
+        prefer_horizontal=True,
+        items=[
+            weave.panels.LabeledItem(label="input", item=output.get_model_input()),
+            weave.panels.LabeledItem(label="output", item=output.get_model_output()),
+        ],
+    )
 
 
 @weave.weave_class(weave_type=HFModelTextClassificationType)

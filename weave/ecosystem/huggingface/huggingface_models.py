@@ -57,7 +57,7 @@ def model_refine_output_type(id: str) -> weave.types.Type:
     return hfmodel.HFModelType()
 
 
-@weave.op(render_info={"type": "function"})
+@weave.op(render_info={"type": "function"}, refine_output_type=model_refine_output_type)
 def model(id: str) -> hfmodel.HFModel:
     api = huggingface_hub.HfApi()
     info = api.model_info(id)
