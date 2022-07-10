@@ -127,6 +127,25 @@ class ModelOutputAttentionType(weave.types.ObjectType):
         }
 
 
+class PipelineOutputType(weave.types.ObjectType):
+    def property_types(self):
+        return {
+            "model": HFModelType(),
+            "model_input": weave.types.String(),
+            "model_output": weave.types.List(
+                weave.types.TypedDict(
+                    {
+                        "score": weave.types.Float(),
+                        "label": weave.types.String(),
+                        # "token": weave.types.Int(),
+                        # "token_str": weave.types.String(),
+                        # "sequence": weave.types.String(),
+                    }
+                )
+            ),
+        }
+
+
 # TODO
 #  - do we need to declare a new Object here?
 #  - or can we just attached to existing model info?
@@ -158,11 +177,11 @@ class HFModel:
     def tokenizer(self):
         return transformers.AutoTokenizer.from_pretrained(self.id)
 
-    def pipeline(self, return_all_scores=False):
+    def pipeline(self, return_all_scores=False) -> transformers.pipelines.base.Pipeline:
         return transformers.pipeline(
             self.pipeline_tag,
             model=self.id,
-            return_all_scores=return_all_scores,
+            # return_all_scores=return_all_scores,
         )
 
     @weave.op()
@@ -173,20 +192,40 @@ class HFModel:
     def get_pipeline_tag(self) -> str:
         return self.pipeline_tag
 
-    @weave.op(output_type=BaseModelOutputType())
+    @weave.op(output_type=PipelineOutputType())
     def call(self, input: str):
-        # TODO: these take awhile to load. We should create them on init, and
-        #     ensure auto-caching of MemRefs works.
-        tokenizer = transformers.AutoTokenizer.from_pretrained(self.id)
-        model = transformers.AutoModel.from_pretrained(self.id)
-        # model = transformers.AutoModel.from_pretrained(self.id, output_attentions=True)
-
-        encoded_input = tokenizer.encode(input, return_tensors="pt")
-        model_output = model(encoded_input)
-        return BaseModelOutput(self, input, encoded_input, model_output)
+        output = self.pipeline()(input)
+        res = PipelineOutput(self, input, output)
+        return res
 
 
 HFModelType.instance_classes = HFModel
+
+
+class TextClassificationPipelineOutput(typing.TypedDict):
+    label: str
+    score: float
+
+
+@weave.weave_class(weave_type=PipelineOutputType)
+@dataclasses.dataclass
+class PipelineOutput:
+    model: HFModel
+    model_input: str
+    model_output: TextClassificationPipelineOutput
+
+    @weave.op(output_type=ModelOutputAttentionType())
+    def attention(self):
+        pipeline = self.model.pipeline()
+        tokenizer = pipeline.tokenizer
+        # re-initialize model with output_attentions=True
+        model = pipeline.model.__class__.from_pretrained(
+            self.model.id, output_attentions=True
+        )
+        encoded_input = tokenizer.encode(self.model_input, return_tensors="pt")
+        model_output = model(encoded_input)
+        bmo = BaseModelOutput(self.model, self.model_input, encoded_input, model_output)
+        return ModelOutputAttention(bmo, model_output[-1])
 
 
 @weave.weave_class(weave_type=BaseModelOutputType)
