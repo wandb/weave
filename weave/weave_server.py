@@ -31,10 +31,12 @@ from weave import ops
 loading_builtins_token = context.set_loading_built_ins()
 
 from weave.ecosystem import openai
-from weave.ecosystem import bertviz_
+from weave.ecosystem import bertviz
 from weave.ecosystem import shap
 from weave.ecosystem import huggingface
 from weave.ecosystem import torchvision
+from weave.ecosystem import xgboost
+from weave.ecosystem import sklearn
 from weave.ecosystem import torch_mnist_model_example
 from weave.ecosystem import craiyon
 
