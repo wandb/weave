@@ -7,7 +7,7 @@ from .. import op_def
 from .. import panels
 
 from . import shap
-from . import mnist
+from . import torchvision
 
 # TODO: feels odd to call this "ops.Markdown".
 # Maybe make it top level
@@ -48,7 +48,7 @@ def ecosystem() -> EcosystemTypedDict:
         # This is not Weavey at all!  We should look for any registered ps of no arguments that produce DatasetCard type
         # We can do that query using... Weave, lazily. In fact, EcosystemType() doesn't need to store any data, just
         # render the panel. Which can lazily fetch / search for everything.
-        "datasets": [shap.ca_housing_dataset, mnist.mnist],
+        "datasets": [shap.ca_housing_dataset, torchvision.mnist],
         "models": [],
         "ops": registry_mem.memory_registry.list_ops(),
     }
