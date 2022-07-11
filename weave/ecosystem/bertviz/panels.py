@@ -2,7 +2,7 @@ import bertviz
 
 import weave
 
-from . import huggingface
+from .. import huggingface
 
 
 @weave.op()

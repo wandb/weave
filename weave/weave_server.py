@@ -31,7 +31,7 @@ from weave import ops
 loading_builtins_token = context.set_loading_built_ins()
 
 from weave.ecosystem import openai
-from weave.ecosystem import bertviz_
+from weave.ecosystem import bertviz
 from weave.ecosystem import shap
 from weave.ecosystem import huggingface
 from weave.ecosystem import torchvision
