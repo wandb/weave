@@ -64,7 +64,10 @@ def model_refine_output_type(id: str) -> weave.types.Type:
         return model_textclassification.HFModelTextClassificationType()
     if info.pipeline_tag == "text-generation":
         return model_textgeneration.HFModelTextGenerationType()
-    return hfmodel.HFModelType()
+    raise Exception(
+        "Huggingface model type '%s' not yet supported. Add support in ecosystem/huggingface."
+        % info.pipeline_tag
+    )
 
 
 @weave.op(render_info={"type": "function"}, refine_output_type=model_refine_output_type)
