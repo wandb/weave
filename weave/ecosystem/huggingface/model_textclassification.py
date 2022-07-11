@@ -20,9 +20,9 @@ class FullTextClassificationPipelineOutputType(weave.types.ObjectType):
 
     def property_types(self):
         return {
-            "model": HFModelTextClassificationType(),
-            "model_input": weave.types.String(),
-            "model_output": weave.types.List(
+            "_model": HFModelTextClassificationType(),
+            "_model_input": weave.types.String(),
+            "_model_output": weave.types.List(
                 weave.types.TypedDict(
                     {
                         "score": weave.types.Float(),
@@ -41,17 +41,17 @@ class TextClassificationPipelineOutput(typing.TypedDict):
 @weave.weave_class(weave_type=FullTextClassificationPipelineOutputType)
 @dataclasses.dataclass
 class FullTextClassificationPipelineOutput(hfmodel.FullPipelineOutput):
-    model: "HFModelTextClassification"
-    model_input: str
-    model_output: TextClassificationPipelineOutput
+    _model: "HFModelTextClassification"
+    _model_input: str
+    _model_output: TextClassificationPipelineOutput
 
     @weave.op()
-    def get_model_input(self) -> str:
-        return self.model_input
+    def model_input(self) -> str:
+        return self._model_input
 
     @weave.op()
-    def get_model_output(self) -> TextClassificationPipelineOutput:
-        return self.model_output
+    def model_output(self) -> TextClassificationPipelineOutput:
+        return self._model_output
 
 
 FullTextClassificationPipelineOutputType.instance_classes = (
@@ -67,8 +67,8 @@ def full_text_classification_output_render(
     return weave.panels.Group(
         prefer_horizontal=True,
         items=[
-            weave.panels.LabeledItem(label="input", item=output.get_model_input()),
-            weave.panels.LabeledItem(label="output", item=output.get_model_output()),
+            weave.panels.LabeledItem(label="input", item=output.model_input()),
+            weave.panels.LabeledItem(label="output", item=output.model_output()),
         ],
     )
 

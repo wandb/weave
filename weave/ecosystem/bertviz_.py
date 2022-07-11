@@ -12,18 +12,18 @@ def head_view(attention: huggingface.ModelOutputAttention) -> weave.ops.Html:
     # contain references to any information that is necessary for their use.
 
     # we can walk to model_output from attention
-    model_output = attention.model_output
+    model_output = attention._model_output
 
     # we can walk to model_input from model_output
-    encoded_model_input = model_output.encoded_model_input
+    encoded_model_input = model_output._encoded_model_input
 
     # we can walk to the model
-    model = model_output.model
+    model = model_output._model
 
     tokens = model.tokenizer().convert_ids_to_tokens(encoded_model_input[0])
 
     # Finally call bertviz, which gives us back html.
-    html = bertviz.head_view(attention.attention, tokens, html_action="return")
+    html = bertviz.head_view(attention._attention, tokens, html_action="return")
 
     # The .data attribute contains the html string. Wrap it in the weave Html type.
 
