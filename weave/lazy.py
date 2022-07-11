@@ -55,9 +55,12 @@ def _bind_params(fq_op_name, sig, args, kwargs, input_type):
     return bound_params_with_constants
 
 
-def _make_output_node(fq_op_name, bound_params, output_type_):
+def _make_output_node(fq_op_name, bound_params, output_type_, refine_output_type):
     output_type = output_type_
-    if callable(output_type):
+    if refine_output_type:
+        called_refine_output_type = refine_output_type(**bound_params)
+        output_type = weave_internal.use_internal(called_refine_output_type)
+    elif callable(output_type):
         new_input_type = {k: n.type for k, n in bound_params.items()}
         output_type = output_type(new_input_type)
 
@@ -89,7 +92,7 @@ def _make_output_node(fq_op_name, bound_params, output_type_):
     return return_type(output_type, fq_op_name, bound_params)
 
 
-def make_lazy_call(f, fq_op_name, input_type, output_type):
+def make_lazy_call(f, fq_op_name, input_type, output_type, refine_output_type):
     """Given the parameters of an op definition, make a function that returns `graph.Node`
 
     Args:
@@ -109,7 +112,9 @@ def make_lazy_call(f, fq_op_name, input_type, output_type):
 
     def lazy_call(*args, **kwargs):
         bound_params = _bind_params(fq_op_name, sig, args, kwargs, input_type)
-        return _make_output_node(fq_op_name, bound_params, output_type)
+        return _make_output_node(
+            fq_op_name, bound_params, output_type, refine_output_type
+        )
 
     return lazy_call
 

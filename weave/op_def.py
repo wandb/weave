@@ -26,6 +26,7 @@ class OpDef:
         types.Type,
         typing.Callable[[typing.Dict[str, types.Type]], types.Type],
     ]
+    refine_output_type: typing.Optional["OpDef"]
     setter = str
     call_fn: typing.Any
     version: typing.Optional[str]
@@ -40,6 +41,7 @@ class OpDef:
             typing.Callable[[typing.Dict[str, types.Type]], types.Type],
         ],
         resolve_fn,
+        refine_output_type: typing.Optional["OpDef"] = None,
         setter=None,
         render_info=None,
         pure=True,
@@ -48,6 +50,7 @@ class OpDef:
         self.name = name
         self.input_type = input_type
         self.output_type = output_type
+        self.refine_output_type = refine_output_type
         self.resolve_fn = resolve_fn
         self.setter = setter
         self.render_info = render_info

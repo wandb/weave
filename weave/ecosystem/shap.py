@@ -3,11 +3,14 @@ import shap
 import random
 import typing
 import xgboost
+import pickle
 import numpy as np
 
 import matplotlib.pyplot as plt
 from sklearn.datasets import fetch_california_housing
 import weave
+
+from . import huggingface as hf
 
 
 @weave.op(
@@ -22,9 +25,12 @@ def ca_housing_dataset(seed: int):
 
 
 @weave.op(
-    output_type=weave.types.TypedDict({"X": weave.types.Any(), "y": weave.types.Any()})
+    input_type={
+        "df": weave.types.TypedDict({}),
+    },
+    output_type=weave.types.TypedDict({"X": weave.types.Any(), "y": weave.types.Any()}),
 )
-def split_labels(df: typing.Any, label_col: str):
+def split_labels(df, label_col: str):
     X = df.drop(label_col, axis=1)
     y = df[label_col]
     return {"X": X, "y": y}
@@ -86,3 +92,35 @@ def xgboost_train(
     return xgboost.train(
         hyperparams, xgboost.DMatrix(xy["X"], label=xy["y"].to_numpy()), 100
     )
+
+
+class ShapExplanationType(weave.types.Type):
+    instance_classes = shap.Explanation
+
+    def save_instance(self, obj, artifact, name):
+        with artifact.new_file(f"{name}.pickle", binary=True) as f:
+            pickle.dump(obj, f)
+
+
+@weave.op()
+def shap_explain(
+    pipeline_output: hf.FullTextClassificationPipelineOutput,
+) -> shap.Explanation:
+    # TODO: shap has some options, like computing logits is better in some cases?
+    # TODO: does shap work for all task styles?
+    pipeline = pipeline_output._model.pipeline(return_all_scores=True)
+    explainer = shap.Explainer(pipeline)
+    return explainer([pipeline_output._model_input])
+
+
+@weave.op()
+def shap_plot_text(shap_values: shap.Explanation) -> weave.ops.Html:
+    html = shap.plots.text(shap_values, display=False)
+    return weave.ops.Html(html)
+
+
+@weave.op()
+def shap_plot_text_render(
+    shap_values: weave.Node[shap.Explanation],
+) -> weave.panels.Html:
+    return weave.panels.Html(shap_plot_text(shap_values))
