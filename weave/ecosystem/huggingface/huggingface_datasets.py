@@ -46,7 +46,11 @@ def hf_feature_type_to_type(type_):
         return weave.types.Int()
     else:
         dtype = type_.dtype
-        if dtype == "int32":
+        if dtype == "int8":
+            return weave.types.Int()
+        elif dtype == "int16":
+            return weave.types.Int()
+        elif dtype == "int32":
             return weave.types.Int()
         elif dtype == "int64":
             return weave.types.Int()
