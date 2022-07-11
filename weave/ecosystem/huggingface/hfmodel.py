@@ -25,38 +25,58 @@ class HFInternalBaseModelOutputType(weave.types.Type):
 class HFModelType(weave.types.ObjectType):
     def property_types(self):
         return {
-            "id": weave.types.String(),
-            "sha": weave.types.String(),
-            "pipeline_tag": weave.types.String(),
-            "tags": weave.types.List(weave.types.String()),
-            "downloads": weave.types.Int(),
-            "likes": weave.types.Int(),
-            "library_name": weave.types.optional(weave.types.String()),
+            "_id": weave.types.String(),
+            "_sha": weave.types.String(),
+            "_pipeline_tag": weave.types.String(),
+            "_tags": weave.types.List(weave.types.String()),
+            "_downloads": weave.types.Int(),
+            "_likes": weave.types.Int(),
+            "_library_name": weave.types.optional(weave.types.String()),
         }
 
 
 @weave.weave_class(weave_type=HFModelType)
 @dataclasses.dataclass
 class HFModel:
-    id: str
-    sha: str
-    pipeline_tag: str
-    tags: list[str]  # TODO: we need a Tag type
-    downloads: int
-    likes: int
-    library_name: typing.Optional[str]
+    _id: str
+    _sha: str
+    _pipeline_tag: str
+    _tags: list[str]  # TODO: we need a Tag type
+    _downloads: int
+    _likes: int
+    _library_name: typing.Optional[str]
     # TODO: version?
 
     def tokenizer(self):
         return transformers.AutoTokenizer.from_pretrained(self.id)
 
     @weave.op()
-    def get_id(self) -> str:
-        return self.id
+    def id(self) -> str:
+        return self._id
 
     @weave.op()
-    def get_pipeline_tag(self) -> str:
-        return self.pipeline_tag
+    def sha(self) -> str:
+        return self._sha
+
+    @weave.op()
+    def pipeline_tag(self) -> str:
+        return self._pipeline_tag
+
+    @weave.op()
+    def tags(self) -> list[str]:
+        return self._tags
+
+    @weave.op()
+    def downloads(self) -> int:
+        return self._downloads
+
+    @weave.op()
+    def likes(self) -> int:
+        return self._likes
+
+    @weave.op()
+    def library_name(self) -> typing.Optional[str]:
+        return self._library_name
 
 
 HFModelType.instance_classes = HFModel

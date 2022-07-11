@@ -41,6 +41,8 @@ def python_type_to_type(
             return weave_types.List(*args)
         elif py_type.__origin__ == dict:
             return weave_types.Dict(*args)
+        elif py_type.__origin__ == typing.Union:
+            return weave_types.UnionType(*args)
         elif py_type.__origin__ == graph.Node:
             return weave_types.Function({}, args[0])
         else:

@@ -76,8 +76,8 @@ class HFModelTextGeneration(hfmodel.HFModel):
         self,
     ) -> transformers.pipelines.text_generation.TextGenerationPipeline:
         return transformers.pipeline(
-            self.pipeline_tag,
-            model=self.id,
+            self._pipeline_tag,
+            model=self._id,
         )
 
     @weave.op()

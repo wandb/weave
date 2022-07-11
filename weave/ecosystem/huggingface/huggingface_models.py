@@ -17,13 +17,13 @@ def full_model_info_to_hfmodel(
     info: huggingface_hub.hf_api.ModelInfo,
 ) -> hfmodel.HFModel:
     kwargs = {
-        "id": info.modelId,
-        "sha": info.sha,
-        "pipeline_tag": info.pipeline_tag,
-        "tags": info.tags,
-        "downloads": getattr(info, "downloads", 0),
-        "likes": getattr(info, "likes", 0),
-        "library_name": getattr(info, "library_name", None),
+        "_id": info.modelId,
+        "_sha": info.sha,
+        "_pipeline_tag": info.pipeline_tag,
+        "_tags": info.tags,
+        "_downloads": getattr(info, "downloads", 0),
+        "_likes": getattr(info, "likes", 0),
+        "_library_name": getattr(info, "library_name", None),
     }
     if info.pipeline_tag == "text-classification":
         return model_textclassification.HFModelTextClassification(**kwargs)
@@ -45,8 +45,13 @@ def models_render(
     return weave.panels.Table(
         models,
         columns=[
-            lambda model: model.get_id(),
-            lambda model: model.get_pipeline_tag(),
+            lambda model: model.id(),
+            lambda model: model.sha(),
+            lambda model: model.pipeline_tag(),
+            lambda model: model.tags(),
+            lambda model: model.downloads(),
+            lambda model: model.likes(),
+            lambda model: model.library_name(),
         ],
     )
 
@@ -78,16 +83,16 @@ def model_render(
     # TODO: Fix!
     model = typing.cast(hfmodel.HFModel, model_node)
     return weave.panels.Card(
-        title=model.get_id(),
+        title=model.id(),
         subtitle="HuggingFace Hub Model",
         content=[
             weave.panels.CardTab(
                 name="Overview",
                 content=weave.panels.Group(
                     items=[
-                        weave.panels.LabeledItem(item=model.get_id(), label="ID"),
+                        weave.panels.LabeledItem(item=model.id(), label="ID"),
                         weave.panels.LabeledItem(
-                            item=model.get_pipeline_tag(), label="Pipeline tag"
+                            item=model.pipeline_tag(), label="Pipeline tag"
                         ),
                     ]
                 ),

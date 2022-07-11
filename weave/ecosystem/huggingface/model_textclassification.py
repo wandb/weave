@@ -80,8 +80,8 @@ class HFModelTextClassification(hfmodel.HFModel):
         self, return_all_scores=False
     ) -> transformers.pipelines.text_classification.TextClassificationPipeline:
         return transformers.pipeline(
-            self.pipeline_tag,
-            model=self.id,
+            self._pipeline_tag,
+            model=self._id,
             return_all_scores=return_all_scores,
         )
 
