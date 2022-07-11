@@ -119,7 +119,7 @@ class FullPipelineOutputType(weave.types.ObjectType):
 class FullPipelineOutput:
     model: HFModel
     model_input: str
-    model_output: EmptyModelOutputTypedDict
+    model_output: typing.Any
 
     @weave.op(output_type=ModelOutputAttentionType())
     def attention(self):

@@ -10,6 +10,7 @@ from .. import pytorch
 
 from . import hfmodel
 from . import model_textclassification
+from . import model_textgeneration
 
 
 def full_model_info_to_hfmodel(
@@ -26,6 +27,8 @@ def full_model_info_to_hfmodel(
     }
     if info.pipeline_tag == "text-classification":
         return model_textclassification.HFModelTextClassification(**kwargs)
+    elif info.pipeline_tag == "text-generation":
+        return model_textgeneration.HFModelTextGeneration(**kwargs)
     return hfmodel.HFModel(**kwargs)
 
 
@@ -54,6 +57,8 @@ def model_refine_output_type(id: str) -> weave.types.Type:
     info = api.model_info(id)
     if info.pipeline_tag == "text-classification":
         return model_textclassification.HFModelTextClassificationType()
+    if info.pipeline_tag == "text-generation":
+        return model_textgeneration.HFModelTextGenerationType()
     return hfmodel.HFModelType()
 
 
