@@ -1,7 +1,8 @@
-# Mnist dataset example
+# Torch vision datasets
 #
 # TODO:
 #   - Doesn't use the much faster ArrowWeaveList
+#   - The patterns here aren't final. Prefer the style used in huggingface/models
 
 from typing import TypeVar
 import typing
