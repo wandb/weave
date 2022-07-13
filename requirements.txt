@@ -1,4 +1,4 @@
-git+https://github.com/wandb/client.git@master#egg=wandb
+wandb
 ddtrace
 json_log_formatter
 numpy
