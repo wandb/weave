@@ -293,6 +293,10 @@ def filter_nodes(node: Node, filter_fn: typing.Callable[[Node], bool]) -> list[N
     return [n for n in nodes if filter_fn(n)]
 
 
+def expr_vars(node: Node):
+    return filter_nodes(node, lambda n: isinstance(n, VarNode))
+
+
 def is_open(node: Node) -> bool:
     """A Node is 'open' (as in open function) if there are one or more VarNodes"""
     return len(filter_nodes(node, lambda n: isinstance(n, VarNode))) > 0

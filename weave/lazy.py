@@ -57,7 +57,11 @@ def _bind_params(fq_op_name, sig, args, kwargs, input_type):
 
 def _make_output_node(fq_op_name, bound_params, output_type_, refine_output_type):
     output_type = output_type_
-    if refine_output_type:
+    # Don't try to refine if there are variable nodes, we are building a
+    # function in that case!
+    if refine_output_type and not any(
+        graph.expr_vars(arg_node) for arg_node in bound_params.values()
+    ):
         called_refine_output_type = refine_output_type(**bound_params)
         output_type = weave_internal.use_internal(called_refine_output_type)
     elif callable(output_type):

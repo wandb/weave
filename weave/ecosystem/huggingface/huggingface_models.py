@@ -45,13 +45,15 @@ def models_render(
     return weave.panels.Table(
         models,
         columns=[
-            lambda model: model.id(),
-            lambda model: model.sha(),
-            lambda model: model.pipeline_tag(),
-            lambda model: model.tags(),
-            lambda model: model.downloads(),
-            lambda model: model.likes(),
-            lambda model: model.library_name(),
+            lambda model_row: weave.panels.WeaveLink(
+                model_row.id(), to=lambda id: model(id)
+            ),
+            lambda model_row: model_row.sha(),
+            lambda model_row: model_row.pipeline_tag(),
+            lambda model_row: model_row.tags(),
+            lambda model_row: model_row.downloads(),
+            lambda model_row: model_row.likes(),
+            lambda model_row: model_row.library_name(),
         ],
     )
 

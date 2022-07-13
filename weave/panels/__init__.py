@@ -7,5 +7,6 @@ from .panel_card import Card, CardTab
 from .panel_group import Group
 from .panel_html import Html
 from .panel_markdown import Markdown
+from .panel_weavelink import WeaveLink
 from .panel_sized_string import SizedString
 from .panel_container import *
