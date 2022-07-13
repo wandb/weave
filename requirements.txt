@@ -1,4 +1,4 @@
-wandb
+wandb>=0.12.21
 ddtrace
 json_log_formatter
 numpy
