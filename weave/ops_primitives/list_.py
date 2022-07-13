@@ -79,6 +79,28 @@ class List:
     @op(
         input_type={
             "self": types.List(types.Any()),
+            "comp_fn": lambda input_types: types.Function(
+                {"row": input_types["self"].object_type}, types.Any()
+            ),
+            "column_dirs": types.Any(),
+        },
+        output_type=lambda input_types: input_types["self"],
+    )
+    def sort(self, comp_fn, column_dirs):
+        call_results = execute_fast.fast_map_fn(self, comp_fn)
+        # TODO: currently taking first elem of sort directions only, may not account
+        # for all casees
+        sort_direction = True if column_dirs[0] == "desc" else False
+        return [
+            r[1]
+            for r in sorted(
+                zip(call_results, self), key=lambda tup: tup[0], reverse=sort_direction
+            )
+        ]
+
+    @op(
+        input_type={
+            "self": types.List(types.Any()),
             "map_fn": lambda input_types: types.Function(
                 {"row": input_types["self"].object_type}, types.Any()
             ),
@@ -430,13 +452,11 @@ class WeaveJSListInterface:
             ),
             "columnDirs": types.Any(),
         },
-        output_type=lambda input_types: types.List(input_types["sortFn"].output_type),
+        output_type=lambda input_types: types.List(input_types["compFn"].output_type),
     )
     def sort(arr, compFn, columnDirs):  # type: ignore
-        # TODO: not implemented
-        # type_class = types.TypeRegistry.type_class_of(arr)
-        # return type_class.NodeMethodsClass.sort.resolve_fn(arr, sortFn)
-        return arr
+        type_class = types.TypeRegistry.type_class_of(arr)
+        return type_class.NodeMethodsClass.sort.resolve_fn(arr, compFn, columnDirs)
 
     @op(
         name="groupby",
