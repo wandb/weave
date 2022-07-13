@@ -318,7 +318,7 @@ class Project:
 
     @op(name="project-filtered-runs")
     def filtered_runs(
-        project: wandb_api.Project, filter: typing.Any, order: str
+        project: wandb_api.Project, filter: str, order: str
     ) -> wandb_api.Runs:
         import wandb
 
