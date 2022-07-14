@@ -95,7 +95,7 @@ class HFModelTextClassification(hfmodel.HFModel):
 
     @weave.op()
     def call(self, input: str) -> FullTextClassificationPipelineOutput:
-        output = weave.use(self.pipeline(True))(input)[0]
+        output = weave.use(self.pipeline(True))(input)
         return FullTextClassificationPipelineOutput(self, input, output)
 
 
