@@ -22,6 +22,18 @@ class HFInternalBaseModelOutputType(weave.types.Type):
             return pickle.load(f)
 
 
+class HFInternalPipelineType(weave.types.Type):
+    instance_classes = transformers.pipelines.base.Pipeline
+
+    def save_instance(self, obj, artifact, name):
+        with artifact.new_file(f"{name}.pickle", binary=True) as f:
+            pickle.dump(obj, f)
+
+    def load_instance(self, artifact, name, extra=None):
+        with artifact.open(f"{name}.pickle", binary=True) as f:
+            return pickle.load(f)
+
+
 class HFModelType(weave.types.ObjectType):
     def property_types(self):
         return {
@@ -134,7 +146,7 @@ class FullPipelineOutput:
 
     @weave.op(output_type=ModelOutputAttentionType())
     def attention(self):
-        pipeline = self._model.pipeline()
+        pipeline = weave.use(self._model.pipeline())
         tokenizer = pipeline.tokenizer
         # re-initialize model with output_attentions=True
         model = pipeline.model.__class__.from_pretrained(

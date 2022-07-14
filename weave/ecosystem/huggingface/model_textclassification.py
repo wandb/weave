@@ -43,14 +43,14 @@ class TextClassificationPipelineOutput(typing.TypedDict):
 class FullTextClassificationPipelineOutput(hfmodel.FullPipelineOutput):
     _model: "HFModelTextClassification"
     _model_input: str
-    _model_output: TextClassificationPipelineOutput
+    _model_output: list[TextClassificationPipelineOutput]
 
     @weave.op()
     def model_input(self) -> str:
         return self._model_input
 
     @weave.op()
-    def model_output(self) -> TextClassificationPipelineOutput:
+    def model_output(self) -> list[TextClassificationPipelineOutput]:
         return self._model_output
 
 
@@ -68,7 +68,14 @@ def full_text_classification_output_render(
         prefer_horizontal=True,
         items=[
             weave.panels.LabeledItem(label="input", item=output.model_input()),
-            weave.panels.LabeledItem(label="output", item=output.model_output()),
+            weave.panels.LabeledItem(
+                label="output",
+                item=weave.panels.Plot(
+                    output.model_output(),
+                    x=lambda class_score: class_score["score"],
+                    y=lambda class_score: class_score["label"],
+                ),
+            ),
         ],
     )
 
@@ -76,8 +83,9 @@ def full_text_classification_output_render(
 @weave.weave_class(weave_type=HFModelTextClassificationType)
 @dataclasses.dataclass
 class HFModelTextClassification(hfmodel.HFModel):
+    @weave.op()
     def pipeline(
-        self, return_all_scores=False
+        self, return_all_scores: bool = True
     ) -> transformers.pipelines.text_classification.TextClassificationPipeline:
         return transformers.pipeline(
             self._pipeline_tag,
@@ -87,7 +95,7 @@ class HFModelTextClassification(hfmodel.HFModel):
 
     @weave.op()
     def call(self, input: str) -> FullTextClassificationPipelineOutput:
-        output = self.pipeline()(input)
+        output = weave.use(self.pipeline(True))(input)[0]
         return FullTextClassificationPipelineOutput(self, input, output)
 
 

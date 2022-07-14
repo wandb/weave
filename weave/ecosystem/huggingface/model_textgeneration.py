@@ -72,6 +72,7 @@ def full_text_generation_output_render(
 @weave.weave_class(weave_type=HFModelTextGenerationType)
 @dataclasses.dataclass
 class HFModelTextGeneration(hfmodel.HFModel):
+    @weave.op()
     def pipeline(
         self,
     ) -> transformers.pipelines.text_generation.TextGenerationPipeline:
@@ -87,7 +88,7 @@ class HFModelTextGeneration(hfmodel.HFModel):
     #    It'd be nice to call these different types, and therefore have different signatures
     #    for this call!
     def call(self, input: str) -> FullTextGenerationPipelineOutput:
-        output = self.pipeline()(input)
+        output = weave.use(self.pipeline())(input)
         return FullTextGenerationPipelineOutput(self, input, output)
 
 
