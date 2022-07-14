@@ -127,7 +127,7 @@ app = make_app()
 
 # Very important! We rely on key ordering on both sides!
 app.config["JSON_SORT_KEYS"] = False
-CORS(app, send_wildcard=True)
+CORS(app, supports_credentials=True)
 
 
 @app.route("/__weave/ops", methods=["GET"])
