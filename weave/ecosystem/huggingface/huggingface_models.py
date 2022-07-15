@@ -32,12 +32,6 @@ def full_model_info_to_hfmodel(
     return hfmodel.HFModel(**kwargs)
 
 
-@weave.op(render_info={"type": "function"})
-def models() -> list[hfmodel.HFModel]:
-    api = huggingface_hub.HfApi()
-    return [full_model_info_to_hfmodel(info) for info in api.list_models(full=True)]
-
-
 @weave.op()
 def models_render(
     models: weave.Node[list[hfmodel.HFModel]],
@@ -46,7 +40,7 @@ def models_render(
         models,
         columns=[
             lambda model_row: weave.panels.WeaveLink(
-                model_row.id(), to=lambda id: model(id)
+                model_row.id(), to=lambda input: huggingface().model(input)  # type: ignore
             ),
             lambda model_row: model_row.sha(),
             lambda model_row: model_row.pipeline_tag(),
@@ -56,27 +50,6 @@ def models_render(
             lambda model_row: model_row.library_name(),
         ],
     )
-
-
-@weave.op(render_info={"type": "function"})
-def model_refine_output_type(id: str) -> weave.types.Type:
-    api = huggingface_hub.HfApi()
-    info = api.model_info(id)
-    if info.pipeline_tag == "text-classification":
-        return model_textclassification.HFModelTextClassificationType()
-    if info.pipeline_tag == "text-generation":
-        return model_textgeneration.HFModelTextGenerationType()
-    raise Exception(
-        "Huggingface model type '%s' not yet supported. Add support in ecosystem/huggingface."
-        % info.pipeline_tag
-    )
-
-
-@weave.op(render_info={"type": "function"}, refine_output_type=model_refine_output_type)
-def model(id: str) -> hfmodel.HFModel:
-    api = huggingface_hub.HfApi()
-    info = api.model_info(id)
-    return full_model_info_to_hfmodel(info)
 
 
 @weave.op()
@@ -106,16 +79,47 @@ def model_render(
     )
 
 
-### Trying out a "module" pattern here. Not quite right...
+@weave.type()
+class HuggingFacePackage:
+    @weave.op(render_info={"type": "function"})
+    def model_refine_output_type(self, id: str) -> weave.types.Type:
+        api = huggingface_hub.HfApi()
+        info = api.model_info(id)
+        if info.pipeline_tag == "text-classification":
+            return model_textclassification.HFModelTextClassificationType()
+        if info.pipeline_tag == "text-generation":
+            return model_textgeneration.HFModelTextGenerationType()
+        raise Exception(
+            "Huggingface model type '%s' not yet supported. Add support in ecosystem/huggingface."
+            % info.pipeline_tag
+        )
+
+    @weave.op(refine_output_type=model_refine_output_type)
+    def model(self, id: str) -> hfmodel.HFModel:
+        api = huggingface_hub.HfApi()
+        info = api.model_info(id)
+        return full_model_info_to_hfmodel(info)
+
+    @weave.op(render_info={"type": "function"})
+    def models(self) -> list[hfmodel.HFModel]:
+        api = huggingface_hub.HfApi()
+        return [full_model_info_to_hfmodel(info) for info in api.list_models(full=True)]
 
 
-# @weave.type()
-# class HuggingFaceModule:
-#     @weave.op()
-#     def model(self, name: str) -> HFModel:
-#         return HFModel(name)
+@weave.op(render_info={"type": "function"})
+def huggingface() -> HuggingFacePackage:
+    return HuggingFacePackage()
 
 
-# @weave.op(render_info={"type": "function"})
-# def huggingface() -> HuggingFaceModule:
-#     return HuggingFaceModule()
+@weave.op()
+def hfm_render(
+    hfm_node: weave.Node[HuggingFacePackage],
+) -> weave.panels.Card:
+    hfm_node = typing.cast(HuggingFacePackage, hfm_node)  # type: ignore
+    return weave.panels.Card(
+        title="Huggingface Package",
+        subtitle="Browse Models and Datasets",
+        content=[
+            weave.panels.CardTab(name="Models", content=hfm_node.models()),  # type: ignore
+        ],
+    )

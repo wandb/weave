@@ -1,5 +1,6 @@
 import typing
 
+from weave.op_args import OpNamedArgs
 
 from . import op_def
 from . import weave_types
@@ -85,6 +86,18 @@ class Registry:
         # be the last one we loaded() [rather than the last one the user declared] which
         # is incorrect behavior
         return list(self._ops.values())
+
+    # Currently this just returns all ops that take no arguments.
+    # Perhaps a better extension is to require a return type that
+    # subclasses some abstract package type?
+    def list_packages(self) -> typing.List[op_def.OpDef]:
+        packages = [
+            a
+            for a in list(self._ops.values())
+            if isinstance(a.input_type, OpNamedArgs)
+            and len(a.input_type.arg_types.keys()) == 0
+        ]
+        return packages
 
     def rename_op(self, name, new_name):
         """Internal use only, used during op bootstrapping at decorator time"""

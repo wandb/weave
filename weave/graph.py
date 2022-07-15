@@ -307,6 +307,8 @@ def count(node: Node) -> int:
 
 
 def _linearize(node: OutputNode) -> list[OutputNode]:
+    if not node.from_op.inputs:
+        return [node]
     arg0 = next(iter(node.from_op.inputs.values()))
     if not isinstance(arg0, OutputNode):
         return [node]
