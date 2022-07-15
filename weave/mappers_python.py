@@ -141,19 +141,16 @@ class FunctionToPyFunction(mappers.Mapper):
         # TODO: This should be a check on input type rather than a value check!
         #   As implemented it might be possible to save in two different formats
         #   for the save input type, which is bad.
-        return obj.to_json()
-        # The following is commented out as it is WIP from Shawn:
-        # if not graph.is_open(obj):
-        #     equivalent_ref = refs.node_to_ref(obj)
-        #     if equivalent_ref is None:
-        #         print("OBJ:", obj)
-        #         raise errors.WeaveInternalError(
-        #             "Saving non-Ref closed functions not allowed (yet?)"
-        #         )
-        #     return equivalent_ref.uri
-        # else:
-        #     # Obj is graph.Node
-        #     return obj.to_json()
+        if not graph.is_open(obj):
+            equivalent_ref = refs.node_to_ref(obj)
+            if equivalent_ref is None:
+                raise errors.WeaveInternalError(
+                    "Saving non-Ref closed functions not allowed (yet?)"
+                )
+            return equivalent_ref.uri
+        else:
+            # Obj is graph.Node
+            return obj.to_json()
 
 
 class PyFunctionToFunction(mappers.Mapper):

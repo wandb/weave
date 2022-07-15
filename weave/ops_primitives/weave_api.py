@@ -1,4 +1,3 @@
-from weave.graph import Node
 from ..api import op, mutation
 from .. import weave_types as types
 
@@ -71,10 +70,3 @@ def execute(node):
     from .. import weave_internal
 
     return weave_internal.use_internal(node)
-
-
-@op()
-def call_op(name: str) -> Node[types.Any]:
-    from .. import weave_internal
-
-    return weave_internal.make_output_node(types.Any(), name, {})
