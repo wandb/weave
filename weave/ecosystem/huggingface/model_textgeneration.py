@@ -91,5 +91,20 @@ class HFModelTextGeneration(hfmodel.HFModel):
         output = weave.use(self.pipeline())(input)
         return FullTextGenerationPipelineOutput(self, input, output)
 
+    @weave.op()
+    # TODO: There are many more arguments for text generation. Some of the arguments
+    #    are pipeline arguments, others are passed to the underlying model's .generate()
+    #    method. Need to find the docs for each of those.
+    #    It'd be nice to call these different types, and therefore have different signatures
+    #    for this call!
+    def call_list(
+        self, input: typing.List[str]
+    ) -> typing.List[FullTextGenerationPipelineOutput]:
+        output = map(self.pipeline(), input)
+        return [
+            FullTextGenerationPipelineOutput(self, i, o)
+            for (i, o) in zip(input, output)
+        ]
+
 
 HFModelTextGenerationType.instance_classes = HFModelTextGeneration
