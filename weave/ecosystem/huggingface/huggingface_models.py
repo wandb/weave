@@ -79,6 +79,41 @@ def model_render(
     )
 
 
+##### This is super ugly and should not be here - temporary for demo
+
+
+@weave.op(render_info={"type": "function"})
+def hf_model_refine_output_type(id: str) -> weave.types.Type:
+    api = huggingface_hub.HfApi()
+    info = api.model_info(id)
+    if info.pipeline_tag == "text-classification":
+        return model_textclassification.HFModelTextClassificationType()
+    if info.pipeline_tag == "text-generation":
+        return model_textgeneration.HFModelTextGenerationType()
+    raise Exception(
+        "Huggingface model type '%s' not yet supported. Add support in ecosystem/huggingface."
+        % info.pipeline_tag
+    )
+
+
+@weave.op(
+    render_info={"type": "function"}, refine_output_type=hf_model_refine_output_type
+)
+def hf_model(id: str) -> hfmodel.HFModel:
+    api = huggingface_hub.HfApi()
+    info = api.model_info(id)
+    return full_model_info_to_hfmodel(info)
+
+
+@weave.op(render_info={"type": "function"})
+def hf_models() -> list[hfmodel.HFModel]:
+    api = huggingface_hub.HfApi()
+    return [full_model_info_to_hfmodel(info) for info in api.list_models(full=True)]
+
+
+####
+
+
 @weave.type()
 class HuggingFacePackage:
     @weave.op(render_info={"type": "function"})
@@ -100,7 +135,7 @@ class HuggingFacePackage:
         info = api.model_info(id)
         return full_model_info_to_hfmodel(info)
 
-    @weave.op(render_info={"type": "function"})
+    @weave.op()
     def models(self) -> list[hfmodel.HFModel]:
         api = huggingface_hub.HfApi()
         return [full_model_info_to_hfmodel(info) for info in api.list_models(full=True)]
