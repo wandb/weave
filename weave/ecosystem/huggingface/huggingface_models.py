@@ -60,12 +60,17 @@ def model_render(
     # the types arent' setup properly, so cast to tell the type-checker
     # TODO: Fix!
     model = typing.cast(hfmodel.HFModel, model_node)
+
     return weave.panels.Card(
         title=model.id(),
         subtitle="HuggingFace Hub Model",
         content=[
             weave.panels.CardTab(
-                name="Overview",
+                name="Model Card",
+                content=weave.panels.Markdown(model.readme()),  # type: ignore
+            ),
+            weave.panels.CardTab(
+                name="Metadata",
                 content=weave.panels.Group(
                     items=[
                         weave.panels.LabeledItem(item=model.id(), label="ID"),

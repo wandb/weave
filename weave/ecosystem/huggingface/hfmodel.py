@@ -1,4 +1,5 @@
 import typing
+import huggingface_hub
 import dataclasses
 import pickle
 import torch
@@ -61,6 +62,22 @@ class HFModel:
 
     def tokenizer(self):
         return transformers.AutoTokenizer.from_pretrained(self._id)
+
+    @weave.op()
+    def readme(self) -> weave.ops.Markdown:
+        readme = huggingface_hub.hf_hub_download(self._id, "README.md")
+        # quick hack: remove the metadata header from the readme
+        readme_contents = ""
+        break_count = 0
+        for l in open(readme).readlines():
+            if l.startswith("---"):
+                break_count += 1
+            elif break_count > 1:
+                readme_contents += l
+        # if we failed to parse out the header
+        if len(readme_contents) < 1:
+            readme_contents = open(readme).read()
+        return weave.ops.Markdown(readme_contents)
 
     @weave.op()
     def id(self) -> str:
