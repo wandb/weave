@@ -9,6 +9,9 @@ from .. import panels
 from . import xgboost
 from . import sklearn
 from . import torchvision
+from . import huggingface
+from . import craiyon
+from . import openai
 
 # TODO: feels odd to call this "ops.Markdown".
 # Maybe make it top level

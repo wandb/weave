@@ -302,7 +302,7 @@ Gpt3FineTuneType.instance_class = Gpt3FineTune
     ),
 )
 def finetune_gpt3(training_dataset, hyperparameters, _run=None):
-    from .. import api
+    from ... import api
 
     uploaded = weave.use(upload_gpt3_dataset(training_dataset))
     create_args = {"training_file": uploaded.id}
