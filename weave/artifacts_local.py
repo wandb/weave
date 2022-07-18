@@ -142,7 +142,7 @@ class LocalArtifact:
         orig_full_path = os.path.join(self._write_dirname, last_write_path)
         hash = md5_hash_file(orig_full_path)
         target_name = f"{hash}-{last_write_path}"
-        os.rename(orig_full_path, os.path.join(self._write_dirname, target_name))
+        shutil.move(orig_full_path, os.path.join(self._write_dirname, target_name))
         return hash
 
     @contextlib.contextmanager
@@ -217,7 +217,7 @@ class LocalArtifact:
         with tempfile.TemporaryDirectory() as d:
             temp_path = os.path.join(d, "tmplink")
             os.symlink(self._version, temp_path)
-            os.rename(temp_path, link_name)
+            shutil.move(temp_path, link_name)
 
 
 class WandbArtifact:
