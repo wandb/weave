@@ -214,7 +214,7 @@ class LocalArtifact:
 
         # Example of one of many races here
         link_name = os.path.join(self._root, branch)
-        with tempfile.TemporaryDirectory() as d:
+        with tempfile.TemporaryDirectory(dir=local_artifact_dir()) as d:
             temp_path = os.path.join(d, "tmplink")
             os.symlink(self._version, temp_path)
             os.rename(temp_path, link_name)
