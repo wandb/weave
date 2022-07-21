@@ -213,8 +213,12 @@ class LocalArtifact:
         self._setup_dirs()
 
         # Example of one of many races here
+        # ensure tempdir root exists
+        tmpdir_root = pathlib.Path(os.path.join(local_artifact_dir(), "tmp"))
+        tmpdir_root.mkdir(exist_ok=True)
+
         link_name = os.path.join(self._root, branch)
-        with tempfile.TemporaryDirectory(dir=local_artifact_dir()) as d:
+        with tempfile.TemporaryDirectory(dir=tmpdir_root) as d:
             temp_path = os.path.join(d, "tmplink")
             os.symlink(self._version, temp_path)
             os.rename(temp_path, link_name)
