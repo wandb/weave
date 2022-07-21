@@ -62,7 +62,19 @@ def _make_output_node(fq_op_name, bound_params, output_type_, refine_output_type
     if refine_output_type and not any(
         graph.expr_vars(arg_node) for arg_node in bound_params.values()
     ):
-        called_refine_output_type = refine_output_type(**bound_params)
+        # If the weave.op in question is defined on a class, then the
+        # incoming bound_params will have a `self` key. Interestingly,
+        # the `refine_output_type` is an instance of `weave.op_def.OpDef`
+        # which means that it already is bound to an object. This results
+        # in two (both valid) `self` values:
+        #   1. `self` in the `bound_params` which is the logical `self` in the weave graph
+        #   2. `self` bound to `refine_output_type` as a byproduct of python language.
+        #
+        # Normally, we would do `refine_output_type(**bound_params). However.
+        # Now, we _want_ to use the self in #1 as the self paramter passed to the
+        # underlying implementation. So, we drop down a level and manually call
+        # the underlying implementation.
+        called_refine_output_type = refine_output_type.call_fn(**bound_params)
         output_type = weave_internal.use_internal(called_refine_output_type)
     elif callable(output_type):
         new_input_type = {k: n.type for k, n in bound_params.items()}
