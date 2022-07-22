@@ -146,6 +146,14 @@ def list_ops():
 def execute():
     """Execute endpoint used by WeaveJS"""
     # print('REQUEST', request, request.json)
+
+    current_span = ddtrace.tracer.current_span()
+    if current_span and (
+        os.getenv("WEAVE_SERVER_DD_LOG_REQUEST_BODY_JSON")
+        or request.headers.get("weave-dd-log-request-body-json")
+    ):
+        current_span.set_tag("json", request.json)
+
     if not request.json or "graphs" not in request.json:
         abort(400)
     # Simulate browser/server latency
@@ -163,7 +171,14 @@ def execute():
         else:
             final_response.append(r)
     # print("FINAL RESPONSE", final_response)
-    return {"data": final_response}
+    response = {"data": final_response}
+    if current_span and (
+        os.getenv("WEAVE_SERVER_DD_LOG_REQUEST_RESPONSES")
+        or request.headers.get("weave-dd-log-request-response")
+    ):
+        current_span.set_tag("response", response)
+
+    return response
 
 
 @app.route("/__weave/execute/v2", methods=["POST"])
