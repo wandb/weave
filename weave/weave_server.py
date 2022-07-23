@@ -39,6 +39,7 @@ from weave.ecosystem import xgboost
 from weave.ecosystem import sklearn
 from weave.ecosystem import torch_mnist_model_example
 from weave.ecosystem import craiyon
+from .artifacts_local import local_artifact_dir
 
 context.clear_loading_built_ins(loading_builtins_token)
 
@@ -195,6 +196,15 @@ def execute_v2():
 
 @app.route("/__weave/file/<path:path>")
 def send_js(path):
+    # path is given relative to the FS root. check to see that path is a subdirectory of the
+    # local artifacts path. if not, return 403. then if there is a cache scope function defined
+    # call it to make sure we have access to the path
+    abspath = "/" / pathlib.Path(
+        path
+    )  # add preceding slash as werkzeug strips this by default and it is reappended below in send_from_directory
+    local_artifacts_path = pathlib.Path(local_artifact_dir()).absolute()
+    if local_artifacts_path not in list(abspath.parents):
+        abort(403)
     return send_from_directory("/", path)
 
 
