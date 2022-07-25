@@ -82,7 +82,7 @@ def use(nodes, client=None):
             if _context.eager_mode():
                 raise errors.WeaveApiError("use not allowed in eager mode.")
             else:
-                raise errors.WeaveApiError("non-Node passed to use().")
+                raise errors.WeaveApiError("non-Node passed to use(): %s" % type(node))
         actual_nodes.append(node)
 
     result = client.execute(actual_nodes)

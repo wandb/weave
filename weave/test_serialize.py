@@ -26,7 +26,7 @@ def test_serialize_nested_function():
     filtered = rows.filter(
         api.define_fn(
             {"row": types.TypedDict({"a": types.List(types.Int())})},
-            lambda row: ops.avg(
+            lambda row: ops.numbers_avg(
                 row["a"].map(api.define_fn({"row": types.Int()}, lambda row: row + 1))
             ),
         )

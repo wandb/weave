@@ -86,7 +86,7 @@ def test_nested_functions():
     rows = weave.save([{"a": [1, 2]}])
     map_fn = weave.define_fn(
         {"row": types.TypedDict({"a": types.List(types.Int())})},
-        lambda row: number.avg(
+        lambda row: number.numbers_avg(
             row["a"].map(weave.define_fn({"row": types.Int()}, lambda row: row + 1))
         ),
     )

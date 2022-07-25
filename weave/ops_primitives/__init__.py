@@ -1,5 +1,6 @@
 from .string import *
 from .number import *
+from .boolean import *
 from .dict import *
 from .list_ import *
 from .file import *

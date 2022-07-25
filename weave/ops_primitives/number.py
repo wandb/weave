@@ -1,3 +1,4 @@
+import math
 from ..api import op, mutation, weave_class
 from .. import weave_types as types
 
@@ -48,6 +49,22 @@ class Number(object):
         return lhs / rhs
 
     @op(
+        name="number-modulo",
+        input_type={"lhs": types.Number(), "rhs": types.Number()},
+        output_type=types.Number(),
+    )
+    def __mod__(lhs, rhs):
+        return lhs % rhs
+
+    @op(
+        name="number-pow-binary",
+        input_type={"lhs": types.Number(), "rhs": types.Number()},
+        output_type=types.Number(),
+    )
+    def __pow__(lhs, rhs):
+        return lhs**rhs
+
+    @op(
         name="number-equal",
         input_type={"lhs": types.Number(), "rhs": types.Number()},
         output_type=types.Boolean(),
@@ -95,13 +112,54 @@ class Number(object):
     def __ge__(lhs, rhs):
         return lhs >= rhs
 
+    @op(
+        name="number-negate",
+        input_type={"val": types.Number()},
+        output_type=types.Number(),
+    )
+    def __neg__(val):
+        return val * -1
+
+    @op(
+        name="number-floor",
+        input_type={"number": types.Number()},
+        output_type=types.Number(),
+    )
+    def floor(number):
+        return math.floor(number)
+
+    @op(
+        name="number-ceil",
+        input_type={"number": types.Number()},
+        output_type=types.Number(),
+    )
+    def ceil(number):
+        return math.ceil(number)
+
+    @op(
+        name="number-pow",
+        input_type={"lhs": types.Number(), "rhs": types.Number()},
+        output_type=types.Number(),
+    )
+    def pow(lhs, rhs):
+        return lhs**rhs
+
+
+@op(
+    name="numbers-sum",
+    input_type={"numbers": types.List(types.Number())},
+    output_type=types.Number(),
+)
+def numbers_sum(numbers):
+    return sum(numbers)
+
 
 @op(
     name="numbers-avg",
     input_type={"numbers": types.List(types.Number())},
     output_type=types.Number(),
 )
-def avg(numbers):
+def numbers_avg(numbers):
     return sum(numbers) / len(numbers)
 
 
