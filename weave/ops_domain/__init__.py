@@ -313,7 +313,7 @@ class Project:
     def runs(project: wandb_api.Project) -> wandb_api.Runs:
         import wandb
 
-        api = wandb.Api()
+        api = wandb_public_api()
         return api.runs(path="%s/%s" % (project.entity, project.name), per_page=500)
 
     @op(name="project-filtered-runs")
@@ -322,7 +322,7 @@ class Project:
     ) -> wandb_api.Runs:
         import wandb
 
-        api = wandb.Api()
+        api = wandb_public_api()
         return api.runs(
             path="%s/%s" % (project.entity, project.name),  # type: ignore
             filters=json.loads(filter),
