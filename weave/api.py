@@ -84,7 +84,10 @@ def use(nodes, client=None):
             else:
                 raise errors.WeaveApiError("non-Node passed to use(): %s" % type(node))
         actual_nodes.append(node)
+    print(actual_nodes)
+    import pdb
 
+    pdb.set_trace()
     result = client.execute(actual_nodes)
 
     if single:

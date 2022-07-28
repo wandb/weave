@@ -48,15 +48,20 @@ class ExecuteStats:
 
 
 def execute_nodes(nodes, no_cache=False):
+    print("nodes", nodes)
     nodes = compile.compile(nodes)
+    print("compiled", nodes)
     fg = forward_graph.ForwardGraph(nodes)
+    print("fg", fg)
 
     with context.execution_client():
         stats = execute_forward(fg, no_cache=no_cache)
     summary = stats.summary()
     logging.info("Execution summary\n%s" % pprint.pformat(summary))
 
-    return [fg.get_result(n) for n in nodes]
+    res = [fg.get_result(n) for n in nodes]
+    print("res", res)
+    return res
 
 
 def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteStats:

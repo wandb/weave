@@ -174,6 +174,8 @@ class ConstNode(Node):
         val = self.val
         if isinstance(self.type, weave_types.Function):
             val = val.to_json()
+        # import pdb; pdb.set_trace();
+        # print("Here")
         return {"nodeType": "const", "type": self.type.to_dict(), "val": val}
 
     def __str__(self):

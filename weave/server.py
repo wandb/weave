@@ -139,6 +139,7 @@ class HttpServerClient(object):
 
     def execute(self, nodes, no_cache=False):
         serialized = serialize.serialize(nodes)
+        print("sending", serialized)
         r = requests.post(
             self.url + self.execute_endpoint,
             json={"graphs": serialized},
@@ -147,13 +148,17 @@ class HttpServerClient(object):
         r.raise_for_status()
 
         response = r.json()["data"]
+        print("response", response)
 
         if self.emulate_weavejs:
             # When emulating weavejs, just return the server's json response.
             return response
 
         deserialized = [storage.from_python(r) for r in response]
-        return [storage.deref(r) for r in deserialized]
+        print("deserialized", deserialized)
+        res = [storage.deref(r) for r in deserialized]
+        print("res", res)
+        return res
 
 
 class HttpServer(threading.Thread):
