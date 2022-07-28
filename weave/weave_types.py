@@ -84,6 +84,12 @@ def type_name_to_type(type_name):
     return mapping.get(type_name)
 
 
+def clear_global_type_class_cache():
+    instance_class_to_potential_type.cache_clear()
+    type_name_to_type_map.cache_clear()
+    type_name_to_type.cache_clear()
+
+
 class TypeRegistry:
     @staticmethod
     def has_type(obj):
@@ -146,8 +152,17 @@ class TypeRegistry:
         return type_.from_dict(d)
 
 
+# Addapted from https://stackoverflow.com/questions/18126552/how-to-run-code-when-a-class-is-subclassed
+class _TypeSubclassWatcher(type):
+    def __init__(cls, name, bases, clsdict):
+        # This code will run whenever `Type` is subclassed!
+        # Bust the cache!
+        clear_global_type_class_cache()
+        super(_TypeSubclassWatcher, cls).__init__(name, bases, clsdict)
+
+
 @dataclasses.dataclass
-class Type:
+class Type(metaclass=_TypeSubclassWatcher):
     """`Type` is the base class for all Weave types. It serves 2 primary purposes:
         1. Defines the set Python class(es) that map to this type (referred to as `instance_classes`)
         2. Defines the serialization and deserialization strategy for the underlying instance class(es).
