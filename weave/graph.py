@@ -148,6 +148,9 @@ class ConstNode(Node):
         val = obj["val"]
         if isinstance(val, dict) and "nodeType" in val:
             val = Node.node_from_json(val)
+        # elif isinstance(val, dict) and "_val" in val and "_type" in val:
+        #     from weave.storage import from_python
+        #     val = from_python(val)
         return cls(weave_types.TypeRegistry.type_from_dict(obj["type"]), val)
 
     def equivalent_output_node(self):
@@ -174,6 +177,9 @@ class ConstNode(Node):
         val = self.val
         if isinstance(self.type, weave_types.Function):
             val = val.to_json()
+        # elif isinstance(self.type, weave_types.Type):
+        #     from weave.storage import to_python
+        #     val = to_python(val)
         return {"nodeType": "const", "type": self.type.to_dict(), "val": val}
 
     def __str__(self):

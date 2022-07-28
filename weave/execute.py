@@ -149,7 +149,7 @@ def execute_forward_node(
     if isinstance(node, graph.ConstNode):
         return
 
-    logging.debug("Executing node: %s" % node)
+    # logging.debug("Executing node: %s" % node)
 
     op_def = registry_mem.memory_registry.get_op(node.from_op.name)
     input_nodes = node.from_op.inputs
@@ -266,4 +266,4 @@ def execute_forward_node(
                 storage.save(run, name=run_artifact_name)
             except errors.WeaveSerializeError:
                 pass
-        logging.debug("Done executing node: %s" % node)
+        # logging.debug("Done executing node: %s" % node)

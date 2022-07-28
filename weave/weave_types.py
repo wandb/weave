@@ -409,8 +409,11 @@ class Const(Type):
         return cls(TypeRegistry.type_from_dict(d["valType"]), d["val"])
 
     def _to_dict(self):
-        # should we be converting the val to dict?
-        return {"valType": self.val_type.to_dict(), "val": self.val}
+        val = self.val
+        # if isinstance(self.val_type, Type):
+        #     from weave.storage import to_python
+        #     val = to_python(val)
+        return {"valType": self.val_type.to_dict(), "val": val}
 
     def __str__(self):
         return "<Const %s %s>" % (self.val_type, self.val)
