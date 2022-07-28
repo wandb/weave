@@ -1,26 +1,37 @@
-from ..api import op
+from ..api import op, mutation, weave_class
+from .. import weave_types as types
 
 
-@op(name="boolean-equal")
-def bool_equals(lhs: bool, rhs: bool) -> bool:
-    return lhs == rhs
+@weave_class(weave_type=types.Boolean)
+class Boolean:
+    @op(
+        name="boolean-set",
+        input_type={"self": types.Boolean(), "val": types.Boolean()},
+        output_type=types.Boolean(),
+    )
+    @mutation
+    def set(self: bool, val: bool):  # type: ignore
+        return val
+
+    @op(name="boolean-equal")
+    def bool_equals(lhs: bool, rhs: bool) -> bool:  # type: ignore
+        return lhs == rhs
+
+    @op(name="boolean-notEqual")
+    def bool_notEquals(lhs: bool, rhs: bool) -> bool:  # type: ignore
+        return lhs != rhs
+
+    @op(name="and")
+    def bool_and(lhs: bool, rhs: bool) -> bool:  # type: ignore
+        return lhs and rhs
+
+    @op(name="or")
+    def bool_or(lhs: bool, rhs: bool) -> bool:  # type: ignore
+        return lhs or rhs
+
+    @op(name="boolean-not")
+    def bool_not(bool: bool) -> bool:  # type: ignore
+        return not bool
 
 
-@op(name="boolean-notEqual")
-def bool_notEquals(lhs: bool, rhs: bool) -> bool:
-    return lhs != rhs
-
-
-@op(name="and")
-def bool_and(lhs: bool, rhs: bool) -> bool:
-    return lhs and rhs
-
-
-@op(name="or")
-def bool_or(lhs: bool, rhs: bool) -> bool:
-    return lhs or rhs
-
-
-@op(name="boolean-not")
-def bool_not(bool: bool) -> bool:
-    return not bool
+types.Boolean.instance_class = Boolean
