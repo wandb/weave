@@ -26,6 +26,8 @@ from .weave_internal import define_fn
 Node = _graph.Node
 
 
+# The bad part about this is that the op chain is lost
+# when we just do `use`.
 def save(node_or_obj, name=None):
     use_save_op = False
     if use_save_op and isinstance(node_or_obj, _graph.Node):
