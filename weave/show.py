@@ -16,12 +16,36 @@ from . import usage_analytics
 from .ops_primitives.weave_api import get as op_get
 
 
+def is_json_compatible(obj):
+    return isinstance(obj, (dict, list, str, int, float, bool))
+
+
 def make_refs(node: graph.Node):
+    # Wow this is a smell.
+    # save_constant_vals = True
+    # if isinstance(node, graph.OutputNode) and node.from_op.name == 'save':
+    #     save_constant_vals = False
     def make_ref(node: graph.Node):
+        # import pdb; pdb.set_trace();
         if isinstance(node, graph.ConstNode):
             ref = storage.get_ref(node.val)
             if ref is not None:
                 return op_get(str(ref.uri))
+            # possibly wrong place - perhaps should be done in const node?, possibly need all branches from _show_params?, # will this match everything?
+            # None when there is a 'get' op?!?!
+            elif (
+                node.val is not None
+                and not is_json_compatible(node.val)
+                and types.TypeRegistry.has_type(node.val)
+            ):
+                # print("Doing something special")
+                obj = node.val
+                from weave import ops
+
+                names = util.find_names(obj)
+
+                ref = storage.save(obj, name=names[-1])
+                return weavejs_fixes.fixup_node(ops.get(ref.uri))
         return node
 
     return graph.map_nodes(node, make_ref)

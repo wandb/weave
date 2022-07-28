@@ -27,18 +27,19 @@ Node = _graph.Node
 
 
 def save(node_or_obj, name=None):
-    if isinstance(node_or_obj, _graph.Node):
+    use_save_op = False
+    if use_save_op and isinstance(node_or_obj, _graph.Node):
         from .ops_primitives.weave_api import save as op_save
 
         return op_save(node_or_obj, name=name)
     else:
-        ref = _storage.save(node_or_obj, name=name)
+        ref = _storage.save(use(node_or_obj), name=name)
 
         # TODO: This doesn't return op_get
         # But somehow we eventually get an op_get... how?
-        from .ops_primitives.weave_api import get as op_get
+        # from .ops_primitives.weave_api import get as op_get
 
-        return op_get(str(ref))
+        # return op_get(str(ref))
 
         return _weave_internal.make_const_node(ref.type, ref.obj)
 

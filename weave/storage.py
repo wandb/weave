@@ -59,6 +59,7 @@ def save_to_artifact(obj, artifact: artifacts_local.LocalArtifact, name, type_):
     # references to existing artifacts work.
     # TODO: Fix
     # DO NOT MERGE
+    # import pdb; pdb.set_trace();
     if name != "_obj":
         name = type_.name
     ref_extra = type_.save_instance(obj, artifact, name)

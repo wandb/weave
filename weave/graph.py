@@ -107,6 +107,7 @@ class OutputNode(Node, typing.Generic[OpInputNodeT]):
         return iter(self.from_op.inputs.items())
 
     def to_json(self):
+        # import pdb; pdb.set_trace();
         return {
             "nodeType": "output",
             "type": self.type.to_dict(),
@@ -177,6 +178,7 @@ class ConstNode(Node):
         val = self.val
         if isinstance(self.type, weave_types.Function):
             val = val.to_json()
+        # Val is a python type at this point, not a primitive
         # elif isinstance(self.type, weave_types.Type):
         #     from weave.storage import to_python
         #     val = to_python(val)
