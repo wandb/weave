@@ -153,8 +153,7 @@ class HttpServerClient(object):
             return response
 
         deserialized = [storage.from_python(r) for r in response]
-        res = [storage.deref(r) for r in deserialized]
-        return res
+        return [storage.deref(r) for r in deserialized]
 
 
 class HttpServer(threading.Thread):
