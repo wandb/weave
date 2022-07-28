@@ -139,3 +139,16 @@ def ecosystem_render(
             ),
         ],
     )
+
+
+# @weave.type()
+# class MyCustomType:
+#     attribute: int
+
+# @weave.op(render_info={"type": "function"})
+# def make_custom(val: int) -> MyCustomType:
+#     return MyCustomType(val)
+
+# @weave.op()
+# def addCustom(a: MyCustomType, b:MyCustomType) -> int:
+#     return a.attribute + b.attribute

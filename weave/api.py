@@ -79,15 +79,19 @@ def use(nodes, client=None):
     actual_nodes = []
     for node in nodes:
         if not isinstance(node, _graph.Node):
-            if _context.eager_mode():
-                raise errors.WeaveApiError("use not allowed in eager mode.")
+            # This is the case that we are passing some python object.
+            # In this case, we probably want to convert to a const node.
+            if not callable(node):
+                node_type = types.TypeRegistry.type_of(node)
+                node = _graph.ConstNode(types.Const(node_type, node), node)
             else:
-                raise errors.WeaveApiError("non-Node passed to use(): %s" % type(node))
+                if _context.eager_mode():
+                    raise errors.WeaveApiError("use not allowed in eager mode.")
+                else:
+                    raise errors.WeaveApiError(
+                        "non-Node passed to use(): %s" % type(node)
+                    )
         actual_nodes.append(node)
-    print(actual_nodes)
-    import pdb
-
-    pdb.set_trace()
     result = client.execute(actual_nodes)
 
     if single:
