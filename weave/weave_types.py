@@ -84,6 +84,12 @@ def type_name_to_type(type_name):
     return mapping.get(type_name)
 
 
+def clear_global_type_class_cache():
+    instance_class_to_potential_type.cache_clear()
+    type_name_to_type_map.cache_clear()
+    type_name_to_type.cache_clear()
+
+
 class TypeRegistry:
     @staticmethod
     def has_type(obj):
@@ -146,8 +152,56 @@ class TypeRegistry:
         return type_.from_dict(d)
 
 
+# Addapted from https://stackoverflow.com/questions/18126552/how-to-run-code-when-a-class-is-subclassed
+class _TypeSubclassWatcher(type):
+    def __init__(cls, name, bases, clsdict):
+        # This code will run whenever `Type` is subclassed!
+        # Bust the cache!
+        clear_global_type_class_cache()
+        super(_TypeSubclassWatcher, cls).__init__(name, bases, clsdict)
+
+
 @dataclasses.dataclass
-class Type:
+class Type(metaclass=_TypeSubclassWatcher):
+    """`Type` is the base class for all Weave types. It serves 2 primary purposes:
+        1. Defines the set Python class(es) that map to this type (referred to as `instance_classes`)
+        2. Defines the serialization and deserialization strategy for the underlying instance class(es).
+
+    In addition to the above two things, `Type` also handles the following:
+        a. The string identifier (name) of the type
+        b. The type variables
+        c. How to serialize the type itself
+        d. How to determine if a Python class is assignable to this type
+        e. How to determine if other Weave Types are assignable to it.
+
+    Most users will only need to care about #1 and #2 above. To define the Python class(es), simply
+    set the `instance_classes` property to a list of suitable Python classes.
+    To define the serialization and deserialization strategy, you have two options:
+        1. Override the `instance_to_dict` and `instance_from_dict` which define how to transform an object
+        of the instance_classes into a dictionary and vice versa.
+        2. If you need more sophisticated serialization, you can override the `save_instance` and `load_instance`
+        methods. Their default implementation call `instance_to_dict` and `instance_from_dict`, however you can
+        ignore those if desired and use your own serialization strategy (ex. Pickle, SavedModel, etc).
+
+    There are two primary cases to define a `Type`:
+        1. You want Weave to understand an existing Python class (often from another library) - for example a Pytorch Model.
+        2. You have some custom data structure that you want to use with Weave.
+
+    In the case you have an existing type, then you want to create a new class that inherits from this `Type`.
+    ```
+    class DataframeType(Type):
+        instance_classes = [pd.DataFrame]
+        # define serialization logic...
+    ```
+
+    In the case that you have some custom struct, use the decorator for simplicity:
+    This will automatically create a new ObjectType with properties and serialization setup.
+    ```
+    @weave.type()
+    class MyCustomType:
+        attribute: int
+    ```
+    """
 
     instance_class: typing.ClassVar[typing.Optional[type]]
     instance_classes: typing.ClassVar[
