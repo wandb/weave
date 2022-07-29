@@ -20,28 +20,37 @@ def is_json_compatible(obj):
     return isinstance(obj, (dict, list, str, int, float, bool))
 
 
+def _obj_to_showable_node(obj):
+    from weave import ops
+
+    names = util.find_names(obj)
+
+    ref = storage.save(obj, name=names[-1])
+    node = ops.get(ref.uri)
+
+    return weavejs_fixes.fixup_node(node)
+
+
 def make_refs(node: graph.Node):
+    """make_refs is used by _show_params, which in turn is called from `weave.show()`.
+    It takes a node and converts all ConstNodes in its ancestry to references so that
+    they can be serialized to JSON, and sent to the JS renderer. However, sometimes
+    a reference does not already exist. In such cases, when the value is not a primitive
+    serializable to JSON, we save the const value and then return that reference. This
+    path is invoked when the user has non-primtiive const values in their graph.
+    """
+
     def make_ref(node: graph.Node):
         if isinstance(node, graph.ConstNode):
             ref = storage.get_ref(node.val)
             if ref is not None:
                 return op_get(str(ref.uri))
-            # possibly wrong place - perhaps should be done in const node?,
-            # possibly need all branches from _show_params?, # will this match
-            # everything? None when there is a 'get' op?!?!
             elif (
                 node.val is not None
                 and not is_json_compatible(node.val)
                 and types.TypeRegistry.has_type(node.val)
             ):
-                # print("Doing something special")
-                obj = node.val
-                from weave import ops
-
-                names = util.find_names(obj)
-
-                ref = storage.save(obj, name=names[-1])
-                return weavejs_fixes.fixup_node(ops.get(ref.uri))
+                return _obj_to_showable_node(node.val)
         return node
 
     return graph.map_nodes(node, make_ref)
@@ -68,14 +77,7 @@ def _show_params(obj):
         return {"weave_node": weavejs_fixes.fixup_node(node)}
 
     elif types.TypeRegistry.has_type(obj):
-        from weave import ops
-
-        names = util.find_names(obj)
-
-        ref = storage.save(obj, name=names[-1])
-        node = ops.get(ref.uri)
-
-        return {"weave_node": weavejs_fixes.fixup_node(node)}
+        return {"weave_node": _obj_to_showable_node(obj)}
 
     else:
         raise errors.WeaveTypeError(
