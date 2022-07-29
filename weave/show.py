@@ -26,7 +26,6 @@ def make_refs(node: graph.Node):
     # if isinstance(node, graph.OutputNode) and node.from_op.name == 'save':
     #     save_constant_vals = False
     def make_ref(node: graph.Node):
-        # import pdb; pdb.set_trace();
         if isinstance(node, graph.ConstNode):
             ref = storage.get_ref(node.val)
             if ref is not None:

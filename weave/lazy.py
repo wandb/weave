@@ -49,7 +49,6 @@ def _bind_params(fq_op_name, sig, args, kwargs, input_type):
                     fq_op_name, sub_v, None, None
                 )
         else:
-            # print("input_type.arg_types", input_type.arg_types, bound_params.arguments)
             bound_params_with_constants[k] = _ensure_node(
                 fq_op_name, v, input_type.arg_types[k], bound_params_with_constants
             )

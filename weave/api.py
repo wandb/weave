@@ -35,6 +35,7 @@ def save(node_or_obj, name=None):
 
         return op_save(node_or_obj, name=name)
     else:
+        # Tiis use call is not right, i just got lucky b/c i made use accept objs.
         ref = _storage.save(use(node_or_obj), name=name)
 
         # TODO: This doesn't return op_get
@@ -48,6 +49,7 @@ def save(node_or_obj, name=None):
 
 def publish(node_or_obj, name=None):
     if isinstance(node_or_obj, _graph.Node):
+        # Why call use? wouldn't we want to pass the graph itself, not the result of use??
         node_or_obj = use(node_or_obj)
 
     ref = _storage.publish(node_or_obj, name)
