@@ -21,17 +21,14 @@ def is_json_compatible(obj):
 
 
 def make_refs(node: graph.Node):
-    # Wow this is a smell.
-    # save_constant_vals = True
-    # if isinstance(node, graph.OutputNode) and node.from_op.name == 'save':
-    #     save_constant_vals = False
     def make_ref(node: graph.Node):
         if isinstance(node, graph.ConstNode):
             ref = storage.get_ref(node.val)
             if ref is not None:
                 return op_get(str(ref.uri))
-            # possibly wrong place - perhaps should be done in const node?, possibly need all branches from _show_params?, # will this match everything?
-            # None when there is a 'get' op?!?!
+            # possibly wrong place - perhaps should be done in const node?,
+            # possibly need all branches from _show_params?, # will this match
+            # everything? None when there is a 'get' op?!?!
             elif (
                 node.val is not None
                 and not is_json_compatible(node.val)
@@ -98,7 +95,6 @@ def show(obj=None, height=400):
     params = _show_params(obj)
     panel_url = f"{context.get_frontend_url()}/__frontend/weave_jupyter?fullScreen"
     if "weave_node" in params:
-        # print("JSON", params["weave_node"].to_json())
         panel_url += "&expNode=%s" % urllib.parse.quote(
             json.dumps(params["weave_node"].to_json())
         )
