@@ -16,12 +16,41 @@ from . import usage_analytics
 from .ops_primitives.weave_api import get as op_get
 
 
+def is_json_compatible(obj):
+    return isinstance(obj, (dict, list, str, int, float, bool))
+
+
+def _obj_to_showable_node(obj):
+    from weave import ops
+
+    names = util.find_names(obj)
+
+    ref = storage.save(obj, name=names[-1])
+    node = ops.get(ref.uri)
+
+    return weavejs_fixes.fixup_node(node)
+
+
 def make_refs(node: graph.Node):
+    """make_refs is used by _show_params, which in turn is called from `weave.show()`.
+    It takes a node and converts all ConstNodes in its ancestry to references so that
+    they can be serialized to JSON, and sent to the JS renderer. However, sometimes
+    a reference does not already exist. In such cases, when the value is not a primitive
+    serializable to JSON, we save the const value and then return that reference. This
+    path is invoked when the user has non-primtiive const values in their graph.
+    """
+
     def make_ref(node: graph.Node):
         if isinstance(node, graph.ConstNode):
             ref = storage.get_ref(node.val)
             if ref is not None:
                 return op_get(str(ref.uri))
+            elif (
+                node.val is not None
+                and not is_json_compatible(node.val)
+                and types.TypeRegistry.has_type(node.val)
+            ):
+                return _obj_to_showable_node(node.val)
         return node
 
     return graph.map_nodes(node, make_ref)
@@ -48,14 +77,7 @@ def _show_params(obj):
         return {"weave_node": weavejs_fixes.fixup_node(node)}
 
     elif types.TypeRegistry.has_type(obj):
-        from weave import ops
-
-        names = util.find_names(obj)
-
-        ref = storage.save(obj, name=names[-1])
-        node = ops.get(ref.uri)
-
-        return {"weave_node": weavejs_fixes.fixup_node(node)}
+        return {"weave_node": _obj_to_showable_node(obj)}
 
     else:
         raise errors.WeaveTypeError(
