@@ -1,4 +1,4 @@
-wandb>=0.12.21
+git+https://github.com/wandb/client.git@danny/plumb-api-key#egg=wandb
 ddtrace
 json_log_formatter
 numpy
