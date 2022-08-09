@@ -143,8 +143,8 @@ def op(
                     "Could not infer Weave Type from declared Python return type: %s"
                     % python_return_type
                 )
+
         weave_output_type = output_type
-        # usable_refine_output_type = refine_output_type
         if weave_output_type is None:
             # weave output type is not declared, use type inferred from Python
             weave_output_type = inferred_output_type
@@ -155,19 +155,17 @@ def op(
                     raise errors.WeaveDefinitionError(
                         "refine_output_type cannot be used with a callable output_type"
                     )
-
-                weave_output_type_closure = weave_output_type
+                if inferred_output_type != types.UnknownType():
+                    raise errors.WeaveDefinitionError(
+                        "output_type is function but Python return type also declared. This is not yet supported"
+                    )
 
                 def artificial_refine_output_type(**kwargs):
                     input_types = {
-                        k: graph.ConstNode(types.TypeRegistry.type_of(v), v)
-                        for k, v in kwargs.items()
+                        k: types.TypeRegistry.type_of(v) for k, v in kwargs.items()
                     }
-                    return weave_output_type_closure(input_types)
+                    return weave_output_type(input_types)
 
-                # weave_output_type = inferred_output_type
-
-                # usable_refine_output_type = registry_mem.memory_registry.register_op(op_def.OpDef(
                 registry_mem.memory_registry.register_op(
                     op_def.OpDef(
                         fq_op_name + "_refine_output_type",
@@ -176,11 +174,7 @@ def op(
                         artificial_refine_output_type,
                     )
                 )
-            elif weave_output_type == types.UnknownType():
-                raise errors.WeaveDefinitionError(
-                    "Op's return type must be declared: %s" % f
-                )
-            if (
+            elif (
                 inferred_output_type != types.UnknownType()
                 and weave_output_type.assign_type(inferred_output_type)
                 == types.Invalid()
@@ -189,13 +183,16 @@ def op(
                     "Python return type not assignable to declared Weave output_type: %s !-> %s"
                     % (inferred_output_type, weave_output_type)
                 )
+        if not callable(weave_output_type) and weave_output_type == types.UnknownType():
+            raise errors.WeaveDefinitionError(
+                "Op's return type must be declared: %s" % f
+            )
 
         op = op_def.OpDef(
             fq_op_name,
             weave_input_type,
             weave_output_type,
             f,
-            # refine_output_type=usable_refine_output_type,
             refine_output_type=refine_output_type,
             setter=setter,
             render_info=render_info,
