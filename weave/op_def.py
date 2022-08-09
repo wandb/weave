@@ -6,9 +6,11 @@ import os
 import typing
 import sys
 
+
 from . import artifacts_local
 from . import errors
 from . import op_args
+from . import registry_mem
 from . import context
 from . import weave_types as types
 from . import uris
@@ -93,13 +95,9 @@ class OpDef:
 
     def to_dict(self):
         output_type = self.output_type
-        if callable(self.output_type):
-            raise errors.WeaveSerializeError(
-                "serializing op with callable output_type not yet implemented"
-            )
         # No callable output_type still
-        # if callable(output_type):
-        #     output_type = types.Any()
+        if callable(output_type):
+            output_type = types.Any()
         output_type = output_type.to_dict()
 
         # Make callable input_type args into types.Any() for now.
@@ -126,6 +124,12 @@ class OpDef:
 
     def __str__(self):
         return "<OpDef: %s>" % self.name
+
+    def _update_refine_output_name(self):
+        if self.refine_output_type is not None:
+            registry_mem.memory_registry.rename_op(
+                self.refine_output_type.name, f"{self.name}_refine_output_type"
+            )
 
 
 def is_op_def(obj):

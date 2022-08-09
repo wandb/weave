@@ -208,31 +208,16 @@ class KerasModel(weave.types.Type):
         "input_str": weave.types.String(),
     },
     # TODO: Get the shapes correct
-    output_type=lambda input_types: List(
-        DTYPE_NAME_TO_WEAVE_TYPE[
-            DTYPE_ENUM_TO_DTYPE_NAME[
-                input_types["model"]
-                .outputs_type["property_types"]["0"]
-                .datatype_enum.val
-            ]
+    output_type=lambda input_types: DTYPE_NAME_TO_WEAVE_TYPE[
+        DTYPE_ENUM_TO_DTYPE_NAME[
+            input_types["model"].outputs_type.property_types["0"].datatype_enum.val
         ]
-    ),
+    ],
 )
 def call_string(model, input_str):
-    return model.predict(tf.constant([input_str]))[0].item()
-
-
-@weave.op(
-    input_type={
-        "model": KerasModel.make_type(
-            [([None, 1], DTYPE_NAME.STRING)], [([None, 1], DTYPE_NAME.STRING)]
-        ),
-        "input_str": weave.types.String(),
-    },
-    output_type=weave.types.String(),
-)
-def call_string_to_string(model, input_str):
-    return model.predict(tf.constant([input_str]))[0][0].item()
+    # TODO: this double [0][0] is a smell. the first one gets into the batch and
+    # the second one goes into the first result. this is really not ideal.
+    return model.predict(tf.constant([input_str])).tolist()[0][0]
 
 
 ## The following op (image_classification) is just an example, it needs to be generalized

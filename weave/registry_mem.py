@@ -108,6 +108,7 @@ class Registry:
             self._op_versions.pop((name, op.version))
             self._op_versions[(new_name, op.version)] = op
         self._make_op_calls(op)
+        op._update_refine_output_name()
 
     # def register_type(self, type: weave_types.Type):
     #    self._types[type.name] = type
