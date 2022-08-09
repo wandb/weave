@@ -151,29 +151,29 @@ def op(
         else:
             # Weave output_type was declared. Ensure compatibility with Python type.
             if callable(weave_output_type):
-                if refine_output_type is not None:
-                    raise errors.WeaveDefinitionError(
-                        "refine_output_type cannot be used with a callable output_type"
-                    )
                 if inferred_output_type != types.UnknownType():
                     raise errors.WeaveDefinitionError(
                         "output_type is function but Python return type also declared. This is not yet supported"
                     )
-
-                def artificial_refine_output_type(**kwargs):
-                    input_types = {
-                        k: types.TypeRegistry.type_of(v) for k, v in kwargs.items()
-                    }
-                    return weave_output_type(input_types)
-
-                registry_mem.memory_registry.register_op(
-                    op_def.OpDef(
-                        fq_op_name + "_refine_output_type",
-                        weave_input_type,
-                        infer_types.python_type_to_type(types.Type),
-                        artificial_refine_output_type,
+                # In the case that we have a callable weave_output_type, but no
+                # refine type, then we need a way to tell TS what the return type is.
+                # Here we define a custom refine type that calls the provided output_type
+                # function. This is a bit of a hack, but it works. Notably, it operates
+                # in the slower, value-space so we should think about optimizing in the future.
+                if refine_output_type is not None:
+                    registry_mem.memory_registry.register_op(
+                        op_def.OpDef(
+                            fq_op_name + "_refine_output_type",
+                            weave_input_type,
+                            infer_types.python_type_to_type(types.Type),
+                            lambda **kwargs: weave_output_type(
+                                {
+                                    k: types.TypeRegistry.type_of(v)
+                                    for k, v in kwargs.items()
+                                }
+                            ),
+                        )
                     )
-                )
             elif (
                 inferred_output_type != types.UnknownType()
                 and weave_output_type.assign_type(inferred_output_type)
