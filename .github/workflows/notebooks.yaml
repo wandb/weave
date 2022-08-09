@@ -27,4 +27,4 @@ jobs:
       - name: Install spacy language
         run: python -m spacy download en_core_web_sm
       - name: Run tests
-        run: pytest -n=auto --nbmake examples/ tutorial/  --ignore=examples/WB_API.ipynb
+        run: pytest -n=auto --nbmake examples/ tutorial/  --ignore=examples/WB_API.ipynb --ignore=examples/KerasModel.ipynb
