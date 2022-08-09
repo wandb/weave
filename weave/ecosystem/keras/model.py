@@ -197,12 +197,17 @@ class KerasModel(weave.types.Type):
         return cls(inputs, outputs)
 
 
+# def call_string_output_type(input_types):
+#     dimensions = 0
+#     for input_type in input_types:
+
 # TODO: Figure out batching - we already have the `None` in the batch index!
 @weave.op(
     input_type={
         "model": KerasModel.make_type([([None, 1], DTYPE_NAME.STRING)]),
         "input_str": weave.types.String(),
     },
+    # TODO: Get the shapes correct
     output_type=lambda input_types: List(
         DTYPE_NAME_TO_WEAVE_TYPE[
             DTYPE_ENUM_TO_DTYPE_NAME[
