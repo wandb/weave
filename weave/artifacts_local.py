@@ -1,5 +1,5 @@
 import contextlib
-import logging
+import functools
 import hashlib
 import os
 import json
@@ -15,11 +15,8 @@ from . import wandb_api
 import wandb
 
 
-# @functools.lru_cache(1000)
+@functools.lru_cache(1000)
 def get_wandb_read_artifact(path):
-    from . import context
-
-    logging.getLogger("root").info(f"API_KEY {context._wandb_api_key.get()}")
     return wandb_api.wandb_public_api().artifact(path)
 
 
