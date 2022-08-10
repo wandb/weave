@@ -28,3 +28,6 @@ transformers<4.21
 
 # spaCy Requirements:
 spacy>=3.0.0,<4.0.0
+
+# networkx Requirements:
+networkx
