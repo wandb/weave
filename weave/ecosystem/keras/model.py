@@ -194,6 +194,32 @@ def call_string_to_number(model, input_str):
 @weave.op(
     input_type={
         "model": KerasModel.make_type(
+            [([None, 1], DTYPE_NAME.STRING)], [([None, 1], DTYPE_NAME.NUMBER)]
+        ),
+        "input_str": weave.types.String(),
+    },
+    output_type=weave.types.Number(),
+)
+def call_string_to_argmax(model, input_str):
+    return np.argmax(model.predict(tf.constant([input_str]))).item()
+
+
+@weave.op(
+    input_type={
+        "model": KerasModel.make_type(
+            [([None, 1], DTYPE_NAME.STRING)], [([None, 1], DTYPE_NAME.NUMBER)]
+        ),
+        "input_str": weave.types.String(),
+    },
+    output_type=weave.types.List(weave.types.Number()),
+)
+def call_string_to_confidence_scores(model, input_str):
+    return model.predict(tf.constant([input_str])).toList()
+
+
+@weave.op(
+    input_type={
+        "model": KerasModel.make_type(
             [([None, 1], DTYPE_NAME.STRING)], [([None, 1], DTYPE_NAME.STRING)]
         ),
         "input_str": weave.types.String(),
