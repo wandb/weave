@@ -164,7 +164,7 @@ def op(
                 if weave_refine_output_type is None:
                     weave_refine_output_type = registry_mem.memory_registry.register_op(
                         op_def.OpDef(
-                            fq_op_name + "_refine_output_type",
+                            f"__ts__{fq_op_name}_refine_output_type",
                             weave_input_type,
                             infer_types.python_type_to_type(types.Type),
                             lambda **kwargs: weave_output_type(
