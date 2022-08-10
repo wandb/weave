@@ -145,7 +145,7 @@ def op(
                 )
 
         weave_output_type = output_type
-        weave_refine_output_type = refine_output_type
+        ts_refine_output_type = None
         if weave_output_type is None:
             # weave output type is not declared, use type inferred from Python
             weave_output_type = inferred_output_type
@@ -161,8 +161,8 @@ def op(
                 # Here we define a custom refine type that calls the provided output_type
                 # function. This is a bit of a hack, but it works. Notably, it operates
                 # in the slower, value-space so we should think about optimizing in the future.
-                if weave_refine_output_type is None:
-                    weave_refine_output_type = registry_mem.memory_registry.register_op(
+                if refine_output_type is None:
+                    ts_refine_output_type = registry_mem.memory_registry.register_op(
                         op_def.OpDef(
                             f"__ts__{fq_op_name}_refine_output_type",
                             weave_input_type,
@@ -194,7 +194,8 @@ def op(
             weave_input_type,
             weave_output_type,
             f,
-            refine_output_type=weave_refine_output_type,
+            refine_output_type=refine_output_type,
+            ts_refine_output_type=ts_refine_output_type,
             setter=setter,
             render_info=render_info,
             pure=pure,

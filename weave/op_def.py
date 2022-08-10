@@ -27,6 +27,7 @@ class OpDef:
         typing.Callable[[typing.Dict[str, types.Type]], types.Type],
     ]
     refine_output_type: typing.Optional["OpDef"]
+    ts_refine_output_type: typing.Optional["OpDef"]
     setter = str
     call_fn: typing.Any
     version: typing.Optional[str]
@@ -42,15 +43,20 @@ class OpDef:
         ],
         resolve_fn,
         refine_output_type: typing.Optional["OpDef"] = None,
+        ts_refine_output_type: typing.Optional["OpDef"] = None,
         setter=None,
         render_info=None,
         pure=True,
         is_builtin: typing.Optional[bool] = None,
     ):
+        assert not (
+            refine_output_type is not None and ts_refine_output_type is not None
+        )
         self.name = name
         self.input_type = input_type
         self.output_type = output_type
         self.refine_output_type = refine_output_type
+        self.ts_refine_output_type = ts_refine_output_type
         self.resolve_fn = resolve_fn
         self.setter = setter
         self.render_info = render_info
@@ -117,8 +123,15 @@ class OpDef:
         }
         if self.render_info is not None:
             serialized["render_info"] = self.render_info
-        if self.refine_output_type is not None:
-            serialized["refine_output_type_op_name"] = self.refine_output_type.name
+        if (
+            self.refine_output_type is not None
+            or self.ts_refine_output_type is not None
+        ):
+            serialized["refine_output_type_op_name"] = (
+                self.refine_output_type.name
+                if self.refine_output_type is not None
+                else self.ts_refine_output_type.name
+            )
 
         return serialized
 
