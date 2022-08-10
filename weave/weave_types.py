@@ -347,8 +347,11 @@ class Any(BasicType):
         return Any()
 
 
+@dataclasses.dataclass
 class Const(Type):
     name = "const"
+    val_type: Type
+    val: typing.Any
 
     def __init__(self, type_, val):
         self.val_type = type_
