@@ -214,7 +214,7 @@ def call_string_to_argmax(model, input_str):
     output_type=weave.types.List(weave.types.Number()),
 )
 def call_string_to_confidence_scores(model, input_str):
-    return model.predict(tf.constant([input_str])).toList()
+    return model.predict(tf.constant([input_str]))
 
 
 @weave.op(
