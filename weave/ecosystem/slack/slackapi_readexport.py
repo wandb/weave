@@ -1,21 +1,22 @@
-import dataclasses
 import json
 import pathlib
+
+import weave
 
 
 def dirsize(path) -> int:
     return sum(f.stat().st_size for f in path.glob("**/*") if f.is_file())
 
 
-@dataclasses.dataclass
+@weave.type()
 class SlackReadExportApi:
-    data_dir: pathlib.Path  # TODO: change to weave.Dir
+    data_dir: str  # TODO: change to weave.Dir
 
     def channel_names(self):
-        return (n.name for n in self.data_dir.glob("*"))
+        return (n.name for n in pathlib.Path(self.data_dir).glob("*"))
 
     def channel_path(self, channel_name):
-        return self.data_dir / channel_name
+        return pathlib.Path(self.data_dir) / channel_name
 
     def channel_export_size(self, channel_name: str):
         return dirsize(self.channel_path(channel_name))
