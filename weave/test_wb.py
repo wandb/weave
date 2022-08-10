@@ -13,8 +13,13 @@ def test_table_call():
         entity = "stacey"
         name = "mendeleev"
 
-    class FakeManifest:
+    class FakeEntry:
         pass
+
+    class FakeManifest:
+        entries = {"fakePath": FakeEntry()}
+
+        get_entry_by_path = mock.Mock(return_value=FakeEntry())
 
     class FakePath:
         def __init__(self, path):
@@ -29,7 +34,7 @@ def test_table_call():
         _sequence_name = "test_res_1fwmcd3q"
         version = "v0"
 
-        manifest = mock.Mock(return_value=FakeManifest())
+        manifest = FakeManifest()
 
         def get_path(self, path):
             return FakePath(os.path.join(TEST_TABLE_ARTIFACT_PATH, path))

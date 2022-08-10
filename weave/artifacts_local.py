@@ -129,6 +129,12 @@ class LocalArtifact:
         yield f
         f.close()
 
+    @contextlib.contextmanager
+    def new_dir(self, path):
+        full_path = os.path.abspath(os.path.join(self._write_dirname, path))
+        os.makedirs(full_path, exist_ok=True)
+        yield full_path
+
     def make_last_file_content_addressed(self):
         # Warning: This function is really bad and a terrible smell!
         # We need to fix the type saving API so we don't need to do this!!!!
@@ -198,14 +204,14 @@ class LocalArtifact:
                 for path in os.listdir(self._read_dirname):
                     src_path = os.path.join(self._read_dirname, path)
                     target_path = os.path.join(new_dirname, path)
-                    if os.path.isdir(full_path):
+                    if os.path.isdir(src_path):
                         shutil.copytree(src_path, target_path)
                     else:
                         shutil.copyfile(src_path, target_path)
             for path in os.listdir(self._write_dirname):
                 src_path = os.path.join(self._write_dirname, path)
                 target_path = os.path.join(new_dirname, path)
-                if os.path.isdir(full_path):
+                if os.path.isdir(src_path):
                     shutil.copytree(src_path, target_path)
                 else:
                     shutil.copyfile(src_path, target_path)
@@ -276,6 +282,14 @@ class WandbArtifact:
             raise errors.WeaveInternalError("cannot download of an unsaved artifact")
         if name in self._local_path:
             return self._local_path[name]
+        if name not in self._saved_artifact.manifest.entries:
+            found = False
+            for entry in self._saved_artifact.manifest.entries:
+                if entry.startswith(name):
+                    _path = self.path(entry)
+                    found = True
+            if found:
+                return os.path.join(self._saved_artifact._default_root(), name)
         path = self._saved_artifact.get_path(name).download()
         # python module loading does not support colons
         # TODO: This is an extremely expensive fix!
@@ -357,6 +371,14 @@ class WandbArtifact:
             mode = "wb"
         with self._writeable_artifact.new_file(path, mode) as f:
             yield f
+
+    @contextlib.contextmanager
+    def new_dir(self, path):
+        if not self._writeable_artifact:
+            raise errors.WeaveInternalError("cannot add new file to readonly artifact")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            yield os.path.abspath(tmpdir)
+            self._writeable_artifact.add_dir(tmpdir, path)
 
     @contextlib.contextmanager
     def open(self, path, binary=False):

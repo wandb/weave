@@ -73,6 +73,7 @@ def dataset_refine_output_type(name: str) -> weave.types.Type:
 @weave.op(
     render_info={"type": "function"},
     output_type=weave.types.List(weave.types.TypedDict({})),
+    refine_output_type=dataset_refine_output_type,
 )
 def dataset(name: str):
     ds = hf_datasets.load_dataset(name, split="train", streaming=True)
