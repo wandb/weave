@@ -219,3 +219,43 @@ class KerasModel(weave.types.Type):
 )
 def call_string(model, input):
     return model.predict([[input]]).tolist()[0][0]
+
+
+## The following op (image_classification) is just an example, it needs to be generalized
+# before using it in production.
+# TODO: figure out how to do this class lookup as part of the model
+CLASS_NAMES = [
+    "airplane",
+    "automobile",
+    "bird",
+    "cat",
+    "deer",
+    "dog",
+    "frog",
+    "horse",
+    "ship",
+    "truck",
+]
+# TODO: Make this work with any image size?
+@weave.op(
+    input_type={
+        "model": KerasModel.make_type(
+            [([None, 32, 32, 3], DTYPE_NAME.NUMBER)], [([None, 10], DTYPE_NAME.NUMBER)]
+        ),
+        "url": weave.types.String(),
+    },
+    output_type=weave.types.TypedDict(
+        {"image": PILImageType(32, 32), "prediction": weave.types.String()}
+    ),
+)
+def image_classification(model, url):
+    # TODO: maybe this should be it's own inner op?
+    im = Image.open(requests.get(url, stream=True).raw)
+    class_name = CLASS_NAMES[
+        np.argmax(
+            model.predict(
+                tf.constant([np.asarray(im.resize((32, 32), Image.ANTIALIAS)) / 255.0])
+            )[0]
+        ).item()
+    ]
+    return {"image": im, "prediction": class_name}
