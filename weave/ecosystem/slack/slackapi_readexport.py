@@ -10,13 +10,13 @@ def dirsize(path) -> int:
 
 @weave.type()
 class SlackReadExportApi:
-    data_dir: str  # TODO: change to weave.Dir
+    data_dir: weave.ops.VersionedDir  # TODO: change to weave.Dir
 
     def channel_names(self):
-        return (n.name for n in pathlib.Path(self.data_dir).glob("*"))
+        return (n.name for n in pathlib.Path(self.data_dir.path).glob("*"))
 
     def channel_path(self, channel_name):
-        return pathlib.Path(self.data_dir) / channel_name
+        return pathlib.Path(self.data_dir.path) / channel_name
 
     def channel_export_size(self, channel_name: str):
         return dirsize(self.channel_path(channel_name))

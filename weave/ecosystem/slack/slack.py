@@ -1,8 +1,5 @@
-import pathlib
-
 import weave
 
-from . import slackapi
 from . import slackapi_readexport
 
 
@@ -74,7 +71,7 @@ class Slack:
 # TODO: make this work with artifacts
 @weave.op(render_info={"type": "function"})
 def open_slack_export(d: str) -> Slack:
-    return Slack(slackapi_readexport.SlackReadExportApi(d))
+    return Slack(slackapi_readexport.SlackReadExportApi(weave.ops.VersionedDir(d)))
 
 
 def all_messages(channels: list[Channel]) -> list[Message]:

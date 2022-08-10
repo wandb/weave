@@ -5,6 +5,20 @@ import weave
 
 
 @weave.op()
+def messages_render(
+    messages_node: weave.Node[list[slack.Message]],
+) -> weave.panels.Table:
+    messages = typing.cast(list[slack.Message], messages_node)  # type: ignore
+    return weave.panels.Table(
+        messages,
+        columns=[
+            lambda message: message.user_id(),
+            lambda message: message.text(),
+        ],
+    )
+
+
+@weave.op()
 def channels_render(
     channels: weave.Node[list[slack.Channel]],
 ) -> weave.panels.Table:
@@ -12,9 +26,6 @@ def channels_render(
         channels,
         columns=[
             lambda channel: channel.channel_name(),
-            # lambda channel: weave.panels.WeaveLink(
-            #     channel.name(), to=lambda channel: channel  # TODO...
-            # ),
             lambda channel: channel.size(),
         ],
     )
@@ -30,14 +41,23 @@ def channel_render(
         subtitle="Slack channel",
         content=[
             weave.panels.CardTab(
-                name="Messages",
-                content=weave.panels.Table(
-                    channel.messages(),
-                    columns=[
-                        lambda message: message.user_id(),
-                        lambda message: message.text(),
-                    ],
-                ),
+                name="Messages", content=messages_render(channel.messages())
+            ),
+        ],
+    )
+
+
+@weave.op()
+def slack_render(
+    slack_node: weave.Node[slack.Slack],
+) -> weave.panels.Card:
+    s = typing.cast(slack.Slack, slack_node)  # type: ignore
+    return weave.panels.Card(
+        title="Slack export data",
+        subtitle="",
+        content=[
+            weave.panels.CardTab(
+                name="Channels", content=channels_render(s.channels())
             ),
         ],
     )
