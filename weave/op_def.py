@@ -51,7 +51,7 @@ class OpDef:
     ):
         assert not (
             refine_output_type is not None and ts_refine_output_type is not None
-        )
+        ), "refine_output_type and ts_refine_output_type cannot both be set"
         self.name = name
         self.input_type = input_type
         self.output_type = output_type
