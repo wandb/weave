@@ -32,7 +32,7 @@ import numpy as np
 
 import weave
 from weave.ops_primitives.image import PILImageType
-from weave.weave_types import List, TypeRegistry
+from weave.weave_types import Invalid, List, TypeRegistry
 
 
 class DTYPE_NAME(Enum):
@@ -117,12 +117,15 @@ class KerasTensorType(weave.types.Type):
     def from_list(
         cls: Type["KerasTensorType"],
         shape: list[Union[None, int]],
-        dtype_name: DTYPE_NAME,
+        dtype_name: Optional[DTYPE_NAME] = None,
     ) -> "KerasTensorType":
-        type_union_members = [
-            weave.types.Const(weave.types.Number(), dtype.as_datatype_enum)
-            for dtype in DTYPE_NAME_TO_TF_DTYPES[dtype_name]
-        ]
+        datatype_enum = weave.types.Any()
+        if dtype_name is not None:
+            type_union_members = [
+                weave.types.Const(weave.types.Number(), dtype.as_datatype_enum)
+                for dtype in DTYPE_NAME_TO_TF_DTYPES[dtype_name]
+            ]
+            datatype_enum = weave.types.union(*type_union_members)  # type: ignore
 
         return cls(
             shape=weave.types.TypedDict(
@@ -135,7 +138,7 @@ class KerasTensorType(weave.types.Type):
                     for shape_ndx, dim in enumerate(shape)
                 }
             ),
-            datatype_enum=weave.types.union(*type_union_members),  # type: ignore
+            datatype_enum=datatype_enum,
         )
 
 
@@ -171,8 +174,12 @@ class KerasModel(weave.types.Type):
     @classmethod
     def make_type(
         cls: Type["KerasModel"],
-        inputs_def: Optional[list[tuple[list[Union[None, int]], DTYPE_NAME]]] = None,
-        outputs_def: Optional[list[tuple[list[Union[None, int]], DTYPE_NAME]]] = None,
+        inputs_def: Optional[
+            list[tuple[list[Union[None, int]], Optional[DTYPE_NAME]]]
+        ] = None,
+        outputs_def: Optional[
+            list[tuple[list[Union[None, int]], Optional[DTYPE_NAME]]]
+        ] = None,
     ) -> "KerasModel":
         inputs = (
             weave.types.TypedDict(
@@ -198,63 +205,82 @@ class KerasModel(weave.types.Type):
 
 
 # def call_string_output_type(input_types):
-#     dimensions = 0
-#     for input_type in input_types:
+#     output_type = DTYPE_NAME_TO_WEAVE_TYPE[
+#         DTYPE_ENUM_TO_DTYPE_NAME[
+#             input_types["model"].outputs_type.property_types["0"].datatype_enum.val
+#         ]
+#     ]
+#     if not isinstance(weave.types.List(weave.types.String()).assign_type(input_types['input']), Invalid):
+#         return weave.types.List(output_type)
+#     return output_type
 
-# TODO: Figure out batching - we already have the `None` in the batch index!
+# # TODO: Figure out batching - we already have the `None` in the batch index!
+# @weave.op(
+#     input_type={
+#         "model": KerasModel.make_type([([None, 1], DTYPE_NAME.STRING)], [([None, 1], None)]),
+#         "input": weave.types.union(weave.types.String(), weave.types.List(weave.types.String())),
+#     },
+#     output_type=call_string_output_type
+# )
+# def call_string(model, input):
+#     if type(input) == 'str':
+#         return model.predict([[input]]).tolist()[0][0]
+#     else:
+#         return [item[0] for item in model.predict([[s] for s in input]).tolist()]
+
+
 @weave.op(
     input_type={
-        "model": KerasModel.make_type([([None, 1], DTYPE_NAME.STRING)]),
-        "input_str": weave.types.String(),
+        "model": KerasModel.make_type(
+            [([None, 1], DTYPE_NAME.STRING)], [([None, 1], None)]
+        ),
+        "input": weave.types.String(),
     },
-    # TODO: Get the shapes correct
     output_type=lambda input_types: DTYPE_NAME_TO_WEAVE_TYPE[
         DTYPE_ENUM_TO_DTYPE_NAME[
             input_types["model"].outputs_type.property_types["0"].datatype_enum.val
         ]
     ],
 )
-def call_string(model, input_str):
-    # TODO: this double [0][0] is a smell. the first one gets into the batch and
-    # the second one goes into the first result. this is really not ideal.
-    return model.predict(tf.constant([input_str])).tolist()[0][0]
+def call_string(model, input):
+    return model.predict([[input]]).tolist()[0][0]
 
 
-## The following op (image_classification) is just an example, it needs to be generalized
-# before using it in production.
-# TODO: figure out how to do this class lookup as part of the model
-CLASS_NAMES = [
-    "airplane",
-    "automobile",
-    "bird",
-    "cat",
-    "deer",
-    "dog",
-    "frog",
-    "horse",
-    "ship",
-    "truck",
-]
-# TODO: Make this work with any image size?
-@weave.op(
-    input_type={
-        "model": KerasModel.make_type(
-            [([None, 32, 32, 3], DTYPE_NAME.NUMBER)], [([None, 10], DTYPE_NAME.NUMBER)]
-        ),
-        "url": weave.types.String(),
-    },
-    output_type=weave.types.TypedDict(
-        {"image": PILImageType(32, 32), "prediction": weave.types.String()}
-    ),
-)
-def image_classification(model, url):
-    # TODO: maybe this should be it's own inner op?
-    im = Image.open(requests.get(url, stream=True).raw)
-    class_name = CLASS_NAMES[
-        np.argmax(
-            model.predict(
-                tf.constant([np.asarray(im.resize((32, 32), Image.ANTIALIAS)) / 255.0])
-            )[0]
-        ).item()
-    ]
-    return {"image": im, "prediction": class_name}
+# ## The following op (image_classification) is just an example, it needs to be generalized
+# # before using it in production.
+# # TODO: figure out how to do this class lookup as part of the model
+# CLASS_NAMES = [
+#     "airplane",
+#     "automobile",
+#     "bird",
+#     "cat",
+#     "deer",
+#     "dog",
+#     "frog",
+#     "horse",
+#     "ship",
+#     "truck",
+# ]
+# # TODO: Make this work with any image size?
+# @weave.op(
+#     input_type={
+#         "model": KerasModel.make_type(
+#             [([None, 32, 32, 3], DTYPE_NAME.NUMBER)], [([None, 10], DTYPE_NAME.NUMBER)]
+#         ),
+#         "url": weave.types.String(),
+#     },
+#     output_type=weave.types.TypedDict(
+#         {"image": PILImageType(32, 32), "prediction": weave.types.String()}
+#     ),
+# )
+# def image_classification(model, url):
+#     # TODO: maybe this should be it's own inner op?
+#     im = Image.open(requests.get(url, stream=True).raw)
+#     class_name = CLASS_NAMES[
+#         np.argmax(
+#             model.predict(
+#                 tf.constant([np.asarray(im.resize((32, 32), Image.ANTIALIAS)) / 255.0])
+#             )[0]
+#         ).item()
+#     ]
+#     return {"image": im, "prediction": class_name}
