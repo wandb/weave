@@ -13,6 +13,7 @@ from . import huggingface
 from . import craiyon
 from . import openai
 from . import spacy
+from . import networkx
 
 # TODO: feels odd to call this "ops.Markdown".
 # Maybe make it top level

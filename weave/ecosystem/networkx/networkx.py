@@ -1,8 +1,9 @@
-import weave
-import networkx as nx_lib
 import matplotlib
+import networkx as nx_lib
 import pyvis.network
 from pylab import cm
+
+import weave
 
 
 class NetworkxType(weave.types.Type):
@@ -19,18 +20,32 @@ class NetworkxType(weave.types.Type):
 
 
 @weave.op()
-def visualize(graph: nx_lib.Graph) -> weave.panels.Html:
+def render_graph_html(graph: nx_lib.Graph) -> weave.ops.Html:
     cmap_name = graph.graph.get("cmap", "Set2")
     cmap = cm.get_cmap(cmap_name)
-    dim = ("50px", "50px")
+    dim = ("300px", "300px")
     netw = pyvis.network.Network(*dim)
     netw.from_nx(graph)
     netw.inherit_edge_colors(False)
     netw.set_edge_smooth("discrete")
 
-    labels = graph.graph.get("labels", None)
+    labels = graph.graph.get("labels", [])
 
     for i, c in enumerate(labels):
         netw.nodes[i]["color"] = matplotlib.colors.rgb2hex(cmap(int(c)))
 
-    return weave.panels.Html(weave.ops.Html(netw.generate_html()))
+    return weave.ops.Html(netw.generate_html())
+
+
+@weave.op()
+def visualize(graph: weave.Node[nx_lib.Graph]) -> weave.panels.Card:
+
+    return weave.panels.Card(
+        title="",
+        subtitle="Graph Visualization",
+        content=[
+            weave.panels.CardTab(
+                name="Graph", content=weave.panels.Html(render_graph_html(graph))
+            )
+        ],
+    )
