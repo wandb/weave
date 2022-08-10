@@ -119,6 +119,8 @@ class OpDef:
         }
         if self.render_info is not None:
             serialized["render_info"] = self.render_info
+        if self.refine_output_type is not None:
+            serialized["refine_output_type_op_name"] = self.refine_output_type.name
 
         return serialized
 
