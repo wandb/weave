@@ -534,23 +534,14 @@ def argmax(numbers: list[typing.Union[int, float]]) -> int:
     return numbers.index(max(numbers))
 
 
-@op(
-    input_type={
-        "zipped": types.List(types.TypedDict({"0": types.Any(), "1": types.Any()}))
-    },
-)
 def unwrap_const_type(t):
     while isinstance(t, types.Const):
         t = t.val_type
     return t
 
 
-def _zip_to_dict_refine(zipped) -> types.Type:
-    return types.TypedDict({obj["0"]: type_of(obj["1"]) for obj in zipped})
-
-
 @op(
-    name="zip",
+    name="dict-zip",
     input_type={"arr1": types.List(types.Any()), "arr2": types.List(types.Any())},
     output_type=lambda input_types: types.List(
         types.TypedDict(
