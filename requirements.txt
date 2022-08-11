@@ -17,7 +17,7 @@ pillow
 openai
 analytics-python
 typing_extensions
-matplotlib
+matplotlib!=3.5.3
 shap
 xgboost
 torch

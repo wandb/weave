@@ -21,7 +21,7 @@ TODOS:
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Type, Union
+from typing import Optional, Type, Union
 from tensorflow import keras
 from keras.engine import keras_tensor
 from tensorflow.python.framework import dtypes
@@ -32,7 +32,7 @@ import numpy as np
 
 import weave
 from weave.ops_primitives.image import PILImageType
-from weave.weave_types import TypeRegistry
+from weave.weave_types import Invalid, List, TypeRegistry
 
 
 class DTYPE_NAME(Enum):
@@ -43,7 +43,7 @@ class DTYPE_NAME(Enum):
 
 
 # see https://www.tensorflow.org/api_docs/python/tf/dtypes
-DTYPE_MAP: dict[DTYPE_NAME, dtypes.DType] = {
+DTYPE_NAME_TO_TF_DTYPES: dict[DTYPE_NAME, list[dtypes.DType]] = {
     DTYPE_NAME.NUMBER: [
         dtypes.bfloat16,
         dtypes.double,
@@ -75,6 +75,18 @@ DTYPE_MAP: dict[DTYPE_NAME, dtypes.DType] = {
     ],
 }
 
+DTYPE_NAME_TO_WEAVE_TYPE: dict[DTYPE_NAME, weave.types.Type] = {
+    DTYPE_NAME.NUMBER: weave.types.Number(),
+    DTYPE_NAME.BOOL: weave.types.Boolean(),
+    DTYPE_NAME.STRING: weave.types.String(),
+    DTYPE_NAME.UNMAPPED: weave.types.UnknownType(),
+}
+
+DTYPE_ENUM_TO_DTYPE_NAME: dict[int, DTYPE_NAME] = {}
+for dtype_name, dtypes in DTYPE_NAME_TO_TF_DTYPES.items():
+    for dtype in dtypes:
+        DTYPE_ENUM_TO_DTYPE_NAME[dtype.as_datatype_enum] = dtype_name
+
 
 @dataclass
 class KerasTensorType(weave.types.Type):
@@ -105,12 +117,15 @@ class KerasTensorType(weave.types.Type):
     def from_list(
         cls: Type["KerasTensorType"],
         shape: list[Union[None, int]],
-        dtype_name: DTYPE_NAME,
+        dtype_name: Optional[DTYPE_NAME] = None,
     ) -> "KerasTensorType":
-        type_union_members = [
-            weave.types.Const(weave.types.Number(), dtype.as_datatype_enum)
-            for dtype in DTYPE_MAP[dtype_name]
-        ]
+        datatype_enum = weave.types.Any()
+        if dtype_name is not None:
+            type_union_members = [
+                weave.types.Const(weave.types.Number(), dtype.as_datatype_enum)
+                for dtype in DTYPE_NAME_TO_TF_DTYPES[dtype_name]
+            ]
+            datatype_enum = weave.types.union(*type_union_members)  # type: ignore
 
         return cls(
             shape=weave.types.TypedDict(
@@ -123,7 +138,7 @@ class KerasTensorType(weave.types.Type):
                     for shape_ndx, dim in enumerate(shape)
                 }
             ),
-            datatype_enum=weave.types.union(*type_union_members),  # type: ignore
+            datatype_enum=datatype_enum,
         )
 
 
@@ -159,49 +174,55 @@ class KerasModel(weave.types.Type):
     @classmethod
     def make_type(
         cls: Type["KerasModel"],
-        inputs_def: list[tuple[list[Union[None, int]], DTYPE_NAME]],
-        outputs_def: list[tuple[list[Union[None, int]], DTYPE_NAME]],
+        inputs_def: Optional[
+            list[tuple[list[Union[None, int]], Optional[DTYPE_NAME]]]
+        ] = None,
+        outputs_def: Optional[
+            list[tuple[list[Union[None, int]], Optional[DTYPE_NAME]]]
+        ] = None,
     ) -> "KerasModel":
-        inputs = weave.types.TypedDict(
-            {
-                f"{input_ndx}": KerasTensorType.from_list(shape[0], shape[1])
-                for input_ndx, shape in enumerate(inputs_def)
-            }
+        inputs = (
+            weave.types.TypedDict(
+                {
+                    f"{input_ndx}": KerasTensorType.from_list(shape[0], shape[1])
+                    for input_ndx, shape in enumerate(inputs_def)
+                }
+            )
+            if inputs_def is not None
+            else weave.types.Any()
         )
-        outputs = weave.types.TypedDict(
-            {
-                f"{input_ndx}": KerasTensorType.from_list(shape[0], shape[1])
-                for input_ndx, shape in enumerate(outputs_def)
-            }
+        outputs = (
+            weave.types.TypedDict(
+                {
+                    f"{input_ndx}": KerasTensorType.from_list(shape[0], shape[1])
+                    for input_ndx, shape in enumerate(outputs_def)
+                }
+            )
+            if outputs_def is not None
+            else weave.types.Any()
         )
         return cls(inputs, outputs)
 
 
-# TODO: Figure out batching - we already have the `None` in the batch index!
 @weave.op(
     input_type={
         "model": KerasModel.make_type(
-            [([None, 1], DTYPE_NAME.STRING)], [([None, 1], DTYPE_NAME.NUMBER)]
+            [([None, 1], DTYPE_NAME.STRING)], [([None, 1], None)]
         ),
-        "input_str": weave.types.String(),
+        "input": weave.types.String(),
     },
-    output_type=weave.types.Number(),
+    output_type=lambda input_types: DTYPE_NAME_TO_WEAVE_TYPE[
+        DTYPE_ENUM_TO_DTYPE_NAME[
+            input_types["model"].outputs_type.property_types["0"].datatype_enum.val
+        ]
+    ],
 )
-def call_string_to_number(model, input_str):
-    return model.predict(tf.constant([input_str]))[0][0].item()
-
-
-@weave.op(
-    input_type={
-        "model": KerasModel.make_type(
-            [([None, 1], DTYPE_NAME.STRING)], [([None, 1], DTYPE_NAME.STRING)]
-        ),
-        "input_str": weave.types.String(),
-    },
-    output_type=weave.types.String(),
-)
-def call_string_to_string(model, input_str):
-    return model.predict(tf.constant([input_str]))[0][0].item()
+def call_string(model, input):
+    res = model.predict([[input]]).tolist()[0][0]
+    # Special case for strings: we need to convert the bytes to a string
+    if type(res) == bytes:
+        return res.decode("utf-8")
+    return res
 
 
 ## The following op (image_classification) is just an example, it needs to be generalized
