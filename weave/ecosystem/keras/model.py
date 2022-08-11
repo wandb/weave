@@ -221,6 +221,32 @@ def call_string(model, input):
     return model.predict([[input]]).tolist()[0][0]
 
 
+# @weave.op(
+#     input_type={
+#         "model": KerasModel.make_type(
+#             [([None, 1], DTYPE_NAME.STRING)], [([None, 1], DTYPE_NAME.NUMBER)]
+#         ),
+#         "input_str": weave.types.String(),
+#     },
+#     output_type=weave.types.Number(),
+# )
+# def call_string_to_argmax(model, input_str):
+#     return np.argmax(model.predict(tf.constant([input_str]))).item()
+
+
+# @weave.op(
+#     input_type={
+#         "model": KerasModel.make_type(
+#             [([None, 1], DTYPE_NAME.STRING)], [([None, 1], DTYPE_NAME.NUMBER)]
+#         ),
+#         "input_str": weave.types.String(),
+#     },
+#     output_type=weave.types.List(weave.types.Number()),
+# )
+# def call_string_to_confidence_scores(model, input_str):
+#     return model.predict(tf.constant([input_str]))
+
+
 ## The following op (image_classification) is just an example, it needs to be generalized
 # before using it in production.
 # TODO: figure out how to do this class lookup as part of the model
