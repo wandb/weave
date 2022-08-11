@@ -1,4 +1,4 @@
-git+https://github.com/wandb/client.git@27dfd63e643b1e0b675e99edcb8157d086a44301#egg=wandb
+git+https://github.com/wandb/client.git@danny/debug#egg=wandb
 ddtrace
 json_log_formatter
 numpy
