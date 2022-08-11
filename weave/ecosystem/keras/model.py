@@ -218,7 +218,11 @@ class KerasModel(weave.types.Type):
     ],
 )
 def call_string(model, input):
-    return model.predict([[input]]).tolist()[0][0]
+    res = model.predict([[input]]).tolist()[0][0]
+    # Special case for strings: we need to convert the bytes to a string
+    if type(res) == bytes:
+        return res.decode("utf-8")
+    return res
 
 
 ## The following op (image_classification) is just an example, it needs to be generalized
