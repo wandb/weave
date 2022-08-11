@@ -68,8 +68,13 @@ class Slack:
         return Channel(self.slack_api, name)
 
 
-# TODO: make this work with artifacts
-@weave.op(render_info={"type": "function"})
+# Marked as impure, because we need to read the directory d on every execution.
+# TODO: This should not need to be manually marked. We know that VersionedDir reads
+#     a local dir. One way to fix this would be to use Weave ops for constructors
+#     instead of Python class constructors (ie we'd have a versioned_dir op that is
+#     impure, and everything downstream of it would be impure until we hit an existing
+#     artifact version).
+@weave.op(render_info={"type": "function"}, pure=False)
 def open_slack_export(d: str) -> Slack:
     return Slack(slackapi_readexport.SlackReadExportApi(weave.ops.VersionedDir(d)))
 
