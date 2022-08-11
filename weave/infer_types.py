@@ -8,6 +8,7 @@ import typing
 import typing_extensions
 
 from . import weave_types
+from . import errors
 from . import graph
 
 
@@ -20,6 +21,10 @@ def is_typed_dict_like(t: type) -> typing_extensions.TypeGuard[TypedDictLike]:
 
 
 def simple_python_type_to_type(py_type: type):
+    if isinstance(py_type, str):
+        raise errors.WeaveTypeError(
+            "Cannot yet detect Weave type from forward type references"
+        )
     types = weave_types.instance_class_to_potential_type(py_type)
     if not types:
         return weave_types.UnknownType()
