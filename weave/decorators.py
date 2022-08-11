@@ -145,7 +145,7 @@ def op(
                 )
 
         weave_output_type = output_type
-        ts_refine_output_type = None
+        callable_refine_output_type = None
         if weave_output_type is None:
             # weave output type is not declared, use type inferred from Python
             weave_output_type = inferred_output_type
@@ -162,17 +162,19 @@ def op(
                 # function. This is a bit of a hack, but it works. Notably, it operates
                 # in the slower, value-space so we should think about optimizing in the future.
                 if refine_output_type is None:
-                    ts_refine_output_type = registry_mem.memory_registry.register_op(
-                        op_def.OpDef(
-                            f"__ts__{fq_op_name}_refine_output_type",
-                            weave_input_type,
-                            infer_types.python_type_to_type(types.Type),
-                            lambda **kwargs: weave_output_type(
-                                {
-                                    k: types.Const(types.TypeRegistry.type_of(v), v)
-                                    for k, v in kwargs.items()
-                                }
-                            ),
+                    callable_refine_output_type = (
+                        registry_mem.memory_registry.register_op(
+                            op_def.OpDef(
+                                f"__callable__{fq_op_name}_refine_output_type",
+                                weave_input_type,
+                                infer_types.python_type_to_type(types.Type),
+                                lambda **kwargs: weave_output_type(
+                                    {
+                                        k: types.Const(types.TypeRegistry.type_of(v), v)
+                                        for k, v in kwargs.items()
+                                    }
+                                ),
+                            )
                         )
                     )
             elif (
@@ -195,7 +197,7 @@ def op(
             weave_output_type,
             f,
             refine_output_type=refine_output_type,
-            ts_refine_output_type=ts_refine_output_type,
+            callable_refine_output_type=callable_refine_output_type,
             setter=setter,
             render_info=render_info,
             pure=pure,
