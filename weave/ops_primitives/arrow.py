@@ -8,6 +8,7 @@ import pyarrow.parquet as pq
 from .. import weave_internal
 
 from ..api import op, weave_class
+from . import list_
 from .. import weave_types as types
 from .. import graph
 from .. import errors
@@ -194,14 +195,7 @@ class ArrowTableType(types.Type):
             return pq.read_table(f)
 
 
-def _pick_output_type(input_types):
-    if not isinstance(input_types["key"], types.Const):
-        return types.UnknownType()
-    key = input_types["key"].val
-    prop_type = input_types["self"].object_type.property_types.get(key)
-    if prop_type is None:
-        return types.Invalid()
-    return ArrowWeaveListType(prop_type)
+_pick_output_type = list_.make_pick_output_type("self")
 
 
 def rewrite_weavelist_refs(arrow_data, object_type, artifact):
