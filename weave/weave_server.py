@@ -39,6 +39,7 @@ from weave.ecosystem import xgboost
 from weave.ecosystem import sklearn
 from weave.ecosystem import torch_mnist_model_example
 from weave.ecosystem import craiyon
+from weave.ecosystem import slack
 from .artifacts_local import local_artifact_dir
 
 context.clear_loading_built_ins(loading_builtins_token)
