@@ -43,7 +43,6 @@ WORKDIR /weave
 ADD . .
 
 RUN pip install -r requirements.txt
-RUN python -m spacy download en_core_web_sm
 RUN mkdir /local-artifacts
 
 EXPOSE 9239

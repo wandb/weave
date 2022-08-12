@@ -5,7 +5,7 @@ def convert_git_requirement(req):
     # If requirements contains a git repo like
     # git+https://github.com/wandb/client.git@dtypes/safer_image_restore#egg=wandb
     # convert it to "wandb @ git+https://github.com/wandb/client.git@dtypes/safer_image_restore#egg=wandb""
-    if ":/" in req:
+    if "egg=" in req:
         _, package_name = req.split("egg=", 1)
         return f"{package_name} @ {req}"
     return req
