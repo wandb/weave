@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import typing
 from .. import weave_types as types
-from ..api import op, mutation, type_of, weave_class, OpVarArgs
+from ..api import op, mutation, weave_class, OpVarArgs
 from .. import weave_internal
 from .. import errors
 from .. import execute_fast
@@ -340,48 +340,37 @@ def index_output_type(input_types):
         return self_type.object_type
 
 
-def make_pick_output_type(self_key):
-    def _pick_output_type(input_types):
-        # This is heinous. It handles mapped pick as well as regular pick.
-        # Doesn't support all the fancy stuff with '*' that the frontend does yet.
-        # TODO: fix, probably by a better mapped op implementation, and possible some
-        # clearner way of implementing nice type logic.
-        if not isinstance(input_types["key"], types.Const):
-            return types.UnknownType()
-        key = input_types["key"].val
-        object_type = input_types[self_key]
-        is_list = False
-        # Ew, this is the best way to determine if a Type looks like a list
-        # (like pandas, sql list types).
-        # TODO: fix
-
-        while isinstance(object_type, types.Const):
-            object_type = object_type.val_type
-
-        if hasattr(object_type, "object_type"):
-            object_type = object_type.object_type
-            is_list = True
-        if isinstance(object_type, types.Dict):
-            output_type = object_type.object_type
-        elif isinstance(object_type, types.TypedDict):
-            property_types = object_type.property_types
-            output_type = property_types.get(key)
-            if output_type is None:
-                output_type = types.none_type
-        else:
-            raise errors.WeaveInternalError(
-                "pick received invalid input types: %s" % input_types,
-                self_key,
-                object_type,
-            )
-        if is_list:
-            output_type = types.List(output_type)
-        return output_type
-
-    return _pick_output_type
-
-
-pick_output_type = make_pick_output_type("obj")
+def pick_output_type(input_types):
+    # This is heinous. It handles mapped pick as well as regular pick.
+    # Doesn't support all the fancy stuff with '*' that the frontend does yet.
+    # TODO: fix, probably by a better mapped op implementation, and possible some
+    # clearner way of implementing nice type logic.
+    if not isinstance(input_types["key"], types.Const):
+        return types.UnknownType()
+    key = input_types["key"].val
+    self_type = input_types["obj"]
+    object_type = self_type
+    is_list = False
+    # Ew, this is the best way to determine if a Type looks like a list
+    # (like pandas, sql list types).
+    # TODO: fix
+    if hasattr(self_type, "object_type"):
+        object_type = self_type.object_type
+        is_list = True
+    if isinstance(object_type, types.Dict):
+        output_type = object_type.object_type
+    elif isinstance(object_type, types.TypedDict):
+        property_types = object_type.property_types
+        output_type = property_types.get(key)
+        if output_type is None:
+            output_type = types.none_type
+    else:
+        raise errors.WeaveInternalError(
+            "pick received invalid input types: %s" % input_types
+        )
+    if is_list:
+        output_type = types.List(output_type)
+    return output_type
 
 
 class WeaveGroupResultInterface:
@@ -527,30 +516,3 @@ def list_return_type(input_types):
 )
 def make_list(**l):
     return list(l.values())
-
-
-@op(name="numbers-argmax")
-def argmax(numbers: list[typing.Union[int, float]]) -> int:
-    return numbers.index(max(numbers))
-
-
-def unwrap_const_type(t):
-    while isinstance(t, types.Const):
-        t = t.val_type
-    return t
-
-
-@op(
-    name="dict-zip",
-    input_type={"arr1": types.List(types.Any()), "arr2": types.List(types.Any())},
-    output_type=lambda input_types: types.List(
-        types.TypedDict(
-            {
-                "0": unwrap_const_type(input_types["arr1"]).object_type,
-                "1": unwrap_const_type(input_types["arr2"]).object_type,
-            }
-        )
-    ),
-)
-def dict_zip(arr1, arr2):
-    return [{"0": a, "1": b} for a, b in zip(arr1, arr2)]

@@ -9,7 +9,7 @@ from .weave_api import *
 from .arrow import *
 from .pandas_ import *
 from .csv_ import *
-from .sql import *  # type: ignore
+from .sql import *
 from .artifacts import *
 from .random_junk import *
 from .image import *

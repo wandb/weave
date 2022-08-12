@@ -85,7 +85,14 @@ def index_output_type(input_types):
         return self_type.object_type
 
 
-pick_output_type = list_.make_pick_output_type("self")
+def pick_output_type(input_types):
+    if not isinstance(input_types["key"], types.Const):
+        return types.UnknownType()
+    key = input_types["key"].val
+    prop_type = input_types["self"].object_type.property_types.get(key)
+    if prop_type is None:
+        return types.Invalid()
+    return prop_type
 
 
 @weave_class(weave_type=SqlTableType)

@@ -204,73 +204,25 @@ class KerasModel(weave.types.Type):
         return cls(inputs, outputs)
 
 
-def _call_string_output_type(input_types):
-    res = DTYPE_NAME_TO_WEAVE_TYPE[
+@weave.op(
+    input_type={
+        "model": KerasModel.make_type(
+            [([None, 1], DTYPE_NAME.STRING)], [([None, 1], None)]
+        ),
+        "input": weave.types.String(),
+    },
+    output_type=lambda input_types: DTYPE_NAME_TO_WEAVE_TYPE[
         DTYPE_ENUM_TO_DTYPE_NAME[
             input_types["model"].outputs_type.property_types["0"].datatype_enum.val
         ]
-    ]
-
-    dims = (
-        len(
-            input_types["model"]
-            .outputs_type.property_types["0"]
-            .shape.property_types.keys()
-        )
-        - 1
-    )
-    for _ in range(dims):
-        res = weave.types.List(res)
-    return res
-
-
-@weave.op(
-    input_type={
-        "model": KerasModel.make_type([([None, 1], DTYPE_NAME.STRING)]),
-        "input": weave.types.String(),
-    },
-    output_type=_call_string_output_type,
+    ],
 )
 def call_string(model, input):
-    res = model.predict([[input]]).tolist()[0]
+    res = model.predict([[input]]).tolist()[0][0]
     # Special case for strings: we need to convert the bytes to a string
     if type(res) == bytes:
         return res.decode("utf-8")
-    if type(res) == list:
-        return [x.decode("utf-8") if type(x) == bytes else x for x in res]
     return res
-
-
-@weave.op(
-    name="modelDict-callString",
-    input_type={
-        "model_dict": weave.types.TypedDict(
-            {
-                "model": KerasModel.make_type([([None, 1], DTYPE_NAME.STRING)]),
-                "classes": weave.types.List(weave.types.String()),
-            }
-        ),
-        "input_str": weave.types.String(),
-        "top_k": weave.types.Number(),
-    },
-    output_type=weave.types.List(
-        weave.types.TypedDict(
-            {
-                "class": weave.types.String(),
-                "score": weave.types.Number(),
-            }
-        )
-    ),
-)
-def md_call_string(model_dict, input_str, top_k):
-    model = model_dict["model"]
-    classes = model_dict["classes"]
-    # TODO: How to cache this?
-    res = model.predict([[input_str]]).tolist()[0]
-    if len(res) != len(classes):
-        return []
-    res = sorted(zip(res, classes), key=lambda x: x[0], reverse=True)[:top_k]
-    return [{"class": c, "score": s} for s, c in res]
 
 
 ## The following op (image_classification) is just an example, it needs to be generalized
