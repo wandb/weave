@@ -27,6 +27,7 @@ class OpDef:
         typing.Callable[[typing.Dict[str, types.Type]], types.Type],
     ]
     refine_output_type: typing.Optional["OpDef"]
+    callable_output_type_op: typing.Optional["OpDef"]
     setter = str
     call_fn: typing.Any
     version: typing.Optional[str]
@@ -42,15 +43,20 @@ class OpDef:
         ],
         resolve_fn,
         refine_output_type: typing.Optional["OpDef"] = None,
+        callable_output_type_op: typing.Optional["OpDef"] = None,
         setter=None,
         render_info=None,
         pure=True,
         is_builtin: typing.Optional[bool] = None,
     ):
+        assert not (
+            refine_output_type is not None and callable_output_type_op is not None
+        ), "refine_output_type and callable_output_type_op cannot both be set"
         self.name = name
         self.input_type = input_type
         self.output_type = output_type
         self.refine_output_type = refine_output_type
+        self.callable_output_type_op = callable_output_type_op
         self.resolve_fn = resolve_fn
         self.setter = setter
         self.render_info = render_info
@@ -93,13 +99,9 @@ class OpDef:
 
     def to_dict(self):
         output_type = self.output_type
-        if callable(self.output_type):
-            raise errors.WeaveSerializeError(
-                "serializing op with callable output_type not yet implemented"
-            )
         # No callable output_type still
-        # if callable(output_type):
-        #     output_type = types.Any()
+        if callable(output_type):
+            output_type = types.Any()
         output_type = output_type.to_dict()
 
         # Make callable input_type args into types.Any() for now.
@@ -121,6 +123,15 @@ class OpDef:
         }
         if self.render_info is not None:
             serialized["render_info"] = self.render_info
+        if (
+            self.refine_output_type is not None
+            or self.callable_output_type_op is not None
+        ):
+            serialized["refine_output_type_op_name"] = (
+                self.refine_output_type.name
+                if self.refine_output_type is not None
+                else self.callable_output_type_op.name
+            )
 
         return serialized
 

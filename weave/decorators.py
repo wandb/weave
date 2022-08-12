@@ -123,6 +123,14 @@ def op(
             # TODO: no validation here...
             pass
 
+        fq_op_name = name
+        if fq_op_name is None:
+            fq_op_name = "op-%s" % f.__name__
+            # Don't use fully qualified names (which are URIs) for
+            # now.
+            # Ah crap this isn't right yet.
+            # fq_op_name = op_def.fully_qualified_opname(f)
+
         ##### Output type processing
 
         python_return_type = type_hints.get("return")
@@ -137,6 +145,7 @@ def op(
                 )
 
         weave_output_type = output_type
+        callable_output_type_op = None
         if weave_output_type is None:
             # weave output type is not declared, use type inferred from Python
             weave_output_type = inferred_output_type
@@ -146,6 +155,25 @@ def op(
                 if inferred_output_type != types.UnknownType():
                     raise errors.WeaveDefinitionError(
                         "output_type is function but Python return type also declared. This is not yet supported"
+                    )
+                # In the case that we have a callable weave_output_type, but no
+                # refine type, then we need a way to tell TS what the return type is.
+                # Here we define a custom refine type that calls the provided output_type
+                # function. This is a bit of a hack, but it works. Notably, it operates
+                # in the slower, value-space so we should think about optimizing in the future.
+                if refine_output_type is None:
+                    callable_output_type_op = registry_mem.memory_registry.register_op(
+                        op_def.OpDef(
+                            f"__callable__{fq_op_name}_refine_output_type",
+                            weave_input_type,
+                            infer_types.python_type_to_type(types.Type),
+                            lambda **kwargs: weave_output_type(
+                                {
+                                    k: types.Const(types.TypeRegistry.type_of(v), v)
+                                    for k, v in kwargs.items()
+                                }
+                            ),
+                        )
                     )
             elif (
                 inferred_output_type != types.UnknownType()
@@ -161,20 +189,13 @@ def op(
                 "Op's return type must be declared: %s" % f
             )
 
-        fq_op_name = name
-        if fq_op_name is None:
-            fq_op_name = "op-%s" % f.__name__
-            # Don't use fully qualified names (which are URIs) for
-            # now.
-            # Ah crap this isn't right yet.
-            # fq_op_name = op_def.fully_qualified_opname(f)
-
         op = op_def.OpDef(
             fq_op_name,
             weave_input_type,
             weave_output_type,
             f,
             refine_output_type=refine_output_type,
+            callable_output_type_op=callable_output_type_op,
             setter=setter,
             render_info=render_info,
             pure=pure,

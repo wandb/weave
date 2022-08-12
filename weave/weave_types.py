@@ -205,7 +205,13 @@ class Type:
 
     def assign_type(self, next_type):
         if isinstance(next_type, self.__class__):
-            return self
+            for prop_name in self.type_vars():
+                if isinstance(
+                    getattr(self, prop_name).assign_type(getattr(next_type, prop_name)),
+                    Invalid,
+                ):
+                    return Invalid()
+            return next_type
         return Invalid()
 
     def to_dict(self):
@@ -341,8 +347,11 @@ class Any(BasicType):
         return Any()
 
 
+@dataclasses.dataclass
 class Const(Type):
     name = "const"
+    val_type: Type
+    val: typing.Any
 
     def __init__(self, type_, val):
         self.val_type = type_

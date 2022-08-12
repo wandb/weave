@@ -1,4 +1,6 @@
 import os
+import dataclasses
+import shutil
 
 from ..api import op, mutation, weave_class
 from .. import weave_types as types
@@ -196,3 +198,26 @@ class Dir(object):
 
 types.DirType.instance_classes = Dir
 types.DirType.instance_class = Dir
+
+#### VersionedDir is a directory that will automatically be saved to
+# an artifact when it is used.
+# TODO: the File/Dir/Artifact/Local/VersionedDir design needs to be
+#    reworked. File/Dir are more like Refs...
+
+
+class VersionedDirType(types.Type):
+    def save_instance(self, obj, artifact, name):
+        with artifact.new_dir(f"{name}") as dirpath:
+            shutil.copytree(obj.path, dirpath, dirs_exist_ok=True)
+
+    def load_instance(self, artifact, name, extra=None):
+        return VersionedDir(artifact.path(name))
+
+
+@weave_class(weave_type=VersionedDirType)
+@dataclasses.dataclass
+class VersionedDir:
+    path: str
+
+
+VersionedDirType.instance_classes = VersionedDir

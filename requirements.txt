@@ -1,4 +1,4 @@
-wandb>=0.12.21
+wandb>0.13
 ddtrace
 json_log_formatter
 numpy
@@ -17,7 +17,7 @@ pillow
 openai
 analytics-python
 typing_extensions
-matplotlib
+matplotlib!=3.5.3
 shap
 xgboost
 torch
@@ -25,10 +25,11 @@ torchvision
 bertviz
 datasets
 transformers<4.21
+tensorflow>=1.15.2
 
 # spaCy Requirements:
 spacy>=3.0.0,<4.0.0
 
-# networkx integration Requirements:
+# networkx integration requirements:
 networkx
 pyvis==0.2.1
