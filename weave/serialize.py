@@ -125,7 +125,7 @@ def _deserialize_node(
             if fn_body_node["nodeType"] == "var":
                 parsed_fn_body_node = weave_internal.make_var_node(
                     types.TypeRegistry.type_from_dict(fn_body_node["type"]),
-                    fn_body_node["name"],
+                    fn_body_node["varName"],
                 )
             elif fn_body_node["nodeType"] == "output":
                 op = nodes[fn_body_node["fromOp"]]
