@@ -84,9 +84,7 @@ def _make_output_node(fq_op_name, bound_params, output_type_, refine_output_type
     bases = [graph.OutputNode]
 
     # Mixin Node methods
-    if hasattr(output_type, "NodeMethodsClass"):
-        name += output_type.__class__.__name__
-        bases.append(output_type.NodeMethodsClass)
+    bases += weave_internal.get_node_methods_classes(output_type)
 
     # If the output type is a run, mixin the Run's output type
     # as well. execute.py automatic inserts await_output operations

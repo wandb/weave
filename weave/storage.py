@@ -252,10 +252,11 @@ def to_python(obj):
     # to the frontend for these objects. But this will break querying them in Weave
     # Python when not using InProcessServer.
     # TODO: Remove!
-    if hasattr(obj, "to_pylist"):
-        obj = obj.to_pylist()
-    elif hasattr(obj, "as_py"):
-        obj = obj.as_py()
+    if not isinstance(obj, graph.Node):
+        if hasattr(obj, "to_pylist"):
+            obj = obj.to_pylist()
+        elif hasattr(obj, "as_py"):
+            obj = obj.as_py()
 
     wb_type = types.TypeRegistry.type_of(obj)
     mapper = mappers_python.map_to_python(

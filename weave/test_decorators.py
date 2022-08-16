@@ -30,6 +30,12 @@ class Point:
     y: float
 
 
+def test_attr_access():
+    p = weave.save(Point(1, 2), "my-point")
+    assert weave.use(p.x) == 1
+    assert weave.use(p.y) == 2
+
+
 @weave.type()
 class LineSegment:
     start: Point

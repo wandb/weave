@@ -46,11 +46,23 @@ def use_internal(nodes):
     return result
 
 
+def get_node_methods_classes(type_):
+    classes = []
+    for type_class in type_.__class__.mro():
+        if (
+            hasattr(type_class, "NodeMethodsClass")
+            and type_class.NodeMethodsClass not in classes
+        ):
+            classes.append(type_class.NodeMethodsClass)
+    return classes
+
+
 def make_var_node(type_, name):
-    if hasattr(type_, "NodeMethodsClass"):
+    node_methods_classes = get_node_methods_classes(type_)
+    if node_methods_classes:
         return_type = type(
             "VarNode%s" % type_.__class__.__name__,
-            (graph.VarNode, type_.NodeMethodsClass),
+            (graph.VarNode, *node_methods_classes),
             {},
         )
     else:
@@ -59,10 +71,11 @@ def make_var_node(type_, name):
 
 
 def make_const_node(type_, val):
-    if hasattr(type_, "NodeMethodsClass"):
+    node_methods_classes = get_node_methods_classes(type_)
+    if node_methods_classes:
         return_type = type(
             "ConstNode%s" % type_.__class__.__name__,
-            (graph.ConstNode, type_.NodeMethodsClass),
+            (graph.ConstNode, *node_methods_classes),
             {},
         )
     else:
@@ -71,10 +84,11 @@ def make_const_node(type_, val):
 
 
 def make_output_node(type_, op_name, op_params):
-    if hasattr(type_, "NodeMethodsClass"):
+    node_methods_classes = get_node_methods_classes(type_)
+    if node_methods_classes:
         return_type = type(
             "OutputNode%s" % type_.__class__.__name__,
-            (graph.OutputNode, type_.NodeMethodsClass),
+            (graph.OutputNode, *node_methods_classes),
             {},
         )
     else:

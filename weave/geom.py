@@ -3,52 +3,18 @@ from . import api as weave
 from . import weave_types as types
 
 
-class Point2dType(types.ObjectType):
-    def property_types(self):
-        return {
-            "x": types.Float(),
-            "y": types.Float(),
-        }
-
-
-@weave.weave_class(weave_type=Point2dType)
+@weave.type()
 class Point2d:
-    def __init__(self, x, y):
-        self.x = x
-        self.y = y
-
-    # TODO: we need properties!
-    @weave.op()
-    def get_x(self) -> float:
-        return self.x
-
-    @weave.op()
-    def get_y(self) -> float:
-        return self.y
-
-    # Would be really nice to be able to compare this to a dict
-    # so compare would do self.as_type(type_of(other)).__equal__
-    # Type-casting is the really nice type behavior I want.
-    # We can automatically find a type path from a to b, like we do with ConverterPanels.
+    x: float
+    y: float
 
 
-class LineSegmentType(types.ObjectType):
-    def property_types(self):
-        return {
-            "x0": types.Float(),
-            "y0": types.Float(),
-            "x1": types.Float(),
-            "y1": types.Float(),
-        }
-
-
-@weave.weave_class(weave_type=LineSegmentType)
+@weave.type()
 class LineSegment:
-    def __init__(self, x0, y0, x1, y1):
-        self.x0 = x0
-        self.y0 = y0
-        self.x1 = x1
-        self.y1 = y1
+    x0: float
+    y0: float
+    x1: float
+    y1: float
 
     @weave.op()
     def length(self) -> float:
