@@ -28,16 +28,28 @@ def test_show_simple_call(cereal_csv):
                                 "nodeType": "const",
                                 "type": {
                                     "type": "const",
-                                    "val": cereal_csv,
+                                    "val": test_helpers.RegexMatcher(".*cereal.csv"),
                                     "valType": "string",
                                 },
-                                "val": cereal_csv,
+                                "val": test_helpers.RegexMatcher(".*cereal.csv"),
                             }
                         },
                         "name": "localpath",
                     },
                     "nodeType": "output",
-                    "type": {"extension": "csv", "type": "local_file"},
+                    "type": {
+                        "extension": "csv",
+                        "_property_types": {
+                            "extension": {
+                                "type": "const",
+                                "val": "csv",
+                                "valType": "string",
+                            },
+                            "mtime": "float",
+                            "path": "string",
+                        },
+                        "type": "local_file",
+                    },
                 }
             },
             "name": "file-readcsv",
@@ -52,17 +64,16 @@ def test_show_simple_call(cereal_csv):
 
 EXPECTED_SHOW_PARAMS_FINE_TUNE_WEAVE_NODE = {
     "fromOp": {
-        "name": "openai-finetunegpt3",
         "inputs": {
             "hyperparameters": {
                 "nodeType": "const",
                 "type": {
                     "type": "const",
-                    "valType": {
-                        "type": "typedDict",
-                        "propertyTypes": {"n_epochs": "int"},
-                    },
                     "val": {"n_epochs": 2},
+                    "valType": {
+                        "propertyTypes": {"n_epochs": "int"},
+                        "type": "typedDict",
+                    },
                 },
                 "val": {"n_epochs": 2},
             },
@@ -73,10 +84,12 @@ EXPECTED_SHOW_PARAMS_FINE_TUNE_WEAVE_NODE = {
                             "nodeType": "const",
                             "type": {
                                 "type": "const",
+                                "val": "local-artifact:///tmp/weave/pytest/weave/test_show.py::test_large_const_node "
+                                "(setup)/list/4cf1abf0d040d897276e4be3c6aa90df",
                                 "valType": "string",
-                                "val": test_helpers.RegexMatcher(".*list/.*"),
                             },
-                            "val": test_helpers.RegexMatcher(".*list/.*"),
+                            "val": "local-artifact:///tmp/weave/pytest/weave/test_show.py::test_large_const_node "
+                            "(setup)/list/4cf1abf0d040d897276e4be3c6aa90df",
                         }
                     },
                     "name": "get",
@@ -95,12 +108,93 @@ EXPECTED_SHOW_PARAMS_FINE_TUNE_WEAVE_NODE = {
                 },
             },
         },
+        "name": "openai-finetunegpt3",
     },
     "nodeType": "output",
     "type": {
         "_history": {"objectType": "any", "type": "list"},
         "_inputs": {"propertyTypes": {}, "type": "typedDict"},
-        "_output": {"type": "gpt3-fine-tune-type"},
+        "_output": {
+            "_property_types": {
+                "fine_tuned_model": {"members": ["none", "string"], "type": "union"},
+                "id": "string",
+                "result_file": {
+                    "members": [
+                        "none",
+                        {
+                            "_property_types": {
+                                "bytes": "int",
+                                "created_at": "int",
+                                "filename": "string",
+                                "id": "string",
+                                "object": "string",
+                                "purpose": {
+                                    "type": "const",
+                                    "val": "fine-tune-results",
+                                    "valType": "string",
+                                },
+                                "status": "string",
+                                "status_details": "none",
+                            },
+                            "type": "gpt3-fine-tune-results-type",
+                        },
+                    ],
+                    "type": "union",
+                },
+                "status": "string",
+            },
+            "type": "gpt3-fine-tune-type",
+        },
+        "_property_types": {
+            "_history": {"objectType": "any", "type": "list"},
+            "_id": "string",
+            "_inputs": {"propertyTypes": {}, "type": "typedDict"},
+            "_op_name": "string",
+            "_output": {
+                "_property_types": {
+                    "fine_tuned_model": {
+                        "members": ["none", "string"],
+                        "type": "union",
+                    },
+                    "id": "string",
+                    "result_file": {
+                        "members": [
+                            "none",
+                            {
+                                "_property_types": {
+                                    "bytes": "int",
+                                    "created_at": "int",
+                                    "filename": "string",
+                                    "id": "string",
+                                    "object": "string",
+                                    "purpose": {
+                                        "type": "const",
+                                        "val": "fine-tune-results",
+                                        "valType": "string",
+                                    },
+                                    "status": "string",
+                                    "status_details": "none",
+                                },
+                                "type": "gpt3-fine-tune-results-type",
+                            },
+                        ],
+                        "type": "union",
+                    },
+                    "status": "string",
+                },
+                "type": "gpt3-fine-tune-type",
+            },
+            "_prints": {"objectType": "string", "type": "list"},
+            "_state": {
+                "members": [
+                    {"type": "const", "val": "pending", "valType": "string"},
+                    {"type": "const", "val": "running", "valType": "string"},
+                    {"type": "const", "val": "finished", "valType": "string"},
+                    {"type": "const", "val": "failed", "valType": "string"},
+                ],
+                "type": "union",
+            },
+        },
         "type": "run-type",
     },
 }

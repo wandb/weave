@@ -30,6 +30,7 @@ from weave import ops
 # These are all treated as builtins for now.
 loading_builtins_token = context.set_loading_built_ins()
 
+from weave import geom
 from weave.ecosystem import openai
 from weave.ecosystem import bertviz
 from weave.ecosystem import shap

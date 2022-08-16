@@ -634,7 +634,7 @@ class ObjectType(Type):
     _base_type: typing.ClassVar[Type] = Invalid()
 
     def property_types(self):
-        raise NotImplementedError
+        return {}
 
     def variable_property_types(self):
         return self.type_vars()
@@ -650,6 +650,19 @@ class ObjectType(Type):
 
     def _to_dict(self):
         d = super()._to_dict()
+
+        # NOTE: we unnecessarily store all property_types in the serialized
+        # type! We actually only need to store type_vars() which super() takes
+        # care of, but WeaveJS does not currently have a type registry in which
+        # to lookup a named type to figure out its property types. So just
+        # serialize all property types all the time for now. This adds a lot
+        # of redundant information that needs to go over the network.
+        # TODO: Fix
+        property_types = {}
+        for k, prop_type in self.property_types().items():
+            property_types[to_weavejs_typekey(k)] = prop_type.to_dict()
+        d["_property_types"] = property_types
+
         if not isinstance(self._base_type, Invalid):
             d["_base_type"] = self._base_type.to_dict()
         return d
@@ -866,10 +879,7 @@ class SubDirType(ObjectType):
     # TODO doesn't match frontend
     name = "subdir"
 
-    file_type: FileType
-
-    def __init__(self, file_type):
-        self.file_type = file_type
+    file_type: FileType = FileType()
 
     def property_types(self):
         return {

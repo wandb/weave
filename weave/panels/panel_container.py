@@ -12,7 +12,7 @@ class PanelType(types.ObjectType):
     def property_types(self):
         return {
             "id": types.String(),
-            "input_node": types.Function(types.TypedDict({}), types.Any()),
+            "input_node": types.Function({}, types.Any()),
             "config": types.Any(),
         }
 
@@ -46,7 +46,7 @@ class SliderPanelType(types.ObjectType):
     def property_types(self):
         return {
             "id": types.Const(types.String(), "slider"),
-            "input_node": types.Function(types.TypedDict({}), types.Number()),
+            "input_node": types.Function({}, types.Number()),
             "config": SliderConfigType(),
         }
 
@@ -83,7 +83,7 @@ class NumberPanelType(types.ObjectType):
     def property_types(self):
         return {
             "id": types.Const(types.String(), "number"),
-            "input_node": types.Function(types.TypedDict({}), types.Number()),
+            "input_node": types.Function({}, types.Number()),
             "config": types.TypedDict({}),
         }
 

@@ -12,8 +12,8 @@ def messages_render(
     return weave.panels.Table(
         messages,
         columns=[
-            lambda message: message.user_id(),
-            lambda message: message.text(),
+            lambda message: message.user_id,
+            lambda message: message.text,
         ],
     )
 
@@ -25,7 +25,7 @@ def channels_render(
     return weave.panels.Table(
         channels,
         columns=[
-            lambda channel: channel.channel_name(),
+            lambda channel: channel.channel_name,
             lambda channel: channel.size(),
         ],
     )
@@ -37,7 +37,7 @@ def channel_render(
 ) -> weave.panels.Card:
     channel = typing.cast(slack.Channel, channel_node)  # type: ignore
     return weave.panels.Card(
-        title=channel.channel_name(),
+        title=channel.channel_name,
         subtitle="Slack channel",
         content=[
             weave.panels.CardTab(

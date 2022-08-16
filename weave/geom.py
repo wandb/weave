@@ -1,12 +1,28 @@
+## Just used for testing for now.
 import math
+import typing
 from . import api as weave
-from . import weave_types as types
+from . import panels
 
 
 @weave.type()
 class Point2d:
     x: float
     y: float
+
+
+@weave.op()
+def points_render(
+    points_node: weave.Node[list[Point2d]],
+) -> panels.Table:
+    points = typing.cast(list[Point2d], points_node)  # type: ignore
+    return panels.Table(
+        points,
+        columns=[
+            lambda point: point.x,
+            lambda point: point.y,
+        ],
+    )
 
 
 @weave.type()

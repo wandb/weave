@@ -9,7 +9,7 @@ def getattr_output_type(input_type):
 
 
 @weave_class(weave_type=types.ObjectType)
-class ObjectNodeMethods:
+class Object:
     # Little hack, storage._get_ref expects to be able to check whether
     # any object hasattr('_ref') including nodes. Set it here so that
     # our __getattr__ op method doesn't handle that check.
