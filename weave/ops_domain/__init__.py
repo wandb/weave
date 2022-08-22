@@ -353,7 +353,7 @@ class RunSegment:
     metrics: interim_metric_type
 
     @op()
-    def experiment(self, until=None) -> interim_metric_type:
+    def experiment(self, until: int = None) -> interim_metric_type:
         prior_run_metrics: interim_metric_type = []
         if self.prior_run_ref is not None:
             # get the prior run
