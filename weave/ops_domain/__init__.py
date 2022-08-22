@@ -357,9 +357,9 @@ class RunSegment:
         prior_run_metrics: interim_metric_type = []
         if self.prior_run_ref is not None:
             # get the prior run
-            prior_run: RunSegment = weave.use(weave.get(self.prior_run_ref))[0]
+            prior_run: RunSegment = weave.use(weave.get(self.prior_run_ref))
             prior_run_metrics = weave.use(
-                prior_run.experiment(until=self.resumed_from_step + 1)
+                prior_run.experiment(until=self.resumed_from_step)
             )
 
         own_metrics = self.metrics if until is None else self.metrics[:until]
