@@ -342,19 +342,27 @@ class Metric(typing.TypedDict):
     metric2: float
 
 
+class MetricWithName(Metric):
+    name: str
+
+
 # hardcoded for now, later we will make this more general
-interim_metric_type = list[Metric]
+InterimMetricType = list[Metric]
+InterimExperimentOutputType = list[MetricWithName]
 
 
 @weave.type()
 class RunSegment:
+    name: str
     prior_run_ref: typing.Optional[str]
     resumed_from_step: int
-    metrics: interim_metric_type
+    metrics: InterimMetricType
 
     @op()
-    def experiment(self, until: typing.Optional[int] = None) -> interim_metric_type:
-        prior_run_metrics: interim_metric_type = []
+    def experiment(
+        self, until: typing.Optional[int] = None
+    ) -> InterimExperimentOutputType:
+        prior_run_metrics: InterimExperimentOutputType = []
         if self.prior_run_ref is not None:
             # get the prior run
             prior_run: RunSegment = weave.use(weave.get(self.prior_run_ref))
@@ -362,5 +370,13 @@ class RunSegment:
                 prior_run.experiment(until=self.resumed_from_step)
             )
 
-        own_metrics = self.metrics if until is None else self.metrics[:until]
+        own_metrics: InterimExperimentOutputType = [
+            {
+                "step": d["step"],
+                "metric1": d["metric1"],
+                "metric2": d["metric2"],
+                "name": self.name,
+            }
+            for d in (self.metrics if until is None else self.metrics[:until])
+        ]
         return prior_run_metrics + own_metrics
