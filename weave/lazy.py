@@ -4,10 +4,10 @@ import inspect
 
 from . import graph
 from . import weave_types as types
-from . import context
-from . import api
+from . import context_state
 from . import weave_internal
 from . import errors
+from . import api
 
 
 def _ensure_node(fq_op_name, v, input_type, already_bound_params):
@@ -34,7 +34,7 @@ def _ensure_node(fq_op_name, v, input_type, already_bound_params):
             return weave_internal.define_fn(vars, v)
         val_type = types.TypeRegistry.type_of(v)
         # TODO: should type-check v here.
-        v = graph.ConstNode(types.Const(val_type, v), v)
+        v = graph.ConstNode(val_type, v)
     return v
 
 
@@ -75,27 +75,30 @@ def _make_output_node(fq_op_name, bound_params, output_type_, refine_output_type
         # underlying implementation. So, we drop down a level and manually call
         # the underlying implementation.
         called_refine_output_type = refine_output_type.call_fn(**bound_params)
-        output_type = weave_internal.use_internal(called_refine_output_type)
+        output_type = api.use(called_refine_output_type)
     elif callable(output_type):
-        new_input_type = {k: n.type for k, n in bound_params.items()}
+        new_input_type = {}
+        for k, n in bound_params.items():
+            if isinstance(n, graph.ConstNode):
+                new_input_type[k] = types.Const(n.type, n.val)
+            else:
+                new_input_type[k] = n.type
         output_type = output_type(new_input_type)
 
     name = "OutputNode"
     bases = [graph.OutputNode]
 
     # Mixin Node methods
-    if hasattr(output_type, "NodeMethodsClass"):
-        name += output_type.__class__.__name__
-        bases.append(output_type.NodeMethodsClass)
+    bases += weave_internal.get_node_methods_classes(output_type)
 
     # If the output type is a run, mixin the Run's output type
     # as well. execute.py automatic inserts await_output operations
     # as needed.
     if isinstance(output_type, types.RunType) and hasattr(
-        output_type._output, "NodeMethodsClass"
+        output_type.output, "NodeMethodsClass"
     ):
-        name += output_type._output.__class__.__name__
-        bases.append(output_type._output.NodeMethodsClass)
+        name += output_type.output.__class__.__name__
+        bases.append(output_type.output.NodeMethodsClass)
 
     # Mixin function output type Node methods
     if isinstance(output_type, types.Function) and hasattr(
@@ -140,7 +143,7 @@ def make_eager_call(lazy_call, op_def):
 
         def eager_call_async(*args, **kwargs):
             output_node = lazy_call(*args, **kwargs)
-            return api.use(output_node)
+            return weave_internal.use(output_node)
 
         return eager_call_async
     else:
@@ -153,7 +156,7 @@ def make_eager_call(lazy_call, op_def):
 
 def make_call(eager_call, lazy_call):
     def call(*args, **kwargs):
-        if context.eager_mode():
+        if context_state.eager_mode():
             return eager_call(*args, **kwargs)
         else:
             return lazy_call(*args, **kwargs)

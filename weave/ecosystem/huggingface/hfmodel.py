@@ -60,6 +60,12 @@ class HFModel:
     _library_name: typing.Optional[str]
     # TODO: version?
 
+    # This is the type of of the call op that will be overridden by child-classes.
+    # Just putting it here to get nice autocomplete, but there's probably a better
+    # and more general way to do this.
+    # TODO: Fix
+    call: typing.ClassVar[weave.OpDef]
+
     def tokenizer(self):
         return transformers.AutoTokenizer.from_pretrained(self._id)
 
@@ -115,16 +121,16 @@ class BaseModelOutputType(weave.types.ObjectType):
     def property_types(self):
         return {
             "_model": HFModelType(),
-            "_model_input": weave.types.String(),
+            "model_input": weave.types.String(),
             "_encoded_model_input": pytorch.TorchTensorType(),
-            "_model_output": HFInternalBaseModelOutputType(),
+            "model_output": HFInternalBaseModelOutputType(),
         }
 
 
 class ModelOutputAttentionType(weave.types.ObjectType):
     def property_types(self):
         return {
-            "_model_output": BaseModelOutputType(),
+            "model_output": BaseModelOutputType(),
             "_attention": weave.types.List(pytorch.TorchTensorType()),
         }
 
@@ -133,15 +139,15 @@ class ModelOutputAttentionType(weave.types.ObjectType):
 @dataclasses.dataclass
 class BaseModelOutput:
     _model: HFModel
-    _model_input: str
+    model_input: str
     _encoded_model_input: torch.Tensor
-    _model_output: transformers.modeling_outputs.BaseModelOutput
+    model_output: transformers.modeling_outputs.BaseModelOutput
 
 
 @weave.weave_class(weave_type=ModelOutputAttentionType)
 @dataclasses.dataclass
 class ModelOutputAttention:
-    _model_output: BaseModelOutput
+    model_output: BaseModelOutput
     _attention: list[torch.Tensor]
 
 
@@ -149,8 +155,8 @@ class FullPipelineOutputType(weave.types.ObjectType):
     def property_types(self):
         return {
             "_model": HFModelType(),
-            "_model_input": weave.types.String(),
-            "_model_output": weave.types.List(weave.types.TypedDict({})),
+            "model_input": weave.types.String(),
+            "model_output": weave.types.List(weave.types.TypedDict({})),
         }
 
 
@@ -158,8 +164,8 @@ class FullPipelineOutputType(weave.types.ObjectType):
 @dataclasses.dataclass
 class FullPipelineOutput:
     _model: HFModel
-    _model_input: str
-    _model_output: typing.Any
+    model_input: str
+    model_output: typing.Any
 
     @weave.op(output_type=ModelOutputAttentionType())
     def attention(self):
@@ -169,9 +175,9 @@ class FullPipelineOutput:
         model = pipeline.model.__class__.from_pretrained(
             self._model._id, output_attentions=True
         )
-        encoded_input = tokenizer.encode(self._model_input, return_tensors="pt")
+        encoded_input = tokenizer.encode(self.model_input, return_tensors="pt")
         model_output = model(encoded_input)
         bmo = BaseModelOutput(
-            self._model, self._model_input, encoded_input, model_output
+            self._model, self.model_input, encoded_input, model_output
         )
         return ModelOutputAttention(bmo, model_output[-1])

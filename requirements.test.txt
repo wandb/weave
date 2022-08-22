@@ -4,3 +4,4 @@ pytest-watch
 pytest-timeout
 pytest-xdist
 nbmake>=0.5
+rich

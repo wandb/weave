@@ -1,12 +1,101 @@
+import typing
+import time
+
 from weave.graph import Node
-from ..api import op, mutation
+from ..api import op, mutation, weave_class
 from .. import weave_types as types
+from .. import errors
+from .. import storage
+from .. import registry_mem
+from .. import weave_internal
+from .. import trace
+from .. import refs
+from .. import uris
+from .. import artifacts_local
+
+
+# Hmm... This returns the same obj, not a ref anymore
+# TODO: is this what we want?
+@op(
+    name="save",
+    input_type={"obj": types.Any(), "name": types.String()},
+    output_type=lambda input_types: input_types["obj"],
+)
+def save(obj, name):
+    ref = storage.save(obj, name=name)
+    return ref.obj
+
+
+def usedby_output_type(op_name: str) -> types.Type:
+    op_def = registry_mem.memory_registry.get_op(op_name)
+
+    if callable(op_def.output_type):
+        # We can certainly fix this. But this would be a really cool case for
+        # type variables. If this op outputs an output type with variables,
+        # we could include them in the returned type here.
+        # TODO: Fix
+        raise errors.WeaveInternalError(
+            "asking for used_by of op with callable output type not yet supported"
+        )
+
+    return types.List(
+        types.RunType(inputs=op_def.input_type.weave_type(), output=op_def.output_type)
+    )
+
+
+def used_by_callable_output_type(input_type) -> types.Type:
+    if not isinstance(input_type["op_name"], types.Const):
+        return types.List(types.RunType())
+    op_name = input_type["op_name"].val
+    return usedby_output_type(op_name)
+
+
+@op(render_info={"type": "function"})
+def usedby_refine_output_type(obj: typing.Any, op_name: str) -> types.Type:
+    return usedby_output_type(op_name)
+
+
+@op(
+    pure=False,
+    output_type=used_by_callable_output_type,
+    refine_output_type=usedby_refine_output_type,
+)
+def used_by(obj: typing.Any, op_name: str):
+    ref = storage.get_ref(obj)
+    if ref is None:
+        return []
+    res = trace.used_by(ref, op_name)
+    return res
+
+
+@op()
+def call_op(name: str) -> Node[types.Any]:
+    return weave_internal.make_output_node(types.Any(), name, {})
+
+
+@op()
+def objects_refine_output_type(of_type: types.Type, alias: str) -> types.Type:
+    return types.List(of_type)
+
+
+@op(
+    render_info={"type": "function"},
+    output_type=lambda input_type: types.List(input_type["of_type"]),
+    refine_output_type=objects_refine_output_type,
+    pure=False,
+)
+def objects(of_type: types.Type, alias: str):
+    return storage.objects(of_type, alias)
+
+
+# TODO: used_by, created_by, and change them to use filter instead
+#    to get filter output type right, I'll have to implement using refineOutputType
+#    for now. We can optimize by moving this to the type system a little later.
+# Then make a cool UI
 
 
 def op_get_return_type(uri):
-    from .. import uris
-
-    return uris.WeaveURI.parse(uri).to_ref().type
+    return refs.Ref.from_str(uri).type
 
 
 def op_get_return_type_from_inputs(inputs):
@@ -18,24 +107,8 @@ def get_returntype(uri):
     return op_get_return_type(uri)
 
 
-# Hmm... This returns the same obj, not a ref anymore
-# TODO: is this what we want?
-@op(
-    name="save",
-    input_type={"obj": types.Any(), "name": types.String()},
-    output_type=lambda input_types: input_types["obj"],
-)
-def save(obj, name):
-    from . import storage
-
-    ref = storage.save(obj, name=name)
-    return ref.obj
-
-
 @mutation
 def _save(name, obj):
-    from . import storage
-    from .. import uris
 
     obj_uri = uris.WeaveURI.parse(name)
 
@@ -53,8 +126,6 @@ def _save(name, obj):
     output_type=op_get_return_type_from_inputs,
 )
 def get(uri):
-    from . import storage
-
     return storage.get(uri)
 
 
@@ -68,13 +139,83 @@ def get(uri):
     output_type=lambda input_type: input_type["node"].output_type,
 )
 def execute(node):
-    from .. import weave_internal
-
-    return weave_internal.use_internal(node)
+    return weave_internal.use(node)
 
 
-@op()
-def call_op(name: str) -> Node[types.Any]:
-    from .. import weave_internal
+@weave_class(weave_type=types.RunType)
+class Run:
+    # NOTE: the mutations here are unused, only used by test currently.
+    # shows how we can implement the run API entirely on top of Weave objects,
+    # but we're not using this internally so probably best to remove.
+    @op(
+        name="run-setstate",
+        input_type={
+            "state": types.RUN_STATE_TYPE,
+        },
+        # can't return run because then we'll think this is an async op!
+        output_type=types.Invalid(),
+    )
+    @mutation
+    def set_state(self, state):
+        self.state = state
+        return self
 
-    return weave_internal.make_output_node(types.Any(), name, {})
+    @op(
+        name="run-print",
+        # can't return run because then we'll think this is an async op!
+        output_type=types.Invalid(),
+    )
+    @mutation
+    def print_(self, s: str):
+        # print("PRINT s", s)
+        self.prints.append(s)  # type: ignore
+        return self
+
+    @op(
+        name="run-log",
+        # can't return run because then we'll think this is an async op!
+        output_type=types.Invalid(),
+    )
+    @mutation
+    def log(self, v: typing.Any):
+        self.history.append(v)  # type: ignore
+        return self
+
+    @mutation
+    def set_inputs(self, v: typing.Any):
+        self.inputs = v
+        return self
+
+    @op(
+        name="run-setoutput",
+        output_type=types.Invalid(),
+    )
+    @mutation
+    def set_output(self, v: typing.Any):
+        # Force the output to be a ref.
+        # TODO: this is probably not the right place to do this.
+        if not isinstance(v, storage.Ref):
+            v = storage.save(v)
+        self.output = v
+        return self
+
+    @op(
+        name="run-await",
+        output_type=lambda input_types: input_types["self"].output,
+    )
+    def await_final_output(self):
+        sleep_mult = 1
+        while self.state == "pending" or self.state == "running":
+            sleep_time = 0.1 * sleep_mult
+            if sleep_time > 3:
+                sleep_time = 3
+            sleep_mult *= 1.3
+            time.sleep(sleep_time)
+
+            # TODO: this should support full URIS instead of hard coding
+            uri = uris.WeaveLocalArtifactURI.make_uri(
+                artifacts_local.local_artifact_dir(), f"run-{self.id}", "latest"
+            )
+            self = weave_internal.use(get(uri))
+
+        return self.output

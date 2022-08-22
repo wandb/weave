@@ -6,7 +6,7 @@ from . import op_def
 from . import weave_types
 from . import lazy
 from . import errors
-from . import context
+from . import context_state
 from . import storage
 from . import uris
 
@@ -39,7 +39,7 @@ class Registry:
     def register_op(self, op: op_def.OpDef):
         # Always save OpDefs any time they are declared
 
-        location = context.get_loading_op_location()
+        location = context_state.get_loading_op_location()
         is_loading = location is not None
         # do not save built-in ops today
         should_save = not is_loading and not op.is_builtin

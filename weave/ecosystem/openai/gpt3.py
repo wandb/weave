@@ -281,7 +281,6 @@ Gpt3FineTuneType.instance_class = Gpt3FineTune
 
 @weave.op(
     render_info={"type": "function"},
-    name="openai-finetunegpt3",
     input_type={
         "training_dataset": weave.types.List(
             weave.types.TypedDict(
@@ -302,13 +301,12 @@ Gpt3FineTuneType.instance_class = Gpt3FineTune
     ),
 )
 def finetune_gpt3(training_dataset, hyperparameters, _run=None):
-    from ... import api
 
     uploaded = weave.use(upload_gpt3_dataset(training_dataset))
     create_args = {"training_file": uploaded.id}
     for k, v in hyperparameters.items():
         create_args[k] = v
-    api.use(_run.print_("Creating fine tune"))
+    weave.use(_run.print_("Creating fine tune"))
     resp = openai.FineTune.create(**create_args)
     fine_tune = Gpt3FineTune(
         id=resp["id"],
@@ -319,15 +317,14 @@ def finetune_gpt3(training_dataset, hyperparameters, _run=None):
     while True:
         fine_tune.update()
         time.sleep(3)
-        api.use(_run.print_("Fine_tune status: %s" % fine_tune.status))
+        weave.use(_run.print_("Fine_tune status: %s" % fine_tune.status))
         if fine_tune.status == "succeeded":
             break
-    api.use(_run.set_output(fine_tune))
+    weave.use(_run.set_output(fine_tune))
 
 
 @weave.op(
     render_info={"type": "function"},
-    name="openai-finetunegpt3",
     input_type={
         "training_dataset": weave.types.List(
             weave.types.TypedDict(
@@ -348,10 +345,9 @@ def finetune_gpt3(training_dataset, hyperparameters, _run=None):
     ),
 )
 def finetune_gpt3_demo(training_dataset, hyperparameters, _run=None):
-    from .. import api
 
     print("!!! FINE TUNE DEMO, NOT REALLY FINE-TUNING !!!")
-    api.use(_run.print_("Creating fine tune"))
+    weave.use(_run.print_("Creating fine tune"))
     resp = {
         "id": str(training_dataset._ref) + str(json.dumps(hyperparameters)),
         "status": "running",
@@ -365,12 +361,12 @@ def finetune_gpt3_demo(training_dataset, hyperparameters, _run=None):
     )
     i = 0
     while True:
-        api.use(_run.print_("Fine_tune status: running"))
+        weave.use(_run.print_("Fine_tune status: running"))
         i += 1
         if i == 6:
             fine_tune.fine_tuned_model = "ada:ft-wandb-2021-10-05-23-25-22"
             fine_tune.status = "succeeded"
-            api.use(_run.print_("Fine_tune status: succeeded"))
+            weave.use(_run.print_("Fine_tune status: succeeded"))
             break
         time.sleep(3)
-    api.use(_run.set_output(fine_tune))
+    weave.use(_run.set_output(fine_tune))

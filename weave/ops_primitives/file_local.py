@@ -3,6 +3,7 @@ import os
 from ..api import op, mutation, weave_class
 from .. import weave_types as types
 from . import file as weave_file
+from . import csv_
 
 
 class LocalFileType(types.FileType):
@@ -55,8 +56,6 @@ class LocalFile(weave_file.File):
 
     @mutation
     def writecsv(self, csv_data):
-        from . import csv_
-
         csv_.save_csv(self.get_local_path(), csv_data)
 
     # TODO: Move to File object, but does inheritance work?? Probably.
@@ -74,8 +73,6 @@ class LocalFile(weave_file.File):
         # we're opening and just return that type directly.
 
         # file is an artifact manifest entry for now.
-        from . import csv_
-
         return csv_.load_csv(self.get_local_path())
 
 

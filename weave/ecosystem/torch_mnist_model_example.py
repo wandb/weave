@@ -7,17 +7,13 @@ from torchvision import transforms
 
 import typing
 import weave
-from .. import context as _context
 
 from . import pytorch
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# TODO: ...
-_loading_builtins_token = _context.set_loading_built_ins()
 
-
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class ModelType(weave.types.ObjectType):
     input_type: weave.types.Type = weave.types.Any()
     output_type: weave.types.Type = weave.types.Any()
@@ -32,7 +28,7 @@ class ModelType(weave.types.ObjectType):
 
 
 @weave.weave_class(weave_type=ModelType)
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class Model:
     input_type: weave.types.Type
     output_type: weave.types.Type
@@ -149,6 +145,3 @@ def train(X, y, config: TorchMnistTrainConfig):
         print("Epoch: %s" % epoch)
         avg_loss = train_epoch(network, loader, optimizer)
     return Model(weave.type_of(X), weave.type_of(y), network)
-
-
-_context.clear_loading_built_ins(_loading_builtins_token)

@@ -26,7 +26,10 @@ def weave_class(weave_type):
                     )
 
         weave_type.NodeMethodsClass = target
-        if weave_type.instance_classes == None:
+        # Check __dict__ instead of using regular attribute access
+        # because we want to add instance_classes even if it is already
+        # set in a base class
+        if weave_type.__dict__.get("instance_classes") is None:
             weave_type.instance_classes = target
             weave_type.instance_class = target
         return target

@@ -20,14 +20,12 @@ import weave
     ),
 )
 def slowmult(a, b, sleep, _run=None):
-    from . import api
-
     res = b
     for i in range(a - 1):
         res += b
-        api.use(_run.print_("Current result %s" % res))
+        _run.print_("Current result %s" % res)
         time.sleep(sleep)
-    api.use(_run.set_output(res))
+    _run.set_output(res)
 
 
 class AsyncDemoModelType(weave.types.ObjectType):
@@ -103,8 +101,6 @@ AsyncDemoTrainResultType.instance_class = AsyncDemoTrainResult
     ),
 )
 def train(dataset, _run=None):
-    from . import api
-
-    api.use(_run.print_("starting"))
-    api.use(_run.set_output(AsyncDemoTrainResult(dataset[0]["prompt"])))
-    api.use(_run.print_("done"))
+    _run.print_("starting")
+    _run.set_output(AsyncDemoTrainResult(dataset[0]["prompt"]))
+    _run.print_("done")

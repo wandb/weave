@@ -162,7 +162,7 @@ class List:
         return [i for i in arr if i is not None]
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class GroupResultType(types.ObjectType):
     name = "groupresult"
 

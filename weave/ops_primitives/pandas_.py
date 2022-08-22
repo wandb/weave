@@ -130,7 +130,7 @@ class DataFrameType(types.Type):
         return table.to_pandas()
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class DataFrameTableType(types.ObjectType):
     name = "dataframeTable"
 

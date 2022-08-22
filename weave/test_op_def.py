@@ -1,7 +1,7 @@
 from . import api as weave
-from . import context
+from . import context_state
 
-_loading_builtins_token = context.set_loading_built_ins()
+_loading_builtins_token = context_state.set_loading_built_ins()
 
 
 @weave.op(name="int_concat")
@@ -9,7 +9,7 @@ def int_concat(a: int, b: int) -> str:
     return str(a) + str(b)
 
 
-context.clear_loading_built_ins(_loading_builtins_token)
+context_state.clear_loading_built_ins(_loading_builtins_token)
 
 
 def test_op_def_to_dict():

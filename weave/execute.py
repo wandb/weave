@@ -1,27 +1,30 @@
 import logging
 from collections.abc import Mapping
-from . import graph
-from . import forward_graph
 import pprint
 import time
-from . import artifacts_local
 import threading
 import typing
-from . import engine_trace
 
-# TODO: this won't be valid in a real scenario. We need to forward to an
-# agent, that doesn't have the same memory registry
+# Libraries
+from . import box
+from . import engine_trace
 from . import errors
+
+# Planner/Compiler
+from . import compile
+from . import forward_graph
+from . import graph
+from . import weave_types as types
+
+# Ops
 from . import registry_mem
 from . import op_def
-from . import execute_ids
-from . import storage
-from . import weave_types as types
-from . import run_obj
-from . import compile
-from . import context
-from . import uris
-from . import box
+
+# Trace / cache
+from . import trace_local
+from . import refs
+
+TRACE_LOCAL = trace_local.TraceLocal()
 
 
 class ExecuteStats:
@@ -51,8 +54,7 @@ def execute_nodes(nodes, no_cache=False):
     nodes = compile.compile(nodes)
     fg = forward_graph.ForwardGraph(nodes)
 
-    with context.execution_client():
-        stats = execute_forward(fg, no_cache=no_cache)
+    stats = execute_forward(fg, no_cache=no_cache)
     summary = stats.summary()
     logging.info("Execution summary\n%s" % pprint.pformat(summary))
 
@@ -96,30 +98,24 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
     return stats
 
 
-def async_op_body(run_uri, run_body, inputs):
-    from . import api
-    from .ops_primitives.weave_api import get as op_get
-
-    with context.execution_client():
-        run = op_get(run_uri)
-        api.use(run.set_state("running"))
-        dereffed_inputs = {}
-        for input_name, input in inputs.items():
-            dereffed_inputs[input_name] = storage.deref(input)
-        run_body(**dereffed_inputs, _run=run)
-        api.use(run.set_state("finished"))
+def async_op_body(run_id, run_body, inputs):
+    run = TRACE_LOCAL.get_run(run_id)
+    run.state = "running"
+    run.save()
+    dereffed_inputs = {}
+    for input_name, input in inputs.items():
+        dereffed_inputs[input_name] = refs.deref(input)
+    run_body(**dereffed_inputs, _run=run)
+    run.state = "finished"
+    run.save()
 
 
 def execute_async_op(
     op_def: op_def.OpDef, inputs: Mapping[str, typing.Any], run_id: str
 ):
-    # TODO: should this be configurable with remote artifacts
-    art_name = "run-%s" % run_id
-    art_uri = uris.WeaveLocalArtifactURI.make_uri(
-        artifacts_local.local_artifact_dir(), art_name, "latest"
-    )
     job = threading.Thread(
-        target=async_op_body, args=(art_uri, op_def.resolve_fn, inputs)
+        target=async_op_body,
+        args=(run_id, op_def.resolve_fn, inputs),
     )
     job.start()
 
@@ -133,6 +129,9 @@ def execute_sync_op(
 
 def is_run_op(op_call: graph.Op):
     self_node = op_call.inputs.get("self")
+    t = None
+    if self_node is not None:
+        t = self_node.type
     if self_node is not None and isinstance(self_node.type, types.RunType):
         return True
     return False
@@ -154,17 +153,16 @@ def execute_forward_node(
     op_def = registry_mem.memory_registry.get_op(node.from_op.name)
     input_nodes = node.from_op.inputs
 
-    input_refs = {}
+    input_refs: dict[str, refs.Ref] = {}
     for input_name, input_node in input_nodes.items():
         input_refs[input_name] = fg.get_result(input_node)
 
     if use_cache or op_def.is_async:
         # Compute the run ID, which is deterministic if the op is pure
-        run_id = execute_ids.make_run_id(op_def, input_refs)
-        run_artifact_name = f"run-{run_id}"
+        run_id = trace_local.make_run_id(op_def, input_refs)
 
     if use_cache and op_def.pure:
-        run = storage.get_version(run_artifact_name, "latest")
+        run = TRACE_LOCAL.get_run(run_id)
         if run is not None:
             logging.debug("Cache hit, returning")
             # Watch out, we handle loading async runs in different ways.
@@ -172,29 +170,28 @@ def execute_forward_node(
                 forward_node.set_result(run)
                 return
             else:
-                if run._output is not None:
+                if run.output is not None:
                     # if isinstance(run._output, artifacts_local.LocalArtifact):
                     #     print('OUTPUT REF TYPE OBJ TYPE', )
-                    forward_node.set_result(run._output)
+                    forward_node.set_result(run.output)
                     return
             logging.debug("Actually nevermind, didnt return")
             # otherwise, the run's output was not saveable, so we need
             # to recompute it.
-    inputs = {
-        input_name: storage.deref(input) for input_name, input in input_refs.items()
-    }
+    inputs = {input_name: refs.deref(input) for input_name, input in input_refs.items()}
 
     if op_def.is_async:
         logging.debug("Executing async op")
-        run = run_obj.Run(run_id, op_def.name)
         input_refs = {}
         for input_name, input in inputs.items():
-            ref = storage.get_ref(input)
+            ref = refs.get_ref(input)
             if ref is None:
-                ref = storage.save(input)
+                ref = TRACE_LOCAL.save_object(input)
             input_refs[input_name] = ref
-        run._inputs = input_refs
-        storage.save(run, name=run_artifact_name)
+        run = TRACE_LOCAL.new_run(run_id, op_def.name)
+        run.inputs = input_refs
+        run.save()
+
         execute_async_op(op_def, input_refs, run_id)
         forward_node.set_result(run)
     else:
@@ -219,7 +216,7 @@ def execute_forward_node(
         else:
             result = execute_sync_op(op_def, inputs)
 
-        ref = storage._get_ref(result)
+        ref = refs.get_ref(result)
         if ref is not None:
             logging.debug("Op resulted in ref")
             # If the op produced an object which has a ref (as in the case of get())
@@ -238,18 +235,8 @@ def execute_forward_node(
                 # TODO: revisit this behavior
                 output_name = None
                 if op_def.pure:
-                    output_name = "%s-output" % run_artifact_name
-                try:
-                    # Passing the node.type through here will really speed things up!
-                    # But we can't do it yet because Weave Python function aren't all
-                    # correctly typed, and WeaveJS sends down different types (like TagValues)
-                    # TODO: Fix
-                    result = storage.save(result, name=output_name)
-                except errors.WeaveSerializeError:
-                    # Not everything can be serialized currently. But instead of storing
-                    # the result directly here, we save a MemRef with the same run_artifact_name.
-                    # This is required to make downstream run_ids path dependent.
-                    result = storage.save_mem(result, name=output_name)
+                    output_name = "run-%s-output" % run_id
+                result = TRACE_LOCAL.save_object(result, name=output_name)
 
         forward_node.set_result(result)
 
@@ -259,11 +246,11 @@ def execute_forward_node(
         #    as the original ref rather than the new ref, which causes problems)
         if use_cache and not is_run_op(node.from_op):
             logging.debug("Saving run")
-            run = run_obj.Run(run_id, op_def.name)
-            run._inputs = input_refs
-            run._output = result
             try:
-                storage.save(run, name=run_artifact_name)
+                run = TRACE_LOCAL.new_run(run_id, op_def.name)
+                run.inputs = input_refs
+                run.output = result
+                run.save()
             except errors.WeaveSerializeError:
                 pass
         logging.debug("Done executing node: %s" % node)

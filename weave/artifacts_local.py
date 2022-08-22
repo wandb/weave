@@ -45,13 +45,17 @@ def local_artifact_exists(name, branch):
     return os.path.exists(os.path.join(local_artifact_dir(), name, branch))
 
 
+class Artifact:
+    name: str
+
+
 # This is a prototype implementation. Chock full of races, and other
 # problems
 # Do not use in prod!
 # local-artifact://[path][asdfdsa][asdf]
-class LocalArtifact:
+class LocalArtifact(Artifact):
     def __init__(self, name, version=None):
-        self._name = name
+        self.name = name
         self._version = version
         self._root = os.path.join(local_artifact_dir(), name)
         self._path_handlers = {}
@@ -63,7 +67,7 @@ class LocalArtifact:
         self._last_write_path = None
 
     def __repr__(self):
-        return "<LocalArtifact(%s) %s %s>" % (id(self), self._name, self._version)
+        return "<LocalArtifact(%s) %s %s>" % (id(self), self.name, self._version)
 
     @property
     def is_saved(self):
@@ -82,9 +86,9 @@ class LocalArtifact:
         return self.read_metadata()["created_at"]
 
     def get_other_version(self, version):
-        if not local_artifact_exists(self._name, version):
+        if not local_artifact_exists(self.name, version):
             return None
-        return LocalArtifact(self._name, version)
+        return LocalArtifact(self.name, version)
 
     def _setup_dirs(self):
         self._write_dirname = os.path.join(
@@ -102,16 +106,10 @@ class LocalArtifact:
     def path(self, name):
         return os.path.join(self._read_dirname, name)
 
-    # TODO: Placeholder API, rename / replace as we add W&B support
-    def read_path(self, path: str):
-        from .ops_primitives import file_local
-
-        return file_local.LocalFile(os.path.join(self._read_dirname, path))
-
     @property
     def location(self) -> uris.WeaveURI:
         return uris.WeaveLocalArtifactURI.from_parts(
-            os.path.abspath(local_artifact_dir()), self._name, self.version
+            os.path.abspath(local_artifact_dir()), self.name, self.version
         )
 
     def uri(self) -> str:
@@ -230,9 +228,9 @@ class LocalArtifact:
             os.rename(temp_path, link_name)
 
 
-class WandbArtifact:
+class WandbArtifact(Artifact):
     def __init__(self, name, type=None, uri: uris.WeaveWBArtifactURI = None):
-        self._name = name
+        self.name = name
         if not uri:
             self._writeable_artifact = wandb.Artifact(
                 name, type="op_def" if type is None else type
@@ -244,7 +242,7 @@ class WandbArtifact:
         self._local_path: dict[str, str] = {}
 
     def __repr__(self):
-        return "<WandbArtifact %s>" % self._name
+        return "<WandbArtifact %s>" % self.name
 
     @classmethod
     def from_wb_artifact(cls, art):
@@ -299,60 +297,12 @@ class WandbArtifact:
         self._local_path[name] = path_safe
         return path_safe
 
-    # TODO: Placeholder API, rename / replace as we add W&B support
-    def read_path(self, path: str):
-        av = self._saved_artifact
-        from .ops_domain.file_wbartifact import ArtifactVersionFile, ArtifactVersionDir
-        from .ops_primitives import file as weave_file
-
-        manifest = av.manifest
-        manifest_entry = manifest.get_entry_by_path(path)
-        if manifest_entry is not None:
-            # This is a file
-            return ArtifactVersionFile(self, path)
-        # This is not a file, assume its a directory. If not, we'll return an empty result.
-        cur_dir = (
-            path  # give better name so the rest of this code block is more readable
-        )
-        if cur_dir == "":
-            dir_ents = av.manifest.entries.values()
-        else:
-            dir_ents = av.manifest.get_entries_in_directory(cur_dir)
-        sub_dirs: dict[str, weave_file.SubDir] = {}
-        files = {}
-        for entry in dir_ents:
-            entry_path = entry.path
-            rel_path = os.path.relpath(entry_path, path)
-            rel_path_parts = rel_path.split("/")
-            if len(rel_path_parts) == 1:
-                # Its a file within cur_dir
-                # TODO: I haven't tested this since changin ArtifactVersionFile implementation
-                files[entry_path] = ArtifactVersionFile(
-                    self,
-                    entry_path,
-                )
-            else:
-                dir_name = rel_path_parts[0]
-                if dir_name not in sub_dirs:
-                    dir_ = weave_file.SubDir(entry_path, 1111, {}, {})
-                    sub_dirs[dir_name] = dir_
-                dir_ = sub_dirs[dir_name]
-                if len(rel_path_parts) == 2:
-                    # TODO: I haven't tested this since changin ArtifactVersionFile implementation
-                    dir_.files[rel_path_parts[1]] = ArtifactVersionFile(
-                        self,
-                        entry_path,
-                    )
-                else:
-                    dir_.dirs[rel_path_parts[1]] = 1
-        return ArtifactVersionDir(path, 1591, sub_dirs, files)
-
     @property
     def location(self):
         return uris.WeaveWBArtifactURI.from_parts(
             self._saved_artifact.entity,
             self._saved_artifact.project,
-            self._name,
+            self.name,
             self._saved_artifact.version,
         )
 

@@ -3,13 +3,13 @@ import pyarrow as pa
 import typing
 
 from . import mappers
-from . import mappers_python
+from . import mappers_python_def as mappers_python
 from . import mappers_weave
 from . import arrow_util
-from . import refs
 from . import weave_types as types
-from . import uris
+from . import refs
 from . import errors
+from . import node_ref
 
 
 class TypedDictToArrowStruct(mappers_python.TypedDictToPyDict):
@@ -102,14 +102,14 @@ class FunctionToArrowFunction(mappers.Mapper):
         return pa.string()
 
     def apply(self, obj):
-        ref = refs.node_to_ref(obj)
+        ref = node_ref.node_to_ref(obj)
         return str(ref)
 
 
 class ArrowFunctionToFunction(mappers.Mapper):
     def apply(self, obj):
-        ref = uris.WeaveURI.parse(obj).to_ref()
-        return refs.ref_to_node(ref)
+        ref = refs.Ref.from_str(obj)
+        return node_ref.ref_to_node(ref)
 
 
 class NoneToArrowNone(mappers.Mapper):

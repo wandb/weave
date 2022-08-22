@@ -9,6 +9,9 @@ class OpArgs:
     def to_dict(self) -> typing.Union[str, typing.Dict]:
         raise NotImplementedError()
 
+    def weave_type(self) -> types.Type:
+        raise NotImplementedError
+
     @staticmethod
     def from_dict(_type: typing.Union[str, typing.Dict]):
         if isinstance(_type, typing.Dict):
@@ -28,6 +31,9 @@ class OpVarArgs(OpArgs):
     def __init__(self, arg_type: types.Type):
         self.arg_type = arg_type
 
+    def weave_type(self) -> types.Type:
+        return types.Dict(types.String(), self.arg_type)
+
     def to_dict(self) -> str:
         return self.arg_type.to_dict()
 
@@ -35,8 +41,11 @@ class OpVarArgs(OpArgs):
 class OpNamedArgs(OpArgs):
     kind = OpArgs.NAMED_ARGS
 
-    def __init__(self, arg_types: typing.Mapping[str, types.Type]):
+    def __init__(self, arg_types: typing.Dict[str, types.Type]):
         self.arg_types = arg_types
+
+    def weave_type(self) -> types.Type:
+        return types.TypedDict(self.arg_types)
 
     def to_dict(self) -> typing.Dict:
         return {key: val.to_dict() for key, val in self.arg_types.items()}

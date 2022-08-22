@@ -1,7 +1,5 @@
 from . import artifacts_local
 from . import refs
-from . import graph
-from . import api as weave
 
 
 def test_laref_artifact_version():
@@ -13,7 +11,7 @@ def test_laref_artifact_version():
     )
 
     parsed_ref = refs.LocalArtifactRef.from_str(str(ref))
-    assert parsed_ref.artifact._name == art._name
+    assert parsed_ref.artifact.name == art.name
     assert parsed_ref.artifact._version == art._version
     assert parsed_ref.path == "_obj"
     assert parsed_ref.extra == None
@@ -33,7 +31,7 @@ def test_laref_artifact_version_path():
     )
 
     parsed_ref = refs.LocalArtifactRef.from_str(str(ref))
-    assert parsed_ref.artifact._name == art._name
+    assert parsed_ref.artifact.name == art.name
     assert parsed_ref.artifact._version == art._version
     assert parsed_ref.path == "x.txt"
     assert parsed_ref.extra == None
@@ -53,7 +51,7 @@ def test_laref_artifact_version_path_extra1():
     )
 
     parsed_ref = refs.LocalArtifactRef.from_str(str(ref))
-    assert parsed_ref.artifact._name == art._name
+    assert parsed_ref.artifact.name == art.name
     assert parsed_ref.artifact._version == art._version
     assert parsed_ref.path == "x.txt"
     assert parsed_ref.extra == ["5"]
@@ -73,7 +71,7 @@ def test_laref_artifact_version_path_obj_extra1():
     )
 
     parsed_ref = refs.LocalArtifactRef.from_str(str(ref))
-    assert parsed_ref.artifact._name == art._name
+    assert parsed_ref.artifact.name == art.name
     assert parsed_ref.artifact._version == art._version
     assert parsed_ref.path == "_obj"
     assert parsed_ref.extra == ["5"]
@@ -93,7 +91,7 @@ def test_laref_artifact_version_path_extra2():
     )
 
     parsed_ref = refs.LocalArtifactRef.from_str(str(ref))
-    assert parsed_ref.artifact._name == art._name
+    assert parsed_ref.artifact.name == art.name
     assert parsed_ref.artifact._version == art._version
     assert parsed_ref.path == "x.txt"
     assert parsed_ref.extra == ["5", "a"]
@@ -103,15 +101,3 @@ def test_laref_artifact_version_path_extra2():
         "x.txt",
         ["5", "a"],
     )
-
-
-def test_node_to_ref():
-    l = [{"a": 5, "b": 6}, {"a": 7, "b": 9}]
-    l_node = weave.save(l, "my-l")
-    node = l_node[0]["a"]
-    ref = refs.node_to_ref(node)
-    assert ref.name == "my-l"
-    assert ref.extra == ["0", "a"]
-
-    node2 = refs.ref_to_node(ref)
-    assert graph.nodes_equal(node2, node)

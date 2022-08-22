@@ -40,7 +40,7 @@ def type(__override_name: str = None):
             return property_types
 
         TargetType.property_types = property_types_method
-        TargetType = dataclasses.dataclass(TargetType)
+        TargetType = dataclasses.dataclass(frozen=True)(TargetType)
 
         dc.WeaveType = TargetType
         decorator_class.weave_class(weave_type=TargetType)(dc)

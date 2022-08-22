@@ -46,20 +46,6 @@ class PILImageType(types.Type):
     def from_dict(cls, d):
         return cls(d["width"], d["height"], d["mode"])
 
-    def assign_type(self, other: types.Type):
-        if not isinstance(other, PILImageType):
-            return types.Invalid()
-        # TODO: we want to handle this by switch to number. However this logic
-        #     should not need to be implemented by Type implementors. The underlying
-        #     system can handle like ObjectType does.
-        if self.width != other.width:
-            raise errors.WeaveTypeError("image types have different widths")
-        if self.height != other.height:
-            raise errors.WeaveTypeError("image types have different heights")
-        if self.mode != other.mode:
-            raise errors.WeaveTypeError("image types have different modes")
-        return self
-
     @classmethod
     def type_of_instance(cls, obj: PIL.Image.Image):
         return cls(obj.width, obj.height, obj.mode)

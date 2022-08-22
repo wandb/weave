@@ -86,9 +86,8 @@ class File:
             for col_name, val in zip(data["columns"], data_row):
                 row[col_name] = val
             rows.append(row)
-        from .. import storage
 
-        res = storage.to_arrow_from_list_and_artifact(rows, object_type, file.artifact)
+        res = arrow.to_arrow_from_list_and_artifact(rows, object_type, file.artifact)
         # I Don't think I need Table now. We won't parse again
         return Table(res)
 

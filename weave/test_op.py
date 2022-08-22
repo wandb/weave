@@ -27,8 +27,8 @@ def test_op_simple():
             types.String(),
             test_helpers.RegexMatcher(".*test_op-op_simple.*"),
             {
-                "a": weave_internal.make_const_node(types.Const(types.Int(), 3), 3),
-                "b": weave_internal.make_const_node(types.Const(types.Int(), 4), 4),
+                "a": weave_internal.make_const_node(types.Int(), 3),
+                "b": weave_internal.make_const_node(types.Int(), 4),
             },
         ),
     )
@@ -57,8 +57,8 @@ def test_op_kwargs():
             types.String(),
             test_helpers.RegexMatcher(".*test_op-op_kwargs.*"),
             {
-                "a": weave_internal.make_const_node(types.Const(types.Int(), 1), 1),
-                "b": weave_internal.make_const_node(types.Const(types.Int(), 2), 2),
+                "a": weave_internal.make_const_node(types.Int(), 1),
+                "b": weave_internal.make_const_node(types.Int(), 2),
             },
         ),
     )
@@ -160,32 +160,34 @@ def test_op_inferred_list_return():
 
 def test_op_inferred_typeddict_return():
     @weave.op()
-    def op_under_test(a: int) -> typing.TypedDict("OpReturn", {"x": int, "y": str}):
+    def op_test_op_inferred_typeddict_return_op(
+        a: int,
+    ) -> typing.TypedDict("OpReturn", {"x": int, "y": str}):
         return {"a": 1, "y": "x"}
 
-    assert op_under_test.output_type == types.TypedDict(
+    assert op_test_op_inferred_typeddict_return_op.output_type == types.TypedDict(
         {"x": types.Int(), "y": types.String()}
     )
 
 
 def test_op_inferred_list_typeddict_return():
     @weave.op()
-    def op_under_test(
+    def op_inferred_list_typeddict_return(
         a: int,
     ) -> list[typing.TypedDict("OpReturn", {"x": int, "y": str})]:
         return [{"a": 1, "y": "x"}]
 
-    assert op_under_test.output_type == types.List(
+    assert op_inferred_list_typeddict_return.output_type == types.List(
         types.TypedDict({"x": types.Int(), "y": types.String()})
     )
 
 
 def test_op_inferred_dict_return() -> None:
     @weave.op()
-    def op_under_test(a: int) -> dict[str, list[int]]:
+    def op_inferred_dict_return(a: int) -> dict[str, list[int]]:
         return {"a": [5]}
 
-    assert op_under_test.output_type == types.Dict(
+    assert op_inferred_dict_return.output_type == types.Dict(
         types.String(), types.List(types.Int())
     )
 
@@ -215,7 +217,7 @@ def test_load_op_from_artifact():
     ref = storage.save(op_to_int)
 
     # load op from uri
-    loaded_op = uris.WeaveURI.parse(ref.uri).to_ref().get()
+    loaded_op = ref.get()
 
     # test calling from loaded op works
     assert 3 == weave.use(loaded_op("3"))

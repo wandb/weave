@@ -6,17 +6,16 @@ from .. import artifacts_local
 from .. import refs
 
 
-class ArtifactVersionFileType(types.Type):
-    name = "ArtifactVersionFile"
-
-    def save_instance(self, obj, artifact, name):
-        return refs.WandbArtifactRef(obj.artifact, obj.path)
-
-    def load_instance(self, artifact, name, extra=None):
-        return ArtifactVersionFile(artifact, name)
+def load_instance(self, artifact, name, extra=None):
+    return ArtifactVersionFile(artifact, name)
 
 
-@weave.weave_class(weave_type=ArtifactVersionFileType)
+# Inject onto the type, which lives in refs right now :(
+# TODO: fix
+refs.ArtifactVersionFileType.load_instance = load_instance  # type: ignore
+
+
+@weave.weave_class(weave_type=refs.ArtifactVersionFileType)
 class ArtifactVersionFile(weave_file.File):
     artifact: artifacts_local.WandbArtifact
     path: str
@@ -32,8 +31,8 @@ class ArtifactVersionFile(weave_file.File):
         return open(self.get_local_path(), encoding="ISO-8859-1").read()
 
 
-ArtifactVersionFileType.instance_class = ArtifactVersionFile
-ArtifactVersionFileType.instance_classes = ArtifactVersionFile
+refs.ArtifactVersionFileType.instance_class = ArtifactVersionFile
+refs.ArtifactVersionFileType.instance_classes = ArtifactVersionFile
 
 
 class ArtifactVersionDirType(types.ObjectType):

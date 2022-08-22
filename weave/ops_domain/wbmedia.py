@@ -68,7 +68,7 @@ def html_file(html: html.Html) -> HtmlArtifactFileRef:
     ref = storage.save(html)
     ref = copy.copy(ref)
     ref.path += ".html"
-    return HtmlArtifactFileRef(ref)
+    return HtmlArtifactFileRef(ref)  # type: ignore
 
 
 # Yet another pattern for returning a file inside an artifact!

@@ -9,6 +9,7 @@ import json
 from . import graph
 from . import weave_types as types
 from . import errors
+from . import weave_internal
 
 
 NodeOrOp = typing.Union[graph.Node, graph.Op]
@@ -120,8 +121,6 @@ def _deserialize_node(
     if node["nodeType"] == "const":
         if isinstance(node["type"], dict) and node["type"]["type"] == "function":
             fn_body_node = node["val"]
-            from . import weave_internal
-
             if fn_body_node["nodeType"] == "var":
                 parsed_fn_body_node = weave_internal.make_var_node(
                     types.TypeRegistry.type_from_dict(fn_body_node["type"]),

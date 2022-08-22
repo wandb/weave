@@ -19,7 +19,7 @@ from flask import send_from_directory, send_file
 from weave import server
 from weave import registry_mem
 from weave import errors
-from weave import context
+from weave import context_state
 
 from flask.logging import wsgi_errors_stream
 
@@ -28,21 +28,12 @@ from weave import ops
 
 # Load and register the ecosystem ops
 # These are all treated as builtins for now.
-loading_builtins_token = context.set_loading_built_ins()
+loading_builtins_token = context_state.set_loading_built_ins()
 
-from weave.ecosystem import openai
-from weave.ecosystem import bertviz
-from weave.ecosystem import shap
-from weave.ecosystem import huggingface
-from weave.ecosystem import torchvision
-from weave.ecosystem import xgboost
-from weave.ecosystem import sklearn
-from weave.ecosystem import torch_mnist_model_example
-from weave.ecosystem import craiyon
-from weave.ecosystem import slack
+from weave import ecosystem
 from .artifacts_local import local_artifact_dir
 
-context.clear_loading_built_ins(loading_builtins_token)
+context_state.clear_loading_built_ins(loading_builtins_token)
 
 
 # set up logging

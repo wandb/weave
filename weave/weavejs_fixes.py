@@ -21,6 +21,8 @@ def convert_specific_opname_to_generic_opname(
         return "count", {"arr": inputs["self"]}
     elif name == "groupresult-key":
         return "group-groupkey", {"obj": inputs["self"]}
+    elif name == "list-filter":
+        return "filter", {"arr": inputs["self"], "filterFn": inputs["filter_fn"]}
     elif (
         name == "list-__getitem__"
         or name == "groupresult-__getitem__"
@@ -95,9 +97,3 @@ def fixup_node(node: graph.Node) -> graph.Node:
 def fixup_data(data):
     data = remove_opcall_versions_data(data)
     return convert_specific_ops_to_generic_ops_data(data)
-
-
-def unwrap_tag_type(serialized_type):
-    if isinstance(serialized_type, dict) and serialized_type.get("type") == "tagged":
-        return serialized_type["value"]
-    return serialized_type

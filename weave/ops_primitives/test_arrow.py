@@ -10,6 +10,7 @@ from .. import storage
 from .. import api as weave
 from .. import ops
 from .. import artifacts_local
+from . import arrow
 
 
 def simple_hash(n, b):
@@ -38,7 +39,7 @@ def create_arrow_data(n_rows, n_extra_cols=0, images=False):
         for j, col in enumerate(extra_cols):
             im[col] = x_choices[simple_hash(i * 13**j, 11)]
         ims.append(im)
-    arr = storage.to_arrow(ims)
+    arr = arrow.to_arrow(ims)
     return storage.save(arr)
 
 
@@ -86,7 +87,7 @@ def test_table_string_histogram():
 
 
 def test_custom_types():
-    data_node = storage.to_arrow(
+    data_node = arrow.to_arrow(
         [
             {"a": 5, "im": Image.linear_gradient("L").rotate(0)},
             {"a": 6, "im": Image.linear_gradient("L").rotate(4)},
@@ -101,7 +102,7 @@ def test_custom_types():
 
 
 def test_custom_saveload():
-    data = storage.to_arrow(
+    data = arrow.to_arrow(
         [
             {"a": 5, "im": Image.linear_gradient("L").rotate(0)},
             {"a": 6, "im": Image.linear_gradient("L").rotate(4)},
@@ -115,7 +116,7 @@ def test_custom_saveload():
 
 # @pytest.mark.skip()
 def test_custom_groupby():
-    data = storage.to_arrow(
+    data = arrow.to_arrow(
         [
             {"a": 5, "im": Image.linear_gradient("L").rotate(0)},
             {"a": 6, "im": Image.linear_gradient("L").rotate(4)},
@@ -134,7 +135,7 @@ def test_custom_groupby():
 
 
 def test_custom_groupby_intermediate_save():
-    data = storage.to_arrow(
+    data = arrow.to_arrow(
         [
             {"a": 5, "im": Image.linear_gradient("L").rotate(0)},
             {"a": 6, "im": Image.linear_gradient("L").rotate(4)},
@@ -150,12 +151,12 @@ def test_custom_groupby_intermediate_save():
 
 
 def test_map_array():
-    data = storage.to_arrow([1, 2, 3])
+    data = arrow.to_arrow([1, 2, 3])
     assert weave.use(data.map(lambda i: i + 1)).to_pylist() == [2, 3, 4]
 
 
 def test_map_typeddict():
-    data = storage.to_arrow([{"a": 1, "b": 2}, {"a": 3, "b": 5}])
+    data = arrow.to_arrow([{"a": 1, "b": 2}, {"a": 3, "b": 5}])
     assert weave.use(data.map(lambda row: row["a"])).to_pylist() == [1, 3]
 
 
@@ -170,11 +171,22 @@ class Point2:
 
 
 def test_map_object():
-    data = storage.to_arrow([Point2(1, 2), Point2(5, 6)])
+    data = arrow.to_arrow([Point2(1, 2), Point2(5, 6)])
     assert weave.use(data.map(lambda row: row.get_x())).to_pylist() == [1, 5]
 
 
 @pytest.mark.skip("not working yet")
 def test_map_typeddict_object():
-    data = storage.to_arrow([{"a": 0, "p": Point2(1, 2)}, {"a": 3, "p": Point2(9, 12)}])
+    data = arrow.to_arrow([{"a": 0, "p": Point2(1, 2)}, {"a": 3, "p": Point2(9, 12)}])
     assert weave.use(data.map(lambda row: row["p"])).to_pylist() == []
+
+
+def test_arrow_list_of_ref_to_item_in_list():
+    l = [{"a": 5, "b": 6}, {"a": 7, "b": 9}]
+    l_node = weave.save(l, "my-l")
+
+    list_dict_with_ref = arrow.to_arrow([{"c": l_node[0]["a"]}, {"c": l_node[1]["a"]}])
+    d_node = weave.save(list_dict_with_ref, "my-dict_with_ref")
+
+    assert weave.use(d_node[0]["c"] == 5) == True
+    assert weave.use(d_node[1]["c"] == 7) == True

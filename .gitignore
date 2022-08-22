@@ -1,6 +1,6 @@
 .python-version
 .ipynb_checkpoints
-wandb
+/wandb/
 __pycache__
 artifacts
 .idea

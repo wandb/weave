@@ -6,6 +6,7 @@ from .. import ops
 from .. import op_def
 from .. import panels
 
+from . import bertviz
 from . import xgboost
 from . import sklearn
 from . import keras
@@ -14,6 +15,7 @@ from . import huggingface
 from . import craiyon
 from . import openai
 from . import spacy
+from . import wandb
 
 # TODO: feels odd to call this "ops.Markdown".
 # Maybe make it top level

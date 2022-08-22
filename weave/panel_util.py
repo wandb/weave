@@ -1,7 +1,9 @@
 import typing
 from . import panel
 from . import graph
-from . import types as weave_types
+from . import weave_types
+from . import storage
+from . import ops
 
 
 def make_node(v: typing.Any) -> graph.Node:
@@ -14,12 +16,8 @@ def make_node(v: typing.Any) -> graph.Node:
         return graph.ConstNode(node_type, v)
 
     # Otherwise
-    from . import storage
-
     ref = storage.save(v)
-    from .ops_primitives.weave_api import get as op_get
-
-    return op_get(str(ref))
+    return ops.get(str(ref))
 
 
 def child_item(v):
