@@ -334,3 +334,30 @@ class Project:
 @op(name="root-project")
 def project(entityName: str, projectName: str) -> wandb_api.Project:
     return wandb_public_api().project(name=projectName, entity=entityName)
+
+
+class Metric(typing.TypedDict):
+    step: int
+    metric1: float
+    metric2: float
+
+
+# hardcoded for now, later we will make this more general
+interim_metric_type = list[Metric]
+
+
+@weave.type()
+class RunSegment:
+    prior_run_ref: typing.Optional[str]
+    resumed_from_step: int
+    metrics: interim_metric_type
+
+    @op()
+    def experiment(self) -> interim_metric_type:
+        prior_run_metrics: interim_metric_type = []
+        if self.prior_run_ref is not None:
+            # get the prior run
+            prior_run: RunSegment = weave.use(weave.get(self.prior_run_ref))[0]
+            prior_run_metrics = prior_run.experiment()
+
+        return prior_run_metrics + self.metrics
