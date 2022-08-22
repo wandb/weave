@@ -31,7 +31,7 @@ def client(server_type):
 
 
 @pytest.mark.parametrize("server_type", SERVER_TYPES)
-@pytest.mark.timeout(3)
+@pytest.mark.timeout(10)
 def test_basic(server_type):
     with client(server_type) as wc:
         nine = make_const_node(weave.types.Number(), 9)
@@ -39,14 +39,14 @@ def test_basic(server_type):
 
 
 @pytest.mark.parametrize("server_type", SERVER_TYPES)
-@pytest.mark.timeout(3)
+@pytest.mark.timeout(10)
 def test_type_returning_op(server_type, cereal_csv):
     with client(server_type) as wc:
         csv_type = weave.use(ops.local_path_return_type(cereal_csv), client=wc)
         assert csv_type.name == "local_file"
 
 
-@pytest.mark.timeout(3)
+@pytest.mark.timeout(10)
 def test_500_does_raise_jsondecode_error_from_http_server():
     with client("http") as wc:
 

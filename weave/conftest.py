@@ -3,6 +3,8 @@ import os
 import pytest
 import shutil
 import tempfile
+from . import context_state
+from . import weave_server
 
 
 ### Disable datadog engine tracing
@@ -39,10 +41,7 @@ def guard(*args, **kwargs):
 
 
 def pytest_sessionstart(session):
-    context.disable_analytics()
-
-
-from . import context
+    context_state.disable_analytics()
 
 
 @pytest.fixture(autouse=True)
@@ -61,8 +60,6 @@ def pre_post_each_test():
 def fresh_server_logfile():
     def _clearlog():
         try:
-            from . import weave_server
-
             os.remove(weave_server.default_log_filename)
         except (OSError, FileNotFoundError):
             pass

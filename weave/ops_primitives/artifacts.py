@@ -1,10 +1,9 @@
 import json
 
 from .. import weave_types as types
-from .. import storage
-from .. import tags
 from ..api import op, weave_class
 from .. import artifacts_local
+from .. import uris
 
 
 class LocalArtifactVersionType(types.Type):
@@ -17,7 +16,6 @@ class LocalArtifactVersionType(types.Type):
         }
 
     def instance_from_dict(self, d):
-        from .. import uris
 
         uri = uris.WeaveLocalArtifactURI(d["uri"])
         return artifacts_local.LocalArtifact(uri._full_name, uri._version)
@@ -33,7 +31,5 @@ class WandbArtifactVersionType(types.Type):
         }
 
     def instance_from_dict(self, d):
-        from .. import uris
-
         uri = uris.WeaveWBArtifactURI(d["uri"])
         return artifacts_local.WandbArtifact(uri._full_name, uri=uri)

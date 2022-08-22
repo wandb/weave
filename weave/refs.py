@@ -1,5 +1,3 @@
-from collections.abc import Iterable
-import copy
 import typing
 import os
 import json
@@ -8,18 +6,13 @@ from . import artifacts_local
 from . import weave_types as types
 from . import errors
 from . import box
-from . import artifacts_local
 from . import uris
-from . import graph
 
 
 class Ref:
+    artifact: artifacts_local.Artifact
     extra: list[str]
-
-    def _ipython_display_(self):
-        from . import show
-
-        return show(self)
+    type: types.Type
 
     @property
     def is_saved(self):
@@ -34,6 +27,22 @@ class Ref:
             return LocalArtifactRef(artifact, path=path, extra=extra, type=type)
         elif isinstance(artifact, artifacts_local.WandbArtifact):
             return WandbArtifactRef(artifact, path=path, extra=extra, type=type)
+
+    @classmethod
+    def from_str(cls, s):
+        uri = uris.WeaveURI.parse(s)
+        if isinstance(uri, uris.WeaveRuntimeURI):
+            return MemRef.from_uri(uri)
+        elif isinstance(uri, uris.WeaveLocalArtifactURI):
+            return LocalArtifactRef.from_uri(uri)
+        elif isinstance(uri, uris.WeaveWBArtifactURI):
+            return WandbArtifactRef.from_uri(uri)
+        else:
+            raise errors.WeaveInternalError("invalid uri: %s" % s)
+
+    @classmethod
+    def from_uri(cls, uri):
+        raise NotImplementedError
 
     @classmethod
     def parse_local_ref_str(cls, s):
@@ -57,11 +66,40 @@ class Ref:
         return self.uri
 
 
+MEM_OBJS: typing.Dict[str, typing.Any] = {}
+
+
+class MemRef(Ref):
+    def __init__(self, name):
+        self._name = name
+
+    @classmethod
+    def from_uri(cls, uri):
+        return cls(uri)
+
+    @property
+    def name(self):
+        return self._name
+
+    def get(self):
+        return MEM_OBJS[self.name]
+
+    def __str__(self):
+        return self.name
+
+
+def save_mem(obj, name):
+    MEM_OBJS[name] = obj
+    return MemRef(name)
+
+
 # We store REFS here if we can't attach them directly to the object
 REFS: dict[str, typing.Any] = {}
 
 
 def get_ref(obj):
+    if isinstance(obj, Ref):
+        return obj
     if hasattr(obj, "_ref"):
         return obj._ref
     try:
@@ -90,6 +128,27 @@ def clear_ref(obj):
         REFS.pop(id(obj))
 
 
+def deref(ref):
+    if isinstance(ref, Ref):
+        return ref.get()
+    return ref
+
+
+# This should not be declared here, but WandbArtifactRef.type needs to
+# be able to create it right now, because of a series of hacks.
+# Instead, We probably need a WandbArtifactFileRef.
+# TODO: fix
+class ArtifactVersionFileType(types.Type):
+    name = "ArtifactVersionFile"
+
+    def save_instance(self, obj, artifact, name):
+        return WandbArtifactRef(obj.artifact, obj.path)
+
+    # load_instance is injected by file_wbartifact.py in ops_domain.
+    # Bad bad bad!
+    # TODO: fix
+
+
 class WandbArtifactRef(Ref):
     artifact: "artifacts_local.WandbArtifact"
 
@@ -108,21 +167,18 @@ class WandbArtifactRef(Ref):
     def type(self):
         if self._type is not None:
             return self._type
-        if self.path is None:
-            # If there's no path, this is a Ref directly to an ArtifactVersion
-            # TODO: refactor
-            from .ops_domain import wbartifact
+        # if self.path is None:
+        #     # If there's no path, this is a Ref directly to an ArtifactVersion
+        #     # TODO: refactor
+        #     return wbartifact.ArtifactVersionType()
 
-            return wbartifact.ArtifactVersionType()
         try:
             with self.artifact.open(f"{self.path}.type.json") as f:
                 type_json = json.load(f)
         except (FileNotFoundError, KeyError):
             # If there's no type file, this is a Ref to the file itself
             # TODO: refactor
-            from .ops_domain import file_wbartifact
-
-            return file_wbartifact.ArtifactVersionFileType()
+            return ArtifactVersionFileType()
         self._type = types.TypeRegistry.type_from_dict(type_json)
         return self._type
 
@@ -156,8 +212,7 @@ class WandbArtifactRef(Ref):
         return obj
 
     @classmethod
-    def from_str(cls, s):
-        uri = uris.WeaveWBArtifactURI(s)
+    def from_uri(cls, uri):
         # TODO: potentially need to pass full entity/project/name instead
         return cls(
             artifacts_local.WandbArtifact(uri.full_name, uri=uri),
@@ -187,6 +242,9 @@ class LocalArtifactRef(Ref):
         if obj is not None:
             obj = box.box(obj)
             put_ref(obj, self)
+
+    def __repr__(self):
+        return f"<LocalArtifactRef({id(self)}) artifact={self.artifact} path={self.path} type={self.type} obj={bool(self.obj)} extra={self.extra}"
 
     @property
     def uri(self) -> str:
@@ -233,7 +291,7 @@ class LocalArtifactRef(Ref):
 
     def versions(self):
         artifact_path = os.path.join(
-            artifacts_local.local_artifact_dir(), self.artifact._name
+            artifacts_local.local_artifact_dir(), self.artifact.name
         )
         versions = []
         for version_name in os.listdir(artifact_path):
@@ -253,14 +311,12 @@ class LocalArtifactRef(Ref):
         return sorted(versions, key=lambda v: v.artifact.created_at)
 
     @classmethod
-    def from_str(cls, s, type=None):
-        loc = uris.WeaveLocalArtifactURI(s)
+    def from_uri(cls, uri):
         return cls(
-            artifacts_local.LocalArtifact(loc.full_name, loc.version),
-            path=loc.file,
-            type=type,
+            artifacts_local.LocalArtifact(uri.full_name, uri.version),
+            path=uri.file,
             obj=None,
-            extra=loc.extra,
+            extra=uri.extra,
         )
 
     def local_ref_str(self):
@@ -274,97 +330,21 @@ types.LocalArtifactRefType.instance_class = LocalArtifactRef
 types.LocalArtifactRefType.instance_classes = LocalArtifactRef
 
 
-def node_to_ref(node: graph.Node) -> typing.Optional[Ref]:
-    """Converts a Node to equivalent Ref if possible.
-
-    Specific call sequences can be converted to refs. For example:
-      get(<object_path>)[0]['a'] can be converted to a Ref.
-
-    The rule is:
-      - a get call can be converted to a Ref
-      - any __getitem__ (or pick) call can be converted to a Ref if its input is a Node
-        that can be converted to a Ref
-
-    Its desirable to store these as Refs rather than nodes because:
-      - The representation is much more compact
-      - A ref is a guarantee of existence
-      - Artifacts is aware of cross-artifact references and keeps them
-        consistent (it does not allow deletion an artifact that has exisiting
-          depending artifacts)
-
-    This is used when saving objects, to achieve cross-artifact references.
-
-    A user may compose objects from values fetched from other objects. For example:
-    x = weave.save({'a': 5})
-    y = weave.save({'b': x['a']})
-
-    Since Weave is lazy, x['a'] produces a Node. When we save objects, if a Node
-      is encountered we try to convert it to a Ref using this function. If that
-      succeeds, we save in Ref format instead of Node format.
-
-    # TODO: we need to tell the artifact this Ref exists, so that it creates
-    #   the database dependency, which is how we achieve consistency.
-    """
-    nodes = graph.linearize(node)
-    if nodes is None:
+def get_local_version_ref(name, version):
+    # TODO: Watch out, this is a major race!
+    #   - We need to eliminate this race or allow duplicate objectcs in parallel
+    #     and then resolve later.
+    #   - This is especially a problem for creating Runs and async Runs. We may
+    #     accidentally launch parallel runs with the same run ID!
+    if not artifacts_local.local_artifact_exists(name, version):
         return None
+    art = artifacts_local.LocalArtifact(name, version)
+    return LocalArtifactRef(art, path="_obj")
 
-    # First node in chain must be get op
-    # TODO: check its a get of a specific artifact version, not an alias!
-    #     maybe we should have two different ops for that, so we can distinguish
-    #     via type instead of via string checking.
-    if nodes[0].from_op.name != "get":
+
+# Should probably be "get_version_object()"
+def get_local_version(name, version):
+    ref = get_local_version_ref(name, version)
+    if ref is None:
         return None
-    get_arg0 = list(nodes[0].from_op.inputs.values())[0]
-    if not isinstance(get_arg0, graph.ConstNode):
-        return None
-    uri = get_arg0.val
-    parsed_uri = uris.WeaveURI.parse(uri)
-    ref = parsed_uri.to_ref()
-    if ref.extra is None:
-        ref.extra = []
-
-    # Remaining nodes in chain must be __getitem__
-    for node in nodes[1:]:
-        if not (
-            node.from_op.name.endswith("__getitem__")
-            # Allow pick too, but this is kinda busted. What if both exist?
-            # I think we should maybe just use __getitem__ to implement both
-            # of these. If passed a string, its a column lookup, int is row
-            # lookup. Some other tools do this. However, if that's the solution,
-            # then our "ref extra is list of string" solution doesn't work.
-            # TODO: fix
-            or node.from_op.name.endswith("pick")
-        ):
-            return None
-        getitem_arg1 = list(node.from_op.inputs.values())[1]
-        if not isinstance(getitem_arg1, graph.ConstNode):
-            return None
-        ref.extra.append(str(getitem_arg1.val))
-    return ref
-
-
-def ref_to_node(ref: Ref) -> typing.Optional[graph.Node]:
-    """Inverse of node_to_ref, see docstring for node_to_ref."""
-    from .ops_primitives.weave_api import get as op_get
-
-    if ref.extra is None:
-        return None
-    extra = ref.extra
-    ref = copy.copy(ref)
-    ref.extra = []
-
-    node = op_get(str(ref))
-    for str_key in extra:
-        key: typing.Union[str, int] = str_key
-        try:
-            key = int(str_key)
-        except ValueError:
-            pass
-        if hasattr(node, "__getitem__"):
-            node = node[key]
-        elif hasattr(node, "pick"):
-            node = node.pick(key)
-        else:
-            return None
-    return node
+    return ref.get()

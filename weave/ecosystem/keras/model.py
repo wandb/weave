@@ -88,7 +88,7 @@ for dtype_name, dtypes in DTYPE_NAME_TO_TF_DTYPES.items():
         DTYPE_ENUM_TO_DTYPE_NAME[dtype.as_datatype_enum] = dtype_name
 
 
-@dataclass
+@dataclass(frozen=True)
 class KerasTensorType(weave.types.Type):
     instance_classes = keras_tensor.KerasTensor
     instance_class = keras_tensor.KerasTensor
@@ -142,7 +142,7 @@ class KerasTensorType(weave.types.Type):
         )
 
 
-@dataclass
+@dataclass(frozen=True)
 class KerasModel(weave.types.Type):
     instance_classes = keras.Model
     instance_class = keras.Model

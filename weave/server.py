@@ -14,13 +14,11 @@ import viztracer
 import time
 import cProfile
 
-from . import graph, util as _util, client as _client
+from . import graph
+from . import execute
 from . import serialize
-from . import forward_graph
 from . import storage
-
-
-import sys
+from . import context
 
 
 PROFILE = False
@@ -33,7 +31,6 @@ OptionalAuthType = typing.Optional[
 
 
 def _handle_request(request, deref=False):
-    from . import execute
 
     global is_tracing
     start_time = time.time()
@@ -45,11 +42,12 @@ def _handle_request(request, deref=False):
     nodes = serialize.deserialize(request["graphs"])
 
     start_time = time.time()
-    logging.info(
+    print(
         "Server request running %s nodes.\n%s"
         % (len(nodes), "\n".join(graph.node_expr_str(n) for n in nodes))
     )
-    result = execute.execute_nodes(nodes)
+    with context.execution_client():
+        result = execute.execute_nodes(nodes)
     if deref:
         result = [storage.deref(r) for r in result]
     # print("Server request %s (%0.5fs): %s..." % (start_time,
@@ -116,8 +114,6 @@ class InProcessServer(object):
         pass
 
     def execute(self, nodes, no_cache=False):
-        from . import execute
-
         return execute.execute_nodes(nodes, no_cache=no_cache)
 
 
@@ -182,3 +178,9 @@ class HttpServer(threading.Thread):
         if self.port is not None:
             url = f"{url}:{self.port}"
         return url
+
+
+def capture_weave_server_logs(log_level=logging.INFO):
+    from . import weave_server
+
+    weave_server.enable_stream_logging(log_level)

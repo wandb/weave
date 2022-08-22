@@ -1,4 +1,6 @@
 from . import weave_types as types
+from . import runs
+from rich import print
 
 
 def test_typeof_string():
@@ -41,3 +43,34 @@ def test_typeof_type():
 def test_type_tofromdict():
     assert types.Type().to_dict() == "type"
     assert types.TypeRegistry.type_from_dict("type") == types.Type()
+
+
+def test_typeof_list_runs():
+    l = [
+        runs.Run("a", "op", inputs={"a": "x"}, output=4.9),
+        runs.Run("b", "op", inputs={"a": "x", "b": 9}, output=3.3),
+    ]
+    actual = types.TypeRegistry.type_of(l)
+    print("test_typeof_list_runs.actual", actual)
+
+    assert actual == types.List(
+        types.UnionType(
+            types.RunType(
+                inputs=types.TypedDict({"a": types.String()}),
+                history=types.List(types.UnknownType()),
+                output=types.Float(),
+            ),
+            types.RunType(
+                inputs=types.TypedDict({"a": types.String(), "b": types.Int()}),
+                history=types.List(types.UnknownType()),
+                output=types.Float(),
+            ),
+        )
+    )
+
+
+def test_typeof_list_dict_merge():
+    d = [{"a": 6, "b": "x"}, {"a": 5, "b": None}]
+    assert types.TypeRegistry.type_of(d) == types.List(
+        types.TypedDict({"a": types.Int(), "b": types.optional(types.String())})
+    )

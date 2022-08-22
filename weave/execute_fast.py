@@ -49,7 +49,7 @@ def _slow_map_fn(input_list, map_fn):
                 },
             )
         )
-    return weave_internal.use_internal(calls)
+    return weave_internal.use(calls)
 
 
 def fast_map_fn(input_list, map_fn):

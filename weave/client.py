@@ -1,7 +1,7 @@
 from . import storage
 
 
-class Client(object):
+class Client:
     def __init__(self, server):
         self.server = server
 

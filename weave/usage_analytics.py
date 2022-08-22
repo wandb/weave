@@ -1,7 +1,7 @@
 import analytics
 import subprocess
 
-from . import context
+from . import context_state
 
 analytics.write_key = "uJ8vZgKqTBVH6ZdhD4GZGZYsR7ucfJmb"
 
@@ -22,7 +22,7 @@ def _identify():
 
 
 def track(action: str, info=None):
-    if not context.analytics_enabled():
+    if not context_state.analytics_enabled():
         return
     _identify()
     if info is None:

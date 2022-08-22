@@ -61,7 +61,7 @@ def shap_explain(
     # TODO: does shap work for all task styles?
     pipeline = weave.use(pipeline_output._model.pipeline(return_all_scores=True))
     explainer = shap.Explainer(pipeline)
-    return explainer([pipeline_output._model_input])
+    return explainer([pipeline_output.model_input])
 
 
 @weave.op()

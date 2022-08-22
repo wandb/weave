@@ -52,7 +52,7 @@ def models_render(
     )
 
 
-@weave.op()
+@weave.op(pure=False)
 def model_render(
     model_node: weave.Node[hfmodel.HFModel],
 ) -> weave.panels.Card:
@@ -78,6 +78,20 @@ def model_render(
                             item=model.pipeline_tag(), label="Pipeline tag"
                         ),
                     ]
+                ),
+            ),
+            weave.panels.CardTab(
+                name="Inference Logs",
+                content=weave.panels.Table(
+                    weave.ops.used_by(model, model.call.name),
+                    columns=[
+                        lambda run: run.output.model_input,
+                        # TODO: not general yet. Just hacking to make the default UI
+                        #     a little nicer for the moment.
+                        # Should be:
+                        # lambda run: run.output().model_output(),
+                        lambda run: run.output.model_output[0]["generated_text"],
+                    ],
                 ),
             ),
         ],

@@ -13,95 +13,164 @@ from .show import _show_params
 from .ecosystem import openai
 from . import test_helpers
 from . import artifacts_local
+from rich import print
 
 
 def test_show_simple_call(cereal_csv):
     csv = ops.local_path(cereal_csv).readcsv()
-    show_params = _show_params(csv)
-    assert show_params["weave_node"].to_json() == {
+    actual = _show_params(csv)["weave_node"].to_json()
+    print("test_show_simple_call.actual", actual)
+    assert actual == {
+        "nodeType": "output",
+        "type": {
+            "type": "list",
+            "objectType": {"type": "typedDict", "propertyTypes": {}},
+        },
         "fromOp": {
+            "name": "file-readcsv",
             "inputs": {
                 "self": {
+                    "nodeType": "output",
+                    "type": {
+                        "type": "local_file",
+                        "extension": "csv",
+                        "_property_types": {
+                            "extension": {
+                                "type": "const",
+                                "valType": "string",
+                                "val": "csv",
+                            },
+                            "path": "string",
+                            "mtime": "float",
+                        },
+                    },
                     "fromOp": {
+                        "name": "localpath",
                         "inputs": {
                             "path": {
                                 "nodeType": "const",
-                                "type": {
-                                    "type": "const",
-                                    "val": cereal_csv,
-                                    "valType": "string",
-                                },
-                                "val": cereal_csv,
+                                "type": "string",
+                                "val": test_helpers.RegexMatcher(".*cereal.csv"),
                             }
                         },
-                        "name": "localpath",
                     },
-                    "nodeType": "output",
-                    "type": {"extension": "csv", "type": "local_file"},
                 }
             },
-            "name": "file-readcsv",
-        },
-        "nodeType": "output",
-        "type": {
-            "objectType": {"propertyTypes": {}, "type": "typedDict"},
-            "type": "list",
         },
     }
 
 
-EXPECTED_SHOW_PARAMS_FINE_TUNE_WEAVE_NODE = {
-    "fromOp": {
-        "name": "openai-finetunegpt3",
-        "inputs": {
-            "hyperparameters": {
-                "nodeType": "const",
-                "type": {
-                    "type": "const",
-                    "valType": {
-                        "type": "typedDict",
-                        "propertyTypes": {"n_epochs": "int"},
-                    },
-                    "val": {"n_epochs": 2},
-                },
-                "val": {"n_epochs": 2},
-            },
-            "training_dataset": {
-                "fromOp": {
-                    "inputs": {
-                        "uri": {
-                            "nodeType": "const",
-                            "type": {
-                                "type": "const",
-                                "valType": "string",
-                                "val": test_helpers.RegexMatcher(".*list/.*"),
+actual_SHOW_PARAMS_FINE_TUNE_WEAVE_NODE = {
+    "nodeType": "output",
+    "type": {
+        "type": "Run",
+        "inputs": {"type": "typedDict", "propertyTypes": {}},
+        "history": {"type": "list", "objectType": "any"},
+        "output": {
+            "type": "gpt3-fine-tune-type",
+            "_property_types": {
+                "id": "string",
+                "status": "string",
+                "fine_tuned_model": {"type": "union", "members": ["none", "string"]},
+                "result_file": {
+                    "type": "union",
+                    "members": [
+                        "none",
+                        {
+                            "type": "gpt3-fine-tune-results-type",
+                            "_property_types": {
+                                "bytes": "int",
+                                "created_at": "int",
+                                "filename": "string",
+                                "id": "string",
+                                "object": "string",
+                                "purpose": {
+                                    "type": "const",
+                                    "valType": "string",
+                                    "val": "fine-tune-results",
+                                },
+                                "status": "string",
+                                "status_details": "none",
                             },
-                            "val": test_helpers.RegexMatcher(".*list/.*"),
-                        }
-                    },
-                    "name": "get",
-                },
-                "nodeType": "output",
-                "type": {
-                    "objectType": {
-                        "propertyTypes": {
-                            "completion": "string",
-                            "id": "int",
-                            "prompt": "string",
                         },
-                        "type": "typedDict",
+                    ],
+                },
+            },
+        },
+        "_property_types": {
+            "id": "string",
+            "op_name": "string",
+            "state": {
+                "type": "union",
+                "members": [
+                    {"type": "const", "valType": "string", "val": "pending"},
+                    {"type": "const", "valType": "string", "val": "running"},
+                    {"type": "const", "valType": "string", "val": "finished"},
+                    {"type": "const", "valType": "string", "val": "failed"},
+                ],
+            },
+            "prints": {"type": "list", "objectType": "string"},
+            "inputs": {"type": "typedDict", "propertyTypes": {}},
+            "history": {"type": "list", "objectType": "any"},
+            "output": {
+                "type": "gpt3-fine-tune-type",
+                "_property_types": {
+                    "id": "string",
+                    "status": "string",
+                    "fine_tuned_model": {
+                        "type": "union",
+                        "members": ["none", "string"],
                     },
-                    "type": "list",
+                    "result_file": {
+                        "type": "union",
+                        "members": [
+                            "none",
+                            {
+                                "type": "gpt3-fine-tune-results-type",
+                                "_property_types": {
+                                    "bytes": "int",
+                                    "created_at": "int",
+                                    "filename": "string",
+                                    "id": "string",
+                                    "object": "string",
+                                    "purpose": {
+                                        "type": "const",
+                                        "valType": "string",
+                                        "val": "fine-tune-results",
+                                    },
+                                    "status": "string",
+                                    "status_details": "none",
+                                },
+                            },
+                        ],
+                    },
                 },
             },
         },
     },
-    "nodeType": "output",
-    "type": {
-        "_history": {"objectType": "any", "type": "list"},
-        "_inputs": {"propertyTypes": {}, "type": "typedDict"},
-        "_output": {"type": "gpt3-fine-tune-type"},
-        "type": "run-type",
+    "fromOp": {
+        "name": "op-finetune_gpt3",
+        "inputs": {
+            "training_dataset": {
+                "nodeType": "output",
+                "type": {"type": "LocalArtifactRef"},
+                "fromOp": {
+                    "name": "get",
+                    "inputs": {
+                        "uri": {
+                            "nodeType": "const",
+                            "type": "string",
+                            "val": "local-artifact:///tmp/weave/pytest/weave/test_show.py::test_large_const_node (setup)/list/4cf1abf0d040d897276e4be3c6aa90df",
+                        }
+                    },
+                },
+            },
+            "hyperparameters": {
+                "nodeType": "const",
+                "type": {"type": "typedDict", "propertyTypes": {"n_epochs": "int"}},
+                "val": {"n_epochs": 2},
+            },
+        },
     },
 }
 
@@ -118,14 +187,11 @@ def test_large_const_node():
     dataset = storage.save(data)
     # storage.save(dataset)
     fine_tune = openai.finetune_gpt3(dataset, {"n_epochs": 2})
-    show_fine_tune_params = _show_params(fine_tune)
+    actual = _show_params(fine_tune)["weave_node"].to_json()
 
-    # print("JSON", show_fine_tune_params["weave_node"].to_json())
+    print("test_large_const_node.actual", actual)
 
-    assert (
-        show_fine_tune_params["weave_node"].to_json()
-        == EXPECTED_SHOW_PARAMS_FINE_TUNE_WEAVE_NODE
-    )
+    assert actual == actual_SHOW_PARAMS_FINE_TUNE_WEAVE_NODE
 
     model = openai.Gpt3FineTune.model(fine_tune)
     panel = panels.Table(["1 + 9 =", "2 + 14 ="])
@@ -146,6 +212,6 @@ def test_large_const_node():
     # Asserting that weavejs_fixes.remove_opcall_versions_data works
     assert (
         graph.node_expr_str(col_sel_fn2_node)
-        == 'get("local-artifact://%s/list/4cf1abf0d040d897276e4be3c6aa90df").finetunegpt3({"n_epochs": 2}).model().complete(row).pick("choices").index(0).pick("text")'
+        == 'get("local-artifact://%s/list/4cf1abf0d040d897276e4be3c6aa90df").finetune_gpt3({"n_epochs": 2}).model().complete(row).pick("choices").index(0).pick("text")'
         % artifacts_local.local_artifact_dir()
     )

@@ -1,4 +1,5 @@
-from ..op_def import OpDefType, OpDef
+from ..op_def import OpDef
+from ..op_def_type import OpDefType
 from .. import weave_types as types
 from .. import api as weave
 

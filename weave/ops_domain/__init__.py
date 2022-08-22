@@ -106,14 +106,14 @@ class ArtifactVersionsType(types.Type):
 
 
 @weave_class(weave_type=RunType)
-class Run:
+class WBRun:
     @op()
     # @staticmethod  # TODO: doesn't work
     def jobtype(run: wandb_api.Run) -> str:
         return run.jobType
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class RunsType(types.Type):
     name = "runs"
 

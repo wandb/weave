@@ -1,13 +1,12 @@
 import dataclasses
 import typing
 import functools
-import pyarrow as pa
-import pyarrow.parquet as pq
 import json
 from collections.abc import Iterable
 
 from . import box
 from . import errors
+from . import mappers_python
 
 
 def to_weavejs_typekey(k: str) -> str:
@@ -84,6 +83,13 @@ def type_name_to_type(type_name):
     return mapping.get(type_name)
 
 
+# js_compat: we don't have Tag types in Weave Python yet. Just remove them
+def unwrap_tag_type(serialized_type):
+    if isinstance(serialized_type, dict) and serialized_type.get("type") == "tagged":
+        return serialized_type["value"]
+    return serialized_type
+
+
 class TypeRegistry:
     @staticmethod
     def has_type(obj):
@@ -132,9 +138,7 @@ class TypeRegistry:
 
     @staticmethod
     def type_from_dict(d):
-        from . import weavejs_fixes
-
-        d = weavejs_fixes.unwrap_tag_type(d)
+        d = unwrap_tag_type(d)
         # The javascript code sends simple types as just strings
         # instead of {'type': 'string'} for example
         type_name = d["type"] if isinstance(d, dict) else d
@@ -146,13 +150,16 @@ class TypeRegistry:
         return type_.from_dict(d)
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class Type:
 
     instance_class: typing.ClassVar[typing.Optional[type]]
     instance_classes: typing.ClassVar[
         typing.Union[type, typing.List[type], None]
     ] = None
+
+    def __repr__(self):
+        return "<Type>"
 
     @classmethod
     def class_type_name(cls):
@@ -243,10 +250,6 @@ class Type:
             )
         return cls(**type_attrs)
 
-    # def _ipython_display_(self):
-    #     from . import show
-    #     return show(self)
-
     # save_instance/load_instance on Type are used to save/load actual Types
     # since type_of(types.Int()) == types.Type()
     def save_instance(self, obj, artifact, name) -> typing.Optional[list[str]]:
@@ -302,6 +305,9 @@ class BasicType(_PlainStringNamedType):
         with artifact.open(f"{name}.object.json") as f:
             return json.load(f)
 
+    def __repr__(self):
+        return "<%s>" % self.__class__.name
+
 
 class Invalid(BasicType):
     name = "invalid"
@@ -347,15 +353,11 @@ class Any(BasicType):
         return Any()
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class Const(Type):
     name = "const"
     val_type: Type
     val: typing.Any
-
-    def __init__(self, type_, val):
-        self.val_type = type_
-        self.val = val
 
     def __getattr__(self, attr):
         return getattr(self.val_type, attr)
@@ -443,6 +445,7 @@ class Boolean(BasicType):
             json.dump(obj, f)
 
 
+@dataclasses.dataclass(frozen=True)
 class UnionType(Type):
     name = "union"
 
@@ -458,12 +461,18 @@ class UnionType(Type):
             else:
                 if mem not in all_members:
                     all_members.append(mem)
-        self.members = all_members
+        object.__setattr__(self, "members", all_members)
+
+    def __eq__(self, other):
+        if not isinstance(other, UnionType):
+            return False
+        return set(self.members) == set(other.members)
 
     def assign_type(self, other):
         if isinstance(other, UnionType):
-            # TODO: implement me. (We've done this in _dtypes and in js so refer there)
-            raise NotImplementedError
+            if not all(self.assign_type(member) for member in other.members):
+                return Invalid()
+            return self
         if any(member.assign_type(other) == Invalid() for member in self.members):
             return Invalid()
         return self
@@ -482,11 +491,8 @@ class UnionType(Type):
     def _to_dict(self):
         return {"members": [mem.to_dict() for mem in self.members]}
 
-    def __repr__(self):
-        return "<UnionType %s>" % " | ".join((str(m) for m in self.members))
 
-
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class List(Type):
     name = "list"
     instance_classes = [set, list]
@@ -495,20 +501,22 @@ class List(Type):
 
     @classmethod
     def type_of_instance(cls, obj):
-        list_obj_type = UnknownType()
-        for item in obj:
+        if not obj:
+            return cls(UnknownType())
+        list_obj_type = TypeRegistry.type_of(obj[0])
+        for item in obj[1:]:
             obj_type = TypeRegistry.type_of(item)
             if obj_type is None:
                 raise Exception("can't detect type for object: %s" % item)
-            next_type = list_obj_type.assign_type(obj_type)
-            if isinstance(next_type, Invalid):
-                next_type = UnionType(list_obj_type, obj_type)
-            list_obj_type = next_type
+            list_obj_type = merge_types(list_obj_type, obj_type)
         return cls(list_obj_type)
 
-    def save_instance(self, obj, artifact, name):
-        from . import mappers_python
+    def assign_type(self, next_type):
+        if isinstance(next_type, List) and next_type.object_type == UnknownType():
+            return self
+        return super().assign_type(next_type)
 
+    def save_instance(self, obj, artifact, name):
         serializer = mappers_python.map_to_python(self, artifact)
         result = serializer.apply(obj)
         with artifact.new_file(f"{name}.list.json") as f:
@@ -517,40 +525,31 @@ class List(Type):
     def load_instance(self, artifact, name, extra=None):
         with artifact.open(f"{name}.list.json") as f:
             result = json.load(f)
-        from . import mappers_python
-
         mapper = mappers_python.map_from_python(self, artifact)
         return mapper.apply(result)
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class TypedDict(Type):
     name = "typedDict"
     instance_classes = [dict]
     property_types: dict[str, Type]
 
+    def __hash__(self):
+        # Can't hash property_types by default because dict is not hashable
+        return hash(tuple((k, v) for k, v in self.property_types.items()))
+
     def assign_type(self, other_type):
         if not isinstance(other_type, TypedDict):
             return Invalid()
 
-        # Compute the intersection of all keys. Its important to use a dict here
-        # rather than a set, so that we have a stable ordering in our output dict.
-        # (python3.7+ guarantees key ordering of dicts)
-        all_keys_dict = {}
-        for k in self.property_types.keys():
-            all_keys_dict[k] = True
-        for k in other_type.property_types.keys():
-            all_keys_dict[k] = True
-
-        next_prop_types = {}
-        for key in all_keys_dict.keys():
-            self_prop_type = self.property_types.get(key, none_type)
-            other_prop_type = other_type.property_types.get(key, none_type)
-            next_prop_type = self_prop_type.assign_type(other_prop_type)
-            if isinstance(next_prop_type, Invalid):
-                next_prop_type = UnionType(self_prop_type, other_prop_type)
-            next_prop_types[key] = next_prop_type
-        return TypedDict(next_prop_types)
+        for k, ptype in self.property_types.items():
+            if (
+                k not in other_type.property_types
+                or ptype.assign_type(other_type.property_types[k]) == Invalid()
+            ):
+                return Invalid()
+        return self
 
     def _to_dict(self):
         property_types = {}
@@ -573,8 +572,6 @@ class TypedDict(Type):
         return cls(property_types)
 
     def save_instance(self, obj, artifact, name):
-        from . import mappers_python
-
         serializer = mappers_python.map_to_python(self, artifact)
         result = serializer.apply(obj)
         with artifact.new_file(f"{name}.typedDict.json") as f:
@@ -585,13 +582,11 @@ class TypedDict(Type):
         #     obj_type = TypeRegistry.type_from_dict(json.load(f))
         with artifact.open(f"{name}.typedDict.json") as f:
             result = json.load(f)
-        from . import mappers_python
-
         mapper = mappers_python.map_from_python(self, artifact)
         return mapper.apply(result)
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class Dict(Type):
     name = "dict"
 
@@ -628,13 +623,13 @@ class Dict(Type):
         return cls(String(), value_type)
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class ObjectType(Type):
     # TODO: Maybe this belongs on Type?
     _base_type: typing.ClassVar[Type] = Invalid()
 
     def property_types(self):
-        raise NotImplementedError
+        return {}
 
     def variable_property_types(self):
         return self.type_vars()
@@ -650,6 +645,19 @@ class ObjectType(Type):
 
     def _to_dict(self):
         d = super()._to_dict()
+
+        # NOTE: we unnecessarily store all property_types in the serialized
+        # type! We actually only need to store type_vars() which super() takes
+        # care of, but WeaveJS does not currently have a type registry in which
+        # to lookup a named type to figure out its property types. So just
+        # serialize all property types all the time for now. This adds a lot
+        # of redundant information that needs to go over the network.
+        # TODO: Fix
+        property_types = {}
+        for k, prop_type in self.property_types().items():
+            property_types[to_weavejs_typekey(k)] = prop_type.to_dict()
+        d["_property_types"] = property_types
+
         if not isinstance(self._base_type, Invalid):
             d["_base_type"] = self._base_type.to_dict()
         return d
@@ -659,8 +667,6 @@ class ObjectType(Type):
     #     pass
 
     def save_instance(self, obj, artifact, name):
-        from . import mappers_python
-
         serializer = mappers_python.map_to_python(self, artifact)
 
         result = serializer.apply(obj)
@@ -670,13 +676,11 @@ class ObjectType(Type):
     def load_instance(self, artifact, name, extra=None):
         with artifact.open(f"{name}.object.json") as f:
             result = json.load(f)
-        from . import mappers_python
-
         mapper = mappers_python.map_from_python(self, artifact)
         return mapper.apply(result)
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class Function(Type):
     name = "function"
 
@@ -702,46 +706,25 @@ class Function(Type):
         return {"inputTypes": input_types, "outputType": self.output_type.to_dict()}
 
 
+@dataclasses.dataclass(frozen=True)
 class RefType(Type):
-    def __init__(self, ref_type_name, object_type):
-        self.ref_type_name = ref_type_name
-        self.object_type = object_type
-
-    def _to_dict(self):
-        return {"objectType": self.object_type.to_dict()}
-
-    @classmethod
-    def from_dict(cls, d):
-        return cls(TypeRegistry.type_from_dict(d["objectType"]))
-
-    @classmethod
-    def type_of_instance(cls, obj):
-        raise NotImplemented()
-
+    # RefType intentionally does not include the type of the object it
+    # points to. Doing so naively results in a type explosion. We may
+    # want to include it in the future, but we'll need to shrink it, for
+    # example by disallowing unions (replacing with them with uknown or a
+    # type variable)
     def __repr__(self):
-        return f"<{self.ref_type_name} {self.object_type}>"
+        return "<%s>" % self.__class__.name
 
 
+@dataclasses.dataclass(frozen=True)
 class LocalArtifactRefType(RefType):
-    name = "local-ref-type"
-
-    def __init__(self, object_type):
-        super().__init__(LocalArtifactRefType.name, object_type)
-
-    @classmethod
-    def type_of_instance(cls, obj):
-        return LocalArtifactRefType(obj.type)
+    pass
 
 
+@dataclasses.dataclass(frozen=True)
 class WandbArtifactRefType(RefType):
-    name = "wandb-ref-type"
-
-    def __init__(self, object_type):
-        super().__init__(WandbArtifactRefType.name, object_type)
-
-    @classmethod
-    def type_of_instance(cls, obj):
-        return WandbArtifactRefType(obj.type)
+    pass
 
 
 class WBTable(Type):
@@ -791,26 +774,25 @@ RUN_STATE_TYPE = string_enum_type("pending", "running", "finished", "failed")
 
 # TODO: get rid of all the underscores. This is another
 #    conflict with making ops automatically lazy
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class RunType(ObjectType):
-    name = "run-type"
-    _inputs: TypedDict
-    _history: List
-    _output: Type
+    inputs: Type = TypedDict({})
+    history: Type = List(TypedDict({}))
+    output: Type = Any()
 
     def property_types(self):
         return {
-            "_id": String(),
-            "_op_name": String(),
-            "_state": RUN_STATE_TYPE,
-            "_prints": List(String()),
-            "_inputs": self._inputs,
-            "_history": self._history,
-            "_output": self._output,
+            "id": String(),
+            "op_name": String(),
+            "state": RUN_STATE_TYPE,
+            "prints": List(String()),
+            "inputs": self.inputs,
+            "history": self.history,
+            "output": self.output,
         }
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class FileType(ObjectType):
     name = "file"
 
@@ -834,7 +816,7 @@ class FileType(ObjectType):
         # In the js Weave code, file is a non-standard type that
         # puts a const string at extension as just a plain string.
         d = {i: d[i] for i in d if i != "type"}
-        extension = None
+        extension = String()
         if "extension" in d:
             extension = TypeRegistry.type_from_dict(
                 {
@@ -861,15 +843,12 @@ class FileType(ObjectType):
         }
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class SubDirType(ObjectType):
     # TODO doesn't match frontend
     name = "subdir"
 
-    file_type: FileType
-
-    def __init__(self, file_type):
-        self.file_type = file_type
+    file_type: FileType = FileType()
 
     def property_types(self):
         return {
@@ -898,8 +877,32 @@ class DirType(ObjectType):
         }
 
 
-# Ensure numpy types are loaded
-from . import types_numpy
+def merge_types(a: Type, b: Type) -> Type:
+    """Given two types return a new type that both are assignable to
+
+    There are design decisions we can make here. We could choose to produce
+    a less specific type when merging TypedDicts for example, to keep
+    the type size smaller.
+    """
+    if a == b:
+        return a
+    if isinstance(a, TypedDict) and isinstance(b, TypedDict):
+        all_keys_dict = {}
+        for k in a.property_types.keys():
+            all_keys_dict[k] = True
+        for k in b.property_types.keys():
+            all_keys_dict[k] = True
+
+        next_prop_types = {}
+        for key in all_keys_dict.keys():
+            self_prop_type = a.property_types.get(key, none_type)
+            other_prop_type = b.property_types.get(key, none_type)
+            next_prop_type = self_prop_type.assign_type(other_prop_type)
+            if isinstance(next_prop_type, Invalid):
+                next_prop_type = UnionType(self_prop_type, other_prop_type)
+            next_prop_types[key] = next_prop_type
+        return TypedDict(next_prop_types)
+    return UnionType(a, b)
 
 
 def union(*members: list[Type]) -> Type:

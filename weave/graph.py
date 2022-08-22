@@ -4,6 +4,7 @@ import typing
 from . import errors
 from . import weave_types
 from . import uris
+from . import storage
 
 T = typing.TypeVar("T")
 
@@ -29,37 +30,18 @@ class Node(typing.Generic[T]):
     def to_json(self):
         raise NotImplementedError
 
-    # def _repr_html_(self):
-    # return show.weave_panel_iframe(self)
-    def _ipython_display_(self):
-        from . import show
-
-        return show(self)
-
     def __hash__(self):
         # We store nodes in a memoize cache in execute.py. They need to be
         # hashable. But the number.py ops override __eq__ which makes the default
         # Python hash not work, so we fix it up here.
         return id(self)
 
-    def print(self):
-        import pprint
-
-        pprint.pprint(self.to_json())
-        pass
-
     def __str__(self):
         n = self.node_from_json(self.to_json())
         return node_expr_str(n)
 
-    # Experimental: make Node.__eq__ behave eagerly
-    # def __eq__(self, other):
-    #     # TODO: This should only use if there is no var node in the graph!
-    #     # print("SELF mro", self.__class__.mro())
-    #     called_eq = super().__eq__(other)
-    #     from . import api
-
-    #     return api.use(called_eq)
+    def __repr__(self):
+        return "<%s(%s): %s>" % (self.__class__.__name__, id(self), str(self))
 
 
 weave_types.Function.instance_classes = Node
@@ -81,6 +63,9 @@ class Op(typing.Generic[OpInputNodeT]):
         for k, v in self.inputs.items():
             json_inputs[k] = v.to_json()
         return {"name": self.name, "inputs": json_inputs}
+
+    def __repr__(self):
+        return f"<Op({id(self)} name={self.name} inputs={self.inputs}>"
 
 
 class OutputNode(Node, typing.Generic[OpInputNodeT]):
@@ -151,22 +136,31 @@ class ConstNode(Node):
         return cls(weave_types.TypeRegistry.type_from_dict(obj["type"]), val)
 
     def equivalent_output_node(self):
-        # This is a hack to ensure we don't send huge const nodes to the frontend.
-        # TODO: find a better place for this logic.
-        # - currently tested in test_show.py:test_large_const_node
+        if isinstance(self.type, weave_types.Function):
+            return
 
         val = self.val
-        from . import storage
+        if (
+            isinstance(self.type, (weave_types.BasicType, weave_types.TypedDict))
+            or isinstance(self.type, weave_types.Const)
+            and isinstance(
+                self.type.val_type, (weave_types.BasicType, weave_types.TypedDict)
+            )
+        ):
+            return
 
         ref = storage._get_ref(val)
-        from .ops_primitives.weave_api import get as op_get
+        if ref is None:
+            ref = storage.save(val)
 
-        if ref is not None:
-            return op_get(ref.uri)
-
-        return False
+        return OutputNode(
+            self.type, "get", {"uri": ConstNode(weave_types.String(), str(ref))}
+        )
 
     def to_json(self):
+        # This is used to convert to WeaveJS compatible JS. There are business logic
+        # decisions here, like for now if its a BasicType or TypedDict, we encode
+        # as json directly, otherwise we save the object and return a get() operation
         equiv_output_node = self.equivalent_output_node()
         if equiv_output_node:
             return equiv_output_node.to_json()
@@ -175,16 +169,6 @@ class ConstNode(Node):
         if isinstance(self.type, weave_types.Function):
             val = val.to_json()
         return {"nodeType": "const", "type": self.type.to_dict(), "val": val}
-
-    def __str__(self):
-        from . import storage
-
-        ref = storage._get_ref(self.val)
-        from .ops_primitives.weave_api import get as op_get
-
-        if ref is not None:
-            return str(op_get(ref.uri))
-        return str(self.val)
 
 
 class VoidNode(Node):
@@ -271,6 +255,8 @@ def _map_nodes(
         }
         node = OutputNode(node.type, node.from_op.name, inputs)
     mapped_node = map_fn(node)
+    if mapped_node is None:
+        mapped_node = node
     already_mapped[node] = mapped_node
     return mapped_node
 

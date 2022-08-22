@@ -1,5 +1,5 @@
 import huggingface_hub
-import datasets as hf_datasets
+import datasets
 import typing
 
 import weave
@@ -16,7 +16,7 @@ class HFDatasetInfoTypedDict(typing.TypedDict):
 
 
 @weave.op(render_info={"type": "function"})
-def datasets() -> list[HFDatasetInfoTypedDict]:
+def hf_datasets() -> list[HFDatasetInfoTypedDict]:
     api = huggingface_hub.HfApi()
     return [
         {
@@ -37,11 +37,11 @@ def hf_feature_type_to_type(type_):
         for key, type_ in type_.items():
             prop_types[key] = hf_feature_type_to_type(type_)
         return weave.types.TypedDict(prop_types)
-    elif isinstance(type_, hf_datasets.features.features.Sequence):
+    elif isinstance(type_, datasets.features.features.Sequence):
         return weave.types.List(hf_feature_type_to_type(type_.feature))
-    elif isinstance(type_, hf_datasets.features.features.Image):
+    elif isinstance(type_, datasets.features.features.Image):
         return weave.ops.PILImageType()
-    elif isinstance(type_, hf_datasets.features.features.ClassLabel):
+    elif isinstance(type_, datasets.features.features.ClassLabel):
         # TODO: this should be a classes type!!!!!
         return weave.types.Int()
     else:
@@ -63,7 +63,7 @@ def hf_feature_type_to_type(type_):
 
 @weave.op(render_info={"type": "function"})
 def dataset_refine_output_type(name: str) -> weave.types.Type:
-    ds = hf_datasets.load_dataset(name, split="train", streaming=True)
+    ds = datasets.load_dataset(name, split="train", streaming=True)
     prop_types = {}
     for key, type_ in ds.features.items():
         prop_types[key] = hf_feature_type_to_type(type_)
@@ -76,7 +76,7 @@ def dataset_refine_output_type(name: str) -> weave.types.Type:
     refine_output_type=dataset_refine_output_type,
 )
 def dataset(name: str):
-    ds = hf_datasets.load_dataset(name, split="train", streaming=True)
+    ds = datasets.load_dataset(name, split="train", streaming=True)
 
     rows = []
     for _, row in zip(range(100), iter(ds)):

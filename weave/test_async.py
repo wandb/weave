@@ -3,33 +3,34 @@ from . import storage
 from . import ops
 from . import async_demo
 import pytest
-from . import run_obj
+from . import runs
 from . import artifacts_local
 
 
-def test_run():
+def test_run_basic():
     run_id = "TESTRUN"
-    run = run_obj.Run(_id=run_id, _op_name="test-run")
+    run = runs.Run(id=run_id, op_name="test-run")
     run_name = "run-%s" % run_id
     storage.save(run, name=run_name)
 
     run_node = ops.get(
         f"local-artifact://{artifacts_local.local_artifact_dir()}/{run_name}/latest"
     )
+    print("ru_node", run_node.state)
     # run = api.use(run_node)
-    assert api.use(run_node.state()) == "pending"
+    assert api.use(run_node.state) == "pending"
     api.use(run_node.set_state("running"))
-    assert api.use(run_node.state()) == "running"
+    assert api.use(run_node.state) == "running"
     api.use(run_node.print_("Hello"))
     api.use(run_node.print_("Hello again"))
     api.use(run_node.log({"x": 49.0}))
     api.use(run_node.set_output("some-output"))
 
-    saved_prints = api.use(run_node.prints())
+    saved_prints = api.use(run_node.prints)
     assert saved_prints == ["Hello", "Hello again"]
-    saved_logs = api.use(run_node.history())
+    saved_logs = api.use(run_node.history)
     assert saved_logs == [{"x": 49.0}]
-    saved_output = api.use(run_node.output())
+    saved_output = api.use(run_node.output)
     assert saved_output == "some-output"
 
 
@@ -50,8 +51,8 @@ def test_stable_when_fetching_input():
     # (which we know by checking that they come from the same ref in the code)
     train1 = async_demo.train(get_dataset)
     train2 = async_demo.train(get_dataset)
-    run_id1 = api.use(train1.id())
-    run_id2 = api.use(train2.id())
+    run_id1 = api.use(train1.id)
+    run_id2 = api.use(train2.id)
     assert run_id1 == run_id2
     api.use(train1.await_final_output())
     api.use(train2.await_final_output())

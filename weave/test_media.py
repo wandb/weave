@@ -104,7 +104,7 @@ class SomeGenericObj:
         return self.x == other.x and self.y == other.y
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class SomeGenericObjType(types.ObjectType):
     instance_classes = SomeGenericObj
     instance_class = SomeGenericObj

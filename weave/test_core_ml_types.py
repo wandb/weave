@@ -4,13 +4,13 @@ import pytest
 import dataclasses
 import numpy as np
 
-from . import context as _context
+from . import context_state as _context
 import weave
 
 _loading_builtins_token = _context.set_loading_built_ins()
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class LinearModelType(weave.types.ObjectType):
     input_type: weave.types.Type = weave.types.Any()
     output_type: weave.types.Type = weave.types.Any()
@@ -25,7 +25,7 @@ class LinearModelType(weave.types.ObjectType):
 
 
 @weave.weave_class(weave_type=LinearModelType)
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class Model:
     input_type: weave.types.Type
     output_type: weave.types.Type

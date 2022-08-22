@@ -4,6 +4,7 @@ import requests
 from . import api
 from . import ops
 from . import context
+from . import server
 from . import weave_server
 
 import pytest
@@ -73,7 +74,7 @@ def test_log_2_app_instances_different_threads(fresh_server_logfile):
 
 
 def test_capture_server_logs_captures_server_logs(fresh_server_logfile, capsys):
-    context.capture_weave_server_logs()
+    server.capture_weave_server_logs()
 
     with context.local_http_client():
         # run this to kick off a server

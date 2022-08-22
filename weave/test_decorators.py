@@ -5,10 +5,10 @@ from . import storage
 
 def test_function_op_name():
     @weave.op()
-    def my_op(a: int, b: int) -> int:
+    def test_decorators_function_op(a: int, b: int) -> int:
         return a + b
 
-    assert my_op.name == "op-my_op"
+    assert test_decorators_function_op.name == "op-test_decorators_function_op"
 
 
 def test_method_op_name():
@@ -28,6 +28,12 @@ def test_method_op_name():
 class Point:
     x: float
     y: float
+
+
+def test_attr_access():
+    p = weave.save(Point(1, 2), "my-point")
+    assert weave.use(p.x) == 1
+    assert weave.use(p.y) == 2
 
 
 @weave.type()

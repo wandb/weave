@@ -7,6 +7,23 @@ from . import graph_editable
 from . import registry_mem
 from . import errors
 
+# These call_* functions must match the actual op implementations.
+# But we don't want to import the op definitions themselves here, since
+# those depend on the decorators, which aren't defined in the engine.
+
+
+def call_run_await_final_output(run_node: graph.Node) -> graph.OutputNode:
+    run_node_type = typing.cast(types.RunType, run_node.type)
+    return graph.OutputNode(run_node_type.output, "run-await", {"self": run_node})
+
+
+def call_execute(function_node: graph.Node) -> graph.OutputNode:
+    function_node_type = typing.cast(types.Function, function_node.type)
+    return graph.OutputNode(
+        function_node_type.output_type, "execute", {"node": function_node}
+    )
+
+
 # The two compile passes here follow exactly the same structure.
 # They insert extra operations that resolve either a Promise() or a callable
 # to its output type.
@@ -17,7 +34,6 @@ from . import errors
 
 def await_run_outputs(nodes: typing.List[graph.Node]):
     """Automatically insert Run.await_final_output steps as needed."""
-    from . import run_obj
 
     edit_g = graph_editable.EditGraph()
     for node in nodes:
@@ -26,6 +42,10 @@ def await_run_outputs(nodes: typing.List[graph.Node]):
     for edge in edit_g.edges:
         actual_input_type = edge.output_of.type
         op_def = registry_mem.memory_registry.get_op(edge.input_to.from_op.name)
+        if op_def.name == "tag-indexCheckpoint" or op_def.name == "Object-__getattr__":
+            # These are supposed to be a passthrough op, we don't want to convert
+            # it. TODO: Find a more general way, maybe by type inspection?
+            continue
         if not isinstance(op_def.input_type, op_args.OpNamedArgs):
             # Not correct... we'd want to walk these too!
             # TODO: fix
@@ -43,7 +63,7 @@ def await_run_outputs(nodes: typing.List[graph.Node]):
             expected_input_type, types.RunType
         ):
             if (
-                expected_input_type.assign_type(actual_input_type._output)
+                expected_input_type.assign_type(actual_input_type.output)
                 == types.Invalid()
             ):
                 raise Exception(
@@ -51,7 +71,7 @@ def await_run_outputs(nodes: typing.List[graph.Node]):
                     % (actual_input_type, expected_input_type)
                 )
             new_inputs = dict(edge.input_to.from_op.inputs)
-            new_inputs[edge.input_name] = run_obj.Run.await_final_output(edge.output_of)
+            new_inputs[edge.input_name] = call_run_await_final_output(edge.output_of)
             edit_g.replace(
                 edge.input_to,
                 graph.OutputNode(
@@ -97,9 +117,8 @@ def execute_nodes(nodes: typing.List[graph.Node]):
                     % (actual_input_type, expected_input_type)
                 )
             new_inputs = dict(edge.input_to.from_op.inputs)
-            from .ops_primitives.weave_api import execute
 
-            new_inputs[edge.input_name] = execute(edge.output_of)
+            new_inputs[edge.input_name] = call_execute(edge.output_of)
             edit_g.replace(
                 edge.input_to,
                 graph.OutputNode(

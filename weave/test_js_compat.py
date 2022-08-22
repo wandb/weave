@@ -14,8 +14,12 @@ def test_const_serialization():
     f_type = types.FileType(types.Const(types.String(), "png"))
     f_type_dict = f_type.to_dict()
     assert f_type_dict == {
-        "type": "file",
         "extension": "png",
+        "_property_types": {
+            "extension": {"type": "const", "val": "png", "valType": "string"},
+            "wb_object_type": {"type": "const", "val": "png", "valType": "string"},
+        },
+        "type": "file",
     }
     f_type2 = types.TypeRegistry.type_from_dict(f_type_dict)
     assert isinstance(f_type2, types.FileType)

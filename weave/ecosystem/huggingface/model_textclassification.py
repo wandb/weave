@@ -21,8 +21,8 @@ class FullTextClassificationPipelineOutputType(weave.types.ObjectType):
     def property_types(self):
         return {
             "_model": HFModelTextClassificationType(),
-            "_model_input": weave.types.String(),
-            "_model_output": weave.types.List(
+            "model_input": weave.types.String(),
+            "model_output": weave.types.List(
                 weave.types.TypedDict(
                     {
                         "score": weave.types.Float(),
@@ -37,7 +37,7 @@ class ClassificationResultType(weave.types.ObjectType):
     def property_types(self):
         return {
             "_model_name": weave.types.String(),
-            "_model_input": weave.types.String(),
+            "model_input": weave.types.String(),
             "_score": weave.types.Float(),
             "_label": weave.types.String(),
         }
@@ -47,17 +47,13 @@ class ClassificationResultType(weave.types.ObjectType):
 @dataclasses.dataclass
 class ClassificationResult:
     _model_name: str
-    _model_input: str
+    model_input: str
     _score: float
     _label: str
 
     @weave.op()
     def model_name(self) -> str:
         return self._model_name
-
-    @weave.op()
-    def model_input(self) -> str:
-        return self._model_input
 
     @weave.op()
     def score(self) -> float:
@@ -83,7 +79,7 @@ def classification_result_render(
             lambda result_row: weave.panels.WeaveLink(
                 result_row.model_name(), to=lambda input: huggingface().model(input)  # type: ignore
             ),
-            lambda result_row: result_row.model_input(),
+            lambda result_row: result_row.model_input,
             lambda result_row: result_row.score(),
             lambda result_row: result_row.label(),
         ],
@@ -99,16 +95,8 @@ class TextClassificationPipelineOutput(typing.TypedDict):
 @dataclasses.dataclass
 class FullTextClassificationPipelineOutput(hfmodel.FullPipelineOutput):
     _model: "HFModelTextClassification"
-    _model_input: str
-    _model_output: list[TextClassificationPipelineOutput]
-
-    @weave.op()
-    def model_input(self) -> str:
-        return self._model_input
-
-    @weave.op()
-    def model_output(self) -> list[TextClassificationPipelineOutput]:
-        return self._model_output
+    model_input: str
+    model_output: list[TextClassificationPipelineOutput]
 
     @weave.op()
     def model_name(self) -> str:
@@ -128,11 +116,11 @@ def full_text_classification_output_render(
     return weave.panels.Group(
         prefer_horizontal=True,
         items=[
-            weave.panels.LabeledItem(label="input", item=output.model_input()),
+            weave.panels.LabeledItem(label="input", item=output.model_input),
             weave.panels.LabeledItem(
                 label="output",
                 item=weave.panels.Plot(
-                    output.model_output(),
+                    output.model_output,
                     x=lambda class_score: class_score["score"],
                     y=lambda class_score: class_score["label"],
                 ),
@@ -181,11 +169,11 @@ def apply_models(
     retval: list[ClassificationResult] = []
     for i, result in enumerate(results):
         for item in result:
-            for output in item._model_output:
+            for output in item.model_output:
                 retval.append(
                     ClassificationResult(
                         _model_name=models[i]._id,
-                        _model_input=item._model_input,
+                        model_input=item.model_input,
                         _score=output["score"],
                         _label=output["label"],
                     )

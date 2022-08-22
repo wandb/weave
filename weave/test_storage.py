@@ -149,48 +149,17 @@ def test_list_of_ref_to_item_in_list():
     assert weave.use(d_node[1]["c"] == 7) == True
 
 
-def test_arrow_list_of_ref_to_item_in_list():
-    l = [{"a": 5, "b": 6}, {"a": 7, "b": 9}]
-    l_node = weave.save(l, "my-l")
-
-    list_dict_with_ref = storage.to_arrow(
-        [{"c": l_node[0]["a"]}, {"c": l_node[1]["a"]}]
-    )
-    d_node = weave.save(list_dict_with_ref, "my-dict_with_ref")
-
-    assert weave.use(d_node[0]["c"] == 5) == True
-    assert weave.use(d_node[1]["c"] == 7) == True
-
-
 def test_ref_type():
     obj = {"x": 14}
     ref = storage.save(obj, "my-dict")
     python_ref = storage.to_python(ref)
     assert python_ref == {
-        "_type": {
-            "objectType": {"propertyTypes": {"x": "int"}, "type": "typedDict"},
-            "type": "local-ref-type",
-        },
+        "_type": {"type": "LocalArtifactRef"},
         "_val": f"local-artifact://{artifacts_local.local_artifact_dir()}/my-dict/6036cbf3a05809f1a3f174a1485b1770",
     }
     ref2 = storage.from_python(python_ref)
     obj2 = storage.deref(ref2)
     assert obj == obj2
-
-
-def test_trace():
-    nine = make_const_node(storage.types.Number(), 9)
-    res = weave.use((nine + 3) * 4)
-    assert res == 48
-    mult_run = storage.get_obj_creator(storage._get_ref(res))
-    assert mult_run._op_name == "number-mult"
-    assert re.match(
-        "^local-artifact://.*run-number-add-.*-output/.*$", str(mult_run._inputs["lhs"])
-    )
-    assert mult_run._inputs["rhs"] == 4
-    add_run = storage.get_obj_creator(mult_run._inputs["lhs"])
-    assert add_run._op_name == "number-add"
-    assert add_run._inputs == {"lhs": 9, "rhs": 3}
 
 
 def test_boxing():

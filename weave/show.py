@@ -7,24 +7,13 @@ from IPython.display import IFrame
 from . import context
 from . import graph
 from . import panel
+from . import refs
 from . import weave_types as types
 from . import weavejs_fixes
 from . import storage
 from . import util
 from . import errors
 from . import usage_analytics
-from .ops_primitives.weave_api import get as op_get
-
-
-def make_refs(node: graph.Node):
-    def make_ref(node: graph.Node):
-        if isinstance(node, graph.ConstNode):
-            ref = storage.get_ref(node.val)
-            if ref is not None:
-                return op_get(str(ref.uri))
-        return node
-
-    return graph.map_nodes(node, make_ref)
 
 
 # Broken out into to separate function for testing
@@ -32,7 +21,7 @@ def _show_params(obj):
     if obj is None:
         return {"weave_node": graph.VoidNode()}
     if isinstance(obj, graph.Node):
-        return {"weave_node": weavejs_fixes.fixup_node(make_refs(obj))}
+        return {"weave_node": weavejs_fixes.fixup_node(obj)}
 
     elif isinstance(obj, panel.Panel):
         return {
@@ -87,3 +76,14 @@ def show(obj=None, height=400):
 
     iframe = IFrame(panel_url, "100%", "%spx" % height)
     return display(iframe)
+
+
+def _ipython_display_method_(self):
+    show(self)
+
+
+# Inject _ipython_display_ methods on classes we want to automatically
+# show when the last expression in a notebook cell produces them.
+graph.Node._ipython_display_ = _ipython_display_method_  # type: ignore
+panel.Panel._ipython_display_ = _ipython_display_method_  # type: ignore
+refs.Ref._ipython_display_ = _ipython_display_method_  # type: ignore

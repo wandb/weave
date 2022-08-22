@@ -1,3 +1,4 @@
+from .obj import *
 from .string import *
 from .number import *
 from .boolean import *

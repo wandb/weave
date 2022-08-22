@@ -12,7 +12,7 @@ def head_view(attention: huggingface.ModelOutputAttention) -> weave.ops.Html:
     # contain references to any information that is necessary for their use.
 
     # we can walk to model_output from attention
-    model_output = attention._model_output
+    model_output = attention.model_output
 
     # we can walk to model_input from model_output
     encoded_model_input = model_output._encoded_model_input
@@ -53,7 +53,7 @@ def model_view(attention: huggingface.ModelOutputAttention) -> weave.ops.Html:
     # and layers as columns for each attention map
 
     # walk to model from attention
-    model_output = attention._model_output
+    model_output = attention.model_output
     encoded_model_input = model_output._encoded_model_input
     model = model_output._model
 

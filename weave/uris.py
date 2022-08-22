@@ -88,9 +88,6 @@ class WeaveURI:
     def version(self) -> typing.Optional[str]:
         return self._version
 
-    def to_ref(self):
-        raise NotImplementedError()
-
     # Used to parse an object URI into it's appropriate WeaveURI subclass
     @classmethod
     def parse(cls: typing.Type["WeaveURI"], uri: str) -> "WeaveURI":
@@ -129,11 +126,6 @@ class WeaveLocalArtifactURI(WeaveURI):
             raise errors.WeaveInternalError("invalid uri ", uri)
         self._full_name = parts[-2]
         self._version = parts[-1]
-
-    def to_ref(self):
-        from .refs import LocalArtifactRef
-
-        return LocalArtifactRef.from_str(self.uri)
 
     @classmethod
     def from_parts(
@@ -184,11 +176,6 @@ class WeaveWBArtifactURI(WeaveURI):
         self._artifact_name = parts[2].strip("/")
         self._full_name = parts[2].strip("/")
         self._version = all_parts[1]
-
-    def to_ref(self):
-        from .refs import WandbArtifactRef
-
-        return WandbArtifactRef.from_str(self.uri)
 
     @classmethod
     def from_parts(

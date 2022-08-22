@@ -1,10 +1,14 @@
+import os
+
 from wandb.apis import public as wandb_api
 
 from ..api import op, weave_class
 from .. import weave_types as types
 from . import file_wbartifact
+from ..ops_primitives import file_local
 from .. import artifacts_local
 from .. import refs
+from ..ops_primitives import file as weave_file
 
 
 class ArtifactVersionType(types._PlainStringNamedType):
@@ -49,7 +53,7 @@ class ArtifactVersion:
         input_type={"artifactVersion": ArtifactVersionType(), "path": types.String()},
         # TODO: This Type is not complete (missing DirType())
         # TODO: This needs to call ArtifactVersion.path_type()
-        output_type=file_wbartifact.ArtifactVersionFileType(),
+        output_type=refs.ArtifactVersionFileType(),
     )
     # TODO: This function should probably be called path, but it return Dir or File.
     # ok...
@@ -57,14 +61,61 @@ class ArtifactVersion:
         if ":" in path:
             # This is a URI
 
-            from .. import uris
-
-            uri = uris.WeaveURI.parse(path)
-            ref = uri.to_ref()
+            ref = refs.Ref.from_str(path)
             artifactVersion = ref.artifact
-            path = uri.file
+            path = ref.path
 
-        return artifactVersion.read_path(path)
+        self = artifactVersion
+        # TODO: hideous type-switching here. Need to follow the
+        # generic WeaveJS op pattern in list_.py
+
+        if isinstance(self, artifacts_local.LocalArtifact):
+            return file_local.LocalFile(os.path.join(self._read_dirname, path))
+
+        # rest of implementation if for WandbArtifact
+        av = self._saved_artifact
+
+        manifest = av.manifest
+        manifest_entry = manifest.get_entry_by_path(path)
+        if manifest_entry is not None:
+            # This is a file
+            return file_wbartifact.ArtifactVersionFile(self, path)
+        # This is not a file, assume its a directory. If not, we'll return an empty result.
+        cur_dir = (
+            path  # give better name so the rest of this code block is more readable
+        )
+        if cur_dir == "":
+            dir_ents = av.manifest.entries.values()
+        else:
+            dir_ents = av.manifest.get_entries_in_directory(cur_dir)
+        sub_dirs: dict[str, weave_file.SubDir] = {}
+        files = {}
+        for entry in dir_ents:
+            entry_path = entry.path
+            rel_path = os.path.relpath(entry_path, path)
+            rel_path_parts = rel_path.split("/")
+            if len(rel_path_parts) == 1:
+                # Its a file within cur_dir
+                # TODO: I haven't tested this since changin ArtifactVersionFile implementation
+                files[entry_path] = file_wbartifact.ArtifactVersionFile(
+                    self,
+                    entry_path,
+                )
+            else:
+                dir_name = rel_path_parts[0]
+                if dir_name not in sub_dirs:
+                    dir_ = weave_file.SubDir(entry_path, 1111, {}, {})
+                    sub_dirs[dir_name] = dir_
+                dir_ = sub_dirs[dir_name]
+                if len(rel_path_parts) == 2:
+                    # TODO: I haven't tested this since changin ArtifactVersionFile implementation
+                    dir_.files[rel_path_parts[1]] = file_wbartifact.ArtifactVersionFile(
+                        self,
+                        entry_path,
+                    )
+                else:
+                    dir_.dirs[rel_path_parts[1]] = 1
+        return file_wbartifact.ArtifactVersionDir(path, 1591, sub_dirs, files)
 
 
 @op(

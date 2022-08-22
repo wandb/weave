@@ -1,5 +1,4 @@
 from . import api as weave
-from . import ops
 from PIL import Image
 
 

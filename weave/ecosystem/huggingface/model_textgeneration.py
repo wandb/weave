@@ -21,8 +21,8 @@ class FullTextGenerationPipelineOutputType(weave.types.ObjectType):
     def property_types(self):
         return {
             "_model": HFModelTextGenerationType(),
-            "_model_input": weave.types.String(),
-            "_model_output": weave.types.List(
+            "model_input": weave.types.String(),
+            "model_output": weave.types.List(
                 weave.types.TypedDict(
                     {
                         "generated_text": weave.types.String(),
@@ -40,16 +40,8 @@ class TextGenerationPipelineOutput(typing.TypedDict):
 @dataclasses.dataclass
 class FullTextGenerationPipelineOutput(hfmodel.FullPipelineOutput):
     _model: "HFModelTextGeneration"
-    _model_input: str
-    _model_output: list[TextGenerationPipelineOutput]
-
-    @weave.op()
-    def model_input(self) -> str:
-        return self._model_input
-
-    @weave.op()
-    def model_output(self) -> list[TextGenerationPipelineOutput]:
-        return self._model_output
+    model_input: str
+    model_output: list[TextGenerationPipelineOutput]
 
 
 FullTextGenerationPipelineOutputType.instance_classes = FullTextGenerationPipelineOutput
@@ -63,8 +55,8 @@ def full_text_generation_output_render(
     return weave.panels.Group(
         prefer_horizontal=True,
         items=[
-            weave.panels.LabeledItem(label="input", item=output.model_input()),
-            weave.panels.LabeledItem(label="output", item=output.model_output()),
+            weave.panels.LabeledItem(label="input", item=output.model_input),
+            weave.panels.LabeledItem(label="output", item=output.model_output),
         ],
     )
 
