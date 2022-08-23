@@ -5,7 +5,7 @@ import dataclasses
 
 from wandb.apis import public as wandb_api
 
-from ..api import op, weave_class
+from ..api import op, weave_class, type, use, get, type_of
 from .. import weave_types as types
 from . import wbartifact
 from . import file_wbartifact
@@ -13,8 +13,6 @@ from . import wbmedia
 from .. import errors
 from .. import artifacts_local
 from ..wandb_api import wandb_public_api
-
-import weave
 
 __all__ = [
     "OrgType",
@@ -373,7 +371,7 @@ InterimMetricType = list[HistoryRow]
 InterimExperimentOutputType = list[HistoryRowWithName]
 
 
-@weave.type()
+@type()
 class RunSegment:
     name: str
     prior_run_ref: typing.Optional[str]
@@ -381,24 +379,22 @@ class RunSegment:
     metrics: InterimMetricType
 
     @op(render_info={"type": "function"})
-    def refine_experiment_type(
-        self, until: typing.Optional[int] = None
-    ) -> weave.types.Type:
+    def refine_experiment_type(self, until: typing.Optional[int] = None) -> types.Type:
         segment = self
         metrics = segment.metrics[:until]
         resumed_from_step = self.resumed_from_step
         while len(metrics) == 0:
             if segment.prior_run_ref is None:
                 # no history - return empty
-                return weave.types.List(object_type=weave.types.Any())
+                return types.List(object_type=types.Any())
 
-            segment = weave.use(weave.get(segment.prior_run_ref))
+            segment = use(get(segment.prior_run_ref))
             metrics = segment.metrics[:resumed_from_step]
             resumed_from_step = segment.resumed_from_step
 
         # get the first row and use it to infer the type
         example_row = metrics[0]
-        return weave.types.List(weave.type_of(example_row))
+        return types.List(type_of(example_row))
 
     @op(refine_output_type=refine_experiment_type)
     def experiment(
@@ -407,10 +403,8 @@ class RunSegment:
         prior_run_metrics: InterimExperimentOutputType = []
         if self.prior_run_ref is not None:
             # get the prior run
-            prior_run: RunSegment = weave.use(weave.get(self.prior_run_ref))
-            prior_run_metrics = weave.use(
-                prior_run.experiment(until=self.resumed_from_step)
-            )
+            prior_run: RunSegment = use(get(self.prior_run_ref))
+            prior_run_metrics = use(prior_run.experiment(until=self.resumed_from_step))
 
         own_metrics: InterimExperimentOutputType = [
             {
