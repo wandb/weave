@@ -1,6 +1,7 @@
 # TODO: split this into multiple files like we do in the JS version
 import json
 import typing
+import dataclasses
 
 from wandb.apis import public as wandb_api
 
@@ -8,10 +9,34 @@ from ..api import op, weave_class
 from .. import weave_types as types
 from . import wbartifact
 from . import file_wbartifact
-from .wbmedia import *
+from . import wbmedia
 from .. import errors
 from .. import artifacts_local
 from ..wandb_api import wandb_public_api
+
+import weave
+
+__all__ = [
+    "OrgType",
+    "EntityType",
+    "ArtifactMembershipType",
+    "ProjectType",
+    "RunType",
+    "ArtifactType",
+    "ArtifactVersionsType",
+    "WBRun",
+    "RunsType",
+    "RunsOps",
+    "ArtifactsType",
+    "ArtifactsOps",
+    "ArtifactVersionsOps",
+    "ArtifactOps",
+    "ArtifactTypeOps",
+    "ArtifactTypeType",
+    "ProjectArtifactTypesType",
+    "Project",
+    "RunSegment",
+]
 
 
 class OrgType(types._PlainStringNamedType):
@@ -336,19 +361,16 @@ def project(entityName: str, projectName: str) -> wandb_api.Project:
     return wandb_public_api().project(name=projectName, entity=entityName)
 
 
-class Metric(typing.TypedDict):
+class HistoryRow(typing.TypedDict):
     step: int
-    metric1: float
-    metric2: float
 
 
-class MetricWithName(Metric):
+class HistoryRowWithName(HistoryRow):
     name: str
 
 
-# hardcoded for now, later we will make this more general
-InterimMetricType = list[Metric]
-InterimExperimentOutputType = list[MetricWithName]
+InterimMetricType = list[HistoryRow]
+InterimExperimentOutputType = list[HistoryRowWithName]
 
 
 @weave.type()
@@ -358,7 +380,27 @@ class RunSegment:
     resumed_from_step: int
     metrics: InterimMetricType
 
-    @op()
+    @op(render_info={"type": "function"})
+    def refine_experiment_type(
+        self, until: typing.Optional[int] = None
+    ) -> weave.types.Type:
+        segment = self
+        metrics = segment.metrics[:until]
+        resumed_from_step = self.resumed_from_step
+        while len(metrics) == 0:
+            if segment.prior_run_ref is None:
+                # no history - return empty
+                return weave.types.List(object_type=weave.types.Any())
+
+            segment = weave.use(weave.get(segment.prior_run_ref))
+            metrics = segment.metrics[:resumed_from_step]
+            resumed_from_step = segment.resumed_from_step
+
+        # get the first row and use it to infer the type
+        example_row = metrics[0]
+        return weave.types.List(weave.type_of(example_row))
+
+    @op(refine_output_type=refine_experiment_type)
     def experiment(
         self, until: typing.Optional[int] = None
     ) -> InterimExperimentOutputType:
@@ -373,10 +415,9 @@ class RunSegment:
         own_metrics: InterimExperimentOutputType = [
             {
                 "step": d["step"],
-                "metric1": d["metric1"],
-                "metric2": d["metric2"],
                 "name": self.name,
+                **d,  # type: ignore
             }
-            for d in (self.metrics if until is None else self.metrics[:until])
+            for d in self.metrics[:until]
         ]
         return prior_run_metrics + own_metrics
