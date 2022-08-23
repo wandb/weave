@@ -1,7 +1,6 @@
 # TODO: split this into multiple files like we do in the JS version
 import json
 import typing
-import dataclasses
 
 from wandb.apis import public as wandb_api
 
@@ -9,33 +8,10 @@ from ..api import op, weave_class, type, use, get, type_of
 from .. import weave_types as types
 from . import wbartifact
 from . import file_wbartifact
-from . import wbmedia
+from .wbmedia import *
 from .. import errors
 from .. import artifacts_local
 from ..wandb_api import wandb_public_api
-
-__all__ = [
-    "OrgType",
-    "EntityType",
-    "ArtifactMembershipType",
-    "ProjectType",
-    "RunType",
-    "ArtifactType",
-    "ArtifactVersionsType",
-    "WBRun",
-    "RunsType",
-    "RunsOps",
-    "ArtifactsType",
-    "ArtifactsOps",
-    "ArtifactVersionsOps",
-    "ArtifactOps",
-    "ArtifactTypeOps",
-    "ArtifactTypeType",
-    "ProjectArtifactTypesType",
-    "Project",
-    "RunSegment",
-    "project",
-]
 
 
 class OrgType(types._PlainStringNamedType):
