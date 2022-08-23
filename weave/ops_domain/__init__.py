@@ -34,6 +34,7 @@ __all__ = [
     "ProjectArtifactTypesType",
     "Project",
     "RunSegment",
+    "project",
 ]
 
 
