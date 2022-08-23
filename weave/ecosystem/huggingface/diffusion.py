@@ -8,7 +8,7 @@ from . import hfmodel
 
 
 @weave.type()
-class HFModelStableDiffusion(hfmodel.HFModel):
+class HFModelDiffusion(hfmodel.HFModel):
     @weave.op()
     def pipeline(self) -> diffusers.DiffusionPipeline:
         """This is its own op so the pipeline can be cached."""
