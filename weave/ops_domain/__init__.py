@@ -359,8 +359,8 @@ def project(entityName: str, projectName: str) -> wandb_api.Project:
     return wandb_public_api().project(name=projectName, entity=entityName)
 
 
-InterimMetricType = list[typing.Any]
-InterimExperimentOutputType = list[typing.Any]
+InterimMetric = list[typing.Any]
+InterimExperimentOutput = list[typing.Any]
 
 
 @type()
@@ -368,12 +368,13 @@ class RunSegment:
     name: str
     prior_run_ref: typing.Optional[str]
     resumed_from_step: int
-    metrics: InterimMetricType
+    metrics: InterimMetric
 
     @op(render_info={"type": "function"})
-    def refine_experiment_type(self, until: typing.Optional[int] = None) -> types.Type:
+    def refine_experiment_type(self) -> types.Type:
+        """Assuming a constant type over history rows for now."""
         segment = self
-        metrics = segment.metrics[:until]
+        metrics = segment.metrics
         resumed_from_step = self.resumed_from_step
         while len(metrics) == 0:
             if segment.prior_run_ref is None:
@@ -389,17 +390,16 @@ class RunSegment:
         name_type = types.TypedDict({"name": types.String()})
         return types.List(types.merge_types(type_of(example_row), name_type))
 
-    @op(refine_output_type=refine_experiment_type)
-    def experiment(
+    def _experiment_body(
         self, until: typing.Optional[int] = None
-    ) -> InterimExperimentOutputType:
-        prior_run_metrics: InterimExperimentOutputType = []
+    ) -> InterimExperimentOutput:
+        prior_run_metrics: InterimExperimentOutput = []
         if self.prior_run_ref is not None:
             # get the prior run
             prior_run: RunSegment = use(get(self.prior_run_ref))
-            prior_run_metrics = use(prior_run.experiment(until=self.resumed_from_step))
+            prior_run_metrics = prior_run._experiment_body(until=self.resumed_from_step)
 
-        own_metrics: InterimExperimentOutputType = [
+        own_metrics: InterimExperimentOutput = [
             {
                 "step": d["step"],
                 "name": self.name,
@@ -407,4 +407,9 @@ class RunSegment:
             }
             for d in self.metrics[:until]
         ]
+
         return prior_run_metrics + own_metrics
+
+    @op(refine_output_type=refine_experiment_type)
+    def experiment(self) -> InterimExperimentOutput:
+        return self._experiment_body()
