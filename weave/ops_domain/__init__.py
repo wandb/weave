@@ -4,7 +4,9 @@ import typing
 
 from wandb.apis import public as wandb_api
 
-from ..api import op, weave_class, type, use, get, type_of
+from .. import panels
+from ..api import op, weave_class, type, use, get, type_of, Node
+from ..ops_primitives import TypedDict
 from .. import weave_types as types
 from . import wbartifact
 from . import file_wbartifact
@@ -384,3 +386,33 @@ class RunSegment:
     @op(refine_output_type=refine_experiment_type)
     def experiment(self) -> typing.Any:
         return self._experiment_body()
+
+    @op()
+    def refine_history_type(self) -> types.Type:
+        return type_of(self.metrics)
+
+    @op(refine_output_type=refine_history_type)
+    def history(self) -> typing.Any:
+        return self.metrics
+
+
+@op()
+def run_segment_render(
+    run_segment_node: Node[RunSegment],
+) -> panels.Card:
+
+    # All methods callable on X are callable on weave.Node[X], but
+    # the types arent' setup properly, so cast to tell the type-checker
+    # TODO: Fix!
+    run_segment = typing.cast(RunSegment, run_segment_node)
+
+    return panels.Card(
+        title=run_segment.name,
+        subtitle="Weave Run Segment",
+        content=[
+            panels.CardTab(
+                name="History",
+                content=panels.Table(run_segment.history()),  # type: ignore
+            ),
+        ],
+    )
