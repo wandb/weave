@@ -360,8 +360,8 @@ def project(entityName: str, projectName: str) -> wandb_api.Project:
     return wandb_public_api().project(name=projectName, entity=entityName)
 
 
-InterimMetric = list[typing.Any]
-InterimExperimentOutput = list[typing.Any]
+InterimMetric = typing.Any
+InterimExperimentOutput = typing.Any
 
 
 @type()
