@@ -360,16 +360,12 @@ def project(entityName: str, projectName: str) -> wandb_api.Project:
     return wandb_public_api().project(name=projectName, entity=entityName)
 
 
-InterimMetric = typing.Any
-InterimExperimentOutput = typing.Any
-
-
 @type()
 class RunSegment:
     name: str
     prior_run_ref: typing.Optional[str]
     resumed_from_step: int
-    metrics: InterimMetric
+    metrics: typing.Any
 
     @op(render_info={"type": "function"})
     def refine_experiment_type(self) -> types.Type:
@@ -391,16 +387,14 @@ class RunSegment:
         name_type = types.TypedDict({"name": types.String()})
         return types.List(types.merge_types(type_of(example_row), name_type))
 
-    def _experiment_body(
-        self, until: typing.Optional[int] = None
-    ) -> InterimExperimentOutput:
-        prior_run_metrics: InterimExperimentOutput = []
+    def _experiment_body(self, until: typing.Optional[int] = None) -> typing.Any:
+        prior_run_metrics: typing.Any = []
         if self.prior_run_ref is not None:
             # get the prior run
             prior_run: RunSegment = use(get(self.prior_run_ref))
             prior_run_metrics = prior_run._experiment_body(until=self.resumed_from_step)
 
-        own_metrics: InterimExperimentOutput = [
+        own_metrics: typing.Any = [
             {
                 "step": d["step"],
                 "name": self.name,
@@ -412,5 +406,5 @@ class RunSegment:
         return prior_run_metrics + own_metrics
 
     @op(refine_output_type=refine_experiment_type)
-    def experiment(self) -> InterimExperimentOutput:
+    def experiment(self) -> typing.Any:
         return self._experiment_body()
