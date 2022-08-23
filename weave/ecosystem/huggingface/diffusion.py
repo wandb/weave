@@ -12,20 +12,21 @@ class HFModelDiffusion(hfmodel.HFModel):
     @weave.op()
     def pipeline(self) -> diffusers.DiffusionPipeline:
         """This is its own op so the pipeline can be cached."""
-        result = diffusers.DiffusionPipeline.from_pretrained(
+        return diffusers.DiffusionPipeline.from_pretrained(
             self._id,
         )
 
-        # side effect: move model to cuda
+    @weave.op()
+    def call(self, input: str) -> list[Image.Image]:
+
+        pipeline = weave.use(self.pipeline())
+
+        # side effect: move model to cuda if its not already there
         try:
-            result.to("cuda")
-        except:
+            pipeline.to("cuda")
+        except RuntimeError:
             logging.info("using CPU for pipeline")
         else:
             logging.info("using GPU for pipeline")
 
-        return result
-
-    @weave.op()
-    def call(self, input: str) -> list[Image.Image]:
-        return weave.use(self.pipeline())(input)["sample"]
+        return pipeline(input)["sample"]
