@@ -359,16 +359,8 @@ def project(entityName: str, projectName: str) -> wandb_api.Project:
     return wandb_public_api().project(name=projectName, entity=entityName)
 
 
-class HistoryRow(typing.TypedDict):
-    step: int
-
-
-class HistoryRowWithName(HistoryRow):
-    name: str
-
-
-InterimMetricType = list[HistoryRow]
-InterimExperimentOutputType = list[HistoryRowWithName]
+InterimMetricType = list[typing.Any]
+InterimExperimentOutputType = list[typing.Any]
 
 
 @type()
@@ -394,7 +386,8 @@ class RunSegment:
 
         # get the first row and use it to infer the type
         example_row = metrics[0]
-        return types.List(type_of(example_row))
+        name_type = types.TypedDict({"name": types.String()})
+        return types.List(types.merge_types(type_of(example_row), name_type))
 
     @op(refine_output_type=refine_experiment_type)
     def experiment(
