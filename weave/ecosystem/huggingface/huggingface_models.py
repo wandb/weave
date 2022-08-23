@@ -11,6 +11,7 @@ from .. import pytorch
 from . import hfmodel
 from . import model_textclassification
 from . import model_textgeneration
+from . import model_imagegeneration
 
 
 def full_model_info_to_hfmodel(
@@ -29,6 +30,8 @@ def full_model_info_to_hfmodel(
         return model_textclassification.HFModelTextClassification(**kwargs)
     elif info.pipeline_tag == "text-generation":
         return model_textgeneration.HFModelTextGeneration(**kwargs)
+    elif info.pipeline_tag == "text-to-image":
+        return model_imagegeneration.HFModelImageGeneration(**kwargs)
     return hfmodel.HFModel(**kwargs)
 
 
@@ -94,6 +97,8 @@ class HuggingFacePackage:
             return model_textclassification.HFModelTextClassificationType()
         if info.pipeline_tag == "text-generation":
             return model_textgeneration.HFModelTextGenerationType()
+        if info.pipeline_tag == "text-to-image":
+            return model_imagegeneration.HFModelImageGeneration.WeaveType()  # type: ignore
         raise Exception(
             "Huggingface model type '%s' not yet supported. Add support in ecosystem/huggingface."
             % info.pipeline_tag

@@ -6,6 +6,7 @@ import torch
 import weave
 
 import transformers
+import diffusers
 
 from .. import pytorch
 
@@ -24,7 +25,10 @@ class HFInternalBaseModelOutputType(weave.types.Type):
 
 
 class HFInternalPipelineType(weave.types.Type):
-    instance_classes = transformers.pipelines.base.Pipeline
+    instance_classes = [
+        transformers.pipelines.base.Pipeline,
+        diffusers.DiffusionPipeline,
+    ]
 
     def save_instance(self, obj, artifact, name):
         with artifact.new_file(f"{name}.pickle", binary=True) as f:
