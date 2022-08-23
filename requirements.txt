@@ -26,6 +26,7 @@ bertviz
 datasets
 transformers<4.21
 tensorflow>=1.15.2
+diffusers
 
 # spaCy Requirements:
 spacy>=3.0.0,<4.0.0
