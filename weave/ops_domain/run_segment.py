@@ -7,7 +7,7 @@ from .. import weave_types as types
 
 @type()
 class RunSegment:
-    name: str
+    run_name: str
     prior_run_ref: typing.Optional[str]
     resumed_from_step: int
     metrics: typing.TypeVar("MetricRows")  # type: ignore
@@ -42,7 +42,7 @@ class RunSegment:
         own_metrics: typing.Any = [
             {
                 "step": d["step"],
-                "name": self.name,
+                "name": self.run_name,
                 **d,  # type: ignore
             }
             for d in self.metrics[:until]
@@ -66,7 +66,7 @@ def run_segment_render(
     run_segment = typing.cast(RunSegment, run_segment_node)
 
     return panels.Card(
-        title=run_segment.name,
+        title=run_segment.run_name,
         subtitle="Weave Run Segment",
         content=[
             panels.CardTab(
