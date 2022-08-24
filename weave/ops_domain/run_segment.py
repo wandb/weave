@@ -1,6 +1,8 @@
 import typing
 
-from weave import type, op, weave_types as types, use, get, type_of, Node, panels
+from ..api import type, op, use, get, type_of, Node
+from .. import panels
+from .. import weave_types as types
 
 
 @type()
