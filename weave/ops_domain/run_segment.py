@@ -10,7 +10,7 @@ class RunSegment:
     name: str
     prior_run_ref: typing.Optional[str]
     resumed_from_step: int
-    metrics: typing.TypeVar("M")
+    metrics: typing.TypeVar("MetricRows")  # type: ignore
 
     @op(render_info={"type": "function"})
     def refine_experiment_type(self) -> types.Type:
@@ -54,15 +54,6 @@ class RunSegment:
     def experiment(self) -> typing.Any:
         return self._experiment_body()
 
-    # NOTE: output_type here is incorrect! It shouldn't be '.object_type'. But using
-    # this incorrect type here actually makes the UI render something, so I left it as
-    # proof.
-    # TODO: we should remove this history method entirely as we can just access .metrics
-    # instead
-    @op(output_type=lambda input_type: input_type["self"].metrics.object_type)
-    def history(self):
-        return self.metrics
-
 
 @op()
 def run_segment_render(
@@ -81,7 +72,7 @@ def run_segment_render(
             panels.CardTab(
                 name="History",
                 # TODO: this should just be run_segment.metrics
-                content=panels.Table(run_segment.history()),  # type: ignore
+                content=run_segment.metrics,  # type: ignore
             ),
         ],
     )
