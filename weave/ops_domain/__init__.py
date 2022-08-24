@@ -412,7 +412,7 @@ def run_segment_render(
         content=[
             panels.CardTab(
                 name="History",
-                content=panels.Table(run_segment.history()),  # type: ignore
+                content=panels.Table(run_segment.metrics),  # type: ignore
             ),
         ],
     )
