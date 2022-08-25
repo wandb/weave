@@ -640,6 +640,16 @@ class ArrowWeaveList:
             raise errors.WeaveInternalError(
                 "Arrow groupby not yet support for map result: %s" % type(group_table)
             )
+        # Serializing a large arrow table and then reading it back
+        # causes it to come back with more than 1 chunk. It seems the aggregation
+        # operations don't like this. It will raise a cryptic error about
+        # ExecBatches need to have the same link without this combine_chunks line
+        # But combine_chunks doesn't seem like the most efficient thing to do
+        # either, since it'll have to concatenate everything together.
+        # But this fixes the crash for now!
+        # TODO: investigate this as we optimize the arrow implementation
+        group_table = group_table.combine_chunks()
+
         group_table = group_table.append_column(
             "_index", pa.array(np.arange(len(group_table)))
         )
