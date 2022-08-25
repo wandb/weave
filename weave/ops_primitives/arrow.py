@@ -611,17 +611,18 @@ class ArrowWeaveList:
             res = res.arr
         return ArrowWeaveList(res, map_fn.type, self._artifact)
 
-    # todo: self, other, and retval should all have the same type
-    # need a generic typevar
-    @op(
-        input_type={
-            "self": ArrowWeaveListType(),
-            "other": ArrowWeaveListType(),
-        },
-        output_type=lambda input_types: input_types["self"],
-    )
-    def concatenate(self, other):
-        return ArrowWeaveList(pa.concat_tables(self._arrow_data, other._arrow_data))
+    def concatenate(self, other: "ArrowWeaveList") -> "ArrowWeaveList":
+        self_data = (
+            pa.table({"self": self._arrow_data})
+            if isinstance(self._arrow_data, pa.ChunkedArray)
+            else self._arrow_data
+        )
+        other_data = (
+            pa.table({"self": other._arrow_data})
+            if isinstance(other._arrow_data, pa.ChunkedArray)
+            else other._arrow_data
+        )
+        return ArrowWeaveList(pa.concat_tables((self_data, other_data)))
 
     @op(
         input_type={
@@ -685,11 +686,14 @@ class ArrowWeaveList:
             self._arrow_data.slice(offset), self.object_type, self._artifact
         )
 
-    @op(output_type=lambda input_types: input_types["self"])
-    def limit(self, limit: int):
+    def _limit(self, limit: int):
         return ArrowWeaveList(
             self._arrow_data.slice(0, limit), self.object_type, self._artifact
         )
+
+    @op(output_type=lambda input_types: input_types["self"])
+    def limit(self, limit: int):
+        return self._limit(limit)
 
 
 ArrowWeaveListType.instance_classes = ArrowWeaveList
