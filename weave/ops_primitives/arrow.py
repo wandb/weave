@@ -611,6 +611,18 @@ class ArrowWeaveList:
             res = res.arr
         return ArrowWeaveList(res, map_fn.type, self._artifact)
 
+    # todo: self, other, and retval should all have the same type
+    # need a generic typevar
+    @op(
+        input_type={
+            "self": ArrowWeaveListType(),
+            "other": ArrowWeaveListType(),
+        },
+        output_type=lambda input_types: input_types["self"],
+    )
+    def concatenate(self, other):
+        return ArrowWeaveList(pa.concat_tables(self._arrow_data, other._arrow_data))
+
     @op(
         input_type={
             "self": ArrowWeaveListType(ArrowTableType(types.Any())),
