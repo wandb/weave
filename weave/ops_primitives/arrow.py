@@ -549,6 +549,9 @@ class ArrowWeaveList:
     def _count(self):
         return len(self._arrow_data)
 
+    def __len__(self):
+        return self._count()
+
     @op()
     def count(self) -> int:
         return self._count()
@@ -744,8 +747,9 @@ def to_arrow_from_list_and_artifact(obj, object_type, artifact):
     return weave_obj
 
 
-def to_arrow(obj):
-    wb_type = types.TypeRegistry.type_of(obj)
+def to_arrow(obj, wb_type=None):
+    if wb_type is None:
+        wb_type = types.TypeRegistry.type_of(obj)
     artifact = artifacts_local.LocalArtifact("to-arrow-%s" % wb_type.name)
     if isinstance(wb_type, types.List):
         object_type = wb_type.object_type

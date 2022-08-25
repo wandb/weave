@@ -1,5 +1,6 @@
 from weave.ops_domain import RunSegment
-from weave import storage, publish
+from weave import storage, publish, type_of
+from weave.weave_types import List
 import typing
 import numpy as np
 from weave.ops import to_arrow
@@ -7,18 +8,22 @@ from weave.ops import to_arrow
 # serializer = publish   # uses w&b artifacts intead of local artifacts
 serializer = storage.save
 
-N_METRICS = 100  # number of columns in the metrics table
+N_NUMERIC_METRICS = 99  # number of numerical columns in the metrics table
 
 
 def random_metrics(n=10, starting_index=0):
     """Create an array of metrics of length n starting from step starting_index."""
-    return [
+    raw = [
         {
             "step": starting_index + i + 1,
-            **{f"metric{j + 1}": np.random.random() for j in range(N_METRICS)},
+            "string_col": np.random.choice(list("ABCDEFGHIJKLMNOPQRSTUVWXYZ")),
+            **{f"metric{j + 1}": np.random.random() for j in range(N_NUMERIC_METRICS)},
         }
         for i in range(n)
     ]
+
+    wb_type = List(type_of(raw[0]))
+    return to_arrow(raw, wb_type=wb_type)
 
 
 def create_branch(
@@ -50,18 +55,21 @@ def create_branch(
     """
     if previous_segment:
         previous_metrics = previous_segment.metrics
-        starting_index = previous_metrics[0]["step"] + min(
+        starting_index = previous_metrics._index(0)["step"] + min(
             int(
                 branch_frac
-                * (previous_metrics[-1]["step"] - previous_metrics[0]["step"])
+                * (
+                    previous_metrics._index(len(previous_metrics) - 1)["step"]
+                    - previous_metrics._index(0)["step"]
+                )
             ),
             len(previous_metrics) - 1,
         )
 
         ref = serializer(previous_segment)
-        new_metrics = to_arrow(random_metrics(n=length, starting_index=starting_index))
+        new_metrics = random_metrics(n=length, starting_index=starting_index)
         return RunSegment(name, ref.uri, starting_index, new_metrics)
-    return RunSegment(name, None, 0, to_arrow(random_metrics(length, 0)))
+    return RunSegment(name, None, 0, random_metrics(length, 0))
 
 
 def create_experiment(
