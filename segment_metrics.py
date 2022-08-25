@@ -2,8 +2,17 @@ from weave.ops_domain import RunSegment
 from weave import storage, publish, type_of
 from weave.weave_types import List
 import typing
+import time
 import numpy as np
 from weave.ops import to_arrow
+
+import logging
+
+logger = logging.getLogger("run_segment")
+handler = logging.StreamHandler()
+handler.setFormatter(logging.Formatter("%(asctime)s - %(message)s"))
+logger.addHandler(handler)
+logger.setLevel(logging.INFO)
 
 # serializer = publish   # uses w&b artifacts intead of local artifacts
 serializer = storage.save
@@ -13,6 +22,10 @@ N_NUMERIC_METRICS = 99  # number of numerical columns in the metrics table
 
 def random_metrics(n=10, starting_index=0):
     """Create an array of metrics of length n starting from step starting_index."""
+    logger.info(
+        f"Creating a python list of {n} dicts with {N_NUMERIC_METRICS + 2} keys per dict."
+    )
+    start_time = time.time()
     raw = [
         {
             "step": starting_index + i + 1,
@@ -21,9 +34,19 @@ def random_metrics(n=10, starting_index=0):
         }
         for i in range(n)
     ]
+    done_time = time.time()
+    logger.info(f"Finished creating dict in {done_time - start_time:.2f} sec.")
 
+    logger.info(f"Converting list-of-dict representation to arrow.")
+    arrow_start_time = time.time()
     wb_type = List(type_of(raw[0]))
-    return to_arrow(raw, wb_type=wb_type)
+    arrow_form = to_arrow(raw, wb_type=wb_type)
+    arrow_end_time = time.time()
+    logger.info(
+        f"Finished converting list-of-dict representation to arrow in {arrow_end_time - arrow_start_time:.2f} sec."
+    )
+
+    return arrow_form
 
 
 def create_branch(
