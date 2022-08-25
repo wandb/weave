@@ -71,8 +71,7 @@ def run_segment_render(
         content=[
             panels.CardTab(
                 name="History",
-                # TODO: this should just be run_segment.metrics
-                content=run_segment.metrics,  # type: ignore
+                content=run_segment.metrics,
             ),
         ],
     )
