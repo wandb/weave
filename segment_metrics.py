@@ -3,13 +3,14 @@ from weave import storage, publish, type_of
 from weave.weave_types import List
 import typing
 import time
+import sys
 import numpy as np
 from weave.ops import to_arrow
 
 import logging
 
 logger = logging.getLogger("run_segment")
-handler = logging.StreamHandler()
+handler = logging.StreamHandler(stream=sys.stdout)
 handler.setFormatter(logging.Formatter("%(asctime)s - %(message)s"))
 logger.addHandler(handler)
 logger.setLevel(logging.INFO)
