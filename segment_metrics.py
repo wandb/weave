@@ -6,7 +6,7 @@ import numpy as np
 # serializer = publish   # uses w&b artifacts intead of local artifacts
 serializer = storage.save
 
-N_METRICS = 100
+N_METRICS = 100  # number of columns in the metrics table
 
 
 def random_metrics(n=10, starting_index=0):
