@@ -25,9 +25,7 @@ class RunSegment:
 
             segment = use(get(segment.prior_run_ref))
             metrics = list(
-                filter(
-                    lambda metric: metric["step"] >= resumed_from_step, segment.metrics
-                )
+                filter(lambda metric: metric["step"] > resumed_from_step, metrics)
             )
             resumed_from_step = segment.resumed_from_step
 
@@ -49,7 +47,9 @@ class RunSegment:
                 "name": self.run_name,
                 **d,  # type: ignore
             }
-            for d in self.metrics[:until]
+            for d in filter(
+                lambda metric: not until or metric["step"] <= until, self.metrics
+            )
         ]
 
         return prior_run_metrics + own_metrics
