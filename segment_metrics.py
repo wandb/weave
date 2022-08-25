@@ -2,6 +2,7 @@ from weave.ops_domain import RunSegment
 from weave import storage, publish
 import typing
 import numpy as np
+from weave.ops import to_arrow
 
 # serializer = publish   # uses w&b artifacts intead of local artifacts
 serializer = storage.save
@@ -58,15 +59,15 @@ def create_branch(
         )
 
         ref = serializer(previous_segment)
-        new_metrics = random_metrics(n=length, starting_index=starting_index)
+        new_metrics = to_arrow(random_metrics(n=length, starting_index=starting_index))
         return RunSegment(name, ref.uri, starting_index, new_metrics)
-    return RunSegment(name, None, 0, random_metrics(length, 0))
+    return RunSegment(name, None, 0, to_arrow(random_metrics(length, 0)))
 
 
 def create_experiment(
     num_steps: int, num_runs: int, branch_frac: float = 0.8
 ) -> typing.Optional[RunSegment]:
-    num_steps_per_run = num_steps / num_runs
+    num_steps_per_run = num_steps // num_runs
     segment = None
     for i in range(num_runs):
         segment = create_branch(
