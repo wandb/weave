@@ -60,3 +60,18 @@ def create_branch(
         new_metrics = random_metrics(n=length, starting_index=starting_index)
         return RunSegment(name, ref.uri, starting_index, new_metrics)
     return RunSegment(name, None, 0, random_metrics(length, 0))
+
+
+def create_experiment(
+    num_steps: int, num_runs: int, branch_frac: float = 0.8
+) -> typing.Optional[RunSegment]:
+    num_steps_per_run = num_steps / num_runs
+    segment = None
+    for i in range(num_runs):
+        segment = create_branch(
+            f"branch {i + 1}",
+            segment,
+            length=num_steps_per_run,
+            branch_frac=branch_frac,
+        )
+    return segment
