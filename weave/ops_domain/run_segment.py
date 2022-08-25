@@ -24,7 +24,11 @@ class RunSegment:
                 return types.List(object_type=types.Any())
 
             segment = use(get(segment.prior_run_ref))
-            metrics = segment.metrics[:resumed_from_step]
+            metrics = list(
+                filter(
+                    lambda metric: metric["step"] >= resumed_from_step, segment.metrics
+                )
+            )
             resumed_from_step = segment.resumed_from_step
 
         # get the first row and use it to infer the type
