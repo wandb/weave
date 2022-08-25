@@ -51,7 +51,8 @@ def create_branch(
         previous_metrics = previous_segment.metrics
         starting_index = previous_metrics[0]["step"] + min(
             int(
-                branch_frac * previous_metrics[-1]["step"] - previous_metrics[0]["step"]
+                branch_frac
+                * (previous_metrics[-1]["step"] - previous_metrics[0]["step"])
             ),
             len(previous_metrics) - 1,
         )
