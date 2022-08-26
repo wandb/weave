@@ -613,7 +613,6 @@ class ArrowWeaveList:
         return ArrowWeaveList(res, map_fn.type, self._artifact)
 
     def _append_column(self, name, data) -> "ArrowWeaveList":
-        print("args to append column", "name", name, "data", data)
         new_data = self._arrow_data.append_column(name, [data])
         new_data_type = types.TypedDict({name: type_of(data[0])})
         return ArrowWeaveList(
