@@ -24,10 +24,11 @@ from .. import weave_types as types
 
 
 def typeddict_pick_output_type(input_types):
+    property_types = input_types["self"].property_types
     if not isinstance(input_types["key"], types.Const):
+        return types.union(*list(property_types.values()))
         return types.UnknownType()
     key = input_types["key"].val
-    property_types = input_types["self"].property_types
     output_type = property_types.get(key)
     if output_type is None:
         # TODO: we hack this to types.Number() for now! This is relied
@@ -41,7 +42,7 @@ def typeddict_pick_output_type(input_types):
 
 
 @weave_class(weave_type=types.TypedDict)
-class TypedDict(dict):
+class TypedDict:
     @mutation
     def __setitem__(self, k, v):
         dict.__setitem__(self, k, v)
@@ -62,6 +63,10 @@ class TypedDict(dict):
             return dict.__getitem__(self, key)
         except KeyError:
             return None
+
+    @op()
+    def keys(self) -> list[str]:
+        return list(self.keys())
 
     @op(
         name="merge",

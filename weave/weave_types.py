@@ -533,7 +533,7 @@ class List(Type):
 class TypedDict(Type):
     name = "typedDict"
     instance_classes = [dict]
-    property_types: dict[str, Type]
+    property_types: dict[str, Type] = dataclasses.field(default_factory=dict)
 
     def __hash__(self):
         # Can't hash property_types by default because dict is not hashable

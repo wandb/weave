@@ -4,6 +4,7 @@ from .number import *
 from .boolean import *
 from .dict import *
 from .list_ import *
+from .set_ import *
 from .file import *
 from .file_local import *
 from .weave_api import *

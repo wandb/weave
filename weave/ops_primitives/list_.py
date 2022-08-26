@@ -516,3 +516,83 @@ def list_return_type(input_types):
 )
 def make_list(**l):
     return list(l.values())
+
+
+def _join_output_type(input_types):
+    arr1_prop_types = input_types["arr1"].object_type.property_types
+    arr2_prop_types = input_types["arr2"].object_type.property_types
+    prop_types = {}
+    for k in set(arr1_prop_types.keys()).union(arr2_prop_types.keys()):
+        prop_types[k] = types.List(types.union(arr1_prop_types[k], arr2_prop_types[k]))
+    return types.List(types.TypedDict(prop_types))
+
+
+@op(
+    input_type={
+        "arr1": types.List(types.TypedDict({})),
+        "arr2": types.List(types.TypedDict({})),
+        "keyFn1": lambda input_types: types.Function(
+            {"row": input_types["arr1"].object_type}, types.Any()
+        ),
+        "keyFn2": lambda input_types: types.Function(
+            {"row": input_types["arr2"].object_type}, types.Any()
+        ),
+    },
+    output_type=_join_output_type,
+)
+def join2(arr1, arr2, keyFn1, keyFn2):  # type: ignore
+    arr1_keys = execute_fast.fast_map_fn(arr1, keyFn1)
+    arr2_keys = execute_fast.fast_map_fn(arr2, keyFn2)
+    all_keys = set(arr1_keys).union(arr2_keys)
+    arr1_lookup = dict(zip(arr1_keys, arr1))
+    arr2_lookup = dict(zip(arr2_keys, arr2))
+    results = []
+    for k in all_keys:
+        arr1_row = arr1_lookup[k]
+        arr2_row = arr2_lookup[k]
+        row_keys = set(arr1_row.keys()).union(arr2_row.keys())
+        row = {}
+        for rk in row_keys:
+            row[rk] = [arr1_row.get(rk), arr2_row.get(rk)]
+        results.append(row)
+    return results
+
+
+def _join_all_output_type(input_types):
+    arr_prop_types = input_types["arrs"].object_type.object_type.property_types
+    prop_types = {}
+    for k in arr_prop_types.keys():
+        prop_types[k] = types.List(arr_prop_types[k])
+    return types.List(types.TypedDict(prop_types))
+
+
+@op(
+    name="joinAll",
+    input_type={
+        "arrs": types.List(types.List(types.TypedDict({}))),
+        "joinFn": lambda input_types: types.Function(
+            {"row": input_types["arrs"].object_type.object_type}, types.Any()
+        ),
+    },
+    output_type=_join_all_output_type,
+)
+def join_all(arrs, joinFn, outer: bool):  # type: ignore
+    arr1 = arrs[0]
+    arr2 = arrs[1]
+    keyFn1 = joinFn
+    keyFn2 = joinFn
+    arr1_keys = execute_fast.fast_map_fn(arr1, keyFn1)
+    arr2_keys = execute_fast.fast_map_fn(arr2, keyFn2)
+    all_keys = set(arr1_keys).union(arr2_keys)
+    arr1_lookup = dict(zip(arr1_keys, arr1))
+    arr2_lookup = dict(zip(arr2_keys, arr2))
+    results = []
+    for k in all_keys:
+        arr1_row = arr1_lookup[k]
+        arr2_row = arr2_lookup[k]
+        row_keys = set(arr1_row.keys()).union(arr2_row.keys())
+        row = {}
+        for rk in row_keys:
+            row[rk] = [arr1_row.get(rk), arr2_row.get(rk)]
+        results.append(row)
+    return results
