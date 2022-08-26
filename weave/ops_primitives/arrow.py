@@ -5,9 +5,10 @@ import numpy as np
 import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.parquet as pq
+
 from .. import weave_internal
 
-from ..api import op, weave_class
+from ..api import op, weave_class, type_of
 from .. import weave_types as types
 from .. import graph
 from .. import errors
@@ -610,6 +611,14 @@ class ArrowWeaveList:
         if isinstance(res, ArrowArrayVectorizer):
             res = res.arr
         return ArrowWeaveList(res, map_fn.type, self._artifact)
+
+    def _append_column(self, name, data) -> "ArrowWeaveList":
+        print("args to append column", "name", name, "data", data)
+        new_data = self._arrow_data.append_column(name, [data])
+        new_data_type = types.TypedDict({name: type_of(data[0])})
+        return ArrowWeaveList(
+            new_data, types.merge_types(self.object_type, new_data_type), self._artifact
+        )
 
     def concatenate(self, other: "ArrowWeaveList") -> "ArrowWeaveList":
         self_data = (
