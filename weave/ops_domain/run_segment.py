@@ -1,5 +1,7 @@
+import typing
 from typing import Optional, cast
 from ..api import type, op, use, get, type_of, Node
+from .. import weave_types as types
 from .. import panels
 from ..ops_primitives.arrow import ArrowWeaveList
 
@@ -9,7 +11,7 @@ class RunSegment:
     run_name: str
     prior_run_ref: Optional[str]
     resumed_from_step: int
-    metrics: ArrowWeaveList
+    metrics: typing.TypeVar("MetricRows")  # type: ignore
 
     def _experiment_body(self, until: Optional[int] = None) -> ArrowWeaveList:
         my_first_step = self.metrics._index(0)["step"]
@@ -24,8 +26,20 @@ class RunSegment:
         prior_run_metrics = prior_run._experiment_body(until=self.resumed_from_step)
         return limited.concatenate(prior_run_metrics)
 
-    @op()
-    def experiment(self) -> ArrowWeaveList:
+    @op(render_info={"type": "function"})
+    def refine_experiment_type(self) -> types.Type:
+        """Assuming a constant type over history rows for now."""
+
+        segment = self
+        metrics = segment.metrics
+
+        # get the first row and use it to infer the type
+        example_row = metrics._index(0)
+        # name_type = types.TypedDict({"name": types.String()})
+        return types.List(type_of(example_row))
+
+    @op(refine_output_type=refine_experiment_type)
+    def experiment(self) -> typing.Any:
         return self._experiment_body()
 
 
