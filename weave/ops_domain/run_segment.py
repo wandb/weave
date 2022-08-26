@@ -13,30 +13,28 @@ class RunSegment:
     resumed_from_step: int
     metrics: typing.TypeVar("MetricRows")  # type: ignore
 
-    def _experiment_body(self, until: Optional[int] = None) -> ArrowWeaveList:
-        my_first_step = self.metrics._index(0)["step"]
-        limit = until - my_first_step + 1 if until else len(self.metrics)
-        limited = self.metrics._limit(limit)
+    def _experiment_body(self, end_step: Optional[int] = None) -> ArrowWeaveList:
+        start_step = self.metrics._index(0)["step"]
+        limit = end_step - start_step + 1 if end_step else len(self.metrics)
+        limited = self.metrics._limit(limit)._append_column(
+            "run_name", [self.run_name] * limit
+        )
 
         if self.prior_run_ref is None:
             return limited
 
         # get the prior run
         prior_run: RunSegment = use(get(self.prior_run_ref))
-        prior_run_metrics = prior_run._experiment_body(until=self.resumed_from_step)
+        prior_run_metrics = prior_run._experiment_body(end_step=self.resumed_from_step)
         return limited.concatenate(prior_run_metrics)
 
     @op(render_info={"type": "function"})
     def refine_experiment_type(self) -> types.Type:
         """Assuming a constant type over history rows for now."""
-
-        segment = self
-        metrics = segment.metrics
-
         # get the first row and use it to infer the type
-        example_row = metrics._index(0)
-        # name_type = types.TypedDict({"name": types.String()})
-        return types.List(type_of(example_row))
+        example_row = self.metrics._index(0)
+        name_type = types.TypedDict({"run_name": types.String()})
+        return types.List(types.merge_types(type_of(example_row), name_type))
 
     @op(refine_output_type=refine_experiment_type)
     def experiment(self) -> typing.Any:
