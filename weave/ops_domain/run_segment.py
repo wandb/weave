@@ -15,7 +15,7 @@ class RunSegment:
 
     def _experiment_body(self, end_step: Optional[int] = None) -> ArrowWeaveList:
         start_step = self.metrics._index(0)["step"]
-        limit = end_step - start_step if end_step else len(self.metrics)
+        limit = end_step - start_step + 1 if end_step else len(self.metrics)
         limited = self.metrics._limit(limit)._append_column(
             "run_name", [self.run_name] * limit, weave_type=types.String()
         )
