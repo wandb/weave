@@ -4,8 +4,6 @@ from .ops_domain import RunSegment
 from . import storage, type_of, use
 from .weave_types import List
 import typing
-import time
-import sys
 import numpy as np
 from .ops import to_arrow
 
@@ -15,13 +13,17 @@ serializer = storage.save
 N_NUMERIC_METRICS = 99  # number of numerical columns in the metrics table
 
 
-def random_metrics(n=10, starting_index=0):
+def random_metrics(n: int = 10, starting_index: int = 0):
     """Create an array of metrics of length n starting from step starting_index."""
+    if n <= 0:
+        raise ValueError("n must be at least 1")
+    if starting_index < 0:
+        raise ValueError("starting index must be at least 0")
     raw = [
         {
-            "step": starting_index + i + 1,
+            "step": starting_index + i,
             "string_col": np.random.choice(list("ABCDEFGHIJKLMNOPQRSTUVWXYZ")),
-            **{f"metric{j + 1}": np.random.random() for j in range(N_NUMERIC_METRICS)},
+            **{f"metric{j}": np.random.random() for j in range(N_NUMERIC_METRICS)},
         }
         for i in range(n)
     ]
@@ -58,22 +60,25 @@ def create_branch(
     segment: RunSegment
         The new segment.
     """
+    if not (0 <= branch_frac <= 1):
+        raise ValueError("branch_frac must be between 0 and 1")
+
+    # run 0: [0, 1]
+    # run 1: branch frac 0.1, len 2
+    # starting_index = 0,
+
     if previous_segment:
         previous_metrics = previous_segment.metrics
-        starting_index = previous_metrics._index(0)["step"] + min(
-            int(
-                branch_frac
-                * (
-                    previous_metrics._index(len(previous_metrics) - 1)["step"]
-                    - previous_metrics._index(0)["step"]
-                )
-            ),
-            len(previous_metrics) - 1,
-        )
+        n_previous_metrics = len(previous_metrics)
+        if n_previous_metrics > 0:
+            starting_index = previous_metrics._index(0)["step"] + min(
+                int(branch_frac * n_previous_metrics),
+                n_previous_metrics,
+            )
 
-        ref = serializer(previous_segment)
-        new_metrics = random_metrics(n=length, starting_index=starting_index)
-        return RunSegment(name, ref.uri, starting_index, new_metrics)
+            ref = serializer(previous_segment)
+            new_metrics = random_metrics(n=length, starting_index=starting_index)
+            return RunSegment(name, ref.uri, starting_index + 1, new_metrics)
     return RunSegment(name, None, 0, random_metrics(length, 0))
 
 
@@ -84,7 +89,7 @@ def create_experiment(
     segment = None
     for i in range(num_runs):
         segment = create_branch(
-            f"branch {i + 1}",
+            f"branch {i}",
             segment,
             length=num_steps_per_run,
             branch_frac=branch_frac,
