@@ -1,11 +1,13 @@
-from weave.ops_domain import RunSegment
-from weave import storage, publish, type_of
-from weave.weave_types import List
+import pytest
+
+from .ops_domain import RunSegment
+from . import storage, type_of, use
+from .weave_types import List
 import typing
 import time
 import sys
 import numpy as np
-from weave.ops import to_arrow
+from .ops import to_arrow
 
 import logging
 
@@ -13,7 +15,9 @@ logger = logging.getLogger("run_segment")
 handler = logging.StreamHandler(stream=sys.stdout)
 handler.setFormatter(logging.Formatter("%(asctime)s - %(message)s"))
 logger.addHandler(handler)
-logger.setLevel(logging.INFO)
+
+# set to logging.INFO for more verbose profiling
+logger.setLevel(logging.ERROR)
 
 # serializer = publish   # uses w&b artifacts intead of local artifacts
 serializer = storage.save
@@ -109,3 +113,14 @@ def create_experiment(
             branch_frac=branch_frac,
         )
     return segment
+
+
+@pytest.mark.parametrize("branch_frac", [0.0, 0.8, 1.0])
+def test_experiment_branching(branch_frac):
+    num_steps = 50000
+    num_runs = 100
+    steps_per_run = num_steps // num_runs
+    segment = create_experiment(num_steps, num_runs, branch_frac)
+    assert len(use(segment.experiment())) == steps_per_run * (
+        (num_runs - 1) * branch_frac + 1
+    )

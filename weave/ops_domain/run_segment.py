@@ -15,9 +15,9 @@ class RunSegment:
 
     def _experiment_body(self, end_step: Optional[int] = None) -> ArrowWeaveList:
         start_step = self.metrics._index(0)["step"]
-        limit = end_step - start_step + 1 if end_step else len(self.metrics)
+        limit = end_step - start_step if end_step else len(self.metrics)
         limited = self.metrics._limit(limit)._append_column(
-            "run_name", [self.run_name] * limit
+            "run_name", [self.run_name] * limit, weave_type=types.String()
         )
 
         if self.prior_run_ref is None:
@@ -26,7 +26,9 @@ class RunSegment:
         # get the prior run
         prior_run: RunSegment = use(get(self.prior_run_ref))
         prior_run_metrics = prior_run._experiment_body(end_step=self.resumed_from_step)
-        return limited.concatenate(prior_run_metrics)
+        if len(prior_run_metrics) > 0:
+            return limited.concatenate(prior_run_metrics)
+        return limited
 
     @op(render_info={"type": "function"})
     def refine_experiment_type(self) -> types.Type:
