@@ -7,12 +7,9 @@ class Table(panel.Panel):
 
     def __init__(self, input_node, **kwargs):
         super().__init__(input_node)
-        self._table_state = None  # None instructs JS to automatically configure how to display the table
+        self._table_state = table_state.TableState(self.input_node)
 
         if "columns" in kwargs:
-            # if we explicitly have columns as args, we explicitly construct a table state here and pass
-            # it to JS to configure how the resulting panel should be displayed
-            self._table_state = table_state.TableState(self.input_node)
             for column_expr in kwargs["columns"]:
                 self.append_column(column_expr)
 
@@ -25,5 +22,4 @@ class Table(panel.Panel):
 
     @property
     def config(self):
-        state = self._table_state.to_json() if self._table_state else self._table_state
-        return {"tableState": state}
+        return {"tableState": self._table_state.to_json()}
