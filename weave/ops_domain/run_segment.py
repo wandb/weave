@@ -1,4 +1,5 @@
 import typing
+import functools
 from typing import Optional, cast
 from ..api import type, op, use, get, type_of, Node
 from .. import weave_types as types
@@ -10,12 +11,16 @@ from ..ops_primitives.arrow import ArrowWeaveList
 class RunSegment:
     run_name: str
     prior_run_ref: Optional[str]
-    resumed_from_step: int
+    previous_run_branch_step: Optional[int]
     metrics: typing.TypeVar("MetricRows")  # type: ignore
 
-    def _experiment_body(self, end_step: Optional[int] = None) -> ArrowWeaveList:
-        start_step = self.metrics._index(0)["step"]
-        limit = end_step - start_step if end_step else len(self.metrics)
+    def _experiment_body(self, slice_end: Optional[int] = None) -> ArrowWeaveList:
+
+        limit = (
+            sum([v["step"] < slice_end for v in self.metrics])
+            if slice_end is not None
+            else len(self.metrics)
+        )
         limited = self.metrics._limit(limit)._append_column(
             "run_name", [self.run_name] * limit, weave_type=types.String()
         )
@@ -26,7 +31,9 @@ class RunSegment:
         # get the prior run
         prior_run: RunSegment = use(get(self.prior_run_ref))
         prior_run_metrics = prior_run._experiment_body(
-            end_step=self.resumed_from_step + 1
+            slice_end=self.previous_run_branch_step + 1
+            if self.previous_run_branch_step is not None
+            else self.previous_run_branch_step
         )
         if len(prior_run_metrics) > 0:
             return limited.concatenate(prior_run_metrics)
