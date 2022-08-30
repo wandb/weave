@@ -47,9 +47,27 @@ def use(nodes, client=None):
     return result
 
 
+# TODO: remove from PR
+def _get_common_union_type_class(type_):
+    if isinstance(type_, types.UnionType):
+        members = type_.members
+        class0 = members[0].__class__
+        if all(m.__class__ == class0 for m in members[1:]):
+            return class0
+    return None
+
+
 def get_node_methods_classes(type_):
     classes = []
-    for type_class in type_.__class__.mro():
+
+    # If we have a union of all the same type class, then use that
+    # type class for our Node Methods.
+    # TODO: This is not as general as WeaveJS!
+    tc = _get_common_union_type_class(type_)
+    if tc is None:
+        tc = type_.__class__
+
+    for type_class in tc.mro():
         if (
             hasattr(type_class, "NodeMethodsClass")
             and type_class.NodeMethodsClass not in classes

@@ -394,6 +394,13 @@ class String(BasicType):
     name = "string"
     instance_classes = str
 
+    # Just for String, we use a Const Type
+    # TODO: this sucks! Maybe we need a const object?
+    # but how does user code know to use it?
+    @classmethod
+    def type_of_instance(cls, obj):
+        return Const(cls(), obj)
+
 
 class Number(BasicType):
     name = "number"

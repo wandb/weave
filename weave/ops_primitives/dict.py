@@ -23,11 +23,28 @@ from .. import weave_types as types
 # Then figure out how to do array/mapped ops...
 
 
+def is_const_union_of_type(type_, of_type):
+    if not isinstance(type_, types.UnionType):
+        return False
+    return all(
+        isinstance(m, types.Const) and m.val_type == of_type for m in type_.members
+    )
+
+
 def typeddict_pick_output_type(input_types):
     property_types = input_types["self"].property_types
+    if is_const_union_of_type(input_types["key"], types.String()):
+        member_types = []
+        for m in input_types["key"].members:
+            prop_type = property_types.get(m.val)
+            if prop_type is None:
+                member_types.append(types.NoneType())
+            else:
+                member_types.append(prop_type)
+        return types.union(*member_types)
+
     if not isinstance(input_types["key"], types.Const):
         return types.union(*list(property_types.values()))
-        return types.UnknownType()
     key = input_types["key"].val
     output_type = property_types.get(key)
     if output_type is None:
@@ -64,8 +81,17 @@ class TypedDict:
         except KeyError:
             return None
 
-    @op()
-    def keys(self) -> list[str]:
+    @op(
+        output_type=lambda input_type: types.List(
+            types.UnionType(
+                *(
+                    types.Const(types.String(), k)
+                    for k in input_type["self"].property_types.keys()
+                )
+            )
+        )
+    )
+    def keys(self):
         return list(self.keys())
 
     @op(

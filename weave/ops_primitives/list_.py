@@ -11,6 +11,13 @@ from .. import execute_fast
 from . import dict as dict_ops
 
 
+def getitem_output_type(input_types):
+    self_type = input_types["self"]
+    if isinstance(self_type, types.UnionType):
+        return types.UnionType(*[t.object_type for t in self_type.members])
+    return self_type.object_type
+
+
 @weave_class(weave_type=types.List)
 class List:
     @op(input_type={"self": types.List(types.Any())}, output_type=types.Float())
@@ -35,7 +42,7 @@ class List:
     @op(
         setter=__setitem__,
         input_type={"self": types.List(types.Any()), "index": types.Int()},
-        output_type=lambda input_types: input_types["self"].object_type,
+        output_type=getitem_output_type,
     )
     def __getitem__(self, index):
         try:

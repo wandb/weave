@@ -3,7 +3,7 @@ import typing
 
 
 class ScenarioResult(typing.TypedDict):
-    scenario_id: float
+    scenario_id: str
     metric1: float
     metric2: float
     metric3: float
@@ -27,11 +27,7 @@ def metrics_bank(input_node: weave.Node[MetricsBankInput]) -> weave.panels.Plot:
         False,
     )
 
-    # Note metrics is keys of joined, so we don't need to compute it here
-    # really...
-    metrics = weave.ops.subtract(
-        weave.ops.union(baseline[0].keys(), candidate[0].keys()), ["scenario_id"]
-    )
+    metrics = weave.ops.difference(joined[0].keys(), ["scenario_id"])
 
     return weave.panels.Each(
         metrics,
@@ -42,20 +38,3 @@ def metrics_bank(input_node: weave.Node[MetricsBankInput]) -> weave.panels.Plot:
             y=lambda row: row[metric_name][1],
         ),
     )
-
-
-from ... import weave_internal
-
-
-def cast_type(node: weave.graph.OutputNode, type):
-    return weave_internal.make_output_node(type, node.from_op.name, node.from_op.inputs)
-
-
-def row_x(row, metric_name):
-    print("ROW", row)
-    return cast_type(row[metric_name], weave.types.List(weave.types.Float()))[0]
-
-
-def row_y(row, metric_name):
-    print("ROW Y", row)
-    return cast_type(row[metric_name], weave.types.List(weave.types.Float()))[1]
