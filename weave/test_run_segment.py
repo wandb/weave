@@ -127,8 +127,8 @@ def test_experiment_branching(branch_frac, num_steps, num_runs):
     )
 
 
-@pytest.mark.parametrize("delta_step", [1, 2])
-def test_explicit_experiment_construction_linear(delta_step):
+@pytest.mark.parametrize("delta_step", [1, 2, 3])
+def test_explicit_experiment_construction(delta_step):
     root_segment = RunSegment(
         "my-first-run", None, 0, random_metrics(10, delta_step=delta_step)
     )
