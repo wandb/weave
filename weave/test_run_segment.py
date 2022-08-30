@@ -7,9 +7,6 @@ import typing
 import numpy as np
 from .ops import to_arrow
 
-# serializer = publish   # uses w&b artifacts intead of local artifacts
-serializer = storage.save
-
 N_NUMERIC_METRICS = 99  # number of numerical columns in the metrics table
 
 
@@ -70,7 +67,7 @@ def create_branch(
             previous_run_branch_step = previous_metrics._index(0)["step"] + int(
                 branch_frac * n_previous_metrics
             )
-            ref = serializer(previous_segment)
+            ref = storage.save(previous_segment)
             new_metrics = random_metrics(
                 n=length, starting_step=previous_run_branch_step
             )
@@ -117,4 +114,21 @@ def test_experiment_branching(branch_frac, num_steps, num_runs):
         experiment._get_col("step").to_pylist()
         == list(range(int(steps_per_run * branch_frac) * (num_runs - 1)))
         + segment.metrics._get_col("step").to_pylist()
+    )
+
+
+def test_explicit_experiment_construction_linear():
+    root_segment = RunSegment("my-first-run", None, 0, random_metrics(10))
+    ref1 = storage.save(root_segment)
+    segment1 = RunSegment("my-second-run", ref1.uri, 5, random_metrics(10, 5))
+    ref2 = storage.save(segment1)
+    segment2 = RunSegment("my-third-run", ref2.uri, 10, random_metrics(5, 10))
+    experiment = use(segment2.experiment())
+
+    assert experiment._get_col("step").to_pylist() == list(range(15))
+    assert (
+        experiment._get_col("string_col").to_pylist()
+        == root_segment.metrics._get_col("string_col").to_pylist()[:5]
+        + segment1.metrics._get_col("string_col").to_pylist()[:5]
+        + segment2.metrics._get_col("string_col").to_pylist()
     )
