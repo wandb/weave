@@ -1,6 +1,6 @@
 import typing
-import functools
-from typing import Optional, cast
+import bisect
+from typing import Optional, cast, Sequence
 from ..api import type, op, use, get, type_of, Node
 from .. import weave_types as types
 from .. import panels
@@ -15,12 +15,27 @@ class RunSegment:
     metrics: typing.TypeVar("MetricRows")  # type: ignore
 
     def _experiment_body(self, slice_end: Optional[int] = None) -> ArrowWeaveList:
+        class ListWithCustomAccessor(Sequence):
+            def __init__(self, data):
+                self.data = data
 
+            def __getitem__(self, i):
+                return self.data._index(i)["step"]
+
+            def __len__(self):
+                return len(self.data)
+
+        # log(n) solution to find the number of records to insert assuming step
+        # is monotonically increasing but not uniformly spaced
         limit = (
-            sum([v["step"] < slice_end for v in self.metrics])
-            if slice_end is not None
+            bisect.bisect_left(
+                ListWithCustomAccessor(self.metrics),
+                slice_end,
+            )
+            if slice_end is not None and len(self.metrics) != 0
             else len(self.metrics)
         )
+
         limited = self.metrics._limit(limit)._append_column(
             "run_name", [self.run_name] * limit, weave_type=types.String()
         )
@@ -31,7 +46,7 @@ class RunSegment:
         # get the prior run
         prior_run: RunSegment = use(get(self.prior_run_ref))
         prior_run_metrics = prior_run._experiment_body(
-            slice_end=self.previous_run_branch_step + 1
+            slice_end=self.previous_run_branch_step
             if self.previous_run_branch_step is not None
             else self.previous_run_branch_step
         )

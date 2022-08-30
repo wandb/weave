@@ -13,15 +13,15 @@ serializer = storage.save
 N_NUMERIC_METRICS = 99  # number of numerical columns in the metrics table
 
 
-def random_metrics(n: int = 10, starting_index: int = 0):
+def random_metrics(n: int = 10, starting_step: int = 0):
     """Create an array of metrics of length n starting from step starting_index."""
     if n <= 0:
         raise ValueError("n must be at least 1")
-    if starting_index < 0:
+    if starting_step < 0:
         raise ValueError("starting index must be at least 0")
     raw = [
         {
-            "step": starting_index + i,
+            "step": starting_step + i,
             "string_col": np.random.choice(list("ABCDEFGHIJKLMNOPQRSTUVWXYZ")),
             **{f"metric{j}": np.random.random() for j in range(N_NUMERIC_METRICS)},
         }
@@ -63,22 +63,18 @@ def create_branch(
     if not (0 <= branch_frac <= 1):
         raise ValueError("branch_frac must be between 0 and 1")
 
-    # run 0: [0, 1]
-    # run 1: branch frac 0.1, len 2
-    # starting_index = 0,
-
     if previous_segment:
         previous_metrics = previous_segment.metrics
         n_previous_metrics = len(previous_metrics)
         if n_previous_metrics > 0:
-            starting_index = previous_metrics._index(0)["step"] + min(
-                int(branch_frac * n_previous_metrics),
-                n_previous_metrics,
+            previous_run_branch_step = previous_metrics._index(0)["step"] + int(
+                branch_frac * n_previous_metrics
             )
-
             ref = serializer(previous_segment)
-            new_metrics = random_metrics(n=length, starting_index=starting_index)
-            return RunSegment(name, ref.uri, starting_index + 1, new_metrics)
+            new_metrics = random_metrics(
+                n=length, starting_step=previous_run_branch_step + 1
+            )
+            return RunSegment(name, ref.uri, previous_run_branch_step, new_metrics)
     return RunSegment(name, None, 0, random_metrics(length, 0))
 
 
@@ -103,6 +99,7 @@ def test_experiment_branching(branch_frac):
     num_runs = 20
     steps_per_run = num_steps // num_runs
     segment = create_experiment(num_steps, num_runs, branch_frac)
-    assert len(use(segment.experiment())) == steps_per_run * (
-        int((num_runs - 1) * branch_frac) + 1
+    assert (
+        len(use(segment.experiment()))
+        == int(steps_per_run * branch_frac) * (num_runs - 1) + steps_per_run
     )
