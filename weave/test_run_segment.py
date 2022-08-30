@@ -1,4 +1,5 @@
 import pytest
+from itertools import chain
 
 from .ops_domain import RunSegment
 from . import storage, type_of, use
@@ -131,4 +132,10 @@ def test_explicit_experiment_construction_linear():
         == root_segment.metrics._get_col("string_col").to_pylist()[:5]
         + segment1.metrics._get_col("string_col").to_pylist()[:5]
         + segment2.metrics._get_col("string_col").to_pylist()
+    )
+
+    assert experiment._get_col("run_name").to_pylist() == list(
+        chain(
+            *[[name] * 5 for name in ["my-first-run", "my-second-run", "my-third-run"]]
+        )
     )
