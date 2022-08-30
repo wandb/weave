@@ -3,7 +3,7 @@ import typing
 
 
 class ScenarioResult(typing.TypedDict):
-    scenario_id: str
+    scenario_id: float
     metric1: float
     metric2: float
     metric3: float
@@ -21,36 +21,41 @@ def metrics_bank(input_node: weave.Node[MetricsBankInput]) -> weave.panels.Plot:
     baseline = input["baseline"]
     candidate = input["candidate"]
 
-    metrics = weave.ops.union(baseline[0].keys(), candidate[0].keys())  # .subtract(
-    #     ["scenario_id"]
-    # )
-
-    # TODO: make this a variable
     joined = weave.ops.join_all(
         weave.ops.make_list(l0=baseline, l1=candidate),
-        lambda b_row: b_row["scenario_id"],
-        False
-        # lambda c_row: c_row["scenario_id"],
-    )
-    return weave.panels.Plot(
-        joined,
-        x=lambda scenario_metrics: scenario_metrics["metric1"][0],
-        y=lambda scenario_metrics: scenario_metrics["metric2"][1],
+        lambda row: row["scenario_id"],
+        False,
     )
 
-    # TODO: searchable PanelBank style thing
-    return weave.panels.Facet(
+    # Note metrics is keys of joined, so we don't need to compute it here
+    # really...
+    metrics = weave.ops.subtract(
+        weave.ops.union(baseline[0].keys(), candidate[0].keys()), ["scenario_id"]
+    )
+
+    return weave.panels.Each(
         metrics,
-        x=lambda m: m,
-        select=lambda m: weave.panels.Plot(
+        render=lambda metric_name: weave.panels.Plot(
             joined,
-            x=lambda scenario_metrics: scenario_metrics[m][0],
-            y=lambda scenario_metrics: scenario_metrics[m][1],
+            title=metric_name,
+            x=lambda row: row[metric_name][0],
+            y=lambda row: row[metric_name][1],
         ),
     )
 
 
-# TODO:
-#   Make it work
-#   How do we setup sidebar
-#   Drilldown
+from ... import weave_internal
+
+
+def cast_type(node: weave.graph.OutputNode, type):
+    return weave_internal.make_output_node(type, node.from_op.name, node.from_op.inputs)
+
+
+def row_x(row, metric_name):
+    print("ROW", row)
+    return cast_type(row[metric_name], weave.types.List(weave.types.Float()))[0]
+
+
+def row_y(row, metric_name):
+    print("ROW Y", row)
+    return cast_type(row[metric_name], weave.types.List(weave.types.Float()))[1]
