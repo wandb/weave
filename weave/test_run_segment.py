@@ -11,15 +11,17 @@ from .ops import to_arrow
 N_NUMERIC_METRICS = 99  # number of numerical columns in the metrics table
 
 
-def random_metrics(n: int = 10, starting_step: int = 0):
+def random_metrics(n: int = 10, starting_step: int = 0, delta_step: int = 1):
     """Create an array of metrics of length n starting from step starting_index."""
     if n <= 0:
         raise ValueError("n must be at least 1")
     if starting_step < 0:
         raise ValueError("starting index must be at least 0")
+    if delta_step < 1:
+        raise ValueError("delta_step must be an integer greater than or equal to 1.")
     raw = [
         {
-            "step": starting_step + i,
+            "step": starting_step + i * delta_step,
             "string_col": np.random.choice(list("ABCDEFGHIJKLMNOPQRSTUVWXYZ")),
             **{f"metric{j}": np.random.random() for j in range(N_NUMERIC_METRICS)},
         }
@@ -125,15 +127,30 @@ def test_experiment_branching(branch_frac, num_steps, num_runs):
     )
 
 
-def test_explicit_experiment_construction_linear():
-    root_segment = RunSegment("my-first-run", None, 0, random_metrics(10))
+@pytest.mark.parametrize("delta_step", [1, 2])
+def test_explicit_experiment_construction_linear(delta_step):
+    root_segment = RunSegment(
+        "my-first-run", None, 0, random_metrics(10, delta_step=delta_step)
+    )
     ref1 = storage.save(root_segment)
-    segment1 = RunSegment("my-second-run", ref1.uri, 4, random_metrics(10, 5))
+    segment1 = RunSegment(
+        "my-second-run",
+        ref1.uri,
+        4 * delta_step,
+        random_metrics(10, 5 * delta_step, delta_step=delta_step),
+    )
     ref2 = storage.save(segment1)
-    segment2 = RunSegment("my-third-run", ref2.uri, 9, random_metrics(5, 10))
+    segment2 = RunSegment(
+        "my-third-run",
+        ref2.uri,
+        9 * delta_step,
+        random_metrics(5, 10 * delta_step, delta_step=delta_step),
+    )
     experiment = use(segment2.experiment())
 
-    assert experiment._get_col("step").to_pylist() == list(range(15))
+    assert experiment._get_col("step").to_pylist() == list(
+        range(0, 15 * delta_step, delta_step)
+    )
     assert (
         experiment._get_col("string_col").to_pylist()
         == root_segment.metrics._get_col("string_col").to_pylist()[:5]
