@@ -11,7 +11,7 @@ from ..ops_primitives.arrow import ArrowWeaveList
 class RunSegment:
     run_name: str
     prior_run_ref: Optional[str]
-    previous_run_branch_step: Optional[int]
+    prior_run_branch_step: Optional[int]
     metrics: typing.TypeVar("MetricRows")  # type: ignore
 
     def _experiment_body(self, slice_end: Optional[int] = None) -> ArrowWeaveList:
@@ -46,9 +46,9 @@ class RunSegment:
         # get the prior run
         prior_run: RunSegment = use(get(self.prior_run_ref))
         prior_run_metrics = prior_run._experiment_body(
-            slice_end=self.previous_run_branch_step
-            if self.previous_run_branch_step is not None
-            else self.previous_run_branch_step
+            slice_end=self.prior_run_branch_step + 1
+            if self.prior_run_branch_step is not None
+            else 0
         )
         if len(prior_run_metrics) > 0:
             return prior_run_metrics.concatenate(limited)

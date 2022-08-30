@@ -65,13 +65,20 @@ def create_branch(
         previous_metrics = previous_segment.metrics
         n_previous_metrics = len(previous_metrics)
         if n_previous_metrics > 0:
-            previous_run_branch_step = previous_metrics._index(0)["step"] + int(
-                branch_frac * n_previous_metrics
+            previous_run_branch_step = (
+                previous_metrics._index(0)["step"]
+                + int(branch_frac * n_previous_metrics)
+                - 1
             )
             ref = storage.save(previous_segment)
             new_metrics = random_metrics(
-                n=length, starting_step=previous_run_branch_step
+                n=length, starting_step=previous_run_branch_step + 1
             )
+
+            # this run segment has a different root than the previous one
+            if previous_run_branch_step < 0:
+                previous_run_branch_step = None
+
             return RunSegment(name, ref.uri, previous_run_branch_step, new_metrics)
     return RunSegment(name, None, 0, random_metrics(length, 0))
 
@@ -121,9 +128,9 @@ def test_experiment_branching(branch_frac, num_steps, num_runs):
 def test_explicit_experiment_construction_linear():
     root_segment = RunSegment("my-first-run", None, 0, random_metrics(10))
     ref1 = storage.save(root_segment)
-    segment1 = RunSegment("my-second-run", ref1.uri, 5, random_metrics(10, 5))
+    segment1 = RunSegment("my-second-run", ref1.uri, 4, random_metrics(10, 5))
     ref2 = storage.save(segment1)
-    segment2 = RunSegment("my-third-run", ref2.uri, 10, random_metrics(5, 10))
+    segment2 = RunSegment("my-third-run", ref2.uri, 9, random_metrics(5, 10))
     experiment = use(segment2.experiment())
 
     assert experiment._get_col("step").to_pylist() == list(range(15))
