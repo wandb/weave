@@ -51,7 +51,7 @@ class RunSegment:
             else self.previous_run_branch_step
         )
         if len(prior_run_metrics) > 0:
-            return limited.concatenate(prior_run_metrics)
+            return prior_run_metrics.concatenate(limited)
         return limited
 
     @op(render_info={"type": "function"})

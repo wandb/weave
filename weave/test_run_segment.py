@@ -93,13 +93,28 @@ def create_experiment(
     return segment
 
 
+@pytest.fixture()
+def num_steps():
+    return 100
+
+
+@pytest.fixture()
+def num_runs():
+    return 20
+
+
 @pytest.mark.parametrize("branch_frac", [0.0, 0.8, 1.0])
-def test_experiment_branching(branch_frac):
-    num_steps = 100
-    num_runs = 20
+def test_experiment_branching(branch_frac, num_steps, num_runs):
     steps_per_run = num_steps // num_runs
     segment = create_experiment(num_steps, num_runs, branch_frac)
+    experiment = use(segment.experiment())
     assert (
-        len(use(segment.experiment()))
+        len(experiment)
         == int(steps_per_run * branch_frac) * (num_runs - 1) + steps_per_run
+    )
+
+    assert (
+        experiment._get_col("step").to_pylist()
+        == list(range(int(steps_per_run * branch_frac) * (num_runs - 1)))
+        + segment.metrics._get_col("step").to_pylist()
     )
