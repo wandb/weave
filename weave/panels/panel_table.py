@@ -1,9 +1,12 @@
+import typing
+
 from .. import panel
 from . import table_state
 
 
 class Table(panel.Panel):
     id = "table"
+    _table_state: typing.Optional[table_state.TableState]
 
     def __init__(self, input_node, **kwargs):
         super().__init__(input_node)
