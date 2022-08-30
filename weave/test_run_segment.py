@@ -114,17 +114,22 @@ def num_runs():
 def test_experiment_branching(branch_frac, num_steps, num_runs):
     steps_per_run = num_steps // num_runs
     segment = create_experiment(num_steps, num_runs, branch_frac)
-    experiment = use(segment.experiment())
-    assert (
-        len(experiment)
-        == int(steps_per_run * branch_frac) * (num_runs - 1) + steps_per_run
-    )
 
-    assert (
-        experiment._get_col("step").to_pylist()
-        == list(range(int(steps_per_run * branch_frac) * (num_runs - 1)))
-        + segment.metrics._get_col("step").to_pylist()
-    )
+    try:
+        experiment = use(segment.experiment())
+    except ValueError:
+        assert branch_frac == 0
+    else:
+        assert (
+            len(experiment)
+            == int(steps_per_run * branch_frac) * (num_runs - 1) + steps_per_run
+        )
+
+        assert (
+            experiment._get_col("step").to_pylist()
+            == list(range(int(steps_per_run * branch_frac) * (num_runs - 1)))
+            + segment.metrics._get_col("step").to_pylist()
+        )
 
 
 @pytest.mark.parametrize("delta_step", [1, 2, 3])
@@ -163,3 +168,28 @@ def test_explicit_experiment_construction(delta_step):
             *[[name] * 5 for name in ["my-first-run", "my-second-run", "my-third-run"]]
         )
     )
+
+
+def test_invalid_explicit_experiment_construction():
+    root_segment = RunSegment("my-first-run", None, 0, random_metrics(10))
+    ref1 = storage.save(root_segment)
+
+    # this run has no metrics
+    segment1 = RunSegment(
+        "my-second-run",
+        ref1.uri,
+        4,
+        root_segment.metrics._limit(0),
+    )
+    ref2 = storage.save(segment1)
+
+    # this run tries to branch off a run with no metrics, which is not possible
+    segment2 = RunSegment(
+        "my-third-run",
+        ref2.uri,
+        5,
+        random_metrics(5, 10),
+    )
+
+    with pytest.raises(ValueError):
+        use(segment2.experiment())

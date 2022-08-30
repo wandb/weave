@@ -45,14 +45,18 @@ class RunSegment:
 
         # get the prior run
         prior_run: RunSegment = use(get(self.prior_run_ref))
-        prior_run_metrics = prior_run._experiment_body(
+        prior_experiment = prior_run._experiment_body(
             slice_end=self.prior_run_branch_step + 1
             if self.prior_run_branch_step is not None
             else 0
         )
-        if len(prior_run_metrics) > 0:
-            return prior_run_metrics.concatenate(limited)
-        return limited
+
+        if len(prior_experiment) == 0:
+            raise ValueError(
+                f"Attempted to branch off of an empty run: run {prior_run} has no metrics."
+            )
+
+        return prior_experiment.concatenate(limited)
 
     @op(render_info={"type": "function"})
     def refine_experiment_type(self) -> types.Type:
