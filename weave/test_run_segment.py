@@ -72,7 +72,7 @@ def create_branch(
             )
             ref = serializer(previous_segment)
             new_metrics = random_metrics(
-                n=length, starting_step=previous_run_branch_step + 1
+                n=length, starting_step=previous_run_branch_step
             )
             return RunSegment(name, ref.uri, previous_run_branch_step, new_metrics)
     return RunSegment(name, None, 0, random_metrics(length, 0))
