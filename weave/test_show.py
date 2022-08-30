@@ -195,8 +195,8 @@ def test_large_const_node():
 
     model = openai.Gpt3FineTune.model(fine_tune)
     panel = panels.Table(["1 + 9 =", "2 + 14 ="])
-    panel.table_query.add_column(lambda row: row)
-    panel.table_query.add_column(lambda row: model.complete(row)["choices"][0]["text"])
+    panel.append_column(lambda row: row)
+    panel.append_column(lambda row: model.complete(row)["choices"][0]["text"])
     show_panel_params = _show_params(panel)
 
     # Ensure that we sent the dataset as a get(<ref>) rather than as a const list
