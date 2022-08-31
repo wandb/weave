@@ -25,7 +25,7 @@ def number_bins_equal(min: float, max: float, n_bins: int):
     def assign_bin(val: float) -> typing.Optional[NumberBin]:
         if val > bins[-1] or val < bins[0]:
             return None
-        index = bisect.bisect_left(bins, val)
+        index = bisect.bisect_left(bins, val) - 1
         return number_bins[index]
 
     return assign_bin

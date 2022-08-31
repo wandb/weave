@@ -100,3 +100,5 @@ def test_number_bins():
         input_types={"val": weave_types.Float()},
         output_type=number_bin.NumberBin.WeaveType(),
     )
+
+    assert weave.use(nb_node)(2.5).id == 2
