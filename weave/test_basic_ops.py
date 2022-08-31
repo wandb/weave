@@ -1,6 +1,7 @@
 from . import api as weave
 from . import ops
-from .ops_primitives import number
+from . import weave_types
+from .ops_primitives import number, number_bin
 from .ops_primitives.string import *
 
 
@@ -91,3 +92,11 @@ def test_string_ops():
 
     # assert weave.use(foo in foobar) == True # Broken
     # assert weave.use(foobar in foo) == False # Broken
+
+
+def test_number_bins():
+    nb_node = number_bin.number_bins_equal(0, 10, 10)
+    assert nb_node.type == weave_types.Function(
+        input_types={"val": weave_types.Float()},
+        output_type=number_bin.NumberBin.WeaveType(),
+    )

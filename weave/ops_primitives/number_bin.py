@@ -3,6 +3,7 @@ import typing
 import numpy as np
 
 from ..api import type, op
+from ..weave_types import Function, Float
 
 
 @type()
@@ -12,10 +13,12 @@ class NumberBin:
     stop: float
 
 
-@op()
-def number_bins_equal(
-    min: float, max: float, n_bins: int
-) -> typing.Callable[[float], typing.Optional[NumberBin]]:
+@op(
+    output_type=Function(
+        input_types={"val": Float()}, output_type=NumberBin.WeaveType()  # type: ignore
+    )
+)
+def number_bins_equal(min: float, max: float, n_bins: int):
     bins = np.linspace(min, max, n_bins + 1)
     number_bins = [NumberBin(i, bins[i], bins[i + 1]) for i in range(len(bins) - 1)]
 
