@@ -1,9 +1,10 @@
+import numpy as np
+
 from . import api as weave
 from . import ops
 from . import weave_types
 from .ops_primitives import number, number_bin
 from .ops_primitives.string import *
-
 
 from .weave_internal import make_const_node, call_fn
 
@@ -100,6 +101,10 @@ def test_number_bins():
         input_types={"row": weave_types.Float()},
         output_type=number_bin.NumberBin.WeaveType(),
     )
-    call_node = call_fn(nb_node, {"row": 2.5})
-    weave.use(call_node)
-    raise Exception()  # fail on purpose for debugging
+    # extract the function from its containing node
+    function = weave.use(nb_node)
+    call_node = call_fn(function, {"row": make_const_node(weave.types.Float(), 2.5)})
+    result = weave.use(call_node)
+
+    assert np.isclose(result.start, 2.4)
+    assert np.isclose(result.stop, 2.7)
