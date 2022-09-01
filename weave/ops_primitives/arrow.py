@@ -5,9 +5,10 @@ import numpy as np
 import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.parquet as pq
+
 from .. import weave_internal
 
-from ..api import op, weave_class
+from ..api import op, weave_class, type_of
 from .. import weave_types as types
 from .. import graph
 from .. import errors
@@ -549,6 +550,9 @@ class ArrowWeaveList:
     def _count(self):
         return len(self._arrow_data)
 
+    def __len__(self):
+        return self._count()
+
     @op()
     def count(self) -> int:
         return self._count()
@@ -607,6 +611,32 @@ class ArrowWeaveList:
         if isinstance(res, ArrowArrayVectorizer):
             res = res.arr
         return ArrowWeaveList(res, map_fn.type, self._artifact)
+
+    def _append_column(self, name, data, weave_type=None) -> "ArrowWeaveList":
+        new_data = self._arrow_data.append_column(name, [data])
+        try:
+            new_data_type = types.TypedDict({name: weave_type or type_of(data[0])})
+        except IndexError:
+            raise ValueError(
+                "Unable to infer type of new column. Either explicitly pass "
+                "column type or ensure that column has at least one row."
+            )
+        return ArrowWeaveList(
+            new_data, types.merge_types(self.object_type, new_data_type), self._artifact
+        )
+
+    def concatenate(self, other: "ArrowWeaveList") -> "ArrowWeaveList":
+        self_data = (
+            pa.table({"self": self._arrow_data})
+            if isinstance(self._arrow_data, pa.ChunkedArray)
+            else self._arrow_data
+        )
+        other_data = (
+            pa.table({"self": other._arrow_data})
+            if isinstance(other._arrow_data, pa.ChunkedArray)
+            else other._arrow_data
+        )
+        return ArrowWeaveList(pa.concat_tables((self_data, other_data)))
 
     @op(
         input_type={
@@ -670,11 +700,14 @@ class ArrowWeaveList:
             self._arrow_data.slice(offset), self.object_type, self._artifact
         )
 
-    @op(output_type=lambda input_types: input_types["self"])
-    def limit(self, limit: int):
+    def _limit(self, limit: int):
         return ArrowWeaveList(
             self._arrow_data.slice(0, limit), self.object_type, self._artifact
         )
+
+    @op(output_type=lambda input_types: input_types["self"])
+    def limit(self, limit: int):
+        return self._limit(limit)
 
 
 ArrowWeaveListType.instance_classes = ArrowWeaveList
@@ -744,8 +777,9 @@ def to_arrow_from_list_and_artifact(obj, object_type, artifact):
     return weave_obj
 
 
-def to_arrow(obj):
-    wb_type = types.TypeRegistry.type_of(obj)
+def to_arrow(obj, wb_type=None):
+    if wb_type is None:
+        wb_type = types.TypeRegistry.type_of(obj)
     artifact = artifacts_local.LocalArtifact("to-arrow-%s" % wb_type.name)
     if isinstance(wb_type, types.List):
         object_type = wb_type.object_type
