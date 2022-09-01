@@ -1,9 +1,8 @@
-import bisect
 import typing
-import numpy as np
+import math
 
 from ..api import type, op, use
-from ..weave_types import Function, Float, maybe
+from ..weave_types import Function, Float
 from ..ops_primitives import dict_ops, Number
 
 from ..weave_internal import define_fn, call_fn
@@ -18,7 +17,7 @@ class NumberBin:
 @op(
     input_type={"step": Float()},
     output_type=Function(
-        input_types={"row": maybe(Float())},
+        input_types={"row": Float()},
         output_type=NumberBin.WeaveType(),  # type: ignore
     ),
 )
@@ -28,34 +27,28 @@ def number_bins_fixed(step):
             raise ValueError("Step must be greater than zero.")
         mult = 1.0 / step
         start_node = Number.floor(row * mult) / mult
-        return dict_ops.dict_(
-            {
-                "start": start_node,
-                "stop": start_node + step,
-            }
-        )
+        return dict_ops.dict_(start=start_node, stop=start_node + step)
 
     return define_fn({"row": Float()}, body)
 
 
 @op(
     output_type=Function(
-        input_types={"row": maybe(Float())}, output_type=NumberBin.WeaveType()  # type: ignore
+        input_types={"row": Float()}, output_type=NumberBin.WeaveType()  # type: ignore
     )
 )
 def numbers_bins_equal(arr: typing.List[float], bins: float):
     arr_min = min(arr) if len(arr) > 0 else 0
     arr_max = max(arr) if len(arr) > 0 else 0
     step = (arr_max - arr_min) / bins
-    bin_op = number_bins_fixed(step)
-    return use(bin_op)
+    return use(number_bins_fixed(step))
 
 
 @op(
     input_type={
         "in_": Float(),
         "bin_fn": Function(
-            input_types={"row": maybe(Float())}, output_type=NumberBin.WeaveType()  # type: ignore
+            input_types={"row": Float()}, output_type=NumberBin.WeaveType()  # type: ignore
         ),
     }
 )

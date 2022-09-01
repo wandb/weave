@@ -5,7 +5,7 @@ from .ops_primitives import number, number_bin
 from .ops_primitives.string import *
 
 
-from .weave_internal import make_const_node
+from .weave_internal import make_const_node, call_fn
 
 
 def test_number_ops():
@@ -95,10 +95,11 @@ def test_string_ops():
 
 
 def test_number_bins():
-    nb_node = number_bin.number_bins_equal(0, 10, 10)
+    nb_node = number_bin.numbers_bins_equal([1, 2, 3, 4], 10)
     assert nb_node.type == weave_types.Function(
-        input_types={"val": weave_types.Float()},
+        input_types={"row": weave_types.Float()},
         output_type=number_bin.NumberBin.WeaveType(),
     )
-
-    assert weave.use(nb_node)(2.5).id == 2
+    call_node = call_fn(nb_node, {"row": 2.5})
+    weave.use(call_node)
+    raise Exception()  # fail on purpose for debugging
