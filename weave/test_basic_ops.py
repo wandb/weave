@@ -95,7 +95,7 @@ def test_string_ops():
     # assert weave.use(foobar in foo) == False # Broken
 
 
-def test_number_bins():
+def test_number_bin_generation():
     nb_node = number_bin.numbers_bins_equal([1, 2, 3, 4], 10)
     assert nb_node.type == weave_types.Function(
         input_types={"row": weave_types.Float()},
@@ -108,3 +108,17 @@ def test_number_bins():
 
     assert np.isclose(result.start, 2.4)
     assert np.isclose(result.stop, 2.7)
+
+
+def test_number_bin_assignment():
+    function = number_bin.numbers_bins_equal([1, 2, 3, 4], 10)
+    assert function.type == weave_types.Function(
+        input_types={"row": weave_types.Float()},
+        output_type=number_bin.NumberBin.WeaveType(),
+    )
+    # create a graph representing bin assignment
+    assigned_number_bin_node = number_bin.number_bin(in_=2.5, bin_fn=function)
+    assigned_bin = weave.use(assigned_number_bin_node)
+
+    assert np.isclose(assigned_bin.start, 2.4)
+    assert np.isclose(assigned_bin.stop, 2.7)
