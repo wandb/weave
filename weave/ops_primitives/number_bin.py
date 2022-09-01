@@ -57,7 +57,7 @@ def numbers_bins_equal(arr: typing.List[float], bins: float):
     }
 )
 def number_bin(in_, bin_fn) -> NumberBin:
-    return call_fn(bin_fn, {"row": in_})
+    return call_fn(bin_fn, {"row": make_const_node(Float(), in_)})
 
 
 @op()
