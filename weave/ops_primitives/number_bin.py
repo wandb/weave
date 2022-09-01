@@ -1,9 +1,8 @@
 import typing
-import math
 
 from ..api import type, op, use
 from ..weave_types import Function, Float
-from ..ops_primitives import dict_ops, Number
+from ..ops_primitives import Number
 
 from ..weave_internal import define_fn, call_fn, make_const_node
 
