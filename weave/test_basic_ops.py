@@ -96,13 +96,13 @@ def test_string_ops():
 
 
 def test_number_bin_generation():
-    nb_node = number_bin.numbers_bins_equal([1, 2, 3, 4], 10)
-    assert nb_node.type == weave_types.Function(
+    function = number_bin.numbers_bins_equal([1, 2, 3, 4], 10)
+    assert function.type == weave_types.Function(
         input_types={"row": weave_types.Float()},
         output_type=number_bin.NumberBin.WeaveType(),
     )
     # extract the function from its containing node
-    function = weave.use(nb_node)
+    function = weave.use(function)
     call_node = call_fn(function, {"row": make_const_node(weave.types.Float(), 2.5)})
     result = weave.use(call_node)
 
@@ -122,3 +122,10 @@ def test_number_bin_assignment():
 
     assert np.isclose(assigned_bin.start, 2.4)
     assert np.isclose(assigned_bin.stop, 2.7)
+
+    # now do one outside the original range
+    assigned_number_bin_node = number_bin.number_bin(in_=7, bin_fn=function)
+    assigned_bin = weave.use(assigned_number_bin_node)
+
+    assert np.isclose(assigned_bin.start, 6.9)
+    assert np.isclose(assigned_bin.stop, 7.2)
