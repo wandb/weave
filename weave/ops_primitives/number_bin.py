@@ -1,7 +1,5 @@
-import typing
-
 from ..api import type, op, use
-from ..weave_types import Function, maybe
+from ..weave_types import Function
 from .. import weave_types as types
 from ..ops_primitives import Number
 
