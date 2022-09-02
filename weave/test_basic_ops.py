@@ -4,7 +4,7 @@ import pytest
 from . import api as weave
 from . import ops
 from . import weave_types
-from .ops_primitives import number, numbers_bins_equal, number_bin, NumberBin
+from .ops_primitives import number, numbers_bins_equal, number_bin, NumberBinType
 from .ops_primitives.string import *
 
 from .weave_internal import make_const_node, call_fn
@@ -104,7 +104,7 @@ def number_bin_fn_node():
 def test_number_bin_fn_node_type(number_bin_fn_node):
     assert number_bin_fn_node.type == weave_types.Function(
         input_types={"row": weave_types.Number()},
-        output_type=NumberBin.WeaveType(),
+        output_type=NumberBinType,
     )
 
 
@@ -114,8 +114,8 @@ def test_number_bin_generation(number_bin_fn_node):
     call_node = call_fn(function, {"row": make_const_node(weave.types.Number(), 2.5)})
     result = weave.use(call_node)
 
-    assert np.isclose(result.start, 2.4)
-    assert np.isclose(result.stop, 2.7)
+    assert np.isclose(result["start"], 2.4)
+    assert np.isclose(result["stop"], 2.7)
 
 
 def test_number_bin_assignment_in_bin_range(number_bin_fn_node):
@@ -123,8 +123,8 @@ def test_number_bin_assignment_in_bin_range(number_bin_fn_node):
     assigned_number_bin_node = number_bin(in_=2.5, bin_fn=number_bin_fn_node)
     assigned_bin = weave.use(assigned_number_bin_node)
 
-    assert np.isclose(assigned_bin.start, 2.4)
-    assert np.isclose(assigned_bin.stop, 2.7)
+    assert np.isclose(assigned_bin["start"], 2.4)
+    assert np.isclose(assigned_bin["stop"], 2.7)
 
 
 def test_number_bin_assignment_outside_bin_range(number_bin_fn_node):
@@ -132,5 +132,5 @@ def test_number_bin_assignment_outside_bin_range(number_bin_fn_node):
     assigned_number_bin_node = number_bin(in_=7, bin_fn=number_bin_fn_node)
     assigned_bin = weave.use(assigned_number_bin_node)
 
-    assert np.isclose(assigned_bin.start, 6.9)
-    assert np.isclose(assigned_bin.stop, 7.2)
+    assert np.isclose(assigned_bin["start"], 6.9)
+    assert np.isclose(assigned_bin["stop"], 7.2)
