@@ -1,7 +1,8 @@
 import typing
 
 from ..api import type, op, use
-from ..weave_types import Function, Float
+from ..weave_types import Function, maybe
+from .. import weave_types as types
 from ..ops_primitives import Number
 
 from ..weave_internal import define_fn, call_fn, make_const_node
@@ -14,9 +15,9 @@ class NumberBin:
 
 
 @op(
-    input_type={"step": Float()},
+    input_type={"step": types.Number()},
     output_type=Function(
-        input_types={"row": Float()},
+        input_types={"row": types.Number()},
         output_type=NumberBin.WeaveType(),  # type: ignore
     ),
 )
@@ -32,15 +33,18 @@ def number_bins_fixed(step):
 
     # need to call use because define_fn returns a constNode
     # where the val is an outputNode
-    return use(define_fn({"row": Float()}, body))
+    return use(define_fn({"row": types.Number()}, body))
 
 
 @op(
+    name="numbers-pybinsequal",
+    input_type={"arr": types.List(types.Number()), "bins": types.Number()},
     output_type=Function(
-        input_types={"row": Float()}, output_type=NumberBin.WeaveType()  # type: ignore
-    )
+        input_types={"row": types.Number()}, output_type=NumberBin.WeaveType()  # type: ignore
+    ),
+    render_info={"type": "function"},
 )
-def numbers_bins_equal(arr: typing.List[float], bins: float):
+def numbers_bins_equal(arr, bins):
     arr_min = min(arr) if len(arr) > 0 else 0
     arr_max = max(arr) if len(arr) > 0 else 0
     step = (arr_max - arr_min) / bins
@@ -48,18 +52,20 @@ def numbers_bins_equal(arr: typing.List[float], bins: float):
 
 
 @op(
+    name="number-pybin",
     input_type={
-        "in_": Float(),
+        "in_": types.Number(),
         "bin_fn": Function(
-            input_types={"row": Float()}, output_type=NumberBin.WeaveType()  # type: ignore
+            input_types={"row": types.Number()}, output_type=NumberBin.WeaveType()  # type: ignore
         ),
-    }
+    },
+    output_type=NumberBin.WeaveType(),  # type: ignore
 )
-def number_bin(in_, bin_fn) -> NumberBin:
-    result = use(call_fn(bin_fn, {"row": make_const_node(Float(), in_)}))
+def number_bin(in_, bin_fn):
+    result = use(call_fn(bin_fn, {"row": make_const_node(types.Number(), in_)}))
     return result
 
 
-@op()
+@op(render_info={"type": "function"})
 def make_number_bin(start: float, stop: float) -> NumberBin:
     return NumberBin(start, stop)
