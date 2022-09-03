@@ -718,6 +718,33 @@ class ArrowWeaveList:
     def limit(self, limit: int):
         return self._limit(limit)
 
+    @op(
+        input_type={"self": ArrowWeaveListType(types.TypedDict({}))},
+        output_type=lambda input_types: ArrowWeaveListType(
+            types.TypedDict(
+                {
+                    k: v if not types.is_list_like(v) else v.object_type
+                    for (k, v) in input_types["self"].object_type.property_types.items()
+                }
+            )
+        ),
+    )
+    def unnest(self):
+        if not self or not isinstance(self.object_type, types.TypedDict):
+            return self
+
+        list_cols = []
+        for k, v_type in self.object_type.property_types.items():
+            if types.is_list_like(v_type):
+                list_cols.append(k)
+        if not list_cols:
+            return self
+
+        # todo: make this more efficient
+        return pa.Table.from_pandas(
+            df=self._arrow_data.to_pandas().explode(list_cols), preserve_index=False
+        )
+
 
 ArrowWeaveListType.instance_classes = ArrowWeaveList
 ArrowWeaveListType.instance_class = ArrowWeaveList

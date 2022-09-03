@@ -190,3 +190,15 @@ def test_arrow_list_of_ref_to_item_in_list():
 
     assert weave.use(d_node[0]["c"] == 5) == True
     assert weave.use(d_node[1]["c"] == 7) == True
+
+
+def test_arrow_unnest():
+    data = arrow.to_arrow([{"a": [1, 2, 3], "b": "c"}, {"a": [4, 5, 6], "b": "d"}])
+    assert weave.use(data.unnest()).to_pylist() == [
+        {"a": 1, "b": "c"},
+        {"a": 2, "b": "c"},
+        {"a": 3, "b": "c"},
+        {"a": 4, "b": "d"},
+        {"a": 5, "b": "d"},
+        {"a": 6, "b": "d"},
+    ]
