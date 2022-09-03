@@ -11,6 +11,7 @@ from .. import api as weave
 from .. import ops
 from .. import artifacts_local
 from . import arrow
+from .. import weave_types as types
 
 
 def simple_hash(n, b):
@@ -194,6 +195,13 @@ def test_arrow_list_of_ref_to_item_in_list():
 
 def test_arrow_unnest():
     data = arrow.to_arrow([{"a": [1, 2, 3], "b": "c"}, {"a": [4, 5, 6], "b": "d"}])
+    assert weave.type_of(data) == arrow.ArrowWeaveListType(
+        types.TypedDict({"a": types.List(types.Int()), "b": types.String()})
+    )
+    unnest_node = data.unnest()
+    assert unnest_node.type == arrow.ArrowWeaveListType(
+        types.TypedDict({"a": types.Int(), "b": types.String()})
+    )
     assert weave.use(data.unnest()).to_pylist() == [
         {"a": 1, "b": "c"},
         {"a": 2, "b": "c"},

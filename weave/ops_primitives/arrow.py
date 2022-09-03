@@ -740,7 +740,9 @@ class ArrowWeaveList:
         if not list_cols:
             return self
 
-        # todo: make this more efficient
+        # todo: make this more efficient. we shouldn't have to convert back and forth
+        # from the arrow in-memory representation to pandas just to call the explode
+        # function. but there is no native pyarrow implementation of this
         return pa.Table.from_pandas(
             df=self._arrow_data.to_pandas().explode(list_cols), preserve_index=False
         )
