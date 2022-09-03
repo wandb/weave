@@ -35,6 +35,9 @@ class ArrowArrayVectorizer:
         for col_name in self.arr._arrow_data.column_names:
             yield col_name, self._get_col(col_name)
 
+    def floor(self):
+        return ArrowArrayVectorizer(pc.floor(self.arr))
+
     def __getattr__(self, attr):
         return self._get_col(attr)
 
@@ -57,10 +60,10 @@ class ArrowArrayVectorizer:
     def __gt__(self, other):
         return ArrowArrayVectorizer(pc.greater(self.arr, other))
 
-    def __mult__(self, other):
+    def __mul__(self, other):
         if isinstance(other, ArrowArrayVectorizer):
             other = other.arr
-        return ArrowArrayVectorizer(pc.divide(self.arr, other))
+        return ArrowArrayVectorizer(pc.multiply(self.arr, other))
 
     def __truediv__(self, other):
         if isinstance(other, ArrowArrayVectorizer):
@@ -243,7 +246,10 @@ def rewrite_weavelist_refs(arrow_data, object_type, artifact):
             )
         return rewrite_weavelist_refs(arrow_data, types.non_none(object_type), artifact)
     else:
-        if isinstance(object_type, types.BasicType):
+        if isinstance(object_type, types.BasicType) or (
+            isinstance(object_type, types.Const)
+            and isinstance(object_type.val_type, types.BasicType)
+        ):
             return arrow_data
 
         # We have a column of refs
@@ -396,6 +402,9 @@ class ArrowTableGroupBy:
         try:
             row = self._groups.slice(index, 1)
         except pa.ArrowIndexError:
+            return None
+
+        if len(row) == 0:
             return None
 
         if self._group_keys == ["group_key"]:

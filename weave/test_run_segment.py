@@ -4,9 +4,12 @@ from itertools import chain
 from .ops_domain import RunSegment
 from . import storage, type_of, use
 from .weave_types import List
+from . import weave_types as types
 import typing
 import numpy as np
-from .ops import to_arrow
+from .ops import to_arrow, dict_
+
+from .weave_internal import define_fn
 
 N_NUMERIC_METRICS = 99  # number of numerical columns in the metrics table
 
@@ -193,3 +196,37 @@ def test_invalid_explicit_experiment_construction():
 
     with pytest.raises(ValueError):
         use(segment2.experiment())
+
+
+def test_vectorized_unnest_list_for_panelplot():
+    root_segment = RunSegment("my-first-run", None, 0, random_metrics(10))
+    storage.save(root_segment)
+
+    def map_fn(row):
+        return dict_(
+            **{
+                "100": 100,
+                "step": row["step"],
+                "metric0": row["metric0"],
+                "string_col": row["string_col"],
+                "circle": "circle",
+            }
+        )
+
+    fn_node = define_fn(
+        {
+            "row": types.TypedDict(
+                {
+                    "100": types.Int(),
+                    "step": types.Int(),
+                    "metric0": types.Float(),
+                    "string_col": types.String(),
+                    "circle": types.String(),
+                }
+            )
+        },
+        map_fn,
+    )
+
+    res = root_segment.metrics.map(fn_node)
+    use(res)
