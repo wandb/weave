@@ -10,6 +10,7 @@ from . import graph
 from . import weave_types as types
 from . import errors
 from . import weave_internal
+from . import storage
 
 
 NodeOrOp = typing.Union[graph.Node, graph.Op]
@@ -99,7 +100,7 @@ def node_id(node: graph.Node):
         ):
             hashable["val"] = node.val.to_json()
         else:
-            hashable["val"] = node.val
+            hashable["val"] = storage.to_python(node.val)
     else:
         raise errors.WeaveInternalError("invalid node encountered: %s" % node)
     hash = hashlib.md5()

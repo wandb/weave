@@ -118,7 +118,7 @@ class Dict(dict):
             "self": types.Dict(types.String(), types.Any()),
             "key": types.String(),
         },
-        output_type=lambda input_types: input_types["self"].value_type,
+        output_type=lambda input_types: input_types["self"].object_type,
     )
     def pick(self, key):
         if not isinstance(self, dict):

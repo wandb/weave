@@ -133,7 +133,9 @@ def mapped_fn_to_arrow(arrow_table, node):
 
 
 def arrow_type_to_weave_type(pa_type) -> types.Type:
-    if pa_type == pa.string():
+    if pa_type == pa.null():
+        return types.NoneType()
+    elif pa_type == pa.string():
         return types.String()
     elif pa_type == pa.int64():
         return types.Int()

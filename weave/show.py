@@ -20,15 +20,15 @@ from . import usage_analytics
 def _show_params(obj):
     if obj is None:
         return {"weave_node": graph.VoidNode()}
-    if isinstance(obj, graph.Node):
-        return {"weave_node": weavejs_fixes.fixup_node(obj)}
-
-    elif isinstance(obj, panel.Panel):
+    if isinstance(obj, panel.Panel):
         return {
             "weave_node": weavejs_fixes.fixup_node(obj.input_node),
             "panel_id": obj.id,
-            "panel_config": weavejs_fixes.fixup_data(obj.config),
+            "panel_config": weavejs_fixes.fixup_data(obj.config()),
         }
+
+    elif isinstance(obj, graph.Node):
+        return {"weave_node": weavejs_fixes.fixup_node(obj)}
 
     elif isinstance(obj, storage.Ref):
         from weave import ops

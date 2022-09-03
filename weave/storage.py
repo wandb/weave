@@ -203,6 +203,7 @@ def to_python(obj):
         wb_type, artifacts_local.LocalArtifact(_get_name(wb_type, obj))
     )
     val = mapper.apply(obj)
+    # TODO: this should be a ConstNode!
     return {"_type": wb_type.to_dict(), "_val": val}
 
 

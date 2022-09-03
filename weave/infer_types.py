@@ -62,4 +62,10 @@ def python_type_to_type(
     weave_type = simple_python_type_to_type(py_type)
     if weave_type == weave_types.UnknownType():
         return weave_type
-    return weave_type()
+    try:
+        return weave_type()
+    except TypeError:
+        raise errors.WeaveDefinitionError(
+            "Can't instantatiate Weave Type %s without arguments. To fix: ensure all fields have defaults."
+            % weave_type
+        )

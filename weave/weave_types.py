@@ -260,12 +260,13 @@ class Type:
             try:
                 d = self.instance_to_dict(obj)
             except NotImplementedError:
-                pass
-        if d is None:
-            raise errors.WeaveSerializeError(
-                "Object is not serializable. Provide instance_<to/from>_dict or <save/load>_instance methods on Type: %s"
-                % self
-            )
+                serializer = mappers_python.map_to_python(self, artifact)
+                d = serializer.apply(obj)
+        # if d is None:
+        #     raise errors.WeaveSerializeError(
+        #         "Object is not serializable. Provide instance_<to/from>_dict or <save/load>_instance methods on Type: %s"
+        #         % self
+        #     )
         with artifact.new_file(f"{name}.object.json") as f:
             json.dump(d, f)
         return None
@@ -275,13 +276,30 @@ class Type:
             d = json.load(f)
         if self.__class__ == Type:
             return TypeRegistry.type_from_dict(d)
-        return self.instance_from_dict(d)
+        try:
+            return self.instance_from_dict(d)
+        except NotImplementedError:
+            mapper = mappers_python.map_from_python(self, artifact)
+            return mapper.apply(d)
 
     def instance_to_dict(self, obj):
         raise NotImplementedError
 
     def instance_from_dict(self, d):
         raise NotImplementedError
+
+    # def save_instance(self, obj, artifact, name):
+    #     serializer = mappers_python.map_to_python(self, artifact)
+
+    #     result = serializer.apply(obj)
+    #     with artifact.new_file(f"{name}.object.json") as f:
+    #         json.dump(result, f, allow_nan=False)
+
+    # def load_instance(self, artifact, name, extra=None):
+    #     with artifact.open(f"{name}.object.json") as f:
+    #         result = json.load(f)
+    #     mapper = mappers_python.map_from_python(self, artifact)
+    #     return mapper.apply(result)
 
 
 # _PlainStringNamedType should only be used for backward compatibility with
@@ -397,9 +415,9 @@ class String(BasicType):
     # Just for String, we use a Const Type
     # TODO: this sucks! Maybe we need a const object?
     # but how does user code know to use it?
-    @classmethod
-    def type_of_instance(cls, obj):
-        return Const(cls(), obj)
+    # @classmethod
+    # def type_of_instance(cls, obj):
+    #     return Const(cls(), obj)
 
 
 class Number(BasicType):
@@ -673,29 +691,42 @@ class ObjectType(Type):
     #     # TODO
     #     pass
 
-    def save_instance(self, obj, artifact, name):
-        serializer = mappers_python.map_to_python(self, artifact)
+    # def save_instance(self, obj, artifact, name):
+    #     serializer = mappers_python.map_to_python(self, artifact)
 
-        result = serializer.apply(obj)
-        with artifact.new_file(f"{name}.object.json") as f:
-            json.dump(result, f, allow_nan=False)
+    #     result = serializer.apply(obj)
+    #     with artifact.new_file(f"{name}.object.json") as f:
+    #         json.dump(result, f, allow_nan=False)
 
-    def load_instance(self, artifact, name, extra=None):
-        with artifact.open(f"{name}.object.json") as f:
-            result = json.load(f)
-        mapper = mappers_python.map_from_python(self, artifact)
-        return mapper.apply(result)
+    # def load_instance(self, artifact, name, extra=None):
+    #     with artifact.open(f"{name}.object.json") as f:
+    #         result = json.load(f)
+    #     mapper = mappers_python.map_from_python(self, artifact)
+    #     return mapper.apply(result)
+
+
+def fn():
+    pass
+
+
+PythonFunction = type(fn)
 
 
 @dataclasses.dataclass(frozen=True)
 class Function(Type):
     name = "function"
 
-    input_types: dict[str, Type]
-    output_type: Type
+    instance_classes = [PythonFunction]
+
+    input_types: dict[str, Type] = dataclasses.field(default_factory=dict)
+    output_type: Type = dataclasses.field(default_factory=lambda: UnknownType())
 
     @classmethod
     def type_of_instance(cls, obj):
+        # obj is either a Python function or a Node
+        if callable(obj):
+            # its a python function
+            return cls()
         # instance is graph.Node
         # TODO: get input variable types!
         return cls({}, obj.type)
@@ -718,7 +749,7 @@ class RefType(Type):
     # RefType intentionally does not include the type of the object it
     # points to. Doing so naively results in a type explosion. We may
     # want to include it in the future, but we'll need to shrink it, for
-    # example by disallowing unions (replacing with them with uknown or a
+    # example by disallowing unions (replacing with them with unknown or a
     # type variable)
     def __repr__(self):
         return "<%s>" % self.__class__.name

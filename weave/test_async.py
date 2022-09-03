@@ -16,7 +16,6 @@ def test_run_basic():
     run_node = ops.get(
         f"local-artifact://{artifacts_local.local_artifact_dir()}/{run_name}/latest"
     )
-    print("ru_node", run_node.state)
     # run = api.use(run_node)
     assert api.use(run_node.state) == "pending"
     api.use(run_node.set_state("running"))
@@ -81,13 +80,13 @@ def test_run_ops_mapped():
 
 @pytest.mark.timeout(1.5)
 def test_async_op_expr():
-    dataset = [{"prompt": "a", "completion": "5"}]
+    dataset = api.save([{"prompt": "a", "completion": "5"}])
 
     train_result = async_demo.train(dataset)
     model = train_result.model()
     saved_model = api.save(model, "model")
-    version0 = api.versions(saved_model)[0]
+
     assert (
-        str(api.expr(version0))
+        str(saved_model)
         == f'get("local-artifact://{artifacts_local.local_artifact_dir()}/list/6b6c14ba4268dc8c0bd47d5ee549721b").train().model().save("model")'
     )

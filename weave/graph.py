@@ -37,14 +37,18 @@ class Node(typing.Generic[T]):
         return id(self)
 
     def __str__(self):
-        n = self.node_from_json(self.to_json())
-        return node_expr_str(n)
+        return node_expr_str(self)
 
     def __repr__(self):
-        return "<%s(%s): %s>" % (self.__class__.__name__, id(self), str(self))
+        return "<%s(%s): %s %s>" % (
+            self.__class__.__name__,
+            id(self),
+            self.type,
+            str(self),
+        )
 
 
-weave_types.Function.instance_classes = Node
+weave_types.Function.instance_classes.append(Node)
 
 OpInputNodeT = typing.TypeVar("OpInputNodeT")
 
@@ -98,13 +102,6 @@ class OutputNode(Node, typing.Generic[OpInputNodeT]):
             "fromOp": self.from_op.to_json(),
         }
 
-    def __repr__(self):
-        return "<OutputNode(%s) type: %s op_name: %s>" % (
-            id(self),
-            self.type,
-            self.from_op.name,
-        )
-
 
 class VarNode(Node):
     name: str
@@ -133,6 +130,8 @@ class ConstNode(Node):
         val = obj["val"]
         if isinstance(val, dict) and "nodeType" in val:
             val = Node.node_from_json(val)
+        else:
+            val = storage.from_python({"_type": obj["type"], "_val": obj["val"]})
         return cls(weave_types.TypeRegistry.type_from_dict(obj["type"]), val)
 
     def equivalent_output_node(self):
@@ -172,6 +171,8 @@ class ConstNode(Node):
 
 
 class VoidNode(Node):
+    type = weave_types.Invalid()
+
     def to_json(self):
         return {"nodeType": "void", "type": "invalid"}
 
@@ -210,6 +211,20 @@ def node_expr_str(node: Node):
                     "%s: %s" % (k, node_expr_str(n))
                     for k, n in node.from_op.inputs.items()
                 )
+            )
+        elif node.from_op.name.endswith("__getattr__"):
+            inputs = list(node.from_op.inputs.values())
+            return "%s.%s" % (
+                node_expr_str(inputs[0]),
+                inputs[1].val,
+            )
+        elif node.from_op.name.endswith("pick") or node.from_op.name.endswith(
+            "__getitem__"
+        ):
+            inputs = list(node.from_op.inputs.values())
+            return "%s[%s]" % (
+                node_expr_str(inputs[0]),
+                node_expr_str(inputs[1]),
             )
         elif all([not isinstance(n, OutputNode) for n in node.from_op.inputs.values()]):
             return "%s(%s)" % (
