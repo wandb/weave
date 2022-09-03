@@ -199,7 +199,8 @@ def test_invalid_explicit_experiment_construction():
 
 
 def test_vectorized_unnest_list_for_panelplot():
-    root_segment = RunSegment("my-first-run", None, 0, random_metrics(10))
+    metrics = random_metrics(10)
+    root_segment = RunSegment("my-first-run", None, 0, metrics)
     storage.save(root_segment)
 
     def map_fn(row):
@@ -229,4 +230,15 @@ def test_vectorized_unnest_list_for_panelplot():
     )
 
     res = root_segment.metrics.map(fn_node)
-    use(res)
+    mapped = use(res).to_pylist()
+    metrics_arr = metrics._arrow_data.to_pylist()
+    assert mapped == [
+        {
+            "100": 100,
+            "circle": "circle",
+            "string_col": metrics_arr[i]["string_col"],
+            "metric0": metrics_arr[i]["metric0"],
+            "step": i,
+        }
+        for i in range(len(metrics))
+    ]
