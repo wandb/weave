@@ -1,3 +1,4 @@
+import logging
 import typing
 import dataclasses
 import json
@@ -8,7 +9,7 @@ import pyarrow.parquet as pq
 
 from .. import weave_internal
 
-from ..api import op, weave_class, type_of
+from ..api import op, weave_class, type_of, type
 from .. import weave_types as types
 from .. import graph
 from .. import errors
@@ -21,9 +22,14 @@ from .. import storage
 from .. import refs
 
 
+@type()
 class ArrowArrayVectorizer:
+    arr: typing.TypeVar("arr")  # type: ignore
+
+    """
     def __init__(self, arr):
         self.arr = arr
+    """
 
     def _get_col(self, key):
         col = self.arr._get_col(key)
@@ -76,6 +82,22 @@ class ArrowArrayVectorizer:
         return ArrowArrayVectorizer(pc.power(self.arr, other))
 
 
+def remove_arrow_array_vectorizers(obj: typing.Any) -> typing.Any:
+    if isinstance(obj, dict):
+        return {k: remove_arrow_array_vectorizers(v) for (k, v) in obj.items()}
+    elif isinstance(obj, list):
+        return [remove_arrow_array_vectorizers(item) for item in obj]
+    elif isinstance(obj, ArrowArrayVectorizer):
+        return obj.arr
+    return obj
+
+
+def unzip_struct_array(arr: pa.ChunkedArray) -> pa.Table:
+    flattened = arr.flatten()
+    col_names = [field.name for field in arr.type]
+    return pa.table(dict(zip(col_names, flattened)))
+
+
 def mapped_fn_to_arrow(arrow_table, node):
     if isinstance(node, graph.ConstNode):
         return node.val
@@ -90,9 +112,10 @@ def mapped_fn_to_arrow(arrow_table, node):
         elif op_name == "typedDict-pick":
             return inputs["self"]._get_col(inputs["key"])
         elif op_name == "dict":
+            inputs = remove_arrow_array_vectorizers(inputs)
             for k, v in inputs.items():
-                if isinstance(v, ArrowArrayVectorizer):
-                    inputs[k] = v.arr
+                if np.isscalar(v):
+                    inputs[k] = [v] * len(arrow_table)
             return pa.table(inputs)
         elif op_name == "merge":
             lhs = inputs["lhs"]
@@ -670,15 +693,45 @@ class ArrowWeaveList:
         group_table = mapped_fn_to_arrow(self, group_by_fn)
         if isinstance(group_table, ArrowArrayVectorizer):
             group_table = group_table.arr
+
+        has_struct = False
+        original_col_names = group_table.column_names
+        original_group_table = group_table
+
+        # pyarrow does not currently implement support for grouping / aggregations on keys that are
+        # structs (typed Dicts). to get around this, we unzip struct columns into multiple columns, one for each
+        # struct field. then we group on those columns.
         if isinstance(group_table, pa.Table):
-            group_cols = group_table.column_names
+            group_cols = []
+            for i, colname in enumerate(group_table.column_names):
+                if isinstance(group_table[colname].type, pa.StructType):
+                    has_struct = True
+                    # convert struct columns to multiple destructured columns
+                    replacement_table = unzip_struct_array(group_table[colname])
+                    group_table = group_table.remove_column(i)
+                    for newcol in replacement_table.column_names:
+                        group_table = group_table.append_column(
+                            newcol, replacement_table[newcol]
+                        )
+                        group_cols.append(newcol)
+
+                else:
+                    # if a column is not a struct then just use it
+                    group_cols.append(colname)
+
         elif isinstance(group_table, pa.ChunkedArray):
-            group_table = pa.table({"group_key": group_table})
-            group_cols = ["group_key"]
+            if isinstance(group_table.type, pa.StructType):
+                has_struct = True
+                group_table = unzip_struct_array(group_table)
+                group_cols = group_table.column_names
+            else:
+                group_table = pa.table({"group_key": group_table})
+                group_cols = ["group_key"]
         else:
             raise errors.WeaveInternalError(
                 "Arrow groupby not yet support for map result: %s" % type(group_table)
             )
+
         # Serializing a large arrow table and then reading it back
         # causes it to come back with more than 1 chunk. It seems the aggregation
         # operations don't like this. It will raise a cryptic error about
@@ -694,10 +747,31 @@ class ArrowWeaveList:
         )
         grouped = group_table.group_by(group_cols)
         agged = grouped.aggregate([("_index", "list")])
+
+        if has_struct:
+            # after grouping, re-create the grouped table using the correct key
+            index_list = agged["_index_list"]
+            cols = {}
+            for colname in original_col_names:
+                if isinstance(original_group_table[colname].type, pa.StructType):
+                    col = pa.array(
+                        [
+                            {
+                                struct_key.name: agged[struct_key.name][i].as_py()
+                                for struct_key in original_group_table[colname].type
+                            }
+                            for i in range(len(index_list))
+                        ]
+                    )
+                else:
+                    col = agged[colname]
+                cols[colname] = col
+            agged = pa.table({"_index_list": index_list, **cols})
+
         return ArrowTableGroupBy(
             table,
             agged,
-            group_cols,
+            original_col_names,
             self.object_type,
             group_by_fn.type,
             self._artifact,
