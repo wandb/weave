@@ -1,13 +1,15 @@
 import numpy as np
 import pytest
 
-from . import api as weave
+from . import api as weave, type_of
 from . import ops
 from . import weave_types
+from .ops_primitives import dict_
 from .ops_primitives import number, numbers_bins_equal, number_bin, NumberBinType
 from .ops_primitives.string import *
+from .test_run_segment import create_experiment
 
-from .weave_internal import make_const_node, call_fn
+from .weave_internal import make_const_node, call_fn, define_fn
 
 
 def test_number_ops():
@@ -94,43 +96,3 @@ def test_string_ops():
 
     # assert weave.use(foo in foobar) == True # Broken
     # assert weave.use(foobar in foo) == False # Broken
-
-
-@pytest.fixture()
-def number_bin_fn_node():
-    return numbers_bins_equal([1, 2, 3, 4], 10)
-
-
-def test_number_bin_fn_node_type(number_bin_fn_node):
-    assert number_bin_fn_node.type == weave_types.Function(
-        input_types={"row": weave_types.Number()},
-        output_type=NumberBinType,
-    )
-
-
-def test_number_bin_generation(number_bin_fn_node):
-    # extract the function from its containing node
-    function = weave.use(number_bin_fn_node)
-    call_node = call_fn(function, {"row": make_const_node(weave.types.Number(), 2.5)})
-    result = weave.use(call_node)
-
-    assert np.isclose(result["start"], 2.4)
-    assert np.isclose(result["stop"], 2.7)
-
-
-def test_number_bin_assignment_in_bin_range(number_bin_fn_node):
-    # create a graph representing bin assignment
-    assigned_number_bin_node = number_bin(in_=2.5, bin_fn=number_bin_fn_node)
-    assigned_bin = weave.use(assigned_number_bin_node)
-
-    assert np.isclose(assigned_bin["start"], 2.4)
-    assert np.isclose(assigned_bin["stop"], 2.7)
-
-
-def test_number_bin_assignment_outside_bin_range(number_bin_fn_node):
-    # now do one outside the original range
-    assigned_number_bin_node = number_bin(in_=7, bin_fn=number_bin_fn_node)
-    assigned_bin = weave.use(assigned_number_bin_node)
-
-    assert np.isclose(assigned_bin["start"], 6.9)
-    assert np.isclose(assigned_bin["stop"], 7.2)

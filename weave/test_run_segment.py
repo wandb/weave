@@ -7,9 +7,9 @@ from .weave_types import List
 from . import weave_types as types
 import typing
 import numpy as np
-from .ops import to_arrow, dict_
+from .ops import to_arrow, dict_, numbers_bins_equal, NumberBinType, number_bin
 
-from .weave_internal import define_fn
+from .weave_internal import define_fn, call_fn, make_const_node
 
 N_NUMERIC_METRICS = 99  # number of numerical columns in the metrics table
 
@@ -242,3 +242,59 @@ def test_vectorized_unnest_list_for_panelplot():
         }
         for i in range(len(metrics))
     ]
+
+
+@pytest.fixture()
+def number_bin_fn_node():
+    return numbers_bins_equal([1, 2, 3, 4], 10)
+
+
+def test_number_bin_fn_node_type(number_bin_fn_node):
+    assert number_bin_fn_node.type == types.Function(
+        input_types={"row": types.Number()},
+        output_type=NumberBinType,
+    )
+
+
+def test_number_bin_generation(number_bin_fn_node):
+    # extract the function from its containing node
+    function = use(number_bin_fn_node)
+    call_node = call_fn(function, {"row": make_const_node(types.Number(), 2.5)})
+    result = use(call_node)
+
+    assert np.isclose(result["start"], 2.4)
+    assert np.isclose(result["stop"], 2.7)
+
+
+def test_number_bin_assignment_in_bin_range(number_bin_fn_node):
+    # create a graph representing bin assignment
+    assigned_number_bin_node = number_bin(in_=2.5, bin_fn=number_bin_fn_node)
+    assigned_bin = use(assigned_number_bin_node)
+
+    assert np.isclose(assigned_bin["start"], 2.4)
+    assert np.isclose(assigned_bin["stop"], 2.7)
+
+
+def test_number_bin_assignment_outside_bin_range(number_bin_fn_node):
+    # now do one outside the original range
+    assigned_number_bin_node = number_bin(in_=7, bin_fn=number_bin_fn_node)
+    assigned_bin = use(assigned_number_bin_node)
+
+    assert np.isclose(assigned_bin["start"], 6.9)
+    assert np.isclose(assigned_bin["stop"], 7.2)
+
+
+def test_group_by_bins_arrow_vectorized():
+    number_bin_fn_node = numbers_bins_equal([0, 10], 2)
+    segment = create_experiment(200, 5, 0.8)
+
+    def groupby_func(row):
+        step = row["step"]
+        assigned_number_bin_node = number_bin(in_=step, bin_fn=number_bin_fn_node)
+        return dict_(number_bin_col_name=assigned_number_bin_node)
+
+    func_node = define_fn({"row": type_of(segment.metrics).object_type}, groupby_func)
+    groupby_node = segment.metrics.groupby(func_node)
+
+    result = use(groupby_node)
+    assert use(result.count()) == 9
