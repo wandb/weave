@@ -1,4 +1,5 @@
 import math
+import numpy as np
 from ..api import op, mutation, weave_class
 from .. import weave_types as types
 
@@ -126,7 +127,11 @@ class Number(object):
         output_type=types.Number(),
     )
     def floor(number):
-        return math.floor(number)
+        from .arrow import ArrowArrayVectorizer
+
+        if isinstance(number, ArrowArrayVectorizer):
+            return number.floor()
+        return np.floor(number)
 
     @op(
         name="number-ceil",
