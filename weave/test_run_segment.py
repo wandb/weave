@@ -301,4 +301,4 @@ def test_group_by_bins_arrow_vectorized():
 
     group_key_node = result[4].key()
     key = use(group_key_node)
-    assert key == {"start": 130.0, "stop": 135.0}
+    assert key == {"number_bin_col_name": {"start": 130.0, "stop": 135.0}}
