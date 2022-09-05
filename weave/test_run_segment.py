@@ -2,7 +2,7 @@ import pytest
 from itertools import chain
 
 from .ops_domain import RunSegment
-from . import storage, type_of, use
+from . import storage, type_of, use, get
 from .weave_types import List
 from . import weave_types as types
 import typing
@@ -302,3 +302,45 @@ def test_group_by_bins_arrow_vectorized():
     group_key_node = result[4].key()
     key = use(group_key_node)
     assert key == {"number_bin_col_name": {"start": 130.0, "stop": 135.0}}
+
+
+# cache busting didn't work properly with this query before
+def test_map_merge_cache_busting():
+    root_segment = RunSegment("my-first-run", None, 0, random_metrics(10))
+    ref = storage.save(root_segment)
+
+    def map_fn_1_body(row):
+        const_dict = dict_()
+        merge_dict = dict_(
+            **{
+                "100": 100,
+                "step": row["step"],
+                "metric0": row["metric0"],
+                "string_col": row["string_col"],
+                "circle": "circle",
+            }
+        )
+        return const_dict.merge(merge_dict)
+
+    fn_node = define_fn({"row": root_segment.metrics.object_type}, map_fn_1_body)
+    query = get(ref).metrics.map(fn_node)
+    result1 = use(query)
+
+    def map_fn_2_body(row):
+        const_dict = dict_()
+        merge_dict = dict_(
+            **{
+                "100": 100,
+                "step": row["step"],
+                "metric1": row["metric1"],
+                "string_col": row["string_col"],
+                "circle": "circle",
+            }
+        )
+        return const_dict.merge(merge_dict)
+
+    fn_node = define_fn({"row": root_segment.metrics.object_type}, map_fn_2_body)
+    query = get(ref).metrics.map(fn_node)
+    result2 = use(query)
+
+    assert result1._arrow_data != result2._arrow_data
