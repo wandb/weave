@@ -188,15 +188,24 @@ def objects(of_type: types.Type, alias: str):
     return objects
 
 
+def recursively_unwrap_arrow(obj):
+    if getattr(obj, "to_pylist", None):
+        return obj.to_pylist()
+    if getattr(obj, "as_py", None):
+        return obj.as_py()
+    if isinstance(obj, dict):
+        return {k: recursively_unwrap_arrow(v) for (k, v) in obj.items()}
+    elif isinstance(obj, list):
+        return [recursively_unwrap_arrow(item) for item in obj]
+    return obj
+
+
 def to_python(obj):
     # Arrow hacks for WeaveJS. We want to send the raw Python data
     # to the frontend for these objects. But this will break querying them in Weave
     # Python when not using InProcessServer.
     # TODO: Remove!
-    if getattr(obj, "to_pylist", None):
-        obj = obj.to_pylist()
-    elif getattr(obj, "as_py", None):
-        obj = obj.as_py()
+    obj = recursively_unwrap_arrow(obj)
 
     wb_type = types.TypeRegistry.type_of(obj)
     mapper = mappers_python.map_to_python(
