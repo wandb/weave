@@ -51,10 +51,10 @@ def create_branch(
        The number of history rows to generate for the segment.
     previous_segment_branch_frac: float satisfying 0 < branch_frac <= 1.
        Parameter describing where in the previous segment to set the branch point.
-       A previous_segment_branch_frac of 0 sets the branch point at the previous segment's root,
-       whereas a previous_segment_branch_frac of 1 sets the branch point at the end of the previous
-       segment. A previous_segment_branch_frac of 0.5 would include half of the previous segment's
-       metric rows.
+       A previous_segment_branch_frac of 0 sets the branch point at the previous
+       segment's root, whereas a previous_segment_branch_frac of 1 sets the branch
+       point at the end of the previous segment. A previous_segment_branch_frac of
+       0.5 would include half of the previous segment's metric rows.
 
     Returns
     -------
