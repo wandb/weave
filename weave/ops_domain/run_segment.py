@@ -37,7 +37,8 @@ class RunSegment:
         )
 
         limited = self.metrics._limit(limit)._append_column(
-            "run_name", [self.run_name] * limit, weave_type=types.String()
+            "run_name",
+            [self.run_name] * limit,
         )
 
         if self.prior_run_ref is None:

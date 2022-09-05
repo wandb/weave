@@ -612,18 +612,12 @@ class ArrowWeaveList:
             res = res.arr
         return ArrowWeaveList(res, map_fn.type, self._artifact)
 
-    def _append_column(self, name, data, weave_type=None) -> "ArrowWeaveList":
+    def _append_column(self, name: str, data) -> "ArrowWeaveList":
+        if not data:
+            raise ValueError(f'Data for new column "{name}" must be nonnull.')
+
         new_data = self._arrow_data.append_column(name, [data])
-        try:
-            new_data_type = types.TypedDict({name: weave_type or type_of(data[0])})
-        except IndexError:
-            raise ValueError(
-                "Unable to infer type of new column. Either explicitly pass "
-                "column type or ensure that column has at least one row."
-            )
-        return ArrowWeaveList(
-            new_data, types.merge_types(self.object_type, new_data_type), self._artifact
-        )
+        return ArrowWeaveList(new_data)
 
     def concatenate(self, other: "ArrowWeaveList") -> "ArrowWeaveList":
         self_data = (
