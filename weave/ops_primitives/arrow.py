@@ -620,17 +620,24 @@ class ArrowWeaveList:
         return ArrowWeaveList(new_data)
 
     def concatenate(self, other: "ArrowWeaveList") -> "ArrowWeaveList":
-        self_data = (
-            pa.table({"self": self._arrow_data})
-            if isinstance(self._arrow_data, pa.ChunkedArray)
-            else self._arrow_data
-        )
-        other_data = (
-            pa.table({"self": other._arrow_data})
-            if isinstance(other._arrow_data, pa.ChunkedArray)
-            else other._arrow_data
-        )
-        return ArrowWeaveList(pa.concat_tables((self_data, other_data)))
+        arrow_data = [awl._arrow_data for awl in (self, other)]
+        if (
+            all([isinstance(ad, pa.ChunkedArray) for ad in arrow_data])
+            and arrow_data[0].type == arrow_data[1].type
+        ):
+            return ArrowWeaveList(
+                pa.chunked_array(arrow_data[0].chunks + arrow_data[1].chunks)
+            )
+        elif (
+            all([isinstance(ad, pa.Table) for ad in arrow_data])
+            and arrow_data[0].schema == arrow_data[1].schema
+        ):
+            return ArrowWeaveList(pa.concat_tables([arrow_data[0], arrow_data[1]]))
+        else:
+            raise ValueError(
+                "Can only concatenate two ArrowWeaveLists that both contain "
+                "ChunkedArrays of the same type or Tables of the same schema."
+            )
 
     @op(
         input_type={
