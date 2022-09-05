@@ -11,6 +11,7 @@ from . import mappers_python
 from . import box
 from . import errors
 from . import refs
+from . import graph
 
 Ref = refs.Ref
 
@@ -193,6 +194,8 @@ def recursively_unwrap_arrow(obj):
         return obj.to_pylist()
     if getattr(obj, "as_py", None):
         return obj.as_py()
+    if isinstance(obj, graph.Node):
+        return obj
     if isinstance(obj, dict):
         return {k: recursively_unwrap_arrow(v) for (k, v) in obj.items()}
     elif isinstance(obj, list):

@@ -344,3 +344,11 @@ def test_map_merge_cache_busting():
     result2 = use(query)
 
     assert result1._arrow_data != result2._arrow_data
+    assert (
+        "metric0" in result1._arrow_data.column_names
+        and "metric0" not in result2._arrow_data.column_names
+    )
+    assert (
+        "metric1" not in result1._arrow_data.column_names
+        and "metric1" in result2._arrow_data.column_names
+    )
