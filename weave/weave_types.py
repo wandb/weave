@@ -917,7 +917,9 @@ def union(*members: list[Type]) -> Type:
 
 
 def is_list_like(t: Type) -> bool:
-    return isinstance(non_none(t), List)
+    from .ops_primitives import arrow
+
+    return isinstance(non_none(t), (List, arrow.ArrowWeaveListType))
 
 
 def is_custom_type(t: Type) -> bool:
