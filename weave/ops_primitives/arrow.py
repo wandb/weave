@@ -650,31 +650,32 @@ class ArrowWeaveList:
             res = res.arr
         return ArrowWeaveList(res, map_fn.type, self._artifact)
 
-    def _append_column(self, name, data, weave_type=None) -> "ArrowWeaveList":
+    def _append_column(self, name: str, data) -> "ArrowWeaveList":
+        if not data:
+            raise ValueError(f'Data for new column "{name}" must be nonnull.')
+
         new_data = self._arrow_data.append_column(name, [data])
-        try:
-            new_data_type = types.TypedDict({name: weave_type or type_of(data[0])})
-        except IndexError:
-            raise ValueError(
-                "Unable to infer type of new column. Either explicitly pass "
-                "column type or ensure that column has at least one row."
-            )
-        return ArrowWeaveList(
-            new_data, types.merge_types(self.object_type, new_data_type), self._artifact
-        )
+        return ArrowWeaveList(new_data)
 
     def concatenate(self, other: "ArrowWeaveList") -> "ArrowWeaveList":
-        self_data = (
-            pa.table({"self": self._arrow_data})
-            if isinstance(self._arrow_data, pa.ChunkedArray)
-            else self._arrow_data
-        )
-        other_data = (
-            pa.table({"self": other._arrow_data})
-            if isinstance(other._arrow_data, pa.ChunkedArray)
-            else other._arrow_data
-        )
-        return ArrowWeaveList(pa.concat_tables((self_data, other_data)))
+        arrow_data = [awl._arrow_data for awl in (self, other)]
+        if (
+            all([isinstance(ad, pa.ChunkedArray) for ad in arrow_data])
+            and arrow_data[0].type == arrow_data[1].type
+        ):
+            return ArrowWeaveList(
+                pa.chunked_array(arrow_data[0].chunks + arrow_data[1].chunks)
+            )
+        elif (
+            all([isinstance(ad, pa.Table) for ad in arrow_data])
+            and arrow_data[0].schema == arrow_data[1].schema
+        ):
+            return ArrowWeaveList(pa.concat_tables([arrow_data[0], arrow_data[1]]))
+        else:
+            raise ValueError(
+                "Can only concatenate two ArrowWeaveLists that both contain "
+                "ChunkedArrays of the same type or Tables of the same schema."
+            )
 
     @op(
         input_type={

@@ -40,7 +40,7 @@ def create_branch(
     name: str,
     previous_segment: typing.Optional[RunSegment] = None,
     length=10,
-    branch_frac=0.8,
+    previous_segment_branch_frac=0.8,
 ) -> RunSegment:
     """Create a new segment and optionally attach it to a previous segment.
 
@@ -52,39 +52,49 @@ def create_branch(
        The parent run segment. If this is a root run segment, use None.
     length: int, default = 10
        The number of history rows to generate for the segment.
-    branch_frac: float between 0 and 1.
+    previous_segment_branch_frac: float satisfying 0 < branch_frac <= 1.
        Parameter describing where in the previous segment to set the branch point.
-       A branch_frac of 0 sets the branch point at the previous segment's root,
-       whereas a branch_frac of 1 sets the branch point at the end of the previous
-       segment.
+       A previous_segment_branch_frac of 0 sets the branch point at the previous
+       segment's root, whereas a previous_segment_branch_frac of 1 sets the branch
+       point at the end of the previous segment. A previous_segment_branch_frac of
+       0.5 would include half of the previous segment's metric rows.
 
     Returns
     -------
     segment: RunSegment
         The new segment.
     """
-    if not (0 <= branch_frac <= 1):
-        raise ValueError("branch_frac must be between 0 and 1")
+    if not (0 < previous_segment_branch_frac <= 1):
+        raise ValueError("branch_frac must satisfy 0 < branch_frac <= 1")
+
+    if length <= 0:
+        raise ValueError("Length must be greater than 0.")
 
     if previous_segment:
         previous_metrics = previous_segment.metrics
         n_previous_metrics = len(previous_metrics)
         if n_previous_metrics > 0:
-            previous_run_branch_step = (
-                previous_metrics._index(0)["step"]
-                + int(branch_frac * n_previous_metrics)
-                - 1
-            )
-            ref = storage.save(previous_segment)
-            new_metrics = random_metrics(
-                n=length, starting_step=previous_run_branch_step + 1
+            previous_segment_branch_index = (
+                int(previous_segment_branch_frac * n_previous_metrics) - 1
             )
 
             # this run segment has a different root than the previous one
-            if previous_run_branch_step < 0:
-                previous_run_branch_step = None
+            if previous_segment_branch_index < 0:
+                raise ValueError(
+                    f"Invalid branch point on RunSegment: previous_segment_branch_index "
+                    f"{previous_segment_branch_index} must be between 0 and {len(previous_metrics) - 1}"
+                )
 
-            return RunSegment(name, ref.uri, previous_run_branch_step, new_metrics)
+            previous_segment_branch_step = (
+                previous_metrics._index(0)["step"] + previous_segment_branch_index
+            )
+
+            ref = storage.save(previous_segment)
+            new_metrics = random_metrics(
+                n=length, starting_step=previous_segment_branch_step + 1
+            )
+
+            return RunSegment(name, ref.uri, previous_segment_branch_index, new_metrics)
     return RunSegment(name, None, 0, random_metrics(length, 0))
 
 
@@ -98,7 +108,7 @@ def create_experiment(
             f"branch {i}",
             segment,
             length=num_steps_per_run,
-            branch_frac=branch_frac,
+            previous_segment_branch_frac=branch_frac,
         )
     return segment
 
@@ -116,13 +126,13 @@ def num_runs():
 @pytest.mark.parametrize("branch_frac", [0.0, 0.8, 1.0])
 def test_experiment_branching(branch_frac, num_steps, num_runs):
     steps_per_run = num_steps // num_runs
-    segment = create_experiment(num_steps, num_runs, branch_frac)
 
     try:
-        experiment = use(segment.experiment())
+        segment = create_experiment(num_steps, num_runs, branch_frac)
     except ValueError:
         assert branch_frac == 0
     else:
+        experiment = use(segment.experiment())
         assert (
             len(experiment)
             == int(steps_per_run * branch_frac) * (num_runs - 1) + steps_per_run
@@ -144,14 +154,14 @@ def test_explicit_experiment_construction(delta_step):
     segment1 = RunSegment(
         "my-second-run",
         ref1.uri,
-        4 * delta_step,
+        4,
         random_metrics(10, 5 * delta_step, delta_step=delta_step),
     )
     ref2 = storage.save(segment1)
     segment2 = RunSegment(
         "my-third-run",
         ref2.uri,
-        9 * delta_step,
+        4,
         random_metrics(5, 10 * delta_step, delta_step=delta_step),
     )
     experiment = use(segment2.experiment())

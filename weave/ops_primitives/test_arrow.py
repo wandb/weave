@@ -210,3 +210,42 @@ def test_arrow_unnest():
         {"a": 5, "b": "d"},
         {"a": 6, "b": "d"},
     ]
+
+
+def test_arrow_concat_arrow_weave_list():
+
+    # test concatenating two arrow weave lists that contain chunked arrays of the same type
+    ca1 = pa.chunked_array([[1, 2], [3, 4]])
+    ca2 = pa.compute.add(ca1, 1)
+    awl1 = arrow.ArrowWeaveList(ca1)
+    awl2 = arrow.ArrowWeaveList(ca2)
+    result = awl1.concatenate(awl2)
+
+    assert result._arrow_data.chunks == ca1.chunks + ca2.chunks
+
+    # test concatenating two arrow weave lists that contain tables of the same type
+    t1 = pa.table([[1, 2], [3, 4]], names=["col1", "col2"])
+    t2 = pa.table([[2, 3], [4, 5]], names=["col1", "col2"])
+    awl1 = arrow.ArrowWeaveList(t1)
+    awl2 = arrow.ArrowWeaveList(t2)
+    result = awl1.concatenate(awl2)
+
+    assert result._arrow_data == pa.concat_tables([t1, t2])
+
+    # test concatenating two arrow weave lists that contain chunked arrays of different types
+    ca1 = pa.chunked_array([[1, 2], [3, 4]])
+    ca2 = pa.chunked_array([["b", "c"], ["e", "d"]])
+    awl1 = arrow.ArrowWeaveList(ca1)
+    awl2 = arrow.ArrowWeaveList(ca2)
+
+    with pytest.raises(ValueError):
+        awl1.concatenate(awl2)
+
+    # test concatenating two arrow weave lists that contain tables of different types
+    t1 = pa.table([[1, 2], [3, 4]], names=["col1", "col2"])
+    t2 = pa.table([["b", "c"], ["e", "d"]], names=["col1", "col2"])
+    awl1 = arrow.ArrowWeaveList(t1)
+    awl2 = arrow.ArrowWeaveList(t2)
+
+    with pytest.raises(ValueError):
+        awl1.concatenate(awl2)
