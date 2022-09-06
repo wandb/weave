@@ -562,6 +562,12 @@ class ArrowWeaveList:
     _arrow_data: typing.Union[pa.Table, pa.ChunkedArray]
     object_type: types.Type
 
+    def __array__(self, dtype=None):
+        return np.asarray(self.to_pylist())
+
+    def __iter__(self):
+        return iter(self.to_pylist())
+
     def to_pylist(self):
         return self._arrow_data.to_pylist()
 

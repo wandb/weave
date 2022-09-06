@@ -1,6 +1,5 @@
 import typing
-import bisect
-from typing import Optional, cast, Sequence
+from typing import Optional, cast
 from ..api import type, op, use, get, type_of, Node
 from .. import weave_types as types
 from .. import panels
@@ -11,33 +10,29 @@ from ..ops_primitives.arrow import ArrowWeaveList
 class RunSegment:
     run_name: str
     prior_run_ref: Optional[str]
-    prior_run_branch_step: Optional[int]
+
+    # index of the prior run's
+    prior_run_branch_index: Optional[int]
+
+    # this is an ArrowWeaveList containing a table with an arbitrary schema
+    # except that one column should be called "step" and have cells of any
+    # integer type
     metrics: typing.TypeVar("MetricRows")  # type: ignore
 
-    def _experiment_body(self, slice_end: Optional[int] = None) -> ArrowWeaveList:
-        class ListWithCustomAccessor(Sequence):
-            def __init__(self, data):
-                self.data = data
+    @property
+    def prior_run_branch_step(self) -> Optional[int]:
+        if self.prior_run_branch_index is None:
+            return None
+        return self.metrics._index(self.prior_run_branch_index)["step"]
 
-            def __getitem__(self, i):
-                return self.data._index(i)["step"]
+    def _experiment_body(self, limit: Optional[int] = None) -> ArrowWeaveList:
 
-            def __len__(self):
-                return len(self.data)
-
-        # log(n) solution to find the number of records to insert assuming step
-        # is monotonically increasing but not uniformly spaced
-        limit = (
-            bisect.bisect_left(
-                ListWithCustomAccessor(self.metrics),
-                slice_end,
-            )
-            if slice_end is not None and len(self.metrics) != 0
-            else len(self.metrics)
-        )
+        if limit is None:
+            limit = len(self.metrics)
 
         limited = self.metrics._limit(limit)._append_column(
-            "run_name", [self.run_name] * limit, weave_type=types.String()
+            "run_name",
+            [self.run_name] * limit,
         )
 
         if self.prior_run_ref is None:
@@ -46,8 +41,8 @@ class RunSegment:
         # get the prior run
         prior_run: RunSegment = use(get(self.prior_run_ref))
         prior_experiment = prior_run._experiment_body(
-            slice_end=self.prior_run_branch_step + 1
-            if self.prior_run_branch_step is not None
+            limit=self.prior_run_branch_index + 1
+            if self.prior_run_branch_index is not None
             else 0
         )
 
