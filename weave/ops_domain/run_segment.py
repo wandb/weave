@@ -3,7 +3,7 @@ from typing import Optional, cast
 from ..api import type, op, use, get, type_of, Node
 from .. import weave_types as types
 from .. import panels
-from ..ops_primitives.arrow import ArrowWeaveList
+from ..ops_primitives.arrow import ArrowWeaveList, ArrowWeaveListType
 
 
 @type()
@@ -55,11 +55,11 @@ class RunSegment:
 
     @op(render_info={"type": "function"})
     def refine_experiment_type(self) -> types.Type:
-        """Assuming a constant type over history rows for now."""
-        # get the first row and use it to infer the type
-        example_row = self.metrics._index(0)
-        name_type = types.TypedDict({"run_name": types.String()})
-        return types.List(types.merge_types(type_of(example_row), name_type))
+        return ArrowWeaveListType(
+            object_type=types.TypedDict(
+                {**self.metrics.object_type.property_types, "run_name": types.String()}
+            )
+        )
 
     @op(refine_output_type=refine_experiment_type)
     def experiment(self) -> typing.Any:
