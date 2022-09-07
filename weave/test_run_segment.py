@@ -8,12 +8,14 @@ from . import weave_types as types
 import typing
 import numpy as np
 from .ops import (
+    arrow,
     to_arrow,
     dict_,
     numbers_bins_equal,
     NumberBinType,
     number_bin,
     WeaveGroupResultInterface,
+    list_,
 )
 
 from .weave_internal import define_fn, call_fn, make_const_node
@@ -376,14 +378,15 @@ def test_map_experiment_profile_post_groupby_map():
     experiment = last_segment.experiment()
 
     group_key_name = "steppybin(pybinsequal (list (2, 500) , 2) )"
+    list_node = list_.make_list(**{"0": 2, "1": 500})
+    number_bin_fn_node = numbers_bins_equal(list_node, 2)
 
     def groupby_fn(row):
-        number_bin_fn_node = numbers_bins_equal([2, 500], 2)
-        step = row["step"]
+        step = row.pick("step")
         assigned_number_bin_node = number_bin(in_=step, bin_fn=number_bin_fn_node)
         return dict_(**{group_key_name: assigned_number_bin_node})
 
-    groupby_node = define_fn({"row": last_segment.metrics.object_type}, groupby_fn)
+    groupby_node = define_fn({"row": experiment.type.object_type}, groupby_fn)
     groupby = experiment.groupby(groupby_node)
 
     def map_fn_1_body(row):
@@ -391,15 +394,22 @@ def test_map_experiment_profile_post_groupby_map():
         merge_dict = dict_(
             **{
                 "100": 100,
-                "step": row["step"],
-                "metric0": row["metric0"],
-                "string_col": row["string_col"],
+                "step": row.pick("step"),
+                "metric0": row.pick("metric0"),
+                "string_col": row.pick("string_col"),
                 "circle": "circle",
             }
         )
         return row_key.merge(merge_dict)
 
-    map_fn_node = define_fn({"row": groupby.type}, map_fn_1_body)
+    map_fn_node = define_fn(
+        {
+            "row": arrow.ArrowTableGroupResultType(
+                experiment.type.object_type, groupby_node.type.output_type
+            )
+        },
+        map_fn_1_body,
+    )
     mapped = groupby.map(map_fn_node)
 
     use(mapped)
