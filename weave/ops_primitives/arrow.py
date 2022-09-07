@@ -19,6 +19,7 @@ from .. import mappers_python
 from .. import artifacts_local
 from .. import storage
 from .. import refs
+from .. import execute_fast
 
 
 class ArrowArrayVectorizer:
@@ -386,6 +387,9 @@ class ArrowTableGroupBy:
     def count(self) -> int:
         return len(self._groups)
 
+    def __len__(self):
+        return len(self._groups)
+
     @op(
         output_type=lambda input_types: ArrowTableGroupResultType(
             input_types["self"].object_type,
@@ -434,20 +438,7 @@ class ArrowTableGroupBy:
         output_type=lambda input_types: types.List(input_types["map_fn"].output_type),
     )
     def map(self, map_fn):
-        calls = []
-        for i in range(len(self._groups)):
-            row = self.__getitem__.resolve_fn(self, i)
-            calls.append(
-                weave_internal.call_fn(
-                    map_fn,
-                    {
-                        "row": graph.ConstNode(types.Any(), row),
-                        "index": graph.ConstNode(types.Number(), i),
-                    },
-                )
-            )
-        result = weave_internal.use(calls)
-        return result
+        return execute_fast.fast_map_fn(self, map_fn)
 
 
 ArrowTableGroupByType.instance_classes = ArrowTableGroupBy
