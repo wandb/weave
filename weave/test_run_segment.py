@@ -17,6 +17,7 @@ from .ops import (
     WeaveGroupResultInterface,
     list_,
 )
+import weave
 
 from .weave_internal import define_fn, call_fn, make_const_node
 
@@ -374,7 +375,7 @@ def test_map_merge_cache_busting():
 
 
 def test_map_experiment_profile_post_groupby_map():
-    last_segment = create_experiment(4000, 20)
+    last_segment = create_experiment(500000, 20)
     experiment = last_segment.experiment()
 
     group_key_name = "steppybin(pybinsequal (list (2, 500) , 2) )"
@@ -412,4 +413,6 @@ def test_map_experiment_profile_post_groupby_map():
     )
     mapped = groupby.map(map_fn_node)
 
-    use(mapped)
+    import cProfile
+
+    cProfile.runctx("use(mapped)", globals(), locals(), filename="map_profile.pstat")
