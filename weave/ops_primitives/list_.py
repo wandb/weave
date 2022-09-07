@@ -377,7 +377,7 @@ class WeaveGroupResultInterface:
     @op(
         name="group-groupkey",
         input_type={"obj": GroupResultType()},
-        output_type=lambda input_types: input_types["obj"].key,
+        output_type=lambda input_types: input_types["obj"]._key,
     )
     def key(obj):
         type_class = types.TypeRegistry.type_class_of(obj)
