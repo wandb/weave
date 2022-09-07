@@ -1,3 +1,4 @@
+import typing
 import dataclasses
 
 from . import weave_types as types
@@ -21,22 +22,32 @@ def type(__override_name: str = None):
         TargetType.instance_class = target
         TargetType.NodeMethodsClass = dc
 
-        property_types = {
-            field.name: infer_types.python_type_to_type(field.type) for field in fields
-        }
+        type_vars: dict[str, types.Type] = {}
+        static_property_types: dict[str, types.Type] = {}
+        for field in fields:
+            if isinstance(field.type, typing.TypeVar):
+                # This is a Python type variable
+                type_vars[field.name] = types.Any()
+            else:
+                weave_type = infer_types.python_type_to_type(field.type)
+                if weave_type.type_vars():
+                    # this is a Weave type with a type variable in it
+                    type_vars[field.name] = weave_type
+                else:
+                    static_property_types[field.name] = weave_type
 
-        # If there are any variable type properties, make them variable
-        # in the type we are creating.
-        for name, prop_type in property_types.items():
-            prop_type_vars = prop_type.type_vars
-            if callable(prop_type_vars):
-                prop_type_vars = prop_type_vars()
-            if len(prop_type_vars):
-                setattr(TargetType, name, prop_type)
-                setattr(TargetType, "__annotations__", {})
-                TargetType.__dict__["__annotations__"][name] = types.Type
+        if type_vars:
+            setattr(TargetType, "__annotations__", {})
+        for name, default_type in type_vars.items():
+            setattr(TargetType, name, default_type)
+            TargetType.__dict__["__annotations__"][name] = types.Type
 
         def property_types_method(self):
+            property_types = {}
+            for name in type_vars:
+                property_types[name] = getattr(self, name)
+            for name, prop_type in static_property_types.items():
+                property_types[name] = prop_type
             return property_types
 
         TargetType.property_types = property_types_method
