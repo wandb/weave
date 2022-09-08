@@ -1,11 +1,14 @@
 import copy
 import typing
 
+from weave.weavejs_fixes import fixup_node
+
 from . import errors
 from . import op_args
 from . import context_state
 from . import weave_types as types
 from . import uris
+from . import weave_internal
 
 
 class OpDef:
@@ -89,10 +92,16 @@ class OpDef:
 
     def to_dict(self):
         output_type = self.output_type
-        # No callable output_type still
         if callable(output_type):
-            output_type = types.Any()
-        output_type = output_type.to_dict()
+            # TODO: Consider removing the ability for an output_type to
+            # be a function - they all must be Types or ConstNodes. Probably
+            # this can be done after all the existing ops can safely be converted.
+            # Once that change happens, we can do this conversion in the constructor.
+            output_type = callable_output_type_to_dict(
+                self.input_type, output_type, self.uri
+            )
+        else:
+            output_type = output_type.to_dict()
 
         # Make callable input_type args into types.Any() for now.
         input_type = self.input_type
@@ -124,3 +133,20 @@ class OpDef:
 
 def is_op_def(obj):
     return isinstance(obj, OpDef)
+
+
+def callable_output_type_to_dict(input_type, output_type, op_name):
+    if not isinstance(input_type, op_args.OpNamedArgs):
+        print(f"Failed to transform op {op_name}: Requires named args")
+        return types.Any().to_dict()
+    try:
+        # TODO: Make this transformation more sophisticated once the type hierarchy is settled
+        arg_types = {
+            "input_types": types.TypedDict(
+                {k: types.Type() for k, _ in input_type.arg_types.items()}
+            )
+        }
+        return fixup_node(weave_internal.define_fn(arg_types, output_type)).to_json()
+    except errors.WeaveMakeFunctionError as e:
+        print(f"Failed to transform op {op_name}: Invalid output type function")
+        return types.Any().to_dict()

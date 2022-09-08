@@ -58,10 +58,6 @@ def instance_class_to_potential_type(cls):
 
 
 def type_class_type_name(type_class):
-    try:
-        return type_class.__dict__["name"]
-    except KeyError:
-        pass
     if hasattr(type_class, "class_type_name"):
         return type_class.class_type_name()
 
@@ -165,6 +161,8 @@ class Type:
     def class_type_name(cls):
         if cls == Type:
             return "type"
+        if hasattr(cls, "name") and type(cls.name) == str:
+            return cls.name
         return cls.__name__.removesuffix("Type")
 
     @classmethod
@@ -282,6 +280,14 @@ class Type:
 
     def instance_from_dict(self, d):
         raise NotImplementedError
+
+    @classmethod
+    def make(cls, kwargs={}):
+        return cls._make(cls, kwargs)
+
+    @staticmethod
+    def _make(cls, kwargs={}):
+        raise Exception("Please import `weave` to use `Type.make`.")
 
 
 # _PlainStringNamedType should only be used for backward compatibility with

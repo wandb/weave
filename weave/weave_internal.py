@@ -98,9 +98,12 @@ def make_output_node(type_, op_name, op_params):
 
 
 # Given a registered op, make a mapped version of it.
-
-
 def define_fn(parameters, body):
     var_nodes = [make_var_node(t, k) for k, t in parameters.items()]
-    fnNode = body(*var_nodes)
+    try:
+        fnNode = body(*var_nodes)
+    except errors.WeaveExpectedConstError as e:
+        raise errors.WeaveMakeFunctionError("function body expected const node.")
+    if not isinstance(fnNode, graph.Node):
+        raise errors.WeaveMakeFunctionError("output_type function must return a node.")
     return graph.ConstNode(types.Function(parameters, fnNode.type), fnNode)
