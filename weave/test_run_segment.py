@@ -411,7 +411,7 @@ def test_map_experiment_profile_post_groupby_map():
         },
         map_fn_1_body,
     )
-    mapped = groupby.map(map_fn_node)
+    mapped = list_.make_list(**{"0": list_.unnest(groupby.map(map_fn_node))})
 
     import cProfile
 
