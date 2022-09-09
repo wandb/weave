@@ -4,6 +4,7 @@ import typing
 
 from wandb.apis import public as wandb_api
 
+from .run_segment import RunSegment, run_segment_render
 from ..api import op, weave_class
 from .. import weave_types as types
 from . import wbartifact

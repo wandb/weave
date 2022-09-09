@@ -5,9 +5,10 @@ import numpy as np
 import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.parquet as pq
+
 from .. import weave_internal
 
-from ..api import op, weave_class
+from ..api import op, weave_class, type_of
 from .. import weave_types as types
 from .. import graph
 from .. import errors
@@ -18,6 +19,7 @@ from .. import mappers_python
 from .. import artifacts_local
 from .. import storage
 from .. import refs
+from .. import execute_fast
 
 
 class ArrowArrayVectorizer:
@@ -385,6 +387,9 @@ class ArrowTableGroupBy:
     def count(self) -> int:
         return len(self._groups)
 
+    def __len__(self):
+        return len(self._groups)
+
     @op(
         output_type=lambda input_types: ArrowTableGroupResultType(
             input_types["self"].object_type,
@@ -433,20 +438,7 @@ class ArrowTableGroupBy:
         output_type=lambda input_types: types.List(input_types["map_fn"].output_type),
     )
     def map(self, map_fn):
-        calls = []
-        for i in range(len(self._groups)):
-            row = self.__getitem__.resolve_fn(self, i)
-            calls.append(
-                weave_internal.call_fn(
-                    map_fn,
-                    {
-                        "row": graph.ConstNode(types.Any(), row),
-                        "index": graph.ConstNode(types.Number(), i),
-                    },
-                )
-            )
-        result = weave_internal.use(calls)
-        return result
+        return execute_fast.fast_map_fn(self, map_fn)
 
 
 ArrowTableGroupByType.instance_classes = ArrowTableGroupBy
@@ -549,6 +541,9 @@ class ArrowWeaveList:
     def _count(self):
         return len(self._arrow_data)
 
+    def __len__(self):
+        return self._count()
+
     @op()
     def count(self) -> int:
         return self._count()
@@ -608,6 +603,33 @@ class ArrowWeaveList:
             res = res.arr
         return ArrowWeaveList(res, map_fn.type, self._artifact)
 
+    def _append_column(self, name: str, data) -> "ArrowWeaveList":
+        if not data:
+            raise ValueError(f'Data for new column "{name}" must be nonnull.')
+
+        new_data = self._arrow_data.append_column(name, [data])
+        return ArrowWeaveList(new_data)
+
+    def concatenate(self, other: "ArrowWeaveList") -> "ArrowWeaveList":
+        arrow_data = [awl._arrow_data for awl in (self, other)]
+        if (
+            all([isinstance(ad, pa.ChunkedArray) for ad in arrow_data])
+            and arrow_data[0].type == arrow_data[1].type
+        ):
+            return ArrowWeaveList(
+                pa.chunked_array(arrow_data[0].chunks + arrow_data[1].chunks)
+            )
+        elif (
+            all([isinstance(ad, pa.Table) for ad in arrow_data])
+            and arrow_data[0].schema == arrow_data[1].schema
+        ):
+            return ArrowWeaveList(pa.concat_tables([arrow_data[0], arrow_data[1]]))
+        else:
+            raise ValueError(
+                "Can only concatenate two ArrowWeaveLists that both contain "
+                "ChunkedArrays of the same type or Tables of the same schema."
+            )
+
     @op(
         input_type={
             "self": ArrowWeaveListType(ArrowTableType(types.Any())),
@@ -640,6 +662,16 @@ class ArrowWeaveList:
             raise errors.WeaveInternalError(
                 "Arrow groupby not yet support for map result: %s" % type(group_table)
             )
+        # Serializing a large arrow table and then reading it back
+        # causes it to come back with more than 1 chunk. It seems the aggregation
+        # operations don't like this. It will raise a cryptic error about
+        # ExecBatches need to have the same link without this combine_chunks line
+        # But combine_chunks doesn't seem like the most efficient thing to do
+        # either, since it'll have to concatenate everything together.
+        # But this fixes the crash for now!
+        # TODO: investigate this as we optimize the arrow implementation
+        group_table = group_table.combine_chunks()
+
         group_table = group_table.append_column(
             "_index", pa.array(np.arange(len(group_table)))
         )
@@ -660,11 +692,14 @@ class ArrowWeaveList:
             self._arrow_data.slice(offset), self.object_type, self._artifact
         )
 
-    @op(output_type=lambda input_types: input_types["self"])
-    def limit(self, limit: int):
+    def _limit(self, limit: int):
         return ArrowWeaveList(
             self._arrow_data.slice(0, limit), self.object_type, self._artifact
         )
+
+    @op(output_type=lambda input_types: input_types["self"])
+    def limit(self, limit: int):
+        return self._limit(limit)
 
 
 ArrowWeaveListType.instance_classes = ArrowWeaveList
@@ -734,8 +769,9 @@ def to_arrow_from_list_and_artifact(obj, object_type, artifact):
     return weave_obj
 
 
-def to_arrow(obj):
-    wb_type = types.TypeRegistry.type_of(obj)
+def to_arrow(obj, wb_type=None):
+    if wb_type is None:
+        wb_type = types.TypeRegistry.type_of(obj)
     artifact = artifacts_local.LocalArtifact("to-arrow-%s" % wb_type.name)
     if isinstance(wb_type, types.List):
         object_type = wb_type.object_type

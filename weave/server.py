@@ -29,6 +29,8 @@ OptionalAuthType = typing.Optional[
     typing.Union[typing.Tuple[str, str], requests.models.HTTPBasicAuth]
 ]
 
+logger = logging.getLogger("root")
+
 
 def _handle_request(request, deref=False):
 
@@ -42,7 +44,7 @@ def _handle_request(request, deref=False):
     nodes = serialize.deserialize(request["graphs"])
 
     start_time = time.time()
-    print(
+    logger.info(
         "Server request running %s nodes.\n%s"
         % (len(nodes), "\n".join(graph.node_expr_str(n) for n in nodes))
     )
@@ -57,7 +59,7 @@ def _handle_request(request, deref=False):
         tracer.stop()
         tracer.save(output_file="request_%s.json" % time.time())
     result = [storage.to_python(r) for r in result]
-    logging.info("Server request done in: %ss" % (time.time() - start_time))
+    logger.info("Server request done in: %ss" % (time.time() - start_time))
     return result
 
 
