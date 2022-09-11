@@ -260,13 +260,12 @@ class Type:
             try:
                 d = self.instance_to_dict(obj)
             except NotImplementedError:
-                serializer = mappers_python.map_to_python(self, artifact)
-                d = serializer.apply(obj)
-        # if d is None:
-        #     raise errors.WeaveSerializeError(
-        #         "Object is not serializable. Provide instance_<to/from>_dict or <save/load>_instance methods on Type: %s"
-        #         % self
-        #     )
+                pass
+        if d is None:
+            raise errors.WeaveSerializeError(
+                "Object is not serializable. Provide instance_<to/from>_dict or <save/load>_instance methods on Type: %s"
+                % self
+            )
         with artifact.new_file(f"{name}.object.json") as f:
             json.dump(d, f)
         return None
@@ -276,30 +275,13 @@ class Type:
             d = json.load(f)
         if self.__class__ == Type:
             return TypeRegistry.type_from_dict(d)
-        try:
-            return self.instance_from_dict(d)
-        except NotImplementedError:
-            mapper = mappers_python.map_from_python(self, artifact)
-            return mapper.apply(d)
+        return self.instance_from_dict(d)
 
     def instance_to_dict(self, obj):
         raise NotImplementedError
 
     def instance_from_dict(self, d):
         raise NotImplementedError
-
-    # def save_instance(self, obj, artifact, name):
-    #     serializer = mappers_python.map_to_python(self, artifact)
-
-    #     result = serializer.apply(obj)
-    #     with artifact.new_file(f"{name}.object.json") as f:
-    #         json.dump(result, f, allow_nan=False)
-
-    # def load_instance(self, artifact, name, extra=None):
-    #     with artifact.open(f"{name}.object.json") as f:
-    #         result = json.load(f)
-    #     mapper = mappers_python.map_from_python(self, artifact)
-    #     return mapper.apply(result)
 
 
 # _PlainStringNamedType should only be used for backward compatibility with
@@ -691,18 +673,18 @@ class ObjectType(Type):
     #     # TODO
     #     pass
 
-    # def save_instance(self, obj, artifact, name):
-    #     serializer = mappers_python.map_to_python(self, artifact)
+    def save_instance(self, obj, artifact, name):
+        serializer = mappers_python.map_to_python(self, artifact)
 
-    #     result = serializer.apply(obj)
-    #     with artifact.new_file(f"{name}.object.json") as f:
-    #         json.dump(result, f, allow_nan=False)
+        result = serializer.apply(obj)
+        with artifact.new_file(f"{name}.object.json") as f:
+            json.dump(result, f, allow_nan=False)
 
-    # def load_instance(self, artifact, name, extra=None):
-    #     with artifact.open(f"{name}.object.json") as f:
-    #         result = json.load(f)
-    #     mapper = mappers_python.map_from_python(self, artifact)
-    #     return mapper.apply(result)
+    def load_instance(self, artifact, name, extra=None):
+        with artifact.open(f"{name}.object.json") as f:
+            result = json.load(f)
+        mapper = mappers_python.map_from_python(self, artifact)
+        return mapper.apply(result)
 
 
 def fn():
