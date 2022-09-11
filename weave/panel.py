@@ -87,8 +87,14 @@ class Panel:
     #         input_node = op_get(ref.uri)
     #     self.input_node = input_node
 
+    @property
     def config(self):
-        return {}
+        conf = {}
+        for field in dataclasses.fields(self):
+            if field.name == "input_node" or field.name == "vars":
+                continue
+            conf[field.name] = getattr(self, field.name)
+        return conf
 
     def to_json(self):
         return {
