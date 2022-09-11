@@ -20,5 +20,6 @@ class Table(panel.Panel):
     def append_column(self, expr, name=""):
         self._table_state.add_column(expr, name=name)
 
-    def config(self, _vars={}):
+    @property
+    def config(self):
         return {"tableState": self._table_state.to_json()}

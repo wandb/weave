@@ -56,10 +56,10 @@ class ArrowArrayVectorizer:
     def __gt__(self, other):
         return ArrowArrayVectorizer(pc.greater(self.arr, other))
 
-    def __mult__(self, other):
+    def __mul__(self, other):
         if isinstance(other, ArrowArrayVectorizer):
             other = other.arr
-        return ArrowArrayVectorizer(pc.divide(self.arr, other))
+        return ArrowArrayVectorizer(pc.multiply(self.arr, other))
 
     def __truediv__(self, other):
         if isinstance(other, ArrowArrayVectorizer):
@@ -70,6 +70,10 @@ class ArrowArrayVectorizer:
         if isinstance(other, ArrowArrayVectorizer):
             other = other.arr
         return ArrowArrayVectorizer(pc.power(self.arr, other))
+
+
+# Arrow problem: we have part of our op that returns a const. We should
+# produce an array of those here, but we don't...
 
 
 def mapped_fn_to_arrow(arrow_table, node):
@@ -85,10 +89,15 @@ def mapped_fn_to_arrow(arrow_table, node):
             return inputs["obj"]._get_col(inputs["key"])
         elif op_name == "typedDict-pick":
             return inputs["self"]._get_col(inputs["key"])
+        elif op_name == "number-sin":
+            print("GOT SIN", inputs)
+            print("SIN RES", pc.sin(inputs["n"].arr))
+            return ArrowArrayVectorizer(pc.sin(inputs["n"].arr))
         elif op_name == "dict":
             for k, v in inputs.items():
                 if isinstance(v, ArrowArrayVectorizer):
                     inputs[k] = v.arr
+            print("INPUTS", inputs)
             return pa.table(inputs)
         elif op_name == "merge":
             lhs = inputs["lhs"]

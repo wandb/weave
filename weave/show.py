@@ -24,7 +24,7 @@ def _show_params(obj):
         return {
             "weave_node": weavejs_fixes.fixup_node(obj.input_node),
             "panel_id": obj.id,
-            "panel_config": weavejs_fixes.fixup_data(obj.config()),
+            "panel_config": weavejs_fixes.fixup_data(obj.config),
         }
 
     elif isinstance(obj, graph.Node):

@@ -6,6 +6,7 @@ TODO: this file is not complete. We should try to put all compability fixes here
 import typing
 import copy
 from . import graph
+from . import weave_types
 
 
 def convert_specific_opname_to_generic_opname(
@@ -21,6 +22,10 @@ def convert_specific_opname_to_generic_opname(
         return "count", {"arr": inputs["self"]}
     elif name == "groupresult-key":
         return "group-groupkey", {"obj": inputs["self"]}
+    elif name == "list-map":
+        return "map", {"arr": inputs["self"], "mapFn": inputs["map_fn"]}
+    elif name == "list-groupby":
+        return "groupby", {"arr": inputs["self"], "groupByFn": inputs["group_by_fn"]}
     elif name == "list-filter":
         return "filter", {"arr": inputs["self"], "filterFn": inputs["filter_fn"]}
     elif (
@@ -37,6 +42,12 @@ def convert_specific_ops_to_generic_ops_node(node: graph.Node) -> graph.Node:
     """Converts specific ops like typedDict-pick to generic ops like pick"""
 
     def convert_specific_op_to_generic_op(node: graph.Node):
+        if isinstance(node, graph.ConstNode) and isinstance(
+            node.type, weave_types.Function
+        ):
+            return graph.ConstNode(
+                node.type, convert_specific_ops_to_generic_ops_node(node.val)
+            )
         if not isinstance(node, graph.OutputNode):
             return node
         name, inputs = convert_specific_opname_to_generic_opname(

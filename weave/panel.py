@@ -1,5 +1,4 @@
 import dataclasses
-import copy
 import typing
 import inspect
 from . import api as weave
@@ -9,6 +8,7 @@ from . import weave_types as types
 from . import weavejs_fixes
 from . import weave_internal
 from . import panel_util
+from . import errors
 from .ops import get as op_get
 
 
@@ -30,23 +30,38 @@ class PanelType(types.Type):
         return obj
 
 
-def inject_variables(obj, vars):
+def run_variable_lambdas(obj, vars):
     if callable(obj):
         sig = inspect.signature(obj)
         param_nodes = {}
         for param in sig.parameters:
-            param_type = vars[param].type
+            try:
+                param_type = vars[param].type
+            except KeyError:
+                raise errors.WeaveDefinitionError(
+                    "Variable '%s' not available in frame: %s" % (param, vars)
+                )
             if isinstance(param_type, types.Function):
                 param_type = param_type.output_type
             param_nodes[param] = weave_internal.make_var_node(param_type, param)
         injected = obj(**param_nodes)
-        return inject_variables(injected, vars)
+        return run_variable_lambdas(injected, vars)
     if isinstance(obj, list):
-        return [inject_variables(v, vars) for v in obj]
+        return [run_variable_lambdas(v, vars) for v in obj]
     elif isinstance(obj, dict):
-        return {k: inject_variables(v, vars) for k, v in obj.items()}
+        return {k: run_variable_lambdas(v, vars) for k, v in obj.items()}
     else:
         return obj
+
+
+# So this needs to take:
+# user can pass
+#   - input
+#   - user assignments
+#   - settings (initial state, not 1to1 with config)
+# internal
+#   - config
+#   - scope assignments
 
 
 @weave.weave_class(weave_type=PanelType)
@@ -63,7 +78,7 @@ class Panel:
         for name, val in self.vars.items():
             self.vars[name] = panel_util.make_node(val)
 
-    def normalize(self, _vars={}):
+    def _normalize(self, frame=None):
         pass
 
     # def __init__(self, input_node=graph.VoidNode()):
@@ -72,24 +87,15 @@ class Panel:
     #         input_node = op_get(ref.uri)
     #     self.input_node = input_node
 
-    def config(self, _vars={}):
-        vars = copy.copy(_vars)
-        vars.update(self.vars)
+    def config(self):
+        return {}
 
-        # OK so resolve any lambdas (variable injection).
-        conf = {}
-        for field in dataclasses.fields(self):
-            if field.name == "input_node" or field.name == "vars":
-                continue
-            conf[field.name] = inject_variables(getattr(self, field.name), vars)
-        return conf
-
-    def to_json(self, _vars={}):
+    def to_json(self):
         return {
             "vars": self.vars,
             "input_node": self.input_node.to_json(),
             "id": self.id,
-            "config": self.config(_vars),
+            "config": self.config,
         }
 
 

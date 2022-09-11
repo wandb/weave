@@ -121,6 +121,14 @@ class Number(object):
         return val * -1
 
     @op(
+        name="number-round",
+        input_type={"val": types.Number()},
+        output_type=types.Number(),
+    )
+    def __round__(val):
+        return round(val)
+
+    @op(
         name="number-floor",
         input_type={"number": types.Number()},
         output_type=types.Number(),
@@ -143,6 +151,22 @@ class Number(object):
     )
     def pow(lhs, rhs):
         return lhs**rhs
+
+    @op(
+        name="number-cos",
+        input_type={"n": types.Number()},
+        output_type=types.Number(),
+    )
+    def cos(n):
+        return math.cos(n)
+
+    @op(
+        name="number-sin",
+        input_type={"n": types.Number()},
+        output_type=types.Number(),
+    )
+    def sin(n):
+        return math.sin(n)
 
 
 @op(

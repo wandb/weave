@@ -97,7 +97,8 @@ class Plot(panel.Panel):
     def set_mark(self, mark_option):
         self._mark = mark_option
 
-    def config(self, _vars={}):
+    @property
+    def config(self):
         return {
             "table": self._table_state.to_json(),
             "dims": self._dims,
