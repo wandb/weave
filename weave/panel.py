@@ -72,20 +72,17 @@ class Panel:
     vars: dict[str, graph.Node] = dataclasses.field(default_factory=dict)
 
     def __post_init__(self):
-        if not isinstance(self.input_node, graph.Node):
-            ref = storage.save(self.input_node)
-            self.input_node = op_get(ref.uri)
         for name, val in self.vars.items():
             self.vars[name] = panel_util.make_node(val)
 
+        self.input_node = run_variable_lambdas(self.input_node, self.vars)
+
+        if not isinstance(self.input_node, graph.Node):
+            ref = storage.save(self.input_node)
+            self.input_node = op_get(ref.uri)
+
     def _normalize(self, frame=None):
         pass
-
-    # def __init__(self, input_node=graph.VoidNode()):
-    #     if not isinstance(input_node, graph.Node):
-    #         ref = storage.save(input_node)
-    #         input_node = op_get(ref.uri)
-    #     self.input_node = input_node
 
     @property
     def config(self):
@@ -98,7 +95,7 @@ class Panel:
 
     def to_json(self):
         return {
-            "vars": self.vars,
+            "vars": {k: v.to_json() for k, v in self.vars.items()},
             "input_node": self.input_node.to_json(),
             "id": self.id,
             "config": self.config,

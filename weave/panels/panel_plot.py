@@ -7,8 +7,8 @@ from .. import graph
 class Plot(panel.Panel):
     id = "plot"
 
-    def __init__(self, input_node, **config):
-        super().__init__(input_node)
+    def __init__(self, input_node, vars, **config):
+        super().__init__(input_node, vars)
         self._table_state = table_state.TableState(self.input_node)
         self._dims = {
             "x": self._table_state.add_column(lambda row: graph.VoidNode()),
