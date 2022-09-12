@@ -346,10 +346,6 @@ class NoneType(BasicType):
 none_type = NoneType()
 
 
-def maybe(type: Type) -> Type:
-    return UnionType(type, none_type)
-
-
 class Any(BasicType):
     name = "any"
 
