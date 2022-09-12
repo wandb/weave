@@ -7,16 +7,27 @@ from . import weave_types as types
 from . import context_state
 from . import weave_internal
 from . import errors
+from . import op_args
 from . import api
 
 
-def _ensure_node(fq_op_name, v, input_type, already_bound_params):
-    if callable(input_type):
+def _ensure_node(fq_op_name, v, input_type, param_input_type, already_bound_params):
+    if callable(param_input_type):
         already_bound_types = {k: n.type for k, n in already_bound_params.items()}
-        input_type = input_type(already_bound_types)
+
+        # Automatic Node execution
+        for k, t in already_bound_types.items():
+            if isinstance(input_type, op_args.OpNamedArgs):
+                expected_input_type = input_type.arg_types[k]
+                if isinstance(t, types.Function) and not isinstance(
+                    expected_input_type, types.Function
+                ):
+                    already_bound_types[k] = already_bound_types[k].output_type
+
+        param_input_type = param_input_type(already_bound_types)
     if not isinstance(v, graph.Node):
         if callable(v):
-            if not isinstance(input_type, types.Function):
+            if not isinstance(param_input_type, types.Function):
                 raise errors.WeaveInternalError(
                     "callable passed as argument, but type is not Function. Op: %s"
                     % fq_op_name
@@ -28,8 +39,10 @@ def _ensure_node(fq_op_name, v, input_type, already_bound_params):
             #    lambda row: ...
             sig = inspect.signature(v)
             vars = {}
-            for name in list(input_type.input_types.keys())[: len(sig.parameters)]:
-                vars[name] = input_type.input_types[name]
+            for name in list(param_input_type.input_types.keys())[
+                : len(sig.parameters)
+            ]:
+                vars[name] = param_input_type.input_types[name]
 
             return weave_internal.define_fn(vars, v)
         val_type = types.TypeRegistry.type_of(v)
@@ -46,16 +59,22 @@ def _bind_params(fq_op_name, sig, args, kwargs, input_type):
         if param.kind == inspect.Parameter.VAR_KEYWORD:
             for sub_k, sub_v in v.items():
                 bound_params_with_constants[sub_k] = _ensure_node(
-                    fq_op_name, sub_v, None, None
+                    fq_op_name, sub_v, None, None, None
                 )
         else:
             bound_params_with_constants[k] = _ensure_node(
-                fq_op_name, v, input_type.arg_types[k], bound_params_with_constants
+                fq_op_name,
+                v,
+                input_type,
+                input_type.arg_types[k],
+                bound_params_with_constants,
             )
     return bound_params_with_constants
 
 
-def _make_output_node(fq_op_name, bound_params, output_type_, refine_output_type):
+def _make_output_node(
+    fq_op_name, bound_params, input_type, output_type_, refine_output_type
+):
     output_type = output_type_
     # Don't try to refine if there are variable nodes, we are building a
     # function in that case!
@@ -83,6 +102,15 @@ def _make_output_node(fq_op_name, bound_params, output_type_, refine_output_type
                 new_input_type[k] = types.Const(n.type, n.val)
             else:
                 new_input_type[k] = n.type
+
+                # Automatic Node execution
+                if isinstance(input_type, op_args.OpNamedArgs):
+                    expected_input_type = input_type.arg_types[k]
+                    if isinstance(new_input_type[k], types.Function) and not isinstance(
+                        expected_input_type, types.Function
+                    ):
+                        new_input_type[k] = new_input_type[k].output_type
+
         output_type = output_type(new_input_type)
 
     name = "OutputNode"
@@ -132,7 +160,7 @@ def make_lazy_call(f, fq_op_name, input_type, output_type, refine_output_type):
     def lazy_call(*args, **kwargs):
         bound_params = _bind_params(fq_op_name, sig, args, kwargs, input_type)
         return _make_output_node(
-            fq_op_name, bound_params, output_type, refine_output_type
+            fq_op_name, bound_params, input_type, output_type, refine_output_type
         )
 
     return lazy_call
