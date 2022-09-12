@@ -374,6 +374,7 @@ def test_map_merge_cache_busting():
     )
 
 
+@pytest.mark.skip()  # TODO(dg): enable
 def test_map_experiment_profile_post_groupby_map():
     last_segment = create_experiment(500000, 20)
     experiment = last_segment.experiment()
