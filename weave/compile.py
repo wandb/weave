@@ -32,7 +32,7 @@ def call_execute(function_node: graph.Node) -> graph.OutputNode:
 # same pattern.
 
 
-def await_run_outputs(nodes: typing.List[graph.Node]):
+def await_run_outputs(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
     """Automatically insert Run.await_final_output steps as needed."""
 
     edit_g = graph_editable.EditGraph()
@@ -82,7 +82,7 @@ def await_run_outputs(nodes: typing.List[graph.Node]):
     return [edit_g.get_node(n) for n in nodes]
 
 
-def execute_nodes(nodes: typing.List[graph.Node]):
+def execute_nodes(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
     """In cases where an input is a Node, execute the Node"""
 
     edit_g = graph_editable.EditGraph()
@@ -129,7 +129,7 @@ def execute_nodes(nodes: typing.List[graph.Node]):
     return [edit_g.get_node(n) for n in nodes]
 
 
-def compile(nodes: typing.List[graph.Node]):
+def compile(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
     nodes = await_run_outputs(nodes)
     nodes = execute_nodes(nodes)
     return nodes
