@@ -7,22 +7,17 @@ from . import weave_types as types
 from . import context_state
 from . import weave_internal
 from . import errors
-from . import op_args
 from . import api
+from . import language_autocall
 
 
 def _ensure_node(fq_op_name, v, input_type, param_input_type, already_bound_params):
     if callable(param_input_type):
         already_bound_types = {k: n.type for k, n in already_bound_params.items()}
-
-        # Automatic Node execution
-        for k, t in already_bound_types.items():
-            if isinstance(input_type, op_args.OpNamedArgs):
-                expected_input_type = input_type.arg_types[k]
-                if isinstance(t, types.Function) and not isinstance(
-                    expected_input_type, types.Function
-                ):
-                    already_bound_types[k] = already_bound_types[k].output_type
+        already_bound_types = language_autocall.update_input_types(
+            input_type,
+            already_bound_types,
+        )
 
         param_input_type = param_input_type(already_bound_types)
     if not isinstance(v, graph.Node):
@@ -103,13 +98,9 @@ def _make_output_node(
             else:
                 new_input_type[k] = n.type
 
-                # Automatic Node execution
-                if isinstance(input_type, op_args.OpNamedArgs):
-                    expected_input_type = input_type.arg_types[k]
-                    if isinstance(new_input_type[k], types.Function) and not isinstance(
-                        expected_input_type, types.Function
-                    ):
-                        new_input_type[k] = new_input_type[k].output_type
+        new_input_type = language_autocall.update_input_types(
+            input_type, new_input_type
+        )
 
         output_type = output_type(new_input_type)
 
@@ -128,12 +119,10 @@ def _make_output_node(
         name += output_type.output.__class__.__name__
         bases.append(output_type.output.NodeMethodsClass)
 
-    # Mixin function output type Node methods
-    if isinstance(output_type, types.Function) and hasattr(
-        output_type.output_type, "NodeMethodsClass"
-    ):
-        name += output_type.output_type.__class__.__name__
-        bases.append(output_type.output_type.NodeMethodsClass)
+    node_methods_class, node_name = language_autocall.node_methods_class(output_type)
+    if node_methods_class is not None:
+        name += node_name
+        bases.append(node_methods_class)
 
     return_type = type(name, tuple(bases), {})
     return return_type(output_type, fq_op_name, bound_params)
