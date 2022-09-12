@@ -1,4 +1,3 @@
-import logging
 import typing
 import dataclasses
 import json
@@ -7,9 +6,7 @@ import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.parquet as pq
 
-from .. import weave_internal
-
-from ..api import op, weave_class, type_of, type
+from ..api import op, weave_class, type
 from .. import weave_types as types
 from .. import graph
 from .. import errors
