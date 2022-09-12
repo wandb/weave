@@ -676,14 +676,14 @@ class ArrowWeaveList:
             group_table = group_table.arr
 
         has_struct = False
-        original_col_names = group_table.column_names
-        original_group_table = group_table
 
         # pyarrow does not currently implement support for grouping / aggregations on keys that are
         # structs (typed Dicts). to get around this, we unzip struct columns into multiple columns, one for each
         # struct field. then we group on those columns.
         if isinstance(group_table, pa.Table):
             group_cols = []
+            original_col_names = group_table.column_names
+            original_group_table = group_table
             for i, colname in enumerate(group_table.column_names):
                 if isinstance(group_table[colname].type, pa.StructType):
                     has_struct = True
@@ -701,13 +701,15 @@ class ArrowWeaveList:
                     group_cols.append(colname)
 
         elif isinstance(group_table, pa.ChunkedArray):
+            original_group_table = pa.table({"group_key": group_table})
+            original_col_names = ["group_key"]
             if isinstance(group_table.type, pa.StructType):
                 has_struct = True
                 group_table = unzip_struct_array(group_table)
                 group_cols = group_table.column_names
             else:
-                group_table = pa.table({"group_key": group_table})
-                group_cols = ["group_key"]
+                group_table = original_group_table
+                group_cols = original_col_names
         else:
             raise errors.WeaveInternalError(
                 "Arrow groupby not yet support for map result: %s" % type(group_table)
