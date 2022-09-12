@@ -23,6 +23,7 @@ from . import op_def
 # Trace / cache
 from . import trace_local
 from . import refs
+from .decorator_cache_control import get_cache_controller
 
 TRACE_LOCAL = trace_local.TraceLocal()
 
@@ -160,6 +161,10 @@ def execute_forward_node(
     if use_cache or op_def.is_async:
         # Compute the run ID, which is deterministic if the op is pure
         run_id = trace_local.make_run_id(op_def, input_refs)
+
+    cache_controller = get_cache_controller(op_def)
+    if cache_controller:
+        use_cache &= cache_controller(**input_refs)
 
     if use_cache and op_def.pure:
         run = TRACE_LOCAL.get_run(run_id)
