@@ -20,14 +20,9 @@ from .. import refs
 from .. import execute_fast
 
 
-@type()
 class ArrowArrayVectorizer:
-    arr: typing.TypeVar("arr")  # type: ignore
-
-    """
     def __init__(self, arr):
         self.arr = arr
-    """
 
     def _get_col(self, key):
         col = self.arr._get_col(key)
@@ -80,16 +75,6 @@ class ArrowArrayVectorizer:
         return ArrowArrayVectorizer(pc.power(self.arr, other))
 
 
-def remove_arrow_array_vectorizers(obj: typing.Any) -> typing.Any:
-    if isinstance(obj, dict):
-        return {k: remove_arrow_array_vectorizers(v) for (k, v) in obj.items()}
-    elif isinstance(obj, list):
-        return [remove_arrow_array_vectorizers(item) for item in obj]
-    elif isinstance(obj, ArrowArrayVectorizer):
-        return obj.arr
-    return obj
-
-
 def unzip_struct_array(arr: pa.ChunkedArray) -> pa.Table:
     flattened = arr.flatten()
     col_names = [field.name for field in arr.type]
@@ -110,8 +95,9 @@ def mapped_fn_to_arrow(arrow_table, node):
         elif op_name == "typedDict-pick":
             return inputs["self"]._get_col(inputs["key"])
         elif op_name == "dict":
-            inputs = remove_arrow_array_vectorizers(inputs)
             for k, v in inputs.items():
+                if isinstance(v, ArrowArrayVectorizer):
+                    inputs[k] = v.arr
                 if np.isscalar(v):
                     inputs[k] = [v] * len(arrow_table)
             return pa.table(inputs)

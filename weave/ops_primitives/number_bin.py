@@ -3,6 +3,7 @@ from ..weave_types import Function
 from .. import weave_types as types
 from ..ops_primitives import Number
 from .. import storage
+from .. import context
 from .arrow import ArrowArrayVectorizer
 
 import pyarrow as pa
@@ -44,7 +45,8 @@ def number_bins_fixed(step):
 
     # need to call use because define_fn returns a constNode
     # where the val is an outputNode
-    return use(define_fn({"row": types.Number()}, body))
+    with context.non_caching_execution_client():
+        return use(define_fn({"row": types.Number()}, body))
 
 
 @op(
@@ -59,7 +61,8 @@ def numbers_bins_equal(arr, bins):
     arr_min = min(arr) if len(arr) > 0 else 0
     arr_max = max(arr) if len(arr) > 0 else 0
     step = (arr_max - arr_min) / bins
-    return use(number_bins_fixed(step))
+    with context.non_caching_execution_client():
+        return use(number_bins_fixed(step))
 
 
 @op(
@@ -73,6 +76,7 @@ def numbers_bins_equal(arr, bins):
     output_type=NumberBinType,  # type: ignore
 )
 def number_bin(in_, bin_fn):
-    storage.save(in_)
-    result = use(call_fn(bin_fn, {"row": make_const_node(types.Number(), in_)}))
+    # storage.save(in_)
+    with context.non_caching_execution_client():
+        result = use(call_fn(bin_fn, {"row": make_const_node(types.Number(), in_)}))
     return result
