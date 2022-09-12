@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import typing
 from .. import weave_types as types
-from ..api import op, mutation, weave_class, OpVarArgs
+from ..api import Node, op, mutation, weave_class, OpVarArgs
 from .. import weave_internal
 from .. import errors
 from .. import execute_fast
@@ -269,9 +269,15 @@ def tag_indexCheckpoint(obj):
     return 0
 
 
+def is_list_like(list_type_or_node):
+    if isinstance(list_type_or_node, Node):
+        return is_list_like(list_type_or_node.type)
+    return hasattr(list_type_or_node, "object_type")
+
+
 def flatten_type(list_type):
     obj_type = list_type.object_type
-    if hasattr(obj_type, "object_type"):
+    if is_list_like(obj_type):
         return flatten_type(obj_type)
     return types.List(obj_type)
 

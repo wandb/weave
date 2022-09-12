@@ -3,6 +3,9 @@ from . import context_state as _context
 _loading_builtins_token = _context.set_loading_built_ins()
 
 from . import weave_types as types
+from . import (
+    make_type as _make_type,
+)  # this patches the `Type` class to enable the make method - needed due to circular references
 from . import ops
 from . import panels
 from .graph import Node  # used as a type in op definitions

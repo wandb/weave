@@ -18,3 +18,11 @@ class WeaveTypeError(Exception):
 
 class WeaveDefinitionError(Exception):
     pass
+
+
+class WeaveMakeFunctionError(Exception):
+    pass
+
+
+class WeaveExpectedConstError(Exception):
+    pass

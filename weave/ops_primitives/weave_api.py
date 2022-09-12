@@ -98,8 +98,17 @@ def op_get_return_type(uri):
     return refs.Ref.from_str(uri).type
 
 
+def get_const_val(list_type_or_node):
+    if isinstance(list_type_or_node, Node):
+        return get_const_val(list_type_or_node.type)
+    elif isinstance(list_type_or_node, types.Const):
+        return list_type_or_node.val
+    else:
+        raise errors.WeaveExpectedConstError("Expected a const value passed to `get`")
+
+
 def op_get_return_type_from_inputs(inputs):
-    return op_get_return_type(inputs["uri"].val)
+    return op_get_return_type(get_const_val(inputs["uri"]))
 
 
 @op(name="getReturnType", input_type={"uri": types.String()}, output_type=types.Type())
