@@ -8,6 +8,7 @@ from . import panels
 from .graph import Node  # used as a type in op definitions
 from .show import show
 from .api import *
+from . import cache_control
 
 # Note: we don't want to treat ecosystem as builtins, but this makes things
 # easier at the moment.

@@ -2,6 +2,8 @@ from . import api as weave
 from . import weave_types as types
 from . import storage
 
+from .ops_primitives import list_
+
 
 def test_function_op_name():
     @weave.op()
@@ -84,3 +86,10 @@ def test_list_nested_weave_obj():
     ref = storage.save(lines)
     lines2 = ref.get()
     assert lines2 == lines
+
+
+def test_cache_control_decorator():
+    target = {"t": 1, "b": [1, 2, 3, 4]}
+    node_that_should_not_cache = list_.make_list(**{"0": target})
+    second_node_that_should_not_cache = list_.unnest(node_that_should_not_cache)
+    result = weave.use(second_node_that_should_not_cache)
