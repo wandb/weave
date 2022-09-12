@@ -1,15 +1,10 @@
-import numpy as np
-import pytest
-
-from . import api as weave, type_of
+from . import api as weave
 from . import ops
-from . import weave_types
-from .ops_primitives import dict_
-from .ops_primitives import number, numbers_bins_equal, number_bin, NumberBinType
+from .ops_primitives import number
 from .ops_primitives.string import *
-from .test_run_segment import create_experiment
 
-from .weave_internal import make_const_node, call_fn, define_fn
+
+from .weave_internal import make_const_node
 
 
 def test_number_ops():
