@@ -32,16 +32,19 @@ class ExecuteStats:
     def __init__(self):
         self.node_stats = []
 
-    def add_node(self, node, execution_time):
-        self.node_stats.append((node, execution_time))
+    def add_node(self, node, execution_time, cache_used):
+        self.node_stats.append((node, execution_time, cache_used))
 
     def summary(self):
         op_counts = {}
-        for node, t in self.node_stats:
+        for node, t, cache_used in self.node_stats:
             if isinstance(node, graph.OutputNode):
-                op_counts.setdefault(node.from_op.name, {"count": 0, "total_time": 0})
+                op_counts.setdefault(
+                    node.from_op.name, {"count": 0, "total_time": 0, "cache_used": 0}
+                )
                 op_counts[node.from_op.name]["count"] += 1
                 op_counts[node.from_op.name]["total_time"] += t
+                op_counts[node.from_op.name]["cache_used"] += int(cache_used)
         for stats in op_counts.values():
             stats["avg_time"] = stats["total_time"] / stats["count"]
         sortable_stats = [(k, v) for k, v in op_counts.items()]
@@ -78,7 +81,7 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
                     "op.%s" % graph.op_full_name(forward_node.node.from_op)
                 )
             try:
-                execute_forward_node(fg, forward_node, no_cache=no_cache)
+                report = execute_forward_node(fg, forward_node, no_cache=no_cache)
             except:
                 logging.error(
                     "Exception during execution of: %s" % str(forward_node.node)
@@ -87,7 +90,9 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
             finally:
                 if span is not None:
                     span.finish()
-            stats.add_node(forward_node.node, time.time() - start_time)
+            stats.add_node(
+                forward_node.node, time.time() - start_time, report["cache_used"]
+            )
         for forward_node in running_now:
             for downstream_forward_node in forward_node.input_to:
                 ready_to_run = True
@@ -138,16 +143,20 @@ def is_run_op(op_call: graph.Op):
     return False
 
 
+class NodeExecutionReport(typing.TypedDict):
+    cache_used: bool
+
+
 def execute_forward_node(
     fg: forward_graph.ForwardGraph,
     forward_node: forward_graph.ForwardNode,
     no_cache=False,
-):
+) -> NodeExecutionReport:
     use_cache = not no_cache
     # use_cache = False
     node = forward_node.node
     if isinstance(node, graph.ConstNode):
-        return
+        return {"cache_used": False}
 
     logging.debug("Executing node: %s" % node)
 
@@ -173,13 +182,13 @@ def execute_forward_node(
             # Watch out, we handle loading async runs in different ways.
             if op_def.is_async:
                 forward_node.set_result(run)
-                return
+                return {"cache_used": use_cache}
             else:
                 if run.output is not None:
                     # if isinstance(run._output, artifacts_local.LocalArtifact):
                     #     print('OUTPUT REF TYPE OBJ TYPE', )
                     forward_node.set_result(run.output)
-                    return
+                    return {"cache_used": use_cache}
             logging.debug("Actually nevermind, didnt return")
             # otherwise, the run's output was not saveable, so we need
             # to recompute it.
@@ -259,3 +268,4 @@ def execute_forward_node(
             except errors.WeaveSerializeError:
                 pass
         logging.debug("Done executing node: %s" % node)
+    return {"cache_used": use_cache}

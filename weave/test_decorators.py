@@ -1,6 +1,13 @@
+import pytest
+
 from . import api as weave
 from . import weave_types as types
 from . import storage
+from . import errors
+from .decorators import cache_control
+from . import compile
+from . import forward_graph
+from .execute import execute_forward
 
 from .ops_primitives import list_
 
@@ -92,4 +99,32 @@ def test_cache_control_decorator():
     target = {"t": 1, "b": [1, 2, 3, 4]}
     node_that_should_not_cache = list_.make_list(**{"0": target})
     second_node_that_should_not_cache = list_.unnest(node_that_should_not_cache)
-    result = weave.use(second_node_that_should_not_cache)
+
+    nodes = compile.compile([second_node_that_should_not_cache])
+    fg = forward_graph.ForwardGraph(nodes)
+    stats = execute_forward(fg, no_cache=False)
+    summary = stats.summary()
+    assert sum([v["cache_used"] for v in summary.values()]) == 0
+
+    node_that_should_cache = list_.make_list(**{"0": target, "1": target})
+    node_that_should_not_cache = list_.unnest(node_that_should_cache)
+
+    nodes = compile.compile([node_that_should_not_cache])
+    fg = forward_graph.ForwardGraph(nodes)
+    stats = execute_forward(fg, no_cache=False)
+    summary = stats.summary()
+    assert sum([v["cache_used"] for v in summary.values()]) == 1
+
+
+def test_cache_control_decorator_fails_on_sig_mismatch():
+    with pytest.raises(errors.WeaveDefinitionError):
+
+        @cache_control("number-add")
+        def number_add(number1, number2):
+            return True
+
+    with pytest.raises(errors.WeaveDefinitionError):
+
+        @cache_control("number-add")
+        def number_add(lhs, rhs, superfluous_arg):
+            return True
