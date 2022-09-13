@@ -137,7 +137,7 @@ def is_op_def(obj):
 
 def callable_output_type_to_dict(input_type, output_type, op_name):
     if not isinstance(input_type, op_args.OpNamedArgs):
-        print(f"Failed to transform op {op_name}: Requires named args")
+        # print(f"Failed to transform op {op_name}: Requires named args")
         return types.Any().to_dict()
     try:
         # TODO: Make this transformation more sophisticated once the type hierarchy is settled
@@ -148,5 +148,5 @@ def callable_output_type_to_dict(input_type, output_type, op_name):
         }
         return fixup_node(weave_internal.define_fn(arg_types, output_type)).to_json()
     except errors.WeaveMakeFunctionError as e:
-        print(f"Failed to transform op {op_name}: Invalid output type function")
+        # print(f"Failed to transform op {op_name}: Invalid output type function")
         return types.Any().to_dict()
