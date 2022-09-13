@@ -8,6 +8,16 @@ from .. import weave_types as types
 def getattr_output_type(input_type):
     self_arg = input_type["self"]
 
+    if isinstance(self_arg, types.Const):
+        self_arg = self_arg.val_type
+
+    if isinstance(self_arg, types.ObjectType):
+        if not isinstance(input_type["name"], types.Const):
+            return types.UnknownType()
+        key = input_type["name"].val
+        property_types = self_arg.property_types()
+        return property_types.get(key, types.Invalid())
+
     # TODO: In particular, this branch should go away since
     # we anticipate getattr will eventually just target the
     # object type. This is a temporary special casing until
@@ -23,14 +33,6 @@ def getattr_output_type(input_type):
             elif input_type["name"].val == "members":
                 return types.List(types.Type())
         return types.Type()
-
-    if not isinstance(input_type["name"], types.Const):
-        return types.UnknownType()
-
-    if isinstance(self_arg, types.ObjectType):
-        key = input_type["name"].val
-        property_types = self_arg.property_types()
-        return property_types.get(key, types.Invalid())
 
     return types.Invalid()
 
