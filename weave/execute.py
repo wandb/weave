@@ -137,6 +137,9 @@ def is_run_op(op_call: graph.Op):
     return False
 
 
+cache_disallowlist = ["list", "unnest"]
+
+
 def execute_forward_node(
     fg: forward_graph.ForwardGraph,
     forward_node: forward_graph.ForwardNode,
@@ -152,6 +155,9 @@ def execute_forward_node(
 
     op_def = registry_mem.memory_registry.get_op(node.from_op.name)
     input_nodes = node.from_op.inputs
+
+    # disable caching if op is in the cache disallowlist
+    use_cache &= op_def.name not in cache_disallowlist
 
     input_refs: dict[str, refs.Ref] = {}
     for input_name, input_node in input_nodes.items():
