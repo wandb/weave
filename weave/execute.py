@@ -143,7 +143,13 @@ def is_run_op(op_call: graph.Op):
 
 
 # the results of these ops will not be cached.
-CACHE_DISALLOWLIST = ["list", "unnest"]
+CACHE_DISALLOWLIST = [
+    "list",
+    "unnest",
+    "ArrowTableGroupBy-map",
+    "ArrowWeaveList-groupby",
+    "RunSegment-experiment",
+]
 
 
 class NodeExecutionReport(typing.TypedDict):
