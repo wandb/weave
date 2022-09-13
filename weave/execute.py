@@ -137,6 +137,7 @@ def is_run_op(op_call: graph.Op):
     return False
 
 
+# the results of these ops will not be cached.
 cache_disallowlist = ["list", "unnest"]
 
 
