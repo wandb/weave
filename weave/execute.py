@@ -40,11 +40,12 @@ class ExecuteStats:
         for node, t, cache_used in self.node_stats:
             if isinstance(node, graph.OutputNode):
                 op_counts.setdefault(
-                    node.from_op.name, {"count": 0, "total_time": 0, "cache_used": 0}
+                    node.from_op.name,
+                    {"count": 0, "total_time": 0, "result_serialized": 0},
                 )
                 op_counts[node.from_op.name]["count"] += 1
                 op_counts[node.from_op.name]["total_time"] += t
-                op_counts[node.from_op.name]["cache_used"] += int(cache_used)
+                op_counts[node.from_op.name]["result_serialized"] += int(cache_used)
         for stats in op_counts.values():
             stats["avg_time"] = stats["total_time"] / stats["count"]
         sortable_stats = [(k, v) for k, v in op_counts.items()]
@@ -91,7 +92,7 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
                 if span is not None:
                     span.finish()
             stats.add_node(
-                forward_node.node, time.time() - start_time, report["cache_used"]
+                forward_node.node, time.time() - start_time, report["result_serialized"]
             )
         for forward_node in running_now:
             for downstream_forward_node in forward_node.input_to:
@@ -144,7 +145,7 @@ def is_run_op(op_call: graph.Op):
 
 
 class NodeExecutionReport(typing.TypedDict):
-    cache_used: bool
+    result_serialized: bool
 
 
 def execute_forward_node(
@@ -155,8 +156,10 @@ def execute_forward_node(
     use_cache = not no_cache
     # use_cache = False
     node = forward_node.node
+
+    result_serialized = False
     if isinstance(node, graph.ConstNode):
-        return {"cache_used": False}
+        return {"result_serialized": result_serialized}
 
     logging.debug("Executing node: %s" % node)
 
@@ -171,10 +174,6 @@ def execute_forward_node(
         # Compute the run ID, which is deterministic if the op is pure
         run_id = trace_local.make_run_id(op_def, input_refs)
 
-    cache_controller = get_cache_controller(op_def)
-    if cache_controller:
-        use_cache &= cache_controller(**input_refs)
-
     if use_cache and op_def.pure:
         run = TRACE_LOCAL.get_run(run_id)
         if run is not None:
@@ -182,13 +181,13 @@ def execute_forward_node(
             # Watch out, we handle loading async runs in different ways.
             if op_def.is_async:
                 forward_node.set_result(run)
-                return {"cache_used": use_cache}
+                return {"result_serialized": result_serialized}
             else:
                 if run.output is not None:
                     # if isinstance(run._output, artifacts_local.LocalArtifact):
                     #     print('OUTPUT REF TYPE OBJ TYPE', )
                     forward_node.set_result(run.output)
-                    return {"cache_used": use_cache}
+                    return {"result_serialized": result_serialized}
             logging.debug("Actually nevermind, didnt return")
             # otherwise, the run's output was not saveable, so we need
             # to recompute it.
@@ -250,7 +249,11 @@ def execute_forward_node(
                 output_name = None
                 if op_def.pure:
                     output_name = "run-%s-output" % run_id
-                result = TRACE_LOCAL.save_object(result, name=output_name)
+
+                cache_controller = get_cache_controller(op_def)
+                if cache_controller is None or cache_controller(input_refs, result):
+                    result = TRACE_LOCAL.save_object(result, name=output_name)
+                    result_serialized = True
 
         forward_node.set_result(result)
 
@@ -268,4 +271,4 @@ def execute_forward_node(
             except errors.WeaveSerializeError:
                 pass
         logging.debug("Done executing node: %s" % node)
-    return {"cache_used": use_cache}
+    return {"result_serialized": result_serialized}

@@ -97,6 +97,7 @@ def test_list_nested_weave_obj():
 
 def test_cache_control_decorator():
     target = {"t": 1, "b": [1, 2, 3, 4]}
+
     node_that_should_not_cache = list_.make_list(**{"0": target})
     second_node_that_should_not_cache = list_.unnest(node_that_should_not_cache)
 
@@ -104,7 +105,7 @@ def test_cache_control_decorator():
     fg = forward_graph.ForwardGraph(nodes)
     stats = execute_forward(fg, no_cache=False)
     summary = stats.summary()
-    assert sum([v["cache_used"] for v in summary.values()]) == 0
+    assert sum([v["result_serialized"] for v in summary.values()]) == 0
 
     node_that_should_cache = list_.make_list(**{"0": target, "1": target})
     node_that_should_not_cache = list_.unnest(node_that_should_cache)
@@ -113,18 +114,4 @@ def test_cache_control_decorator():
     fg = forward_graph.ForwardGraph(nodes)
     stats = execute_forward(fg, no_cache=False)
     summary = stats.summary()
-    assert sum([v["cache_used"] for v in summary.values()]) == 1
-
-
-def test_cache_control_decorator_fails_on_sig_mismatch():
-    with pytest.raises(errors.WeaveDefinitionError):
-
-        @cache_control("number-add")
-        def number_add(number1, number2):
-            return True
-
-    with pytest.raises(errors.WeaveDefinitionError):
-
-        @cache_control("number-add")
-        def number_add(lhs, rhs, superfluous_arg):
-            return True
+    assert sum([v["result_serialized"] for v in summary.values()]) == 0

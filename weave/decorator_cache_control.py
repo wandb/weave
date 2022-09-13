@@ -1,24 +1,18 @@
 from .registry_mem import memory_registry
-from .decorator_op import get_signature
 from .op_def import OpDef
-
-from . import errors
+from . import refs
 
 import typing
 
-_CACHE_CONTROLLERS: dict[OpDef, typing.Callable] = {}
+_CACHE_CONTROLLERS: dict[
+    OpDef, typing.Callable[[dict[str, refs.Ref], typing.Any], bool]
+] = {}
 
 
 def cache_control(op_uri: str):
     op = memory_registry.get_op(op_uri)
-    op_sig = get_signature(op.resolve_fn)
 
-    def wrap(f: typing.Callable):
-        cache_control_sig = get_signature(f)
-        if cache_control_sig.parameters != op_sig.parameters:
-            raise errors.WeaveDefinitionError(
-                "Cache control function parameters must match corresponding op resolver parameters"
-            )
+    def wrap(f: typing.Callable[[dict[str, refs.Ref], typing.Any], bool]):
         _CACHE_CONTROLLERS[op] = f
 
     return wrap
