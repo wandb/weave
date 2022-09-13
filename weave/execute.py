@@ -149,6 +149,9 @@ CACHE_DISALLOWLIST = [
     "ArrowTableGroupBy-map",
     "ArrowWeaveList-groupby",
     "RunSegment-experiment",
+    "numbers-min",
+    "numbers-max",
+    "numbers-avg",
 ]
 
 
