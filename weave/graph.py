@@ -8,14 +8,13 @@ from . import storage
 
 T = typing.TypeVar("T")
 
-
 # The Generic here is currently only used in op definitions, its not actually
 # applied within the class. See infer_types.py for usage.
 class Node(typing.Generic[T]):
     type: weave_types.Type
 
     @classmethod
-    def node_from_json(cls, obj):
+    def node_from_json(cls, obj: dict) -> "Node":
         if obj["nodeType"] == "const":
             return ConstNode.from_json(obj)
         elif obj["nodeType"] == "output":
@@ -27,46 +26,46 @@ class Node(typing.Generic[T]):
         else:
             raise errors.WeaveInternalError("invalid node type: %s" % obj)
 
-    def to_json(self):
+    def to_json(self) -> dict:
         raise NotImplementedError
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         # We store nodes in a memoize cache in execute.py. They need to be
         # hashable. But the number.py ops override __eq__ which makes the default
         # Python hash not work, so we fix it up here.
         return id(self)
 
-    def __str__(self):
+    def __str__(self) -> str:
         n = self.node_from_json(self.to_json())
         return node_expr_str(n)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "<%s(%s): %s>" % (self.__class__.__name__, id(self), str(self))
 
 
 weave_types.Function.instance_classes = Node
 
-OpInputNodeT = typing.TypeVar("OpInputNodeT")
+OpInputNodeT = typing.TypeVar("OpInputNodeT", bound=Node)
 
 Frame = typing.Mapping[str, Node]
 
 
 class Op(typing.Generic[OpInputNodeT]):
     name: str
-    inputs: typing.Dict[str, OpInputNodeT]
+    inputs: dict[str, OpInputNodeT]
 
-    def __init__(self, name, inputs):
+    def __init__(self, name: str, inputs: dict[str, OpInputNodeT]) -> None:
         # TODO: refactor this variable to be "uri"
         self.name = name
         self.inputs = inputs
 
-    def to_json(self):
+    def to_json(self) -> dict:
         json_inputs = {}
         for k, v in self.inputs.items():
             json_inputs[k] = v.to_json()
         return {"name": self.name, "inputs": json_inputs}
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<Op({id(self)} name={self.name} inputs={self.inputs}>"
 
 
@@ -74,33 +73,39 @@ class OutputNode(Node, typing.Generic[OpInputNodeT]):
     from_op: Op[OpInputNodeT]
     val: typing.Any
 
-    def __init__(self, type, op_name, op_inputs):
+    def __init__(
+        self, type: weave_types.Type, op_name: str, op_inputs: dict[str, OpInputNodeT]
+    ) -> None:
         self.type = type
         self.from_op = Op(op_name, op_inputs)
 
     @classmethod
-    def from_json(cls, val):
+    def from_json(cls, val: dict) -> "OutputNode":
         op_inputs = val["fromOp"]["inputs"]
-        inputs = {}
+        inputs: dict[str, OpInputNodeT] = {}
         for param_name, param_node_json in op_inputs.items():
-            inputs[param_name] = Node.node_from_json(param_node_json)
+            # I am not sure why we need a cast here, `OpInputNodeT` is bound to
+            # `Node` so it should be fine.
+            inputs[param_name] = typing.cast(
+                OpInputNodeT, Node.node_from_json(param_node_json)
+            )
         return cls(
             weave_types.TypeRegistry.type_from_dict(val["type"]),
             val["fromOp"]["name"],
             inputs,
         )
 
-    def iteritems_op_inputs(self):
+    def iteritems_op_inputs(self) -> typing.Iterator[typing.Tuple[str, Node]]:
         return iter(self.from_op.inputs.items())
 
-    def to_json(self):
+    def to_json(self) -> dict:
         return {
             "nodeType": "output",
             "type": self.type.to_dict(),
             "fromOp": self.from_op.to_json(),
         }
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "<OutputNode(%s) type: %s op_name: %s>" % (
             id(self),
             self.type,
@@ -111,35 +116,35 @@ class OutputNode(Node, typing.Generic[OpInputNodeT]):
 class VarNode(Node):
     name: str
 
-    def __init__(self, type, name):
+    def __init__(self, type: weave_types.Type, name: str) -> None:
         self.type = type
         self.name = name
 
     @classmethod
-    def from_json(cls, val):
+    def from_json(cls, val: dict) -> "VarNode":
         return cls(weave_types.TypeRegistry.type_from_dict(val["type"]), val["varName"])
 
-    def to_json(self):
+    def to_json(self) -> dict:
         return {"nodeType": "var", "type": self.type.to_dict(), "varName": self.name}
 
 
 class ConstNode(Node):
     val: typing.Any
 
-    def __init__(self, type, val):
+    def __init__(self, type: weave_types.Type, val: typing.Any) -> None:
         self.type = type
         self.val = val
 
     @classmethod
-    def from_json(cls, obj):
+    def from_json(cls, obj: dict) -> "ConstNode":
         val = obj["val"]
         if isinstance(val, dict) and "nodeType" in val:
             val = Node.node_from_json(val)
         return cls(weave_types.TypeRegistry.type_from_dict(obj["type"]), val)
 
-    def equivalent_output_node(self):
+    def equivalent_output_node(self) -> typing.Union[OutputNode, None]:
         if isinstance(self.type, weave_types.Function):
-            return
+            return None
 
         val = self.val
         if (
@@ -149,7 +154,7 @@ class ConstNode(Node):
                 self.type.val_type, (weave_types.BasicType, weave_types.TypedDict)
             )
         ):
-            return
+            return None
 
         ref = storage._get_ref(val)
         if ref is None:
@@ -159,7 +164,7 @@ class ConstNode(Node):
             self.type, "get", {"uri": ConstNode(weave_types.String(), str(ref))}
         )
 
-    def to_json(self):
+    def to_json(self) -> dict:
         # This is used to convert to WeaveJS compatible JS. There are business logic
         # decisions here, like for now if its a BasicType or TypedDict, we encode
         # as json directly, otherwise we save the object and return a get() operation
@@ -174,27 +179,27 @@ class ConstNode(Node):
 
 
 class VoidNode(Node):
-    def to_json(self):
+    def to_json(self) -> dict:
         return {"nodeType": "void", "type": "invalid"}
 
 
-def nodes_equal(n1: Node, n2: Node):
+def nodes_equal(n1: Node, n2: Node) -> bool:
     return n1.to_json() == n2.to_json()
 
 
-def for_each(graph: Node, visitor):
+def for_each(graph: Node, visitor: typing.Callable[[Node], None]) -> None:
     if isinstance(graph, OutputNode):
         for param_name, param_node in graph.from_op.inputs.items():
             for_each(param_node, visitor)
     visitor(graph)
 
 
-def opuri_full_name(op_uri: str):
+def opuri_full_name(op_uri: str) -> str:
     uri = uris.WeaveURI.parse(op_uri)
     return uri.full_name
 
 
-def op_full_name(op: Op):
+def op_full_name(op: Op) -> str:
     return opuri_full_name(op.name)
 
 
@@ -203,7 +208,7 @@ def opuri_expr_str(op_uri: str) -> str:
     return uris.WeaveURI.parse(op_uri).friendly_name
 
 
-def node_expr_str(node: Node):
+def node_expr_str(node: Node) -> str:
     if isinstance(node, OutputNode):
         param_names = list(node.from_op.inputs.keys())
         if node.from_op.name == "dict":
@@ -283,7 +288,7 @@ def filter_nodes(node: Node, filter_fn: typing.Callable[[Node], bool]) -> list[N
     return [n for n in nodes if filter_fn(n)]
 
 
-def expr_vars(node: Node):
+def expr_vars(node: Node) -> list[Node]:
     return filter_nodes(node, lambda n: isinstance(n, VarNode))
 
 

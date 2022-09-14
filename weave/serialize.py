@@ -134,9 +134,13 @@ def _deserialize_node(
                     params[param_name] = _deserialize_node(
                         param_node_index, nodes, parsed_nodes, hashed_nodes
                     )
-
+                node_type = types.TypeRegistry.type_from_dict(node["type"])
+                if not isinstance(node_type, types.Function):
+                    raise errors.WeaveInternalError(
+                        "expected function type, got %s" % node_type
+                    )
                 parsed_fn_body_node = weave_internal.make_output_node(
-                    types.TypeRegistry.type_from_dict(node["type"]).output_type,
+                    node_type.output_type,
                     op["name"],
                     params,
                 )

@@ -133,7 +133,7 @@ class TypeRegistry:
         raise errors.WeaveTypeError("no Type for obj: (%s) %s" % (type(obj), obj))
 
     @staticmethod
-    def type_from_dict(d):
+    def type_from_dict(d: typing.Union[str, dict]) -> "Type":
         d = unwrap_tag_type(d)
         # The javascript code sends simple types as just strings
         # instead of {'type': 'string'} for example
@@ -219,7 +219,7 @@ class Type:
             return next_type
         return Invalid()
 
-    def to_dict(self):
+    def to_dict(self) -> typing.Union[dict, str]:
         if self.__class__ == Type:
             return "type"
         d = {"type": self.name}

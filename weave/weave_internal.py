@@ -92,7 +92,7 @@ def make_const_node(type_: types.Type, val: typing.Any) -> graph.ConstNode:
 
 
 def make_output_node(
-    type_: types.Type, op_name: str, op_params: graph.Frame
+    type_: types.Type, op_name: str, op_params: dict[str, graph.Node]
 ) -> graph.OutputNode:
     node_methods_classes = get_node_methods_classes(type_)
     if node_methods_classes:

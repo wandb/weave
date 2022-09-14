@@ -149,7 +149,7 @@ def deref(ref):
     return ref
 
 
-def _get_ref(obj):
+def _get_ref(obj: typing.Any) -> refs.Ref:
     if isinstance(obj, refs.Ref):
         return obj
     return refs.get_ref(obj)

@@ -34,7 +34,7 @@ class OpVarArgs(OpArgs):
     def weave_type(self) -> types.Type:
         return types.Dict(types.String(), self.arg_type)
 
-    def to_dict(self) -> str:
+    def to_dict(self) -> typing.Union[str, dict]:
         return self.arg_type.to_dict()
 
 
