@@ -55,11 +55,12 @@ class ExecuteStats:
 
 def is_panelplot_data_fetch_query(node: graph.Node) -> bool:
     if isinstance(node, graph.OutputNode) and node.from_op.name == "list":
-        if (
-            isinstance(node.from_op, graph.OutputNode)
-            and node.from_op.from_op.name == "unnest"
-        ):
-            return True
+        return all(
+            map(
+                lambda input: input.from_op.name == "unnest",
+                node.from_op.inputs.values(),
+            )
+        )
     return False
 
 
