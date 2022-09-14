@@ -26,19 +26,6 @@ from . import refs
 
 TRACE_LOCAL = trace_local.TraceLocal()
 
-# the results of these ops will not be cached.
-CACHE_DISALLOWLIST = [
-    "list",
-    "unnest",
-    "ArrowTableGroupBy-map",
-    "ArrowWeaveList-groupby",
-    "RunSegment-experiment",
-    "numbers-min",
-    "numbers-max",
-    "numbers-avg",
-    "list-indexCheckpoint",
-]
-
 
 class ExecuteStats:
     def __init__(self):
@@ -155,6 +142,19 @@ def is_run_op(op_call: graph.Op):
     return False
 
 
+# the results of these ops will not be cached.
+CACHE_DISALLOWLIST = [
+    "list",
+    "unnest",
+    "ArrowTableGroupBy-map",
+    "ArrowWeaveList-groupby",
+    "RunSegment-experiment",
+    "numbers-min",
+    "numbers-max",
+    "numbers-avg",
+]
+
+
 class NodeExecutionReport(typing.TypedDict):
     cache_used: bool
 
@@ -165,7 +165,7 @@ def execute_forward_node(
     no_cache=False,
 ) -> NodeExecutionReport:
     use_cache = not no_cache
-    use_cache = False
+    # use_cache = False
     node = forward_node.node
     if isinstance(node, graph.ConstNode):
         return {"cache_used": False}
