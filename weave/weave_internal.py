@@ -1,31 +1,37 @@
+import typing
 from . import graph
 from . import weave_types as types
 from . import context_state
 from . import errors
+from . import client_interface
 
 
-def dereference_variables(node, var_values):
-    def map_fn(n):
+def dereference_variables(node: graph.Node, var_values: graph.Frame) -> graph.Node:
+    def map_fn(n: graph.Node) -> graph.Node:
         if isinstance(n, graph.VarNode):
             return var_values[n.name]
+        return n
 
     return graph.map_nodes(node, map_fn)
 
 
-def call_fn(weave_fn, inputs):
+def call_fn(weave_fn: graph.Node, inputs: graph.Frame) -> graph.Node:
     return dereference_variables(weave_fn, inputs)
 
 
-def use(nodes, client=None):
+def use(
+    nodes: typing.Union[graph.Node, typing.Sequence[graph.Node]],
+    client: typing.Union[client_interface.ClientInterface, None] = None,
+) -> typing.Union[typing.Any, typing.Sequence[typing.Any]]:
     if client is None:
         client = context_state.get_client()
+        if client is None:
+            raise errors.WeaveInternalError("no client set")
     single = True
-    if not isinstance(nodes, graph.Node) and (
-        isinstance(nodes, list) or isinstance(nodes, tuple)
-    ):
+    if not isinstance(nodes, graph.Node):
         single = False
-    if single:
-        nodes = (nodes,)
+    else:
+        nodes = [nodes]
 
     # Do this to convert all Refs to get(str(ref))
     # But this is incorrect! If there are shared parent nodes among nodes, we will
@@ -47,18 +53,19 @@ def use(nodes, client=None):
     return result
 
 
-def get_node_methods_classes(type_):
+def get_node_methods_classes(type_: types.Type) -> typing.Sequence[typing.Type]:
     classes = []
     for type_class in type_.__class__.mro():
         if (
-            hasattr(type_class, "NodeMethodsClass")
+            issubclass(type_class, types.Type)
+            and type_class.NodeMethodsClass is not None
             and type_class.NodeMethodsClass not in classes
         ):
             classes.append(type_class.NodeMethodsClass)
     return classes
 
 
-def make_var_node(type_, name):
+def make_var_node(type_: types.Type, name: str) -> graph.VarNode:
     node_methods_classes = get_node_methods_classes(type_)
     if node_methods_classes:
         return_type = type(
@@ -71,7 +78,7 @@ def make_var_node(type_, name):
     return return_type(type_, name)
 
 
-def make_const_node(type_, val):
+def make_const_node(type_: types.Type, val: typing.Any) -> graph.ConstNode:
     node_methods_classes = get_node_methods_classes(type_)
     if node_methods_classes:
         return_type = type(
@@ -84,7 +91,9 @@ def make_const_node(type_, val):
     return return_type(type_, val)
 
 
-def make_output_node(type_, op_name, op_params):
+def make_output_node(
+    type_: types.Type, op_name: str, op_params: graph.Frame
+) -> graph.OutputNode:
     node_methods_classes = get_node_methods_classes(type_)
     if node_methods_classes:
         return_type = type(
@@ -98,7 +107,9 @@ def make_output_node(type_, op_name, op_params):
 
 
 # Given a registered op, make a mapped version of it.
-def define_fn(parameters, body):
+def define_fn(
+    parameters: dict[str, types.Type], body: typing.Callable[..., graph.Node]
+) -> graph.ConstNode:
     var_nodes = [make_var_node(t, k) for k, t in parameters.items()]
     try:
         fnNode = body(*var_nodes)

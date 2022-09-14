@@ -48,6 +48,8 @@ weave_types.Function.instance_classes = Node
 
 OpInputNodeT = typing.TypeVar("OpInputNodeT")
 
+Frame = typing.Mapping[str, Node]
+
 
 class Op(typing.Generic[OpInputNodeT]):
     name: str
@@ -244,7 +246,9 @@ def node_expr_str(node: Node):
 
 
 def _map_nodes(
-    node: Node, map_fn: typing.Callable[[Node], Node], already_mapped: dict[Node, Node]
+    node: Node,
+    map_fn: typing.Callable[[Node], Node],
+    already_mapped: dict[Node, Node],
 ) -> Node:
     if node in already_mapped:
         return already_mapped[node]

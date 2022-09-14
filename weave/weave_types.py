@@ -148,7 +148,7 @@ class TypeRegistry:
 
 @dataclasses.dataclass(frozen=True)
 class Type:
-
+    NodeMethodsClass: typing.ClassVar[typing.Optional[type]]
     instance_class: typing.ClassVar[typing.Optional[type]]
     instance_classes: typing.ClassVar[
         typing.Union[type, typing.List[type], None]

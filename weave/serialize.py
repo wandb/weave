@@ -121,6 +121,7 @@ def _deserialize_node(
     if node["nodeType"] == "const":
         if isinstance(node["type"], dict) and node["type"]["type"] == "function":
             fn_body_node = node["val"]
+            parsed_fn_body_node: graph.Node
             if fn_body_node["nodeType"] == "var":
                 parsed_fn_body_node = weave_internal.make_var_node(
                     types.TypeRegistry.type_from_dict(fn_body_node["type"]),

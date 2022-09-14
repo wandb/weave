@@ -5,7 +5,7 @@ from . import op_def
 from . import weave_types as types
 
 
-def weave_class(weave_type):
+def weave_class(weave_type: type[types.Type]):
     def wrap(target):
         # add self type to input_types if its not already defined.
         for _, member in inspect.getmembers(target):
