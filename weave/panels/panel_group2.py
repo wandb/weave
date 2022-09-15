@@ -14,9 +14,6 @@ class Group2(panel.Panel):
     id = "group2"
     items: typing.TypeVar("items") = dataclasses.field(default_factory=dict)
 
-    def __post_init__(self):
-        pass
-
     def _normalize(self, frame=None):
         if frame is None:
             frame = {}
