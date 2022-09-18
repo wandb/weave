@@ -1,6 +1,7 @@
 import typing
 from typing import Optional, cast
-from ..api import type, op, use, get, type_of, Node
+from ..api import type, op, Node
+from ..storage import get
 from .. import weave_types as types
 from .. import panels
 from ..ops_primitives.arrow import ArrowWeaveList, ArrowWeaveListType
@@ -39,7 +40,7 @@ class RunSegment:
             return limited
 
         # get the prior run
-        prior_run: RunSegment = use(get(self.prior_run_ref))
+        prior_run: RunSegment = get(self.prior_run_ref)
         prior_experiment = prior_run._experiment_body(
             limit=self.prior_run_branch_index + 1
             if self.prior_run_branch_index is not None

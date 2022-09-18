@@ -31,21 +31,24 @@ class ExecuteStats:
     def __init__(self):
         self.node_stats = []
 
-    def add_node(self, node, execution_time, cache_used):
-        self.node_stats.append((node, execution_time, cache_used))
+    def add_node(self, node, execution_time, cache_used, store_time):
+        self.node_stats.append((node, execution_time, cache_used, store_time))
 
     def summary(self):
         op_counts = {}
-        for node, t, cache_used in self.node_stats:
+        for node, t, cache_used, store_time in self.node_stats:
             if isinstance(node, graph.OutputNode):
                 op_counts.setdefault(
-                    node.from_op.name, {"count": 0, "total_time": 0, "cache_used": 0}
+                    node.from_op.name,
+                    {"count": 0, "total_time": 0, "cache_used": 0, "store_time": 0},
                 )
                 op_counts[node.from_op.name]["count"] += 1
                 op_counts[node.from_op.name]["total_time"] += t
                 op_counts[node.from_op.name]["cache_used"] += int(cache_used)
+                op_counts[node.from_op.name]["store_time"] += store_time
         for stats in op_counts.values():
             stats["avg_time"] = stats["total_time"] / stats["count"]
+            stats["avg_store_time"] = stats["store_time"] / stats["count"]
         sortable_stats = [(k, v) for k, v in op_counts.items()]
 
         return dict(
@@ -72,9 +75,14 @@ def execute_nodes(nodes, no_cache=False):
 
     fg = forward_graph.ForwardGraph(nodes)
 
+    start_time = time.time()
     stats = execute_forward(fg, no_cache=no_cache)
+    execute_time = time.time() - start_time
     summary = stats.summary()
-    logging.info("Execution summary\n%s" % pprint.pformat(summary))
+    logging.info(
+        "Executed %s leaf nodes in %ss\n%s"
+        % (len(nodes), execute_time, pprint.pformat(summary))
+    )
 
     return [fg.get_result(n) for n in nodes]
 
@@ -105,7 +113,10 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
                 if span is not None:
                     span.finish()
             stats.add_node(
-                forward_node.node, time.time() - start_time, report["cache_used"]
+                forward_node.node,
+                time.time() - start_time,
+                report["cache_used"],
+                report["store_time"],
             )
         for forward_node in running_now:
             for downstream_forward_node in forward_node.input_to:
@@ -174,9 +185,11 @@ def execute_forward_node(
     no_cache=False,
 ) -> NodeExecutionReport:
     use_cache = not no_cache
+    use_cache = False
     node = forward_node.node
+    report = {"cache_used": use_cache, "store_time": 0}
     if isinstance(node, graph.ConstNode):
-        return {"cache_used": False}
+        return report
 
     logging.debug("Executing node: %s" % node)
 
@@ -201,18 +214,19 @@ def execute_forward_node(
             # Watch out, we handle loading async runs in different ways.
             if op_def.is_async:
                 forward_node.set_result(run)
-                return {"cache_used": use_cache}
+                return report
             else:
                 if run.output is not None:
                     # if isinstance(run._output, artifacts_local.LocalArtifact):
                     #     print('OUTPUT REF TYPE OBJ TYPE', )
                     forward_node.set_result(run.output)
-                    return {"cache_used": use_cache}
+                    return report
             logging.debug("Actually nevermind, didnt return")
             # otherwise, the run's output was not saveable, so we need
             # to recompute it.
     inputs = {input_name: refs.deref(input) for input_name, input in input_refs.items()}
 
+    store_time = 0
     if op_def.is_async:
         logging.debug("Executing async op")
         input_refs = {}
@@ -269,7 +283,9 @@ def execute_forward_node(
                 output_name = None
                 if op_def.pure:
                     output_name = "run-%s-output" % run_id
+                start_time = time.time()
                 result = TRACE_LOCAL.save_object(result, name=output_name)
+                store_time = time.time() - start_time
 
         forward_node.set_result(result)
 
@@ -287,4 +303,4 @@ def execute_forward_node(
             except errors.WeaveSerializeError:
                 pass
         logging.debug("Done executing node: %s" % node)
-    return {"cache_used": use_cache}
+    return {"cache_used": use_cache, "store_time": store_time}

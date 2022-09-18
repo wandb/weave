@@ -450,10 +450,13 @@ class ArrowTableGroupBy:
                 types.Any(),
             ),
         },
-        output_type=lambda input_types: types.List(input_types["map_fn"].output_type),
+        output_type=lambda input_types: ArrowWeaveListType(
+            input_types["map_fn"].output_type
+        ),
     )
     def map(self, map_fn):
-        return execute_fast.fast_map_fn(self, map_fn)
+        res = execute_fast.fast_map_fn(self, map_fn)
+        return to_arrow(res)
 
 
 ArrowTableGroupByType.instance_classes = ArrowTableGroupBy
@@ -558,6 +561,11 @@ class ArrowWeaveList:
     @op()
     def sum(self) -> float:
         return pa.compute.sum(self._arrow_data)
+
+    # TODO: doesn't belong here
+    @op()
+    def avg(self) -> float:
+        return pa.compute.mean(self._arrow_data).as_py()
 
     def _count(self):
         return len(self._arrow_data)

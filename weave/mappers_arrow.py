@@ -36,6 +36,14 @@ class ListToArrowArr(mappers_python.ListToPyList):
         return pa.list_(arrow_util.arrow_field("x", self._object_type.result_type()))
 
 
+class ArrowListToArrowArr(mappers_weave.ListMapper):
+    def result_type(self):
+        return pa.list_(arrow_util.arrow_field("x", self._object_type.result_type()))
+
+    def apply(self, obj):
+        return obj._arrow_data.to_pylist()
+
+
 class UnionToArrowUnion(mappers_weave.UnionMapper):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -196,10 +204,14 @@ class DefaultFromArrow(mappers_python.DefaultFromPy):
 
 
 def map_to_arrow_(type, mapper, artifact, path=[]):
+    from .ops_primitives import arrow
+
     if isinstance(type, types.TypedDict):
         return TypedDictToArrowStruct(type, mapper, artifact, path)
     elif isinstance(type, types.List):
         return ListToArrowArr(type, mapper, artifact, path)
+    elif isinstance(type, arrow.ArrowWeaveListType):
+        return ArrowListToArrowArr(type, mapper, artifact, path)
     elif isinstance(type, types.UnionType):
         return UnionToArrowUnion(type, mapper, artifact, path)
     elif isinstance(type, types.ObjectType):
