@@ -1,6 +1,7 @@
 import typing
 
 from weave.op_args import OpNamedArgs
+import functools
 
 from . import op_def
 from . import weave_types
@@ -58,6 +59,9 @@ class Registry:
             self._op_versions[(op.name, version)] = op
         return op
 
+    # This is hotspot in execute_fast because we call it a lot
+    # TODO: fix in execute_fast
+    @functools.cache
     def get_op(self, uri: str) -> op_def.OpDef:
         object_uri = uris.WeaveURI.parse(uri)
         if object_uri.version is not None:
