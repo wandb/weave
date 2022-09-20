@@ -1,6 +1,5 @@
 import typing
-import bisect
-from typing import Optional, cast, Sequence
+from typing import Optional, cast
 from ..api import type, op, use, get, type_of, Node
 from .. import weave_types as types
 from .. import panels
@@ -64,7 +63,11 @@ class RunSegment:
 
     @op(refine_output_type=refine_experiment_type)
     def experiment(self) -> typing.Any:
-        return self._experiment_body()
+        result = self._experiment_body()
+
+        # combine chunks to make future takes faster
+        result._arrow_data = result._arrow_data.combine_chunks()
+        return result
 
 
 @op()

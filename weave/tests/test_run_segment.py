@@ -2,11 +2,15 @@ import pytest
 from itertools import chain
 
 from ..ops_domain import RunSegment
-from .. import storage, type_of, use
-from ..weave_types import List
+from .. import ops
+from .. import storage
+from .. import api
+from .. import weave_types as types
+
 import typing
 import numpy as np
-from ..ops import to_arrow
+
+from .. import weave_internal
 
 N_NUMERIC_METRICS = 99  # number of numerical columns in the metrics table
 
@@ -28,8 +32,8 @@ def random_metrics(n: int = 10, starting_step: int = 0, delta_step: int = 1):
         for i in range(n)
     ]
 
-    wb_type = List(type_of(raw[0]))
-    arrow_form = to_arrow(raw, wb_type=wb_type)
+    wb_type = types.List(api.type_of(raw[0]))
+    arrow_form = ops.to_arrow(raw, wb_type=wb_type)
     return arrow_form
 
 
@@ -129,7 +133,7 @@ def test_experiment_branching(branch_frac, num_steps, num_runs):
     except ValueError:
         assert branch_frac == 0
     else:
-        experiment = use(segment.experiment())
+        experiment = api.use(segment.experiment())
         assert (
             len(experiment)
             == int(steps_per_run * branch_frac) * (num_runs - 1) + steps_per_run
@@ -161,7 +165,7 @@ def test_explicit_experiment_construction(delta_step):
         4,
         random_metrics(5, 10 * delta_step, delta_step=delta_step),
     )
-    experiment = use(segment2.experiment())
+    experiment = api.use(segment2.experiment())
 
     assert experiment._get_col("step").to_pylist() == list(
         range(0, 15 * delta_step, delta_step)
@@ -202,4 +206,215 @@ def test_invalid_explicit_experiment_construction():
     )
 
     with pytest.raises(ValueError):
-        use(segment2.experiment())
+        api.use(segment2.experiment())
+
+
+def test_vectorized_unnest_list_for_panelplot():
+    metrics = random_metrics(10)
+    root_segment = RunSegment("my-first-run", None, 0, metrics)
+    storage.save(root_segment)
+
+    def map_fn(row):
+        return ops.dict_(
+            **{
+                "100": 100,
+                "step": row["step"],
+                "metric0": row["metric0"],
+                "string_col": row["string_col"],
+                "circle": "circle",
+            }
+        )
+
+    fn_node = ops.define_fn(
+        {
+            "row": types.TypedDict(
+                {
+                    "100": types.Int(),
+                    "step": types.Int(),
+                    "metric0": types.Float(),
+                    "string_col": types.String(),
+                    "circle": types.String(),
+                }
+            )
+        },
+        map_fn,
+    )
+
+    res = root_segment.metrics.map(fn_node)
+    mapped = api.use(res).to_pylist()
+    metrics_arr = metrics._arrow_data.to_pylist()
+    assert mapped == [
+        {
+            "100": 100,
+            "circle": "circle",
+            "string_col": metrics_arr[i]["string_col"],
+            "metric0": metrics_arr[i]["metric0"],
+            "step": i,
+        }
+        for i in range(len(metrics))
+    ]
+
+
+@pytest.fixture()
+def number_bin_fn_node():
+    return ops.numbers_bins_equal([1, 2, 3, 4], 10)
+
+
+def test_number_bin_fn_node_type(number_bin_fn_node):
+    assert number_bin_fn_node.type == types.Function(
+        input_types={"row": types.Number()},
+        output_type=types.NumberBinType,
+    )
+
+
+def test_number_bin_generation(number_bin_fn_node):
+    # extract the function from its containing node
+    function = api.use(number_bin_fn_node)
+    call_node = ops.call_fn(
+        function, {"row": weave_internal.make_const_node(types.Number(), 2.5)}
+    )
+    result = api.use(call_node)
+
+    assert np.isclose(result["start"], 2.4)
+    assert np.isclose(result["stop"], 2.7)
+
+
+def test_number_bin_assignment_in_bin_range(number_bin_fn_node):
+    # create a graph representing bin assignment
+    assigned_number_bin_node = ops.number_bin(in_=2.5, bin_fn=number_bin_fn_node)
+    assigned_bin = api.use(assigned_number_bin_node)
+
+    assert np.isclose(assigned_bin["start"], 2.4)
+    assert np.isclose(assigned_bin["stop"], 2.7)
+
+
+def test_number_bin_assignment_outside_bin_range(number_bin_fn_node):
+    # now do one outside the original range
+    assigned_number_bin_node = ops.number_bin(in_=7, bin_fn=number_bin_fn_node)
+    assigned_bin = api.use(assigned_number_bin_node)
+
+    assert np.isclose(assigned_bin["start"], 6.9)
+    assert np.isclose(assigned_bin["stop"], 7.2)
+
+
+def test_group_by_bins_arrow_vectorized():
+    number_bin_fn_node = ops.numbers_bins_equal([0, 10], 2)
+    segment = create_experiment(200, 5, 0.8)
+
+    def groupby_func(row):
+        step = row["step"]
+        assigned_number_bin_node = ops.number_bin(in_=step, bin_fn=number_bin_fn_node)
+        return ops.dict_(number_bin_col_name=assigned_number_bin_node)
+
+    func_node = weave_internal.define_fn(
+        {"row": api.type_of(segment.metrics).object_type}, groupby_func
+    )
+    groupby_node = segment.metrics.groupby(func_node)
+
+    result = api.use(groupby_node)
+    assert api.use(result.count()) == 9
+
+    group_key_node = result[4].key()
+    key = api.use(group_key_node)
+    assert key == {"number_bin_col_name": {"start": 130.0, "stop": 135.0}}
+
+
+# cache busting didn't work properly with this query before
+def test_map_merge_cache_busting():
+    root_segment = RunSegment("my-first-run", None, 0, random_metrics(10))
+    ref = storage.save(root_segment)
+
+    def map_fn_1_body(row):
+        const_dict = ops.dict_()
+        merge_dict = ops.dict_(
+            **{
+                "100": 100,
+                "step": row["step"],
+                "metric0": row["metric0"],
+                "string_col": row["string_col"],
+                "circle": "circle",
+            }
+        )
+        return const_dict.merge(merge_dict)
+
+    fn_node = weave_internal.define_fn(
+        {"row": root_segment.metrics.object_type}, map_fn_1_body
+    )
+    query = api.get(ref).metrics.map(fn_node)
+    result1 = api.use(query)
+
+    def map_fn_2_body(row):
+        const_dict = ops.dict_()
+        merge_dict = ops.dict_(
+            **{
+                "100": 100,
+                "step": row["step"],
+                "metric1": row["metric1"],
+                "string_col": row["string_col"],
+                "circle": "circle",
+            }
+        )
+        return const_dict.merge(merge_dict)
+
+    fn_node = weave_internal.define_fn(
+        {"row": root_segment.metrics.object_type}, map_fn_2_body
+    )
+    query = api.get(ref).metrics.map(fn_node)
+    result2 = api.use(query)
+
+    assert result1._arrow_data != result2._arrow_data
+    assert (
+        "metric0" in result1._arrow_data.column_names
+        and "metric0" not in result2._arrow_data.column_names
+    )
+    assert (
+        "metric1" not in result1._arrow_data.column_names
+        and "metric1" in result2._arrow_data.column_names
+    )
+
+
+@pytest.mark.skip()  # TODO(dg): enable
+def test_map_experiment_profile_post_groupby_map():
+    last_segment = create_experiment(500000, 20)
+    experiment = last_segment.experiment()
+
+    group_key_name = "steppybin(pybinsequal (list (2, 500) , 2) )"
+    list_node = ops.list_.make_list(**{"0": 2, "1": 500})
+    number_bin_fn_node = ops.numbers_bins_equal(list_node, 2)
+
+    def groupby_fn(row):
+        step = row.pick("step")
+        assigned_number_bin_node = ops.number_bin(in_=step, bin_fn=number_bin_fn_node)
+        return ops.dict_(**{group_key_name: assigned_number_bin_node})
+
+    groupby_node = weave_internal.define_fn(
+        {"row": experiment.type.object_type}, groupby_fn
+    )
+    groupby = experiment.groupby(groupby_node)
+
+    def map_fn_1_body(row):
+        row_key = ops.WeaveGroupResultInterface.key(row)
+        merge_dict = ops.dict_(
+            **{
+                "100": 100,
+                "step": row.pick("step"),
+                "metric0": row.pick("metric0"),
+                "string_col": row.pick("string_col"),
+                "circle": "circle",
+            }
+        )
+        return row_key.merge(merge_dict)
+
+    map_fn_node = weave_internal.define_fn(
+        {
+            "row": ops.arrow.ArrowTableGroupResultType(
+                experiment.type.object_type, groupby_node.type.output_type
+            )
+        },
+        map_fn_1_body,
+    )
+    mapped = ops.list_.make_list(**{"0": ops.list_.unnest(groupby.map(map_fn_node))})
+
+    import cProfile
+
+    cProfile.runctx("use(mapped)", globals(), locals(), filename="map_profile.pstat")

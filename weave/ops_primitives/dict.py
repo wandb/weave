@@ -66,7 +66,9 @@ class TypedDict(dict):
     @op(
         name="merge",
         input_type={"lhs": types.TypedDict({}), "rhs": types.TypedDict({})},
-        output_type=types.TypedDict({}),
+        output_type=lambda input_types: types.TypedDict(
+            {**input_types["lhs"].property_types, **input_types["rhs"].property_types}
+        ),
     )
     def merge(lhs, rhs):
         return {**lhs, **rhs}

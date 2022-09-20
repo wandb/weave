@@ -919,7 +919,8 @@ def union(*members: list[Type]) -> Type:
 
 
 def is_list_like(t: Type) -> bool:
-    return isinstance(non_none(t), List)
+    non_none_t = non_none(t)
+    return isinstance(non_none_t, List) or non_none_t.name == "ArrowWeaveList"
 
 
 def is_custom_type(t: Type) -> bool:
@@ -930,3 +931,6 @@ def is_custom_type(t: Type) -> bool:
         or isinstance(t, List)
         or isinstance(t, UnionType)
     )
+
+
+NumberBinType = TypedDict({"start": Float(), "stop": Float()})

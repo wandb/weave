@@ -8,6 +8,13 @@ from . import context_state
 
 
 @contextlib.contextmanager
+def non_caching_execution_client():
+    with context_state.client(client.NonCachingClient(server.InProcessServer())):
+        with context_state.analytics_disabled():
+            yield
+
+
+@contextlib.contextmanager
 def execution_client():
     """Returns a client for use by the execution engine and op resolvers."""
     # Force in process execution

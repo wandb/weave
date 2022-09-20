@@ -2,7 +2,6 @@ import pytest
 import itertools
 import hashlib
 import pyarrow as pa
-import random
 import string
 from PIL import Image
 
@@ -11,6 +10,8 @@ from .. import api as weave
 from .. import ops
 from .. import artifacts_local
 from . import arrow
+from .. import weave_types as types
+from .. import weave_internal
 
 
 def simple_hash(n, b):
@@ -192,6 +193,25 @@ def test_arrow_list_of_ref_to_item_in_list():
     assert weave.use(d_node[1]["c"] == 7) == True
 
 
+def test_arrow_unnest():
+    data = arrow.to_arrow([{"a": [1, 2, 3], "b": "c"}, {"a": [4, 5, 6], "b": "d"}])
+    assert weave.type_of(data) == arrow.ArrowWeaveListType(
+        types.TypedDict({"a": types.List(types.Int()), "b": types.String()})
+    )
+    unnest_node = data.unnest()
+    assert unnest_node.type == arrow.ArrowWeaveListType(
+        types.TypedDict({"a": types.Int(), "b": types.String()})
+    )
+    assert weave.use(data.unnest()).to_pylist() == [
+        {"a": 1, "b": "c"},
+        {"a": 2, "b": "c"},
+        {"a": 3, "b": "c"},
+        {"a": 4, "b": "d"},
+        {"a": 5, "b": "d"},
+        {"a": 6, "b": "d"},
+    ]
+
+
 def test_arrow_concat_arrow_weave_list():
 
     # test concatenating two arrow weave lists that contain chunked arrays of the same type
@@ -229,3 +249,41 @@ def test_arrow_concat_arrow_weave_list():
 
     with pytest.raises(ValueError):
         awl1.concatenate(awl2)
+
+
+def test_arrow_weave_list_groupby_struct_type_table():
+
+    table = pa.Table.from_pylist(
+        [{"d": {"a": 1, "b": 2}, "c": 1}, {"d": {"a": 3, "b": 4}, "c": 2}]
+    )
+    awl = arrow.ArrowWeaveList(table)
+
+    def group_func_body(row):
+        return ops.dict_(**{"d": row["d"]})
+
+    # note: access more than 1 level deep is broken, should work, fix
+    # def group_func_body(row):
+    #    return ops.dict_(**{"d.a": row["d"]["a"]})
+
+    group_func = weave_internal.define_fn({"row": awl.object_type}, group_func_body)
+    grouped = awl.groupby(group_func)
+    assert weave.use(grouped[0])._arrow_data.to_pylist() == [
+        {"d": {"a": 1, "b": 2}, "c": 1}
+    ]
+
+
+def test_arrow_weave_list_groupby_struct_chunked_array_type():
+    ref = create_arrow_data(1000)
+
+    # chunkedarray is used when there are two levels of nesting
+    node = (
+        weave.get(ref)
+        .groupby(lambda row: ops.dict_(rotate=row["rotate"], shear=row["shear"]))
+        .map(lambda row: row.groupby(lambda row: row["y"]))
+        .dropna()[0][0]
+    )
+
+    assert (
+        weave.use(node)._arrow_data.to_pylist()
+        == [{"rotate": 0, "shear": 0, "x": "a", "y": 5}] * 5
+    )

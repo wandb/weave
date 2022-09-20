@@ -53,8 +53,23 @@ class ExecuteStats:
         )
 
 
+def is_panelplot_data_fetch_query(node: graph.Node) -> bool:
+    if isinstance(node, graph.OutputNode) and node.from_op.name == "list":
+        return all(
+            map(
+                lambda input: input.from_op.name == "unnest",
+                node.from_op.inputs.values(),
+            )
+        )
+    return False
+
+
 def execute_nodes(nodes, no_cache=False):
     nodes = compile.compile(nodes)
+
+    # hack: disable caching for panelplot
+    no_cache |= any([is_panelplot_data_fetch_query(node) for node in nodes])
+
     fg = forward_graph.ForwardGraph(nodes)
 
     stats = execute_forward(fg, no_cache=no_cache)
@@ -143,7 +158,10 @@ def is_run_op(op_call: graph.Op):
 
 
 # the results of these ops will not be cached.
-CACHE_DISALLOWLIST = ["list", "unnest"]
+CACHE_DISALLOWLIST = [
+    "list",
+    "unnest",
+]
 
 
 class NodeExecutionReport(typing.TypedDict):
@@ -156,7 +174,6 @@ def execute_forward_node(
     no_cache=False,
 ) -> NodeExecutionReport:
     use_cache = not no_cache
-    # use_cache = False
     node = forward_node.node
     if isinstance(node, graph.ConstNode):
         return {"cache_used": False}
