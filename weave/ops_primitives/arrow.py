@@ -19,6 +19,7 @@ from .. import mappers_python
 from .. import artifacts_local
 from .. import storage
 from .. import refs
+from .. import dispatch
 from .. import execute_fast
 
 
@@ -533,8 +534,11 @@ class ArrowWeaveListType(types.Type):
         return ArrowWeaveList(res["_arrow_data"], res["object_type"], artifact)
 
 
+ArrowWeaveListObjectTypeVar = typing.TypeVar("ArrowWeaveListObjectTypeVar")
+
+
 @weave_class(weave_type=ArrowWeaveListType)
-class ArrowWeaveList:
+class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
     _arrow_data: typing.Union[pa.Table, pa.ChunkedArray]
     object_type: types.Type
 
@@ -850,6 +854,74 @@ class ArrowTableGroupResult(ArrowWeaveList):
 
 ArrowTableGroupResultType.instance_classes = ArrowTableGroupResult
 ArrowTableGroupResultType.instance_class = ArrowTableGroupResult
+
+
+@dataclasses.dataclass(frozen=True)
+class ArrowWeaveListNumberType(ArrowWeaveListType):
+    # TODO: This should not be assignable via constructor. It should be
+    #    a static property type at this point.
+    object_type: types.Type = types.Number()
+
+
+@weave_class(weave_type=ArrowWeaveListNumberType)
+class ArrowWeaveListNumber(ArrowWeaveList):
+    object_type = types.Number()
+
+    # TODO: weirdly need to name this "<something>-add" since that's what the base
+    # Number op does. But we'd like to get rid of that requirement so we don't
+    # need name= for any ops!
+    @op(name="arrow-add")
+    def __add__(
+        self, other: typing.Union[float, ArrowWeaveList[float]]
+    ) -> ArrowWeaveList[float]:
+        if isinstance(other, ArrowWeaveList):
+            other = other._arrow_data
+        return ArrowWeaveList(pc.add(self._arrow_data, other), types.Number())
+
+
+class VectorizeError(errors.WeaveBaseError):
+    pass
+
+
+def vectorize(weave_fn, with_respect_to=None):
+    """Convert a Weave Function of T to a Weave Function of ArrowWeaveList[T]
+
+    We walk the DAG represented by weave_fn, starting from its roots. Replace
+    with_respect_to VarNodes of Type T with ArrowWeaveList[T]. Then as we
+    walk up the DAG, replace OutputNodes with new op calls to whatever ops
+    exist that can handle the changed input types.
+    """
+
+    # TODO: handle with_respect_to, it doesn't do anything right now.
+
+    def convert_node(node):
+        if isinstance(node, graph.OutputNode):
+            inputs = node.from_op.inputs
+            short_name = node.from_op.name.split("-")[1]
+            op_def = dispatch.get_op_for_inputs(short_name, inputs)
+            if op_def:
+                # Rename inputs to match op, ie, call by position...
+                # Hmm, need to centralize this behavior
+                # TODO
+                final_inputs = {
+                    k: v for k, v in zip(op_def.input_type.arg_types, inputs.values())
+                }
+                return op_def.lazy_call(**final_inputs)
+            raise VectorizeError(
+                "Can't vectorize, no op for: %s %s" % (short_name, inputs)
+            )
+        elif isinstance(node, graph.VarNode):
+            # Vectorize variable
+            # TODO: currently replaces all Var Nodes blindly!
+            # NOTE: This is the only line that is specific to the arrow
+            #     implementation (uses ArrowWeaveListType). Everything
+            #     else will work for other List types, as long as there is
+            #     a set of ops declared that can handle the new types.
+            return graph.VarNode(ArrowWeaveListType(node.type), node.name)
+        elif isinstance(node, graph.ConstNode):
+            return node
+
+    return graph.map_nodes(weave_fn, convert_node)
 
 
 def dataframe_to_arrow(df):

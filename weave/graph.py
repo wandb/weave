@@ -40,7 +40,12 @@ class Node(typing.Generic[T]):
         return node_expr_str(n)
 
     def __repr__(self) -> str:
-        return "<%s(%s): %s>" % (self.__class__.__name__, id(self), str(self))
+        return "<%s(%s): %s %s>" % (
+            self.__class__.__name__,
+            id(self),
+            self.type,
+            str(self),
+        )
 
 
 weave_types.Function.instance_classes = Node

@@ -63,6 +63,9 @@ class OpDef:
         self.call_fn = None
         self.instance = None
 
+    def __repr__(self):
+        return "<OpDef(%s) %s>" % (id(self), self.name)
+
     def __get__(self, instance, owner):
         # This is part of Python's descriptor protocol, and when this op_def
         # is fetched as a member of a class

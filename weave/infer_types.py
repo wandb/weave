@@ -45,13 +45,17 @@ def python_type_to_type(
         if py_type.__origin__ == list or py_type.__origin__ == collections.abc.Sequence:
             return weave_types.List(*args)
         elif py_type.__origin__ == dict:
+            # Special case, we return dict instead of TypedDict
             return weave_types.Dict(*args)
         elif py_type.__origin__ == typing.Union:
             return weave_types.UnionType(*args)
         elif py_type.__origin__ == graph.Node:
             return weave_types.Function({}, args[0])
         else:
-            return weave_types.UnknownType()
+            weave_type = simple_python_type_to_type(py_type.__origin__)
+            if weave_type == weave_types.UnknownType():
+                return weave_type
+            return weave_type(*args)
     elif is_typed_dict_like(py_type):
         return weave_types.TypedDict(
             {

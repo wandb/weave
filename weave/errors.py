@@ -1,22 +1,26 @@
-class WeaveInternalError(Exception):
+class WeaveBaseError(Exception):
+    pass
+
+
+class WeaveInternalError(WeaveBaseError):
     """Internal Weave Error (a programming error)"""
 
     pass
 
 
-class WeaveSerializeError(Exception):
+class WeaveSerializeError(WeaveBaseError):
     pass
 
 
-class WeaveApiError(Exception):
+class WeaveApiError(WeaveBaseError):
     pass
 
 
-class WeaveTypeError(Exception):
+class WeaveTypeError(WeaveBaseError):
     pass
 
 
-class WeaveDefinitionError(Exception):
+class WeaveDefinitionError(WeaveBaseError):
     pass
 
 

@@ -208,8 +208,17 @@ class Type:
     def instance_class(self):
         return self._instance_classes()[-1]
 
-    def assign_type(self, next_type):
-        if isinstance(next_type, self.__class__):
+    def assign_type(self, next_type: "Type") -> "Type":
+        if (
+            isinstance(next_type, self.__class__)
+            or
+            # parent is assignable to child class
+            #     when type variables match
+            # TODO: only valid when python hiearchy matches type hierarchy!
+            #     And no Abstract classes (Type)
+            isinstance(self, next_type.__class__)
+        ):
+            # if isinstance(next_type, self.__class__):
             for prop_name in self.type_vars():
                 if isinstance(
                     getattr(self, prop_name).assign_type(getattr(next_type, prop_name)),
@@ -479,9 +488,9 @@ class UnionType(Type):
             if not all(self.assign_type(member) for member in other.members):
                 return Invalid()
             return self
-        if any(member.assign_type(other) == Invalid() for member in self.members):
-            return Invalid()
-        return self
+        if any(member.assign_type(other) != Invalid() for member in self.members):
+            return self
+        return Invalid()
 
     # def instance_to_py(self, obj):
     #     # Figure out which union member this obj is, and delegate to that
@@ -636,9 +645,6 @@ class ObjectType(Type):
 
     def property_types(self):
         return {}
-
-    def variable_property_types(self):
-        return self.type_vars()
 
     @classmethod
     def type_of_instance(cls, obj):
