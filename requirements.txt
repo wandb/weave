@@ -25,7 +25,8 @@ torchvision
 bertviz
 datasets
 transformers<4.21
-tensorflow>=1.15.2
+tensorflow>=1.15.2; sys_platform != 'darwin' or platform_machine != 'arm64'
+tensorflow-macos>=1.15.2; sys_platform == 'darwin' and platform_machine == 'arm64'
 
 # spaCy Requirements:
 spacy>=3.0.0,<4.0.0
