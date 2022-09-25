@@ -393,7 +393,8 @@ class ArrowTableGroupBy:
         # if self.object_type is None:
         #     self.object_type = types.TypeRegistry.type_of(self._table).object_type
         self._artifact = artifact
-        self._mapper = mappers_arrow.map_from_arrow(self.object_type, self._artifact)
+        # MAPPER REMOVAL
+        # self._mapper = mappers_arrow.map_from_arrow(self.object_type, self._artifact)
 
     @op()
     def count(self) -> int:
@@ -427,11 +428,11 @@ class ArrowTableGroupBy:
             group_key = pa.StructArray.from_arrays(key.values(), key.keys())[0]
 
         group_indexes = row["_index_list"].combine_chunks()[0].values
-        group_table = self._table.take(group_indexes)
 
         return ArrowTableGroupResult(
             # TODO: remove as_py() from group_key. Stay in arrow!
-            group_table,
+            self,
+            group_indexes,
             group_key.as_py(),
             self.object_type,
             self._artifact,
@@ -554,13 +555,23 @@ class ArrowWeaveList:
         if self.object_type is None:
             self.object_type = types.TypeRegistry.type_of(self._arrow_data).object_type
         self._artifact = artifact
-        self._mapper = mappers_arrow.map_from_arrow(self.object_type, self._artifact)
-        # TODO: construct mapper
+        # MAPPER REMOVAL
+        # self._mapper = mappers_arrow.map_from_arrow(self.object_type, self._artifact)
 
     # TODO: doesn't belong here
     @op()
     def sum(self) -> float:
         return pa.compute.sum(self._arrow_data)
+
+    # TODO: doesn't belong here
+    @op()
+    def min(self) -> float:
+        return pa.compute.min(self._arrow_data).as_py()
+
+    # TODO: doesn't belong here
+    @op()
+    def max(self) -> float:
+        return pa.compute.max(self._arrow_data).as_py()
 
     # TODO: doesn't belong here
     @op()
@@ -579,16 +590,20 @@ class ArrowWeaveList:
 
     def _get_col(self, name):
         col = self._arrow_data[name]
-        col_mapper = self._mapper._property_serializers[name]
-        if isinstance(col_mapper, mappers_python_def.DefaultFromPy):
-            return [col_mapper.apply(i.as_py()) for i in col]
-        return col_mapper.apply(col)
+        # MAPPER REMOVAL
+        return col
+        # col_mapper = self._mapper._property_serializers[name]
+        # if isinstance(col_mapper, mappers_python_def.DefaultFromPy):
+        #     return [col_mapper.apply(i.as_py()) for i in col]
+        # return col_mapper.apply(col)
 
     def _index(self, index):
         try:
             row = self._arrow_data.slice(index, 1)
         except IndexError:
             return None
+        # MAPPER REMOVAL
+        return row.to_pylist()[0]
         res = self._mapper.apply(row.to_pylist()[0])
         return res
 
@@ -818,17 +833,19 @@ ArrowWeaveListType.instance_class = ArrowWeaveList
 
 
 @dataclasses.dataclass(frozen=True)
-class ArrowTableGroupResultType(ArrowWeaveListType):
+class ArrowTableGroupResultType(types.Type):
     name = "ArrowTableGroupResult"
 
+    # _arrow_groupby = ArrowTableGroupBy
+    object_type: types.Type = types.Any()
     _key: types.Type = types.Any()
 
-    @classmethod
-    def type_of_instance(cls, obj):
-        return cls(
-            obj.object_type,
-            types.TypeRegistry.type_of(obj._key),
-        )
+    # @classmethod
+    # def type_of_instance(cls, obj):
+    #     return cls(
+    #         obj.object_type,
+    #         types.TypeRegistry.type_of(obj._key),
+    #     )
 
     # def property_types(self):
     #     return {
@@ -839,19 +856,32 @@ class ArrowTableGroupResultType(ArrowWeaveListType):
 
 
 @weave_class(weave_type=ArrowTableGroupResultType)
-class ArrowTableGroupResult(ArrowWeaveList):
-    def __init__(self, _arrow_data, _key, object_type=None, artifact=None):
-        self._arrow_data = _arrow_data
-        self._key = _key
+class ArrowTableGroupResult:
+    def __init__(
+        self, arrow_groupby, group_indexes, key, object_type=None, artifact=None
+    ):
+        self._arrow_groupby = arrow_groupby
+        self._group_indexes = group_indexes
+        self._key = key
         self.object_type = object_type
         if self.object_type is None:
             self.object_type = types.TypeRegistry.type_of(self._table).object_type
         self._artifact = artifact
-        self._mapper = mappers_arrow.map_from_arrow(self.object_type, self._artifact)
+        # TODO(mapper):
+        # self._mapper = mappers_arrow.map_from_arrow(self.object_type, self._artifact)
 
     @op(output_type=lambda input_types: input_types["self"]._key)
     def key(self):
         return self._key
+
+    @op(
+        output_type=lambda input_types: ArrowWeaveListType(
+            input_types["self"].object_type.property_types[input_types["key"].val]
+        )
+    )
+    def pick(self, key: str):
+        col = self._arrow_groupby._table[key]
+        return ArrowWeaveList(col.take(self._group_indexes))
 
 
 ArrowTableGroupResultType.instance_classes = ArrowTableGroupResult
