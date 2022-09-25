@@ -1,4 +1,5 @@
 -r requirements.txt
+types-requests
 pre-commit
 black
 rich
