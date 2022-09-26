@@ -14,6 +14,7 @@ from . import torchvision
 from . import huggingface
 from . import craiyon
 from . import openai
+from . import slurm
 from . import spacy
 from . import wandb
 
