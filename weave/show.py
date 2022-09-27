@@ -21,10 +21,12 @@ def _show_params(obj):
     if obj is None:
         return {"weave_node": graph.VoidNode()}
     if isinstance(obj, panel.Panel):
+        converted = storage.to_python(obj)["_val"]
+
         return {
             "weave_node": weavejs_fixes.fixup_node(obj.input_node),
-            "panel_id": obj.id,
-            "panel_config": weavejs_fixes.fixup_data(obj.config),
+            "panel_id": converted["id"],
+            "panel_config": weavejs_fixes.fixup_data(converted["config"]),
         }
 
     elif isinstance(obj, graph.Node):

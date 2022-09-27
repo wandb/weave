@@ -16,6 +16,7 @@ from .. import panels
 # from . import openai
 # from . import spacy
 # from . import wandb
+from . import scenario
 from . import shawn
 
 # TODO: feels odd to call this "ops.Markdown".

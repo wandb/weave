@@ -42,17 +42,21 @@ class ObjectToPyDict(mappers_weave.ObjectMapper):
 
 class ObjectDictToObject(mappers_weave.ObjectMapper):
     def apply(self, obj):
-        result = obj
-        for k, serializer in self._property_serializers.items():
-            v = serializer.apply(obj[k])
-            result[k] = v
+        # Only add keys that are accepted by the constructor.
+        # This is used for Panels where we have an Class-level id attribute
+        # that we want to include in the serialized representation.
+        result = {}
         result_type = self._obj_type
+        instance_class = result_type._instance_classes()[0]
+        constructor_sig = inspect.signature(instance_class)
+        for k, serializer in self._property_serializers.items():
+            if k in constructor_sig.parameters:
+                v = serializer.apply(obj[k])
+                result[k] = v
         for prop_name, prop_type in result_type.variable_property_types().items():
             if isinstance(prop_type, types.Const):
                 result[prop_name] = prop_type.val
 
-        instance_class = result_type._instance_classes()[0]
-        constructor_sig = inspect.signature(instance_class)
         if "artifact" in constructor_sig.parameters:
             result["artifact"] = self._artifact
         res = instance_class(**result)

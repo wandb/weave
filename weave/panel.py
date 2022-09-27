@@ -1,4 +1,5 @@
 import dataclasses
+from tarfile import DEFAULT_FORMAT
 import typing
 import inspect
 from . import api as weave
@@ -93,24 +94,19 @@ class ConfigDescriptor:
         # setattr(obj, self._name, int(value))
 
 
-@weave.type()
-class Panel:
-    id: typing.ClassVar[str]
-    input_node: graph.Node = graph.VoidNode()
-    # vars: dict[str, graph.Node] = dataclasses.field(default_factory=dict)
-    vars: typing.TypeVar("vars") = dataclasses.field(default_factory=dict)
-    config: dataclasses.InitVar[dict[str, str]] = dataclasses.field(
-        default=ConfigDescriptor()
-    )
+VarsType = typing.TypeVar("VarsType")
 
-    def __init__(self, **kwargs):
-        names = set([f.name for f in dataclasses.fields(self)])
-        for k, v in kwargs.items():
-            if k in names:
-                setattr(self, k, v)
-        self.__post_init__()
+
+@weave.type()
+class Panel(typing.Generic[VarsType]):
+    id: str = dataclasses.field(init=False)
+    input_node: graph.Node = dataclasses.field(default=graph.VoidNode())
+    # vars: dict[str, graph.Node] = dataclasses.field(default_factory=dict)
+    vars: VarsType = dataclasses.field(default_factory=dict)
 
     def __post_init__(self, *args):
+        if self.vars is None:
+            self.vars = {}
         for name, val in self.vars.items():
             self.vars[name] = panel_util.make_node(val)
 

@@ -86,3 +86,32 @@ def test_synced():
 #     panel = Group2(
 #         items={"step": Slider2(), "table": panellambda my_slider: my_slider.value}
 # )
+
+
+def test_save_panel():
+    metrics = weave.save(["a", "b"])
+    data = weave.save([{"a": [0, 1], "b": [2, 3]}, {"a": [4, 5], "b": [6, 7]}])
+
+    panel = weave.panels.Each(
+        metrics,
+        render=lambda metric_name: weave.panels.Plot(
+            data,
+            title=metric_name,
+            x=lambda row: row[metric_name][0],
+            y=lambda row: row[metric_name][1],
+        ),
+    )
+    # panel = weave.panels.Each(
+    #     metrics,
+    # )
+    # panel.set_render(
+    #     lambda metric_name: weave.panels.Plot(
+    #         data,
+    #         title=metric_name,
+    #         x=lambda row: row[metric_name][0],
+    #         y=lambda row: row[metric_name][1],
+    #     )
+    # )
+
+    saved_panel = weave.save(panel)
+    1 / 0

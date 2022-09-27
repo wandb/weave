@@ -15,7 +15,7 @@ class MetricsBankInput(typing.TypedDict):
 
 
 @weave.op(pure=False)
-def metrics_bank(input_node: weave.Node[MetricsBankInput]) -> weave.panels.Plot:
+def metrics_bank(input_node: weave.Node[MetricsBankInput]) -> weave.panels.Each:
     input = typing.cast(MetricsBankInput, input_node)
 
     baseline = input["baseline"]

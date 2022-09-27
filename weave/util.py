@@ -53,6 +53,6 @@ def is_notebook():
                 return False
             if "IPKernelApp" not in ip.config:
                 return False
-            if "VSCODE_PID" in os.environ:
-                return False
+            # if "VSCODE_PID" in os.environ:
+            #     return False
     return True

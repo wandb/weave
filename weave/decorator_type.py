@@ -54,6 +54,13 @@ def type(__override_name: str = None):
                 property_types[name] = prop_type
             return property_types
 
+        if target.__bases__:
+            # Add the first base classes as the type base.
+            # TODO: should we add all bases?
+            target_base0 = target.__bases__[0]
+            if hasattr(target_base0, "WeaveType"):
+                TargetType._base_type = target_base0.WeaveType()
+
         TargetType.property_types = property_types_method
         TargetType = dataclasses.dataclass(frozen=True)(TargetType)
 
