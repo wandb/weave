@@ -244,7 +244,7 @@ def sqlconnection_tables(conn):
 
 
 @op(
-    name="sqlconnection-tables-type",
+    name="sqlconnection-tablesType",
     input_type={"conn": SqlConnectionType()},
     output_type=types.Type(),
 )

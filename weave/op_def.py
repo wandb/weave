@@ -17,7 +17,6 @@ class OpDef:
     Must be immediately passed to Register.register_op() after construction.
     """
 
-    name: str
     input_type: op_args.OpArgs
     output_type: typing.Union[
         types.Type,
@@ -76,6 +75,18 @@ class OpDef:
         if self.instance is not None:
             return self.call_fn(self.instance, *args, **kwargs)
         return self.call_fn(*args, **kwargs)
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @name.setter
+    def name(self, name: str):
+        if name.count("-") > 1:
+            raise errors.WeaveDefinitionError(
+                "Op names must have at most one hyphen. Got: %s" % name
+            )
+        self._name = name
 
     @property
     def uri(self):

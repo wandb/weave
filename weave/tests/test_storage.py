@@ -26,7 +26,7 @@ class SomeCustomObj:
 
 
 class SomeCustomObjType(types.Type):
-    name = "test-storage-somecustomobj"
+    name = "test_storage_somecustomobj"
     instance_classes = SomeCustomObj
     instance_class = SomeCustomObj
 

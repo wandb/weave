@@ -27,7 +27,7 @@ class ImageType(types.Type):
 
 
 class PILImageType(types.Type):
-    name = "pil-image"
+    name = "pil_image"
     instance_class = PIL.Image.Image
     instance_classes = PIL.Image.Image
 

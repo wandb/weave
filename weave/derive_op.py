@@ -9,7 +9,10 @@ from . import op_def
 
 def make_mapped_op(op_name):
 
-    mapped_op_name = "list-%s" % op_name  # TODO: doesn't handle fqn
+    if "-" not in op_name:
+        mapped_op_name = f"mapped-{op_name}"
+    else:
+        mapped_op_name = f"mapped_{op_name}"
 
     op = registry_mem.memory_registry.get_op(op_name)
     if op.input_type.kind != op_args.OpArgs.NAMED_ARGS:

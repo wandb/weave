@@ -67,7 +67,7 @@ actual_SHOW_PARAMS_FINE_TUNE_WEAVE_NODE = {
         "inputs": {"type": "typedDict", "propertyTypes": {}},
         "history": {"type": "list", "objectType": "any"},
         "output": {
-            "type": "gpt3-fine-tune-type",
+            "type": "gpt3_fine_tune_type",
             "_property_types": {
                 "id": "string",
                 "status": "string",
@@ -77,7 +77,7 @@ actual_SHOW_PARAMS_FINE_TUNE_WEAVE_NODE = {
                     "members": [
                         "none",
                         {
-                            "type": "gpt3-fine-tune-results-type",
+                            "type": "gpt3_fine_tune_results_type",
                             "_property_types": {
                                 "bytes": "int",
                                 "created_at": "int",
@@ -113,7 +113,7 @@ actual_SHOW_PARAMS_FINE_TUNE_WEAVE_NODE = {
             "inputs": {"type": "typedDict", "propertyTypes": {}},
             "history": {"type": "list", "objectType": "any"},
             "output": {
-                "type": "gpt3-fine-tune-type",
+                "type": "gpt3_fine_tune_type",
                 "_property_types": {
                     "id": "string",
                     "status": "string",
@@ -126,7 +126,7 @@ actual_SHOW_PARAMS_FINE_TUNE_WEAVE_NODE = {
                         "members": [
                             "none",
                             {
-                                "type": "gpt3-fine-tune-results-type",
+                                "type": "gpt3_fine_tune_results_type",
                                 "_property_types": {
                                     "bytes": "int",
                                     "created_at": "int",

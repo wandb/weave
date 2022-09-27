@@ -251,7 +251,7 @@ GroupResultType.instance_classes = GroupResult
 
 
 @op(
-    name="list-indexCheckpoint",
+    name="list-createIndexCheckpointTag",
     input_type={"arr": types.List(types.Any())},
     output_type=lambda input_types: input_types["arr"],
 )

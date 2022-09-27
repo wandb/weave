@@ -6,7 +6,7 @@ import weave
 
 
 class XGBoostModelType(weave.types.Type):
-    name = "xgboost-model"
+    name = "xgboost_model"
     instance_class = xgboost.core.Booster
     instance_classes = xgboost.core.Booster
 

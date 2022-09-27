@@ -155,7 +155,7 @@ class Type:
     ] = None
 
     def __repr__(self):
-        return "<Type>"
+        return f"<{self.name}>"
 
     @classmethod
     def class_type_name(cls):

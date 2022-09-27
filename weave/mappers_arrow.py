@@ -162,7 +162,7 @@ class DefaultToArrow(mappers_python.DefaultToPy):
             )
         elif (
             self.type.name == "ndarray"
-            or self.type.name == "pil-image"
+            or self.type.name == "pil_image"
             or self.type.name == "ArrowArray"
             or self.type.name == "ArrowTable"
             or self.type.name == "ArrowTableGroupBy"

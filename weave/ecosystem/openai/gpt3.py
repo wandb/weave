@@ -11,7 +11,7 @@ openai.api_key_path = os.path.expanduser("~/.openai-apikey")
 
 
 class StoredFileType(weave.types.ObjectType):
-    name = "openai-stored-file"
+    name = "openai_stored_file"
     type_vars = {"purpose": weave.types.String()}  # TODO: enum?
 
     def __init__(self, purpose=weave.types.String()):
@@ -66,7 +66,7 @@ StoredFileType.instance_class = StoredFile
 
 
 class Gpt3DatasetType(StoredFileType):
-    name = "gpt3-dataset"
+    name = "gpt3_dataset"
 
     def __init__(self):
         self.purpose = weave.types.Const(weave.types.String(), "fine-tune")
@@ -100,7 +100,7 @@ Gpt3DatasetType.instance_class = Gpt3Dataset
 
 
 class Gpt3FineTuneResultsType(StoredFileType):
-    name = "gpt3-fine-tune-results-type"
+    name = "gpt3_fine_tune_results_type"
 
     def __init__(self):
         self.purpose = weave.types.Const(weave.types.String(), "fine-tune-results")
@@ -231,7 +231,7 @@ def gpt3_davinci_2() -> Gpt3Model:
 
 
 class Gpt3FineTuneType(weave.types.ObjectType):
-    name = "gpt3-fine-tune-type"
+    name = "gpt3_fine_tune_type"
 
     def __init__(self):
         pass

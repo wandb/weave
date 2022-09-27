@@ -317,7 +317,7 @@ class Project:
         api = wandb_public_api()
         return api.runs(path="%s/%s" % (project.entity, project.name), per_page=500)
 
-    @op(name="project-filtered-runs")
+    @op(name="project-filteredRuns")
     def filtered_runs(
         project: wandb_api.Project, filter: str, order: str
     ) -> wandb_api.Runs:
