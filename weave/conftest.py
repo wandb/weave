@@ -1,10 +1,15 @@
 import os
+import random
 
 import pytest
 import shutil
 import tempfile
 from . import context_state
 from . import weave_server
+from . import serialize
+from . import client
+
+from flask.testing import FlaskClient
 
 
 ### Disable datadog engine tracing
@@ -75,3 +80,50 @@ def cereal_csv():
         cereal_path = os.path.join(d, "cereal.csv")
         shutil.copy("testdata/cereal.csv", cereal_path)
         yield cereal_path
+
+
+@pytest.fixture()
+def fixed_random_seed():
+    random.seed(8675309)
+    yield
+    random.seed(None)
+
+
+@pytest.fixture()
+def app():
+    app = weave_server.make_app()
+    app.config.update(
+        {
+            "TESTING": True,
+        }
+    )
+
+    yield app
+
+
+class HttpServerTestClient:
+    def __init__(self, flask_test_client: FlaskClient):
+        """Constructor.
+
+        Args:
+            flask_test_client: A flask test client to use for sending requests to the test application
+        """
+        self.flask_test_client = flask_test_client
+        self.execute_endpoint = "/__weave/execute"
+
+    def execute(self, nodes, no_cache=False):
+        serialized = serialize.serialize(nodes)
+        r = self.flask_test_client.post(
+            self.execute_endpoint,
+            json={"graphs": serialized},
+        )
+        response = r.json["data"]
+        return response
+
+
+@pytest.fixture()
+def weave_test_client(app):
+    app = weave_server.make_app()
+    flask_client = app.test_client()
+    server = HttpServerTestClient(flask_client)
+    return client.Client(server)

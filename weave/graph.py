@@ -13,6 +13,9 @@ T = typing.TypeVar("T")
 class Node(typing.Generic[T]):
     type: weave_types.Type
 
+    def __deepcopy__(self, memo: dict) -> "Node":
+        return self.node_from_json(self.to_json())
+
     @classmethod
     def node_from_json(cls, obj: dict) -> "Node":
         if obj["nodeType"] == "const":

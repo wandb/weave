@@ -58,7 +58,9 @@ def _handle_request(request, deref=False):
         is_tracing = False
         tracer.stop()
         tracer.save(output_file="request_%s.json" % time.time())
+
     result = [storage.to_python(r) for r in result]
+
     logger.info("Server request done in: %ss" % (time.time() - start_time))
     return result
 

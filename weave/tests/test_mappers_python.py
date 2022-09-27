@@ -2,6 +2,7 @@ import math
 
 from .. import mappers_python
 from .. import weave_types as types
+from .. import context
 
 
 def test_map_typed_dict():

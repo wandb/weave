@@ -6,6 +6,10 @@ from .. import weavejs_fixes
 from .. import ops
 from .. import api
 
+from .. import mappers_python
+
+from .. import weave_internal
+
 
 def test_clean_opcall_str():
     @api.op(input_type={"x": types.Number()}, output_type=types.Number())
@@ -42,3 +46,18 @@ def test_convert_specific_op_to_generic_op_data():
     assert dict_node["fromOp"]["name"] == "index"
     assert "self" not in dict_node["fromOp"]["inputs"]
     assert list(dict_node["fromOp"]["inputs"].keys())[0] == "arr"
+
+
+def test_strip_union_encoding_from_weavejs_response(weave_test_client):
+    obj = [1, "a"]
+    obj_type = types.TypeRegistry.type_of(obj)
+    m = mappers_python.map_to_python(obj_type, None)
+    serialized = m.apply(obj)
+
+    assert serialized != obj
+    assert all("_union_id" in item for item in serialized)
+
+    node = weave_internal.make_const_node(obj_type, obj)
+    serialized2 = weave_test_client.execute([node])[0]
+
+    assert serialized2 == obj

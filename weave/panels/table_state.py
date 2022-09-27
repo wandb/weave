@@ -1,8 +1,8 @@
 import random
 import string
+import copy
 
 from .. import graph
-from .. import weave_types as types
 from .. import weave_internal
 from .. import ops
 from .. import panel
@@ -21,6 +21,9 @@ class TableState(object):
         self._sort = []
         self._page_size = 10
         self._page = 0
+
+    def clone(self):
+        return copy.deepcopy(self)
 
     def _new_col_id(self):
         return "".join(
@@ -68,6 +71,9 @@ class TableState(object):
                     make_list_args["i%s" % i] = item
                 selected = ops.make_list(**make_list_args)
             self._column_select_functions[col_id] = selected
+
+    def __eq__(self, other):
+        return self.to_json() == other.to_json()
 
     def to_json(self):
         # TODO: its annoying that we have to manually rename everything to fix js
