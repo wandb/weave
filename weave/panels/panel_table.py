@@ -24,6 +24,11 @@ class Table(panel.Panel):
             for column_expr in kwargs["columns"]:
                 self.append_column(column_expr)
 
+        if "pd_columns" in kwargs:
+            self._set_default_nonauto_tablestate()
+            for name, expr in kwargs["pd_columns"].items():
+                self.append_column(expr, name)
+
     @property
     def table_query(self):
         return self._table_state
