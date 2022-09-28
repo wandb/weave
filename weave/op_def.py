@@ -119,15 +119,15 @@ class OpDef:
 
         # Make callable input_type args into types.Any() for now.
         input_type = self.input_type
-        if not isinstance(input_type, op_args.OpNamedArgs):
-            raise errors.WeaveSerializeError(
-                "serializing op with non-named-args input_type not yet implemented"
-            )
-        arg_types = copy.copy(input_type.arg_types)
-        for arg_name, arg_type in arg_types.items():
-            if callable(arg_type):
-                arg_types[arg_name] = types.Any()
-        input_types = op_args.OpNamedArgs(arg_types).to_dict()
+        if isinstance(input_type, op_args.OpVarArgs):
+            # This is what we do on the frontend.
+            input_types = {"manyX": "invalid"}
+        else:
+            arg_types = copy.copy(input_type.arg_types)
+            for arg_name, arg_type in arg_types.items():
+                if callable(arg_type):
+                    arg_types[arg_name] = types.Any()
+            input_types = op_args.OpNamedArgs(arg_types).to_dict()
 
         serialized = {
             "name": self.uri,
