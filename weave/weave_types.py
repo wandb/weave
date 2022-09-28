@@ -209,6 +209,19 @@ class Type:
         return self._instance_classes()[-1]
 
     def assign_type(self, next_type: "Type") -> "Type":
+        if isinstance(next_type, Const):
+            return self.assign_type(next_type.val_type)
+        elif isinstance(next_type, UnionType):
+            assigned = []
+            for t in next_type.members:
+                a_type = self.assign_type(t)
+                if isinstance(a_type, Invalid):
+                    return Invalid()
+                assigned.append(a_type)
+            return UnionType(assigned)
+        return self._assign_type_inner(next_type)
+
+    def _assign_type_inner(self, next_type: "Type") -> "Type":
         if (
             isinstance(next_type, self.__class__)
             or
@@ -219,7 +232,11 @@ class Type:
             isinstance(self, next_type.__class__)
         ):
             # if isinstance(next_type, self.__class__):
-            for prop_name in self.type_vars():
+            if callable(self.type_vars):
+                type_vars = self.type_vars()
+            else:
+                type_vars = self.type_vars
+            for prop_name in type_vars:
                 if isinstance(
                     getattr(self, prop_name).assign_type(getattr(next_type, prop_name)),
                     Invalid,
@@ -328,13 +345,13 @@ class Invalid(BasicType):
     name = "invalid"
 
     def assign_type(self, next_type):
-        return next_type
+        return Invalid()
 
 
 class UnknownType(BasicType):
     name = "unknown"
 
-    def assign_type(self, next_type):
+    def _assign_type_inner(self, next_type):
         return next_type
 
 
@@ -389,7 +406,7 @@ class Const(Type):
                 return Invalid()
             if self.val == next_type.val:
                 return self
-        return self.val_type.assign_type(next_type)
+        return Invalid()
 
     @classmethod
     def from_dict(cls, d):
@@ -418,7 +435,7 @@ class Float(Number):
     instance_classes = float
     name = "float"
 
-    def assign_type(self, other_type: Type):
+    def _assign_type_inner(self, other_type: Type):
         # Float if either side is a number
         if isinstance(other_type, Float) or isinstance(other_type, Int):
             return Float()
@@ -437,7 +454,7 @@ class Int(Number):
             return False
         return super().is_instance(obj)
 
-    def assign_type(self, other_type: Type):
+    def _assign_type_inner(self, other_type: Type):
         # Become Float if rhs is Float
         if isinstance(other_type, Float):
             return Float()
@@ -483,7 +500,7 @@ class UnionType(Type):
             return False
         return set(self.members) == set(other.members)
 
-    def assign_type(self, other):
+    def _assign_type_inner(self, other):
         if isinstance(other, UnionType):
             if not all(self.assign_type(member) for member in other.members):
                 return Invalid()
@@ -526,10 +543,10 @@ class List(Type):
             list_obj_type = merge_types(list_obj_type, obj_type)
         return cls(list_obj_type)
 
-    def assign_type(self, next_type):
+    def _assign_type_inner(self, next_type):
         if isinstance(next_type, List) and next_type.object_type == UnknownType():
             return self
-        return super().assign_type(next_type)
+        return super()._assign_type_inner(next_type)
 
     def save_instance(self, obj, artifact, name):
         serializer = mappers_python.map_to_python(self, artifact)
@@ -554,7 +571,7 @@ class TypedDict(Type):
         # Can't hash property_types by default because dict is not hashable
         return hash(tuple((k, v) for k, v in self.property_types.items()))
 
-    def assign_type(self, other_type):
+    def _assign_type_inner(self, other_type):
         if not isinstance(other_type, TypedDict):
             return Invalid()
 
@@ -615,7 +632,7 @@ class Dict(Type):
         if not isinstance(self.key_type, String):
             raise Exception("Dict only supports string keys!")
 
-    def assign_type(self, other_type):
+    def _assign_type_inner(self, other_type):
         if isinstance(other_type, Dict):
             next_key_type = self.key_type.assign_type(other_type.key_type)
             if isinstance(next_key_type, Invalid):
@@ -917,7 +934,7 @@ def merge_types(a: Type, b: Type) -> Type:
     return UnionType(a, b)
 
 
-def union(*members: list[Type]) -> Type:
+def union(*members: Type) -> Type:
     t = UnionType(*members)
     if len(t.members) == 1:
         return t.members[0]

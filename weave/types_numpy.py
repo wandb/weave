@@ -49,7 +49,7 @@ class NumpyArrayType(types.Type):
     def from_dict(cls, d):
         return cls(np.dtype(d["dtype"]), d["shape"])
 
-    def assign_type(self, next_type):
+    def _assign_type_inner(self, next_type):
         if not isinstance(next_type, NumpyArrayType):
             return types.InvalidType()
         if self.dtype != next_type.dtype or self.shape != next_type.shape:
