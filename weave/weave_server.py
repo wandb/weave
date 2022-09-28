@@ -66,7 +66,8 @@ def enable_stream_logging(level=logging.INFO):
     logger.addHandler(stream_handler)
 
 
-blueprint = Blueprint("weave", "weave-server", static_folder="frontend")
+static_folder = os.path.join(os.path.dirname(__file__), "frontend")
+blueprint = Blueprint("weave", "weave-server", static_folder=static_folder)
 
 
 def make_app(log_filename=None):
@@ -225,11 +226,6 @@ def frontend(path):
         return send_from_directory(blueprint.static_folder, path)
     else:
         return send_from_directory(blueprint.static_folder, "index.html")
-
-
-@blueprint.route("/tree-sitter.wasm")
-def tree_sitter_wasm():
-    return send_file(pathlib.Path(blueprint.static_folder) / "tree-sitter.wasm")
 
 
 @blueprint.route("/__weave/hello")
