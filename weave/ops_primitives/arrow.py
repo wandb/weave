@@ -870,13 +870,110 @@ class ArrowWeaveListNumber(ArrowWeaveList):
     # TODO: weirdly need to name this "<something>-add" since that's what the base
     # Number op does. But we'd like to get rid of that requirement so we don't
     # need name= for any ops!
-    @op(name="arrow-add")
+    @op(name="ArrowWeaveListNumber-add")
     def __add__(
         self, other: typing.Union[float, ArrowWeaveList[float]]
     ) -> ArrowWeaveList[float]:
         if isinstance(other, ArrowWeaveList):
             other = other._arrow_data
         return ArrowWeaveList(pc.add(self._arrow_data, other), types.Number())
+
+    @op(name="ArrowWeaveListNumber-mult")
+    def __mul__(
+        self, other: typing.Union[float, ArrowWeaveList[float]]
+    ) -> ArrowWeaveList[float]:
+        if isinstance(other, ArrowWeaveList):
+            other = other._arrow_data
+        return ArrowWeaveList(pc.multiply(self._arrow_data, other), types.Number())
+
+    @op(name="ArrowWeaveListNumber-div")
+    def __truediv__(
+        self, other: typing.Union[float, ArrowWeaveList[float]]
+    ) -> ArrowWeaveList[float]:
+        if isinstance(other, ArrowWeaveList):
+            other = other._arrow_data
+        return ArrowWeaveList(pc.divide(self._arrow_data, other), types.Number())
+
+    @op(name="ArrowWeaveListNumber-sub")
+    def __sub__(
+        self, other: typing.Union[float, ArrowWeaveList[float]]
+    ) -> ArrowWeaveList[float]:
+        if isinstance(other, ArrowWeaveList):
+            other = other._arrow_data
+        return ArrowWeaveList(pc.subtract(self._arrow_data, other), types.Number())
+
+    @op(name="ArrowWeaveListNumber-powBinary")
+    def __pow__(
+        self, other: typing.Union[float, ArrowWeaveList[float]]
+    ) -> ArrowWeaveList[float]:
+        if isinstance(other, ArrowWeaveList):
+            other = other._arrow_data
+        return ArrowWeaveList(pc.power(self._arrow_data, other), types.Number())
+
+    @op(name="ArrowWeaveListNumber-notEqual")
+    def __ne__(
+        self, other: typing.Union[float, ArrowWeaveList[float]]
+    ) -> ArrowWeaveList[bool]:
+        if isinstance(other, ArrowWeaveList):
+            other = other._arrow_data
+        return ArrowWeaveList(pc.not_equal(self._arrow_data, other), types.Boolean())
+
+    @op(name="ArrowWeaveListNumber-equal")
+    def __eq__(
+        self, other: typing.Union[float, ArrowWeaveList[float]]
+    ) -> ArrowWeaveList[bool]:
+        if isinstance(other, ArrowWeaveList):
+            other = other._arrow_data
+        return ArrowWeaveList(pc.equal(self._arrow_data, other), types.Boolean())
+
+    @op(name="ArrowWeaveListNumber-greater")
+    def __gt__(
+        self, other: typing.Union[float, ArrowWeaveList[float]]
+    ) -> ArrowWeaveList[bool]:
+        if isinstance(other, ArrowWeaveList):
+            other = other._arrow_data
+        return ArrowWeaveList(pc.greater(self._arrow_data, other), types.Boolean())
+
+    @op(name="ArrowWeaveListNumber-greaterEqual")
+    def __ge__(
+        self, other: typing.Union[float, ArrowWeaveList[float]]
+    ) -> ArrowWeaveList[bool]:
+        if isinstance(other, ArrowWeaveList):
+            other = other._arrow_data
+        return ArrowWeaveList(
+            pc.greater_equal(self._arrow_data, other), types.Boolean()
+        )
+
+    @op(name="ArrowWeaveListNumber-less")
+    def __lt__(
+        self, other: typing.Union[float, ArrowWeaveList[float]]
+    ) -> ArrowWeaveList[bool]:
+        if isinstance(other, ArrowWeaveList):
+            other = other._arrow_data
+        return ArrowWeaveList(pc.less(self._arrow_data, other), types.Boolean())
+
+    @op(name="ArrowWeaveListNumber-lessEqual")
+    def __le__(
+        self, other: typing.Union[float, ArrowWeaveList[float]]
+    ) -> ArrowWeaveList[bool]:
+        if isinstance(other, ArrowWeaveList):
+            other = other._arrow_data
+        return ArrowWeaveList(pc.less_equal(self._arrow_data, other), types.Boolean())
+
+    @op(name="ArrowWeaveListNumber-negate")
+    def __neg__(self) -> ArrowWeaveList[float]:
+        return ArrowWeaveList(pc.negate(self._arrow_data), types.Number())
+
+    # todo: fix op decorator to not require name here,
+    # these names are needed because the base class also has an op called floor.
+    # also true for ceil below
+    @op(name="ArrowWeaveListNumber-floor")
+    def floor(self) -> ArrowWeaveList[float]:
+        return ArrowWeaveList(pc.floor(self._arrow_data), types.Number())
+
+    @op(name="ArrowWeaveListNumber-ceil")
+    def ceil(self) -> ArrowWeaveList[float]:
+        return ArrowWeaveList(pc.ceil(self._arrow_data), types.Number())
 
 
 class VectorizeError(errors.WeaveBaseError):

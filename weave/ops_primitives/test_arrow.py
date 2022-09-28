@@ -6,7 +6,7 @@ import string
 from PIL import Image
 
 from .. import storage
-from . import weave_internal
+from ..ops_primitives import Number
 from .. import api as weave
 from .. import ops
 from .. import artifacts_local
@@ -194,30 +194,6 @@ def test_arrow_list_of_ref_to_item_in_list():
     assert weave.use(d_node[1]["c"] == 7) == True
 
 
-def test_arrow_vectorizer_add_float():
-    l = weave.save(arrow.to_arrow([1.0, 2.0, 3.0]))
-
-    fn = weave_internal.define_fn({"x": weave.types.Float()}, lambda x: x + 2).val
-
-    vec_fn = arrow.vectorize(fn)
-
-    # TODO:  make it nicer to call vec_fn, we shouldn't need to jump through hoops here
-    called = weave_internal.call_fn(vec_fn, {"x": l})
-
-    assert weave.use(called).to_pylist() == [3.0, 4.0, 5.0]
-
-
-def test_arrow_vectorizer_add_vec():
-    fn = weave_internal.define_fn({"x": weave.types.Float()}, lambda x: x + x).val
-
-    vec_fn = arrow.vectorize(fn)
-
-    l = weave.save(arrow.to_arrow([1.0, 2.0, 3.0]))
-    called = weave_internal.call_fn(vec_fn, {"x": l})
-
-    assert weave.use(called).to_pylist() == [2.0, 4.0, 6.0]
-
-
 # TODO: move to generic test as Weave types test.
 def test_arrow_list_assign():
     assert (
@@ -322,3 +298,49 @@ def test_arrow_weave_list_groupby_struct_chunked_array_type():
         weave.use(node)._arrow_data.to_pylist()
         == [{"rotate": 0, "shear": 0, "x": "a", "y": 5}] * 5
     )
+
+
+@pytest.mark.parametrize(
+    "name,weave_func,expected_output",
+    [
+        ("add", lambda x: x + 2, [3.0, 4.0, 5.0]),
+        ("add-vec", lambda x: x + x, [2.0, 4.0, 6.0]),
+        ("subtract", lambda x: x - 1, [0.0, 1.0, 2.0]),
+        ("multiply", lambda x: x * 2, [2.0, 4.0, 6.0]),
+        ("divide", lambda x: x / 2, [0.5, 1.0, 1.5]),
+        ("pow", lambda x: x**2, [1.0, 4.0, 9.0]),
+        ("ne", lambda x: x != 2, [True, False, True]),
+        ("eq", lambda x: x == 2, [False, True, False]),
+        ("gt", lambda x: x > 2, [False, False, True]),
+        ("lt", lambda x: x < 2, [True, False, False]),
+        ("ge", lambda x: x >= 2, [False, True, True]),
+        ("le", lambda x: x <= 2, [True, True, False]),
+        ("neg", lambda x: -x, [-1.0, -2.0, -3.0]),
+    ],
+)
+def test_arrow_vectorizer_number_ops(name, weave_func, expected_output):
+    l = weave.save(arrow.to_arrow([1.0, 2.0, 3.0]))
+
+    fn = weave_internal.define_fn({"x": weave.types.Float()}, weave_func).val
+
+    vec_fn = arrow.vectorize(fn)
+
+    # TODO:  make it nicer to call vec_fn, we shouldn't need to jump through hoops here
+    called = weave_internal.call_fn(vec_fn, {"x": l})
+
+    assert weave.use(called).to_pylist() == expected_output
+
+
+@pytest.mark.parametrize(
+    "name,weave_func,expected_output",
+    [
+        ("floor", lambda x: Number.floor(x), [1.0, 2.0, 3.0]),
+        ("ceil", lambda x: Number.ceil(x), [2.0, 3.0, 4.0]),
+    ],
+)
+def test_arrow_floor_ceil_vectorized(name, weave_func, expected_output):
+    l = weave.save(arrow.to_arrow([1.1, 2.5, 3.9]))
+    fn = weave_internal.define_fn({"x": weave.types.Float()}, weave_func).val
+    vec_fn = arrow.vectorize(fn)
+    called = weave_internal.call_fn(vec_fn, {"x": l})
+    assert weave.use(called).to_pylist() == expected_output
