@@ -2,11 +2,13 @@ import pytest
 from itertools import chain
 
 from ..ops_domain import RunSegment
+from ..ops_primitives import ArrowWeaveList
 from .. import ops
 from .. import storage
 from .. import api
 from .. import weave_types as types
 
+import pyarrow as pa
 import typing
 import numpy as np
 
@@ -23,18 +25,14 @@ def random_metrics(n: int = 10, starting_step: int = 0, delta_step: int = 1):
         raise ValueError("starting index must be at least 0")
     if delta_step < 1:
         raise ValueError("delta_step must be an integer greater than or equal to 1.")
-    raw = [
-        {
-            "step": starting_step + i * delta_step,
-            "string_col": np.random.choice(list("ABCDEFGHIJKLMNOPQRSTUVWXYZ")),
-            **{f"metric{j}": np.random.random() for j in range(N_NUMERIC_METRICS)},
-        }
-        for i in range(n)
-    ]
 
-    wb_type = types.List(api.type_of(raw[0]))
-    arrow_form = ops.to_arrow(raw, wb_type=wb_type)
-    return arrow_form
+    data = {
+        "step": np.arange(starting_step, starting_step + n * delta_step, delta_step),
+        "string_col": np.random.choice(list("ABCDEFGHIJKLMNOPQRSTUVWXYZ"), n),
+    }
+    for j in range(N_NUMERIC_METRICS):
+        data[f"metric{j}"] = np.random.random(n)
+    return ArrowWeaveList(pa.table(data))
 
 
 def create_branch(
