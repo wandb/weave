@@ -1,4 +1,7 @@
+import collections
 import copy
+from enum import Enum
+import inspect
 import typing
 
 from weave.weavejs_fixes import fixup_node
@@ -8,7 +11,13 @@ from . import op_args
 from . import context_state
 from . import weave_types as types
 from . import uris
+from . import graph
 from . import weave_internal
+from . import pyfunc_type_util
+
+
+def common_name(name: str) -> str:
+    return name.split("-")[-1]
 
 
 class OpDef:
@@ -26,7 +35,14 @@ class OpDef:
     setter = str
     call_fn: typing.Any
     version: typing.Optional[str]
+    location: typing.Optional[uris.WeaveURI]
     is_builtin: bool = False
+    instance: typing.Union[None, graph.Node]
+
+    # This is required to be able to determine which ops were derived from this
+    # op. Particularly in cases where we need to rename or lookup when
+    # versioned, we cannot rely just on naming structure alone.
+    derived_ops: typing.Dict[str, "OpDef"]
 
     def __init__(
         self,
@@ -57,10 +73,12 @@ class OpDef:
             else context_state.get_loading_built_ins()
         )
         self.version = None
+        self.location = None
         self.lazy_call = None
         self.eager_call = None
         self.call_fn = None
         self.instance = None
+        self.derived_ops = {}
 
     def __repr__(self):
         return "<OpDef(%s) %s>" % (id(self), self.name)
@@ -71,10 +89,10 @@ class OpDef:
         self.instance = instance
         return self
 
-    def __call__(self, *args, **kwargs):
-        if self.instance is not None:
-            return self.call_fn(self.instance, *args, **kwargs)
-        return self.call_fn(*args, **kwargs)
+    def __call__(_self, *args, **kwargs):
+        if _self.instance is not None:
+            return _self.call_fn(_self.instance, *args, **kwargs)
+        return _self.call_fn(*args, **kwargs)
 
     @property
     def name(self) -> str:
@@ -89,8 +107,12 @@ class OpDef:
         self._name = name
 
     @property
+    def common_name(self):
+        return common_name(self.name)
+
+    @property
     def uri(self):
-        return self.name
+        return self.location.uri if self.location is not None else self.name
 
     @property
     def simple_name(self):
@@ -143,6 +165,30 @@ class OpDef:
 
     def __str__(self):
         return "<OpDef: %s>" % self.name
+
+    def bind_params(
+        self, args: list[typing.Any], kwargs: dict[str, typing.Any]
+    ) -> collections.OrderedDict[str, graph.Node]:
+        return weave_internal.bind_value_params_as_nodes(
+            self.uri,
+            pyfunc_type_util.get_signature(self.resolve_fn),
+            args,
+            kwargs,
+            self.input_type,
+        )
+
+    def return_type_of_arg_types(
+        self, param_types: dict[str, types.Type]
+    ) -> types.Type:
+        res_args = self.input_type.assign_param_dict(
+            self.input_type.create_param_dict([], param_types)
+        )
+        if not op_args.all_types_valid(res_args):
+            return types.Invalid()
+        if isinstance(self.output_type, types.Type):
+            return self.output_type
+        else:
+            return self.output_type(res_args)
 
 
 def is_op_def(obj):

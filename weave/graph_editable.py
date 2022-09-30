@@ -69,3 +69,22 @@ class EditGraph:
                 consumer.type, consumer.from_op.name, new_inputs
             )
             self.replace(consumer, new_consumer)
+
+    @property
+    def updated_edges(self):
+        """
+        Users should use this to iterate over edges, as it will return the
+        updated edges after replacements have been made.
+        """
+        for edge in self.edges:
+            input_to_node = self.get_node(edge.input_to)
+            input_to_node_inputs = list(input_to_node.from_op.inputs.keys())
+            orig_to_node = edge.input_to
+            orig_to_node_inputs = list(orig_to_node.from_op.inputs.keys())
+            orig_to_node_input_ndx = (orig_to_node_inputs).index(edge.input_name)
+            input_to_node_input_name = (input_to_node_inputs)[orig_to_node_input_ndx]
+            yield Edge(
+                self.get_node(edge.output_of),
+                self.get_node(edge.input_to),
+                input_to_node_input_name,
+            )

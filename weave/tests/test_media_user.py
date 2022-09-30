@@ -1,6 +1,14 @@
-from .. import media_user
 from .. import api as weave
 from PIL import Image
+from .. import context_state
+
+_loading_builtins_token = context_state.set_loading_built_ins()
+# This is needed becuase media_user is not imported by default and therefore not considered a built-in
+# however, in `conftest::pre_post_each_test` we set a custom artifact directory for each test for isolation
+# Puting this import in the context allows the test execution to access these ops
+from .. import media_user
+
+context_state.clear_loading_built_ins(_loading_builtins_token)
 
 
 def test_im_with_metadata():

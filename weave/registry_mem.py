@@ -50,6 +50,7 @@ class Registry:
             location = ref.artifact.location
         version = location.version if location is not None else None
         op.version = version
+        op.location = location
 
         self._make_op_calls(op, location)
         if not is_loading:
@@ -80,6 +81,9 @@ class Registry:
             if op_def.call_fn == lazy_local_fn:
                 return op_def
         raise Exception("Op def doesn't exist for %s" % lazy_local_fn)
+
+    def find_ops_by_common_name(self, common_name: str) -> typing.List[op_def.OpDef]:
+        return [op for op in self._ops.values() if op.common_name == common_name]
 
     def list_ops(self) -> typing.List[op_def.OpDef]:
         # Note this uses self._ops, so provides the most recent registered op, which could

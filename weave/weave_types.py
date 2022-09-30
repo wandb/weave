@@ -146,8 +146,23 @@ class TypeRegistry:
         return type_.from_dict(d)
 
 
+def _clear_global_type_class_cache():
+    instance_class_to_potential_type.cache_clear()
+    type_name_to_type_map.cache_clear()
+    type_name_to_type.cache_clear()
+
+
+# Addapted from https://stackoverflow.com/questions/18126552/how-to-run-code-when-a-class-is-subclassed
+class _TypeSubclassWatcher(type):
+    def __init__(cls, name, bases, clsdict):
+        # This code will run whenever `Type` is subclassed!
+        # Bust the cache!
+        _clear_global_type_class_cache()
+        super(_TypeSubclassWatcher, cls).__init__(name, bases, clsdict)
+
+
 @dataclasses.dataclass(frozen=True)
-class Type:
+class Type(metaclass=_TypeSubclassWatcher):
     NodeMethodsClass: typing.ClassVar[typing.Optional[type]]
     instance_class: typing.ClassVar[typing.Optional[type]]
     instance_classes: typing.ClassVar[
@@ -237,6 +252,8 @@ class Type:
             else:
                 type_vars = self.type_vars
             for prop_name in type_vars:
+                if not hasattr(next_type, prop_name):
+                    return Invalid()
                 if isinstance(
                     getattr(self, prop_name).assign_type(getattr(next_type, prop_name)),
                     Invalid,

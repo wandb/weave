@@ -13,6 +13,22 @@ from .. import artifacts_local
 from . import arrow
 from .. import weave_types as types
 from .. import weave_internal
+from .. import context_state
+
+_loading_builtins_token = context_state.set_loading_built_ins()
+# T in `conftest::pre_post_each_test` we set a custom artifact directory for each test for isolation
+# Puting this import in the context allows the test execution to access these ops
+@weave.type()
+class Point2:
+    x: float
+    y: float
+
+    @weave.op()
+    def get_x(self) -> float:
+        return self.x
+
+
+context_state.clear_loading_built_ins(_loading_builtins_token)
 
 
 def simple_hash(n, b):
@@ -160,16 +176,6 @@ def test_map_array():
 def test_map_typeddict():
     data = arrow.to_arrow([{"a": 1, "b": 2}, {"a": 3, "b": 5}])
     assert weave.use(data.map(lambda row: row["a"])).to_pylist() == [1, 3]
-
-
-@weave.type()
-class Point2:
-    x: float
-    y: float
-
-    @weave.op()
-    def get_x(self) -> float:
-        return self.x
 
 
 def test_map_object():

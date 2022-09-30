@@ -200,7 +200,7 @@ class Gpt3Model:
     @weave.op(
         name="gpt3model-complete",
     )
-    def complete(self, prompt: str, seed: int = 0) -> Gpt3ModelCompleteReturn:
+    def complete(self, prompt: str) -> Gpt3ModelCompleteReturn:
         sleep = 1
         completion_params = {
             "model": self.id,

@@ -994,18 +994,19 @@ def vectorize(weave_fn, with_respect_to=None):
     def convert_node(node):
         if isinstance(node, graph.OutputNode):
             inputs = node.from_op.inputs
-            short_name = node.from_op.name.split("-")[1]
-            op_def = dispatch.get_op_for_inputs(short_name, inputs)
-            if op_def:
+            op = dispatch.get_op_for_input_types(
+                node.from_op.name, [], {k: v.type for k, v in inputs.items()}
+            )
+            if op:
                 # Rename inputs to match op, ie, call by position...
                 # Hmm, need to centralize this behavior
                 # TODO
                 final_inputs = {
-                    k: v for k, v in zip(op_def.input_type.arg_types, inputs.values())
+                    k: v for k, v in zip(op.input_type.arg_types, inputs.values())
                 }
-                return op_def.lazy_call(**final_inputs)
+                return op.lazy_call(**final_inputs)
             raise VectorizeError(
-                "Can't vectorize, no op for: %s %s" % (short_name, inputs)
+                "Can't vectorize, no op for: %s %s" % (node.from_op.name, inputs)
             )
         elif isinstance(node, graph.VarNode):
             # Vectorize variable

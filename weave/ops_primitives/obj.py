@@ -1,3 +1,4 @@
+import typing
 from ..api import op, weave_class
 from .. import weave_types as types
 
@@ -56,12 +57,12 @@ class Object:
     to_pylist = None
     as_py = None
 
-    # name is needed here since the decorator will rename to 'type-__getattr__'
-    @op(name="Object-__getattr__", output_type=getattr_output_type)
-    def __getattr__(self, name: str):
-        return getattr(self, name)
-
     # TODO: figure out how this conflicts with the above __getattr__ op
     # particularly for lists
     def __getitem__(self, name: str):
-        return self.__getattr__(name)
+        return obj_getattr(self, name)
+
+
+@op(name="Object-__getattr__", output_type=getattr_output_type)
+def obj_getattr(self: typing.Any, name: str):
+    return getattr(self, name)
