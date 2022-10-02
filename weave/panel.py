@@ -97,6 +97,8 @@ class ConfigDescriptor:
 VarsType = typing.TypeVar("VarsType")
 
 
+# Currently, storage.save() works on Panels, but storage.get()
+# does not.
 @weave.type()
 class Panel(typing.Generic[VarsType]):
     id: str = dataclasses.field(init=False)
