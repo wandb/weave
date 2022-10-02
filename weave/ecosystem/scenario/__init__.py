@@ -27,7 +27,7 @@ def metrics_bank(input_node: weave.Node[MetricsBankInput]) -> weave.panels.Each:
         False,
     )
 
-    metrics = weave.ops.difference(joined[0].keys(), ["scenario_id"])
+    metrics = weave.ops.difference(joined[0].keys(), [weave.const("scenario_id")])
 
     return weave.panels.Each(
         metrics,

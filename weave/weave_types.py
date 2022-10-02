@@ -364,7 +364,7 @@ class Const(Type):
 
     @classmethod
     def type_of_instance(cls, obj):
-        return cls(obj)
+        return cls(TypeRegistry.type_of(obj.val), obj.val)
 
     def assign_type(self, next_type):
         if isinstance(next_type, Const):

@@ -10,6 +10,7 @@ from . import weave_types as types
 from . import errors
 from . import box
 from . import mappers_python
+from . import val_const
 
 
 class TypedDictToPyDict(mappers_weave.TypedDictMapper):
@@ -165,6 +166,8 @@ class PyTypeToType(mappers.Mapper):
 
 class ConstToPyConst(mappers_weave.ConstMapper):
     def apply(self, obj):
+        if isinstance(obj, val_const.Const):
+            return obj.val
         return obj
 
 

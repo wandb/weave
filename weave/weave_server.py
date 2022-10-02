@@ -20,6 +20,7 @@ from weave import server
 from weave import registry_mem
 from weave import errors
 from weave import context_state
+from weave import weavejs_fixes
 
 from flask.logging import wsgi_errors_stream
 
@@ -160,9 +161,8 @@ def execute():
     for r in response:
         # final_response.append(n)
         if isinstance(r, dict) and "_val" in r:
-            final_response.append(r["_val"])
-        else:
-            final_response.append(r)
+            r = r["_val"]
+        final_response.append(weavejs_fixes.fixup_data(r))
     # print("FINAL RESPONSE", final_response)
     response = {"data": final_response}
     if current_span and (
