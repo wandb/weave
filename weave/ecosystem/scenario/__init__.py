@@ -27,13 +27,21 @@ def metrics_bank(input_node: weave.Node[MetricsBankInput]) -> weave.panels.Each:
         False,
     )
 
-    metrics = weave.ops.difference(joined[0].keys(), [weave.const("scenario_id")])
+    # The output type of keys includes the keys (its List["scenario_id" | "metric1" | "metric2" | "metric3"])
+    joined_keys = joined[0].keys()
+
+    # The output type of difference is List["metric1" | "metric2" | "metric3"]
+    metrics = weave.ops.difference(joined_keys, [weave.const("scenario_id")])
 
     return weave.panels.Each(
         metrics,
         render=lambda metric_name: weave.panels.Plot(
             joined,
             title=metric_name,
+            # The [metric_name] pick operations correctly product list[float], since
+            # we know metric_name is not scenario_id in the type system.
+            # If this produced list[float | str], PanelPlot would not know how to render
+            # the data.
             x=lambda row: row[metric_name][0],
             y=lambda row: row[metric_name][1],
         ),
