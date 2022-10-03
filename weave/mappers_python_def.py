@@ -15,6 +15,7 @@ from . import val_const
 
 class TypedDictToPyDict(mappers_weave.TypedDictMapper):
     def apply(self, obj):
+        print("TYPED DICT TYPE", self.type)
         result = {}
         for k, prop_serializer in self._property_serializers.items():
             result[k] = prop_serializer.apply(obj[k])
@@ -50,6 +51,7 @@ class ObjectDictToObject(mappers_weave.ObjectMapper):
         result_type = self._obj_type
         instance_class = result_type._instance_classes()[0]
         constructor_sig = inspect.signature(instance_class)
+        print("OBJ DICT", self.type)
         for k, serializer in self._property_serializers.items():
             if k in constructor_sig.parameters:
                 v = serializer.apply(obj[k])

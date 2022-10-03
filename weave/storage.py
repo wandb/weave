@@ -208,6 +208,7 @@ def to_python(obj):
 
 
 def from_python(obj):
+    print("FROM PYTHON", obj["_val"])
     wb_type = types.TypeRegistry.type_from_dict(obj["_type"])
     mapper = mappers_python.map_from_python(
         wb_type, artifacts_local.LocalArtifact(_get_name(wb_type, obj))

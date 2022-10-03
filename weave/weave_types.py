@@ -99,6 +99,7 @@ class TypeRegistry:
     def type_class_of(obj):
         type_classes = instance_class_to_potential_type(type(obj))
         if not type_classes:
+            # return UnknownType()
             raise errors.WeaveTypeError("no Type for obj: %s" % obj)
         return type_classes[-1]
 
@@ -134,6 +135,7 @@ class TypeRegistry:
             obj_type = type_.type_of(obj)
             if obj_type is not None:
                 return obj_type
+        # return UnknownType()
         raise errors.WeaveTypeError("no Type for obj: (%s) %s" % (type(obj), obj))
 
     @staticmethod

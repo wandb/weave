@@ -48,6 +48,7 @@ class Node(typing.Generic[T]):
         )
 
 
+# weave_types.Function.instance_classes = Node
 weave_types.Function.instance_classes.append(Node)
 
 OpInputNodeT = typing.TypeVar("OpInputNodeT")

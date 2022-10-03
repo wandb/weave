@@ -39,15 +39,20 @@ class Group2(panel.Panel):
 
         for name, p in self.config.items.items():
             injected = panel.run_variable_lambdas(p, frame)
+            print("INJECTED", injected)
             child = panel_util.child_item(injected)
+            print("CHILD", child)
             if not isinstance(child, graph.Node):
                 child._normalize(frame)
             self.config.items[name] = child
 
+            # print("SELF CONFIG", self.config)
             config_var = weave_internal.make_var_node(
                 weave.type_of(self.config), "self"
             )
             frame[name] = config_var.items[name]
+            # print("FRAME", frame)
+            # print()
 
     # @property
     # def config(self):

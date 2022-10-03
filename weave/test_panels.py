@@ -6,6 +6,7 @@ from .panels.panel_slider2 import Slider2
 from . import weave_internal
 import weave
 from . import storage
+from . import weave_internal
 
 
 def test_panel_id():
@@ -52,6 +53,7 @@ def test_controlled_state_out():
     # panel.items['val'] will have been converted to a node, stringifying it
     # produces an expression string.
     assert str(panel.config.items["val"]) == "my_slider.config.value"
+    assert 1 == 2
 
 
 @pytest.mark.skip()
@@ -105,3 +107,11 @@ def test_save_panel():
     )
     # Just make sure it doesn't crash for now
     storage.save(panel)
+
+
+def test_object_picker_choice_type():
+    ints = weave.save([1, 2, 3], name="my-ints")
+    panel = weave.panels.ObjectPicker(ints)
+    panel_node = weave_internal.make_var_node(weave.type_of(panel), "panel")
+    choice = panel_node.config.choice
+    assert choice.type == weave.types.Function({}, weave.types.Int())
