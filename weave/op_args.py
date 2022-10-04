@@ -44,6 +44,14 @@ class OpArgs:
         raise NotImplementedError()
 
 
+def assign_param_type_result(
+    param_type: types.Type, arg_type: types.Type
+) -> types.Type:
+    if arg_type.assign_type(param_type) == types.Invalid():
+        return types.Invalid()
+    return param_type
+
+
 class OpVarArgs(OpArgs):
     kind = OpArgs.VAR_ARGS
 
@@ -59,7 +67,10 @@ class OpVarArgs(OpArgs):
     def assign_param_dict(
         _self, param_types: dict[str, types.Type]
     ) -> dict[str, types.Type]:
-        return {k: _self.arg_type.assign_type(v) for k, v in param_types.items()}
+        return {
+            k: assign_param_type_result(v, _self.arg_type)
+            for k, v in param_types.items()
+        }
 
     def named_args(self) -> typing.List["NamedArg"]:
         return []
@@ -112,7 +123,7 @@ class OpNamedArgs(OpArgs):
             if arg_name not in param_dict:
                 arg_type = types.Invalid()
             else:
-                arg_type = arg_type.assign_type(param_dict[arg_name])
+                arg_type = assign_param_type_result(param_dict[arg_name], arg_type)
             res[arg_name] = arg_type
             if isinstance(arg_type, types.Invalid):
                 has_invalid = True

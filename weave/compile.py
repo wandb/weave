@@ -39,6 +39,14 @@ def edit_graph_to_nodes(
     return [edit_g.get_node(n) for n in nodes]
 
 
+# Helper function to get the type of a node safely respecting constant types.
+# TODO: This should be moved into the core node logic
+def node_type(node: graph.Node) -> types.Type:
+    if isinstance(node, graph.ConstNode) and not isinstance(node.type, types.Const):
+        return types.Const(node.type, node.val)
+    return node.type
+
+
 def apply_type_based_dispatch(
     edit_g: graph_editable.EditGraph,
 ) -> graph_editable.EditGraph:
@@ -49,7 +57,7 @@ def apply_type_based_dispatch(
     types. Importantly, it does rely on paramter ordering.
     """
     for node in edit_g.nodes:
-        input_types = {k: v.type for k, v in node.from_op.inputs.items()}
+        input_types = {k: node_type(v) for k, v in node.from_op.inputs.items()}
         found_op = dispatch.get_op_for_input_types(node.from_op.name, [], input_types)
         if found_op is None:
             # There is a parallel spot in lazy.py which has a similar comment
@@ -65,7 +73,7 @@ def apply_type_based_dispatch(
             params = found_op.bind_params(
                 [], found_op.input_type.create_param_dict([], node.from_op.inputs)
             )
-            named_param_types = {k: v.type for k, v in params.items()}
+            named_param_types = {k: node_type(v) for k, v in params.items()}
             edit_g.replace(
                 node,
                 graph.OutputNode(
@@ -83,7 +91,7 @@ def await_run_outputs_edit_graph(
 ) -> graph_editable.EditGraph:
     """Automatically insert Run.await_final_output steps as needed."""
 
-    for edge in edit_g.updated_edges:
+    for edge in edit_g.edges_with_replacements:
         actual_input_type = edge.output_of.type
         op_def = registry_mem.memory_registry.get_op(edge.input_to.from_op.name)
         if op_def.name == "tag-indexCheckpoint" or op_def.name == "Object-__getattr__":
@@ -129,7 +137,7 @@ def await_run_outputs_edit_graph(
 def execute_edit_graph(edit_g: graph_editable.EditGraph) -> graph_editable.EditGraph:
     """In cases where an input is a Node, execute the Node"""
 
-    for edge in edit_g.updated_edges:
+    for edge in edit_g.edges_with_replacements:
         actual_input_type = edge.output_of.type
         op_def = registry_mem.memory_registry.get_op(edge.input_to.from_op.name)
         if not isinstance(op_def.input_type, op_args.OpNamedArgs):

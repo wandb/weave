@@ -2,6 +2,7 @@ import weave
 from .. import context_state as _context
 from ..ecosystem import keras as weave_keras
 from .. import weave_internal
+from .. import graph
 
 _loading_builtins_token = _context.set_loading_built_ins()
 
@@ -118,3 +119,47 @@ def test_json_pick_map():
     )
 
     assert weave.use(res) == [1]
+
+
+def test_nested_js_dict_pick():
+    assert (
+        weave.use(
+            graph.OutputNode(
+                weave.types.Number(),
+                "pick",
+                {
+                    "obj": graph.OutputNode(
+                        weave.types.TypedDict(
+                            {
+                                "e": weave.types.Number(),
+                                "f": weave.types.Number(),
+                                "j": weave.types.Number(),
+                            }
+                        ),
+                        "pick",
+                        {
+                            "obj": graph.ConstNode(
+                                weave.types.TypedDict(
+                                    {
+                                        "a": weave.types.Number(),
+                                        "b": weave.types.Number(),
+                                        "c": weave.types.TypedDict(
+                                            {
+                                                "e": weave.types.Number(),
+                                                "f": weave.types.Number(),
+                                                "j": weave.types.Number(),
+                                            }
+                                        ),
+                                    }
+                                ),
+                                {"a": 1, "b": 2, "c": {"d": 3, "e": 4, "f": 5}},
+                            ),
+                            "key": graph.ConstNode(weave.types.String(), "c"),
+                        },
+                    ),
+                    "key": graph.ConstNode(weave.types.String(), "f"),
+                },
+            )
+        )
+        == 5
+    )
