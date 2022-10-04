@@ -64,23 +64,23 @@ class String:
         return list(str.partition(sep))
 
     @op(name="string-startsWith")
-    def startsWith(str: str, prefix: str) -> bool:  # type: ignore
+    def startswith(str: str, prefix: str) -> bool:  # type: ignore
         return str.startswith(prefix)
 
     @op(name="string-endsWith")
-    def endsWith(str: str, suffix: str) -> bool:  # type: ignore
+    def endswith(str: str, suffix: str) -> bool:  # type: ignore
         return str.endswith(suffix)
 
     @op(name="string-isAlpha")
-    def isAlpha(str: str) -> bool:  # type: ignore
+    def isalpha(str: str) -> bool:  # type: ignore
         return str.isalpha()
 
     @op(name="string-isNumeric")
-    def isNumeric(str: str) -> bool:  # type: ignore
+    def isnumeric(str: str) -> bool:  # type: ignore
         return str.isnumeric()
 
     @op(name="string-isAlnum")
-    def isAlnum(str: str) -> bool:  # type: ignore
+    def isalnum(str: str) -> bool:  # type: ignore
         return str.isalnum()
 
     @op(name="string-lower")
@@ -108,11 +108,11 @@ class String:
         return str.strip()
 
     @op(name="string-lStrip")
-    def lStrip(str: str) -> str:  # type: ignore
+    def lstrip(str: str) -> str:  # type: ignore
         return str.lstrip()
 
     @op(name="string-rStrip")
-    def rStrip(str: str) -> str:  # type: ignore
+    def rstrip(str: str) -> str:  # type: ignore
         return str.rstrip()
 
 

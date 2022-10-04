@@ -309,6 +309,95 @@ def test_arrow_weave_list_groupby_struct_chunked_array_type():
 @pytest.mark.parametrize(
     "name,weave_func,expected_output",
     [
+        ("eq-scalar", lambda x: x == "bc", [True, False, False]),
+        ("ne-scalar", lambda x: x != "bc", [False, True, True]),
+        ("contains-scalar", lambda x: x.__contains__("b"), [True, False, False]),
+        ("in-scalar", lambda x: x.in_("bcd"), [True, True, False]),
+        ("len-scalar", lambda x: x.len(), [2, 2, 2]),
+        ("add-scalar", lambda x: x + "q", ["bcq", "cdq", "dfq"]),
+        ("append-scalar", lambda x: x.append("qq"), ["bcqq", "cdqq", "dfqq"]),
+        ("prepend-scalar", lambda x: x.prepend("qq"), ["qqbc", "qqcd", "qqdf"]),
+        ("split-scalar", lambda x: x.split("c"), [["b", ""], ["", "d"], ["df"]]),
+        (
+            "partition-scalar",
+            lambda x: x.partition("c"),
+            [["b", "c", ""], ["", "c", "d"], ["df", "", ""]],
+        ),
+        ("startswith-scalar", lambda x: x.startswith("b"), [True, False, False]),
+        ("endswith-scalar", lambda x: x.endswith("f"), [False, False, True]),
+        ("replace-scalar", lambda x: x.replace("c", "q"), ["bq", "qd", "df"]),
+    ],
+)
+def test_arrow_vectorizer_string_scalar(name, weave_func, expected_output):
+    l = weave.save(arrow.to_arrow(["bc", "cd", "df"]))
+    fn = weave_internal.define_fn({"x": weave.types.String()}, weave_func).val
+    vec_fn = arrow.vectorize(fn)
+    called = weave_internal.call_fn(vec_fn, {"x": l})
+    assert weave.use(called).to_pylist() == expected_output
+
+
+@pytest.mark.parametrize(
+    "name,weave_func,expected_output",
+    [
+        (
+            "isAlpha-scalar",
+            lambda x: x.isalpha(),
+            [False, True, False, False, False, False],
+        ),
+        (
+            "isNumeric-scalar",
+            lambda x: x.isnumeric(),
+            [False, False, False, True, False, False],
+        ),
+        (
+            "isAlnum-scalar",
+            lambda x: x.isalnum(),
+            [False, True, True, True, False, False],
+        ),
+        (
+            "lower-scalar",
+            lambda x: x.lower(),
+            ["b22?c", "cd", "df2", "212", "", "?>!@#"],
+        ),
+        (
+            "upper-scalar",
+            lambda x: x.upper(),
+            ["B22?C", "CD", "DF2", "212", "", "?>!@#"],
+        ),
+        (
+            "slice-scalar",
+            lambda x: x.slice(1, 2),
+            ["2", "d", "F", "1", "", ">"],
+        ),
+    ],
+)
+def test_arrow_vectorizer_string_alnum(name, weave_func, expected_output):
+    l = weave.save(arrow.to_arrow(["B22?c", "cd", "DF2", "212", "", "?>!@#"]))
+    fn = weave_internal.define_fn({"x": weave.types.String()}, weave_func).val
+    vec_fn = arrow.vectorize(fn)
+    called = weave_internal.call_fn(vec_fn, {"x": l})
+    assert weave.use(called).to_pylist() == expected_output
+
+
+@pytest.mark.parametrize(
+    "name,weave_func,expected_output",
+    [
+        ("strip-scalar", lambda x: x.strip(), ["c", "cd", "DF2", "212", ""]),
+        ("lstrip-scalar", lambda x: x.lstrip(), ["c ", "cd", "DF2", "212 ", ""]),
+        ("rstrip-scalar", lambda x: x.rstrip(), ["  c", "cd", " DF2", "212", ""]),
+    ],
+)
+def test_arrow_vectorizer_string_strip(name, weave_func, expected_output):
+    l = weave.save(arrow.to_arrow(["  c ", "cd", " DF2", "212 ", ""]))
+    fn = weave_internal.define_fn({"x": weave.types.String()}, weave_func).val
+    vec_fn = arrow.vectorize(fn)
+    called = weave_internal.call_fn(vec_fn, {"x": l})
+    assert weave.use(called).to_pylist() == expected_output
+
+
+@pytest.mark.parametrize(
+    "name,weave_func,expected_output",
+    [
         ("add", lambda x: x + 2, [3.0, 4.0, 5.0]),
         ("add-vec", lambda x: x + x, [2.0, 4.0, 6.0]),
         ("subtract", lambda x: x - 1, [0.0, 1.0, 2.0]),
@@ -332,8 +421,46 @@ def test_arrow_vectorizer_number_ops(name, weave_func, expected_output):
     vec_fn = arrow.vectorize(fn)
 
     # TODO:  make it nicer to call vec_fn, we shouldn't need to jump through hoops here
+
     called = weave_internal.call_fn(vec_fn, {"x": l})
 
+    assert weave.use(called).to_pylist() == expected_output
+
+
+@pytest.mark.parametrize(
+    "name,weave_func,expected_output",
+    [
+        ("eq-vector", lambda x, y: x == y, [False, False, True]),
+        ("ne-vector", lambda x, y: x != y, [True, True, False]),
+        ("contains-vector", lambda x, y: x.__contains__(y), [False, False, True]),
+        ("in-vector", lambda x, y: x.in_(y), [True, False, True]),
+        ("add-vector", lambda x, y: x + y, ["bccbc", "cdaef", "dfdf"]),
+        ("append-vector", lambda x, y: x.append(y), ["bccbc", "cdaef", "dfdf"]),
+        ("prepend-vector", lambda x, y: x.prepend(y), ["cbcbc", "aefcd", "dfdf"]),
+        ("split-vector", lambda x, y: y.split(x), [["c", ""], ["aef"], ["", ""]]),
+        (
+            "partition-vector",
+            lambda x, y: y.partition(x),
+            [["c", "bc", ""], ["aef", "", ""], ["", "df", ""]],
+        ),
+        (
+            "startswith-vector",
+            lambda x, y: y.startswith(x),
+            [False, False, True],
+        ),
+        ("endswith-vector", lambda x, y: y.endswith(x), [True, False, True]),
+    ],
+)
+def test_arrow_vectorizer_string_vector(name, weave_func, expected_output):
+    l = weave.save(arrow.to_arrow(["bc", "cd", "df"]))
+    l2 = weave.save(arrow.to_arrow(["cbc", "aef", "df"]))
+
+    fn = weave_internal.define_fn(
+        {"x": weave.types.String(), "y": weave.types.String()}, weave_func
+    ).val
+
+    vec_fn = arrow.vectorize(fn)
+    called = weave_internal.call_fn(vec_fn, {"x": l, "y": l2})
     assert weave.use(called).to_pylist() == expected_output
 
 
