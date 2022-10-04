@@ -77,4 +77,8 @@ class TraceLocal:
             # Not everything can be serialized currently. But instead of storing
             # the result directly here, we save a MemRef with the same run_artifact_name.
             # This is required to make downstream run_ids path dependent.
+            if name is None:
+                raise errors.WeaveInternalError(
+                    "TraceLocal.save_object requires a non-null name"
+                )
             return storage.save_mem(obj, name=name)

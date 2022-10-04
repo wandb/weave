@@ -8,28 +8,39 @@ from . import errors
 from . import box
 from . import uris
 
+if typing.TYPE_CHECKING:
+    from .ops_domain.file_wbartifact import ArtifactVersionFile
+
 
 class Ref:
     artifact: artifacts_local.Artifact
-    extra: list[str]
-    type: types.Type
+    extra: typing.Optional[list[str]]
+    _type: typing.Optional[types.Type]
 
     @property
-    def is_saved(self):
+    def is_saved(self) -> bool:
         return self.artifact.is_saved
+
+    @property
+    def type(self) -> typing.Optional[types.Type]:
+        return self._type
 
     # TODO: This local ref stuff should be split out to separate class.
     # Its a hack.
     @classmethod
-    def from_local_ref(cls, artifact, s, type):
+    def from_local_ref(
+        cls, artifact: artifacts_local.Artifact, s: str, type: types.Type
+    ) -> "Ref":
         path, extra = cls.parse_local_ref_str(s)
         if isinstance(artifact, artifacts_local.LocalArtifact):
             return LocalArtifactRef(artifact, path=path, extra=extra, type=type)
         elif isinstance(artifact, artifacts_local.WandbArtifact):
             return WandbArtifactRef(artifact, path=path, extra=extra, type=type)
+        else:
+            raise ValueError(f"Unknown artifact type {artifact}")
 
     @classmethod
-    def from_str(cls, s):
+    def from_str(cls, s: str) -> "Ref":
         uri = uris.WeaveURI.parse(s)
         if isinstance(uri, uris.WeaveRuntimeURI):
             return MemRef.from_uri(uri)
@@ -41,11 +52,13 @@ class Ref:
             raise errors.WeaveInternalError("invalid uri: %s" % s)
 
     @classmethod
-    def from_uri(cls, uri):
+    def from_uri(cls, uri: uris.WeaveURI) -> "Ref":
         raise NotImplementedError
 
     @classmethod
-    def parse_local_ref_str(cls, s):
+    def parse_local_ref_str(
+        cls, s: str
+    ) -> typing.Tuple[str, typing.Optional[list[str]]]:
         if "#" not in s:
             return s, None
         path, extra = s.split("#", 1)
@@ -59,7 +72,7 @@ class Ref:
     def uri(self) -> str:
         raise NotImplementedError()
 
-    def get(self):
+    def get(self) -> typing.Any:
         raise NotImplementedError()
 
     def __str__(self) -> str:
@@ -70,34 +83,40 @@ MEM_OBJS: typing.Dict[str, typing.Any] = {}
 
 
 class MemRef(Ref):
-    def __init__(self, name):
+    _name: str
+
+    def __init__(self, name: str):
         self._name = name
 
     @classmethod
-    def from_uri(cls, uri):
-        return cls(uri)
+    def from_uri(cls, uri: uris.WeaveURI) -> "MemRef":
+        if not isinstance(uri, uris.WeaveRuntimeURI):
+            raise errors.WeaveInternalError(
+                f"Invalid URI class passed to MemRef.from_uri: {type(uri)}"
+            )
+        return cls(uri.full_name)
 
     @property
-    def name(self):
+    def name(self) -> str:
         return self._name
 
-    def get(self):
+    def get(self) -> typing.Any:
         return MEM_OBJS[self.name]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.name
 
 
-def save_mem(obj, name):
+def save_mem(obj: typing.Any, name: str) -> MemRef:
     MEM_OBJS[name] = obj
     return MemRef(name)
 
 
 # We store REFS here if we can't attach them directly to the object
-REFS: dict[str, typing.Any] = {}
+REFS: dict[int, Ref] = {}
 
 
-def get_ref(obj):
+def get_ref(obj: typing.Any) -> typing.Optional[Ref]:
     if isinstance(obj, Ref):
         return obj
     if hasattr(obj, "_ref"):
@@ -110,7 +129,7 @@ def get_ref(obj):
     return None
 
 
-def put_ref(obj, ref):
+def put_ref(obj: typing.Any, ref: Ref) -> None:
     try:
         obj._ref = ref
     except AttributeError:
@@ -119,7 +138,7 @@ def put_ref(obj, ref):
         REFS[id(obj)] = ref
 
 
-def clear_ref(obj):
+def clear_ref(obj: typing.Any) -> None:
     try:
         delattr(obj, "_ref")
     except AttributeError:
@@ -128,7 +147,7 @@ def clear_ref(obj):
         REFS.pop(id(obj))
 
 
-def deref(ref):
+def deref(ref: Ref) -> typing.Any:
     if isinstance(ref, Ref):
         return ref.get()
     return ref
@@ -141,7 +160,12 @@ def deref(ref):
 class ArtifactVersionFileType(types.Type):
     name = "ArtifactVersionFile"
 
-    def save_instance(self, obj, artifact, name):
+    def save_instance(
+        self,
+        obj: "ArtifactVersionFile",
+        artifact: artifacts_local.LocalArtifact,
+        name: str,
+    ) -> "WandbArtifactRef":
         return WandbArtifactRef(obj.artifact, obj.path)
 
     # load_instance is injected by file_wbartifact.py in ops_domain.
@@ -151,8 +175,19 @@ class ArtifactVersionFileType(types.Type):
 
 class WandbArtifactRef(Ref):
     artifact: "artifacts_local.WandbArtifact"
+    path: typing.Optional[str]
+    _type: typing.Optional[types.Type]
+    obj: typing.Optional[typing.Any]
+    extra: typing.Optional[list[str]]
 
-    def __init__(self, artifact, path, type=None, obj=None, extra=None):
+    def __init__(
+        self,
+        artifact: artifacts_local.WandbArtifact,
+        path: typing.Optional[str],
+        type: typing.Optional[types.Type] = None,
+        obj: typing.Optional[typing.Any] = None,
+        extra: typing.Optional[list[str]] = None,
+    ):
         self.artifact = artifact
         self.path = path
         self._type = type
@@ -160,11 +195,11 @@ class WandbArtifactRef(Ref):
         self.extra = extra
 
     @property
-    def version(self):
+    def version(self) -> str:
         return self.artifact.version
 
     @property
-    def type(self):
+    def type(self) -> types.Type:
         if self._type is not None:
             return self._type
         # if self.path is None:
@@ -196,11 +231,11 @@ class WandbArtifactRef(Ref):
         uri.file = self.path
         return uri.uri
 
-    def versions(self):
+    def versions(self) -> list[str]:
         # TODO: implement versions on wandb artifact
         return [self.artifact.version]
 
-    def get(self):
+    def get(self) -> typing.Any:
         if self.obj is not None:
             return self.obj
         if self.path is None:
@@ -212,7 +247,11 @@ class WandbArtifactRef(Ref):
         return obj
 
     @classmethod
-    def from_uri(cls, uri):
+    def from_uri(cls, uri: uris.WeaveURI) -> "WandbArtifactRef":
+        if not isinstance(uri, uris.WeaveWBArtifactURI):
+            raise errors.WeaveInternalError(
+                f"Invalid URI class passed to WandbArtifactRef.from_uri: {type(uri)}"
+            )
         # TODO: potentially need to pass full entity/project/name instead
         return cls(
             artifacts_local.WandbArtifact(uri.full_name, uri=uri),
@@ -225,17 +264,26 @@ types.WandbArtifactRefType.instance_classes = WandbArtifactRef
 
 
 class LocalArtifactRef(Ref):
-    artifact: "artifacts_local.LocalArtifact"
+    artifact: artifacts_local.LocalArtifact
+    path: str
+    _type: typing.Optional[types.Type]
+    obj: typing.Optional[typing.Any]
+    extra: typing.Optional[list[str]]
 
-    def __init__(self, artifact, path, type=None, obj=None, extra=None):
+    def __init__(
+        self,
+        artifact: artifacts_local.LocalArtifact,
+        path: typing.Optional[str],
+        type: typing.Optional[types.Type] = None,
+        obj: typing.Optional[typing.Any] = None,
+        extra: typing.Optional[list[str]] = None,
+    ):
         self.artifact = artifact
-        self.path = path
-        if "/" in self.path:
-            raise errors.WeaveInternalError(
-                '"/" in path not yet supported: %s' % self.path
-            )
-        if self.path is None:
+        if path is None:
             raise errors.WeaveInternalError("path must not be None")
+        if "/" in path:
+            raise errors.WeaveInternalError('"/" in path not yet supported: %s' % path)
+        self.path = path
         self._type = type
         self.obj = obj
         self.extra = extra
@@ -243,7 +291,7 @@ class LocalArtifactRef(Ref):
             obj = box.box(obj)
             put_ref(obj, self)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<LocalArtifactRef({id(self)}) artifact={self.artifact} path={self.path} type={self.type} obj={bool(self.obj)} extra={self.extra}"
 
     @property
@@ -257,11 +305,11 @@ class LocalArtifactRef(Ref):
         return uri.uri
 
     @property
-    def version(self):
+    def version(self) -> typing.Optional[str]:
         return self.artifact.version
 
     @property
-    def type(self):
+    def type(self) -> types.Type:
         if self._type is not None:
             return self._type
         # if self.path != "_obj":
@@ -289,7 +337,7 @@ class LocalArtifactRef(Ref):
         self.obj = obj
         return obj
 
-    def versions(self):
+    def versions(self) -> list["LocalArtifactRef"]:
         artifact_path = os.path.join(
             artifacts_local.local_artifact_dir(), self.artifact.name
         )
@@ -304,6 +352,11 @@ class LocalArtifactRef(Ref):
                 # get the ref.
                 # TODO
                 art = self.artifact.get_other_version(version_name)
+                if art is None:
+                    raise errors.WeaveInternalError(
+                        "Could not get other version: %s %s"
+                        % (self.artifact, version_name)
+                    )
                 ref = LocalArtifactRef(art, path="_obj")
                 # obj = uri.get()
                 # ref = get_ref(obj)
@@ -311,7 +364,11 @@ class LocalArtifactRef(Ref):
         return sorted(versions, key=lambda v: v.artifact.created_at)
 
     @classmethod
-    def from_uri(cls, uri):
+    def from_uri(cls, uri: uris.WeaveURI) -> "LocalArtifactRef":
+        if not isinstance(uri, uris.WeaveLocalArtifactURI):
+            raise errors.WeaveInternalError(
+                f"Invalid URI class passed to WandbLocalArtifactRef.from_uri: {type(uri)}"
+            )
         return cls(
             artifacts_local.LocalArtifact(uri.full_name, uri.version),
             path=uri.file,
@@ -319,7 +376,7 @@ class LocalArtifactRef(Ref):
             extra=uri.extra,
         )
 
-    def local_ref_str(self):
+    def local_ref_str(self) -> str:
         s = self.path
         if self.extra is not None:
             s += "#%s" % "/".join(self.extra)
@@ -330,7 +387,7 @@ types.LocalArtifactRefType.instance_class = LocalArtifactRef
 types.LocalArtifactRefType.instance_classes = LocalArtifactRef
 
 
-def get_local_version_ref(name, version):
+def get_local_version_ref(name: str, version: str) -> typing.Optional[LocalArtifactRef]:
     # TODO: Watch out, this is a major race!
     #   - We need to eliminate this race or allow duplicate objectcs in parallel
     #     and then resolve later.
@@ -343,7 +400,7 @@ def get_local_version_ref(name, version):
 
 
 # Should probably be "get_version_object()"
-def get_local_version(name, version):
+def get_local_version(name: str, version: str) -> typing.Any:
     ref = get_local_version_ref(name, version)
     if ref is None:
         return None

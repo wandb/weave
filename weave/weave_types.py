@@ -8,6 +8,10 @@ from . import box
 from . import errors
 from . import mappers_python
 
+if typing.TYPE_CHECKING:
+    from .refs import Ref
+    from .artifacts_local import Artifact
+
 
 def to_weavejs_typekey(k: str) -> str:
     if k == "object_type":
@@ -293,7 +297,9 @@ class Type(metaclass=_TypeSubclassWatcher):
 
     # save_instance/load_instance on Type are used to save/load actual Types
     # since type_of(types.Int()) == types.Type()
-    def save_instance(self, obj, artifact, name) -> typing.Optional[list[str]]:
+    def save_instance(
+        self, obj, artifact, name
+    ) -> typing.Optional[typing.Union[list[str], "Ref"]]:
         d = None
         if self.__class__ == Type:
             d = obj.to_dict()
@@ -311,7 +317,9 @@ class Type(metaclass=_TypeSubclassWatcher):
             json.dump(d, f)
         return None
 
-    def load_instance(self, artifact, name, extra=None):
+    def load_instance(
+        self, artifact: "Artifact", name: str, extra: typing.Optional[list[str]] = None
+    ) -> typing.Any:
         with artifact.open(f"{name}.object.json") as f:
             d = json.load(f)
         if self.__class__ == Type:

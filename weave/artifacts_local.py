@@ -7,6 +7,7 @@ import shutil
 from datetime import datetime
 import pathlib
 import tempfile
+import typing
 
 from . import uris
 from . import util
@@ -20,7 +21,7 @@ def get_wandb_read_artifact(path):
     return wandb_api.wandb_public_api().artifact(path)
 
 
-def local_artifact_dir():
+def local_artifact_dir() -> str:
     return os.environ.get("WEAVE_LOCAL_ARTIFACT_DIR") or os.path.join(
         "/tmp", "local-artifacts"
     )
@@ -41,12 +42,20 @@ def md5_string(string: str) -> str:
     return hash_md5.hexdigest()
 
 
-def local_artifact_exists(name, branch):
+def local_artifact_exists(name: str, branch: str) -> bool:
     return os.path.exists(os.path.join(local_artifact_dir(), name, branch))
 
 
 class Artifact:
     name: str
+
+    @property
+    def is_saved(self) -> bool:
+        raise NotImplementedError()
+
+    @contextlib.contextmanager
+    def open(self, path, binary=False):
+        raise NotImplementedError()
 
 
 # This is a prototype implementation. Chock full of races, and other
@@ -54,11 +63,11 @@ class Artifact:
 # Do not use in prod!
 # local-artifact://[path][asdfdsa][asdf]
 class LocalArtifact(Artifact):
-    def __init__(self, name, version=None):
+    def __init__(self, name: str, version: typing.Optional[str] = None):
         self.name = name
         self._version = version
         self._root = os.path.join(local_artifact_dir(), name)
-        self._path_handlers = {}
+        self._path_handlers: dict[str, typing.Any] = {}
         os.makedirs(self._root, exist_ok=True)
         self._setup_dirs()
 
@@ -70,7 +79,7 @@ class LocalArtifact(Artifact):
         return "<LocalArtifact(%s) %s %s>" % (id(self), self.name, self._version)
 
     @property
-    def is_saved(self):
+    def is_saved(self) -> bool:
         return self._version is not None
 
     @property
@@ -85,7 +94,7 @@ class LocalArtifact(Artifact):
     def created_at(self):
         return self.read_metadata()["created_at"]
 
-    def get_other_version(self, version):
+    def get_other_version(self, version: str) -> typing.Optional["LocalArtifact"]:
         if not local_artifact_exists(self.name, version):
             return None
         return LocalArtifact(self.name, version)
@@ -258,7 +267,7 @@ class WandbArtifact(Artifact):
         return None
 
     @property
-    def is_saved(self):
+    def is_saved(self) -> bool:
         return hasattr(self, "_saved_artifact")
 
     @property
@@ -306,7 +315,7 @@ class WandbArtifact(Artifact):
             self._saved_artifact.version,
         )
 
-    def uri(self):
+    def uri(self) -> str:
         if not self._saved_artifact:
             raise errors.WeaveInternalError("cannot get uri of an unsaved artifact")
         # TODO: should we include server URL here?
