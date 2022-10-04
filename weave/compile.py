@@ -114,10 +114,7 @@ def await_run_outputs_edit_graph(
         if isinstance(actual_input_type, types.RunType) and not isinstance(
             expected_input_type, types.RunType
         ):
-            if (
-                expected_input_type.assign_type(actual_input_type.output)
-                == types.Invalid()
-            ):
+            if not expected_input_type.assign_type(actual_input_type.output):
                 raise Exception(
                     "invalid type chaining for run. input_type: %s, op_input_type: %s"
                     % (actual_input_type, expected_input_type)
@@ -156,10 +153,7 @@ def execute_edit_graph(edit_g: graph_editable.EditGraph) -> graph_editable.EditG
         if isinstance(actual_input_type, types.Function) and not isinstance(
             expected_input_type, types.Function
         ):
-            if (
-                expected_input_type.assign_type(actual_input_type.output_type)
-                == types.Invalid()
-            ):
+            if not expected_input_type.assign_type(actual_input_type.output_type):
                 raise Exception(
                     "invalid type chaining for Node. input_type: %s, op_input_type: %s"
                     % (actual_input_type, expected_input_type)

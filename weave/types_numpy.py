@@ -51,10 +51,10 @@ class NumpyArrayType(types.Type):
 
     def _assign_type_inner(self, next_type):
         if not isinstance(next_type, NumpyArrayType):
-            return types.InvalidType()
+            return False
         if self.dtype != next_type.dtype or self.shape != next_type.shape:
-            return types.InvalidType()
-        return self
+            return False
+        return True
 
     def save_instance(self, obj, artifact, name):
         handler = artifact.get_path_handler(name, handler_constructor=NumpyArraySaver)

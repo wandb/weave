@@ -97,12 +97,12 @@ class MappedDeriveOpHandler(DeriveOpHandler):
 
         # If the first argument can be assigned to a list<any>, then we should not map it -
         # it will create unresolvable ambiguity between the current op and the mapped.
-        if types.List(types.Any()).assign_type(first_arg.type) != types.Invalid():
+        if types.List(types.Any()).assign_type(first_arg.type):
             return False
 
         # If the first argument can be assigned a list of the first argument, then we should not map -
         # this too will create unresolvable ambiguity.
-        if first_arg.type.assign_type(types.List(first_arg.type)) != types.Invalid():
+        if first_arg.type.assign_type(types.List(first_arg.type)):
             return False
 
         return True
@@ -139,11 +139,9 @@ class MappedDeriveOpHandler(DeriveOpHandler):
                 # Therefore the `inner_input_types[mapped_param_name] = replacement`
                 # line below will not work. This is a temporary fix until we can
                 # implement `merge` as a core op.
-                currently_weavifying = (
-                    isinstance(input_types, graph.Node)
-                    and types.TypedDict({}).assign_type(input_types.type)
-                    != types.Invalid()
-                )
+                currently_weavifying = isinstance(
+                    input_types, graph.Node
+                ) and types.TypedDict({}).assign_type(input_types.type)
                 if currently_weavifying:
                     op_dict = registry_mem.memory_registry.get_op("dict")
                     op_dict.instance = None

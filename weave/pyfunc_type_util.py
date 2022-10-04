@@ -113,7 +113,7 @@ def determine_output_type(
                 )
         elif (
             inferred_output_type != types.UnknownType()
-            and weave_output_type.assign_type(inferred_output_type) == types.Invalid()
+            and not weave_output_type.assign_type(inferred_output_type)
         ):
             raise errors.WeaveDefinitionError(
                 "Python return type not assignable to declared Weave output_type: %s !-> %s"

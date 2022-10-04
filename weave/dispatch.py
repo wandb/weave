@@ -75,10 +75,7 @@ class FallbackNodeTypeDispatcherMixin(weave_internal.UniversalNodeMixin):
         ops_with_name_and_arg = []
         for op in ops_with_name:
             named_args = op.input_type.named_args()
-            if (
-                len(named_args) > 0
-                and named_args[0].type.assign_type(self.type) != types.Invalid()
-            ):
+            if len(named_args) > 0 and named_args[0].type.assign_type(self.type):
                 if isinstance(self, graph.Node):
                     op.instance = self
                 ops_with_name_and_arg.append(op)

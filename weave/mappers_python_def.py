@@ -80,7 +80,7 @@ class UnionToPyUnion(mappers_weave.UnionMapper):
                 obj_type, types.Const
             ):
                 obj_type = types.Const(obj_type, obj)
-            if member_type.assign_type(obj_type) != types.Invalid():
+            if member_type.assign_type(obj_type):
                 result = member_mapper.apply(obj)
                 if isinstance(result, dict):
                     result["_union_id"] = i

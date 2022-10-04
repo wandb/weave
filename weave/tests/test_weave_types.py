@@ -20,7 +20,7 @@ def test_serialize_const_string():
     assert t == deser
 
 
-def test_typedict_assign_keys_are_stable():
+def test_merge_typedict_keys_are_stable():
     for i in range(10):
         t = types.TypedDict(
             {"a": types.String(), "b": types.String(), "c": types.String()}
@@ -28,7 +28,7 @@ def test_typedict_assign_keys_are_stable():
         t2 = types.TypedDict(
             {"a": types.String(), "b": types.String(), "c": types.String()}
         )
-        r = t.assign_type(t2)
+        r = types.merge_types(t, t2)
         assert list(r.property_types.keys()) == ["a", "b", "c"]
 
 

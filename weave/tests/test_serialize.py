@@ -68,13 +68,11 @@ def test_op_compat():
                     continue
 
                 if not a_assign_has_invalid:
-                    a_assignment = a_arg.assign_type(b_arg)
-                    if a_assignment == types.Invalid():
+                    if not a_arg.assign_type(b_arg):
                         a_assign_has_invalid = True
 
                 if not b_assign_has_invalid:
-                    b_assignment = b_arg.assign_type(a_arg)
-                    if b_assignment == types.Invalid():
+                    if not b_arg.assign_type(a_arg):
                         b_assign_has_invalid = True
 
                 if a_assign_has_invalid and b_assign_has_invalid:

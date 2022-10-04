@@ -21,7 +21,7 @@ def test_unnest():
 
 def test_op_list():
     node = list_.make_list(a=1, b=2, c=3)
-    assert types.List(types.Int()).assign_type(node.type) != types.Invalid()
+    assert types.List(types.Int()).assign_type(node.type)
 
 
 def test_typeof_groupresult():

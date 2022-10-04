@@ -181,7 +181,7 @@ def objects(of_type: types.Type, alias: str):
     for art_name in os.listdir(artifacts_local.local_artifact_dir()):
         ref = refs.get_local_version_ref(art_name, alias)
         if ref is not None:
-            if of_type.assign_type(ref.type) != types.Invalid():
+            if of_type.assign_type(ref.type):
                 obj = ref.get()
                 if isinstance(ref.type, types.RunType) and obj.op_name == "op-objects":
                     continue

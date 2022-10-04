@@ -227,20 +227,17 @@ class Type(metaclass=_TypeSubclassWatcher):
     def instance_class(self):
         return self._instance_classes()[-1]
 
-    def assign_type(self, next_type: "Type") -> "Type":
+    def assign_type(self, next_type: "Type") -> bool:
         if isinstance(next_type, Const):
             return self.assign_type(next_type.val_type)
         elif isinstance(next_type, UnionType):
-            assigned = []
             for t in next_type.members:
-                a_type = self.assign_type(t)
-                if isinstance(a_type, Invalid):
-                    return Invalid()
-                assigned.append(a_type)
-            return UnionType(assigned)
+                if not self.assign_type(t):
+                    return False
+            return True
         return self._assign_type_inner(next_type)
 
-    def _assign_type_inner(self, next_type: "Type") -> "Type":
+    def _assign_type_inner(self, next_type: "Type") -> bool:
         if (
             isinstance(next_type, self.__class__)
             or
@@ -257,14 +254,13 @@ class Type(metaclass=_TypeSubclassWatcher):
                 type_vars = self.type_vars
             for prop_name in type_vars:
                 if not hasattr(next_type, prop_name):
-                    return Invalid()
-                if isinstance(
-                    getattr(self, prop_name).assign_type(getattr(next_type, prop_name)),
-                    Invalid,
+                    return False
+                if not getattr(self, prop_name).assign_type(
+                    getattr(next_type, prop_name)
                 ):
-                    return Invalid()
-            return next_type
-        return Invalid()
+                    return False
+            return True
+        return False
 
     def to_dict(self) -> typing.Union[dict, str]:
         if self.__class__ == Type:
@@ -370,14 +366,14 @@ class Invalid(BasicType):
     name = "invalid"
 
     def assign_type(self, next_type):
-        return Invalid()
+        return False
 
 
 class UnknownType(BasicType):
     name = "unknown"
 
     def _assign_type_inner(self, next_type):
-        return next_type
+        return True
 
 
 # TODO: Tim has this as ConstType(None), but how is that serialized?
@@ -407,7 +403,7 @@ class Any(BasicType):
     name = "any"
 
     def assign_type(self, next_type):
-        return Any()
+        return True
 
 
 @dataclasses.dataclass(frozen=True)
@@ -428,10 +424,10 @@ class Const(Type):
             # This does a check on class equality, so won't work for
             # fancier types. We can fix later if we need to.
             if self.__class__ != next_type.__class__:
-                return Invalid()
+                return False
             if self.val == next_type.val:
-                return self
-        return Invalid()
+                return True
+        return False
 
     @classmethod
     def from_dict(cls, d):
@@ -463,9 +459,9 @@ class Float(Number):
     def _assign_type_inner(self, other_type: Type):
         # Float if either side is a number
         if isinstance(other_type, Float) or isinstance(other_type, Int):
-            return Float()
+            return True
         else:
-            return Invalid()
+            return False
 
 
 class Int(Number):
@@ -482,11 +478,11 @@ class Int(Number):
     def _assign_type_inner(self, other_type: Type):
         # Become Float if rhs is Float
         if isinstance(other_type, Float):
-            return Float()
+            return True
         elif isinstance(other_type, Int):
-            return Int()
+            return True
         else:
-            return Invalid()
+            return False
 
 
 class Boolean(BasicType):
@@ -528,11 +524,11 @@ class UnionType(Type):
     def _assign_type_inner(self, other):
         if isinstance(other, UnionType):
             if not all(self.assign_type(member) for member in other.members):
-                return Invalid()
-            return self
-        if any(member.assign_type(other) != Invalid() for member in self.members):
-            return self
-        return Invalid()
+                return False
+            return True
+        if any(member.assign_type(other) for member in self.members):
+            return True
+        return False
 
     # def instance_to_py(self, obj):
     #     # Figure out which union member this obj is, and delegate to that
@@ -570,7 +566,7 @@ class List(Type):
 
     def _assign_type_inner(self, next_type):
         if isinstance(next_type, List) and next_type.object_type == UnknownType():
-            return self
+            return True
         return super()._assign_type_inner(next_type)
 
     def save_instance(self, obj, artifact, name):
@@ -598,15 +594,14 @@ class TypedDict(Type):
 
     def _assign_type_inner(self, other_type):
         if not isinstance(other_type, TypedDict):
-            return Invalid()
+            return False
 
         for k, ptype in self.property_types.items():
-            if (
-                k not in other_type.property_types
-                or ptype.assign_type(other_type.property_types[k]) == Invalid()
+            if k not in other_type.property_types or not ptype.assign_type(
+                other_type.property_types[k]
             ):
-                return Invalid()
-        return self
+                return False
+        return True
 
     def _to_dict(self):
         property_types = {}
@@ -660,15 +655,15 @@ class Dict(Type):
     def _assign_type_inner(self, other_type):
         if isinstance(other_type, Dict):
             next_key_type = self.key_type.assign_type(other_type.key_type)
-            if isinstance(next_key_type, Invalid):
-                next_key_type = UnionType(self.key_type, other_type.key_type)
+            if not next_key_type:
+                return False
             next_value_type = self.object_type.assign_type(other_type.object_type)
-            if isinstance(next_value_type, Invalid):
-                next_value_type = UnionType(self.object_type, other_type.object_type)
+            if not next_value_type:
+                return False
+            return True
         else:
             # TODO: we could handle TypedDict here.
-
-            return Invalid()
+            return False
 
     @classmethod
     def type_of_instance(cls, obj):
@@ -951,8 +946,8 @@ def merge_types(a: Type, b: Type) -> Type:
         for key in all_keys_dict.keys():
             self_prop_type = a.property_types.get(key, none_type)
             other_prop_type = b.property_types.get(key, none_type)
-            next_prop_type = self_prop_type.assign_type(other_prop_type)
-            if isinstance(next_prop_type, Invalid):
+            next_prop_type = self_prop_type
+            if not self_prop_type.assign_type(other_prop_type):
                 next_prop_type = UnionType(self_prop_type, other_prop_type)
             next_prop_types[key] = next_prop_type
         return TypedDict(next_prop_types)

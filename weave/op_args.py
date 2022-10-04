@@ -47,7 +47,7 @@ class OpArgs:
 def assign_param_type_result(
     param_type: types.Type, arg_type: types.Type
 ) -> types.Type:
-    if arg_type.assign_type(param_type) == types.Invalid():
+    if not arg_type.assign_type(param_type):
         return types.Invalid()
     return param_type
 

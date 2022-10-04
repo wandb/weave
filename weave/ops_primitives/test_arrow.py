@@ -202,11 +202,8 @@ def test_arrow_list_of_ref_to_item_in_list():
 
 # TODO: move to generic test as Weave types test.
 def test_arrow_list_assign():
-    assert (
-        arrow.ArrowWeaveListNumberType().assign_type(
-            arrow.ArrowWeaveListType(weave.types.Number())
-        )
-        != weave.types.Invalid()
+    assert arrow.ArrowWeaveListNumberType().assign_type(
+        arrow.ArrowWeaveListType(weave.types.Number())
     )
 
 
