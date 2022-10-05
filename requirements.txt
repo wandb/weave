@@ -30,3 +30,6 @@ tensorflow>=1.15.2
 # spaCy Requirements:
 spacy>=3.0.0,<4.0.0
 en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.4.0/en_core_web_sm-3.4.0.tar.gz
+
+# string-levenshtein op:
+levenshtein
