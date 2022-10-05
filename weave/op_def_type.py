@@ -23,7 +23,7 @@ class OpDefType(types.Type):
                 json.dump({"name": obj.name}, f)
         else:
             code = "import weave\n" "\n"
-            code += textwrap.dedent(inspect.getsource(obj.resolve_fn))
+            code += textwrap.dedent(inspect.getsource(obj._resolve_fn))
             with artifact.new_file(f"{name}.py") as f:
                 f.write(code)
 

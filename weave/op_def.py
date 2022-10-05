@@ -63,7 +63,7 @@ class OpDef:
         self.input_type = input_type
         self.output_type = output_type
         self.refine_output_type = refine_output_type
-        self.resolve_fn = resolve_fn
+        self._resolve_fn = resolve_fn
         self.setter = setter
         self.render_info = render_info
         self.pure = pure
@@ -82,6 +82,31 @@ class OpDef:
 
     def __repr__(self):
         return "<OpDef(%s) %s>" % (id(self), self.name)
+
+    def resolve_fn(__self, *args, **kwargs):
+        # TODO: this is a temp hack...it only knows how to pass along the arg tag
+        candidate_arg = None
+        if len(args) > 0:
+            candidate_arg = args[0]
+        elif len(kwargs) > 0:
+            candidate_arg = list(kwargs.values())[0]
+        tags = None
+        if isinstance(candidate_arg, types.TaggedValue):
+            tags = candidate_arg._tag
+
+        res = __self._resolve_fn(*args, **kwargs)
+
+        named_args = __self.input_type.named_args()
+        if (
+            tags is not None
+            and len(named_args) > 0
+            and not types.TaggedType(types.TypedDict({}), types.Any()).assign_type(
+                candidate_arg
+            )
+        ):
+            res = types.TaggedValue.create(res, tags)
+
+        return res
 
     def __get__(self, instance, owner):
         # This is part of Python's descriptor protocol, and when this op_def
@@ -120,7 +145,7 @@ class OpDef:
 
     @property
     def is_mutation(self):
-        return getattr(self.resolve_fn, "is_mutation", False)
+        return getattr(self._resolve_fn, "is_mutation", False)
 
     @property
     def is_async(self):
@@ -171,7 +196,7 @@ class OpDef:
     ) -> collections.OrderedDict[str, graph.Node]:
         return weave_internal.bind_value_params_as_nodes(
             self.uri,
-            pyfunc_type_util.get_signature(self.resolve_fn),
+            pyfunc_type_util.get_signature(self._resolve_fn),
             args,
             kwargs,
             self.input_type,
