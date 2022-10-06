@@ -246,6 +246,14 @@ def rewrite_weavelist_refs(arrow_data, object_type, artifact):
                 column = unchunked.field(col_name)
                 arrays[col_name] = rewrite_weavelist_refs(column, col_type, artifact)
             return pa.StructArray.from_arrays(arrays.values(), names=arrays.keys())
+        elif isinstance(arrow_data, pa.StructArray):
+            arrays = {}
+            for col_name, col_type in prop_types.items():
+                column = arrow_data.field(col_name)
+                arrays[col_name] = rewrite_weavelist_refs(column, col_type, artifact)
+            return pa.StructArray.from_arrays(arrays.values(), names=arrays.keys())
+        else:
+            raise errors.WeaveTypeError('Unhandled type "%s"' % type(arrow_data))
     elif isinstance(object_type, types.UnionType):
         non_none_members = [
             m for m in object_type.members if not isinstance(m, types.NoneType)
@@ -541,7 +549,7 @@ ArrowWeaveListObjectTypeVar = typing.TypeVar("ArrowWeaveListObjectTypeVar")
 
 @weave_class(weave_type=ArrowWeaveListType)
 class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
-    _arrow_data: typing.Union[pa.Table, pa.ChunkedArray]
+    _arrow_data: typing.Union[pa.Table, pa.ChunkedArray, pa.Array]
     object_type: types.Type
 
     def __array__(self, dtype=None):
