@@ -20,7 +20,31 @@ from . import usage_analytics
 def _show_params(obj):
     if obj is None:
         return {"weave_node": graph.VoidNode()}
-    if isinstance(obj, panel.Panel):
+    if isinstance(obj, graph.Node):
+        if isinstance(obj, graph.OutputNode) and obj.from_op.name == "get":
+            # If its a basic get op, remove the type from the node, the
+            # frontend will fetch it by refining. We could do this for all nodes
+            # since the frontend currently refines, but there may be compatibility bugs.
+            # So for now just do it for get(), which will definitely refine correctly.
+            # This allows us to send nodes of a fixed size (the length of a local artifact
+            # uri plus a little overhead) via get parameter. We can store anything in artifacts,
+            # so we can communicate any sized object to the browser this way.
+            obj = graph.OutputNode(
+                types.UnknownType(),
+                "get",
+                {"uri": obj.from_op.inputs["uri"]},
+            )
+        return {"weave_node": weavejs_fixes.fixup_node(obj)}
+
+    elif isinstance(obj, panel.Panel):
+        ref = storage.save(obj)
+        node = graph.OutputNode(
+            types.UnknownType(),
+            "get",
+            {"uri": graph.ConstNode(types.String(), str(ref))},
+        )
+        return {"weave_node": weavejs_fixes.fixup_node(node)}
+
         converted = storage.to_python(obj)["_val"]
 
         return {
@@ -28,9 +52,6 @@ def _show_params(obj):
             "panel_id": converted["id"],
             "panel_config": weavejs_fixes.fixup_data(converted["config"]),
         }
-
-    elif isinstance(obj, graph.Node):
-        return {"weave_node": weavejs_fixes.fixup_node(obj)}
 
     elif isinstance(obj, storage.Ref):
         from weave import ops

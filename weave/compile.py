@@ -78,5 +78,13 @@ def await_run_outputs(nodes: typing.List[graph.Node]):
 
 def compile(nodes: typing.List[graph.Node]):
     nodes = await_run_outputs(nodes)
+
+    # Call twice because there is a bug that makes it only work on
+    # one argument at a time, and I have a demo where this needs to work
+    # on both a and b in add(a, b).
+    # I think some of Tim's future changes may have fixed this bug?
+    # TODO: fix.
     nodes = language_autocall.insert_execute_nodes(nodes)
+    nodes = language_autocall.insert_execute_nodes(nodes)
+
     return nodes

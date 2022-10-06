@@ -12,23 +12,31 @@ ItemsType = typing.TypeVar("ItemsType")
 
 
 @weave.type()
-class PanelGroup2Config(typing.Generic[ItemsType]):
+class Group2Config(typing.Generic[ItemsType]):
     items: ItemsType = dataclasses.field(default_factory=dict)
+    preferHorizontal: bool = dataclasses.field(default_factory=lambda: False)
+
+
+Group2ConfigType = typing.TypeVar("Group2ConfigType")
 
 
 @weave.type()
-class Group2(panel.Panel):
-    id = "group2"
-    config: PanelGroup2Config = None
+class Group2(panel.Panel, typing.Generic[Group2ConfigType]):
+    id = "Group2"
+    config: Group2ConfigType = dataclasses.field(default_factory=lambda: None)
     # items: typing.TypeVar("items") = dataclasses.field(default_factory=dict)
 
-    def __init__(self, input_node=graph.VoidNode(), vars=None, **options):
+    def __init__(self, input_node=graph.VoidNode(), vars=None, config=None, **options):
         if vars is None:
             vars = {}
         super().__init__(input_node=input_node, vars=vars)
-        self.config = PanelGroup2Config()
+        self.config = config
+        if self.config is None:
+            self.config = Group2Config()
         if "items" in options:
             self.config.items = options["items"]
+        if "preferHorizontal" in options:
+            self.config.preferHorizontal = options["preferHorizontal"]
         self._normalize()
 
     def _normalize(self, frame=None):
@@ -39,9 +47,7 @@ class Group2(panel.Panel):
 
         for name, p in self.config.items.items():
             injected = panel.run_variable_lambdas(p, frame)
-            print("INJECTED", injected)
             child = panel_util.child_item(injected)
-            print("CHILD", child)
             if not isinstance(child, graph.Node):
                 child._normalize(frame)
             self.config.items[name] = child
