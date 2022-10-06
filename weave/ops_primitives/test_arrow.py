@@ -6,7 +6,7 @@ import string
 from PIL import Image
 
 from .. import storage
-from ..ops_primitives import Number
+from ..ops_primitives import Number, dict_
 from .. import api as weave
 from .. import ops
 from .. import artifacts_local
@@ -474,3 +474,32 @@ def test_arrow_floor_ceil_vectorized(name, weave_func, expected_output):
     vec_fn = arrow.vectorize(fn)
     called = weave_internal.call_fn(vec_fn, {"x": l})
     assert weave.use(called).to_pylist() == expected_output
+
+
+@pytest.mark.parametrize(
+    "name,input_data,weave_func,expected_output",
+    [
+        (
+            "dict",
+            {"a": [1, 2, 3], "b": ["a", "b", "c"]},
+            lambda x: dict_(**x),
+            [{"a": 1, "b": "a"}, {"a": 2, "b": "b"}, {"a": 3, "b": "c"}],
+        ),
+    ],
+)
+def test_arrow_dict(input_data, name, weave_func, expected_output):
+    l = weave.save(arrow.to_arrow(input_data))
+    fn = weave_internal.define_fn(
+        {
+            "x": weave.type_of(input_data).object_type,
+        },
+        weave_func,
+    ).val
+    vec_fn = arrow.vectorize(fn)
+    called = weave_internal.call_fn(vec_fn, {"x": l})
+    awl = weave.use(called)
+    assert awl.to_pylist() == expected_output
+    assert called.type == arrow.ArrowWeaveListType(
+        weave.type_of(expected_output).object_type
+    )
+    assert awl.object_type == weave.type_of(expected_output).object_type
