@@ -476,27 +476,17 @@ def test_arrow_floor_ceil_vectorized(name, weave_func, expected_output):
     assert weave.use(called).to_pylist() == expected_output
 
 
-@pytest.mark.parametrize(
-    "name,input_data,weave_func,expected_output",
-    [
-        (
-            "dict",
-            {"a": [1, 2, 3], "b": ["a", "b", "c"]},
-            lambda x: dict_(**x),
-            [{"a": 1, "b": "a"}, {"a": 2, "b": "b"}, {"a": 3, "b": "c"}],
-        ),
-    ],
-)
-def test_arrow_dict(input_data, name, weave_func, expected_output):
-    l = weave.save(arrow.to_arrow(input_data))
+def test_arrow_dict():
+    a = weave.save(arrow.to_arrow([1, 2, 3]))
+    b = weave.save(arrow.to_arrow(["a", "b", "c"]))
+    expected_output = [{"a": 1, "b": "a"}, {"a": 2, "b": "b"}, {"a": 3, "b": "c"}]
+    weave_func = lambda a, b: dict_(a=a, b=b)
     fn = weave_internal.define_fn(
-        {
-            "x": weave.type_of(input_data).object_type,
-        },
+        {"a": weave.types.Int(), "b": weave.types.String()},
         weave_func,
     ).val
     vec_fn = arrow.vectorize(fn)
-    called = weave_internal.call_fn(vec_fn, {"x": l})
+    called = weave_internal.call_fn(vec_fn, {"a": a, "b": b})
     awl = weave.use(called)
     assert awl.to_pylist() == expected_output
     assert called.type == arrow.ArrowWeaveListType(
