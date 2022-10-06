@@ -1,4 +1,5 @@
 from . import storage
+from . import weave_types
 
 
 class Client:
@@ -7,4 +8,11 @@ class Client:
 
     def execute(self, nodes, no_cache=False):
         results = self.server.execute(nodes, no_cache=no_cache)
-        return [storage.deref(r) for r in results]
+
+        # Deref if node output type is not RefType
+        # TODO: move to language_ref.py, do in compile pass
+        # TODO: this logic is duplicated in server.py:_handle_request
+        return [
+            r if isinstance(n.type, weave_types.RefType) else storage.deref(r)
+            for (n, r) in zip(nodes, results)
+        ]

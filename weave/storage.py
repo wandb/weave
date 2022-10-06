@@ -176,7 +176,7 @@ def all_objects():
 
 
 def objects(of_type: types.Type, alias: str):
-    objects = []
+    result = []
     for art_name in os.listdir(artifacts_local.local_artifact_dir()):
         ref = refs.get_local_version_ref(art_name, alias)
         if ref is not None:
@@ -184,8 +184,8 @@ def objects(of_type: types.Type, alias: str):
                 obj = ref.get()
                 if isinstance(ref.type, types.RunType) and obj.op_name == "op-objects":
                     continue
-                objects.append(obj)
-    return objects
+                result.append(ref)
+    return result
 
 
 def to_python(obj):

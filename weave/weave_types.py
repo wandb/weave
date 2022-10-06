@@ -730,13 +730,22 @@ class Function(Type):
 
 @dataclasses.dataclass(frozen=True)
 class RefType(Type):
+    object_type: Type = UnknownType()
+
+    @classmethod
+    def type_of_instance(cls, obj):
+        return cls(obj.type)
+
+    # TODO: Address this comment. I'm sure this introduced the same type
+    #     blowup as before again. Slows everything down. But in this PR
+    #     I've put object_type back into RefType for now.
     # RefType intentionally does not include the type of the object it
     # points to. Doing so naively results in a type explosion. We may
     # want to include it in the future, but we'll need to shrink it, for
     # example by disallowing unions (replacing with them with unknown or a
     # type variable)
-    def __repr__(self):
-        return "<%s>" % self.__class__.name
+    # def __repr__(self):
+    #     return "<%s>" % self.__class__.name
 
 
 @dataclasses.dataclass(frozen=True)

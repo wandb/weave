@@ -19,6 +19,7 @@ from . import execute
 from . import serialize
 from . import storage
 from . import context
+from . import weave_types
 
 
 PROFILE = False
@@ -51,7 +52,10 @@ def _handle_request(request, deref=False):
     with context.execution_client():
         result = execute.execute_nodes(nodes)
     if deref:
-        result = [storage.deref(r) for r in result]
+        result = [
+            r if isinstance(n.type, weave_types.RefType) else storage.deref(r)
+            for (n, r) in zip(nodes, result)
+        ]
     # print("Server request %s (%0.5fs): %s..." % (start_time,
     #                                              time.time() - start_time, [n.from_op.name for n in nodes[:3]]))
     if request_trace:

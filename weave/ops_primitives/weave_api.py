@@ -14,6 +14,13 @@ from .. import uris
 from .. import artifacts_local
 
 
+@weave_class(weave_type=types.RefType)
+class RefNodeMethods:
+    @op(output_type=lambda input_type: input_type["self"].object_type)
+    def get(self):
+        return storage.deref(self)
+
+
 # Hmm... This returns the same obj, not a ref anymore
 # TODO: is this what we want?
 @op(
@@ -75,7 +82,7 @@ def call_op(name: str) -> Node[types.Any]:
 
 @op()
 def objects_refine_output_type(of_type: types.Type, alias: str) -> types.Type:
-    return types.List(of_type)
+    return types.List(types.RefType(of_type))
 
 
 @op(
