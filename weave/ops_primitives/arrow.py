@@ -8,7 +8,7 @@ import pyarrow.parquet as pq
 
 py_type = type
 
-from ..api import op, weave_class, type
+from ..api import op, weave_class, type, OpVarArgs
 from .. import weave_types as types
 from .. import graph
 from .. import errors
@@ -815,6 +815,21 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
 
 ArrowWeaveListType.instance_classes = ArrowWeaveList
 ArrowWeaveListType.instance_class = ArrowWeaveList
+
+
+@op(
+    name="ArrowWeaveList-dict",
+    input_type=OpVarArgs(types.List(types.Any())),
+    output_type=lambda input_types: ArrowWeaveListType(
+        types.TypedDict(
+            {p_name: p_type.object_type for (p_name, p_type) in input_types.items()}
+        )
+    ),
+)
+def arrow_dict_(**d):
+    arrays, names = list(zip(*d.items()))
+    arrow_obj = pa.StructArray.from_arrays(arrays=arrays, names=names)
+    return ArrowWeaveList(arrow_obj)
 
 
 @dataclasses.dataclass(frozen=True)
