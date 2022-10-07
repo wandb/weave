@@ -203,7 +203,7 @@ def slurm(restapi_url: str) -> Slurm:
 
 
 @weave.op()
-def slurm_render6(
+def slurm_render7(
     slurm_node: weave.Node[Slurm],
 ) -> weave.panels.Card:
     slurm = typing.cast(Slurm, slurm_node)
@@ -231,10 +231,10 @@ def slurm_render6(
                     prefer_horizontal=True,
                     items=[
                         weave.panels.LabeledItem(
-                            item=cost_by_user(slurm.jobs()), label="Cost by user"
+                            item=slurm.jobs(), label="Cost by user"
                         ),
                         weave.panels.LabeledItem(
-                            item=time_by_user(slurm.jobs()), label="Time by user"
+                            item=slurm.jobs(), label="Time by user"
                         ),
                     ],
                 ),
