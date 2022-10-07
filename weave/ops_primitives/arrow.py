@@ -826,7 +826,7 @@ ArrowWeaveListType.instance_class = ArrowWeaveList
 
 
 @op(
-    name="ArrowWeaveList-vectorizedDict",
+    name="ArrowWeaveList-dict",
     input_type=OpVarArgs(types.List(types.Any())),
     output_type=lambda input_types: ArrowWeaveListType(
         types.TypedDict(
@@ -1247,9 +1247,7 @@ def vectorize(weave_fn, with_respect_to=None):
             # as a candidate for vectorizing itself. We don't want to do that, so we
             # explicitly force using ArrowWeaveList-dict instead.
             if node.from_op.name == "dict":
-                op = registry_mem.memory_registry.get_op(
-                    "ArrowWeaveList-vectorizedDict"
-                )
+                op = registry_mem.memory_registry.get_op("ArrowWeaveList-dict")
                 return op.lazy_call(**inputs)
             else:
                 op = dispatch.get_op_for_input_types(
