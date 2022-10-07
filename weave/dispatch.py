@@ -1,5 +1,5 @@
 """Functions for determining which op is being called."""
-import copy
+from dataclasses import dataclass
 import typing
 
 from . import errors
@@ -9,6 +9,35 @@ from . import op_args
 from . import registry_mem
 from . import weave_internal
 from . import graph
+
+
+@dataclass
+class Candidate:
+    op: op_def.OpDef
+    assigned_param_dict: dict[str, types.Type]
+
+
+def resolve_op_amgiguity(fq_op_name: str, candidates: list[Candidate]) -> op_def.OpDef:
+    # Temporary special case for ArrowWeaveList-dict until we implement the general narrowing
+    # solution below
+    if fq_op_name == "ArrowWeaveList-dict":
+        match = None
+        for candidate in candidates:
+            if candidate.op.name == "ArrowWeaveList-dict":
+                match = candidate.op
+                break
+        if match is not None:
+            return match
+    # TODO: Implement intelligent disambiguiation via narrowing.
+    #
+    #
+    # Rejecting here is important. We don't in Weave0, which is what leads to ambiguous.
+    # cases.
+    # TODO: reject earlier, at declaration time.
+    raise errors.WeaveInternalError(
+        "Too many candidate ops, this means there are two ops declared with same name and overlapping input types: %s"
+        % candidates
+    )
 
 
 def get_op_for_input_types(
@@ -28,24 +57,17 @@ def get_op_for_input_types(
         shared_name_ops = registry_mem.memory_registry.find_ops_by_common_name(
             op_def.common_name(fq_op_name)
         )
-    candidates = []
+    candidates: list[Candidate] = []
     for op in shared_name_ops:
-        if op_args.all_types_valid(
-            op.input_type.assign_param_dict(
-                op.input_type.create_param_dict(args, kwargs)
-            )
-        ):
-            candidates.append(op)
-    if len(candidates) > 1:
-        # Rejecting here is important. We don't in Weave0, which is what leads to ambiguous.
-        # cases.
-        # TODO: reject earlier, at declaration time.
-        raise errors.WeaveInternalError(
-            "Too many candidate ops, this means there are two ops declared with same name and overlapping input types: %s"
-            % candidates
+        assigned_param_dict = op.input_type.assign_param_dict(
+            op.input_type.create_param_dict(args, kwargs)
         )
+        if op_args.all_types_valid(assigned_param_dict):
+            candidates.append(Candidate(op, assigned_param_dict))
+    if len(candidates) > 1:
+        return resolve_op_amgiguity(fq_op_name, candidates)
     if candidates:
-        return candidates[0]
+        return candidates[0].op
     return None
 
 
