@@ -12,6 +12,7 @@ ChoiceType = typing.TypeVar("ChoiceType", bound=weave.Node)
 
 @weave.type()
 class ObjectPickerConfig(typing.Generic[ChoiceType]):
+    label: str = dataclasses.field(default_factory=lambda: "")
     choice: ChoiceType = dataclasses.field(default_factory=graph.VoidNode)
 
 
@@ -19,6 +20,16 @@ class ObjectPickerConfig(typing.Generic[ChoiceType]):
 class ObjectPicker(panel.Panel):
     id = "ObjectPicker"
     config: ObjectPickerConfig = dataclasses.field(default_factory=ObjectPickerConfig)
+
+    def __init__(self, input_node=graph.VoidNode(), vars=None, config=None, **options):
+        if vars is None:
+            vars = {}
+        self.config = config
+        if self.config is None:
+            self.config = ObjectPickerConfig()
+        if "label" in options:
+            self.config.label = options["label"]
+        super().__init__(input_node=input_node, vars=vars)
 
     def __post_init__(self):
         # I originally tried to use a VarNode here. With the following comment:

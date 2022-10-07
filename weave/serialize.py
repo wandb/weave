@@ -5,6 +5,7 @@
 import typing
 import hashlib
 import json
+import functools
 
 from . import graph
 from . import weave_types as types
@@ -84,6 +85,8 @@ def serialize(graphs: typing.List[graph.Node]) -> SerializedReturnType:
     return {"nodes": nodes, "rootNodes": root_nodes}
 
 
+# TODO: caching this solves an algorithm issue, but having a limit is scary.
+@functools.lru_cache(maxsize=10000)
 def node_id(node: graph.Node):
     hashable = {"type": node.type.to_dict()}
     if isinstance(node, graph.OutputNode):

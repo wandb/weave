@@ -13,8 +13,10 @@ ItemsType = typing.TypeVar("ItemsType")
 
 @weave.type()
 class Group2Config(typing.Generic[ItemsType]):
-    items: ItemsType = dataclasses.field(default_factory=dict)
     preferHorizontal: bool = dataclasses.field(default_factory=lambda: False)
+    equalSize: bool = dataclasses.field(default_factory=lambda: False)
+    style: str = dataclasses.field(default_factory=lambda: "")
+    items: ItemsType = dataclasses.field(default_factory=dict)
 
 
 Group2ConfigType = typing.TypeVar("Group2ConfigType")
@@ -37,6 +39,10 @@ class Group2(panel.Panel, typing.Generic[Group2ConfigType]):
             self.config.items = options["items"]
         if "preferHorizontal" in options:
             self.config.preferHorizontal = options["preferHorizontal"]
+        if "equalSize" in options:
+            self.config.equalSize = options["equalSize"]
+        if "style" in options:
+            self.config.style = options["style"]
         self._normalize()
 
     def _normalize(self, frame=None):

@@ -23,6 +23,7 @@ class AxisSettings:
     noLabels: bool = False
     noTitle: bool = False
     noTicks: bool = False
+    title: str = None
 
 
 @weave.type()
@@ -80,11 +81,17 @@ class Plot(panel.Panel):
         if "x" in options:
             self.set_x(options["x"])
 
+        if "x_title" in options:
+            self.config.axisSettings.x.title = options["x_title"]
+
         if options.get("groupby_x"):
             self.groupby_x(options["groupby_x"])
 
         if "y" in options:
             self.set_y(options["y"])
+
+        if "y_title" in options:
+            self.config.axisSettings.y.title = options["y_title"]
 
         if options.get("groupby_y"):
             self.groupby_y(options["groupby_y"])

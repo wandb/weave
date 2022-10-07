@@ -81,7 +81,9 @@ def call_op(name: str) -> Node[types.Any]:
 
 
 @op()
-def objects_refine_output_type(of_type: types.Type, alias: str) -> types.Type:
+def objects_refine_output_type(
+    of_type: types.Type, alias: str, timestamp: int
+) -> types.Type:
     return types.List(types.RefType(of_type))
 
 
@@ -89,9 +91,13 @@ def objects_refine_output_type(of_type: types.Type, alias: str) -> types.Type:
     render_info={"type": "function"},
     output_type=lambda input_type: types.List(input_type["of_type"]),
     refine_output_type=objects_refine_output_type,
-    pure=False,
+    # Not impure now that we have the cache-busting timestamp arg
+    # pure=False,
 )
-def objects(of_type: types.Type, alias: str):
+# Timestamp is a way for us to force cache this, but also
+# be able to bust the cache.
+# TODO: Think about this pattern
+def objects(of_type: types.Type, alias: str, timestamp: int):
     return storage.objects(of_type, alias)
 
 

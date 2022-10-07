@@ -181,9 +181,10 @@ def objects(of_type: types.Type, alias: str):
         ref = refs.get_local_version_ref(art_name, alias)
         if ref is not None:
             if of_type.assign_type(ref.type) != types.Invalid():
-                obj = ref.get()
-                if isinstance(ref.type, types.RunType) and obj.op_name == "op-objects":
-                    continue
+                # TODO: Why did I have this here?
+                # obj = ref.get()
+                # if isinstance(ref.type, types.RunType) and obj.op_name == "op-objects":
+                #     continue
                 result.append(ref)
     return result
 

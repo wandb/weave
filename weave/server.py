@@ -44,7 +44,6 @@ def _handle_request(request, deref=False):
         tracer.start()
     nodes = serialize.deserialize(request["graphs"])
 
-    start_time = time.time()
     logger.info(
         "Server request running %s nodes.\n%s"
         % (len(nodes), "\n".join(graph.node_expr_str(n) for n in nodes))

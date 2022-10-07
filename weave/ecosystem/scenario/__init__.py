@@ -7,6 +7,9 @@ class ScenarioResult(typing.TypedDict):
     metric1: float
     metric2: float
     metric3: float
+    metric4: float
+    metric5: float
+    metric6: float
 
 
 class MetricsBankInput(typing.TypedDict):
@@ -35,14 +38,21 @@ def metrics_bank(input_node: weave.Node[MetricsBankInput]) -> weave.panels.Each:
 
     return weave.panels.Each(
         metrics,
-        render=lambda metric_name: weave.panels.Plot(
-            joined,
-            title=metric_name,
-            # The [metric_name] pick operations correctly product list[float], since
-            # we know metric_name is not scenario_id in the type system.
-            # If this produced list[float | str], PanelPlot would not know how to render
-            # the data.
-            x=lambda row: row[metric_name][0],
-            y=lambda row: row[metric_name][1],
+        render=lambda metric_name: weave.panels.Group2(
+            items={
+                "title": metric_name,
+                "plot": weave.panels.Plot(
+                    joined,
+                    title=metric_name,
+                    # The [metric_name] pick operations correctly product list[float], since
+                    # we know metric_name is not scenario_id in the type system.
+                    # If this produced list[float | str], PanelPlot would not know how to render
+                    # the data.
+                    x=lambda row: row[metric_name][0],
+                    x_title="baseline",
+                    y=lambda row: row[metric_name][1],
+                    y_title="candidate",
+                ),
+            },
         ),
     )

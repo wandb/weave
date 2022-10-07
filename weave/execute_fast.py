@@ -28,6 +28,25 @@ def _fast_apply_map_fn(item, index, map_fn):
         raise errors.WeaveInternalError("Invalid Node: %s" % map_fn)
 
 
+def _resolve_static_branches(map_fn):
+    if isinstance(map_fn, graph.OutputNode):
+        inputs = {
+            name: _resolve_static_branches(node)
+            for name, node in map_fn.from_op.inputs.items()
+        }
+        if all(isinstance(v, graph.ConstNode) for v in inputs.values()):
+            op_def = registry_mem.memory_registry.get_op(map_fn.from_op.name)
+            call_inputs = {name: node.val for name, node in inputs.items()}
+            return graph.ConstNode(map_fn.type, op_def.resolve_fn(**call_inputs))
+        return graph.OutputNode(map_fn.type, map_fn.from_op.name, inputs)
+    elif isinstance(map_fn, graph.ConstNode):
+        return map_fn
+    elif isinstance(map_fn, graph.VarNode):
+        return map_fn
+    else:
+        raise errors.WeaveInternalError("Invalid Node: %s" % map_fn)
+
+
 def _can_fast_map(map_fn):
     async_op_nodes = graph.filter_nodes(
         map_fn,
@@ -55,4 +74,5 @@ def _slow_map_fn(input_list, map_fn):
 def fast_map_fn(input_list, map_fn):
     if not _can_fast_map(map_fn):
         return _slow_map_fn(input_list, map_fn)
+    map_fn = _resolve_static_branches(map_fn)
     return [_fast_apply_map_fn(item, i, map_fn) for i, item in enumerate(input_list)]
