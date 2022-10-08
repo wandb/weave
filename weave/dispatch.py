@@ -22,7 +22,7 @@ def resolve_op_amgiguity(fq_op_name: str, candidates: list[Candidate]) -> op_def
     # solution below
     match = None
     for candidate in candidates:
-        if candidate.op.name == "ArrowWeaveList-dict":
+        if candidate.op.name == fq_op_name:
             match = candidate.op
             break
     if match is not None:

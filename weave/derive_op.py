@@ -125,6 +125,9 @@ class MappedDeriveOpHandler(DeriveOpHandler):
         mapped_param_name = first_arg.name
 
         output_type: typing.Union[types.Type, typing.Callable]
+        # TODO: In all of these, we use types.optional, but this should only be
+        # used if the input_type is also optional. However we don't have a
+        # weave-way to check that yet :(.
         if not callable(orig_op.output_type):
             output_type = types.List(types.optional(orig_op.output_type))
         else:
@@ -159,7 +162,19 @@ class MappedDeriveOpHandler(DeriveOpHandler):
                         raise errors.WeaveMakeFunctionError(
                             "output_type function must return a node."
                         )
-                    return types.List.make({"object_type": inner_res})
+                    from .ops_primitives.list_ import make_list
+
+                    return types.List.make(
+                        {
+                            "object_type": types.UnionType.make(
+                                {
+                                    "members": make_list(
+                                        n_0=types.NoneType.make(), n_1=inner_res
+                                    )
+                                }
+                            )
+                        }
+                    )
 
                 inner_input_types = copy.copy(input_types)
                 inner_input_types[mapped_param_name] = replacement
@@ -185,7 +200,7 @@ class MappedDeriveOpHandler(DeriveOpHandler):
         # of the lazy call
         resolve.sig = inspect.signature(orig_op.resolve_fn)  # type: ignore
         input_type = copy.copy(orig_op.input_type.arg_types)
-        input_type[mapped_param_name] = types.List(first_arg.type)
+        input_type[mapped_param_name] = types.List(types.optional(first_arg.type))
         new_op = op_def.OpDef(
             mapped_op_name, op_args.OpNamedArgs(input_type), output_type, resolve
         )
@@ -209,10 +224,12 @@ class MappedDeriveOpHandler(DeriveOpHandler):
         first_arg = named_args[0]
         # Check to see if the first argument is a list of UnknownType. This is how
         # we know that the type is expected to be the class type
-        first_arg_is_cls = first_arg.type == types.List(types.UnknownType())
+        first_arg_is_cls = first_arg.type == types.List(
+            types.optional(types.UnknownType())
+        )
         if first_arg_is_cls:
             derived_op.input_type.arg_types[first_arg.name] = types.List(
-                base_weave_type()
+                types.optional(base_weave_type())
             )
         registry_mem.memory_registry.rename_op(
             derived_op.name, MappedDeriveOpHandler.derived_name(orig_op_new_name)
