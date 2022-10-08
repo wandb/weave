@@ -8,6 +8,7 @@ from . import registry_mem
 from . import op_def
 from . import errors
 from . import graph
+from . import box
 
 
 class DeriveOpHandler:
@@ -125,7 +126,7 @@ class MappedDeriveOpHandler(DeriveOpHandler):
 
         output_type: typing.Union[types.Type, typing.Callable]
         if not callable(orig_op.output_type):
-            output_type = types.List(orig_op.output_type)
+            output_type = types.List(types.optional(orig_op.output_type))
         else:
 
             def make_output_type(input_types):
@@ -162,7 +163,9 @@ class MappedDeriveOpHandler(DeriveOpHandler):
 
                 inner_input_types = copy.copy(input_types)
                 inner_input_types[mapped_param_name] = replacement
-                return types.List(orig_op.output_type(inner_input_types))
+                return types.List(
+                    types.optional(orig_op.output_type(inner_input_types))
+                )
 
             output_type = make_output_type
 
@@ -171,7 +174,12 @@ class MappedDeriveOpHandler(DeriveOpHandler):
             list_ = new_inputs.pop(mapped_param_name)
             # TODO: use the vectorization described here:
             # https://paper.dropbox.com/doc/Weave-Python-Weave0-Op-compatibility-workstream-kJ3XSDdgR96XwKPapHwPD
-            return [orig_op.resolve_fn(x, **new_inputs) for x in list_]
+            return [
+                orig_op.resolve_fn(x, **new_inputs)
+                if not (x is None or isinstance(x, box.BoxedNone))
+                else None
+                for x in list_
+            ]
 
         # Use the function signature of the original op to compute the signature
         # of the lazy call

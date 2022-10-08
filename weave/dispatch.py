@@ -20,14 +20,13 @@ class Candidate:
 def resolve_op_amgiguity(fq_op_name: str, candidates: list[Candidate]) -> op_def.OpDef:
     # Temporary special case for ArrowWeaveList-dict until we implement the general narrowing
     # solution below
-    if fq_op_name == "ArrowWeaveList-dict":
-        match = None
-        for candidate in candidates:
-            if candidate.op.name == "ArrowWeaveList-dict":
-                match = candidate.op
-                break
-        if match is not None:
-            return match
+    match = None
+    for candidate in candidates:
+        if candidate.op.name == "ArrowWeaveList-dict":
+            match = candidate.op
+            break
+    if match is not None:
+        return match
     # TODO: Implement intelligent disambiguiation via narrowing.
     #
     #
