@@ -84,13 +84,6 @@ def type_name_to_type(type_name):
     return mapping.get(type_name)
 
 
-# js_compat: we don't have Tag types in Weave Python yet. Just remove them
-def unwrap_tag_type(serialized_type):
-    if isinstance(serialized_type, dict) and serialized_type.get("type") == "tagged":
-        return serialized_type["value"]
-    return serialized_type
-
-
 class TypeRegistry:
     @staticmethod
     def has_type(obj):
@@ -144,7 +137,6 @@ class TypeRegistry:
 
     @staticmethod
     def type_from_dict(d: typing.Union[str, dict]) -> "Type":
-        d = unwrap_tag_type(d)
         # The javascript code sends simple types as just strings
         # instead of {'type': 'string'} for example
         type_name = d["type"] if isinstance(d, dict) else d

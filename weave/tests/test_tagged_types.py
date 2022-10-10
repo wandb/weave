@@ -8,7 +8,7 @@ def test_tagged_types():
         #     "a": weave.types.Int(),
         # }), weave.types.Int()),
     )
-    def add_tester(a: int, b: int):
+    def add_tester(a: int, b: int) -> int:
         return a + b
 
     # @weave.op()
