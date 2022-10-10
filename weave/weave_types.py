@@ -1,3 +1,4 @@
+import copy
 import dataclasses
 import typing
 import functools
@@ -83,13 +84,6 @@ def type_name_to_type(type_name):
     return mapping.get(type_name)
 
 
-# js_compat: we don't have Tag types in Weave Python yet. Just remove them
-def unwrap_tag_type(serialized_type):
-    if isinstance(serialized_type, dict) and serialized_type.get("type") == "tagged":
-        return serialized_type["value"]
-    return serialized_type
-
-
 class TypeRegistry:
     @staticmethod
     def has_type(obj):
@@ -121,6 +115,11 @@ class TypeRegistry:
         if "function" in (t.name for t in potential_types):
             potential_types = [Function]
 
+        # We can't be sure that Tagged will be last in the tree, so
+        # we just force it here. TODO: Fix
+        if "tagged" in (t.name for t in potential_types):
+            potential_types = [TaggedType]
+
         # FileType and ArtifactFileVersionFileType are peers because
         # one is an ObjectType and one is a base type, and we don't
         # know python class hierarchy. This is a major major hack
@@ -138,7 +137,6 @@ class TypeRegistry:
 
     @staticmethod
     def type_from_dict(d: typing.Union[str, dict]) -> "Type":
-        d = unwrap_tag_type(d)
         # The javascript code sends simple types as just strings
         # instead of {'type': 'string'} for example
         type_name = d["type"] if isinstance(d, dict) else d
@@ -727,6 +725,77 @@ class ObjectType(Type):
             result = json.load(f)
         mapper = mappers_python.map_from_python(self, artifact)
         return mapper.apply(result)
+
+
+@dataclasses.dataclass
+class TaggedValue:
+    _tag: dict[str, typing.Any]
+    _value: typing.Any
+
+    @classmethod
+    def create(cls, obj: typing.Any, tags: dict[str, typing.Any]):
+        obj_cls = obj.__class__
+        copy_obj = box.box(copy.copy(obj))
+        copy_obj.__class__ = type(
+            f"Tagged{obj_cls.__name__}", (copy_obj.__class__, TaggedValue), {}
+        )
+        copy_obj = typing.cast(TaggedValue, copy_obj)
+        copy_obj._value = obj
+        copy_obj._tag = tags
+        return copy_obj
+
+
+@dataclasses.dataclass(frozen=True)
+class TaggedType(Type):
+    name = "tagged"
+    tag: TypedDict
+    value: Type
+
+    instance_classes = [TaggedValue]
+
+    def _assign_type_inner(self, next_type):
+        # import pdb; pdb.set_trace()
+        return (
+            isinstance(next_type, TaggedType)
+            and self.tag.assign_type(next_type.tag)
+            and self.value.assign_type(next_type.value)
+        )
+
+    @classmethod
+    def type_of_instance(cls, obj):
+        if not isinstance(obj, TaggedValue):
+            return TypeRegistry.type_of(obj)
+        return cls(TypeRegistry.type_of(obj._tag), TypeRegistry.type_of(obj._value))
+
+    def save_instance(self, obj, artifact, name):
+        tag_serialized = mappers_python.map_to_python(self.tag, artifact).apply(
+            obj._tag
+        )
+        value_serialized = mappers_python.map_to_python(self.value, artifact).apply(
+            obj._value
+        )
+
+        with artifact.new_file(f"{name}.tagged.json") as f:
+            json.dump(
+                {
+                    "tag": tag_serialized,
+                    "value": value_serialized,
+                },
+                f,
+                allow_nan=False,
+            )
+
+    def load_instance(self, artifact, name, extra=None):
+        with artifact.open(f"{name}.tagged.json") as f:
+            result = json.load(f)
+
+        tag_deserialize = mappers_python.map_from_python(self.tag, artifact).apply(
+            result["tag"]
+        )
+        value_deserialize = mappers_python.map_from_python(self.value, artifact).apply(
+            result["value"]
+        )
+        return TaggedValue.create(value_deserialize, tag_deserialize)
 
 
 @dataclasses.dataclass(frozen=True)

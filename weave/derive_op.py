@@ -175,7 +175,7 @@ class MappedDeriveOpHandler(DeriveOpHandler):
 
         # Use the function signature of the original op to compute the signature
         # of the lazy call
-        resolve.sig = inspect.signature(orig_op.resolve_fn)  # type: ignore
+        resolve.sig = inspect.signature(orig_op._resolve_fn)  # type: ignore
         input_type = copy.copy(orig_op.input_type.arg_types)
         input_type[mapped_param_name] = types.List(first_arg.type)
         new_op = op_def.OpDef(
