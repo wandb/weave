@@ -244,17 +244,20 @@ GroupResultType.instance_classes = GroupResult
     output_type=lambda input_types: input_types["arr"],
 )
 def list_indexCheckpoint(arr):
-    return arr
+    arr
+    # return [types.TaggedValue.create(item, {"index": ndx}) for ndx, item in enumerate(arr)]
 
 
 @op(
     name="tag-indexCheckpoint",
-    input_type={"obj": types.Any()},
+    input_type={
+        "obj": types.TaggedType(types.TypedDict({"index": types.Number()}), types.Any())
+    },
     output_type=types.Number(),
 )
 def tag_indexCheckpoint(obj):
-    # TODO. Do we really need this?
-    return 0
+    return 5
+    return obj._tag["index"]
 
 
 def is_list_like(list_type_or_node):
