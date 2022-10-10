@@ -165,9 +165,13 @@ class ConstNode(Node):
         if equiv_output_node:
             return equiv_output_node.to_json()
 
-        val = self.val
-        if isinstance(self.type, weave_types.Function):
-            val = val.to_json()
+        val = storage.to_python(self.val)["_val"]
+        # mapper = mappers_python.map_to_python(self.type, None)
+        # val = mapper.apply(self.val)
+
+        # val = self.val
+        # if isinstance(self.type, weave_types.Function):
+        #     val = val.to_json()
         return {"nodeType": "const", "type": self.type.to_dict(), "val": val}
 
 

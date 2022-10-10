@@ -56,63 +56,67 @@ class Plot(panel.Panel):
     id = "plot"
     config: typing.Optional[PanelPlotConfig] = None
 
-    def __init__(self, input_node, vars=None, **options):
+    def __init__(self, input_node, vars=None, config=None, **options):
         super().__init__(input_node=input_node, vars=vars)
-        table = table_state.TableState(self.input_node)
-        self.config = PanelPlotConfig(
-            **{
-                "table": table,
-                "dims": PanelPlotDimsConfig(
-                    x=table.add_column(lambda row: graph.VoidNode()),
-                    y=table.add_column(lambda row: graph.VoidNode()),
-                    color=table.add_column(lambda row: graph.VoidNode()),
-                    label=table.add_column(lambda row: graph.VoidNode()),
-                    tooltip=table.add_column(lambda row: graph.VoidNode()),
-                ),
-                "mark": None,
-                "axisSettings": PanelPlotAxisSettingsConfig(
-                    x=AxisSettings(), y=AxisSettings()
-                ),
-                "legendSettings": PanelPlotLegendSettingsConfig(color=LegendSettings()),
-            }
-        )
+        self.config = config
+        if self.config is None:
+            table = table_state.TableState(self.input_node)
+            self.config = PanelPlotConfig(
+                **{
+                    "table": table,
+                    "dims": PanelPlotDimsConfig(
+                        x=table.add_column(lambda row: graph.VoidNode()),
+                        y=table.add_column(lambda row: graph.VoidNode()),
+                        color=table.add_column(lambda row: graph.VoidNode()),
+                        label=table.add_column(lambda row: graph.VoidNode()),
+                        tooltip=table.add_column(lambda row: graph.VoidNode()),
+                    ),
+                    "mark": None,
+                    "axisSettings": PanelPlotAxisSettingsConfig(
+                        x=AxisSettings(), y=AxisSettings()
+                    ),
+                    "legendSettings": PanelPlotLegendSettingsConfig(
+                        color=LegendSettings()
+                    ),
+                }
+            )
 
-        # TODO: handle all this stuff generically!
-        if "x" in options:
-            self.set_x(options["x"])
+            # TODO: handle all this stuff generically!
+            if "x" in options:
+                self.set_x(options["x"])
 
-        if "x_title" in options:
-            self.config.axisSettings.x.title = options["x_title"]
+            if "x_title" in options:
+                self.config.axisSettings.x.title = options["x_title"]
 
-        if options.get("groupby_x"):
-            self.groupby_x(options["groupby_x"])
+            if options.get("groupby_x"):
+                self.groupby_x(options["groupby_x"])
 
-        if "y" in options:
-            self.set_y(options["y"])
+            if "y" in options:
+                self.set_y(options["y"])
 
-        if "y_title" in options:
-            self.config.axisSettings.y.title = options["y_title"]
+            if "y_title" in options:
+                self.config.axisSettings.y.title = options["y_title"]
 
-        if options.get("groupby_y"):
-            self.groupby_y(options["groupby_y"])
+            if options.get("groupby_y"):
+                self.groupby_y(options["groupby_y"])
 
-        if "label" in options:
-            self.set_label(options["label"])
+            if "label" in options:
+                self.set_label(options["label"])
 
-        if options.get("groupby_label"):
-            self.groupby_label(options["groupby_label"])
+            if options.get("groupby_label"):
+                self.groupby_label(options["groupby_label"])
 
-        if "tooltip" in options:
-            self.set_tooltip(options["tooltip"])
+            if "tooltip" in options:
+                self.set_tooltip(options["tooltip"])
 
-        if options.get("no_axes"):
-            self.set_no_axes()
+            if options.get("no_axes"):
+                self.set_no_axes()
 
-        if options.get("no_legend"):
-            self.set_no_legend()
+            if options.get("no_legend"):
+                self.set_no_legend()
 
-        if options.get("mark"):
-            self.set_mark(options["mark"])
+            if options.get("mark"):
+                self.set_mark(options["mark"])
 
     @property
     def table_query(self):

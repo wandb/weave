@@ -1,25 +1,31 @@
+import dataclasses
+import typing
+
+import weave
 from .. import panel
 from . import table_state
 
 
+@weave.type()
+class TableConfig:
+    tableState: table_state.TableState
+    rowSize: int = dataclasses.field(default_factory=lambda: 1)
+
+
+@weave.type()
 class Table(panel.Panel):
     id = "table"
+    config: typing.Optional[TableConfig] = dataclasses.field(
+        default_factory=lambda: None
+    )
 
-    def __init__(self, input_node, **kwargs):
-        super().__init__(input_node)
-        self._table_state = table_state.TableState(self.input_node)
+    def __init__(self, input_node, vars=None, config=None, **options):
+        super().__init__(input_node=input_node, vars=vars)
+        self.config = config
+        if self.config is None:
+            table = table_state.TableState(self.input_node)
+            self.config = TableConfig(table)
 
-        if "columns" in kwargs:
-            for column_expr in kwargs["columns"]:
-                self.append_column(column_expr)
-
-    @property
-    def table_query(self):
-        return self._table_state
-
-    def append_column(self, expr, name=""):
-        self._table_state.add_column(expr, name=name)
-
-    @property
-    def config(self):
-        return {"tableState": self._table_state.to_json()}
+            if "columns" in options:
+                for column_expr in options["columns"]:
+                    table.add_column(column_expr)

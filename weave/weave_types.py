@@ -1,4 +1,5 @@
 import dataclasses
+import datetime
 import typing
 import functools
 import json
@@ -452,6 +453,27 @@ class Boolean(BasicType):
             obj = obj.val
         with artifact.new_file(f"{name}.object.json") as f:
             json.dump(obj, f)
+
+
+class Datetime(Type):
+    # TODO: Should be datetime but weavejs expects date
+    # name = "datetime"
+    name = "timestamp"
+    instance_classes = datetime.datetime
+
+    def save_instance(self, obj, artifact, name):
+        if artifact is None:
+            raise errors.WeaveSerializeError(
+                "save_instance invalid when artifact is None for type: %s" % self
+            )
+        with artifact.new_file(f"{name}.object.json") as f:
+            v = int(obj.timestamp() * 1000)
+            json.dump(v, f)
+
+    def load_instance(self, artifact, name, extra=None):
+        with artifact.open(f"{name}.object.json") as f:
+            v = json.load(f)
+            return datetime.datetime.fromtimestamp(v / 1000)
 
 
 @dataclasses.dataclass(frozen=True)

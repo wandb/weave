@@ -1,4 +1,5 @@
 import dataclasses
+import datetime
 import inspect
 import math
 
@@ -50,6 +51,7 @@ class ObjectDictToObject(mappers_weave.ObjectMapper):
         result_type = self._obj_type
         instance_class = result_type._instance_classes()[0]
         constructor_sig = inspect.signature(instance_class)
+        print("%s XYZ" % self.type.name, obj)
         for k, serializer in self._property_serializers.items():
             if k in constructor_sig.parameters:
                 v = serializer.apply(obj[k])
@@ -130,6 +132,18 @@ class PyFloatToFloat(mappers.Mapper):
 class StringToPyString(mappers.Mapper):
     def apply(self, obj):
         return obj
+
+
+class DatetimeToPyDatetime(mappers.Mapper):
+    def apply(self, obj: datetime.datetime):
+        return int(obj.timestamp() * 1000)
+        return obj.isoformat()
+
+
+class PyDatetimeToDatetime(mappers.Mapper):
+    def apply(self, obj):
+        return datetime.datetime.fromtimestamp(obj / 1000)
+        return datetime.datetime.fromisoformat(obj)
 
 
 class NoneToPyNone(mappers.Mapper):
@@ -271,6 +285,8 @@ def map_to_python_(type, mapper, artifact, path=[]):
         return FloatToPyFloat(type, mapper, artifact, path)
     elif isinstance(type, types.String):
         return StringToPyString(type, mapper, artifact, path)
+    elif isinstance(type, types.Datetime):
+        return DatetimeToPyDatetime(type, mapper, artifact, path)
     elif isinstance(type, types.Const):
         return ConstToPyConst(type, mapper, artifact, path)
     elif isinstance(type, types.NoneType):
@@ -310,6 +326,8 @@ def map_from_python_(type: types.Type, mapper, artifact, path=[]):
         return PyFloatToFloat(type, mapper, artifact, path)
     elif isinstance(type, types.String):
         return StringToPyString(type, mapper, artifact, path)
+    elif isinstance(type, types.Datetime):
+        return PyDatetimeToDatetime(type, mapper, artifact, path)
     elif isinstance(type, types.Const):
         return ConstToPyConst(type, mapper, artifact, path)
     elif isinstance(type, types.NoneType):
