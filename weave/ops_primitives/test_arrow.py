@@ -6,7 +6,7 @@ import string
 from PIL import Image
 
 from .. import storage
-from ..ops_primitives import Number
+from ..ops_primitives import Number, dict_
 from .. import api as weave
 from .. import ops
 from .. import artifacts_local
@@ -580,6 +580,25 @@ def test_arrow_typeddict_merge(
     ).val
     vec_fn = arrow.vectorize(fn)
     called = weave_internal.call_fn(vec_fn, {"x": l, "y": r})
+    awl = weave.use(called)
+    assert awl.to_pylist() == expected_output
+    assert called.type == arrow.ArrowWeaveListType(
+        weave.type_of(expected_output).object_type
+    )
+    assert awl.object_type == weave.type_of(expected_output).object_type
+
+
+def test_arrow_dict():
+    a = weave.save(arrow.to_arrow([1, 2, 3]))
+    b = weave.save(arrow.to_arrow(["a", "b", "c"]))
+    expected_output = [{"a": 1, "b": "a"}, {"a": 2, "b": "b"}, {"a": 3, "b": "c"}]
+    weave_func = lambda a, b: dict_(a=a, b=b)
+    fn = weave_internal.define_fn(
+        {"a": weave.types.Int(), "b": weave.types.String()},
+        weave_func,
+    ).val
+    vec_fn = arrow.vectorize(fn)
+    called = weave_internal.call_fn(vec_fn, {"a": a, "b": b})
     awl = weave.use(called)
     assert awl.to_pylist() == expected_output
     assert called.type == arrow.ArrowWeaveListType(

@@ -8,7 +8,7 @@ import pyarrow.parquet as pq
 
 py_type = type
 
-from ..api import op, weave_class, type, use
+from ..api import op, weave_class, type, use, OpVarArgs
 from .. import weave_types as types
 from .. import graph
 from .. import errors
@@ -846,6 +846,27 @@ ArrowWeaveListType.instance_classes = ArrowWeaveList
 ArrowWeaveListType.instance_class = ArrowWeaveList
 
 
+@op(
+    name="ArrowWeaveList-vectorizedDict",
+    input_type=OpVarArgs(types.List(types.Any())),
+    output_type=lambda input_types: ArrowWeaveListType(
+        types.TypedDict(
+            {p_name: p_type.object_type for (p_name, p_type) in input_types.items()}
+        )
+    ),
+)
+def arrow_dict_(**d):
+    names, arrays = list(zip(*d.items()))
+    arrays = [
+        a._arrow_data.combine_chunks()
+        if isinstance(a._arrow_data, pa.ChunkedArray)
+        else a._arrow_data
+        for a in arrays
+    ]  # convert from ArrowWeaveList -> arrow
+    arrow_obj = pa.StructArray.from_arrays(arrays=arrays, names=names)
+    return ArrowWeaveList(arrow_obj)
+
+
 @dataclasses.dataclass(frozen=True)
 class ArrowTableGroupResultType(ArrowWeaveListType):
     name = "ArrowTableGroupResult"
@@ -1318,17 +1339,27 @@ def vectorize(weave_fn, with_respect_to=None):
     def convert_node(node):
         if isinstance(node, graph.OutputNode):
             inputs = node.from_op.inputs
-            op = dispatch.get_op_for_input_types(
-                node.from_op.name, [], {k: v.type for k, v in inputs.items()}
-            )
-            if op:
-                # Rename inputs to match op, ie, call by position...
-                # Hmm, need to centralize this behavior
-                # TODO
-                final_inputs = {
-                    k: v for k, v in zip(op.input_type.arg_types, inputs.values())
-                }
-                return op.lazy_call(**final_inputs)
+
+            # since dict takes OpVarArgs(typing.Any()) as input, it will always show up
+            # as a candidate for vectorizing itself. We don't want to do that, so we
+            # explicitly force using ArrowWeaveList-dict instead.
+            if node.from_op.name == "dict":
+                op = registry_mem.memory_registry.get_op(
+                    "ArrowWeaveList-vectorizedDict"
+                )
+                return op.lazy_call(**inputs)
+            else:
+                op = dispatch.get_op_for_input_types(
+                    node.from_op.name, [], {k: v.type for k, v in inputs.items()}
+                )
+                if op:
+                    # Rename inputs to match op, ie, call by position...
+                    # Hmm, need to centralize this behavior
+                    # TODO
+                    final_inputs = {
+                        k: v for k, v in zip(op.input_type.arg_types, inputs.values())
+                    }
+                    return op.lazy_call(**final_inputs)
             raise VectorizeError(
                 "Can't vectorize, no op for: %s %s" % (node.from_op.name, inputs)
             )
