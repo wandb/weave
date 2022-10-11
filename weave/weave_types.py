@@ -732,70 +732,55 @@ class TaggedValue:
     _tag: dict[str, typing.Any]
     _value: typing.Any
 
-    @classmethod
-    def create(cls, obj: typing.Any, tags: dict[str, typing.Any]):
-        obj_cls = obj.__class__
-        copy_obj = box.box(copy.copy(obj))
+    def __new__(cls, _tag: dict[str, typing.Any], _value: typing.Any):
+        obj_cls = _value.__class__
+        copy_obj = box.box(copy.copy(_value))
         copy_obj.__class__ = type(
-            f"Tagged{obj_cls.__name__}", (copy_obj.__class__, TaggedValue), {}
+            f"Tagged{obj_cls.__name__}",
+            (
+                TaggedValue,
+                copy_obj.__class__,
+            ),
+            {},
         )
         copy_obj = typing.cast(TaggedValue, copy_obj)
-        copy_obj._value = obj
-        copy_obj._tag = tags
+        copy_obj._value = _value
+        copy_obj._tag = _tag
         return copy_obj
+
+    def __init__(self, *args, **kwargs):
+        pass
 
 
 @dataclasses.dataclass(frozen=True)
-class TaggedType(Type):
+class TaggedType(ObjectType):
     name = "tagged"
-    tag: TypedDict
-    value: Type
+    _tag: TypedDict
+    _value: Type
 
     instance_classes = [TaggedValue]
 
-    def _assign_type_inner(self, next_type):
-        # import pdb; pdb.set_trace()
-        return (
-            isinstance(next_type, TaggedType)
-            and self.tag.assign_type(next_type.tag)
-            and self.value.assign_type(next_type.value)
-        )
+    def property_types(self):
+        return {"_tag": self._tag, "_value": self._value}
 
     @classmethod
-    def type_of_instance(cls, obj):
-        if not isinstance(obj, TaggedValue):
-            return TypeRegistry.type_of(obj)
-        return cls(TypeRegistry.type_of(obj._tag), TypeRegistry.type_of(obj._value))
-
-    def save_instance(self, obj, artifact, name):
-        tag_serialized = mappers_python.map_to_python(self.tag, artifact).apply(
-            obj._tag
-        )
-        value_serialized = mappers_python.map_to_python(self.value, artifact).apply(
-            obj._value
-        )
-
-        with artifact.new_file(f"{name}.tagged.json") as f:
-            json.dump(
-                {
-                    "tag": tag_serialized,
-                    "value": value_serialized,
-                },
-                f,
-                allow_nan=False,
+    def from_dict(cls, d):
+        # This is needed because in JS we don't use underscores
+        if "tag" in d and "value" in d:
+            tag = d["tag"]
+            value = d["value"]
+        else:
+            tag = d["_tag"]
+            value = d["_value"]
+        try:
+            return cls(
+                TypeRegistry.type_from_dict(tag), TypeRegistry.type_from_dict(value)
             )
+        except Exception as e:
+            import pdb
 
-    def load_instance(self, artifact, name, extra=None):
-        with artifact.open(f"{name}.tagged.json") as f:
-            result = json.load(f)
-
-        tag_deserialize = mappers_python.map_from_python(self.tag, artifact).apply(
-            result["tag"]
-        )
-        value_deserialize = mappers_python.map_from_python(self.value, artifact).apply(
-            result["value"]
-        )
-        return TaggedValue.create(value_deserialize, tag_deserialize)
+            pdb.set_trace()
+            raise Exception(f"Error creating TaggedType from {d}") from e
 
 
 @dataclasses.dataclass(frozen=True)

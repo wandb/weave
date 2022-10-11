@@ -241,11 +241,18 @@ GroupResultType.instance_classes = GroupResult
 @op(
     name="list-createIndexCheckpointTag",
     input_type={"arr": types.List(types.Any())},
-    output_type=lambda input_types: input_types["arr"],
+    output_type=lambda input_types: types.List(
+        types.TaggedType(
+            types.TypedDict({"index": types.Number()}), input_types["arr"].object_type
+        )
+    ),
 )
 def list_indexCheckpoint(arr):
-    arr
-    # return [types.TaggedValue.create(item, {"index": ndx}) for ndx, item in enumerate(arr)]
+    # UGGG: not all things assignable to a list are enumerable...
+    res = []
+    for item in arr:
+        res.append(types.TaggedValue({"index": len(res)}, item))
+    return res
 
 
 @op(
@@ -256,7 +263,6 @@ def list_indexCheckpoint(arr):
     output_type=types.Number(),
 )
 def tag_indexCheckpoint(obj):
-    return 5
     return obj._tag["index"]
 
 

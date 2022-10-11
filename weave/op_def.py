@@ -104,7 +104,7 @@ class OpDef:
                 candidate_arg
             )
         ):
-            res = types.TaggedValue.create(res, tags)
+            res = types.TaggedValue(tags, res)
 
         return res
 
