@@ -474,3 +474,115 @@ def test_arrow_floor_ceil_vectorized(name, weave_func, expected_output):
     vec_fn = arrow.vectorize(fn)
     called = weave_internal.call_fn(vec_fn, {"x": l})
     assert weave.use(called).to_pylist() == expected_output
+
+
+@pytest.mark.parametrize(
+    "name,input_data,weave_func,expected_output",
+    [
+        (
+            "pick",
+            [{"a": 1.0, "b": "c"}, {"a": 2.0, "b": "G"}, {"a": 3.0, "b": "q"}],
+            lambda x: x.pick("a"),
+            [1.0, 2.0, 3.0],
+        ),
+        (
+            "pick-nested",
+            [
+                {"a": {"b": 1.0}, "c": "d"},
+                {"a": {"b": 2.0}, "c": "G"},
+                {"a": {"b": 3.0}, "c": "q"},
+            ],
+            lambda x: x.pick("a").pick("b"),
+            [1.0, 2.0, 3.0],
+        ),
+    ],
+)
+def test_arrow_typeddict_pick(input_data, name, weave_func, expected_output):
+    l = weave.save(arrow.to_arrow(input_data))
+    fn = weave_internal.define_fn(
+        {"x": weave.type_of(input_data).object_type}, weave_func
+    ).val
+    vec_fn = arrow.vectorize(fn)
+    called = weave_internal.call_fn(vec_fn, {"x": l})
+    assert weave.use(called).to_pylist() == expected_output
+    assert called.type == arrow.ArrowWeaveListType(
+        weave.type_of(expected_output).object_type
+    )
+
+
+@pytest.mark.parametrize(
+    "name,input_datal,input_datar,weave_func,expected_output",
+    [
+        (
+            "merge",
+            [{"b": "c"}, {"b": "G"}, {"b": "q"}],
+            [{"c": 4}, {"c": 5}, {"c": 6}],
+            lambda x, y: x.merge(y),
+            [{"b": "c", "c": 4}, {"b": "G", "c": 5}, {"b": "q", "c": 6}],
+        ),
+        (
+            "merge-overwrite",
+            [{"b": "c"}, {"b": "G"}, {"b": "q"}],
+            [{"b": "g"}, {"b": "q"}, {"b": "a"}],
+            lambda x, y: x.merge(y),
+            [{"b": "g"}, {"b": "q"}, {"b": "a"}],
+        ),
+        (
+            "merge-dicts",
+            [{"b": "c"}, {"b": "G"}, {"b": "q"}],
+            [{"c": {"a": 2}}, {"c": {"a": 3}}, {"c": {"a": 4}}],
+            lambda x, y: x.merge(y),
+            [
+                {"b": "c", "c": {"a": 2}},
+                {"b": "G", "c": {"a": 3}},
+                {"b": "q", "c": {"a": 4}},
+            ],
+        ),
+        (
+            "merge-nested",
+            [{"a": {"c": 1}}, {"a": {"c": 2}}, {"a": {"c": 3}}],
+            [{"a": {"b": 2}}, {"a": {"b": 4}}, {"a": {"b": 6}}],
+            lambda x, y: x.merge(y),
+            [{"a": {"b": 2, "c": 1}}, {"a": {"c": 2, "b": 4}}, {"a": {"c": 3, "b": 6}}],
+        ),
+        (
+            "merge-3nested",
+            [
+                {"a": {"c": 1, "d": {"a": 2}}},
+                {"a": {"c": 2, "d": {"a": 3}}},
+                {"a": {"c": 3, "d": {"a": 4}}},
+            ],
+            [
+                {"a": {"b": 2, "d": {"q": 2}}},
+                {"a": {"b": 4, "d": {"q": 9}}},
+                {"a": {"b": 6, "d": {"q": 10}}},
+            ],
+            lambda x, y: x.merge(y),
+            [
+                {"a": {"b": 2, "c": 1, "d": {"a": 2, "q": 2}}},
+                {"a": {"c": 2, "b": 4, "d": {"a": 3, "q": 9}}},
+                {"a": {"c": 3, "b": 6, "d": {"a": 4, "q": 10}}},
+            ],
+        ),
+    ],
+)
+def test_arrow_typeddict_merge(
+    input_datal, input_datar, name, weave_func, expected_output
+):
+    l = weave.save(arrow.to_arrow(input_datal))
+    r = weave.save(arrow.to_arrow(input_datar))
+    fn = weave_internal.define_fn(
+        {
+            "x": weave.type_of(input_datal).object_type,
+            "y": weave.type_of(input_datar).object_type,
+        },
+        weave_func,
+    ).val
+    vec_fn = arrow.vectorize(fn)
+    called = weave_internal.call_fn(vec_fn, {"x": l, "y": r})
+    awl = weave.use(called)
+    assert awl.to_pylist() == expected_output
+    assert called.type == arrow.ArrowWeaveListType(
+        weave.type_of(expected_output).object_type
+    )
+    assert awl.object_type == weave.type_of(expected_output).object_type

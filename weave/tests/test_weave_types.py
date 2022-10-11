@@ -1,5 +1,7 @@
+import weave.weave_types
 from .. import weave_types as types
 from .. import runs
+from ..ops_primitives import _dict_utils
 from rich import print
 
 
@@ -73,4 +75,17 @@ def test_typeof_list_dict_merge():
     d = [{"a": 6, "b": "x"}, {"a": 5, "b": None}]
     assert types.TypeRegistry.type_of(d) == types.List(
         types.TypedDict({"a": types.Int(), "b": types.optional(types.String())})
+    )
+
+
+def test_typeof_nested_dict_merge():
+    t1 = weave.weave_types.TypedDict(
+        {"a": weave.weave_types.TypedDict({"b": types.Int()})}
+    )
+    t2 = weave.weave_types.TypedDict(
+        {"a": weave.weave_types.TypedDict({"c": types.String()})}
+    )
+    merged_type = _dict_utils.typeddict_merge_output_type({"self": t1, "other": t2})
+    assert merged_type == weave.weave_types.TypedDict(
+        {"a": weave.weave_types.TypedDict({"b": types.Int(), "c": types.String()})}
     )
