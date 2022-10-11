@@ -16,6 +16,14 @@ def call_fn(weave_fn, inputs):
     return dereference_variables(weave_fn, inputs)
 
 
+def better_call_fn(weave_fn, *inputs):
+    call_inputs = {}
+    for input_name, input in zip(weave_fn.type.input_types.keys(), inputs):
+        call_inputs[input_name] = input
+    res = call_fn(weave_fn.val, call_inputs)
+    return make_output_node(res.type, res.from_op.name, res.from_op.inputs)
+
+
 def use(nodes, client=None):
     if client is None:
         client = context_state.get_client()

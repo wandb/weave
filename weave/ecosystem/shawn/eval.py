@@ -12,21 +12,6 @@ class Prediction:
     input: float
     output: float
 
-    @weave.op()
-    def process(self):
-        # What do we do here?
-        # It should be init'd with self.process as an attribute
-        # if it definitely comes from one.
-        # But that's the thing..it may not.
-        return self.parent  # ?
-        # But we don't want process() if this is a prediction not from a process.
-        # On the other hand... everything comes from a process
-
-    # TaggedValue is a mixin of the object and a Tags object (also an object
-    # so therefore also has getattr)
-    #
-    # Then make subset ops all lazy, ie they just return Refs
-
 
 @weave.type()
 class Model:

@@ -305,10 +305,25 @@ def flatten(arr):
     return _flatten(list(arr))
 
 
+def unnest_return_type(input_types):
+    arr_type = input_types["arr"]
+    # if isinstance(arr_type, types.UnionType):
+    #     return types.union(
+    #         *(unnest_return_type({"arr": m}) for m in input_types["self"].members)
+    #     )
+    unnested_object_property_types = {}
+    for k, v_type in arr_type.object_type.property_types.items():
+        if types.is_list_like(v_type):
+            unnested_object_property_types[k] = v_type.object_type
+        else:
+            unnested_object_property_types[k] = v_type
+    return types.List(types.TypedDict(unnested_object_property_types))
+
+
 @op(
     name="unnest",
     input_type={"arr": types.List(types.TypedDict({}))},
-    output_type=lambda input_types: input_types["arr"],
+    output_type=unnest_return_type,
 )
 def unnest(arr):
     if not arr:

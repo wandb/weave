@@ -32,6 +32,13 @@ def is_const_union_of_type(type_, of_type):
 
 
 def typeddict_pick_output_type(input_types):
+    if isinstance(input_types["self"], types.UnionType):
+        return types.union(
+            *(
+                typeddict_pick_output_type({"self": m, "key": input_types["key"]})
+                for m in input_types["self"].members
+            )
+        )
     property_types = input_types["self"].property_types
     if is_const_union_of_type(input_types["key"], types.String()):
         member_types = []
@@ -145,10 +152,25 @@ class Dict(dict):
 #         return super(TypedDict, obj).__getitem__(key)
 
 
+def dict_return_type(input_types):
+    # Discard Const types!
+    # TODO: this is probably not really ideal. We lose a lot of information here.
+    # But we don't handle unions very well in Weave1 right now, so this makes
+    # developing panel composition stuff easier.
+    res = {}
+    for k, v in input_types.items():
+        if isinstance(v, types.Const):
+            res[k] = v.val_type
+        else:
+            res[k] = v
+    return types.TypedDict(res)
+
+
 @op(
     name="dict",
     input_type=OpVarArgs(types.Any()),
-    output_type=lambda input_types: types.TypedDict(input_types),
+    # output_type=lambda input_types: types.TypedDict(input_types),
+    output_type=dict_return_type,
 )
 def dict_(**d):
     return d
