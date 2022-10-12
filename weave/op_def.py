@@ -27,7 +27,7 @@ class OpDef:
     """
 
     input_type: op_args.OpArgs
-    output_type: typing.Union[
+    _output_type: typing.Union[
         types.Type,
         typing.Callable[[typing.Dict[str, types.Type]], types.Type],
     ]
@@ -61,7 +61,7 @@ class OpDef:
     ):
         self.name = name
         self.input_type = input_type
-        self.output_type = output_type
+        self._output_type = output_type
         self.refine_output_type = refine_output_type
         self._resolve_fn = resolve_fn
         self.setter = setter
@@ -83,6 +83,61 @@ class OpDef:
     def __repr__(self):
         return "<OpDef(%s) %s>" % (id(self), self.name)
 
+    def is_tag_getter(self):
+        named_args = self.input_type.named_args()
+        return len(named_args) > 0 and types.TaggedType(
+            types.Any(), types.Any()
+        ).assign_type(named_args[0].type)
+
+    def should_tag_outputs(self):
+        named_args = self.input_type.named_args()
+        return (
+            not self.is_tag_getter()
+            and len(named_args) > 0
+            and types.union(*[types.ProjectType(), types.RunType()]).assign_type(
+                named_args[0].type
+            )
+        )
+
+    @property
+    def output_type(self):
+        # TODO: catch this - do this once?
+        # if not self.should_tag_outputs():
+        #     return self._output_type
+
+        named_args = self.input_type.named_args()
+        if self.is_tag_getter():
+            return self._output_type
+        if isinstance(self._output_type, types.Type):
+            if len(named_args) > 0:
+                return types.TaggedType(
+                    types.TypedDict({named_args[0].name: named_args[0].type}),
+                    self._output_type,
+                )
+            else:
+                return self._output_type
+        # handle callable.
+        def ot(input_types):
+            ret = self._output_type(input_types)
+            currently_weavifying = isinstance(
+                input_types, graph.Node
+            ) and types.TypedDict({}).assign_type(input_types.type)
+            if currently_weavifying:
+                return types.TaggedType.make(
+                    {
+                        "_tag": types.TypedDict.make(
+                            {"property_types": {named_args[0].name: named_args[0].type}}
+                        ),
+                        "_value": ret,
+                    }
+                )
+            else:
+                return types.TaggedType(
+                    types.TypedDict({named_args[0].name: named_args[0].type}), ret
+                )
+
+        return ot
+
     def resolve_fn(__self, *args, **kwargs):
         res = __self._resolve_fn(*args, **kwargs)
         # Make this tagging opt-in, not opt-out
@@ -95,12 +150,15 @@ class OpDef:
                 named_args[0].type
             )
         ):
+            # Very important condition: in Weave1, we have ops that return
+            # their identity (like `save`). this is very bad and will create inf recursion
             first_arg_val = params[named_args[0].name]
-            tags = {}
-            if isinstance(first_arg_val, types.TaggedValue):
-                tags = first_arg_val._tag
-            tags[named_args[0].name] = first_arg_val
-            res = types.TaggedValue(tags, res)
+            if first_arg_val != res:
+                tags = {}
+                if isinstance(first_arg_val, types.TaggedValue):
+                    tags = first_arg_val._tag
+                tags[named_args[0].name] = first_arg_val
+                res = types.TaggedValue(tags, res)
 
         return res
 

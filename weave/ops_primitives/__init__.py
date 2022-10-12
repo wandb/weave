@@ -18,3 +18,4 @@ from .image import *
 from .html import *
 from .markdown import *
 from .op_def import *
+from .tagged import *

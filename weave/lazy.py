@@ -65,7 +65,12 @@ def _make_output_node(fq_op_name, bound_params, output_type_, refine_output_type
         name += output_type.output_type.__class__.__name__
         bases.append(output_type.output_type.NodeMethodsClass)
 
-    # TODO: Consider this pattern for tagged values
+    # Mixin function output type Node methods
+    if isinstance(output_type, types.TaggedType) and hasattr(
+        output_type._value, "NodeMethodsClass"
+    ):
+        name += output_type._value.__class__.__name__
+        bases.append(output_type._value.NodeMethodsClass)
 
     unique_bases = []
     for base in bases:

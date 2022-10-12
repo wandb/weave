@@ -117,8 +117,8 @@ class TypeRegistry:
 
         # We can't be sure that Tagged will be last in the tree, so
         # we just force it here. TODO: Fix
-        if "tagged" in (t.name for t in potential_types):
-            potential_types = [TaggedType]
+        # if "tagged" in (t.name for t in potential_types):
+        #     potential_types = [TaggedType]
 
         # FileType and ArtifactFileVersionFileType are peers because
         # one is an ObjectType and one is a base type, and we don't
@@ -228,6 +228,8 @@ class Type(metaclass=_TypeSubclassWatcher):
     def assign_type(self, next_type: "Type") -> bool:
         if isinstance(next_type, Const):
             return self.assign_type(next_type.val_type)
+        elif isinstance(next_type, TaggedValue) and not isinstance(self, TaggedValue):
+            return self.assign_type(next_type._value)
         elif isinstance(next_type, UnionType):
             for t in next_type.members:
                 if not self.assign_type(t):
@@ -727,173 +729,52 @@ class ObjectType(Type):
         return mapper.apply(result)
 
 
-class TaggedValue_V0:
-    _tag: dict[str, typing.Any]
-    _value: typing.Any
-
-    # TODO: Turn tag and value accessors into functions
-    # TODO: Handle chains of tags and assignment rules
-
-    def __new__(cls, _tag: dict[str, typing.Any], _value: typing.Any):
-        if isinstance(_value, TaggedValue):
-            # TODO: this needs to be a chain
-            _tag = {**_value._tag, **_tag}
-            _value = _value._value
-        obj_cls = _value.__class__
-        copy_obj = box.box(copy.copy(_value))
-        copy_obj.__class__ = type(
-            f"Tagged{obj_cls.__name__}",
-            (
-                TaggedValue,
-                copy_obj.__class__,
-            ),
-            {},
-        )
-        copy_obj = typing.cast(TaggedValue, copy_obj)
-        copy_obj._value = _value
-        copy_obj._tag = _tag
-        return copy_obj
-
-    def __init__(self, *args, **kwargs):
-        pass
-
-
-# class TaggedValue_V1:
-#     _tag: dict[str, typing.Any]
-#     _value: typing.Any
-
-#     # TODO: Turn tag and value accessors into functions
-#     # TODO: Handle chains of tags and assignment rules
-
-#     def __init__(self, _tag: dict[str, typing.Any], _value: typing.Any):
-#         import pdb; pdb.set_trace()
-#         if isinstance(_value, TaggedValue):
-#             # TODO: this needs to be a chain
-#             _tag = {**_value._tag, **_tag}
-#             _value = _value._value
-#         self._tag = _tag
-#         self._value = _value
-#         # self.__class__ = type(
-#         #     f"Tagged{_value.__class__.__name__}",
-#         #     (
-#         #         TaggedValue,
-#         #         _value.__class__,
-#         #     ),
-#         #     {},
-#         # )
-
-#     def __repr__(self):
-#         return f"TaggedValue({self._tag}, {self._value})"
-
-#     def __str__(self):
-#         return f"TaggedValue({self._tag}, {self._value})"
-
-#     def __getattr__(self, name):
-#         if name in ["_tag", "_value"]:
-#             return self.__dict__[name]
-#         else:
-#             return getattr(self._value, name)
-
-#     def __setattr__(self, name, value):
-#         if name in ["_tag", "_value"]:
-#             self.__dict__[name] = value
-#         else:
-#             return setattr(self._value, name, value)
-
-# class TaggedValue_V2_Outer:
-#     _tag: dict[str, typing.Any]
-#     _value: typing.Any
-
-#     def __init__(self, _tag: dict[str, typing.Any], _value: typing.Any):
-#         if isinstance(_value, TaggedValue):
-#             # TODO: this needs to be a chain
-#             _tag = {**_value._tag, **_tag}
-#             _value = _value._value
-#         self._tag = _tag
-#         self._value = _value
-
-#     def __getattr__(self, attr):
-#         if attr in ["_tag", "_value"]:
-#             return self.__dict__[attr]
-#         return getattr(self._value, attr)
-
-# for dund in ["__eq__", "__add__"]:
-#     def dund_fn(self, *args, **kwargs):
-#         args = [a if not isinstance(a, TaggedValue) else a._value for a in args]
-#         kwargs = {k: v if not isinstance(v, TaggedValue) else v._value for k, v in kwargs.items()}
-#         return getattr(self._value, dund)(*args, **kwargs)
-#     setattr(TaggedValue_V2_Outer, dund, dund_fn)
-
-# class TaggedValue_V2:
-#     _tag: dict[str, typing.Any]
-#     _value: typing.Any
-
-#     def __new__(cls, _tag: dict[str, typing.Any], _value: typing.Any):
-#         if isinstance(_value, TaggedValue):
-#             # TODO: this needs to be a chain
-#             _tag = {**_value._tag, **_tag}
-#             _value = _value._value
-#         _value = box.box(_value)
-#         class TaggedValue_V2_Inner(TaggedValue_V2_Outer, _value.__class__):
-#             pass
-
-#         copy_obj = TaggedValue_V2_Inner(_tag, _value)
-#         # copy_obj.__dict__ = _value.__dict__
-#         # copy_obj._value = _value
-#         # copy_obj._tag = _tag
-#         return copy_obj
-
-#     def __init__(self, _tag: dict[str, typing.Any], _value: typing.Any):
-#         pass
-#         # self.__class__ = type(_value.__class__.__name__,
-#         #                       (self.__class__, _value.__class__),
-#         #                       {})
-#         # self.__dict__ = _value.__dict__
-#         # self._tag = _tag
-#         # self._value = _value
-
-# class TaggedValue_V3:
-#     _tag: dict[str, typing.Any]
-#     _value: typing.Any
-
-#     def __init__(self, _tag: dict[str, typing.Any], _value: typing.Any):
-#         if isinstance(_value, TaggedValue):
-#             # TODO: this needs to be a chain
-#             _tag = {**_value._tag, **_tag}
-#             _value = _value._value
-#         _value = box.box(_value)
-#         self.__class__ = type(_value.__class__.__name__,
-#                               (self.__class__, _value.__class__),
-#                               {})
-#         self.__dict__ = _value.__dict__
-#         self._tag = _tag
-#         self._value = _value
-
-
-class TaggedValue_V4:
+class TaggedValue:
     _tag: dict[str, typing.Any]
     _value: typing.Any
 
     def __init__(self, _tag: dict[str, typing.Any], _value: typing.Any):
-        if isinstance(_value, TaggedValue):
+        if isinstance(_tag, TaggedValue):
+            raise Exception("TaggedValue can not be nested")
+        while isinstance(_value, TaggedValue):
             # TODO: this needs to be a chain
             _tag = {**_value._tag, **_tag}
             _value = _value._value
+        for key, value in _tag.items():
+            if value == _value:
+                raise Exception("TaggedValue tag can not be the same as the value")
+            if isinstance(value, TaggedValue):
+                # TODO: unnest?
+                pass
+        if isinstance(_value, TaggedValue):
+            raise Exception("TaggedValue can not be nested")
         self._tag = _tag
         self._value = _value
 
 
-TaggedValue = TaggedValue_V4
-
-
-@dataclasses.dataclass(frozen=True)
+# @dataclasses.dataclass(frozen=True)
 class TaggedType(ObjectType):
     name = "tagged"
     _tag: TypedDict = TypedDict({})
     _value: Type = Any()
 
+    @classmethod
+    def type_vars(cls):
+        return {"_tag": TypedDict({}), "_value": Any()}
+
     # TODO: Turn tag and value accessors into functions
     # TODO: Handle chains of tags and assignment rules
+    def __init__(self, _tag: TypedDict, _value: Type):
+        if isinstance(_tag, TaggedType):
+            raise Exception("TaggedType can not be nested")
+        while isinstance(_value, TaggedType):
+            # TODO: this needs to be a chain
+            _tag = TypedDict({**_value._tag.property_types, **_tag.property_types})
+            _value = _value._value
+        if isinstance(_value, TaggedType):
+            raise Exception("TaggedType can not be nested")
+        self._tag = _tag
+        self._value = _value
 
     instance_classes = [TaggedValue]
 

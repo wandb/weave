@@ -3,7 +3,7 @@ from .. import graph
 
 
 def test_tagged_value():
-    assert weave.types.TaggedValue({"a": 1}, 2) == 2
+    assert weave.types.TaggedValue({"a": 1}, 2)._value == 2
 
 
 def test_tagged_types():
@@ -13,6 +13,7 @@ def test_tagged_types():
         # }), weave.types.Int()),
     )
     def add_tester(a: int, b: int) -> int:
+        # import pdb; pdb.set_trace()
         return a + b
 
     # @weave.op()
@@ -22,34 +23,36 @@ def test_tagged_types():
     @weave.op(
         input_type={
             "a": weave.types.TaggedType(
-                weave.types.TypedDict({"tim": weave.types.Int()}), weave.types.Any()
+                weave.types.TypedDict({"a": weave.types.Int()}), weave.types.Any()
             ),
         },
     )
-    def get_tim_tag(a) -> int:
-        return a._tag["tim"]
+    def get_a_tag(a) -> int:
+        return a._tag["a"]
 
     # assert(weave.use(graph.OutputNode(weave.types.Number(),"typedDict-pick",{
     #     "self": incorrect_return_type(1), "key": graph.ConstNode(weave.types.String(), "a")})) == 1)
 
     # 1: Assert that that they tester works
-    assert weave.use(add_tester(1, 2)) == 3
+    three = add_tester(1, 2)
+    assert weave.use(three) == 3
 
     # 2: Assert that we can get a tag
-    one = weave.types.TaggedValue({"tim": 42}, 1)
-    assert weave.use(get_tim_tag(one)) == 42
+    assert weave.use(get_a_tag(three)) == 1
 
     # 3: Assert that we can use tagged values instread of raw values
-    two = weave.types.TaggedValue({"sweeney": "hello world"}, 2)
-    addition = add_tester(one, two)
-    assert weave.use(addition) == 3
+    seven = add_tester(3, 4)
+    ten = add_tester(three, seven)
+    assert weave.use(ten) == 10
 
     # 4: Show that tags flow through
-    assert weave.use(get_tim_tag(addition)) == 42
+    assert weave.use(get_a_tag(ten)) == 3
 
     # 5: Show that saving works:
-    addition = weave.save(addition)
-    assert weave.use(get_tim_tag(addition)) == 42
+    ten = weave.save(ten)
+    assert weave.use(ten) == 10
+    # import pdb; pdb.set_trace()
+    assert weave.use(get_a_tag(ten)) == 3
 
 
 def test_tag_adder():

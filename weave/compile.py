@@ -19,6 +19,15 @@ def call_run_await_final_output(run_node: graph.Node) -> graph.OutputNode:
     return graph.OutputNode(run_node_type.output, "run-await", {"self": run_node})
 
 
+def call_tag_unwrapper(tagged_node: graph.Node) -> graph.OutputNode:
+    tagged_node_type = typing.cast(types.TaggedType, tagged_node.type)
+    return graph.OutputNode(
+        tagged_node_type._value,
+        "tagged-unwrapTaggedValue",
+        {"tagged_value": tagged_node},
+    )
+
+
 def call_execute(function_node: graph.Node) -> graph.OutputNode:
     function_node_type = typing.cast(types.Function, function_node.type)
     return graph.OutputNode(
@@ -91,7 +100,7 @@ def await_run_outputs_edit_graph(
 ) -> graph_editable.EditGraph:
     """Automatically insert Run.await_final_output steps as needed."""
 
-    for edge in edit_g.edges_with_replacements:
+    for orig, edge in edit_g.edges_with_replacements:
         actual_input_type = edge.output_of.type
         op_def = registry_mem.memory_registry.get_op(edge.input_to.from_op.name)
         if op_def.name == "tag-indexCheckpoint" or op_def.name == "Object-__getattr__":
@@ -122,7 +131,7 @@ def await_run_outputs_edit_graph(
             new_inputs = dict(edge.input_to.from_op.inputs)
             new_inputs[edge.input_name] = call_run_await_final_output(edge.output_of)
             edit_g.replace(
-                edge.input_to,
+                orig.input_to,
                 graph.OutputNode(
                     edge.input_to.type, edge.input_to.from_op.name, new_inputs
                 ),
@@ -131,10 +140,67 @@ def await_run_outputs_edit_graph(
     return edit_g
 
 
+def unwrap_tagged_values(
+    edit_g: graph_editable.EditGraph,
+) -> graph_editable.EditGraph:
+    """Automatically insert Run.await_final_output steps as needed."""
+
+    for orig, edge in edit_g.edges_with_replacements:
+        actual_input_type = edge.output_of.type
+        op_def = registry_mem.memory_registry.get_op(edge.input_to.from_op.name)
+        # if op_def.name == "tag-indexCheckpoint" or op_def.name == "Object-__getattr__":
+        #     # These are supposed to be a passthrough op, we don't want to convert
+        #     # it. TODO: Find a more general way, maybe by type inspection?
+        #     continue
+        if not isinstance(op_def.input_type, op_args.OpNamedArgs):
+            # Not correct... we'd want to walk these too!
+            # TODO: fix
+            continue
+        # If the Node type is RunType, but the Op argument it is passed to
+        # is not a RunType, insert an await_final_output operation to convert
+        # the Node from a run to the run's output.
+        try:
+            expected_input_type = op_def.input_type.arg_types[edge.input_name]
+        except KeyError:
+            raise errors.WeaveInternalError(
+                "OpDef (%s) missing input_name: %s" % (op_def.name, edge.input_name)
+            )
+        if isinstance(actual_input_type, types.TaggedType) and not isinstance(
+            expected_input_type, types.TaggedType
+        ):
+            if not expected_input_type.assign_type(actual_input_type._value):
+                raise Exception(
+                    "invalid type chaining for tagged value. input_type: %s, op_input_type: %s"
+                    % (actual_input_type, expected_input_type)
+                )
+            # import pdb; pdb.set_trace()
+            new_inputs = dict(edge.input_to.from_op.inputs)
+            new_inputs[edge.input_name] = call_tag_unwrapper(edge.output_of)
+            edit_g.replace(
+                orig.input_to,
+                graph.OutputNode(
+                    edge.input_to.type, edge.input_to.from_op.name, new_inputs
+                ),
+            )
+
+    for node in edit_g.nodes:
+        outputs = edit_g.output_edges.get(node, [])
+        if len(outputs) == 0:
+            replaced = edit_g.get_node(node)
+            if isinstance(replaced.type, types.TaggedType):
+                # import pdb; pdb.set_trace()
+                edit_g.replace(
+                    node,
+                    call_tag_unwrapper(replaced),
+                )
+
+    return edit_g
+
+
 def execute_edit_graph(edit_g: graph_editable.EditGraph) -> graph_editable.EditGraph:
     """In cases where an input is a Node, execute the Node"""
 
-    for edge in edit_g.edges_with_replacements:
+    for orig, edge in edit_g.edges_with_replacements:
         actual_input_type = edge.output_of.type
         op_def = registry_mem.memory_registry.get_op(edge.input_to.from_op.name)
         if not isinstance(op_def.input_type, op_args.OpNamedArgs):
@@ -162,7 +228,7 @@ def execute_edit_graph(edit_g: graph_editable.EditGraph) -> graph_editable.EditG
 
             new_inputs[edge.input_name] = call_execute(edge.output_of)
             edit_g.replace(
-                edge.input_to,
+                orig.input_to,
                 graph.OutputNode(
                     edge.input_to.type, edge.input_to.from_op.name, new_inputs
                 ),
@@ -188,6 +254,9 @@ def compile(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
 
     # 3: Execute function nodes
     g = execute_edit_graph(g)
+
+    # 4: Unwrap tagged values
+    g = unwrap_tagged_values(g)
 
     # Reconstruct a node list that matches the original order from the transformed graph
     n = edit_graph_to_nodes(g, nodes)
