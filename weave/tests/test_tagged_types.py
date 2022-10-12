@@ -2,6 +2,10 @@ import weave
 from .. import graph
 
 
+def test_tagged_value():
+    assert weave.types.TaggedValue({"a": 1}, 2) == 2
+
+
 def test_tagged_types():
     @weave.op(
         # output_type=weave.types.TaggedType(weave.types.TypedDict({

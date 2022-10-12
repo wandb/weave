@@ -727,9 +727,12 @@ class ObjectType(Type):
         return mapper.apply(result)
 
 
-class TaggedValue:
+class TaggedValue_V0:
     _tag: dict[str, typing.Any]
     _value: typing.Any
+
+    # TODO: Turn tag and value accessors into functions
+    # TODO: Handle chains of tags and assignment rules
 
     def __new__(cls, _tag: dict[str, typing.Any], _value: typing.Any):
         if isinstance(_value, TaggedValue):
@@ -755,11 +758,142 @@ class TaggedValue:
         pass
 
 
+# class TaggedValue_V1:
+#     _tag: dict[str, typing.Any]
+#     _value: typing.Any
+
+#     # TODO: Turn tag and value accessors into functions
+#     # TODO: Handle chains of tags and assignment rules
+
+#     def __init__(self, _tag: dict[str, typing.Any], _value: typing.Any):
+#         import pdb; pdb.set_trace()
+#         if isinstance(_value, TaggedValue):
+#             # TODO: this needs to be a chain
+#             _tag = {**_value._tag, **_tag}
+#             _value = _value._value
+#         self._tag = _tag
+#         self._value = _value
+#         # self.__class__ = type(
+#         #     f"Tagged{_value.__class__.__name__}",
+#         #     (
+#         #         TaggedValue,
+#         #         _value.__class__,
+#         #     ),
+#         #     {},
+#         # )
+
+#     def __repr__(self):
+#         return f"TaggedValue({self._tag}, {self._value})"
+
+#     def __str__(self):
+#         return f"TaggedValue({self._tag}, {self._value})"
+
+#     def __getattr__(self, name):
+#         if name in ["_tag", "_value"]:
+#             return self.__dict__[name]
+#         else:
+#             return getattr(self._value, name)
+
+#     def __setattr__(self, name, value):
+#         if name in ["_tag", "_value"]:
+#             self.__dict__[name] = value
+#         else:
+#             return setattr(self._value, name, value)
+
+# class TaggedValue_V2_Outer:
+#     _tag: dict[str, typing.Any]
+#     _value: typing.Any
+
+#     def __init__(self, _tag: dict[str, typing.Any], _value: typing.Any):
+#         if isinstance(_value, TaggedValue):
+#             # TODO: this needs to be a chain
+#             _tag = {**_value._tag, **_tag}
+#             _value = _value._value
+#         self._tag = _tag
+#         self._value = _value
+
+#     def __getattr__(self, attr):
+#         if attr in ["_tag", "_value"]:
+#             return self.__dict__[attr]
+#         return getattr(self._value, attr)
+
+# for dund in ["__eq__", "__add__"]:
+#     def dund_fn(self, *args, **kwargs):
+#         args = [a if not isinstance(a, TaggedValue) else a._value for a in args]
+#         kwargs = {k: v if not isinstance(v, TaggedValue) else v._value for k, v in kwargs.items()}
+#         return getattr(self._value, dund)(*args, **kwargs)
+#     setattr(TaggedValue_V2_Outer, dund, dund_fn)
+
+# class TaggedValue_V2:
+#     _tag: dict[str, typing.Any]
+#     _value: typing.Any
+
+#     def __new__(cls, _tag: dict[str, typing.Any], _value: typing.Any):
+#         if isinstance(_value, TaggedValue):
+#             # TODO: this needs to be a chain
+#             _tag = {**_value._tag, **_tag}
+#             _value = _value._value
+#         _value = box.box(_value)
+#         class TaggedValue_V2_Inner(TaggedValue_V2_Outer, _value.__class__):
+#             pass
+
+#         copy_obj = TaggedValue_V2_Inner(_tag, _value)
+#         # copy_obj.__dict__ = _value.__dict__
+#         # copy_obj._value = _value
+#         # copy_obj._tag = _tag
+#         return copy_obj
+
+#     def __init__(self, _tag: dict[str, typing.Any], _value: typing.Any):
+#         pass
+#         # self.__class__ = type(_value.__class__.__name__,
+#         #                       (self.__class__, _value.__class__),
+#         #                       {})
+#         # self.__dict__ = _value.__dict__
+#         # self._tag = _tag
+#         # self._value = _value
+
+# class TaggedValue_V3:
+#     _tag: dict[str, typing.Any]
+#     _value: typing.Any
+
+#     def __init__(self, _tag: dict[str, typing.Any], _value: typing.Any):
+#         if isinstance(_value, TaggedValue):
+#             # TODO: this needs to be a chain
+#             _tag = {**_value._tag, **_tag}
+#             _value = _value._value
+#         _value = box.box(_value)
+#         self.__class__ = type(_value.__class__.__name__,
+#                               (self.__class__, _value.__class__),
+#                               {})
+#         self.__dict__ = _value.__dict__
+#         self._tag = _tag
+#         self._value = _value
+
+
+class TaggedValue_V4:
+    _tag: dict[str, typing.Any]
+    _value: typing.Any
+
+    def __init__(self, _tag: dict[str, typing.Any], _value: typing.Any):
+        if isinstance(_value, TaggedValue):
+            # TODO: this needs to be a chain
+            _tag = {**_value._tag, **_tag}
+            _value = _value._value
+        self._tag = _tag
+        self._value = _value
+
+
+TaggedValue = TaggedValue_V4
+
+
 @dataclasses.dataclass(frozen=True)
 class TaggedType(ObjectType):
     name = "tagged"
     _tag: TypedDict = TypedDict({})
     _value: Type = Any()
+
+    # TODO: Turn tag and value accessors into functions
+    # TODO: Handle chains of tags and assignment rules
 
     instance_classes = [TaggedValue]
 

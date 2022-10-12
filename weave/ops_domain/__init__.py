@@ -332,6 +332,20 @@ class Project:
         )
 
 
+@op(
+    name="tag-project",
+    input_type={
+        "obj": types.TaggedType(
+            types.TypedDict({"project": ProjectType()}), types.Any()
+        ),
+    },
+)
+def tag_project(obj) -> wandb_api.Project:
+    # TODO: Make this a helper method to get the tag up the chain
+    print(obj._tag)
+    return obj._tag["project"]
+
+
 @op(name="root-project")
 def project(entityName: str, projectName: str) -> wandb_api.Project:
     return wandb_public_api().project(name=projectName, entity=entityName)

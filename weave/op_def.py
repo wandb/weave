@@ -84,26 +84,22 @@ class OpDef:
         return "<OpDef(%s) %s>" % (id(self), self.name)
 
     def resolve_fn(__self, *args, **kwargs):
-        # TODO: this is a temp hack...it only knows how to pass along the arg tag
-        candidate_arg = None
-        if len(args) > 0:
-            candidate_arg = args[0]
-        elif len(kwargs) > 0:
-            candidate_arg = list(kwargs.values())[0]
-        tags = None
-        if isinstance(candidate_arg, types.TaggedValue):
-            tags = candidate_arg._tag
-
         res = __self._resolve_fn(*args, **kwargs)
-
+        # Make this tagging opt-in, not opt-out
         named_args = __self.input_type.named_args()
+        params = __self.input_type.create_param_dict(args, kwargs)
         if (
-            tags is not None
-            and len(named_args) > 0
+            len(named_args) > 0
+            and len(params) > 0
             and not types.TaggedType(types.TypedDict({}), types.Any()).assign_type(
-                candidate_arg
+                named_args[0].type
             )
         ):
+            first_arg_val = params[named_args[0].name]
+            tags = {}
+            if isinstance(first_arg_val, types.TaggedValue):
+                tags = first_arg_val._tag
+            tags[named_args[0].name] = first_arg_val
             res = types.TaggedValue(tags, res)
 
         return res

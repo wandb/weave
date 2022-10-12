@@ -65,6 +65,8 @@ def _make_output_node(fq_op_name, bound_params, output_type_, refine_output_type
         name += output_type.output_type.__class__.__name__
         bases.append(output_type.output_type.NodeMethodsClass)
 
+    # TODO: Consider this pattern for tagged values
+
     unique_bases = []
     for base in bases:
         if base not in unique_bases:
