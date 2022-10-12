@@ -30,7 +30,7 @@ class LabeledItem(panel.Panel):
         if "label" in options:
             self.config.label = options["label"]
         if "item" in options:
-            self.config.item = options["item"]
+            self.config.item = panel_util.child_item(options["item"])
         # self._normalize()
 
     # def set_label(self, label: str):

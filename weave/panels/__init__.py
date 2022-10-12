@@ -9,6 +9,7 @@ from .panel_group import Group
 from .panel_group2 import Group2
 from .panel_slider2 import Slider2
 from .panel_object_picker import ObjectPicker
+from .panel_expression_editor import ExpressionEditor
 from .panel_html import Html
 from .panel_markdown import Markdown
 from .panel_weavelink import WeaveLink
