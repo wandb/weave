@@ -236,10 +236,14 @@ GroupResultType.instance_classes = GroupResult
 
 
 ### TODO Move these ops onto List class and make part of the List interface
+@mutation
+def index_checkpoint_setter(arr, new_arr):
+    return new_arr
 
 
 @op(
     name="list-createIndexCheckpointTag",
+    setter=index_checkpoint_setter,
     input_type={"arr": types.List(types.Any())},
     output_type=lambda input_types: types.List(
         types.TaggedType(
@@ -263,7 +267,7 @@ def list_indexCheckpoint(arr):
     output_type=types.Number(),
 )
 def tag_indexCheckpoint(obj):
-    return obj._tag["index"]
+    return obj.tag["index"]
 
 
 def is_list_like(list_type_or_node):

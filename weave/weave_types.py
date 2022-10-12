@@ -727,14 +727,16 @@ class ObjectType(Type):
         return mapper.apply(result)
 
 
-@dataclasses.dataclass
 class TaggedValue:
-    _tag: dict[str, typing.Any]
-    _value: typing.Any
+    tag: dict[str, typing.Any]
+    value: typing.Any
 
-    def __new__(cls, _tag: dict[str, typing.Any], _value: typing.Any):
-        obj_cls = _value.__class__
-        copy_obj = box.box(copy.copy(_value))
+    def __new__(cls, tag: dict[str, typing.Any], value: typing.Any):
+        if isinstance(value, TaggedValue):
+            tag = {**value.tag, **tag}
+            value = value.value
+        obj_cls = value.__class__
+        copy_obj = box.box(copy.copy(value))
         copy_obj.__class__ = type(
             f"Tagged{obj_cls.__name__}",
             (
@@ -744,8 +746,8 @@ class TaggedValue:
             {},
         )
         copy_obj = typing.cast(TaggedValue, copy_obj)
-        copy_obj._value = _value
-        copy_obj._tag = _tag
+        copy_obj.value = value
+        copy_obj.tag = tag
         return copy_obj
 
     def __init__(self, *args, **kwargs):
@@ -755,32 +757,20 @@ class TaggedValue:
 @dataclasses.dataclass(frozen=True)
 class TaggedType(ObjectType):
     name = "tagged"
-    _tag: TypedDict
-    _value: Type
+    tag: TypedDict = TypedDict({})
+    value: Type = Any()
 
     instance_classes = [TaggedValue]
 
     def property_types(self):
-        return {"_tag": self._tag, "_value": self._value}
+        return {"tag": self.tag, "value": self.value}
 
     @classmethod
     def from_dict(cls, d):
-        # This is needed because in JS we don't use underscores
-        if "tag" in d and "value" in d:
-            tag = d["tag"]
-            value = d["value"]
-        else:
-            tag = d["_tag"]
-            value = d["_value"]
-        try:
-            return cls(
-                TypeRegistry.type_from_dict(tag), TypeRegistry.type_from_dict(value)
-            )
-        except Exception as e:
-            import pdb
-
-            pdb.set_trace()
-            raise Exception(f"Error creating TaggedType from {d}") from e
+        return cls(
+            TypeRegistry.type_from_dict(d["tag"]),
+            TypeRegistry.type_from_dict(d["value"]),
+        )
 
 
 @dataclasses.dataclass(frozen=True)

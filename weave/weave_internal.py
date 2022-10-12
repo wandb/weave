@@ -62,6 +62,10 @@ class UniversalNodeMixin:
 
 def get_node_methods_classes(type_: types.Type) -> typing.Sequence[typing.Type]:
     classes = []
+    # TODO: This is a bit of a hack - it would be nice to have this
+    # logic not here.
+    if isinstance(type_, types.TaggedType):
+        type_ = type_.value
 
     # Keeping this is still important for overriding dunder methods!
     for type_class in type_.__class__.mro():
