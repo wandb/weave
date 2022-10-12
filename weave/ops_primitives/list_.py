@@ -267,7 +267,7 @@ def list_indexCheckpoint(arr):
     output_type=types.Number(),
 )
 def tag_indexCheckpoint(obj):
-    return obj.tag["index"]
+    return obj._tag["index"]
 
 
 def is_list_like(list_type_or_node):

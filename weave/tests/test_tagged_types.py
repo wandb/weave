@@ -23,7 +23,7 @@ def test_tagged_types():
         },
     )
     def get_tim_tag(a) -> int:
-        return a.tag["tim"]
+        return a._tag["tim"]
 
     # assert(weave.use(graph.OutputNode(weave.types.Number(),"typedDict-pick",{
     #     "self": incorrect_return_type(1), "key": graph.ConstNode(weave.types.String(), "a")})) == 1)

@@ -728,15 +728,16 @@ class ObjectType(Type):
 
 
 class TaggedValue:
-    tag: dict[str, typing.Any]
-    value: typing.Any
+    _tag: dict[str, typing.Any]
+    _value: typing.Any
 
-    def __new__(cls, tag: dict[str, typing.Any], value: typing.Any):
-        if isinstance(value, TaggedValue):
-            tag = {**value.tag, **tag}
-            value = value.value
-        obj_cls = value.__class__
-        copy_obj = box.box(copy.copy(value))
+    def __new__(cls, _tag: dict[str, typing.Any], _value: typing.Any):
+        if isinstance(_value, TaggedValue):
+            # TODO: this needs to be a chain
+            _tag = {**_value._tag, **_tag}
+            _value = _value._value
+        obj_cls = _value.__class__
+        copy_obj = box.box(copy.copy(_value))
         copy_obj.__class__ = type(
             f"Tagged{obj_cls.__name__}",
             (
@@ -746,8 +747,8 @@ class TaggedValue:
             {},
         )
         copy_obj = typing.cast(TaggedValue, copy_obj)
-        copy_obj.value = value
-        copy_obj.tag = tag
+        copy_obj._value = _value
+        copy_obj._tag = _tag
         return copy_obj
 
     def __init__(self, *args, **kwargs):
@@ -757,20 +758,29 @@ class TaggedValue:
 @dataclasses.dataclass(frozen=True)
 class TaggedType(ObjectType):
     name = "tagged"
-    tag: TypedDict = TypedDict({})
-    value: Type = Any()
+    _tag: TypedDict = TypedDict({})
+    _value: Type = Any()
 
     instance_classes = [TaggedValue]
 
     def property_types(self):
-        return {"tag": self.tag, "value": self.value}
+        return {"_tag": self._tag, "_value": self._value}
 
     @classmethod
     def from_dict(cls, d):
+        # We use custom serialization for tagged types because JS doesn't
+        # use underscores in type keys, but we need to use them in Python
+        # so we don't pollute the namespace.
         return cls(
             TypeRegistry.type_from_dict(d["tag"]),
             TypeRegistry.type_from_dict(d["value"]),
         )
+
+    def _to_dict(self):
+        # We use custom serialization for tagged types because JS doesn't
+        # use underscores in type keys, but we need to use them in Python
+        # so we don't pollute the namespace.
+        return {"tag": self._tag.to_dict(), "value": self._value.to_dict()}
 
 
 @dataclasses.dataclass(frozen=True)

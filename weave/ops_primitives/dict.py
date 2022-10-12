@@ -34,7 +34,7 @@ def typeddict_pick_output_type(input_types):
     # in this case we want the latter. We should probably have a way to
     # specify which one we want.
     if isinstance(self, types.TaggedType):
-        self = self.value
+        self = self._value
     property_types = self.property_types
     output_type = property_types.get(key)
     if output_type is None:

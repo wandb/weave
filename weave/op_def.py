@@ -92,7 +92,7 @@ class OpDef:
             candidate_arg = list(kwargs.values())[0]
         tags = None
         if isinstance(candidate_arg, types.TaggedValue):
-            tags = candidate_arg.tag
+            tags = candidate_arg._tag
 
         res = __self._resolve_fn(*args, **kwargs)
 
