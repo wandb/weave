@@ -14,6 +14,7 @@ from . import uris
 from . import graph
 from . import weave_internal
 from . import pyfunc_type_util
+from . import language_tagging
 
 
 def common_name(name: str) -> str:
@@ -63,7 +64,7 @@ class OpDef:
         self.input_type = input_type
         self.output_type = output_type
         self.refine_output_type = refine_output_type
-        self.resolve_fn = resolve_fn
+        self.raw_resolve_fn = resolve_fn
         self.setter = setter
         self.render_info = render_info
         self.pure = pure
@@ -94,6 +95,10 @@ class OpDef:
             return _self.call_fn(_self.instance, *args, **kwargs)
         return _self.call_fn(*args, **kwargs)
 
+    def resolve_fn(__self, *args, **kwargs):
+        res = __self.raw_resolve_fn(*args, **kwargs)
+        return language_tagging.process_opdef_resolution(__self, res, args, kwargs)
+
     @property
     def name(self) -> str:
         return self._name
@@ -120,7 +125,7 @@ class OpDef:
 
     @property
     def is_mutation(self):
-        return getattr(self.resolve_fn, "is_mutation", False)
+        return getattr(self.raw_resolve_fn, "is_mutation", False)
 
     @property
     def is_async(self):
@@ -171,7 +176,7 @@ class OpDef:
     ) -> collections.OrderedDict[str, graph.Node]:
         return weave_internal.bind_value_params_as_nodes(
             self.uri,
-            pyfunc_type_util.get_signature(self.resolve_fn),
+            pyfunc_type_util.get_signature(self.raw_resolve_fn),
             args,
             kwargs,
             self.input_type,

@@ -171,11 +171,11 @@ class MappedDeriveOpHandler(DeriveOpHandler):
             list_ = new_inputs.pop(mapped_param_name)
             # TODO: use the vectorization described here:
             # https://paper.dropbox.com/doc/Weave-Python-Weave0-Op-compatibility-workstream-kJ3XSDdgR96XwKPapHwPD
-            return [orig_op.resolve_fn(x, **new_inputs) for x in list_]
+            return [orig_op.raw_resolve_fn(x, **new_inputs) for x in list_]
 
         # Use the function signature of the original op to compute the signature
         # of the lazy call
-        resolve.sig = inspect.signature(orig_op.resolve_fn)  # type: ignore
+        resolve.sig = inspect.signature(orig_op.raw_resolve_fn)  # type: ignore
         input_type = copy.copy(orig_op.input_type.arg_types)
         input_type[mapped_param_name] = types.List(first_arg.type)
         new_op = op_def.OpDef(

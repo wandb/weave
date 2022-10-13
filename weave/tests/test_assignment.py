@@ -20,6 +20,11 @@ def test_const_assignment(type_name, type_cls):
         params = [weave.types.String(), weave.types.String()]
     if type_name == "dataframe":
         params = [weave.types.TypedDict({"col": weave.types.String()})]
+    if type_name == "tagged":
+        params = [
+            weave.types.TypedDict({"col": weave.types.String()}),
+            weave.types.String(),
+        ]
 
     cls_type = type_cls(*params)
     const_type = weave.types.Const(

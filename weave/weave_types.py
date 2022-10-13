@@ -729,6 +729,50 @@ class ObjectType(Type):
         return mapper.apply(result)
 
 
+class TaggedValue:
+    _tag: dict[str, typing.Any]
+    _value: typing.Any
+
+    def __init__(self, _tag: dict[str, typing.Any], _value: typing.Any):
+        if isinstance(_value, TaggedValue):
+            # TODO: this needs to be a chain
+            _tag = {**_value._tag, **_tag}
+            _value = _value._value
+        self._tag = _tag
+        self._value = _value
+
+
+@dataclasses.dataclass(frozen=True)
+class TaggedType(ObjectType):
+    name = "tagged"
+    _tag: TypedDict = TypedDict({})
+    _value: Type = Any()
+
+    # TODO: Turn tag and value accessors into functions
+    # TODO: Handle chains of tags and assignment rules
+
+    instance_classes = [TaggedValue]
+
+    def property_types(self):
+        return {"_tag": self._tag, "_value": self._value}
+
+    @classmethod
+    def from_dict(cls, d):
+        # We use custom serialization for tagged types because JS doesn't
+        # use underscores in type keys, but we need to use them in Python
+        # so we don't pollute the namespace.
+        return cls(
+            TypeRegistry.type_from_dict(d["tag"]),
+            TypeRegistry.type_from_dict(d["value"]),
+        )
+
+    def _to_dict(self):
+        # We use custom serialization for tagged types because JS doesn't
+        # use underscores in type keys, but we need to use them in Python
+        # so we don't pollute the namespace.
+        return {"tag": self._tag.to_dict(), "value": self._value.to_dict()}
+
+
 @dataclasses.dataclass(frozen=True)
 class Function(Type):
     name = "function"
