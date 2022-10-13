@@ -756,6 +756,14 @@ class TaggedValue:
     def __setitem__(self, key, value):
         self._value[key] = value
 
+    def __eq__(self, other):
+        if isinstance(other, TaggedValue):
+            return self._tag == other._tag and self._value == other._value
+        return self._value == other
+
+    def __len__(self):
+        return len(self._value)
+
 
 # @dataclasses.dataclass(frozen=True)
 class TaggedType(ObjectType):

@@ -11,7 +11,8 @@ def process_opdef_resolution(
     args: list[typing.Any],
     kwargs: dict[str, typing.Any],
 ) -> typing.Any:
-    return res
+    # I am here, just returning empty tagged value to ensure I can handle all cases
+    return types.TaggedValue({}, res)
     named_args = op_def.input_type.named_args()
     params = op_def.input_type.create_param_dict(args, kwargs)
     if (
