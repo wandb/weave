@@ -1,5 +1,7 @@
 import typing
 from . import weave_types as types
+from . import artifacts_local
+from . import graph
 
 if typing.TYPE_CHECKING:
     from . import op_def as OpDef
@@ -11,6 +13,11 @@ def process_opdef_resolution(
     args: list[typing.Any],
     kwargs: dict[str, typing.Any],
 ) -> typing.Any:
+    # Exception list
+    if isinstance(res, artifacts_local.Artifact):
+        return res
+    if isinstance(res, graph.Node):
+        return res
     # I am here, just returning empty tagged value to ensure I can handle all cases
     return types.TaggedValue({}, res)
     named_args = op_def.input_type.named_args()

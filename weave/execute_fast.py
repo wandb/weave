@@ -13,7 +13,10 @@ def _fast_apply_map_fn(item, index, map_fn):
             for name, node in map_fn.from_op.inputs.items()
         }
         op_def = registry_mem.memory_registry.get_op(map_fn.from_op.name)
-        return op_def.resolve_fn(**inputs)
+        res = op_def.resolve_fn(**inputs)
+        if isinstance(res, types.TaggedValue):
+            res = res._value
+        return res
     elif isinstance(map_fn, graph.ConstNode):
         return map_fn.val
     elif isinstance(map_fn, graph.VarNode):
@@ -70,6 +73,7 @@ def fast_map_fn(input_list, map_fn):
     else:
         getitem = lambda input_list, index: input_list.__getitem__(index)
 
-    return [
+    res = [
         _fast_apply_map_fn(getitem(input_list, i), i, map_fn) for i in range(list_len)
     ]
+    return [r._value if isinstance(r, types.TaggedValue) else r for r in res]

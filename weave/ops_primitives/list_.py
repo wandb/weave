@@ -116,7 +116,12 @@ class List:
         for row, group_key_items in zip(arr, call_results):
             import json
 
-            group_key_s = json.dumps(group_key_items)
+            try:
+                group_key_s = json.dumps(group_key_items)
+            except TypeError:
+                import pdb
+
+                pdb.set_trace()
             if group_key_s not in result:
                 result[group_key_s] = (group_key_items, [])
             result[group_key_s][1].append(row)

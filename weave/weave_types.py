@@ -761,8 +761,65 @@ class TaggedValue:
             return self._tag == other._tag and self._value == other._value
         return self._value == other
 
-    def __len__(self):
-        return len(self._value)
+    def __bool__(self):
+        return bool(self._value)
+
+
+def make_dunder(dund):
+    def dund_fn(self, *args, **kwargs):
+        val = self._value
+        # if not hasattr(val, dund):
+        #     val = box.box(val)
+        return getattr(val, dund)(*args, **kwargs)
+
+    return dund_fn
+
+
+for dund in [
+    "__rshift__",
+    "__mod__",
+    "__float__",
+    "__iter__",
+    "__abs__",
+    "__reversed__",
+    "__ror__",
+    "__ne__",
+    "__pow__",
+    "__add__",
+    "__delete__",
+    "__neg__",
+    "__le__",
+    "__xor__",
+    "__next__",
+    "__lt__",
+    "__matmul__",
+    "__floordiv__",
+    "__mul__",
+    "__index__",
+    "__contains__",
+    "__round__",
+    "__ceil__",
+    "__sub__",
+    "__or__",
+    "__ge__",
+    "__reduce__",
+    "__pos__",
+    "__truediv__",
+    "__div__",
+    "__rfloordiv__",
+    "__rtruediv__" "__trunc__",
+    "__int__",
+    "__floor__",
+    "__len__",
+    "__sizeof__",
+    "__lshift__",
+    "__str__",
+    "__gt__",
+    "__and__",
+    "__complex__",
+    "__radd__",
+]:
+    setattr(TaggedValue, dund, make_dunder(dund))
 
 
 # @dataclasses.dataclass(frozen=True)
