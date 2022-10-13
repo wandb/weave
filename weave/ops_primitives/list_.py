@@ -238,23 +238,38 @@ GroupResultType.instance_classes = GroupResult
 ### TODO Move these ops onto List class and make part of the List interface
 
 
+@mutation
+def index_checkpoint_setter(arr, new_arr):
+    return new_arr
+
+
 @op(
     name="list-createIndexCheckpointTag",
+    setter=index_checkpoint_setter,
     input_type={"arr": types.List(types.Any())},
-    output_type=lambda input_types: input_types["arr"],
+    output_type=lambda input_types: types.List(
+        types.TaggedType(
+            types.TypedDict({"index": types.Number()}), input_types["arr"].object_type
+        )
+    ),
 )
 def list_indexCheckpoint(arr):
-    return arr
+    # UGGG: not all things assignable to a list are enumerable...
+    res = []
+    for item in arr:
+        res.append(types.TaggedValue({"index": len(res)}, item))
+    return res
 
 
 @op(
     name="tag-indexCheckpoint",
-    input_type={"obj": types.Any()},
+    input_type={
+        "obj": types.TaggedType(types.TypedDict({"index": types.Number()}), types.Any())
+    },
     output_type=types.Number(),
 )
 def tag_indexCheckpoint(obj):
-    # TODO. Do we really need this?
-    return 0
+    return obj._tag["index"]
 
 
 def is_list_like(list_type_or_node):

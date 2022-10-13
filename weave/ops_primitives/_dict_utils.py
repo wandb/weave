@@ -6,7 +6,15 @@ def typeddict_pick_output_type(input_types):
     if not isinstance(input_types["key"], types.Const):
         return types.UnknownType()
     key = input_types["key"].val
-    property_types = input_types["self"].property_types
+    self_input = input_types["self"]
+
+    # TODO: This is really bad - tagged type's `property_types` shadows
+    # typed dicts' `property_types`. In most cases we want the former, but
+    # in this case we want the latter. We should probably have a way to
+    # specify which one we want.
+    if isinstance(self_input, types.TaggedType):
+        self_input = self_input._value
+    property_types = self_input.property_types
     output_type = property_types.get(key)
     if output_type is None:
         # TODO: we hack this to types.Number() for now! This is relied

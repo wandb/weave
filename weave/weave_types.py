@@ -83,13 +83,6 @@ def type_name_to_type(type_name):
     return mapping.get(type_name)
 
 
-# js_compat: we don't have Tag types in Weave Python yet. Just remove them
-def unwrap_tag_type(serialized_type):
-    if isinstance(serialized_type, dict) and serialized_type.get("type") == "tagged":
-        return serialized_type["value"]
-    return serialized_type
-
-
 class TypeRegistry:
     @staticmethod
     def has_type(obj):
@@ -138,7 +131,6 @@ class TypeRegistry:
 
     @staticmethod
     def type_from_dict(d: typing.Union[str, dict]) -> "Type":
-        d = unwrap_tag_type(d)
         # The javascript code sends simple types as just strings
         # instead of {'type': 'string'} for example
         type_name = d["type"] if isinstance(d, dict) else d
@@ -230,6 +222,8 @@ class Type(metaclass=_TypeSubclassWatcher):
     def assign_type(self, next_type: "Type") -> bool:
         if isinstance(next_type, Const):
             return self.assign_type(next_type.val_type)
+        elif isinstance(next_type, TaggedValue) and not isinstance(self, TaggedValue):
+            return self.assign_type(next_type._value)
         elif isinstance(next_type, UnionType):
             for t in next_type.members:
                 if not self.assign_type(t):
@@ -734,22 +728,58 @@ class TaggedValue:
     _value: typing.Any
 
     def __init__(self, _tag: dict[str, typing.Any], _value: typing.Any):
-        if isinstance(_value, TaggedValue):
+        if isinstance(_tag, TaggedValue):
+            raise Exception("TaggedValue can not be nested")
+        while isinstance(_value, TaggedValue):
             # TODO: this needs to be a chain
             _tag = {**_value._tag, **_tag}
             _value = _value._value
+        for key, value in _tag.items():
+            if value == _value:
+                raise Exception("TaggedValue tag can not be the same as the value")
+            if isinstance(value, TaggedValue):
+                # TODO: unnest?
+                pass
+        if isinstance(_value, TaggedValue):
+            raise Exception("TaggedValue can not be nested")
         self._tag = _tag
         self._value = _value
 
+    def __getattr__(self, attr):
+        if attr in ["_tag", "_value"]:
+            return self.__dict__[attr]
+        return getattr(self._value, attr)
 
-@dataclasses.dataclass(frozen=True)
+    def __getitem__(self, item):
+        return self._value[item]
+
+    def __setitem__(self, key, value):
+        self._value[key] = value
+
+
+# @dataclasses.dataclass(frozen=True)
 class TaggedType(ObjectType):
     name = "tagged"
     _tag: TypedDict = TypedDict({})
     _value: Type = Any()
 
+    @classmethod
+    def type_vars(cls):
+        return {"_tag": TypedDict({}), "_value": Any()}
+
     # TODO: Turn tag and value accessors into functions
     # TODO: Handle chains of tags and assignment rules
+    def __init__(self, _tag: TypedDict, _value: Type):
+        if isinstance(_tag, TaggedType):
+            raise Exception("TaggedType can not be nested")
+        while isinstance(_value, TaggedType):
+            # TODO: this needs to be a chain
+            _tag = TypedDict({**_value._tag.property_types, **_tag.property_types})
+            _value = _value._value
+        if isinstance(_value, TaggedType):
+            raise Exception("TaggedType can not be nested")
+        self._tag = _tag
+        self._value = _value
 
     instance_classes = [TaggedValue]
 

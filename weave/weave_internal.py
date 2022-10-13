@@ -63,6 +63,10 @@ class UniversalNodeMixin:
 def get_node_methods_classes(type_: types.Type) -> typing.Sequence[typing.Type]:
     classes = []
 
+    # Mixin function output type Node methods
+    if isinstance(type_, types.TaggedType):
+        type_ = type_._value
+
     # Keeping this is still important for overriding dunder methods!
     for type_class in type_.__class__.mro():
         if (

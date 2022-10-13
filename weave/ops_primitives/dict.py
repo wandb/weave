@@ -31,7 +31,8 @@ from .. import weave_types as types
 class TypedDict(dict):
     @mutation
     def __setitem__(self, k, v):
-        dict.__setitem__(self, k, v)
+        self[k] = v
+        # dict.__setitem__(self, k, v)
         return self
 
     @op(
@@ -40,15 +41,16 @@ class TypedDict(dict):
         output_type=typeddict_pick_output_type,
     )
     def pick(self, key):
-        if not isinstance(self, dict):
-            # won't need this when we fix type-checking, but for now it
-            # surfaces an error
-            # TODO: totally not right, need to figure out mapped ops
-            return self.pick(key)
-        try:
-            return dict.__getitem__(self, key)
-        except KeyError:
-            return None
+        return self.get(key, None)
+        # if not isinstance(self, dict):
+        #     # won't need this when we fix type-checking, but for now it
+        #     # surfaces an error
+        #     # TODO: totally not right, need to figure out mapped ops
+        #     return self.pick(key)
+        # try:
+        #     return dict.__getitem__(self, key)
+        # except KeyError:
+        #     return None
 
     @op(
         name="merge",
