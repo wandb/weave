@@ -6,6 +6,7 @@ import weave
 
 from ... import weave_internal
 from ... import panel
+from ... import panel_util
 
 
 @weave.op()
@@ -29,6 +30,9 @@ class DistributionConfig:
     label: weave.Node[float] = dataclasses.field(
         default_factory=lambda: weave.graph.VoidNode()
     )
+    bin_size: weave.Node[float] = dataclasses.field(
+        default_factory=lambda: weave.graph.ConstNode(weave.types.Float(), 10)
+    )
 
 
 @weave.op()
@@ -38,7 +42,11 @@ def multi_distribution(
     unnested = weave.ops.unnest(input_node)
     binned = unnested.groupby(
         lambda item: weave.ops.dict_(
-            value=round(weave_internal.better_call_fn(config["value"], item) * 10) / 10,
+            value=round(
+                weave_internal.better_call_fn(config["value"], item)
+                / config["bin_size"]
+            )
+            * config["bin_size"],
             label=weave_internal.better_call_fn(config["label"], item),
         )
     ).map(
@@ -46,6 +54,7 @@ def multi_distribution(
             value=group.key()["value"], label=group.key()["label"], count=group.count()
         )
     )
+    print("BINNED TYPE", binned.type)
     return weave.panels.Plot(
         binned,
         x=lambda row: row["value"],
@@ -96,3 +105,5 @@ class MultiDistribution(panel.Panel):
             self.config.label = weave_internal.define_fn(
                 {param_name: unnested.type.object_type}, options["label_fn"]
             )
+        if "bin_size" in options:
+            self.config.bin_size = panel_util.make_node(options["bin_size"])
