@@ -2,11 +2,14 @@ import dataclasses
 
 import weave
 from .. import panel
+from .. import weave_internal
 
 
 @weave.type()
 class PanelSlider2Config:
-    value: float = dataclasses.field(default_factory=lambda: 1)
+    value: weave.Node[int] = dataclasses.field(
+        default_factory=lambda: weave_internal.make_const_node(weave.types.Int(), 1)
+    )
 
 
 @weave.type()

@@ -417,12 +417,17 @@ class WeaveJSListInterface:
         type_class = types.TypeRegistry.type_class_of(arr)
         return type_class.NodeMethodsClass.__getitem__.resolve_fn(arr, index)
 
+    def pick_set(obj, k, v, action=None):
+        type_class = types.TypeRegistry.type_class_of(obj)
+        return type_class.NodeMethodsClass.__setitem__(obj, k, v, action=action)
+
     # This should not actually be part of the list interface, as its
     # only valid when contained items are lists. However, this is the
     # best place to adapt to frontend behavior, which expects a single
     # pick op that does mapping as well as TypedDict lookups.
     @op(
         name="pick",
+        setter=pick_set,
         input_type={
             "obj": types.UnionType(
                 types.TypedDict({}), types.List(types.TypedDict({}))

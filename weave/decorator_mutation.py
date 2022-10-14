@@ -39,7 +39,7 @@ def _do_mutation_call(f, args, action=None):
             name: storage.deref(input) for name, input in from_run.inputs.items()
         }
         if op_def.setter is not None:
-            op_def.setter(*run_inputs.values(), res, action=action)
+            return op_def.setter(*run_inputs.values(), res, action=action)
     return res
 
 

@@ -55,6 +55,23 @@ def multi_distribution(
     )
 
 
+# TODO: not yet used
+@weave.op()
+def multi_distribution_config(
+    input_node: weave.Node[list[typing.Any]], config: DistributionConfig
+) -> weave.panels.Group2:
+    return weave.panels.Group2(
+        items={
+            "value_fn": weave.panels.LabeledItem(
+                label="value", item=weave.panels.ExpressionEditor()
+            ),
+            "label_fn": weave.panels.LabeledItem(
+                label="label", item=weave.panels.ExpressionEditor()
+            ),
+        }
+    )
+
+
 @weave.type()
 class MultiDistribution(panel.Panel):
     id = "op-multi_distribution"
