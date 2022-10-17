@@ -39,6 +39,9 @@ class DistributionConfig:
 def multi_distribution(
     input_node: weave.Node[list[typing.Any]], config: DistributionConfig
 ) -> weave.panels.Plot:
+    if config is None:
+        # TODO: Placeholder None value
+        return weave.panels.Slider2()
     unnested = weave.ops.unnest(input_node)
     binned = unnested.groupby(
         lambda item: weave.ops.dict_(

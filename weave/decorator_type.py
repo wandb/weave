@@ -1,9 +1,11 @@
+import inspect
 import typing
 import dataclasses
 
 from . import weave_types as types
 from . import infer_types
 from . import decorator_class
+from . import errors
 
 _py_type = type
 
@@ -29,7 +31,15 @@ def type(__override_name: str = None):
                 # This is a Python type variable
                 type_vars[field.name] = types.Any()
             else:
-                weave_type = infer_types.python_type_to_type(field.type)
+                try:
+                    weave_type = infer_types.python_type_to_type(field.type)
+                except TypeError:
+                    # hmmm... type rewriting. Am I OK with this? Could be overly aggressive.
+                    # TODO: decide if we should do this
+                    raise errors.WeaveDefinitionError(
+                        f"{target}.{field.name} is not a valid python type (a class or type)"
+                    )
+
                 weave_type_vars = weave_type.type_vars()
                 if any(
                     isinstance((getattr(weave_type, var_name)), types.Any)

@@ -37,21 +37,21 @@ def _show_params(obj):
         return {"weave_node": weavejs_fixes.fixup_node(obj)}
 
     elif isinstance(obj, panel.Panel):
-        ref = storage.save(obj)
-        node = graph.OutputNode(
-            types.UnknownType(),
-            "get",
-            {"uri": graph.ConstNode(types.String(), str(ref))},
-        )
-        return {"weave_node": weavejs_fixes.fixup_node(node)}
+        # ref = storage.save(obj)
+        # node = graph.OutputNode(
+        #     types.UnknownType(),
+        #     "get",
+        #     {"uri": graph.ConstNode(types.String(), str(ref))},
+        # )
+        # return {"weave_node": weavejs_fixes.fixup_node(node)}
 
-        # converted = storage.to_python(obj)["_val"]
+        converted = storage.to_python(obj)["_val"]
 
-        # return {
-        #     "weave_node": weavejs_fixes.fixup_node(obj.input_node),
-        #     "panel_id": converted["id"],
-        #     "panel_config": weavejs_fixes.fixup_data(converted["config"]),
-        # }
+        return {
+            "weave_node": weavejs_fixes.fixup_node(obj.input_node),
+            "panel_id": converted["id"],
+            "panel_config": weavejs_fixes.fixup_data(converted["config"]),
+        }
 
     elif isinstance(obj, storage.Ref):
         from weave import ops

@@ -81,42 +81,47 @@ class Plot(panel.Panel):
                 }
             )
 
-            # TODO: handle all this stuff generically!
-            if "x" in options:
-                self.set_x(options["x"])
+            # TODO is this correct?
+            for k, v in options.items():
+                method = getattr(self, "set_%s" % k, None)
+                if method is None:
+                    method = getattr(self, k)
+                method(v)
+            # if "x" in options:
+            #     self.set_x(options["x"])
 
-            if "x_title" in options:
-                self.config.axisSettings.x.title = options["x_title"]
+            # if "x_title" in options:
+            #     self.config.axisSettings.x.title = options["x_title"]
 
-            if options.get("groupby_x"):
-                self.groupby_x(options["groupby_x"])
+            # if options.get("groupby_x"):
+            #     self.groupby_x()
 
-            if "y" in options:
-                self.set_y(options["y"])
+            # if "y" in options:
+            #     self.set_y(options["y"])
 
-            if "y_title" in options:
-                self.config.axisSettings.y.title = options["y_title"]
+            # if "y_title" in options:
+            #     self.config.axisSettings.y.title = options["y_title"]
 
-            if options.get("groupby_y"):
-                self.groupby_y(options["groupby_y"])
+            # if options.get("groupby_y"):
+            #     self.groupby_y()
 
-            if "label" in options:
-                self.set_label(options["label"])
+            # if "label" in options:
+            #     self.set_label(options["label"])
 
-            if options.get("groupby_label"):
-                self.groupby_label(options["groupby_label"])
+            # if options.get("groupby_label"):
+            #     self.groupby_label(options["groupby_label"])
 
-            if "tooltip" in options:
-                self.set_tooltip(options["tooltip"])
+            # if "tooltip" in options:
+            #     self.set_tooltip(options["tooltip"])
 
-            if options.get("no_axes"):
-                self.set_no_axes()
+            # if options.get("no_axes"):
+            #     self.set_no_axes()
 
-            if options.get("no_legend"):
-                self.set_no_legend()
+            # if options.get("no_legend"):
+            #     self.set_no_legend()
 
-            if options.get("mark"):
-                self.set_mark(options["mark"])
+            # if options.get("mark"):
+            #     self.set_mark(options["mark"])
 
     @property
     def table_query(self):
@@ -126,13 +131,19 @@ class Plot(panel.Panel):
     def set_x(self, expr):
         self.config.table.update_col(self.config.dims.x, expr)
 
-    def groupby_x(self):
+    def groupby_x(self, val):
+        if not val:
+            # TODO
+            raise Exception("fix me")
         self.config.table.enable_groupby(self.config.dims.x)
 
     def set_y(self, expr):
         self.config.table.update_col(self.config.dims.y, expr)
 
-    def groupby_y(self):
+    def groupby_y(self, val):
+        if not val:
+            # TODO
+            raise Exception("wait fix")
         self.config.table.enable_groupby(self.config.dims.y)
 
     def set_label(self, expr):
