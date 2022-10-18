@@ -110,3 +110,46 @@ class MultiDistribution(panel.Panel):
             )
         if "bin_size" in options:
             self.config.bin_size = panel_util.make_node(options["bin_size"])
+
+
+@weave.type()
+class AdderConfig:
+    operand: weave.Node[int] = dataclasses.field(
+        default_factory=lambda: weave.graph.ConstNode(weave.types.Int(), 10)
+    )
+
+
+@weave.op()
+def adder_config(
+    input_node: weave.Node[int], config: AdderConfig
+) -> weave.panels.LabeledItem:
+    input_val = typing.cast(int, input_node)
+    if config is None:
+        config = {"operand": panel_util.make_node(0.1)}
+    return weave.panels.LabeledItem(
+        label="operand",
+        item=weave.panels.Slider2(config=weave.panels.Slider2Config(config["operand"])),
+    )
+
+
+@weave.op()
+def adder(input_node: weave.Node[int], config: AdderConfig) -> weave.panels.LabeledItem:
+    input_val = typing.cast(int, input_node)
+    if config is None:
+        config = {"operand": 10}
+    return weave.panels.LabeledItem(label="output", item=input_val + config["operand"])
+
+
+@weave.type()
+class Adder(panel.Panel):
+    id = "op-adder"
+    config: typing.Optional[AdderConfig] = None
+
+    def __init__(self, input_node, vars=None, config=None, **options):
+        super().__init__(input_node=input_node, vars=vars)
+        self.config = config
+        if self.config is None:
+            self.config = AdderConfig()
+
+        if "operand" in options:
+            self.config.operand = panel_util.make_node(options["operand"])
