@@ -1,4 +1,4 @@
-from ..api import op, weave_class
+from ..api import mutation, op, weave_class
 from .. import weave_types as types
 
 
@@ -27,6 +27,11 @@ class Object:
     to_pylist = None
     as_py = None
 
-    @op(output_type=getattr_output_type)
+    @mutation
+    def obj_settattr(self, attr, v):
+        setattr(self, attr, v)
+        return self
+
+    @op(setter=obj_settattr, output_type=getattr_output_type)
     def __getattr__(self, name: str):
         return getattr(self, name)

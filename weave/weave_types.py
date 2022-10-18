@@ -749,6 +749,17 @@ class Function(Type):
         input_types = {k: v.to_dict() for (k, v) in self.input_types.items()}
         return {"inputTypes": input_types, "outputType": self.output_type.to_dict()}
 
+    def save_instance(self, obj, artifact, name):
+        with artifact.new_file(f"{name}.object.json") as f:
+            json.dump(obj.to_json(), f)
+
+    def load_instance(self, artifact, name, extra=None):
+        with artifact.open(f"{name}.object.json") as f:
+            # TODO: no circular imports!
+            from . import graph
+
+            return graph.Node.node_from_json(json.load(f))
+
 
 @dataclasses.dataclass(frozen=True)
 class RefType(Type):

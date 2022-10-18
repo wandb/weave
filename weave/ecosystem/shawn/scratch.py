@@ -119,25 +119,36 @@ class AdderConfig:
     )
 
 
+@weave.mutation
+def adder_set_default_config(config, new_config):
+    return new_config
+
+
+# TODO: really annoying that I need the setter here.
+@weave.op(setter=adder_set_default_config)
+def adder_default_config(config: typing.Optional[AdderConfig]) -> AdderConfig:
+    if config == None:
+        return AdderConfig(operand=panel_util.make_node(0.1))
+    return config
+
+
 @weave.op()
 def adder_config(
     input_node: weave.Node[int], config: AdderConfig
 ) -> weave.panels.LabeledItem:
     input_val = typing.cast(int, input_node)
-    if config is None:
-        config = {"operand": panel_util.make_node(0.1)}
+    config = adder_default_config(config)
     return weave.panels.LabeledItem(
         label="operand",
-        item=weave.panels.Slider2(config=weave.panels.Slider2Config(config["operand"])),
+        item=weave.panels.Slider2(config=weave.panels.Slider2Config(config.operand)),
     )
 
 
 @weave.op()
 def adder(input_node: weave.Node[int], config: AdderConfig) -> weave.panels.LabeledItem:
     input_val = typing.cast(int, input_node)
-    if config is None:
-        config = {"operand": 10}
-    return weave.panels.LabeledItem(label="output", item=input_val + config["operand"])
+    config = adder_default_config(config)
+    return weave.panels.LabeledItem(label="output", item=input_val + config.operand)
 
 
 @weave.type()

@@ -11,6 +11,7 @@ from .. import weave_internal
 from .. import trace
 from .. import refs
 from .. import uris
+from .. import graph
 from .. import artifacts_local
 
 
@@ -142,11 +143,25 @@ def get(uri):
     return storage.get(uri)
 
 
+@mutation
+def execute_setter(node, value):
+    if isinstance(node, graph.ConstNode):
+        return graph.ConstNode(node.type, value)
+    else:
+        # TODO: The OutputNode code path needs to do the mutation
+        #     on node, instead of going back up whatever constructed
+        #     Node
+        raise errors.WeaveInternalError(
+            "Execute setter path not implemented for ", node
+        )
+
+
 @op(
     # TODO: purity is a function of arguments in this special case.
     # E.g. if argument is "3 + 1", executing it is pure. If this matters
     # in practice, we can just hardcode in the engine.
     pure=False,
+    setter=execute_setter,
     name="execute",
     input_type={"node": types.Function({}, types.Any())},
     output_type=lambda input_type: input_type["node"].output_type,

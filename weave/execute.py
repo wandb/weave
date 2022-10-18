@@ -19,6 +19,7 @@ from . import weave_types as types
 # Ops
 from . import registry_mem
 from . import op_def
+from . import op_args
 
 # Trace / cache
 from . import trace_local
@@ -208,9 +209,11 @@ def execute_forward_node(
             input_name0 = list(inputs.keys())[0]
             input0 = list(inputs.values())[0]
             if input0 is None or isinstance(input0, box.BoxedNone):
-                input0_type = node.from_op.inputs[input_name0]
-                if not types.is_optional(input0_type):
-                    force_none_result = True
+                op_input_types = op_def.input_type
+                if isinstance(op_input_types, op_args.OpNamedArgs):
+                    input0_type = op_input_types.arg_types[input_name0]
+                    if not types.is_optional(input0_type):
+                        force_none_result = True
         if force_none_result:
             result = None
         else:
