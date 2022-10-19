@@ -36,6 +36,18 @@ from .artifacts_local import local_artifact_dir
 
 context_state.clear_loading_built_ins(loading_builtins_token)
 
+import sys
+
+# NOTE: Fixes flask dev server's auto-reload capability, by forcing it to use
+# stat mode instead of watchdog mode. It turns out that "import wandb" breaks
+# users of watchdog somehow. We'll need to fix that in wandb.
+# TODO: fix.
+if os.environ.get("FLASK_DEBUG"):
+    print(
+        "!!! Weave server removing watchdog from sys.path for development mode. This could break other libraries"
+    )
+    sys.modules["watchdog.observers"] = None  # type: ignore
+
 
 # set up logging
 
