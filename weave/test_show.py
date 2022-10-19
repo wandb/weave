@@ -153,7 +153,20 @@ actual_SHOW_PARAMS_FINE_TUNE_WEAVE_NODE = {
         "inputs": {
             "training_dataset": {
                 "nodeType": "output",
-                "type": {"type": "LocalArtifactRef"},
+                "type": {
+                    "type": "LocalArtifactRef",
+                    "objectType": {
+                        "type": "list",
+                        "objectType": {
+                            "type": "typedDict",
+                            "propertyTypes": {
+                                "id": "int",
+                                "prompt": "string",
+                                "completion": "string",
+                            },
+                        },
+                    },
+                },
                 "fromOp": {
                     "name": "get",
                     "inputs": {
@@ -195,8 +208,10 @@ def test_large_const_node():
 
     model = openai.Gpt3FineTune.model(fine_tune)
     panel = panels.Table(["1 + 9 =", "2 + 14 ="])
-    panel.table_query.add_column(lambda row: row)
-    panel.table_query.add_column(lambda row: model.complete(row)["choices"][0]["text"])
+    panel.config.tableState.add_column(lambda row: row)
+    panel.config.tableState.add_column(
+        lambda row: model.complete(row)["choices"][0]["text"]
+    )
     show_panel_params = _show_params(panel)
 
     # Ensure that we sent the dataset as a get(<ref>) rather than as a const list

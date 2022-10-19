@@ -154,8 +154,11 @@ def test_ref_type():
     ref = storage.save(obj, "my-dict")
     python_ref = storage.to_python(ref)
     assert python_ref == {
-        "_type": {"type": "LocalArtifactRef"},
-        "_val": f"local-artifact://{artifacts_local.local_artifact_dir()}/my-dict/6036cbf3a05809f1a3f174a1485b1770",
+        "_type": {
+            "type": "LocalArtifactRef",
+            "objectType": {"type": "typedDict", "propertyTypes": {"x": "int"}},
+        },
+        "_val": "local-artifact:///tmp/weave/pytest/weave/test_storage.py::test_ref_type (setup)/my-dict/6036cbf3a05809f1a3f174a1485b1770",
     }
     ref2 = storage.from_python(python_ref)
     obj2 = storage.deref(ref2)

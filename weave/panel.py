@@ -32,7 +32,7 @@ from .ops import get as op_get
 
 
 def run_variable_lambdas(obj, vars):
-    if callable(obj):
+    if not isinstance(obj, graph.Node) and callable(obj):
         sig = inspect.signature(obj)
         param_nodes = {}
         for param in sig.parameters:

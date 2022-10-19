@@ -11,8 +11,8 @@ from . import weave_internal
 
 def test_panel_id():
     panel = Group2(items={})
-    assert panel.id == "group2"
-    assert panel.to_json()["id"] == "group2"
+    assert panel.id == "Group2"
+    assert panel.to_json()["id"] == "Group2"
 
 
 @pytest.mark.skip()
@@ -49,11 +49,9 @@ def test_controlled_state_out():
     panel = Group2(
         items={"my_slider": Slider2(), "val": lambda my_slider: my_slider.config.value}
     )
-    panel._normalize()
     # panel.items['val'] will have been converted to a node, stringifying it
     # produces an expression string.
     assert str(panel.config.items["val"]) == "my_slider.config.value"
-    assert 1 == 2
 
 
 @pytest.mark.skip()
@@ -100,7 +98,6 @@ def test_save_panel():
         metrics,
         render=lambda metric_name: weave.panels.Plot(
             data,
-            title=metric_name,
             x=lambda row: row[metric_name][0],
             y=lambda row: row[metric_name][1],
         ),
