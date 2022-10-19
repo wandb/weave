@@ -7,10 +7,10 @@ import weave
 
 @weave.type()
 class DistributionConfig:
-    value: weave.Node[float] = dataclasses.field(
+    value_fn: weave.Node[float] = dataclasses.field(
         default_factory=lambda: weave.graph.VoidNode()
     )
-    label: weave.Node[str] = dataclasses.field(
+    label_fn: weave.Node[str] = dataclasses.field(
         default_factory=lambda: weave.graph.VoidNode()
     )
     bin_size: weave.Node[float] = dataclasses.field(
@@ -25,8 +25,8 @@ def multi_distribution(
     unnested = weave.ops.unnest(input_node)
     binned = unnested.groupby(
         lambda item: weave.ops.dict_(
-            value=round(config.value(item) / config.bin_size) * config.bin_size,
-            label=config.label(item),
+            value=round(config.value_fn(item) / config.bin_size) * config.bin_size,
+            label=config.label_fn(item),
         )
     ).map(
         lambda group: weave.ops.dict_(
@@ -48,11 +48,20 @@ def multi_distribution_config(
 ) -> weave.panels.Group2:
     return weave.panels.Group2(
         items={
-            # "value_fn": weave.panels.LabeledItem(
-            #     label="value", item=weave.panels.ExpressionEditor()
-            # ),
-            "bin_size": weave.panels.LabeledItem(
+            "value_fn": weave.panels.LabeledItem(
+                label="value",
+                item=weave.panels.ExpressionEditor(
+                    config=weave.panels.ExpressionEditorConfig(config.value_fn)
+                ),
+            ),
+            "label_fn": weave.panels.LabeledItem(
                 label="label",
+                item=weave.panels.ExpressionEditor(
+                    config=weave.panels.ExpressionEditorConfig(config.label_fn)
+                ),
+            ),
+            "bin_size": weave.panels.LabeledItem(
+                label="bin_size",
                 item=weave.panels.Slider2(
                     config=weave.panels.Slider2Config(config.bin_size)
                 ),
@@ -76,13 +85,13 @@ class MultiDistribution(weave.Panel):
         if "value_fn" in options:
             sig = inspect.signature(options["value_fn"])
             param_name = list(sig.parameters.values())[0].name
-            self.config.value = weave.define_fn(
+            self.config.value_fn = weave.define_fn(
                 {param_name: unnested.type.object_type}, options["value_fn"]
             )
         if "label_fn" in options:
             sig = inspect.signature(options["label_fn"])
             param_name = list(sig.parameters.values())[0].name
-            self.config.label = weave.define_fn(
+            self.config.label_fn = weave.define_fn(
                 {param_name: unnested.type.object_type}, options["label_fn"]
             )
         if "bin_size" in options:
