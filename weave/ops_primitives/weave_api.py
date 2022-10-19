@@ -170,6 +170,19 @@ def execute(node):
     return weave_internal.use(node)
 
 
+@weave_class(weave_type=types.Function)
+class FunctionOps:
+    @op(
+        output_type=lambda input_type: input_type["self"].output_type,
+    )
+    def __call__(self, arg1: typing.Any):
+        arg1_node = weave_internal.make_const_node(
+            types.TypeRegistry.type_of(arg1), arg1
+        )
+        called = weave_internal.better_call_fn(self, arg1_node)
+        return weave_internal.use(called)
+
+
 @weave_class(weave_type=types.RunType)
 class Run:
     # NOTE: the mutations here are unused, only used by test currently.

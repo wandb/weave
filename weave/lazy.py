@@ -122,7 +122,8 @@ def _make_output_node(
     node_methods_class, node_name = language_autocall.node_methods_class(output_type)
     if node_methods_class is not None:
         name += node_name
-        bases.append(node_methods_class)
+        if node_methods_class not in bases:
+            bases.append(node_methods_class)
 
     return_type = type(name, tuple(bases), {})
     return return_type(output_type, fq_op_name, bound_params)

@@ -18,6 +18,7 @@ from .. import panels
 # from . import wandb
 from . import scenario
 from . import shawn
+from . import wandb
 
 # TODO: feels odd to call this "ops.Markdown".
 # Maybe make it top level

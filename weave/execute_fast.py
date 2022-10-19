@@ -34,6 +34,15 @@ def _resolve_static_branches(map_fn):
             name: _resolve_static_branches(node)
             for name, node in map_fn.from_op.inputs.items()
         }
+
+        if map_fn.from_op.name == "function-__call__":
+            # Special case to expand function calls
+            if isinstance(inputs["self"], graph.ConstNode):
+                return weave_internal.better_call_fn(
+                    inputs["self"].val,
+                    inputs["arg1"],
+                )
+
         if all(isinstance(v, graph.ConstNode) for v in inputs.values()):
             op_def = registry_mem.memory_registry.get_op(map_fn.from_op.name)
             call_inputs = {name: node.val for name, node in inputs.items()}
@@ -74,5 +83,6 @@ def _slow_map_fn(input_list, map_fn):
 def fast_map_fn(input_list, map_fn):
     if not _can_fast_map(map_fn):
         return _slow_map_fn(input_list, map_fn)
+
     map_fn = _resolve_static_branches(map_fn)
     return [_fast_apply_map_fn(item, i, map_fn) for i, item in enumerate(input_list)]

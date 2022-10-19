@@ -11,9 +11,13 @@ from .api import *
 # Note: we don't want to treat ecosystem as builtins, but this makes things
 # easier at the moment.
 # TODO: fix
-from .ecosystem import ecosystem
+# from .ecosystem import ecosystem
 
 from . import panels
+from .panel import Panel
+
+# TODO: Don't expose
+from .panel_util import make_node
 
 _context.clear_loading_built_ins(_loading_builtins_token)
 
