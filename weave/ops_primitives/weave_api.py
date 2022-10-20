@@ -170,6 +170,52 @@ def execute(node):
     return weave_internal.use(node)
 
 
+@op(
+    pure=False,
+    name="set",
+    input_type={"self": types.Function({}, types.Any())},
+)
+def set(self, val: typing.Any) -> typing.Any:
+    nodes = graph.linearize(self)
+    if nodes is None:
+        raise errors.WeaveInternalError("Set error")
+
+    # Run through resolvers forward
+    results = []
+    op_inputs = []
+    arg0 = list(nodes[0].from_op.inputs.values())[0].val
+    for node in nodes:
+        inputs = {}
+        arg0_name = list(node.from_op.inputs.keys())[0]
+        inputs[arg0_name] = arg0
+        for name, input_node in list(node.from_op.inputs.items())[1:]:
+            if not isinstance(input_node, graph.ConstNode):
+                raise errors.WeaveInternalError("Set error")
+            inputs[name] = input_node.val
+        op_inputs.append(inputs)
+        op_def = registry_mem.memory_registry.get_op(node.from_op.name)
+        arg0 = op_def.resolve_fn(**inputs)
+        results.append(arg0)
+
+    # Make the updates backwards
+    res = val
+    for node, inputs, result in reversed(list(zip(nodes, op_inputs, results))):
+        op_def = registry_mem.memory_registry.get_op(node.from_op.name)
+        if not op_def.setter:
+            raise errors.WeaveInternalError("Set error")
+        args = list(inputs.values())
+        args.append(res)
+        print("OP DEF", op_def.resolve_fn)
+        try:
+            res = op_def.setter.func(*args)
+        except AttributeError:
+            res = op_def.setter(*args)
+
+    print("MUTATION RESULT", res)
+    print("TO PYTHON", storage.to_python(res))
+    return res
+
+
 @weave_class(weave_type=types.Function)
 class FunctionOps:
     @op(

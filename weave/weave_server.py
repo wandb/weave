@@ -41,7 +41,8 @@ import sys
 # NOTE: Fixes flask dev server's auto-reload capability, by forcing it to use
 # stat mode instead of watchdog mode. It turns out that "import wandb" breaks
 # users of watchdog somehow. We'll need to fix that in wandb.
-# TODO: fix.
+# A wandb fix should go out in 0.13.5.
+# TODO: remove this hack when wandb 0.13.5 is released.
 if os.environ.get("FLASK_DEBUG"):
     print(
         "!!! Weave server removing watchdog from sys.path for development mode. This could break other libraries"

@@ -52,4 +52,5 @@ def mutation(f):
 
     # Attach the signature so additional decorators (@op) can use it.
     call.sig = inspect.signature(f)
+    call.func = f
     return call

@@ -141,10 +141,14 @@ class ConstNode(Node):
 
         val = self.val
         if (
-            isinstance(self.type, (weave_types.BasicType, weave_types.TypedDict))
+            isinstance(
+                self.type,
+                (weave_types.BasicType, weave_types.TypedDict, weave_types.ObjectType),
+            )
             or isinstance(self.type, weave_types.Const)
             and isinstance(
-                self.type.val_type, (weave_types.BasicType, weave_types.TypedDict)
+                self.type.val_type,
+                (weave_types.BasicType, weave_types.TypedDict, weave_types.ObjectType),
             )
         ):
             return
