@@ -146,7 +146,10 @@ def get(uri):
 @mutation
 def execute_setter(node, value):
     if isinstance(node, graph.ConstNode):
-        return graph.ConstNode(node.type, value)
+        new_type = node.type
+        if isinstance(new_type, types.Function):
+            new_type = types.Function(new_type.input_types, value.type)
+        return graph.ConstNode(new_type, value)
     else:
         # TODO: The OutputNode code path needs to do the mutation
         #     on node, instead of going back up whatever constructed
@@ -190,8 +193,15 @@ def set(self, val: typing.Any) -> typing.Any:
         inputs[arg0_name] = arg0
         for name, input_node in list(node.from_op.inputs.items())[1:]:
             if not isinstance(input_node, graph.ConstNode):
-                raise errors.WeaveInternalError("Set error")
-            inputs[name] = input_node.val
+                inputs[name] = weave_internal.use(input_node)
+                # TODO: I was raising here, but the way I'm handling
+                # default config in multi_distribution makes it necessary
+                # to handle this case. This solution is more general,
+                # but also more expensive. We should make use of the execution
+                # cache (mutations should probably be planned by the compiler)
+                # raise errors.WeaveInternalError("Set error")
+            else:
+                inputs[name] = input_node.val
         op_inputs.append(inputs)
         op_def = registry_mem.memory_registry.get_op(node.from_op.name)
         arg0 = op_def.resolve_fn(**inputs)
@@ -205,14 +215,11 @@ def set(self, val: typing.Any) -> typing.Any:
             raise errors.WeaveInternalError("Set error")
         args = list(inputs.values())
         args.append(res)
-        print("OP DEF", op_def.resolve_fn)
         try:
             res = op_def.setter.func(*args)
         except AttributeError:
             res = op_def.setter(*args)
 
-    print("MUTATION RESULT", res)
-    print("TO PYTHON", storage.to_python(res))
     return res
 
 

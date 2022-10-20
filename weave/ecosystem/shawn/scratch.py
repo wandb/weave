@@ -50,7 +50,9 @@ def adder_config(
     config = adder_default_config(config)
     return weave.panels.LabeledItem(
         label="operand",
-        item=weave.panels.Slider2(config=weave.panels.Slider2Config(config.operand)),
+        item=weave.panels.Slider2(
+            config=weave.panels.Slider2Config(weave.ops.execute(config.operand))
+        ),
     )
 
 

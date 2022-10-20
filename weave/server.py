@@ -42,9 +42,6 @@ def _handle_request(request, deref=False):
         is_tracing = True
         tracer = viztracer.VizTracer()
         tracer.start()
-    # from rich import print
-
-    # print("NODES", request["graphs"])
     # nodes = [graph.Node.node_from_json(n) for n in request["graphs"]]
     nodes = serialize.deserialize(request["graphs"])
 

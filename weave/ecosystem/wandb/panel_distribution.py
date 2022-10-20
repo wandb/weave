@@ -4,6 +4,8 @@ import typing
 
 import weave
 
+from ... import panel_util
+
 
 @weave.type()
 class DistributionConfig:
@@ -18,14 +20,50 @@ class DistributionConfig:
     )
 
 
+@weave.mutation
+def multi_distribution_set_default_config(config, input_node, new_config):
+    return new_config
+
+
+def default_config(input_node: weave.Node[list[typing.Any]]):
+    unnested = weave.ops.unnest(input_node)
+    return DistributionConfig(
+        value_fn=weave.define_fn(
+            {"item": unnested.type.object_type}, lambda item: item
+        ),
+        label_fn=weave.define_fn(
+            {"item": unnested.type.object_type}, lambda item: item
+        ),
+        bin_size=panel_util.make_node(10),
+    )
+
+
+# TODO: really annoying that I need the setter here.
+@weave.op(setter=multi_distribution_set_default_config)
+def multi_distribution_default_config(
+    config: typing.Optional[DistributionConfig],
+    unnested_node: list[typing.Any],
+) -> DistributionConfig:
+    input_type_item_type = weave.type_of(unnested_node).object_type
+    if config == None:
+        return DistributionConfig(
+            value_fn=weave.define_fn({"item": input_type_item_type}, lambda item: item),
+            label_fn=weave.define_fn({"item": input_type_item_type}, lambda item: item),
+            bin_size=panel_util.make_node(10),
+        )
+    return config
+
+
 @weave.op()
 def multi_distribution(
     input_node: weave.Node[list[typing.Any]], config: DistributionConfig
 ) -> weave.panels.Plot:
     unnested = weave.ops.unnest(input_node)
+    config = multi_distribution_default_config(config, unnested)
+    bin_size = weave.ops.execute(config.bin_size)
     binned = unnested.groupby(
         lambda item: weave.ops.dict_(
-            value=round(config.value_fn(item) / config.bin_size) * config.bin_size,
+            value=round(config.value_fn(item) / bin_size) * bin_size,
             label=config.label_fn(item),
         )
     ).map(
@@ -46,6 +84,8 @@ def multi_distribution(
 def multi_distribution_config(
     input_node: weave.Node[list[typing.Any]], config: DistributionConfig
 ) -> weave.panels.Group2:
+    unnested = weave.ops.unnest(input_node)
+    config = multi_distribution_default_config(config, unnested)
     return weave.panels.Group2(
         items={
             "value_fn": weave.panels.LabeledItem(
