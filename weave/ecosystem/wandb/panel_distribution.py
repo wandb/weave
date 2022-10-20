@@ -63,7 +63,11 @@ def multi_distribution_config(
             "bin_size": weave.panels.LabeledItem(
                 label="bin_size",
                 item=weave.panels.Slider2(
-                    config=weave.panels.Slider2Config(config.bin_size)
+                    config=weave.panels.Slider2Config(
+                        # Need execute here because....
+                        # TODO: I don't quite know. Figure this out.
+                        weave.ops.execute(config.bin_size)
+                    )
                 ),
             ),
         }
