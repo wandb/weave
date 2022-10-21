@@ -20,22 +20,9 @@ class DistributionConfig:
     )
 
 
-@weave.mutation
+# This is boilerplate that I'd like to get rid of.
 def multi_distribution_set_default_config(config, input_node, new_config):
     return new_config
-
-
-def default_config(input_node: weave.Node[list[typing.Any]]):
-    unnested = weave.ops.unnest(input_node)
-    return DistributionConfig(
-        value_fn=weave.define_fn(
-            {"item": unnested.type.object_type}, lambda item: item
-        ),
-        label_fn=weave.define_fn(
-            {"item": unnested.type.object_type}, lambda item: item
-        ),
-        bin_size=panel_util.make_node(10),
-    )
 
 
 # TODO: really annoying that I need the setter here.
@@ -54,6 +41,7 @@ def multi_distribution_default_config(
     return config
 
 
+# The render op. This renders the panel.
 @weave.op()
 def multi_distribution(
     input_node: weave.Node[list[typing.Any]], config: DistributionConfig
@@ -80,6 +68,7 @@ def multi_distribution(
     )
 
 
+# The config render op. This renders the config editor.
 @weave.op()
 def multi_distribution_config(
     input_node: weave.Node[list[typing.Any]], config: DistributionConfig
@@ -114,6 +103,7 @@ def multi_distribution_config(
     )
 
 
+# The interface for constructing this Panel from Python
 @weave.type()
 class MultiDistribution(weave.Panel):
     id = "op-multi_distribution"
