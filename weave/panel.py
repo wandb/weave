@@ -94,6 +94,7 @@ class ConfigDescriptor:
         # setattr(obj, self._name, int(value))
 
 
+InputNodeType = typing.TypeVar("InputNodeType")
 VarsType = typing.TypeVar("VarsType")
 
 
@@ -102,7 +103,8 @@ VarsType = typing.TypeVar("VarsType")
 @weave.type()
 class Panel(typing.Generic[VarsType]):
     id: str = dataclasses.field(init=False)
-    input_node: graph.Node = dataclasses.field(default=graph.VoidNode())
+    # input_node: graph.Node = dataclasses.field(default=graph.VoidNode())
+    input_node: InputNodeType = dataclasses.field(default=graph.VoidNode())
     # vars: dict[str, graph.Node] = dataclasses.field(default_factory=dict)
     vars: VarsType = dataclasses.field(default_factory=dict)
 

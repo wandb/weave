@@ -6,6 +6,8 @@ import weave
 
 from ... import panel_util
 
+from . import weave_plotly
+
 
 @weave.type()
 class DistributionConfig:
@@ -45,7 +47,7 @@ def multi_distribution_default_config(
 @weave.op()
 def multi_distribution(
     input_node: weave.Node[list[typing.Any]], config: DistributionConfig
-) -> weave.panels.Plot:
+) -> weave_plotly.PanelPlotly:
     unnested = weave.ops.unnest(input_node)
     config = multi_distribution_default_config(config, unnested)
     bin_size = weave.ops.execute(config.bin_size)
@@ -59,13 +61,17 @@ def multi_distribution(
             value=group.key()["value"], label=group.key()["label"], count=group.count()
         )
     )
-    return weave.panels.Plot(
-        binned,
-        x=lambda row: row["value"],
-        y=lambda row: row["count"],
-        label=lambda row: row["label"],
-        mark="bar",
-    )
+    fig = weave_plotly.plotly_barplot(binned)
+    return weave_plotly.PanelPlotly(fig)
+
+    # Uncomment to use PanelPlot instead
+    # return weave.panels.Plot(
+    #     binned,
+    #     x=lambda row: row["value"],
+    #     y=lambda row: row["count"],
+    #     label=lambda row: row["label"],
+    #     mark="bar",
+    # )
 
 
 # The config render op. This renders the config editor.

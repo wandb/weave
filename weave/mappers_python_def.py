@@ -53,8 +53,14 @@ class ObjectDictToObject(mappers_weave.ObjectMapper):
         constructor_sig = inspect.signature(instance_class)
         for k, serializer in self._property_serializers.items():
             if k in constructor_sig.parameters:
-                v = serializer.apply(obj[k])
-                result[k] = v
+                # None haxxx
+                # TODO: remove
+                obj_val = obj.get(k)
+                if obj_val is None:
+                    result[k] = None
+                else:
+                    v = serializer.apply(obj_val)
+                    result[k] = v
         for prop_name, prop_type in result_type.variable_property_types().items():
             if isinstance(prop_type, types.Const):
                 result[prop_name] = prop_type.val
