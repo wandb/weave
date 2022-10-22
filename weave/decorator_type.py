@@ -34,17 +34,13 @@ def type(__override_name: str = None):
                 try:
                     weave_type = infer_types.python_type_to_type(field.type)
                 except TypeError:
-                    # hmmm... type rewriting. Am I OK with this? Could be overly aggressive.
+                    # hmmm... Exception rewriting. Am I OK with this? Could be overly aggressive.
                     # TODO: decide if we should do this
                     raise errors.WeaveDefinitionError(
                         f"{target}.{field.name} is not a valid python type (a class or type)"
                     )
 
-                weave_type_vars = weave_type.type_vars()
-                if any(
-                    isinstance((getattr(weave_type, var_name)), types.Any)
-                    for var_name in weave_type_vars
-                ):
+                if types.type_is_variable(weave_type):
                     # this is a Weave type with a type variable in it
                     type_vars[field.name] = weave_type
                 else:

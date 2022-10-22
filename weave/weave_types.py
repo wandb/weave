@@ -180,11 +180,18 @@ class Type:
         return (cls.instance_classes,)
 
     @classmethod
-    def type_vars(cls):
-        type_vars = {}
+    def type_attrs(cls):
+        type_attrs = []
         for field in dataclasses.fields(cls):
             if issubclass(field.type, Type):
-                type_vars[field.name] = field.type
+                type_attrs.append(field.name)
+        return type_attrs
+
+    def type_vars(self) -> dict[str, "Type"]:
+        type_vars = {}
+        for field in dataclasses.fields(self.__class__):
+            if issubclass(field.type, Type):
+                type_vars[field.name] = getattr(self, field.name)
         return type_vars
 
     @classmethod
@@ -312,8 +319,14 @@ class BasicType(_PlainStringNamedType):
         return "<%s>" % self.__class__.name
 
 
+class InvalidPy:
+    pass
+
+
 class Invalid(BasicType):
     name = "invalid"
+
+    instance_classes = InvalidPy
 
     def assign_type(self, next_type):
         return next_type
@@ -668,7 +681,7 @@ class ObjectType(Type):
     @classmethod
     def type_of_instance(cls, obj):
         variable_prop_types = {}
-        for prop_name in cls.type_vars():
+        for prop_name in cls.type_attrs():
             prop_type = TypeRegistry.type_of(getattr(obj, prop_name))
             # print("TYPE_OF", cls, prop_name, prop_type, type(getattr(obj, prop_name)))
             variable_prop_types[prop_name] = prop_type
@@ -988,3 +1001,19 @@ def is_custom_type(t: Type) -> bool:
         or isinstance(t, List)
         or isinstance(t, UnionType)
     )
+
+
+def type_is_variable(t: Type) -> bool:
+    # not concrete
+    if isinstance(t, Any):
+        # Any is currently the equivalent Weave Type for any Python
+        # TypeVar
+        return True
+    elif isinstance(t, UnionType):
+        return True
+    elif isinstance(t, TypedDict):
+        # Should we just make type_vars for TypedDict be its property types?
+        # That would simplify a lot.
+        return any(type_is_variable(sub_t) for sub_t in t.property_types.values())
+    else:
+        return any(type_is_variable(sub_t) for sub_t in t.type_vars().values())

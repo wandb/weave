@@ -11,10 +11,10 @@ from . import weave_plotly
 
 @weave.type()
 class DistributionConfig:
-    value_fn: weave.Node[float] = dataclasses.field(
+    value_fn: weave.Node[typing.Union[float, str]] = dataclasses.field(
         default_factory=lambda: weave.graph.VoidNode()
     )
-    label_fn: weave.Node[str] = dataclasses.field(
+    label_fn: weave.Node[typing.Union[str, weave.types.InvalidPy]] = dataclasses.field(
         default_factory=lambda: weave.graph.VoidNode()
     )
     bin_size: weave.Node[float] = dataclasses.field(
@@ -28,11 +28,16 @@ def multi_distribution_set_default_config(config, input_node, new_config):
 
 
 # TODO: really annoying that I need the setter here.
-@weave.op(setter=multi_distribution_set_default_config)
+@weave.op(
+    setter=multi_distribution_set_default_config,
+    output_type=lambda input_type: DistributionConfig.WeaveType()
+    if input_type["config"] == None
+    else input_type["config"],
+)
 def multi_distribution_default_config(
     config: typing.Optional[DistributionConfig],
     unnested_node: list[typing.Any],
-) -> DistributionConfig:
+):
     input_type_item_type = weave.type_of(unnested_node).object_type
     if config == None:
         return DistributionConfig(
@@ -51,12 +56,24 @@ def multi_distribution(
     unnested = weave.ops.unnest(input_node)
     config = multi_distribution_default_config(config, unnested)
     bin_size = weave.ops.execute(config.bin_size)
-    binned = unnested.groupby(
-        lambda item: weave.ops.dict_(
-            value=round(config.value_fn(item) / bin_size) * bin_size,
-            label=config.label_fn(item),
-        )
-    ).map(
+
+    def bin_func(item):
+        value_fn_output_type = config.value_fn.type.output_type
+        label_fn_output_type = config.label_fn.type.output_type
+        group_items = {}
+        if value_fn_output_type == weave.types.String():
+            group_items["value"] = config.value_fn(item)
+        else:
+            group_items["value"] = round(config.value_fn(item) / bin_size) * bin_size
+
+        if label_fn_output_type == weave.types.Invalid():
+            group_items["label"] = "no_label"
+        else:
+            group_items["label"] = config.label_fn(item)
+
+        return weave.ops.dict_(**group_items)
+
+    binned = unnested.groupby(lambda item: bin_func(item)).map(
         lambda group: weave.ops.dict_(
             value=group.key()["value"], label=group.key()["label"], count=group.count()
         )
