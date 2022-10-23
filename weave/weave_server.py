@@ -21,6 +21,7 @@ from weave import registry_mem
 from weave import errors
 from weave import context_state
 from weave import weavejs_fixes
+from weave import automation
 
 from flask.logging import wsgi_errors_stream
 
@@ -211,6 +212,28 @@ def send_js(path):
     if local_artifacts_path not in list(abspath.parents):
         abort(403)
     return send_from_directory("/", path)
+
+
+@app.route("/__weave/automate/<string:automation_id>/add_command", methods=["POST"])
+def automation_add_command(automation_id):
+    automation.add_command(automation_id, request.json)
+    return {"status": "ok"}
+
+
+@app.route("/__weave/automate/<string:automation_id>/commands_after/<int:after>")
+def automation_commands_after(automation_id, after):
+    return {"commands": automation.commands_after(automation_id, after)}
+
+
+@app.route("/__weave/automate/<string:automation_id>/set_status", methods=["POST"])
+def automation_set_status(automation_id):
+    automation.set_status(automation_id, request.json)
+    return {"status": "ok"}
+
+
+@app.route("/__weave/automate/<string:automation_id>/status")
+def automation_status(automation_id):
+    return automation.get_status(automation_id)
 
 
 @app.route("/__frontend", defaults={"path": None})

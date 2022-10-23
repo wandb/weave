@@ -57,11 +57,8 @@ def _make_default_client():
             serv = server.HttpServer()
             serv.start()
             context_state.set_server(serv)
+        return server.HttpServerClient(serv.url)
 
-    # we are returning a client that does not talk to the http server we just created because
-    # the http server only communicates with the frontend. we create it above so that there is
-    # a running server for the frontend to talk to as soon as we call use() or show().
-    # python code can use the in process server by default.
     return client.Client(server.InProcessServer())
 
 

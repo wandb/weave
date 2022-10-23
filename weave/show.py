@@ -1,4 +1,6 @@
 import json
+import random
+import string
 import urllib
 
 from IPython.display import display
@@ -14,6 +16,7 @@ from . import storage
 from . import util
 from . import errors
 from . import usage_analytics
+from . import automation
 
 
 # Broken out into to separate function for testing
@@ -75,7 +78,7 @@ def _show_params(obj):
         )
 
 
-def show(obj=None, height=400):
+def show(obj=None, height=400, enable_automation=False):
     usage_analytics.show_called()
 
     if not util.is_notebook():
@@ -96,9 +99,18 @@ def show(obj=None, height=400):
         panel_url += "&panelConfig=%s" % urllib.parse.quote(
             json.dumps(params["panel_config"])
         )
+    automation_handle = None
+    if enable_automation:
+        automation_id = "".join(
+            random.choice(string.ascii_uppercase + string.digits) for _ in range(14)
+        )
+        automation_handle = automation.AutomationHandle(automation_id)
+        panel_url += "&automationId=%s" % automation_id
 
     iframe = IFrame(panel_url, "100%", "%spx" % height)
-    return display(iframe)
+    display(iframe)
+
+    return automation_handle
 
 
 def _ipython_display_method_(self):
