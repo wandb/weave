@@ -86,7 +86,7 @@ class AutomationHandle:
             "const button = document.querySelector('.button[data-test=panel-config]'); button.click();"
         )
 
-    def focus_config_ee(self, num):
+    def _focus_config_ee(self, num):
         self.send_raw_command(
             """
             document.querySelector('div[data-test=config-panel]')
@@ -98,6 +98,7 @@ class AutomationHandle:
         )
 
     def add_ee_text(self, num, text):
+        self._focus_config_ee(num)
         self.send_raw_command(
             """
             const container = document.querySelector('div[data-test=config-panel]')
@@ -110,8 +111,9 @@ class AutomationHandle:
         """
             % (num, text)
         )
+        self._submit_ee(num)
 
-    def submit_ee(self, num):
+    def _submit_ee(self, num):
         self.send_raw_command(
             """
             document.querySelector('div[data-test=config-panel]')
