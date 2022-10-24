@@ -135,7 +135,7 @@ def save(obj, name=None, type=None, artifact=None) -> refs.LocalArtifactRef:
     return _save_or_publish(obj, name, type, False, artifact=artifact)
 
 
-def get(uri_s):
+def get(uri_s: typing.Union[str, refs.Ref]) -> typing.Any:
     if isinstance(uri_s, refs.Ref):
         return uri_s.get()
     return refs.Ref.from_str(uri_s).get()
@@ -150,7 +150,7 @@ def deref(ref):
     return ref
 
 
-def _get_ref(obj: typing.Any) -> refs.Ref:
+def _get_ref(obj: typing.Any) -> typing.Optional[refs.Ref]:
     if isinstance(obj, refs.Ref):
         return obj
     return refs.get_ref(obj)
@@ -181,7 +181,7 @@ def objects(of_type: types.Type, alias: str):
     for art_name in os.listdir(artifacts_local.local_artifact_dir()):
         ref = refs.get_local_version_ref(art_name, alias)
         if ref is not None:
-            if of_type.assign_type(ref.type) != types.Invalid():
+            if of_type.assign_type(ref.type):
                 obj = ref.get()
                 if isinstance(ref.type, types.RunType) and obj.op_name == "op-objects":
                     continue

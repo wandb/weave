@@ -118,9 +118,13 @@ class ArtifactVersion:
         return file_wbartifact.ArtifactVersionDir(path, 1591, sub_dirs, files)
 
 
+class ArtifactAssetType(types._PlainStringNamedType):
+    name = "asset"
+
+
 @op(
     name="asset-artifactVersion",
-    input_type={"asset": types.Any()},
+    input_type={"asset": ArtifactAssetType()},
     output_type=ArtifactVersionType(),
 )
 def artifactVersion(asset):

@@ -51,6 +51,10 @@ def op(
         )
 
         op_version = registry_mem.memory_registry.register_op(op)
+
+        # After we register the op, create any derived ops
+        derive_op.derive_ops(op)
+
         return op_version
 
     return wrap

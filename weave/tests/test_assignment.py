@@ -27,14 +27,14 @@ def test_const_assignment(type_name, type_cls):
     )  # technically `None` is invalid, but we're just testing the assignment
 
     # Validate that you can assign a const type to a general type
-    assert not isinstance(cls_type.assign_type(const_type), weave.types.Invalid)
+    assert cls_type.assign_type(const_type)
 
     # Validate that you cannot assign a general type to a const type
-    assert isinstance(const_type.assign_type(cls_type), weave.types.Invalid)
+    assert not const_type.assign_type(cls_type)
 
     # Validate that unions are automatically unwrapped
     union_type = weave.types.UnionType(cls_type, const_type)
-    assert not isinstance(union_type.assign_type(const_type), weave.types.Invalid)
-    assert not isinstance(union_type.assign_type(cls_type), weave.types.Invalid)
-    assert not isinstance(cls_type.assign_type(union_type), weave.types.Invalid)
-    assert isinstance(const_type.assign_type(union_type), weave.types.Invalid)
+    assert union_type.assign_type(const_type)
+    assert union_type.assign_type(cls_type)
+    assert cls_type.assign_type(union_type)
+    assert not const_type.assign_type(union_type)

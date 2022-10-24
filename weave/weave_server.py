@@ -6,6 +6,7 @@ import pathlib
 import warnings
 import json_log_formatter
 
+import traceback
 import ddtrace
 
 ddtrace.patch(logging=True)
@@ -14,7 +15,7 @@ from flask import Flask, Blueprint
 from flask import request
 from flask import abort
 from flask_cors import CORS, cross_origin
-from flask import send_from_directory, send_file
+from flask import send_from_directory, send_file, jsonify
 
 from weave import server
 from weave import registry_mem
@@ -166,7 +167,13 @@ def execute():
     # Simulate browser/server latency
     # import time
     # time.sleep(0.1)
-    response = server.handle_request(request.json, deref=True)
+    try:
+        response = server.handle_request(request.json, deref=True)
+    except Exception as e:
+        tb = traceback.format_exc()
+        print("Error: ", tb)
+        # Consider removing this in production settings
+        return jsonify({"error": tb}), 500
 
     # remove unions from the response
     response = recursively_unwrap_unions(response)

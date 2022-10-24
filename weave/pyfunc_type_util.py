@@ -25,7 +25,7 @@ def determine_input_type(
     weave_input_type = _create_args_from_op_input_type(declared_input_type)
 
     if isinstance(weave_input_type, op_args.OpNamedArgs):
-        arg_names = _get_signature(pyfunc).parameters.keys()
+        arg_names = get_signature(pyfunc).parameters.keys()
 
         # validate there aren't extra declared Weave types
         weave_type_extra_arg_names = set(weave_input_type.arg_types.keys()) - set(
@@ -113,7 +113,7 @@ def determine_output_type(
                 )
         elif (
             inferred_output_type != types.UnknownType()
-            and weave_output_type.assign_type(inferred_output_type) == types.Invalid()
+            and not weave_output_type.assign_type(inferred_output_type)
         ):
             raise errors.WeaveDefinitionError(
                 "Python return type not assignable to declared Weave output_type: %s !-> %s"
@@ -131,6 +131,12 @@ def determine_output_type(
     return weave_output_type
 
 
+def get_signature(pyfunc: typing.Callable) -> inspect.Signature:
+    if hasattr(pyfunc, "sig"):
+        return pyfunc.sig  # type: ignore
+    return inspect.signature(pyfunc)
+
+
 def _create_args_from_op_input_type(
     input_type: typing.Union[op_args.OpArgs, typing.Dict[str, types.Type]]
 ) -> op_args.OpArgs:
@@ -144,12 +150,6 @@ def _create_args_from_op_input_type(
                 "input_type must be dict[str, Type] but %s is %s" % (k, v)
             )
     return op_args.OpNamedArgs(input_type)
-
-
-def _get_signature(pyfunc: typing.Callable) -> inspect.Signature:
-    if hasattr(pyfunc, "sig"):
-        return pyfunc.sig  # type: ignore
-    return inspect.signature(pyfunc)
 
 
 def _get_type_hints(pyfunc: typing.Callable) -> dict[str, typing.Any]:

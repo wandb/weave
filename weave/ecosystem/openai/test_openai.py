@@ -7,7 +7,6 @@ def test_gpt3model_inferred_type():
     assert gpt3.Gpt3Model.complete.input_type.arg_types == {
         "self": gpt3.Gpt3ModelType(),
         "prompt": types.String(),
-        "seed": types.Int(),
     }
     assert gpt3.Gpt3Model.complete.output_type == types.TypedDict(
         {

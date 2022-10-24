@@ -1,5 +1,6 @@
 import os
 import random
+import numpy as np
 
 import pytest
 import shutil
@@ -85,8 +86,10 @@ def cereal_csv():
 @pytest.fixture()
 def fixed_random_seed():
     random.seed(8675309)
+    np.random.seed(8675309)
     yield
     random.seed(None)
+    np.random.seed(None)
 
 
 @pytest.fixture()

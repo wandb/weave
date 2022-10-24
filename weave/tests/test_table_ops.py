@@ -6,6 +6,7 @@ from .. import weave_types as types
 from .. import ops
 from .. import storage
 from .. import context
+from .. import weave_internal
 
 TABLE_TYPES = ["list", "pandas", "sql"]
 
@@ -55,11 +56,19 @@ def test_index(table_type):
     assert weave.use(ops.WeaveJSListInterface.index(table, 0)) == expected
 
 
+def js_op_pick(obj, key):
+    return weave_internal.make_output_node(
+        types.Any(),
+        "pick",
+        {"obj": obj, "key": weave_internal.make_const_node(weave.types.String(), key)},
+    )
+
+
 @pytest.mark.parametrize("table_type", TABLE_TYPES)
 def test_pick(table_type):
     table = get_test_table(table_type)
     assert len(weave.use(table.pick("type"))) == 77
-    assert len(weave.use(ops.WeaveJSListInterface.pick(table, "type"))) == 77
+    assert len(weave.use(js_op_pick(table, "type"))) == 77
 
 
 @pytest.mark.parametrize("table_type", TABLE_TYPES)
@@ -67,14 +76,10 @@ def test_filter(table_type):
     table = get_test_table(table_type)
     # Use the lambda passing convention here.
     assert weave.use(table.filter(lambda row: row["potass"] > 280).count()) == 2
-    assert (
-        weave.use(
-            ops.WeaveJSListInterface.filter(
-                table, lambda row: row["potass"] > 280
-            ).count()
-        )
-        == 2
-    )
+    node = ops.WeaveJSListInterface.filter(
+        table, lambda row: row["potass"] > 280
+    ).count()
+    assert weave.use(node) == 2
 
 
 # WARNING: Separating tests for group by, because

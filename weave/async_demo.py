@@ -15,7 +15,7 @@ import weave
     },
     output_type=weave.types.RunType(
         weave.types.TypedDict({}),
-        weave.types.List(weave.types.Any()),
+        weave.types.List(weave.types.TypedDict({})),
         weave.types.Int(),
     ),
 )

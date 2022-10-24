@@ -1,3 +1,4 @@
+from ._dict_utils import typeddict_pick_output_type
 from ..api import op, weave_class, mutation, OpVarArgs
 from .. import weave_types as types
 
@@ -21,20 +22,6 @@ from .. import weave_types as types
 #      should be easy, we can look up op based on which object its being
 #      called on
 # Then figure out how to do array/mapped ops...
-
-
-def typeddict_pick_output_type(input_types):
-    if not isinstance(input_types["key"], types.Const):
-        return types.UnknownType()
-    key = input_types["key"].val
-    property_types = input_types["self"].property_types
-    output_type = property_types.get(key)
-    if output_type is None:
-        # TODO: we hack this to types.Number() for now! This is relied
-        # on by tests because readcsv() doesn't properly return a full
-        # type right now. Super janky
-        return types.Number()
-    return output_type
 
 
 # TODO: type dict v dict

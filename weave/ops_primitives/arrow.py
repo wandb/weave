@@ -8,7 +8,7 @@ import pyarrow.parquet as pq
 
 py_type = type
 
-from ..api import op, weave_class, type
+from ..api import op, weave_class, type, use, OpVarArgs
 from .. import weave_types as types
 from .. import graph
 from .. import errors
@@ -21,6 +21,7 @@ from .. import storage
 from .. import refs
 from .. import dispatch
 from .. import execute_fast
+from . import _dict_utils
 
 
 class ArrowArrayVectorizer:
@@ -134,9 +135,13 @@ def mapped_fn_to_arrow(arrow_table, node):
         return result
     elif isinstance(node, graph.VarNode):
         if node.name == "row":
-            if isinstance(arrow_table, ArrowWeaveList) and (
-                isinstance(arrow_table._arrow_data, pa.ChunkedArray)
-                or isinstance(arrow_table._arrow_data, pa.Array)
+            if (
+                isinstance(arrow_table, ArrowWeaveList)
+                and not isinstance(arrow_table._arrow_data, pa.StructArray)
+                and (
+                    isinstance(arrow_table._arrow_data, pa.ChunkedArray)
+                    or isinstance(arrow_table._arrow_data, pa.Array)
+                )
             ):
                 return ArrowArrayVectorizer(arrow_table._arrow_data)
 
@@ -149,7 +154,7 @@ def mapped_fn_to_arrow(arrow_table, node):
 def arrow_type_to_weave_type(pa_type) -> types.Type:
     if pa_type == pa.string():
         return types.String()
-    elif pa_type == pa.int64():
+    elif pa_type == pa.int64() or pa_type == pa.int32():
         return types.Int()
     elif pa_type == pa.float64():
         return types.Float()
@@ -188,7 +193,7 @@ class ArrowArrayType(types.Type):
 
     def load_instance(self, artifact, name, extra=None):
         with artifact.open(f"{name}.parquet", binary=True) as f:
-            return pq.read_table(f)["arr"]
+            return pq.read_table(f)["arr"].combine_chunks()
 
 
 @dataclasses.dataclass(frozen=True)
@@ -246,6 +251,14 @@ def rewrite_weavelist_refs(arrow_data, object_type, artifact):
                 column = unchunked.field(col_name)
                 arrays[col_name] = rewrite_weavelist_refs(column, col_type, artifact)
             return pa.StructArray.from_arrays(arrays.values(), names=arrays.keys())
+        elif isinstance(arrow_data, pa.StructArray):
+            arrays = {}
+            for col_name, col_type in prop_types.items():
+                column = arrow_data.field(col_name)
+                arrays[col_name] = rewrite_weavelist_refs(column, col_type, artifact)
+            return pa.StructArray.from_arrays(arrays.values(), names=arrays.keys())
+        else:
+            raise errors.WeaveTypeError('Unhandled type "%s"' % type(arrow_data))
     elif isinstance(object_type, types.UnionType):
         non_none_members = [
             m for m in object_type.members if not isinstance(m, types.NoneType)
@@ -255,13 +268,15 @@ def rewrite_weavelist_refs(arrow_data, object_type, artifact):
                 "Unions not fully supported yet in Weave arrow"
             )
         return rewrite_weavelist_refs(arrow_data, types.non_none(object_type), artifact)
-    else:
-        if isinstance(object_type, types.BasicType) or (
-            isinstance(object_type, types.Const)
-            and isinstance(object_type.val_type, types.BasicType)
-        ):
-            return arrow_data
+    elif isinstance(object_type, types.BasicType) or (
+        isinstance(object_type, types.Const)
+        and isinstance(object_type.val_type, types.BasicType)
+    ):
+        return arrow_data
+    elif isinstance(object_type, types.List):
+        return pa.array(rewrite_weavelist_refs(item.as_py(), object_type.object_type, artifact) for item in arrow_data)  # type: ignore
 
+    else:
         # We have a column of refs
         new_refs = []
         for ref_str in arrow_data:
@@ -539,7 +554,7 @@ ArrowWeaveListObjectTypeVar = typing.TypeVar("ArrowWeaveListObjectTypeVar")
 
 @weave_class(weave_type=ArrowWeaveListType)
 class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
-    _arrow_data: typing.Union[pa.Table, pa.ChunkedArray]
+    _arrow_data: typing.Union[pa.Table, pa.ChunkedArray, pa.Array]
     object_type: types.Type
 
     def __array__(self, dtype=None):
@@ -576,7 +591,12 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         return self._count()
 
     def _get_col(self, name):
-        col = self._arrow_data[name]
+        if isinstance(self._arrow_data, pa.Table):
+            col = self._arrow_data[name]
+        elif isinstance(self._arrow_data, pa.ChunkedArray):
+            raise NotImplementedError("TODO: implement this")
+        elif isinstance(self._arrow_data, pa.StructArray):
+            col = self._arrow_data.field(name)
         col_mapper = self._mapper._property_serializers[name]
         if isinstance(col_mapper, mappers_python_def.DefaultFromPy):
             return [col_mapper.apply(i.as_py()) for i in col]
@@ -594,12 +614,8 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
     def __getitem__(self, index: int):
         return self._index(index)
 
-    @op(output_type=_pick_output_type)
+    @op(output_type=_pick_output_type, name="ArrowWeaveList-pickAux")
     def pick(self, key: str):
-        # return self._table[key]
-        # TODO: Don't do to_pylist() here! Stay in arrow til as late
-        #     as possible
-
         object_type = self.object_type
         if isinstance(object_type, types.TypedDict):
             col_type = object_type.property_types[key]
@@ -610,7 +626,12 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                 "unexpected type for pick: %s" % object_type
             )
 
-        return ArrowWeaveList(self._arrow_data[key], col_type, self._artifact)
+        picked = (
+            self._arrow_data[key]
+            if not isinstance(self._arrow_data, pa.StructArray)
+            else self._arrow_data.field(key)
+        )
+        return ArrowWeaveList(picked, col_type, self._artifact)
 
     @op(
         input_type={
@@ -706,7 +727,9 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                     # if a column is not a struct then just use it
                     group_cols.append(colname)
 
-        elif isinstance(group_table, pa.ChunkedArray):
+        elif isinstance(group_table, (pa.ChunkedArray, pa.Array)):
+            if isinstance(group_table, pa.Array):
+                group_table = pa.chunked_array([group_table])
             original_group_table = pa.table({"group_key": group_table})
             original_col_names = ["group_key"]
             if isinstance(group_table.type, pa.StructType):
@@ -803,16 +826,45 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         if not list_cols:
             return self
 
+        if isinstance(self._arrow_data, pa.StructArray):
+            rb = pa.RecordBatch.from_struct_array(
+                self._arrow_data
+            )  # this pivots to columnar layout
+            arrow_obj = pa.Table.from_batches([rb])
+        else:
+            arrow_obj = self._arrow_data
+
         # todo: make this more efficient. we shouldn't have to convert back and forth
         # from the arrow in-memory representation to pandas just to call the explode
         # function. but there is no native pyarrow implementation of this
         return pa.Table.from_pandas(
-            df=self._arrow_data.to_pandas().explode(list_cols), preserve_index=False
+            df=arrow_obj.to_pandas().explode(list_cols), preserve_index=False
         )
 
 
 ArrowWeaveListType.instance_classes = ArrowWeaveList
 ArrowWeaveListType.instance_class = ArrowWeaveList
+
+
+@op(
+    name="ArrowWeaveList-vectorizedDict",
+    input_type=OpVarArgs(types.List(types.Any())),
+    output_type=lambda input_types: ArrowWeaveListType(
+        types.TypedDict(
+            {p_name: p_type.object_type for (p_name, p_type) in input_types.items()}
+        )
+    ),
+)
+def arrow_dict_(**d):
+    names, arrays = list(zip(*d.items()))
+    arrays = [
+        a._arrow_data.combine_chunks()
+        if isinstance(a._arrow_data, pa.ChunkedArray)
+        else a._arrow_data
+        for a in arrays
+    ]  # convert from ArrowWeaveList -> arrow
+    arrow_obj = pa.StructArray.from_arrays(arrays=arrays, names=names)
+    return ArrowWeaveList(arrow_obj)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -860,6 +912,7 @@ ArrowTableGroupResultType.instance_class = ArrowTableGroupResult
 class ArrowWeaveListNumberType(ArrowWeaveListType):
     # TODO: This should not be assignable via constructor. It should be
     #    a static property type at this point.
+    name = "ArrowWeaveListNumber"
     object_type: types.Type = types.Number()
 
 
@@ -976,8 +1029,300 @@ class ArrowWeaveListNumber(ArrowWeaveList):
         return ArrowWeaveList(pc.ceil(self._arrow_data), types.Number())
 
 
+@dataclasses.dataclass(frozen=True)
+class ArrowWeaveListStringType(ArrowWeaveListType):
+    # TODO: This should not be assignable via constructor. It should be
+    #    a static property type at this point.
+    object_type: types.Type = types.String()
+    name = "ArrowWeaveListString"
+
+
+def _concatenate_strings(
+    left: ArrowWeaveList[str], right: typing.Union[str, ArrowWeaveList[str]]
+) -> ArrowWeaveList[str]:
+    if isinstance(right, ArrowWeaveList):
+        right = right._arrow_data
+    return ArrowWeaveList(
+        pc.binary_join_element_wise(left._arrow_data, right, ""), types.String()
+    )
+
+
+@weave_class(weave_type=ArrowWeaveListStringType)
+class ArrowWeaveListString(ArrowWeaveList):
+    object_type = types.String()
+
+    @op(name="ArrowWeaveListString-equal")
+    def __eq__(
+        self, other: typing.Union[str, ArrowWeaveList[str]]
+    ) -> ArrowWeaveList[bool]:
+        if isinstance(other, ArrowWeaveList):
+            other = other._arrow_data
+        return ArrowWeaveList(pc.equal(self._arrow_data, other), types.Boolean())
+
+    @op(name="ArrowWeaveListString-notEqual")
+    def __ne__(
+        self, other: typing.Union[str, ArrowWeaveList[str]]
+    ) -> ArrowWeaveList[bool]:
+        if isinstance(other, ArrowWeaveList):
+            other = other._arrow_data
+        return ArrowWeaveList(pc.not_equal(self._arrow_data, other), types.Boolean())
+
+    @op(name="ArrowWeaveListString-contains")
+    def __contains__(
+        self, other: typing.Union[str, ArrowWeaveList[str]]
+    ) -> ArrowWeaveList[bool]:
+        if isinstance(other, ArrowWeaveList):
+            return ArrowWeaveList(
+                pa.array(
+                    other_item.as_py() in my_item.as_py()
+                    for my_item, other_item in zip(self._arrow_data, other._arrow_data)
+                )
+            )
+        return ArrowWeaveList(
+            pc.match_substring(self._arrow_data, other), types.Boolean()
+        )
+
+    # TODO: fix
+    @op(name="ArrowWeaveListString-in")
+    def in_(
+        self, other: typing.Union[str, ArrowWeaveList[str]]
+    ) -> ArrowWeaveList[bool]:
+        if isinstance(other, ArrowWeaveList):
+            return ArrowWeaveList(
+                pa.array(
+                    my_item.as_py() in other_item.as_py()
+                    for my_item, other_item in zip(self._arrow_data, other._arrow_data)
+                )
+            )
+        return ArrowWeaveList(
+            # this has to be a python loop because the second argument to match_substring has to be a scalar string
+            pa.array(item.as_py() in other for item in self._arrow_data),
+            types.Boolean(),
+        )
+
+    @op(name="ArrowWeaveListString-len")
+    def len(self) -> ArrowWeaveList[int]:
+        return ArrowWeaveList(pc.binary_length(self._arrow_data), types.Int())
+
+    @op(name="ArrowWeaveListString-add")
+    def __add__(
+        self, other: typing.Union[str, ArrowWeaveList[str]]
+    ) -> ArrowWeaveList[str]:
+        return _concatenate_strings(self, other)
+
+    # todo: remove this explicit name, it shouldn't be needed
+    @op(name="ArrowWeaveListString-append")
+    def append(
+        self, other: typing.Union[str, ArrowWeaveList[str]]
+    ) -> ArrowWeaveList[str]:
+        return _concatenate_strings(self, other)
+
+    @op(name="ArrowWeaveListString-prepend")
+    def prepend(
+        self, other: typing.Union[str, ArrowWeaveList[str]]
+    ) -> ArrowWeaveList[str]:
+        if isinstance(other, str):
+            other = ArrowWeaveList(
+                pa.array([other] * len(self._arrow_data)), types.String()
+            )
+        return _concatenate_strings(other, self)
+
+    @op(name="ArrowWeaveListString-split")
+    def split(
+        self, pattern: typing.Union[str, ArrowWeaveList[str]]
+    ) -> ArrowWeaveList[list[str]]:
+        if isinstance(pattern, str):
+            return ArrowWeaveList(
+                pc.split_pattern(self._arrow_data, pattern), types.List(types.String())
+            )
+        return ArrowWeaveList(
+            pa.array(
+                self._arrow_data[i].as_py().split(pattern._arrow_data[i].as_py())
+                for i in range(len(self._arrow_data))
+            ),
+            types.List(types.String()),
+        )
+
+    @op(name="ArrowWeaveListString-partition")
+    def partition(
+        self, sep: typing.Union[str, ArrowWeaveList[str]]
+    ) -> ArrowWeaveList[list[str]]:
+        return ArrowWeaveList(
+            pa.array(
+                self._arrow_data[i]
+                .as_py()
+                .partition(sep if isinstance(sep, str) else sep._arrow_data[i].as_py())
+                for i in range(len(self._arrow_data))
+            ),
+            types.List(types.String()),
+        )
+
+    @op(name="ArrowWeaveListString-startsWith")
+    def startswith(
+        self, prefix: typing.Union[str, ArrowWeaveList[str]]
+    ) -> ArrowWeaveList[bool]:
+        if isinstance(prefix, str):
+            return ArrowWeaveList(
+                pc.starts_with(self._arrow_data, prefix),
+                types.Boolean(),
+            )
+        return ArrowWeaveList(
+            pa.array(
+                s.as_py().startswith(p.as_py())
+                for s, p in zip(self._arrow_data, prefix._arrow_data)
+            ),
+            types.Boolean(),
+        )
+
+    @op(name="ArrowWeaveListString-endsWith")
+    def endswith(
+        self, suffix: typing.Union[str, ArrowWeaveList[str]]
+    ) -> ArrowWeaveList[bool]:
+        if isinstance(suffix, str):
+            return ArrowWeaveList(
+                pc.ends_with(self._arrow_data, suffix),
+                types.Boolean(),
+            )
+        return ArrowWeaveList(
+            pa.array(
+                s.as_py().endswith(p.as_py())
+                for s, p in zip(self._arrow_data, suffix._arrow_data)
+            ),
+            types.Boolean(),
+        )
+
+    @op(name="ArrowWeaveListString-isAlpha")
+    def isalpha(self) -> ArrowWeaveList[bool]:
+        return ArrowWeaveList(pc.ascii_is_alpha(self._arrow_data), types.Boolean())
+
+    @op(name="ArrowWeaveListString-isNumeric")
+    def isnumeric(self) -> ArrowWeaveList[bool]:
+        return ArrowWeaveList(pc.ascii_is_decimal(self._arrow_data), types.Boolean())
+
+    @op(name="ArrowWeaveListString-isAlnum")
+    def isalnum(self) -> ArrowWeaveList[bool]:
+        return ArrowWeaveList(pc.ascii_is_alnum(self._arrow_data), types.Boolean())
+
+    @op(name="ArrowWeaveListString-lower")
+    def lower(self) -> ArrowWeaveList[str]:
+        return ArrowWeaveList(pc.ascii_lower(self._arrow_data), types.String())
+
+    @op(name="ArrowWeaveListString-upper")
+    def upper(self) -> ArrowWeaveList[str]:
+        return ArrowWeaveList(pc.ascii_upper(self._arrow_data), types.String())
+
+    @op(name="ArrowWeaveListString-slice")
+    def slice(self, begin: int, end: int) -> ArrowWeaveList[str]:
+        return ArrowWeaveList(
+            pc.utf8_slice_codeunits(self._arrow_data, begin, end), types.String()
+        )
+
+    @op(name="ArrowWeaveListString-replace")
+    def replace(self, pattern: str, replacement: str) -> ArrowWeaveList[str]:
+        return ArrowWeaveList(
+            pc.replace_substring(self._arrow_data, pattern, replacement),
+            types.String(),
+        )
+
+    # @op(name="string-findAll")
+    # def findAll(str: str, sub: str) -> list[int]:  # type: ignore
+    #     return str.find(sub)
+
+    @op(name="ArrowWeaveListString-strip")
+    def strip(self) -> ArrowWeaveList[str]:
+        return ArrowWeaveList(pc.utf8_trim_whitespace(self._arrow_data), types.String())
+
+    @op(name="ArrowWeaveListString-lStrip")
+    def lstrip(self) -> ArrowWeaveList[str]:
+        return ArrowWeaveList(
+            pc.utf8_ltrim_whitespace(self._arrow_data), types.String()
+        )
+
+    @op(name="ArrowWeaveListString-rStrip")
+    def rstrip(self) -> ArrowWeaveList[str]:
+        return ArrowWeaveList(
+            pc.utf8_rtrim_whitespace(self._arrow_data), types.String()
+        )
+
+
 class VectorizeError(errors.WeaveBaseError):
     pass
+
+
+@dataclasses.dataclass(frozen=True)
+class ArrowWeaveListTypedDictType(ArrowWeaveListType):
+    # TODO: This should not be assignable via constructor. It should be
+    #    a static property type at this point.
+    object_type: types.Type = types.TypedDict({})
+
+
+@weave_class(weave_type=ArrowWeaveListTypedDictType)
+class ArrowWeaveListTypedDict(ArrowWeaveList):
+    object_type = types.TypedDict({})
+    _arrow_data: pa.StructArray
+
+    @op(
+        name="ArrowWeaveListTypedDict-pick",
+        output_type=lambda input_types: ArrowWeaveListType(
+            _dict_utils.typeddict_pick_output_type(
+                {"self": input_types["self"].object_type, "key": input_types["key"]}
+            )
+        ),
+    )
+    def pick(self, key: str):
+        object_type = _dict_utils.typeddict_pick_output_type(
+            {"self": self.object_type, "key": types.Const(types.String(), key)}
+        )
+        return ArrowWeaveList(self._arrow_data.field(key), object_type, self._artifact)
+
+    @op(
+        name="ArrowWeaveListTypedDict-merge",
+        input_type={
+            "self": ArrowWeaveListTypedDictType(),
+            "other": ArrowWeaveListTypedDictType(),
+        },
+        output_type=lambda input_types: ArrowWeaveListType(
+            _dict_utils.typeddict_merge_output_type(
+                {
+                    "self": input_types["self"].object_type,
+                    "other": input_types["other"].object_type,
+                }
+            )
+        ),
+    )
+    def merge(self, other):
+        self_keys = set(self.object_type.property_types.keys())
+        other_keys = set(other.object_type.property_types.keys())
+        common_keys = self_keys.intersection(other_keys)
+
+        field_names_to_arrays: dict[str, pa.Array] = {
+            key: arrow_weave_list._arrow_data.field(key)
+            for arrow_weave_list in (self, other)
+            for key in arrow_weave_list.object_type.property_types
+        }
+
+        # update field names and arrays with merged dicts
+
+        for key in common_keys:
+            if isinstance(self.object_type.property_types[key], types.TypedDict):
+                self_sub_awl = ArrowWeaveList(
+                    self._arrow_data.field(key), self.object_type.property_types[key]
+                )
+                other_sub_awl = ArrowWeaveList(
+                    other._arrow_data.field(key), other.object_type.property_types[key]
+                )
+                merged = use(ArrowWeaveListTypedDict.merge(self_sub_awl, other_sub_awl))._arrow_data  # type: ignore
+                field_names_to_arrays[key] = merged
+
+        field_names, arrays = tuple(zip(*field_names_to_arrays.items()))
+
+        return ArrowWeaveList(
+            pa.StructArray.from_arrays(arrays=arrays, names=field_names),  # type: ignore
+            _dict_utils.typeddict_merge_output_type(
+                {"self": self.object_type, "other": other.object_type}
+            ),
+            self._artifact,
+        )
 
 
 def vectorize(weave_fn, with_respect_to=None):
@@ -994,18 +1339,29 @@ def vectorize(weave_fn, with_respect_to=None):
     def convert_node(node):
         if isinstance(node, graph.OutputNode):
             inputs = node.from_op.inputs
-            short_name = node.from_op.name.split("-")[1]
-            op_def = dispatch.get_op_for_inputs(short_name, inputs)
-            if op_def:
-                # Rename inputs to match op, ie, call by position...
-                # Hmm, need to centralize this behavior
-                # TODO
-                final_inputs = {
-                    k: v for k, v in zip(op_def.input_type.arg_types, inputs.values())
-                }
-                return op_def.lazy_call(**final_inputs)
+
+            # since dict takes OpVarArgs(typing.Any()) as input, it will always show up
+            # as a candidate for vectorizing itself. We don't want to do that, so we
+            # explicitly force using ArrowWeaveList-dict instead.
+            if node.from_op.name == "dict":
+                op = registry_mem.memory_registry.get_op(
+                    "ArrowWeaveList-vectorizedDict"
+                )
+                return op.lazy_call(**inputs)
+            else:
+                op = dispatch.get_op_for_input_types(
+                    node.from_op.name, [], {k: v.type for k, v in inputs.items()}
+                )
+                if op:
+                    # Rename inputs to match op, ie, call by position...
+                    # Hmm, need to centralize this behavior
+                    # TODO
+                    final_inputs = {
+                        k: v for k, v in zip(op.input_type.arg_types, inputs.values())
+                    }
+                    return op.lazy_call(**final_inputs)
             raise VectorizeError(
-                "Can't vectorize, no op for: %s %s" % (short_name, inputs)
+                "Can't vectorize, no op for: %s %s" % (node.from_op.name, inputs)
             )
         elif isinstance(node, graph.VarNode):
             # Vectorize variable
@@ -1058,13 +1414,7 @@ def to_arrow(obj, wb_type=None):
         # TODO: do I need this branch? Does it work now?
         # if isinstance(wb_type.object_type, types.ObjectType):
         #     arrow_obj = pa.array(py_objs, pyarrow_type)
-
-        if pa.types.is_struct(pyarrow_type):
-            arr = pa.array(py_objs, type=pyarrow_type)
-            rb = pa.RecordBatch.from_struct_array(arr)  # this pivots to columnar layout
-            arrow_obj = pa.Table.from_batches([rb])
-        else:
-            arrow_obj = pa.array(py_objs, pyarrow_type)
+        arrow_obj = pa.array(py_objs, pyarrow_type)
         weave_obj = ArrowWeaveList(arrow_obj, object_type, artifact)
 
         # Save the weave object to the artifact

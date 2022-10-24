@@ -75,11 +75,12 @@ class UnionToPyUnion(mappers_weave.UnionMapper):
             # TODO: assignment isn't right here (a dict with 'a', 'b' int keys is
             # assignable to a dict with an 'a' int key). We want type equality.
             # But that breaks some stuff
+            # TODO: Should types.TypeRegistry.type_of always return a const type??
             if isinstance(member_type, types.Const) and not isinstance(
                 obj_type, types.Const
             ):
                 obj_type = types.Const(obj_type, obj)
-            if member_type.assign_type(obj_type) != types.Invalid():
+            if member_type.assign_type(obj_type):
                 result = member_mapper.apply(obj)
                 if isinstance(result, dict):
                     result["_union_id"] = i

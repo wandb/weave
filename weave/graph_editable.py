@@ -62,10 +62,38 @@ class EditGraph:
             # TODO
             return
         for output_edge in self.output_edges[node]:
-            consumer = output_edge.input_to
-            new_inputs = dict(consumer.from_op.inputs)
-            new_inputs[output_edge.input_name] = replace_with
+            consumer = self.get_node(output_edge.input_to)
+            new_inputs = {
+                k: self.get_node(v) for k, v in dict(consumer.from_op.inputs).items()
+            }
+            # If the edge name is out of date...
+            edge_name = output_edge.input_name
+            if edge_name not in new_inputs:
+                for new_edge_name, new_input in new_inputs.items():
+                    if self.get_node(new_input) == self.get_node(node):
+                        edge_name = new_edge_name
+                        break
+            new_inputs[edge_name] = replace_with
             new_consumer: graph.OutputNode[graph.Node] = graph.OutputNode(
                 consumer.type, consumer.from_op.name, new_inputs
             )
-            self.replace(consumer, new_consumer)
+            self.replace(output_edge.input_to, new_consumer)
+
+    @property
+    def edges_with_replacements(self):
+        """
+        Users should use this to iterate over edges, as it will return the
+        updated edges after replacements have been made.
+        """
+        for edge in self.edges:
+            input_to_node = self.get_node(edge.input_to)
+            input_to_node_inputs = list(input_to_node.from_op.inputs.keys())
+            orig_to_node = edge.input_to
+            orig_to_node_inputs = list(orig_to_node.from_op.inputs.keys())
+            orig_to_node_input_ndx = (orig_to_node_inputs).index(edge.input_name)
+            input_to_node_input_name = (input_to_node_inputs)[orig_to_node_input_ndx]
+            yield Edge(
+                self.get_node(edge.output_of),
+                self.get_node(edge.input_to),
+                input_to_node_input_name,
+            )
