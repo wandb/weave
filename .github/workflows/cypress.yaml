@@ -12,7 +12,7 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Checkout submodules
-        uses: textbook/git-checkout-submodule-action@master
+        run: git submodule update --init
 
       - name: Cypress run
         uses: cypress-io/github-action@v4
