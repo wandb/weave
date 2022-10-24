@@ -2,9 +2,6 @@ name: cypress
 
 on:
   push:
-    branches:
-      - master
-  pull_request:
 
 jobs:
   cypress-run:
