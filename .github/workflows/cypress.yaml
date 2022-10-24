@@ -1,0 +1,21 @@
+name: cypress
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+jobs:
+  cypress-run:
+    name: Cypress run
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Checkout submodules
+        uses: textbook/git-checkout-submodule-action@master
+
+      - name: Cypress run
+        uses: cypress-io/github-action@v4
