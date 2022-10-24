@@ -1,7 +1,7 @@
 describe('empty spec', () => {
   it('passes', () => {
     // cy.visit('http://localhost:8888')
-    cy.visit('http://localhost:8888/notebooks/Test%20automation.ipynb?token=70e21adae1ea945e550c2b899223e8529d4f2fa417506450')
+    cy.visit('http://localhost:8888/notebooks/Test%20automation.ipynb')
     cy.get('#kernellink').click()
     cy.get('#restart_run_all a').click()
     cy.get('button.btn-danger').click()
