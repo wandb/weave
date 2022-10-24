@@ -138,26 +138,27 @@ class MultiDistribution(weave.Panel):
         if self.config is None:
             self.config = DistributionConfig()
 
-        unnested = weave.ops.unnest(self.input_node)
-        if "value_fn" in options:
-            sig = inspect.signature(options["value_fn"])
-            param_name = list(sig.parameters.values())[0].name
-            self.config.value_fn = weave.define_fn(
-                {param_name: unnested.type.object_type}, options["value_fn"]
-            )
-        else:
-            self.config.value_fn = weave.define_fn(
-                {"item": unnested.type.object_type}, lambda item: item
-            )
-        if "label_fn" in options:
-            sig = inspect.signature(options["label_fn"])
-            param_name = list(sig.parameters.values())[0].name
-            self.config.label_fn = weave.define_fn(
-                {param_name: unnested.type.object_type}, options["label_fn"]
-            )
-        else:
-            self.config.label_fn = weave.define_fn(
-                {"item": unnested.type.object_type}, lambda item: item
-            )
-        if "bin_size" in options:
-            self.config.bin_size = weave.make_node(options["bin_size"])
+            unnested = weave.ops.unnest(self.input_node)
+            if "value_fn" in options:
+                sig = inspect.signature(options["value_fn"])
+                param_name = list(sig.parameters.values())[0].name
+                self.config.value_fn = weave.define_fn(
+                    {param_name: unnested.type.object_type}, options["value_fn"]
+                )
+            else:
+                self.config.value_fn = weave.define_fn(
+                    {"item": unnested.type.object_type}, lambda item: item
+                )
+            if "label_fn" in options:
+                sig = inspect.signature(options["label_fn"])
+                param_name = list(sig.parameters.values())[0].name
+                self.config.label_fn = weave.define_fn(
+                    {param_name: unnested.type.object_type}, options["label_fn"]
+                )
+            else:
+                self.config.label_fn = weave.define_fn(
+                    {"item": unnested.type.object_type},
+                    lambda item: weave.graph.VoidNode(),
+                )
+            if "bin_size" in options:
+                self.config.bin_size = weave.make_node(options["bin_size"])
