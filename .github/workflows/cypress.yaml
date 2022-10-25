@@ -26,4 +26,5 @@ jobs:
         run: nohup jupyter notebook --NotebookApp.token=abcd &
       - name: Cypress run
         uses: cypress-io/github-action@v4
-        working-directory: ./notebook_test
+        with:
+          working-directory: ./notebook_test

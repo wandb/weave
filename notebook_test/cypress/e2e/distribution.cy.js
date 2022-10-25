@@ -2,7 +2,7 @@ describe('empty spec', () => {
   it('passes', () => {
     // If the notebook output is not clear, this will take too long.
     // TODO: auto-clear
-    cy.visit('http://localhost:8888/notebooks/examples/vis/Distribution.ipynb')
+    cy.visit('http://localhost:8888/notebooks/examples/vis/Distribution.ipynb?token=abcd')
 
     // Restart and run all
     cy.get('#kernellink').click()
