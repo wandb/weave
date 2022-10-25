@@ -8,6 +8,7 @@ jobs:
     name: Jupyter notebook server
     runs-on: ubuntu-20.04
     steps:
+      - uses: actions/checkout@v2
       - name: Setup Python version
         uses: actions/setup-python@v2
         with:
