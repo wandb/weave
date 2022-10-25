@@ -329,6 +329,11 @@ class Invalid(BasicType):
     instance_classes = InvalidPy
 
     def assign_type(self, next_type):
+        if isinstance(next_type, Invalid):
+            # TODO: We're supposed to return a type, but master
+            # has been changed to return a boolean. We can
+            # delete this method after merging.
+            return True
         return next_type
 
 
