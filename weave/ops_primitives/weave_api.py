@@ -212,7 +212,9 @@ def set(self, val: typing.Any) -> typing.Any:
     for node, inputs, result in reversed(list(zip(nodes, op_inputs, results))):
         op_def = registry_mem.memory_registry.get_op(node.from_op.name)
         if not op_def.setter:
-            raise errors.WeaveInternalError("Set error")
+            raise errors.WeaveInternalError(
+                "Set error. No setter declared for op: %s" % node.from_op.name
+            )
         args = list(inputs.values())
         args.append(res)
         try:

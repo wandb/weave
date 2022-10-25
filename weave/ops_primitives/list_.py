@@ -31,8 +31,7 @@ class List:
     def count(self):
         return len(self)
 
-    @mutation
-    def __setitem__(self, k, v):
+    def __setitem__(self, k, v, action=None):
         # TODO: copy the whole list to an actual list so we can mutate!
         #    (not good, need to implement on ArrowTableList)
         self_list = list(self)
@@ -257,8 +256,13 @@ GroupResultType.instance_classes = GroupResult
 ### TODO Move these ops onto List class and make part of the List interface
 
 
+def list_indexCheckpoint_setter(arr, v):
+    return v
+
+
 @op(
     name="list-indexCheckpoint",
+    setter=list_indexCheckpoint_setter,
     input_type={"arr": types.List(types.Any())},
     output_type=lambda input_types: input_types["arr"],
 )
@@ -412,7 +416,11 @@ class WeaveJSListInterface:
         type_class = types.TypeRegistry.type_class_of(arr)
         return type_class.NodeMethodsClass.count.resolve_fn(arr)
 
-    @op(name="index", output_type=index_output_type)
+    def index_set(obj, index, v, action=None):
+        type_class = types.TypeRegistry.type_class_of(obj)
+        return type_class.NodeMethodsClass.__setitem__(obj, index, v, action=action)
+
+    @op(name="index", setter=index_set, output_type=index_output_type)
     def index(arr: list[typing.Any], index: int):  # type: ignore
         type_class = types.TypeRegistry.type_class_of(arr)
         return type_class.NodeMethodsClass.__getitem__.resolve_fn(arr, index)
