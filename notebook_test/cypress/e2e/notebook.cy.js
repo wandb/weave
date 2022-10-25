@@ -2,6 +2,7 @@ describe('empty spec', () => {
   it('passes', () => {
     // You can set a jupyter notebook server's token like this: jupyter notebook --NotebookApp.token=abcd
     cy.visit('http://localhost:8888/notebooks/Test%20automation.ipynb?token=abcd')
+    cy.wait(2000)
     cy.get('#kernellink').click()
     cy.get('#restart_run_all a').click()
     cy.get('button.btn-danger').click()
