@@ -27,6 +27,7 @@ datasets
 transformers<4.21
 tensorflow>=1.15.2
 rich
+plotly
 
 # spaCy Requirements:
 spacy>=3.0.0,<4.0.0
