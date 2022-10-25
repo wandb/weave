@@ -4,8 +4,8 @@ on:
   push:
 
 jobs:
-  notebook-server:
-    name: Jupyter notebook server
+  cypress-run:
+    name: Cypress run
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
@@ -23,15 +23,8 @@ jobs:
       - name: Install dev dependencies
         run: pip install -r requirements.test.txt
       - name: Start Jupyter notebook server
-        run: jupyter notebook --NotebookApp.token=abcd &
-
-  cypress-run:
-    name: Cypress run
-    needs: notebook-server
-    runs-on: ubuntu-20.04
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-
+        run: nohup jupyter notebook --NotebookApp.token=abcd &
       - name: Cypress run
         uses: cypress-io/github-action@v4
+        with:
+          project: ./notebook_test
