@@ -4,15 +4,33 @@ on:
   push:
 
 jobs:
+  notebook-server:
+    name: Jupyter notebook server
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Setup Python version
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.9
+          cache: "pip"
+      - name: Create and start virtual environment
+        run: |
+          python3 -m venv venv
+          source venv/bin/activate
+      - name: Install package
+        run: pip install .
+      - name: Install dev dependencies
+        run: pip install -r requirements.test.txt
+      - name: Start Jupyter notebook server
+        run: jupyter notebook --NotebookApp.token=abcd &
+
   cypress-run:
     name: Cypress run
+    needs: notebook-server
     runs-on: ubuntu-20.04
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-
-      - name: Checkout submodules
-        run: git submodule update --init
 
       - name: Cypress run
         uses: cypress-io/github-action@v4
