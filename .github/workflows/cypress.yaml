@@ -28,6 +28,12 @@ jobs:
         uses: cypress-io/github-action@v4
         with:
           working-directory: ./notebook_test
+          record: true
+        env:
+          # pass the Dashboard record key as an environment variable
+          CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
+          # pass GitHub token to allow accurately detecting a build vs a re-run build
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       # after the test run completes
       # store videos and any screenshots
       # NOTE: screenshots will be generated only if E2E test failed
@@ -44,4 +50,4 @@ jobs:
         if: always()
         with:
           name: cypress-videos
-          path: notebook_test/cypress/videos
+          path: notebook_test/tcypress/videos
