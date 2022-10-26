@@ -4,6 +4,8 @@ import plotly
 import weave
 import typing
 import plotly.express as px
+import pandas as pd
+from plotly import graph_objs as go
 
 from ... import weave_internal
 from ... import infer_types
@@ -89,4 +91,39 @@ def plotly_scatter(data: list[ScatterData]) -> plotly.graph_objs.Figure:
     fig = px.scatter(data, x="x", y="y", template="plotly_white")
     fig.update_layout(margin=dict(l=0, r=0, t=0, b=0))
     fig.update_layout(dragmode="select")
+    return fig
+
+
+class GeoData(typing.TypedDict):
+    lat: float
+    long: float
+    color: typing.Union[float, str]
+
+
+@weave.op()
+def plotly_geo(data: list[GeoData]) -> plotly.graph_objs.Figure:
+    de = pd.DataFrame(data)
+
+    fig = go.Figure(
+        data=go.Scattergeo(
+            lon=de["long"],
+            lat=de["lat"],
+            mode="markers",
+            # text=de["Map label"],  # str(de["Magnitude"]) + " " + de["Date"],
+            marker_color=de["color"]  # , colors[df["Type"][0]]
+            # showlegend=True,
+            # marker=dict(
+            #     color=de["Magnitude"], size=15, opacity=0.9, colorscale="Sunset"
+            # )
+            # opacity
+            # marker_color=colors[volcano_types[df["Type"][0]]]
+        )
+    )
+    fig.update_geos(
+        projection_type="orthographic",
+        landcolor="white",
+        oceancolor="MidnightBlue",
+        showocean=True,
+        lakecolor="LightBlue",
+    )
     return fig
