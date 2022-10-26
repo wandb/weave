@@ -74,6 +74,16 @@ def test_table_call():
         .table()
         .rows()[0]["image"]
     )
+
+    artifactVersion = (
+        ops.project("stacey", "mendeleev")
+        .artifact_type("test_results")
+        .artifacts()[0]
+        .versions()[0]
+    )
+    test_diff_node = artifactVersion.diff(artifactVersion)
+    av = weave.use(test_diff_node)
+
     table_image0 = weave.use(table_image0_node)
     assert table_image0.height == 299
     assert table_image0.width == 299

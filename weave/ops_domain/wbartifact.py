@@ -28,6 +28,23 @@ class ArtifactVersionType(types._PlainStringNamedType):
 @weave_class(weave_type=ArtifactVersionType)
 class ArtifactVersion:
     @op(
+        name="artifactVersion-manifestDiff",
+        input_type={"self": ArtifactVersionType(), "other": ArtifactVersionType()},
+        output_type=types.TypedDict(
+            {
+                "a_only": types.List(types.String()),
+                "b_only": types.List(types.String()),
+                "modified": types.List(types.String()),
+                "unchanged": types.List(types.String()),
+            }
+        ),
+    )
+    def diff(self, other):
+        self_manifest = self._saved_artifact.manifest
+        other_manifest = other._saved_artifact.manifest
+        return True
+
+    @op(
         name="artifactVersion-fileReturnType",
         input_type={"artifactVersion": ArtifactVersionType(), "path": types.String()},
         output_type=types.Type(),
