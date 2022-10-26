@@ -20,16 +20,31 @@ class ScatterConfig:
 
 
 # This is boilerplate that I'd like to get rid of.
-def scatter_set_default_config(config, input_node, new_config):
+def _scatter_set_default_config(config, input_node, new_config):
     return new_config
 
 
+def _scatter_default_config_output_type(input_type):
+    # We have to do shenaningans to pass the input type through
+    # because it might be a subtype since the input type has unions
+    # TOOD: Fix
+    config_type = input_type["config"]
+    if config_type == None:
+        return ScatterConfig.WeaveType()
+    if isinstance(config_type, weave.types.Const):
+        return config_type.val_type
+    return config_type
+
+
 # TODO: really annoying that I need the setter here.
-@weave.op(setter=scatter_set_default_config)
+@weave.op(
+    setter=_scatter_set_default_config,
+    output_type=_scatter_default_config_output_type,
+)
 def scatter_default_config(
     config: typing.Optional[ScatterConfig],
     unnested_node: list[typing.Any],
-) -> ScatterConfig:
+):
     input_type_item_type = weave.type_of(unnested_node).object_type
     if config == None:
         return ScatterConfig(
@@ -91,30 +106,35 @@ class Scatter(weave.Panel):
         self, input_node, vars=None, config=None, _renderAsPanel=None, **options
     ):
         super().__init__(input_node=input_node, vars=vars)
+        self._renderAsPanel = _renderAsPanel
+        if self._renderAsPanel is None:
+            self._renderAsPanel = weave_plotly.PanelPlotly()
+
         self.config = config
         if self.config is None:
             self.config = ScatterConfig()
 
-        self._renderAsPanel = _renderAsPanel
-        if self._renderAsPanel is None:
-            self._renderAsPanel = weave_plotly.PanelPlotly()
-        # self._renderAsPanel = weave_internal.make_var_node(
-        #     weave_plotly.PanelPlotly.WeaveType(), "panel"
-        # )
-
-        unnested = weave.ops.unnest(self.input_node)
-        if "x_fn" in options:
-            sig = inspect.signature(options["x_fn"])
-            param_name = list(sig.parameters.values())[0].name
-            self.config.x_fn = weave.define_fn(
-                {param_name: unnested.type.object_type}, options["x_fn"]
-            )
-        if "y_fn" in options:
-            sig = inspect.signature(options["y_fn"])
-            param_name = list(sig.parameters.values())[0].name
-            self.config.y_fn = weave.define_fn(
-                {param_name: unnested.type.object_type}, options["y_fn"]
-            )
+            unnested = weave.ops.unnest(self.input_node)
+            if "x_fn" in options:
+                sig = inspect.signature(options["x_fn"])
+                param_name = list(sig.parameters.values())[0].name
+                self.config.x_fn = weave.define_fn(
+                    {param_name: unnested.type.object_type}, options["x_fn"]
+                )
+            else:
+                self.config.x_fn = weave.define_fn(
+                    {"item": unnested.type.object_type}, lambda item: item
+                )
+            if "y_fn" in options:
+                sig = inspect.signature(options["y_fn"])
+                param_name = list(sig.parameters.values())[0].name
+                self.config.y_fn = weave.define_fn(
+                    {param_name: unnested.type.object_type}, options["y_fn"]
+                )
+            else:
+                self.config.y_fn = weave.define_fn(
+                    {"item": unnested.type.object_type}, lambda item: item
+                )
 
     @weave.op(output_type=lambda input_type: input_type["self"].input_node.output_type)
     def selected(self):

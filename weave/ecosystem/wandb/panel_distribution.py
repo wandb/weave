@@ -23,16 +23,26 @@ class DistributionConfig:
 
 
 # This is boilerplate that I'd like to get rid of.
-def multi_distribution_set_default_config(config, input_node, new_config):
+def _multi_distribution_set_default_config(config, input_node, new_config):
     return new_config
+
+
+def _multi_distribution_default_config_output_type(input_type):
+    # We have to do shenaningans to pass the input type through
+    # because it might be a subtype since the input type has unions
+    # TOOD: Fix
+    config_type = input_type["config"]
+    if config_type == None:
+        return DistributionConfig.WeaveType()
+    if isinstance(config_type, weave.types.Const):
+        return config_type.val_type
+    return config_type
 
 
 # TODO: really annoying that I need the setter here.
 @weave.op(
-    setter=multi_distribution_set_default_config,
-    output_type=lambda input_type: DistributionConfig.WeaveType()
-    if input_type["config"] == None
-    else input_type["config"],
+    setter=_multi_distribution_set_default_config,
+    output_type=_multi_distribution_default_config_output_type,
 )
 def multi_distribution_default_config(
     config: typing.Optional[DistributionConfig],
