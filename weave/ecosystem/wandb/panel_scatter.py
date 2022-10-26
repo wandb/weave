@@ -136,6 +136,8 @@ class Scatter(weave.Panel):
                     {"item": unnested.type.object_type}, lambda item: item
                 )
 
+    # This function currently requires a paired output_type implementation in WeaveJS!
+    # TODO: Fix
     @weave.op(output_type=lambda input_type: input_type["self"].input_node.output_type)
     def selected(self):
         unnested = weave.ops.unnest(self.input_node)
