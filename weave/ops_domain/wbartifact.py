@@ -56,14 +56,17 @@ class ArtifactVersion:
                 else:
                     changed.add(k)
 
-            return a_only, b_only, unchanged, changed
+            return {
+                "a_only": list(a_only),
+                "b_only": list(b_only),
+                "unchanged": list(unchanged),
+                "changed": list(changed),
+            }
 
-        self_manifest = stringify_artifact_manifest(self._saved_artifact.manifest)
-        other_manifest = stringify_artifact_manifest(other._saved_artifact.manifest)
+        self_manifest = stringify_artifact_manifest(self.manifest)
+        other_manifest = stringify_artifact_manifest(other.manifest)
 
-        self_only, other_only, unchanged, changed = _diff(self_manifest, other_manifest)
-
-        return True
+        return _diff(self_manifest, other_manifest)
 
     @op(
         name="artifactVersion-fileReturnType",
