@@ -40,8 +40,29 @@ class ArtifactVersion:
         ),
     )
     def diff(self, other):
-        self_manifest = self._saved_artifact.manifest
-        other_manifest = other._saved_artifact.manifest
+        def stringify_artifact_manifest(manifest):
+            return {name: obj.digest for name, obj in manifest.entries.items()}
+
+        def _diff(a, b):
+            a_only = set(a.keys()) - set(b.keys())
+            b_only = set(b.keys()) - set(a.keys())
+            unchanged = set()
+            changed = set()
+
+            intersection = set(a.keys()) & set(b.keys())
+            for k in intersection:
+                if a[k] == b[k]:
+                    unchanged.add(k)
+                else:
+                    changed.add(k)
+
+            return a_only, b_only, unchanged, changed
+
+        self_manifest = stringify_artifact_manifest(self._saved_artifact.manifest)
+        other_manifest = stringify_artifact_manifest(other._saved_artifact.manifest)
+
+        self_only, other_only, unchanged, changed = _diff(self_manifest, other_manifest)
+
         return True
 
     @op(
@@ -115,8 +136,7 @@ class ArtifactVersion:
                 # Its a file within cur_dir
                 # TODO: I haven't tested this since changin ArtifactVersionFile implementation
                 files[entry_path] = file_wbartifact.ArtifactVersionFile(
-                    self,
-                    entry_path,
+                    self, entry_path,
                 )
             else:
                 dir_name = rel_path_parts[0]
@@ -127,8 +147,7 @@ class ArtifactVersion:
                 if len(rel_path_parts) == 2:
                     # TODO: I haven't tested this since changin ArtifactVersionFile implementation
                     dir_.files[rel_path_parts[1]] = file_wbartifact.ArtifactVersionFile(
-                        self,
-                        entry_path,
+                        self, entry_path,
                     )
                 else:
                     dir_.dirs[rel_path_parts[1]] = 1

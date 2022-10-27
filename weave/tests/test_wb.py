@@ -14,7 +14,7 @@ def test_table_call():
         name = "mendeleev"
 
     class FakeEntry:
-        pass
+        digest = mock.Mock(return_value="abcd")
 
     class FakeManifest:
         entries = {"fakePath": FakeEntry()}
@@ -83,6 +83,7 @@ def test_table_call():
     )
     test_diff_node = artifactVersion.diff(artifactVersion)
     av = weave.use(test_diff_node)
+    print(av)
 
     table_image0 = weave.use(table_image0_node)
     assert table_image0.height == 299
