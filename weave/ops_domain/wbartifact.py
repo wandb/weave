@@ -9,6 +9,7 @@ from ..ops_primitives import file_local
 from .. import artifacts_local
 from .. import refs
 from ..ops_primitives import file as weave_file
+from .. import panels
 
 
 class ArtifactVersionType(types._PlainStringNamedType):
@@ -30,16 +31,17 @@ class ArtifactVersion:
     @op(
         name="artifactVersion-manifestDiff",
         input_type={"self": ArtifactVersionType(), "other": ArtifactVersionType()},
-        output_type=types.TypedDict(
-            {
-                "a_only": types.List(types.String()),
-                "b_only": types.List(types.String()),
-                "modified": types.List(types.String()),
-                "unchanged": types.List(types.String()),
-            }
-        ),
+        # output_type=types.TypedDict(
+        #     {
+        #         "a_only": types.List(types.String()),
+        #         "b_only": types.List(types.String()),
+        #         "modified": types.List(types.String()),
+        #         "unchanged": types.List(types.String()),
+        #     }
+        # ),
+        render_info={"type": "function"},
     )
-    def diff(self, other):
+    def diff(self, other) -> panels.Card:
         def stringify_artifact_manifest(manifest):
             return {name: obj.digest for name, obj in manifest.entries.items()}
 
@@ -65,8 +67,28 @@ class ArtifactVersion:
 
         self_manifest = stringify_artifact_manifest(self.manifest)
         other_manifest = stringify_artifact_manifest(other.manifest)
+        result = _diff(self_manifest, other_manifest)
 
-        return _diff(self_manifest, other_manifest)
+        return panels.Card(
+            title="ARTIFACT DIFF",
+            subtitle="demo",
+            content=[
+                panels.CardTab(
+                    name="First Artifact Only",
+                    content=panels.Group(items=result["a_only"]),
+                ),
+                panels.CardTab(
+                    name="Second Artifact Only",
+                    content=panels.Group(items=result["b_only"]),
+                ),
+                panels.CardTab(
+                    name="Unchanged", content=panels.Group(items=result["unchanged"]),
+                ),
+                panels.CardTab(
+                    name="Modified", content=panels.Group(items=result["changed"]),
+                ),
+            ],
+        )
 
     @op(
         name="artifactVersion-fileReturnType",
