@@ -121,8 +121,7 @@ def get_returntype(uri):
     return op_get_return_type(uri)
 
 
-@mutation
-def _save(name, obj):
+def _save(name, obj, action=None):
 
     obj_uri = uris.WeaveURI.parse(name)
 
@@ -143,8 +142,7 @@ def get(uri):
     return storage.get(uri)
 
 
-@mutation
-def execute_setter(node, value):
+def execute_setter(node, value, action=None):
     if isinstance(node, graph.ConstNode):
         new_type = node.type
         if isinstance(new_type, types.Function):

@@ -67,8 +67,7 @@ def typeddict_pick_output_type(input_types):
 
 @weave_class(weave_type=types.TypedDict)
 class TypedDict:
-    @mutation
-    def __setitem__(self, k, v):
+    def __setitem__(self, k, v, action=None):
         dict.__setitem__(self, k, v)
         return self
 
@@ -114,8 +113,7 @@ class TypedDict:
 
 @weave_class(weave_type=types.Dict)
 class Dict(dict):
-    @mutation
-    def __setitem__(self, k, v):
+    def __setitem__(self, k, v, action=None):
         dict.__setitem__(self, k, v)
         return self
 
