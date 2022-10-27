@@ -10,6 +10,7 @@ from .. import artifacts_local
 from .. import refs
 from ..ops_primitives import file as weave_file
 from .. import panels
+from .. import ops
 
 
 class ArtifactVersionType(types._PlainStringNamedType):
@@ -69,10 +70,98 @@ class ArtifactVersion:
         other_manifest = stringify_artifact_manifest(other.manifest)
         result = _diff(self_manifest, other_manifest)
 
+        def template(text, color):
+            return f"""<p style="color:{color}; font-family:'Source Sans Pro',sans-serif;">{text}</p>"""
+
+        def first_artifact_html():
+            a_only = [template(t, "red") for t in result["a_only"]]
+            b_only = [template(t, "white") for t in result["b_only"]]
+            unchanged = [template(t, "black") for t in result["unchanged"]]
+            changed = [template(t, "orange") for t in result["changed"]]
+
+            html = a_only + b_only + unchanged + changed
+            html = "\n".join(html)
+
+            return html
+
+            # op = ops.Html(html)
+            # return panels.Html(op)
+
+        def second_artifact_html():
+            a_only = [template(t, "white") for t in result["a_only"]]
+            b_only = [template(t, "green") for t in result["b_only"]]
+            unchanged = [template(t, "black") for t in result["unchanged"]]
+            changed = [template(t, "orange") for t in result["changed"]]
+
+            html = a_only + b_only + unchanged + changed
+            html = "\n".join(html)
+
+            return html
+
+            # op = ops.Html(html)
+            # return panels.Html(op)
+
+        def artifact_html():
+
+            first = first_artifact_html()
+            second = second_artifact_html()
+            html = f"""
+            <html>
+            <head>
+                <title>Title of the document</title>
+                <style>
+                #boxes {{
+                    content: "";
+                    display: table;
+                    clear: both;
+                }}
+                div {{
+                    float: left;
+                    width: 45%;
+                    padding: 0 10px;
+                }}
+                #column1 {{
+                    background-color: #FFF;
+                }}
+                #column2 {{
+                    background-color: #FFF;
+                }}
+                h2 {{
+                    color: #000000;
+                    text-align: center;
+                }}
+                </style>
+            </head>
+            <body>
+                <div id="column1">
+                    <h2>First Artifact</h2>
+                    {first}
+                </div>
+                <div id="column2">
+                    <h2>Second Artifact</h2>
+                    {second}
+                </div>
+            </body>
+            </html>
+            """
+
+            return panels.Html(ops.Html(html))
+
         return panels.Card(
             title="ARTIFACT DIFF",
             subtitle="demo",
             content=[
+                panels.CardTab(
+                    name="HTML Diff",
+                    content=panels.Group(
+                        items=[
+                            artifact_html()
+                            # panels.LabeledItem(label="First Artifact", item=first_artifact_html()),
+                            # panels.LabeledItem(label="Second Artifact", item=second_artifact_html()),
+                        ],
+                        prefer_horizontal=True,
+                    ),
+                ),
                 panels.CardTab(
                     name="First Artifact Only",
                     content=panels.Group(items=result["a_only"]),
