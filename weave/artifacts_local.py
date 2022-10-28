@@ -17,7 +17,9 @@ import wandb
 
 @functools.lru_cache(1000)
 def get_wandb_read_artifact(path):
-    return wandb_api.wandb_public_api().artifact(path)
+    artifact = wandb_api.wandb_public_api().artifact(path)
+    artifact.download()
+    return artifact
 
 
 def local_artifact_dir():

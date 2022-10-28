@@ -42,6 +42,9 @@ class PILImageType(types.Type):
     def _to_dict(self):
         return {"width": self.width, "height": self.height, "mode": self.mode}
 
+    def __repr__(self):
+        return "<PILImageType>"
+
     @classmethod
     def from_dict(cls, d):
         return cls(d["width"], d["height"], d["mode"])

@@ -58,6 +58,7 @@ class Table:
         name="table-rows",
         input_type={"table": types.WBTable()},
         output_type=arrow.ArrowWeaveListType(types.TypedDict({})),
+        refine_output_type=rows_type,
     )
     def rows(table):
         return table._rows
