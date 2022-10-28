@@ -130,6 +130,11 @@ def _deserialize_node(
                     types.TypeRegistry.type_from_dict(fn_body_node["type"]),
                     fn_body_node["name"],
                 )
+            elif fn_body_node["nodeType"] == "const":
+                parsed_fn_body_node = weave_internal.make_const_node(
+                    types.TypeRegistry.type_from_dict(fn_body_node["type"]),
+                    fn_body_node["val"],
+                )
             elif fn_body_node["nodeType"] == "output":
                 op = nodes[fn_body_node["fromOp"]]
                 params = {}

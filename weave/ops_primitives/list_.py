@@ -631,3 +631,8 @@ def join_all(arrs, joinFn, outer: bool):  # type: ignore
             row[rk] = [arr1_row.get(rk), arr2_row.get(rk)]
         results.append(row)
     return results
+
+
+@op(name="range")
+def op_range(start: int, stop: int, step: int) -> list[int]:
+    return list(range(start, stop, step))
