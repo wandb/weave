@@ -75,11 +75,27 @@ class List:
         output_type=lambda input_types: input_types["self"],
     )
     def filter(self, filter_fn):
+        from ..ops_primitives import arrow
+
+        # WHOAAAA. Major hacks here.
+        # This handles arrow filtering for a demo.
+        # TODO: Remove
+        arrow_obj = None
+        if isinstance(self, arrow.ArrowWeaveList):
+            arrow_obj = self
+            self = self.to_pylist()
+
         call_results = execute_fast.fast_map_fn(self, filter_fn)
         result = []
         for row, keep in zip(self, call_results):
             if keep:
                 result.append(row)
+
+        if arrow_obj is not None:
+            return arrow.to_arrow_from_list_and_artifact(
+                result, arrow_obj.object_type, arrow_obj._artifact
+            )
+
         return result
 
     @op(

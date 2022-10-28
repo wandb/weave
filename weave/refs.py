@@ -82,7 +82,10 @@ class MemRef(Ref):
         return self._name
 
     def get(self):
-        return MEM_OBJS[self.name]
+        try:
+            return MEM_OBJS[self.name]
+        except KeyError:
+            raise errors.WeaveInternalError("MemRef not found: %s" % self.name)
 
     def __str__(self):
         return self.name
@@ -244,7 +247,7 @@ class LocalArtifactRef(Ref):
             put_ref(obj, self)
 
     def __repr__(self):
-        return f"<LocalArtifactRef({id(self)}) artifact={self.artifact} path={self.path} type={self.type} obj={bool(self.obj)} extra={self.extra}"
+        return f"<LocalArtifactRef({id(self)}) artifact={self.artifact} path={self.path} type={self.type} obj={self.obj is not None} extra={self.extra}"
 
     @property
     def uri(self) -> str:

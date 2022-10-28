@@ -531,8 +531,7 @@ class ArrowWeaveListType(types.Type):
 
         mapper = mappers_python.map_from_python(type_of_d, artifact)
         res = mapper.apply(result)
-        # TODO: This won't work for Grouped result!
-        return ArrowWeaveList(res["_arrow_data"], res["object_type"], artifact)
+        return self.instance_class(artifact=artifact, **res)
 
 
 @weave_class(weave_type=ArrowWeaveListType)
@@ -541,6 +540,8 @@ class ArrowWeaveList:
     object_type: types.Type
 
     def to_pylist(self):
+        if isinstance(self, graph.Node):
+            return []
         return self._arrow_data.to_pylist()
 
     def __init__(self, _arrow_data, object_type=None, artifact=None):
@@ -575,6 +576,8 @@ class ArrowWeaveList:
         try:
             row = self._arrow_data.slice(index, 1)
         except IndexError:
+            return None
+        if not row:
             return None
         res = self._mapper.apply(row.to_pylist()[0])
         return res
