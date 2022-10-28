@@ -79,7 +79,7 @@ class ArtifactVersion:
             unchanged = [template(t, "black") for t in result["unchanged"]]
             changed = [template(t, "orange") for t in result["changed"]]
 
-            html = a_only + b_only + unchanged + changed
+            html = a_only + b_only + changed + unchanged
             html = "\n".join(html)
 
             return html
@@ -93,7 +93,7 @@ class ArtifactVersion:
             unchanged = [template(t, "black") for t in result["unchanged"]]
             changed = [template(t, "orange") for t in result["changed"]]
 
-            html = a_only + b_only + unchanged + changed
+            html = a_only + b_only + changed + unchanged
             html = "\n".join(html)
 
             return html
