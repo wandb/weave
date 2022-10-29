@@ -13,6 +13,7 @@ ItemsType = typing.TypeVar("ItemsType")
 
 @weave.type()
 class Group2Config(typing.Generic[ItemsType]):
+    layered: bool = dataclasses.field(default_factory=lambda: False)
     preferHorizontal: bool = dataclasses.field(default_factory=lambda: False)
     equalSize: bool = dataclasses.field(default_factory=lambda: False)
     style: str = dataclasses.field(default_factory=lambda: "")
@@ -37,6 +38,8 @@ class Group2(panel.Panel, typing.Generic[Group2ConfigType]):
             self.config = Group2Config()
         if "items" in options:
             self.config.items = options["items"]
+        if "layered" in options:
+            self.config.layered = options["layered"]
         if "preferHorizontal" in options:
             self.config.preferHorizontal = options["preferHorizontal"]
         if "equalSize" in options:

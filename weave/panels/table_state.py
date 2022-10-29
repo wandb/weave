@@ -1,4 +1,5 @@
 import dataclasses
+import inspect
 import random
 import string
 import typing
@@ -76,7 +77,18 @@ class TableState:
         object_type = self.input_node.type.object_type
         if self.groupBy and col_id not in self.groupBy:
             object_type = ops.GroupResultType(object_type)
-        selected = select_expr(weave_internal.make_var_node(object_type, "row"))
+
+        sig = inspect.signature(select_expr)
+        kwargs = {}
+        if "domain" in sig.parameters:
+            kwargs = {
+                "domain": weave_internal.make_var_node(
+                    weave.types.List(object_type), "domain"
+                )
+            }
+        selected = select_expr(
+            weave_internal.make_var_node(object_type, "row"), **kwargs
+        )
 
         if isinstance(selected, panel.Panel):
             self.columnSelectFunctions[col_id] = selected.input_node
