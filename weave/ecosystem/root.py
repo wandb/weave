@@ -13,12 +13,13 @@ from .. import panels
 # from . import torchvision
 # from . import huggingface
 # from . import craiyon
-# from . import openai
 # from . import spacy
 # from . import wandb
 from . import scenario
 from . import shawn
 from . import wandb
+from . import replicate
+from . import openai
 
 # TODO: feels odd to call this "ops.Markdown".
 # Maybe make it top level

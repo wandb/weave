@@ -118,8 +118,8 @@ class OpDef:
 
         return serialized
 
-    def __str__(self):
-        return "<OpDef: %s>" % self.name
+    def __repr__(self):
+        return "<OpDef: %s %s>" % (self.name, self.version)
 
 
 def is_op_def(obj):
