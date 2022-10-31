@@ -12,17 +12,19 @@ jobs:
       - name: Setup Python version
         uses: actions/setup-python@v2
         with:
-          python-version: 3.9
+          python-version: 3.9.7
           cache: "pip"
       - uses: actions/cache@v3
         id: venvcache
         with:
           path: venv
           key: ${{ hashFiles('requirements*') }}
-      - name: Create and start virtual environment
+      - name: Create virtual environment
         if: steps.venvcache.outputs.cache-hit != 'true'
         run: |
           python3 -m venv venv
+      - name: Start virtual environment
+        run: |
           source venv/bin/activate
       - name: Install package
         if: steps.venvcache.outputs.cache-hit != 'true'

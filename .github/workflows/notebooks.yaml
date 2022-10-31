@@ -1,7 +1,7 @@
 name: notebooks
 
-on:
-  push:
+# on:
+#   push:
 
 jobs:
   test:
