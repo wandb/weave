@@ -24,6 +24,9 @@ from . import op_def
 from . import trace_local
 from . import refs
 
+# Language Features
+from . import language_nullability
+
 TRACE_LOCAL = trace_local.TraceLocal()
 
 
@@ -229,22 +232,7 @@ def execute_forward_node(
         forward_node.set_result(run)
     else:
         logging.debug("Executing sync op")
-
-        # Hacking... this is nullability of ops
-        # We should do this as a compile pass instead of hard-coding in engine.
-        # That means we need an op called like "handle_null" that takes a function
-        # as its second argument. Function is the op we want to execute if non-null.
-        # TODO: fix
-        # TODO: not implemented for async ops
-        force_none_result = False
-        if inputs:
-            input_name0 = list(inputs.keys())[0]
-            input0 = list(inputs.values())[0]
-            if input0 is None or isinstance(input0, box.BoxedNone):
-                input0_type = node.from_op.inputs[input_name0]
-                if not types.is_optional(input0_type):
-                    force_none_result = True
-        if force_none_result:
+        if language_nullability.should_force_none_result(inputs, op_def):
             result = None
         else:
             result = execute_sync_op(op_def, inputs)

@@ -41,8 +41,16 @@ def test_non_mapped_serialized():
 
 def test_mapped_use():
     node = test_add_one([1, 2, 3])
-    assert node.type == weave.types.List(weave.types.Int())
+    # TODO: this shold not be optional! Needs to be fixed when we fix the deriveOp class
+    assert node.type == weave.types.List(weave.types.optional(weave.types.Int()))
     assert weave.use(node) == [2, 3, 4]
+
+
+def test_mapped_nullable_use():
+    node = test_add_one([1, None, 3])
+    # TODO: this shold not be optional! Needs to be fixed when we fix the deriveOp class
+    assert node.type == weave.types.List(weave.types.optional(weave.types.Int()))
+    assert weave.use(node) == [2, None, 4]
 
 
 def test_mapped_serialized():
@@ -56,7 +64,7 @@ def test_mapped_serialized():
 
 def test_mapped_empty_use():
     node = test_add_one([])
-    assert node.type == weave.types.List(weave.types.Int())
+    assert node.type == weave.types.List(weave.types.optional(weave.types.Int()))
     assert weave.use(node) == []
 
 

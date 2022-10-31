@@ -795,7 +795,7 @@ def optional(type_):
     return UnionType(none_type, type_)
 
 
-def is_optional(type_):
+def is_optional(type_: Type) -> bool:
     return isinstance(type_, UnionType) and none_type in type_.members
 
 
