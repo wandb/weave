@@ -14,13 +14,21 @@ jobs:
         with:
           python-version: 3.9
           cache: "pip"
+      - uses: actions/cache@v3
+        id: venvcache
+        with:
+          path: venv
+          key: ${{ hashFiles('requirements*') }}
       - name: Create and start virtual environment
+        if: steps.venvcache.outputs.cache-hit != 'true'
         run: |
           python3 -m venv venv
           source venv/bin/activate
       - name: Install package
+        if: steps.venvcache.outputs.cache-hit != 'true'
         run: pip install .
       - name: Install dev dependencies
+        if: steps.venvcache.outputs.cache-hit != 'true'
         run: pip install -r requirements.test.txt
       - name: Run notebooks
         run: pytest -n=auto --nbmake examples/vis/Scatter.ipynb examples/vis/Confusion.ipynb
