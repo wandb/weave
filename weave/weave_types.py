@@ -458,10 +458,7 @@ class Float(Number):
 
     def _assign_type_inner(self, other_type: Type):
         # Float if either side is a number
-        if isinstance(other_type, Float) or isinstance(other_type, Int):
-            return True
-        else:
-            return False
+        return isinstance(other_type, Number)
 
 
 class Int(Number):
@@ -477,12 +474,7 @@ class Int(Number):
 
     def _assign_type_inner(self, other_type: Type):
         # Become Float if rhs is Float
-        if isinstance(other_type, Float):
-            return True
-        elif isinstance(other_type, Int):
-            return True
-        else:
-            return False
+        return isinstance(other_type, Number)
 
 
 class Boolean(BasicType):
@@ -962,8 +954,7 @@ def union(*members: Type) -> Type:
 
 
 def is_list_like(t: Type) -> bool:
-    non_none_t = non_none(t)
-    return isinstance(non_none_t, List) or non_none_t.name == "ArrowWeaveList"
+    return isinstance(non_none(t), List)
 
 
 def is_custom_type(t: Type) -> bool:

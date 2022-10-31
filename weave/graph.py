@@ -50,6 +50,9 @@ class Node(typing.Generic[T]):
             str(self),
         )
 
+    def __bool__(self) -> bool:
+        raise errors.WeaveTypeError("Cannot use a node as a boolean predicate.")
+
 
 weave_types.Function.instance_classes = Node
 
@@ -177,7 +180,7 @@ class ConstNode(Node):
         # decisions here, like for now if its a BasicType or TypedDict, we encode
         # as json directly, otherwise we save the object and return a get() operation
         equiv_output_node = self.equivalent_output_node()
-        if equiv_output_node:
+        if equiv_output_node is not None:
             return equiv_output_node.to_json()
 
         val = self.val
@@ -296,8 +299,10 @@ def filter_nodes(node: Node, filter_fn: typing.Callable[[Node], bool]) -> list[N
     return [n for n in nodes if filter_fn(n)]
 
 
-def expr_vars(node: Node) -> list[Node]:
-    return filter_nodes(node, lambda n: isinstance(n, VarNode))
+def expr_vars(node: Node) -> list[VarNode]:
+    return typing.cast(
+        list[VarNode], filter_nodes(node, lambda n: isinstance(n, VarNode))
+    )
 
 
 def is_open(node: Node) -> bool:

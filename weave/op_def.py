@@ -4,6 +4,7 @@ from enum import Enum
 import inspect
 import typing
 
+import weave
 from weave.weavejs_fixes import fixup_node
 
 from . import errors
@@ -38,6 +39,11 @@ class OpDef:
     location: typing.Optional[uris.WeaveURI]
     is_builtin: bool = False
     instance: typing.Union[None, graph.Node]
+    weave_fn: typing.Optional[graph.Node]
+    pure: bool
+    resolve_fn: typing.Callable
+    lazy_call: typing.Optional[typing.Callable]
+    eager_call: typing.Optional[typing.Callable]
 
     # This is required to be able to determine which ops were derived from this
     # op. Particularly in cases where we need to rename or lookup when
@@ -52,18 +58,19 @@ class OpDef:
             types.Type,
             typing.Callable[[typing.Dict[str, types.Type]], types.Type],
         ],
-        resolve_fn,
+        resolve_fn: typing.Callable,
         refine_output_type: typing.Optional["OpDef"] = None,
         setter=None,
         render_info=None,
         pure=True,
         is_builtin: typing.Optional[bool] = None,
+        weave_fn: typing.Optional[graph.Node] = None,
     ):
         self.name = name
         self.input_type = input_type
         self.output_type = output_type
         self.refine_output_type = refine_output_type
-        self.resolve_fn = resolve_fn
+        self.resolve_fn = resolve_fn  # type: ignore
         self.setter = setter
         self.render_info = render_info
         self.pure = pure
@@ -79,6 +86,7 @@ class OpDef:
         self.call_fn = None
         self.instance = None
         self.derived_ops = {}
+        self.weave_fn = weave_fn
 
     def __repr__(self):
         return "<OpDef(%s) %s>" % (id(self), self.name)

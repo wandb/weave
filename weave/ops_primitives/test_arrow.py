@@ -14,6 +14,9 @@ from . import arrow
 from .. import weave_types as types
 from .. import weave_internal
 from .. import context_state
+from .. import graph
+from ..ecosystem.wandb import geom
+
 
 _loading_builtins_token = context_state.set_loading_built_ins()
 # T in `conftest::pre_post_each_test` we set a custom artifact directory for each test for isolation
@@ -111,9 +114,9 @@ def test_custom_types():
             {"a": 6, "im": Image.linear_gradient("L").rotate(4)},
         ]
     )
-    assert weave.use(data_node[0]["im"].width()) == 256
+    assert weave.use(data_node[0]["im"].width_()) == 256
 
-    assert weave.use(data_node.map(lambda row: row["im"].width())).to_pylist() == [
+    assert weave.use(data_node.map(lambda row: row["im"].width_())).to_pylist() == [
         256,
         256,
     ]
@@ -129,7 +132,7 @@ def test_custom_saveload():
     ref = storage.save(data)
     data2 = storage.get(str(ref))
     print("data2", data2._artifact)
-    assert weave.use(data2[0]["im"].width()) == 256
+    assert weave.use(data2[0]["im"].width_()) == 256
 
 
 # @pytest.mark.skip()
@@ -146,7 +149,7 @@ def test_custom_groupby():
             data.groupby(lambda row: ops.dict_(a=row["a"]))[0]
             .pick("im")
             .offset(0)[0]
-            .width()
+            .width_()
         )
         == 256
     )
@@ -165,7 +168,7 @@ def test_custom_groupby_intermediate_save():
     loaded_node = ops.get(
         f"local-artifact://{artifacts_local.local_artifact_dir()}/test_custom_groupby_intermediate_save/latest"
     )
-    assert weave.use(loaded_node.pick("im").offset(0)[0].width()) == 256
+    assert weave.use(loaded_node.pick("im").offset(0)[0].width_()) == 256
 
 
 def test_map_array():
@@ -605,3 +608,98 @@ def test_arrow_dict():
         weave.type_of(expected_output).object_type
     )
     assert awl.object_type == weave.type_of(expected_output).object_type
+
+
+def test_vectorize_works_recursively_on_weavifiable_op():
+
+    # this op is weavifiable because it just calls add
+    @weave.op()
+    def add_one(x: int) -> int:
+        return x + 1
+
+    weave_fn = weave_internal.define_fn(
+        {"x": weave.types.Int()}, lambda x: add_one(x)
+    ).val
+    vectorized = arrow.vectorize(weave_fn)
+    assert vectorized.to_json() == {
+        "nodeType": "output",
+        "type": {"type": "ArrowWeaveListNumber", "objectType": "number"},
+        "fromOp": {
+            "name": "ArrowWeaveListNumber-add",
+            "inputs": {
+                "self": {
+                    "nodeType": "var",
+                    "type": {"type": "ArrowWeaveList", "objectType": "int"},
+                    "varName": "x",
+                },
+                "other": {"nodeType": "const", "type": "int", "val": 1},
+            },
+        },
+    }
+
+
+@pytest.mark.parametrize(
+    "name,object,expected",
+    [
+        ("dict", {"a": 1, "b": 2}, ops.dict_(**{"a": 1, "b": 2})),
+        ("int", 1, weave_internal.make_const_node(types.Int(), 1)),
+        ("float", 1.0, weave_internal.make_const_node(types.Float(), 1.0)),
+        ("string", "a", weave_internal.make_const_node(types.String(), "a")),
+        ("bool", True, weave_internal.make_const_node(types.Boolean(), True)),
+        (
+            "mixed list",
+            [1, weave_internal.make_const_node(types.Int(), 2)],
+            ops.make_list(**{"0": 1, "1": 2}),
+        ),
+        (
+            "recursive dict",
+            {"a": {"b": 1}, "d": 2},
+            ops.dict_(**{"a": ops.dict_(**{"b": 1}), "d": 2}),
+        ),
+        (
+            "recursive list",
+            [1, [2, 3]],
+            ops.make_list(**{"0": 1, "1": ops.make_list(**{"0": 2, "1": 3})}),
+        ),
+        (
+            "recursive mixed",
+            {"a": [1, 2], "b": {"c": 3}},
+            ops.dict_(
+                **{"a": ops.make_list(**{"0": 1, "1": 2}), "b": ops.dict_(**{"c": 3})}
+            ),
+        ),
+        ("none", None, weave_internal.make_const_node(types.NoneType(), None)),
+        (
+            "object",
+            geom.Point2d(1, 2),
+            geom.Point2d.constructor(ops.dict_(**{"x": 1, "y": 2})),  # type: ignore
+        ),
+        (
+            "mixed object",
+            {"a": geom.Point2d(1, 2)},
+            ops.dict_(**{"a": geom.Point2d.constructor(ops.dict_(**{"x": 1, "y": 2}))}),  # type: ignore
+        ),
+        (
+            "mixed object list",
+            [
+                geom.Point2d(1, 2),
+                geom.Point2d.constructor(  # type: ignore
+                    ops.dict_(
+                        **{
+                            "x": weave_internal.make_const_node(types.Int(), 1),
+                            "y": weave_internal.make_const_node(types.Int(), 2),
+                        }
+                    )
+                ),
+            ],
+            ops.make_list(
+                **{
+                    "0": geom.Point2d.constructor(ops.dict_(**{"x": 1, "y": 2})),  # type: ignore
+                    "1": geom.Point2d.constructor(ops.dict_(**{"x": 1, "y": 2})),  # type: ignore
+                }
+            ),
+        ),
+    ],
+)
+def test_weavify_object(name, object, expected):
+    assert graph.nodes_equal(arrow.weavify_object(object), expected)

@@ -37,7 +37,7 @@ def _serialize_node(node: NodeOrOp, serialized_nodes: MapNodeOrOpToSerialized) -
         return op_id
     if isinstance(node, graph.ConstNode):
         equiv_output_node = node.equivalent_output_node()
-        if equiv_output_node:
+        if equiv_output_node is not None:
             return _serialize_node(equiv_output_node, serialized_nodes)
         if isinstance(node.type, types.Function):
             op_id = _serialize_node(node.val.from_op, serialized_nodes)

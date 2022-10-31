@@ -135,6 +135,7 @@ class DefaultToArrow(mappers_python.DefaultToPy):
         #     (this is similar to ObjectType and should be shared somehow).
         # Or we'll use save_instance which return a RefType (which we encode
         #     as a pyarrow string).
+
         if self.type.name == "run":
             return pa.struct(
                 (
@@ -196,6 +197,8 @@ class DefaultFromArrow(mappers_python.DefaultFromPy):
 
 
 def map_to_arrow_(type, mapper, artifact, path=[]):
+    if isinstance(type, types.Const):
+        type = type.val_type
     if isinstance(type, types.TypedDict):
         return TypedDictToArrowStruct(type, mapper, artifact, path)
     elif isinstance(type, types.List):

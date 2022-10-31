@@ -17,6 +17,9 @@ from .api import *
 # TODO: fix
 from .ecosystem import ecosystem
 
+from .vectorize import _make_vectorized_constructor_ops
+
+_make_vectorized_constructor_ops()
 _context.clear_loading_built_ins(_loading_builtins_token)
 
 # Wow, this works! you can do just "weave" in a notebook and render

@@ -4,7 +4,6 @@ from PIL import Image
 from weave.ecosystem.wandb import geom
 
 from .. import api as weave
-from .. import storage
 from ..ops_primitives import arrow
 
 
@@ -43,6 +42,7 @@ def test_mapped_method_returning_custom_type():
             geom.LineSegment(0.0, 0.2, 0.4, 1.1),
         ]
     )
+
     mid = weave.use(segments.map(lambda seg: seg.midpoint()))
 
     assert weave.use(mid[0].x) == 0.45
@@ -58,7 +58,7 @@ def test_mapped_on_fully_custom_type():
     ]
     arrow_arr = arrow.to_arrow(data)
 
-    assert weave.use(arrow_arr.map(lambda row: row["im"].width())).to_pylist() == [
+    assert weave.use(arrow_arr.map(lambda row: row["im"].width_())).to_pylist() == [
         256,
         256,
     ]
@@ -72,3 +72,12 @@ def test_mapped_pick():
     arrow_arr = arrow.to_arrow(data)
 
     assert weave.use(arrow_arr.pick("b")).to_pylist() == [9, 10]
+
+
+def test_constructor():
+    expected = geom.Point2d(0.5, 0.6)
+    point2d_node = geom.Point2d.constructor({"x": 0.5, "y": 0.6})
+    assert weave.use(point2d_node) == expected
+
+    with pytest.raises(KeyError):
+        weave.use(geom.Point2d.constructor({"x": 0.5}))

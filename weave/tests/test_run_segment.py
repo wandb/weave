@@ -362,12 +362,12 @@ def test_map_merge_cache_busting():
 
     assert result1._arrow_data != result2._arrow_data
     assert (
-        "metric0" in result1._arrow_data.column_names
-        and "metric0" not in result2._arrow_data.column_names
+        result1._arrow_data.type.get_field_index("metric0") != -1
+        and result2._arrow_data.type.get_field_index("metric0") == -1
     )
     assert (
-        "metric1" not in result1._arrow_data.column_names
-        and "metric1" in result2._arrow_data.column_names
+        result1._arrow_data.type.get_field_index("metric1") == -1
+        and result2._arrow_data.type.get_field_index("metric1") != -1
     )
 
 

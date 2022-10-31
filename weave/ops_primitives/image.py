@@ -52,5 +52,5 @@ class PILImageOps:
         return binascii.hexlify(f.read()).decode("ISO-8859-1")
 
     @weave.op()
-    def width(self) -> int:
-        return self.width
+    def width_(self) -> int:
+        return self.width  # type: ignore
