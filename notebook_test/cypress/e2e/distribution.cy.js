@@ -1,4 +1,4 @@
-describe('empty spec', () => {
+describe.skip('empty spec', () => {
   it('passes', () => {
     // If the notebook output is not clear, this will take too long.
     // TODO: auto-clear
