@@ -14,10 +14,10 @@ jobs:
         with:
           python-version: 3.9
           cache: "pip"
-      # - name: Create and start virtual environment
-      #   run: |
-      #     python3 -m venv venv
-      #     source venv/bin/activate
+      - name: Create and start virtual environment
+        run: |
+          python3 -m venv venv
+          source venv/bin/activate
       - name: Install package
         run: pip install .
       - name: Install dev dependencies
