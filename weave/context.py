@@ -57,7 +57,10 @@ def _make_default_client():
             serv = server.HttpServer()
             serv.start()
             context_state.set_server(serv)
-        return server.HttpServerClient(serv.url)
+        # Falling through here means the notebook kernel uses
+        # InprocessServer, but the frontend uses HttpServer.
+        # versions() doesn't work when we use the HttpServer currently.
+        # return server.HttpServerClient(serv.url)
 
     return client.Client(server.InProcessServer())
 

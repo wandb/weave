@@ -7,6 +7,7 @@ import shutil
 from datetime import datetime
 import pathlib
 import tempfile
+import contextlib
 
 from . import uris
 from . import util
@@ -15,10 +16,21 @@ from . import wandb_api
 import wandb
 
 
+@contextlib.contextmanager
+def chdir(to_dir: str):
+    curdir = os.getcwd()
+    os.chdir(to_dir)
+    try:
+        yield
+    finally:
+        os.chdir(curdir)
+
+
 @functools.lru_cache(1000)
 def get_wandb_read_artifact(path):
-    artifact = wandb_api.wandb_public_api().artifact(path)
-    artifact.download()
+    with chdir(wandb_artifact_dir()):
+        artifact = wandb_api.wandb_public_api().artifact(path)
+        artifact.download()
     return artifact
 
 
@@ -26,6 +38,14 @@ def local_artifact_dir():
     return os.environ.get("WEAVE_LOCAL_ARTIFACT_DIR") or os.path.join(
         "/tmp", "local-artifacts"
     )
+
+
+def wandb_artifact_dir():
+    # Make this a subdir of local_artifact_dir, since the server
+    # checks for local_artifact_dir to see if it should serve
+    d = os.path.join(local_artifact_dir(), "_wandb_artifacts")
+    os.makedirs(d, exist_ok=True)
+    return d
 
 
 # From sdk/interface/artifacts.py
@@ -290,7 +310,9 @@ class WandbArtifact(Artifact):
                     found = True
             if found:
                 return os.path.join(self._saved_artifact._default_root(), name)
-        path = self._saved_artifact.get_path(name).download()
+        path = os.path.join(
+            wandb_artifact_dir(), self._saved_artifact.get_path(name).download()
+        )
         # python module loading does not support colons
         # TODO: This is an extremely expensive fix!
         path_safe = path.replace(":", "_")

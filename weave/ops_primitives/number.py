@@ -49,6 +49,13 @@ class Number(object):
         return lhs / rhs
 
     @op(
+        input_type={"lhs": types.Number(), "rhs": types.Number()},
+        output_type=types.Number(),
+    )
+    def __floordiv__(lhs, rhs):
+        return lhs // rhs
+
+    @op(
         name="number-modulo",
         input_type={"lhs": types.Number(), "rhs": types.Number()},
         output_type=types.Number(),
