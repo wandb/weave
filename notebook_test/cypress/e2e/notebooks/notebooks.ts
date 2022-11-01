@@ -67,7 +67,7 @@ export function checkWeaveNotebookOutputs(notebookPath: string) {
   forEachCellInNotebook(notebookPath, () => {
     // assert that there is at least 1 element with an attribute 'data-test-weave-id'
     const panels = cy
-      .get('[data-test-weave-id]')
+      .get('[data-test-weave-id]', {timeout: 10000})
       .should('have.length.greaterThan', 0);
     panels.each((panel, index) => {
       // assert that the element has a non-empty attribute 'data-test-weave-id'
