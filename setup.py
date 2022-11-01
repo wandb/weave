@@ -23,7 +23,7 @@ setup(
     author="Weights & Biases",
     author_email="support@wandb.com",
     url="https://github.com/wandb/end-to-end",
-    package_dir={"": "weave"},
+    package_dir={"weave": "weave"},
     include_package_data=True,
     install_requires=requirements,
     license="MIT license",
