@@ -32,7 +32,7 @@ jobs:
       - name: Cypress run
         uses: cypress-io/github-action@v4
         with:
-          working-directory: ./notebook_test
+          working-directory: ./integration_test
           record: true
           browser: chrome
         env:
@@ -50,10 +50,10 @@ jobs:
         if: failure()
         with:
           name: cypress-screenshots
-          path: notebook_test/cypress/screenshots
+          path: integration_test/cypress/screenshots
       # Test run video was always captured, so this action uses "always()" condition
       - uses: actions/upload-artifact@v2
         if: always()
         with:
           name: cypress-videos
-          path: notebook_test/tcypress/videos
+          path: integration_test/tcypress/videos
