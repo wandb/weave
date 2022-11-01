@@ -23,8 +23,8 @@ jobs:
       - name: Install test dependencies
         if: steps.cache-virtualenv.outputs.cache-hit != 'true'
         run: pip install -r requirements.test.txt
-      # - name: Run notebooks
-      #   run: pytest -n=auto --nbmake --overwrite examples/vis/Scatter.ipynb examples/vis/Confusion.ipynb
+      - name: Run notebooks
+        run: pytest -n=auto --nbmake --overwrite examples/vis/Scatter.ipynb examples/vis/Confusion.ipynb
       # - name: Start Jupyter notebook server
       #   run: nohup sh weave_server.sh &
       # - name: Cypress run
