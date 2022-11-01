@@ -15,14 +15,16 @@ jobs:
           python-version: 3.9.7
       - uses: syphar/restore-virtualenv@v1
         id: cache-virtualenv
-      - uses: syphar/restore-pip-download-cache@v1
-        if: steps.cache-virtualenv.outputs.cache-hit != 'true'
+      # - uses: syphar/restore-pip-download-cache@v1
+      #   if: steps.cache-virtualenv.outputs.cache-hit != 'true'
       - name: Install package
         if: steps.cache-virtualenv.outputs.cache-hit != 'true'
         run: pip install .
       - name: Install test dependencies
         if: steps.cache-virtualenv.outputs.cache-hit != 'true'
         run: pip install -r requirements.test.txt
+      - name: Setup upterm session
+        uses: lhotari/action-upterm@v1
       - name: Run notebooks
         run: pytest -n=auto --nbmake --overwrite examples/vis/Scatter.ipynb examples/vis/Confusion.ipynb
       # - name: Start Jupyter notebook server
