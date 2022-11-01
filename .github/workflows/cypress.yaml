@@ -15,8 +15,6 @@ jobs:
           python-version: 3.9.7
       - uses: syphar/restore-virtualenv@v1
         id: cache-virtualenv
-        with:
-          requirement_files: requirements.txt, requirements.test.txt
       - uses: syphar/restore-pip-download-cache@v1
         if: steps.cache-virtualenv.outputs.cache-hit != 'true'
       - name: Install package
