@@ -27,7 +27,7 @@ jobs:
     name: Run notebooks with nbmake
     # needs: create-venv
     runs-on: self-hosted
-    container: wandb/weave-test:latest
+    container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:latest
     steps:
       - uses: actions/checkout@v2
       # - name: Setup Python version
@@ -50,7 +50,7 @@ jobs:
     name: Run UI tests with Cypress
     needs: nbmake
     runs-on: self-hosted
-    container: wandb/weave-test:latest
+    container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:latest
     strategy:
       fail-fast: false
       matrix:
