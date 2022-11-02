@@ -4,8 +4,47 @@ on:
   push:
 
 jobs:
+  create-venv:
+    name: Create Python venv
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+      - name: Setup Python version
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.9.7
+      - uses: syphar/restore-virtualenv@v1
+        id: cache-virtualenv
+
+      - name: Install package
+        if: steps.cache-virtualenv.outputs.cache-hit != 'true'
+        run: pip install .
+      - name: Install test dependencies
+        if: steps.cache-virtualenv.outputs.cache-hit != 'true'
+        run: pip install -r requirements.test.txt
+
+  nbmake:
+    name: Run notebooks with nbmake
+    needs: create-venv
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+      - name: Setup Python version
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.9.7
+      - uses: syphar/restore-virtualenv@v1
+
+      - name: Run notebooks
+        run: pytest -n=auto --nbmake --overwrite examples
+      - name: Upload executed notebooks
+        uses: actions/upload-artifact@v3
+        with:
+          name: notebooks
+          path: examples
+
   cypress-run:
-    name: Cypress run
+    name: Run UI tests with Cypress
     runs-on: ubuntu-20.04
     strategy:
       fail-fast: false
@@ -19,19 +58,12 @@ jobs:
         with:
           python-version: 3.9.7
       - uses: syphar/restore-virtualenv@v1
-        id: cache-virtualenv
-      # - uses: syphar/restore-pip-download-cache@v1
-      #   if: steps.cache-virtualenv.outputs.cache-hit != 'true'
-      - name: Install package
-        if: steps.cache-virtualenv.outputs.cache-hit != 'true'
-        run: pip install .
-      - name: Install test dependencies
-        if: steps.cache-virtualenv.outputs.cache-hit != 'true'
-        run: pip install -r requirements.test.txt
-      # - name: Setup upterm session
-      #   uses: lhotari/action-upterm@v1
-      - name: Run notebooks
-        run: pytest -n=auto --nbmake --overwrite examples
+
+      - name: Download executed notebooks
+        uses: actions/download-artifact@v3
+        with:
+          name: notebooks
+
       - name: Start Jupyter notebook server
         run: nohup sh weave_server.sh &
       - name: Cypress run
@@ -51,13 +83,13 @@ jobs:
       # thus we store screenshots only on failures
       # Alternative: create and commit an empty cypress/screenshots folder
       # to always have something to upload
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         if: failure()
         with:
           name: cypress-screenshots
           path: integration_test/cypress/screenshots
       # Test run video was always captured, so this action uses "always()" condition
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         if: always()
         with:
           name: cypress-videos
