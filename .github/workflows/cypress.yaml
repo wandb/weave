@@ -26,7 +26,7 @@ jobs:
       # - name: Setup upterm session
       #   uses: lhotari/action-upterm@v1
       - name: Run notebooks
-        run: pytest -n=auto --nbmake --overwrite examples/vis/Scatter.ipynb examples/vis/Distribution.ipynb
+        run: pytest -n=auto --nbmake --overwrite examples
       - name: Start Jupyter notebook server
         run: nohup sh weave_server.sh &
       - name: Cypress run
