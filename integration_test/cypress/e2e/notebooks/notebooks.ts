@@ -86,7 +86,7 @@ export function checkWeaveNotebookOutputs(notebookPath: string) {
   forEachCellInNotebook(notebookPath, () => {
     // assert that there is at least 1 element with an attribute 'data-test-weave-id'
     checkNotebookOutputsExist();
-    cy.wait(5000);
+    cy.wait(3000);
     checkNotebookOutputsExist();
   });
 }
