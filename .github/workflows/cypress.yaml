@@ -4,39 +4,40 @@ on:
   push:
 
 jobs:
-  create-venv:
-    name: Create Python venv
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v2
-      - name: Setup Python version
-        uses: actions/setup-python@v2
-        with:
-          python-version: 3.9.7
-      - uses: syphar/restore-virtualenv@v1
-        id: cache-virtualenv
+  # create-venv:
+  #   name: Create Python venv
+  #   runs-on: ubuntu-20.04
+  #   steps:
+  #     - uses: actions/checkout@v2
+  #     - name: Setup Python version
+  #       uses: actions/setup-python@v2
+  #       with:
+  #         python-version: 3.9.7
+  #     - uses: syphar/restore-virtualenv@v1
+  #       id: cache-virtualenv
 
-      - name: Install package
-        if: steps.cache-virtualenv.outputs.cache-hit != 'true'
-        run: pip install .
-      - name: Install test dependencies
-        if: steps.cache-virtualenv.outputs.cache-hit != 'true'
-        run: pip install -r requirements.test.txt
+  #     - name: Install package
+  #       if: steps.cache-virtualenv.outputs.cache-hit != 'true'
+  #       run: pip install .
+  #     - name: Install test dependencies
+  #       if: steps.cache-virtualenv.outputs.cache-hit != 'true'
+  #       run: pip install -r requirements.test.txt
 
   nbmake:
     name: Run notebooks with nbmake
-    needs: create-venv
+    # needs: create-venv
     runs-on: ubuntu-20.04
+    container: wandb/weave-test:latest
     steps:
       - uses: actions/checkout@v2
-      - name: Setup Python version
-        uses: actions/setup-python@v2
-        with:
-          python-version: 3.9.7
-      - uses: syphar/restore-virtualenv@v1
+      # - name: Setup Python version
+      #   uses: actions/setup-python@v2
+      #   with:
+      #     python-version: 3.9.7
+      # - uses: syphar/restore-virtualenv@v1
 
       - name: Run notebooks
-        run: pytest -n=auto --nbmake --overwrite examples
+        run: pytest -n=auto --nbmake --overwrite examples/vis
       - name: Upload executed notebooks
         uses: actions/upload-artifact@v3
         with:
@@ -47,6 +48,7 @@ jobs:
     name: Run UI tests with Cypress
     needs: nbmake
     runs-on: ubuntu-20.04
+    container: wandb/weave-test:latest
     strategy:
       fail-fast: false
       matrix:
@@ -54,11 +56,11 @@ jobs:
         containers: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v2
-      - name: Setup Python version
-        uses: actions/setup-python@v2
-        with:
-          python-version: 3.9.7
-      - uses: syphar/restore-virtualenv@v1
+      # - name: Setup Python version
+      #   uses: actions/setup-python@v2
+      #   with:
+      #     python-version: 3.9.7
+      # - uses: syphar/restore-virtualenv@v1
 
       - name: Download executed notebooks
         uses: actions/download-artifact@v3
