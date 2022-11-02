@@ -33,3 +33,4 @@ en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_
 
 # string-levenshtein op:
 levenshtein
+wheel>=0.38.0 # not directly required, pinned by Snyk to avoid a vulnerability
