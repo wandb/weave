@@ -20,12 +20,9 @@ typing_extensions
 matplotlib!=3.5.3
 shap
 xgboost
-torch
-torchvision
 bertviz
 datasets
 transformers<4.21
-tensorflow>=1.15.2
 rich
 plotly
 
