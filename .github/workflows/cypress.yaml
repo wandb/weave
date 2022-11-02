@@ -26,7 +26,7 @@ jobs:
   nbmake:
     name: Run notebooks with nbmake
     # needs: create-venv
-    runs-on: ubuntu-20.04
+    runs-on: self-hosted
     container: wandb/weave-test:latest
     steps:
       - uses: actions/checkout@v2
@@ -49,13 +49,13 @@ jobs:
   cypress-run:
     name: Run UI tests with Cypress
     needs: nbmake
-    runs-on: ubuntu-20.04
+    runs-on: self-hosted
     container: wandb/weave-test:latest
     strategy:
       fail-fast: false
       matrix:
         # run copies of the current job in parallel
-        containers: [1, 2, 3, 4]
+        containers: [1, 2]
     steps:
       - uses: actions/checkout@v2
       # - name: Setup Python version
