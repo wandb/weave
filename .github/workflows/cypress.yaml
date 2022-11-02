@@ -7,6 +7,11 @@ jobs:
   cypress-run:
     name: Cypress run
     runs-on: ubuntu-20.04
+    strategy:
+      fail-fast: false
+      matrix:
+        # run copies of the current job in parallel
+        containers: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v2
       - name: Setup Python version
@@ -34,7 +39,7 @@ jobs:
         with:
           working-directory: ./integration_test
           record: true
-          browser: chrome
+          parallel: true
         env:
           # pass the Dashboard record key as an environment variable
           CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
