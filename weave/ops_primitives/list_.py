@@ -2,12 +2,13 @@ import dataclasses
 import numpy as np
 import pandas as pd
 import typing
-from .. import graph
+from .. import box
 from .. import weave_types as types
 from ..api import Node, op, mutation, weave_class, OpVarArgs
 from .. import weave_internal
 from .. import errors
 from .. import execute_fast
+from ..language_features.tagging import make_tag_getter_op, tag_store, tagged_value_type
 
 from . import dict as dict_ops
 
@@ -238,23 +239,37 @@ GroupResultType.instance_classes = GroupResult
 ### TODO Move these ops onto List class and make part of the List interface
 
 
+@mutation
+def index_checkpoint_setter(arr, new_arr):
+    return new_arr
+
+
 @op(
     name="list-createIndexCheckpointTag",
+    setter=index_checkpoint_setter,
     input_type={"arr": types.List(types.Any())},
-    output_type=lambda input_types: input_types["arr"],
+    output_type=lambda input_types: types.List(
+        tagged_value_type.TaggedValueType(
+            types.TypedDict({"index": types.Number()}), input_types["arr"].object_type
+        )
+    ),
 )
 def list_indexCheckpoint(arr):
-    return arr
+    # TODO: I think this will be inefficient for larger lists
+    # or other data structures. Need to improve this.
+    # if not isinstance(arr, list):
+    #     return arr
+    res = []
+    for item in arr:
+        item = box.box(item)
+        tag_store.add_tags(item, {"index": len(res)})
+        res.append(item)
+    return res
 
 
-@op(
-    name="tag-indexCheckpoint",
-    input_type={"obj": types.Any()},
-    output_type=types.Number(),
+index_checkpoint_tag_getter_op = make_tag_getter_op.make_tag_getter_op(
+    "index", types.Number(), op_name="tag-indexCheckpoint"
 )
-def tag_indexCheckpoint(obj):
-    # TODO. Do we really need this?
-    return 0
 
 
 def is_list_like(list_type_or_node):

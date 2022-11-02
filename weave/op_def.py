@@ -15,6 +15,7 @@ from . import uris
 from . import graph
 from . import weave_internal
 from . import pyfunc_type_util
+from .language_features.tagging import process_opdef_resolve_fn
 
 
 def common_name(name: str) -> str:
@@ -28,10 +29,6 @@ class OpDef:
     """
 
     input_type: op_args.OpArgs
-    output_type: typing.Union[
-        types.Type,
-        typing.Callable[[typing.Dict[str, types.Type]], types.Type],
-    ]
     refine_output_type: typing.Optional["OpDef"]
     setter = str
     call_fn: typing.Any
@@ -41,9 +38,15 @@ class OpDef:
     instance: typing.Union[None, graph.Node]
     weave_fn: typing.Optional[graph.Node]
     pure: bool
-    resolve_fn: typing.Callable
+    raw_resolve_fn: typing.Callable
     lazy_call: typing.Optional[typing.Callable]
     eager_call: typing.Optional[typing.Callable]
+    _output_type: typing.Optional[
+        typing.Union[
+            types.Type,
+            typing.Callable[[typing.Dict[str, types.Type]], types.Type],
+        ]
+    ]
 
     # This is required to be able to determine which ops were derived from this
     # op. Particularly in cases where we need to rename or lookup when
@@ -68,9 +71,9 @@ class OpDef:
     ):
         self.name = name
         self.input_type = input_type
-        self.output_type = output_type
+        self.raw_output_type = output_type
         self.refine_output_type = refine_output_type
-        self.resolve_fn = resolve_fn  # type: ignore
+        self.raw_resolve_fn = resolve_fn  # type: ignore
         self.setter = setter
         self.render_info = render_info
         self.pure = pure
@@ -87,6 +90,7 @@ class OpDef:
         self.instance = None
         self.derived_ops = {}
         self.weave_fn = weave_fn
+        self._output_type = None
 
     def __repr__(self):
         return "<OpDef(%s) %s>" % (id(self), self.name)
@@ -101,6 +105,53 @@ class OpDef:
         if _self.instance is not None:
             return _self.call_fn(_self.instance, *args, **kwargs)
         return _self.call_fn(*args, **kwargs)
+
+    def resolve_fn(__self, *args, **kwargs):
+        res = __self.raw_resolve_fn(*args, **kwargs)
+        return process_opdef_resolve_fn.process_opdef_resolve_fn(
+            __self, res, args, kwargs
+        )
+
+    @property
+    def output_type(
+        self,
+    ) -> typing.Union[
+        types.Type,
+        typing.Callable[[typing.Dict[str, types.Type]], types.Type],
+    ]:
+        if self._output_type is None:
+            if self.name in [
+                "op_get_tag_type",
+                "op_make_type_tagged",
+                "op_make_type_key_tag",
+            ]:
+                self._output_type = self.raw_output_type
+            else:
+                # This is a circular import: defining an op requires some ops already defined!
+                # We should think about how to get rid of this (probably having a special set of
+                # built-in ops that are defined before the rest of the system is loaded).
+                from .language_features.tagging.process_opdef_output_type import (
+                    process_opdef_output_type,
+                )
+
+                self._output_type = process_opdef_output_type(
+                    self.raw_output_type, self
+                )
+        return self._output_type
+
+    @property
+    def concrete_output_type(self) -> types.Type:
+        if callable(self.output_type):
+            if isinstance(self.input_type, op_args.OpVarArgs):
+                return self.output_type({})
+            elif isinstance(self.input_type, op_args.OpNamedArgs):
+                try:
+                    return self.output_type(self.input_type.to_dict())
+                except AttributeError:
+                    return types.UnknownType()
+            else:
+                raise NotImplementedError("Unknown input type for op %s" % self.name)
+        return self.output_type
 
     @property
     def name(self) -> str:
@@ -128,14 +179,17 @@ class OpDef:
 
     @property
     def is_mutation(self):
-        return getattr(self.resolve_fn, "is_mutation", False)
+        return getattr(self.raw_resolve_fn, "is_mutation", False)
 
     @property
     def is_async(self):
-        return not callable(self.output_type) and self.output_type.name == "Run"
+        return (
+            not callable(self.raw_output_type)
+            and self.concrete_output_type.name == "Run"
+        )
 
     def to_dict(self):
-        output_type = self.output_type
+        output_type = self.raw_output_type
         if callable(output_type):
             # TODO: Consider removing the ability for an output_type to
             # be a function - they all must be Types or ConstNodes. Probably
@@ -179,7 +233,7 @@ class OpDef:
     ) -> collections.OrderedDict[str, graph.Node]:
         return weave_internal.bind_value_params_as_nodes(
             self.uri,
-            pyfunc_type_util.get_signature(self.resolve_fn),
+            pyfunc_type_util.get_signature(self.raw_resolve_fn),
             args,
             kwargs,
             self.input_type,

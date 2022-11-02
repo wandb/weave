@@ -14,6 +14,8 @@ import viztracer
 import time
 import cProfile
 
+from weave.language_features.tagging.tag_store import isolated_tagging_context
+
 from . import graph
 from . import execute
 from . import serialize
@@ -59,7 +61,9 @@ def _handle_request(request, deref=False):
         tracer.stop()
         tracer.save(output_file="request_%s.json" % time.time())
 
-    result = [storage.to_python(r) for r in result]
+    # Forces output to be untagged
+    with isolated_tagging_context():
+        result = [storage.to_python(r) for r in result]
 
     logger.info("Server request done in: %ss" % (time.time() - start_time))
     return result

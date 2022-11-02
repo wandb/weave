@@ -8,7 +8,7 @@ def test_gpt3model_inferred_type():
         "self": gpt3.Gpt3ModelType(),
         "prompt": types.String(),
     }
-    assert gpt3.Gpt3Model.complete.output_type == types.TypedDict(
+    assert gpt3.Gpt3Model.complete.concrete_output_type == types.TypedDict(
         {
             "id": types.String(),
             "object": types.String(),

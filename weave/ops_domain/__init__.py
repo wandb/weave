@@ -13,6 +13,7 @@ from .wbmedia import *
 from .. import errors
 from .. import artifacts_local
 from ..wandb_api import wandb_public_api
+from ..language_features.tagging import make_tag_getter_op
 
 
 class OrgType(types._PlainStringNamedType):
@@ -112,6 +113,10 @@ class WBRun:
     # @staticmethod  # TODO: doesn't work
     def jobtype(run: wandb_api.Run) -> str:
         return run.jobType
+
+    @op()
+    def name(run: wandb_api.Run) -> str:
+        return run.name
 
 
 @dataclasses.dataclass(frozen=True)
@@ -335,3 +340,8 @@ class Project:
 @op(name="root-project")
 def project(entityName: str, projectName: str) -> wandb_api.Project:
     return wandb_public_api().project(name=projectName, entity=entityName)
+
+
+project_tag_getter_op = make_tag_getter_op.make_tag_getter_op(
+    "project", ProjectType(), op_name="tag-project"
+)

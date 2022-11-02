@@ -83,13 +83,6 @@ def type_name_to_type(type_name):
     return mapping.get(type_name)
 
 
-# js_compat: we don't have Tag types in Weave Python yet. Just remove them
-def unwrap_tag_type(serialized_type):
-    if isinstance(serialized_type, dict) and serialized_type.get("type") == "tagged":
-        return serialized_type["value"]
-    return serialized_type
-
-
 class TypeRegistry:
     @staticmethod
     def has_type(obj):
@@ -103,9 +96,13 @@ class TypeRegistry:
         return type_classes[-1]
 
     @staticmethod
-    def type_of(obj):
+    def type_of(obj: typing.Any) -> "Type":
         if isinstance(obj, Type):
             return Type()
+
+        obj_type = type_name_to_type("tagged").type_of(obj)
+        if obj_type is not None:
+            return obj_type
 
         # use reversed instance_class_to_potential_type so our result
         # is the most specific type.
@@ -117,7 +114,7 @@ class TypeRegistry:
         # representation of whatever the type is, not the actual type.
         #
         # TODO: Its a small that we need to hardcode here. Fix this.
-        potential_types = instance_class_to_potential_type(type(obj))
+        potential_types = instance_class_to_potential_type(type(obj))  # type: ignore
         if "function" in (t.name for t in potential_types):
             potential_types = [Function]
 
@@ -138,7 +135,6 @@ class TypeRegistry:
 
     @staticmethod
     def type_from_dict(d: typing.Union[str, dict]) -> "Type":
-        d = unwrap_tag_type(d)
         # The javascript code sends simple types as just strings
         # instead of {'type': 'string'} for example
         type_name = d["type"] if isinstance(d, dict) else d
@@ -209,7 +205,7 @@ class Type(metaclass=_TypeSubclassWatcher):
         return None
 
     @classmethod
-    def type_of(cls, obj):
+    def type_of(cls, obj) -> typing.Optional["Type"]:
         if not cls.is_instance(obj):
             return None
         return cls.type_of_instance(obj)
@@ -228,6 +224,7 @@ class Type(metaclass=_TypeSubclassWatcher):
         return self._instance_classes()[-1]
 
     def assign_type(self, next_type: "Type") -> bool:
+        TaggedValueType = type_name_to_type("tagged")
         if isinstance(next_type, Const):
             return self.assign_type(next_type.val_type)
         elif isinstance(next_type, UnionType):
@@ -235,17 +232,24 @@ class Type(metaclass=_TypeSubclassWatcher):
                 if not self.assign_type(t):
                     return False
             return True
+        elif isinstance(next_type, TaggedValueType) and not isinstance(
+            self, TaggedValueType
+        ):
+            return self.assign_type(next_type.value)
         return self._assign_type_inner(next_type)
 
     def _assign_type_inner(self, next_type: "Type") -> bool:
-        if (
-            isinstance(next_type, self.__class__)
-            or
-            # parent is assignable to child class
-            #     when type variables match
-            # TODO: only valid when python hiearchy matches type hierarchy!
-            #     And no Abstract classes (Type)
-            isinstance(self, next_type.__class__)
+        if self.__class__ == next_type.__class__ or (
+            (self.__class__ != Type and next_type.__class__ != Type)
+            and (
+                isinstance(next_type, self.__class__)
+                or
+                # parent is assignable to child class
+                #     when type variables match
+                # TODO: only valid when python hiearchy matches type hierarchy!
+                #     And no Abstract classes (Type)
+                isinstance(self, next_type.__class__)
+            )
         ):
             # if isinstance(next_type, self.__class__):
             if callable(self.type_vars):
@@ -513,7 +517,7 @@ class UnionType(Type):
             return False
         return set(self.members) == set(other.members)
 
-    def _assign_type_inner(self, other):
+    def assign_type(self, other):
         if isinstance(other, UnionType):
             if not all(self.assign_type(member) for member in other.members):
                 return False

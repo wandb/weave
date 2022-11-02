@@ -54,7 +54,11 @@ class Artifact:
         raise NotImplementedError()
 
     @contextlib.contextmanager
-    def open(self, path, binary=False):
+    def open(self, path: str, binary: bool = False):
+        raise NotImplementedError()
+
+    @contextlib.contextmanager
+    def new_file(self, path: str, binary: bool = False):
         raise NotImplementedError()
 
 

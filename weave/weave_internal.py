@@ -7,6 +7,7 @@ from . import context_state
 from . import errors
 from . import client_interface
 from . import op_args
+from .language_features.tagging import tagged_value_type
 
 
 def dereference_variables(node: graph.Node, var_values: graph.Frame) -> graph.Node:
@@ -62,6 +63,10 @@ class UniversalNodeMixin:
 
 def get_node_methods_classes(type_: types.Type) -> typing.Sequence[typing.Type]:
     classes = []
+
+    # When the type is a TaggedValueType, use the inner type to determine methods.
+    if isinstance(type_, tagged_value_type.TaggedValueType):
+        return get_node_methods_classes(type_.value)
 
     # Keeping this is still important for overriding dunder methods!
     for type_class in type_.__class__.mro():

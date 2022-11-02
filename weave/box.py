@@ -89,3 +89,7 @@ def box(
     elif obj is None:
         return BoxedNone(obj)
     return obj
+
+
+def is_boxed(obj: typing.Any) -> bool:
+    return id(obj) == id(box(obj))

@@ -17,7 +17,7 @@ class Candidate:
     assigned_param_dict: dict[str, types.Type]
 
 
-def resolve_op_amgiguity(fq_op_name: str, candidates: list[Candidate]) -> op_def.OpDef:
+def resolve_op_ambiguity(fq_op_name: str, candidates: list[Candidate]) -> op_def.OpDef:
     match = None
     for candidate in candidates:
         if candidate.op.name == fq_op_name:
@@ -62,7 +62,7 @@ def get_op_for_input_types(
         if op_args.all_types_valid(assigned_param_dict):
             candidates.append(Candidate(op, assigned_param_dict))
     if len(candidates) > 1:
-        return resolve_op_amgiguity(fq_op_name, candidates)
+        return resolve_op_ambiguity(fq_op_name, candidates)
     if candidates:
         return candidates[0].op
     return None

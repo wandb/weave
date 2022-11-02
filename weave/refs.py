@@ -49,7 +49,7 @@ class Ref:
         elif isinstance(uri, uris.WeaveWBArtifactURI):
             return WandbArtifactRef.from_uri(uri)
         else:
-            raise errors.WeaveInternalError("invalid uri: %s" % s)
+            raise errors.WeaveInvalidURIError("invalid uri: %s" % s)
 
     @classmethod
     def from_uri(cls, uri: uris.WeaveURI) -> "Ref":
@@ -101,6 +101,8 @@ class MemRef(Ref):
         return self._name
 
     def get(self) -> typing.Any:
+        if self._name not in MEM_OBJS:
+            raise errors.WeaveStorageError(f"Object {self._name} not found")
         return MEM_OBJS[self.name]
 
     def __str__(self) -> str:

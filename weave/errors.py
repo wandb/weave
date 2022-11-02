@@ -30,3 +30,11 @@ class WeaveMakeFunctionError(Exception):
 
 class WeaveExpectedConstError(Exception):
     pass
+
+
+class WeaveInvalidURIError(Exception):
+    pass
+
+
+class WeaveStorageError(Exception):
+    pass

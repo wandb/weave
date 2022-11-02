@@ -75,7 +75,7 @@ def test_op_inferred_type():
         "a": types.Int(),
         "b": types.Int(),
     }
-    assert op_inferredtype.output_type == types.String()
+    assert op_inferredtype.concrete_output_type == types.String()
 
 
 def test_op_incompatible_return_type():
@@ -155,7 +155,7 @@ def test_op_inferred_list_return():
     def op_under_test(a: int) -> list[int]:
         return [a, 2 * a, 3 * a]
 
-    assert op_under_test.output_type == types.List(types.Int())
+    assert op_under_test.concrete_output_type == types.List(types.Int())
 
 
 def test_op_inferred_typeddict_return():
@@ -165,8 +165,9 @@ def test_op_inferred_typeddict_return():
     ) -> typing.TypedDict("OpReturn", {"x": int, "y": str}):
         return {"a": 1, "y": "x"}
 
-    assert op_test_op_inferred_typeddict_return_op.output_type == types.TypedDict(
-        {"x": types.Int(), "y": types.String()}
+    assert (
+        op_test_op_inferred_typeddict_return_op.concrete_output_type
+        == types.TypedDict({"x": types.Int(), "y": types.String()})
     )
 
 
@@ -177,7 +178,7 @@ def test_op_inferred_list_typeddict_return():
     ) -> list[typing.TypedDict("OpReturn", {"x": int, "y": str})]:
         return [{"a": 1, "y": "x"}]
 
-    assert op_inferred_list_typeddict_return.output_type == types.List(
+    assert op_inferred_list_typeddict_return.concrete_output_type == types.List(
         types.TypedDict({"x": types.Int(), "y": types.String()})
     )
 
@@ -187,7 +188,7 @@ def test_op_inferred_dict_return() -> None:
     def op_inferred_dict_return(a: int) -> dict[str, list[int]]:
         return {"a": [5]}
 
-    assert op_inferred_dict_return.output_type == types.Dict(
+    assert op_inferred_dict_return.concrete_output_type == types.Dict(
         types.String(), types.List(types.Int())
     )
 
@@ -206,7 +207,7 @@ def test_op_method_inferred_self():
         "self": SomeWeaveType(),
         "a": types.Int(),
     }
-    assert SomeWeaveObj.my_op.output_type == types.String()
+    assert SomeWeaveObj.my_op.concrete_output_type == types.String()
 
 
 def test_load_op_from_artifact():

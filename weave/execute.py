@@ -14,6 +14,7 @@ from . import errors
 from . import compile
 from . import forward_graph
 from . import graph
+from .language_features.tagging import tag_store
 from . import weave_types as types
 
 # Ops
@@ -60,7 +61,8 @@ def is_panelplot_data_fetch_query(node: graph.Node) -> bool:
     if isinstance(node, graph.OutputNode) and node.from_op.name == "list":
         return all(
             map(
-                lambda input: input.from_op.name == "unnest",
+                lambda input: isinstance(input, graph.OutputNode)
+                and input.from_op.name == "unnest",
                 node.from_op.inputs.values(),
             )
         )
@@ -72,14 +74,15 @@ def execute_nodes(nodes, no_cache=False):
 
     # hack: disable caching for panelplot
     no_cache |= any([is_panelplot_data_fetch_query(node) for node in nodes])
+    with tag_store.isolated_tagging_context():
+        fg = forward_graph.ForwardGraph(nodes)
 
-    fg = forward_graph.ForwardGraph(nodes)
+        stats = execute_forward(fg, no_cache=no_cache)
+        summary = stats.summary()
+        logging.info("Execution summary\n%s" % pprint.pformat(summary))
 
-    stats = execute_forward(fg, no_cache=no_cache)
-    summary = stats.summary()
-    logging.info("Execution summary\n%s" % pprint.pformat(summary))
-
-    return [fg.get_result(n) for n in nodes]
+        res = [fg.get_result(n) for n in nodes]
+    return res
 
 
 def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteStats:
@@ -98,7 +101,14 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
                     "op.%s" % graph.op_full_name(forward_node.node.from_op)
                 )
             try:
-                report = execute_forward_node(fg, forward_node, no_cache=no_cache)
+                with tag_store.set_curr_node(
+                    id(forward_node.node),
+                    [
+                        id(input_node)
+                        for input_node in forward_node.node.from_op.inputs.values()
+                    ],
+                ):
+                    report = execute_forward_node(fg, forward_node, no_cache=no_cache)
             except:
                 logging.error(
                     "Exception during execution of: %s" % str(forward_node.node)

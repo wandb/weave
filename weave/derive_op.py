@@ -41,6 +41,7 @@ class DeriveOpHandler:
 
 # These are a list of type names that should not be mapped
 disallow_mapping_type_name_list = [
+    "type",
     "list",
     "wbtable",
     "ndarray",
@@ -191,7 +192,7 @@ class MappedDeriveOpHandler(DeriveOpHandler):
             # TODO: use the vectorization described here:
             # https://paper.dropbox.com/doc/Weave-Python-Weave0-Op-compatibility-workstream-kJ3XSDdgR96XwKPapHwPD
             return [
-                orig_op.resolve_fn(x, **new_inputs)
+                orig_op.raw_resolve_fn(x, **new_inputs)
                 if not (x is None or isinstance(x, box.BoxedNone))
                 or types.is_optional(first_arg.type)
                 else None
@@ -200,7 +201,7 @@ class MappedDeriveOpHandler(DeriveOpHandler):
 
         # Use the function signature of the original op to compute the signature
         # of the lazy call
-        resolve.sig = inspect.signature(orig_op.resolve_fn)  # type: ignore
+        resolve.sig = inspect.signature(orig_op.raw_resolve_fn)  # type: ignore
         input_type = copy.copy(orig_op.input_type.arg_types)
         input_type[mapped_param_name] = types.List(types.optional(first_arg.type))
         new_op = op_def.OpDef(

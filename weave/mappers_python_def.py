@@ -10,6 +10,7 @@ from . import weave_types as types
 from . import errors
 from . import box
 from . import mappers_python
+from .language_features.tagging import tagged_value_type
 
 
 class TypedDictToPyDict(mappers_weave.TypedDictMapper):
@@ -259,6 +260,8 @@ def map_to_python_(type, mapper, artifact, path=[]):
         return UnionToPyUnion(type, mapper, artifact, path)
     elif isinstance(type, types.ObjectType):
         return ObjectToPyDict(type, mapper, artifact, path)
+    elif isinstance(type, tagged_value_type.TaggedValueType):
+        return tagged_value_type.TaggedValueToPy(type, mapper, artifact, path)
     elif isinstance(type, types.Boolean):
         return BoolToPyBool(type, mapper, artifact, path)
     elif isinstance(type, types.Int):
@@ -296,6 +299,8 @@ def map_from_python_(type: types.Type, mapper, artifact, path=[]):
         return ListToPyList(type, mapper, artifact, path)
     elif isinstance(type, types.UnionType):
         return PyUnionToUnion(type, mapper, artifact, path)
+    elif isinstance(type, tagged_value_type.TaggedValueType):
+        return tagged_value_type.TaggedValueFromPy(type, mapper, artifact, path)
     elif isinstance(type, types.Boolean):
         return BoolToPyBool(type, mapper, artifact, path)
     elif isinstance(type, types.Int):
