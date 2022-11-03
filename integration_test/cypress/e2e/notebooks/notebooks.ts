@@ -91,7 +91,8 @@ const exec = (command: string) => {
       Stdout:\n${result.stdout}
       Stderr:\n${result.stderr}`);
     }
-  })
+  });
+};
 
 function executeNotebook(notebookPath: string) {
   exec('pytest --nbmake --overwrite ' + notebookPath);
