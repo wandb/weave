@@ -18,7 +18,7 @@ jobs:
         env:
           DD_SERVICE: weave-python
           DD_ENV: ci
-        run: cd weave && pytest --ddtrace
+        run: source /root/venv/bin/activate && cd weave && pytest --ddtrace
 
   nbmake:
     name: Run notebooks with nbmake
