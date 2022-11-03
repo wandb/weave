@@ -164,7 +164,7 @@ class RunsOps:
         output_type=types.List(RunType()),
     )
     def limit(self: wandb_api.Runs, limit: int):
-        runs = []  # type: ignore
+        runs: list[wandb_api.Run] = []
         for run in self:
             if len(runs) >= limit:
                 break
