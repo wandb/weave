@@ -82,8 +82,19 @@ function checkNotebookOutputsExist() {
   });
 }
 
+// Log the full error output. From here: https://github.com/cypress-io/cypress/issues/5470
+const exec = (command: string) => {
+  cy.exec(command, {failOnNonZeroExit: false}).then(result => {
+    if (result.code) {
+      throw new Error(`Execution of "${command}" failed
+      Exit code: ${result.code}
+      Stdout:\n${result.stdout}
+      Stderr:\n${result.stderr}`);
+    }
+  })
+
 function executeNotebook(notebookPath: string) {
-  cy.exec('pytest --nbmake --overwrite ' + notebookPath);
+  exec('pytest --nbmake --overwrite ' + notebookPath);
 }
 
 export function checkWeaveNotebookOutputs(notebookPath: string) {
