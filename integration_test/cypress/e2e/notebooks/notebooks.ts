@@ -74,7 +74,7 @@ function checkNotebookOutputsExist() {
       cy.wrap(panel).find('.plotly').should('exist');
     } else if (panelId == 'table') {
       cy.wrap(panel).find('.BaseTable').should('exist');
-    } else if (panelId === 'string') {
+    } else if (panelId === 'string' || panelId === 'number') {
       // just existence of the data-test-weave-id is enough
     } else {
       throw new Error(
