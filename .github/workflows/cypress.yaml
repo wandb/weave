@@ -4,6 +4,15 @@ on:
   push:
 
 jobs:
+  lint:
+    runs-on: self-hosted
+    container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - run: source /root/venv/bin/activate && pre-commit run --all-files
+
   test:
     name: Python unit tests
     runs-on: self-hosted
