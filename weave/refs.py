@@ -159,7 +159,9 @@ def deref(ref: Ref) -> typing.Any:
 # be able to create it right now, because of a series of hacks.
 # Instead, We probably need a WandbArtifactFileRef.
 # TODO: fix
-class ArtifactVersionFileType(types.Type):
+class ArtifactVersionFileType(
+    types.FileType
+):  # this was type.Type - not sure if this is correct
     name = "ArtifactVersionFile"
 
     def save_instance(

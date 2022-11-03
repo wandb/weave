@@ -1,5 +1,7 @@
 import typing
 
+from .lazy import _make_output_node
+
 from . import op_args
 from . import weave_types as types
 from . import graph
@@ -56,7 +58,8 @@ def apply_type_based_dispatch(
     case where the provided op may not be the true op needed given the provided
     types. Importantly, it does rely on paramter ordering.
     """
-    for node in edit_g.nodes:
+    for og_node in edit_g.ordered_nodes[::-1]:
+        node = edit_g.get_node(og_node)
         input_types = {k: node_type(v) for k, v in node.from_op.inputs.items()}
         found_op = dispatch.get_op_for_input_types(node.from_op.name, [], input_types)
         if found_op is None:
@@ -68,18 +71,20 @@ def apply_type_based_dispatch(
             #     f"Could not find op for input types {pos_param_types} for node {node.from_op.name}"
             # )
             continue
-
-        if found_op.uri != node.from_op.name:
+        # SUPERHACK: this is going to slow things down majorly
+        is_js_hacking = True
+        if is_js_hacking or found_op.uri != node.from_op.name:
             params = found_op.bind_params(
                 [], found_op.input_type.create_param_dict([], node.from_op.inputs)
             )
             named_param_types = {k: node_type(v) for k, v in params.items()}
             edit_g.replace(
-                node,
-                graph.OutputNode(
-                    found_op.return_type_of_arg_types(named_param_types),
+                og_node,
+                _make_output_node(
                     found_op.uri,
                     params,
+                    found_op.return_type_of_arg_types(named_param_types),
+                    found_op.refine_output_type,
                 ),
             )
 
@@ -178,6 +183,8 @@ def compile(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
 
     # Convert the nodes to an editable graph data structure
     g = nodes_to_edit_graph(nodes)
+
+    # import pdb; pdb.set_trace()
 
     # TODO: Here we need to adjust the type since JS might not know about our better types
     # The key here is that `runs` produces a RunsType, not a list of runs... and in this case

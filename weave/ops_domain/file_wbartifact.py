@@ -20,7 +20,7 @@ class ArtifactVersionFile(weave_file.File):
     artifact: artifacts_local.WandbArtifact
     path: str
 
-    def __init__(self, artifact, path):
+    def __init__(self, artifact, path, extension=None, wb_object_type=None):
         self.artifact = artifact
         self.path = path
 
@@ -29,6 +29,14 @@ class ArtifactVersionFile(weave_file.File):
 
     def _contents(self):
         return open(self.get_local_path(), encoding="ISO-8859-1").read()
+
+    @property
+    def extension(self):
+        return "json"
+
+    @property
+    def wb_object_type(self):
+        return "table-file"
 
 
 refs.ArtifactVersionFileType.instance_class = ArtifactVersionFile
