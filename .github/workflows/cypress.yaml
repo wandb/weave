@@ -28,6 +28,8 @@ jobs:
     # needs: create-venv
     runs-on: self-hosted
     container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:latest
+    env:
+      PYTHON_PATH: /root/weave-internal/weave-internal
     steps:
       - uses: actions/checkout@v2
       # - name: Setup Python version
@@ -36,7 +38,7 @@ jobs:
       #     python-version: 3.9.7
       # - uses: syphar/restore-virtualenv@v1
       - run: pwd
-      - run: source /root/venv/bin/activate && pip install -e .
+      # - run: source /root/venv/bin/activate && pip install -e .
 
       - run: ls
 
@@ -52,7 +54,7 @@ jobs:
   cypress-run:
     name: Run UI tests with Cypress
     needs: nbmake
-    if: always()
+    # if: always()
     runs-on: self-hosted
     container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:latest
     strategy:
@@ -73,7 +75,7 @@ jobs:
         with:
           name: notebooks
 
-      - name: Start Jupyter notebook server
+      - name: Start weave server
         run: nohup sh weave_server.sh &
       - name: Cypress run
         uses: cypress-io/github-action@v4
