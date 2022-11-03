@@ -37,7 +37,7 @@ jobs:
       - uses: actions/checkout@v2
 
       - name: Run notebooks
-        run: source /root/venv/bin/activate && export PYTHONPATH=$(pwd) && pytest -n=auto --nbmake --overwrite examples/vis
+        run: source /root/venv/bin/activate && export PYTHONPATH=$(pwd) && pytest -n=auto --nbmake --overwrite examples
       - name: Upload executed notebooks
         uses: actions/upload-artifact@v3
         if: always()
