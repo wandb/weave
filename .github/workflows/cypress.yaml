@@ -28,8 +28,6 @@ jobs:
     # needs: create-venv
     runs-on: self-hosted
     container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:latest
-    env:
-      PYTHONPATH: $GITHUB_WORKSPACE/weave-internal
     steps:
       - uses: actions/checkout@v2
       # - name: Setup Python version
@@ -44,7 +42,7 @@ jobs:
       - run: ls
 
       - name: Run notebooks
-        run: source /root/venv/bin/activate && pytest -n=auto --nbmake --overwrite examples/vis
+        run: source /root/venv/bin/activate && PYTHONPATH=. && pytest -n=auto --nbmake --overwrite examples/vis
       - name: Upload executed notebooks
         uses: actions/upload-artifact@v3
         if: always()
