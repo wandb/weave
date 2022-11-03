@@ -109,10 +109,7 @@ class ArtifactVersionsType(types.Type):
 
 @op(render_info={"type": "function"})
 def refine_experiment_type(run: wandb_api.Run) -> weave.types.Type:
-    import pdb
-
-    pdb.set_trace()
-    return run.summary
+    return types.TypeRegistry.type_of(run.summary._json_dict)
 
 
 @weave_class(weave_type=RunType)
@@ -128,10 +125,7 @@ class WBRun:
 
     @op(refine_output_type=refine_experiment_type)
     def summary(run: wandb_api.Run) -> dict[str, typing.Any]:
-        import pdb
-
-        pdb.set_trace()
-        return run.summary
+        return run.summary._json_dict
 
 
 @dataclasses.dataclass(frozen=True)
@@ -152,6 +146,10 @@ class RunsType(types.Type):
     def instance_from_dict(self, d):
         api = wandb_public_api()
         return api.runs("{entity_name}/{project_name}".format(**d), per_page=500)
+
+    @classmethod
+    def from_dict(cls, d):
+        return cls()
 
 
 @weave_class(weave_type=RunsType)
