@@ -44,6 +44,7 @@ jobs:
         run: source /root/venv/bin/activate && pytest -n=auto --nbmake --overwrite examples/vis
       - name: Upload executed notebooks
         uses: actions/upload-artifact@v3
+        if: always()
         with:
           name: notebooks
           path: examples
@@ -51,13 +52,14 @@ jobs:
   cypress-run:
     name: Run UI tests with Cypress
     needs: nbmake
+    if: always()
     runs-on: self-hosted
     container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:latest
     strategy:
       fail-fast: false
       matrix:
         # run copies of the current job in parallel
-        containers: [1, 2]
+        containers: [1]
     steps:
       - uses: actions/checkout@v2
       # - name: Setup Python version
