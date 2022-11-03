@@ -111,23 +111,23 @@ class Gpt3FineTuneResultsType(StoredFileType):
 
 
 class Gpt3FineTuneResults(StoredFile):
-    @weave.op(
-        input_type={
-            "self": StoredFileType(),
-        },
-        output_type=weave.types.List(
-            weave.types.TypedDict(
-                {
-                    "step": weave.types.Int(),
-                    "elapsed_tokens": weave.types.Float(),
-                    "elapsed_examples": weave.types.Float(),
-                    "training_loss": weave.types.Float(),
-                    "training_sequence_accuracy": weave.types.Float(),
-                    "training_token_accuracy": weave.types.Float(),
-                }
-            )
-        ),
-    )
+    # @weave.op(
+    #     input_type={
+    #         "self": StoredFileType(),
+    #     },
+    #     output_type=weave.types.List(
+    #         weave.types.TypedDict(
+    #             {
+    #                 "step": weave.types.Int(),
+    #                 "elapsed_tokens": weave.types.Float(),
+    #                 "elapsed_examples": weave.types.Float(),
+    #                 "training_loss": weave.types.Float(),
+    #                 "training_sequence_accuracy": weave.types.Float(),
+    #                 "training_token_accuracy": weave.types.Float(),
+    #             }
+    #         )
+    #     ),
+    # )
     def table(self):
         contents = openai.File.download(id=self.id)
         with tempfile.NamedTemporaryFile() as f:

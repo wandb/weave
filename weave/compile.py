@@ -179,6 +179,10 @@ def compile(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
     # Convert the nodes to an editable graph data structure
     g = nodes_to_edit_graph(nodes)
 
+    # TODO: Here we need to adjust the type since JS might not know about our better types
+    # The key here is that `runs` produces a RunsType, not a list of runs... and in this case
+    # the input to limit is considered a list of runs and gets dispatched incorrectly.
+
     # Each of the following lines is a transformation pass of the graph:
     # 1: Adjust any Op calls based on type-based dispatching
     g = apply_type_based_dispatch(g)
