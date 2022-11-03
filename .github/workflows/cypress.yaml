@@ -29,7 +29,7 @@ jobs:
     runs-on: self-hosted
     container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:latest
     env:
-      PYTHONPATH: /root/weave-internal/weave-internal
+      PYTHONPATH: $(pwd)/weave-internal
     steps:
       - uses: actions/checkout@v2
       # - name: Setup Python version
@@ -37,6 +37,7 @@ jobs:
       #   with:
       #     python-version: 3.9.7
       # - uses: syphar/restore-virtualenv@v1
+      - run: echo $PYTHONPATH
       - run: pwd
       # - run: source /root/venv/bin/activate && pip install -e .
 
