@@ -1,3 +1,4 @@
+# Should match version in integration_test/package.json
 FROM cypress/included:10.11.0
 
 RUN apt update
@@ -7,4 +8,12 @@ COPY requirements.txt requirements.test.txt /root/
 WORKDIR /root
 RUN python3 -m venv venv
 RUN source venv/bin/activate && pip install -r requirements.test.txt
+COPY requirements.dev.txt /root/
+RUN source venv/bin/activate && pip install -r requirements.dev.txt
+
+COPY integration_test /root/integration_test
+RUN cd integration_test && rm -rf node_modules && npm install
+
 RUN rm -rf /root/.cache/pip
+
+ENTRYPOINT "/bin/bash"
