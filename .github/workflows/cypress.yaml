@@ -41,7 +41,7 @@ jobs:
       - run: ls
 
       - name: Run notebooks
-        run: pytest -n=auto --nbmake --overwrite examples/vis
+        run: source /root/venv/bin/activate && pytest -n=auto --nbmake --overwrite examples/vis
       - name: Upload executed notebooks
         uses: actions/upload-artifact@v3
         with:

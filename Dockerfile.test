@@ -1,0 +1,10 @@
+FROM cypress/included:10.11.0
+
+RUN apt update
+RUN apt -y install python3-venv gcc python3-dev g++
+RUN rm /bin/sh && ln -s /bin/bash /bin/sh
+COPY requirements.txt requirements.test.txt /root/
+WORKDIR /root
+RUN python3 -m venv venv
+RUN source venv/bin/activate && pip install -r requirements.test.txt
+RUN rm -rf /root/.cache/pip
