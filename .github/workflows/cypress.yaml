@@ -48,7 +48,7 @@ jobs:
 
   cypress-run:
     name: Notebook and UI tests
-    needs: lint, test
+    needs: [lint, test]
     if: always()
     runs-on: self-hosted
     container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:latest
