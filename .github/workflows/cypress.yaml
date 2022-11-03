@@ -29,7 +29,7 @@ jobs:
     runs-on: self-hosted
     container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:latest
     env:
-      PYTHON_PATH: /root/weave-internal/weave-internal
+      PYTHONPATH: /root/weave-internal/weave-internal
     steps:
       - uses: actions/checkout@v2
       # - name: Setup Python version
