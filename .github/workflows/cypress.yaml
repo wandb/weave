@@ -64,6 +64,12 @@ jobs:
         with:
           name: notebooks
 
+      - name: Copy node_modules from container to checkout
+        run: cp -R /root/integration_test/node_modules ./integration_test/
+
+      - run: ls
+      - run: ls integration_test
+
       - name: Start weave server
         run: nohup sh weave_server.sh &
       - name: Cypress run
