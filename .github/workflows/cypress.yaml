@@ -9,9 +9,9 @@ jobs:
     runs-on: self-hosted
     container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:latest
     steps:
-      - uses: datadog/agent-github-action@v1.3
-        with:
-          api_key: ${{ secrets.DD_API_KEY }}
+      # - uses: datadog/agent-github-action@v1.3
+      #   with:
+      #     api_key: ${{ secrets.DD_API_KEY }}
       - uses: actions/checkout@v2
 
       - name: Run tests
@@ -39,7 +39,7 @@ jobs:
   cypress-run:
     name: Run UI tests with Cypress
     needs: nbmake
-    # if: always()
+    if: always()
     runs-on: self-hosted
     container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:latest
     strategy:
