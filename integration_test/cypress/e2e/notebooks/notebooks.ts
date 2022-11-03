@@ -54,7 +54,7 @@ function forEachCellInNotebook(notebookPath: string, cellTest: () => void) {
         const url = new URL(src);
 
         // TODO: This switches depending on if in devmode
-        cy.visit('http://localhost:9994/__frontend/weave' + url.search);
+        cy.visit('/__frontend/weave' + url.search);
         // cy.visit('http://localhost:3000/' + url.search);
 
         cellTest();
