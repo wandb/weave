@@ -29,26 +29,26 @@ jobs:
           DD_ENV: ci
         run: source /root/venv/bin/activate && cd weave && pytest --ddtrace
 
-  nbmake:
-    name: Run notebooks with nbmake
-    runs-on: self-hosted
-    container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:latest
-    steps:
-      - uses: actions/checkout@v2
+  # nbmake:
+  #   name: Run notebooks with nbmake
+  #   runs-on: self-hosted
+  #   container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:latest
+  #   steps:
+  #     - uses: actions/checkout@v2
 
-      - name: Run notebooks
-        run: source /root/venv/bin/activate && export PYTHONPATH=$(pwd) && pytest -n=4 --nbmake --overwrite examples
-      - name: Upload executed notebooks
-        uses: actions/upload-artifact@v3
-        if: always()
-        with:
-          name: notebooks
-          path: examples
+  #     - name: Run notebooks
+  #       run: source /root/venv/bin/activate && export PYTHONPATH=$(pwd) && pytest -n=4 --nbmake --overwrite examples
+  #     - name: Upload executed notebooks
+  #       uses: actions/upload-artifact@v3
+  #       if: always()
+  #       with:
+  #         name: notebooks
+  #         path: examples
 
   cypress-run:
     name: Run UI tests with Cypress
-    needs: nbmake
-    if: always()
+    # needs: nbmake
+    # if: always()
     runs-on: self-hosted
     container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:latest
     strategy:

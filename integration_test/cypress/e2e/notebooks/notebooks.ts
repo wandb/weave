@@ -82,7 +82,12 @@ function checkNotebookOutputsExist() {
   });
 }
 
+function executeNotebook(notebookPath: string) {
+  cy.exec('pytest --nbmake --overwrite ' + notebookPath);
+}
+
 export function checkWeaveNotebookOutputs(notebookPath: string) {
+  executeNotebook(notebookPath);
   forEachCellInNotebook(notebookPath, () => {
     // assert that there is at least 1 element with an attribute 'data-test-weave-id'
     checkNotebookOutputsExist();
