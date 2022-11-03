@@ -136,6 +136,14 @@ class MappedDeriveOpHandler(DeriveOpHandler):
 
             def make_output_type(input_types):
                 replacement = input_types[mapped_param_name].object_type
+                if isinstance(replacement, types.UnionType):
+                    replacement = types.union(
+                        *[
+                            member
+                            for member in replacement.members
+                            if member != types.NoneType()
+                        ]
+                    )
 
                 # This is a special circumstance (aka "God Mode") where we are
                 # inferring when an external caller is trying to weaveify this
