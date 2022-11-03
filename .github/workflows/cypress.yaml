@@ -42,7 +42,7 @@ jobs:
       - run: ls
 
       - name: Run notebooks
-        run: source /root/venv/bin/activate && python -m pytest -n=auto --nbmake --overwrite examples/vis
+        run: source /root/venv/bin/activate && export PYTHONPATH=. && python -m pytest -n=auto --nbmake --overwrite examples/vis
       - name: Upload executed notebooks
         uses: actions/upload-artifact@v3
         if: always()
