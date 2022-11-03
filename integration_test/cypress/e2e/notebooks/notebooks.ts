@@ -95,9 +95,7 @@ const exec = (command: string) => {
 };
 
 function executeNotebook(notebookPath: string) {
-  exec(
-    'export PYTHONPATH=$(PWD) && pytest --nbmake --overwrite ' + notebookPath
-  );
+  exec('pytest --nbmake --overwrite ' + notebookPath);
 }
 
 export function checkWeaveNotebookOutputs(notebookPath: string) {
