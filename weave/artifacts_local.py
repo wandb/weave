@@ -380,6 +380,8 @@ class WandbArtifact(Artifact):
         os.environ["WANDB_SILENT"] = "true"
         wandb.require("service")  # speeds things up
         run = wandb.init(project=project)
+        if run is None:
+            raise errors.WeaveInternalError("unexpected, run is None")
         self._writeable_artifact.save()
         self._writeable_artifact.wait()
         run.finish()
