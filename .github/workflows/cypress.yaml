@@ -36,7 +36,7 @@ jobs:
       #     python-version: 3.9.7
       # - uses: syphar/restore-virtualenv@v1
       - run: pwd
-      - run: source /root/venv/bin/activate
+      - run: source /root/venv/bin/activate && pip install -e .
 
       - run: ls
 
