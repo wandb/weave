@@ -74,7 +74,7 @@ jobs:
       - name: Start weave server
         run: nohup sh weave_server.sh &
       - name: Cypress run
-        run: source /root/bin/venv/activate && cd integration_test && npx cypress run --record --parallel
+        run: source /root/venv/bin/activate && cd integration_test && npx cypress run --record --parallel
         # uses: cypress-io/github-action@v4
         # with:
         #   working-directory: ./integration_test
