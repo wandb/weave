@@ -4,41 +4,28 @@ on:
   push:
 
 jobs:
-  # create-venv:
-  #   name: Create Python venv
-  #   runs-on: ubuntu-20.04
-  #   steps:
-  #     - uses: actions/checkout@v2
-  #     - name: Setup Python version
-  #       uses: actions/setup-python@v2
-  #       with:
-  #         python-version: 3.9.7
-  #     - uses: syphar/restore-virtualenv@v1
-  #       id: cache-virtualenv
+  test:
+    name: Python unit tests
+    runs-on: self-hosted
+    container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:latest
+    steps:
+      - uses: datadog/agent-github-action@v1.3
+        with:
+          api_key: ${{ secrets.DD_API_KEY }}
+      - uses: actions/checkout@v2
 
-  #     - name: Install package
-  #       if: steps.cache-virtualenv.outputs.cache-hit != 'true'
-  #       run: pip install .
-  #     - name: Install test dependencies
-  #       if: steps.cache-virtualenv.outputs.cache-hit != 'true'
-  #       run: pip install -r requirements.test.txt
+      - name: Run tests
+        env:
+          DD_SERVICE: weave-python
+          DD_ENV: ci
+        run: cd weave && pytest --ddtrace
 
   nbmake:
     name: Run notebooks with nbmake
-    # needs: create-venv
     runs-on: self-hosted
     container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:latest
     steps:
       - uses: actions/checkout@v2
-      # - name: Setup Python version
-      #   uses: actions/setup-python@v2
-      #   with:
-      #     python-version: 3.9.7
-      # - uses: syphar/restore-virtualenv@v1
-      - run: pwd
-      # - run: source /root/venv/bin/activate && pip install -e .
-
-      - run: ls
 
       - name: Run notebooks
         run: source /root/venv/bin/activate && export PYTHONPATH=$(pwd) && pytest -n=auto --nbmake --overwrite examples/vis
@@ -62,11 +49,6 @@ jobs:
         containers: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v2
-      # - name: Setup Python version
-      #   uses: actions/setup-python@v2
-      #   with:
-      #     python-version: 3.9.7
-      # - uses: syphar/restore-virtualenv@v1
 
       - name: Download executed notebooks
         uses: actions/download-artifact@v3
