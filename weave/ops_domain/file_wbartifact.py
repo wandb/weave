@@ -30,6 +30,7 @@ class ArtifactVersionFile(weave_file.File):
     def _contents(self):
         return open(self.get_local_path(), encoding="ISO-8859-1").read()
 
+    # HACK: why?
     @property
     def extension(self):
         return "json"
