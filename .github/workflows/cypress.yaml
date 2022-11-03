@@ -73,11 +73,12 @@ jobs:
       - name: Start weave server
         run: nohup sh weave_server.sh &
       - name: Cypress run
-        uses: cypress-io/github-action@v4
-        with:
-          working-directory: ./integration_test
-          record: true
-          parallel: true
+        run: cd integration_test && npx cypress run --record --parallel
+        # uses: cypress-io/github-action@v4
+        # with:
+        #   working-directory: ./integration_test
+        #   record: true
+        #   parallel: true
         env:
           # pass the Dashboard record key as an environment variable
           CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
