@@ -38,6 +38,8 @@ jobs:
       - run: pwd
       - run: source /root/venv/bin/activate
 
+      - run: ls
+
       - name: Run notebooks
         run: pytest -n=auto --nbmake --overwrite examples/vis
       - name: Upload executed notebooks
