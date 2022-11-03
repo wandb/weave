@@ -52,7 +52,7 @@ jobs:
   cypress-run:
     name: Run UI tests with Cypress
     needs: nbmake
-    if: always()
+    # if: always()
     runs-on: self-hosted
     container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:latest
     strategy:
