@@ -52,14 +52,14 @@ jobs:
   cypress-run:
     name: Run UI tests with Cypress
     needs: nbmake
-    # if: always()
+    if: always()
     runs-on: self-hosted
     container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:latest
     strategy:
       fail-fast: false
       matrix:
         # run copies of the current job in parallel
-        containers: [1]
+        containers: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v2
       # - name: Setup Python version
