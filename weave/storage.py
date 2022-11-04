@@ -171,7 +171,7 @@ def all_objects():
     for art_path in obj_paths:
         ref = refs.get_local_version_ref(art_path.name, "latest")
         if ref is not None:
-            result.append((ref, ref.created_at))
+            result.append((ref.created_at, ref))
     return [r[1] for r in sorted(result)]
 
 
@@ -185,8 +185,9 @@ def objects(of_type: types.Type, alias: str):
                 # obj = ref.get()
                 # if isinstance(ref.type, types.RunType) and obj.op_name == "op-objects":
                 #     continue
-                result.append(ref)
-    return result
+                result.append((ref.created_at, ref))
+    # Sorted by created_at
+    return [r[1] for r in sorted(result)]
 
 
 def to_python(obj):
