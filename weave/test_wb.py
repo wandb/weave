@@ -10,73 +10,7 @@ from . import artifacts_local
 TEST_TABLE_ARTIFACT_PATH = "testdata/wb_artifacts/test_res_1fwmcd3q:v0"
 
 
-def test_table_call():
-    class FakeProject:
-        entity = "stacey"
-        name = "mendeleev"
-
-    class FakeEntry:
-        pass
-
-    class FakeManifest:
-        entries = {"fakePath": FakeEntry()}
-
-        get_entry_by_path = mock.Mock(return_value=FakeEntry())
-
-    class FakePath:
-        def __init__(self, path):
-            self.path = path
-
-        def download(self):
-            return self.path
-
-    class FakeVersion:
-        entity = "stacey"
-        project = "mendeleev"
-        _sequence_name = "test_res_1fwmcd3q"
-        version = "v0"
-
-        manifest = FakeManifest()
-
-        def get_path(self, path):
-            full_artifact_dir = os.path.join(
-                artifacts_local.wandb_artifact_dir(), TEST_TABLE_ARTIFACT_PATH
-            )
-            full_artifact_path = os.path.join(full_artifact_dir, path)
-            os.makedirs(os.path.dirname(full_artifact_path), exist_ok=True)
-            artifact_path = os.path.join(TEST_TABLE_ARTIFACT_PATH, path)
-            shutil.copy2(artifact_path, full_artifact_path)
-            return FakePath(artifact_path)
-
-        def download(self):
-            pass
-
-    class FakeVersions:
-        __getitem__ = mock.Mock(return_value=FakeVersion())
-
-    class FakeArtifact:
-        versions = mock.Mock(return_value=FakeVersions())
-
-    class FakeArtifacts:
-        __getitem__ = mock.Mock(return_value=FakeArtifact())
-
-    class FakeArtifactType:
-        # "collections" should be called "artifacts" in the wandb API
-        collections = mock.Mock(return_value=FakeArtifacts())
-
-    class FakeApi:
-        project = mock.Mock(return_value=FakeProject())
-        artifact_type = mock.Mock(return_value=FakeArtifactType())
-        artifact = mock.Mock(return_value=FakeVersion())
-
-    fake_api = FakeApi()
-
-    def wandb_public_api():
-        return fake_api
-
-    ops_domain.wandb_public_api = wandb_public_api
-    wandb_api.wandb_public_api = wandb_public_api
-
+def test_table_call(fake_wandb):
     table_image0_node = (
         ops.project("stacey", "mendeleev")
         .artifact_type("test_results")

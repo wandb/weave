@@ -5,6 +5,7 @@ import shutil
 import tempfile
 from . import context_state
 from . import weave_server
+from . import fixture_fakewandb
 
 
 ### Disable datadog engine tracing
@@ -75,3 +76,10 @@ def cereal_csv():
         cereal_path = os.path.join(d, "cereal.csv")
         shutil.copy("testdata/cereal.csv", cereal_path)
         yield cereal_path
+
+
+@pytest.fixture()
+def fake_wandb():
+    setup_response = fixture_fakewandb.setup()
+    yield
+    fixture_fakewandb.teardown(setup_response)

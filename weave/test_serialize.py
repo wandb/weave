@@ -4,10 +4,10 @@ from . import ops
 from . import serialize
 
 
-def test_serialize():
+def test_serialize(fake_wandb):
     proj = ops.project("shawn", "show-test")
     av = proj.artifact_version("show", "v14")
-    file = av.path("obj.table.json")
+    file = av.path("test_results.table.json")
     table = file.table()
     rows = table.rows()
     filter_fn = api.define_fn(
