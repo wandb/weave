@@ -74,7 +74,7 @@ jobs:
       - name: Start weave server
         run: source /root/venv/bin/activate && nohup sh weave_server.sh &
       - name: Cypress run
-        run: source /root/venv/bin/activate && export PYTHONPATH=$(pwd) && cd integration_test && npx cypress run --record --parallel
+        run: source /root/venv/bin/activate && export PYTHONPATH=$(pwd) && cd integration_test && npx cypress run --record --parallel --browser chrome
         # uses: cypress-io/github-action@v4
         # with:
         #   working-directory: ./integration_test
