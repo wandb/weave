@@ -39,6 +39,13 @@ class ArtifactVersionFile(weave_file.File):
     def wb_object_type(self):
         return "table-file"
 
+    # def property_types(self):
+    #     return {
+    #         "extension": self.extension,
+    #         "wb_object_type": self.wb_object_type,
+    #         "path": self.path,
+    #     }
+
 
 refs.ArtifactVersionFileType.instance_class = ArtifactVersionFile
 refs.ArtifactVersionFileType.instance_classes = ArtifactVersionFile

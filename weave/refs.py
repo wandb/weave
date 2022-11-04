@@ -176,6 +176,13 @@ class ArtifactVersionFileType(
     # Bad bad bad!
     # TODO: fix
 
+    def property_types(self):  # type: ignore
+        return {
+            "extension": self.extension,
+            "wb_object_type": self.extension,
+            "path": types.String(),
+        }
+
 
 class WandbArtifactRef(Ref):
     artifact: "artifacts_local.WandbArtifact"

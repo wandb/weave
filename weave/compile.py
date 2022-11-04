@@ -58,6 +58,9 @@ def apply_type_based_dispatch(
     case where the provided op may not be the true op needed given the provided
     types. Importantly, it does rely on paramter ordering.
     """
+    # TODO: This is not stable and does not work with multiple roots!!!
+    # also: {"data":[{"type":"list","objectType":{"type":"typedDict","propertyTypes":{"_timestamp":"float","small_table":{"type":"ArtifactVersionFile","extension":"string","_property_types":{"extension":{"type":"const","valType":"string","val":"string"},"wb_object_type":{"type":"const","valType":"string","val":"string"},"path":"string"}},"_step":"int","_wandb":{"type":"typedDict","propertyTypes":{"runtime":"int"}},"_runtime":"float"}}}]}
+    # ^^ this is the return of summy type - the custom type is no good
     for og_node in edit_g.ordered_nodes[::-1]:
         node = edit_g.get_node(og_node)
         input_types = {k: node_type(v) for k, v in node.from_op.inputs.items()}
