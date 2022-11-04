@@ -91,14 +91,48 @@ def multi_distribution(
     fig = weave_plotly.plotly_barplot(binned)
     return weave_plotly.PanelPlotly(fig)
 
-    # Uncomment to use PanelPlot instead
-    # return weave.panels.Plot(
-    #     binned,
-    #     x=lambda row: row["value"],
-    #     y=lambda row: row["count"],
-    #     label=lambda row: row["label"],
-    #     mark="bar",
-    # )
+
+# PanelPlot version...
+@weave.op()
+def multi_distribution_panel_plot(
+    input_node: weave.Node[list[typing.Any]], config: DistributionConfig
+) -> weave.panels.Plot:
+    from rich import print
+
+    unnested = weave.ops.unnest(input_node)
+    config = multi_distribution_default_config(config, unnested)
+    bin_size = weave.ops.execute(config.bin_size)
+
+    def bin_func(item):
+        value_fn_output_type = config.value_fn.type.output_type
+        label_fn_output_type = config.label_fn.type.output_type
+        group_items = {}
+        if value_fn_output_type == weave.types.String():
+            group_items["value"] = config.value_fn(item)
+        else:
+            group_items["value"] = round(config.value_fn(item) / bin_size) * bin_size
+
+        if label_fn_output_type == weave.types.Invalid():
+            group_items["label"] = "no_label"
+        else:
+            group_items["label"] = config.label_fn(item)
+
+        res = weave.ops.dict_(**group_items)
+        return res
+
+    binned = unnested.groupby(lambda item: bin_func(item)).map(
+        lambda group: weave.ops.dict_(
+            value=group.key()["value"], label=group.key()["label"], count=group.count()
+        )
+    )
+
+    return weave.panels.Plot(
+        binned,
+        x=lambda row: row["value"],
+        y=lambda row: row["count"],
+        label=lambda row: row["label"],
+        mark="bar",
+    )
 
 
 # The config render op. This renders the config editor.

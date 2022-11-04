@@ -752,6 +752,11 @@ class Function(Type):
             # its a python function
             return cls()
         # instance is graph.Node
+        if isinstance(obj.type, Function):
+            # Its already a Function type, so just return it.
+            # TODO: I'm not sure if this is right, this makes FunctionType
+            # a top of sorts...
+            return obj.type
         # TODO: get input variable types!
         return cls({}, obj.type)
 

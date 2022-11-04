@@ -19,12 +19,14 @@ def test_flow():
     )
 
     # JS passes weave "functions" (nodes) in, just to ensure this is a pure weave op
-    input_var = weave_internal.make_var_node(weave.type_of(items), "input")
+    input_var = weave_internal.make_var_node(items.type, "input")
     input_node = weave_internal.make_const_node(weave.type_of(input_var), input_var)
     config_var = weave_internal.make_var_node(weave.type_of(panel.config), "config")
     config_node = weave_internal.make_const_node(weave.type_of(config_var), config_var)
 
-    rendered = weave.use(panel_distribution.multi_distribution(input_node, config_node))
+    rendered = weave.use(
+        panel_distribution.multi_distribution_panel_plot(input_node, config_node)
+    )
 
     rendered_config = rendered.config
     plot_select_function_x = rendered_config.table.columnSelectFunctions[
