@@ -1,9 +1,11 @@
 import os
+import shutil
 from unittest import mock
 from . import api as weave
 from . import ops as ops
 from . import ops_domain
 from . import wandb_api
+from . import artifacts_local
 
 TEST_TABLE_ARTIFACT_PATH = "testdata/wb_artifacts/test_res_1fwmcd3q:v0"
 
@@ -37,7 +39,17 @@ def test_table_call():
         manifest = FakeManifest()
 
         def get_path(self, path):
-            return FakePath(os.path.join(TEST_TABLE_ARTIFACT_PATH, path))
+            full_artifact_dir = os.path.join(
+                artifacts_local.wandb_artifact_dir(), TEST_TABLE_ARTIFACT_PATH
+            )
+            full_artifact_path = os.path.join(full_artifact_dir, path)
+            os.makedirs(os.path.dirname(full_artifact_path), exist_ok=True)
+            artifact_path = os.path.join(TEST_TABLE_ARTIFACT_PATH, path)
+            shutil.copy2(artifact_path, full_artifact_path)
+            return FakePath(artifact_path)
+
+        def download(self):
+            pass
 
     class FakeVersions:
         __getitem__ = mock.Mock(return_value=FakeVersion())
