@@ -62,7 +62,8 @@ def fresh_server_logfile():
     def _clearlog():
         try:
             os.remove(weave_server.default_log_filename)
-        except (OSError, FileNotFoundError):
+        except (OSError, FileNotFoundError) as e:
+            print("GOT CLEAR LOG ERROR", e)
             pass
 
     _clearlog()
