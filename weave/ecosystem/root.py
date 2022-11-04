@@ -6,15 +6,15 @@ from .. import ops
 from .. import op_def
 from .. import panels
 
-# from . import bertviz
-# from . import xgboost
-# from . import sklearn
-# from . import keras
-# from . import torchvision
-# from . import huggingface
-# from . import craiyon
-# from . import spacy
-# from . import wandb
+from . import bertviz
+from . import xgboost
+from . import sklearn
+from . import keras
+from . import torchvision
+from . import huggingface
+from . import craiyon
+from . import spacy
+from . import wandb
 from . import scenario
 from . import shawn
 from . import wandb
