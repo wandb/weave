@@ -71,7 +71,7 @@ function checkNotebookOutputsExist() {
     // assert that the element has a non-empty attribute 'data-test-weave-id'
     const panelId = panel.attr('data-test-weave-id');
     if (panelId == 'PanelPlotly') {
-      cy.wrap(panel, {timeout: 30000}).find('.plotly').should('exist');
+      cy.wrap(panel).find('.plotly', {timeout: 30000}).should('exist');
     } else if (panelId == 'table') {
       cy.wrap(panel).find('.BaseTable').should('exist');
     } else if (panelId === 'string' || panelId === 'number') {
