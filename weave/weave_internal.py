@@ -110,6 +110,12 @@ def make_const_node(type_, val):
     return return_type(type_, val)
 
 
+def const(val, type=None):
+    if type is None:
+        type = types.TypeRegistry.type_of(type)
+    return make_const_node(type, val)
+
+
 def make_output_node(type_, op_name, op_params):
     node_methods_classes = get_node_methods_classes(type_)
     if node_methods_classes:

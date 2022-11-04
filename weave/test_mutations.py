@@ -1,8 +1,3 @@
-import os
-import pytest
-import shutil
-import tempfile
-
 from . import ops
 from . import storage
 from . import api as weave
@@ -14,12 +9,12 @@ def test_autocommit(cereal_csv):
     csv = ops.local_path(cereal_csv).readcsv()
     assert weave.use(csv[-1]["type"]) == "C"  # value before set is 'C'
 
-    weave.use(csv[-1]["type"].set("XXXX"))
+    weave.use(ops.set(weave_internal.const(csv[-1]["type"]), "XXXX"))
 
     csv = ops.local_path(cereal_csv).readcsv()
     assert weave.use(csv[-1]["type"]) == "XXXX"
 
-    weave.use(csv[-1]["type"].set("YY"))
+    weave.use(ops.set(weave_internal.const(csv[-1]["type"]), "YY"))
 
     csv = ops.local_path(cereal_csv).readcsv()
     assert weave.use(csv[-1]["type"]) == "YY"
@@ -29,11 +24,11 @@ def test_nonconst(cereal_csv):
     # note, not doing a use here.
     csv = ops.local_path(cereal_csv).readcsv()
     assert weave.use(csv[-1]["type"]) == "C"  # value before set is 'C'
-    weave.use(csv[-1]["type"].set("XXXX"))
+    weave.use(ops.set(weave_internal.const(csv[-1]["type"]), "XXXX"))
     # cache.RESULT_CACHE.clear()
     csv = ops.local_path(cereal_csv).readcsv()
     assert weave.use(csv[-1]["type"]) == "XXXX"
-    weave.use(csv[-1]["type"].set("YY"))
+    weave.use(ops.set(weave_internal.const(csv[-1]["type"]), "YY"))
     # cache.RESULT_CACHE.clear()
     csv = ops.local_path(cereal_csv).readcsv()
     assert weave.use(csv[-1]["type"]) == "YY"
@@ -41,7 +36,7 @@ def test_nonconst(cereal_csv):
 
 def test_mutate_with_use(cereal_csv):
     csv = ops.local_path(cereal_csv).readcsv()
-    weave.use(csv[-1]["type"].set("XXXX"))
+    weave.use(ops.set(weave_internal.const(csv[-1]["type"]), "XXXX"))
     assert weave.use(csv[-1]["type"]) == "XXXX"
     csv = ops.local_path(cereal_csv).readcsv()
     assert weave.use(csv[-1]["type"]) == "XXXX"
@@ -52,7 +47,7 @@ def test_mutate_artifact():
     dict_obj = ops.get(
         f"local-artifact://{artifacts_local.local_artifact_dir()}/my-dict/latest"
     )
-    weave.use(dict_obj["a"].set(17))
+    weave.use(ops.set(weave_internal.const(dict_obj["a"]), 17))
     assert weave.use(dict_obj["a"]) == 17
 
 
@@ -67,7 +62,7 @@ def test_skips_list_indexcheckpoint(cereal_csv):
     assert weave.use(csv[-1]["type"]) == "C"  # value before set is 'C'
 
     row = ops.List.__getitem__(ops.list_indexCheckpoint(csv), -1)
-    weave.use(row["type"].set("XXXX"))
+    weave.use(ops.set(weave_internal.const(row["type"]), "XXXX"))
 
     csv = ops.local_path(cereal_csv).readcsv()
     assert weave.use(csv[-1]["type"]) == "XXXX"

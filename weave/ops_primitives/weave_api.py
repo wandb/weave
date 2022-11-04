@@ -177,6 +177,10 @@ def execute(node):
     input_type={"self": types.Function({}, types.Any())},
 )
 def set(self, val: typing.Any) -> typing.Any:
+    # This implements mutations. Note that its argument must be a
+    # Node. You can call it like this:
+    # weave.use(ops.set(weave_internal.const(csv[-1]["type"]), "YY"))
+
     nodes = graph.linearize(self)
     if nodes is None:
         raise errors.WeaveInternalError("Set error")
@@ -210,9 +214,12 @@ def set(self, val: typing.Any) -> typing.Any:
     for node, inputs, result in reversed(list(zip(nodes, op_inputs, results))):
         op_def = registry_mem.memory_registry.get_op(node.from_op.name)
         if not op_def.setter:
-            raise errors.WeaveInternalError(
-                "Set error. No setter declared for op: %s" % node.from_op.name
-            )
+            return res
+            # TODO: we can't raise the error here. Some of the tests
+            # rely on partial setter chains.
+            # raise errors.WeaveInternalError(
+            #     "Set error. No setter declared for op: %s" % node.from_op.name
+            # )
         args = list(inputs.values())
         args.append(res)
         try:
