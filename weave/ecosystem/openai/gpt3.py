@@ -372,8 +372,10 @@ def gpt3_davinci_2() -> Gpt3Model:
     return Gpt3Model("text-davinci-002", "text-davinci-002")
 
 
+# A very simple predict API. Should probably return more than one
+# result though.
 @weave.op()
-def gpt3(prompt: str) -> str:
+def gpt3_predict(prompt: str) -> str:
     completion_params = {
         "model": "text-davinci-002",
         "prompt": prompt,
