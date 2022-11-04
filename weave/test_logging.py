@@ -44,6 +44,9 @@ def test_logfile_captures_error(fresh_server_logfile):
 
 
 def test_log_2_app_instances_different_threads(fresh_server_logfile):
+    with open(weave_server.default_log_filename, "r") as f:
+        content = f.read()
+    print("PRE TEST CONTENT", content)
     # kick off two http servers
 
     with context.local_http_client():
