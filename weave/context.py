@@ -23,6 +23,7 @@ def local_http_client():
     with context_state.server(s):
         with context_state.client(server.HttpServerClient(s.url)):
             yield
+    s.shutdown()
 
 
 @contextlib.contextmanager
