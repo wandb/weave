@@ -213,20 +213,19 @@ def test_large_const_node():
         lambda row: model.complete(row)["choices"][0]["text"]
     )
     show_panel_params = _show_params(panel)
+    panel_params = weave.use(show_panel_params["weave_node"])
 
     # Ensure that we sent the dataset as a get(<ref>) rather than as a const list
     # (this behavior is currently implemented in graph.py:ConstNode)
-    panel_config = show_panel_params["panel_config"]
-    table_state = panel_config["tableState"]
-    col_select_fns = table_state["columnSelectFunctions"]
+    panel_config = panel_params.config
+    table_state = panel_config.tableState
+    col_select_fns = table_state.columnSelectFunctions
     col_sel_fn2 = list(col_select_fns.values())[1]
-    assert "list/" in json.dumps(col_sel_fn2)
-
-    col_sel_fn2_node = graph.Node.node_from_json(col_sel_fn2)
+    assert "list/" in graph.node_expr_str(col_sel_fn2)
 
     # Asserting that weavejs_fixes.remove_opcall_versions_data works
     assert (
-        graph.node_expr_str(col_sel_fn2_node)
-        == 'get("local-artifact://%s/list/4cf1abf0d040d897276e4be3c6aa90df").finetune_gpt3({"n_epochs": 2}).model().complete(row)["choices"].index(0)["text"]'
+        graph.node_expr_str(col_sel_fn2)
+        == 'get("local-artifact://%s/list/4cf1abf0d040d897276e4be3c6aa90df").finetune_gpt3({"n_epochs": 2}).model().complete(row)["choices"][0]["text"]'
         % artifacts_local.local_artifact_dir()
     )
