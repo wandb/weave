@@ -250,6 +250,10 @@ class LocalArtifactRef(Ref):
         return f"<LocalArtifactRef({id(self)}) artifact={self.artifact} path={self.path} type={self.type} obj={self.obj is not None} extra={self.extra}"
 
     @property
+    def created_at(self):
+        return self.artifact.created_at
+
+    @property
     def uri(self) -> str:
         # TODO: should artifacts themselves be "extras" aware??
         # this is really clunky but we cannot use artifact URI since we need
