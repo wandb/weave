@@ -44,9 +44,23 @@ def test_logfile_captures_error(fresh_server_logfile):
 
 
 def test_log_2_app_instances_different_threads(fresh_server_logfile):
-    with open(weave_server.default_log_filename, "r") as f:
-        content = f.read()
-    print("PRE TEST CONTENT", content)
+    print("PRE TEST LOG FILENAME", weave_server.default_log_filename)
+    try:
+        with open(weave_server.default_log_filename, "r") as f:
+            content = f.read()
+        print("PRE TEST CONTENT", content)
+    except FileNotFoundError:
+        print("NO PRE TEST CONTENT")
+    import time
+
+    time.sleep(2)
+    try:
+        with open(weave_server.default_log_filename, "r") as f:
+            content = f.read()
+        print("POST SLEEP CONTENT", content)
+    except FileNotFoundError:
+        print("NO POST SLEEP CONTENT")
+
     # kick off two http servers
 
     with context.local_http_client():
