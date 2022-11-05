@@ -71,8 +71,10 @@ jobs:
       - run: ls
       - run: ls integration_test
 
+      # - name: Start weave server
+      #   run: source /root/venv/bin/activate && nohup sh weave_server.sh &
       - name: Start weave server
-        run: source /root/venv/bin/activate && nohup sh weave_server.sh &
+        run: sh weave_server.sh
       - name: Wait
         run: sleep 30
       - name: Cypress run
