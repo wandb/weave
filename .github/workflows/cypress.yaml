@@ -77,7 +77,7 @@ jobs:
       - name: Start weave server
         run: ./weave_server.sh &
       - name: Cypress run
-        run: export PYTHONPATH=$(pwd) && cd integration_test && npx cypress run --record --parallel --browser chrome cypress/e2e/notebooks/Bertviz.cy.ts
+        run: export PYTHONPATH=$(pwd) && cd integration_test && npx cypress run --record --parallel --browser chrome --spec cypress/e2e/notebooks/Bertviz.cy.ts
         # uses: cypress-io/github-action@v4
         # with:
         #   working-directory: ./integration_test
