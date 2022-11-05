@@ -1,5 +1,5 @@
 import {checkWeaveNotebookOutputs} from './notebooks';
 
-describe.only('../examples/Bertviz.ipynb notebook test', () => {
+describe('../examples/Bertviz.ipynb notebook test', () => {
   it('passes', () => checkWeaveNotebookOutputs('../examples/Bertviz.ipynb'));
 });
