@@ -52,11 +52,11 @@ jobs:
     if: always()
     runs-on: self-hosted
     container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:latest
-    # strategy:
-    #   fail-fast: false
-    #   matrix:
-    #     # run copies of the current job in parallel
-    #     containers: [1, 2, 3, 4, 5, 6]
+    strategy:
+      fail-fast: false
+      matrix:
+        # run copies of the current job in parallel
+        containers: [1, 2, 3, 4, 5, 6]
     steps:
       - uses: actions/checkout@v2
 
@@ -68,21 +68,19 @@ jobs:
       - name: Copy node_modules from container to checkout
         run: cp -R /root/integration_test/node_modules ./integration_test/
 
-      - run: ls
-      - run: ls integration_test
-
       - name: Activate venv
         run: source /root/venv/bin/activate && echo "PATH=$PATH" >> $GITHUB_ENV
       - run: echo $PATH
       - name: Start weave server
-        run: nohup ./weave_server.sh &
+        run: /weave_server.sh &
         shell: bash
       - name: Sleep 1
         run: sleep 1
       - name: Tail server logs
         run: tail -f nohup.out &
       - name: Cypress run
-        run: export PYTHONPATH=$(pwd) && cd integration_test && npx cypress run --record --parallel --browser chrome --spec cypress/e2e/notebooks/Bertviz.cy.ts
+        # run: export PYTHONPATH=$(pwd) && cd integration_test && npx cypress run --record --parallel --browser chrome --spec cypress/e2e/notebooks/Bertviz.cy.ts
+        run: export PYTHONPATH=$(pwd) && cd integration_test && npx cypress run --record --parallel --browser chrome
         # uses: cypress-io/github-action@v4
         # with:
         #   working-directory: ./integration_test
