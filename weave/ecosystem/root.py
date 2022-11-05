@@ -5,13 +5,18 @@ from .. import api as weave
 from .. import ops
 from .. import op_def
 from .. import panels
+from weave import context_state
 
-# from . import bertviz
+loading_builtins_token = context_state.set_loading_built_ins()
+
+from . import bertviz
+
 # from . import xgboost
 # from . import sklearn
 # from . import keras
 # from . import torchvision
-# from . import huggingface
+from . import huggingface
+
 # from . import craiyon
 # from . import spacy
 from . import wandb
@@ -147,3 +152,6 @@ def ecosystem_render(
             ),
         ],
     )
+
+
+context_state.clear_loading_built_ins(loading_builtins_token)
