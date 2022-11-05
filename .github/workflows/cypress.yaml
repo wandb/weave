@@ -75,7 +75,7 @@ jobs:
         run: source /root/venv/bin/activate && echo "PATH=$PATH" >> $GITHUB_ENV
       - run: echo $PATH
       - name: Start weave server
-        run: ./weave_server.sh &
+        run: nohup ./weave_server.sh & tail -f nohup.out &
       - name: Cypress run
         run: export PYTHONPATH=$(pwd) && cd integration_test && npx cypress run --record --parallel --browser chrome --spec cypress/e2e/notebooks/Bertviz.cy.ts
         # uses: cypress-io/github-action@v4
