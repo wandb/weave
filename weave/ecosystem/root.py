@@ -9,7 +9,8 @@ from .. import panels
 from . import bertviz
 from . import xgboost
 from . import sklearn
-from . import keras
+
+# from . import keras
 from . import torchvision
 from . import huggingface
 from . import craiyon
