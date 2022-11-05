@@ -71,10 +71,13 @@ jobs:
       - run: ls
       - run: ls integration_test
 
+      - name: Activate venv
+        run: source /root/venv/bin/activate && echo "PATH=$PATH" >> $GITHUB_ENV
+      - run: echo $PATH
       - name: Start weave server
-        run: source /root/venv/bin/activate && sh weave_server.sh &
+        run: ./weave_server.sh &
       - name: Cypress run
-        run: source /root/venv/bin/activate && export PYTHONPATH=$(pwd) && cd integration_test && npx cypress run --record --parallel --browser chrome cypress/e2e/notebooks/Bertviz.cy.ts
+        run: export PYTHONPATH=$(pwd) && cd integration_test && npx cypress run --record --parallel --browser chrome cypress/e2e/notebooks/Bertviz.cy.ts
         # uses: cypress-io/github-action@v4
         # with:
         #   working-directory: ./integration_test
