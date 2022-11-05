@@ -76,6 +76,7 @@ jobs:
       - run: echo $PATH
       - name: Start weave server
         run: nohup ./weave_server.sh &
+        shell: bash
       - name: Sleep 1
         run: sleep 1
       - name: Tail server logs
