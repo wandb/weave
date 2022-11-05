@@ -35,12 +35,12 @@ function forEachCellInNotebook(notebookPath: string, cellTest: () => void) {
           throw new Error(`Encountered python error in cell ${i}`);
         }
         if (output.output_type !== 'display_data') {
-          break;
+          continue;
         }
         const html = output.data['text/html'];
         if (html == null) {
           // Not a cell that output html
-          break;
+          continue;
         }
         const el = document.createElement('html');
         el.innerHTML = html;
@@ -74,6 +74,8 @@ function checkNotebookOutputsExist() {
       cy.wrap(panel).find('.plotly', {timeout: 30000}).should('exist');
     } else if (panelId == 'table') {
       cy.wrap(panel).find('.BaseTable').should('exist');
+    } else if (panelId == 'html-file') {
+      // pass, this is rendered as an iframe, we don't reach in for now.
     } else if (panelId === 'string' || panelId === 'number') {
       // just existence of the data-test-weave-id is enough
     } else {
