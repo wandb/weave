@@ -74,7 +74,7 @@ jobs:
       # - name: Start weave server
       #   run: source /root/venv/bin/activate && nohup sh weave_server.sh &
       - name: Start weave server
-        run: sh weave_server.sh
+        run: source /root/venv/bin/activate && sh weave_server.sh
       - name: Wait
         run: sleep 30
       - name: Cypress run
