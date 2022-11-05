@@ -51,6 +51,12 @@ jobs:
     # needs: [lint, test]
     if: always()
     runs-on: self-hosted
+    services:
+      weave-server:
+        image: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:latest
+        ports: 9994:9994
+        options: --entrypoint sh "source /root/venv/bin/activate && ./weave_server.sh"
+
     container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:latest
     strategy:
       fail-fast: false
@@ -71,13 +77,9 @@ jobs:
       - name: Activate venv
         run: source /root/venv/bin/activate && echo "PATH=$PATH" >> $GITHUB_ENV
       - run: echo $PATH
-      - name: Start weave server
-        run: ./weave_server.sh &
-        shell: bash
-      - name: Sleep 1
-        run: sleep 1
-      - name: Tail server logs
-        run: tail -f nohup.out &
+      # - name: Start weave server
+      #   run: ./weave_server.sh &
+      #   shell: bash
       - name: Cypress run
         # run: export PYTHONPATH=$(pwd) && cd integration_test && npx cypress run --record --parallel --browser chrome --spec cypress/e2e/notebooks/Bertviz.cy.ts
         run: export PYTHONPATH=$(pwd) && cd integration_test && npx cypress run --record --parallel --browser chrome
