@@ -72,7 +72,7 @@ jobs:
         run: source /root/venv/bin/activate && echo "PATH=$PATH" >> $GITHUB_ENV
       - run: echo $PATH
       - name: Start weave server
-        run: /weave_server.sh &
+        run: ./weave_server.sh &
         shell: bash
       - name: Sleep 1
         run: sleep 1
