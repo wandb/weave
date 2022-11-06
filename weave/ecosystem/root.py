@@ -109,7 +109,7 @@ def ecosystem_render(
             # TODO: need to figure out a way to do this without breaking python types
             panels.CardTab(
                 name="Intro",
-                content=panels.Markdown(INTRO),  # type: ignore
+                content=panels.PanelMarkdown(INTRO),  # type: ignore
             ),
             panels.CardTab(
                 name="Organizations",

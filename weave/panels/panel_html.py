@@ -11,8 +11,6 @@ class PanelHtml(panel.Panel):
     id = "html-file"
 
     def __init__(self, input_node=graph.VoidNode(), vars=None, config=None, **options):
-        if vars is None:
-            vars = {}
         # Convert input_node here
         # TODO: Type adaptation should be done by render, not
         #     construction (ie the Panel should handle Markdown and File<Markdown>

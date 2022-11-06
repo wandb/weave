@@ -1,12 +1,16 @@
+import weave
+
 from .. import panel
 from .. import panel_util
 from .. import ops
+from .. import graph
 
 
-class Markdown(panel.Panel):
+@weave.type()
+class PanelMarkdown(panel.Panel):
     id = "markdown"
 
-    def __init__(self, input_node, **config):
+    def __init__(self, input_node=graph.VoidNode(), vars=None, config=None, **options):
         # Convert input_node here
         # TODO: Type adaptation should be done by render, not
         #     construction (ie the Panel should handle Markdown and File<Markdown>
@@ -14,8 +18,4 @@ class Markdown(panel.Panel):
         input_node = panel_util.make_node(input_node)
         if isinstance(input_node.type, ops.MarkdownType):
             input_node = ops.markdown_file(input_node)
-        super().__init__(input_node)
-
-    @property
-    def config(self):
-        return {}
+        super().__init__(input_node=input_node, vars=vars)

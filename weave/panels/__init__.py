@@ -12,7 +12,7 @@ from .panel_color import Color
 from .panel_object_picker import ObjectPicker
 from .panel_expression_editor import ExpressionEditor, ExpressionEditorConfig
 from .panel_html import PanelHtml
-from .panel_markdown import Markdown
+from .panel_markdown import PanelMarkdown
 from .panel_weavelink import WeaveLink
 from .panel_sized_string import SizedString
 from .panel_container import *

@@ -8,11 +8,6 @@ from .graph import Node  # used as a type in op definitions
 from .show import show
 from .api import *
 
-# Note: we don't want to treat ecosystem as builtins, but this makes things
-# easier at the moment.
-# TODO: fix
-# from .ecosystem import ecosystem
-
 from . import panels
 from .panel import Panel
 
