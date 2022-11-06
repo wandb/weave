@@ -8,6 +8,7 @@ interface Notebook {
         'text/html'?: string;
       };
     }>;
+    source: string[];
   }>;
 }
 
@@ -22,6 +23,9 @@ function forEachCellInNotebook(notebookPath: string, cellTest: () => void) {
     for (let i = 0; i < notebook.cells.length; i++) {
       const cell = notebook.cells[i];
       if (cell.cell_type !== 'code') {
+        continue;
+      }
+      if (cell.source[0]?.includes('# weave-test-skip')) {
         continue;
       }
       executionCount++;
@@ -76,6 +80,14 @@ function checkNotebookOutputsExist() {
       cy.wrap(panel).find('.BaseTable').should('exist');
     } else if (panelId == 'html-file') {
       // pass, this is rendered as an iframe, we don't reach in for now.
+    } else if (panelId == 'pil-image') {
+      cy.wrap(panel)
+        .find('img')
+        .should('exist')
+        .and($img => {
+          // "naturalWidth" and "naturalHeight" are set when the image loads
+          expect($img[0].naturalWidth).to.be.greaterThan(0);
+        });
     } else if (panelId == 'Color') {
       cy.wrap(panel).should('have.css', 'background-color');
     } else if (panelId === 'string' || panelId === 'number') {
