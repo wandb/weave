@@ -17,7 +17,8 @@ from . import bertviz
 # from . import torchvision
 from . import huggingface
 
-# from . import craiyon
+from . import craiyon
+
 # from . import spacy
 from . import lens
 from . import wandb
