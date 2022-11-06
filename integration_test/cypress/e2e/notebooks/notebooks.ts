@@ -80,6 +80,8 @@ function checkNotebookOutputsExist() {
       cy.wrap(panel).find('.BaseTable').should('exist');
     } else if (panelId == 'html-file') {
       // pass, this is rendered as an iframe, we don't reach in for now.
+    } else if (panelId === 'dir') {
+      cy.wrap(panel).find('table').should('exist');
     } else if (panelId == 'pil-image') {
       cy.wrap(panel)
         .find('img')
