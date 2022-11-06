@@ -1,5 +1,6 @@
 interface Notebook {
   cells: Array<{
+    id: string;
     cell_type: 'code' | 'markdown';
     execution_count: number;
     outputs: Array<{
@@ -16,7 +17,10 @@ function parseNotebook(s: string): Notebook {
   return JSON.parse(s);
 }
 
-function forEachCellInNotebook(notebookPath: string, cellTest: () => void) {
+function forEachWeaveOutputCellInNotebook(
+  notebookPath: string,
+  cellTest: (cellId: string) => void
+) {
   cy.readFile(notebookPath).then(notebookContents => {
     const notebook = parseNotebook(notebookContents);
     let executionCount = 0;
@@ -61,7 +65,7 @@ function forEachCellInNotebook(notebookPath: string, cellTest: () => void) {
         cy.visit('/__frontend/weave' + url.search);
         // cy.visit('http://localhost:3000/' + url.search);
 
-        cellTest();
+        cellTest(cell.id);
       }
     }
   });
@@ -121,11 +125,20 @@ function executeNotebook(notebookPath: string) {
 }
 
 export function checkWeaveNotebookOutputs(notebookPath: string) {
-  executeNotebook(notebookPath);
-  forEachCellInNotebook(notebookPath, () => {
-    // assert that there is at least 1 element with an attribute 'data-test-weave-id'
-    checkNotebookOutputsExist();
-    cy.wait(1000);
-    checkNotebookOutputsExist();
+  cy.readFile(notebookPath).then(notebookContents => {
+    const notebook = parseNotebook(notebookContents);
+    if (notebook.cells[0].source[0]?.includes('# weave-test-skip-all')) {
+      cy.log(
+        'Skipping notebook due to weave-test-skip-all directive ' + notebookPath
+      );
+      return;
+    }
+    executeNotebook(notebookPath);
+    forEachWeaveOutputCellInNotebook(notebookPath, cellId => {
+      // assert that there is at least 1 element with an attribute 'data-test-weave-id'
+      checkNotebookOutputsExist();
+      cy.wait(1000);
+      checkNotebookOutputsExist();
+    });
   });
 }
