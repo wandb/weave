@@ -73,14 +73,14 @@ jobs:
         run: source /root/venv/bin/activate && echo "PATH=$PATH" >> $GITHUB_ENV
       - run: echo $PATH
       - name: Start weave server
-        run: nohup ./weave_server_test.sh &
+        run: nohup ./weave_server_test.sh < /dev/null &> /tmp/weave-server.log &
         shell: bash
       - name: Cypress run
         run: export PYTHONPATH=$(pwd) && cd integration_test && npx cypress run --record --parallel --browser chrome --spec cypress/e2e/notebooks/Bertviz.cy.ts
         # run: export PYTHONPATH=$(pwd) && cd integration_test && npx cypress run --record --parallel --browser chrome
         # uses: cypress-io/github-action@v4
         # with:
-        #   working-directory: ./integration_test
+        #   working-directory: ./integration_testG
         #   record: true
         #   parallel: true
         env:
@@ -114,5 +114,5 @@ jobs:
       - uses: actions/upload-artifact@v3
         if: always()
         with:
-          name: server-output
-          path: nohup.out
+          name: weave-server-output
+          path: /tmp/weave-server.log
