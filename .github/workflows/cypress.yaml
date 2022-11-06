@@ -110,3 +110,9 @@ jobs:
         with:
           name: weave-logs
           path: /tmp/weave
+
+      - uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: server-output
+          path: nohup.out
