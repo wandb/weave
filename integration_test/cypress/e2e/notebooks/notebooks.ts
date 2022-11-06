@@ -76,6 +76,8 @@ function checkNotebookOutputsExist() {
       cy.wrap(panel).find('.BaseTable').should('exist');
     } else if (panelId == 'html-file') {
       // pass, this is rendered as an iframe, we don't reach in for now.
+    } else if (panelId == 'Color') {
+      cy.wrap(panel).should('have.css', 'background-color');
     } else if (panelId === 'string' || panelId === 'number') {
       // just existence of the data-test-weave-id is enough
     } else {
