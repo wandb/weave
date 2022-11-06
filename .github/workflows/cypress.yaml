@@ -73,6 +73,9 @@ jobs:
         run: source /root/venv/bin/activate && echo "PATH=$PATH" >> $GITHUB_ENV
       - run: echo $PATH
       - name: Start weave server
+        # github actions does something funky with the std file descriptors, they end up
+        # being closed. tqdm (for example) raises an exception when the descriptor it
+        # wants to write to is closed.
         run: nohup ./weave_server_test.sh < /dev/null &> /tmp/weave-server.log &
         shell: bash
       - name: Cypress run
