@@ -56,7 +56,7 @@ jobs:
         image: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:latest
         ports:
           - 9994:9994
-        options: --entrypoint sh "source /root/venv/bin/activate && ./weave_server.sh"
+        options: --entrypoint 'sh "source /root/venv/bin/activate && ./weave_server.sh"'
 
     container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:latest
     strategy:
