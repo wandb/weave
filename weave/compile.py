@@ -1,5 +1,6 @@
 import typing
 
+from .lazy import _make_output_node
 from . import op_args
 from . import weave_types as types
 from . import graph
@@ -7,7 +8,6 @@ from . import graph_editable
 from . import registry_mem
 from . import errors
 from . import dispatch
-from . import op_def
 
 # These call_* functions must match the actual op implementations.
 # But we don't want to import the op definitions themselves here, since
@@ -56,8 +56,11 @@ def apply_type_based_dispatch(
     case where the provided op may not be the true op needed given the provided
     types. Importantly, it does rely on paramter ordering.
     """
-    for node in edit_g.nodes:
-        input_types = {k: node_type(v) for k, v in node.from_op.inputs.items()}
+    # Reverse insertion order garuntees that all parents have been processed before the children
+    for orig_node in edit_g.insertion_ordered_nodes[::-1]:
+        node = edit_g.get_node(orig_node)
+        node_inputs = {k: edit_g.get_node(v) for k, v in node.from_op.inputs.items()}
+        input_types = {k: node_type(v) for k, v in node_inputs.items()}
         found_op = dispatch.get_op_for_input_types(node.from_op.name, [], input_types)
         if found_op is None:
             # There is a parallel spot in lazy.py which has a similar comment
@@ -69,17 +72,23 @@ def apply_type_based_dispatch(
             # )
             continue
 
-        if found_op.uri != node.from_op.name:
+        found_new_node = found_op.uri != node.from_op.name
+        at_least_one_parent_changed = any(
+            v in edit_g.replacements for v in orig_node.from_op.inputs.values()
+        )
+
+        if found_new_node or at_least_one_parent_changed:
             params = found_op.bind_params(
-                [], found_op.input_type.create_param_dict([], node.from_op.inputs)
+                [], found_op.input_type.create_param_dict([], node_inputs)
             )
             named_param_types = {k: node_type(v) for k, v in params.items()}
             edit_g.replace(
-                node,
-                graph.OutputNode(
-                    found_op.return_type_of_arg_types(named_param_types),
+                orig_node,
+                _make_output_node(
                     found_op.uri,
                     params,
+                    found_op.return_type_of_arg_types(named_param_types),
+                    found_op.refine_output_type,
                 ),
             )
 
