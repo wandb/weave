@@ -209,7 +209,11 @@ class MappedDeriveOpHandler(DeriveOpHandler):
         input_type = copy.copy(orig_op.input_type.arg_types)
         input_type[mapped_param_name] = types.List(types.optional(first_arg.type))
         new_op = op_def.OpDef(
-            mapped_op_name, op_args.OpNamedArgs(input_type), output_type, resolve
+            mapped_op_name,
+            op_args.OpNamedArgs(input_type),
+            output_type,
+            resolve,
+            # _mapped_refine_output_type(orig_op),
         )
         op_version = registry_mem.memory_registry.register_op(new_op)
 
@@ -241,6 +245,34 @@ class MappedDeriveOpHandler(DeriveOpHandler):
         registry_mem.memory_registry.rename_op(
             derived_op.name, MappedDeriveOpHandler.derived_name(orig_op_new_name)
         )
+
+
+def _mapped_refine_output_type(orig_op):
+    refine_output_type = None
+
+    # Mapp the type refiner
+    if (
+        orig_op.refine_output_type is not None
+        and "mapped" in orig_op.refine_output_type.derived_ops
+    ):
+        mapped_refine_op = orig_op.refine_output_type.derived_ops["mapped"]
+
+        def mapped_refine_output_type_refiner(*args, **kwargs):
+            union_members = mapped_refine_op.raw_resolve_fn(*args, **kwargs)
+            return types.List(types.union(*union_members))
+
+        unioned_mapped_type_refiner_op = op_def.OpDef(
+            f"unioned_{mapped_refine_op.name}",
+            mapped_refine_op.input_type,
+            types.Type(),
+            mapped_refine_output_type_refiner,
+            None,
+        )
+        unioned_mapped_type_refiner_op_def = registry_mem.memory_registry.register_op(
+            unioned_mapped_type_refiner_op
+        )
+        refine_output_type = unioned_mapped_type_refiner_op_def
+    return refine_output_type
 
 
 def handler_for_id(handler_id: str) -> type[DeriveOpHandler]:
