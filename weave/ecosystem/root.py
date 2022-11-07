@@ -17,6 +17,7 @@ from . import shap
 # from . import sklearn
 from . import keras
 from . import torchvision
+from . import torch_mnist_model_example
 from . import huggingface
 
 from . import craiyon

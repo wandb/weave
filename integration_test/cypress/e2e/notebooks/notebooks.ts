@@ -73,7 +73,7 @@ function forEachWeaveOutputCellInNotebook(
 
 function checkNotebookOutputsExist() {
   const panels = cy
-    .get('[data-test-weave-id]', {timeout: 30000})
+    .get('[data-test-weave-id]', {timeout: 60000})
     .should('have.length.greaterThan', 0);
   panels.each((panel, index) => {
     // assert that the element has a non-empty attribute 'data-test-weave-id'
@@ -125,7 +125,7 @@ const exec = (command: string) => {
 
 function executeNotebook(notebookPath: string) {
   exec(
-    'pytest --nbmake --nbmake-timeout=30000 --overwrite "' + notebookPath + '"'
+    'pytest --nbmake --nbmake-timeout=90000 --overwrite "' + notebookPath + '"'
   );
 }
 
