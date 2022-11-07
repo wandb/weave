@@ -225,6 +225,25 @@ def call_string(model, input):
     return res
 
 
+# Added back by Shawn to make notebook work for now.
+# call_string has a callable output type. WeaveJS doesn't seem to be able
+# to make use of it.
+@weave.op(
+    input_type={
+        "model": KerasModel.make_type(
+            [([None, 1], DTYPE_NAME.STRING)], [([None, 1], None)]
+        ),
+        "input": weave.types.String(),
+    },
+)
+def call_string_to_number(model, input) -> int:
+    res = model.predict([[input]]).tolist()[0][0]
+    # Special case for strings: we need to convert the bytes to a string
+    if type(res) == bytes:
+        return res.decode("utf-8")
+    return res
+
+
 ## The following op (image_classification) is just an example, it needs to be generalized
 # before using it in production.
 # TODO: figure out how to do this class lookup as part of the model
