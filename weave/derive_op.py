@@ -270,7 +270,7 @@ def _mapped_refine_output_type(orig_op):
             )
 
         unioned_mapped_type_refiner_op = op_def.OpDef(
-            f"unioned_{mapped_refine_op.name}",
+            f"{mapped_refine_op.name}_unioned",
             mapped_refine_op.input_type,
             types.Type(),
             mapped_refine_output_type_refiner,
