@@ -137,6 +137,10 @@ class MappedDeriveOpHandler(DeriveOpHandler):
             def make_output_type(input_types):
                 replacement = input_types[mapped_param_name].object_type
 
+                # Remove the nulls from the inner type
+                if types.is_optional(replacement):
+                    replacement = types.non_none(replacement)
+
                 # This is a special circumstance (aka "God Mode") where we are
                 # inferring when an external caller is trying to weaveify this
                 # function. In this specific case, we need to manually construct the
