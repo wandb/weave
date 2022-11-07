@@ -67,6 +67,8 @@ jobs:
       #     name: notebooks
       - name: Setup W&B API key
         run: echo "WANDB_API_KEY=${{ secrets.WANDB_API_KEY }}" >> $GITHUB_ENV
+      - name: Setup Replicate API token
+        run: echo "${{ secrets.REPLICATE_API_TOKEN }}" > /root/.replicate-api-token
 
       - name: Copy node_modules from container to checkout
         run: cp -R /root/integration_test/node_modules ./integration_test/
