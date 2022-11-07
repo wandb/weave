@@ -113,7 +113,7 @@ function checkNotebookOutputsExist() {
 
 // Log the full error output. From here: https://github.com/cypress-io/cypress/issues/5470
 const exec = (command: string) => {
-  cy.exec(command, {failOnNonZeroExit: false}).then(result => {
+  cy.exec(command, {failOnNonZeroExit: false, timeout: 90000}).then(result => {
     if (result.code) {
       throw new Error(`Execution of "${command}" failed
       Exit code: ${result.code}
