@@ -369,10 +369,10 @@ class ArtifactCollectionMembership:
 
 @op(name="artifact-membershipForAlias")
 def artifact_membership_for_alias(
-    artifactCollection: ArtifactCollection, aliasName: str
+    artifact: ArtifactCollection, aliasName: str
 ) -> ArtifactCollectionMembership:
     return ArtifactCollectionMembership(
-        artifactCollection=artifactCollection, aliasName=aliasName
+        artifactCollection=artifact, aliasName=aliasName
     )
 
 
