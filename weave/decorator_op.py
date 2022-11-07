@@ -179,6 +179,7 @@ def op(
             setter=setter,
             render_info=render_info,
             pure=pure,
+            _decl_locals=inspect.currentframe().f_back.f_locals,
         )
 
         op_version = registry_mem.memory_registry.register_op(op)

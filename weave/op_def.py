@@ -25,6 +25,7 @@ class OpDef:
     call_fn: typing.Any
     version: typing.Optional[str]
     is_builtin: bool = False
+    _decl_locals: typing.Dict[str, typing.Any]
 
     def __init__(
         self,
@@ -40,6 +41,7 @@ class OpDef:
         render_info=None,
         pure=True,
         is_builtin: typing.Optional[bool] = None,
+        _decl_locals=None,  # These are python locals() from the enclosing scope.
     ):
         self.name = name
         self.input_type = input_type
@@ -54,6 +56,7 @@ class OpDef:
             if is_builtin is not None
             else context_state.get_loading_built_ins()
         )
+        self._decl_locals = _decl_locals
         self.version = None
         self.lazy_call = None
         self.eager_call = None

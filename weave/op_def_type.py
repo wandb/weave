@@ -36,8 +36,11 @@ def type_code(type_):
         return type_code(type_.__args__[0])
 
 
-def get_import_code(fn):
-    # Even more horrible and hacky
+def get_code_deps(fn, decl_locals):
+    # Pretty horrible and hacky POC.
+    # Tries to pull in other functions and modules referenced in the function
+    # body. Generates a lot of repetition and not general. I just made it
+    # work for specific cases that exist in the example notebooks currently.
     source = inspect.getsource(fn)
     try:
         parsed = ast.parse(source)
@@ -48,8 +51,12 @@ def get_import_code(fn):
         if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load):
             # A really bad way to check if a variable reference is for
             # a module!
-            if node.id in sys.modules:
-                import_code += f"import {node.id}\n"
+            local_val = decl_locals.get(node.id)
+            if isinstance(local_val, py_types.ModuleType):
+                import_code += f"import {local_val.__name__} as {node.id}\n"
+            elif isinstance(local_val, py_types.FunctionType):
+                import_code += get_code_deps(local_val, decl_locals)
+                import_code += inspect.getsource(local_val)
     return import_code
 
 
@@ -67,7 +74,7 @@ class OpDefType(types.Type):
 
             # Try to figure out module imports from the function body
             # (in a real hacky way as a POC)
-            code += get_import_code(obj.resolve_fn)
+            code += get_code_deps(obj.resolve_fn, obj._decl_locals)
 
             # Create TypedDict types for referenced TypedDicts
             resolve_annotations = obj.resolve_fn.__annotations__
