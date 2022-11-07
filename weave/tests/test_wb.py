@@ -1,5 +1,7 @@
 import os
 from unittest import mock
+
+import pytest
 from .. import api as weave
 from .. import ops as ops
 from .. import ops_domain
@@ -8,7 +10,24 @@ from .. import wandb_api
 TEST_TABLE_ARTIFACT_PATH = "testdata/wb_artifacts/test_res_1fwmcd3q:v0"
 
 
-def test_table_call():
+@pytest.mark.parametrize(
+    "table_file_node",
+    [
+        # Path used in weave demos
+        ops.project("stacey", "mendeleev")
+        .artifact_type("test_results")
+        .artifacts()[0]
+        .versions()[0]
+        .path("test_results.table.json"),
+        # Path used in artifact browser
+        ops.project("stacey", "mendeleev")
+        .artifact("test_results")
+        .membershipForAlias("v0")
+        .artifactVersion()
+        .file("test_results.table.json"),
+    ],
+)
+def test_table_call(table_file_node):
     class FakeProject:
         entity = "stacey"
         name = "mendeleev"
@@ -65,15 +84,7 @@ def test_table_call():
     ops_domain.wandb_public_api = wandb_public_api
     wandb_api.wandb_public_api = wandb_public_api
 
-    table_image0_node = (
-        ops.project("stacey", "mendeleev")
-        .artifact_type("test_results")
-        .artifacts()[0]
-        .versions()[0]
-        .path("test_results.table.json")
-        .table()
-        .rows()[0]["image"]
-    )
+    table_image0_node = table_file_node.table().rows()[0]["image"]
     table_image0 = weave.use(table_image0_node)
     assert table_image0.height == 299
     assert table_image0.width == 299
