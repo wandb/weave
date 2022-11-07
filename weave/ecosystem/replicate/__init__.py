@@ -8,9 +8,12 @@ from PIL import Image
 import requests
 import shutil
 
-os.environ["REPLICATE_API_TOKEN"] = (
-    open(os.path.expanduser("~/.replicate_api_token")).read().strip()
-)
+try:
+    os.environ["REPLICATE_API_TOKEN"] = (
+        open(os.path.expanduser("~/.replicate_api_token")).read().strip()
+    )
+except FileNotFoundError:
+    pass
 
 
 def download_file(url, local_path):
