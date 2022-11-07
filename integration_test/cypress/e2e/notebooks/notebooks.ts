@@ -82,6 +82,8 @@ function checkNotebookOutputsExist() {
       cy.wrap(panel).find('.plotly', {timeout: 30000}).should('exist');
     } else if (panelId == 'table') {
       cy.wrap(panel).find('.BaseTable').should('exist');
+    } else if (panelId === 'plot') {
+      cy.wrap(panel).find('canvas').should('exist');
     } else if (panelId == 'html-file') {
       // pass, this is rendered as an iframe, we don't reach in for now.
     } else if (panelId == 'Card') {

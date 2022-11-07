@@ -175,7 +175,9 @@ def all_objects():
     return [r[1] for r in sorted(result)]
 
 
-def objects(of_type: types.Type, alias: str):
+def objects(
+    of_type: types.Type, alias: str = "latest"
+) -> typing.List[refs.LocalArtifactRef]:
     result = []
     for art_name in os.listdir(artifacts_local.local_artifact_dir()):
         ref = refs.get_local_version_ref(art_name, alias)

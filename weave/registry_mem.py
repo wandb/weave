@@ -3,6 +3,7 @@ import typing
 from weave.op_args import OpNamedArgs
 
 from . import op_def
+from . import op_def_type
 from . import weave_types
 from . import lazy
 from . import errors
@@ -38,7 +39,6 @@ class Registry:
 
     def register_op(self, op: op_def.OpDef):
         # Always save OpDefs any time they are declared
-
         location = context_state.get_loading_op_location()
         is_loading = location is not None
         # do not save built-in ops today
@@ -52,8 +52,8 @@ class Registry:
         op.version = version
 
         self._make_op_calls(op, location)
-        if not is_loading:
-            self._ops[op.name] = op
+        # if not is_loading:
+        self._ops[op.name] = op
         if version:
             self._op_versions[(op.name, version)] = op
         return op
@@ -82,6 +82,11 @@ class Registry:
         raise Exception("Op def doesn't exist for %s" % lazy_local_fn)
 
     def list_ops(self) -> typing.List[op_def.OpDef]:
+        for op_ref in storage.objects(op_def_type.OpDefType()):
+            try:
+                op_ref.get()
+            except:
+                print("Failed to load non-builtin op: %s" % op_ref.uri)
         # Note this uses self._ops, so provides the most recent registered op, which could
         # be the last one we loaded() [rather than the last one the user declared] which
         # is incorrect behavior
