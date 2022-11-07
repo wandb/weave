@@ -345,3 +345,48 @@ def project(entityName: str, projectName: str) -> wandb_api.Project:
 project_tag_getter_op = make_tag_getter_op.make_tag_getter_op(
     "project", ProjectType(), op_name="tag-project"
 )
+
+
+# We don't have proper `wandb` SDK classes for these types so we use object types for now
+@weave.type()
+class ArtifactCollection:
+    project: wandb_api.Project
+    artifactName: str
+
+
+@op(name="project-artifact")
+def project_artifact(
+    project: wandb_api.Project, artifactName: str
+) -> ArtifactCollection:
+    return ArtifactCollection(project=project, artifactName=artifactName)
+
+
+@weave.type()
+class ArtifactCollectionMembership:
+    artifactCollection: ArtifactCollection
+    aliasName: str
+
+
+@op(name="artifact-membershipForAlias")
+def artifact_membership_for_alias(
+    artifactCollection: ArtifactCollection, aliasName: str
+) -> ArtifactCollectionMembership:
+    return ArtifactCollectionMembership(
+        artifactCollection=artifactCollection, aliasName=aliasName
+    )
+
+
+@op(name="artifactMembership-artifactVersion")
+def artifact_membership_version(
+    artifactMembership: ArtifactCollectionMembership,
+) -> artifacts_local.WandbArtifact:
+    wb_artifact = wandb_public_api().artifact(
+        "%s/%s/%s:%s"
+        % (
+            artifactMembership.artifactCollection.project.entity,
+            artifactMembership.artifactCollection.project.name,
+            artifactMembership.artifactCollection.artifactName,
+            artifactMembership.aliasName,
+        )
+    )
+    return artifacts_local.WandbArtifact.from_wb_artifact(wb_artifact)
