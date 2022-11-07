@@ -155,6 +155,8 @@ class TypeRegistry:
 
 @dataclasses.dataclass(frozen=True)
 class Type:
+    # @decorator_class.weave_class attaches this
+    NodeMethodsClass: typing.ClassVar[typing.Optional[type]]
 
     instance_class: typing.ClassVar[typing.Optional[type]]
     instance_classes: typing.ClassVar[
@@ -740,7 +742,8 @@ PythonFunction = type(fn)
 class Function(Type):
     name = "function"
 
-    instance_classes = [PythonFunction]
+    # TODO: Do I really want PythonFunction here? Why?
+    instance_classes: typing.ClassVar[typing.List[type]] = [PythonFunction]
 
     input_types: dict[str, Type] = dataclasses.field(default_factory=dict)
     output_type: Type = dataclasses.field(default_factory=lambda: UnknownType())
