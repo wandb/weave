@@ -65,6 +65,8 @@ jobs:
       #   uses: actions/download-artifact@v3
       #   with:
       #     name: notebooks
+      - name: Setup W&B API key
+        run: echo "WANDB_API_KEY=${{ secrets.WANDB_API_KEY }}" >> $GITHUB_ENV
 
       - name: Copy node_modules from container to checkout
         run: cp -R /root/integration_test/node_modules ./integration_test/
