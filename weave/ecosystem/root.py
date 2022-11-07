@@ -21,14 +21,13 @@ from . import huggingface
 
 from . import craiyon
 
-# from . import spacy
+from . import spacy
 from . import lens
 from . import wandb
 from . import scenario
 from . import shawn
 from . import wandb
-
-# from . import replicate
+from . import replicate
 from . import openai
 
 # TODO: feels odd to call this "ops.Markdown".
