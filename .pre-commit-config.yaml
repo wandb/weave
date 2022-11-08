@@ -7,5 +7,5 @@ repos:
     rev: "v0.960"
     hooks:
       - id: mypy
-        additional_dependencies: ["types-requests"]
+        additional_dependencies: [types-all]
         exclude: .*pyi$
