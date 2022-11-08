@@ -1,7 +1,6 @@
 import typing
 
 from .lazy import _make_output_node
-
 from . import op_args
 from . import weave_types as types
 from . import graph
@@ -9,7 +8,6 @@ from . import graph_editable
 from . import registry_mem
 from . import errors
 from . import dispatch
-from . import op_def
 
 # These call_* functions must match the actual op implementations.
 # But we don't want to import the op definitions themselves here, since
@@ -58,12 +56,11 @@ def apply_type_based_dispatch(
     case where the provided op may not be the true op needed given the provided
     types. Importantly, it does rely on paramter ordering.
     """
-    # TODO: This is not stable and does not work with multiple roots!!!
-    # also: {"data":[{"type":"list","objectType":{"type":"typedDict","propertyTypes":{"_timestamp":"float","small_table":{"type":"ArtifactVersionFile","extension":"string","_property_types":{"extension":{"type":"const","valType":"string","val":"string"},"wb_object_type":{"type":"const","valType":"string","val":"string"},"path":"string"}},"_step":"int","_wandb":{"type":"typedDict","propertyTypes":{"runtime":"int"}},"_runtime":"float"}}}]}
-    # ^^ this is the return of summy type - the custom type is no good
-    for og_node in edit_g.ordered_nodes[::-1]:
-        node = edit_g.get_node(og_node)
-        input_types = {k: node_type(v) for k, v in node.from_op.inputs.items()}
+    # Reverse insertion order garuntees that all parents have been processed before the children
+    for orig_node in edit_g.insertion_ordered_nodes[::-1]:
+        node = edit_g.get_node(orig_node)
+        node_inputs = {k: edit_g.get_node(v) for k, v in node.from_op.inputs.items()}
+        input_types = {k: node_type(v) for k, v in node_inputs.items()}
         found_op = dispatch.get_op_for_input_types(node.from_op.name, [], input_types)
         if found_op is None:
             # There is a parallel spot in lazy.py which has a similar comment
@@ -74,15 +71,19 @@ def apply_type_based_dispatch(
             #     f"Could not find op for input types {pos_param_types} for node {node.from_op.name}"
             # )
             continue
-        # SUPERHACK: this is going to slow things down majorly
-        is_js_hacking = True
-        if is_js_hacking or found_op.uri != node.from_op.name:
+
+        found_new_node = found_op.uri != node.from_op.name
+        at_least_one_parent_changed = any(
+            v in edit_g.replacements for v in orig_node.from_op.inputs.values()
+        )
+
+        if found_new_node or at_least_one_parent_changed:
             params = found_op.bind_params(
-                [], found_op.input_type.create_param_dict([], node.from_op.inputs)
+                [], found_op.input_type.create_param_dict([], node_inputs)
             )
             named_param_types = {k: node_type(v) for k, v in params.items()}
             edit_g.replace(
-                og_node,
+                orig_node,
                 _make_output_node(
                     found_op.uri,
                     params,
@@ -186,12 +187,6 @@ def compile(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
 
     # Convert the nodes to an editable graph data structure
     g = nodes_to_edit_graph(nodes)
-
-    # import pdb; pdb.set_trace()
-
-    # TODO: Here we need to adjust the type since JS might not know about our better types
-    # The key here is that `runs` produces a RunsType, not a list of runs... and in this case
-    # the input to limit is considered a list of runs and gets dispatched incorrectly.
 
     # Each of the following lines is a transformation pass of the graph:
     # 1: Adjust any Op calls based on type-based dispatching
