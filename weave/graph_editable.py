@@ -20,7 +20,7 @@ class EditGraph:
     output_edges: typing.MutableMapping[graph.OutputNode, typing.List[Edge]]
     input_edges: typing.MutableMapping[typing.Tuple[graph.Node, str], Edge]
     replacements: typing.MutableMapping[graph.OutputNode, graph.OutputNode]
-    insertion_ordered_nodes: typing.List[graph.OutputNode]
+    topologically_ordered_nodes: typing.List[graph.OutputNode]
 
     def __init__(self):
         self.nodes = set()
@@ -28,7 +28,7 @@ class EditGraph:
         self.output_edges = {}
         self.input_edges = {}
         self.replacements = {}
-        self.insertion_ordered_nodes = []
+        self.topologically_ordered_nodes = []
 
     def _add_edge(
         self, output_of: graph.OutputNode, input_to: graph.OutputNode, input_name: str
@@ -44,11 +44,11 @@ class EditGraph:
         if not isinstance(node, graph.OutputNode):
             return
         self.nodes.add(node)
-        self.insertion_ordered_nodes.append(node)
         for input_name, input in node.from_op.inputs.items():
             if isinstance(input, graph.OutputNode):
                 self._add_edge(input, node, input_name)
                 self.add_node(input)
+        self.topologically_ordered_nodes.append(node)
 
     def get_node(self, node: graph.Node):
         if not isinstance(node, graph.OutputNode):
