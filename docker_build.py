@@ -18,7 +18,7 @@ def exec_read(cmd: str) -> str:
     return proc.stdout.decode("utf-8").rstrip()
 
 
-def exec_stream(cmd: str) -> subprocess.CompletedProcess[bytes]:
+def exec_stream(cmd: str):
     return subprocess.run(
         cmd.replace("\n", "").replace("\\", ""), shell=True, check=True
     )
