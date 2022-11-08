@@ -1,17 +1,15 @@
 import dataclasses
-import inspect
 import typing
 
 import weave
 
-from ... import weave_internal
 from ... import panel
 from ... import panel_util
 
 
 @weave.op()
 def single_distribution(input_node: weave.Node[list[float]]) -> weave.panels.Plot:
-    binned = input_node.groupby(lambda v: round(v * 10) / 10).map(
+    binned = input_node.groupby(lambda v: round(v * 10) / 10).map(  # type: ignore
         lambda group: weave.ops.dict_(value=group.key(), count=group.count())
     )
     return weave.panels.Plot(
@@ -39,7 +37,7 @@ def adder_set_default_config(config, new_config):
 def adder_default_config(config: typing.Optional[AdderConfig]) -> AdderConfig:
     if config == None:
         return AdderConfig(operand=panel_util.make_node(0.1))
-    return config
+    return typing.cast(AdderConfig, config)
 
 
 @weave.op()
@@ -60,7 +58,7 @@ def adder_config(
 def adder(input_node: weave.Node[int], config: AdderConfig) -> weave.panels.LabeledItem:
     input_val = typing.cast(int, input_node)
     config = adder_default_config(config)
-    return weave.panels.LabeledItem(label="output", item=input_val + config.operand)
+    return weave.panels.LabeledItem(label="output", item=input_val + config.operand)  # type: ignore
 
 
 @weave.type()

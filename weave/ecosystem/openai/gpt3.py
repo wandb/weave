@@ -12,7 +12,7 @@ openai.api_key_path = os.path.expanduser("~/.openai-apikey")
 
 class StoredFileType(weave.types.ObjectType):
     name = "openai-stored-file"
-    type_vars = {"purpose": weave.types.String()}  # TODO: enum?
+    purpose: str
 
     def __init__(self, purpose=weave.types.String()):
         self.purpose = purpose

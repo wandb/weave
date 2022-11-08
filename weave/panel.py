@@ -101,12 +101,12 @@ VarsType = typing.TypeVar("VarsType")
 # Currently, storage.save() works on Panels, but storage.get()
 # does not.
 @weave.type()
-class Panel(typing.Generic[VarsType]):
+class Panel(typing.Generic[InputNodeType, VarsType]):
     id: str = dataclasses.field(init=False)
     # input_node: graph.Node = dataclasses.field(default=graph.VoidNode())
-    input_node: InputNodeType = dataclasses.field(default=graph.VoidNode())
+    input_node: weave.Node[InputNodeType] = dataclasses.field(default=graph.VoidNode())
     # vars: dict[str, graph.Node] = dataclasses.field(default_factory=dict)
-    vars: VarsType = dataclasses.field(default_factory=dict)
+    vars: VarsType = dataclasses.field(default_factory=dict)  # type: ignore
 
     def __post_init__(self, *args):
         if self.vars is None:

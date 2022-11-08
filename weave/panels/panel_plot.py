@@ -23,7 +23,7 @@ class AxisSettings:
     noLabels: bool = False
     noTitle: bool = False
     noTicks: bool = False
-    title: str = None
+    title: typing.Optional[str] = None
 
 
 @weave.type()

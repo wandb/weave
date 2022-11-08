@@ -237,11 +237,7 @@ def call_string(model, input):
     },
 )
 def call_string_to_number(model, input) -> int:
-    res = model.predict([[input]]).tolist()[0][0]
-    # Special case for strings: we need to convert the bytes to a string
-    if type(res) == bytes:
-        return res.decode("utf-8")
-    return res
+    return model.predict([[input]]).tolist()[0][0]
 
 
 ## The following op (image_classification) is just an example, it needs to be generalized

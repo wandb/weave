@@ -49,7 +49,7 @@ class ArtifactVersion:
         )
 
     @op(name="artifactVersion-name")
-    def name(artifactVersion: artifacts_local.WandbArtifact) -> str:
+    def name(artifactVersion: artifacts_local.WandbArtifact) -> str:  # type: ignore
         # TODO: we actually get an artifact version file here because
         # we get refs types messed up somehow
         return getattr(artifactVersion, "name", "BUG a192bx (search weave code)")

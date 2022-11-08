@@ -223,7 +223,7 @@ def set(self, val: typing.Any) -> typing.Any:
         args = list(inputs.values())
         args.append(res)
         try:
-            res = op_def.setter.func(*args)
+            res = op_def.setter.func(*args)  # type: ignore
         except AttributeError:
             res = op_def.setter(*args)
 

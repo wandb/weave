@@ -45,7 +45,7 @@ def scatter_default_config(
     config: typing.Optional[ScatterConfig],
     unnested_node: list[typing.Any],
 ):
-    input_type_item_type = weave.type_of(unnested_node).object_type
+    input_type_item_type = weave.type_of(unnested_node).object_type  # type: ignore
     if config == None:
         return ScatterConfig(
             x_fn=weave.define_fn({"item": input_type_item_type}, lambda item: item),
@@ -62,7 +62,7 @@ def scatter(
     unnested = weave.ops.unnest(input_node)
     config = scatter_default_config(config, unnested)
     plot_data = unnested.map(
-        lambda item: weave.ops.dict_(x=config.x_fn(item), y=config.y_fn(item))
+        lambda item: weave.ops.dict_(x=config.x_fn(item), y=config.y_fn(item))  # type: ignore
     )
     fig = weave_plotly.plotly_scatter(plot_data)
     return weave_plotly.PanelPlotly(fig)
@@ -98,7 +98,7 @@ def scatter_config(
 class Scatter(weave.Panel):
     id = "Scatter"
     config: typing.Optional[ScatterConfig] = None
-    _renderAsPanel: weave_plotly.PanelPlotly = dataclasses.field(
+    _renderAsPanel: weave_plotly.PanelPlotly = dataclasses.field(  # type: ignore
         default_factory=lambda: None
     )
 

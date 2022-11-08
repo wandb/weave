@@ -50,7 +50,7 @@ def geo_default_config(
     config: typing.Optional[GeoConfig],
     unnested_node: list[typing.Any],
 ):
-    input_type_item_type = weave.type_of(unnested_node).object_type
+    input_type_item_type = weave.type_of(unnested_node).object_type  # type: ignore
     if config == None:
         return GeoConfig(
             x_fn=weave.define_fn({"item": input_type_item_type}, lambda item: item),
@@ -69,9 +69,9 @@ def geo(
     config = geo_default_config(config, unnested)
     plot_data = unnested.map(
         lambda item: weave.ops.dict_(
-            long=config.x_fn(item),
-            lat=config.y_fn(item),
-            color=config.color_fn(item),
+            long=config.x_fn(item),  # type: ignore
+            lat=config.y_fn(item),  # type: ignore
+            color=config.color_fn(item),  # type: ignore
         )
     )
     fig = weave_plotly.plotly_geo(plot_data)
@@ -114,7 +114,7 @@ def geo_config(
 class Geo(weave.Panel):
     id = "Geo"
     config: typing.Optional[GeoConfig] = None
-    _renderAsPanel: weave_plotly.PanelPlotly = dataclasses.field(
+    _renderAsPanel: typing.Optional[weave_plotly.PanelPlotly] = dataclasses.field(
         default_factory=lambda: None
     )
 

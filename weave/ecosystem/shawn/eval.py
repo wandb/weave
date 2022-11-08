@@ -22,7 +22,7 @@ class Model:
         self, start_datetime: datetime.datetime, end_datetime: datetime.datetime
     ) -> list[Prediction]:
         pred_procs_node = weave.ops.objects(
-            PredictionProcess.WeaveType(), "latest", 0
+            PredictionProcess.WeaveType(), "latest", 0  # type: ignore
         ).filter(lambda proc: proc.get().model.id == self.id)
         # TODO: this'll be slow! Should all be done in weave
         # TODO: use ref metadata to determine if a given obj falls

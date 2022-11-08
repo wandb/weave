@@ -18,7 +18,9 @@ class LabeledItemConfig(typing.Generic[ItemType]):
 @weave.type()
 class LabeledItem(panel.Panel):
     id = "LabeledItem"
-    config: LabeledItemConfig = dataclasses.field(default_factory=lambda: None)
+    config: typing.Optional[LabeledItemConfig] = dataclasses.field(
+        default_factory=lambda: None
+    )
 
     def __init__(self, input_node=graph.VoidNode(), vars=None, config=None, **options):
         super().__init__(input_node=input_node, vars=vars)

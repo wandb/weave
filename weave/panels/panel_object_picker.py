@@ -7,13 +7,13 @@ from .. import panel
 from .. import graph
 
 
-ChoiceType = typing.TypeVar("ChoiceType", bound=weave.Node)
+ChoiceType = typing.TypeVar("ChoiceType")
 
 
 @weave.type()
 class ObjectPickerConfig(typing.Generic[ChoiceType]):
     label: str = dataclasses.field(default_factory=lambda: "")
-    choice: ChoiceType = dataclasses.field(default_factory=graph.VoidNode)
+    choice: graph.Node[ChoiceType] = dataclasses.field(default_factory=graph.VoidNode)
 
 
 @weave.type()

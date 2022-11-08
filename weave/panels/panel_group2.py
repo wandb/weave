@@ -17,7 +17,7 @@ class Group2Config(typing.Generic[ItemsType]):
     preferHorizontal: bool = dataclasses.field(default_factory=lambda: False)
     equalSize: bool = dataclasses.field(default_factory=lambda: False)
     style: str = dataclasses.field(default_factory=lambda: "")
-    items: ItemsType = dataclasses.field(default_factory=dict)
+    items: ItemsType = dataclasses.field(default_factory=dict)  # type: ignore
 
 
 Group2ConfigType = typing.TypeVar("Group2ConfigType")

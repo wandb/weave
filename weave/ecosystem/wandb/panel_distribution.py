@@ -48,7 +48,7 @@ def multi_distribution_default_config(
     config: typing.Optional[DistributionConfig],
     unnested_node: list[typing.Any],
 ):
-    input_type_item_type = weave.type_of(unnested_node).object_type
+    input_type_item_type = weave.type_of(unnested_node).object_type  # type: ignore
     if config == None:
         return DistributionConfig(
             value_fn=weave.define_fn({"item": input_type_item_type}, lambda item: item),
