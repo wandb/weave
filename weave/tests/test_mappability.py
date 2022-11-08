@@ -1,5 +1,9 @@
 import weave
+from ..weave_internal import make_const_node
 from .. import context_state as _context
+from .. import registry_mem
+from .. import graph
+from .. import weave_types as types
 
 _loading_builtins_token = _context.set_loading_built_ins()
 
@@ -99,3 +103,70 @@ def test_pick_index_challenge():
 
     pick_index = node["a"][0]
     assert weave.use(pick_index) == 1
+
+
+def test_mapped_maybe_list():
+    op = registry_mem.memory_registry.get_op("number-add")
+    a = graph.ConstNode(
+        types.List(types.union(types.Number(), types.NoneType())), [3, None, 4, None, 5]
+    )
+    b = graph.ConstNode(types.Number(), 1)
+    res = op(a, b)
+    assert res.type == types.List(types.union(types.Number(), types.NoneType()))
+    assert weave.use(res) == [4, None, 5, None, 6]
+
+
+def test_mapped_maybe_custom_pick():
+    @weave.op(
+        input_type={"x": types.TypedDict({"a": types.Any()})},
+        output_type=lambda input_type: input_type["x"].property_types["a"],
+    )
+    def custom_pick(x):
+        return x["a"]
+
+    a = graph.ConstNode(
+        types.List(
+            types.union(types.TypedDict({"a": types.Number()}), types.NoneType())
+        ),
+        [{"a": 3}, None, {"a": 4}, None, {"a": 5}],
+    )
+    res = custom_pick(a)
+    assert res.type == types.List(types.union(types.Number(), types.NoneType()))
+    assert weave.use(res) == [3, None, 4, None, 5]
+
+
+def test_mapped_maybe_pick():
+    a = make_const_node(
+        types.List(
+            types.union(types.TypedDict({"a": types.Number()}), types.NoneType())
+        ),
+        [{"a": 3}, None, {"a": 4}, None, {"a": 5}],
+    )
+    res = a.pick("a")
+    assert res.type == types.List(types.union(types.Number(), types.NoneType()))
+    assert weave.use(res) == [3, None, 4, None, 5]
+
+
+def test_mapped_maybe_custom_refine():
+    @weave.op(
+        input_type={"obj": types.TypedDict({}), "key": types.String()},
+        output_type=types.Type(),
+    )
+    def custom_pick_refine(obj, key):
+        return types.TypeRegistry.type_of(obj[key])
+
+    @weave.op(
+        input_type={"obj": types.TypedDict({}), "key": types.String()},
+        output_type=types.Any(),
+        refine_output_type=custom_pick_refine,
+    )
+    def custom_pick(obj, key):
+        return obj[key]
+
+    a = make_const_node(
+        types.List(types.union(types.TypedDict({"a": types.Int()}), types.NoneType())),
+        [{"a": 3}, None, {"a": 4}, None, {"a": 5}],
+    )
+    res = custom_pick(a, "a")
+    assert res.type == types.List(types.union(types.Int(), types.NoneType()))
+    assert weave.use(res) == [3, None, 4, None, 5]
