@@ -64,7 +64,7 @@ class Number(object):
         return lhs % rhs
 
     @op(
-        name="number-pow-binary",
+        name="number-powBinary",
         input_type={"lhs": types.Number(), "rhs": types.Number()},
         output_type=types.Number(),
     )

@@ -215,7 +215,7 @@ def local_sqlconnection(path):
 
 
 @op(
-    name="sqlconnection-tables",
+    name="sqlconnection_tables",
     input_type={"conn": SqlConnectionType()},
     output_type=types.TypedDict({}),
 )
@@ -244,7 +244,7 @@ def sqlconnection_tables(conn):
 
 
 @op(
-    name="sqlconnection-tables-type",
+    name="sqlconnection_tables_type",
     input_type={"conn": SqlConnectionType()},
     output_type=types.Type(),
 )

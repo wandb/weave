@@ -277,7 +277,7 @@ def list_indexCheckpoint_setter(arr, v):
 
 
 @op(
-    name="list-indexCheckpoint",
+    name="list-createIndexCheckpointTag",
     setter=list_indexCheckpoint_setter,
     input_type={"arr": types.List(types.Any())},
     output_type=lambda input_types: input_types["arr"],

@@ -66,7 +66,7 @@ StoredFileType.instance_class = StoredFile
 
 
 class Gpt3DatasetType(StoredFileType):
-    name = "gpt3-dataset"
+    name = "gpt3_dataset"
 
     def __init__(self):
         self.purpose = weave.types.Const(weave.types.String(), "fine-tune")
