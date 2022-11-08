@@ -1,3 +1,4 @@
+import collections
 import textwrap
 import json
 import inspect
@@ -13,27 +14,45 @@ from . import errors
 from . import context_state
 from . import weave_types as types
 from . import registry_mem
+from . import errors
 
 from . import infer_types
 
 
-def typed_dict_code(type_):
-    result = f"class {type_.__name__}(typing.TypedDict):\n"
-    for k in type_.__required_keys__:
-        result += f"    {k}: {type_.__annotations__[k].__name__}\n"
-    return result
-
-
 def type_code(type_):
+    if isinstance(type_, py_types.GenericAlias) or isinstance(
+        type_, typing._GenericAlias  # type: ignore
+    ):
+        args = ", ".join(type_code(t) for t in type_.__args__)
+        if type_.__origin__ == list or type_.__origin__ == collections.abc.Sequence:
+            return f"list[{args}]"
+        elif type_.__origin__ == dict:
+            return f"dict[{args}]"
+        elif type_.__origin__ == typing.Union:
+            return f"typing.Union[{args}]"
+        else:
+            return f"{type_.__origin__}[{args}]"
+    else:
+        return type_.__name__
+
+
+def generate_referenced_type_code(type_):
+    # Given a function that may have type annotations, generate non-redundant
+    # code that declares any referenced types and their referenced types and
+    # so on.
+
     # Absolutely horrible and hacky. This is not recursive in a tree/graph
     # way, its linear, so it'll only produce one TypedDict if there are many.
     # Using this to get the versioned object notebook working.
     if infer_types.is_typed_dict_like(type_):
-        return typed_dict_code(type_) + "\n"
+        result = f"class {type_.__name__}(typing.TypedDict):\n"
+        for k in type_.__annotations__:
+            result += f"    {k}: {type_code(type_.__annotations__[k])}\n"
+        return result
     elif isinstance(type_, py_types.GenericAlias) or isinstance(
         type_, typing._GenericAlias  # type: ignore
     ):
-        return type_code(type_.__args__[0])
+        return generate_referenced_type_code(type_.__args__[0])
 
 
 def get_code_deps(fn, decl_locals):
@@ -65,7 +84,6 @@ class OpDefType(types.Type):
     instance_classes = op_def.OpDef
 
     def save_instance(self, obj: op_def.OpDef, artifact, name):
-
         if obj.is_builtin:
             with artifact.new_file(f"{name}.json") as f:
                 json.dump({"name": obj.name}, f)
@@ -79,7 +97,7 @@ class OpDefType(types.Type):
             # Create TypedDict types for referenced TypedDicts
             resolve_annotations = obj.resolve_fn.__annotations__
             for k, type_ in resolve_annotations.items():
-                gen_type_code = type_code(type_)
+                gen_type_code = generate_referenced_type_code(type_)
                 if gen_type_code is not None:
                     code += gen_type_code
 

@@ -38,6 +38,11 @@ def python_type_to_type(
         return weave_types.Type()
     elif py_type == typing.Any:
         return weave_types.Any()
+    elif isinstance(py_type, typing.TypeVar):
+        if py_type.__bound__ is None:
+            return weave_types.Any()
+        else:
+            return python_type_to_type(py_type.__bound__)
     elif isinstance(py_type, types.GenericAlias) or isinstance(
         py_type, typing._GenericAlias  # type: ignore
     ):

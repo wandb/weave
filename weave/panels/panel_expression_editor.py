@@ -6,12 +6,12 @@ from .. import panel
 from .. import graph
 
 
-ExpressionType = typing.TypeVar("ExpressionType", bound=weave.Node)
+ExpressionType = typing.TypeVar("ExpressionType")
 
 
 @weave.type()
 class ExpressionEditorConfig(typing.Generic[ExpressionType]):
-    expr: ExpressionType = dataclasses.field(default_factory=graph.VoidNode)
+    expr: graph.Node[ExpressionType] = dataclasses.field(default_factory=graph.VoidNode)
 
 
 @weave.type()

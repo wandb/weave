@@ -18,7 +18,7 @@ def exec_read(cmd: str) -> str:
     return proc.stdout.decode("utf-8").rstrip()
 
 
-def exec_stream(cmd: str) -> str:
+def exec_stream(cmd: str) -> subprocess.CompletedProcess[bytes]:
     return subprocess.run(
         cmd.replace("\n", "").replace("\\", ""), shell=True, check=True
     )
@@ -122,7 +122,7 @@ def build(
     build_contexts: Dict[str, str] = {},
     target: Optional[str] = None,
     platform: str = "linux/amd64",
-) -> str:
+):
     """
     Builds an image, using previous builds as cache.
 

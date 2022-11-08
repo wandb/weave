@@ -26,7 +26,9 @@ Group2ConfigType = typing.TypeVar("Group2ConfigType")
 @weave.type()
 class Group2(panel.Panel, typing.Generic[Group2ConfigType]):
     id = "Group2"
-    config: Group2ConfigType = dataclasses.field(default_factory=lambda: None)
+    config: typing.Optional[Group2ConfigType] = dataclasses.field(
+        default_factory=lambda: None
+    )
     # items: typing.TypeVar("items") = dataclasses.field(default_factory=dict)
 
     def __init__(self, input_node=graph.VoidNode(), vars=None, config=None, **options):

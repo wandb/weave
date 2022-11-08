@@ -24,13 +24,17 @@ class PanelEachConfig(typing.Generic[RenderType]):
     h: weave.Node[float] = dataclasses.field(
         default_factory=lambda: weave.graph.VoidNode()
     )
-    render: RenderType = dataclasses.field(default_factory=lambda: graph.VoidNode())
+    render: graph.Node[RenderType] = dataclasses.field(
+        default_factory=lambda: graph.VoidNode()
+    )
 
 
 @weave.type()
 class Each(panel.Panel):
     id = "Each"
-    config: PanelEachConfig = dataclasses.field(default_factory=lambda: None)
+    config: typing.Optional[PanelEachConfig] = dataclasses.field(
+        default_factory=lambda: None
+    )
 
     def __init__(self, input_node, vars=None, config=None, **options):
         super().__init__(input_node=input_node, vars=vars)
