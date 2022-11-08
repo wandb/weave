@@ -25,7 +25,7 @@ torchvision
 bertviz
 datasets
 transformers<4.21
-tensorflow=1.15.2
+tensorflow
 rich
 plotly
 replicate
