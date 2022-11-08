@@ -42,7 +42,9 @@ def op_make_type_tagged(obj_type, tag_type):  # type: ignore
     output_type=types.Type(),
 )
 def op_make_type_key_tag(obj_type, key, tag_type):  # type: ignore
-    if isinstance(tag_type, types.TypedDict):
-        return TaggedValueType(tag_type, types.TypedDict({key: obj_type}))
-    else:
-        return obj_type
+    tags = {key: tag_type}
+    if isinstance(tag_type, TaggedValueType) and isinstance(
+        tag_type.tag, types.TypedDict
+    ):
+        tags.update(tag_type.tag.property_types)
+    return TaggedValueType(types.TypedDict(tags), obj_type)

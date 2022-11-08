@@ -39,13 +39,13 @@ def process_opdef_output_type(
                     return op_make_type_key_tag(
                         output_type,
                         first_arg_name,
-                        op_get_tag_type(input_types[first_arg_name]),
+                        input_types[first_arg_name],
                     )
                 else:
                     return op_make_type_key_tag.resolve_fn(
                         output_type,
                         first_arg_name,
-                        op_get_tag_type.resolve_fn(input_types[first_arg_name]),
+                        input_types[first_arg_name],
                     )
 
             return ot
@@ -57,13 +57,13 @@ def process_opdef_output_type(
                     return op_make_type_key_tag(
                         callable_output_type(input_types),
                         first_arg_name,
-                        op_get_tag_type(input_types[first_arg_name]),
+                        input_types[first_arg_name],
                     )
                 else:
                     return op_make_type_key_tag.resolve_fn(
                         callable_output_type(input_types),
                         first_arg_name,
-                        op_get_tag_type.resolve_fn(input_types[first_arg_name]),
+                        input_types[first_arg_name],
                     )
 
             return ot

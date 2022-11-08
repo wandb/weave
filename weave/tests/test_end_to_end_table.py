@@ -37,7 +37,7 @@ requests = [
                     "nodeType": "output",
                     "fromOp": 1,
                     "type": "none",
-                    "id": "5006775084447754",
+                    "id": "5367932688815243",
                 },
                 {"name": "run-summary", "inputs": {"run": 2}},
                 {
@@ -56,18 +56,14 @@ requests = [
                             },
                             "value": {
                                 "type": "typedDict",
-                                "propertyTypes": {
-                                    "project": "project",
-                                    "filter": "string",
-                                    "order": "string",
-                                },
+                                "propertyTypes": {"project": "project"},
                             },
                         },
                         "value": {"type": "list", "objectType": "run", "maxLength": 50},
                     },
-                    "id": "6021280798311683",
+                    "id": "5981012718708336",
                 },
-                {"name": "limit", "inputs": {"arr": 4, "limit": 12}},
+                {"name": "limit", "inputs": {"arr": 4, "limit": 10}},
                 {
                     "nodeType": "output",
                     "fromOp": 5,
@@ -84,22 +80,14 @@ requests = [
                             },
                             "value": {
                                 "type": "typedDict",
-                                "propertyTypes": {
-                                    "project": "project",
-                                    "filter": "string",
-                                    "order": "string",
-                                },
+                                "propertyTypes": {"project": "project"},
                             },
                         },
-                        "value": {"type": "runs"},
-                        # "value": {"type": "list", "objectType": "run"},
+                        "value": {"type": "list", "objectType": "run"},
                     },
-                    "id": "6576376696262289",
+                    "id": "8994115873573894",
                 },
-                {
-                    "name": "project-filteredRuns",
-                    "inputs": {"project": 6, "filter": 10, "order": 11},
-                },
+                {"name": "project-runs", "inputs": {"project": 6}},
                 {
                     "nodeType": "output",
                     "fromOp": 7,
@@ -114,440 +102,14 @@ requests = [
                         },
                         "value": "project",
                     },
-                    "id": "5979598482807720",
+                    "id": "1228024693382936",
                 },
                 {"name": "root-project", "inputs": {"entityName": 8, "projectName": 9}},
                 {"nodeType": "const", "type": "string", "val": "timssweeney"},
-                {"nodeType": "const", "type": "string", "val": "keras_learning_rate"},
-                {"nodeType": "const", "type": "string", "val": '{"name":{"$ne":null}}'},
-                {"nodeType": "const", "type": "string", "val": "-createdAt"},
-                {"nodeType": "const", "type": "number", "val": 50},
-            ],
-            "rootNodes": [0],
-        }
-    },
-    {
-        "graphs": {
-            "nodes": [
-                {
-                    "nodeType": "output",
-                    "fromOp": 1,
-                    "type": {
-                        "type": "tagged",
-                        "tag": {
-                            "type": "tagged",
-                            "tag": {
-                                "type": "typedDict",
-                                "propertyTypes": {
-                                    "entityName": "string",
-                                    "projectName": "string",
-                                },
-                            },
-                            "value": {
-                                "type": "typedDict",
-                                "propertyTypes": {
-                                    "project": "project",
-                                    "filter": "string",
-                                    "order": "string",
-                                },
-                            },
-                        },
-                        "value": "number",
-                    },
-                    "id": "2377182998923253",
-                },
-                {"name": "count", "inputs": {"arr": 2}},
-                {
-                    "nodeType": "output",
-                    "fromOp": 3,
-                    "type": {
-                        "type": "tagged",
-                        "tag": {
-                            "type": "tagged",
-                            "tag": {
-                                "type": "typedDict",
-                                "propertyTypes": {
-                                    "entityName": "string",
-                                    "projectName": "string",
-                                },
-                            },
-                            "value": {
-                                "type": "typedDict",
-                                "propertyTypes": {
-                                    "project": "project",
-                                    "filter": "string",
-                                    "order": "string",
-                                },
-                            },
-                        },
-                        "value": {
-                            "type": "list",
-                            "objectType": {
-                                "type": "tagged",
-                                "tag": {
-                                    "type": "typedDict",
-                                    "propertyTypes": {"run": "run"},
-                                },
-                                "value": "none",
-                            },
-                            "maxLength": 50,
-                        },
-                    },
-                    "id": "3466349275246562",
-                },
-                {"name": "pick", "inputs": {"obj": 4, "key": 17}},
-                {
-                    "nodeType": "output",
-                    "fromOp": 5,
-                    "type": {
-                        "type": "tagged",
-                        "tag": {
-                            "type": "tagged",
-                            "tag": {
-                                "type": "typedDict",
-                                "propertyTypes": {
-                                    "entityName": "string",
-                                    "projectName": "string",
-                                },
-                            },
-                            "value": {
-                                "type": "typedDict",
-                                "propertyTypes": {
-                                    "project": "project",
-                                    "filter": "string",
-                                    "order": "string",
-                                },
-                            },
-                        },
-                        "value": {
-                            "type": "list",
-                            "objectType": {
-                                "type": "tagged",
-                                "tag": {
-                                    "type": "typedDict",
-                                    "propertyTypes": {"run": "run"},
-                                },
-                                "value": {"type": "typedDict", "propertyTypes": {}},
-                            },
-                            "maxLength": 50,
-                        },
-                    },
-                    "id": "3536294956874416",
-                },
-                {"name": "run-summary", "inputs": {"run": 6}},
-                {
-                    "nodeType": "output",
-                    "fromOp": 7,
-                    "type": {
-                        "type": "tagged",
-                        "tag": {
-                            "type": "tagged",
-                            "tag": {
-                                "type": "typedDict",
-                                "propertyTypes": {
-                                    "entityName": "string",
-                                    "projectName": "string",
-                                },
-                            },
-                            "value": {
-                                "type": "typedDict",
-                                "propertyTypes": {
-                                    "project": "project",
-                                    "filter": "string",
-                                    "order": "string",
-                                },
-                            },
-                        },
-                        "value": {"type": "list", "objectType": "run", "maxLength": 50},
-                    },
-                    "id": "6021280798311683",
-                },
-                {"name": "limit", "inputs": {"arr": 8, "limit": 16}},
-                {
-                    "nodeType": "output",
-                    "fromOp": 9,
-                    "type": {
-                        "type": "tagged",
-                        "tag": {
-                            "type": "tagged",
-                            "tag": {
-                                "type": "typedDict",
-                                "propertyTypes": {
-                                    "entityName": "string",
-                                    "projectName": "string",
-                                },
-                            },
-                            "value": {
-                                "type": "typedDict",
-                                "propertyTypes": {
-                                    "project": "project",
-                                    "filter": "string",
-                                    "order": "string",
-                                },
-                            },
-                        },
-                        "value": {"type": "runs"},
-                        # "value": {"type": "list", "objectType": "run"},
-                    },
-                    "id": "6576376696262289",
-                },
-                {
-                    "name": "project-filteredRuns",
-                    "inputs": {"project": 10, "filter": 14, "order": 15},
-                },
-                {
-                    "nodeType": "output",
-                    "fromOp": 11,
-                    "type": {
-                        "type": "tagged",
-                        "tag": {
-                            "type": "typedDict",
-                            "propertyTypes": {
-                                "entityName": "string",
-                                "projectName": "string",
-                            },
-                        },
-                        "value": "project",
-                    },
-                    "id": "5979598482807720",
-                },
-                {
-                    "name": "root-project",
-                    "inputs": {"entityName": 12, "projectName": 13},
-                },
-                {"nodeType": "const", "type": "string", "val": "timssweeney"},
-                {"nodeType": "const", "type": "string", "val": "keras_learning_rate"},
-                {"nodeType": "const", "type": "string", "val": '{"name":{"$ne":null}}'},
-                {"nodeType": "const", "type": "string", "val": "-createdAt"},
-                {"nodeType": "const", "type": "number", "val": 50},
-                {
-                    "nodeType": "const",
-                    "type": "string",
-                    "val": "validation_predictions",
-                },
-            ],
-            "rootNodes": [0],
-        }
-    },
-    {
-        "graphs": {
-            "nodes": [
-                {
-                    "nodeType": "output",
-                    "fromOp": 1,
-                    "type": "type",
-                    "id": "8672157828254704",
-                },
-                {"name": "table-rowsType", "inputs": {"table": 2}},
-                {
-                    "nodeType": "output",
-                    "fromOp": 3,
-                    "type": {
-                        "type": "list",
-                        "objectType": {
-                            "type": "tagged",
-                            "tag": {
-                                "type": "tagged",
-                                "tag": {
-                                    "type": "tagged",
-                                    "tag": {
-                                        "type": "typedDict",
-                                        "propertyTypes": {
-                                            "entityName": "string",
-                                            "projectName": "string",
-                                        },
-                                    },
-                                    "value": {
-                                        "type": "typedDict",
-                                        "propertyTypes": {
-                                            "project": "project",
-                                            "filter": "string",
-                                            "order": "string",
-                                        },
-                                    },
-                                },
-                                "value": {
-                                    "type": "typedDict",
-                                    "propertyTypes": {"run": "run"},
-                                },
-                            },
-                            "value": "none",
-                        },
-                        "maxLength": 50,
-                    },
-                    "id": "6599598770743241",
-                },
-                {"name": "file-table", "inputs": {"file": 4}},
-                {
-                    "nodeType": "output",
-                    "fromOp": 5,
-                    "type": {
-                        "type": "tagged",
-                        "tag": {
-                            "type": "tagged",
-                            "tag": {
-                                "type": "typedDict",
-                                "propertyTypes": {
-                                    "entityName": "string",
-                                    "projectName": "string",
-                                },
-                            },
-                            "value": {
-                                "type": "typedDict",
-                                "propertyTypes": {
-                                    "project": "project",
-                                    "filter": "string",
-                                    "order": "string",
-                                },
-                            },
-                        },
-                        "value": {
-                            "type": "list",
-                            "objectType": {
-                                "type": "tagged",
-                                "tag": {
-                                    "type": "typedDict",
-                                    "propertyTypes": {"run": "run"},
-                                },
-                                "value": "none",
-                            },
-                            "maxLength": 50,
-                        },
-                    },
-                    "id": "3466349275246562",
-                },
-                {"name": "pick", "inputs": {"obj": 6, "key": 19}},
-                {
-                    "nodeType": "output",
-                    "fromOp": 7,
-                    "type": {
-                        "type": "tagged",
-                        "tag": {
-                            "type": "tagged",
-                            "tag": {
-                                "type": "typedDict",
-                                "propertyTypes": {
-                                    "entityName": "string",
-                                    "projectName": "string",
-                                },
-                            },
-                            "value": {
-                                "type": "typedDict",
-                                "propertyTypes": {
-                                    "project": "project",
-                                    "filter": "string",
-                                    "order": "string",
-                                },
-                            },
-                        },
-                        "value": {
-                            "type": "list",
-                            "objectType": {
-                                "type": "tagged",
-                                "tag": {
-                                    "type": "typedDict",
-                                    "propertyTypes": {"run": "run"},
-                                },
-                                "value": {"type": "typedDict", "propertyTypes": {}},
-                            },
-                            "maxLength": 50,
-                        },
-                    },
-                    "id": "3536294956874416",
-                },
-                {"name": "run-summary", "inputs": {"run": 8}},
-                {
-                    "nodeType": "output",
-                    "fromOp": 9,
-                    "type": {
-                        "type": "tagged",
-                        "tag": {
-                            "type": "tagged",
-                            "tag": {
-                                "type": "typedDict",
-                                "propertyTypes": {
-                                    "entityName": "string",
-                                    "projectName": "string",
-                                },
-                            },
-                            "value": {
-                                "type": "typedDict",
-                                "propertyTypes": {
-                                    "project": "project",
-                                    "filter": "string",
-                                    "order": "string",
-                                },
-                            },
-                        },
-                        "value": {"type": "list", "objectType": "run", "maxLength": 50},
-                    },
-                    "id": "6021280798311683",
-                },
-                {"name": "limit", "inputs": {"arr": 10, "limit": 18}},
-                {
-                    "nodeType": "output",
-                    "fromOp": 11,
-                    "type": {
-                        "type": "tagged",
-                        "tag": {
-                            "type": "tagged",
-                            "tag": {
-                                "type": "typedDict",
-                                "propertyTypes": {
-                                    "entityName": "string",
-                                    "projectName": "string",
-                                },
-                            },
-                            "value": {
-                                "type": "typedDict",
-                                "propertyTypes": {
-                                    "project": "project",
-                                    "filter": "string",
-                                    "order": "string",
-                                },
-                            },
-                        },
-                        "value": {"type": "runs"},
-                        # "value": {"type": "list", "objectType": "run"},
-                    },
-                    "id": "6576376696262289",
-                },
-                {
-                    "name": "project-filteredRuns",
-                    "inputs": {"project": 12, "filter": 16, "order": 17},
-                },
-                {
-                    "nodeType": "output",
-                    "fromOp": 13,
-                    "type": {
-                        "type": "tagged",
-                        "tag": {
-                            "type": "typedDict",
-                            "propertyTypes": {
-                                "entityName": "string",
-                                "projectName": "string",
-                            },
-                        },
-                        "value": "project",
-                    },
-                    "id": "5979598482807720",
-                },
-                {
-                    "name": "root-project",
-                    "inputs": {"entityName": 14, "projectName": 15},
-                },
-                {"nodeType": "const", "type": "string", "val": "timssweeney"},
                 {"nodeType": "const", "type": "string", "val": "dev_public_tables"},
-                {"nodeType": "const", "type": "string", "val": '{"name":{"$ne":null}}'},
-                {"nodeType": "const", "type": "string", "val": "-createdAt"},
                 {"nodeType": "const", "type": "number", "val": 50},
-                {
-                    "nodeType": "const",
-                    "type": "string",
-                    "val": "small_table",
-                },
             ],
-            "rootNodes": [2],
+            "rootNodes": [0],
         }
-    },
+    }
 ]
