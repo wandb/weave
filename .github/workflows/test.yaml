@@ -6,7 +6,7 @@
 # So we create a separate "builder" tagged runner to do the build job on
 # the host, and then all the tests run on "runner" tagged runners.
 
-name: cypress
+name: test
 
 on:
   push:
