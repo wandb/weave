@@ -1,4 +1,3 @@
-from .. import derive_op
 from .. import api as weave
 from .. import registry_mem
 from .. import derive_op
