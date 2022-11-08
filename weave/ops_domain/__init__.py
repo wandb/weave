@@ -348,10 +348,21 @@ project_tag_getter_op = make_tag_getter_op.make_tag_getter_op(
 
 
 # We don't have proper `wandb` SDK classes for these types so we use object types for now
-@weave.type()
+
+
+@classmethod  # type: ignore
+def identity_constuctor(cls, dict):
+    cls()
+
+
+@weave.type("artifact")
 class ArtifactCollection:
     project: wandb_api.Project
     artifactName: str
+
+
+ArtifactCollection.WeaveType.to_dict = lambda self: "artifact"  # type: ignore
+ArtifactCollection.WeaveType.from_dict = identity_constuctor  # type: ignore
 
 
 @op(name="project-artifact")
@@ -361,10 +372,14 @@ def project_artifact(
     return ArtifactCollection(project=project, artifactName=artifactName)
 
 
-@weave.type()
+@weave.type("artifactMembership")
 class ArtifactCollectionMembership:
     artifactCollection: ArtifactCollection
     aliasName: str
+
+
+ArtifactCollectionMembership.WeaveType.to_dict = lambda self: "artifactMembership"  # type: ignore
+ArtifactCollectionMembership.WeaveType.from_dict = identity_constuctor  # type: ignore
 
 
 @op(name="artifact-membershipForAlias")
