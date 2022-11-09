@@ -159,9 +159,7 @@ def deref(ref: Ref) -> typing.Any:
 # be able to create it right now, because of a series of hacks.
 # Instead, We probably need a WandbArtifactFileRef.
 # TODO: fix
-class ArtifactVersionFileType(
-    types.FileType
-):  # this was type.Type - not sure if this is correct
+class ArtifactVersionFileType(types.Type):
     name = "ArtifactVersionFile"
 
     def save_instance(
@@ -175,13 +173,6 @@ class ArtifactVersionFileType(
     # load_instance is injected by file_wbartifact.py in ops_domain.
     # Bad bad bad!
     # TODO: fix
-
-    def property_types(self):  # type: ignore
-        return {
-            "extension": self.extension,
-            "wb_object_type": self.extension,
-            "path": types.String(),
-        }
 
 
 class WandbArtifactRef(Ref):

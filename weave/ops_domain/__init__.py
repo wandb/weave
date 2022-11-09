@@ -109,19 +109,7 @@ class ArtifactVersionsType(types.Type):
         )
 
 
-def deep_visitor(d, vistor_fn):
-    def next_fn(val):
-        if isinstance(val, dict):
-            return {k: deep_visitor(v, vistor_fn) for k, v in d.items()}
-        elif isinstance(val, list):
-            return [deep_visitor(v, vistor_fn) for v in d]
-        else:
-            return val
-
-    return visitor_fn(d, next_fn)
-
-
-def visitor_fn(val, next):
+def process_summary_obj(val):
     if isinstance(val, dict) and "_type" in val and val["_type"] == "table-file":
         return file_wbartifact.ArtifactVersionFile(
             artifact=artifacts_local.WandbArtifact(
@@ -134,18 +122,20 @@ def visitor_fn(val, next):
             ),
             path="small_table.table.json",
         )
+    return val
 
-    return next(val)
 
-
-def run_summary_to_obj(d):
-    return deep_visitor(d, visitor_fn)
+def process_summary_type(val):
+    if isinstance(val, dict) and "_type" in val and val["_type"] == "table-file":
+        return types.NoneType()
+    return types.TypeRegistry.type_of(val)
 
 
 @op(render_info={"type": "function"})
-def refine_summary_type(run: wandb_api.Run) -> weave.types.Type:
-    obj = run_summary_to_obj(run.summary._json_dict)
-    return types.TypeRegistry.type_of(obj)
+def refine_summary_type(run: wandb_api.Run) -> types.Type:
+    return types.TypedDict(
+        {k: process_summary_type(v) for k, v in run.summary._json_dict.items()}
+    )
 
 
 @weave_class(weave_type=RunType)
@@ -161,7 +151,7 @@ class WBRun:
 
     @op(refine_output_type=refine_summary_type)
     def summary(run: wandb_api.Run) -> dict[str, typing.Any]:
-        return run_summary_to_obj(run.summary._json_dict)
+        return {k: process_summary_obj(v) for k, v in run.summary._json_dict.items()}
 
 
 @dataclasses.dataclass(frozen=True)
