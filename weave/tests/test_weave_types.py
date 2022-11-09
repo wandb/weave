@@ -89,3 +89,13 @@ def test_typeof_nested_dict_merge():
     assert merged_type == weave.weave_types.TypedDict(
         {"a": weave.weave_types.TypedDict({"b": types.Int(), "c": types.String()})}
     )
+
+
+def test_dict_without_key_type():
+    fully_typed = weave.weave_types.TypeRegistry.type_from_dict(
+        {"type": "dict", "keyType": "string", "objectType": "number"}
+    )
+    partial_typed = weave.weave_types.TypeRegistry.type_from_dict(
+        {"type": "dict", "objectType": "number"}
+    )
+    assert fully_typed.assign_type(partial_typed)
