@@ -127,7 +127,9 @@ def process_summary_obj(val):
 
 def process_summary_type(val):
     if isinstance(val, dict) and "_type" in val and val["_type"] == "table-file":
-        return types.NoneType()
+        return types.FileType(
+            extension=types.Const(types.String(), "json"), wb_object_type="table"
+        )
     return types.TypeRegistry.type_of(val)
 
 
