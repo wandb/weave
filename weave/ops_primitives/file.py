@@ -57,6 +57,7 @@ class Table:
     @op(
         name="table-rows",
         input_type={"table": TableType()},
+        # input_type={"table": types.union(TableType(), types.WBTable())},
         output_type=arrow.ArrowWeaveListType(types.TypedDict({})),
     )
     def rows(table):

@@ -853,8 +853,9 @@ class FileType(ObjectType):
             d["extension"] = self.extension.val
         if isinstance(self.wb_object_type, Const):
             d["wbObjectType"] = {"type": self.wb_object_type.val}
-        # HACKS
+        # HACKS - TODO FIX ME
         d["wbObjectType"] = {"type": "table", "columnTypes": {}}
+        d["extension"] = "string"
         return d
 
     @classmethod

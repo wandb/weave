@@ -390,7 +390,7 @@ class Project:
         )
 
 
-@op(name="root-project")
+@op(name="root-project", render_info={"type": "function"})
 def project(entityName: str, projectName: str) -> wandb_api.Project:
     return wandb_public_api().project(name=projectName, entity=entityName)
 
