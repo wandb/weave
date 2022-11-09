@@ -152,8 +152,7 @@ def recursively_unwrap_unions(obj):
 
 @blueprint.route("/__weave/execute", methods=["POST"])
 def execute():
-    """Execute endpoint used by WeaveJS"""
-    # print('REQUEST', request, request.json)
+    """Execute endpoint used by WeaveJS."""
 
     current_span = ddtrace.tracer.current_span()
     if current_span and (
@@ -167,13 +166,7 @@ def execute():
     # Simulate browser/server latency
     # import time
     # time.sleep(0.1)
-    try:
-        response = server.handle_request(request.json, deref=True)
-    except Exception as e:
-        tb = traceback.format_exc()
-        print("Error: ", tb)
-        # Consider removing this in production settings
-        return jsonify({"error": tb}), 500
+    response = server.handle_request(request.json, deref=True)
 
     # remove unions from the response
     response = recursively_unwrap_unions(response)
@@ -194,6 +187,9 @@ def execute():
         or request.headers.get("weave-dd-log-request-response")
     ):
         current_span.set_tag("response", response)
+
+    if request.headers.get("weave-shadow"):
+        response["data"] = []
 
     return response
 

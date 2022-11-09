@@ -1,13 +1,15 @@
+import asyncio
 import numpy as np
 import contextlib
 import pytest
 from .. import api as weave
 from ..weave_internal import make_const_node
+from .. import weave_types as types
 from .. import ops
-import os
-from .. import storage
 from .. import client as _client
 from .. import server as _server
+from .. import context_state
+import time
 
 import requests
 
@@ -59,3 +61,16 @@ def test_500_does_raise_jsondecode_error_from_http_server():
         # should not raise json decoder error, but an HTTP error insteard
         with pytest.raises(requests.exceptions.HTTPError):
             weave.use(custom_op_that_should_return_500("abcd"), client=wc)
+
+
+def test_shadow_server(http_server_test_client):
+
+    node = make_const_node(types.Int(), 1)
+    resnode = node + 1
+
+    # test that shadow is executed properly
+    res = http_server_test_client.execute(
+        [resnode],
+        headers={"weave-shadow": True},
+    )
+    assert res == []
