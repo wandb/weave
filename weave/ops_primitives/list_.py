@@ -146,7 +146,8 @@ class List:
     @op(
         name="dropna",
         input_type={"arr": types.List(types.Any())},
-        output_type=lambda input_types: input_types["arr"],
+        # HACK: This is a case of actually wanting to perform an op on a TYPE!
+        output_type=lambda input_types: handle_dropna_output_type(input_types),
     )
     def dropna(arr):
         return [i for i in arr if i is not None]
@@ -168,6 +169,15 @@ class List:
                     tag_store.add_tags(obj, tags)
                     res.append(obj)
         return res
+
+
+def handle_dropna_output_type(input_types):
+    # import pdb; pdb.set_trace()
+    return (
+        types.List.make({"object_type": input_types["arr"].object_type.non_none()})
+        if isinstance(input_types["arr"].object_type, Node)
+        else types.List(types.non_none(input_types["arr"].object_type))
+    )
 
 
 @dataclasses.dataclass(frozen=True)

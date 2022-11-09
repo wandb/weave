@@ -1,3 +1,4 @@
+from .types import *
 from .obj import *
 from .string import *
 from .number import *
