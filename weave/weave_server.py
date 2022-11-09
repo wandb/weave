@@ -166,13 +166,7 @@ def execute():
     # Simulate browser/server latency
     # import time
     # time.sleep(0.1)
-    try:
-        response = server.handle_request(request.json, deref=True)
-    except Exception as e:
-        tb = traceback.format_exc()
-        logging.error("Error: ", tb)
-        # Consider removing this in production settings
-        return jsonify({"error": tb}), 500
+    response = server.handle_request(request.json, deref=True)
 
     # remove unions from the response
     response = recursively_unwrap_unions(response)
