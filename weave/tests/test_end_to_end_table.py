@@ -14,6 +14,381 @@ requests = [
                 {
                     "nodeType": "output",
                     "fromOp": 1,
+                    "type": "unknown",
+                    "id": "488545910515644",
+                },
+                {"name": "index", "inputs": {"arr": 2, "index": 24}},
+                {
+                    "nodeType": "output",
+                    "fromOp": 3,
+                    "type": {
+                        "type": "tagged",
+                        "tag": {
+                            "type": "typedDict",
+                            "propertyTypes": {
+                                "table": {
+                                    "type": "union",
+                                    "members": [
+                                        "none",
+                                        {
+                                            "type": "tagged",
+                                            "tag": {
+                                                "type": "typedDict",
+                                                "propertyTypes": {
+                                                    "file": {
+                                                        "type": "file",
+                                                        "extension": "string",
+                                                        "_property_types": {
+                                                            "extension": {
+                                                                "type": "const",
+                                                                "valType": "string",
+                                                                "val": "string",
+                                                            },
+                                                            "wb_object_type": {
+                                                                "type": "const",
+                                                                "valType": "string",
+                                                                "val": "string",
+                                                            },
+                                                        },
+                                                        "wbObjectType": {
+                                                            "type": "table",
+                                                            "columnTypes": {},
+                                                        },
+                                                    }
+                                                },
+                                            },
+                                            "value": {
+                                                "type": "table",
+                                                "_property_types": {
+                                                    "_rows": {
+                                                        "type": "ArrowWeaveList",
+                                                        "objectType": {
+                                                            "type": "typedDict",
+                                                            "propertyTypes": {},
+                                                        },
+                                                    }
+                                                },
+                                            },
+                                        },
+                                    ],
+                                }
+                            },
+                        },
+                        "value": {
+                            "type": "ArrowWeaveList",
+                            "objectType": {"type": "typedDict", "propertyTypes": {}},
+                        },
+                    },
+                    "id": "1099215610400189",
+                },
+                {"name": "concat", "inputs": {"arr": 4}},
+                {
+                    "nodeType": "output",
+                    "fromOp": 5,
+                    "type": {
+                        "type": "list",
+                        "objectType": {
+                            "type": "tagged",
+                            "tag": {
+                                "type": "typedDict",
+                                "propertyTypes": {
+                                    "table": {
+                                        "type": "union",
+                                        "members": [
+                                            "none",
+                                            {
+                                                "type": "tagged",
+                                                "tag": {
+                                                    "type": "typedDict",
+                                                    "propertyTypes": {
+                                                        "file": {
+                                                            "type": "file",
+                                                            "extension": "string",
+                                                            "_property_types": {
+                                                                "extension": {
+                                                                    "type": "const",
+                                                                    "valType": "string",
+                                                                    "val": "string",
+                                                                },
+                                                                "wb_object_type": {
+                                                                    "type": "const",
+                                                                    "valType": "string",
+                                                                    "val": "string",
+                                                                },
+                                                            },
+                                                            "wbObjectType": {
+                                                                "type": "table",
+                                                                "columnTypes": {},
+                                                            },
+                                                        }
+                                                    },
+                                                },
+                                                "value": {
+                                                    "type": "table",
+                                                    "_property_types": {
+                                                        "_rows": {
+                                                            "type": "ArrowWeaveList",
+                                                            "objectType": {
+                                                                "type": "typedDict",
+                                                                "propertyTypes": {},
+                                                            },
+                                                        }
+                                                    },
+                                                },
+                                            },
+                                        ],
+                                    }
+                                },
+                            },
+                            "value": {
+                                "type": "ArrowWeaveList",
+                                "objectType": {
+                                    "type": "typedDict",
+                                    "propertyTypes": {},
+                                },
+                            },
+                        },
+                    },
+                    "id": "8897334478065385",
+                },
+                {"name": "dropna", "inputs": {"arr": 6}},
+                {
+                    "nodeType": "output",
+                    "fromOp": 7,
+                    "type": {
+                        "type": "list",
+                        "objectType": {
+                            "type": "union",
+                            "members": [
+                                "none",
+                                {
+                                    "type": "tagged",
+                                    "tag": {
+                                        "type": "typedDict",
+                                        "propertyTypes": {
+                                            "table": {
+                                                "type": "union",
+                                                "members": [
+                                                    "none",
+                                                    {
+                                                        "type": "tagged",
+                                                        "tag": {
+                                                            "type": "typedDict",
+                                                            "propertyTypes": {
+                                                                "file": {
+                                                                    "type": "file",
+                                                                    "extension": "string",
+                                                                    "_property_types": {
+                                                                        "extension": {
+                                                                            "type": "const",
+                                                                            "valType": "string",
+                                                                            "val": "string",
+                                                                        },
+                                                                        "wb_object_type": {
+                                                                            "type": "const",
+                                                                            "valType": "string",
+                                                                            "val": "string",
+                                                                        },
+                                                                    },
+                                                                    "wbObjectType": {
+                                                                        "type": "table",
+                                                                        "columnTypes": {},
+                                                                    },
+                                                                }
+                                                            },
+                                                        },
+                                                        "value": {
+                                                            "type": "table",
+                                                            "_property_types": {
+                                                                "_rows": {
+                                                                    "type": "ArrowWeaveList",
+                                                                    "objectType": {
+                                                                        "type": "typedDict",
+                                                                        "propertyTypes": {},
+                                                                    },
+                                                                }
+                                                            },
+                                                        },
+                                                    },
+                                                ],
+                                            }
+                                        },
+                                    },
+                                    "value": {
+                                        "type": "ArrowWeaveList",
+                                        "objectType": {
+                                            "type": "typedDict",
+                                            "propertyTypes": {},
+                                        },
+                                    },
+                                },
+                            ],
+                        },
+                    },
+                    "id": "6479195950225948",
+                },
+                {"name": "mapped_table-rows", "inputs": {"table": 8}},
+                {
+                    "nodeType": "output",
+                    "fromOp": 9,
+                    "type": {
+                        "type": "list",
+                        "objectType": {
+                            "type": "union",
+                            "members": [
+                                "none",
+                                {
+                                    "type": "tagged",
+                                    "tag": {
+                                        "type": "typedDict",
+                                        "propertyTypes": {
+                                            "file": {
+                                                "type": "file",
+                                                "extension": "string",
+                                                "_property_types": {
+                                                    "extension": {
+                                                        "type": "const",
+                                                        "valType": "string",
+                                                        "val": "string",
+                                                    },
+                                                    "wb_object_type": {
+                                                        "type": "const",
+                                                        "valType": "string",
+                                                        "val": "string",
+                                                    },
+                                                },
+                                                "wbObjectType": {
+                                                    "type": "table",
+                                                    "columnTypes": {},
+                                                },
+                                            }
+                                        },
+                                    },
+                                    "value": {
+                                        "type": "table",
+                                        "_property_types": {
+                                            "_rows": {
+                                                "type": "ArrowWeaveList",
+                                                "objectType": {
+                                                    "type": "typedDict",
+                                                    "propertyTypes": {},
+                                                },
+                                            }
+                                        },
+                                    },
+                                },
+                            ],
+                        },
+                    },
+                    "id": "563690048272551",
+                },
+                {"name": "mapped_file-table", "inputs": {"file": 10}},
+                {
+                    "nodeType": "output",
+                    "fromOp": 11,
+                    "type": {
+                        "type": "list",
+                        "objectType": {
+                            "type": "file",
+                            "extension": "string",
+                            "_property_types": {
+                                "extension": {
+                                    "type": "const",
+                                    "valType": "string",
+                                    "val": "string",
+                                },
+                                "wb_object_type": {
+                                    "type": "const",
+                                    "valType": "string",
+                                    "val": "string",
+                                },
+                            },
+                            "wbObjectType": {"type": "table", "columnTypes": {}},
+                        },
+                    },
+                    "id": "6511839970921531",
+                },
+                {"name": "pick", "inputs": {"obj": 12, "key": 23}},
+                {
+                    "nodeType": "output",
+                    "fromOp": 13,
+                    "type": {
+                        "type": "list",
+                        "objectType": {
+                            "type": "typedDict",
+                            "propertyTypes": {
+                                "_runtime": "float",
+                                "_timestamp": "float",
+                                "small_table": {
+                                    "type": "file",
+                                    "extension": "string",
+                                    "_property_types": {
+                                        "extension": {
+                                            "type": "const",
+                                            "valType": "string",
+                                            "val": "string",
+                                        },
+                                        "wb_object_type": {
+                                            "type": "const",
+                                            "valType": "string",
+                                            "val": "string",
+                                        },
+                                    },
+                                    "wbObjectType": {
+                                        "type": "table",
+                                        "columnTypes": {},
+                                    },
+                                },
+                                "_step": "int",
+                                "_wandb": {
+                                    "type": "typedDict",
+                                    "propertyTypes": {"runtime": "int"},
+                                },
+                            },
+                        },
+                    },
+                    "id": "4777865340976064",
+                },
+                {"name": "mapped_op-summary", "inputs": {"run": 14}},
+                {
+                    "nodeType": "output",
+                    "fromOp": 15,
+                    "type": {"type": "runs", "objectType": "run"},
+                    "id": "5547632592503809",
+                },
+                {"name": "limit", "inputs": {"arr": 16, "limit": 22}},
+                {
+                    "nodeType": "output",
+                    "fromOp": 17,
+                    "type": {"type": "runs", "objectType": "run"},
+                    "id": "6789608712693708",
+                },
+                {"name": "project-runs", "inputs": {"project": 18}},
+                {
+                    "nodeType": "output",
+                    "fromOp": 19,
+                    "type": "project",
+                    "id": "1940021914357666",
+                },
+                {
+                    "name": "root-project",
+                    "inputs": {"entityName": 20, "projectName": 21},
+                },
+                {"nodeType": "const", "type": "string", "val": "timssweeney"},
+                {"nodeType": "const", "type": "string", "val": "dev_public_tables"},
+                {"nodeType": "const", "type": "number", "val": 50},
+                {"nodeType": "const", "type": "string", "val": "small_table"},
+                {"nodeType": "const", "type": "number", "val": 5},
+            ],
+            "rootNodes": [0],
+        }
+    },
+    {
+        "graphs": {
+            "nodes": [
+                {
+                    "nodeType": "output",
+                    "fromOp": 1,
                     "type": "type",
                     "id": "1459762168614146",
                 },
