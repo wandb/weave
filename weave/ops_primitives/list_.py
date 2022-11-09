@@ -151,6 +151,14 @@ class List:
     def dropna(arr):
         return [i for i in arr if i is not None]
 
+    @op(
+        name="concat",
+        input_type={"arr": types.List(types.List(types.Any()))},
+        output_type=lambda input_types: input_types["arr"].object_type,
+    )
+    def concat(arr):
+        return [i for sublist in arr for i in sublist]
+
 
 @dataclasses.dataclass(frozen=True)
 class GroupResultType(types.ObjectType):
