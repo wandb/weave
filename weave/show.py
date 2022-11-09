@@ -78,15 +78,7 @@ def _show_params(obj):
         )
 
 
-def show(obj=None, height=400, enable_automation=False):
-    usage_analytics.show_called()
-
-    if not util.is_notebook():
-        raise RuntimeError(
-            "`weave.show()` can only be called within notebooks. To extract the value of "
-            "a weave node, try `weave.use()`."
-        )
-
+def show_url(obj=None, enable_automation=False):
     params = _show_params(obj)
     panel_url = f"{context.get_frontend_url()}/__frontend/weave_jupyter?fullScreen"
     if "weave_node" in params:
@@ -99,6 +91,19 @@ def show(obj=None, height=400, enable_automation=False):
         panel_url += "&panelConfig=%s" % urllib.parse.quote(
             json.dumps(params["panel_config"])
         )
+    return panel_url
+
+
+def show(obj=None, height=400, enable_automation=False):
+    if not util.is_notebook():
+        raise RuntimeError(
+            "`weave.show()` can only be called within notebooks. To extract the value of "
+            "a weave node, try `weave.use()`."
+        )
+
+    usage_analytics.show_called()
+    panel_url = show_url(obj, enable_automation)
+
     automation_handle = None
     if enable_automation:
         automation_id = "".join(

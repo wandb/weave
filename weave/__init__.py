@@ -5,7 +5,7 @@ _loading_builtins_token = _context.set_loading_built_ins()
 from . import weave_types as types
 from . import ops
 from .graph import Node  # used as a type in op definitions
-from .show import show
+from .show import show, show_url
 from .api import *
 
 from . import panels
