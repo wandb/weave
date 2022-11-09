@@ -290,9 +290,13 @@ class Type(metaclass=_TypeSubclassWatcher):
         fields = dataclasses.fields(cls)
         type_attrs = {}
         for field in fields:
-            type_attrs[field.name] = TypeRegistry.type_from_dict(
-                d[to_weavejs_typekey(field.name)]
-            )
+            # HACK: Fixes the key_type issue from JS
+            if field.name == "key_type" and cls.__name__ == "Dict":
+                type_attrs[field.name] = String()
+            else:
+                type_attrs[field.name] = TypeRegistry.type_from_dict(
+                    d[to_weavejs_typekey(field.name)]
+                )
         return cls(**type_attrs)
 
     # save_instance/load_instance on Type are used to save/load actual Types

@@ -48,7 +48,7 @@ def node_type(node: graph.Node) -> types.Type:
 
 
 # TODO: Get rid of this hack once JS accepts incoming types correctly
-js_ops_with_incorrect_types = ["project-runs"]
+js_ops_with_incorrect_types = ["project-runs", "project-filteredRuns"]
 
 
 def apply_type_based_dispatch(

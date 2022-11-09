@@ -151,6 +151,10 @@ class WBRun:
     def name(run: wandb_api.Run) -> str:
         return run.name
 
+    @op()
+    def id(run: wandb_api.Run) -> str:
+        return run.id
+
     @op(refine_output_type=refine_summary_type)
     def summary(run: wandb_api.Run) -> dict[str, typing.Any]:
         return {k: process_summary_obj(v) for k, v in run.summary._json_dict.items()}
@@ -397,6 +401,10 @@ def project(entityName: str, projectName: str) -> wandb_api.Project:
 
 project_tag_getter_op = make_tag_getter_op.make_tag_getter_op(
     "project", ProjectType(), op_name="tag-project"
+)
+
+run_tag_getter_op = make_tag_getter_op.make_tag_getter_op(
+    "run", RunType(), op_name="tag-run"
 )
 
 
