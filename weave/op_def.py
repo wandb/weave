@@ -5,6 +5,7 @@ import inspect
 import typing
 
 import weave
+from weave import storage
 from weave.weavejs_fixes import fixup_node
 
 from . import errors
@@ -20,6 +21,35 @@ from .language_features.tagging import process_opdef_resolve_fn
 
 def common_name(name: str) -> str:
     return name.split("-")[-1]
+
+
+def deref_nodes(node_dict):
+    if node_dict["nodeType"] == "output":
+        if node_dict["fromOp"]["name"] == "get":
+            if node_dict["fromOp"]["inputs"]["uri"]["nodeType"] == "const":
+                val = storage.deref(
+                    storage.get(node_dict["fromOp"]["inputs"]["uri"]["val"])
+                ).to_dict()
+                return {
+                    "nodeType": "const",
+                    "type": node_dict["fromOp"]["inputs"]["uri"]["type"],
+                    "val": val,
+                }
+        node_dict["fromOp"]["inputs"] = {
+            k: deref_nodes(v) for k, v in node_dict["fromOp"]["inputs"].items()
+        }
+    return node_dict
+
+
+def deref_output_type_dict(output_type_dict):
+    if (
+        "nodeType" in output_type_dict
+        and output_type_dict["nodeType"] == "const"
+        and "type" in output_type_dict["type"]
+        and output_type_dict["type"]["type"] == "function"
+    ):
+        output_type_dict["val"] = deref_nodes(output_type_dict["val"])
+    return output_type_dict
 
 
 class OpDef:
@@ -188,7 +218,7 @@ class OpDef:
             and self.concrete_output_type.name == "Run"
         )
 
-    def to_dict(self):
+    def to_dict(self, deref=False):
         output_type = self.raw_output_type
         if callable(output_type):
             # TODO: Consider removing the ability for an output_type to
@@ -200,6 +230,9 @@ class OpDef:
             )
         else:
             output_type = output_type.to_dict()
+
+        if deref:
+            output_type = deref_output_type_dict(output_type)
 
         # Make callable input_type args into types.Any() for now.
         input_type = self.input_type

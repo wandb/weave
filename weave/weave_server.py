@@ -133,7 +133,7 @@ def list_ops():
     ret = []
     for op in ops:
         try:
-            ret.append(op.to_dict())
+            ret.append(op.to_dict(deref=True))
         except errors.WeaveSerializeError:
             pass
     return {"data": ret}
