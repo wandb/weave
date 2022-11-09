@@ -160,7 +160,8 @@ def deref(ref: Ref) -> typing.Any:
 # Instead, We probably need a WandbArtifactFileRef.
 # TODO: fix
 class ArtifactVersionFileType(
-    types.FileType
+    # types.FileType
+    types.Type
 ):  # this was type.Type - not sure if this is correct
     name = "ArtifactVersionFile"
 
@@ -176,12 +177,13 @@ class ArtifactVersionFileType(
     # Bad bad bad!
     # TODO: fix
 
-    def property_types(self):  # type: ignore
-        return {
-            "extension": self.extension,
-            "wb_object_type": self.extension,
-            "path": types.String(),
-        }
+    # def property_types(self):  # type: ignore
+    #     return {
+    #         "extension": self.extension,
+    #         "wb_object_type": self.extension,
+    #         # "wb_object_type": self.wb_object_type,
+    #         "path": types.String(),
+    #     }
 
 
 class WandbArtifactRef(Ref):

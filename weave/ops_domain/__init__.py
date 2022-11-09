@@ -109,43 +109,80 @@ class ArtifactVersionsType(types.Type):
         )
 
 
-def deep_visitor(d, vistor_fn):
-    def next_fn(val):
-        if isinstance(val, dict):
-            return {k: deep_visitor(v, vistor_fn) for k, v in d.items()}
-        elif isinstance(val, list):
-            return [deep_visitor(v, vistor_fn) for v in d]
-        else:
-            return val
+# def deep_visitor(d, visitor_fn):
+#     def next_fn(val):
+#         if isinstance(val, dict):
+#             return {k: deep_visitor(v, visitor_fn) for k, v in d.items()}
+#         elif isinstance(val, list):
+#             return [deep_visitor(v, visitor_fn) for v in d]
+#         else:
+#             return val
 
-    return visitor_fn(d, next_fn)
-
-
-def visitor_fn(val, next):
-    if isinstance(val, dict) and "_type" in val and val["_type"] == "table-file":
-        return file_wbartifact.ArtifactVersionFile(
-            artifact=artifacts_local.WandbArtifact(
-                # TODO: Read from dict... ugg this is in an id format!
-                "run-2mj2qxxg-small_table",
-                "run_table",
-                WeaveWBArtifactURI(
-                    "wandb-artifact://timssweeney/dev_public_tables/run-2mj2qxxg-small_table:v0"
-                ),
-            ),
-            path="small_table.table.json",
-        )
-
-    return next(val)
+#     return visitor_fn(d, next_fn)
 
 
-def run_summary_to_obj(d):
-    return deep_visitor(d, visitor_fn)
+# def visitor_obj_fn(val, next):
+#     if isinstance(val, dict) and "_type" in val and val["_type"] == "table-file":
+#         return file_wbartifact.ArtifactVersionFile(
+#             artifact=artifacts_local.WandbArtifact(
+#                 # TODO: Read from dict... ugg this is in an id format!
+#                 "run-2mj2qxxg-small_table",
+#                 "run_table",
+#                 WeaveWBArtifactURI(
+#                     "wandb-artifact://timssweeney/dev_public_tables/run-2mj2qxxg-small_table:v0"
+#                 ),
+#             ),
+#             path="small_table.table.json",
+#         )
+
+#     return next(val)
+
+# def visitor_type_fn(val, next):
+#     if isinstance(val, dict) and "_type" in val and val["_type"] == "table-file":
+#         return types.FileType(extension=types.Const(types.String(), "json"), wb_object_type=types.Const(types.String(), "table"))
+#     else:
+#         return types.TypeRegistry.type_of(val)
+#     # return next(val)
+
+
+# def run_summary_to_obj(d):
+#     return deep_visitor(d, visitor_obj_fn)
+
+# def run_summary_to_type(d):
+#     return deep_visitor(d, visitor_type_fn)
+
+
+# @op(render_info={"type": "function"})
+# def refine_summary_type(run: wandb_api.Run) -> weave.types.Type:
+#     type = {k: run_summary_to_type(v) for k, v in run.summary._json_dict.items()}
+#     res = types.TypedDict(type)
+#     # import pdb; pdb.set_trace()
+#     return res
+
+
+def val_is_table_dict(val):
+    return isinstance(val, dict) and "_type" in val and val["_type"] == "table-file"
 
 
 @op(render_info={"type": "function"})
 def refine_summary_type(run: wandb_api.Run) -> weave.types.Type:
-    obj = run_summary_to_obj(run.summary._json_dict)
-    return types.TypeRegistry.type_of(obj)
+    summary_dict = run.summary._json_dict
+    res = types.TypedDict(
+        {
+            k: (
+                types.TypeRegistry.type_of(v)
+                if not val_is_table_dict(v)
+                else types.FileType(
+                    extension=types.Const(types.String(), "json"),
+                    wb_object_type=types.Const(
+                        types.TypedDict({}), {"type": "table", "columnTypes": {}}
+                    ),
+                )
+            )
+            for k, v in summary_dict.items()
+        }
+    )
+    return res
 
 
 @weave_class(weave_type=RunType)
@@ -161,7 +198,26 @@ class WBRun:
 
     @op(refine_output_type=refine_summary_type)
     def summary(run: wandb_api.Run) -> dict[str, typing.Any]:
-        return run_summary_to_obj(run.summary._json_dict)
+
+        return {
+            k: (
+                types.TypeRegistry.type_of(v)
+                if not val_is_table_dict(v)
+                else file_wbartifact.ArtifactVersionFile(
+                    artifact=artifacts_local.WandbArtifact(
+                        # TODO: Read from dict... ugg this is in an id format!
+                        "run-2mj2qxxg-small_table",
+                        "run_table",
+                        WeaveWBArtifactURI(
+                            "wandb-artifact://timssweeney/dev_public_tables/run-2mj2qxxg-small_table:v0"
+                        ),
+                    ),
+                    path="small_table.table.json",
+                )
+            )
+            for k, v in run.summary._json_dict.items()
+        }
+        # return run_summary_to_obj(run.summary._json_dict)
 
 
 @dataclasses.dataclass(frozen=True)

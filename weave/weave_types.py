@@ -98,6 +98,8 @@ class TypeRegistry:
     @staticmethod
     def type_of(obj: typing.Any) -> "Type":
         if isinstance(obj, Type):
+            # if obj.__class__.__name__ == "FileType":
+            #     return obj
             return Type()
 
         obj_type = type_name_to_type("tagged").type_of(obj)
@@ -125,6 +127,9 @@ class TypeRegistry:
         # TODO: fix in refactor!!
         for t in potential_types:
             if t.name == "ArtifactVersionFile":
+                # return FileType(
+                #     extension=Const(String(), "json"), wb_object_type=Const(String(), "table") #type ignore
+                # )
                 return t()
 
         for type_ in reversed(potential_types):
@@ -842,7 +847,7 @@ class FileType(ObjectType):
     name = "file"
 
     extension: String = String()
-    wb_object_type: dataclasses.InitVar[String] = String()
+    wb_object_type: String = String()
 
     def _to_dict(self):
         # NOTE: js_compat
@@ -852,7 +857,15 @@ class FileType(ObjectType):
         if isinstance(self.extension, Const):
             d["extension"] = self.extension.val
         if isinstance(self.wb_object_type, Const):
-            d["wbObjectType"] = {"type": self.wb_object_type.val}
+            if isinstance(self.wb_object_type.val_type, String):
+                d["wbObjectType"] = {"type": self.wb_object_type.val}
+            elif isinstance(self.wb_object_type.val_type, TypedDict):
+                d["wbObjectType"] = self.wb_object_type.val
+        # if "wbObjectType" in d and "type" in d["wbObjectType"] and d["wbObjectType"]["type"] == "table":
+        #     import pdb; pdb.set_trace()
+
+        ### HMMM - there is a problem somewhere. I can't seem to get the summary to properly return an artifact file type that plays niceley
+
         return d
 
     @classmethod
@@ -884,7 +897,7 @@ class FileType(ObjectType):
     def property_types(self):
         return {
             "extension": self.extension,
-            "wb_object_type": self.extension,
+            "wb_object_type": self.wb_object_type,
         }
 
 
