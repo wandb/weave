@@ -5,6 +5,7 @@ describe('scatter interactions', () => {
     exec('python cypress/e2e/interactive/scatter.py', 10000).then(result => {
       const url = result.stdout;
       cy.visit(url);
+      cy.wait(1000);
 
       checkAllPanelsRendered();
 
