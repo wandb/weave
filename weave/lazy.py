@@ -45,9 +45,10 @@ def _make_output_node(
             else:
                 new_input_type[k] = n.type
 
-        new_input_type = language_autocall.update_input_types(
-            input_type, new_input_type
-        )
+        # print("LANGUAGE AUTOCALL", fq_op_name, input_type, new_input_type)
+        # new_input_type = language_autocall.update_input_types(
+        #     input_type, new_input_type
+        # )
 
         output_type = output_type(new_input_type)
 
@@ -81,7 +82,10 @@ def _make_output_node(
 
 
 def _type_of(v: typing.Any):
-    if callable(v):
+    if isinstance(v, graph.Node):
+        # Check if its a Node first, sometimes we mixin a callables with Node!
+        return v.type
+    elif callable(v):
         input_type = pyfunc_type_util.determine_input_type(v, None, True)
         output_type = pyfunc_type_util.determine_output_type(v, None, True)
         if not isinstance(input_type, op_args.OpNamedArgs):
@@ -94,8 +98,6 @@ def _type_of(v: typing.Any):
             input_type.arg_types,
             output_type,
         )
-    elif isinstance(v, graph.Node):
-        return v.type
     else:
         return types.TypeRegistry.type_of(v)
 
