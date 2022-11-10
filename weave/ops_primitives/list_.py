@@ -53,13 +53,13 @@ class List:
         name="filter",
         input_type={
             "arr": types.List(types.Any()),
-            "filter_fn": lambda input_types: types.Function(
+            "filterFn": lambda input_types: types.Function(
                 {"row": input_types["arr"].object_type}, types.Any()
             ),
         },
         output_type=lambda input_types: input_types["arr"],
     )
-    def filter(arr, filter_fn):
+    def filter(arr, filterFn):
         from ..ops_primitives import arrow
 
         # WHOAAAA. Major hacks here.
@@ -70,7 +70,7 @@ class List:
             arrow_obj = arr
             arr = arr.to_pylist()
 
-        call_results = execute_fast.fast_map_fn(arr, filter_fn)
+        call_results = execute_fast.fast_map_fn(arr, filterFn)
         result = []
         for row, keep in zip(arr, call_results):
             if keep:
