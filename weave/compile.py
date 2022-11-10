@@ -81,6 +81,7 @@ def apply_type_based_dispatch(
                 _make_output_node(
                     found_op.uri,
                     params,
+                    found_op.input_type,
                     found_op.return_type_of_arg_types(named_param_types),
                     found_op.refine_output_type,
                 ),
