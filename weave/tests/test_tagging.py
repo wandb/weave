@@ -5,7 +5,11 @@ from .. import weave_types as types
 
 
 def test_tagged_value():
-    assert tagged_value_type.TaggedValueType({"a": 1}, 2).value == 2
+    tv = tagged_value_type.TaggedValueType(
+        types.TypedDict({"a": types.Number()}), types.String()
+    )
+    assert tv.value == types.String()
+    assert tv.tag == types.TypedDict({"a": types.Number()})
 
 
 def test_tagged_types():

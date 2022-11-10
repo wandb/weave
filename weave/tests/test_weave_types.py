@@ -1,3 +1,4 @@
+import pytest
 import weave.weave_types
 from .. import weave_types as types
 from .. import runs
@@ -99,3 +100,81 @@ def test_dict_without_key_type():
         {"type": "dict", "objectType": "number"}
     )
     assert fully_typed.assign_type(partial_typed)
+
+
+def test_union_access():
+    ### Type return
+
+    # Not all members have props
+    unioned = weave.weave_types.union(
+        weave.weave_types.String(), weave.weave_types.List(weave.weave_types.String())
+    )
+    with pytest.raises(AttributeError):
+        unioned.object_type
+
+    # Combined dicts
+    unioned = weave.weave_types.union(
+        weave.weave_types.List(weave.weave_types.String()),
+        weave.weave_types.List(weave.weave_types.Number()),
+    )
+    assert unioned.object_type == weave.weave_types.union(
+        weave.weave_types.String(), weave.weave_types.Number()
+    )
+
+    # Nullable type
+    unioned = weave.weave_types.union(
+        weave.weave_types.NoneType(), weave.weave_types.List(weave.weave_types.String())
+    )
+    assert unioned.object_type == weave.weave_types.union(
+        weave.weave_types.String(), weave.weave_types.NoneType()
+    )
+
+    ### Dict Return
+    # Not all members have props
+    unioned = weave.weave_types.union(
+        weave.weave_types.String(),
+        weave.weave_types.TypedDict({"a": weave.weave_types.String()}),
+    )
+    with pytest.raises(AttributeError):
+        unioned.property_types
+
+    # Combined dicts
+    unioned = weave.weave_types.union(
+        weave.weave_types.TypedDict(
+            {
+                "same": weave.weave_types.Number(),
+                "solo_a": weave.weave_types.Number(),
+                "differ": weave.weave_types.Number(),
+            }
+        ),
+        weave.weave_types.TypedDict(
+            {
+                "same": weave.weave_types.Number(),
+                "solo_b": weave.weave_types.String(),
+                "differ": weave.weave_types.String(),
+            }
+        ),
+    )
+    assert unioned.property_types == {
+        "same": weave.weave_types.Number(),
+        "solo_a": weave.weave_types.union(
+            weave.weave_types.Number(), weave.weave_types.NoneType()
+        ),
+        "solo_b": weave.weave_types.union(
+            weave.weave_types.String(), weave.weave_types.NoneType()
+        ),
+        "differ": weave.weave_types.union(
+            weave.weave_types.Number(), weave.weave_types.String()
+        ),
+    }
+
+    # Nullable type
+    unioned = weave.weave_types.union(
+        weave.weave_types.NoneType(),
+        weave.weave_types.TypedDict({"a": weave.weave_types.String()}),
+    )
+    assert unioned.property_types == {
+        "a": weave.weave_types.union(
+            weave.weave_types.String(), weave.weave_types.NoneType()
+        )
+    }

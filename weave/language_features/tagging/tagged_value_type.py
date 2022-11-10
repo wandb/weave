@@ -49,6 +49,9 @@ class TaggedValueType(types.Type):
         tag: types.TypedDict = types.TypedDict({}),
         value: types.Type = types.Any(),
     ):
+        assert types.TypedDict({}).assign_type(tag), (
+            "Tags must be assignable to TypedDict, found %s" % tag
+        )
         self.tag = tag
         self.value = value
 
@@ -79,17 +82,19 @@ class TaggedValueType(types.Type):
     def from_dict(cls, d: dict) -> "TaggedValueType":
         tag_type = types.TypeRegistry.type_from_dict(d["tag"])
         if isinstance(tag_type, TaggedValueType):
-            # here, we are coming from JS...
-            assert isinstance(tag_type.tag, types.TypedDict)
-            assert isinstance(tag_type.value, types.TypedDict)
-            tag_type = types.TypedDict(
-                {**tag_type.tag.property_types, **tag_type.value.property_types}
+            # here, we are coming from JS
+            assert types.TypedDict({}).assign_type(tag_type.tag), (
+                "tag_type.tag must be assignable to TypedDict, found %s" % tag_type.tag
             )
-        assert isinstance(tag_type, types.TypedDict), (
-            "Tags must be a dictionary, found %s" % tag_type
-        )
+            assert types.TypedDict({}).assign_type(tag_type.value), (
+                "tag_type.value must be assignable to TypedDict, found %s"
+                % tag_type.value
+            )
+            tag_type = types.TypedDict(
+                {**tag_type.tag.property_types, **tag_type.value.property_types}  # type: ignore
+            )
         return cls(
-            tag_type,
+            tag_type,  # type: ignore
             types.TypeRegistry.type_from_dict(d["value"]),
         )
 

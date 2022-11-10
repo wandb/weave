@@ -540,6 +540,42 @@ class UnionType(Type):
     def _to_dict(self):
         return {"members": [mem.to_dict() for mem in self.members]}
 
+    def __getattr__(self, attr):
+        has_none = False
+        results = []
+        for mem in self.members:
+            if mem == none_type:
+                has_none = True
+            else:
+                results.append(getattr(mem, attr))
+        if len(results) == 0:
+            raise errors.WeaveTypeError(
+                f"Attempt to get attribute {attr} from UnionType with no non-none members"
+            )
+        first_result = results[0]
+        if isinstance(first_result, Type):
+            if any((not isinstance(res, Type)) for res in results):
+                raise errors.WeaveTypeError(
+                    f"Attempt to get attribute {attr} from UnionType with inconsistent types"
+                )
+            if has_none:
+                results.append(none_type)
+            return union(*results)
+        if isinstance(first_result, dict):
+            if any((not isinstance(res, dict)) for res in results):
+                raise errors.WeaveTypeError(
+                    f"Attempt to get attribute {attr} from UnionType with inconsistent types"
+                )
+            all_keys = set(k for res in results for k in res.keys())
+            if has_none:
+                results.append({})
+            return {
+                k: union(*[res.get(k, NoneType()) for res in results]) for k in all_keys
+            }
+        raise errors.WeaveTypeError(
+            f"Attempt to get attribute {attr} from UnionType resulted in type {type(first_result)}, expected Type or dict"
+        )
+
 
 @dataclasses.dataclass(frozen=True)
 class List(Type):
