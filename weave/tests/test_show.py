@@ -23,8 +23,29 @@ def test_show_simple_call(cereal_csv):
     assert actual == {
         "nodeType": "output",
         "type": {
-            "type": "list",
-            "objectType": {"type": "typedDict", "propertyTypes": {}},
+            "type": "tagged",
+            "tag": {
+                "type": "typedDict",
+                "propertyTypes": {
+                    "self": {
+                        "type": "local_file",
+                        "extension": "csv",
+                        "_property_types": {
+                            "extension": {
+                                "type": "const",
+                                "valType": "string",
+                                "val": "csv",
+                            },
+                            "path": "string",
+                            "mtime": "float",
+                        },
+                    }
+                },
+            },
+            "value": {
+                "type": "list",
+                "objectType": {"type": "typedDict", "propertyTypes": {}},
+            },
         },
         "fromOp": {
             "name": "file-readcsv",

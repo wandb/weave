@@ -139,6 +139,21 @@ class VarNode(Node):
         return {"nodeType": "var", "type": self.type.to_dict(), "varName": self.name}
 
 
+def _inner_type_skips_output_node(type: weave_types.Type) -> bool:
+    return (
+        isinstance(type, (weave_types.BasicType, weave_types.TypedDict))
+        or type.__class__ == weave_types.Type
+    )
+
+
+def _type_skips_output_node(type: weave_types.Type) -> bool:
+    return (
+        _inner_type_skips_output_node(type)
+        or isinstance(type, weave_types.Const)
+        and _inner_type_skips_output_node(type.val_type)
+    )
+
+
 class ConstNode(Node):
     val: typing.Any
 
@@ -151,20 +166,19 @@ class ConstNode(Node):
         val = obj["val"]
         if isinstance(val, dict) and "nodeType" in val:
             val = Node.node_from_json(val)
-        return cls(weave_types.TypeRegistry.type_from_dict(obj["type"]), val)
+        val_type = weave_types.TypeRegistry.type_from_dict(obj["type"])
+        if val_type.__class__ == weave_types.Type:
+            val = weave_types.TypeRegistry.type_from_dict(val)
+        elif isinstance(val_type, weave_types.Const):
+            val = val_type.val
+        return cls(val_type, val)
 
     def equivalent_output_node(self) -> typing.Union[OutputNode, None]:
         if isinstance(self.type, weave_types.Function):
             return None
 
         val = self.val
-        if (
-            isinstance(self.type, (weave_types.BasicType, weave_types.TypedDict))
-            or isinstance(self.type, weave_types.Const)
-            and isinstance(
-                self.type.val_type, (weave_types.BasicType, weave_types.TypedDict)
-            )
-        ):
+        if _type_skips_output_node(self.type):
             return None
 
         ref = storage._get_ref(val)
@@ -186,6 +200,11 @@ class ConstNode(Node):
         val = self.val
         if isinstance(self.type, weave_types.Function):
             val = val.to_json()
+        if self.type.__class__ == weave_types.Type or (
+            isinstance(self.type, weave_types.Const)
+            and self.type.val_type.__class__ == weave_types.Type
+        ):
+            val = val.to_dict()
         return {"nodeType": "const", "type": self.type.to_dict(), "val": val}
 
 

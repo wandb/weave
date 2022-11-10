@@ -36,6 +36,4 @@ def test_explicit_experiment_construction(op_name, op):
     # Just make sure that this is successful
     op_as_dict = op.to_dict()
     assert op_as_dict is not None
-    op_as_dict = op.to_dict(deref=True)
-    assert op_as_dict is not None
     assert_valid_output_type(op_as_dict)
