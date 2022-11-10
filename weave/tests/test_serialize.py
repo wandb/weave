@@ -1,3 +1,6 @@
+import pytest
+from .. import graph
+from ..weave_internal import make_const_node
 from .. import weave_types as types
 from .. import api
 from .. import ops
@@ -89,3 +92,23 @@ def test_op_compat():
     if len(issues) > 0:
         sep = "\n\t*  "
         raise Exception("Found op ambiguities:" + sep + sep.join(issues))
+
+
+@pytest.mark.parametrize(
+    "val_type, val",
+    [
+        # Case 1: ConstNode, no const type, normal val
+        (types.String(), "hello"),
+        # Case 2: ConstNode, no const type, type val
+        (types.Type(), types.String()),
+        # Case 3: ConstNode, const type, normal val
+        (types.Const(types.String(), "hello"), "hello"),
+        # Case 4: ConstNode, const type, type val
+        (types.Const(types.Type(), types.String()), types.String()),
+    ],
+)
+def test_const_node_serialize(val_type, val):
+    node = make_const_node(val_type, val)
+    node = graph.Node.node_from_json(node.to_json())
+    assert node.type == val_type
+    assert node.val == val

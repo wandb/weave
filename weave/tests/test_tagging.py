@@ -34,6 +34,14 @@ def test_tagged_types():
     # 3: Assert that we can use tagged values instead of raw values
     seven = add_tester(TestNumber(3), TestNumber(4))
     ten = add_tester_2(three, seven)
+    assert ten.type == tt({"a": 1, "d": 3}, TestNumber.WeaveType())
+    assert (
+        isinstance(ten.type, tagged_value_type.TaggedValueType)
+        and isinstance(
+            ten.type.tag.property_types["d"], tagged_value_type.TaggedValueType
+        )
+        and isinstance(ten.type.tag.property_types["d"].value, TestNumber.WeaveType)
+    )
     assert weave.use(ten).inner == 10
 
     # 4: Show that tags flow through
