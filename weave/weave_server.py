@@ -280,5 +280,10 @@ def hello():
 app = make_app()
 
 
+@app.before_first_request
+def before_first_request():
+    registry_mem.memory_registry.load_saved_ops()
+
+
 if __name__ == "__main__":
     app.run(ssl_context="adhoc", port=9994)

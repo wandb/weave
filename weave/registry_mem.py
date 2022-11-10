@@ -89,12 +89,14 @@ class Registry:
     def find_ops_by_common_name(self, common_name: str) -> typing.List[op_def.OpDef]:
         return [op for op in self._ops.values() if op.common_name == common_name]
 
-    def list_ops(self) -> typing.List[op_def.OpDef]:
+    def load_saved_ops(self):
         for op_ref in storage.objects(op_def_type.OpDefType()):
             try:
                 op_ref.get()
             except:
                 print("Failed to load non-builtin op: %s" % op_ref.uri)
+
+    def list_ops(self) -> typing.List[op_def.OpDef]:
         # Note this uses self._ops, so provides the most recent registered op, which could
         # be the last one we loaded() [rather than the last one the user declared] which
         # is incorrect behavior

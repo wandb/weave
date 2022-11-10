@@ -219,7 +219,7 @@ class DefaultToPy(mappers.Mapper):
             elif existing_ref.artifact != self._artifact:
                 raise errors.WeaveInternalError(
                     "Can't save cross-artifact reference to unsaved artifact. This error was triggered when saving obj %s of type: %s"
-                    % (self.obj, self.type)
+                    % (obj, self.type)
                 )
         name = "-".join(self._path)
         ref = storage.save_to_artifact(obj, self._artifact, name, self.type)
