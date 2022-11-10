@@ -60,7 +60,7 @@ def apply_type_based_dispatch(
     case where the provided op may not be the true op needed given the provided
     types. Importantly, it does rely on paramter ordering.
     """
-    # Topological order garuntees that all parents have been processed before the children
+    # Topological order guarantees that all parents have been processed before the children
     for orig_node in edit_g.topologically_ordered_nodes:
         node = edit_g.get_node(orig_node)
         node_inputs = {k: edit_g.get_node(v) for k, v in node.from_op.inputs.items()}

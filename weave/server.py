@@ -1,5 +1,6 @@
 from __future__ import print_function
 
+import os
 import typing
 import logging
 
@@ -21,6 +22,7 @@ from . import execute
 from . import serialize
 from . import storage
 from . import context
+from . import util
 
 
 PROFILE = False
@@ -51,7 +53,9 @@ def _handle_request(request, deref=False):
         % (len(nodes), "\n".join(graph.node_expr_str(n) for n in nodes))
     )
     with context.execution_client():
-        result = execute.execute_nodes(nodes)
+        result = execute.execute_nodes(
+            nodes, no_cache=util.parse_boolean_env_var("WEAVE_NO_CACHE")
+        )
     if deref:
         result = [storage.deref(r) for r in result]
     # print("Server request %s (%0.5fs): %s..." % (start_time,

@@ -290,13 +290,9 @@ class Type(metaclass=_TypeSubclassWatcher):
         fields = dataclasses.fields(cls)
         type_attrs = {}
         for field in fields:
-            # HACK: Fixes the key_type issue from JS
-            if field.name == "key_type" and cls.__name__ == "Dict":
-                type_attrs[field.name] = String()
-            else:
-                type_attrs[field.name] = TypeRegistry.type_from_dict(
-                    d[to_weavejs_typekey(field.name)]
-                )
+            field_name = to_weavejs_typekey(field.name)
+            if field_name in d:
+                type_attrs[field.name] = TypeRegistry.type_from_dict(d[field_name])
         return cls(**type_attrs)
 
     # save_instance/load_instance on Type are used to save/load actual Types
@@ -642,8 +638,8 @@ class TypedDict(Type):
 class Dict(Type):
     name = "dict"
 
-    key_type: Type
-    object_type: Type
+    key_type: Type = String()
+    object_type: Type = Any()
 
     def __post_init__(self):
         # Note this differs from Python's Dict in that keys are always strings!
