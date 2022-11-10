@@ -5,20 +5,20 @@ import string
 import copy
 import typing
 
-import weave
 from .. import graph
 from .. import weave_internal
 from .. import ops
 from .. import panel
+from .. import decorator_type
 
 
-@weave.type()
+@decorator_type.type()
 class PanelDef:
     panelId: str
     panelConfig: typing.Optional[dict[str, str]]  # TODO: WRONG!!!
 
 
-@weave.type()
+@decorator_type.type()
 class TableState:
     input_node: graph.Node
     autoColumns: bool = dataclasses.field(default=False)

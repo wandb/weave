@@ -1,7 +1,7 @@
 import pytest
 from itertools import chain
 
-from ..ops_domain import RunSegment
+from ..ops_domain.run_segment import RunSegment
 from ..ops_primitives import ArrowWeaveList
 from .. import ops
 from .. import storage

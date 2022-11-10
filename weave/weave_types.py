@@ -628,7 +628,7 @@ class TypedDict(Type):
 
     def __hash__(self):
         # Can't hash property_types by default because dict is not hashable
-        return hash(tuple((k, v) for k, v in self.property_types.items()))
+        return hash(tuple(k, v) for k, v in self.property_types.items())
 
     def _assign_type_inner(self, other_type):
         if not isinstance(other_type, TypedDict):

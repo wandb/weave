@@ -53,7 +53,7 @@ class List:
         name="filter",
         input_type={
             "arr": types.List(types.Any()),
-            "filterFn": lambda input_types: types.Function(
+            "filter_fn": lambda input_types: types.Function(
                 {"row": input_types["arr"].object_type}, types.Any()
             ),
         },

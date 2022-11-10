@@ -23,21 +23,3 @@ class Table(panel.Panel):
             self._set_default_nonauto_tablestate()
             for column_expr in kwargs["columns"]:
                 self.append_column(column_expr)
-
-
-@weave.type()
-class Table(panel.Panel):
-    id = "table"
-    config: typing.Optional[TableConfig] = dataclasses.field(
-        default_factory=lambda: None
-    )
-
-    def append_column(self, expr, name=""):
-        if self._table_state is None:
-            self._set_default_nonauto_tablestate()
-        self._table_state.add_column(expr, name=name)
-
-    @property
-    def config(self):
-        state = self._table_state.to_json() if self._table_state else self._table_state
-        return {"tableState": state}

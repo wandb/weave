@@ -159,6 +159,7 @@ def make_lazy_call(f, fq_op_name, input_type, output_type, refine_output_type):
         return _make_output_node(
             op_name,
             bound_params,
+            input_type,
             op_output,
             op_refine,
         )

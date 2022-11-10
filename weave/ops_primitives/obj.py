@@ -70,7 +70,7 @@ class Object:
 
 @op(
     name="Object-__getattr__",
-    setter=Object.obj_setattr,
+    setter=Object.obj_settattr,
     output_type=getattr_output_type,
 )
 def obj_getattr(self: typing.Any, name: str):
