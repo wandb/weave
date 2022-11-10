@@ -1,0 +1,42 @@
+from .. import api as weave
+from PIL import Image
+from .. import context_state
+
+_loading_builtins_token = context_state.set_loading_built_ins()
+# This is needed becuase media_user is not imported by default and therefore not considered a built-in
+# however, in `conftest::pre_post_each_test` we set a custom artifact directory for each test for isolation
+# Puting this import in the context allows the test execution to access these ops
+from .. import media_user
+
+context_state.clear_loading_built_ins(_loading_builtins_token)
+
+
+def test_im_with_metadata():
+    base_im = Image.linear_gradient("L").resize((32, 32))
+    ims = [
+        media_user.ImageWithBoxes(
+            base_im,
+            [
+                media_user.BoundingBox2D(
+                    media_user.Point2D(1, 2), media_user.Size2D(5, 9)
+                )
+            ],
+        ),
+        media_user.ImageWithBoxes(
+            base_im.rotate(4),
+            [
+                media_user.BoundingBox2D(
+                    media_user.Point2D(5, 9), media_user.Size2D(1, 2)
+                )
+            ],
+        ),
+    ]
+    ims_saved = weave.save(ims)
+    assert (
+        weave.use(
+            ims_saved.map(
+                lambda im: im.get_boxes().map(lambda box: box.center().get_x()).sum()
+            ).sum()
+        )
+        == 9.0
+    )

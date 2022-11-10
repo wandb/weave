@@ -1,3 +1,4 @@
+import typing
 import numpy as np
 
 # Watch out, can't do "is None" on this!
@@ -55,7 +56,22 @@ class BoxedNDArray(np.ndarray):
             return
 
 
-def box(obj):
+T = typing.TypeVar("T")
+
+
+def box(
+    obj: T,
+) -> typing.Union[
+    T,
+    BoxedInt,
+    BoxedFloat,
+    BoxedStr,
+    BoxedBool,
+    BoxedDict,
+    BoxedList,
+    BoxedNDArray,
+    BoxedNone,
+]:
     if type(obj) == int:
         return BoxedInt(obj)
     elif type(obj) == float:
@@ -73,3 +89,7 @@ def box(obj):
     elif obj is None:
         return BoxedNone(obj)
     return obj
+
+
+def is_boxed(obj: typing.Any) -> bool:
+    return id(obj) == id(box(obj))

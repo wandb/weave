@@ -1,3 +1,4 @@
+from ._dict_utils import typeddict_pick_output_type
 from ..api import op, weave_class, mutation, OpVarArgs
 from .. import weave_types as types
 
@@ -77,15 +78,7 @@ class TypedDict:
         output_type=typeddict_pick_output_type,
     )
     def pick(self, key):
-        if not isinstance(self, dict):
-            # won't need this when we fix type-checking, but for now it
-            # surfaces an error
-            # TODO: totally not right, need to figure out mapped ops
-            return self.pick(key)
-        try:
-            return dict.__getitem__(self, key)
-        except KeyError:
-            return None
+        return self.get(key, None)
 
     @op(
         output_type=lambda input_type: types.List(
@@ -103,7 +96,9 @@ class TypedDict:
     @op(
         name="merge",
         input_type={"lhs": types.TypedDict({}), "rhs": types.TypedDict({})},
-        output_type=types.TypedDict({}),
+        output_type=lambda input_types: types.TypedDict(
+            {**input_types["lhs"].property_types, **input_types["rhs"].property_types}
+        ),
     )
     def merge(lhs, rhs):
         return {**lhs, **rhs}

@@ -166,13 +166,13 @@ class SqlTable:
         except IndexError:
             return None
 
-    @op(output_type=index_output_type)
+    @op(name="sqltable-index", output_type=index_output_type)
     def __getitem__(self, index: int):
         return self._index(index)
 
     @op(output_type=pick_output_type)
     def pick(self, key: str):
-        return list_.List.pick.resolve_fn(self._to_list_table(), key)
+        return list_.general_picker(self._to_list_table(), key)
 
     @op(output_type=lambda input_types: types.List(input_types["self"].object_type))
     def map(self, map_fn: typing.Any):
@@ -180,7 +180,6 @@ class SqlTable:
 
     @op(
         input_type={
-            "self": types.List(types.Any()),
             "filter_fn": lambda input_types: types.Function(
                 {"row": input_types["self"].object_type}, types.Any()
             ),
@@ -215,7 +214,7 @@ def local_sqlconnection(path):
 
 
 @op(
-    name="sqlconnection_tables",
+    name="sqlconnection-tables",
     input_type={"conn": SqlConnectionType()},
     output_type=types.TypedDict({}),
 )
@@ -244,7 +243,7 @@ def sqlconnection_tables(conn):
 
 
 @op(
-    name="sqlconnection_tables_type",
+    name="sqlconnection-tablesType",
     input_type={"conn": SqlConnectionType()},
     output_type=types.Type(),
 )

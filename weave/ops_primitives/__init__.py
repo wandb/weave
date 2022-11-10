@@ -1,6 +1,7 @@
 from .obj import *
 from .string import *
 from .number import *
+from .number_bin import *
 from .boolean import *
 from .dict import *
 from .list_ import *

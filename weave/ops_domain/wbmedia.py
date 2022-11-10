@@ -3,6 +3,8 @@
 import copy
 import dataclasses
 import typing
+
+from weave.language_features.tagging.tag_store import isolated_tagging_context
 from .. import types
 from .. import api as weave
 from ..ops_primitives import html
@@ -65,7 +67,8 @@ def html_file(html: html.Html) -> HtmlArtifactFileRef:
     from weave import storage
 
     # This is a ref to the html object
-    ref = storage.save(html)
+    with isolated_tagging_context():
+        ref = storage.save(html)
     ref = copy.copy(ref)
     ref.path += ".html"
     return HtmlArtifactFileRef(ref)  # type: ignore
@@ -86,5 +89,6 @@ def html_file(html: html.Html) -> HtmlArtifactFileRef:
 def markdown_file(md: markdown.Markdown):
     from weave import storage
 
-    ref = storage.save(md)
+    with isolated_tagging_context():
+        ref = storage.save(md)
     return file_wbartifact.ArtifactVersionFile(ref.artifact, ref.path + ".md")

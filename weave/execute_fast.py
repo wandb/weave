@@ -3,6 +3,7 @@ from . import registry_mem
 from . import weave_internal
 from . import weave_types as types
 from . import errors
+from . import op_def
 
 
 def _fast_apply_map_fn(item, index, map_fn):
@@ -85,4 +86,20 @@ def fast_map_fn(input_list, map_fn):
         return _slow_map_fn(input_list, map_fn)
 
     map_fn = _resolve_static_branches(map_fn)
-    return [_fast_apply_map_fn(item, i, map_fn) for i, item in enumerate(input_list)]
+
+    # These are hacks because sometimes __len__ and __getitem__
+    # are OpDefs, sometimes they are regular Python functions.
+    # TODO: Fix this (eager behavior)
+    if isinstance(input_list.__len__, op_def.OpDef):
+        list_len = input_list.__len__.resolve_fn()
+    else:
+        list_len = len(input_list)
+
+    if isinstance(input_list.__getitem__, op_def.OpDef):
+        getitem = input_list.__getitem__.resolve_fn
+    else:
+        getitem = lambda input_list, index: input_list.__getitem__(index)
+
+    return [
+        _fast_apply_map_fn(getitem(input_list, i), i, map_fn) for i in range(list_len)
+    ]

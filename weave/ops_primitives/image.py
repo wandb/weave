@@ -1,57 +1,33 @@
+import dataclasses
 import io
 import PIL
 import PIL.Image
-import base64
 import binascii
 
 from .. import api as weave
 from .. import weave_types as types
-from .. import errors
 
 
 class ImageType(types.Type):
     name = "image"
 
 
-# Things that all images have:
-#   Type info (things we need to know at call time / type time)
-#     width, height, channels
-#
-#     content ID (hash)
-#     ability to get pixels, rows, columns etc
-#     detailed type information, like which channel maps to what human concept
-#
-# Image files have
-#     file size, hash, etc
-#     format (png)
-
-
+@dataclasses.dataclass(frozen=True)
 class PILImageType(types.Type):
     name = "pil_image"
-    instance_class = PIL.Image.Image
     instance_classes = PIL.Image.Image
 
-    # TODO: format is enum?
-    # Hmm, even format is part of a saved image file, not part of a PIL Image
-    # But dimensions and whatnot should be part of this definition
-    def __init__(self, width: int = 5, height: int = 5, mode: str = "L"):
-        self.width = width
-        self.height = height
-        self.mode = mode  # TODO: enum
-
-    def _to_dict(self):
-        return {"width": self.width, "height": self.height, "mode": self.mode}
-
-    def __repr__(self):
-        return "<PILImageType>"
-
-    @classmethod
-    def from_dict(cls, d):
-        return cls(d["width"], d["height"], d["mode"])
+    width: types.Type = types.Int()
+    height: types.Type = types.Int()
+    mode: types.Type = types.String()
 
     @classmethod
     def type_of_instance(cls, obj: PIL.Image.Image):
-        return cls(obj.width, obj.height, obj.mode)
+        return cls(
+            types.Const(types.Int(), obj.width),
+            types.Const(types.Int(), obj.height),
+            types.Const(types.String(), obj.mode),
+        )
 
     @classmethod
     def save_instance(cls, obj: PIL.Image.Image, artifact, name):
@@ -65,19 +41,10 @@ class PILImageType(types.Type):
             return im
 
 
-# I think I can fix PilImage To be a Weave Object instead of a custom type.
-# The self._to_dict() method:
-#   - by default saves any public, typed attributes on the class.
-#   - you can override this and return a different dict.
-#   - OR!
-#   - you can return a Ref object, with extra attributes attached!
-#   - That ref object itself will be converted to a dict.
-
-
 @weave.weave_class(weave_type=PILImageType)
 class PILImageOps:
     # TODO: should not need to hardcode type constants!
-    @weave.op(input_type={"self": PILImageType(5, 5, "L")})
+    @weave.op(input_type={"self": PILImageType()})
     def image_bytes(self) -> str:
         f = io.BytesIO()
         self.save(f, format="png")  # type: ignore
@@ -85,5 +52,5 @@ class PILImageOps:
         return binascii.hexlify(f.read()).decode("ISO-8859-1")
 
     @weave.op()
-    def width(self) -> int:
-        return self.width
+    def width_(self) -> int:
+        return self.width  # type: ignore

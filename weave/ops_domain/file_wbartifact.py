@@ -36,7 +36,7 @@ refs.ArtifactVersionFileType.instance_classes = ArtifactVersionFile
 
 
 class ArtifactVersionDirType(types.ObjectType):
-    name = "artifactversion-dir"
+    name = "artifactversion_dir"
 
     def __init__(self):
         pass

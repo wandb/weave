@@ -11,7 +11,7 @@ openai.api_key_path = os.path.expanduser("~/.openai-apikey")
 
 
 class StoredFileType(weave.types.ObjectType):
-    name = "openai-stored-file"
+    name = "openai_stored_file"
     purpose: str
 
     def __init__(self, purpose=weave.types.String()):
@@ -100,7 +100,7 @@ Gpt3DatasetType.instance_class = Gpt3Dataset
 
 
 class Gpt3FineTuneResultsType(StoredFileType):
-    name = "gpt3-fine-tune-results-type"
+    name = "gpt3_fine_tune_results_type"
 
     def __init__(self):
         self.purpose = weave.types.Const(weave.types.String(), "fine-tune-results")
@@ -200,7 +200,7 @@ class Gpt3Model:
     @weave.op(
         name="gpt3model-complete",
     )
-    def complete(self, prompt: str, seed: int = 0) -> Gpt3ModelCompleteReturn:
+    def complete(self, prompt: str) -> Gpt3ModelCompleteReturn:
         sleep = 1
         completion_params = {
             "model": self.id,
@@ -226,7 +226,7 @@ Gpt3ModelType.instance_class = Gpt3Model
 
 
 class Gpt3FineTuneType(weave.types.ObjectType):
-    name = "gpt3-fine-tune-type"
+    name = "gpt3_fine_tune_type"
 
     def __init__(self):
         pass

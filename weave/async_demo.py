@@ -15,7 +15,7 @@ import weave
     },
     output_type=weave.types.RunType(
         weave.types.TypedDict({}),
-        weave.types.List(weave.types.Any()),
+        weave.types.List(weave.types.TypedDict({})),
         weave.types.Int(),
     ),
 )
@@ -29,7 +29,7 @@ def slowmult(a, b, sleep, _run=None):
 
 
 class AsyncDemoModelType(weave.types.ObjectType):
-    name = "asyncdemo-model"
+    name = "asyncdemo_model"
 
     def __init__(self):
         pass
@@ -44,7 +44,7 @@ class AsyncDemoModel:
         self.id = id
 
     @weave.op(
-        name="asyncdemo-model-infer",
+        name="asyncdemo_model-infer",
         input_type={"self": AsyncDemoModelType(), "x": weave.types.String()},
         output_type=weave.types.String(),
     )
@@ -57,7 +57,7 @@ AsyncDemoModelType.instance_class = AsyncDemoModel
 
 
 class AsyncDemoTrainResultType(weave.types.ObjectType):
-    name = "asyncdemo-trainresult"
+    name = "asyncdemo_trainresult"
 
     def __init__(self):
         pass
@@ -72,7 +72,7 @@ class AsyncDemoTrainResult:
         self.id = id
 
     @weave.op(
-        name="asyncdemo-trainresult-model",
+        name="asyncdemo_trainresult-model",
         input_type={"self": AsyncDemoTrainResultType()},
         output_type=AsyncDemoModelType(),
     )

@@ -60,14 +60,10 @@ def _call_execute(function_node: graph.Node) -> graph.OutputNode:
     )
 
 
-def insert_execute_nodes(nodes: typing.List[graph.Node]):
+def execute_edit_graph(edit_g: graph_editable.EditGraph) -> graph_editable.EditGraph:
     """In cases where an input is a Node, execute the Node"""
 
-    edit_g = graph_editable.EditGraph()
-    for node in nodes:
-        edit_g.add_node(node)
-
-    for edge in edit_g.edges:
+    for edge in edit_g.edges_with_replacements:
         actual_input_type = edge.output_of.type
         op_def = registry_mem.memory_registry.get_op(edge.input_to.from_op.name)
         if not isinstance(op_def.input_type, op_args.OpNamedArgs):
@@ -86,10 +82,7 @@ def insert_execute_nodes(nodes: typing.List[graph.Node]):
         if isinstance(actual_input_type, types.Function) and not isinstance(
             expected_input_type, types.Function
         ):
-            if (
-                expected_input_type.assign_type(actual_input_type.output_type)
-                == types.Invalid()
-            ):
+            if not expected_input_type.assign_type(actual_input_type.output_type):
                 raise Exception(
                     "invalid type chaining for Node. input_type: %s, op_input_type: %s"
                     % (actual_input_type, expected_input_type)
@@ -103,5 +96,4 @@ def insert_execute_nodes(nodes: typing.List[graph.Node]):
                     edge.input_to.type, edge.input_to.from_op.name, new_inputs
                 ),
             )
-
-    return [edit_g.get_node(n) for n in nodes]
+    return edit_g

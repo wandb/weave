@@ -21,7 +21,7 @@ def test_unnest():
 
 def test_op_list():
     node = list_.make_list(a=1, b=2, c=3)
-    assert node.type == types.List(types.Int())
+    assert types.List(types.Int()).assign_type(node.type)
 
 
 def test_typeof_groupresult():
@@ -92,3 +92,11 @@ def test_nested_functions():
     )
     mapped = rows.map(map_fn)
     assert weave.use(mapped) == [2.5]
+
+
+def test_concat():
+    list_node_1 = list_.make_list(a=1, b=2, c=3)
+    list_node_2 = list_.make_list(a=10, b=20, c=30)
+    list_node_3 = list_.make_list(a=list_node_1, b=list_node_2)
+    concat_list = list_node_3.concat()
+    assert weave.use(concat_list) == [1, 2, 3, 10, 20, 30]

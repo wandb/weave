@@ -37,18 +37,20 @@ def save(obj, name):
 def usedby_output_type(op_name: str) -> types.Type:
     op_def = registry_mem.memory_registry.get_op(op_name)
 
-    if callable(op_def.output_type):
-        # We can certainly fix this. But this would be a really cool case for
-        # type variables. If this op outputs an output type with variables,
-        # we could include them in the returned type here.
-        # TODO: Fix
-        raise errors.WeaveInternalError(
-            "asking for used_by of op with callable output type not yet supported"
-        )
+    if not callable(op_def.output_type):
+        ot = op_def.output_type
+    else:
+        ot = op_def.concrete_output_type
+        if isinstance(ot, types.UnknownType):
+            # We can certainly fix this. But this would be a really cool case for
+            # type variables. If this op outputs an output type with variables,
+            # we could include them in the returned type here.
+            # TODO: Fix
+            raise errors.WeaveInternalError(
+                "asking for used_by of op with callable output type not yet supported"
+            )
 
-    return types.List(
-        types.RunType(inputs=op_def.input_type.weave_type(), output=op_def.output_type)
-    )
+    return types.List(types.RunType(inputs=op_def.input_type.weave_type(), output=ot))
 
 
 def used_by_callable_output_type(input_type) -> types.Type:
@@ -112,8 +114,17 @@ def op_get_return_type(uri):
     return refs.Ref.from_str(uri).type
 
 
+def get_const_val(list_type_or_node):
+    if isinstance(list_type_or_node, Node):
+        return get_const_val(list_type_or_node.type)
+    elif isinstance(list_type_or_node, types.Const):
+        return list_type_or_node.val
+    else:
+        raise errors.WeaveExpectedConstError("Expected a const value passed to `get`")
+
+
 def op_get_return_type_from_inputs(inputs):
-    return op_get_return_type(inputs["uri"].val)
+    return op_get_return_type(get_const_val(inputs["uri"]))
 
 
 @op(name="getReturnType", input_type={"uri": types.String()}, output_type=types.Type())

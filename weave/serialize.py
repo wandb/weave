@@ -39,7 +39,7 @@ def _serialize_node(node: NodeOrOp, serialized_nodes: MapNodeOrOpToSerialized) -
         return op_id
     if isinstance(node, graph.ConstNode):
         equiv_output_node = node.equivalent_output_node()
-        if equiv_output_node:
+        if equiv_output_node is not None:
             return _serialize_node(equiv_output_node, serialized_nodes)
         if isinstance(node.type, types.Function):
             op_id = _serialize_node(node.val.from_op, serialized_nodes)
@@ -125,6 +125,7 @@ def _deserialize_node(
     if node["nodeType"] == "const":
         if isinstance(node["type"], dict) and node["type"]["type"] == "function":
             fn_body_node = node["val"]
+            parsed_fn_body_node: graph.Node
             if fn_body_node["nodeType"] == "var":
                 parsed_fn_body_node = weave_internal.make_var_node(
                     types.TypeRegistry.type_from_dict(fn_body_node["type"]),
@@ -142,9 +143,13 @@ def _deserialize_node(
                     params[param_name] = _deserialize_node(
                         param_node_index, nodes, parsed_nodes, hashed_nodes
                     )
-
+                node_type = types.TypeRegistry.type_from_dict(node["type"])
+                if not isinstance(node_type, types.Function):
+                    raise errors.WeaveInternalError(
+                        "expected function type, got %s" % node_type
+                    )
                 parsed_fn_body_node = weave_internal.make_output_node(
-                    types.TypeRegistry.type_from_dict(node["type"]).output_type,
+                    node_type.output_type,
                     op["name"],
                     params,
                 )

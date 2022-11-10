@@ -5,6 +5,8 @@ TODO: this file is not complete. We should try to put all compability fixes here
 """
 import typing
 import copy
+
+from . import weave_types
 from . import graph
 from . import weave_types
 

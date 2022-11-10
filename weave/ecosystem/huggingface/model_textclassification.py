@@ -120,7 +120,7 @@ def full_text_classification_output_render(
             "output": weave.panels.LabeledItem(
                 label="output",
                 item=weave.panels.Plot(
-                    output.model_output,
+                    input_node=typing.cast(weave.Node, output.model_output),
                     x=lambda class_score: class_score["score"],
                     y=lambda class_score: class_score["label"],
                 ),

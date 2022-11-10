@@ -25,13 +25,16 @@ torchvision
 bertviz
 datasets
 transformers<4.21
-tensorflow
+tensorflow>=1.15.2 ; sys_platform!='darwin' or platform_machine!='arm64'
+tensorflow-macos ; sys_platform=='darwin' and platform_machine=='arm64'
 rich
 plotly
 replicate
 protobuf==3.20.0
-                                                         
 
 # spaCy Requirements:
 spacy>=3.0.0,<4.0.0
 en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.4.0/en_core_web_sm-3.4.0.tar.gz
+
+# string-levenshtein op:
+levenshtein

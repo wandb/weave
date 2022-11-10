@@ -1,11 +1,18 @@
 import os
+import random
+import numpy as np
 
+import typing
 import pytest
 import shutil
 import tempfile
 from . import context_state
 from . import weave_server
 from . import fixture_fakewandb
+from . import serialize
+from . import client
+
+from flask.testing import FlaskClient
 
 
 ### Disable datadog engine tracing
@@ -83,3 +90,67 @@ def fake_wandb():
     setup_response = fixture_fakewandb.setup()
     yield
     fixture_fakewandb.teardown(setup_response)
+
+
+@pytest.fixture()
+def fixed_random_seed():
+    random.seed(8675309)
+    np.random.seed(8675309)
+    yield
+    random.seed(None)
+    np.random.seed(None)
+
+
+@pytest.fixture()
+def app():
+    app = weave_server.make_app()
+    app.config.update(
+        {
+            "TESTING": True,
+        }
+    )
+
+    yield app
+
+
+class HttpServerTestClient:
+    def __init__(self, flask_test_client: FlaskClient):
+        """Constructor.
+
+        Args:
+            flask_test_client: A flask test client to use for sending requests to the test application
+        """
+        self.flask_test_client = flask_test_client
+        self.execute_endpoint = "/__weave/execute"
+
+    def execute(
+        self,
+        nodes,
+        headers: typing.Optional[dict[str, typing.Any]] = None,
+        no_cache=False,
+    ):
+
+        _headers: dict[str, typing.Any] = {}
+        if headers is not None:
+            _headers = headers
+
+        serialized = serialize.serialize(nodes)
+        r = self.flask_test_client.post(
+            self.execute_endpoint,
+            json={"graphs": serialized},
+            headers=_headers,
+        )
+
+        return r.json["data"]
+
+
+@pytest.fixture()
+def http_server_test_client(app):
+    app = weave_server.make_app()
+    flask_client = app.test_client()
+    return HttpServerTestClient(flask_client)
+
+
+@pytest.fixture()
+def weave_test_client(http_server_test_client):
+    return client.Client(http_server_test_client)

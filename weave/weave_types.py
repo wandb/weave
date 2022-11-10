@@ -9,6 +9,10 @@ from . import box
 from . import errors
 from . import mappers_python
 
+if typing.TYPE_CHECKING:
+    from .refs import Ref
+    from .artifacts_local import Artifact
+
 
 def to_weavejs_typekey(k: str) -> str:
     if k == "object_type":
@@ -59,10 +63,6 @@ def instance_class_to_potential_type(cls):
 
 
 def type_class_type_name(type_class):
-    try:
-        return type_class.__dict__["name"]
-    except KeyError:
-        pass
     if hasattr(type_class, "class_type_name"):
         return type_class.class_type_name()
 
@@ -84,13 +84,6 @@ def type_name_to_type(type_name):
     return mapping.get(type_name)
 
 
-# js_compat: we don't have Tag types in Weave Python yet. Just remove them
-def unwrap_tag_type(serialized_type):
-    if isinstance(serialized_type, dict) and serialized_type.get("type") == "tagged":
-        return serialized_type["value"]
-    return serialized_type
-
-
 class TypeRegistry:
     @staticmethod
     def has_type(obj):
@@ -105,9 +98,13 @@ class TypeRegistry:
         return type_classes[-1]
 
     @staticmethod
-    def type_of(obj):
+    def type_of(obj: typing.Any) -> "Type":
         if isinstance(obj, Type):
             return Type()
+
+        obj_type = type_name_to_type("tagged").type_of(obj)
+        if obj_type is not None:
+            return obj_type
 
         # use reversed instance_class_to_potential_type so our result
         # is the most specific type.
@@ -119,7 +116,7 @@ class TypeRegistry:
         # representation of whatever the type is, not the actual type.
         #
         # TODO: Its a small that we need to hardcode here. Fix this.
-        potential_types = instance_class_to_potential_type(type(obj))
+        potential_types = instance_class_to_potential_type(type(obj))  # type: ignore
         if "function" in (t.name for t in potential_types):
             potential_types = [Function]
 
@@ -140,8 +137,7 @@ class TypeRegistry:
         raise errors.WeaveTypeError("no Type for obj: (%s) %s" % (type(obj), obj))
 
     @staticmethod
-    def type_from_dict(d):
-        d = unwrap_tag_type(d)
+    def type_from_dict(d: typing.Union[str, dict]) -> "Type":
         # The javascript code sends simple types as just strings
         # instead of {'type': 'string'} for example
         type_name = d["type"] if isinstance(d, dict) else d
@@ -153,23 +149,39 @@ class TypeRegistry:
         return type_.from_dict(d)
 
 
+def _clear_global_type_class_cache():
+    instance_class_to_potential_type.cache_clear()
+    type_name_to_type_map.cache_clear()
+    type_name_to_type.cache_clear()
+
+
+# Addapted from https://stackoverflow.com/questions/18126552/how-to-run-code-when-a-class-is-subclassed
+class _TypeSubclassWatcher(type):
+    def __init__(cls, name, bases, clsdict):
+        # This code will run whenever `Type` is subclassed!
+        # Bust the cache!
+        _clear_global_type_class_cache()
+        super(_TypeSubclassWatcher, cls).__init__(name, bases, clsdict)
+
+
 @dataclasses.dataclass(frozen=True)
-class Type:
+class Type(metaclass=_TypeSubclassWatcher):
     # @decorator_class.weave_class attaches this
     NodeMethodsClass: typing.ClassVar[typing.Optional[type]]
-
     instance_class: typing.ClassVar[typing.Optional[type]]
     instance_classes: typing.ClassVar[
         typing.Union[type, typing.List[type], None]
     ] = None
 
     def __repr__(self):
-        return "<Type>"
+        return f"<{self.name}>"
 
     @classmethod
     def class_type_name(cls):
         if cls == Type:
             return "type"
+        if hasattr(cls, "name") and type(cls.name) == str:
+            return cls.name
         return cls.__name__.removesuffix("Type")
 
     @classmethod
@@ -204,7 +216,7 @@ class Type:
         return None
 
     @classmethod
-    def type_of(cls, obj):
+    def type_of(cls, obj) -> typing.Optional["Type"]:
         if not cls.is_instance(obj):
             return None
         return cls.type_of_instance(obj)
@@ -222,18 +234,50 @@ class Type:
     def instance_class(self):
         return self._instance_classes()[-1]
 
-    def assign_type(self, next_type):
-        if isinstance(next_type, self.__class__):
-            for prop_name in self.type_vars():
-                if isinstance(
-                    getattr(self, prop_name).assign_type(getattr(next_type, prop_name)),
-                    Invalid,
-                ):
-                    return Invalid()
-            return next_type
-        return Invalid()
+    def assign_type(self, next_type: "Type") -> bool:
+        TaggedValueType = type_name_to_type("tagged")
+        if isinstance(next_type, Const):
+            return self.assign_type(next_type.val_type)
+        elif isinstance(next_type, UnionType):
+            for t in next_type.members:
+                if not self.assign_type(t):
+                    return False
+            return True
+        elif isinstance(next_type, TaggedValueType) and not isinstance(
+            self, TaggedValueType
+        ):
+            return self.assign_type(next_type.value)
+        return self._assign_type_inner(next_type)
 
-    def to_dict(self):
+    def _assign_type_inner(self, next_type: "Type") -> bool:
+        if self.__class__ == next_type.__class__ or (
+            (self.__class__ != Type and next_type.__class__ != Type)
+            and (
+                isinstance(next_type, self.__class__)
+                or
+                # parent is assignable to child class
+                #     when type variables match
+                # TODO: only valid when python hiearchy matches type hierarchy!
+                #     And no Abstract classes (Type)
+                isinstance(self, next_type.__class__)
+            )
+        ):
+            # if isinstance(next_type, self.__class__):
+            if callable(self.type_vars):
+                type_vars = self.type_vars()
+            else:
+                type_vars = self.type_vars
+            for prop_name in type_vars:
+                if not hasattr(next_type, prop_name):
+                    return False
+                if not getattr(self, prop_name).assign_type(
+                    getattr(next_type, prop_name)
+                ):
+                    return False
+            return True
+        return False
+
+    def to_dict(self) -> typing.Union[dict, str]:
         if self.__class__ == Type:
             return "type"
         d = {"type": self.name}
@@ -257,14 +301,16 @@ class Type:
         fields = dataclasses.fields(cls)
         type_attrs = {}
         for field in fields:
-            type_attrs[field.name] = TypeRegistry.type_from_dict(
-                d[to_weavejs_typekey(field.name)]
-            )
+            field_name = to_weavejs_typekey(field.name)
+            if field_name in d:
+                type_attrs[field.name] = TypeRegistry.type_from_dict(d[field_name])
         return cls(**type_attrs)
 
     # save_instance/load_instance on Type are used to save/load actual Types
     # since type_of(types.Int()) == types.Type()
-    def save_instance(self, obj, artifact, name) -> typing.Optional[list[str]]:
+    def save_instance(
+        self, obj, artifact, name
+    ) -> typing.Optional[typing.Union[list[str], "Ref"]]:
         d = None
         if self.__class__ == Type:
             d = obj.to_dict()
@@ -282,7 +328,9 @@ class Type:
             json.dump(d, f)
         return None
 
-    def load_instance(self, artifact, name, extra=None):
+    def load_instance(
+        self, artifact: "Artifact", name: str, extra: typing.Optional[list[str]] = None
+    ) -> typing.Any:
         with artifact.open(f"{name}.object.json") as f:
             d = json.load(f)
         if self.__class__ == Type:
@@ -294,6 +342,14 @@ class Type:
 
     def instance_from_dict(self, d):
         raise NotImplementedError
+
+    @classmethod
+    def make(cls, kwargs={}):
+        return cls._make(cls, kwargs)
+
+    @staticmethod
+    def _make(cls, kwargs={}):
+        raise Exception("Please import `weave` to use `Type.make`.")
 
 
 # _PlainStringNamedType should only be used for backward compatibility with
@@ -330,20 +386,12 @@ class Invalid(BasicType):
 
     instance_classes = InvalidPy
 
-    def assign_type(self, next_type):
-        if isinstance(next_type, Invalid):
-            # TODO: We're supposed to return a type, but master
-            # has been changed to return a boolean. We can
-            # delete this method after merging.
-            return True
-        return next_type
-
 
 class UnknownType(BasicType):
     name = "unknown"
 
-    def assign_type(self, next_type):
-        return next_type
+    def _assign_type_inner(self, next_type):
+        return True
 
 
 # TODO: Tim has this as ConstType(None), but how is that serialized?
@@ -373,7 +421,7 @@ class Any(BasicType):
     name = "any"
 
     def assign_type(self, next_type):
-        return Any()
+        return True
 
 
 @dataclasses.dataclass(frozen=True)
@@ -394,10 +442,10 @@ class Const(Type):
             # This does a check on class equality, so won't work for
             # fancier types. We can fix later if we need to.
             if self.__class__ != next_type.__class__:
-                return Invalid()
+                return False
             if self.val == next_type.val:
-                return self
-        return self.val_type.assign_type(next_type)
+                return True
+        return False
 
     @classmethod
     def from_dict(cls, d):
@@ -433,12 +481,9 @@ class Float(Number):
     instance_classes = float
     name = "float"
 
-    def assign_type(self, other_type: Type):
+    def _assign_type_inner(self, other_type: Type):
         # Float if either side is a number
-        if isinstance(other_type, Float) or isinstance(other_type, Int):
-            return Float()
-        else:
-            return Invalid()
+        return isinstance(other_type, Number)
 
 
 class Int(Number):
@@ -452,14 +497,9 @@ class Int(Number):
             return False
         return super().is_instance(obj)
 
-    def assign_type(self, other_type: Type):
+    def _assign_type_inner(self, other_type: Type):
         # Become Float if rhs is Float
-        if isinstance(other_type, Float):
-            return Float()
-        elif isinstance(other_type, Int):
-            return Int()
-        else:
-            return Invalid()
+        return isinstance(other_type, Number)
 
 
 class Boolean(BasicType):
@@ -522,11 +562,11 @@ class UnionType(Type):
     def assign_type(self, other):
         if isinstance(other, UnionType):
             if not all(self.assign_type(member) for member in other.members):
-                return Invalid()
-            return self
-        if any(member.assign_type(other) == Invalid() for member in self.members):
-            return Invalid()
-        return self
+                return False
+            return True
+        if any(member.assign_type(other) for member in self.members):
+            return True
+        return False
 
     # def instance_to_py(self, obj):
     #     # Figure out which union member this obj is, and delegate to that
@@ -562,10 +602,10 @@ class List(Type):
             list_obj_type = merge_types(list_obj_type, obj_type)
         return cls(list_obj_type)
 
-    def assign_type(self, next_type):
+    def _assign_type_inner(self, next_type):
         if isinstance(next_type, List) and next_type.object_type == UnknownType():
-            return self
-        return super().assign_type(next_type)
+            return True
+        return super()._assign_type_inner(next_type)
 
     def save_instance(self, obj, artifact, name):
         serializer = mappers_python.map_to_python(self, artifact)
@@ -590,17 +630,16 @@ class TypedDict(Type):
         # Can't hash property_types by default because dict is not hashable
         return hash(tuple((k, v) for k, v in self.property_types.items()))
 
-    def assign_type(self, other_type):
+    def _assign_type_inner(self, other_type):
         if not isinstance(other_type, TypedDict):
-            return Invalid()
+            return False
 
         for k, ptype in self.property_types.items():
-            if (
-                k not in other_type.property_types
-                or ptype.assign_type(other_type.property_types[k]) == Invalid()
+            if k not in other_type.property_types or not ptype.assign_type(
+                other_type.property_types[k]
             ):
-                return Invalid()
-        return self
+                return False
+        return True
 
     def _to_dict(self):
         property_types = {}
@@ -641,8 +680,8 @@ class TypedDict(Type):
 class Dict(Type):
     name = "dict"
 
-    key_type: Type
-    object_type: Type
+    key_type: Type = String()
+    object_type: Type = Any()
 
     def __post_init__(self):
         # Note this differs from Python's Dict in that keys are always strings!
@@ -651,18 +690,18 @@ class Dict(Type):
         if not isinstance(self.key_type, String):
             raise Exception("Dict only supports string keys!")
 
-    def assign_type(self, other_type):
+    def _assign_type_inner(self, other_type):
         if isinstance(other_type, Dict):
             next_key_type = self.key_type.assign_type(other_type.key_type)
-            if isinstance(next_key_type, Invalid):
-                next_key_type = UnionType(self.key_type, other_type.key_type)
+            if not next_key_type:
+                return False
             next_value_type = self.object_type.assign_type(other_type.object_type)
-            if isinstance(next_value_type, Invalid):
-                next_value_type = UnionType(self.object_type, other_type.object_type)
+            if not next_value_type:
+                return False
+            return True
         else:
             # TODO: we could handle TypedDict here.
-
-            return Invalid()
+            return False
 
     @classmethod
     def type_of_instance(cls, obj):
@@ -681,9 +720,6 @@ class ObjectType(Type):
 
     def property_types(self):
         return {}
-
-    def variable_property_types(self):
-        return self.type_vars()
 
     @classmethod
     def type_of_instance(cls, obj):
@@ -836,7 +872,7 @@ def optional(type_):
     return UnionType(none_type, type_)
 
 
-def is_optional(type_):
+def is_optional(type_: Type) -> bool:
     return isinstance(type_, UnionType) and none_type in type_.members
 
 
@@ -987,15 +1023,15 @@ def merge_types(a: Type, b: Type) -> Type:
         for key in all_keys_dict.keys():
             self_prop_type = a.property_types.get(key, none_type)
             other_prop_type = b.property_types.get(key, none_type)
-            next_prop_type = self_prop_type.assign_type(other_prop_type)
-            if isinstance(next_prop_type, Invalid):
+            next_prop_type = self_prop_type
+            if not self_prop_type.assign_type(other_prop_type):
                 next_prop_type = UnionType(self_prop_type, other_prop_type)
             next_prop_types[key] = next_prop_type
         return TypedDict(next_prop_types)
     return UnionType(a, b)
 
 
-def union(*members: list[Type]) -> Type:
+def union(*members: Type) -> Type:
     t = UnionType(*members)
     if len(t.members) == 1:
         return t.members[0]
@@ -1030,3 +1066,6 @@ def type_is_variable(t: Type) -> bool:
         return any(type_is_variable(sub_t) for sub_t in t.property_types.values())
     else:
         return any(type_is_variable(sub_t) for sub_t in t.type_vars().values())
+
+
+NumberBinType = TypedDict({"start": Float(), "stop": Float()})

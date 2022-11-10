@@ -1,70 +1,17 @@
 # TODO: rename this file to op_call.py
-import collections
-import inspect
-
+import typing
 from . import graph
 from . import weave_types as types
 from . import context_state
 from . import weave_internal
-from . import errors
 from . import api
+from . import registry_mem
+from . import errors
+from . import op_def
+from . import op_args
+from . import dispatch
+from . import pyfunc_type_util
 from . import language_autocall
-
-
-def _ensure_node(fq_op_name, v, input_type, param_input_type, already_bound_params):
-    if callable(param_input_type):
-        already_bound_types = {k: n.type for k, n in already_bound_params.items()}
-        already_bound_types = language_autocall.update_input_types(
-            input_type,
-            already_bound_types,
-        )
-
-        param_input_type = param_input_type(already_bound_types)
-    if not isinstance(v, graph.Node):
-        if callable(v):
-            if not isinstance(param_input_type, types.Function):
-                raise errors.WeaveInternalError(
-                    "callable passed as argument, but type is not Function. Op: %s"
-                    % fq_op_name
-                )
-
-            # Allow passing in functions with fewer arguments then the op
-            # declares. E.g. for List.map I pass either of these:
-            #    lambda row, index: ...
-            #    lambda row: ...
-            sig = inspect.signature(v)
-            vars = {}
-            for name in list(param_input_type.input_types.keys())[
-                : len(sig.parameters)
-            ]:
-                vars[name] = param_input_type.input_types[name]
-
-            return weave_internal.define_fn(vars, v)
-        val_type = types.TypeRegistry.type_of(v)
-        # TODO: should type-check v here.
-        v = graph.ConstNode(val_type, v)
-    return v
-
-
-def _bind_params(fq_op_name, sig, args, kwargs, input_type):
-    bound_params = sig.bind(*args, **kwargs)
-    bound_params_with_constants = collections.OrderedDict()
-    for k, v in bound_params.arguments.items():
-        param = sig.parameters[k]
-        if param.kind == inspect.Parameter.VAR_KEYWORD:
-            for sub_k, sub_v in v.items():
-                bound_params_with_constants[sub_k] = _ensure_node(
-                    fq_op_name, sub_v, None, None, None
-                )
-        else:
-            bound_params_with_constants[k] = _ensure_node(
-                fq_op_name,
-                v,
-                input_type,
-                input_type.arg_types[k],
-                bound_params_with_constants,
-            )
-    return bound_params_with_constants
 
 
 def _make_output_node(
@@ -93,7 +40,7 @@ def _make_output_node(
     elif callable(output_type):
         new_input_type = {}
         for k, n in bound_params.items():
-            if isinstance(n, graph.ConstNode):
+            if isinstance(n, graph.ConstNode) and not isinstance(n.type, types.Const):
                 new_input_type[k] = types.Const(n.type, n.val)
             else:
                 new_input_type[k] = n.type
@@ -125,8 +72,32 @@ def _make_output_node(
         if node_methods_class not in bases:
             bases.append(node_methods_class)
 
-    return_type = type(name, tuple(bases), {})
+    unique_bases = []
+    for base in bases:
+        if base not in unique_bases:
+            unique_bases.append(base)
+    return_type = type(name, tuple(unique_bases), {})
     return return_type(output_type, fq_op_name, bound_params)
+
+
+def _type_of(v: typing.Any):
+    if callable(v):
+        input_type = pyfunc_type_util.determine_input_type(v, None, True)
+        output_type = pyfunc_type_util.determine_output_type(v, None, True)
+        if not isinstance(input_type, op_args.OpNamedArgs):
+            raise errors.WeaveInternalError("Function conversion requires named args")
+        if callable(output_type):
+            raise errors.WeaveInternalError(
+                "Function conversion does not support callable output types"
+            )
+        return types.Function(
+            input_type.arg_types,
+            output_type,
+        )
+    elif isinstance(v, graph.Node):
+        return v.type
+    else:
+        return types.TypeRegistry.type_of(v)
 
 
 def make_lazy_call(f, fq_op_name, input_type, output_type, refine_output_type):
@@ -142,15 +113,54 @@ def make_lazy_call(f, fq_op_name, input_type, output_type, refine_output_type):
         A lazy function with the same signature structure as f. The returned function accepts
         `graph.Node` arguments and will return a `graph.Node`
     """
-    if hasattr(f, "sig"):
-        sig = f.sig
-    else:
-        sig = inspect.signature(f)
 
     def lazy_call(*args, **kwargs):
-        bound_params = _bind_params(fq_op_name, sig, args, kwargs, input_type)
+        arg_types = [_type_of(a) for a in args]
+        kwarg_types = {k: _type_of(v) for k, v in kwargs.items()}
+        op = dispatch.get_op_for_input_types(
+            fq_op_name,
+            arg_types,
+            kwarg_types,
+        )
+
+        # IMPORTANT: there is one case where we expect to fall into here: list<dict>["a"].
+        # In this case, the outer list's `index` method will be called. This will result
+        # in no valid op being found, and we should try to use the inner pick op. This
+        # is one of the few "dispatch" hacks and could be avoided if we had different symbols:
+        if op is None and op_def.common_name(fq_op_name) == "index":
+            op = dispatch.get_op_for_input_types(
+                "pick",
+                arg_types,
+                kwarg_types,
+            )
+
+        if op is None:
+            # There is a parallel spot in compile.py which has a similar comment
+            # This indicates that we believe there is no valid op to accept the
+            # incoming data Before productionizing Weave, we should throw here -
+            # for now since assignability is still a bit off, we are a bit more
+            # relaxed. This is the case where we are not confident that any op
+            # is appropriate, so we just go with the one provided at runtime -
+            # not gaurenteed to be correct!
+            # raise errors.WeaveInternalError(
+            #     f"Could not find op for inputs {args} and {kwargs} for op {fq_op_name}"
+            # )
+            op = registry_mem.memory_registry.get_op(fq_op_name)
+
+            op_name = fq_op_name
+            op_output = output_type
+            op_refine = refine_output_type
+        else:
+            # We use URI in case it is versioned - this is the fully qualified name of the op
+            op_name = op.uri
+            op_output = op.output_type
+            op_refine = op.refine_output_type
+        bound_params = op.bind_params(args, kwargs)
         return _make_output_node(
-            fq_op_name, bound_params, input_type, output_type, refine_output_type
+            op_name,
+            bound_params,
+            op_output,
+            op_refine,
         )
 
     return lazy_call

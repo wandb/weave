@@ -1,5 +1,6 @@
 from __future__ import print_function
 
+import os
 import typing
 import logging
 
@@ -14,12 +15,15 @@ import viztracer
 import time
 import cProfile
 
+from weave.language_features.tagging.tag_store import isolated_tagging_context
+
 from . import graph
 from . import execute
 from . import serialize
 from . import storage
 from . import context
 from . import weave_types
+from . import util
 
 
 PROFILE = False
@@ -50,7 +54,9 @@ def _handle_request(request, deref=False):
         % (len(nodes), "\n".join(graph.node_expr_str(n) for n in nodes))
     )
     with context.execution_client():
-        result = execute.execute_nodes(nodes)
+        result = execute.execute_nodes(
+            nodes, no_cache=util.parse_boolean_env_var("WEAVE_NO_CACHE")
+        )
     if deref:
         result = [
             r if isinstance(n.type, weave_types.RefType) else storage.deref(r)
@@ -62,7 +68,11 @@ def _handle_request(request, deref=False):
         is_tracing = False
         tracer.stop()
         tracer.save(output_file="request_%s.json" % time.time())
-    result = [storage.to_python(r) for r in result]
+
+    # Forces output to be untagged
+    with isolated_tagging_context():
+        result = [storage.to_python(r) for r in result]
+
     logger.info("Server request done in: %ss" % (time.time() - start_time))
     return result
 

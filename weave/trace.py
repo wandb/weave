@@ -25,7 +25,7 @@ def get_obj_creator(ref: refs.Ref) -> typing.Optional[runs.Run]:
             run = refs.get_local_version(art_name, "latest")
             if isinstance(run.output, refs.Ref) and str(run.output) == str(ref):
                 # If any input is also the ref, this run did not create obj, since
-                # the obj already existed. This fixes an infinite loop where list-indexCheckpoint
+                # the obj already existed. This fixes an infinite loop where list-createIndexCheckpointTag
                 # which just returns its input would be treated as a the obj creator
                 # TODO: This whole thing is a pile of hacks, not production ready! Fix! We should
                 #     not need heuristics.

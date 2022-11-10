@@ -191,6 +191,10 @@ class DataFrameTable:
         except IndexError:
             return None
 
+    @op(output_type=lambda input_types: input_types["self"].object_type)
+    def index(self, index: int):
+        return self._index(index)
+
     @op(output_type=index_output_type)
     def __getitem__(self, index: int):
         return self._index(index)
@@ -201,7 +205,6 @@ class DataFrameTable:
 
     @op(
         input_type={
-            "self": types.List(types.Any()),
             "filter_fn": lambda input_types: types.Function(
                 {"row": input_types["self"].object_type}, types.Any()
             ),

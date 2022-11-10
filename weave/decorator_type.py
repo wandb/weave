@@ -6,12 +6,14 @@ from . import weave_types as types
 from . import infer_types
 from . import decorator_class
 from . import errors
+from . import decorator_op
 
 _py_type = type
 
 
 def type(__override_name: str = None):
     def wrap(target):
+
         dc = dataclasses.dataclass(target)
         fields = dataclasses.fields(dc)
         target_name = target.__name__
@@ -72,6 +74,28 @@ def type(__override_name: str = None):
 
         dc.WeaveType = TargetType
         decorator_class.weave_class(weave_type=TargetType)(dc)
+
+        # constructor op for this type. due to a circular dependency with ArrowWeave* types, we
+        # define the vectorized constructor ops in vectorize.py instead of here
+        @decorator_op.op(
+            name=f"op-{target_name.replace('-', '_')}",
+            input_type={
+                "attributes": types.TypedDict(
+                    {
+                        field.name: static_property_types.get(field.name, None)
+                        or type_vars[field.name]
+                        for field in fields
+                    }
+                )
+            },
+            output_type=TargetType(),
+            render_info={"type": "function"},
+        )
+        def constructor(attributes):
+            return dc(**{field.name: attributes[field.name] for field in fields})
+
+        dc.constructor = constructor
+
         return dc
 
     return wrap

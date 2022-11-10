@@ -92,16 +92,16 @@ class OpDefType(types.Type):
 
             # Try to figure out module imports from the function body
             # (in a real hacky way as a POC)
-            code += get_code_deps(obj.resolve_fn, obj._decl_locals)
+            code += get_code_deps(obj.raw_resolve_fn, obj._decl_locals)
 
             # Create TypedDict types for referenced TypedDicts
-            resolve_annotations = obj.resolve_fn.__annotations__
+            resolve_annotations = obj.raw_resolve_fn.__annotations__
             for k, type_ in resolve_annotations.items():
                 gen_type_code = generate_referenced_type_code(type_)
                 if gen_type_code is not None:
                     code += gen_type_code
 
-            code += textwrap.dedent(inspect.getsource(obj.resolve_fn))
+            code += textwrap.dedent(inspect.getsource(obj.raw_resolve_fn))
             with artifact.new_file(f"{name}.py") as f:
                 f.write(code)
 

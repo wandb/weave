@@ -16,3 +16,11 @@ class Client:
             r if isinstance(n.type, weave_types.RefType) else storage.deref(r)
             for (n, r) in zip(nodes, results)
         ]
+
+
+class NonCachingClient:
+    def __init__(self, server):
+        self.server = server
+
+    def execute(self, nodes):
+        return self.server.execute(nodes, no_cache=True)

@@ -2,11 +2,11 @@ import dataclasses
 import inspect
 import random
 import string
+import copy
 import typing
-import weave
 
+import weave
 from .. import graph
-from .. import weave_types as types
 from .. import weave_internal
 from .. import ops
 from .. import panel
@@ -48,6 +48,9 @@ class TableState:
     #     self._sort = []
     #     self._page_size = 10
     #     self._page = 0
+
+    def clone(self):
+        return copy.deepcopy(self)
 
     def _new_col_id(self):
         return "".join(
@@ -106,26 +109,29 @@ class TableState:
                 selected = ops.make_list(**make_list_args)
             self.columnSelectFunctions[col_id] = selected
 
-    # def to_json(self):
-    #     # TODO: its annoying that we have to manually rename everything to fix js
-    #     # v python conventions. Automate or settle on one.
-    #     columns = {
-    #         id: {"panelId": v["panel_id"], "panelConfig": v["panel_config"]}
-    #         for (id, v) in self._columns.items()
-    #     }
-    #     pre_filter_function = self._pre_filter_function.to_json()
-    #     column_select_functions = {
-    #         id: v.to_json() for (id, v) in self._column_select_functions.items()
-    #     }
-    #     return {
-    #         "autoColumns": self._auto_columns,
-    #         "columns": columns,
-    #         "preFilterFunction": pre_filter_function,
-    #         "columnNames": self._column_names,
-    #         "columnSelectFunctions": column_select_functions,
-    #         "order": self._order,
-    #         "groupBy": self._group_by,
-    #         "sort": self._sort,
-    #         "pageSize": self._page_size,
-    #         "page": self._page,
-    #     }
+    def __eq__(self, other):
+        return self.to_json() == other.to_json()
+
+    def to_json(self):
+        # TODO: its annoying that we have to manually rename everything to fix js
+        # v python conventions. Automate or settle on one.
+        columns = {
+            id: {"panelId": v["panel_id"], "panelConfig": v["panel_config"]}
+            for (id, v) in self._columns.items()
+        }
+        pre_filter_function = self._pre_filter_function.to_json()
+        column_select_functions = {
+            id: v.to_json() for (id, v) in self._column_select_functions.items()
+        }
+        return {
+            "autoColumns": self._auto_columns,
+            "columns": columns,
+            "preFilterFunction": pre_filter_function,
+            "columnNames": self._column_names,
+            "columnSelectFunctions": column_select_functions,
+            "order": self._order,
+            "groupBy": self._group_by,
+            "sort": self._sort,
+            "pageSize": self._page_size,
+            "page": self._page,
+        }

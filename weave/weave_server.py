@@ -6,15 +6,16 @@ import pathlib
 import warnings
 import json_log_formatter
 
+import traceback
 import ddtrace
 
 ddtrace.patch(logging=True)
 
-from flask import Flask
+from flask import Flask, Blueprint
 from flask import request
 from flask import abort
 from flask_cors import CORS, cross_origin
-from flask import send_from_directory, send_file
+from flask import send_from_directory, send_file, jsonify
 
 from weave import server
 from weave import registry_mem
@@ -81,6 +82,10 @@ def enable_stream_logging(level=logging.INFO):
     logger.addHandler(stream_handler)
 
 
+static_folder = os.path.join(os.path.dirname(__file__), "frontend")
+blueprint = Blueprint("weave", "weave-server", static_folder=static_folder)
+
+
 def make_app(log_filename=None):
     fs_logging_enabled = True
     log_file = log_filename or default_log_filename
@@ -127,18 +132,17 @@ def make_app(log_filename=None):
     if os.getenv("DD_ENV"):
         enable_datadog_logging()
 
-    return Flask(__name__, static_folder="frontend")
+    app = Flask(__name__)
+    app.register_blueprint(blueprint)
+
+    # Very important! We rely on key ordering on both sides!
+    app.config["JSON_SORT_KEYS"] = False
+    CORS(app, supports_credentials=True)
+
+    return app
 
 
-# This makes all server logs go into the notebook
-app = make_app()
-
-# Very important! We rely on key ordering on both sides!
-app.config["JSON_SORT_KEYS"] = False
-CORS(app, supports_credentials=True)
-
-
-@app.route("/__weave/ops", methods=["GET"])
+@blueprint.route("/__weave/ops", methods=["GET"])
 def list_ops():
     ops = registry_mem.memory_registry.list_ops()
     ret = []
@@ -150,10 +154,20 @@ def list_ops():
     return {"data": ret}
 
 
-@app.route("/__weave/execute", methods=["POST"])
+def recursively_unwrap_unions(obj):
+    if isinstance(obj, list):
+        return [recursively_unwrap_unions(o) for o in obj]
+    if isinstance(obj, dict):
+        if "_union_id" in obj and "_val" in obj:
+            return recursively_unwrap_unions(obj["_val"])
+        else:
+            return {k: recursively_unwrap_unions(v) for k, v in obj.items()}
+    return obj
+
+
+@blueprint.route("/__weave/execute", methods=["POST"])
 def execute():
-    """Execute endpoint used by WeaveJS"""
-    # print('REQUEST', request, request.json)
+    """Execute endpoint used by WeaveJS."""
 
     current_span = ddtrace.tracer.current_span()
     if current_span and (
@@ -168,6 +182,9 @@ def execute():
     # import time
     # time.sleep(0.1)
     response = server.handle_request(request.json, deref=True)
+
+    # remove unions from the response
+    response = recursively_unwrap_unions(response)
 
     # MAJOR HACKING HERE
     # TODO: fix me
@@ -185,10 +202,13 @@ def execute():
     ):
         current_span.set_tag("response", response)
 
+    if request.headers.get("weave-shadow"):
+        response["data"] = []
+
     return response
 
 
-@app.route("/__weave/execute/v2", methods=["POST"])
+@blueprint.route("/__weave/execute/v2", methods=["POST"])
 def execute_v2():
     """Execute endpoint used by Weave Python"""
     # print('REQUEST', request, request.json)
@@ -200,7 +220,7 @@ def execute_v2():
     return {"data": response}
 
 
-@app.route("/__weave/file/<path:path>")
+@blueprint.route("/__weave/file/<path:path>")
 def send_js(path):
     # path is given relative to the FS root. check to see that path is a subdirectory of the
     # local artifacts path. if not, return 403. then if there is a cache scope function defined
@@ -214,47 +234,50 @@ def send_js(path):
     return send_from_directory("/", path)
 
 
-@app.route("/__weave/automate/<string:automation_id>/add_command", methods=["POST"])
+@blueprint.route(
+    "/__weave/automate/<string:automation_id>/add_command", methods=["POST"]
+)
 def automation_add_command(automation_id):
     automation.add_command(automation_id, request.json)
     return {"status": "ok"}
 
 
-@app.route("/__weave/automate/<string:automation_id>/commands_after/<int:after>")
+@blueprint.route("/__weave/automate/<string:automation_id>/commands_after/<int:after>")
 def automation_commands_after(automation_id, after):
     return {"commands": automation.commands_after(automation_id, after)}
 
 
-@app.route("/__weave/automate/<string:automation_id>/set_status", methods=["POST"])
+@blueprint.route(
+    "/__weave/automate/<string:automation_id>/set_status", methods=["POST"]
+)
 def automation_set_status(automation_id):
     automation.set_status(automation_id, request.json)
     return {"status": "ok"}
 
 
-@app.route("/__weave/automate/<string:automation_id>/status")
+@blueprint.route("/__weave/automate/<string:automation_id>/status")
 def automation_status(automation_id):
     return automation.get_status(automation_id)
 
 
-@app.route("/__frontend", defaults={"path": None})
-@app.route("/__frontend/<path:path>")
+@blueprint.route("/__frontend", defaults={"path": None})
+@blueprint.route("/__frontend/<path:path>")
 def frontend(path):
     """Serve the frontend with a simple fileserver over HTTP."""
-    full_path = pathlib.Path(app.static_folder) / path
+    full_path = pathlib.Path(blueprint.static_folder) / path
     if path and full_path.exists():
-        return send_from_directory(app.static_folder, path)
+        return send_from_directory(blueprint.static_folder, path)
     else:
-        return send_from_directory(app.static_folder, "index.html")
+        return send_from_directory(blueprint.static_folder, "index.html")
 
 
-@app.route("/tree-sitter.wasm")
-def tree_sitter_wasm():
-    return send_file(pathlib.Path(app.static_folder) / "tree-sitter.wasm")
-
-
-@app.route("/__weave/hello")
+@blueprint.route("/__weave/hello")
 def hello():
     return "hello"
+
+
+# This makes all server logs go into the notebook
+app = make_app()
 
 
 if __name__ == "__main__":

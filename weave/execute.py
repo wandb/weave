@@ -14,6 +14,7 @@ from . import errors
 from . import compile
 from . import forward_graph
 from . import graph
+from .language_features.tagging import tag_store
 from . import weave_types as types
 
 # Ops
@@ -25,6 +26,9 @@ from . import op_args
 from . import trace_local
 from . import refs
 
+# Language Features
+from . import language_nullability
+
 TRACE_LOCAL = trace_local.TraceLocal()
 
 
@@ -32,16 +36,19 @@ class ExecuteStats:
     def __init__(self):
         self.node_stats = []
 
-    def add_node(self, node, execution_time):
-        self.node_stats.append((node, execution_time))
+    def add_node(self, node, execution_time, cache_used):
+        self.node_stats.append((node, execution_time, cache_used))
 
     def summary(self):
         op_counts = {}
-        for node, t in self.node_stats:
+        for node, t, cache_used in self.node_stats:
             if isinstance(node, graph.OutputNode):
-                op_counts.setdefault(node.from_op.name, {"count": 0, "total_time": 0})
+                op_counts.setdefault(
+                    node.from_op.name, {"count": 0, "total_time": 0, "cache_used": 0}
+                )
                 op_counts[node.from_op.name]["count"] += 1
                 op_counts[node.from_op.name]["total_time"] += t
+                op_counts[node.from_op.name]["cache_used"] += int(cache_used)
         for stats in op_counts.values():
             stats["avg_time"] = stats["total_time"] / stats["count"]
         sortable_stats = [(k, v) for k, v in op_counts.items()]
@@ -51,15 +58,32 @@ class ExecuteStats:
         )
 
 
+def is_panelplot_data_fetch_query(node: graph.Node) -> bool:
+    if isinstance(node, graph.OutputNode) and node.from_op.name == "list":
+        return all(
+            map(
+                lambda input: isinstance(input, graph.OutputNode)
+                and input.from_op.name == "unnest",
+                node.from_op.inputs.values(),
+            )
+        )
+    return False
+
+
 def execute_nodes(nodes, no_cache=False):
     nodes = compile.compile(nodes)
-    fg = forward_graph.ForwardGraph(nodes)
 
-    stats = execute_forward(fg, no_cache=no_cache)
-    summary = stats.summary()
-    logging.info("Execution summary\n%s" % pprint.pformat(summary))
+    # hack: disable caching for panelplot
+    no_cache |= any([is_panelplot_data_fetch_query(node) for node in nodes])
+    with tag_store.isolated_tagging_context():
+        fg = forward_graph.ForwardGraph(nodes)
 
-    return [fg.get_result(n) for n in nodes]
+        stats = execute_forward(fg, no_cache=no_cache)
+        summary = stats.summary()
+        logging.info("Execution summary\n%s" % pprint.pformat(summary))
+
+        res = [fg.get_result(n) for n in nodes]
+    return res
 
 
 def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteStats:
@@ -78,7 +102,14 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
                     "op.%s" % graph.op_full_name(forward_node.node.from_op)
                 )
             try:
-                execute_forward_node(fg, forward_node, no_cache=no_cache)
+                with tag_store.set_curr_node(
+                    id(forward_node.node),
+                    [
+                        id(input_node)
+                        for input_node in forward_node.node.from_op.inputs.values()
+                    ],
+                ):
+                    report = execute_forward_node(fg, forward_node, no_cache=no_cache)
             except:
                 logging.error(
                     "Exception during execution of: %s" % str(forward_node.node)
@@ -87,7 +118,9 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
             finally:
                 if span is not None:
                     span.finish()
-            stats.add_node(forward_node.node, time.time() - start_time)
+            stats.add_node(
+                forward_node.node, time.time() - start_time, report["cache_used"]
+            )
         for forward_node in running_now:
             for downstream_forward_node in forward_node.input_to:
                 ready_to_run = True
@@ -138,21 +171,34 @@ def is_run_op(op_call: graph.Op):
     return False
 
 
+# the results of these ops will not be cached.
+CACHE_DISALLOWLIST = [
+    "list",
+    "unnest",
+]
+
+
+class NodeExecutionReport(typing.TypedDict):
+    cache_used: bool
+
+
 def execute_forward_node(
     fg: forward_graph.ForwardGraph,
     forward_node: forward_graph.ForwardNode,
     no_cache=False,
-):
+) -> NodeExecutionReport:
     use_cache = not no_cache
-    # use_cache = False
     node = forward_node.node
     if isinstance(node, graph.ConstNode):
-        return
+        return {"cache_used": False}
 
     logging.debug("Executing node: %s" % node)
 
     op_def = registry_mem.memory_registry.get_op(node.from_op.name)
     input_nodes = node.from_op.inputs
+
+    # disable caching if op is in the cache disallowlist
+    use_cache &= op_def.name not in CACHE_DISALLOWLIST
 
     input_refs: dict[str, refs.Ref] = {}
     for input_name, input_node in input_nodes.items():
@@ -169,13 +215,13 @@ def execute_forward_node(
             # Watch out, we handle loading async runs in different ways.
             if op_def.is_async:
                 forward_node.set_result(run)
-                return
+                return {"cache_used": use_cache}
             else:
                 if run.output is not None:
                     # if isinstance(run._output, artifacts_local.LocalArtifact):
                     #     print('OUTPUT REF TYPE OBJ TYPE', )
                     forward_node.set_result(run.output)
-                    return
+                    return {"cache_used": use_cache}
             logging.debug("Actually nevermind, didnt return")
             # otherwise, the run's output was not saveable, so we need
             # to recompute it.
@@ -197,24 +243,7 @@ def execute_forward_node(
         forward_node.set_result(run)
     else:
         logging.debug("Executing sync op")
-
-        # Hacking... this is nullability of ops
-        # We should do this as a compile pass instead of hard-coding in engine.
-        # That means we need an op called like "handle_null" that takes a function
-        # as its second argument. Function is the op we want to execute if non-null.
-        # TODO: fix
-        # TODO: not implemented for async ops
-        force_none_result = False
-        if inputs:
-            input_name0 = list(inputs.keys())[0]
-            input0 = list(inputs.values())[0]
-            if input0 is None or isinstance(input0, box.BoxedNone):
-                op_input_types = op_def.input_type
-                if isinstance(op_input_types, op_args.OpNamedArgs):
-                    input0_type = op_input_types.arg_types[input_name0]
-                    if not types.is_optional(input0_type):
-                        force_none_result = True
-        if force_none_result:
+        if language_nullability.should_force_none_result(inputs, op_def):
             result = None
         else:
             result = execute_sync_op(op_def, inputs)
@@ -257,3 +286,4 @@ def execute_forward_node(
             except errors.WeaveSerializeError:
                 pass
         logging.debug("Done executing node: %s" % node)
+    return {"cache_used": use_cache}

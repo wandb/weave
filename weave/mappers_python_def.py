@@ -12,6 +12,7 @@ from . import errors
 from . import box
 from . import mappers_python
 from . import val_const
+from .language_features.tagging import tagged_value_type
 
 
 class TypedDictToPyDict(mappers_weave.TypedDictMapper):
@@ -49,6 +50,8 @@ class ObjectDictToObject(mappers_weave.ObjectMapper):
         # that we want to include in the serialized representation.
         result = {}
         result_type = self._obj_type
+
+        # TODO: I think these are hacks in my branch. What do they do?
         instance_class = result_type._instance_classes()[0]
         constructor_sig = inspect.signature(instance_class)
         for k, serializer in self._property_serializers.items():
@@ -61,6 +64,7 @@ class ObjectDictToObject(mappers_weave.ObjectMapper):
                 else:
                     v = serializer.apply(obj_val)
                     result[k] = v
+
         for prop_name, prop_type in result_type.variable_property_types().items():
             if isinstance(prop_type, types.Const):
                 result[prop_name] = prop_type.val
@@ -87,7 +91,12 @@ class UnionToPyUnion(mappers_weave.UnionMapper):
             # TODO: assignment isn't right here (a dict with 'a', 'b' int keys is
             # assignable to a dict with an 'a' int key). We want type equality.
             # But that breaks some stuff
-            if member_type.assign_type(obj_type) != types.Invalid():
+            # TODO: Should types.TypeRegistry.type_of always return a const type??
+            if isinstance(member_type, types.Const) and not isinstance(
+                obj_type, types.Const
+            ):
+                obj_type = types.Const(obj_type, obj)
+            if member_type.assign_type(obj_type):
                 result = member_mapper.apply(obj)
                 if isinstance(result, dict):
                     result["_union_id"] = i
@@ -280,6 +289,8 @@ def map_to_python_(type, mapper, artifact, path=[]):
         return UnionToPyUnion(type, mapper, artifact, path)
     elif isinstance(type, types.ObjectType):
         return ObjectToPyDict(type, mapper, artifact, path)
+    elif isinstance(type, tagged_value_type.TaggedValueType):
+        return tagged_value_type.TaggedValueToPy(type, mapper, artifact, path)
     elif isinstance(type, types.Boolean):
         return BoolToPyBool(type, mapper, artifact, path)
     elif isinstance(type, types.Int):
@@ -321,6 +332,8 @@ def map_from_python_(type: types.Type, mapper, artifact, path=[]):
         return ListToPyList(type, mapper, artifact, path)
     elif isinstance(type, types.UnionType):
         return PyUnionToUnion(type, mapper, artifact, path)
+    elif isinstance(type, tagged_value_type.TaggedValueType):
+        return tagged_value_type.TaggedValueFromPy(type, mapper, artifact, path)
     elif isinstance(type, types.Boolean):
         return BoolToPyBool(type, mapper, artifact, path)
     elif isinstance(type, types.Int):

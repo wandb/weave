@@ -32,7 +32,11 @@ class Registry:
     ):
         op_uri = uri.uri if uri is not None else op.uri
         op.lazy_call = lazy.make_lazy_call(
-            op.resolve_fn, op_uri, op.input_type, op.output_type, op.refine_output_type
+            op.raw_resolve_fn,
+            op_uri,
+            op.input_type,
+            op.output_type,
+            op.refine_output_type,
         )
         op.eager_call = lazy.make_eager_call(op.lazy_call, op)
         op.call_fn = lazy.make_call(op.eager_call, op.lazy_call)
@@ -50,6 +54,7 @@ class Registry:
             location = ref.artifact.location
         version = location.version if location is not None else None
         op.version = version
+        op.location = location
 
         self._make_op_calls(op, location)
         # if not is_loading:
@@ -80,6 +85,9 @@ class Registry:
             if op_def.call_fn == lazy_local_fn:
                 return op_def
         raise Exception("Op def doesn't exist for %s" % lazy_local_fn)
+
+    def find_ops_by_common_name(self, common_name: str) -> typing.List[op_def.OpDef]:
+        return [op for op in self._ops.values() if op.common_name == common_name]
 
     def list_ops(self) -> typing.List[op_def.OpDef]:
         for op_ref in storage.objects(op_def_type.OpDefType()):

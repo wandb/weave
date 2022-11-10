@@ -4,6 +4,7 @@ import typing
 
 from wandb.apis import public as wandb_api
 
+from .run_segment import RunSegment, run_segment_render
 from ..api import op, weave_class
 from .. import weave_types as types
 from . import wbartifact
@@ -12,6 +13,7 @@ from .wbmedia import *
 from .. import errors
 from .. import artifacts_local
 from ..wandb_api import wandb_public_api
+from ..language_features.tagging import make_tag_getter_op
 
 
 class OrgType(types._PlainStringNamedType):
@@ -111,6 +113,10 @@ class WBRun:
     # @staticmethod  # TODO: doesn't work
     def jobtype(run: wandb_api.Run) -> str:
         return run.jobType
+
+    @op()
+    def name(run: wandb_api.Run) -> str:
+        return run.name
 
 
 @dataclasses.dataclass(frozen=True)
@@ -334,3 +340,53 @@ class Project:
 @op(name="root-project")
 def project(entityName: str, projectName: str) -> wandb_api.Project:
     return wandb_public_api().project(name=projectName, entity=entityName)
+
+
+project_tag_getter_op = make_tag_getter_op.make_tag_getter_op(
+    "project", ProjectType(), op_name="tag-project"
+)
+
+
+# We don't have proper `wandb` SDK classes for these types so we use object types for now
+@weave.type()
+class ArtifactCollection:
+    project: wandb_api.Project
+    artifactName: str
+
+
+@op(name="project-artifact")
+def project_artifact(
+    project: wandb_api.Project, artifactName: str
+) -> ArtifactCollection:
+    return ArtifactCollection(project=project, artifactName=artifactName)
+
+
+@weave.type()
+class ArtifactCollectionMembership:
+    artifactCollection: ArtifactCollection
+    aliasName: str
+
+
+@op(name="artifact-membershipForAlias")
+def artifact_membership_for_alias(
+    artifact: ArtifactCollection, aliasName: str
+) -> ArtifactCollectionMembership:
+    return ArtifactCollectionMembership(
+        artifactCollection=artifact, aliasName=aliasName
+    )
+
+
+@op(name="artifactMembership-artifactVersion")
+def artifact_membership_version(
+    artifactMembership: ArtifactCollectionMembership,
+) -> artifacts_local.WandbArtifact:
+    wb_artifact = wandb_public_api().artifact(
+        "%s/%s/%s:%s"
+        % (
+            artifactMembership.artifactCollection.project.entity,
+            artifactMembership.artifactCollection.project.name,
+            artifactMembership.artifactCollection.artifactName,
+            artifactMembership.aliasName,
+        )
+    )
+    return artifacts_local.WandbArtifact.from_wb_artifact(wb_artifact)

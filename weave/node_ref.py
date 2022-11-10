@@ -66,6 +66,7 @@ def node_to_ref(node: graph.Node) -> typing.Optional[refs.Ref]:
             # then our "ref extra is list of string" solution doesn't work.
             # TODO: fix
             or node.from_op.name.endswith("pick")
+            or node.from_op.name.endswith("index")
         ):
             return None
         getitem_arg1 = list(node.from_op.inputs.values())[1]
