@@ -23,3 +23,17 @@ class Table(panel.Panel):
             self._set_default_nonauto_tablestate()
             for column_expr in kwargs["columns"]:
                 self.append_column(column_expr)
+
+    @property
+    def table_query(self):
+        return self._table_state
+
+    def append_column(self, expr, name=""):
+        if self._table_state is None:
+            self._set_default_nonauto_tablestate()
+        self._table_state.add_column(expr, name=name)
+
+    @property
+    def config(self):
+        state = self._table_state.to_json() if self._table_state else self._table_state
+        return {"tableState": state}
