@@ -116,22 +116,22 @@ class TableState:
         # TODO: its annoying that we have to manually rename everything to fix js
         # v python conventions. Automate or settle on one.
         columns = {
-            id: {"panelId": v["panel_id"], "panelConfig": v["panel_config"]}
-            for (id, v) in self._columns.items()
+            id: {"panelId": v.panelId, "panelConfig": v.panelConfig}
+            for (id, v) in self.columns.items()
         }
-        pre_filter_function = self._pre_filter_function.to_json()
+        pre_filter_function = self.preFilterFunction.to_json()
         column_select_functions = {
-            id: v.to_json() for (id, v) in self._column_select_functions.items()
+            id: v.to_json() for (id, v) in self.columnSelectFunctions.items()
         }
         return {
-            "autoColumns": self._auto_columns,
+            "autoColumns": self.autoColumns,
             "columns": columns,
             "preFilterFunction": pre_filter_function,
-            "columnNames": self._column_names,
+            "columnNames": self.columnNames,
             "columnSelectFunctions": column_select_functions,
-            "order": self._order,
-            "groupBy": self._group_by,
-            "sort": self._sort,
-            "pageSize": self._page_size,
-            "page": self._page,
+            "order": self.order,
+            "groupBy": self.groupBy,
+            "sort": self.sort,
+            "pageSize": self.pageSize,
+            "page": self.page,
         }

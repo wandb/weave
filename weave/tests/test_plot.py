@@ -10,16 +10,18 @@ from .test_run_segment import create_experiment
 
 def test_run_segment_plot_config():
     last_segment = create_experiment(1000, 3, 0.8)
+    weave.save(last_segment)
     config = Plot(last_segment.experiment())
     assert len(config.series) == 1
     assert all(
         isinstance(v, (graph.VoidNode, graph.ConstNode))
-        for v in config.series[0].table._column_select_functions.values()
+        for v in config.series[0].table.columnSelectFunctions.values()
     )
 
 
 def test_multi_series_plot_config_with_grouping():
     last_segment = create_experiment(1000, 3, 0.8)
+    weave.save(last_segment)
     plot = Plot(last_segment.experiment())
     plot.set_x(
         lambda row: weave.ops.number_bin(
@@ -43,13 +45,14 @@ def test_multi_series_plot_config_with_grouping():
     assert len(plot.series) == 2
     assert all(
         isinstance(v, (graph.VoidNode, graph.ConstNode, graph.OutputNode))
-        for v in list(plot.series[0].table._column_select_functions.values())
-        + list(plot.series[1].table._column_select_functions.values())
+        for v in list(plot.series[0].table.columnSelectFunctions.values())
+        + list(plot.series[1].table.columnSelectFunctions.values())
     )
 
 
 def test_multi_series_grouping():
     last_segment = create_experiment(1000, 3, 0.8)
+    weave.save(last_segment)
     plot = Plot(last_segment.experiment())
     plot.set_x(
         lambda row: weave.ops.number_bin(
@@ -78,6 +81,7 @@ def test_multi_series_grouping():
 
 def test_overspecification_of_plot_config_raises_exception():
     last_segment = create_experiment(1000, 3, 0.8)
+    weave.save(last_segment)
     ok_plot = Plot(last_segment.experiment())
     series = ok_plot.series[0]
 
@@ -92,6 +96,7 @@ def test_overspecification_of_plot_config_raises_exception():
 
 def test_multi_series_setting():
     last_segment = create_experiment(1000, 3, 0.8)
+    weave.save(last_segment)
     plot = Plot(last_segment.experiment())
     plot.set_x(
         lambda row: weave.ops.number_bin(
@@ -120,6 +125,7 @@ def test_multi_series_setting():
 
 def test_constructor():
     last_segment = create_experiment(1000, 3, 0.8)
+    weave.save(last_segment)
     series = Series(
         input_node=last_segment.experiment(),
         select_functions={
@@ -137,6 +143,7 @@ def test_constructor():
 
 def test_actual_config_value(fixed_random_seed):
     last_segment = create_experiment(1000, 3, 0.8)
+    weave.save(last_segment)
     plot = Plot(last_segment.experiment())
     plot.set_x(
         lambda row: weave.ops.number_bin(
@@ -152,35 +159,35 @@ def test_actual_config_value(fixed_random_seed):
     series2.set_y(lambda row: weave.ops.numbers_min(row["metric0"]))
     series2.set_y2(lambda row: weave.ops.numbers_max(row["metric0"]))
     series2.set_mark_constant("area")
-
+    print("PLOT CONFIG", plot.config)
     assert plot.config == {
         "series": [
             {
                 "table": {
                     "autoColumns": False,
                     "columns": {
-                        "LEWVQ43VQJ7UVS": {"panelId": "", "panelConfig": None},
-                        "KRDEEO6PKRDH36": {"panelId": "", "panelConfig": None},
-                        "K5CG252HAV2FLZ": {"panelId": "", "panelConfig": None},
-                        "9ORNJG56OGUUS2": {"panelId": "", "panelConfig": None},
-                        "BJB2AY8D1P5JPO": {"panelId": "", "panelConfig": None},
-                        "EPBPZ7OF3CU3BT": {"panelId": "", "panelConfig": None},
-                        "PJ3TAMZ9RE8CSQ": {"panelId": "", "panelConfig": None},
-                        "NQV4ZUZP68VEFU": {"panelId": "", "panelConfig": None},
+                        "VSKRDEEO6PKRDH": {"panelId": "", "panelConfig": None},
+                        "36K5CG252HAV2F": {"panelId": "", "panelConfig": None},
+                        "LZ9ORNJG56OGUU": {"panelId": "", "panelConfig": None},
+                        "S2BJB2AY8D1P5J": {"panelId": "", "panelConfig": None},
+                        "POEPBPZ7OF3CU3": {"panelId": "", "panelConfig": None},
+                        "BTPJ3TAMZ9RE8C": {"panelId": "", "panelConfig": None},
+                        "SQNQV4ZUZP68VE": {"panelId": "", "panelConfig": None},
+                        "FUE4DX2S5BL68G": {"panelId": "", "panelConfig": None},
                     },
                     "preFilterFunction": {"nodeType": "void", "type": "invalid"},
                     "columnNames": {
-                        "LEWVQ43VQJ7UVS": "",
-                        "KRDEEO6PKRDH36": "",
-                        "K5CG252HAV2FLZ": "",
-                        "9ORNJG56OGUUS2": "",
-                        "BJB2AY8D1P5JPO": "",
-                        "EPBPZ7OF3CU3BT": "",
-                        "PJ3TAMZ9RE8CSQ": "",
-                        "NQV4ZUZP68VEFU": "",
+                        "VSKRDEEO6PKRDH": "",
+                        "36K5CG252HAV2F": "",
+                        "LZ9ORNJG56OGUU": "",
+                        "S2BJB2AY8D1P5J": "",
+                        "POEPBPZ7OF3CU3": "",
+                        "BTPJ3TAMZ9RE8C": "",
+                        "SQNQV4ZUZP68VE": "",
+                        "FUE4DX2S5BL68G": "",
                     },
                     "columnSelectFunctions": {
-                        "LEWVQ43VQJ7UVS": {
+                        "VSKRDEEO6PKRDH": {
                             "nodeType": "output",
                             "type": {
                                 "type": "typedDict",
@@ -358,7 +365,7 @@ def test_actual_config_value(fixed_random_seed):
                                 },
                             },
                         },
-                        "KRDEEO6PKRDH36": {
+                        "36K5CG252HAV2F": {
                             "nodeType": "output",
                             "type": "number",
                             "fromOp": {
@@ -492,22 +499,22 @@ def test_actual_config_value(fixed_random_seed):
                                 },
                             },
                         },
-                        "K5CG252HAV2FLZ": {"nodeType": "void", "type": "invalid"},
-                        "9ORNJG56OGUUS2": {"nodeType": "void", "type": "invalid"},
-                        "BJB2AY8D1P5JPO": {"nodeType": "void", "type": "invalid"},
-                        "EPBPZ7OF3CU3BT": {"nodeType": "void", "type": "invalid"},
-                        "PJ3TAMZ9RE8CSQ": {"nodeType": "void", "type": "invalid"},
-                        "NQV4ZUZP68VEFU": {"nodeType": "void", "type": "invalid"},
+                        "LZ9ORNJG56OGUU": {"nodeType": "void", "type": "invalid"},
+                        "S2BJB2AY8D1P5J": {"nodeType": "void", "type": "invalid"},
+                        "POEPBPZ7OF3CU3": {"nodeType": "void", "type": "invalid"},
+                        "BTPJ3TAMZ9RE8C": {"nodeType": "void", "type": "invalid"},
+                        "SQNQV4ZUZP68VE": {"nodeType": "void", "type": "invalid"},
+                        "FUE4DX2S5BL68G": {"nodeType": "void", "type": "invalid"},
                     },
                     "order": [
-                        "LEWVQ43VQJ7UVS",
-                        "KRDEEO6PKRDH36",
-                        "K5CG252HAV2FLZ",
-                        "9ORNJG56OGUUS2",
-                        "BJB2AY8D1P5JPO",
-                        "EPBPZ7OF3CU3BT",
-                        "PJ3TAMZ9RE8CSQ",
-                        "NQV4ZUZP68VEFU",
+                        "VSKRDEEO6PKRDH",
+                        "36K5CG252HAV2F",
+                        "LZ9ORNJG56OGUU",
+                        "S2BJB2AY8D1P5J",
+                        "POEPBPZ7OF3CU3",
+                        "BTPJ3TAMZ9RE8C",
+                        "SQNQV4ZUZP68VE",
+                        "FUE4DX2S5BL68G",
                     ],
                     "groupBy": [],
                     "sort": [],
@@ -515,14 +522,14 @@ def test_actual_config_value(fixed_random_seed):
                     "page": 0,
                 },
                 "dims": {
-                    "x": "LEWVQ43VQJ7UVS",
-                    "y": "KRDEEO6PKRDH36",
-                    "color": "K5CG252HAV2FLZ",
-                    "label": "9ORNJG56OGUUS2",
-                    "tooltip": "BJB2AY8D1P5JPO",
-                    "pointSize": "EPBPZ7OF3CU3BT",
-                    "pointShape": "PJ3TAMZ9RE8CSQ",
-                    "y2": "NQV4ZUZP68VEFU",
+                    "x": "VSKRDEEO6PKRDH",
+                    "y": "36K5CG252HAV2F",
+                    "color": "LZ9ORNJG56OGUU",
+                    "label": "S2BJB2AY8D1P5J",
+                    "tooltip": "POEPBPZ7OF3CU3",
+                    "pointSize": "BTPJ3TAMZ9RE8C",
+                    "pointShape": "SQNQV4ZUZP68VE",
+                    "y2": "FUE4DX2S5BL68G",
                 },
                 "constants": {
                     "mark": "line",
@@ -536,28 +543,28 @@ def test_actual_config_value(fixed_random_seed):
                 "table": {
                     "autoColumns": False,
                     "columns": {
-                        "LEWVQ43VQJ7UVS": {"panelId": "", "panelConfig": None},
-                        "KRDEEO6PKRDH36": {"panelId": "", "panelConfig": None},
-                        "K5CG252HAV2FLZ": {"panelId": "", "panelConfig": None},
-                        "9ORNJG56OGUUS2": {"panelId": "", "panelConfig": None},
-                        "BJB2AY8D1P5JPO": {"panelId": "", "panelConfig": None},
-                        "EPBPZ7OF3CU3BT": {"panelId": "", "panelConfig": None},
-                        "PJ3TAMZ9RE8CSQ": {"panelId": "", "panelConfig": None},
-                        "NQV4ZUZP68VEFU": {"panelId": "", "panelConfig": None},
+                        "VSKRDEEO6PKRDH": {"panelId": "", "panelConfig": None},
+                        "36K5CG252HAV2F": {"panelId": "", "panelConfig": None},
+                        "LZ9ORNJG56OGUU": {"panelId": "", "panelConfig": None},
+                        "S2BJB2AY8D1P5J": {"panelId": "", "panelConfig": None},
+                        "POEPBPZ7OF3CU3": {"panelId": "", "panelConfig": None},
+                        "BTPJ3TAMZ9RE8C": {"panelId": "", "panelConfig": None},
+                        "SQNQV4ZUZP68VE": {"panelId": "", "panelConfig": None},
+                        "FUE4DX2S5BL68G": {"panelId": "", "panelConfig": None},
                     },
                     "preFilterFunction": {"nodeType": "void", "type": "invalid"},
                     "columnNames": {
-                        "LEWVQ43VQJ7UVS": "",
-                        "KRDEEO6PKRDH36": "",
-                        "K5CG252HAV2FLZ": "",
-                        "9ORNJG56OGUUS2": "",
-                        "BJB2AY8D1P5JPO": "",
-                        "EPBPZ7OF3CU3BT": "",
-                        "PJ3TAMZ9RE8CSQ": "",
-                        "NQV4ZUZP68VEFU": "",
+                        "VSKRDEEO6PKRDH": "",
+                        "36K5CG252HAV2F": "",
+                        "LZ9ORNJG56OGUU": "",
+                        "S2BJB2AY8D1P5J": "",
+                        "POEPBPZ7OF3CU3": "",
+                        "BTPJ3TAMZ9RE8C": "",
+                        "SQNQV4ZUZP68VE": "",
+                        "FUE4DX2S5BL68G": "",
                     },
                     "columnSelectFunctions": {
-                        "LEWVQ43VQJ7UVS": {
+                        "VSKRDEEO6PKRDH": {
                             "nodeType": "output",
                             "type": {
                                 "type": "typedDict",
@@ -735,7 +742,7 @@ def test_actual_config_value(fixed_random_seed):
                                 },
                             },
                         },
-                        "KRDEEO6PKRDH36": {
+                        "36K5CG252HAV2F": {
                             "nodeType": "output",
                             "type": "number",
                             "fromOp": {
@@ -869,12 +876,12 @@ def test_actual_config_value(fixed_random_seed):
                                 },
                             },
                         },
-                        "K5CG252HAV2FLZ": {"nodeType": "void", "type": "invalid"},
-                        "9ORNJG56OGUUS2": {"nodeType": "void", "type": "invalid"},
-                        "BJB2AY8D1P5JPO": {"nodeType": "void", "type": "invalid"},
-                        "EPBPZ7OF3CU3BT": {"nodeType": "void", "type": "invalid"},
-                        "PJ3TAMZ9RE8CSQ": {"nodeType": "void", "type": "invalid"},
-                        "NQV4ZUZP68VEFU": {
+                        "LZ9ORNJG56OGUU": {"nodeType": "void", "type": "invalid"},
+                        "S2BJB2AY8D1P5J": {"nodeType": "void", "type": "invalid"},
+                        "POEPBPZ7OF3CU3": {"nodeType": "void", "type": "invalid"},
+                        "BTPJ3TAMZ9RE8C": {"nodeType": "void", "type": "invalid"},
+                        "SQNQV4ZUZP68VE": {"nodeType": "void", "type": "invalid"},
+                        "FUE4DX2S5BL68G": {
                             "nodeType": "output",
                             "type": "number",
                             "fromOp": {
@@ -1010,14 +1017,14 @@ def test_actual_config_value(fixed_random_seed):
                         },
                     },
                     "order": [
-                        "LEWVQ43VQJ7UVS",
-                        "KRDEEO6PKRDH36",
-                        "K5CG252HAV2FLZ",
-                        "9ORNJG56OGUUS2",
-                        "BJB2AY8D1P5JPO",
-                        "EPBPZ7OF3CU3BT",
-                        "PJ3TAMZ9RE8CSQ",
-                        "NQV4ZUZP68VEFU",
+                        "VSKRDEEO6PKRDH",
+                        "36K5CG252HAV2F",
+                        "LZ9ORNJG56OGUU",
+                        "S2BJB2AY8D1P5J",
+                        "POEPBPZ7OF3CU3",
+                        "BTPJ3TAMZ9RE8C",
+                        "SQNQV4ZUZP68VE",
+                        "FUE4DX2S5BL68G",
                     ],
                     "groupBy": [],
                     "sort": [],
@@ -1025,14 +1032,14 @@ def test_actual_config_value(fixed_random_seed):
                     "page": 0,
                 },
                 "dims": {
-                    "x": "LEWVQ43VQJ7UVS",
-                    "y": "KRDEEO6PKRDH36",
-                    "color": "K5CG252HAV2FLZ",
-                    "label": "9ORNJG56OGUUS2",
-                    "tooltip": "BJB2AY8D1P5JPO",
-                    "pointSize": "EPBPZ7OF3CU3BT",
-                    "pointShape": "PJ3TAMZ9RE8CSQ",
-                    "y2": "NQV4ZUZP68VEFU",
+                    "x": "VSKRDEEO6PKRDH",
+                    "y": "36K5CG252HAV2F",
+                    "color": "LZ9ORNJG56OGUU",
+                    "label": "S2BJB2AY8D1P5J",
+                    "tooltip": "POEPBPZ7OF3CU3",
+                    "pointSize": "BTPJ3TAMZ9RE8C",
+                    "pointShape": "SQNQV4ZUZP68VE",
+                    "y2": "FUE4DX2S5BL68G",
                 },
                 "constants": {
                     "mark": "area",
