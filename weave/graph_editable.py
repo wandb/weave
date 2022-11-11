@@ -1,6 +1,7 @@
 import typing
 
 from . import graph
+from . import errors
 
 
 # TODO: Switch this to use Node/Op terminolgy
@@ -59,7 +60,9 @@ class EditGraph:
 
     def replace(self, node: graph.OutputNode, replace_with: graph.OutputNode):
         if node not in self.nodes:
-            raise Exception("invalid")
+            raise errors.WeaveInternalError(
+                f"Can't replace a node that isn't in the graph. Node: {node}"
+            )
         self.replacements[node] = replace_with
         if node not in self.output_edges:
             # TODO

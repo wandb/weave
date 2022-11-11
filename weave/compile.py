@@ -152,10 +152,6 @@ def compile(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
     g = await_run_outputs_edit_graph(g)
 
     # 3: Execute function nodes
-    # Two calls to this function are needed to ensure that all function nodes
-    # though this was probably fixed by Tim's work which is now merged?
-    # TODO: see if we can remove this.
-    g = language_autocall.execute_edit_graph(g)
     g = language_autocall.execute_edit_graph(g)
 
     # Reconstruct a node list that matches the original order from the transformed graph
