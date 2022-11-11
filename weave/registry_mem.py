@@ -63,6 +63,9 @@ class Registry:
             self._op_versions[(op.name, version)] = op
         return op
 
+    def have_op(self, op_name: str) -> bool:
+        return op_name in self._ops
+
     def get_op(self, uri: str) -> op_def.OpDef:
         object_uri = uris.WeaveURI.parse(uri)
         if object_uri.version is not None:

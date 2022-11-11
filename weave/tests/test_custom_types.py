@@ -1,7 +1,13 @@
 import pytest
 from PIL import Image
 
+
+from .. import context_state as _context
+
+_loading_builtins_token = _context.set_loading_built_ins()
 from weave.ecosystem.wandb import geom
+
+_context.clear_loading_built_ins(_loading_builtins_token)
 
 from .. import api as weave
 from ..ops_primitives import arrow
