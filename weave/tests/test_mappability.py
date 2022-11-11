@@ -82,11 +82,15 @@ def test_mapped_empty_serialized():
 
 
 def test_custom_class():
+    _loading_builtins_token = _context.set_loading_built_ins()
+
     @weave.type()
     class TestType:
         @weave.op()
         def test_fn(self, a: int) -> int:
             return a + 1
+
+    _context.clear_loading_built_ins(_loading_builtins_token)
 
     node = TestType().test_fn(1)
     assert weave.use(node) == 2
