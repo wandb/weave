@@ -158,7 +158,7 @@ def test_ref_type():
             "type": "LocalArtifactRef",
             "objectType": {"type": "typedDict", "propertyTypes": {"x": "int"}},
         },
-        "_val": "local-artifact:///tmp/weave/pytest/weave/test_storage.py::test_ref_type (setup)/my-dict/6036cbf3a05809f1a3f174a1485b1770",
+        "_val": "local-artifact:///tmp/weave/pytest/weave/tests/test_storage.py::test_ref_type (setup)/my-dict/6036cbf3a05809f1a3f174a1485b1770",
     }
     ref2 = storage.from_python(python_ref)
     obj2 = storage.deref(ref2)
