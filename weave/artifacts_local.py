@@ -36,9 +36,11 @@ def get_wandb_read_artifact(path):
 
 
 def local_artifact_dir() -> str:
-    return os.environ.get("WEAVE_LOCAL_ARTIFACT_DIR") or os.path.join(
+    d = os.environ.get("WEAVE_LOCAL_ARTIFACT_DIR") or os.path.join(
         "/tmp", "local-artifacts"
     )
+    os.makedirs(d, exist_ok=True)
+    return d
 
 
 def wandb_artifact_dir():
