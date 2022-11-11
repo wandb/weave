@@ -7,7 +7,6 @@ from . import graph
 from . import graph_editable
 from . import registry_mem
 from . import errors
-from . import language_autocall
 from . import dispatch
 
 # These call_* functions must match the actual op implementations.
@@ -18,6 +17,15 @@ from . import dispatch
 def call_run_await_final_output(run_node: graph.Node) -> graph.OutputNode:
     run_node_type = typing.cast(types.RunType, run_node.type)
     return graph.OutputNode(run_node_type.output, "run-await", {"self": run_node})
+
+
+# We don't want to import the op definitions themselves here, since
+# those depend on the decorators, which aren't defined in the engine.
+def _call_execute(function_node: graph.Node) -> graph.OutputNode:
+    function_node_type = typing.cast(types.Function, function_node.type)
+    return graph.OutputNode(
+        function_node_type.output_type, "execute", {"node": function_node}
+    )
 
 
 def nodes_to_edit_graph(nodes: typing.List[graph.Node]) -> graph_editable.EditGraph:
@@ -135,6 +143,45 @@ def await_run_outputs_edit_graph(
     return edit_g
 
 
+def execute_edit_graph(edit_g: graph_editable.EditGraph) -> graph_editable.EditGraph:
+    """In cases where an input is a Node, execute the Node"""
+
+    for edge in edit_g.edges_with_replacements:
+        actual_input_type = edge.output_of.type
+        op_def = registry_mem.memory_registry.get_op(edge.input_to.from_op.name)
+        if not isinstance(op_def.input_type, op_args.OpNamedArgs):
+            # Not correct... we'd want to walk these too!
+            # TODO: fix
+            continue
+        # If the Node type is RunType, but the Op argument it is passed to
+        # is not a RunType, insert an await_final_output operation to convert
+        # the Node from a run to the run's output.
+        try:
+            expected_input_type = op_def.input_type.arg_types[edge.input_name]
+        except KeyError:
+            raise errors.WeaveInternalError(
+                "OpDef (%s) missing input_name: %s" % (op_def.name, edge.input_name)
+            )
+        if isinstance(actual_input_type, types.Function) and not isinstance(
+            expected_input_type, types.Function
+        ):
+            if not expected_input_type.assign_type(actual_input_type.output_type):
+                raise Exception(
+                    "invalid type chaining for Node. input_type: %s, op_input_type: %s"
+                    % (actual_input_type, expected_input_type)
+                )
+            new_inputs = dict(edge.input_to.from_op.inputs)
+
+            new_inputs[edge.input_name] = _call_execute(edge.output_of)
+            edit_g.replace(
+                edge.input_to,
+                graph.OutputNode(
+                    edge.input_to.type, edge.input_to.from_op.name, new_inputs
+                ),
+            )
+    return edit_g
+
+
 def compile(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
     """
     This method is used to "compile" a list of nodes. Here we can add any
@@ -152,7 +199,7 @@ def compile(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
     g = await_run_outputs_edit_graph(g)
 
     # 3: Execute function nodes
-    g = language_autocall.execute_edit_graph(g)
+    g = execute_edit_graph(g)
 
     # Reconstruct a node list that matches the original order from the transformed graph
     n = edit_graph_to_nodes(g, nodes)

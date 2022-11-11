@@ -8,6 +8,7 @@ from . import errors
 from . import client_interface
 from . import op_args
 from .language_features.tagging import tagged_value_type
+from . import language_autocall
 
 
 def dereference_variables(node: graph.Node, var_values: graph.Frame) -> graph.Node:
@@ -179,22 +180,26 @@ ENBoundParamsType = typing.Optional[dict[str, graph.Node]]
 def _ensure_node(
     fq_op_name: str,
     v: ENVType,
-    input_type: ENInputTypeType,
-    already_bound_params: ENBoundParamsType,
+    param_input_type: ENInputTypeType = None,
+    input_type: op_args.OpArgs = None,
+    already_bound_params: ENBoundParamsType = None,
 ) -> graph.Node:
-    if callable(input_type):
+    if callable(param_input_type):
         if already_bound_params is None:
             already_bound_params = {}
         already_bound_types = {k: n.type for k, n in already_bound_params.items()}
+        already_bound_types = language_autocall.update_input_types(
+            input_type, already_bound_types
+        )
         try:
-            input_type = input_type(already_bound_types)
+            param_input_type = param_input_type(already_bound_types)
         except AttributeError as e:
             raise errors.WeaveInternalError(
                 f"callable input_type of {fq_op_name} failed to accept already_bound_types of {already_bound_types}"
             )
     if not isinstance(v, graph.Node):
         if callable(v):
-            if not isinstance(input_type, types.Function):
+            if not isinstance(param_input_type, types.Function):
                 raise errors.WeaveInternalError(
                     "callable passed as argument, but type is not Function. Op: %s"
                     % fq_op_name
@@ -206,8 +211,10 @@ def _ensure_node(
             #    lambda row: ...
             sig = inspect.signature(v)
             vars = {}
-            for name in list(input_type.input_types.keys())[: len(sig.parameters)]:
-                vars[name] = input_type.input_types[name]
+            for name in list(param_input_type.input_types.keys())[
+                : len(sig.parameters)
+            ]:
+                vars[name] = param_input_type.input_types[name]
 
             return define_fn(vars, v)
         val_type = types.TypeRegistry.type_of(v)
@@ -230,7 +237,7 @@ def bind_value_params_as_nodes(
         if param.kind == inspect.Parameter.VAR_KEYWORD:
             for sub_k, sub_v in v.items():
                 bound_params_with_constants[sub_k] = _ensure_node(
-                    fq_op_name, sub_v, None, None
+                    fq_op_name, sub_v, None, None, None
                 )
         else:
             if not isinstance(input_type, op_args.OpNamedArgs):
@@ -238,6 +245,10 @@ def bind_value_params_as_nodes(
                     f"Error binding params to {fq_op_name} - found named params in signature, but op does not have named param args"
                 )
             bound_params_with_constants[k] = _ensure_node(
-                fq_op_name, v, input_type.arg_types[k], bound_params_with_constants
+                fq_op_name,
+                v,
+                input_type.arg_types[k],
+                input_type,
+                bound_params_with_constants,
             )
     return bound_params_with_constants

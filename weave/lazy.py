@@ -45,18 +45,14 @@ def _make_output_node(
             else:
                 new_input_type[k] = n.type
 
-        # print("LANGUAGE AUTOCALL", fq_op_name, input_type, new_input_type)
-        # new_input_type = language_autocall.update_input_types(
-        #     input_type, new_input_type
-        # )
+        new_input_type = language_autocall.update_input_types(
+            input_type, new_input_type
+        )
 
         output_type = output_type(new_input_type)
 
     name = "OutputNode"
     bases = [graph.OutputNode]
-
-    # Mixin Node methods
-    bases += weave_internal.get_node_methods_classes(output_type)
 
     # If the output type is a run, mixin the Run's output type
     # as well. execute.py automatic inserts await_output operations
@@ -72,6 +68,9 @@ def _make_output_node(
         name += node_name
         if node_methods_class not in bases:
             bases.append(node_methods_class)
+
+    # Mixin Node methods
+    bases += weave_internal.get_node_methods_classes(output_type)
 
     unique_bases = []
     for base in bases:
