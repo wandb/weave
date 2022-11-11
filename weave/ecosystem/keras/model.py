@@ -162,7 +162,7 @@ class KerasModel(weave.types.Type):
             list[typing.Union[KerasTensorType, weave.types.Any]]
         ] = None,
         outputs_def: Optional[
-            list[typing.Union[KerasTensorType, weave.types.Any]]
+            list[typing.Union[KerasTensorType, weave.types.Type]]
         ] = None,
     ) -> "KerasModel":
         inputs = (
@@ -221,7 +221,8 @@ def call_string(model, input):
 @weave.op(
     input_type={
         "model": KerasModel.make_type(
-            [([None, 1], DTYPE_NAME.STRING)], [([None, 1], None)]
+            [KerasTensorType.from_list([None, 1], weave.types.String())],
+            [weave.types.String()],
         ),
         "input": weave.types.String(),
     },
