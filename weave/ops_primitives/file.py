@@ -2,7 +2,7 @@ import os
 import dataclasses
 import shutil
 
-from weave.refs import ArtifactVersionFileType
+from ..refs import ArtifactVersionFileType
 
 from ..api import op, mutation, weave_class
 from .. import weave_types as types

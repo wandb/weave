@@ -55,6 +55,7 @@ def _slow_map_fn(input_list, map_fn):
 
 
 def fast_map_fn(input_list, map_fn):
+    # TODO: Perform this recursively in the main compile pass
     map_fn = compile.compile([map_fn])[0]
 
     if not _can_fast_map(map_fn):
