@@ -72,7 +72,7 @@ def apply_type_based_dispatch(
             # Before productionizing Weave, we should throw here - for now since assignability is
             # still a bit off, we are a bit more relaxed.
             # raise errors.WeaveInternalError(
-            #     f"Could not find op for input types {pos_param_types} for node {node.from_op.name}"
+            #     f"Could not find op for input types {input_types} for node {node.from_op.name}"
             # )
             continue
 

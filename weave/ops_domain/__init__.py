@@ -123,9 +123,11 @@ def process_summary_type(val):
 
 @op(render_info={"type": "function"})
 def refine_summary_type(run: wandb_api.Run) -> types.Type:
-    return types.TypedDict(
-        {k: process_summary_type(v) for k, v in run.summary._json_dict.items()}
-    )
+    summary = WBRun.summary.raw_resolve_fn(run)
+    return types.TypeRegistry.type_of(summary)
+    # return types.TypedDict(
+    #     {k: process_summary_type(v) for k, v in run.summary._json_dict.items()}
+    # )
 
 
 @weave_class(weave_type=RunType)

@@ -775,6 +775,13 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         )
 
 
+# TODO: Implement concat here (probably for list-arrow and arrow of arrow)
+# @op(output_type=lambda input_types: input_types["self"])
+# def concat(self):
+#     return ArrowWeaveList(
+#         self._arrow_data.slice(offset), self.object_type, self._artifact
+#     )
+
 ArrowWeaveListType.instance_classes = ArrowWeaveList
 ArrowWeaveListType.instance_class = ArrowWeaveList
 
