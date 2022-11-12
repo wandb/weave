@@ -2,6 +2,8 @@ import os
 import dataclasses
 import shutil
 
+from weave.refs import ArtifactVersionFileType
+
 from ..api import op, mutation, weave_class
 from .. import weave_types as types
 from .. import wandb_util
@@ -67,7 +69,7 @@ class Table:
 class File:
     @op(
         name="file-table",
-        input_type={"file": types.FileType()},
+        input_type={"file": types.union(types.FileType(), ArtifactVersionFileType())},
         output_type=TableType(),
     )
     def table(file):
