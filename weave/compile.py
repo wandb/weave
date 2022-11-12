@@ -47,6 +47,10 @@ def node_type(node: graph.Node) -> types.Type:
     return node.type
 
 
+# TODO: Get rid of this hack once JS incorperates incoming types correctly
+js_ops_with_incorrect_types = ["groupby"]
+
+
 def apply_type_based_dispatch(
     edit_g: graph_editable.EditGraph,
 ) -> graph_editable.EditGraph:
@@ -77,7 +81,9 @@ def apply_type_based_dispatch(
             v in edit_g.replacements for v in orig_node.from_op.inputs.values()
         )
 
-        if found_new_node or at_least_one_parent_changed:
+        should_force_replacement = node.from_op.name in js_ops_with_incorrect_types
+
+        if found_new_node or at_least_one_parent_changed or should_force_replacement:
             params = found_op.bind_params(
                 [], found_op.input_type.create_param_dict([], node_inputs)
             )
