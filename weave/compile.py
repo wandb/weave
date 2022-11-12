@@ -48,7 +48,7 @@ def node_type(node: graph.Node) -> types.Type:
 
 
 # TODO: Get rid of this hack once JS incorperates incoming types correctly
-js_ops_with_incorrect_types = ["groupby"]
+always_calculate_output_type = True
 
 
 def apply_type_based_dispatch(
@@ -72,7 +72,7 @@ def apply_type_based_dispatch(
             # Before productionizing Weave, we should throw here - for now since assignability is
             # still a bit off, we are a bit more relaxed.
             # raise errors.WeaveInternalError(
-            #     f"Could not find op for input types {pos_param_types} for node {node.from_op.name}"
+            #     f"Could not find op for input types {input_types} for node {node.from_op.name}"
             # )
             continue
 
@@ -81,9 +81,11 @@ def apply_type_based_dispatch(
             v in edit_g.replacements for v in orig_node.from_op.inputs.values()
         )
 
-        should_force_replacement = node.from_op.name in js_ops_with_incorrect_types
-
-        if found_new_node or at_least_one_parent_changed or should_force_replacement:
+        if (
+            always_calculate_output_type
+            or found_new_node
+            or at_least_one_parent_changed
+        ):
             params = found_op.bind_params(
                 [], found_op.input_type.create_param_dict([], node_inputs)
             )

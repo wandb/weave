@@ -54,6 +54,11 @@ def get_op_for_input_types(
         shared_name_ops = registry_mem.memory_registry.find_ops_by_common_name(
             op_def.common_name(fq_op_name)
         )
+        # TEMP HACK: If we are fetching index, also match __getitem__
+        if fq_op_name == "index":
+            shared_name_ops += registry_mem.memory_registry.find_ops_by_common_name(
+                op_def.common_name("__getitem__")
+            )
     candidates: list[Candidate] = []
     for op in shared_name_ops:
         assigned_param_dict = op.input_type.assign_param_dict(
