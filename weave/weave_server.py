@@ -55,10 +55,9 @@ def enable_datadog_logging():
     json_handler.setFormatter(formatter)
     logger = logging.getLogger("root")
     logger.addHandler(json_handler)
-    logger.setLevel(logging.INFO)
 
 
-def enable_stream_logging(level=logging.INFO):
+def enable_stream_logging(level=logging.DEBUG):
     logger = logging.getLogger("root")
     stream_handler = logging.StreamHandler(wsgi_errors_stream)
     stream_handler.setLevel(level)
@@ -101,7 +100,7 @@ def make_app(log_filename=None):
             },
         },
         "root": {
-            "level": "INFO",
+            "level": "DEBUG",
             "handlers": ["wsgi_file"] if fs_logging_enabled else [],
         },
     }

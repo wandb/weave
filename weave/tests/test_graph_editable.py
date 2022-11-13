@@ -17,8 +17,7 @@ def test_build_and_replace():
 
     assert weave.use(d) == 18
 
-    edit_g = graph_editable.EditGraph()
-    edit_g.add_node(d)
+    edit_g = graph_editable.EditGraph((d,))
 
     assert len(edit_g.nodes) == 4
     assert len(edit_g.edges) == 4

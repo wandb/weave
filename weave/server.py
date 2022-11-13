@@ -17,12 +17,12 @@ import cProfile
 
 from weave.language_features.tagging.tag_store import isolated_tagging_context
 
-from . import graph
 from . import execute
 from . import serialize
 from . import storage
 from . import context
 from . import util
+from . import graph_debug
 
 
 PROFILE = False
@@ -50,7 +50,13 @@ def _handle_request(request, deref=False):
     start_time = time.time()
     logger.info(
         "Server request running %s nodes.\n%s"
-        % (len(nodes), "\n".join(graph.node_expr_str(n) for n in nodes))
+        % (
+            len(nodes),
+            "\n".join(
+                graph_debug.node_expr_str_full(n)
+                for n in graph_debug.combine_common_nodes(nodes)
+            ),
+        )
     )
     with context.execution_client():
         result = execute.execute_nodes(
@@ -192,7 +198,7 @@ class HttpServer(threading.Thread):
         return url
 
 
-def capture_weave_server_logs(log_level=logging.INFO):
+def capture_weave_server_logs(log_level=logging.DEBUG):
     from . import weave_server
 
     weave_server.enable_stream_logging(log_level)
