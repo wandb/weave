@@ -28,7 +28,8 @@ class OpDef:
     Must be immediately passed to Register.register_op() after construction.
     """
 
-    input_type: op_args.OpArgs
+    raw_input_type: op_args.OpArgs
+    _input_type: op_args.OpArgs
     refine_output_type: typing.Optional["OpDef"]
     setter = str
     call_fn: typing.Any
@@ -47,6 +48,7 @@ class OpDef:
             typing.Callable[[typing.Dict[str, types.Type]], types.Type],
         ]
     ]
+    # handles_none: bool
 
     # This is required to be able to determine which ops were derived from this
     # op. Particularly in cases where we need to rename or lookup when
@@ -70,7 +72,7 @@ class OpDef:
         weave_fn: typing.Optional[graph.Node] = None,
     ):
         self.name = name
-        self.input_type = input_type
+        self.raw_input_type = input_type
         self.raw_output_type = output_type
         self.refine_output_type = refine_output_type
         self.raw_resolve_fn = resolve_fn  # type: ignore
@@ -91,6 +93,8 @@ class OpDef:
         self.derived_ops = {}
         self.weave_fn = weave_fn
         self._output_type = None
+        self._input_type = None
+        # self.handles_none = _input_type_handles_nones(input_type)
 
     def __repr__(self):
         return "<OpDef(%s) %s>" % (id(self), self.name)
@@ -107,10 +111,18 @@ class OpDef:
         return _self.call_fn(*args, **kwargs)
 
     def resolve_fn(__self, *args, **kwargs):
-        res = __self.raw_resolve_fn(*args, **kwargs)
+        from . import language_nullability
+        res = language_nullability.process_op_def_resolve_fn(__self, args, kwargs)
         return process_opdef_resolve_fn.process_opdef_resolve_fn(
             __self, res, args, kwargs
         )
+
+    @property
+    def input_type(self)-> op_args.OpArgs:
+        from . import language_nullability
+        if self._input_type is None:
+            self._input_type = language_nullability.process_op_def_input_type(self.raw_input_type, self)
+        return self._input_type
 
     @property
     def output_type(
@@ -133,10 +145,20 @@ class OpDef:
                 from .language_features.tagging.process_opdef_output_type import (
                     process_opdef_output_type,
                 )
+                from . import language_nullability
 
-                self._output_type = process_opdef_output_type(
-                    self.raw_output_type, self
+                ot = self.raw_output_type
+
+                ot = language_nullability.process_opdef_output_type(
+                    ot, self
                 )
+
+                ot = process_opdef_output_type(
+                    ot, self
+                )
+
+                self._output_type = ot
+
         return self._output_type
 
     @property

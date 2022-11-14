@@ -56,6 +56,7 @@ def apply_type_based_dispatch(
             # This indicates that we believe there is no valid op to accept the incoming types.
             # Before productionizing Weave, we should throw here - for now since assignability is
             # still a bit off, we are a bit more relaxed.
+            # import pdb; pdb.set_trace()
             # raise errors.WeaveInternalError(
             #     f"Could not find op for input types {input_types} for node {node.from_op.name}"
             # )

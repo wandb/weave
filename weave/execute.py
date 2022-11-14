@@ -25,9 +25,6 @@ from . import op_def
 from . import trace_local
 from . import refs
 
-# Language Features
-from . import language_nullability
-
 TRACE_LOCAL = trace_local.TraceLocal()
 
 
@@ -251,10 +248,7 @@ def execute_forward_node(
         forward_node.set_result(run)
     else:
         logging.debug("Executing sync op")
-        if language_nullability.should_force_none_result(inputs, op_def):
-            result = None
-        else:
-            result = execute_sync_op(op_def, inputs)
+        result = execute_sync_op(op_def, inputs)
 
         ref = refs.get_ref(result)
         if ref is not None:

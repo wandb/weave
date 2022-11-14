@@ -225,7 +225,9 @@ class Type(metaclass=_TypeSubclassWatcher):
 
     def assign_type(self, next_type: "Type") -> bool:
         TaggedValueType = type_name_to_type("tagged")
-        if isinstance(next_type, Const):
+        if isinstance(next_type, Const) and not isinstance(
+            self, Const
+        ):
             return self.assign_type(next_type.val_type)
         elif isinstance(next_type, UnionType):
             for t in next_type.members:
@@ -423,7 +425,7 @@ class Const(Type):
     def type_of_instance(cls, obj):
         return cls(obj)
 
-    def assign_type(self, next_type):
+    def _assign_type_inner(self, next_type):
         if isinstance(next_type, Const):
             # This does a check on class equality, so won't work for
             # fancier types. We can fix later if we need to.
@@ -517,14 +519,8 @@ class UnionType(Type):
             return False
         return set(self.members) == set(other.members)
 
-    def assign_type(self, other):
-        if isinstance(other, UnionType):
-            if not all(self.assign_type(member) for member in other.members):
-                return False
-            return True
-        if any(member.assign_type(other) for member in self.members):
-            return True
-        return False
+    def _assign_type_inner(self, other):
+        return any(member.assign_type(other) for member in self.members)
 
     # def instance_to_py(self, obj):
     #     # Figure out which union member this obj is, and delegate to that
@@ -743,9 +739,6 @@ class ObjectType(Type):
             d["_base_type"] = self._base_type.to_dict()
         return d
 
-    # def assign_type(self):
-    #     # TODO
-    #     pass
 
     def save_instance(self, obj, artifact, name):
         serializer = mappers_python.map_to_python(self, artifact)
@@ -828,14 +821,20 @@ def optional(type_):
 
 
 def is_optional(type_: Type) -> bool:
+    TaggedValueType = type_name_to_type("tagged")
+    if isinstance(type_, TaggedValueType):
+        return is_optional(type_.value)
     return isinstance(type_, UnionType) and none_type in type_.members
 
 
-def non_none(type_):
+def non_none(type_: Type) -> Type:
+    TaggedValueType = type_name_to_type("tagged")
     if type_ == none_type:
         return Invalid()
+    if isinstance(type_, TaggedValueType):
+        return TaggedValueType(type_.tag, non_none(type_.value))
     if is_optional(type_):
-        new_members = [m for m in type_.members if m != none_type]
+        new_members = [m for m in type_.members if m != none_type] #type: ignore
         # TODO: could put this logic in UnionType.from_members ?
         if len(new_members) == 0:
             # Should never have a length one union to start with
