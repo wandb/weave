@@ -9,7 +9,6 @@ from ..ops_primitives import file_local
 from .. import artifacts_local
 from .. import refs
 from ..ops_primitives import file as weave_file
-from ..ops_domain.wbmedia import ImageArtifactFileRef
 
 
 class ArtifactVersionType(types._PlainStringNamedType):

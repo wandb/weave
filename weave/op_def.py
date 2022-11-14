@@ -48,7 +48,6 @@ class OpDef:
             typing.Callable[[typing.Dict[str, types.Type]], types.Type],
         ]
     ]
-    # handles_none: bool
 
     # This is required to be able to determine which ops were derived from this
     # op. Particularly in cases where we need to rename or lookup when
@@ -94,7 +93,6 @@ class OpDef:
         self.weave_fn = weave_fn
         self._output_type = None
         self._input_type = None
-        # self.handles_none = _input_type_handles_nones(input_type)
 
     def __repr__(self):
         return "<OpDef(%s) %s>" % (id(self), self.name)
