@@ -507,7 +507,8 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         return np.asarray(self.to_pylist())
 
     def __iter__(self):
-        return iter(self.to_pylist())
+        for item in self.to_pylist():
+            yield self._mapper.apply(item)
 
     def to_pylist(self):
         return self._arrow_data.to_pylist()
