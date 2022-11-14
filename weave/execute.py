@@ -14,6 +14,7 @@ from . import errors
 from . import compile
 from . import forward_graph
 from . import graph
+from . import graph_debug
 from .language_features.tagging import tag_store
 from . import weave_types as types
 
@@ -70,6 +71,16 @@ def is_panelplot_data_fetch_query(node: graph.Node) -> bool:
 
 
 def execute_nodes(nodes, no_cache=False):
+    logging.info(
+        "Executing %s leaf nodes.\n%s"
+        % (
+            len(nodes),
+            "\n".join(
+                graph_debug.node_expr_str_full(n)
+                for n in graph_debug.combine_common_nodes(nodes)
+            ),
+        )
+    )
     nodes = compile.compile(nodes)
 
     # hack: disable caching for panelplot
