@@ -118,8 +118,11 @@ class EditGraph:
             orig_to_node_inputs = list(orig_to_node.from_op.inputs.keys())
             orig_to_node_input_ndx = (orig_to_node_inputs).index(edge.input_name)
             input_to_node_input_name = (input_to_node_inputs)[orig_to_node_input_ndx]
-            yield Edge(
-                self.get_node(edge.output_of),
-                self.get_node(edge.input_to),
-                input_to_node_input_name,
+            yield (
+                edge,
+                Edge(
+                    self.get_node(edge.output_of),
+                    self.get_node(edge.input_to),
+                    input_to_node_input_name,
+                ),
             )

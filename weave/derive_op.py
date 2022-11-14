@@ -43,7 +43,6 @@ class DeriveOpHandler:
 disallow_mapping_type_name_list = [
     "type",
     "list",
-    "wbtable",
     "ndarray",
     "ArrowArray",
     "ArrowTable",
@@ -60,7 +59,6 @@ disallow_mapping_type_name_list = [
     "none",
     "any",
     "groupresult",
-    "table",
     "dataframeTable",
     "ArrowTableGroupResult",
     "ArrowWeaveList",

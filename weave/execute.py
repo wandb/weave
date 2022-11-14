@@ -219,6 +219,15 @@ def execute_forward_node(
                 if run.output is not None:
                     # if isinstance(run._output, artifacts_local.LocalArtifact):
                     #     print('OUTPUT REF TYPE OBJ TYPE', )
+                    # This `refs.deref(run.output)` a critical call, even though
+                    # the output is not used. This call ensures that the output
+                    # is loaded, which in turn materializes the tags at the
+                    # currect context scope. Without this call, the first child
+                    # of this node will perform the derefing, which will result
+                    # in the tags being added the the scope of the child. If
+                    # more than 1 direct child exists, the next children will
+                    # not have the tags in their scope.
+                    refs.deref(run.output)
                     forward_node.set_result(run.output)
                     return {"cache_used": use_cache}
             logging.debug("Actually nevermind, didnt return")

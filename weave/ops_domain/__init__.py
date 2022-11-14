@@ -1,8 +1,11 @@
 # TODO: split this into multiple files like we do in the JS version
+import functools
 import json
 import typing
 
 from wandb.apis import public as wandb_api
+
+from ..wbartifact_util import wb_client_dict_to_artifact_version_file
 
 from .run_segment import RunSegment, run_segment_render
 from ..api import op, weave_class
@@ -41,6 +44,20 @@ class ProjectType(types._PlainStringNamedType):
         return api.project(name=d["project_name"], entity=d["entity_name"])
 
 
+# This is very helpful when deserializing runs which have been
+# serialized. Without caching here, the mappers end up loading
+# the run for every tagged cell in the table!
+@functools.lru_cache(1000)
+def _memoed_get_run(run_uri):
+    import time
+
+    print("%s: RUN INSTANCE FROM DICT" % time.time())
+    api = wandb_public_api()
+    run = api.run(run_uri)
+    print("%s: DONE RUN INSTANCE FROM DICT" % time.time())
+    return run
+
+
 class RunType(types._PlainStringNamedType):
     name = "run"
 
@@ -55,13 +72,7 @@ class RunType(types._PlainStringNamedType):
         }
 
     def instance_from_dict(self, d):
-        import time
-
-        print("%s: RUN INSTANCE FROM DICT" % time.time())
-        api = wandb_public_api()
-        res = api.run("{entity_name}/{project_name}/{run_id}".format(**d))
-        print("%s: DONE RUN INSTANCE FROM DICT" % time.time())
-        return res
+        return _memoed_get_run("{entity_name}/{project_name}/{run_id}".format(**d))
 
 
 class ArtifactType(types._PlainStringNamedType):
@@ -107,6 +118,27 @@ class ArtifactVersionsType(types.Type):
         )
 
 
+def process_summary_obj(val):
+    if isinstance(val, dict):
+        maybe_afv = wb_client_dict_to_artifact_version_file(val)
+        if maybe_afv:
+            return maybe_afv
+    return val
+
+
+def process_summary_type(val):
+    if isinstance(val, dict) and "_type" in val and val["_type"] == "table-file":
+        return types.FileType(
+            extension=types.Const(types.String(), "json"), wb_object_type="table"
+        )
+    return types.TypeRegistry.type_of(val)
+
+
+@op(render_info={"type": "function"})
+def refine_summary_type(run: wandb_api.Run) -> types.Type:
+    return types.TypeRegistry.type_of(WBRun.summary.raw_resolve_fn(run))
+
+
 @weave_class(weave_type=RunType)
 class WBRun:
     @op()
@@ -117,6 +149,14 @@ class WBRun:
     @op()
     def name(run: wandb_api.Run) -> str:
         return run.name
+
+    @op()
+    def id(run: wandb_api.Run) -> str:
+        return run.id
+
+    @op(refine_output_type=refine_summary_type)
+    def summary(run: wandb_api.Run) -> dict[str, typing.Any]:
+        return {k: process_summary_obj(v) for k, v in run.summary._json_dict.items()}
 
 
 @dataclasses.dataclass(frozen=True)
@@ -138,12 +178,28 @@ class RunsType(types.Type):
         api = wandb_public_api()
         return api.runs("{entity_name}/{project_name}".format(**d), per_page=500)
 
+    @classmethod
+    def from_dict(cls, d):
+        return cls()
+
 
 @weave_class(weave_type=RunsType)
 class RunsOps:
     @op()
     def count(self: wandb_api.Runs) -> int:
         return len(self)
+
+    @op(
+        output_type=types.List(RunType()),
+    )
+    def limit(self: wandb_api.Runs, limit: int):
+        runs: list[wandb_api.Run] = []
+        for run in self:
+            if len(runs) >= limit:
+                break
+            runs.append(run)
+
+        return runs
 
 
 class ArtifactsType(types.Type):
@@ -344,6 +400,10 @@ def project(entityName: str, projectName: str) -> wandb_api.Project:
 
 project_tag_getter_op = make_tag_getter_op.make_tag_getter_op(
     "project", ProjectType(), op_name="tag-project"
+)
+
+run_tag_getter_op = make_tag_getter_op.make_tag_getter_op(
+    "run", RunType(), op_name="tag-run"
 )
 
 

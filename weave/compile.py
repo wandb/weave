@@ -57,7 +57,7 @@ def apply_type_based_dispatch(
             # Before productionizing Weave, we should throw here - for now since assignability is
             # still a bit off, we are a bit more relaxed.
             # raise errors.WeaveInternalError(
-            #     f"Could not find op for input types {pos_param_types} for node {node.from_op.name}"
+            #     f"Could not find op for input types {input_types} for node {node.from_op.name}"
             # )
             continue
 
@@ -92,7 +92,7 @@ def await_run_outputs_edit_graph(
 ) -> None:
     """Automatically insert Run.await_final_output steps as needed."""
 
-    for edge in edit_g.edges_with_replacements:
+    for orig_edge, edge in edit_g.edges_with_replacements:
         actual_input_type = edge.output_of.type
         op_def = registry_mem.memory_registry.get_op(edge.input_to.from_op.name)
         if op_def.name == "tag-indexCheckpoint" or op_def.name == "Object-__getattr__":
@@ -133,7 +133,7 @@ def await_run_outputs_edit_graph(
 def execute_edit_graph(edit_g: graph_editable.EditGraph) -> None:
     """In cases where an input is a Node, execute the Node"""
 
-    for edge in edit_g.edges_with_replacements:
+    for orig_edge, edge in edit_g.edges_with_replacements:
         actual_input_type = edge.output_of.type
         op_def = registry_mem.memory_registry.get_op(edge.input_to.from_op.name)
         if not isinstance(op_def.input_type, op_args.OpNamedArgs):
@@ -161,7 +161,7 @@ def execute_edit_graph(edit_g: graph_editable.EditGraph) -> None:
 
             new_inputs[edge.input_name] = call_execute(edge.output_of)
             edit_g.replace(
-                edge.input_to,
+                orig_edge.input_to,
                 graph.OutputNode(
                     edge.input_to.type, edge.input_to.from_op.name, new_inputs
                 ),

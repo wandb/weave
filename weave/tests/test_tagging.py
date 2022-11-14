@@ -173,3 +173,15 @@ def test_tag_lookups():
     assert tag_store.find_tag(obj_3, "a") == 2
     assert tag_store.find_tag(tag_store.find_tag(obj_3, "nest"), "b") == 2
     assert tag_store.find_tag(obj_3, "b") == 3
+
+
+def test_tag_scope_with_multiple_children():
+    list_node = weave.save([1, 2, 3])
+    indexed = list_node.createIndexCheckpointTag()
+    count_node = indexed.count()
+    first_node = indexed[0]
+    second_node = indexed[1]
+    first_tag = first_node.indexCheckpoint()
+    second_tag = second_node.indexCheckpoint()
+    assert weave.use(count_node) == 3
+    assert weave.use([first_tag, second_tag]) == [0, 1]
