@@ -11,6 +11,7 @@ from .. import refs
 from ..ops_primitives import file as weave_file
 from ..ops_domain.wbmedia import ImageArtifactFileRef
 
+
 class ArtifactVersionType(types._PlainStringNamedType):
     name = "artifactVersion"
     instance_classes = artifacts_local.WandbArtifact
@@ -121,14 +122,10 @@ class ArtifactVersion:
 class ArtifactAssetType(types._PlainStringNamedType):
     name = "asset"
 
-asset_type = types.union(
-    ImageArtifactFileRef.WeaveType(),
-    ArtifactAssetType()
-)
 
 @op(
     name="asset-artifactVersion",
-    input_type={"asset": asset_type},
+    input_type={"asset": ArtifactAssetType()},
     output_type=ArtifactVersionType(),
 )
 def artifactVersion(asset):

@@ -29,7 +29,7 @@ class OpDef:
     """
 
     raw_input_type: op_args.OpArgs
-    _input_type: op_args.OpArgs
+    _input_type: typing.Optional[op_args.OpArgs]
     refine_output_type: typing.Optional["OpDef"]
     setter = str
     call_fn: typing.Any
@@ -112,16 +112,20 @@ class OpDef:
 
     def resolve_fn(__self, *args, **kwargs):
         from . import language_nullability
+
         res = language_nullability.process_op_def_resolve_fn(__self, args, kwargs)
         return process_opdef_resolve_fn.process_opdef_resolve_fn(
             __self, res, args, kwargs
         )
 
     @property
-    def input_type(self)-> op_args.OpArgs:
+    def input_type(self) -> op_args.OpArgs:
         from . import language_nullability
+
         if self._input_type is None:
-            self._input_type = language_nullability.process_op_def_input_type(self.raw_input_type, self)
+            self._input_type = language_nullability.process_op_def_input_type(
+                self.raw_input_type, self
+            )
         return self._input_type
 
     @property
@@ -149,13 +153,9 @@ class OpDef:
 
                 ot = self.raw_output_type
 
-                ot = language_nullability.process_opdef_output_type(
-                    ot, self
-                )
+                ot = language_nullability.process_opdef_output_type(ot, self)
 
-                ot = process_opdef_output_type(
-                    ot, self
-                )
+                ot = process_opdef_output_type(ot, self)
 
                 self._output_type = ot
 
