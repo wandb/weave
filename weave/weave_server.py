@@ -1,15 +1,14 @@
 import os
 import logging
 from logging.config import dictConfig
-from logging.handlers import WatchedFileHandler
 import pathlib
 import warnings
 import json_log_formatter
 
-import traceback
 import ddtrace
 
-ddtrace.patch(logging=True)
+ddtrace.patch_all()
+ddtrace.patch(logging=True, requests=True)
 
 from flask import Flask, Blueprint
 from flask import request
