@@ -102,7 +102,8 @@ class MemRef(Ref):
 
     def get(self) -> typing.Any:
         if self._name not in MEM_OBJS:
-            raise errors.WeaveStorageError(f"Object {self._name} not found")
+            name = self._name  # pick name off of self for sentry logging
+            raise errors.WeaveStorageError(f"Object {name} not found")
         return MEM_OBJS[self.name]
 
     def __str__(self) -> str:
