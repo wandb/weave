@@ -1,6 +1,6 @@
 wandb>0.13
 ddtrace
-json_log_formatter
+python-json-logger
 numpy
 pandas
 h5py

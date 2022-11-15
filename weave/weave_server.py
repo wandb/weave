@@ -3,12 +3,11 @@ import logging
 from logging.config import dictConfig
 import pathlib
 import warnings
-import json_log_formatter
+from pythonjsonlogger import jsonlogger
 
 import ddtrace
 
-ddtrace.patch_all()
-ddtrace.patch(logging=True, requests=True)
+ddtrace.patch(logging=True)
 
 from flask import Flask, Blueprint
 from flask import request
@@ -49,7 +48,8 @@ def enable_stream_logging(level=logging.DEBUG, enable_datadog=False):
 
     log_format = (
         (
-            "[dd.service=%(dd.service)s dd.env=%(dd.env)s dd.version=%(dd.version)s dd.trace_id=%(dd.trace_id)s dd.span_id=%(dd.span_id)s] "
+            "%(asctime)s %(levelname)s [%(name)s] [%(filename)s:%(lineno)d] "
+            "[dd.trace_id=%(dd.trace_id)s dd.span_id=%(dd.span_id)s] "
             "- %(message)s"
         )
         if enable_datadog
@@ -59,7 +59,7 @@ def enable_stream_logging(level=logging.DEBUG, enable_datadog=False):
     logger = logging.getLogger("root")
     stream_handler = logging.StreamHandler(wsgi_errors_stream)
     stream_handler.setLevel(level)
-    formatter = logging.Formatter(log_format)
+    formatter = jsonlogger.JsonFormatter(log_format)
     stream_handler.setFormatter(formatter)
     logger.addHandler(stream_handler)
 
