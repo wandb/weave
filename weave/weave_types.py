@@ -767,22 +767,11 @@ class ObjectType(Type):
         return cls(**variable_prop_types)
 
     def _to_dict(self):
-        d = super()._to_dict()
-
-        # NOTE: we unnecessarily store all property_types in the serialized
-        # type! We actually only need to store type_vars() which super() takes
-        # care of, but WeaveJS does not currently have a type registry in which
-        # to lookup a named type to figure out its property types. So just
-        # serialize all property types all the time for now. This adds a lot
-        # of redundant information that needs to go over the network.
-        # TODO: Fix
-        property_types = {}
-        for k, prop_type in self.property_types().items():
-            property_types[to_weavejs_typekey(k)] = prop_type.to_dict()
-        d["_property_types"] = property_types
-
+        d = {"_is_object": True}
         if not isinstance(self._base_type, Invalid):
             d["_base_type"] = self._base_type.to_dict()
+        for k, prop_type in self.property_types().items():
+            d[to_weavejs_typekey(k)] = prop_type.to_dict()
         return d
 
     # def assign_type(self):

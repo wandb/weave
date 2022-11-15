@@ -10,6 +10,7 @@ from .. import weave_internal
 from .. import ops
 from .. import panel
 from .. import decorator_type
+from .. import weave_types
 
 
 @decorator_type.type()
@@ -79,14 +80,14 @@ class TableState:
     def update_col(self, col_id, select_expr):
         object_type = self.input_node.type.object_type
         if self.groupBy and col_id not in self.groupBy:
-            object_type = ops.GroupResultType(object_type)
+            object_type = ops.GroupResultType(weave_types.List(object_type))
 
         sig = inspect.signature(select_expr)
         kwargs = {}
         if "domain" in sig.parameters:
             kwargs = {
                 "domain": weave_internal.make_var_node(
-                    weave.types.List(object_type), "domain"
+                    weave_types.List(object_type), "domain"
                 )
             }
         selected = select_expr(

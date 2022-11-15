@@ -198,7 +198,7 @@ class SqlTable:
             ),
         },
         output_type=lambda input_types: types.List(
-            list_.GroupResultType(input_types["self"].object_type)
+            list_.GroupResultType(types.List(input_types["self"].object_type))
         ),
     )
     def groupby(self, group_by_fn):

@@ -164,941 +164,185 @@ def test_actual_config_value(fixed_random_seed):
     assert storage.to_python(plot.config) == {
         "_type": {
             "type": "PlotConfig",
+            "_is_object": True,
             "series": {
                 "type": "list",
                 "objectType": {
                     "type": "Series",
+                    "_is_object": True,
                     "table": {
                         "type": "TableState",
+                        "_is_object": True,
                         "columns": {
                             "type": "typedDict",
                             "propertyTypes": {
                                 "VSKRDEEO6PKRDH": {
                                     "type": "PanelDef",
+                                    "_is_object": True,
                                     "panelConfig": "none",
-                                    "_property_types": {
-                                        "panelConfig": "none",
-                                        "panelId": "string",
-                                    },
+                                    "panelId": "string",
                                 },
                                 "36K5CG252HAV2F": {
                                     "type": "PanelDef",
+                                    "_is_object": True,
                                     "panelConfig": "none",
-                                    "_property_types": {
-                                        "panelConfig": "none",
-                                        "panelId": "string",
-                                    },
+                                    "panelId": "string",
                                 },
                                 "LZ9ORNJG56OGUU": {
                                     "type": "PanelDef",
+                                    "_is_object": True,
                                     "panelConfig": "none",
-                                    "_property_types": {
-                                        "panelConfig": "none",
-                                        "panelId": "string",
-                                    },
+                                    "panelId": "string",
                                 },
                                 "S2BJB2AY8D1P5J": {
                                     "type": "PanelDef",
+                                    "_is_object": True,
                                     "panelConfig": "none",
-                                    "_property_types": {
-                                        "panelConfig": "none",
-                                        "panelId": "string",
-                                    },
+                                    "panelId": "string",
                                 },
                                 "POEPBPZ7OF3CU3": {
                                     "type": "PanelDef",
+                                    "_is_object": True,
                                     "panelConfig": "none",
-                                    "_property_types": {
-                                        "panelConfig": "none",
-                                        "panelId": "string",
-                                    },
+                                    "panelId": "string",
                                 },
                                 "BTPJ3TAMZ9RE8C": {
                                     "type": "PanelDef",
+                                    "_is_object": True,
                                     "panelConfig": "none",
-                                    "_property_types": {
-                                        "panelConfig": "none",
-                                        "panelId": "string",
-                                    },
+                                    "panelId": "string",
                                 },
                                 "SQNQV4ZUZP68VE": {
                                     "type": "PanelDef",
+                                    "_is_object": True,
                                     "panelConfig": "none",
-                                    "_property_types": {
-                                        "panelConfig": "none",
-                                        "panelId": "string",
-                                    },
+                                    "panelId": "string",
                                 },
                                 "FUE4DX2S5BL68G": {
                                     "type": "PanelDef",
+                                    "_is_object": True,
                                     "panelConfig": "none",
-                                    "_property_types": {
-                                        "panelConfig": "none",
-                                        "panelId": "string",
-                                    },
+                                    "panelId": "string",
                                 },
                             },
                         },
-                        "_property_types": {
-                            "columns": {
-                                "type": "typedDict",
-                                "propertyTypes": {
-                                    "VSKRDEEO6PKRDH": {
-                                        "type": "PanelDef",
-                                        "panelConfig": "none",
-                                        "_property_types": {
-                                            "panelConfig": "none",
-                                            "panelId": "string",
-                                        },
-                                    },
-                                    "36K5CG252HAV2F": {
-                                        "type": "PanelDef",
-                                        "panelConfig": "none",
-                                        "_property_types": {
-                                            "panelConfig": "none",
-                                            "panelId": "string",
-                                        },
-                                    },
-                                    "LZ9ORNJG56OGUU": {
-                                        "type": "PanelDef",
-                                        "panelConfig": "none",
-                                        "_property_types": {
-                                            "panelConfig": "none",
-                                            "panelId": "string",
-                                        },
-                                    },
-                                    "S2BJB2AY8D1P5J": {
-                                        "type": "PanelDef",
-                                        "panelConfig": "none",
-                                        "_property_types": {
-                                            "panelConfig": "none",
-                                            "panelId": "string",
-                                        },
-                                    },
-                                    "POEPBPZ7OF3CU3": {
-                                        "type": "PanelDef",
-                                        "panelConfig": "none",
-                                        "_property_types": {
-                                            "panelConfig": "none",
-                                            "panelId": "string",
-                                        },
-                                    },
-                                    "BTPJ3TAMZ9RE8C": {
-                                        "type": "PanelDef",
-                                        "panelConfig": "none",
-                                        "_property_types": {
-                                            "panelConfig": "none",
-                                            "panelId": "string",
-                                        },
-                                    },
-                                    "SQNQV4ZUZP68VE": {
-                                        "type": "PanelDef",
-                                        "panelConfig": "none",
-                                        "_property_types": {
-                                            "panelConfig": "none",
-                                            "panelId": "string",
-                                        },
-                                    },
-                                    "FUE4DX2S5BL68G": {
-                                        "type": "PanelDef",
-                                        "panelConfig": "none",
-                                        "_property_types": {
-                                            "panelConfig": "none",
-                                            "panelId": "string",
-                                        },
-                                    },
-                                },
-                            },
-                            "input_node": {
+                        "input_node": {
+                            "type": "function",
+                            "inputTypes": {},
+                            "outputType": "unknown",
+                        },
+                        "autoColumns": "boolean",
+                        "preFilterFunction": {
+                            "type": "function",
+                            "inputTypes": {},
+                            "outputType": "unknown",
+                        },
+                        "columnNames": {
+                            "type": "dict",
+                            "key_type": "string",
+                            "objectType": "string",
+                        },
+                        "columnSelectFunctions": {
+                            "type": "dict",
+                            "key_type": "string",
+                            "objectType": {
                                 "type": "function",
                                 "inputTypes": {},
                                 "outputType": "unknown",
                             },
-                            "autoColumns": "boolean",
-                            "preFilterFunction": {
-                                "type": "function",
-                                "inputTypes": {},
-                                "outputType": "unknown",
-                            },
-                            "columnNames": {
-                                "type": "dict",
-                                "key_type": "string",
-                                "objectType": "string",
-                            },
-                            "columnSelectFunctions": {
-                                "type": "dict",
-                                "key_type": "string",
-                                "objectType": {
-                                    "type": "function",
-                                    "inputTypes": {},
-                                    "outputType": "unknown",
-                                },
-                            },
-                            "order": {"type": "list", "objectType": "string"},
-                            "groupBy": {"type": "list", "objectType": "string"},
-                            "sort": {"type": "list", "objectType": "string"},
-                            "pageSize": "int",
-                            "page": "int",
                         },
+                        "order": {"type": "list", "objectType": "string"},
+                        "groupBy": {"type": "list", "objectType": "string"},
+                        "sort": {"type": "list", "objectType": "string"},
+                        "pageSize": "int",
+                        "page": "int",
                     },
                     "constants": {
                         "type": "PlotConstants",
+                        "_is_object": True,
                         "mark": "string",
                         "pointShape": "none",
                         "lineStyle": "none",
-                        "_property_types": {
-                            "mark": "string",
-                            "pointShape": "none",
-                            "lineStyle": "none",
-                            "label": {
-                                "type": "const",
-                                "valType": "string",
-                                "val": "series",
-                            },
+                        "label": {
+                            "type": "const",
+                            "valType": "string",
+                            "val": "series",
                         },
                     },
                     "uiState": {
                         "type": "PlotUIState",
+                        "_is_object": True,
                         "pointShape": "string",
                         "label": "string",
-                        "_property_types": {"pointShape": "string", "label": "string"},
                     },
-                    "_property_types": {
-                        "table": {
-                            "type": "TableState",
-                            "columns": {
-                                "type": "typedDict",
-                                "propertyTypes": {
-                                    "VSKRDEEO6PKRDH": {
-                                        "type": "PanelDef",
-                                        "panelConfig": "none",
-                                        "_property_types": {
-                                            "panelConfig": "none",
-                                            "panelId": "string",
-                                        },
-                                    },
-                                    "36K5CG252HAV2F": {
-                                        "type": "PanelDef",
-                                        "panelConfig": "none",
-                                        "_property_types": {
-                                            "panelConfig": "none",
-                                            "panelId": "string",
-                                        },
-                                    },
-                                    "LZ9ORNJG56OGUU": {
-                                        "type": "PanelDef",
-                                        "panelConfig": "none",
-                                        "_property_types": {
-                                            "panelConfig": "none",
-                                            "panelId": "string",
-                                        },
-                                    },
-                                    "S2BJB2AY8D1P5J": {
-                                        "type": "PanelDef",
-                                        "panelConfig": "none",
-                                        "_property_types": {
-                                            "panelConfig": "none",
-                                            "panelId": "string",
-                                        },
-                                    },
-                                    "POEPBPZ7OF3CU3": {
-                                        "type": "PanelDef",
-                                        "panelConfig": "none",
-                                        "_property_types": {
-                                            "panelConfig": "none",
-                                            "panelId": "string",
-                                        },
-                                    },
-                                    "BTPJ3TAMZ9RE8C": {
-                                        "type": "PanelDef",
-                                        "panelConfig": "none",
-                                        "_property_types": {
-                                            "panelConfig": "none",
-                                            "panelId": "string",
-                                        },
-                                    },
-                                    "SQNQV4ZUZP68VE": {
-                                        "type": "PanelDef",
-                                        "panelConfig": "none",
-                                        "_property_types": {
-                                            "panelConfig": "none",
-                                            "panelId": "string",
-                                        },
-                                    },
-                                    "FUE4DX2S5BL68G": {
-                                        "type": "PanelDef",
-                                        "panelConfig": "none",
-                                        "_property_types": {
-                                            "panelConfig": "none",
-                                            "panelId": "string",
-                                        },
-                                    },
-                                },
-                            },
-                            "_property_types": {
-                                "columns": {
-                                    "type": "typedDict",
-                                    "propertyTypes": {
-                                        "VSKRDEEO6PKRDH": {
-                                            "type": "PanelDef",
-                                            "panelConfig": "none",
-                                            "_property_types": {
-                                                "panelConfig": "none",
-                                                "panelId": "string",
-                                            },
-                                        },
-                                        "36K5CG252HAV2F": {
-                                            "type": "PanelDef",
-                                            "panelConfig": "none",
-                                            "_property_types": {
-                                                "panelConfig": "none",
-                                                "panelId": "string",
-                                            },
-                                        },
-                                        "LZ9ORNJG56OGUU": {
-                                            "type": "PanelDef",
-                                            "panelConfig": "none",
-                                            "_property_types": {
-                                                "panelConfig": "none",
-                                                "panelId": "string",
-                                            },
-                                        },
-                                        "S2BJB2AY8D1P5J": {
-                                            "type": "PanelDef",
-                                            "panelConfig": "none",
-                                            "_property_types": {
-                                                "panelConfig": "none",
-                                                "panelId": "string",
-                                            },
-                                        },
-                                        "POEPBPZ7OF3CU3": {
-                                            "type": "PanelDef",
-                                            "panelConfig": "none",
-                                            "_property_types": {
-                                                "panelConfig": "none",
-                                                "panelId": "string",
-                                            },
-                                        },
-                                        "BTPJ3TAMZ9RE8C": {
-                                            "type": "PanelDef",
-                                            "panelConfig": "none",
-                                            "_property_types": {
-                                                "panelConfig": "none",
-                                                "panelId": "string",
-                                            },
-                                        },
-                                        "SQNQV4ZUZP68VE": {
-                                            "type": "PanelDef",
-                                            "panelConfig": "none",
-                                            "_property_types": {
-                                                "panelConfig": "none",
-                                                "panelId": "string",
-                                            },
-                                        },
-                                        "FUE4DX2S5BL68G": {
-                                            "type": "PanelDef",
-                                            "panelConfig": "none",
-                                            "_property_types": {
-                                                "panelConfig": "none",
-                                                "panelId": "string",
-                                            },
-                                        },
-                                    },
-                                },
-                                "input_node": {
-                                    "type": "function",
-                                    "inputTypes": {},
-                                    "outputType": "unknown",
-                                },
-                                "autoColumns": "boolean",
-                                "preFilterFunction": {
-                                    "type": "function",
-                                    "inputTypes": {},
-                                    "outputType": "unknown",
-                                },
-                                "columnNames": {
-                                    "type": "dict",
-                                    "key_type": "string",
-                                    "objectType": "string",
-                                },
-                                "columnSelectFunctions": {
-                                    "type": "dict",
-                                    "key_type": "string",
-                                    "objectType": {
-                                        "type": "function",
-                                        "inputTypes": {},
-                                        "outputType": "unknown",
-                                    },
-                                },
-                                "order": {"type": "list", "objectType": "string"},
-                                "groupBy": {"type": "list", "objectType": "string"},
-                                "sort": {"type": "list", "objectType": "string"},
-                                "pageSize": "int",
-                                "page": "int",
-                            },
-                        },
-                        "constants": {
-                            "type": "PlotConstants",
-                            "mark": "string",
-                            "pointShape": "none",
-                            "lineStyle": "none",
-                            "_property_types": {
-                                "mark": "string",
-                                "pointShape": "none",
-                                "lineStyle": "none",
-                                "label": {
-                                    "type": "const",
-                                    "valType": "string",
-                                    "val": "series",
-                                },
-                            },
-                        },
-                        "uiState": {
-                            "type": "PlotUIState",
-                            "pointShape": "string",
-                            "label": "string",
-                            "_property_types": {
-                                "pointShape": "string",
-                                "label": "string",
-                            },
-                        },
-                        "dims": {
-                            "type": "DimConfig",
-                            "_property_types": {
-                                "x": "string",
-                                "y": "string",
-                                "color": "string",
-                                "label": "string",
-                                "tooltip": "string",
-                                "pointSize": "string",
-                                "pointShape": "string",
-                                "y2": "string",
-                            },
-                        },
+                    "dims": {
+                        "type": "DimConfig",
+                        "_is_object": True,
+                        "x": "string",
+                        "y": "string",
+                        "color": "string",
+                        "label": "string",
+                        "tooltip": "string",
+                        "pointSize": "string",
+                        "pointShape": "string",
+                        "y2": "string",
                     },
                 },
             },
             "axisSettings": {
                 "type": "AxisSettings",
+                "_is_object": True,
                 "color": {
                     "type": "AxisSetting",
-                    "_property_types": {
-                        "noLabels": "boolean",
-                        "noTitle": "boolean",
-                        "noTicks": "boolean",
-                    },
+                    "_is_object": True,
+                    "noLabels": "boolean",
+                    "noTitle": "boolean",
+                    "noTicks": "boolean",
                 },
-                "_property_types": {
-                    "color": {
-                        "type": "AxisSetting",
-                        "_property_types": {
-                            "noLabels": "boolean",
-                            "noTitle": "boolean",
-                            "noTicks": "boolean",
-                        },
-                    },
-                    "x": {
-                        "type": "AxisSetting",
-                        "_property_types": {
-                            "noLabels": "boolean",
-                            "noTitle": "boolean",
-                            "noTicks": "boolean",
-                        },
-                    },
-                    "y": {
-                        "type": "AxisSetting",
-                        "_property_types": {
-                            "noLabels": "boolean",
-                            "noTitle": "boolean",
-                            "noTicks": "boolean",
-                        },
-                    },
+                "x": {
+                    "type": "AxisSetting",
+                    "_is_object": True,
+                    "noLabels": "boolean",
+                    "noTitle": "boolean",
+                    "noTicks": "boolean",
+                },
+                "y": {
+                    "type": "AxisSetting",
+                    "_is_object": True,
+                    "noLabels": "boolean",
+                    "noTitle": "boolean",
+                    "noTicks": "boolean",
                 },
             },
-            "_property_types": {
-                "series": {
-                    "type": "list",
-                    "objectType": {
-                        "type": "Series",
-                        "table": {
-                            "type": "TableState",
-                            "columns": {
-                                "type": "typedDict",
-                                "propertyTypes": {
-                                    "VSKRDEEO6PKRDH": {
-                                        "type": "PanelDef",
-                                        "panelConfig": "none",
-                                        "_property_types": {
-                                            "panelConfig": "none",
-                                            "panelId": "string",
-                                        },
-                                    },
-                                    "36K5CG252HAV2F": {
-                                        "type": "PanelDef",
-                                        "panelConfig": "none",
-                                        "_property_types": {
-                                            "panelConfig": "none",
-                                            "panelId": "string",
-                                        },
-                                    },
-                                    "LZ9ORNJG56OGUU": {
-                                        "type": "PanelDef",
-                                        "panelConfig": "none",
-                                        "_property_types": {
-                                            "panelConfig": "none",
-                                            "panelId": "string",
-                                        },
-                                    },
-                                    "S2BJB2AY8D1P5J": {
-                                        "type": "PanelDef",
-                                        "panelConfig": "none",
-                                        "_property_types": {
-                                            "panelConfig": "none",
-                                            "panelId": "string",
-                                        },
-                                    },
-                                    "POEPBPZ7OF3CU3": {
-                                        "type": "PanelDef",
-                                        "panelConfig": "none",
-                                        "_property_types": {
-                                            "panelConfig": "none",
-                                            "panelId": "string",
-                                        },
-                                    },
-                                    "BTPJ3TAMZ9RE8C": {
-                                        "type": "PanelDef",
-                                        "panelConfig": "none",
-                                        "_property_types": {
-                                            "panelConfig": "none",
-                                            "panelId": "string",
-                                        },
-                                    },
-                                    "SQNQV4ZUZP68VE": {
-                                        "type": "PanelDef",
-                                        "panelConfig": "none",
-                                        "_property_types": {
-                                            "panelConfig": "none",
-                                            "panelId": "string",
-                                        },
-                                    },
-                                    "FUE4DX2S5BL68G": {
-                                        "type": "PanelDef",
-                                        "panelConfig": "none",
-                                        "_property_types": {
-                                            "panelConfig": "none",
-                                            "panelId": "string",
-                                        },
-                                    },
-                                },
-                            },
-                            "_property_types": {
-                                "columns": {
-                                    "type": "typedDict",
-                                    "propertyTypes": {
-                                        "VSKRDEEO6PKRDH": {
-                                            "type": "PanelDef",
-                                            "panelConfig": "none",
-                                            "_property_types": {
-                                                "panelConfig": "none",
-                                                "panelId": "string",
-                                            },
-                                        },
-                                        "36K5CG252HAV2F": {
-                                            "type": "PanelDef",
-                                            "panelConfig": "none",
-                                            "_property_types": {
-                                                "panelConfig": "none",
-                                                "panelId": "string",
-                                            },
-                                        },
-                                        "LZ9ORNJG56OGUU": {
-                                            "type": "PanelDef",
-                                            "panelConfig": "none",
-                                            "_property_types": {
-                                                "panelConfig": "none",
-                                                "panelId": "string",
-                                            },
-                                        },
-                                        "S2BJB2AY8D1P5J": {
-                                            "type": "PanelDef",
-                                            "panelConfig": "none",
-                                            "_property_types": {
-                                                "panelConfig": "none",
-                                                "panelId": "string",
-                                            },
-                                        },
-                                        "POEPBPZ7OF3CU3": {
-                                            "type": "PanelDef",
-                                            "panelConfig": "none",
-                                            "_property_types": {
-                                                "panelConfig": "none",
-                                                "panelId": "string",
-                                            },
-                                        },
-                                        "BTPJ3TAMZ9RE8C": {
-                                            "type": "PanelDef",
-                                            "panelConfig": "none",
-                                            "_property_types": {
-                                                "panelConfig": "none",
-                                                "panelId": "string",
-                                            },
-                                        },
-                                        "SQNQV4ZUZP68VE": {
-                                            "type": "PanelDef",
-                                            "panelConfig": "none",
-                                            "_property_types": {
-                                                "panelConfig": "none",
-                                                "panelId": "string",
-                                            },
-                                        },
-                                        "FUE4DX2S5BL68G": {
-                                            "type": "PanelDef",
-                                            "panelConfig": "none",
-                                            "_property_types": {
-                                                "panelConfig": "none",
-                                                "panelId": "string",
-                                            },
-                                        },
-                                    },
-                                },
-                                "input_node": {
-                                    "type": "function",
-                                    "inputTypes": {},
-                                    "outputType": "unknown",
-                                },
-                                "autoColumns": "boolean",
-                                "preFilterFunction": {
-                                    "type": "function",
-                                    "inputTypes": {},
-                                    "outputType": "unknown",
-                                },
-                                "columnNames": {
-                                    "type": "dict",
-                                    "key_type": "string",
-                                    "objectType": "string",
-                                },
-                                "columnSelectFunctions": {
-                                    "type": "dict",
-                                    "key_type": "string",
-                                    "objectType": {
-                                        "type": "function",
-                                        "inputTypes": {},
-                                        "outputType": "unknown",
-                                    },
-                                },
-                                "order": {"type": "list", "objectType": "string"},
-                                "groupBy": {"type": "list", "objectType": "string"},
-                                "sort": {"type": "list", "objectType": "string"},
-                                "pageSize": "int",
-                                "page": "int",
-                            },
-                        },
-                        "constants": {
-                            "type": "PlotConstants",
-                            "mark": "string",
-                            "pointShape": "none",
-                            "lineStyle": "none",
-                            "_property_types": {
-                                "mark": "string",
-                                "pointShape": "none",
-                                "lineStyle": "none",
-                                "label": {
-                                    "type": "const",
-                                    "valType": "string",
-                                    "val": "series",
-                                },
-                            },
-                        },
-                        "uiState": {
-                            "type": "PlotUIState",
-                            "pointShape": "string",
-                            "label": "string",
-                            "_property_types": {
-                                "pointShape": "string",
-                                "label": "string",
-                            },
-                        },
-                        "_property_types": {
-                            "table": {
-                                "type": "TableState",
-                                "columns": {
-                                    "type": "typedDict",
-                                    "propertyTypes": {
-                                        "VSKRDEEO6PKRDH": {
-                                            "type": "PanelDef",
-                                            "panelConfig": "none",
-                                            "_property_types": {
-                                                "panelConfig": "none",
-                                                "panelId": "string",
-                                            },
-                                        },
-                                        "36K5CG252HAV2F": {
-                                            "type": "PanelDef",
-                                            "panelConfig": "none",
-                                            "_property_types": {
-                                                "panelConfig": "none",
-                                                "panelId": "string",
-                                            },
-                                        },
-                                        "LZ9ORNJG56OGUU": {
-                                            "type": "PanelDef",
-                                            "panelConfig": "none",
-                                            "_property_types": {
-                                                "panelConfig": "none",
-                                                "panelId": "string",
-                                            },
-                                        },
-                                        "S2BJB2AY8D1P5J": {
-                                            "type": "PanelDef",
-                                            "panelConfig": "none",
-                                            "_property_types": {
-                                                "panelConfig": "none",
-                                                "panelId": "string",
-                                            },
-                                        },
-                                        "POEPBPZ7OF3CU3": {
-                                            "type": "PanelDef",
-                                            "panelConfig": "none",
-                                            "_property_types": {
-                                                "panelConfig": "none",
-                                                "panelId": "string",
-                                            },
-                                        },
-                                        "BTPJ3TAMZ9RE8C": {
-                                            "type": "PanelDef",
-                                            "panelConfig": "none",
-                                            "_property_types": {
-                                                "panelConfig": "none",
-                                                "panelId": "string",
-                                            },
-                                        },
-                                        "SQNQV4ZUZP68VE": {
-                                            "type": "PanelDef",
-                                            "panelConfig": "none",
-                                            "_property_types": {
-                                                "panelConfig": "none",
-                                                "panelId": "string",
-                                            },
-                                        },
-                                        "FUE4DX2S5BL68G": {
-                                            "type": "PanelDef",
-                                            "panelConfig": "none",
-                                            "_property_types": {
-                                                "panelConfig": "none",
-                                                "panelId": "string",
-                                            },
-                                        },
-                                    },
-                                },
-                                "_property_types": {
-                                    "columns": {
-                                        "type": "typedDict",
-                                        "propertyTypes": {
-                                            "VSKRDEEO6PKRDH": {
-                                                "type": "PanelDef",
-                                                "panelConfig": "none",
-                                                "_property_types": {
-                                                    "panelConfig": "none",
-                                                    "panelId": "string",
-                                                },
-                                            },
-                                            "36K5CG252HAV2F": {
-                                                "type": "PanelDef",
-                                                "panelConfig": "none",
-                                                "_property_types": {
-                                                    "panelConfig": "none",
-                                                    "panelId": "string",
-                                                },
-                                            },
-                                            "LZ9ORNJG56OGUU": {
-                                                "type": "PanelDef",
-                                                "panelConfig": "none",
-                                                "_property_types": {
-                                                    "panelConfig": "none",
-                                                    "panelId": "string",
-                                                },
-                                            },
-                                            "S2BJB2AY8D1P5J": {
-                                                "type": "PanelDef",
-                                                "panelConfig": "none",
-                                                "_property_types": {
-                                                    "panelConfig": "none",
-                                                    "panelId": "string",
-                                                },
-                                            },
-                                            "POEPBPZ7OF3CU3": {
-                                                "type": "PanelDef",
-                                                "panelConfig": "none",
-                                                "_property_types": {
-                                                    "panelConfig": "none",
-                                                    "panelId": "string",
-                                                },
-                                            },
-                                            "BTPJ3TAMZ9RE8C": {
-                                                "type": "PanelDef",
-                                                "panelConfig": "none",
-                                                "_property_types": {
-                                                    "panelConfig": "none",
-                                                    "panelId": "string",
-                                                },
-                                            },
-                                            "SQNQV4ZUZP68VE": {
-                                                "type": "PanelDef",
-                                                "panelConfig": "none",
-                                                "_property_types": {
-                                                    "panelConfig": "none",
-                                                    "panelId": "string",
-                                                },
-                                            },
-                                            "FUE4DX2S5BL68G": {
-                                                "type": "PanelDef",
-                                                "panelConfig": "none",
-                                                "_property_types": {
-                                                    "panelConfig": "none",
-                                                    "panelId": "string",
-                                                },
-                                            },
-                                        },
-                                    },
-                                    "input_node": {
-                                        "type": "function",
-                                        "inputTypes": {},
-                                        "outputType": "unknown",
-                                    },
-                                    "autoColumns": "boolean",
-                                    "preFilterFunction": {
-                                        "type": "function",
-                                        "inputTypes": {},
-                                        "outputType": "unknown",
-                                    },
-                                    "columnNames": {
-                                        "type": "dict",
-                                        "key_type": "string",
-                                        "objectType": "string",
-                                    },
-                                    "columnSelectFunctions": {
-                                        "type": "dict",
-                                        "key_type": "string",
-                                        "objectType": {
-                                            "type": "function",
-                                            "inputTypes": {},
-                                            "outputType": "unknown",
-                                        },
-                                    },
-                                    "order": {"type": "list", "objectType": "string"},
-                                    "groupBy": {"type": "list", "objectType": "string"},
-                                    "sort": {"type": "list", "objectType": "string"},
-                                    "pageSize": "int",
-                                    "page": "int",
-                                },
-                            },
-                            "constants": {
-                                "type": "PlotConstants",
-                                "mark": "string",
-                                "pointShape": "none",
-                                "lineStyle": "none",
-                                "_property_types": {
-                                    "mark": "string",
-                                    "pointShape": "none",
-                                    "lineStyle": "none",
-                                    "label": {
-                                        "type": "const",
-                                        "valType": "string",
-                                        "val": "series",
-                                    },
-                                },
-                            },
-                            "uiState": {
-                                "type": "PlotUIState",
-                                "pointShape": "string",
-                                "label": "string",
-                                "_property_types": {
-                                    "pointShape": "string",
-                                    "label": "string",
-                                },
-                            },
-                            "dims": {
-                                "type": "DimConfig",
-                                "_property_types": {
-                                    "x": "string",
-                                    "y": "string",
-                                    "color": "string",
-                                    "label": "string",
-                                    "tooltip": "string",
-                                    "pointSize": "string",
-                                    "pointShape": "string",
-                                    "y2": "string",
-                                },
-                            },
-                        },
-                    },
+            "legendSettings": {
+                "type": "LegendSettings",
+                "_is_object": True,
+                "x": {
+                    "type": "LegendSetting",
+                    "_is_object": True,
+                    "noLegend": "boolean",
                 },
-                "axisSettings": {
-                    "type": "AxisSettings",
-                    "color": {
-                        "type": "AxisSetting",
-                        "_property_types": {
-                            "noLabels": "boolean",
-                            "noTitle": "boolean",
-                            "noTicks": "boolean",
-                        },
-                    },
-                    "_property_types": {
-                        "color": {
-                            "type": "AxisSetting",
-                            "_property_types": {
-                                "noLabels": "boolean",
-                                "noTitle": "boolean",
-                                "noTicks": "boolean",
-                            },
-                        },
-                        "x": {
-                            "type": "AxisSetting",
-                            "_property_types": {
-                                "noLabels": "boolean",
-                                "noTitle": "boolean",
-                                "noTicks": "boolean",
-                            },
-                        },
-                        "y": {
-                            "type": "AxisSetting",
-                            "_property_types": {
-                                "noLabels": "boolean",
-                                "noTitle": "boolean",
-                                "noTicks": "boolean",
-                            },
-                        },
-                    },
+                "y": {
+                    "type": "LegendSetting",
+                    "_is_object": True,
+                    "noLegend": "boolean",
                 },
-                "legendSettings": {
-                    "type": "LegendSettings",
-                    "_property_types": {
-                        "x": {
-                            "type": "LegendSetting",
-                            "_property_types": {"noLegend": "boolean"},
-                        },
-                        "y": {
-                            "type": "LegendSetting",
-                            "_property_types": {"noLegend": "boolean"},
-                        },
-                        "color": {
-                            "type": "LegendSetting",
-                            "_property_types": {"noLegend": "boolean"},
-                        },
-                    },
+                "color": {
+                    "type": "LegendSetting",
+                    "_is_object": True,
+                    "noLegend": "boolean",
                 },
-                "configOptionsExpanded": {
-                    "type": "ConfigOptionsExpanded",
-                    "_property_types": {
-                        "x": "boolean",
-                        "y": "boolean",
-                        "label": "boolean",
-                        "tooltip": "boolean",
-                        "mark": "boolean",
-                    },
-                },
-                "configVersion": "int",
             },
+            "configOptionsExpanded": {
+                "type": "ConfigOptionsExpanded",
+                "_is_object": True,
+                "x": "boolean",
+                "y": "boolean",
+                "label": "boolean",
+                "tooltip": "boolean",
+                "mark": "boolean",
+            },
+            "configVersion": "int",
         },
         "_val": {
             "series": [
@@ -1233,6 +477,7 @@ def test_actual_config_value(fixed_random_seed):
                                         "nodeType": "output",
                                         "type": {
                                             "type": "RunSegment",
+                                            "_is_object": True,
                                             "prior_run_ref": "string",
                                             "prior_run_branch_index": "int",
                                             "metrics": {
@@ -1344,120 +589,7 @@ def test_actual_config_value(fixed_random_seed):
                                                     },
                                                 },
                                             },
-                                            "_property_types": {
-                                                "prior_run_ref": "string",
-                                                "prior_run_branch_index": "int",
-                                                "metrics": {
-                                                    "type": "ArrowWeaveList",
-                                                    "objectType": {
-                                                        "type": "typedDict",
-                                                        "propertyTypes": {
-                                                            "step": "int",
-                                                            "string_col": "string",
-                                                            "metric0": "float",
-                                                            "metric1": "float",
-                                                            "metric2": "float",
-                                                            "metric3": "float",
-                                                            "metric4": "float",
-                                                            "metric5": "float",
-                                                            "metric6": "float",
-                                                            "metric7": "float",
-                                                            "metric8": "float",
-                                                            "metric9": "float",
-                                                            "metric10": "float",
-                                                            "metric11": "float",
-                                                            "metric12": "float",
-                                                            "metric13": "float",
-                                                            "metric14": "float",
-                                                            "metric15": "float",
-                                                            "metric16": "float",
-                                                            "metric17": "float",
-                                                            "metric18": "float",
-                                                            "metric19": "float",
-                                                            "metric20": "float",
-                                                            "metric21": "float",
-                                                            "metric22": "float",
-                                                            "metric23": "float",
-                                                            "metric24": "float",
-                                                            "metric25": "float",
-                                                            "metric26": "float",
-                                                            "metric27": "float",
-                                                            "metric28": "float",
-                                                            "metric29": "float",
-                                                            "metric30": "float",
-                                                            "metric31": "float",
-                                                            "metric32": "float",
-                                                            "metric33": "float",
-                                                            "metric34": "float",
-                                                            "metric35": "float",
-                                                            "metric36": "float",
-                                                            "metric37": "float",
-                                                            "metric38": "float",
-                                                            "metric39": "float",
-                                                            "metric40": "float",
-                                                            "metric41": "float",
-                                                            "metric42": "float",
-                                                            "metric43": "float",
-                                                            "metric44": "float",
-                                                            "metric45": "float",
-                                                            "metric46": "float",
-                                                            "metric47": "float",
-                                                            "metric48": "float",
-                                                            "metric49": "float",
-                                                            "metric50": "float",
-                                                            "metric51": "float",
-                                                            "metric52": "float",
-                                                            "metric53": "float",
-                                                            "metric54": "float",
-                                                            "metric55": "float",
-                                                            "metric56": "float",
-                                                            "metric57": "float",
-                                                            "metric58": "float",
-                                                            "metric59": "float",
-                                                            "metric60": "float",
-                                                            "metric61": "float",
-                                                            "metric62": "float",
-                                                            "metric63": "float",
-                                                            "metric64": "float",
-                                                            "metric65": "float",
-                                                            "metric66": "float",
-                                                            "metric67": "float",
-                                                            "metric68": "float",
-                                                            "metric69": "float",
-                                                            "metric70": "float",
-                                                            "metric71": "float",
-                                                            "metric72": "float",
-                                                            "metric73": "float",
-                                                            "metric74": "float",
-                                                            "metric75": "float",
-                                                            "metric76": "float",
-                                                            "metric77": "float",
-                                                            "metric78": "float",
-                                                            "metric79": "float",
-                                                            "metric80": "float",
-                                                            "metric81": "float",
-                                                            "metric82": "float",
-                                                            "metric83": "float",
-                                                            "metric84": "float",
-                                                            "metric85": "float",
-                                                            "metric86": "float",
-                                                            "metric87": "float",
-                                                            "metric88": "float",
-                                                            "metric89": "float",
-                                                            "metric90": "float",
-                                                            "metric91": "float",
-                                                            "metric92": "float",
-                                                            "metric93": "float",
-                                                            "metric94": "float",
-                                                            "metric95": "float",
-                                                            "metric96": "float",
-                                                            "metric97": "float",
-                                                            "metric98": "float",
-                                                        },
-                                                    },
-                                                },
-                                                "run_name": "string",
-                                            },
+                                            "run_name": "string",
                                         },
                                         "fromOp": {
                                             "name": "get",
@@ -1465,7 +597,7 @@ def test_actual_config_value(fixed_random_seed):
                                                 "uri": {
                                                     "nodeType": "const",
                                                     "type": "string",
-                                                    "val": "local-artifact:///tmp/weave/pytest/weave/tests/test_plot.py::test_actual_config_value (setup)/RunSegment/377dd45d59a4ff6ae9ee124746cb7aef",
+                                                    "val": "local-artifact:///tmp/weave/pytest/weave/tests/test_plot.py::test_actual_config_value (setup)/RunSegment/164b91e6b2832f79254c6da17e094563",
                                                 }
                                             },
                                         },
@@ -1972,6 +1104,7 @@ def test_actual_config_value(fixed_random_seed):
                                         "nodeType": "output",
                                         "type": {
                                             "type": "RunSegment",
+                                            "_is_object": True,
                                             "prior_run_ref": "string",
                                             "prior_run_branch_index": "int",
                                             "metrics": {
@@ -2083,120 +1216,7 @@ def test_actual_config_value(fixed_random_seed):
                                                     },
                                                 },
                                             },
-                                            "_property_types": {
-                                                "prior_run_ref": "string",
-                                                "prior_run_branch_index": "int",
-                                                "metrics": {
-                                                    "type": "ArrowWeaveList",
-                                                    "objectType": {
-                                                        "type": "typedDict",
-                                                        "propertyTypes": {
-                                                            "step": "int",
-                                                            "string_col": "string",
-                                                            "metric0": "float",
-                                                            "metric1": "float",
-                                                            "metric2": "float",
-                                                            "metric3": "float",
-                                                            "metric4": "float",
-                                                            "metric5": "float",
-                                                            "metric6": "float",
-                                                            "metric7": "float",
-                                                            "metric8": "float",
-                                                            "metric9": "float",
-                                                            "metric10": "float",
-                                                            "metric11": "float",
-                                                            "metric12": "float",
-                                                            "metric13": "float",
-                                                            "metric14": "float",
-                                                            "metric15": "float",
-                                                            "metric16": "float",
-                                                            "metric17": "float",
-                                                            "metric18": "float",
-                                                            "metric19": "float",
-                                                            "metric20": "float",
-                                                            "metric21": "float",
-                                                            "metric22": "float",
-                                                            "metric23": "float",
-                                                            "metric24": "float",
-                                                            "metric25": "float",
-                                                            "metric26": "float",
-                                                            "metric27": "float",
-                                                            "metric28": "float",
-                                                            "metric29": "float",
-                                                            "metric30": "float",
-                                                            "metric31": "float",
-                                                            "metric32": "float",
-                                                            "metric33": "float",
-                                                            "metric34": "float",
-                                                            "metric35": "float",
-                                                            "metric36": "float",
-                                                            "metric37": "float",
-                                                            "metric38": "float",
-                                                            "metric39": "float",
-                                                            "metric40": "float",
-                                                            "metric41": "float",
-                                                            "metric42": "float",
-                                                            "metric43": "float",
-                                                            "metric44": "float",
-                                                            "metric45": "float",
-                                                            "metric46": "float",
-                                                            "metric47": "float",
-                                                            "metric48": "float",
-                                                            "metric49": "float",
-                                                            "metric50": "float",
-                                                            "metric51": "float",
-                                                            "metric52": "float",
-                                                            "metric53": "float",
-                                                            "metric54": "float",
-                                                            "metric55": "float",
-                                                            "metric56": "float",
-                                                            "metric57": "float",
-                                                            "metric58": "float",
-                                                            "metric59": "float",
-                                                            "metric60": "float",
-                                                            "metric61": "float",
-                                                            "metric62": "float",
-                                                            "metric63": "float",
-                                                            "metric64": "float",
-                                                            "metric65": "float",
-                                                            "metric66": "float",
-                                                            "metric67": "float",
-                                                            "metric68": "float",
-                                                            "metric69": "float",
-                                                            "metric70": "float",
-                                                            "metric71": "float",
-                                                            "metric72": "float",
-                                                            "metric73": "float",
-                                                            "metric74": "float",
-                                                            "metric75": "float",
-                                                            "metric76": "float",
-                                                            "metric77": "float",
-                                                            "metric78": "float",
-                                                            "metric79": "float",
-                                                            "metric80": "float",
-                                                            "metric81": "float",
-                                                            "metric82": "float",
-                                                            "metric83": "float",
-                                                            "metric84": "float",
-                                                            "metric85": "float",
-                                                            "metric86": "float",
-                                                            "metric87": "float",
-                                                            "metric88": "float",
-                                                            "metric89": "float",
-                                                            "metric90": "float",
-                                                            "metric91": "float",
-                                                            "metric92": "float",
-                                                            "metric93": "float",
-                                                            "metric94": "float",
-                                                            "metric95": "float",
-                                                            "metric96": "float",
-                                                            "metric97": "float",
-                                                            "metric98": "float",
-                                                        },
-                                                    },
-                                                },
-                                                "run_name": "string",
-                                            },
+                                            "run_name": "string",
                                         },
                                         "fromOp": {
                                             "name": "get",
@@ -2204,7 +1224,7 @@ def test_actual_config_value(fixed_random_seed):
                                                 "uri": {
                                                     "nodeType": "const",
                                                     "type": "string",
-                                                    "val": "local-artifact:///tmp/weave/pytest/weave/tests/test_plot.py::test_actual_config_value (setup)/RunSegment/377dd45d59a4ff6ae9ee124746cb7aef",
+                                                    "val": "local-artifact:///tmp/weave/pytest/weave/tests/test_plot.py::test_actual_config_value (setup)/RunSegment/164b91e6b2832f79254c6da17e094563",
                                                 }
                                             },
                                         },

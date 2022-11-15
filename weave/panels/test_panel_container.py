@@ -22,264 +22,89 @@ def test_panel_container():
     serialized = storage.to_python(container)
     expected = {
         "_type": {
-            "_property_types": {
-                "config": {
-                    "_property_types": {
-                        "panels": {
-                            "objectType": {
-                                "members": [
-                                    {
-                                        "_property_types": {
-                                            "config": {
-                                                "_property_types": {
-                                                    "max": "int",
-                                                    "min": "int",
-                                                    "step": "int",
-                                                },
-                                                "type": "slider_config_type",
-                                            },
-                                            "id": {
-                                                "type": "const",
-                                                "val": "slider",
-                                                "valType": "string",
-                                            },
-                                            "input_node": {
-                                                "inputTypes": {},
-                                                "outputType": "number",
-                                                "type": "function",
-                                            },
-                                        },
-                                        "type": "slider_panel_type",
-                                    },
-                                    {
-                                        "_property_types": {
-                                            "config": {
-                                                "propertyTypes": {},
-                                                "type": "typedDict",
-                                            },
-                                            "id": {
-                                                "type": "const",
-                                                "val": "number",
-                                                "valType": "string",
-                                            },
-                                            "input_node": {
-                                                "inputTypes": {},
-                                                "outputType": "number",
-                                                "type": "function",
-                                            },
-                                        },
-                                        "type": "number_panel_type",
-                                    },
-                                ],
-                                "type": "union",
-                            },
-                            "type": "list",
-                        },
-                        "variables": {
-                            "propertyTypes": {"slider_value": "int"},
-                            "type": "typedDict",
-                        },
-                    },
-                    "panels": {
-                        "objectType": {
-                            "members": [
-                                {
-                                    "_property_types": {
-                                        "config": {
-                                            "_property_types": {
-                                                "max": "int",
-                                                "min": "int",
-                                                "step": "int",
-                                            },
-                                            "type": "slider_config_type",
-                                        },
-                                        "id": {
-                                            "type": "const",
-                                            "val": "slider",
-                                            "valType": "string",
-                                        },
-                                        "input_node": {
-                                            "inputTypes": {},
-                                            "outputType": "number",
-                                            "type": "function",
-                                        },
-                                    },
-                                    "type": "slider_panel_type",
-                                },
-                                {
-                                    "_property_types": {
-                                        "config": {
-                                            "propertyTypes": {},
-                                            "type": "typedDict",
-                                        },
-                                        "id": {
-                                            "type": "const",
-                                            "val": "number",
-                                            "valType": "string",
-                                        },
-                                        "input_node": {
-                                            "inputTypes": {},
-                                            "outputType": "number",
-                                            "type": "function",
-                                        },
-                                    },
-                                    "type": "number_panel_type",
-                                },
-                            ],
-                            "type": "union",
-                        },
-                        "type": "list",
-                    },
-                    "type": "container_config_type",
-                    "variables": {
-                        "propertyTypes": {"slider_value": "int"},
-                        "type": "typedDict",
-                    },
-                },
-                "id": {"type": "const", "val": "container", "valType": "string"},
-            },
+            "type": "container_panel_type",
+            "_is_object": True,
+            "id": {"type": "const", "valType": "string", "val": "container"},
             "config": {
-                "_property_types": {
-                    "panels": {
-                        "objectType": {
-                            "members": [
-                                {
-                                    "_property_types": {
-                                        "config": {
-                                            "_property_types": {
-                                                "max": "int",
-                                                "min": "int",
-                                                "step": "int",
-                                            },
-                                            "type": "slider_config_type",
-                                        },
-                                        "id": {
-                                            "type": "const",
-                                            "val": "slider",
-                                            "valType": "string",
-                                        },
-                                        "input_node": {
-                                            "inputTypes": {},
-                                            "outputType": "number",
-                                            "type": "function",
-                                        },
-                                    },
-                                    "type": "slider_panel_type",
-                                },
-                                {
-                                    "_property_types": {
-                                        "config": {
-                                            "propertyTypes": {},
-                                            "type": "typedDict",
-                                        },
-                                        "id": {
-                                            "type": "const",
-                                            "val": "number",
-                                            "valType": "string",
-                                        },
-                                        "input_node": {
-                                            "inputTypes": {},
-                                            "outputType": "number",
-                                            "type": "function",
-                                        },
-                                    },
-                                    "type": "number_panel_type",
-                                },
-                            ],
-                            "type": "union",
-                        },
-                        "type": "list",
-                    },
-                    "variables": {
-                        "propertyTypes": {"slider_value": "int"},
-                        "type": "typedDict",
-                    },
+                "type": "container_config_type",
+                "_is_object": True,
+                "variables": {
+                    "type": "typedDict",
+                    "propertyTypes": {"slider_value": "int"},
                 },
                 "panels": {
+                    "type": "list",
                     "objectType": {
+                        "type": "union",
                         "members": [
                             {
-                                "_property_types": {
-                                    "config": {
-                                        "_property_types": {
-                                            "max": "int",
-                                            "min": "int",
-                                            "step": "int",
-                                        },
-                                        "type": "slider_config_type",
-                                    },
-                                    "id": {
-                                        "type": "const",
-                                        "val": "slider",
-                                        "valType": "string",
-                                    },
-                                    "input_node": {
-                                        "inputTypes": {},
-                                        "outputType": "number",
-                                        "type": "function",
-                                    },
-                                },
                                 "type": "slider_panel_type",
+                                "_is_object": True,
+                                "id": {
+                                    "type": "const",
+                                    "valType": "string",
+                                    "val": "slider",
+                                },
+                                "input_node": {
+                                    "type": "function",
+                                    "inputTypes": {},
+                                    "outputType": "number",
+                                },
+                                "config": {
+                                    "type": "slider_config_type",
+                                    "_is_object": True,
+                                    "min": "int",
+                                    "max": "int",
+                                    "step": "int",
+                                },
                             },
                             {
-                                "_property_types": {
-                                    "config": {
-                                        "propertyTypes": {},
-                                        "type": "typedDict",
-                                    },
-                                    "id": {
-                                        "type": "const",
-                                        "val": "number",
-                                        "valType": "string",
-                                    },
-                                    "input_node": {
-                                        "inputTypes": {},
-                                        "outputType": "number",
-                                        "type": "function",
-                                    },
-                                },
                                 "type": "number_panel_type",
+                                "_is_object": True,
+                                "id": {
+                                    "type": "const",
+                                    "valType": "string",
+                                    "val": "number",
+                                },
+                                "input_node": {
+                                    "type": "function",
+                                    "inputTypes": {},
+                                    "outputType": "number",
+                                },
+                                "config": {"type": "typedDict", "propertyTypes": {}},
                             },
                         ],
-                        "type": "union",
                     },
-                    "type": "list",
-                },
-                "type": "container_config_type",
-                "variables": {
-                    "propertyTypes": {"slider_value": "int"},
-                    "type": "typedDict",
                 },
             },
-            "type": "container_panel_type",
         },
         "_val": {
+            "id": "container",
             "config": {
+                "variables": {"slider_value": 5},
                 "panels": [
                     {
-                        "_union_id": 0,
-                        "config": {"max": 100, "min": 0, "step": 0.1},
                         "id": "slider",
                         "input_node": {
                             "nodeType": "var",
                             "type": "number",
                             "varName": "slider_value",
                         },
+                        "config": {"min": 0, "max": 100, "step": 0.1},
+                        "_union_id": 0,
                     },
                     {
-                        "_union_id": 1,
-                        "config": {},
                         "id": "number",
                         "input_node": {
                             "nodeType": "var",
                             "type": "number",
                             "varName": "slider_value",
                         },
+                        "config": {},
+                        "_union_id": 1,
                     },
                 ],
-                "variables": {"slider_value": 5},
             },
-            "id": "container",
         },
     }
     assert serialized == expected

@@ -134,9 +134,7 @@ class List:
             ),
         },
         output_type=lambda input_types: types.List(
-            GroupResultType(
-                input_types["arr"].object_type, input_types["groupByFn"].output_type
-            )
+            GroupResultType(input_types["arr"], input_types["groupByFn"].output_type)
         ),
     )
     def groupby(arr, groupByFn):
@@ -202,18 +200,22 @@ class List:
 class GroupResultType(types.ObjectType):
     name = "groupresult"
 
-    object_type: types.Type = types.Any()
+    list: types.Type = types.List(types.Any())
     key: types.Type = types.Any()
+
+    @property
+    def object_type(self):
+        return self.list.object_type
 
     @classmethod
     def type_of_instance(cls, obj):
         return cls(
-            types.TypeRegistry.type_of(obj.list).object_type,
+            types.TypeRegistry.type_of(obj.list),
             types.TypeRegistry.type_of(obj.key),
         )
 
     def property_types(self):
-        return {"list": types.List(self.object_type), "key": self.key}
+        return {"list": self.list, "key": self.key}
 
 
 def group_result_index_output_type(input_types):
@@ -221,9 +223,9 @@ def group_result_index_output_type(input_types):
     # TODO: need to fix Const type so we don't need this.
     self_type = input_types["self"]
     if isinstance(self_type, types.Const):
-        return self_type.val_type.object_type
+        return self_type.val_type.list.object_type
     else:
-        return self_type.object_type
+        return self_type.list.object_type
 
 
 @weave_class(weave_type=GroupResultType)
@@ -274,7 +276,7 @@ class GroupResult:
             ),
         },
         output_type=lambda input_types: types.List(
-            GroupResultType(input_types["self"].object_type)
+            GroupResultType(input_types["self"])
         ),
     )
     def groupby(self, group_fn):

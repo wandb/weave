@@ -56,7 +56,7 @@ def _serialize_node(node: NodeOrOp, serialized_nodes: MapNodeOrOpToSerialized) -
         else:
             node_id = len(serialized_nodes)
             serialized_nodes[node] = (
-                {"nodeType": "const", "type": node.type.to_dict(), "val": node.val},
+                node.to_json(),
                 node_id,
             )
             return node_id

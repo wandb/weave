@@ -29,16 +29,10 @@ def test_show_simple_call(cereal_csv):
                 "propertyTypes": {
                     "self": {
                         "type": "local_file",
+                        "_is_object": True,
                         "extension": "csv",
-                        "_property_types": {
-                            "extension": {
-                                "type": "const",
-                                "valType": "string",
-                                "val": "csv",
-                            },
-                            "path": "string",
-                            "mtime": "float",
-                        },
+                        "path": "string",
+                        "mtime": "float",
                     }
                 },
             },
@@ -54,16 +48,10 @@ def test_show_simple_call(cereal_csv):
                     "nodeType": "output",
                     "type": {
                         "type": "local_file",
+                        "_is_object": True,
                         "extension": "csv",
-                        "_property_types": {
-                            "extension": {
-                                "type": "const",
-                                "valType": "string",
-                                "val": "csv",
-                            },
-                            "path": "string",
-                            "mtime": "float",
-                        },
+                        "path": "string",
+                        "mtime": "float",
                     },
                     "fromOp": {
                         "name": "localpath",
@@ -85,87 +73,48 @@ actual_SHOW_PARAMS_FINE_TUNE_WEAVE_NODE = {
     "nodeType": "output",
     "type": {
         "type": "Run",
+        "_is_object": True,
+        "id": "string",
+        "op_name": "string",
+        "state": {
+            "type": "union",
+            "members": [
+                {"type": "const", "valType": "string", "val": "pending"},
+                {"type": "const", "valType": "string", "val": "running"},
+                {"type": "const", "valType": "string", "val": "finished"},
+                {"type": "const", "valType": "string", "val": "failed"},
+            ],
+        },
+        "prints": {"type": "list", "objectType": "string"},
         "inputs": {"type": "typedDict", "propertyTypes": {}},
         "history": {"type": "list", "objectType": "any"},
         "output": {
             "type": "gpt3_fine_tune_type",
-            "_property_types": {
-                "id": "string",
-                "status": "string",
-                "fine_tuned_model": {"type": "union", "members": ["none", "string"]},
-                "result_file": {
-                    "type": "union",
-                    "members": [
-                        "none",
-                        {
-                            "type": "gpt3_fine_tune_results_type",
-                            "_property_types": {
-                                "bytes": "int",
-                                "created_at": "int",
-                                "filename": "string",
-                                "id": "string",
-                                "object": "string",
-                                "purpose": {
-                                    "type": "const",
-                                    "valType": "string",
-                                    "val": "fine-tune-results",
-                                },
-                                "status": "string",
-                                "status_details": "none",
-                            },
-                        },
-                    ],
-                },
-            },
-        },
-        "_property_types": {
+            "_is_object": True,
             "id": "string",
-            "op_name": "string",
-            "state": {
+            "status": "string",
+            "fine_tuned_model": {"type": "union", "members": ["none", "string"]},
+            "result_file": {
                 "type": "union",
                 "members": [
-                    {"type": "const", "valType": "string", "val": "pending"},
-                    {"type": "const", "valType": "string", "val": "running"},
-                    {"type": "const", "valType": "string", "val": "finished"},
-                    {"type": "const", "valType": "string", "val": "failed"},
+                    "none",
+                    {
+                        "type": "gpt3_fine_tune_results_type",
+                        "_is_object": True,
+                        "bytes": "int",
+                        "created_at": "int",
+                        "filename": "string",
+                        "id": "string",
+                        "object": "string",
+                        "purpose": {
+                            "type": "const",
+                            "valType": "string",
+                            "val": "fine-tune-results",
+                        },
+                        "status": "string",
+                        "status_details": "none",
+                    },
                 ],
-            },
-            "prints": {"type": "list", "objectType": "string"},
-            "inputs": {"type": "typedDict", "propertyTypes": {}},
-            "history": {"type": "list", "objectType": "any"},
-            "output": {
-                "type": "gpt3_fine_tune_type",
-                "_property_types": {
-                    "id": "string",
-                    "status": "string",
-                    "fine_tuned_model": {
-                        "type": "union",
-                        "members": ["none", "string"],
-                    },
-                    "result_file": {
-                        "type": "union",
-                        "members": [
-                            "none",
-                            {
-                                "type": "gpt3_fine_tune_results_type",
-                                "_property_types": {
-                                    "bytes": "int",
-                                    "created_at": "int",
-                                    "filename": "string",
-                                    "id": "string",
-                                    "object": "string",
-                                    "purpose": {
-                                        "type": "const",
-                                        "valType": "string",
-                                        "val": "fine-tune-results",
-                                    },
-                                    "status": "string",
-                                    "status_details": "none",
-                                },
-                            },
-                        ],
-                    },
-                },
             },
         },
     },

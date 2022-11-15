@@ -27,7 +27,7 @@ def test_op_list():
 def test_typeof_groupresult():
     assert types.TypeRegistry.type_of(
         list_.GroupResult([1, 2, 3], "a")
-    ) == list_.GroupResultType(types.Int(), types.String())
+    ) == list_.GroupResultType(types.List(types.Int()), types.String())
 
 
 def test_sequence1():

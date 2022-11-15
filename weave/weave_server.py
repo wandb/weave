@@ -1,8 +1,6 @@
 import os
 import logging
-from logging.config import dictConfig
 import pathlib
-import warnings
 from pythonjsonlogger import jsonlogger
 
 import ddtrace
@@ -78,7 +76,10 @@ def enable_stream_logging(level=logging.DEBUG, enable_datadog=False):
     logger = logging.getLogger("root")
     stream_handler = logging.StreamHandler(wsgi_errors_stream)
     stream_handler.setLevel(level)
-    formatter = jsonlogger.JsonFormatter(log_format)
+    if enable_datadog:
+        formatter = jsonlogger.JsonFormatter(log_format)
+    else:
+        formatter = logging.Formatter(log_format)
     stream_handler.setFormatter(formatter)
     logger.addHandler(stream_handler)
 
