@@ -69,42 +69,6 @@ blueprint = Blueprint("weave", "weave-server", static_folder=static_folder)
 
 
 def make_app(log_filename=None):
-    fs_logging_enabled = True
-    log_file = log_filename or default_log_filename
-
-    try:
-        log_file.parent.mkdir(exist_ok=True, parents=True)
-        log_file.touch(exist_ok=True)
-    except OSError:
-        warnings.warn(
-            f"weave: Unable to touch logfile at '{log_file}'. Filesystem logging will be disabled for "
-            f"the remainder of this session. To enable filesystem logging, ensure the path is writable "
-            f"and restart the server."
-        )
-        fs_logging_enabled = False
-
-    logging_config = {
-        "version": 1,
-        "formatters": {
-            "default": {
-                "format": default_log_format,
-            }
-        },
-        "handlers": {
-            "wsgi_file": {
-                "class": "logging.handlers.WatchedFileHandler",
-                "filename": log_file,
-                "formatter": "default",
-            },
-        },
-        "root": {
-            "level": "DEBUG",
-            "handlers": ["wsgi_file"] if fs_logging_enabled else [],
-        },
-    }
-
-    dictConfig(logging_config)
-
     enable_stream_logging(
         enable_datadog=os.getenv("DD_ENV"),
         level=logging.DEBUG
