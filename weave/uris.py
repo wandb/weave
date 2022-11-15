@@ -1,6 +1,8 @@
 import typing
 from urllib import parse
 
+from . import wandb_api
+from wandb.apis import public as wandb_public_api
 from . import errors
 
 
@@ -217,3 +219,66 @@ class WeaveWBArtifactURI(WeaveURI):
 
     def make_path(self) -> str:
         return f"{self._entity_name}/{self._project_name}/{self._artifact_name}:{self._version}"
+
+
+class WeaveWBClientArtifactURI(WeaveURI):
+    scheme = "wandb-client-artifact"
+    _client_id: str
+
+    def __init__(self, uri: str) -> None:
+        super().__init__(uri)
+        all_parts = self.path.split(":")
+        if len(all_parts) != 2:
+            raise errors.WeaveInternalError("invalid uri version ", uri)
+        self._client_id = all_parts[0].strip("/")
+        self._version = all_parts[1].split("/", 1)[0]
+        self._file = all_parts[1].split("/", 1)[1]
+        self._full_name = self._client_id
+
+    def make_path(self) -> str:
+        query = wandb_public_api.gql(
+            """
+        query ArtifactVersion(
+            $id: ID!,
+            $aliasName: String!
+        ) {
+            artifactCollection(id: $id) {
+                id
+                name
+                project {
+                    id
+                    name
+                    entity {
+                        id
+                        name
+                    }
+                }
+                artifactMembership(aliasName: $aliasName) {
+                    id
+                    versionIndex
+                }
+                defaultArtifactType {
+                    id
+                    name
+                }
+            }
+        }
+        """
+        )
+        res = wandb_api.wandb_public_api().client.execute(
+            query,
+            variable_values={
+                "id": self._client_id,
+                "aliasName": self._version,
+            },
+        )
+        entity_name = res["artifactCollection"]["project"]["entity"]["name"]
+        project_name = res["artifactCollection"]["project"]["name"]
+        # artifact_type_name = res["artifactCollection"]["defaultArtifactType"][
+        #     "name"
+        # ]
+        artifact_name = res["artifactCollection"]["name"]
+        version_index = res["artifactCollection"]["artifactMembership"]["versionIndex"]
+        version = f"v{version_index}"
+        return f"{entity_name}/{project_name}/{artifact_name}:{version}"
+        # return f"{self._client_id}:{self._version}/{self._file}"

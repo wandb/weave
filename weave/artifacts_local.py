@@ -376,3 +376,29 @@ class WandbArtifact(Artifact):
         self._saved_artifact = wandb_api.wandb_public_api().artifact(
             f"{run.entity}/{project}/{self._writeable_artifact.name}"
         )
+
+
+class WandbClientArtifact(WandbArtifact):
+    def __init__(self, uri: uris.WeaveWBClientArtifactURI):
+        self._uri = uri
+        self.name = uri.full_name
+        self.__saved_artifact = None
+        self._writeable_artifact = None
+        self._local_path: dict[str, str] = {}
+
+    @property
+    def _saved_artifact(self):
+        if self.__saved_artifact is None:
+            self.__saved_artifact = get_wandb_read_artifact(self._uri.make_path())
+        return self.__saved_artifact
+
+    @property
+    def is_saved(self) -> bool:
+        return True
+
+    @property
+    def location(self):
+        return self._uri
+
+    def uri(self) -> str:
+        return self.location.uri

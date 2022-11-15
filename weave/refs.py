@@ -48,6 +48,8 @@ class Ref:
             return LocalArtifactRef.from_uri(uri)
         elif isinstance(uri, uris.WeaveWBArtifactURI):
             return WandbArtifactRef.from_uri(uri)
+        elif isinstance(uri, uris.WeaveWBClientArtifactURI):
+            return WandbClientArtifactRef.from_uri(uri)
         else:
             raise errors.WeaveInvalidURIError("invalid uri: %s" % s)
 
@@ -191,6 +193,10 @@ class WandbArtifactRef(Ref):
         obj: typing.Optional[typing.Any] = None,
         extra: typing.Optional[list[str]] = None,
     ):
+        if not isinstance(artifact, artifacts_local.WandbArtifact):
+            raise errors.WeaveInternalError(
+                f"Invalid artifact type passed to WandbArtifactRef: {type(artifact)}"
+            )
         self.artifact = artifact
         self.path = path
         self._type = type
@@ -264,6 +270,44 @@ class WandbArtifactRef(Ref):
 
 types.WandbArtifactRefType.instance_class = WandbArtifactRef
 types.WandbArtifactRefType.instance_classes = WandbArtifactRef
+
+
+class WandbClientArtifactRef(WandbArtifactRef):
+    artifact: "artifacts_local.WandbClientArtifact"
+    path: typing.Optional[str]
+    _type: typing.Optional[types.Type]
+    obj: typing.Optional[typing.Any]
+    extra: typing.Optional[list[str]]
+
+    def __init__(
+        self,
+        artifact: artifacts_local.WandbClientArtifact,
+        path: typing.Optional[str],
+        type: typing.Optional[types.Type] = None,
+        obj: typing.Optional[typing.Any] = None,
+        extra: typing.Optional[list[str]] = None,
+    ):
+        self.artifact = artifact
+        self.path = path
+        self._type = type
+        self.obj = obj
+        self.extra = extra
+
+    @classmethod
+    def from_uri(cls, uri: uris.WeaveURI) -> "WandbClientArtifactRef":
+        if not isinstance(uri, uris.WeaveWBClientArtifactURI):
+            raise errors.WeaveInternalError(
+                f"Invalid URI class passed to WandbClientArtifactRef.from_uri: {type(uri)}"
+            )
+        # TODO: potentially need to pass full entity/project/name instead
+        return cls(
+            artifacts_local.WandbClientArtifact(uri=uri),
+            path=uri.file,
+        )
+
+
+types.WandbClientArtifactRefType.instance_class = WandbClientArtifactRef
+types.WandbClientArtifactRefType.instance_classes = WandbClientArtifactRef
 
 
 class LocalArtifactRef(Ref):

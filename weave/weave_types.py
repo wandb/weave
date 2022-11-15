@@ -808,6 +808,11 @@ class WandbArtifactRefType(RefType):
     pass
 
 
+@dataclasses.dataclass(frozen=True)
+class WandbClientArtifactRefType(RefType):
+    pass
+
+
 class WBTable(Type):
     name = "wbtable"
 
