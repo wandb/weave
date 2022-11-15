@@ -1,5 +1,7 @@
 import typing
 
+from .wandb_api import wandb_public_api
+
 from . import artifacts_local
 from .ops_domain import file_wbartifact
 from wandb.apis import public as wandb_api
@@ -49,7 +51,7 @@ def wb_client_dict_to_artifact_version_file(
                 }
                 """
                 )
-                res = wandb_api.Api().client.execute(
+                res = wandb_public_api().client.execute(
                     query,
                     variable_values={
                         "id": art_id,

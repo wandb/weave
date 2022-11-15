@@ -118,6 +118,26 @@ class ArtifactVersionsType(types.Type):
         )
 
 
+class DeferredDict(dict):
+    def __init__(self):
+        super().__init__()
+        self.deferred_cbs = {}
+
+    def get(self, key, default=None):
+        if key in self.deferred_cbs:
+            return self.__getitem__(key)
+        return super().get(key, default)
+
+    def __getitem__(self, key):
+        if key in self.deferred_cbs:
+            self[key] = self.deferred_cbs[key]()
+            del self.deferred_cbs[key]
+        return super().__getitem__(key)
+
+    def set_deferred(self, key, val):
+        self.deferred_cbs[key] = val
+
+
 def process_summary_obj(val):
     if isinstance(val, dict):
         maybe_afv = wb_client_dict_to_artifact_version_file(val)
@@ -136,7 +156,9 @@ def process_summary_type(val):
 
 @op(render_info={"type": "function"})
 def refine_summary_type(run: wandb_api.Run) -> types.Type:
-    return types.TypeRegistry.type_of(WBRun.summary.raw_resolve_fn(run))
+    return types.TypedDict(
+        {k: process_summary_type(v) for k, v in run.summary._json_dict.items()}
+    )
 
 
 @weave_class(weave_type=RunType)
@@ -156,7 +178,14 @@ class WBRun:
 
     @op(refine_output_type=refine_summary_type)
     def summary(run: wandb_api.Run) -> dict[str, typing.Any]:
-        return {k: process_summary_obj(v) for k, v in run.summary._json_dict.items()}
+        dd = DeferredDict()
+
+        def make_deferred(val):
+            return lambda: process_summary_obj(val)
+
+        for k, v in run.summary._json_dict.items():
+            dd.set_deferred(k, make_deferred(v))
+        return dd
 
 
 @dataclasses.dataclass(frozen=True)

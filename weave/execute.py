@@ -5,6 +5,8 @@ import time
 import threading
 import typing
 
+from .wandb_api import wandb_api_session_context
+
 # Libraries
 from . import box
 from . import engine_trace
@@ -85,14 +87,15 @@ def execute_nodes(nodes, no_cache=False):
 
     # hack: disable caching for panelplot
     no_cache |= any([is_panelplot_data_fetch_query(node) for node in nodes])
-    with tag_store.isolated_tagging_context():
-        fg = forward_graph.ForwardGraph(nodes)
+    with wandb_api_session_context():
+        with tag_store.isolated_tagging_context():
+            fg = forward_graph.ForwardGraph(nodes)
 
-        stats = execute_forward(fg, no_cache=no_cache)
-        summary = stats.summary()
-        logging.info("Execution summary\n%s" % pprint.pformat(summary))
+            stats = execute_forward(fg, no_cache=no_cache)
+            summary = stats.summary()
+            logging.info("Execution summary\n%s" % pprint.pformat(summary))
 
-        res = [fg.get_result(n) for n in nodes]
+            res = [fg.get_result(n) for n in nodes]
     return res
 
 
