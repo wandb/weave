@@ -21,7 +21,9 @@ def call_run_await_final_output(run_node: graph.Node) -> graph.OutputNode:
     return graph.OutputNode(run_node_type.output, "run-await", {"self": run_node})
 
 
-def call_execute(function_node: graph.Node) -> graph.OutputNode:
+# We don't want to import the op definitions themselves here, since
+# those depend on the decorators, which aren't defined in the engine.
+def _call_execute(function_node: graph.Node) -> graph.OutputNode:
     function_node_type = typing.cast(types.Function, function_node.type)
     return graph.OutputNode(
         function_node_type.output_type, "execute", {"node": function_node}
@@ -71,6 +73,7 @@ def apply_type_based_dispatch(
         new_node = _make_output_node(
             found_op.uri,
             params,
+            found_op.input_type,
             found_op.return_type_of_arg_types(named_param_types),
             found_op.refine_output_type,
         )
@@ -162,7 +165,7 @@ def execute_edit_graph(edit_g: graph_editable.EditGraph) -> None:
                 )
             new_inputs = dict(edge.input_to.from_op.inputs)
 
-            new_inputs[edge.input_name] = call_execute(edge.output_of)
+            new_inputs[edge.input_name] = _call_execute(edge.output_of)
             edit_g.replace(
                 orig_edge.input_to,
                 graph.OutputNode(

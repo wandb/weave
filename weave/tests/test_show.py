@@ -174,7 +174,20 @@ actual_SHOW_PARAMS_FINE_TUNE_WEAVE_NODE = {
         "inputs": {
             "training_dataset": {
                 "nodeType": "output",
-                "type": {"type": "LocalArtifactRef"},
+                "type": {
+                    "type": "LocalArtifactRef",
+                    "objectType": {
+                        "type": "list",
+                        "objectType": {
+                            "type": "typedDict",
+                            "propertyTypes": {
+                                "id": "int",
+                                "prompt": "string",
+                                "completion": "string",
+                            },
+                        },
+                    },
+                },
                 "fromOp": {
                     "name": "get",
                     "inputs": {
@@ -216,23 +229,24 @@ def test_large_const_node():
 
     model = openai.Gpt3FineTune.model(fine_tune)
     panel = panels.Table(["1 + 9 =", "2 + 14 ="])
-    panel.append_column(lambda row: row)
-    panel.append_column(lambda row: model.complete(row)["choices"][0]["text"])
+    panel.config.tableState.add_column(lambda row: row)
+    panel.config.tableState.add_column(
+        lambda row: model.complete(row)["choices"][0]["text"]
+    )
     show_panel_params = _show_params(panel)
+    panel_params = weave.use(show_panel_params["weave_node"])
 
     # Ensure that we sent the dataset as a get(<ref>) rather than as a const list
     # (this behavior is currently implemented in graph.py:ConstNode)
-    panel_config = show_panel_params["panel_config"]
-    table_state = panel_config["tableState"]
-    col_select_fns = table_state["columnSelectFunctions"]
+    panel_config = panel_params.config
+    table_state = panel_config.tableState
+    col_select_fns = table_state.columnSelectFunctions
     col_sel_fn2 = list(col_select_fns.values())[1]
-    assert "list/" in json.dumps(col_sel_fn2)
-
-    col_sel_fn2_node = graph.Node.node_from_json(col_sel_fn2)
+    assert "list/" in graph.node_expr_str(col_sel_fn2)
 
     # Asserting that weavejs_fixes.remove_opcall_versions_data works
     assert (
-        graph.node_expr_str(col_sel_fn2_node)
-        == 'get("local-artifact://%s/list/4cf1abf0d040d897276e4be3c6aa90df").finetune_gpt3({"n_epochs": 2}).model().complete(row).pick("choices").index(0).pick("text")'
+        graph.node_expr_str(col_sel_fn2)
+        == 'get("local-artifact://%s/list/4cf1abf0d040d897276e4be3c6aa90df").finetune_gpt3({"n_epochs": 2}).model().complete(row)["choices"][0]["text"]'
         % artifacts_local.local_artifact_dir()
     )

@@ -19,6 +19,8 @@ from weave import server
 from weave import registry_mem
 from weave import errors
 from weave import context_state
+from weave import weavejs_fixes
+from weave import automation
 from weave import util
 
 from flask.logging import wsgi_errors_stream
@@ -35,6 +37,19 @@ from .artifacts_local import local_artifact_dir
 
 context_state.clear_loading_built_ins(loading_builtins_token)
 
+import sys
+
+# NOTE: Fixes flask dev server's auto-reload capability, by forcing it to use
+# stat mode instead of watchdog mode. It turns out that "import wandb" breaks
+# users of watchdog somehow. We'll need to fix that in wandb.
+# A wandb fix should go out in 0.13.5.
+# TODO: remove this hack when wandb 0.13.5 is released.
+if os.environ.get("FLASK_DEBUG"):
+    print(
+        "!!! Weave server removing watchdog from sys.path for development mode. This could break other libraries"
+    )
+    sys.modules["watchdog.observers"] = None  # type: ignore
+
 
 # set up logging
 
@@ -42,6 +57,10 @@ pid = os.getpid()
 default_log_filename = pathlib.Path(f"/tmp/weave/log/{pid}.log")
 
 default_log_format = "[%(asctime)s] %(levelname)s in %(module)s (Thread Name: %(threadName)s): %(message)s"
+
+
+def is_wandb_production():
+    return os.getenv("WEAVE_ENV") == "wandb_production"
 
 
 def enable_stream_logging(level=logging.DEBUG, enable_datadog=False):
@@ -88,13 +107,17 @@ def make_app(log_filename=None):
 
 @blueprint.route("/__weave/ops", methods=["GET"])
 def list_ops():
+    if not is_wandb_production():
+        registry_mem.memory_registry.load_saved_ops()
     ops = registry_mem.memory_registry.list_ops()
     ret = []
     for op in ops:
         try:
-            ret.append(op.to_dict())
+            serialized_op = op.to_dict()
         except errors.WeaveSerializeError:
-            pass
+            continue
+        if serialized_op["output_type"] != "any":
+            ret.append(serialized_op)
     return {"data": ret}
 
 
@@ -136,9 +159,8 @@ def execute():
     for r in response:
         # final_response.append(n)
         if isinstance(r, dict) and "_val" in r:
-            final_response.append(r["_val"])
-        else:
-            final_response.append(r)
+            r = r["_val"]
+        final_response.append(weavejs_fixes.fixup_data(r))
     # print("FINAL RESPONSE", final_response)
     response = {"data": final_response}
     if current_span and (
@@ -179,6 +201,32 @@ def send_js(path):
     return send_from_directory("/", path)
 
 
+@blueprint.route(
+    "/__weave/automate/<string:automation_id>/add_command", methods=["POST"]
+)
+def automation_add_command(automation_id):
+    automation.add_command(automation_id, request.json)
+    return {"status": "ok"}
+
+
+@blueprint.route("/__weave/automate/<string:automation_id>/commands_after/<int:after>")
+def automation_commands_after(automation_id, after):
+    return {"commands": automation.commands_after(automation_id, after)}
+
+
+@blueprint.route(
+    "/__weave/automate/<string:automation_id>/set_status", methods=["POST"]
+)
+def automation_set_status(automation_id):
+    automation.set_status(automation_id, request.json)
+    return {"status": "ok"}
+
+
+@blueprint.route("/__weave/automate/<string:automation_id>/status")
+def automation_status(automation_id):
+    return automation.get_status(automation_id)
+
+
 @blueprint.route("/__frontend", defaults={"path": None})
 @blueprint.route("/__frontend/<path:path>")
 def frontend(path):
@@ -197,6 +245,11 @@ def hello():
 
 # This makes all server logs go into the notebook
 app = make_app()
+
+
+@app.before_first_request
+def before_first_request():
+    registry_mem.memory_registry.load_saved_ops()
 
 
 if __name__ == "__main__":

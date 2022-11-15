@@ -48,6 +48,12 @@ class ArtifactVersion:
             extension=types.Const(types.String(), ext), wb_object_type=wb_object_type
         )
 
+    @op(name="artifactVersion-name")
+    def name(artifactVersion: artifacts_local.WandbArtifact) -> str:  # type: ignore
+        # TODO: we actually get an artifact version file here because
+        # we get refs types messed up somehow
+        return getattr(artifactVersion, "name", "BUG a192bx (search weave code)")
+
     @op(
         name="artifactVersion-file",
         input_type={"artifactVersion": ArtifactVersionType(), "path": types.String()},

@@ -37,14 +37,14 @@ def head_view(attention: huggingface.ModelOutputAttention) -> weave.ops.Html:
 @weave.op()
 def head_view_panel_render(
     attention: weave.Node[huggingface.ModelOutputAttention],
-) -> weave.panels.Html:
+) -> weave.panels.PanelHtml:
     # This is a lazy call! It doesn't execute anything
     html = head_view(attention)
 
     # We add the lazy call as input to the returned Html panel. Nothing has been
     # computed so far. The UI's Html panel will perform a useNodeValue operation on its
     # input node. Only then will the head_view function finally be called.
-    return weave.panels.Html(html)
+    return weave.panels.PanelHtml(html)
 
 
 @weave.op()
@@ -67,6 +67,6 @@ def model_view(attention: huggingface.ModelOutputAttention) -> weave.ops.Html:
 @weave.op()
 def model_view_panel_render(
     attention: weave.Node[huggingface.ModelOutputAttention],
-) -> weave.panels.Html:
+) -> weave.panels.PanelHtml:
     html = model_view(attention)
-    return weave.panels.Html(html)
+    return weave.panels.PanelHtml(html)

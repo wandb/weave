@@ -111,13 +111,13 @@ FullTextClassificationPipelineOutputType.instance_classes = (
 @weave.op()
 def full_text_classification_output_render(
     output_node: weave.Node[FullTextClassificationPipelineOutput],
-) -> weave.panels.Group:
+) -> weave.panels.Group2:
     output = typing.cast(FullTextClassificationPipelineOutput, output_node)
-    return weave.panels.Group(
-        prefer_horizontal=True,
-        items=[
-            weave.panels.LabeledItem(label="input", item=output.model_input),
-            weave.panels.LabeledItem(
+    return weave.panels.Group2(
+        preferHorizontal=True,
+        items={
+            "input": weave.panels.LabeledItem(label="input", item=output.model_input),
+            "output": weave.panels.LabeledItem(
                 label="output",
                 item=weave.panels.Plot(
                     input_node=typing.cast(weave.Node, output.model_output),
@@ -125,7 +125,7 @@ def full_text_classification_output_render(
                     y=lambda class_score: class_score["label"],
                 ),
             ),
-        ],
+        },
     )
 
 

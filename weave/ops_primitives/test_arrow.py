@@ -75,7 +75,7 @@ def test_groupby_index_count():
 
 
 def test_map_scalar_map():
-    ref = create_arrow_data(1000)
+    ref = create_arrow_data(100)
 
     node = weave.get(ref).map(lambda row: row["y"] + 1).map(lambda row: row + 9)
     assert weave.use(node[0]) == 15

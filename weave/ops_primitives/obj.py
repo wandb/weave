@@ -1,5 +1,5 @@
 import typing
-from ..api import op, weave_class
+from ..api import mutation, op, weave_class
 from .. import weave_types as types
 
 # This matches the output type logic of the frontend
@@ -57,12 +57,21 @@ class Object:
     to_pylist = None
     as_py = None
 
+    @mutation
+    def obj_settattr(self, attr, v):
+        setattr(self, attr, v)
+        return self
+
     # TODO: figure out how this conflicts with the above __getattr__ op
     # particularly for lists
     def __getitem__(self, name: str):
         return obj_getattr(self, name)
 
 
-@op(name="Object-__getattr__", output_type=getattr_output_type)
+@op(
+    name="Object-__getattr__",
+    setter=Object.obj_settattr,
+    output_type=getattr_output_type,
+)
 def obj_getattr(self: typing.Any, name: str):
     return getattr(self, name)

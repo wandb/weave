@@ -1,3 +1,5 @@
+# See mappers_python_def for actual implementation. Split into two
+# to resolve circular dependency.
 import typing
 
 if typing.TYPE_CHECKING:

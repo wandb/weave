@@ -5,11 +5,13 @@
 import typing
 import hashlib
 import json
+import functools
 
 from . import graph
 from . import weave_types as types
 from . import errors
 from . import weave_internal
+from . import storage
 
 
 NodeOrOp = typing.Union[graph.Node, graph.Op]
@@ -83,6 +85,8 @@ def serialize(graphs: typing.List[graph.Node]) -> SerializedReturnType:
     return {"nodes": nodes, "rootNodes": root_nodes}
 
 
+# TODO: caching this solves an algorithm issue, but having a limit is scary.
+@functools.lru_cache(maxsize=10000)
 def node_id(node: graph.Node):
     hashable = {"type": node.type.to_dict()}
     if isinstance(node, graph.OutputNode):
@@ -99,7 +103,7 @@ def node_id(node: graph.Node):
         ):
             hashable["val"] = node.val.to_json()
         else:
-            hashable["val"] = node.val
+            hashable["val"] = storage.to_python(node.val)
     else:
         raise errors.WeaveInternalError("invalid node encountered: %s" % node)
     hash = hashlib.md5()
@@ -126,6 +130,11 @@ def _deserialize_node(
                 parsed_fn_body_node = weave_internal.make_var_node(
                     types.TypeRegistry.type_from_dict(fn_body_node["type"]),
                     fn_body_node["name"],
+                )
+            elif fn_body_node["nodeType"] == "const":
+                parsed_fn_body_node = weave_internal.make_const_node(
+                    types.TypeRegistry.type_from_dict(fn_body_node["type"]),
+                    fn_body_node["val"],
                 )
             elif fn_body_node["nodeType"] == "output":
                 op = nodes[fn_body_node["fromOp"]]

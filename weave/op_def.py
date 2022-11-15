@@ -29,14 +29,19 @@ class OpDef:
     """
 
     input_type: op_args.OpArgs
+    raw_output_type: typing.Union[
+        types.Type,
+        typing.Callable[[typing.Dict[str, types.Type]], types.Type],
+    ]
     refine_output_type: typing.Optional["OpDef"]
     setter = str
     call_fn: typing.Any
     version: typing.Optional[str]
     location: typing.Optional[uris.WeaveURI]
     is_builtin: bool = False
-    instance: typing.Union[None, graph.Node]
     weave_fn: typing.Optional[graph.Node]
+    _decl_locals: typing.Dict[str, typing.Any]
+    instance: typing.Union[None, graph.Node]
     pure: bool
     raw_resolve_fn: typing.Callable
     lazy_call: typing.Optional[typing.Callable]
@@ -68,6 +73,7 @@ class OpDef:
         pure=True,
         is_builtin: typing.Optional[bool] = None,
         weave_fn: typing.Optional[graph.Node] = None,
+        _decl_locals=None,  # These are python locals() from the enclosing scope.
     ):
         self.name = name
         self.input_type = input_type
@@ -82,6 +88,7 @@ class OpDef:
             if is_builtin is not None
             else context_state.get_loading_built_ins()
         )
+        self._decl_locals = _decl_locals
         self.version = None
         self.location = None
         self.lazy_call = None
@@ -91,9 +98,6 @@ class OpDef:
         self.derived_ops = {}
         self.weave_fn = weave_fn
         self._output_type = None
-
-    def __repr__(self):
-        return "<OpDef(%s) %s>" % (id(self), self.name)
 
     def __get__(self, instance, owner):
         # This is part of Python's descriptor protocol, and when this op_def
@@ -191,13 +195,17 @@ class OpDef:
     def to_dict(self):
         output_type = self.raw_output_type
         if callable(output_type):
+            # Don't try to send ops with callable output types yet, code path
+            # not ready.
+            output_type = "any"
+
             # TODO: Consider removing the ability for an output_type to
             # be a function - they all must be Types or ConstNodes. Probably
             # this can be done after all the existing ops can safely be converted.
             # Once that change happens, we can do this conversion in the constructor.
-            output_type = callable_output_type_to_dict(
-                self.input_type, output_type, self.uri
-            )
+            # output_type = callable_output_type_to_dict(
+            #     self.input_type, output_type, self.uri
+            # )
         else:
             output_type = output_type.to_dict()
 
@@ -214,7 +222,10 @@ class OpDef:
             input_types = op_args.OpNamedArgs(arg_types).to_dict()
 
         serialized = {
-            "name": self.uri,
+            # To_dict() is used to send the op list to WeaveJS.
+            # We should send the full URI, not just the name, but WeaveJS
+            # doesn't handle that yet, so for now, send the name.
+            "name": graph.op_full_name(self),
             "input_types": input_types,
             "output_type": output_type,
         }
@@ -225,8 +236,8 @@ class OpDef:
 
         return serialized
 
-    def __str__(self):
-        return "<OpDef: %s>" % self.name
+    def __repr__(self):
+        return "<OpDef: %s %s>" % (self.name, self.version)
 
     def bind_params(
         self, args: list[typing.Any], kwargs: dict[str, typing.Any]

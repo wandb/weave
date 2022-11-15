@@ -2,6 +2,7 @@ import typing
 from . import box
 from . import weave_types as types
 from . import op_def as OpDef
+from . import op_args
 
 
 def should_force_none_result(
@@ -14,9 +15,15 @@ def should_force_none_result(
     # TODO: fix
     # TODO: not implemented for async ops
     if inputs:
+        input_name0 = list(inputs.keys())[0]
         input0 = list(inputs.values())[0]
         if input0 is None or isinstance(input0, box.BoxedNone):
             named_args = op_def.input_type.named_args()
             if len(named_args) == 0 or not types.is_optional(named_args[0].type):
                 return True
+            op_input_types = op_def.input_type
+            if isinstance(op_input_types, op_args.OpNamedArgs):
+                input0_type = op_input_types.arg_types[input_name0]
+                if not types.is_optional(input0_type):
+                    return True
     return False

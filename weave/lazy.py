@@ -12,9 +12,12 @@ from . import op_def
 from . import op_args
 from . import dispatch
 from . import pyfunc_type_util
+from . import language_autocall
 
 
-def _make_output_node(fq_op_name, bound_params, output_type_, refine_output_type):
+def _make_output_node(
+    fq_op_name, bound_params, input_type, output_type_, refine_output_type
+):
     output_type = output_type_
     # Don't try to refine if there are variable nodes, we are building a
     # function in that case!
@@ -42,13 +45,15 @@ def _make_output_node(fq_op_name, bound_params, output_type_, refine_output_type
                 new_input_type[k] = types.Const(n.type, n.val)
             else:
                 new_input_type[k] = n.type
+
+        new_input_type = language_autocall.update_input_types(
+            input_type, new_input_type
+        )
+
         output_type = output_type(new_input_type)
 
     name = "OutputNode"
     bases = [graph.OutputNode]
-
-    # Mixin Node methods
-    bases += weave_internal.get_node_methods_classes(output_type)
 
     # If the output type is a run, mixin the Run's output type
     # as well. execute.py automatic inserts await_output operations
@@ -59,12 +64,14 @@ def _make_output_node(fq_op_name, bound_params, output_type_, refine_output_type
         name += output_type.output.__class__.__name__
         bases.append(output_type.output.NodeMethodsClass)
 
-    # Mixin function output type Node methods
-    if isinstance(output_type, types.Function) and hasattr(
-        output_type.output_type, "NodeMethodsClass"
-    ):
-        name += output_type.output_type.__class__.__name__
-        bases.append(output_type.output_type.NodeMethodsClass)
+    node_methods_class, node_name = language_autocall.node_methods_class(output_type)
+    if node_methods_class is not None:
+        name += node_name
+        if node_methods_class not in bases:
+            bases.append(node_methods_class)
+
+    # Mixin Node methods
+    bases += weave_internal.get_node_methods_classes(output_type)
 
     unique_bases = []
     for base in bases:
@@ -75,7 +82,10 @@ def _make_output_node(fq_op_name, bound_params, output_type_, refine_output_type
 
 
 def _type_of(v: typing.Any):
-    if callable(v):
+    if isinstance(v, graph.Node):
+        # Check if its a Node first, sometimes we mixin a callables with Node!
+        return v.type
+    elif callable(v):
         input_type = pyfunc_type_util.determine_input_type(v, None, True)
         output_type = pyfunc_type_util.determine_output_type(v, None, True)
         if not isinstance(input_type, op_args.OpNamedArgs):
@@ -88,8 +98,6 @@ def _type_of(v: typing.Any):
             input_type.arg_types,
             output_type,
         )
-    elif isinstance(v, graph.Node):
-        return v.type
     else:
         return types.TypeRegistry.type_of(v)
 
@@ -121,7 +129,7 @@ def make_lazy_call(f, fq_op_name, input_type, output_type, refine_output_type):
         # In this case, the outer list's `index` method will be called. This will result
         # in no valid op being found, and we should try to use the inner pick op. This
         # is one of the few "dispatch" hacks and could be avoided if we had different symbols:
-        if op is None and op_def.common_name(fq_op_name) == "index":
+        if op is None and op_def.common_name(fq_op_name) == "__getitem__":
             op = dispatch.get_op_for_input_types(
                 "pick",
                 arg_types,
@@ -156,6 +164,7 @@ def make_lazy_call(f, fq_op_name, input_type, output_type, refine_output_type):
         return _make_output_node(
             op_name,
             bound_params,
+            input_type,
             op_output,
             op_refine,
         )

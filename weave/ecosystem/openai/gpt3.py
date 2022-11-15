@@ -12,7 +12,7 @@ openai.api_key_path = os.path.expanduser("~/.openai-apikey")
 
 class StoredFileType(weave.types.ObjectType):
     name = "openai_stored_file"
-    type_vars = {"purpose": weave.types.String()}  # TODO: enum?
+    purpose: str
 
     def __init__(self, purpose=weave.types.String()):
         self.purpose = purpose
@@ -225,11 +225,6 @@ Gpt3ModelType.instance_classes = Gpt3Model
 Gpt3ModelType.instance_class = Gpt3Model
 
 
-@weave.op()
-def gpt3_davinci_2() -> Gpt3Model:
-    return Gpt3Model("text-davinci-002", "text-davinci-002")
-
-
 class Gpt3FineTuneType(weave.types.ObjectType):
     name = "gpt3_fine_tune_type"
 
@@ -370,3 +365,36 @@ def finetune_gpt3_demo(training_dataset, hyperparameters, _run=None):
             break
         time.sleep(3)
     weave.use(_run.set_output(fine_tune))
+
+
+@weave.op()
+def gpt3_davinci_2() -> Gpt3Model:
+    return Gpt3Model("text-davinci-002", "text-davinci-002")
+
+
+# A very simple predict API. Should probably return more than one
+# result though.
+@weave.op()
+def gpt3_predict(prompt: str) -> str:
+    completion_params = {
+        "model": "text-davinci-002",
+        "prompt": prompt,
+        "max_tokens": 256,
+        "n": 3,
+        "temperature": 0.9,
+    }
+    sleep = 1
+
+    for _ in range(5):
+        try:
+            result = openai.Completion.create(**completion_params)
+            return result["choices"][0]["text"]
+        except openai.error.RateLimitError:
+            # This error occurs if a model is newly trained or hasn't
+            # been queried for awhile, while the OpenAI backend loads
+            # it up.
+            time.sleep(sleep)
+            sleep *= 2
+    result = openai.Completion.create(**completion_params)["choices"][0]["text"]
+
+    return result

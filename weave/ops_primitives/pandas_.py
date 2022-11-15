@@ -176,6 +176,16 @@ class DataFrameTable:
     def __init__(self, _df):
         self._df = _df
 
+    def __iter__(self):
+        # Iter is implemented to make list_indexCheckpoint work, which
+        # currently expects to be able to iterate. Iteration gets stuck in an
+        # infinite loop without implementing __iter__ here, since Python will
+        # default to using __getitem__, which is a lazy Weave op.
+        # TODO: When we fix arrow/vectorization and tagging, we'll have to
+        # fix this.
+        for row in self._df.itertuples():
+            yield row._asdict()
+
     def _count(self):
         return len(self._df)
 
@@ -190,10 +200,6 @@ class DataFrameTable:
             return json.loads(self._df.iloc[index].to_json())
         except IndexError:
             return None
-
-    @op(output_type=lambda input_types: input_types["self"].object_type)
-    def index(self, index: int):
-        return self._index(index)
 
     @op(output_type=index_output_type)
     def __getitem__(self, index: int):

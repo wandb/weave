@@ -111,6 +111,9 @@ class WeaveRuntimeURI(WeaveURI):
         else:
             self._version = None
 
+    def __repr__(self):
+        return f"<RuntimeURI({self.uri})>"
+
 
 # Used when the Weave object is located on disk (eg after saving locally).
 #

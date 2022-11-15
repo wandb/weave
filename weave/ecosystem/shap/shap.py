@@ -45,6 +45,10 @@ class ShapExplanationType(weave.types.Type):
         with artifact.new_file(f"{name}.pickle", binary=True) as f:
             pickle.dump(obj, f)
 
+    def load_instance(self, artifact, name, extra=None):
+        with artifact.open(f"{name}.pickle", binary=True) as f:
+            return pickle.load(f)
+
 
 @weave.op()
 def shap_explain_tree(self: xgboost.core.Booster, data: typing.Any) -> ShapValues:
@@ -73,5 +77,5 @@ def shap_plot_text(shap_values: shap.Explanation) -> weave.ops.Html:
 @weave.op()
 def shap_plot_text_render(
     shap_values: weave.Node[shap.Explanation],
-) -> weave.panels.Html:
-    return weave.panels.Html(shap_plot_text(shap_values))
+) -> weave.panels.PanelHtml:
+    return weave.panels.PanelHtml(shap_plot_text(shap_values))

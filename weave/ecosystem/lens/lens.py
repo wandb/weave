@@ -1,8 +1,11 @@
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
 import io
 from PIL import Image
 import weave
+
+matplotlib.use("agg")
 
 
 @weave.op(render_info={"type": "function"})

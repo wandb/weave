@@ -38,9 +38,20 @@ def python_type_to_type(
         return weave_types.Type()
     elif py_type == typing.Any:
         return weave_types.Any()
+    elif isinstance(py_type, typing.TypeVar):
+        if py_type.__bound__ is None:
+            return weave_types.Any()
+        else:
+            return python_type_to_type(py_type.__bound__)
     elif isinstance(py_type, types.GenericAlias) or isinstance(
         py_type, typing._GenericAlias  # type: ignore
     ):
+        if py_type.__origin__ == typing.Literal:
+            members = [
+                weave_types.Const(weave_types.TypeRegistry.type_of(v), v)
+                for v in py_type.__args__
+            ]
+            return weave_types.union(*members)
         args = [python_type_to_type(a) for a in py_type.__args__]
         if py_type.__origin__ == list or py_type.__origin__ == collections.abc.Sequence:
             return weave_types.List(*args)
@@ -66,4 +77,10 @@ def python_type_to_type(
     weave_type = simple_python_type_to_type(py_type)
     if weave_type == weave_types.UnknownType():
         return weave_type
-    return weave_type()
+    try:
+        return weave_type()
+    except TypeError:
+        raise errors.WeaveDefinitionError(
+            "Can't instantatiate Weave Type %s without arguments. To fix: ensure all fields have defaults."
+            % weave_type
+        )

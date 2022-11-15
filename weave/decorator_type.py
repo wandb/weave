@@ -1,9 +1,11 @@
+import inspect
 import typing
 import dataclasses
 
 from . import weave_types as types
 from . import infer_types
 from . import decorator_class
+from . import errors
 from . import decorator_op
 
 _py_type = type
@@ -31,8 +33,16 @@ def type(__override_name: str = None):
                 # This is a Python type variable
                 type_vars[field.name] = types.Any()
             else:
-                weave_type = infer_types.python_type_to_type(field.type)
-                if weave_type.type_vars():
+                try:
+                    weave_type = infer_types.python_type_to_type(field.type)
+                except TypeError:
+                    # hmmm... Exception rewriting. Am I OK with this? Could be overly aggressive.
+                    # TODO: decide if we should do this
+                    raise errors.WeaveDefinitionError(
+                        f"{target}.{field.name} is not a valid python type (a class or type)"
+                    )
+
+                if types.type_is_variable(weave_type):
                     # this is a Weave type with a type variable in it
                     type_vars[field.name] = weave_type
                 else:
@@ -52,6 +62,13 @@ def type(__override_name: str = None):
                 property_types[name] = prop_type
             return property_types
 
+        if target.__bases__:
+            # Add the first base classes as the type base.
+            # TODO: should we add all bases?
+            target_base0 = target.__bases__[0]
+            if hasattr(target_base0, "WeaveType"):
+                TargetType._base_type = target_base0.WeaveType()
+
         TargetType.property_types = property_types_method
         TargetType = dataclasses.dataclass(frozen=True)(TargetType)
 
@@ -61,7 +78,7 @@ def type(__override_name: str = None):
         # constructor op for this type. due to a circular dependency with ArrowWeave* types, we
         # define the vectorized constructor ops in vectorize.py instead of here
         @decorator_op.op(
-            name=f"op-{target_name.replace('-', '_')}",
+            name=f"objectConstructor-{target_name.replace('-', '_')}",
             input_type={
                 "attributes": types.TypedDict(
                     {

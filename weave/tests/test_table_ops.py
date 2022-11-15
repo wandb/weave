@@ -7,6 +7,7 @@ from .. import ops
 from .. import storage
 from .. import context
 from .. import weave_internal
+from .. import graph
 
 TABLE_TYPES = ["list", "pandas", "sql"]
 
@@ -116,21 +117,16 @@ def test_groupby(table_type):
     ]
     grouped = table.groupby(groupby_fn)
     assert weave.use((grouped[0].key(), grouped[0][0])) == expected
-    grouped_js = ops.WeaveJSListInterface.groupby(table, groupby_fn)
-    assert weave.use((grouped_js[0].key(), grouped_js[0][0])) == expected
 
 
 @pytest.mark.parametrize("table_type", ["list", "sql"])
 def test_groupby_list(table_type):
     table = get_test_table(table_type)
-    groupby_fn = weave.define_fn(
-        {"row": weave.types.TypedDict({})}, lambda row: row["type"]
-    )
-    grouped = table.groupby(groupby_fn)
+    grouped = table.groupby(lambda row: row["type"])
     group0 = grouped[0]
     group0key = group0.key()
     group00 = group0[0]
-    assert weave.use((group0key, group00)) == [
+    expected = [
         "C",
         {
             "name": "100% Bran",
@@ -151,6 +147,59 @@ def test_groupby_list(table_type):
             "rating": 68.402973,
         },
     ]
+    assert weave.use((group0key, group00)) == expected
+
+
+@pytest.mark.parametrize("table_type", ["list", "sql"])
+def test_groupby_list_weavejs_form(table_type):
+    table = get_test_table(table_type)
+
+    # This test constructs the graph as WeaveJS sends it. WeaveJS
+    # uses generic ops like pick and index. This ensures our machinery for
+    # translating those ops works.
+    # groupby is a special case, because its output is supposed to be a list
+    # of TaggedValues where the tag has the groupkey and the value is the group.
+    # Weave Python is not yet implemented this way. It uses a GroupResult type
+    # instead.
+    #
+    # This relies in a hack in List.__getitem__ to delegate to the underlying
+    # GroupResult's getitem resolver.
+    #
+    # Also ensures that we do op translation with compile in fast_execute
+    # since groupby uses fast execute to evaluate its results.
+    #
+    # TODO: of course, the arrow implementation doesn't handle this stuff.
+    # We should extend these table tests to try the arrow implementation.
+    groupby_fn = weave.define_fn(
+        {"row": weave.types.TypedDict({})},
+        lambda row: graph.OutputNode(
+            types.String(),
+            "pick",
+            {"obj": row, "key": graph.ConstNode(types.String(), "type")},
+        ),
+    )
+    grouped = table.groupby(groupby_fn)
+    weave.use(
+        graph.OutputNode(
+            types.String(),
+            "pick",
+            {
+                "obj": graph.OutputNode(
+                    grouped.type.object_type.object_type,
+                    "index",
+                    {
+                        "arr": graph.OutputNode(
+                            grouped.type.object_type,
+                            "index",
+                            {"arr": grouped, "index": graph.ConstNode(types.Int(), 0)},
+                        ),
+                        "index": graph.ConstNode(types.Int(), 0),
+                    },
+                ),
+                "key": graph.ConstNode(types.String(), "name"),
+            },
+        )
+    ) == "100% Bran"
 
 
 @pytest.mark.parametrize("table_type", TABLE_TYPES)

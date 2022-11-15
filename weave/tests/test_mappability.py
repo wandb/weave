@@ -13,6 +13,31 @@ def test_add_one(x: int) -> int:
     return x + 1
 
 
+@weave.op(
+    input_type={"x": types.TypedDict({"a": types.Any()})},
+    output_type=lambda input_type: input_type["x"].property_types["a"],
+)
+def _test_mappability_custom_pick_op(x):
+    return x["a"]
+
+
+@weave.op(
+    input_type={"obj": types.TypedDict({}), "key": types.String()},
+    output_type=types.Type(),
+)
+def test_mappability_custom_pick_refine(obj, key):
+    return types.TypeRegistry.type_of(obj[key])
+
+
+@weave.op(
+    input_type={"obj": types.TypedDict({}), "key": types.String()},
+    output_type=types.Any(),
+    refine_output_type=test_mappability_custom_pick_refine,
+)
+def _test_mappability_custom_pick_op_with_refine(obj, key):
+    return obj[key]
+
+
 _context.clear_loading_built_ins(_loading_builtins_token)
 
 
@@ -82,11 +107,15 @@ def test_mapped_empty_serialized():
 
 
 def test_custom_class():
+    _loading_builtins_token = _context.set_loading_built_ins()
+
     @weave.type()
     class TestType:
         @weave.op()
         def test_fn(self, a: int) -> int:
             return a + 1
+
+    _context.clear_loading_built_ins(_loading_builtins_token)
 
     node = TestType().test_fn(1)
     assert weave.use(node) == 2
@@ -117,12 +146,6 @@ def test_mapped_maybe_list():
 
 
 def test_mapped_maybe_custom_pick():
-    @weave.op(
-        input_type={"x": types.TypedDict({"a": types.Any()})},
-        output_type=lambda input_type: input_type["x"].property_types["a"],
-    )
-    def custom_pick(x):
-        return x["a"]
 
     a = graph.ConstNode(
         types.List(
@@ -130,7 +153,7 @@ def test_mapped_maybe_custom_pick():
         ),
         [{"a": 3}, None, {"a": 4}, None, {"a": 5}],
     )
-    res = custom_pick(a)
+    res = _test_mappability_custom_pick_op(a)
     assert res.type == types.List(types.union(types.Number(), types.NoneType()))
     assert weave.use(res) == [3, None, 4, None, 5]
 
@@ -148,25 +171,10 @@ def test_mapped_maybe_pick():
 
 
 def test_mapped_maybe_custom_refine():
-    @weave.op(
-        input_type={"obj": types.TypedDict({}), "key": types.String()},
-        output_type=types.Type(),
-    )
-    def custom_pick_refine(obj, key):
-        return types.TypeRegistry.type_of(obj[key])
-
-    @weave.op(
-        input_type={"obj": types.TypedDict({}), "key": types.String()},
-        output_type=types.Any(),
-        refine_output_type=custom_pick_refine,
-    )
-    def custom_pick(obj, key):
-        return obj[key]
-
     a = make_const_node(
         types.List(types.union(types.TypedDict({"a": types.Int()}), types.NoneType())),
         [{"a": 3}, None, {"a": 4}, None, {"a": 5}],
     )
-    res = custom_pick(a, "a")
+    res = _test_mappability_custom_pick_op_with_refine(a, "a")
     assert res.type == types.List(types.union(types.Int(), types.NoneType()))
     assert weave.use(res) == [3, None, 4, None, 5]

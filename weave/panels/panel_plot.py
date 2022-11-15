@@ -1,14 +1,17 @@
+# TODO: types are all messed up after panel_composition branch
 import copy
 import typing
+import weave
 
 from .. import panel
 from . import table_state
 import dataclasses
 
 from .. import graph
+from .. import errors
 
 
-@dataclasses.dataclass
+@weave.type()
 class DimConfig:
     x: str
     y: str
@@ -42,7 +45,7 @@ LineStyleOption = typing.Literal["series", "solid", "dashed", "dotted", "dot-das
 SelectFunction = typing.Union[graph.Node, typing.Callable[[typing.Any], typing.Any]]
 
 
-@dataclasses.dataclass
+@weave.type()
 class PlotConstants:
     mark: MarkOption
     pointShape: PointShapeOption
@@ -73,7 +76,7 @@ DropdownWithExpressionMode = typing.Union[
 ]
 
 
-@dataclasses.dataclass
+@weave.type()
 class PlotUIState:
     pointShape: DropdownWithExpressionMode
     label: DropdownWithExpressionMode
@@ -83,6 +86,7 @@ def default_axis():
     return AxisSetting(noLabels=False, noTitle=False, noTicks=False)
 
 
+@weave.type()
 class Series:
     table: table_state.TableState
     dims: DimConfig
@@ -101,29 +105,34 @@ class Series:
 
     def __init__(
         self,
-        input_node: graph.Node,
-        constants: typing.Optional[PlotConstantsInputDict] = None,
+        input_node: graph.Node = None,
+        table: table_state.TableState = None,
+        dims: DimConfig = None,
+        constants: PlotConstants = None,
         select_functions: typing.Optional[typing.Dict[DimName, SelectFunction]] = None,
     ):
-        _dims = {}
-        table = table_state.TableState(input_node)
-        for dim in dataclasses.fields(DimConfig):
-            _dims[dim.name] = table.add_column(lambda row: graph.VoidNode())
+        if input_node is not None:
+            table = table_state.TableState(input_node)
+        if table is None:
+            raise ValueError("table missing")
+
+        if dims is None:
+            _dims = {}
+            for dim in dataclasses.fields(DimConfig):
+                _dims[dim.name] = table.add_column(lambda row: graph.VoidNode())
+            dims = DimConfig(**_dims)
+        if constants is None:
+            constants = PlotConstants()
 
         if select_functions:
             for dimname in select_functions:
                 table.update_col(_dims[dimname], select_functions[dimname])
 
-        dims = DimConfig(**_dims)
-
-        rendered_constants = PlotConstants(
-            **(constants or typing.cast(PlotConstantsInputDict, {}))
-        )
         uiState = PlotUIState(pointShape="expression", label="expression")
 
         self.table = table
         self.dims = dims
-        self.constants = rendered_constants
+        self.constants = constants
         self.uiState = uiState
 
     @classmethod
@@ -137,15 +146,6 @@ class Series:
                 )
             setattr(series, attr, value)
         return series
-
-    @property
-    def config(self):
-        return {
-            "table": _serialize(self.table),
-            "dims": _serialize(self.dims),
-            "constants": _serialize(self.constants),
-            "uiState": _serialize(self.uiState),
-        }
 
     @property
     def table_query(self):
@@ -171,7 +171,7 @@ def make_group(dim_name: str) -> typing.Callable[[Series], None]:
 def make_get(dim_name: str) -> typing.Callable[[Series], graph.Node]:
     def get(self: Series) -> graph.Node:
         col_id: str = getattr(self.dims, dim_name)
-        return self.table._column_select_functions[col_id]
+        return self.table.columnSelectFunctions[col_id]
 
     return get
 
@@ -203,33 +203,33 @@ for dim in dataclasses.fields(PlotConstants):
     setattr(Series, f"get_{dim.name}_constant", make_get_constant(dim.name))
 
 
-@dataclasses.dataclass
+@weave.type()
 class AxisSetting:
     noLabels: bool
     noTitle: bool
     noTicks: bool
 
 
-@dataclasses.dataclass
+@weave.type()
 class AxisSettings:
     x: AxisSetting
     y: AxisSetting
     color: typing.Optional[AxisSetting]
 
 
-@dataclasses.dataclass
+@weave.type()
 class LegendSetting:
     noLegend: bool = False
 
 
-@dataclasses.dataclass
+@weave.type()
 class LegendSettings:
     x: LegendSetting
     y: LegendSetting
     color: LegendSetting
 
 
-@dataclasses.dataclass
+@weave.type()
 class ConfigOptionsExpanded:
     x: bool = False
     y: bool = False
@@ -238,35 +238,27 @@ class ConfigOptionsExpanded:
     mark: bool = False
 
 
-def _serialize(obj: object) -> object:
-    if isinstance(obj, table_state.TableState):
-        return obj.to_json()
-    elif isinstance(obj, Series):
-        return obj.config
-    elif isinstance(obj, dict):
-        return {k: _serialize(v) for (k, v) in obj.items()}
-    elif isinstance(obj, list):
-        return list(map(_serialize, obj))
-    elif dataclasses.is_dataclass(obj):
-        return {
-            field.name: _serialize(getattr(obj, field.name))
-            for field in dataclasses.fields(obj)  # type: ignore
-        }
-    return obj
-
-
-class Plot(panel.Panel):
-    id = "plot"
+@weave.type()
+class PlotConfig:
     series: typing.List[Series]
     axisSettings: AxisSettings
     legendSettings: LegendSettings
     configOptionsExpanded: ConfigOptionsExpanded
     configVersion: int = 7
 
+
+@weave.type()
+class Plot(panel.Panel):
+    id = "plot"
+    config: typing.Optional[PlotConfig] = None
+
     def __init__(
         self,
-        input_node: typing.Optional[graph.Node] = None,
-        constants: typing.Optional[PlotConstantsInputDict] = None,
+        input_node=None,
+        vars=None,
+        config: typing.Optional[PlotConfig] = None,
+        constants: PlotConstants = None,
+        mark: typing.Optional[MarkOption] = None,
         x: typing.Optional[SelectFunction] = None,
         y: typing.Optional[SelectFunction] = None,
         color: typing.Optional[SelectFunction] = None,
@@ -279,89 +271,100 @@ class Plot(panel.Panel):
         no_axes: bool = False,
         no_legend: bool = False,
     ):
-        super().__init__(input_node)
-
-        select_functions: typing.Optional[dict[DimName, SelectFunction]] = None
-        for (field, maybe_dim) in zip(
-            dataclasses.fields(DimConfig),
-            [x, y, color, label, tooltip, pointShape, lineStyle, y2],
-        ):
-            if maybe_dim is not None:
-                if select_functions is None:
-                    select_functions = {}
-                select_functions[typing.cast(DimName, field.name)] = maybe_dim
-
-        if not (
-            (series is not None)
-            ^ (
-                constants is not None
-                or select_functions is not None
-                or input_node is not None
-            )
-        ):
-            raise ValueError(
-                "Must provide either series or input_node/select_functions/constants, but not both"
-            )
-
-        if series is not None:
-            if isinstance(series, Series):
-                self.series = [series]
-            else:
-                self.series = series
-        else:
-            self.series = [
-                Series(
-                    typing.cast(graph.Node, self.input_node),
-                    constants=constants,
-                    select_functions=select_functions,
+        if vars is None:
+            vars = {}
+        super().__init__(input_node=input_node, vars=vars)
+        self.config = config
+        if self.config is None:
+            if mark is not None:
+                constants = PlotConstants(
+                    mark=mark, pointShape=None, lineStyle=None, label=None
                 )
-            ]
+            else:
+                constants = PlotConstants(
+                    mark=None, pointShape=None, lineStyle=None, label=None
+                )
 
-        self.axisSettings = AxisSettings(
-            x=default_axis(), y=default_axis(), color=default_axis()
-        )
+            select_functions: typing.Optional[dict[DimName, SelectFunction]] = None
+            for (field, maybe_dim) in zip(
+                dataclasses.fields(DimConfig),
+                [x, y, color, label, tooltip, pointShape, lineStyle, y2],
+            ):
+                if maybe_dim is not None:
+                    if select_functions is None:
+                        select_functions = {}
+                    select_functions[typing.cast(DimName, field.name)] = maybe_dim
 
-        self.legendSettings = LegendSettings(
-            x=LegendSetting(), y=LegendSetting(), color=LegendSetting()
-        )
+            if not (
+                (series is not None)
+                ^ (select_functions is not None or input_node is not None)
+            ):
+                raise ValueError(
+                    "Must provide either series or input_node/select_functions/constants, but not both"
+                )
 
-        if no_axes:
-            self.set_no_axes()
+            config_series: typing.List[Series]
+            if series is not None:
+                if isinstance(series, Series):
+                    config_series = [series]
+                else:
+                    config_series = series
+            else:
+                config_series = [
+                    Series(
+                        typing.cast(graph.Node, self.input_node),
+                        constants=constants,
+                        select_functions=select_functions,
+                    )
+                ]
 
-        if no_legend:
-            self.set_no_legend()
+            config_axisSettings = AxisSettings(
+                x=default_axis(), y=default_axis(), color=default_axis()
+            )
 
-        self.configOptionsExpanded = ConfigOptionsExpanded()
+            config_legendSettings = LegendSettings(
+                x=LegendSetting(), y=LegendSetting(), color=LegendSetting()
+            )
+            self.config = PlotConfig(
+                series=config_series,
+                axisSettings=config_axisSettings,
+                legendSettings=config_legendSettings,
+                configOptionsExpanded=ConfigOptionsExpanded(),
+            )
+
+            if no_axes:
+                self.set_no_axes()
+
+            if no_legend:
+                self.set_no_legend()
+        else:
+            for series in self.config.series:
+                series.table.input_node = self.input_node
 
     def add_series(self, series: Series):
-        self.series.append(series)
+        if self.config is None:
+            raise errors.WeaveInternalError("config is None")
+        self.config.series.append(series)
 
     def set_no_axes(self):
-        self.axisSettings.x = AxisSetting(noLabels=True, noTitle=True, noTicks=True)
-        self.axisSettings.y = AxisSetting(noLabels=True, noTitle=True, noTicks=True)
+        if self.config is None:
+            raise errors.WeaveInternalError("config is None")
+        self.config.axisSettings.x = AxisSetting(
+            noLabels=True, noTitle=True, noTicks=True
+        )
+        self.config.axisSettings.y = AxisSetting(
+            noLabels=True, noTitle=True, noTicks=True
+        )
 
     def set_no_legend(self):
-        self.legendSettings.color = LegendSetting(noLegend=True)
-
-    def __eq__(self, other):
-        return self.config == other.config
-
-    @property
-    def config(self):
-        return _serialize(
-            {
-                "series": self.series,
-                "axisSettings": self.axisSettings,
-                "legendSettings": self.legendSettings,
-                "configOptionsExpanded": self.configOptionsExpanded,
-                "configVersion": self.configVersion,
-            }
-        )
+        self.config.legendSettings.color = LegendSetting(noLegend=True)
 
 
 def make_set_all_series(dim_name: str) -> typing.Callable[[Plot, typing.Any], None]:
     def set(self: Plot, expr) -> None:
-        for series in self.series:
+        if self.config is None:
+            raise errors.WeaveInternalError("config is None")
+        for series in self.config.series:
             setter = getattr(series, f"set_{dim_name}")
             setter(expr)
 
@@ -370,7 +373,9 @@ def make_set_all_series(dim_name: str) -> typing.Callable[[Plot, typing.Any], No
 
 def make_group_all_series(dim_name: str) -> typing.Callable[[Plot], None]:
     def group(self: Plot) -> None:
-        for series in self.series:
+        if self.config is None:
+            raise errors.WeaveInternalError("config is None")
+        for series in self.config.series:
             grouper = getattr(series, f"groupby_{dim_name}")
             grouper()
 
@@ -381,8 +386,10 @@ def make_get_all_series(
     dim_name: str,
 ) -> typing.Callable[[Plot], typing.List[graph.Node]]:
     def get(self: Plot) -> typing.List[graph.Node]:
+        if self.config is None:
+            raise errors.WeaveInternalError("config is None")
         dim_select_functions: typing.List[graph.Node] = []
-        for series in self.series:
+        for series in self.config.series:
             getter = getattr(series, f"get_{dim_name}")
             dim_select_functions.append(getter())
         return dim_select_functions
@@ -394,7 +401,9 @@ def make_set_constant_all_series(
     const_name: str,
 ) -> typing.Callable[[Plot, typing.Any], None]:
     def set(self: Plot, value) -> None:
-        for series in self.series:
+        if self.config is None:
+            raise errors.WeaveInternalError("config is None")
+        for series in self.config.series:
             setter = getattr(series, f"set_{const_name}_constant")
             setter(value)
 
@@ -407,7 +416,9 @@ def make_get_constant_all_series(
     constants: typing.List[typing.Any] = []
 
     def get(self: Plot) -> typing.List[typing.Any]:
-        for series in self.series:
+        if self.config is None:
+            raise errors.WeaveInternalError("config is None")
+        for series in self.config.series:
             getter = getattr(series, f"get_{const_name}_constant")
             constants.append(getter())
         return constants

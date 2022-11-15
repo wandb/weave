@@ -21,6 +21,7 @@ from . import weave_types as types
 # Ops
 from . import registry_mem
 from . import op_def
+from . import op_args
 
 # Trace / cache
 from . import trace_local

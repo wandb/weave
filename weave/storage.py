@@ -172,21 +172,25 @@ def all_objects():
     for art_path in obj_paths:
         ref = refs.get_local_version_ref(art_path.name, "latest")
         if ref is not None:
-            result.append(ref)
-    return result
+            result.append((ref.created_at, ref))
+    return [r[1] for r in sorted(result)]
 
 
-def objects(of_type: types.Type, alias: str):
-    objects = []
+def objects(
+    of_type: types.Type, alias: str = "latest"
+) -> typing.List[refs.LocalArtifactRef]:
+    result = []
     for art_name in os.listdir(artifacts_local.local_artifact_dir()):
         ref = refs.get_local_version_ref(art_name, alias)
         if ref is not None:
             if of_type.assign_type(ref.type):
-                obj = ref.get()
-                if isinstance(ref.type, types.RunType) and obj.op_name == "op-objects":
-                    continue
-                objects.append(obj)
-    return objects
+                # TODO: Why did I have this here?
+                # obj = ref.get()
+                # if isinstance(ref.type, types.RunType) and obj.op_name == "op-objects":
+                #     continue
+                result.append((ref.created_at, ref))
+    # Sorted by created_at
+    return [r[1] for r in sorted(result)]
 
 
 def recursively_unwrap_arrow(obj):
@@ -215,6 +219,7 @@ def to_python(obj):
         wb_type, artifacts_local.LocalArtifact(_get_name(wb_type, obj))
     )
     val = mapper.apply(obj)
+    # TODO: this should be a ConstNode!
     return {"_type": wb_type.to_dict(), "_val": val}
 
 

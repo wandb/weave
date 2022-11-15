@@ -9,10 +9,10 @@ from .. import registry_mem
 from .. import op_args
 
 
-def test_serialize():
+def test_serialize(fake_wandb):
     proj = ops.project("shawn", "show-test")
     av = proj.artifact_version("show", "v14")
-    file = av.path("obj.table.json")
+    file = av.path("test_results.table.json")
     table = file.table()
     rows = table.rows()
     filter_fn = api.define_fn(
@@ -97,13 +97,13 @@ def test_op_compat():
 @pytest.mark.parametrize(
     "val_type, val",
     [
-        # Case 1: ConstNode, no const type, normal val
+        # Case 0: ConstNode, no const type, normal val
         (types.String(), "hello"),
-        # Case 2: ConstNode, no const type, type val
+        # Case 1: ConstNode, no const type, type val
         (types.Type(), types.String()),
-        # Case 3: ConstNode, const type, normal val
+        # Case 2: ConstNode, const type, normal val
         (types.Const(types.String(), "hello"), "hello"),
-        # Case 4: ConstNode, const type, type val
+        # Case 3: ConstNode, const type, type val
         (types.Const(types.Type(), types.String()), types.String()),
     ],
 )

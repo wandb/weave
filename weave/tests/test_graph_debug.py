@@ -33,5 +33,5 @@ def test_combine_nodes():
     assert len(result) == 1
     assert (
         graph.node_expr_str(result[0])
-        == "_test_cn_op1().map(_test_cn_op2(row, 1)).index(EACH[0, 1]).pick(EACH['a', 'b', 'c'])"
+        == "_test_cn_op1().map(_test_cn_op2(row, 1))[EACH[0, 1]][EACH['a', 'b', 'c']]"
     )

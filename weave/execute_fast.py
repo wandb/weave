@@ -30,6 +30,34 @@ def _fast_apply_map_fn(item, index, map_fn):
         raise errors.WeaveInternalError("Invalid Node: %s" % map_fn)
 
 
+def _resolve_static_branches(map_fn):
+    if isinstance(map_fn, graph.OutputNode):
+        inputs = {
+            name: _resolve_static_branches(node)
+            for name, node in map_fn.from_op.inputs.items()
+        }
+
+        if map_fn.from_op.name == "function-__call__":
+            # Special case to expand function calls
+            if isinstance(inputs["self"], graph.ConstNode):
+                return weave_internal.better_call_fn(
+                    inputs["self"].val,
+                    inputs["arg1"],
+                )
+
+        if all(isinstance(v, graph.ConstNode) for v in inputs.values()):
+            op_def = registry_mem.memory_registry.get_op(map_fn.from_op.name)
+            call_inputs = {name: node.val for name, node in inputs.items()}
+            return graph.ConstNode(map_fn.type, op_def.resolve_fn(**call_inputs))
+        return graph.OutputNode(map_fn.type, map_fn.from_op.name, inputs)
+    elif isinstance(map_fn, graph.ConstNode):
+        return map_fn
+    elif isinstance(map_fn, graph.VarNode):
+        return map_fn
+    else:
+        raise errors.WeaveInternalError("Invalid Node: %s" % map_fn)
+
+
 def _can_fast_map(map_fn):
     async_op_nodes = graph.filter_nodes(
         map_fn,
@@ -55,11 +83,19 @@ def _slow_map_fn(input_list, map_fn):
 
 
 def fast_map_fn(input_list, map_fn):
+    """Maps a weave function over an input list, without using engine."""
     # TODO: Perform this recursively in the main compile pass
     map_fn = compile.compile([map_fn])[0]
 
     if not _can_fast_map(map_fn):
         return _slow_map_fn(input_list, map_fn)
+
+    # we can resolve any branches that do not have variable node ancestors
+    # one time up front.
+    map_fn = _resolve_static_branches(map_fn)
+    # Need to compile again after resolving static branches.
+    # For example, we may have fetched an expression out of a Const node.
+    map_fn = compile.compile([map_fn])[0]
 
     # These are hacks because sometimes __len__ and __getitem__
     # are OpDefs, sometimes they are regular Python functions.
@@ -74,6 +110,8 @@ def fast_map_fn(input_list, map_fn):
     else:
         getitem = lambda input_list, index: input_list.__getitem__(index)
 
+    # now map the remaining weave_fn (after resolving static branches above)
+    # over the input list
     return [
         _fast_apply_map_fn(getitem(input_list, i), i, map_fn) for i in range(list_len)
     ]

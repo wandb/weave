@@ -295,7 +295,11 @@ class LocalArtifactRef(Ref):
             put_ref(obj, self)
 
     def __repr__(self) -> str:
-        return f"<LocalArtifactRef({id(self)}) artifact={self.artifact} path={self.path} type={self.type} obj={bool(self.obj)} extra={self.extra}"
+        return f"<LocalArtifactRef({id(self)}) artifact={self.artifact} path={self.path} type={self.type} obj={self.obj is not None} extra={self.extra}"
+
+    @property
+    def created_at(self) -> str:
+        return self.artifact.created_at
 
     @property
     def uri(self) -> str:

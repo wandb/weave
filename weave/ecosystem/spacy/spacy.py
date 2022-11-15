@@ -54,11 +54,11 @@ def spacy_doc_render(
         content=[
             weave.panels.CardTab(
                 name="Dependencies",
-                content=weave.panels.Html(spacy_doc_dep_to_html(spacy_doc)),  # type: ignore
+                content=weave.panels.PanelHtml(spacy_doc_dep_to_html(spacy_doc)),  # type: ignore
             ),
             weave.panels.CardTab(
                 name="Named Entities",
-                content=weave.panels.Html(spacy_doc_ent_to_html(spacy_doc)),  # type: ignore
+                content=weave.panels.PanelHtml(spacy_doc_ent_to_html(spacy_doc)),  # type: ignore
             ),
         ],
     )

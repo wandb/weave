@@ -1,4 +1,5 @@
 import os
+import shutil
 from unittest import mock
 
 import pytest
@@ -27,63 +28,7 @@ TEST_TABLE_ARTIFACT_PATH = "testdata/wb_artifacts/test_res_1fwmcd3q:v0"
         .file("test_results.table.json"),
     ],
 )
-def test_table_call(table_file_node):
-    class FakeProject:
-        entity = "stacey"
-        name = "mendeleev"
-
-    class FakeEntry:
-        pass
-
-    class FakeManifest:
-        entries = {"fakePath": FakeEntry()}
-
-        get_entry_by_path = mock.Mock(return_value=FakeEntry())
-
-    class FakePath:
-        def __init__(self, path):
-            self.path = path
-
-        def download(self):
-            return self.path
-
-    class FakeVersion:
-        entity = "stacey"
-        project = "mendeleev"
-        _sequence_name = "test_res_1fwmcd3q"
-        version = "v0"
-
-        manifest = FakeManifest()
-
-        def get_path(self, path):
-            return FakePath(os.path.join(TEST_TABLE_ARTIFACT_PATH, path))
-
-    class FakeVersions:
-        __getitem__ = mock.Mock(return_value=FakeVersion())
-
-    class FakeArtifact:
-        versions = mock.Mock(return_value=FakeVersions())
-
-    class FakeArtifacts:
-        __getitem__ = mock.Mock(return_value=FakeArtifact())
-
-    class FakeArtifactType:
-        # "collections" should be called "artifacts" in the wandb API
-        collections = mock.Mock(return_value=FakeArtifacts())
-
-    class FakeApi:
-        project = mock.Mock(return_value=FakeProject())
-        artifact_type = mock.Mock(return_value=FakeArtifactType())
-        artifact = mock.Mock(return_value=FakeVersion())
-
-    fake_api = FakeApi()
-
-    def wandb_public_api():
-        return fake_api
-
-    ops_domain.wandb_public_api = wandb_public_api
-    wandb_api.wandb_public_api = wandb_public_api
-
+def test_table_call(table_file_node, fake_wandb):
     table_image0_node = table_file_node.table().rows()[0]["image"]
     table_image0 = weave.use(table_image0_node)
     assert table_image0.height == 299

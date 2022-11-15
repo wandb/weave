@@ -1,43 +1,38 @@
+import dataclasses
+import typing
+
+import weave
 from .. import panel
 from .. import panel_util
+from .. import graph
 
 
+@weave.type()
 class CardTab:
-    def __init__(self, **config):
-        self.set_name(config["name"])
-        self.set_content(config["content"])
-
-    def set_name(self, name):
-        self._name = name
-
-    def set_content(self, content):
-        self._content = content
-
-    def to_json(self):
-        return {"name": self._name, "content": self._content.to_json()}
+    name: str
+    content: panel.Panel
 
 
+@weave.type()
+class CardConfig:
+    title: weave.Node[str]
+    subtitle: str
+    content: list[CardTab]
+
+
+@weave.type()
 class Card(panel.Panel):
-    id = "card"
+    id = "Card"
+    config: typing.Optional[CardConfig] = dataclasses.field(
+        default_factory=lambda: None
+    )
 
-    def __init__(self, **config):
-        self.set_title(config["title"])
-        self.set_subtitle(config["subtitle"])
-        self.set_content(config["content"])
-
-    def set_title(self, title):
-        self._title = panel_util.make_node(title)
-
-    def set_subtitle(self, subtitle):
-        self._subtitle = subtitle
-
-    def set_content(self, content):
-        self._content = content
-
-    @property
-    def config(self):
-        return {
-            "title": self._title.to_json(),
-            "subtitle": self._subtitle,
-            "content": [item.to_json() for item in self._content],
-        }
+    def __init__(self, input_node=graph.VoidNode(), vars=None, config=None, **options):
+        super().__init__(input_node=input_node, vars=vars)
+        self.config = config
+        if self.config is None:
+            self.config = CardConfig(
+                panel_util.make_node(options["title"]),
+                options["subtitle"],
+                options["content"],
+            )

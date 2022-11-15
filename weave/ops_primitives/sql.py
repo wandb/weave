@@ -192,11 +192,16 @@ class SqlTable:
         return new_obj
 
     @op(
+        input_type={
+            "group_by_fn": lambda input_types: types.Function(
+                {"row": input_types["self"].object_type}, types.Any()
+            ),
+        },
         output_type=lambda input_types: types.List(
             list_.GroupResultType(input_types["self"].object_type)
         ),
     )
-    def groupby(self, group_by_fn: typing.Any):
+    def groupby(self, group_by_fn):
         return list_.List.groupby.resolve_fn(self._to_list_table(), group_by_fn)
 
 

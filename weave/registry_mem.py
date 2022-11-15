@@ -3,6 +3,7 @@ import typing
 from weave.op_args import OpNamedArgs
 
 from . import op_def
+from . import op_def_type
 from . import weave_types
 from . import lazy
 from . import errors
@@ -42,7 +43,6 @@ class Registry:
 
     def register_op(self, op: op_def.OpDef):
         # Always save OpDefs any time they are declared
-
         location = context_state.get_loading_op_location()
         is_loading = location is not None
         # do not save built-in ops today
@@ -57,11 +57,14 @@ class Registry:
         op.location = location
 
         self._make_op_calls(op, location)
-        if not is_loading:
-            self._ops[op.name] = op
+        # if not is_loading:
+        self._ops[op.name] = op
         if version:
             self._op_versions[(op.name, version)] = op
         return op
+
+    def have_op(self, op_name: str) -> bool:
+        return op_name in self._ops
 
     def get_op(self, uri: str) -> op_def.OpDef:
         object_uri = uris.WeaveURI.parse(uri)
@@ -88,6 +91,14 @@ class Registry:
 
     def find_ops_by_common_name(self, common_name: str) -> typing.List[op_def.OpDef]:
         return [op for op in self._ops.values() if op.common_name == common_name]
+
+    def load_saved_ops(self):
+        for op_ref in storage.objects(op_def_type.OpDefType()):
+            try:
+                op_ref.get()
+            except:
+                # print("Failed to load non-builtin op: %s" % op_ref.uri)
+                pass
 
     def list_ops(self) -> typing.List[op_def.OpDef]:
         # Note this uses self._ops, so provides the most recent registered op, which could

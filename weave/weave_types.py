@@ -1,4 +1,5 @@
 import dataclasses
+import datetime
 import typing
 import functools
 import json
@@ -92,6 +93,7 @@ class TypeRegistry:
     def type_class_of(obj):
         type_classes = instance_class_to_potential_type(type(obj))
         if not type_classes:
+            # return UnknownType()
             raise errors.WeaveTypeError("no Type for obj: %s" % obj)
         return type_classes[-1]
 
@@ -131,6 +133,7 @@ class TypeRegistry:
             obj_type = type_.type_of(obj)
             if obj_type is not None:
                 return obj_type
+        # return UnknownType()
         raise errors.WeaveTypeError("no Type for obj: (%s) %s" % (type(obj), obj))
 
     @staticmethod
@@ -163,6 +166,7 @@ class _TypeSubclassWatcher(type):
 
 @dataclasses.dataclass(frozen=True)
 class Type(metaclass=_TypeSubclassWatcher):
+    # @decorator_class.weave_class attaches this
     NodeMethodsClass: typing.ClassVar[typing.Optional[type]]
     instance_class: typing.ClassVar[typing.Optional[type]]
     instance_classes: typing.ClassVar[
@@ -190,11 +194,18 @@ class Type(metaclass=_TypeSubclassWatcher):
         return (cls.instance_classes,)
 
     @classmethod
-    def type_vars(cls):
-        type_vars = {}
+    def type_attrs(cls):
+        type_attrs = []
         for field in dataclasses.fields(cls):
             if issubclass(field.type, Type):
-                type_vars[field.name] = field.type
+                type_attrs.append(field.name)
+        return type_attrs
+
+    def type_vars(self) -> dict[str, "Type"]:
+        type_vars = {}
+        for field in dataclasses.fields(self.__class__):
+            if issubclass(field.type, Type):
+                type_vars[field.name] = getattr(self, field.name)
         return type_vars
 
     @classmethod
@@ -366,11 +377,14 @@ class BasicType(_PlainStringNamedType):
         return "<%s>" % self.__class__.name
 
 
+class InvalidPy:
+    pass
+
+
 class Invalid(BasicType):
     name = "invalid"
 
-    def assign_type(self, next_type):
-        return False
+    instance_classes = InvalidPy
 
 
 class UnknownType(BasicType):
@@ -421,7 +435,7 @@ class Const(Type):
 
     @classmethod
     def type_of_instance(cls, obj):
-        return cls(obj)
+        return cls(TypeRegistry.type_of(obj.val), obj.val)
 
     def assign_type(self, next_type):
         if isinstance(next_type, Const):
@@ -450,6 +464,13 @@ class Const(Type):
 class String(BasicType):
     name = "string"
     instance_classes = str
+
+    # Just for String, we use a Const Type
+    # TODO: this sucks! Maybe we need a const object?
+    # but how does user code know to use it?
+    # @classmethod
+    # def type_of_instance(cls, obj):
+    #     return Const(cls(), obj)
 
 
 class Number(BasicType):
@@ -492,6 +513,27 @@ class Boolean(BasicType):
             obj = obj.val
         with artifact.new_file(f"{name}.object.json") as f:
             json.dump(obj, f)
+
+
+class Datetime(Type):
+    # TODO: Should be datetime but weavejs expects date
+    # name = "datetime"
+    name = "timestamp"
+    instance_classes = datetime.datetime
+
+    def save_instance(self, obj, artifact, name):
+        if artifact is None:
+            raise errors.WeaveSerializeError(
+                "save_instance invalid when artifact is None for type: %s" % self
+            )
+        with artifact.new_file(f"{name}.object.json") as f:
+            v = int(obj.timestamp() * 1000)
+            json.dump(v, f)
+
+    def load_instance(self, artifact, name, extra=None):
+        with artifact.open(f"{name}.object.json") as f:
+            v = json.load(f)
+            return datetime.datetime.fromtimestamp(v / 1000)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -582,7 +624,7 @@ class List(Type):
     name = "list"
     instance_classes = [set, list]
 
-    object_type: Type
+    object_type: Type = dataclasses.field(default_factory=Any)
 
     @classmethod
     def type_of_instance(cls, obj):
@@ -618,11 +660,11 @@ class List(Type):
 class TypedDict(Type):
     name = "typedDict"
     instance_classes = [dict]
-    property_types: dict[str, Type]
+    property_types: dict[str, Type] = dataclasses.field(default_factory=dict)
 
     def __hash__(self):
         # Can't hash property_types by default because dict is not hashable
-        return hash(tuple((k, v) for k, v in self.property_types.items()))
+        return hash(tuple(k, v) for k, v in self.property_types.items())
 
     def _assign_type_inner(self, other_type):
         if not isinstance(other_type, TypedDict):
@@ -718,7 +760,7 @@ class ObjectType(Type):
     @classmethod
     def type_of_instance(cls, obj):
         variable_prop_types = {}
-        for prop_name in cls.type_vars():
+        for prop_name in cls.type_attrs():
             prop_type = TypeRegistry.type_of(getattr(obj, prop_name))
             # print("TYPE_OF", cls, prop_name, prop_type, type(getattr(obj, prop_name)))
             variable_prop_types[prop_name] = prop_type
@@ -761,16 +803,35 @@ class ObjectType(Type):
         return mapper.apply(result)
 
 
+def fn():
+    pass
+
+
+PythonFunction = type(fn)
+
+
 @dataclasses.dataclass(frozen=True)
 class Function(Type):
     name = "function"
 
-    input_types: dict[str, Type]
-    output_type: Type
+    # TODO: Do I really want PythonFunction here? Why?
+    instance_classes: typing.ClassVar[typing.List[type]] = [PythonFunction]
+
+    input_types: dict[str, Type] = dataclasses.field(default_factory=dict)
+    output_type: Type = dataclasses.field(default_factory=lambda: UnknownType())
 
     @classmethod
     def type_of_instance(cls, obj):
+        # obj is either a Python function or a Node
+        if callable(obj):
+            # its a python function
+            return cls()
         # instance is graph.Node
+        if isinstance(obj.type, Function):
+            # Its already a Function type, so just return it.
+            # TODO: I'm not sure if this is right, this makes FunctionType
+            # a top of sorts...
+            return obj.type
         # TODO: get input variable types!
         return cls({}, obj.type)
 
@@ -786,16 +847,36 @@ class Function(Type):
         input_types = {k: v.to_dict() for (k, v) in self.input_types.items()}
         return {"inputTypes": input_types, "outputType": self.output_type.to_dict()}
 
+    def save_instance(self, obj, artifact, name):
+        with artifact.new_file(f"{name}.object.json") as f:
+            json.dump(obj.to_json(), f)
+
+    def load_instance(self, artifact, name, extra=None):
+        with artifact.open(f"{name}.object.json") as f:
+            # TODO: no circular imports!
+            from . import graph
+
+            return graph.Node.node_from_json(json.load(f))
+
 
 @dataclasses.dataclass(frozen=True)
 class RefType(Type):
+    object_type: Type = UnknownType()
+
+    @classmethod
+    def type_of_instance(cls, obj):
+        return cls(obj.type)
+
+    # TODO: Address this comment. I'm sure this introduced the same type
+    #     blowup as before again. Slows everything down. But in this PR
+    #     I've put object_type back into RefType for now.
     # RefType intentionally does not include the type of the object it
     # points to. Doing so naively results in a type explosion. We may
     # want to include it in the future, but we'll need to shrink it, for
-    # example by disallowing unions (replacing with them with uknown or a
+    # example by disallowing unions (replacing with them with unknown or a
     # type variable)
-    def __repr__(self):
-        return "<%s>" % self.__class__.name
+    # def __repr__(self):
+    #     return "<%s>" % self.__class__.name
 
 
 @dataclasses.dataclass(frozen=True)
@@ -1005,6 +1086,24 @@ def is_custom_type(t: Type) -> bool:
         or isinstance(t, List)
         or isinstance(t, UnionType)
     )
+
+
+def type_is_variable(t: Type) -> bool:
+    # not concrete
+    if isinstance(t, Any):
+        # Any is currently the equivalent Weave Type for any Python
+        # TypeVar
+        return True
+    elif isinstance(t, UnionType):
+        return True
+    elif isinstance(t, TypedDict):
+        # Should we just make type_vars for TypedDict be its property types?
+        # That would simplify a lot.
+        return any(type_is_variable(sub_t) for sub_t in t.property_types.values())
+    elif isinstance(t, Const):
+        return type_is_variable(t.val_type)
+    else:
+        return any(type_is_variable(sub_t) for sub_t in t.type_vars().values())
 
 
 NumberBinType = TypedDict({"start": Float(), "stop": Float()})

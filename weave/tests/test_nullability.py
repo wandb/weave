@@ -1,6 +1,10 @@
 import typing
 import weave
 
+from .. import context_state as _context
+
+_loading_builtins_token = _context.set_loading_built_ins()
+
 
 @weave.op()
 def no_arg_op() -> int:
@@ -22,6 +26,9 @@ def null_consuming_op(a: typing.Optional[int], b: int) -> int:
     if a == None:
         return b * 10
     return a + b  # type: ignore
+
+
+_context.clear_loading_built_ins(_loading_builtins_token)
 
 
 def test_basic_nullability():

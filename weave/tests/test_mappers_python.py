@@ -3,6 +3,7 @@ import math
 from .. import mappers_python
 from .. import weave_types as types
 from .. import context
+from .. import api
 
 
 def test_map_typed_dict():
@@ -48,3 +49,15 @@ def test_map_typed_dict_with_nan():
     d3 = m2.apply(d2)
     assert d["a"] == d3["a"]
     assert math.isnan(d3["b"])
+
+
+def test_map_const():
+    d = {"a": api.const(5)}
+    d_type = types.TypeRegistry.type_of(d)
+    m = mappers_python.map_to_python(d_type, None)
+    d2 = m.apply(d)
+    m2 = mappers_python.map_from_python(d_type, None)
+    d3 = m2.apply(d2)
+    # const is the only case where the mapping is not two-way.
+    # TODO: is this a problem?
+    assert d3["a"] == 5

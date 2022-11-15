@@ -5,17 +5,31 @@ from .. import api as weave
 from .. import ops
 from .. import op_def
 from .. import panels
+from weave import context_state
+
+loading_builtins_token = context_state.set_loading_built_ins()
 
 from . import bertviz
+
 from . import xgboost
+from . import shap
+
 from . import sklearn
 from . import keras
 from . import torchvision
+from . import torch_mnist_model_example
 from . import huggingface
+
 from . import craiyon
-from . import openai
+
 from . import spacy
+from . import lens
 from . import wandb
+from . import scenario
+from . import shawn
+from . import wandb
+from . import replicate
+from . import openai
 
 # TODO: feels odd to call this "ops.Markdown".
 # Maybe make it top level
@@ -97,7 +111,7 @@ def ecosystem_render(
             # TODO: need to figure out a way to do this without breaking python types
             panels.CardTab(
                 name="Intro",
-                content=panels.Markdown(INTRO),  # type: ignore
+                content=panels.PanelMarkdown(INTRO),  # type: ignore
             ),
             panels.CardTab(
                 name="Organizations",
@@ -142,3 +156,6 @@ def ecosystem_render(
             ),
         ],
     )
+
+
+context_state.clear_loading_built_ins(loading_builtins_token)

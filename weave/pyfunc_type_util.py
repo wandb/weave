@@ -13,6 +13,7 @@ def determine_input_type(
     expected_input_type: typing.Optional[
         typing.Union[op_args.OpArgs, typing.Dict[str, types.Type]]
     ] = None,
+    # TODO: I really don't like this boolean flag here.
     allow_unknowns: bool = False,
 ) -> op_args.OpArgs:
     python_input_type = _get_type_hints(pyfunc)

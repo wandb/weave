@@ -31,6 +31,7 @@ from .. import weave_internal
 from . import obj
 from .. import context
 from .. import ops
+from ..vectorize import make_vectorized_object_constructor
 
 
 FLATTEN_DELIMITER = "➡️"
@@ -98,7 +99,9 @@ def unzip_struct_array(arr: pa.ChunkedArray) -> pa.Table:
 
 
 def arrow_type_to_weave_type(pa_type) -> types.Type:
-    if pa_type == pa.string():
+    if pa_type == pa.null():
+        return types.NoneType()
+    elif pa_type == pa.string():
         return types.String()
     elif pa_type == pa.int64() or pa_type == pa.int32():
         return types.Int()
@@ -491,8 +494,7 @@ class ArrowWeaveListType(types.Type):
 
         mapper = mappers_python.map_from_python(type_of_d, artifact)
         res = mapper.apply(result)
-        # TODO: This won't work for Grouped result!
-        return ArrowWeaveList(res["_arrow_data"], res["object_type"], artifact)
+        return self.instance_class(artifact=artifact, **res)
 
 
 ArrowWeaveListObjectTypeVar = typing.TypeVar("ArrowWeaveListObjectTypeVar")
@@ -511,6 +513,8 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             yield self._mapper.apply(item)
 
     def to_pylist(self):
+        if isinstance(self, graph.Node):
+            return []
         return self._arrow_data.to_pylist()
 
     def __init__(self, _arrow_data, object_type=None, artifact=None):
@@ -553,6 +557,8 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         try:
             row = self._arrow_data.slice(index, 1)
         except IndexError:
+            return None
+        if not row:
             return None
         res = self._mapper.apply(row.to_pylist()[0])
         return res
@@ -1374,6 +1380,12 @@ def vectorize(
     if stack_depth > 10:
         raise VectorizeError("Vectorize recursion depth exceeded")
 
+    def ensure_object_constructors_created(node: graph.Node) -> graph.Node:
+        if isinstance(node, graph.OutputNode):
+            if node.from_op.name.startswith("objectConstructor-"):
+                make_vectorized_object_constructor(node.from_op.name)
+        return node
+
     def expand_nodes(node: graph.Node) -> graph.Node:
         if isinstance(node, graph.OutputNode):
             inputs = node.from_op.inputs
@@ -1400,13 +1412,12 @@ def vectorize(
                 )
                 return op.lazy_call(**inputs)
             else:
+                # Get a version of op that can handle vectorized (ArrowWeaveList) inputs
                 op = dispatch.get_op_for_input_types(
                     node.from_op.name, [], {k: v.type for k, v in inputs.items()}
                 )
                 if op:
-                    # Rename inputs to match op, ie, call by position...
-                    # Hmm, need to centralize this behavior
-                    # TODO
+                    # We have a vectorized implementation of this op already.
                     final_inputs = {
                         k: v for k, v in zip(op.input_type.arg_types, inputs.values())
                     }
@@ -1433,6 +1444,7 @@ def vectorize(
         elif isinstance(node, graph.ConstNode):
             return node
 
+    weave_fn = graph.map_nodes(weave_fn, ensure_object_constructors_created)
     weave_fn = graph.map_nodes(weave_fn, expand_nodes)
     return graph.map_nodes(weave_fn, convert_node)
 
@@ -1500,6 +1512,11 @@ def op_to_weave_fn(opdef: op_def.OpDef) -> graph.Node:
     if opdef.name.startswith("Arrow"):
         raise errors.WeaveTypeError(
             "Refusing to convert op that is already defined on Arrow object to weave_fn"
+        )
+
+    if opdef.name.startswith("objectConstructor"):
+        raise errors.WeaveTypeError(
+            "Can't convert objectConstructor to weave_fn: %s" % opdef
         )
 
     if is_base_op(opdef):
