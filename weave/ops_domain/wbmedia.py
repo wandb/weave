@@ -4,11 +4,15 @@ import copy
 import dataclasses
 import typing
 
-from weave.language_features.tagging.tag_store import isolated_tagging_context
+from wandb.apis import public as wandb_api
+
+from ..artifacts_local import get_wandb_read_client_artifact
+from ..language_features.tagging.tag_store import isolated_tagging_context
 from .. import types
 from .. import api as weave
 from ..ops_primitives import html
 from ..ops_primitives import markdown
+from ..ops_primitives import file
 from . import file_wbartifact
 
 
@@ -48,6 +52,50 @@ class ImageArtifactFileRef:
     @property
     def artifact(self):
         return self.path.artifact
+
+
+def _parse_artifact_path(path: str) -> typing.Tuple[str, str, str]:
+    partial_path = path[len(table_client_artifact_file_scheme) :]
+    art_identifier, file_path = partial_path.split("/", 1)
+    art_id, art_version = art_identifier.split(":", 1)
+    return art_id, art_version, file_path
+
+
+table_client_artifact_file_scheme = "wandb-client-artifact://"
+
+
+@weave.type(__override_name="table-file")  # type: ignore
+class TableClientArtifactFileRef:
+    artifact_path: str
+
+    def __init__(self, artifact_path):
+        assert artifact_path.startswith(table_client_artifact_file_scheme)
+        self.artifact_path = artifact_path
+        self._artifact = None
+        self._art_id, self._art_version, self._file_path = _parse_artifact_path(
+            artifact_path
+        )
+
+    @property
+    def wb_artifact(self):
+        if self._artifact == None:
+            self._artifact = get_wandb_read_client_artifact(
+                self._art_id, self._art_version
+            )
+        return self._artifact
+
+    def get_local_path(self):
+        return self.wb_artifact.path(self._file_path)
+
+    # This is a temp hack until we have better support for _base_type inheritance
+    @weave.op(
+        name="tablefile-table",
+        output_type=file.TableType(),
+    )
+    def table(self):
+        if not hasattr(self, "artifact"):
+            self.artifact = self.wb_artifact
+        return file.File.table.resolve_fn(self)
 
 
 @weave.type(__override_name="html-file")  # type: ignore

@@ -14,11 +14,66 @@ from . import util
 from . import errors
 from . import wandb_api
 import wandb
+from wandb.apis import public as wb_public
 
 
 @functools.lru_cache(1000)
 def get_wandb_read_artifact(path):
     return wandb_api.wandb_public_api().artifact(path)
+
+
+@functools.lru_cache(1000)
+def get_wandb_read_client_artifact(art_id: str, art_version: str):
+    query = wb_public.gql(
+        """	
+    query ArtifactVersion(	
+        $id: ID!,	
+        $aliasName: String!	
+    ) {	
+        artifactCollection(id: $id) {	
+            id	
+            name	
+            project {	
+                id	
+                name	
+                entity {	
+                    id	
+                    name	
+                }	
+            }	
+            artifactMembership(aliasName: $aliasName) {	
+                id	
+                versionIndex	
+            }	
+            defaultArtifactType {	
+                id	
+                name	
+            }	
+        }	
+    }	
+    """
+    )
+    res = wandb_api.wandb_public_api().client.execute(
+        query,
+        variable_values={
+            "id": art_id,
+            "aliasName": art_version,
+        },
+    )
+    entity_name = res["artifactCollection"]["project"]["entity"]["name"]
+    project_name = res["artifactCollection"]["project"]["name"]
+    artifact_type_name = res["artifactCollection"]["defaultArtifactType"]["name"]
+    artifact_name = res["artifactCollection"]["name"]
+    version_index = res["artifactCollection"]["artifactMembership"]["versionIndex"]
+    version = f"v{version_index}"
+
+    weave_art_uri = uris.WeaveWBArtifactURI.from_parts(
+        entity_name,
+        project_name,
+        artifact_name,
+        version,
+    )
+    return WandbArtifact(artifact_name, artifact_type_name, weave_art_uri)
 
 
 def local_artifact_dir() -> str:

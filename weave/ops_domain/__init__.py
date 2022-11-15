@@ -5,8 +5,6 @@ import typing
 
 from wandb.apis import public as wandb_api
 
-from ..wbartifact_util import wb_client_dict_to_artifact_version_file
-
 from .run_segment import RunSegment, run_segment_render
 from ..api import op, weave_class
 from .. import weave_types as types
@@ -119,24 +117,22 @@ class ArtifactVersionsType(types.Type):
 
 
 def process_summary_obj(val):
-    if isinstance(val, dict):
-        maybe_afv = wb_client_dict_to_artifact_version_file(val)
-        if maybe_afv:
-            return maybe_afv
+    if isinstance(val, dict) and "_type" in val and val["_type"] == "table-file":
+        return TableClientArtifactFileRef(val["artifact_path"])
     return val
 
 
 def process_summary_type(val):
     if isinstance(val, dict) and "_type" in val and val["_type"] == "table-file":
-        return types.FileType(
-            extension=types.Const(types.String(), "json"), wb_object_type="table"
-        )
+        return TableClientArtifactFileRef.WeaveType()
     return types.TypeRegistry.type_of(val)
 
 
 @op(render_info={"type": "function"})
 def refine_summary_type(run: wandb_api.Run) -> types.Type:
-    return types.TypeRegistry.type_of(WBRun.summary.raw_resolve_fn(run))
+    return types.TypedDict(
+        {k: process_summary_type(v) for k, v in run.summary._json_dict.items()}
+    )
 
 
 @weave_class(weave_type=RunType)
