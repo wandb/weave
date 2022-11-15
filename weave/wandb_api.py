@@ -11,7 +11,7 @@ WANDB_PUBLC_API: contextvars.ContextVar[
 def wandb_public_api() -> public.Api:
     current_key = _wandb_api_key.get()
     current_api = WANDB_PUBLC_API.get()
-    default_api = public.Api()
+    default_api = public.Api(api_key=current_key)
     if current_api is None:
         WANDB_PUBLC_API.set(default_api)
         return default_api
