@@ -1,4 +1,5 @@
 # TODO: rename this file to op_call.py
+import logging
 import typing
 from . import graph
 from . import weave_types as types
@@ -135,6 +136,9 @@ def make_lazy_call(f, fq_op_name, input_type, output_type, refine_output_type):
             # relaxed. This is the case where we are not confident that any op
             # is appropriate, so we just go with the one provided at runtime -
             # not gaurenteed to be correct!
+            logging.warning(
+                f"Lazy Dispatch - Unable to find a valid op for {fq_op_name}"
+            )
             # raise errors.WeaveInternalError(
             #     f"Could not find op for inputs {args} and {kwargs} for op {fq_op_name}"
             # )
