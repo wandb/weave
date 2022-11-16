@@ -25,6 +25,24 @@ class OrgType(types._PlainStringNamedType):
     name = "org"
 
 
+@weave_type("link")
+class Link:
+    pass
+
+
+@weave_type("date")
+class Date:
+    pass
+
+
+@weave_type("user")
+class User:
+    @op(name="user-link")
+    def link(self) -> Link:
+        # TODO
+        return Link()
+
+
 @weave_type("entity")
 class Entity:
     _name: str
@@ -32,6 +50,11 @@ class Entity:
     @op(name="entity-name")
     def name(self) -> str:
         return self.name
+
+    @op(name="entity-link")
+    def link(self) -> Link:
+        # TODO
+        return Link()
 
 
 class ProjectType(types._PlainStringNamedType):
@@ -150,6 +173,11 @@ class WBRun:
     @op()
     def name(run: wandb_api.Run) -> str:
         return run.name
+
+    @op(name="run-link")
+    def link(run: wandb_api.Run) -> Link:
+        # TODO
+        return Link()
 
     @op()
     def id(run: wandb_api.Run) -> str:
@@ -330,9 +358,19 @@ class ArtifactOps:
     def name_(artifact: wandb_api.ArtifactCollection) -> str:
         return artifact.name
 
+    @op(name="artifact-description")
+    def description(artifact: wandb_api.ArtifactCollection) -> str:
+        # TODO
+        return ""
+
     @op(name="artifact-versions")
     def versions(artifact: wandb_api.ArtifactCollection) -> wandb_api.ArtifactVersions:
         return artifact.versions()
+
+    @op(name="artifact-createdAt")
+    def createdAt(artifact: wandb_api.ArtifactCollection) -> Date:
+        # TODO:
+        return None  # type: ignore
 
     @op(name="artifact-id")
     def id(artifact: wandb_api.ArtifactCollection) -> str:
@@ -350,6 +388,11 @@ class Project:
     # @staticmethod  # TODO: doesn't work
     def name(project: wandb_api.Project) -> str:
         return project.name
+
+    @op(name="project-link")
+    def link(self) -> Link:
+        # TODO
+        return Link()
 
     @op(name="project-entity")
     def entity(project: wandb_api.Project) -> Entity:
@@ -412,8 +455,13 @@ class Project:
 
 
 @op(name="root-project")
-def project(entityName: str, projectName: str) -> wandb_api.Project:
+def root_project(entityName: str, projectName: str) -> wandb_api.Project:
     return wandb_public_api().project(name=projectName, entity=entityName)
+
+
+@op(name="root-entity")
+def root_entity(entityName: str) -> Entity:
+    return Entity(entityName)
 
 
 project_tag_getter_op = make_tag_getter_op.make_tag_getter_op(
@@ -433,6 +481,11 @@ class ArtifactAlias:
     @op(name="artifactAlias-alias")
     def alias(self) -> str:
         return self._alias
+
+    @op(name="artifactAlias-artifact")
+    def artifact(self) -> wandb_api.ArtifactCollection:
+        # TODO
+        return None
 
 
 @op(name="project-artifact")
@@ -545,6 +598,14 @@ def artifact_aliases(artifact: wandb_api.ArtifactCollection) -> list[ArtifactAli
     return []
 
 
+@op(name="artifactVersion-aliases")
+def artifact_version_aliases(
+    artifactVersion: artifacts_local.WandbArtifact,
+) -> list[ArtifactAlias]:
+    # TODO
+    return []
+
+
 @op(name="artifactVersion-artifactCollections")
 def artifact_version_size(
     artifactVersion: artifacts_local.WandbArtifact,
@@ -559,6 +620,14 @@ def artifact_version_memberships(
 ) -> list[ArtifactCollectionMembership]:
     # TODO
     return []
+
+
+@op(name="artifactVersion-createdByUser")
+def artifact_version_created_by_user(
+    artifactVersion: artifacts_local.WandbArtifact,
+) -> User:
+    # TODO
+    return None  # type: ignore
 
 
 @op(name="artifactVersion-usedBy")
@@ -577,3 +646,9 @@ def entity_portfolios(entity: Entity) -> wandb_api.ArtifactCollection:
 @op(name="artifact-project")
 def artifact_project(artifact: wandb_api.ArtifactCollection) -> wandb_api.Project:
     return wandb_public_api().project(artifact.project, artifact.entity)
+
+
+@op(name="none-coalesce")
+def none_coalesce(a: typing.Any, b: typing.Any) -> typing.Any:
+    # TODO:
+    return a or b
