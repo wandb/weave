@@ -335,11 +335,11 @@ class ArtifactOps:
         return artifact.versions()
 
     @op(name="artifact-id")
-    def versions(artifact: wandb_api.ArtifactCollection) -> str:
+    def id(artifact: wandb_api.ArtifactCollection) -> str:
         return artifact.id
 
     @op(name="artifact-isPortfolio")
-    def is_portfolio(self) -> bool:
+    def is_portfolio(artifact: wandb_api.ArtifactCollection) -> bool:
         # TODO: needs to be patched with custom query.
         return False
 
@@ -456,19 +456,23 @@ class ArtifactCollectionMembership:
 
 
 @op(name="artifactMembership-versionIndex")
-def version_index(artifactMembership: ArtifactCollectionMembership) -> int:
+def artifact_membership_version_index(
+    artifactMembership: ArtifactCollectionMembership,
+) -> int:
     # TODO: needs to be patched with custom query.
     return 0
 
 
 @op(name="artifactMembership-aliases")
-def aliases(artifactMembership: ArtifactCollectionMembership) -> list[ArtifactAlias]:
+def artifact_membership_aliases(
+    artifactMembership: ArtifactCollectionMembership,
+) -> list[ArtifactAlias]:
     # TODO: Need a query
     return []
 
 
 @op(name="artifactMembership-collection")
-def aliases(
+def artifact_membership_collection(
     artifactMembership: ArtifactCollectionMembership,
 ) -> wandb_api.ArtifactCollection:
     # TODO: Need a query
@@ -476,7 +480,7 @@ def aliases(
 
 
 @op(name="artifact-memberships")
-def memberships(
+def artifact_memberships(
     artifact: wandb_api.ArtifactCollection,
 ) -> list[ArtifactCollectionMembership]:
     # TODO: THIS IS WRONG AND DOES NOT HANDLE PORTFOLIOS CORRECTLY
@@ -496,7 +500,7 @@ def artifact_membership_for_alias(
 
 
 @op(name="artifact-lastMembership")
-def last_membership(
+def artifact_last_membership(
     artifact: wandb_api.ArtifactCollection,
 ) -> ArtifactCollectionMembership:
     # TODO: needs to be patched with custom query.
@@ -520,25 +524,29 @@ def artifact_membership_version(
 
 
 @op(name="artifactVersion-createdBy")
-def created_by(artifactVersion: artifacts_local.WandbArtifact) -> wandb_api.Run:
+def artifact_version_created_by(
+    artifactVersion: artifacts_local.WandbArtifact,
+) -> wandb_api.Run:
     # TODO: this needs a query.
     return None
 
 
 @op(name="artifactVersion-isWeaveObject")
-def is_weave_object(artifactVersion: artifacts_local.WandbArtifact) -> bool:
+def artifact_version_is_weave_object(
+    artifactVersion: artifacts_local.WandbArtifact,
+) -> bool:
     # TODO: this needs a query.
     return False
 
 
 @op(name="artifact-aliases")
-def aliases(artifact: wandb_api.ArtifactCollection) -> list[ArtifactAlias]:
+def artifact_aliases(artifact: wandb_api.ArtifactCollection) -> list[ArtifactAlias]:
     # TODO
     return []
 
 
 @op(name="artifactVersion-artifactCollections")
-def size(
+def artifact_version_size(
     artifactVersion: artifacts_local.WandbArtifact,
 ) -> list[wandb_api.ArtifactCollection]:
     # TODO
@@ -546,8 +554,26 @@ def size(
 
 
 @op(name="artifactVersion-memberships")
-def size(
+def artifact_version_memberships(
     artifactVersion: artifacts_local.WandbArtifact,
 ) -> list[ArtifactCollectionMembership]:
     # TODO
     return []
+
+
+@op(name="artifactVersion-usedBy")
+def artifact_version_used_by(
+    artifactVersion: artifacts_local.WandbArtifact,
+) -> list[wandb_api.Run]:
+    return artifactVersion._saved_artifact.used_by()
+
+
+@op(name="entity-portfolios")
+def entity_portfolios(entity: Entity) -> wandb_api.ArtifactCollection:
+    # TODO
+    return []
+
+
+@op(name="artifact-project")
+def artifact_project(artifact: wandb_api.ArtifactCollection) -> wandb_api.Project:
+    return wandb_public_api().project(artifact.project, artifact.entity)

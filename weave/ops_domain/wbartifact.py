@@ -48,6 +48,10 @@ class ArtifactVersion:
             extension=types.Const(types.String(), ext), wb_object_type=wb_object_type
         )
 
+    @op(name="artifactVersion-id")
+    def id(artifactVersion: artifacts_local.WandbArtifact) -> str:  # type: ignore
+        return artifactVersion._saved_artifact.id
+
     @op(name="artifactVersion-name")
     def name(artifactVersion: artifacts_local.WandbArtifact) -> str:  # type: ignore
         # TODO: we actually get an artifact version file here because
@@ -55,25 +59,23 @@ class ArtifactVersion:
         return getattr(artifactVersion, "name", "BUG a192bx (search weave code)")
 
     @op(name="artifactVersion-digest")
-    def name(artifactVersion: artifacts_local.WandbArtifact) -> str:
+    def digest(artifactVersion: artifacts_local.WandbArtifact) -> str:  # type: ignore
         return artifactVersion._saved_artifact.digest
 
     @op(name="artifactVersion-size")
-    def size(artifactVersion: artifacts_local.WandbArtifact) -> int:
+    def size(artifactVersion: artifacts_local.WandbArtifact) -> int:  # type: ignore
         return artifactVersion._saved_artifact.size
 
     @op(name="artifactVersion-description")
-    def description(artifactVersion: artifacts_local.WandbArtifact) -> str:
+    def description(artifactVersion: artifacts_local.WandbArtifact) -> str:  # type: ignore
         return artifactVersion._saved_artifact.description
 
     @op(name="artifactVersion-createdAt")
-    def description(artifactVersion: artifacts_local.WandbArtifact) -> str: # TODO: Is this a string?
+    def created_at(artifactVersion: artifacts_local.WandbArtifact) -> str:  # type: ignore # TODO: Is this a string?
         return artifactVersion._saved_artifact.created_at
 
     @op(name="artifactVersion-files")
-    def size(
-        artifactVersion: artifacts_local.WandbArtifact,
-    ) -> list[file_wbartifact.ArtifactVersionFile]:
+    def files(artifactVersion: artifacts_local.WandbArtifact) -> list[file_wbartifact.ArtifactVersionFile]:  # type: ignore
         # TODO
         return []
 
@@ -145,10 +147,6 @@ class ArtifactVersion:
                 else:
                     dir_.dirs[rel_path_parts[1]] = 1
         return file_wbartifact.ArtifactVersionDir(path, 1591, sub_dirs, files)
-
-    @op(name="artifactVersion-id")
-    def id(self) -> str:
-        return self._saved_artifact.id
 
 
 class ArtifactAssetType(types._PlainStringNamedType):
