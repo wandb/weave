@@ -19,7 +19,7 @@ class TypedDictToPyDict(mappers_weave.TypedDictMapper):
     def apply(self, obj):
         result = {}
         for k, prop_serializer in self._property_serializers.items():
-            result[k] = prop_serializer.apply(obj.get(k))
+            result[k] = prop_serializer.apply(obj.get(k, None))
         return result
 
 
