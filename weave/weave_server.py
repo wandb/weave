@@ -1,6 +1,7 @@
 import os
 import logging
 import pathlib
+import sys
 from pythonjsonlogger import jsonlogger
 
 import ddtrace
@@ -26,16 +27,8 @@ from flask.logging import wsgi_errors_stream
 # Ensure these are imported and registered
 from weave import ops
 
-# Load and register the ecosystem ops
-# These are all treated as builtins for now.
-loading_builtins_token = context_state.set_loading_built_ins()
-
-from weave import ecosystem
 from .artifacts_local import local_artifact_dir
 
-context_state.clear_loading_built_ins(loading_builtins_token)
-
-import sys
 
 # NOTE: Fixes flask dev server's auto-reload capability, by forcing it to use
 # stat mode instead of watchdog mode. It turns out that "import wandb" breaks
@@ -250,7 +243,7 @@ app = make_app()
 
 @app.before_first_request
 def before_first_request():
-    registry_mem.memory_registry.load_saved_ops()
+    from weave.ecosystem import all
 
 
 if __name__ == "__main__":

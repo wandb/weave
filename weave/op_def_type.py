@@ -84,6 +84,7 @@ class OpDefType(types.Type):
     instance_classes = op_def.OpDef
 
     def save_instance(self, obj: op_def.OpDef, artifact, name):
+        open("/tmp/test-log.txt", "a+").write("save_instance %s\n" % obj)
         if obj.is_builtin:
             with artifact.new_file(f"{name}.json") as f:
                 json.dump({"name": obj.name}, f)

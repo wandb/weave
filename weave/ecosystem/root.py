@@ -9,28 +9,6 @@ from weave import context_state
 
 loading_builtins_token = context_state.set_loading_built_ins()
 
-from . import bertviz
-
-from . import xgboost
-from . import shap
-
-from . import sklearn
-from . import keras
-from . import torchvision
-from . import torch_mnist_model_example
-from . import huggingface
-
-from . import craiyon
-
-from . import spacy
-from . import lens
-from . import wandb
-from . import scenario
-from . import shawn
-from . import wandb
-from . import replicate
-from . import openai
-
 # TODO: feels odd to call this "ops.Markdown".
 # Maybe make it top level
 # Or would types.Markdown by ok?
@@ -91,7 +69,8 @@ def ecosystem() -> Ecosystem:
         # This is not Weavey at all!  We should look for any registered ps of no arguments that produce DatasetCard type
         # We can do that query using... Weave, lazily. In fact, EcosystemType() doesn't need to store any data, just
         # render the panel. Which can lazily fetch / search for everything.
-        _datasets=[sklearn.ca_housing_dataset, torchvision.mnist],
+        # _datasets=[sklearn.ca_housing_dataset, torchvision.mnist],
+        _datasets=[],
         _models=[],
         _ops=registry_mem.memory_registry.list_ops(),
     )
