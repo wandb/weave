@@ -2,9 +2,9 @@ import os
 
 from wandb.apis import public as wandb_api
 
-from ..api import op, weave_class
+from ..api import op, weave_class, type as weave_type
 from .. import weave_types as types
-from . import file_wbartifact
+from . import ArtifactCollection, file_wbartifact
 from ..ops_primitives import file_local
 from .. import artifacts_local
 from .. import refs
@@ -27,6 +27,13 @@ class ArtifactVersionType(types._PlainStringNamedType):
 
 @weave_class(weave_type=ArtifactVersionType)
 class ArtifactVersion:
+    # @op()
+    # def aliases(self) -> list[ArtifactAlias]:
+    #     collection = ArtifactCollection(
+    #         self._saved_artifact.project, self._saved_artifact.name
+    #     )
+    #     return [ArtifactAlias(collection, alias) for alias in self._saved_artifact.aliases]
+
     @op(
         name="artifactVersion-fileReturnType",
         input_type={"artifactVersion": ArtifactVersionType(), "path": types.String()},
@@ -135,3 +142,17 @@ class ArtifactAssetType(types._PlainStringNamedType):
 )
 def artifactVersion(asset):
     return asset.artifact
+
+
+@weave_type("artifactAlias")
+class ArtifactAlias:
+    _collection: ArtifactCollection
+    _alias_name: str
+
+    @op()
+    def alias(self) -> str:
+        return self._alias_name
+
+    @op()
+    def artifact(self) -> ArtifactCollection:
+        return self._collection

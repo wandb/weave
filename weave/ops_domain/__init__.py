@@ -330,6 +330,13 @@ class ArtifactOps:
         return artifact.versions()
 
 
+# @weave_class(weave_type=ArtifactMembershipType)
+# class ArtifactMembership:
+#     @op()
+#     def aliases(self) -> list[ArtifactAlias]:
+#         return self.aliases
+
+
 @weave_class(weave_type=ProjectType)
 class Project:
     @op()
