@@ -54,6 +54,25 @@ class ArtifactVersion:
         # we get refs types messed up somehow
         return getattr(artifactVersion, "name", "BUG a192bx (search weave code)")
 
+    @op(name="artifactVersion-digest")
+    def name(artifactVersion: artifacts_local.WandbArtifact) -> str:
+        return artifactVersion._saved_artifact.digest
+
+    @op(name="artifactVersion-size")
+    def size(artifactVersion: artifacts_local.WandbArtifact) -> int:
+        return artifactVersion._saved_artifact.size
+
+    @op(name="artifactVersion-description")
+    def description(artifactVersion: artifacts_local.WandbArtifact) -> str:
+        return artifactVersion._saved_artifact.description
+
+    @op(name="artifactVersion-files")
+    def size(
+        artifactVersion: artifacts_local.WandbArtifact,
+    ) -> list[file_wbartifact.ArtifactVersionFile]:
+        # TODO
+        return []
+
     @op(
         name="artifactVersion-file",
         input_type={"artifactVersion": ArtifactVersionType(), "path": types.String()},
@@ -122,6 +141,10 @@ class ArtifactVersion:
                 else:
                     dir_.dirs[rel_path_parts[1]] = 1
         return file_wbartifact.ArtifactVersionDir(path, 1591, sub_dirs, files)
+
+    @op(name="artifactVersion-id")
+    def id(self) -> str:
+        return self._saved_artifact.id
 
 
 class ArtifactAssetType(types._PlainStringNamedType):

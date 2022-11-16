@@ -10,7 +10,7 @@ from wandb.apis import public as wandb_api
 # to go in ecosystem.
 # TODO: move this to ecosystem
 # from .run_segment import RunSegment, run_segment_render
-from ..api import op, weave_class
+from ..api import op, weave_class, type as weave_type
 from .. import weave_types as types
 from . import wbartifact
 from . import file_wbartifact
@@ -25,12 +25,13 @@ class OrgType(types._PlainStringNamedType):
     name = "org"
 
 
-class EntityType(types._PlainStringNamedType):
-    name = "entity"
+@weave_type("entity")
+class Entity:
+    _name: str
 
-
-class ArtifactMembershipType(types._PlainStringNamedType):
-    name = "artifactMembership"
+    @op(name="entity-name")
+    def name(self) -> str:
+        return self.name
 
 
 class ProjectType(types._PlainStringNamedType):
@@ -157,6 +158,10 @@ class WBRun:
     @op(refine_output_type=refine_summary_type)
     def summary(run: wandb_api.Run) -> dict[str, typing.Any]:
         return {k: process_summary_obj(v) for k, v in run.summary._json_dict.items()}
+
+    @op(name="run-usedArtifactVersions")
+    def used_artifact_versions(run: wandb_api.Run) -> wandb_api.ArtifactVersions:
+        return run.used_artifacts()
 
 
 @dataclasses.dataclass(frozen=True)
@@ -329,6 +334,15 @@ class ArtifactOps:
     def versions(artifact: wandb_api.ArtifactCollection) -> wandb_api.ArtifactVersions:
         return artifact.versions()
 
+    @op(name="artifact-id")
+    def versions(artifact: wandb_api.ArtifactCollection) -> str:
+        return artifact.id
+
+    @op(name="artifact-isPortfolio")
+    def is_portfolio(self) -> bool:
+        # TODO: needs to be patched with custom query.
+        return False
+
 
 @weave_class(weave_type=ProjectType)
 class Project:
@@ -336,6 +350,10 @@ class Project:
     # @staticmethod  # TODO: doesn't work
     def name(project: wandb_api.Project) -> str:
         return project.name
+
+    @op(name="project-entity")
+    def entity(project: wandb_api.Project) -> Entity:
+        return Entity(project.entity)
 
     @op()
     def artifacts(
@@ -408,32 +426,81 @@ run_tag_getter_op = make_tag_getter_op.make_tag_getter_op(
 
 
 # We don't have proper `wandb` SDK classes for these types so we use object types for now
-@weave.type()
-class ArtifactCollection:
-    project: wandb_api.Project
-    artifactName: str
+@weave_type("artifactAlias")
+class ArtifactAlias:
+    _alias: str
+
+    @op(name="artifactAlias-alias")
+    def alias(self) -> str:
+        return self._alias
 
 
 @op(name="project-artifact")
 def project_artifact(
     project: wandb_api.Project, artifactName: str
-) -> ArtifactCollection:
-    return ArtifactCollection(project=project, artifactName=artifactName)
+) -> wandb_api.ArtifactCollection:
+    # TODO: needs to be patched with custom query (to get type)
+    return wandb_api.ArtifactCollection(
+        wandb_public_api().client,
+        project.entity,
+        project.name,
+        artifactName,
+        "run_table",
+    )
 
 
-@weave.type()
+@weave_type("artifactMembership")
 class ArtifactCollectionMembership:
-    artifactCollection: ArtifactCollection
+    artifactCollection: wandb_api.ArtifactCollection
     aliasName: str
+
+
+@op(name="artifactMembership-versionIndex")
+def version_index(artifactMembership: ArtifactCollectionMembership) -> int:
+    # TODO: needs to be patched with custom query.
+    return 0
+
+
+@op(name="artifactMembership-aliases")
+def aliases(artifactMembership: ArtifactCollectionMembership) -> list[ArtifactAlias]:
+    # TODO: Need a query
+    return []
+
+
+@op(name="artifactMembership-collection")
+def aliases(
+    artifactMembership: ArtifactCollectionMembership,
+) -> wandb_api.ArtifactCollection:
+    # TODO: Need a query
+    return None
+
+
+@op(name="artifact-memberships")
+def memberships(
+    artifact: wandb_api.ArtifactCollection,
+) -> list[ArtifactCollectionMembership]:
+    # TODO: THIS IS WRONG AND DOES NOT HANDLE PORTFOLIOS CORRECTLY
+    return [
+        ArtifactCollectionMembership(artifact, f"v{v._version_index}")
+        for v in artifact.versions()
+    ]
 
 
 @op(name="artifact-membershipForAlias")
 def artifact_membership_for_alias(
-    artifact: ArtifactCollection, aliasName: str
+    artifact: wandb_api.ArtifactCollection, aliasName: str
 ) -> ArtifactCollectionMembership:
     return ArtifactCollectionMembership(
         artifactCollection=artifact, aliasName=aliasName
     )
+
+
+@op(name="artifact-lastMembership")
+def last_membership(
+    artifact: wandb_api.ArtifactCollection,
+) -> ArtifactCollectionMembership:
+    # TODO: needs to be patched with custom query.
+    return ArtifactCollectionMembership(artifact, "latest")
 
 
 @op(name="artifactMembership-artifactVersion")
@@ -443,10 +510,44 @@ def artifact_membership_version(
     wb_artifact = wandb_public_api().artifact(
         "%s/%s/%s:%s"
         % (
-            artifactMembership.artifactCollection.project.entity,
-            artifactMembership.artifactCollection.project.name,
-            artifactMembership.artifactCollection.artifactName,
+            artifactMembership.artifactCollection.entity,
+            artifactMembership.artifactCollection.project,
+            artifactMembership.artifactCollection.name,
             artifactMembership.aliasName,
         )
     )
     return artifacts_local.WandbArtifact.from_wb_artifact(wb_artifact)
+
+
+@op(name="artifactVersion-createdBy")
+def created_by(artifactVersion: artifacts_local.WandbArtifact) -> wandb_api.Run:
+    # TODO: this needs a query.
+    return None
+
+
+@op(name="artifactVersion-isWeaveObject")
+def is_weave_object(artifactVersion: artifacts_local.WandbArtifact) -> bool:
+    # TODO: this needs a query.
+    return False
+
+
+@op(name="artifact-aliases")
+def aliases(artifact: wandb_api.ArtifactCollection) -> list[ArtifactAlias]:
+    # TODO
+    return []
+
+
+@op(name="artifactVersion-artifactCollections")
+def size(
+    artifactVersion: artifacts_local.WandbArtifact,
+) -> list[wandb_api.ArtifactCollection]:
+    # TODO
+    return []
+
+
+@op(name="artifactVersion-memberships")
+def size(
+    artifactVersion: artifacts_local.WandbArtifact,
+) -> list[ArtifactCollectionMembership]:
+    # TODO
+    return []
