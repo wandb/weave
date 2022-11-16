@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import weave
 
 from .. import huggingface as hf
+from .. import xgboost as weave_xgb
 
 
 @weave.op(
