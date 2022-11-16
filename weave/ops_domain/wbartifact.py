@@ -66,6 +66,10 @@ class ArtifactVersion:
     def description(artifactVersion: artifacts_local.WandbArtifact) -> str:
         return artifactVersion._saved_artifact.description
 
+    @op(name="artifactVersion-createdAt")
+    def description(artifactVersion: artifacts_local.WandbArtifact) -> str: # TODO: Is this a string?
+        return artifactVersion._saved_artifact.created_at
+
     @op(name="artifactVersion-files")
     def size(
         artifactVersion: artifacts_local.WandbArtifact,
