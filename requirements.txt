@@ -1,4 +1,4 @@
-wandb>0.13
+wandb==0.13.5
 ddtrace
 python-json-logger
 numpy
@@ -25,8 +25,6 @@ torchvision
 bertviz
 datasets
 transformers<4.21
-tensorflow>=1.15.2 ; sys_platform!='darwin' or platform_machine!='arm64'
-tensorflow-macos ; sys_platform=='darwin' and platform_machine=='arm64'
 rich
 plotly
 replicate

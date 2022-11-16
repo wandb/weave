@@ -1,6 +1,5 @@
 import weave
 from .. import context_state as _context
-from ..ecosystem import keras as weave_keras
 from .. import weave_internal
 from .. import graph
 
@@ -42,23 +41,23 @@ def test_dispatch_params():
     assert weave.use(x.special_mult(num)) == 6
 
 
-def test_model_type():
-    dummy_model = weave_internal.make_const_node(
-        weave_keras.KerasModel.make_type(
-            [weave_keras.KerasTensorType.from_list([None, 1], weave.types.String())],
-            [weave_keras.KerasTensorType.from_list([None, 1], weave.types.Number())],
-        ),
-        None,
-    )
-    assert dummy_model.call_string("a").type == weave.types.List(weave.types.Number())
-    dummy_model = weave_internal.make_const_node(
-        weave_keras.KerasModel.make_type(
-            [weave_keras.KerasTensorType.from_list([None, 1], weave.types.String())],
-            [weave_keras.KerasTensorType.from_list([None, 1], weave.types.String())],
-        ),
-        None,
-    )
-    assert dummy_model.call_string("a").type == weave.types.List(weave.types.String())
+# def test_model_type():
+#     dummy_model = weave_internal.make_const_node(
+#         weave_keras.KerasModel.make_type(
+#             [weave_keras.KerasTensorType.from_list([None, 1], weave.types.String())],
+#             [weave_keras.KerasTensorType.from_list([None, 1], weave.types.Number())],
+#         ),
+#         None,
+#     )
+#     assert dummy_model.call_string("a").type == weave.types.List(weave.types.Number())
+#     dummy_model = weave_internal.make_const_node(
+#         weave_keras.KerasModel.make_type(
+#             [weave_keras.KerasTensorType.from_list([None, 1], weave.types.String())],
+#             [weave_keras.KerasTensorType.from_list([None, 1], weave.types.String())],
+#         ),
+#         None,
+#     )
+#     assert dummy_model.call_string("a").type == weave.types.List(weave.types.String())
 
 
 def test_pick_map():
