@@ -1,4 +1,4 @@
-wandb==0.13.5
+wandb>0.13
 ddtrace
 python-json-logger
 numpy
