@@ -2,6 +2,8 @@ import contextvars
 import contextlib
 import typing
 
+from wandb.apis import public
+
 from . import client_interface
 from . import server_interface
 from . import uris
@@ -48,9 +50,10 @@ _analytics_enabled: contextvars.ContextVar[bool] = contextvars.ContextVar(
     "analytics_enabled", default=True
 )
 
-_wandb_api_key: contextvars.ContextVar[typing.Optional[str]] = contextvars.ContextVar(
-    "_wandb_api_key", default=None
-)
+_wandb_public_api: contextvars.ContextVar[
+    typing.Optional[public.Api]
+] = contextvars.ContextVar("_wandb_public_api", default=None)
+
 
 _cache_namespace_token: contextvars.ContextVar[
     typing.Optional[str]

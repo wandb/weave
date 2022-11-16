@@ -42,6 +42,12 @@ if os.environ.get("FLASK_DEBUG"):
     sys.modules["watchdog.observers"] = None  # type: ignore
 
 
+def silence_mpl():
+    mpl_logger = logging.getLogger("matplotlib")
+    if mpl_logger:
+        mpl_logger.setLevel(logging.CRITICAL)
+
+
 # set up logging
 
 pid = os.getpid()
@@ -82,6 +88,7 @@ blueprint = Blueprint("weave", "weave-server", static_folder=static_folder)
 
 
 def make_app(log_filename=None):
+    silence_mpl()
     enable_stream_logging(
         enable_datadog=os.getenv("DD_ENV"),
         level=logging.DEBUG
