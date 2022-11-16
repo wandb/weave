@@ -66,13 +66,13 @@ class List:
         output_type=lambda input_types: input_types["arr"],
     )
     def filter(arr, filterFn):
-        from ..ops_primitives import arrow
+        from ..ops_arrow import list_ as arrow_list
 
         # WHOAAAA. Major hacks here.
         # This handles arrow filtering for a demo.
         # TODO: Remove
         arrow_obj = None
-        if isinstance(arr, arrow.ArrowWeaveList):
+        if isinstance(arr, arrow_list.ArrowWeaveList):
             arrow_obj = arr
             arr = arr.to_pylist()
 
@@ -83,7 +83,7 @@ class List:
                 result.append(row)
 
         if arrow_obj is not None:
-            return arrow.to_arrow_from_list_and_artifact(
+            return arrow_list.to_arrow_from_list_and_artifact(
                 result, arrow_obj.object_type, arrow_obj._artifact
             )
 

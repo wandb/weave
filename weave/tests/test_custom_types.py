@@ -10,7 +10,7 @@ from weave.ecosystem.wandb import geom
 _context.clear_loading_built_ins(_loading_builtins_token)
 
 from .. import api as weave
-from ..ops_primitives import arrow
+from ..ops_primitives import ops_arrow
 
 
 def test_mapped_method_on_custom_type():
@@ -23,7 +23,7 @@ def test_mapped_method_on_custom_type():
     assert mid.x == 0.45
     assert mid.y == 0.6
 
-    segments = arrow.to_arrow(
+    segments = ops_arrow.to_arrow(
         [
             geom.LineSegment(0.0, 0.1, 0.9, 1.1),
             geom.LineSegment(0.0, 0.2, 0.4, 1.1),
@@ -42,7 +42,7 @@ def test_mapped_method_on_custom_type():
 
 
 def test_mapped_method_returning_custom_type():
-    segments = arrow.to_arrow(
+    segments = ops_arrow.to_arrow(
         [
             geom.LineSegment(0.0, 0.1, 0.9, 1.1),
             geom.LineSegment(0.0, 0.2, 0.4, 1.1),
@@ -62,7 +62,7 @@ def test_mapped_on_fully_custom_type():
         {"a": 5, "im": Image.linear_gradient("L").rotate(0)},
         {"a": 6, "im": Image.linear_gradient("L").rotate(4)},
     ]
-    arrow_arr = arrow.to_arrow(data)
+    arrow_arr = ops_arrow.to_arrow(data)
 
     assert weave.use(arrow_arr.map(lambda row: row["im"].width_())).to_pylist() == [
         256,
@@ -75,7 +75,7 @@ def test_mapped_pick():
         {"a": 5, "b": 9},
         {"a": 6, "b": 10},
     ]
-    arrow_arr = arrow.to_arrow(data)
+    arrow_arr = ops_arrow.to_arrow(data)
 
     assert weave.use(arrow_arr.pick("b")).to_pylist() == [9, 10]
 

@@ -4,5 +4,8 @@
     "python.testing.unittestEnabled": false,
     "python.testing.pytestEnabled": true,
     "python.testing.cwd": "./weave",
-    "python.formatting.provider": "black"
+    "python.formatting.provider": "black",
+    "search.exclude": {
+        "weave/frontend": true
+    }
 }
