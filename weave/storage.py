@@ -181,14 +181,19 @@ def objects(
 ) -> typing.List[refs.LocalArtifactRef]:
     result = []
     for art_name in os.listdir(artifacts_local.local_artifact_dir()):
-        ref = refs.get_local_version_ref(art_name, alias)
-        if ref is not None:
-            if of_type.assign_type(ref.type):
-                # TODO: Why did I have this here?
-                # obj = ref.get()
-                # if isinstance(ref.type, types.RunType) and obj.op_name == "op-objects":
-                #     continue
-                result.append((ref.created_at, ref))
+        try:
+            ref = refs.get_local_version_ref(art_name, alias)
+            if ref is not None:
+                if of_type.assign_type(ref.type):
+                    # TODO: Why did I have this here?
+                    # obj = ref.get()
+                    # if isinstance(ref.type, types.RunType) and obj.op_name == "op-objects":
+                    #     continue
+                    result.append((ref.created_at, ref))
+        except errors.WeaveSerializeError:
+            # This happens because we may not have loaded ecosystem stuff that we need
+            # to deserialize
+            continue
     # Sorted by created_at
     return [r[1] for r in sorted(result)]
 

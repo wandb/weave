@@ -182,7 +182,7 @@ def execute_v2():
 
 
 @blueprint.route("/__weave/file/<path:path>")
-def send_js(path):
+def send_local_file(path):
     # path is given relative to the FS root. check to see that path is a subdirectory of the
     # local artifacts path. if not, return 403. then if there is a cache scope function defined
     # call it to make sure we have access to the path

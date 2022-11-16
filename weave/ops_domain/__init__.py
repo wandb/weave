@@ -10,6 +10,7 @@ from wandb.apis import public as wandb_api
 # to go in ecosystem.
 # TODO: move this to ecosystem
 # from .run_segment import RunSegment, run_segment_render
+from .. import safe_cache
 from ..api import op, weave_class
 from .. import weave_types as types
 from . import wbartifact
@@ -49,7 +50,7 @@ class ProjectType(types._PlainStringNamedType):
 # This is very helpful when deserializing runs which have been
 # serialized. Without caching here, the mappers end up loading
 # the run for every tagged cell in the table!
-@functools.lru_cache(1000)
+@safe_cache.safe_lru_cache(1000)
 def _memoed_get_run(run_uri):
     import time
 

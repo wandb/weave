@@ -7,15 +7,30 @@ import shutil
 from datetime import datetime
 import pathlib
 import tempfile
-import contextlib
 import typing
 
 from . import uris
 from . import util
 from . import errors
 from . import wandb_api
+from . import safe_cache
+from . import context_state
 import wandb
 from wandb.apis import public as wb_public
+
+
+def local_artifact_dir() -> str:
+    # This is a directory that all local and wandb artifacts are stored within.
+    # It includes the current cache namespace, which is a safe token per user,
+    # to ensure cache separation.
+    d = os.environ.get("WEAVE_LOCAL_ARTIFACT_DIR") or os.path.join(
+        "/tmp", "local-artifacts"
+    )
+    cache_namespace = context_state._cache_namespace_token.get()
+    if cache_namespace:
+        d = os.path.join(d, cache_namespace)
+    os.makedirs(d, exist_ok=True)
+    return d
 
 
 @contextlib.contextmanager
@@ -28,7 +43,7 @@ def chdir(to_dir: str):
         os.chdir(curdir)
 
 
-@functools.lru_cache(1000)
+@safe_cache.safe_lru_cache(1000)
 def get_wandb_read_artifact(path):
     with chdir(wandb_artifact_dir()):
         artifact = wandb_api.wandb_public_api().artifact(path)
@@ -36,7 +51,7 @@ def get_wandb_read_artifact(path):
     return artifact
 
 
-@functools.lru_cache(1000)
+@safe_cache.safe_lru_cache(1000)
 def get_wandb_read_client_artifact(art_id: str, art_version: str):
     query = wb_public.gql(
         """	
@@ -88,14 +103,6 @@ def get_wandb_read_client_artifact(art_id: str, art_version: str):
         version,
     )
     return WandbArtifact(artifact_name, artifact_type_name, weave_art_uri)
-
-
-def local_artifact_dir() -> str:
-    d = os.environ.get("WEAVE_LOCAL_ARTIFACT_DIR") or os.path.join(
-        "/tmp", "local-artifacts"
-    )
-    os.makedirs(d, exist_ok=True)
-    return d
 
 
 def wandb_artifact_dir():

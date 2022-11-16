@@ -5,7 +5,6 @@ import typing
 from . import client_interface
 from . import server_interface
 from . import uris
-from . import errors
 
 
 # Set to the op uri if we're in the process of loading
@@ -149,6 +148,15 @@ def analytics_disabled():
         yield
     finally:
         _analytics_enabled.reset(analytics_token)
+
+
+@contextlib.contextmanager
+def cache_namespace(token: str):
+    cache_token = _cache_namespace_token.set(token)
+    try:
+        yield
+    finally:
+        _cache_namespace_token.reset(cache_token)
 
 
 def analytics_enabled():
