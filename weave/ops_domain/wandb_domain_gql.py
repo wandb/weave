@@ -182,6 +182,10 @@ def artifact_version_aliases(
                 id
                 artifactCollection(name: $artifactCollectionName) {	
                     id
+                    defaultArtifactType {
+                        id
+                        name
+                    }
                     membership(aliasName: $digest) {
                         id
                         artifact {
@@ -210,6 +214,7 @@ def artifact_version_aliases(
                 artifact_version.entity,
                 artifact_version.project,
                 artifact_version.name,
+                res["project"]["artifactCollection"]["defaultArtifactType"]["name"],
             ),
         )
         for alias in res["project"]["artifactCollection"]["membership"]["artifact"][
