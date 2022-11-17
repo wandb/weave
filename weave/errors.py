@@ -38,3 +38,7 @@ class WeaveInvalidURIError(Exception):
 
 class WeaveStorageError(Exception):
     pass
+
+
+class WeaveExecutionError(Exception):
+    pass
