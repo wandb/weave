@@ -14,7 +14,6 @@ from . import wandb_domain_gql
 # TODO: move this to ecosystem
 # from .run_segment import RunSegment, run_segment_render
 from ..api import op, weave_class, type as weave_type
-from .. import safe_cache
 from .. import weave_types as types
 from . import wbartifact
 from . import file_wbartifact
@@ -55,70 +54,6 @@ def entity_link(entity: wandb_sdk_weave_0_types.Entity) -> Link:
     return Link(entity._name, f"/{entity._name}")
 
 
-class ProjectType(types._PlainStringNamedType):
-    name = "project"
-    instance_classes = wandb_api.Project
-    instance_class = wandb_api.Project
-
-    def instance_to_dict(self, obj):
-        return {"entity_name": obj.entity, "project_name": obj.name}
-
-    def instance_from_dict(self, d):
-        api = wandb_public_api()
-        return api.project(name=d["project_name"], entity=d["entity_name"])
-
-
-# This is very helpful when deserializing runs which have been
-# serialized. Without caching here, the mappers end up loading
-# the run for every tagged cell in the table!
-@safe_cache.safe_lru_cache(1000)
-def _memoed_get_run(run_uri):
-    import time
-
-    print("%s: RUN INSTANCE FROM DICT" % time.time())
-    api = wandb_public_api()
-    run = api.run(run_uri)
-    print("%s: DONE RUN INSTANCE FROM DICT" % time.time())
-    return run
-
-
-class RunType(types._PlainStringNamedType):
-    name = "run"
-
-    instance_classes = wandb_api.Run
-    instance_class = wandb_api.Run
-
-    def instance_to_dict(self, obj):
-        return {
-            "entity_name": obj._entity,
-            "project_name": obj.project,
-            "run_id": obj.id,
-        }
-
-    def instance_from_dict(self, d):
-        return _memoed_get_run("{entity_name}/{project_name}/{run_id}".format(**d))
-
-
-class ArtifactVersionsType(types.Type):
-    name = "projectArtifactVersions"
-    instance_classes = wandb_api.ArtifactVersions
-    instance_class = wandb_api.ArtifactVersions
-
-    def instance_to_dict(self, obj):
-        return {
-            "entity_name": obj.entity,
-            "project_name": obj.project,
-            "artifact_type_name": obj.type,
-            "artifact_name": obj.collection_name,
-        }
-
-    def instance_from_dict(self, d):
-        api = wandb_public_api()
-        return api.artifact_versions(
-            d["artifact_type_name"],
-            f"{d['entity_name']}/{d['project_name']}/{d['artifact_name']}",
-        )
-
 
 def process_summary_obj(val):
     if isinstance(val, dict) and "_type" in val and val["_type"] == "table-file":
@@ -139,7 +74,7 @@ def refine_summary_type(run: wandb_api.Run) -> types.Type:
     )
 
 
-@weave_class(weave_type=RunType)
+@weave_class(weave_type=wandb_sdk_weave_0_types.RunType)
 class WBRun:
     @op()
     def jobtype(run: wandb_api.Run) -> str:
@@ -166,38 +101,17 @@ class WBRun:
         return run.used_artifacts()
 
 
-@dataclasses.dataclass(frozen=True)
-class RunsType(types.Type):
-    name = "runs"
-
-    instance_classes = wandb_api.Runs
-    instance_class = wandb_api.Runs
-
-    object_type: types.Type = RunType()
-
-    def instance_to_dict(self, obj):
-        return {
-            "entity_name": obj.entity,
-            "project_name": obj.project,
-        }
-
-    def instance_from_dict(self, d):
-        api = wandb_public_api()
-        return api.runs("{entity_name}/{project_name}".format(**d), per_page=500)
-
-    @classmethod
-    def from_dict(cls, d):
-        return cls()
 
 
-@weave_class(weave_type=RunsType)
+
+@weave_class(weave_type=wandb_sdk_weave_0_types.RunsType)
 class RunsOps:
     @op()
     def count(self: wandb_api.Runs) -> int:
         return len(self)
 
     @op(
-        output_type=types.List(RunType()),
+        output_type=types.List(wandb_sdk_weave_0_types.RunType()),
     )
     def limit(self: wandb_api.Runs, limit: int):
         runs: list[wandb_api.Run] = []
@@ -222,7 +136,7 @@ class ArtifactsOps:
         return self[index]
 
 
-@weave_class(weave_type=ArtifactVersionsType)
+@weave_class(weave_type=wandb_sdk_weave_0_types.ArtifactVersionsType)
 class ArtifactVersionsOps:
     @op()
     def count(self: wandb_api.ArtifactVersions) -> int:
@@ -236,26 +150,7 @@ class ArtifactVersionsOps:
         return artifacts_local.WandbArtifact.from_wb_artifact(wb_artifact)
 
 
-class ArtifactTypeType(types._PlainStringNamedType):
-    name = "artifactType"
-    instance_classes = wandb_api.ArtifactType
-    instance_class = wandb_api.ArtifactType
-
-    def instance_to_dict(self, obj):
-        return {
-            "entity_name": obj.entity,
-            "project_name": obj.project,
-            "artifact_type_name": obj.type,
-        }
-
-    def instance_from_dict(self, d):
-        api = wandb_public_api()
-        return api.artifact_type(
-            d["artifact_type_name"], project=f"{d['entity_name']}/{d['project_name']}"
-        )
-
-
-@weave_class(weave_type=ArtifactTypeType)
+@weave_class(weave_type=wandb_sdk_weave_0_types.ArtifactTypeType)
 class ArtifactTypeOps:
     @op(name="artifactType-name")
     def name(artifactType: wandb_api.ArtifactType) -> str:
@@ -267,26 +162,6 @@ class ArtifactTypeOps:
     ) -> wandb_api.ProjectArtifactCollections:
         return artifactType.collections()
 
-
-class ProjectArtifactTypesType(types.Type):
-    name = "projectArtifactTypes"
-
-    instance_classes = wandb_api.ProjectArtifactTypes
-    instance_class = wandb_api.ProjectArtifactTypes
-
-    @property
-    def object_type(self):
-        return RunType()
-
-    def instance_to_dict(self, obj):
-        return {
-            "entity_name": obj.entity,
-            "project_name": obj.project,
-        }
-
-    def instance_from_dict(self, d):
-        api = wandb_public_api()
-        return api.project("{entity_name}/{project_name}".format(**d)).artifacts_types()
 
 
 @weave_class(weave_type=wandb_sdk_weave_0_types.ArtifactCollectionType)
@@ -323,7 +198,7 @@ class ArtifactOps:
         return wandb_domain_gql.artifact_collection_is_portfolio(artifact)
 
 
-@weave_class(weave_type=ProjectType)
+@weave_class(weave_type=wandb_sdk_weave_0_types.ProjectType)
 class Project:
     @op()
     def name(project: wandb_api.Project) -> str:
@@ -402,11 +277,11 @@ def entity(entityName: str) -> wandb_sdk_weave_0_types.Entity:
 
 
 project_tag_getter_op = make_tag_getter_op.make_tag_getter_op(
-    "project", ProjectType(), op_name="tag-project"
+    "project", wandb_sdk_weave_0_types.ProjectType(), op_name="tag-project"
 )
 
 run_tag_getter_op = make_tag_getter_op.make_tag_getter_op(
-    "run", RunType(), op_name="tag-run"
+    "run", wandb_sdk_weave_0_types.RunType(), op_name="tag-run"
 )
 
 
