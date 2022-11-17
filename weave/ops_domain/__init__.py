@@ -5,6 +5,7 @@ import typing
 
 from wandb.apis import public as wandb_api
 
+from . import wandb_sdk_weave_0_types
 from . import wandb_domain_gql
 
 
@@ -102,27 +103,6 @@ class RunType(types._PlainStringNamedType):
 
     def instance_from_dict(self, d):
         return _memoed_get_run("{entity_name}/{project_name}/{run_id}".format(**d))
-
-
-class ArtifactType(types._PlainStringNamedType):
-    name = "artifact"
-    instance_classes = wandb_api.ArtifactCollection
-    instance_class = wandb_api.ArtifactCollection
-
-    def instance_to_dict(self, obj):
-        # TODO: I'm here, trying to serialize/deserialize Artifact
-        return {
-            "entity_name": obj.entity,
-            "project_name": obj.project,
-            "artifact_type_name": obj.type,
-            "artifact_name": obj.name,
-        }
-
-    def instance_from_dict(self, d):
-        api = wandb_public_api()
-        return api.artifact_type(
-            d["artifact_type_name"], project=f"{d['entity_name']}/{d['project_name']}"
-        ).collection(d["artifact_name"])
 
 
 class ArtifactVersionsType(types.Type):
@@ -342,7 +322,7 @@ class ProjectArtifactTypesType(types.Type):
         return api.project("{entity_name}/{project_name}".format(**d)).artifacts_types()
 
 
-@weave_class(weave_type=ArtifactType)
+@weave_class(weave_type=wandb_sdk_weave_0_types.ArtifactCollectionType)
 class ArtifactOps:
     @op(name="artifact-type")
     def type_(artifact: wandb_api.ArtifactCollection) -> wandb_api.ArtifactType:
@@ -469,64 +449,55 @@ run_tag_getter_op = make_tag_getter_op.make_tag_getter_op(
 
 
 # We don't have proper `wandb` SDK classes for these types so we use object types for now
-@weave_type("artifactAlias")
-class ArtifactAlias:
-    _alias: str
 
-    @op(name="artifactAlias-alias")
-    def alias(self) -> str:
-        return self._alias
 
-    @op(name="artifactAlias-artifact")
-    def artifact(self) -> wandb_api.ArtifactCollection:
-        # TODO
-        return None
+@op(name="artifactAlias-alias")
+def alias(alias: wandb_sdk_weave_0_types.ArtifactAlias) -> str:
+    return alias._alias
+
+
+@op(name="artifactAlias-artifact")
+def artifact(
+    alias: wandb_sdk_weave_0_types.ArtifactAlias,
+) -> wandb_api.ArtifactCollection:
+    return alias.artifact_collection
 
 
 @op(name="project-artifact")
-def project_artifact(
+def root_project_artifact(
     project: wandb_api.Project, artifactName: str
 ) -> wandb_api.ArtifactCollection:
-    return project_artifact(project, artifactName)
-
-
-@weave_type("artifactMembership")
-class ArtifactCollectionMembership:
-    artifactCollection: wandb_api.ArtifactCollection
-    aliasName: str
+    return wandb_domain_gql.project_artifact(project, artifactName)
 
 
 @op(name="artifactMembership-versionIndex")
 def artifact_membership_version_index(
-    artifactMembership: ArtifactCollectionMembership,
+    artifactMembership: wandb_sdk_weave_0_types.ArtifactCollectionMembership,
 ) -> int:
-    # TODO: needs to be patched with custom query.
-    return 0
+    return artifactMembership.version_index
 
 
 @op(name="artifactMembership-aliases")
 def artifact_membership_aliases(
-    artifactMembership: ArtifactCollectionMembership,
-) -> list[ArtifactAlias]:
+    artifactMembership: wandb_sdk_weave_0_types.ArtifactCollectionMembership,
+) -> list[wandb_sdk_weave_0_types.ArtifactAlias]:
     # TODO: Need a query
     return []
 
 
 @op(name="artifactMembership-collection")
 def artifact_membership_collection(
-    artifactMembership: ArtifactCollectionMembership,
+    artifactMembership: wandb_sdk_weave_0_types.ArtifactCollectionMembership,
 ) -> wandb_api.ArtifactCollection:
-    # TODO: Need a query
-    return None
+    return artifactMembership.artifact_collection
 
 
 @op(name="artifact-memberships")
 def artifact_memberships(
     artifact: wandb_api.ArtifactCollection,
-) -> list[ArtifactCollectionMembership]:
-    # TODO: THIS IS WRONG AND DOES NOT HANDLE PORTFOLIOS CORRECTLY
+) -> list[wandb_sdk_weave_0_types.ArtifactCollectionMembership]:
     return [
-        ArtifactCollectionMembership(artifact, f"v{v._version_index}")
+        wandb_domain_gql.artifact_collection_membership_for_alias(artifact, v.digest)
         for v in artifact.versions()
     ]
 
@@ -534,31 +505,30 @@ def artifact_memberships(
 @op(name="artifact-membershipForAlias")
 def artifact_membership_for_alias(
     artifact: wandb_api.ArtifactCollection, aliasName: str
-) -> ArtifactCollectionMembership:
-    return ArtifactCollectionMembership(
-        artifactCollection=artifact, aliasName=aliasName
+) -> wandb_sdk_weave_0_types.ArtifactCollectionMembership:
+    return wandb_domain_gql.artifact_collection_membership_for_alias(
+        artifact, aliasName
     )
 
 
 @op(name="artifact-lastMembership")
 def artifact_last_membership(
     artifact: wandb_api.ArtifactCollection,
-) -> ArtifactCollectionMembership:
-    # TODO: needs to be patched with custom query.
-    return ArtifactCollectionMembership(artifact, "latest")
+) -> wandb_sdk_weave_0_types.ArtifactCollectionMembership:
+    return wandb_domain_gql.artifact_collection_membership_for_alias(artifact, "latest")
 
 
 @op(name="artifactMembership-artifactVersion")
 def artifact_membership_version(
-    artifactMembership: ArtifactCollectionMembership,
+    artifactMembership: wandb_sdk_weave_0_types.ArtifactCollectionMembership,
 ) -> artifacts_local.WandbArtifact:
     wb_artifact = wandb_public_api().artifact(
         "%s/%s/%s:%s"
         % (
-            artifactMembership.artifactCollection.entity,
-            artifactMembership.artifactCollection.project,
-            artifactMembership.artifactCollection.name,
-            artifactMembership.aliasName,
+            artifactMembership.artifact_collection.entity,
+            artifactMembership.artifact_collection.project,
+            artifactMembership.artifact_collection.name,
+            artifactMembership.commit_hash,
         )
     )
     return artifacts_local.WandbArtifact.from_wb_artifact(wb_artifact)
@@ -581,7 +551,9 @@ def artifact_version_is_weave_object(
 
 
 @op(name="artifact-aliases")
-def artifact_aliases(artifact: wandb_api.ArtifactCollection) -> list[ArtifactAlias]:
+def artifact_aliases(
+    artifact: wandb_api.ArtifactCollection,
+) -> list[wandb_sdk_weave_0_types.ArtifactAlias]:
     # TODO
     return []
 
@@ -589,7 +561,7 @@ def artifact_aliases(artifact: wandb_api.ArtifactCollection) -> list[ArtifactAli
 @op(name="artifactVersion-aliases")
 def artifact_version_aliases(
     artifactVersion: artifacts_local.WandbArtifact,
-) -> list[ArtifactAlias]:
+) -> list[wandb_sdk_weave_0_types.ArtifactAlias]:
     # TODO
     return []
 
@@ -605,7 +577,7 @@ def artifact_version_size(
 @op(name="artifactVersion-memberships")
 def artifact_version_memberships(
     artifactVersion: artifacts_local.WandbArtifact,
-) -> list[ArtifactCollectionMembership]:
+) -> list[wandb_sdk_weave_0_types.ArtifactCollectionMembership]:
     # TODO
     return []
 

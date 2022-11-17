@@ -1,5 +1,7 @@
 from wandb.apis import public as wandb_api
 
+from . import wandb_sdk_weave_0_types
+
 from ..wandb_api import wandb_public_api
 
 
@@ -8,54 +10,6 @@ def _query(query_str, variables={}):
         wandb_api.gql(query_str),
         variable_values=variables,
     )
-
-
-def client_art_id_to_version_parts(art_id: str, art_version: str):
-    res = _query(
-        """	
-        query ArtifactVersion(	
-            $id: ID!,	
-            $aliasName: String!	
-        ) {	
-            artifactCollection(id: $id) {	
-                id	
-                name	
-                project {	
-                    id	
-                    name	
-                    entity {	
-                        id	
-                        name	
-                    }	
-                }	
-                artifactMembership(aliasName: $aliasName) {	
-                    id	
-                    versionIndex	
-                }	
-                defaultArtifactType {	
-                    id	
-                    name	
-                }	
-            }	
-        }	
-        """,
-        {
-            "id": art_id,
-            "aliasName": art_version,
-        },
-    )
-    entity_name = res["artifactCollection"]["project"]["entity"]["name"]
-    project_name = res["artifactCollection"]["project"]["name"]
-    artifact_type_name = res["artifactCollection"]["defaultArtifactType"]["name"]
-    artifact_name = res["artifactCollection"]["name"]
-    version_index = res["artifactCollection"]["artifactMembership"]["versionIndex"]
-    return {
-        "entity_name": entity_name,
-        "project_name": project_name,
-        "artifact_type_name": artifact_type_name,
-        "artifact_name": artifact_name,
-        "version_index": version_index,
-    }
 
 
 def artifact_collection_is_portfolio(artifact_collection: wandb_api.ArtifactCollection):
@@ -83,16 +37,12 @@ def project_artifact(
     res = _query(
         """	
         query ProjectArtifact(	
-            $projectName: ID!,	
+            $projectName: String!,	
             $entityName: String!,
             $artifactName: String!,	
         ) {	
-            project(name: $projectName, entityName: $entityName {	
-                id	
-                entity {
-                    id
-                    name
-                }
+            project(name: $projectName, entityName: $entityName) {	
+                id
                 artifactCollection(name: $artifactName) {	
                     id
                     defaultArtifactType {	
@@ -104,17 +54,46 @@ def project_artifact(
         }	
         """,
         {
-            "id": project.id,
+            "projectName": project.name,
+            "entityName": project.entity,
             "artifactName": artifactName,
         },
     )
     return wandb_api.ArtifactCollection(
         wandb_public_api().client,
-        res["project"]["entity"]["name"],
-        res["project"]["name"],
+        project.entity,
+        project.name,
         artifactName,
-        res["project"]["defaultArtifactType"]["name"],
+        res["project"]["artifactCollection"]["defaultArtifactType"]["name"],
     )
 
 
-# def artifact_membership_version_index()
+def artifact_collection_membership_for_alias(
+    artifact_collection: wandb_api.ArtifactCollection, identifier: str
+) -> wandb_sdk_weave_0_types.ArtifactCollectionMembership:
+    res = _query(
+        """	
+        query ArtifactCollectionMembershipForAlias(	
+            $id: ID!,	
+            $identifier: String!,	
+        ) {	
+            artifactCollection(id: $id) {	
+                id	
+                artifactMembership(aliasName: $identifier) {
+                    id
+                    versionIndex
+                    commitHash
+                }   
+            }	
+        }
+        """,
+        {
+            "id": artifact_collection.id,
+            "identifier": identifier,
+        },
+    )
+    return wandb_sdk_weave_0_types.ArtifactCollectionMembership(
+        artifact_collection=artifact_collection,
+        commit_hash=res["artifactCollection"]["artifactMembership"]["commitHash"],
+        version_index=res["artifactCollection"]["artifactMembership"]["versionIndex"],
+    )
