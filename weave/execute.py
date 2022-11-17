@@ -122,8 +122,11 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
                 ):
                     report = execute_forward_node(fg, forward_node, no_cache=no_cache)
             except:
+                import traceback
+
                 logging.error(
-                    "Exception during execution of: %s" % str(forward_node.node)
+                    "Exception during execution of: %s\n%s"
+                    % (str(forward_node.node), traceback.format_exc())
                 )
                 raise
             finally:
