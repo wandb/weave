@@ -13,10 +13,14 @@ def should_tag_op_def_outputs(op_def: "OpDef.OpDef") -> bool:
     named_args = op_def.input_type.named_args()
     return (
         should_flow_tags(op_def)
-        # NOTICE: For now, we only autotag with sublcasses of ObjectType
+        # NOTICE: For now, we only autotag with sublcasses of ObjectType that
+        # are named Test*, plus ProjectType and RunType.
         # Uncomment this during advanced testing to ensure tags work in the general cases
         and (
-            isinstance(named_args[0].type, types.ObjectType)
+            (
+                isinstance(named_args[0].type, types.ObjectType)
+                and named_args[0].type.name.startswith("Test")
+            )
             or named_args[0].type.__class__.__name__ in ["ProjectType", "RunType"]
         )
     )

@@ -13,6 +13,7 @@ from . import op_args
 from . import dispatch
 from . import pyfunc_type_util
 from . import language_autocall
+from . import engine_trace
 
 
 def _make_output_node(
@@ -37,7 +38,9 @@ def _make_output_node(
         # underlying implementation. So, we drop down a level and manually call
         # the underlying implementation.
         called_refine_output_type = refine_output_type.call_fn(**bound_params)
-        output_type = api.use(called_refine_output_type)
+        tracer = engine_trace.tracer()
+        with tracer.trace("refine.%s" % fq_op_name):
+            output_type = api.use(called_refine_output_type)
     elif callable(output_type):
         new_input_type = {}
         for k, n in bound_params.items():

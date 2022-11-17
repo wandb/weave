@@ -1,9 +1,30 @@
 import os
 
 
+# Thanks co-pilot!
+class DummySpan:
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args, **kwargs):
+        pass
+
+    def set_tag(self, *args, **kwargs):
+        pass
+
+    def set_meta(self, *args, **kwargs):
+        pass
+
+    def finish(self, *args, **kwargs):
+        pass
+
+
 class DummyTrace:
     def trace(self, *args, **kwargs):
-        return None
+        return DummySpan()
 
 
 def tracer():
