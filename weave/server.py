@@ -27,20 +27,20 @@ from . import graph_debug
 
 
 # A function to monkeypatch the request post method
-def patch_request_post():
-    r_post = requests.post
+# def patch_request_post():
+#     r_post = requests.post
 
-    logging.info = lambda *args, **kwargs: None
-    logging.warn = lambda *args, **kwargs: None
-    logging.debug = lambda *args, **kwargs: None
+#     logging.info = lambda *args, **kwargs: None
+#     logging.warn = lambda *args, **kwargs: None
+#     logging.debug = lambda *args, **kwargs: None
 
-    def post(*args, **kwargs):
-        logging.critical(kwargs["json"]["query"].split(' ')[1])
-        return r_post(*args, **kwargs)
+#     def post(*args, **kwargs):
+#         logging.critical(kwargs["json"]["query"].split(' ')[1])
+#         return r_post(*args, **kwargs)
 
-    requests.post = post
+#     requests.post = post
 
-patch_request_post()
+# patch_request_post()
 
 PROFILE = False
 
