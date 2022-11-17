@@ -4,9 +4,6 @@ import pathlib
 import sys
 from pythonjsonlogger import jsonlogger
 
-import ddtrace
-
-ddtrace.patch(logging=True)
 
 from flask import Flask, Blueprint
 from flask import request
@@ -21,6 +18,16 @@ from weave import context_state
 from weave import weavejs_fixes
 from weave import automation
 from weave import util
+from weave import engine_trace
+
+tracer = engine_trace.tracer()
+if engine_trace.datadog_is_enabled():
+    # Don't import this if you don't have an Agent! You'll get weird
+    # crashes
+    import ddtrace
+
+    ddtrace.patch(logging=True)
+
 
 from flask.logging import wsgi_errors_stream
 
@@ -137,7 +144,7 @@ def recursively_unwrap_unions(obj):
 def execute():
     """Execute endpoint used by WeaveJS."""
 
-    current_span = ddtrace.tracer.current_span()
+    current_span = tracer.current_span()
     if current_span and (
         os.getenv("WEAVE_SERVER_DD_LOG_REQUEST_BODY_JSON")
         or request.headers.get("weave-dd-log-request-body-json")

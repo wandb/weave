@@ -26,6 +26,9 @@ class DummyTrace:
     def trace(self, *args, **kwargs):
         return DummySpan()
 
+    def current_span(self):
+        return None
+
 
 def tracer():
     if os.getenv("DD_ENV"):
@@ -34,3 +37,7 @@ def tracer():
         return ddtrace_tracer
     else:
         return DummyTrace()
+
+
+def datadog_is_enabled():
+    return os.getenv("DD_ENV")
