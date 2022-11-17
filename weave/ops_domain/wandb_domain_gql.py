@@ -1,7 +1,6 @@
 import typing
 from wandb.apis import public as wandb_api
 
-from . import wandb_sdk_weave_0_types
 
 from ..wandb_api import wandb_public_api
 
@@ -34,9 +33,7 @@ def artifact_collection_is_portfolio(
     return res["artifactCollection"]["__typename"] == "ArtifactPortfolio"
 
 
-def entity_portfolios(
-    entity: wandb_sdk_weave_0_types.Entity,
-) -> list[wandb_api.ArtifactCollection]:
+def entity_portfolios(entity_name: str) -> list[str]:
     # TODO: WANDB SDK needs to support portfolios, not just sequences (well, actually we just need to write our own class layer)
     return []
     # The below query is what we will want in the long run:
@@ -124,6 +121,37 @@ def project_artifact(
     )
 
 
+def project_artifact_collection_type(
+    entity_name: str, project_name: str, artifact_collection_name: str
+) -> str:
+    res = _query(
+        """	
+        query project_artifact_collection_type(	
+            $projectName: String!,	
+            $entityName: String!,
+            $artifactCollectionName: String!,	
+        ) {	
+            project(name: $projectName, entityName: $entityName) {	
+                id
+                artifactCollection(name: $artifactName) {	
+                    id
+                    defaultArtifactType {	
+                        id	
+                        name	
+                    }	
+                }	
+            }	
+        }	
+        """,
+        {
+            "projectName": project_name,
+            "entityName": entity_name,
+            "artifactCollectionName": artifact_collection_name,
+        },
+    )
+    return res["project"]["artifactCollection"]["defaultArtifactType"]["name"]
+
+
 def artifact_collection_membership_for_alias(
     artifact_collection: wandb_api.ArtifactCollection, identifier: str
 ) -> wandb_sdk_weave_0_types.ArtifactCollectionMembership:
@@ -157,7 +185,7 @@ def artifact_collection_membership_for_alias(
 
 def artifact_membership_aliases(
     artifact_collection_membership: wandb_sdk_weave_0_types.ArtifactCollectionMembership,
-) -> list[wandb_sdk_weave_0_types.ArtifactAlias]:
+) -> list[str]:
     res = _query(
         """	
         query ArtifactCollectionMembershipAliases(	
