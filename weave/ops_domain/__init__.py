@@ -5,6 +5,8 @@ import typing
 
 from wandb.apis import public as wandb_api
 
+from . import wandb_domain_gql
+
 
 # Can't import this here, since it relies on panels. It needs
 # to go in ecosystem.
@@ -310,10 +312,6 @@ class ArtifactTypeType(types._PlainStringNamedType):
 class ArtifactTypeOps:
     @op(name="artifactType-name")
     def name(artifactType: wandb_api.ArtifactType) -> str:
-        # Hacking to support mapped call here. WeaveJS autosuggest uses it
-        # TODO: True mapped call support
-        if isinstance(artifactType, wandb_api.ProjectArtifactTypes):
-            return [at.name for at in artifactType]  # type: ignore
         return artifactType.type
 
     @op(name="artifactType-artifacts")
@@ -377,14 +375,12 @@ class ArtifactOps:
 
     @op(name="artifact-isPortfolio")
     def is_portfolio(artifact: wandb_api.ArtifactCollection) -> bool:
-        # TODO: needs to be patched with custom query.
-        return False
+        return wandb_domain_gql.artifact_collection_is_portfolio(artifact)
 
 
 @weave_class(weave_type=ProjectType)
 class Project:
     @op()
-    # @staticmethod  # TODO: doesn't work
     def name(project: wandb_api.Project) -> str:
         return project.name
 
@@ -491,14 +487,7 @@ class ArtifactAlias:
 def project_artifact(
     project: wandb_api.Project, artifactName: str
 ) -> wandb_api.ArtifactCollection:
-    # TODO: needs to be patched with custom query (to get type)
-    return wandb_api.ArtifactCollection(
-        wandb_public_api().client,
-        project.entity,
-        project.name,
-        artifactName,
-        "run_table",
-    )
+    return project_artifact(project, artifactName)
 
 
 @weave_type("artifactMembership")

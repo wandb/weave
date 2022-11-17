@@ -9,6 +9,8 @@ import pathlib
 import tempfile
 import typing
 
+from .ops_domain.wandb_domain_gql import client_art_id_to_version_parts
+
 from . import uris
 from . import util
 from . import errors
@@ -53,56 +55,15 @@ def get_wandb_read_artifact(path):
 
 @safe_cache.safe_lru_cache(1000)
 def get_wandb_read_client_artifact(art_id: str, art_version: str):
-    query = wb_public.gql(
-        """	
-    query ArtifactVersion(	
-        $id: ID!,	
-        $aliasName: String!	
-    ) {	
-        artifactCollection(id: $id) {	
-            id	
-            name	
-            project {	
-                id	
-                name	
-                entity {	
-                    id	
-                    name	
-                }	
-            }	
-            artifactMembership(aliasName: $aliasName) {	
-                id	
-                versionIndex	
-            }	
-            defaultArtifactType {	
-                id	
-                name	
-            }	
-        }	
-    }	
-    """
-    )
-    res = wandb_api.wandb_public_api().client.execute(
-        query,
-        variable_values={
-            "id": art_id,
-            "aliasName": art_version,
-        },
-    )
-    entity_name = res["artifactCollection"]["project"]["entity"]["name"]
-    project_name = res["artifactCollection"]["project"]["name"]
-    artifact_type_name = res["artifactCollection"]["defaultArtifactType"]["name"]
-    artifact_name = res["artifactCollection"]["name"]
-    version_index = res["artifactCollection"]["artifactMembership"]["versionIndex"]
-    version = f"v{version_index}"
+    res = client_art_id_to_version_parts(art_id, art_version)
 
     weave_art_uri = uris.WeaveWBArtifactURI.from_parts(
-        entity_name,
-        project_name,
-        artifact_name,
-        version,
+        res["entity_name"],
+        res["project_name"],
+        res["artifact_name"],
+        f"v{res['version_index']}",
     )
-    return WandbArtifact(artifact_name, artifact_type_name, weave_art_uri)
+    return WandbArtifact(res["artifact_name"], res["artifact_type_name"], weave_art_uri)
 
 
 def wandb_artifact_dir():
