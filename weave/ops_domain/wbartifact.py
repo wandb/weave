@@ -76,7 +76,7 @@ class ArtifactVersion:
 
     @op(name="artifactVersion-files")
     def files(artifactVersion: artifacts_local.WandbArtifact) -> list[file_wbartifact.ArtifactVersionFile]:  # type: ignore
-        # TODO
+        # TODO: What is the correct data model here? - def don't want to go download everything
         return []
 
     @op(

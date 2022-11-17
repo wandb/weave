@@ -554,19 +554,21 @@ def artifact_version_aliases(
 
 
 @op(name="artifactVersion-artifactCollections")
-def artifact_version_size(
+def artifact_version_artifact_collections(
     artifactVersion: artifacts_local.WandbArtifact,
 ) -> list[wandb_api.ArtifactCollection]:
-    # TODO
-    return []
+    return wandb_domain_gql.artifact_version_artifact_collections(
+        artifactVersion._saved_artifact
+    )
 
 
 @op(name="artifactVersion-memberships")
 def artifact_version_memberships(
     artifactVersion: artifacts_local.WandbArtifact,
 ) -> list[wandb_sdk_weave_0_types.ArtifactCollectionMembership]:
-    # TODO
-    return []
+    return wandb_domain_gql.artifact_version_memberships(
+        artifactVersion._saved_artifact
+    )
 
 
 @op(name="artifactVersion-createdByUser")

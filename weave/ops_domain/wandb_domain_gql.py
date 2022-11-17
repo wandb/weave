@@ -278,3 +278,152 @@ def artifact_version_created_by(
         "createdBy"
     ]["name"]
     return wandb_public_api().run(f"{entity_name}/{project_name}/{run_name}")
+
+
+def artifact_version_artifact_collections(
+    artifact_version: wandb_api.Artifact,
+) -> list[wandb_api.ArtifactCollection]:
+    res = _query(
+        """	
+        query ArtifactVersionCreatedBy(	
+            $entityName: String!,	
+            $projectName: String!,	
+            $artifactCollectionName: String!,	
+            $digest: String!,
+        ) {	
+            project(name: $projectName, entityName: $entityName) {
+                id
+                artifactCollection(name: $artifactCollectionName) {	
+                    id	
+                    artifactMembership(aliasName: $digest) {
+                        id
+                        artifact {
+                            artifactMemberships {
+                                edges {
+                                    node {
+                                        id
+                                        artifactCollection {
+                                            id
+                                            name
+                                            defaultArtifactType {
+                                                id
+                                                name
+                                            }
+                                            project {
+                                                id
+                                                name {
+                                                    entity {
+                                                        id
+                                                        name
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }   
+                }	
+            }
+        }
+        """,
+        {
+            "entityName": artifact_version.entity,
+            "projectName": artifact_version.project,
+            "artifactCollectionName": artifact_version.name.split(":")[0],
+            "digest": artifact_version.digest,
+        },
+    )
+
+    membershipEdges = res["project"]["artifactCollection"]["artifactMembership"][
+        "artifact"
+    ]["memberships"]["edges"]
+
+    return [
+        wandb_api.ArtifactCollection(
+            wandb_public_api().client,
+            memEdge["node"]["artifactCollection"]["project"]["entity"]["name"],
+            memEdge["node"]["artifactCollection"]["project"]["name"],
+            memEdge["node"]["artifactCollection"]["name"],
+            memEdge["node"]["artifactCollection"]["defaultArtifactType"]["name"],
+        )
+        for memEdge in membershipEdges
+    ]
+
+
+def artifact_version_memberships(
+    artifact_version: wandb_api.Artifact,
+) -> list[wandb_api.ArtifactCollection]:
+    res = _query(
+        """	
+        query ArtifactVersionCreatedBy(	
+            $entityName: String!,	
+            $projectName: String!,	
+            $artifactCollectionName: String!,	
+            $digest: String!,
+        ) {	
+            project(name: $projectName, entityName: $entityName) {
+                id
+                artifactCollection(name: $artifactCollectionName) {	
+                    id	
+                    artifactMembership(aliasName: $digest) {
+                        id
+                        artifact {
+                            artifactMemberships {
+                                edges {
+                                    node {
+                                        id
+                                        versionIndex
+                                        commitHash
+                                        artifactCollection {
+                                            id
+                                            name
+                                            defaultArtifactType {
+                                                id
+                                                name
+                                            }
+                                            project {
+                                                id
+                                                name {
+                                                    entity {
+                                                        id
+                                                        name
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }   
+                }	
+            }
+        }
+        """,
+        {
+            "entityName": artifact_version.entity,
+            "projectName": artifact_version.project,
+            "artifactCollectionName": artifact_version.name.split(":")[0],
+            "digest": artifact_version.digest,
+        },
+    )
+
+    membershipEdges = res["project"]["artifactCollection"]["artifactMembership"][
+        "artifact"
+    ]["memberships"]["edges"]
+    return [
+        wandb_sdk_weave_0_types.ArtifactCollectionMembership(
+            wandb_api.ArtifactCollection(
+                wandb_public_api().client,
+                memEdge["node"]["artifactCollection"]["project"]["entity"]["name"],
+                memEdge["node"]["artifactCollection"]["project"]["name"],
+                memEdge["node"]["artifactCollection"]["name"],
+                memEdge["node"]["artifactCollection"]["defaultArtifactType"]["name"],
+            ),
+            memEdge["node"]["commitHash"],
+            memEdge["node"]["versionIndex"],
+        )
+        for memEdge in membershipEdges
+    ]
