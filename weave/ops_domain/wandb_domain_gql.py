@@ -311,11 +311,10 @@ def artifact_version_artifact_collections(
                                             }
                                             project {
                                                 id
-                                                name {
-                                                    entity {
-                                                        id
-                                                        name
-                                                    }
+                                                name 
+                                                entity {
+                                                    id
+                                                    name
                                                 }
                                             }
                                         }
@@ -338,7 +337,7 @@ def artifact_version_artifact_collections(
 
     membershipEdges = res["project"]["artifactCollection"]["artifactMembership"][
         "artifact"
-    ]["memberships"]["edges"]
+    ]["artifactMemberships"]["edges"]
 
     return [
         wandb_api.ArtifactCollection(
@@ -385,11 +384,10 @@ def artifact_version_memberships(
                                             }
                                             project {
                                                 id
-                                                name {
-                                                    entity {
-                                                        id
-                                                        name
-                                                    }
+                                                name 
+                                                entity {
+                                                    id
+                                                    name
                                                 }
                                             }
                                         }
@@ -412,7 +410,7 @@ def artifact_version_memberships(
 
     membershipEdges = res["project"]["artifactCollection"]["artifactMembership"][
         "artifact"
-    ]["memberships"]["edges"]
+    ]["artifactMemberships"]["edges"]
     return [
         wandb_sdk_weave_0_types.ArtifactCollectionMembership(
             wandb_api.ArtifactCollection(
