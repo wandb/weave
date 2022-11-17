@@ -415,12 +415,12 @@ class Project:
 
 
 @op(name="root-project")
-def root_project(entityName: str, projectName: str) -> wandb_api.Project:
+def project(entityName: str, projectName: str) -> wandb_api.Project:
     return wandb_public_api().project(name=projectName, entity=entityName)
 
 
 @op(name="root-entity")
-def root_entity(entityName: str) -> wandb_sdk_weave_0_types.Entity:
+def entity(entityName: str) -> wandb_sdk_weave_0_types.Entity:
     return wandb_sdk_weave_0_types.Entity(entityName)
 
 
@@ -446,7 +446,7 @@ def artifact(
 
 
 @op(name="project-artifact")
-def root_project_artifact(
+def project_artifact(
     project: wandb_api.Project, artifactName: str
 ) -> wandb_api.ArtifactCollection:
     return wandb_domain_gql.project_artifact(project, artifactName)
