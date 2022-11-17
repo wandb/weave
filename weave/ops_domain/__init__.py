@@ -31,7 +31,8 @@ class OrgType(types._PlainStringNamedType):
 
 @weave_type("link")
 class Link:
-    pass
+    name: str
+    url: str
 
 
 @weave_type("date")
@@ -44,7 +45,7 @@ class User:
     @op(name="user-link")
     def link(self) -> Link:
         # TODO
-        return Link()
+        return Link("", "")
 
 
 @weave_type("entity")
@@ -53,12 +54,11 @@ class Entity:
 
     @op(name="entity-name")
     def name(self) -> str:
-        return self.name
+        return self._name
 
     @op(name="entity-link")
     def link(self) -> Link:
-        # TODO
-        return Link()
+        return Link(self._name, f"/{self._name}")
 
 
 class ProjectType(types._PlainStringNamedType):
@@ -111,7 +111,6 @@ class ArtifactVersionsType(types.Type):
     instance_class = wandb_api.ArtifactVersions
 
     def instance_to_dict(self, obj):
-        # TODO: I'm here, trying to serialize/deserialize Artifact
         return {
             "entity_name": obj.entity,
             "project_name": obj.project,
@@ -149,7 +148,6 @@ def refine_summary_type(run: wandb_api.Run) -> types.Type:
 @weave_class(weave_type=RunType)
 class WBRun:
     @op()
-    # @staticmethod  # TODO: doesn't work
     def jobtype(run: wandb_api.Run) -> str:
         return run.jobType
 
@@ -159,8 +157,7 @@ class WBRun:
 
     @op(name="run-link")
     def link(run: wandb_api.Run) -> Link:
-        # TODO
-        return Link()
+        return Link(run.display_name, f"/{run.entity}/{run.project}/runs/{run.name}")
 
     @op()
     def id(run: wandb_api.Run) -> str:
@@ -274,7 +271,6 @@ class ArtifactTypeType(types._PlainStringNamedType):
     instance_class = wandb_api.ArtifactType
 
     def instance_to_dict(self, obj):
-        # TODO: I'm here, trying to serialize/deserialize Artifact
         return {
             "entity_name": obj.entity,
             "project_name": obj.project,
@@ -331,8 +327,6 @@ class ArtifactOps:
             artifact.type, project=f"{artifact.entity}/{artifact.project}"
         )
 
-    # :( Since we mixin with nodes (include VarNode), name collides.
-    # TODO: Fix this is no good.
     @op(name="artifact-name")
     def name_(artifact: wandb_api.ArtifactCollection) -> str:
         return artifact.name
@@ -366,8 +360,7 @@ class Project:
 
     @op(name="project-link")
     def link(self) -> Link:
-        # TODO
-        return Link()
+        return Link(self.name, f"{self.entity}/{self.name}")
 
     @op(name="project-entity")
     def entity(project: wandb_api.Project) -> Entity:
@@ -620,5 +613,5 @@ def artifact_project(artifact: wandb_api.ArtifactCollection) -> wandb_api.Projec
 
 @op(name="none-coalesce")
 def none_coalesce(a: typing.Any, b: typing.Any) -> typing.Any:
-    # TODO:
+    # TODO: This logic is really complicated in Weavae0.
     return a or b
