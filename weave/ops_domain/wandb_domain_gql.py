@@ -1,7 +1,5 @@
 from wandb.apis import public as wandb_api
 
-from . import artifacts_local
-
 from . import wandb_sdk_weave_0_types
 
 from ..wandb_api import wandb_public_api
@@ -170,7 +168,7 @@ def artifact_collection_aliases(
 
 
 def artifact_version_aliases(
-    artifact_version: artifacts_local.WandbArtifact,
+    artifact_version: wandb_api.Artifact,
 ) -> list[wandb_sdk_weave_0_types.ArtifactAlias]:
     res = _query(
         """	
@@ -198,10 +196,10 @@ def artifact_version_aliases(
         }
         """,
         {
-            "entityName": artifact_version._saved_artifact.entity,
-            "projectName": artifact_version._saved_artifact.project,
-            "artifactCollectionName": artifact_version._saved_artifact.name,
-            "digest": artifact_version._saved_artifact.digest,
+            "entityName": artifact_version.entity,
+            "projectName": artifact_version.project,
+            "artifactCollectionName": artifact_version.name,
+            "digest": artifact_version.digest,
         },
     )
     return [
@@ -209,9 +207,9 @@ def artifact_version_aliases(
             alias["alias"],
             wandb_api.ArtifactCollection(
                 wandb_public_api().client,
-                artifact_version._saved_artifact.entity,
-                artifact_version._saved_artifact.project,
-                artifact_version._saved_artifact.name,
+                artifact_version.entity,
+                artifact_version.project,
+                artifact_version.name,
             ),
         )
         for alias in res["project"]["artifactCollection"]["membership"]["artifact"][
@@ -221,7 +219,7 @@ def artifact_version_aliases(
 
 
 def artifact_version_created_by(
-    artifact_version: artifacts_local.WandbArtifact,
+    artifact_version: wandb_api.Artifact,
 ) -> wandb_api.Run:
     res = _query(
         """	
@@ -256,8 +254,8 @@ def artifact_version_created_by(
         }
         """,
         {
-            "id": artifact_version._saved_artifact.name,
-            "commit_hash": artifact_version._saved_artifact.commit_hash,
+            "id": artifact_version.name,
+            "commit_hash": artifact_version.commit_hash,
         },
     )
     entity_name = res["artifactCollection"]["artifactMembership"]["artifact"][
