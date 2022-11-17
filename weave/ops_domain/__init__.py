@@ -481,8 +481,7 @@ def artifact_membership_version_index(
 def artifact_membership_aliases(
     artifactMembership: wandb_sdk_weave_0_types.ArtifactCollectionMembership,
 ) -> list[wandb_sdk_weave_0_types.ArtifactAlias]:
-    # TODO: Need a query
-    return []
+    return wandb_domain_gql.artifact_membership_aliases(artifactMembership)
 
 
 @op(name="artifactMembership-collection")

@@ -97,3 +97,37 @@ def artifact_collection_membership_for_alias(
         commit_hash=res["artifactCollection"]["artifactMembership"]["commitHash"],
         version_index=res["artifactCollection"]["artifactMembership"]["versionIndex"],
     )
+
+
+def artifact_membership_aliases(
+    artifact_collection_membership: wandb_sdk_weave_0_types.ArtifactCollectionMembership,
+) -> list[wandb_sdk_weave_0_types.ArtifactAlias]:
+    res = _query(
+        """	
+        query ArtifactCollectionAliases(	
+            $id: ID!,	
+            $identifier: String!,	
+        ) {	
+            artifactCollection(id: $id) {	
+                id	
+                artifactMembership(aliasName: $identifier) {
+                    id
+                    aliases {
+                        id
+                        alias
+                    }
+                }   
+            }	
+        }
+        """,
+        {
+            "id": artifact_collection_membership.artifact_collection.id,
+            "identifier": artifact_collection_membership.commit_hash,
+        },
+    )
+    return [
+        wandb_sdk_weave_0_types.ArtifactAlias(
+            alias["alias"], artifact_collection_membership.artifact_collection
+        )
+        for alias in res["artifactCollection"]["artifactMembership"]["aliases"]
+    ]
