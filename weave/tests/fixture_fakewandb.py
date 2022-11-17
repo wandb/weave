@@ -73,7 +73,42 @@ class FakeArtifactType:
     collections = mock.Mock(return_value=FakeArtifacts())
 
 
+class FakeClient:
+    def execute(self, gql, variable_values):
+        if gql.definitions[0].operation == "query":
+            if (
+                gql.definitions[0].name.value == "ProjectArtifact"
+            ):  # this is for wandb_domain.gql.py::project_artifact
+                return {
+                    "project": {
+                        "artifactCollection": {
+                            "defaultArtifactType": {"name": "test_type"}
+                        }
+                    }
+                }
+            elif (
+                gql.definitions[0].name.value == "ArtifactCollectionMembershipForAlias"
+            ):  # this is for wandb_domain.gql.py::artifact_collection_membership_for_alias
+                return {
+                    "artifactCollection": {
+                        "artifactMembership": {
+                            "commitHash": "xyz",
+                            "versionIndex": "0",
+                        }
+                    }
+                }
+            elif (
+                gql.definitions[0].name.value == "ArtifactCollection"
+            ):  # this is for public.py::ArtifactCollection.load
+                return {"project": {"artifactType": {"artifactSequence": {"id": 1001}}}}
+
+        raise Exception(
+            "Query was not mocked - please fill out in fixture_fakewandb.py"
+        )
+
+
 class FakeApi:
+    client = FakeClient()
     project = mock.Mock(return_value=FakeProject())
     artifact_type = mock.Mock(return_value=FakeArtifactType())
     artifact = mock.Mock(return_value=FakeVersion())

@@ -37,42 +37,44 @@ def artifact_collection_is_portfolio(
 def entity_portfolios(
     entity: wandb_sdk_weave_0_types.Entity,
 ) -> list[wandb_api.ArtifactCollection]:
-    res = _query(
-        """	
-        query EntityPortfolios(	
-            $entityName: String!,	
-        ) {	
-            entity(name: $entityName) {	
-                id	
-                artifactCollections(collectionTypes: [PORTFOLIO]) {
-                    edges {
-                        node {
-                            id
-                            name
-                            defaultArtifactType {
-                                id
-                                name
-                            }
-                            project {
-                                id
-                                name
-                                entity {
-                                    id
-                                    name
-                                }
-                            }
-                        }
-                    }
-                }
-            }	
-        }	
-        """,
-        {"entityName": entity._name},
-    )
-
-    portNodes = res["entity"]["artifactCollections"]["edges"]
-    # TODO: WANDB SDK needs to support portfolios, not just sequences
+    # TODO: WANDB SDK needs to support portfolios, not just sequences (well, actually we just need to write our own class layer)
     return []
+    # The below query is what we will want in the long run:
+    # res = _query(
+    #     """
+    #     query EntityPortfolios(
+    #         $entityName: String!,
+    #     ) {
+    #         entity(name: $entityName) {
+    #             id
+    #             artifactCollections(collectionTypes: [PORTFOLIO]) {
+    #                 edges {
+    #                     node {
+    #                         id
+    #                         name
+    #                         defaultArtifactType {
+    #                             id
+    #                             name
+    #                         }
+    #                         project {
+    #                             id
+    #                             name
+    #                             entity {
+    #                                 id
+    #                                 name
+    #                             }
+    #                         }
+    #                     }
+    #                 }
+    #             }
+    #         }
+    #     }
+    #     """,
+    #     {"entityName": entity._name},
+    # )
+
+    # portNodes = res["entity"]["artifactCollections"]["edges"]
+
     # return [
     #     wandb_api.ArtifactCollection(
     #         wandb_public_api().client,
