@@ -451,24 +451,18 @@ class Const(Type):
     def from_dict(cls, d):
         w_type = TypeRegistry.type_from_dict(d["valType"])
         val = d["val"]
-        try:
-            val = w_type.instance_from_dict(val)
-            import pdb
-
-            pdb.set_trace()
-        except NotImplementedError:
-            pass
+        # try:
+        #     val = w_type.instance_from_dict(val)
+        # except NotImplementedError:
+        #     pass
         return cls(w_type, val)
 
     def _to_dict(self):
         val = self.val
-        try:
-            val = self.val_type.instance_to_dict(val)
-            import pdb
-
-            pdb.set_trace()
-        except NotImplementedError:
-            pass
+        # try:
+        #     val = self.val_type.instance_to_dict(val)
+        # except NotImplementedError:
+        #     pass
         return {"valType": self.val_type.to_dict(), "val": val}
 
     def __str__(self):
