@@ -409,8 +409,6 @@ class Project:
 
     @op()
     def runs(project: wandb_api.Project) -> wandb_api.Runs:
-        import wandb
-
         api = wandb_public_api()
         return api.runs(path="%s/%s" % (project.entity, project.name), per_page=500)
 
@@ -452,15 +450,15 @@ run_tag_getter_op = make_tag_getter_op.make_tag_getter_op(
 
 
 @op(name="artifactAlias-alias")
-def alias(alias: wandb_sdk_weave_0_types.ArtifactAlias) -> str:
-    return alias._alias
+def alias(artifactAlias: wandb_sdk_weave_0_types.ArtifactAlias) -> str:
+    return artifactAlias._alias
 
 
 @op(name="artifactAlias-artifact")
 def artifact(
-    alias: wandb_sdk_weave_0_types.ArtifactAlias,
+    artifactAlias: wandb_sdk_weave_0_types.ArtifactAlias,
 ) -> wandb_api.ArtifactCollection:
-    return alias.artifact_collection
+    return artifactAlias.artifact_collection
 
 
 @op(name="project-artifact")
@@ -537,7 +535,7 @@ def artifact_membership_version(
 def artifact_version_created_by(
     artifactVersion: artifacts_local.WandbArtifact,
 ) -> wandb_api.Run:
-    return artifact_version_created_by(artifactVersion._saved_artifact)
+    return wandb_domain_gql.artifact_version_created_by(artifactVersion._saved_artifact)
 
 
 @op(name="artifactVersion-isWeaveObject")
@@ -582,6 +580,22 @@ def artifact_version_memberships(
 def artifact_version_created_by_user(
     artifactVersion: artifacts_local.WandbArtifact,
 ) -> User:
+    # TODO
+    return None  # type: ignore
+
+
+@op(name="artifactVersion-artifactType")
+def artifact_version_artifact_type(
+    artifactVersion: artifacts_local.WandbArtifact,
+) -> wandb_api.ArtifactType:
+    # TODO
+    return None  # type: ignore
+
+
+@op(name="artifactVersion-artifactSequence")
+def artifact_version_artifact_sequence(
+    artifactVersion: artifacts_local.WandbArtifact,
+) -> wandb_api.ArtifactCollection:
     # TODO
     return None  # type: ignore
 

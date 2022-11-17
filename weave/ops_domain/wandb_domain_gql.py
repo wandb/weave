@@ -139,13 +139,12 @@ def artifact_collection_aliases(
     res = _query(
         """	
         query ArtifactCollectionAliases(	
-            $id: ID!,	
-            $identifier: String!,	
+            $id: ID!,
         ) {	
             artifactCollection(id: $id) {	
                 id	
                 aliases {
-                    nodes {
+                    edges {
                         node {
                             id
                             alias
@@ -186,10 +185,10 @@ def artifact_version_aliases(
                         id
                         name
                     }
-                    membership(aliasName: $digest) {
+                    artifactMembership(aliasName: $digest) {
                         id
                         artifact {
-                            alaises {
+                            aliases {
                                 id
                                 alias
                             }
@@ -202,7 +201,7 @@ def artifact_version_aliases(
         {
             "entityName": artifact_version.entity,
             "projectName": artifact_version.project,
-            "artifactCollectionName": artifact_version.name,
+            "artifactCollectionName": artifact_version.name.split(":")[0],
             "digest": artifact_version.digest,
         },
     )
@@ -213,13 +212,13 @@ def artifact_version_aliases(
                 wandb_public_api().client,
                 artifact_version.entity,
                 artifact_version.project,
-                artifact_version.name,
+                artifact_version.name.split(":")[0],
                 res["project"]["artifactCollection"]["defaultArtifactType"]["name"],
             ),
         )
-        for alias in res["project"]["artifactCollection"]["membership"]["artifact"][
-            "aliases"
-        ]
+        for alias in res["project"]["artifactCollection"]["artifactMembership"][
+            "artifact"
+        ]["aliases"]
     ]
 
 
@@ -229,22 +228,26 @@ def artifact_version_created_by(
     res = _query(
         """	
         query ArtifactVersionCreatedBy(	
-            $id: ID!,	
-            $commit_hash: String!,	
+            $entityName: String!,	
+            $projectName: String!,	
+            $artifactCollectionName: String!,	
+            $digest: String!,
         ) {	
-            artifactCollection(id: $id) {	
-                id	
-                artifactMembership(aliasName: $commit_hash) {
-                    id
-                    artifact {
+            project(name: $projectName, entityName: $entityName) {
+                id
+                artifactCollection(name: $artifactCollectionName) {	
+                    id	
+                    artifactMembership(aliasName: $digest) {
                         id
-                        createdBy {
-                            ... on Run {
-                                id
-                                name
-                                project {
+                        artifact {
+                            id
+                            createdBy {
+                                ... on Run {
                                     id
-                                    name {
+                                    name
+                                    project {
+                                        id
+                                        name 
                                         entity {
                                             id
                                             name
@@ -253,23 +256,25 @@ def artifact_version_created_by(
                                 }
                             }
                         }
-                    }
-                }   
-            }	
+                    }   
+                }	
+            }
         }
         """,
         {
-            "id": artifact_version.name,
-            "commit_hash": artifact_version.commit_hash,
+            "entityName": artifact_version.entity,
+            "projectName": artifact_version.project,
+            "artifactCollectionName": artifact_version.name.split(":")[0],
+            "digest": artifact_version.digest,
         },
     )
-    entity_name = res["artifactCollection"]["artifactMembership"]["artifact"][
+    entity_name = res["project"]["artifactCollection"]["artifactMembership"][
+        "artifact"
+    ]["createdBy"]["project"]["entity"]["name"]
+    project_name = res["project"]["artifactCollection"]["artifactMembership"][
+        "artifact"
+    ]["createdBy"]["project"]["name"]
+    run_name = res["project"]["artifactCollection"]["artifactMembership"]["artifact"][
         "createdBy"
-    ]["project"]["name"]["entity"]["name"]
-    project_name = res["artifactCollection"]["artifactMembership"]["artifact"][
-        "createdBy"
-    ]["project"]["name"]
-    run_name = res["artifactCollection"]["artifactMembership"]["artifact"]["createdBy"][
-        "name"
-    ]
-    return wandb_api.Run(f"{entity_name}/{project_name}/{run_name}")
+    ]["name"]
+    return wandb_public_api().run(f"{entity_name}/{project_name}/{run_name}")
