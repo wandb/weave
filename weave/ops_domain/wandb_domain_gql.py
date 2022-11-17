@@ -1,3 +1,4 @@
+import typing
 from wandb.apis import public as wandb_api
 
 from . import wandb_sdk_weave_0_types
@@ -12,7 +13,9 @@ def _query(query_str, variables={}):
     )
 
 
-def artifact_collection_is_portfolio(artifact_collection: wandb_api.ArtifactCollection):
+def artifact_collection_is_portfolio(
+    artifact_collection: wandb_api.ArtifactCollection,
+) -> bool:
     res = _query(
         """	
         query ArtifactCollectionIsPortfolio(	
@@ -29,6 +32,57 @@ def artifact_collection_is_portfolio(artifact_collection: wandb_api.ArtifactColl
         },
     )
     return res["artifactCollection"]["__typename"] == "ArtifactPortfolio"
+
+
+def entity_portfolios(
+    entity: wandb_sdk_weave_0_types.Entity,
+) -> list[wandb_api.ArtifactCollection]:
+    res = _query(
+        """	
+        query EntityPortfolios(	
+            $entityName: String!,	
+        ) {	
+            entity(name: $entityName) {	
+                id	
+                artifactCollections(collectionTypes: [PORTFOLIO]) {
+                    edges {
+                        node {
+                            id
+                            name
+                            defaultArtifactType {
+                                id
+                                name
+                            }
+                            project {
+                                id
+                                name
+                                entity {
+                                    id
+                                    name
+                                }
+                            }
+                        }
+                    }
+                }
+            }	
+        }	
+        """,
+        {"entityName": entity._name},
+    )
+
+    portNodes = res["entity"]["artifactCollections"]["edges"]
+    # TODO: WANDB SDK needs to support portfolios, not just sequences
+    return []
+    # return [
+    #     wandb_api.ArtifactCollection(
+    #         wandb_public_api().client,
+    #         portNode["node"]["project"]["entity"]["name"],
+    #         portNode["node"]["project"]["name"],
+    #         portNode["node"]["name"],
+    #         portNode["node"]["defaultArtifactType"]["name"],
+    #     )
+    #     for portNode in portNodes
+    # ]
 
 
 def project_artifact(
@@ -201,7 +255,7 @@ def artifact_version_aliases(
         {
             "entityName": artifact_version.entity,
             "projectName": artifact_version.project,
-            "artifactCollectionName": artifact_version.name.split(":")[0],
+            "artifactCollectionName": artifact_version._artifact_name.split(":")[0],
             "digest": artifact_version.digest,
         },
     )
@@ -212,7 +266,7 @@ def artifact_version_aliases(
                 wandb_public_api().client,
                 artifact_version.entity,
                 artifact_version.project,
-                artifact_version.name.split(":")[0],
+                artifact_version._artifact_name.split(":")[0],
                 res["project"]["artifactCollection"]["defaultArtifactType"]["name"],
             ),
         )
@@ -224,7 +278,7 @@ def artifact_version_aliases(
 
 def artifact_version_created_by(
     artifact_version: wandb_api.Artifact,
-) -> wandb_api.Run:
+) -> typing.Optional[wandb_api.Run]:
     res = _query(
         """	
         query ArtifactVersionCreatedBy(	
@@ -264,7 +318,7 @@ def artifact_version_created_by(
         {
             "entityName": artifact_version.entity,
             "projectName": artifact_version.project,
-            "artifactCollectionName": artifact_version.name.split(":")[0],
+            "artifactCollectionName": artifact_version._artifact_name.split(":")[0],
             "digest": artifact_version.digest,
         },
     )
@@ -277,7 +331,67 @@ def artifact_version_created_by(
     run_name = res["project"]["artifactCollection"]["artifactMembership"]["artifact"][
         "createdBy"
     ]["name"]
-    return wandb_public_api().run(f"{entity_name}/{project_name}/{run_name}")
+    if (
+        res["project"]["artifactCollection"]["artifactMembership"]["artifact"][
+            "createdBy"
+        ]
+        == "Run"
+    ):
+        return wandb_public_api().run(f"{entity_name}/{project_name}/{run_name}")
+    return None
+
+
+def artifact_version_created_by_user(
+    artifact_version: wandb_api.Artifact,
+) -> typing.Optional[wandb_sdk_weave_0_types.User]:
+    res = _query(
+        """	
+        query ArtifactVersionCreatedBy(	
+            $entityName: String!,	
+            $projectName: String!,	
+            $artifactCollectionName: String!,	
+            $digest: String!,
+        ) {	
+            project(name: $projectName, entityName: $entityName) {
+                id
+                artifactCollection(name: $artifactCollectionName) {	
+                    id	
+                    artifactMembership(aliasName: $digest) {
+                        id
+                        artifact {
+                            id
+                            createdBy {
+                                __typename
+                                ... on User {
+                                    id
+                                    name
+                                }
+                            }
+                        }
+                    }   
+                }	
+            }
+        }
+        """,
+        {
+            "entityName": artifact_version.entity,
+            "projectName": artifact_version.project,
+            "artifactCollectionName": artifact_version._artifact_name.split(":")[0],
+            "digest": artifact_version.digest,
+        },
+    )
+    if (
+        res["project"]["artifactCollection"]["artifactMembership"]["artifact"][
+            "createdBy"
+        ]
+        == "User"
+    ):
+        return wandb_sdk_weave_0_types.User(
+            username=res["project"]["artifactCollection"]["artifactMembership"][
+                "artifact"
+            ]["createdBy"]["name"]
+        )
+    return None
 
 
 def artifact_version_artifact_collections(
@@ -330,7 +444,7 @@ def artifact_version_artifact_collections(
         {
             "entityName": artifact_version.entity,
             "projectName": artifact_version.project,
-            "artifactCollectionName": artifact_version.name.split(":")[0],
+            "artifactCollectionName": artifact_version._artifact_name.split(":")[0],
             "digest": artifact_version.digest,
         },
     )
@@ -403,7 +517,7 @@ def artifact_version_memberships(
         {
             "entityName": artifact_version.entity,
             "projectName": artifact_version.project,
-            "artifactCollectionName": artifact_version.name.split(":")[0],
+            "artifactCollectionName": artifact_version._artifact_name.split(":")[0],
             "digest": artifact_version.digest,
         },
     )
@@ -425,3 +539,23 @@ def artifact_version_memberships(
         )
         for memEdge in membershipEdges
     ]
+
+
+def artifact_version_artifact_type(
+    artifact_version: wandb_api.Artifact,
+) -> wandb_api.ArtifactType:
+    return wandb_public_api().artifact_type(
+        artifact_version.project, artifact_version.type
+    )
+
+
+def artifact_version_artifact_sequence(
+    artifact_version: wandb_api.Artifact,
+) -> wandb_api.ArtifactCollection:
+    return wandb_api.ArtifactCollection(
+        wandb_public_api().client,
+        artifact_version.entity,
+        artifact_version.project,
+        artifact_version._sequence_name,
+        artifact_version.type,
+    )

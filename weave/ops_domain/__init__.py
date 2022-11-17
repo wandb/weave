@@ -40,25 +40,19 @@ class Date:
     pass
 
 
-@weave_type("user")
-class User:
-    @op(name="user-link")
-    def link(self) -> Link:
-        # TODO
-        return Link("", "")
+@op(name="user-link")
+def user_link(user: wandb_sdk_weave_0_types.User) -> Link:
+    return Link(user.username, f"/{user.username}")
 
 
-@weave_type("entity")
-class Entity:
-    _name: str
+@op(name="entity-name")
+def entity_name(entity: wandb_sdk_weave_0_types.Entity) -> str:
+    return entity._name
 
-    @op(name="entity-name")
-    def name(self) -> str:
-        return self._name
 
-    @op(name="entity-link")
-    def link(self) -> Link:
-        return Link(self._name, f"/{self._name}")
+@op(name="entity-link")
+def entity_link(entity: wandb_sdk_weave_0_types.Entity) -> Link:
+    return Link(entity._name, f"/{entity._name}")
 
 
 class ProjectType(types._PlainStringNamedType):
@@ -363,8 +357,8 @@ class Project:
         return Link(self.name, f"{self.entity}/{self.name}")
 
     @op(name="project-entity")
-    def entity(project: wandb_api.Project) -> Entity:
-        return Entity(project.entity)
+    def entity(project: wandb_api.Project) -> wandb_sdk_weave_0_types.Entity:
+        return wandb_sdk_weave_0_types.Entity(project.entity)
 
     @op()
     def artifacts(
@@ -426,8 +420,8 @@ def root_project(entityName: str, projectName: str) -> wandb_api.Project:
 
 
 @op(name="root-entity")
-def root_entity(entityName: str) -> Entity:
-    return Entity(entityName)
+def root_entity(entityName: str) -> wandb_sdk_weave_0_types.Entity:
+    return wandb_sdk_weave_0_types.Entity(entityName)
 
 
 project_tag_getter_op = make_tag_getter_op.make_tag_getter_op(
@@ -437,9 +431,6 @@ project_tag_getter_op = make_tag_getter_op.make_tag_getter_op(
 run_tag_getter_op = make_tag_getter_op.make_tag_getter_op(
     "run", RunType(), op_name="tag-run"
 )
-
-
-# We don't have proper `wandb` SDK classes for these types so we use object types for now
 
 
 @op(name="artifactAlias-alias")
@@ -527,7 +518,7 @@ def artifact_membership_version(
 @op(name="artifactVersion-createdBy")
 def artifact_version_created_by(
     artifactVersion: artifacts_local.WandbArtifact,
-) -> wandb_api.Run:
+) -> typing.Optional[wandb_api.Run]:
     return wandb_domain_gql.artifact_version_created_by(artifactVersion._saved_artifact)
 
 
@@ -574,25 +565,24 @@ def artifact_version_memberships(
 @op(name="artifactVersion-createdByUser")
 def artifact_version_created_by_user(
     artifactVersion: artifacts_local.WandbArtifact,
-) -> User:
-    # TODO
-    return None  # type: ignore
+) -> typing.Optional[wandb_sdk_weave_0_types.User]:
+    return wandb_domain_gql.artifact_version_created_by_user(
+        artifactVersion._saved_artifact
+    )
 
 
 @op(name="artifactVersion-artifactType")
 def artifact_version_artifact_type(
     artifactVersion: artifacts_local.WandbArtifact,
 ) -> wandb_api.ArtifactType:
-    # TODO
-    return None  # type: ignore
+    return wandb_domain_gql.artifact_version_artifact_type(artifactVersion)
 
 
 @op(name="artifactVersion-artifactSequence")
 def artifact_version_artifact_sequence(
     artifactVersion: artifacts_local.WandbArtifact,
 ) -> wandb_api.ArtifactCollection:
-    # TODO
-    return None  # type: ignore
+    return wandb_domain_gql.artifact_version_artifact_sequence(artifactVersion)
 
 
 @op(name="artifactVersion-usedBy")
@@ -603,9 +593,10 @@ def artifact_version_used_by(
 
 
 @op(name="entity-portfolios")
-def entity_portfolios(entity: Entity) -> wandb_api.ArtifactCollection:
-    # TODO
-    return []
+def entity_portfolios(
+    entity: wandb_sdk_weave_0_types.Entity,
+) -> list[wandb_api.ArtifactCollection]:
+    return wandb_domain_gql.entity_portfolios(entity)
 
 
 @op(name="artifact-project")

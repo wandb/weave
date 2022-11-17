@@ -27,6 +27,14 @@ class ArtifactCollectionType(types._PlainStringNamedType):
 
 
 # "Virtual" types - they do not map directly to a public API class
+@weave_type("entity")
+class Entity:
+    _name: str
+
+
+@weave_type("user")
+class User:
+    username: str
 
 
 @weave_type("artifactMembership")
