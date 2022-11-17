@@ -1,7 +1,7 @@
 from .wandb_domain_gql import project_artifact_collection_type
 from ..api import op
 from . import wb_domain_types
-from .ops_domain import wandb_domain_gql
+from . import wandb_domain_gql
 
 
 @op(name="artifact-type")

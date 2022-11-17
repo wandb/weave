@@ -15,3 +15,8 @@ from .wbmedia import *
 from . import wbartifact
 from . import file_wbartifact
 from .. import artifacts_local
+
+
+# make root ops top level
+project = project_ops.project
+entity = entity_ops.entity

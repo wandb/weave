@@ -29,12 +29,12 @@ def refine_summary_type(run: wb_domain_types.Run) -> types.Type:
     )
 
 
-@op("run-jobtype")
+@op(name="run-jobtype")
 def jobtype(run: wb_domain_types.Run) -> str:
     return run.sdk_obj.jobType
 
 
-@op("run-name")
+@op(name="run-name")
 def name(run: wb_domain_types.Run) -> str:
     return run.run_name
 
@@ -47,13 +47,12 @@ def link(run: wb_domain_types.Run) -> wb_domain_types.Link:
     )
 
 
-@op("run-id")
+@op(name="run-id")
 def id(run: wb_domain_types.Run) -> str:
     return run.sdk_obj.id
 
 
-@op("run-summary")
-@op(refine_output_type=refine_summary_type)
+@op(name="run-summary", refine_output_type=refine_summary_type)
 def summary(run: wb_domain_types.Run) -> dict[str, typing.Any]:
     return {
         k: process_summary_obj(v) for k, v in run.sdk_obj.summary._json_dict.items()

@@ -1,8 +1,8 @@
 import typing
 from wandb.apis import public as wandb_api
 
-
 from ..wandb_api import wandb_public_api
+from . import wb_domain_types
 
 
 def _query(query_str, variables={}):
@@ -154,7 +154,7 @@ def project_artifact_collection_type(
 
 def artifact_collection_membership_for_alias(
     artifact_collection: wandb_api.ArtifactCollection, identifier: str
-) -> wandb_sdk_weave_0_types.ArtifactCollectionMembership:
+) -> wb_domain_types.ArtifactCollectionMembership:
     res = _query(
         """	
         query ArtifactCollectionMembershipForAlias(	
@@ -176,7 +176,7 @@ def artifact_collection_membership_for_alias(
             "identifier": identifier,
         },
     )
-    return wandb_sdk_weave_0_types.ArtifactCollectionMembership(
+    return wb_domain_types.ArtifactCollectionMembership(
         artifact_collection=artifact_collection,
         commit_hash=res["artifactCollection"]["artifactMembership"]["commitHash"],
         version_index=res["artifactCollection"]["artifactMembership"]["versionIndex"],
@@ -184,7 +184,7 @@ def artifact_collection_membership_for_alias(
 
 
 def artifact_membership_aliases(
-    artifact_collection_membership: wandb_sdk_weave_0_types.ArtifactCollectionMembership,
+    artifact_collection_membership: wb_domain_types.ArtifactCollectionMembership,
 ) -> list[str]:
     res = _query(
         """	
@@ -210,7 +210,7 @@ def artifact_membership_aliases(
         },
     )
     return [
-        wandb_sdk_weave_0_types.ArtifactAlias(
+        wb_domain_types.ArtifactAlias(
             alias["alias"], artifact_collection_membership.artifact_collection
         )
         for alias in res["artifactCollection"]["artifactMembership"]["aliases"]
@@ -219,7 +219,7 @@ def artifact_membership_aliases(
 
 def artifact_collection_aliases(
     artifact_collection: wandb_api.ArtifactCollection,
-) -> list[wandb_sdk_weave_0_types.ArtifactAlias]:
+) -> list[wb_domain_types.ArtifactAlias]:
     res = _query(
         """	
         query ArtifactCollectionAliases(	
@@ -243,16 +243,14 @@ def artifact_collection_aliases(
         },
     )
     return [
-        wandb_sdk_weave_0_types.ArtifactAlias(
-            edge["node"]["alias"], artifact_collection
-        )
+        wb_domain_types.ArtifactAlias(edge["node"]["alias"], artifact_collection)
         for edge in res["artifactCollection"]["aliases"]["edges"]
     ]
 
 
 def artifact_version_aliases(
     artifact_version: wandb_api.Artifact,
-) -> list[wandb_sdk_weave_0_types.ArtifactAlias]:
+) -> list[wb_domain_types.ArtifactAlias]:
     res = _query(
         """	
         query ArtifactVersionAliases(	
@@ -290,7 +288,7 @@ def artifact_version_aliases(
         },
     )
     return [
-        wandb_sdk_weave_0_types.ArtifactAlias(
+        wb_domain_types.ArtifactAlias(
             alias["alias"],
             wandb_api.ArtifactCollection(
                 wandb_public_api().client,
@@ -373,7 +371,7 @@ def artifact_version_created_by(
 
 def artifact_version_created_by_user(
     artifact_version: wandb_api.Artifact,
-) -> typing.Optional[wandb_sdk_weave_0_types.User]:
+) -> typing.Optional[wb_domain_types.User]:
     res = _query(
         """	
         query ArtifactVersionCreatedBy(	
@@ -416,7 +414,7 @@ def artifact_version_created_by_user(
         ]
         == "User"
     ):
-        return wandb_sdk_weave_0_types.User(
+        return wb_domain_types.User(
             username=res["project"]["artifactCollection"]["artifactMembership"][
                 "artifact"
             ]["createdBy"]["name"]
@@ -556,7 +554,7 @@ def artifact_version_memberships(
         "artifact"
     ]["artifactMemberships"]["edges"]
     return [
-        wandb_sdk_weave_0_types.ArtifactCollectionMembership(
+        wb_domain_types.ArtifactCollectionMembership(
             wandb_api.ArtifactCollection(
                 wandb_public_api().client,
                 memEdge["node"]["artifactCollection"]["project"]["entity"]["name"],
