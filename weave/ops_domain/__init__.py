@@ -537,8 +537,7 @@ def artifact_membership_version(
 def artifact_version_created_by(
     artifactVersion: artifacts_local.WandbArtifact,
 ) -> wandb_api.Run:
-    # TODO: this needs a query.
-    return None
+    return artifact_version_created_by(artifactVersion)
 
 
 @op(name="artifactVersion-isWeaveObject")
@@ -553,16 +552,14 @@ def artifact_version_is_weave_object(
 def artifact_aliases(
     artifact: wandb_api.ArtifactCollection,
 ) -> list[wandb_sdk_weave_0_types.ArtifactAlias]:
-    # TODO
-    return []
+    return wandb_domain_gql.artifact_collection_aliases(artifact)
 
 
 @op(name="artifactVersion-aliases")
 def artifact_version_aliases(
     artifactVersion: artifacts_local.WandbArtifact,
 ) -> list[wandb_sdk_weave_0_types.ArtifactAlias]:
-    # TODO
-    return []
+    return wandb_domain_gql.artifact_version_aliases(artifactVersion)
 
 
 @op(name="artifactVersion-artifactCollections")

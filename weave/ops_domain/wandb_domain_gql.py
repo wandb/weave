@@ -1,5 +1,7 @@
 from wandb.apis import public as wandb_api
 
+from . import artifacts_local
+
 from . import wandb_sdk_weave_0_types
 
 from ..wandb_api import wandb_public_api
@@ -104,7 +106,7 @@ def artifact_membership_aliases(
 ) -> list[wandb_sdk_weave_0_types.ArtifactAlias]:
     res = _query(
         """	
-        query ArtifactCollectionAliases(	
+        query ArtifactCollectionMembershipAliases(	
             $id: ID!,	
             $identifier: String!,	
         ) {	
@@ -131,3 +133,140 @@ def artifact_membership_aliases(
         )
         for alias in res["artifactCollection"]["artifactMembership"]["aliases"]
     ]
+
+
+def artifact_collection_aliases(
+    artifact_collection: wandb_api.ArtifactCollection,
+) -> list[wandb_sdk_weave_0_types.ArtifactAlias]:
+    res = _query(
+        """	
+        query ArtifactCollectionAliases(	
+            $id: ID!,	
+            $identifier: String!,	
+        ) {	
+            artifactCollection(id: $id) {	
+                id	
+                aliases {
+                    nodes {
+                        node {
+                            id
+                            alias
+                        }
+                    }
+                }   
+            }	
+        }
+        """,
+        {
+            "id": artifact_collection.id,
+        },
+    )
+    return [
+        wandb_sdk_weave_0_types.ArtifactAlias(
+            edge["node"]["alias"], artifact_collection
+        )
+        for edge in res["artifactCollection"]["aliases"]["edges"]
+    ]
+
+
+def artifact_version_aliases(
+    artifact_version: artifacts_local.WandbArtifact,
+) -> list[wandb_sdk_weave_0_types.ArtifactAlias]:
+    res = _query(
+        """	
+        query ArtifactVersionAliases(	
+            $entityName: String!,	
+            $projectName: String!,	
+            $artifactCollectionName: String!,	
+            $digest: String!,	
+        ) {	
+            project(name: $projectName, entityName: $entityName) {
+                id
+                artifactCollection(name: $artifactCollectionName) {	
+                    id
+                    membership(aliasName: $digest) {
+                        id
+                        artifact {
+                            alaises {
+                                id
+                                alias
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        """,
+        {
+            "entityName": artifact_version._saved_artifact.entity,
+            "projectName": artifact_version._saved_artifact.project,
+            "artifactCollectionName": artifact_version._saved_artifact.name,
+            "digest": artifact_version._saved_artifact.digest,
+        },
+    )
+    return [
+        wandb_sdk_weave_0_types.ArtifactAlias(
+            alias["alias"],
+            wandb_api.ArtifactCollection(
+                wandb_public_api().client,
+                artifact_version._saved_artifact.entity,
+                artifact_version._saved_artifact.project,
+                artifact_version._saved_artifact.name,
+            ),
+        )
+        for alias in res["project"]["artifactCollection"]["membership"]["artifact"][
+            "aliases"
+        ]
+    ]
+
+
+def artifact_version_created_by(
+    artifact_version: artifacts_local.WandbArtifact,
+) -> wandb_api.Run:
+    res = _query(
+        """	
+        query ArtifactVersionCreatedBy(	
+            $id: ID!,	
+            $commit_hash: String!,	
+        ) {	
+            artifactCollection(id: $id) {	
+                id	
+                artifactMembership(aliasName: $commit_hash) {
+                    id
+                    artifact {
+                        id
+                        createdBy {
+                            ... on Run {
+                                id
+                                name
+                                project {
+                                    id
+                                    name {
+                                        entity {
+                                            id
+                                            name
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }   
+            }	
+        }
+        """,
+        {
+            "id": artifact_version._saved_artifact.name,
+            "commit_hash": artifact_version._saved_artifact.commit_hash,
+        },
+    )
+    entity_name = res["artifactCollection"]["artifactMembership"]["artifact"][
+        "createdBy"
+    ]["project"]["name"]["entity"]["name"]
+    project_name = res["artifactCollection"]["artifactMembership"]["artifact"][
+        "createdBy"
+    ]["project"]["name"]
+    run_name = res["artifactCollection"]["artifactMembership"]["artifact"]["createdBy"][
+        "name"
+    ]
+    return wandb_api.Run(f"{entity_name}/{project_name}/{run_name}")
