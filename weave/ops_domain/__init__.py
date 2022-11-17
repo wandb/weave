@@ -209,30 +209,7 @@ class RunsOps:
         return runs
 
 
-class ArtifactsType(types.Type):
-    name = "artifacts"
-    instance_classes = wandb_api.ProjectArtifactCollections
-    instance_class = wandb_api.ProjectArtifactCollections
-
-    @property
-    def object_type(self):
-        return ArtifactType()
-
-    def instance_to_dict(self, obj):
-        return {
-            "entity_name": obj.entity,
-            "project_name": obj.project,
-            "artifact_type_name": obj.type_name,
-        }
-
-    def instance_from_dict(self, d):
-        api = wandb_public_api()
-        return api.artifact_type(
-            d["artifact_type_name"], project=f"{d['entity_name']}/{d['project_name']}"
-        ).collections()
-
-
-@weave_class(weave_type=ArtifactsType)
+@weave_class(weave_type=wandb_sdk_weave_0_types.ArtifactsType)
 class ArtifactsOps:
     @op()
     def count(self: wandb_api.ProjectArtifactCollections) -> int:
