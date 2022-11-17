@@ -1,8 +1,12 @@
 import typing
+
+from . import file_wbartifact
 from ..api import op
 from . import wb_domain_types
 from . import wandb_domain_gql
-
+from .. import weave_types as types
+from .. import refs
+from .. import artifacts_local
 
 @op(name="artifactVersion-createdBy")
 def artifact_version_created_by(
@@ -76,3 +80,60 @@ def artifact_version_used_by(
         )
         for r in artifactVersion.sdk_obj.used_by()
     ]
+
+@op(
+    name="artifactVersion-fileReturnType",
+    output_type=types.Type(),
+)
+def path_type(artifactVersion:wb_domain_types.ArtifactVersion, path:str):
+    try:
+        artifactVersion.sdk_obj.get_path(path)
+    except KeyError:
+        return types.DirType()
+    parts = path.split(".")
+    ext = ""
+    wb_object_type = types.NoneType()
+    if len(parts) != 1:
+        ext = parts[-1]
+    if len(parts) > 2 and ext == "json":
+        wb_object_type = types.Const(types.String(), parts[-2])
+    return types.FileType(
+        extension=types.Const(types.String(), ext), wb_object_type=wb_object_type
+    )
+
+@op(name="artifactVersion-id")
+def id(artifactVersion: wb_domain_types.ArtifactVersion) -> str:  
+    return artifactVersion.sdk_obj.id
+
+@op(name="artifactVersion-name")
+def name(artifactVersion: wb_domain_types.ArtifactVersion) -> str:  
+    return artifactVersion.sdk_obj.name
+
+@op(name="artifactVersion-digest")
+def digest(artifactVersion: wb_domain_types.ArtifactVersion) -> str:  
+    return artifactVersion.sdk_obj.digest
+
+@op(name="artifactVersion-size")
+def size(artifactVersion: wb_domain_types.ArtifactVersion) -> int:  
+    return artifactVersion.sdk_obj.size
+
+@op(name="artifactVersion-description")
+def description(artifactVersion: wb_domain_types.ArtifactVersion) -> str:  
+    return artifactVersion.sdk_obj.description
+
+@op(name="artifactVersion-createdAt")
+def created_at(artifactVersion: wb_domain_types.ArtifactVersion) -> wb_domain_types.Date:  
+    return artifactVersion.sdk_obj.created_at
+
+@op(name="artifactVersion-files")
+def files(artifactVersion: wb_domain_types.ArtifactVersion) -> list[file_wbartifact.ArtifactVersionFile]:  
+    # TODO: What is the correct data model here? - def don't want to go download everything
+    return []
+
+@op(
+    name="artifactVersion-file",
+    output_type=refs.ArtifactVersionFileType(),
+)
+def path(artifactVersion: wb_domain_types.ArtifactVersion, path:str):
+    art_local = artifacts_local.WandbArtifact.from_wb_artifact(artifactVersion.sdk_obj)
+    return artifacts_local.ArtifactVersion.path.raw_resolve_fn(art_local, path)

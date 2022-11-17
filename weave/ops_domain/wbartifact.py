@@ -12,7 +12,7 @@ from ..ops_primitives import file as weave_file
 
 
 class ArtifactVersionType(types._PlainStringNamedType):
-    name = "artifactVersion"
+    name = "artifactLocalVersion"
     instance_classes = artifacts_local.WandbArtifact
     instance_class = artifacts_local.WandbArtifact
 
@@ -28,7 +28,7 @@ class ArtifactVersionType(types._PlainStringNamedType):
 @weave_class(weave_type=ArtifactVersionType)
 class ArtifactVersion:
     @op(
-        name="artifactVersion-fileReturnType",
+        name="artifactLocalVersion-fileReturnType",
         input_type={"artifactVersion": ArtifactVersionType(), "path": types.String()},
         output_type=types.Type(),
     )
@@ -48,39 +48,14 @@ class ArtifactVersion:
             extension=types.Const(types.String(), ext), wb_object_type=wb_object_type
         )
 
-    @op(name="artifactVersion-id")
-    def id(artifactVersion: artifacts_local.WandbArtifact) -> str:  # type: ignore
-        return artifactVersion._saved_artifact.id
-
-    @op(name="artifactVersion-name")
+    @op(name="artifactLocalVersion-name")
     def name(artifactVersion: artifacts_local.WandbArtifact) -> str:  # type: ignore
         # TODO: we actually get an artifact version file here because
         # we get refs types messed up somehow
         return getattr(artifactVersion, "name", "BUG a192bx (search weave code)")
 
-    @op(name="artifactVersion-digest")
-    def digest(artifactVersion: artifacts_local.WandbArtifact) -> str:  # type: ignore
-        return artifactVersion._saved_artifact.digest
-
-    @op(name="artifactVersion-size")
-    def size(artifactVersion: artifacts_local.WandbArtifact) -> int:  # type: ignore
-        return artifactVersion._saved_artifact.size
-
-    @op(name="artifactVersion-description")
-    def description(artifactVersion: artifacts_local.WandbArtifact) -> str:  # type: ignore
-        return artifactVersion._saved_artifact.description
-
-    @op(name="artifactVersion-createdAt")
-    def created_at(artifactVersion: artifacts_local.WandbArtifact) -> str:  # type: ignore # TODO: Is this a string?
-        return artifactVersion._saved_artifact.created_at
-
-    @op(name="artifactVersion-files")
-    def files(artifactVersion: artifacts_local.WandbArtifact) -> list[file_wbartifact.ArtifactVersionFile]:  # type: ignore
-        # TODO: What is the correct data model here? - def don't want to go download everything
-        return []
-
     @op(
-        name="artifactVersion-file",
+        name="artifactLocalVersion-file",
         input_type={"artifactVersion": ArtifactVersionType(), "path": types.String()},
         # TODO: This Type is not complete (missing DirType())
         # TODO: This needs to call ArtifactVersion.path_type()

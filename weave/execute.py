@@ -72,7 +72,7 @@ def is_panelplot_data_fetch_query(node: graph.Node) -> bool:
 
 
 def execute_nodes(nodes, no_cache=False):
-    logging.info(
+    logging.critical(
         "Executing %s leaf nodes.\n%s"
         % (
             len(nodes),

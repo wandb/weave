@@ -16,7 +16,7 @@ TEST_TABLE_ARTIFACT_PATH = "testdata/wb_artifacts/test_res_1fwmcd3q:v0"
     [
         # Path used in weave demos
         ops.project("stacey", "mendeleev")
-        .artifact_type("test_results")
+        .artifactType("test_results")
         .artifacts()[0]
         .versions()[0]
         .path("test_results.table.json"),
