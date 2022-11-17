@@ -361,8 +361,7 @@ class ArtifactOps:
 
     @op(name="artifact-description")
     def description(artifact: wandb_api.ArtifactCollection) -> str:
-        # TODO
-        return ""
+        return artifact._attrs.get("description", "")
 
     @op(name="artifact-versions")
     def versions(artifact: wandb_api.ArtifactCollection) -> wandb_api.ArtifactVersions:
@@ -370,8 +369,7 @@ class ArtifactOps:
 
     @op(name="artifact-createdAt")
     def createdAt(artifact: wandb_api.ArtifactCollection) -> Date:
-        # TODO:
-        return None  # type: ignore
+        return artifact._attrs.get("createdAt", None)
 
     @op(name="artifact-id")
     def id(artifact: wandb_api.ArtifactCollection) -> str:
