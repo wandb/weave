@@ -6,7 +6,7 @@ from ..refs import ArtifactVersionFileType
 from ..api import op, mutation, weave_class
 from .. import weave_types as types
 from .. import wandb_util
-from . import arrow
+from .. import ops_arrow
 
 
 _py_open = open
@@ -38,7 +38,7 @@ class TableType(types.ObjectType):
     name = "table"
 
     def property_types(self):
-        return {"_rows": arrow.ArrowWeaveListType(types.TypedDict({}))}
+        return {"_rows": ops_arrow.ArrowWeaveListType(types.TypedDict({}))}
 
 
 @weave_class(weave_type=TableType)
@@ -58,7 +58,7 @@ class Table:
     @op(
         name="table-rows",
         input_type={"table": TableType()},
-        output_type=arrow.ArrowWeaveListType(types.TypedDict({})),
+        output_type=ops_arrow.ArrowWeaveListType(types.TypedDict({})),
         refine_output_type=rows_type,
     )
     def rows(table):
@@ -89,7 +89,9 @@ class File:
                 row[col_name] = val
             rows.append(row)
 
-        res = arrow.to_arrow_from_list_and_artifact(rows, object_type, file.artifact)
+        res = ops_arrow.to_arrow_from_list_and_artifact(
+            rows, object_type, file.artifact
+        )
         # I Don't think I need Table now. We won't parse again
         return Table(res)
 

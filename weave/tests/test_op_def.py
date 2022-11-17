@@ -3,7 +3,8 @@ import pytest
 from .. import api as weave
 from .. import context_state
 from dataclasses import dataclass
-from ..ecosystem import keras
+
+# from ..ecosystem import keras
 import json
 
 _loading_builtins_token = context_state.set_loading_built_ins()

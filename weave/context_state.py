@@ -2,10 +2,11 @@ import contextvars
 import contextlib
 import typing
 
+from wandb.apis import public
+
 from . import client_interface
 from . import server_interface
 from . import uris
-from . import errors
 
 
 # Set to the op uri if we're in the process of loading
@@ -49,9 +50,10 @@ _analytics_enabled: contextvars.ContextVar[bool] = contextvars.ContextVar(
     "analytics_enabled", default=True
 )
 
-_wandb_api_key: contextvars.ContextVar[typing.Optional[str]] = contextvars.ContextVar(
-    "_wandb_api_key", default=None
-)
+_wandb_public_api: contextvars.ContextVar[
+    typing.Optional[public.Api]
+] = contextvars.ContextVar("_wandb_public_api", default=None)
+
 
 _cache_namespace_token: contextvars.ContextVar[
     typing.Optional[str]
@@ -149,6 +151,15 @@ def analytics_disabled():
         yield
     finally:
         _analytics_enabled.reset(analytics_token)
+
+
+@contextlib.contextmanager
+def cache_namespace(token: str):
+    cache_token = _cache_namespace_token.set(token)
+    try:
+        yield
+    finally:
+        _cache_namespace_token.reset(cache_token)
 
 
 def analytics_enabled():

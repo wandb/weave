@@ -10,6 +10,10 @@ import weave
 
 from . import pytorch
 
+from weave import context_state as _context
+
+_loading_builtins_token = _context.set_loading_built_ins()
+
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
@@ -145,3 +149,6 @@ def train(X, y, config: TorchMnistTrainConfig):
         print("Epoch: %s" % epoch)
         avg_loss = train_epoch(network, loader, optimizer)
     return Model(weave.type_of(X), weave.type_of(y), network)
+
+
+_context.clear_loading_built_ins(_loading_builtins_token)

@@ -4,7 +4,7 @@ from ..api import use, get, Node
 from .. import weave_types as types
 from .. import panels
 from .. import context_state as _context
-from ..ops_primitives.arrow import ArrowWeaveList, ArrowWeaveListType
+from ..ops_arrow import ArrowWeaveList, ArrowWeaveListType
 import weave
 
 

@@ -1,4 +1,6 @@
 import pytest
+
+from weave.ops_primitives import list_
 from .. import graph
 from ..weave_internal import make_const_node
 from .. import weave_types as types
@@ -7,6 +9,7 @@ from .. import ops
 from .. import serialize
 from .. import registry_mem
 from .. import op_args
+import weave
 
 
 def test_serialize(fake_wandb):
@@ -112,3 +115,11 @@ def test_const_node_serialize(val_type, val):
     node = graph.Node.node_from_json(node.to_json())
     assert node.type == val_type
     assert node.val == val
+
+
+def test_union_dicts():
+    nodeA = make_const_node(types.TypedDict({"a": types.Int()}), {"a": 1})
+    nodeB = make_const_node(types.TypedDict({"b": types.Int()}), {"b": 1})
+    nodeC = list_.make_list(a=nodeA, b=nodeB)
+    nodeD = nodeC["a"]
+    assert weave.use(nodeD) == [1, None]
