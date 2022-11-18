@@ -50,7 +50,19 @@ def test_table_call(table_file_node, fake_wandb):
     )
 
 
-def test_missing_file():
+def test_table_col_order_and_unknown_types(fake_wandb):
+    node = (
+        ops.project("stacey", "mendeleev")
+        .artifactType("test_results")
+        .artifacts()[0]
+        .versions()[0]
+        .file("weird_table.table.json")
+        .table()
+    )
+    assert weave.use(node.rows()[0]["c"]) == 9.93
+
+
+def test_missing_file(fake_wandb):
     node = (
         ops.project("stacey", "mendeleev")
         .artifactType("test_results")

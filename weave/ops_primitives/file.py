@@ -78,7 +78,24 @@ class File:
 
         data = json.loads(_py_open(local_path).read())
 
-        object_type = wandb_util.weave0_type_json_to_weave1_type(data["column_types"])
+        converted_object_type = wandb_util.weave0_type_json_to_weave1_type(
+            data["column_types"]
+        )
+
+        # Fix two things:
+        # 1. incoming table column names may not match the order of column_types
+        # 2. if we had an unknown (happens when old type is "PythonObjectType")
+        #    we need to manually detect the type.
+        obj_prop_types = {}
+        for i, key in enumerate(data["columns"]):
+            col_type = converted_object_type.property_types[key]
+            if col_type.assign_type(types.UnknownType()):
+                unknown_col_example_data = [row[i] for row in data["data"]]
+                detected_type = types.TypeRegistry.type_of(unknown_col_example_data)
+                obj_prop_types[key] = detected_type.object_type
+            else:
+                obj_prop_types[key] = col_type
+        object_type = types.TypedDict(obj_prop_types)
 
         # TODO: this will need to recursively convert dicts to Objects in some
         # cases.

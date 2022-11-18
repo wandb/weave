@@ -38,7 +38,7 @@ def _convert_type(old_type: wandb_dtypes.Type) -> types.Type:
     elif isinstance(old_type, wandb_dtypes.BooleanType):
         return types.Boolean()
     elif isinstance(old_type, wandb_dtypes.PythonObjectType):
-        return types.type_class_type_name(old_type.params["class_name"])
+        return types.UnknownType()
     elif isinstance(old_type, wandb_dtypes.ConstType):
         val = old_type.params["val"]
         if old_type.params["is_set"]:

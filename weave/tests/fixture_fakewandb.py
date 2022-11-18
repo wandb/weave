@@ -29,6 +29,8 @@ class FakeManifest:
             return FakeEntry()
         if path == "media/images/8f65e54dc684f7675aec.png":
             return FakeEntry()
+        if path == "weird_table.table.json":
+            return FakeEntry()
         # Otherwise, file is missing, return None.
         return None
 
