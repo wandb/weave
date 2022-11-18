@@ -8,6 +8,7 @@ from weave.ecosystem.wandb import geom
 
 from .. import api as weave
 from ..ops_primitives import ops_arrow
+from .. import errors
 
 
 def test_mapped_method_on_custom_type():
@@ -82,5 +83,5 @@ def test_constructor():
     point2d_node = geom.Point2d.constructor({"x": 0.5, "y": 0.6})
     assert weave.use(point2d_node) == expected
 
-    with pytest.raises(KeyError):
+    with pytest.raises(errors.WeaveExecutionError):
         weave.use(geom.Point2d.constructor({"x": 0.5}))

@@ -6,6 +6,7 @@ from ..ops_arrow import ArrowWeaveList
 from .. import ops
 from .. import storage
 from .. import api
+from .. import errors
 from .. import weave_types as types
 
 import pyarrow as pa
@@ -206,7 +207,7 @@ def test_invalid_explicit_experiment_construction():
     )
     storage.save(segment2)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(errors.WeaveExecutionError):
         api.use(segment2.experiment())
 
 
