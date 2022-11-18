@@ -1,3 +1,4 @@
+import logging
 import typing
 
 from . import file_wbartifact
@@ -134,7 +135,16 @@ def files(
     output_type=refs.ArtifactVersionFileType(),
 )
 def file_(artifactVersion: wb_domain_types.ArtifactVersion, path: str):
-    art_local = artifacts_local.WandbArtifact.from_wb_artifact(artifactVersion.sdk_obj)
+    # TODO (tim): This is a total hack - I am not sure why dispatch is sending use thsese
+    if isinstance(artifactVersion, artifacts_local.Artifact):
+        logging.warning(
+            "Expected input to be of type ArtifactVersion, but got artifacts_local.Artifact in artifactVersion-file"
+        )
+        art_local = artifactVersion
+    else:
+        art_local = artifacts_local.WandbArtifact.from_wb_artifact(
+            artifactVersion.sdk_obj
+        )
     return wbartifact.ArtifactVersion.path.raw_resolve_fn(art_local, path)
 
 
@@ -144,7 +154,16 @@ def file_(artifactVersion: wb_domain_types.ArtifactVersion, path: str):
     output_type=refs.ArtifactVersionFileType(),
 )
 def path(artifactVersion: wb_domain_types.ArtifactVersion, path: str):
-    art_local = artifacts_local.WandbArtifact.from_wb_artifact(artifactVersion.sdk_obj)
+    # TODO (tim): This is a total hack - I am not sure why dispatch is sending use thsese
+    if isinstance(artifactVersion, artifacts_local.Artifact):
+        logging.warning(
+            "Expected input to be of type ArtifactVersion, but got artifacts_local.Artifact in artifactVersion-file"
+        )
+        art_local = artifactVersion
+    else:
+        art_local = artifacts_local.WandbArtifact.from_wb_artifact(
+            artifactVersion.sdk_obj
+        )
     return wbartifact.ArtifactVersion.path.raw_resolve_fn(art_local, path)
 
 
@@ -153,5 +172,14 @@ def path(artifactVersion: wb_domain_types.ArtifactVersion, path: str):
     output_type=types.Type(),
 )
 def path_type(artifactVersion: wb_domain_types.ArtifactVersion, path: str):
-    art_local = artifacts_local.WandbArtifact.from_wb_artifact(artifactVersion.sdk_obj)
+    # TODO (tim): This is a total hack - I am not sure why dispatch is sending use thsese
+    if isinstance(artifactVersion, artifacts_local.Artifact):
+        logging.warning(
+            "Expected input to be of type ArtifactVersion, but got artifacts_local.Artifact in artifactVersion-file"
+        )
+        art_local = artifactVersion
+    else:
+        art_local = artifacts_local.WandbArtifact.from_wb_artifact(
+            artifactVersion.sdk_obj
+        )
     return wbartifact.ArtifactVersion.path_type.raw_resolve_fn(art_local, path)
