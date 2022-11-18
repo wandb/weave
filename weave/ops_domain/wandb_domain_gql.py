@@ -4,6 +4,8 @@ from wandb.apis import public as wandb_api
 from ..wandb_api import wandb_public_api
 from . import wb_domain_types
 
+# TODO; Check for unused
+
 
 def _query(query_str, variables={}):
     return wandb_public_api().client.execute(
@@ -13,120 +15,39 @@ def _query(query_str, variables={}):
 
 
 def artifact_collection_is_portfolio(
-    artifact_collection: wandb_api.ArtifactCollection,
+    artifact_collection: wb_domain_types.ArtifactCollection,
 ) -> bool:
     res = _query(
         """	
-        query ArtifactCollectionIsPortfolio(	
-            $id: ID!,	
-        ) {	
-            artifactCollection(id: $id) {	
-                id	
-                __typename
-            }	
-        }	
-        """,
-        {
-            "id": artifact_collection.id,
-        },
-    )
-    return res["artifactCollection"]["__typename"] == "ArtifactPortfolio"
-
-
-def entity_portfolios(entity_name: str) -> list[str]:
-    # TODO: WANDB SDK needs to support portfolios, not just sequences (well, actually we just need to write our own class layer)
-    return []
-    # The below query is what we will want in the long run:
-    # res = _query(
-    #     """
-    #     query EntityPortfolios(
-    #         $entityName: String!,
-    #     ) {
-    #         entity(name: $entityName) {
-    #             id
-    #             artifactCollections(collectionTypes: [PORTFOLIO]) {
-    #                 edges {
-    #                     node {
-    #                         id
-    #                         name
-    #                         defaultArtifactType {
-    #                             id
-    #                             name
-    #                         }
-    #                         project {
-    #                             id
-    #                             name
-    #                             entity {
-    #                                 id
-    #                                 name
-    #                             }
-    #                         }
-    #                     }
-    #                 }
-    #             }
-    #         }
-    #     }
-    #     """,
-    #     {"entityName": entity._name},
-    # )
-
-    # portNodes = res["entity"]["artifactCollections"]["edges"]
-
-    # return [
-    #     wandb_api.ArtifactCollection(
-    #         wandb_public_api().client,
-    #         portNode["node"]["project"]["entity"]["name"],
-    #         portNode["node"]["project"]["name"],
-    #         portNode["node"]["name"],
-    #         portNode["node"]["defaultArtifactType"]["name"],
-    #     )
-    #     for portNode in portNodes
-    # ]
-
-
-def project_artifact(
-    project: wandb_api.Project, artifactName: str
-) -> wandb_api.ArtifactCollection:
-    res = _query(
-        """	
-        query ProjectArtifact(	
+        query artifact_collection_is_portfolio(	
             $projectName: String!,	
             $entityName: String!,
-            $artifactName: String!,	
+            $artifactCollectionName: String!,	
         ) {	
             project(name: $projectName, entityName: $entityName) {	
                 id
                 artifactCollection(name: $artifactName) {	
-                    id
-                    defaultArtifactType {	
-                        id	
-                        name	
-                    }	
-                }	
+                    id	
+                    __typename
+                }
             }	
         }	
         """,
         {
-            "projectName": project.name,
-            "entityName": project.entity,
-            "artifactName": artifactName,
+            "projectName": artifact_collection._project.project_name,
+            "entityName": artifact_collection._project._entity.entity_name,
+            "artifactCollectionName": artifact_collection.artifact_collection_name,
         },
     )
-    return wandb_api.ArtifactCollection(
-        wandb_public_api().client,
-        project.entity,
-        project.name,
-        artifactName,
-        res["project"]["artifactCollection"]["defaultArtifactType"]["name"],
-    )
+    return res["project"]["artifactCollection"]["__typename"] == "ArtifactPortfolio"
 
 
-def project_artifact_collection_type(
-    entity_name: str, project_name: str, artifact_collection_name: str
-) -> str:
+def artifact_collection_artifact_type(
+    artifact_collection: wb_domain_types.ArtifactCollection,
+) -> wb_domain_types.ArtifactType:
     res = _query(
         """	
-        query project_artifact_collection_type(	
+        query artifact_collection_artifact_type(	
             $projectName: String!,	
             $entityName: String!,
             $artifactCollectionName: String!,	
@@ -144,120 +65,193 @@ def project_artifact_collection_type(
         }	
         """,
         {
-            "projectName": project_name,
-            "entityName": entity_name,
-            "artifactCollectionName": artifact_collection_name,
+            "projectName": artifact_collection._project.project_name,
+            "entityName": artifact_collection._project._entity.entity_name,
+            "artifactCollectionName": artifact_collection.artifact_collection_name,
         },
     )
-    return res["project"]["artifactCollection"]["defaultArtifactType"]["name"]
+    return wb_domain_types.ArtifactType(
+        artifact_collection._project,
+        res["project"]["artifactCollection"]["defaultArtifactType"]["name"],
+    )
+
+
+def entity_portfolios(
+    entity: wb_domain_types.Entity,
+) -> list[wb_domain_types.ArtifactCollection]:
+    res = _query(
+        """
+        query entity_portfolios(
+            $entityName: String!,
+        ) {
+            entity(name: $entityName) {
+                id
+                artifactCollections(collectionTypes: [PORTFOLIO]) {
+                    edges {
+                        node {
+                            id
+                            name
+                            defaultArtifactType {
+                                id
+                                name
+                            }
+                            project {
+                                id
+                                name
+                                entity {
+                                    id
+                                    name
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        """,
+        {"entityName": entity.entity_name},
+    )
+
+    portNodes = res["entity"]["artifactCollections"]["edges"]
+
+    return [
+        wb_domain_types.ArtifactCollection(
+            wb_domain_types.Project(
+                wb_domain_types.Entity(portNode["node"]["project"]["entity"]["name"]),
+                portNode["node"]["project"]["name"],
+            ),
+            portNode["node"]["name"],
+        )
+        for portNode in portNodes
+    ]
 
 
 def artifact_collection_membership_for_alias(
-    artifact_collection: wandb_api.ArtifactCollection, identifier: str
+    artifact_collection: wb_domain_types.ArtifactCollection, identifier: str
 ) -> wb_domain_types.ArtifactCollectionMembership:
     res = _query(
         """	
-        query ArtifactCollectionMembershipForAlias(	
-            $id: ID!,	
-            $identifier: String!,	
+        query artifact_collection_membership_for_alias(	
+            $projectName: String!,	
+            $entityName: String!,
+            $artifactCollectionName: String!,	
         ) {	
-            artifactCollection(id: $id) {	
-                id	
-                artifactMembership(aliasName: $identifier) {
-                    id
-                    versionIndex
-                    commitHash
-                }   
+            project(name: $projectName, entityName: $entityName) {	
+                id
+                artifactCollection(name: $artifactName) {	
+                    id	
+                    artifactMembership(aliasName: $identifier) {
+                        id
+                        versionIndex
+                    }   
+                }
             }	
         }
         """,
         {
-            "id": artifact_collection.id,
+            "projectName": artifact_collection._project.project_name,
+            "entityName": artifact_collection._project._entity.entity_name,
+            "artifactCollectionName": artifact_collection.artifact_collection_name,
             "identifier": identifier,
         },
     )
     return wb_domain_types.ArtifactCollectionMembership(
-        artifact_collection=artifact_collection,
-        commit_hash=res["artifactCollection"]["artifactMembership"]["commitHash"],
-        version_index=res["artifactCollection"]["artifactMembership"]["versionIndex"],
+        artifact_collection,
+        res["artifactCollection"]["artifactMembership"]["versionIndex"],
     )
 
 
 def artifact_membership_aliases(
     artifact_collection_membership: wb_domain_types.ArtifactCollectionMembership,
-) -> list[str]:
+) -> list[wb_domain_types.ArtifactAlias]:
     res = _query(
         """	
-        query ArtifactCollectionMembershipAliases(	
-            $id: ID!,	
-            $identifier: String!,	
+        query artifact_membership_aliases(	
+            $projectName: String!,	
+            $entityName: String!,
+            $artifactCollectionName: String!,	
+            $indentifier: String!,	
         ) {	
-            artifactCollection(id: $id) {	
-                id	
-                artifactMembership(aliasName: $identifier) {
-                    id
-                    aliases {
+            project(name: $projectName, entityName: $entityName) {	
+                id
+                artifactCollection(name: $artifactName) {	
+                    id	
+                    artifactMembership(aliasName: $identifier) {
                         id
-                        alias
-                    }
-                }   
+                        aliases {
+                            id
+                            alias
+                        }
+                    }   
+                }
             }	
         }
         """,
         {
-            "id": artifact_collection_membership.artifact_collection.id,
-            "identifier": artifact_collection_membership.commit_hash,
+            "projectName": artifact_collection_membership._artifact_collection._project.project_name,
+            "entityName": artifact_collection_membership._artifact_collection._project._entity.entity_name,
+            "artifactCollectionName": artifact_collection_membership._artifact_collection.artifact_collection_name,
+            "identifier": f"v{artifact_collection_membership.version_index}",
         },
     )
     return [
         wb_domain_types.ArtifactAlias(
-            alias["alias"], artifact_collection_membership.artifact_collection
+            artifact_collection_membership._artifact_collection,
+            alias["alias"],
         )
         for alias in res["artifactCollection"]["artifactMembership"]["aliases"]
     ]
 
 
 def artifact_collection_aliases(
-    artifact_collection: wandb_api.ArtifactCollection,
+    artifact_collection: wb_domain_types.ArtifactCollection,
 ) -> list[wb_domain_types.ArtifactAlias]:
     res = _query(
         """	
-        query ArtifactCollectionAliases(	
-            $id: ID!,
+        query artifact_collection_aliases(	
+            $projectName: String!,	
+            $entityName: String!,
+            $artifactCollectionName: String!,	
+            $indentifier: String!,	
         ) {	
-            artifactCollection(id: $id) {	
-                id	
-                aliases {
-                    edges {
-                        node {
-                            id
-                            alias
+            project(name: $projectName, entityName: $entityName) {	
+                id
+                artifactCollection(name: $artifactName) {	
+                    id	
+                    aliases {
+                        edges {
+                            node {
+                                id
+                                alias
+                            }
                         }
-                    }
-                }   
+                    } 
+                }  
             }	
         }
         """,
         {
-            "id": artifact_collection.id,
+            "projectName": artifact_collection._project.project_name,
+            "entityName": artifact_collection._project._entity.entity_name,
+            "artifactCollectionName": artifact_collection.artifact_collection_name,
         },
     )
     return [
-        wb_domain_types.ArtifactAlias(edge["node"]["alias"], artifact_collection)
+        wb_domain_types.ArtifactAlias(artifact_collection, edge["node"]["alias"])
         for edge in res["artifactCollection"]["aliases"]["edges"]
     ]
 
 
 def artifact_version_aliases(
-    artifact_version: wandb_api.Artifact,
+    artifact_version: wb_domain_types.ArtifactVersion,
 ) -> list[wb_domain_types.ArtifactAlias]:
     res = _query(
         """	
-        query ArtifactVersionAliases(	
+        query artifact_version_aliases(	
             $entityName: String!,	
             $projectName: String!,	
             $artifactCollectionName: String!,	
-            $digest: String!,	
+            $aliasName: String!,	
         ) {	
             project(name: $projectName, entityName: $entityName) {
                 id
@@ -267,12 +261,25 @@ def artifact_version_aliases(
                         id
                         name
                     }
-                    artifactMembership(aliasName: $digest) {
+                    artifactMembership(aliasName: $aliasName) {
                         id
                         artifact {
                             aliases {
                                 id
                                 alias
+                                artifactCollection {
+                                    id
+                                    name 
+                                    project {
+                                        id
+                                        name
+                                        entity {
+                                            id
+                                            name
+                                        }
+                                    
+                                    }
+                                }
                             }
                         }
                     }
@@ -281,22 +288,24 @@ def artifact_version_aliases(
         }
         """,
         {
-            "entityName": artifact_version.entity,
-            "projectName": artifact_version.project,
-            "artifactCollectionName": artifact_version._artifact_name.split(":")[0],
-            "digest": artifact_version.digest,
+            "entityName": artifact_version._artifact_sequence._project._entity.entity_name,
+            "projectName": artifact_version._artifact_sequence._project.project_name,
+            "artifactCollectionName": artifact_version._artifact_sequence.artifact_collection_name,
+            "aliasName": f"v{artifact_version.version_index}",
         },
     )
     return [
         wb_domain_types.ArtifactAlias(
-            alias["alias"],
-            wandb_api.ArtifactCollection(
-                wandb_public_api().client,
-                artifact_version.entity,
-                artifact_version.project,
-                artifact_version._artifact_name.split(":")[0],
-                res["project"]["artifactCollection"]["defaultArtifactType"]["name"],
+            wb_domain_types.ArtifactCollection(
+                wb_domain_types.Project(
+                    wb_domain_types.Entity(
+                        alias["artifactCollection"]["project"]["entity"]["name"]
+                    ),
+                    alias["artifactCollection"]["project"]["name"],
+                ),
+                alias["artifactCollection"]["name"],
             ),
+            alias["alias"],
         )
         for alias in res["project"]["artifactCollection"]["artifactMembership"][
             "artifact"
@@ -305,21 +314,21 @@ def artifact_version_aliases(
 
 
 def artifact_version_created_by(
-    artifact_version: wandb_api.Artifact,
-) -> typing.Optional[wandb_api.Run]:
+    artifact_version: wb_domain_types.ArtifactVersion,
+) -> typing.Optional[wb_domain_types.Run]:
     res = _query(
         """	
-        query ArtifactVersionCreatedBy(	
+        query artifact_version_created_by(	
             $entityName: String!,	
             $projectName: String!,	
             $artifactCollectionName: String!,	
-            $digest: String!,
+            $aliasName: String!,
         ) {	
             project(name: $projectName, entityName: $entityName) {
                 id
                 artifactCollection(name: $artifactCollectionName) {	
                     id	
-                    artifactMembership(aliasName: $digest) {
+                    artifactMembership(aliasName: $aliasName) {
                         id
                         artifact {
                             id
@@ -344,10 +353,10 @@ def artifact_version_created_by(
         }
         """,
         {
-            "entityName": artifact_version.entity,
-            "projectName": artifact_version.project,
-            "artifactCollectionName": artifact_version._artifact_name.split(":")[0],
-            "digest": artifact_version.digest,
+            "entityName": artifact_version._artifact_sequence._project._entity.entity_name,
+            "projectName": artifact_version._artifact_sequence._project.project_name,
+            "artifactCollectionName": artifact_version._artifact_sequence.artifact_collection_name,
+            "aliasName": f"v{artifact_version.version_index}",
         },
     )
     entity_name = res["project"]["artifactCollection"]["artifactMembership"][
@@ -365,31 +374,33 @@ def artifact_version_created_by(
         ]
         == "Run"
     ):
-        return wandb_public_api().run(f"{entity_name}/{project_name}/{run_name}")
+        return wb_domain_types.Run(
+            wb_domain_types.Project(wb_domain_types.Entity(entity_name), project_name),
+            run_name,
+        )
     return None
 
 
 def artifact_version_created_by_user(
-    artifact_version: wandb_api.Artifact,
+    artifact_version: wb_domain_types.ArtifactVersion,
 ) -> typing.Optional[wb_domain_types.User]:
     res = _query(
         """	
-        query ArtifactVersionCreatedBy(	
+        query artifact_version_created_by_user(	
             $entityName: String!,	
             $projectName: String!,	
             $artifactCollectionName: String!,	
-            $digest: String!,
+            $aliasName: String!,
         ) {	
             project(name: $projectName, entityName: $entityName) {
                 id
                 artifactCollection(name: $artifactCollectionName) {	
                     id	
-                    artifactMembership(aliasName: $digest) {
+                    artifactMembership(aliasName: $aliasName) {
                         id
                         artifact {
                             id
                             createdBy {
-                                __typename
                                 ... on User {
                                     id
                                     name
@@ -402,10 +413,10 @@ def artifact_version_created_by_user(
         }
         """,
         {
-            "entityName": artifact_version.entity,
-            "projectName": artifact_version.project,
-            "artifactCollectionName": artifact_version._artifact_name.split(":")[0],
-            "digest": artifact_version.digest,
+            "entityName": artifact_version._artifact_sequence._project._entity.entity_name,
+            "projectName": artifact_version._artifact_sequence._project.project_name,
+            "artifactCollectionName": artifact_version._artifact_sequence.artifact_collection_name,
+            "aliasName": f"v{artifact_version.version_index}",
         },
     )
     if (
@@ -415,29 +426,29 @@ def artifact_version_created_by_user(
         == "User"
     ):
         return wb_domain_types.User(
-            username=res["project"]["artifactCollection"]["artifactMembership"][
-                "artifact"
-            ]["createdBy"]["name"]
+            res["project"]["artifactCollection"]["artifactMembership"]["artifact"][
+                "createdBy"
+            ]["name"]
         )
     return None
 
 
 def artifact_version_artifact_collections(
-    artifact_version: wandb_api.Artifact,
-) -> list[wandb_api.ArtifactCollection]:
+    artifact_version: wb_domain_types.ArtifactVersion,
+) -> list[wb_domain_types.ArtifactCollection]:
     res = _query(
         """	
-        query ArtifactVersionCreatedBy(	
+        query artifact_version_artifact_collections(	
             $entityName: String!,	
             $projectName: String!,	
             $artifactCollectionName: String!,	
-            $digest: String!,
+            $aliasName: String!,
         ) {	
             project(name: $projectName, entityName: $entityName) {
                 id
                 artifactCollection(name: $artifactCollectionName) {	
                     id	
-                    artifactMembership(aliasName: $digest) {
+                    artifactMembership(aliasName: $aliasName) {
                         id
                         artifact {
                             artifactMemberships {
@@ -470,10 +481,10 @@ def artifact_version_artifact_collections(
         }
         """,
         {
-            "entityName": artifact_version.entity,
-            "projectName": artifact_version.project,
-            "artifactCollectionName": artifact_version._artifact_name.split(":")[0],
-            "digest": artifact_version.digest,
+            "entityName": artifact_version._artifact_sequence._project._entity.entity_name,
+            "projectName": artifact_version._artifact_sequence._project.project_name,
+            "artifactCollectionName": artifact_version._artifact_sequence.artifact_collection_name,
+            "aliasName": f"v{artifact_version.version_index}",
         },
     )
 
@@ -482,33 +493,35 @@ def artifact_version_artifact_collections(
     ]["artifactMemberships"]["edges"]
 
     return [
-        wandb_api.ArtifactCollection(
-            wandb_public_api().client,
-            memEdge["node"]["artifactCollection"]["project"]["entity"]["name"],
-            memEdge["node"]["artifactCollection"]["project"]["name"],
+        wb_domain_types.ArtifactCollection(
+            wb_domain_types.Project(
+                wb_domain_types.Entity(
+                    memEdge["node"]["artifactCollection"]["project"]["entity"]["name"]
+                ),
+                memEdge["node"]["artifactCollection"]["project"]["name"],
+            ),
             memEdge["node"]["artifactCollection"]["name"],
-            memEdge["node"]["artifactCollection"]["defaultArtifactType"]["name"],
         )
         for memEdge in membershipEdges
     ]
 
 
 def artifact_version_memberships(
-    artifact_version: wandb_api.Artifact,
-) -> list[wandb_api.ArtifactCollection]:
+    artifact_version: wb_domain_types.ArtifactVersion,
+) -> list[wb_domain_types.ArtifactCollectionMembership]:
     res = _query(
         """	
-        query ArtifactVersionCreatedBy(	
+        query artifact_version_memberships(	
             $entityName: String!,	
             $projectName: String!,	
             $artifactCollectionName: String!,	
-            $digest: String!,
+            $aliasName: String!,
         ) {	
             project(name: $projectName, entityName: $entityName) {
                 id
                 artifactCollection(name: $artifactCollectionName) {	
                     id	
-                    artifactMembership(aliasName: $digest) {
+                    artifactMembership(aliasName: $aliasName) {
                         id
                         artifact {
                             artifactMemberships {
@@ -543,10 +556,10 @@ def artifact_version_memberships(
         }
         """,
         {
-            "entityName": artifact_version.entity,
-            "projectName": artifact_version.project,
-            "artifactCollectionName": artifact_version._artifact_name.split(":")[0],
-            "digest": artifact_version.digest,
+            "entityName": artifact_version._artifact_sequence._project._entity.entity_name,
+            "projectName": artifact_version._artifact_sequence._project.project_name,
+            "artifactCollectionName": artifact_version._artifact_sequence.artifact_collection_name,
+            "aliasName": f"v{artifact_version.version_index}",
         },
     )
 
@@ -555,35 +568,18 @@ def artifact_version_memberships(
     ]["artifactMemberships"]["edges"]
     return [
         wb_domain_types.ArtifactCollectionMembership(
-            wandb_api.ArtifactCollection(
-                wandb_public_api().client,
-                memEdge["node"]["artifactCollection"]["project"]["entity"]["name"],
-                memEdge["node"]["artifactCollection"]["project"]["name"],
+            wb_domain_types.ArtifactCollection(
+                wb_domain_types.Project(
+                    wb_domain_types.Entity(
+                        memEdge["node"]["artifactCollection"]["project"]["entity"][
+                            "name"
+                        ]
+                    ),
+                    memEdge["node"]["artifactCollection"]["project"]["name"],
+                ),
                 memEdge["node"]["artifactCollection"]["name"],
-                memEdge["node"]["artifactCollection"]["defaultArtifactType"]["name"],
             ),
-            memEdge["node"]["commitHash"],
             memEdge["node"]["versionIndex"],
         )
         for memEdge in membershipEdges
     ]
-
-
-def artifact_version_artifact_type(
-    artifact_version: wandb_api.Artifact,
-) -> wandb_api.ArtifactType:
-    return wandb_public_api().artifact_type(
-        artifact_version.project, artifact_version.type
-    )
-
-
-def artifact_version_artifact_sequence(
-    artifact_version: wandb_api.Artifact,
-) -> wandb_api.ArtifactCollection:
-    return wandb_api.ArtifactCollection(
-        wandb_public_api().client,
-        artifact_version.entity,
-        artifact_version.project,
-        artifact_version._sequence_name,
-        artifact_version.type,
-    )

@@ -6,7 +6,7 @@ from .. import weave_types as types
 from ..language_features.tagging import make_tag_getter_op
 
 run_tag_getter_op = make_tag_getter_op.make_tag_getter_op(
-    "run", wb_domain_types.Run.WeaveType(), op_name="tag-run"
+    "run", wb_domain_types.Run.WeaveType(), op_name="tag-run"  # type: ignore
 )
 
 

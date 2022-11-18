@@ -14,10 +14,7 @@ def artifact_membership_version_index(
 def artifact_membership_aliases(
     artifactMembership: wb_domain_types.ArtifactCollectionMembership,
 ) -> list[wb_domain_types.ArtifactAlias]:
-    return [
-        wb_domain_types.ArtifactAlias(artifactMembership._artifact_collection, a)
-        for a in wandb_domain_gql.artifact_membership_aliases(artifactMembership)
-    ]
+    return wandb_domain_gql.artifact_membership_aliases(artifactMembership)
 
 
 @op(name="artifactMembership-collection")

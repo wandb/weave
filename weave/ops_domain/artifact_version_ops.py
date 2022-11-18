@@ -3,6 +3,7 @@ import typing
 from . import file_wbartifact
 from ..api import op
 from . import wb_domain_types
+from . import wbartifact
 from . import wandb_domain_gql
 from .. import weave_types as types
 from .. import refs
@@ -56,14 +57,16 @@ def artifact_version_created_by_user(
 def artifact_version_artifact_type(
     artifactVersion: wb_domain_types.ArtifactVersion,
 ) -> wb_domain_types.ArtifactType:
-    return wandb_domain_gql.artifact_version_artifact_type(artifactVersion)
+    return wandb_domain_gql.artifact_collection_artifact_type(
+        artifactVersion._artifact_sequence
+    )
 
 
 @op(name="artifactVersion-artifactSequence")
 def artifact_version_artifact_sequence(
     artifactVersion: wb_domain_types.ArtifactVersion,
 ) -> wb_domain_types.ArtifactCollection:
-    return wandb_domain_gql.artifact_version_artifact_sequence(artifactVersion)
+    return artifactVersion._artifact_sequence
 
 
 @op(name="artifactVersion-usedBy")
@@ -81,27 +84,6 @@ def artifact_version_used_by(
         )
         for r in artifactVersion.sdk_obj.used_by()
     ]
-
-
-@op(
-    name="artifactVersion-fileReturnType",
-    output_type=types.Type(),
-)
-def path_type(artifactVersion: wb_domain_types.ArtifactVersion, path: str):
-    try:
-        artifactVersion.sdk_obj.get_path(path)
-    except KeyError:
-        return types.DirType()
-    parts = path.split(".")
-    ext = ""
-    wb_object_type = types.NoneType()
-    if len(parts) != 1:
-        ext = parts[-1]
-    if len(parts) > 2 and ext == "json":
-        wb_object_type = types.Const(types.String(), parts[-2])
-    return types.FileType(
-        extension=types.Const(types.String(), ext), wb_object_type=wb_object_type
-    )
 
 
 @op(name="artifactVersion-id")
@@ -144,13 +126,16 @@ def files(
     return []
 
 
+# Special bridge functions to lower level local artifacts
+
+
 @op(
     name="artifactVersion-file",
     output_type=refs.ArtifactVersionFileType(),
 )
-def path(artifactVersion: wb_domain_types.ArtifactVersion, path: str):
+def file_(artifactVersion: wb_domain_types.ArtifactVersion, path: str):
     art_local = artifacts_local.WandbArtifact.from_wb_artifact(artifactVersion.sdk_obj)
-    return artifacts_local.ArtifactVersion.path.raw_resolve_fn(art_local, path)
+    return wbartifact.ArtifactVersion.path.raw_resolve_fn(art_local, path)
 
 
 # WHY DO I NEED THIS AS WELL?
@@ -160,4 +145,13 @@ def path(artifactVersion: wb_domain_types.ArtifactVersion, path: str):
 )
 def path(artifactVersion: wb_domain_types.ArtifactVersion, path: str):
     art_local = artifacts_local.WandbArtifact.from_wb_artifact(artifactVersion.sdk_obj)
-    return artifacts_local.ArtifactVersion.path.raw_resolve_fn(art_local, path)
+    return wbartifact.ArtifactVersion.path.raw_resolve_fn(art_local, path)
+
+
+@op(
+    name="artifactVersion-fileReturnType",
+    output_type=types.Type(),
+)
+def path_type(artifactVersion: wb_domain_types.ArtifactVersion, path: str):
+    art_local = artifacts_local.WandbArtifact.from_wb_artifact(artifactVersion.sdk_obj)
+    return wbartifact.ArtifactVersion.path_type.raw_resolve_fn(art_local, path)

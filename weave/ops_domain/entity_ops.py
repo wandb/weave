@@ -22,4 +22,4 @@ def entity_link(entity: wb_domain_types.Entity) -> wb_domain_types.Link:
 def entity_portfolios(
     entity: wb_domain_types.Entity,
 ) -> list[wb_domain_types.ArtifactCollection]:
-    return wandb_domain_gql.entity_portfolios(entity.entity_name)
+    return wandb_domain_gql.entity_portfolios(entity)

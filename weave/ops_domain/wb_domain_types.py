@@ -38,7 +38,7 @@ class Project:
 
     @property
     def sdk_obj(self) -> public.Project:
-        if not hasattr(self, "_sdk_obj") or self._sdk_obj is None:
+        if not hasattr(self, "_sdk_obj"):  # or self._sdk_obj is None:  # tyoe: ignore
             self._sdk_obj = _memoed_get_project(
                 self._entity.entity_name, self.project_name
             )
@@ -60,7 +60,7 @@ class Run:
 
     @property
     def sdk_obj(self) -> public.Run:
-        if not hasattr(self, "_sdk_obj") or self._sdk_obj is None:
+        if not hasattr(self, "_sdk_obj"):  # or self._sdk_obj is None:  # tyoe: ignore
             self._sdk_obj = _memoed_get_run(
                 self._project._entity.entity_name,
                 self._project.project_name,
@@ -97,7 +97,7 @@ class ArtifactType:
 
     @property
     def sdk_obj(self) -> public.Run:
-        if not hasattr(self, "_sdk_obj") or self._sdk_obj is None:
+        if not hasattr(self, "_sdk_obj"):  # or self._sdk_obj is None:  # tyoe: ignore
             self._sdk_obj = _memoed_get_artifact_type(
                 self._project._entity.entity_name,
                 self._project.project_name,
@@ -120,13 +120,8 @@ class ArtifactType:
 
 @safe_cache.safe_lru_cache(1000)
 def _memoed_get_artifact_collection(
-    entity_name: str, project_name: str, artifact_name: str
+    entity_name: str, project_name: str, artifact_name: str, type_name: str
 ):
-    from ..ops_domain.wandb_domain_gql import project_artifact_collection_type
-
-    type_name = project_artifact_collection_type(
-        entity_name, project_name, artifact_name
-    )
     return public.ArtifactCollection(
         wandb_public_api().client, entity_name, project_name, artifact_name, type_name
     )
@@ -140,11 +135,16 @@ class ArtifactCollection:
 
     @property
     def sdk_obj(self) -> public.ArtifactCollection:
-        if not hasattr(self, "_sdk_obj") or self._sdk_obj is None:
+        if not hasattr(self, "_sdk_obj"):  # or self._sdk_obj is None:  # tyoe: ignore
+            # This is a special case of needing to hit the API to get the type first!
+            from ..ops_domain.wandb_domain_gql import artifact_collection_artifact_type
+
+            type_name = artifact_collection_artifact_type(self).artifact_type_name
             self._sdk_obj = _memoed_get_artifact_collection(
                 self._project._entity.entity_name,
                 self._project.project_name,
                 self.artifact_collection_name,
+                type_name,
             )
         return self._sdk_obj
 
@@ -200,7 +200,7 @@ class ArtifactVersion:
 
     @property
     def sdk_obj(self) -> public.Artifact:
-        if not hasattr(self, "_sdk_obj") or self._sdk_obj is None:
+        if not hasattr(self, "_sdk_obj"):  # or self._sdk_obj is None:  # tyoe: ignore
             self._sdk_obj = _memoed_get_artifact_version(
                 self._artifact_sequence._project._entity.entity_name,
                 self._artifact_sequence._project.project_name,

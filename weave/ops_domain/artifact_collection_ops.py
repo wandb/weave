@@ -1,4 +1,4 @@
-from .wandb_domain_gql import project_artifact_collection_type
+from .wandb_domain_gql import artifact_collection_artifact_type
 from ..api import op
 from . import wb_domain_types
 from . import wandb_domain_gql

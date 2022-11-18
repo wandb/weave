@@ -160,7 +160,7 @@ def test_actual_config_value(fixed_random_seed):
     series2.set_y(lambda row: weave.ops.numbers_min(row["metric0"]))
     series2.set_y2(lambda row: weave.ops.numbers_max(row["metric0"]))
     series2.set_mark_constant("area")
-    print("PLOT CONFIG", storage.to_python(plot.config))
+    # print("PLOT CONFIG", storage.to_python(plot.config))
     assert storage.to_python(plot.config) == {
         "_type": {
             "type": "PlotConfig",

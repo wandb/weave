@@ -14,7 +14,7 @@ import weave
 
 def test_serialize(fake_wandb):
     proj = ops.project("shawn", "show-test")
-    av = proj.artifact_version("show", "v14")
+    av = proj.artifactVersion("show", "v14")
     file = av.path("test_results.table.json")
     table = file.table()
     rows = table.rows()

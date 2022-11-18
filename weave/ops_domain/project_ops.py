@@ -5,7 +5,7 @@ from . import wb_domain_types
 from ..language_features.tagging import make_tag_getter_op
 
 project_tag_getter_op = make_tag_getter_op.make_tag_getter_op(
-    "project", wb_domain_types.Project.WeaveType(), op_name="tag-project"
+    "project", wb_domain_types.Project.WeaveType(), op_name="tag-project"  # type: ignore
 )
 
 
@@ -73,7 +73,9 @@ def artifact_version(
             _project=project,
             artifact_collection_name=artifactName,
         ),
-        version_index=int(artifactVersionAlias),  # TODO: I think this could be an alias
+        version_index=int(
+            artifactVersionAlias.split("v")[0]
+        ),  # TODO: I think this could be an alias
     )
 
 

@@ -122,20 +122,16 @@ def wandb_public_api():
 
 
 def setup():
-    old_ops_domain_wandb_public_api = ops_domain.wandb_public_api
     old_wandb_api_wandb_public_api = wandb_api.wandb_public_api
-    old_wandb_domain_gql_wandb_public_api = wandb_domain_gql.wandb_public_api
-    ops_domain.wandb_public_api = wandb_public_api
     wandb_api.wandb_public_api = wandb_public_api
+    old_wandb_domain_gql_wandb_public_api = wandb_domain_gql.wandb_public_api
     wandb_domain_gql.wandb_public_api = wandb_public_api
     return (
-        old_ops_domain_wandb_public_api,
         old_wandb_api_wandb_public_api,
         old_wandb_domain_gql_wandb_public_api,
     )
 
 
 def teardown(setup_response):
-    ops_domain.wandb_public_api = setup_response[0]
-    wandb_api.wandb_public_api = setup_response[1]
-    wandb_domain_gql.wandb_public_api = setup_response[2]
+    wandb_api.wandb_public_api = setup_response[0]
+    wandb_domain_gql.wandb_public_api = setup_response[1]
