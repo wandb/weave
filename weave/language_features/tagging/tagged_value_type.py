@@ -52,6 +52,9 @@ class TaggedValueType(types.Type):
         assert types.TypedDict({}).assign_type(tag), (
             "Tags must be assignable to TypedDict, found %s" % tag
         )
+        # We flatten tags in Weave1
+        if isinstance(value, TaggedValueType):
+            tag = types.TypedDict({**tag.property_types, **value.tag.property_types})
         self.tag = tag
         self.value = value
 

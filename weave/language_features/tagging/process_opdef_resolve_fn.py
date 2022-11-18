@@ -7,9 +7,10 @@ the result of the op_def's resolve_fn.
 
 import typing
 
+from .tagged_value_type import TaggedValueType
 
 from ... import box
-
+from ... import weave_types as types
 from . import tag_store
 from .opdef_util import get_first_arg, should_flow_tags, should_tag_op_def_outputs
 
@@ -33,9 +34,18 @@ def process_opdef_resolve_fn(
         key, val = get_first_arg(op_def, args, kwargs)
         result_is_identity = id(val) == id(res)
         if not result_is_identity:
-            tag_store.add_tags(res, {key: val})
+            if isinstance(res, types.Type):
+                res = TaggedValueType(
+                    types.TypedDict({key: types.TypeRegistry.type_of(val)}), res
+                )
+            else:
+                tag_store.add_tags(res, {key: val})
     elif should_flow_tags(op_def):
         key, val = get_first_arg(op_def, args, kwargs)
         if tag_store.is_tagged(val):
-            tag_store.add_tags(res, tag_store.get_tags(val))
+            if isinstance(res, types.Type):
+                if isinstance(val, TaggedValueType):
+                    res = TaggedValueType(val.tag, res)
+            else:
+                tag_store.add_tags(res, tag_store.get_tags(val))
     return res

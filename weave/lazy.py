@@ -1,6 +1,7 @@
 # TODO: rename this file to op_call.py
 import logging
 import typing
+
 from . import graph
 from . import weave_types as types
 from . import context_state
@@ -41,6 +42,15 @@ def _make_output_node(
         tracer = engine_trace.tracer()
         with tracer.trace("refine.%s" % fq_op_name):
             output_type = api.use(called_refine_output_type)
+
+        # Sorry for this circular dep...
+        from weave.language_features.tagging import process_opdef_output_type
+
+        arg_types = {k: n.type for k, n in bound_params.items()}
+        op_def = registry_mem.memory_registry.get_op(fq_op_name)
+        output_type = process_opdef_output_type.process_opdef_refined_output_type(
+            output_type, arg_types, op_def
+        )
     elif callable(output_type):
         new_input_type = {}
         for k, n in bound_params.items():

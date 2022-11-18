@@ -107,6 +107,28 @@ def process_opdef_output_type(
         return output_type
 
 
+def process_opdef_refined_output_type(
+    output_type: types.Type,
+    input_types: typing.Dict[str, types.Type],
+    op_def: "OpDef.OpDef",
+) -> types.Type:
+    if should_tag_op_def_outputs(op_def):
+        first_arg_name = op_def.input_type.named_args()[0].name
+        return op_make_type_key_tag.resolve_fn(
+            output_type,
+            first_arg_name,
+            input_types[first_arg_name],
+        )
+    elif should_flow_tags(op_def):
+        first_arg_name = op_def.input_type.named_args()[0].name
+        return op_make_type_tagged.resolve_fn(
+            output_type,
+            op_get_tag_type.resolve_fn(input_types[first_arg_name]),
+        )
+    else:
+        return output_type
+
+
 def _currently_weavifying(input_types: typing.Any) -> bool:
     return isinstance(input_types, graph.Node) and types.TypedDict({}).assign_type(
         input_types.type
