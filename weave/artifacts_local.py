@@ -17,6 +17,7 @@ from . import safe_cache
 from . import context_state
 import wandb
 from wandb.apis import public as wb_public
+from wandb.util import hex_to_b64_id
 
 
 def local_artifact_dir() -> str:
@@ -47,53 +48,95 @@ def chdir(to_dir: str):
 def get_wandb_read_artifact(path):
     with chdir(wandb_artifact_dir()):
         artifact = wandb_api.wandb_public_api().artifact(path)
-        artifact.download()
+        # Can't download here, too expensive.
+        # artifact.download()
     return artifact
 
 
 @safe_cache.safe_lru_cache(1000)
-def get_wandb_read_client_artifact(art_id: str, art_version: str):
-    query = wb_public.gql(
-        """	
-    query ArtifactVersion(	
-        $id: ID!,	
-        $aliasName: String!	
-    ) {	
-        artifactCollection(id: $id) {	
-            id	
-            name	
-            project {	
+def get_wandb_read_client_artifact(art_id: str):
+    """art_id may be client_id, or seq:alias"""
+    if ":" in art_id:
+        art_id, art_version = art_id.split(":")
+        query = wb_public.gql(
+            """	
+        query ArtifactVersionFromIdAlias(	
+            $id: ID!,	
+            $aliasName: String!	
+        ) {	
+            artifactCollection(id: $id) {	
                 id	
                 name	
-                entity {	
+                project {	
+                    id	
+                    name	
+                    entity {	
+                        id	
+                        name	
+                    }	
+                }	
+                artifactMembership(aliasName: $aliasName) {	
+                    id	
+                    versionIndex	
+                }	
+                defaultArtifactType {	
                     id	
                     name	
                 }	
             }	
-            artifactMembership(aliasName: $aliasName) {	
-                id	
-                versionIndex	
-            }	
-            defaultArtifactType {	
-                id	
-                name	
+        }	
+        """
+        )
+        res = wandb_api.wandb_public_api().client.execute(
+            query,
+            variable_values={
+                "id": art_id,
+                "aliasName": art_version,
+            },
+        )
+        collection = res["artifactCollection"]
+        artifact_type_name = res["artifactCollection"]["defaultArtifactType"]["name"]
+        version_index = res["artifactCollection"]["artifactMembership"]["versionIndex"]
+    else:
+        query = wb_public.gql(
+            """	
+        query ArtifactVersionFromClientId(	
+            $id: ID!,	
+        ) {	
+            artifact(id: $id) {	
+                id
+                versionIndex
+                artifactType {	
+                    id	
+                    name	
+                }	
+                artifactSequence {
+                    id
+                    name
+                    project {
+                        id
+                        name
+                        entity {
+                            id
+                            name
+                        }
+                    }
+                }
             }	
         }	
-    }	
-    """
-    )
-    res = wandb_api.wandb_public_api().client.execute(
-        query,
-        variable_values={
-            "id": art_id,
-            "aliasName": art_version,
-        },
-    )
-    entity_name = res["artifactCollection"]["project"]["entity"]["name"]
-    project_name = res["artifactCollection"]["project"]["name"]
-    artifact_type_name = res["artifactCollection"]["defaultArtifactType"]["name"]
-    artifact_name = res["artifactCollection"]["name"]
-    version_index = res["artifactCollection"]["artifactMembership"]["versionIndex"]
+        """
+        )
+        res = wandb_api.wandb_public_api().client.execute(
+            query,
+            variable_values={"id": hex_to_b64_id(art_id)},
+        )
+        collection = res["artifact"]["artifactSequence"]
+        artifact_type_name = res["artifact"]["artifactType"]["name"]
+        version_index = res["artifact"]["versionIndex"]
+
+    entity_name = collection["project"]["entity"]["name"]
+    project_name = collection["project"]["name"]
+    artifact_name = collection["name"]
     version = f"v{version_index}"
 
     weave_art_uri = uris.WeaveWBArtifactURI.from_parts(
@@ -395,9 +438,9 @@ class WandbArtifact(Artifact):
                     found = True
             if found:
                 return os.path.join(self._saved_artifact._default_root(), name)
-        path = os.path.join(
-            wandb_artifact_dir(), self._saved_artifact.get_path(name).download()
-        )
+        art_dir = wandb_artifact_dir()
+        with chdir(art_dir):
+            path = os.path.join(art_dir, self._saved_artifact.get_path(name).download())
         # python module loading does not support colons
         # TODO: This is an extremely expensive fix!
         path_safe = path.replace(":", "_")

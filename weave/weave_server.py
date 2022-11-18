@@ -1,8 +1,11 @@
 import os
 import logging
 import pathlib
+import traceback
 import sys
+from flask import json
 from pythonjsonlogger import jsonlogger
+from werkzeug.exceptions import HTTPException
 
 
 from flask import Flask, Blueprint
@@ -253,6 +256,25 @@ def hello():
 
 # This makes all server logs go into the notebook
 app = make_app()
+
+if os.getenv("WEAVE_SERVER_DEBUG"):
+
+    @app.errorhandler(HTTPException)
+    def handle_exception(e):
+        """Return JSON instead of HTML for HTTP errors."""
+        # start with the correct headers and status code from the error
+        response = e.get_response()
+        # replace the body with JSON
+        response.data = json.dumps(
+            {
+                "code": e.code,
+                "name": e.name,
+                "description": e.description,
+                "exc_info": traceback.format_exc(),
+            }
+        )
+        response.content_type = "application/json"
+        return response
 
 
 @app.before_first_request

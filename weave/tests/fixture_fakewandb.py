@@ -8,6 +8,7 @@ from .. import ops_domain
 from .. import wandb_api
 
 TEST_TABLE_ARTIFACT_PATH = "testdata/wb_artifacts/test_res_1fwmcd3q:v0"
+ABS_TEST_TABLE_ARTIFACT_PATH = os.path.abspath(TEST_TABLE_ARTIFACT_PATH)
 
 
 class FakeProject:
@@ -47,7 +48,7 @@ class FakeVersion:
         )
         full_artifact_path = os.path.join(full_artifact_dir, path)
         os.makedirs(os.path.dirname(full_artifact_path), exist_ok=True)
-        artifact_path = os.path.join(TEST_TABLE_ARTIFACT_PATH, path)
+        artifact_path = os.path.join(ABS_TEST_TABLE_ARTIFACT_PATH, path)
         shutil.copy2(artifact_path, full_artifact_path)
         return FakePath(artifact_path)
 
