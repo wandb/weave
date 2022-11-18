@@ -11,7 +11,7 @@ from . import decorator_op
 _py_type = type
 
 
-def type(__override_name: str = None):
+def type(__override_name: str = None, __is_simple: bool = False):
     def wrap(target):
 
         dc = dataclasses.dataclass(target)
@@ -20,7 +20,14 @@ def type(__override_name: str = None):
         if __override_name is not None:
             target_name = __override_name
 
-        TargetType = _py_type(f"{target_name}Type", (types.ObjectType,), {})
+        if __is_simple:
+            bases = (
+                types.ObjectType,
+                types._PlainStringNamedType,
+            )
+        else:
+            bases = (types.ObjectType,)
+        TargetType = _py_type(f"{target_name}Type", bases, {})
         TargetType.name = target_name
         TargetType.instance_classes = target
         TargetType.instance_class = target

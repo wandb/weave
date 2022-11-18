@@ -133,7 +133,7 @@ def test_custom_saveload():
     )
     ref = storage.save(data)
     data2 = storage.get(str(ref))
-    print("data2", data2._artifact)
+    # print("data2", data2._artifact)
     assert weave.use(data2[0]["im"].width_()) == 256
 
 

@@ -6,6 +6,7 @@ from unittest import mock
 from .. import artifacts_local
 from .. import ops_domain
 from .. import wandb_api
+from ..ops_domain import wandb_domain_gql
 
 TEST_TABLE_ARTIFACT_PATH = "testdata/wb_artifacts/test_res_1fwmcd3q:v0"
 ABS_TEST_TABLE_ARTIFACT_PATH = os.path.abspath(TEST_TABLE_ARTIFACT_PATH)
@@ -39,6 +40,7 @@ class FakeVersion:
     project = "mendeleev"
     _sequence_name = "test_res_1fwmcd3q"
     version = "v0"
+    name = "test_res_1fwmcd3q:v0"
 
     manifest = FakeManifest()
 
@@ -59,13 +61,22 @@ class FakeVersion:
 class FakeVersions:
     __getitem__ = mock.Mock(return_value=FakeVersion())
 
+    def __iter__(self):
+        return iter([FakeVersion()])
+
 
 class FakeArtifact:
     versions = mock.Mock(return_value=FakeVersions())
+    entity = "stacey"
+    project = "mendeleev"
+    name = "test_res_1fwmcd3q"
 
 
 class FakeArtifacts:
     __getitem__ = mock.Mock(return_value=FakeArtifact())
+
+    def __iter__(self):
+        return iter([FakeArtifact()])
 
 
 class FakeArtifactType:
@@ -73,7 +84,35 @@ class FakeArtifactType:
     collections = mock.Mock(return_value=FakeArtifacts())
 
 
+class FakeClient:
+    def execute(self, gql, variable_values):
+        if gql.definitions[0].operation == "query":
+            if (
+                gql.definitions[0].name.value
+                == "artifact_collection_membership_for_alias"
+            ):
+                return {
+                    "project": {
+                        "artifactCollection": {
+                            "artifactMembership": {
+                                "commitHash": "xyz",
+                                "versionIndex": "0",
+                            }
+                        }
+                    }
+                }
+            elif (
+                gql.definitions[0].name.value == "ArtifactCollection"
+            ):  # this is for public.py::ArtifactCollection.load
+                return {"project": {"artifactType": {"artifactSequence": {"id": 1001}}}}
+
+        raise Exception(
+            "Query was not mocked - please fill out in fixture_fakewandb.py"
+        )
+
+
 class FakeApi:
+    client = FakeClient()
     project = mock.Mock(return_value=FakeProject())
     artifact_type = mock.Mock(return_value=FakeArtifactType())
     artifact = mock.Mock(return_value=FakeVersion())
@@ -87,13 +126,16 @@ def wandb_public_api():
 
 
 def setup():
-    old_ops_domain_wandb_public_api = ops_domain.wandb_public_api
     old_wandb_api_wandb_public_api = wandb_api.wandb_public_api
-    ops_domain.wandb_public_api = wandb_public_api
     wandb_api.wandb_public_api = wandb_public_api
-    return old_ops_domain_wandb_public_api, old_wandb_api_wandb_public_api
+    old_wandb_domain_gql_wandb_public_api = wandb_domain_gql.wandb_public_api
+    wandb_domain_gql.wandb_public_api = wandb_public_api
+    return (
+        old_wandb_api_wandb_public_api,
+        old_wandb_domain_gql_wandb_public_api,
+    )
 
 
 def teardown(setup_response):
-    ops_domain.wandb_public_api = setup_response[0]
-    wandb_api.wandb_public_api = setup_response[1]
+    wandb_api.wandb_public_api = setup_response[0]
+    wandb_domain_gql.wandb_public_api = setup_response[1]

@@ -179,7 +179,7 @@ def test_groupby_list_weavejs_form(table_type):
         ),
     )
     grouped = table.groupby(groupby_fn)
-    print("GROUPED TYPE", grouped.type)
+    # print("GROUPED TYPE", grouped.type)
     weave.use(
         graph.OutputNode(
             types.String(),

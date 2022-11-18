@@ -1,3 +1,4 @@
+import typing
 from ..api import op, mutation, weave_class
 from .. import weave_types as types
 
@@ -35,3 +36,9 @@ class Boolean:
 
 
 types.Boolean.instance_class = Boolean
+
+
+@op(name="none-coalesce")
+def none_coalesce(a: typing.Any, b: typing.Any) -> typing.Any:
+    # TODO: This logic is really complicated in Weavae0.
+    return a or b

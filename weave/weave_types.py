@@ -449,10 +449,21 @@ class Const(Type):
 
     @classmethod
     def from_dict(cls, d):
-        return cls(TypeRegistry.type_from_dict(d["valType"]), d["val"])
+        w_type = TypeRegistry.type_from_dict(d["valType"])
+        val = d["val"]
+        # try:
+        #     val = w_type.instance_from_dict(val)
+        # except NotImplementedError:
+        #     pass
+        return cls(w_type, val)
 
     def _to_dict(self):
-        return {"valType": self.val_type.to_dict(), "val": self.val}
+        val = self.val
+        # try:
+        #     val = self.val_type.instance_to_dict(val)
+        # except NotImplementedError:
+        #     pass
+        return {"valType": self.val_type.to_dict(), "val": val}
 
     def __str__(self):
         return "<Const %s %s>" % (self.val_type, self.val)

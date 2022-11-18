@@ -12,7 +12,7 @@ from ..ops_primitives import file as weave_file
 
 
 class ArtifactVersionType(types._PlainStringNamedType):
-    name = "artifactVersion"
+    name = "artifactLocalVersion"
     instance_classes = artifacts_local.WandbArtifact
     instance_class = artifacts_local.WandbArtifact
 
@@ -28,7 +28,7 @@ class ArtifactVersionType(types._PlainStringNamedType):
 @weave_class(weave_type=ArtifactVersionType)
 class ArtifactVersion:
     @op(
-        name="artifactVersion-fileReturnType",
+        name="artifactLocalVersion-fileReturnType",
         input_type={"artifactVersion": ArtifactVersionType(), "path": types.String()},
         output_type=types.Type(),
     )
@@ -48,14 +48,14 @@ class ArtifactVersion:
             extension=types.Const(types.String(), ext), wb_object_type=wb_object_type
         )
 
-    @op(name="artifactVersion-name")
+    @op(name="artifactLocalVersion-name")
     def name(artifactVersion: artifacts_local.WandbArtifact) -> str:  # type: ignore
         # TODO: we actually get an artifact version file here because
         # we get refs types messed up somehow
         return getattr(artifactVersion, "name", "BUG a192bx (search weave code)")
 
     @op(
-        name="artifactVersion-file",
+        name="artifactLocalVersion-file",
         input_type={"artifactVersion": ArtifactVersionType(), "path": types.String()},
         # TODO: This Type is not complete (missing DirType())
         # TODO: This needs to call ArtifactVersion.path_type()
@@ -63,7 +63,7 @@ class ArtifactVersion:
     )
     # TODO: This function should probably be called path, but it return Dir or File.
     # ok...
-    def path(artifactVersion, path):
+    def file(artifactVersion, path):
         if ":" in path:
             # This is a URI
 
