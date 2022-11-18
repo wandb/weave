@@ -80,7 +80,7 @@ def artifact_version_used_by(
                 _entity=wb_domain_types.Entity(r.entity),
                 project_name=r.project,
             ),
-            run_name=r.name,
+            run_id=r.id,
         )
         for r in artifactVersion.sdk_obj.used_by()
     ]

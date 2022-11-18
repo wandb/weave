@@ -36,14 +36,14 @@ def jobtype(run: wb_domain_types.Run) -> str:
 
 @op(name="run-name")
 def name(run: wb_domain_types.Run) -> str:
-    return run.run_name
+    return run.sdk_obj.name
 
 
 @op(name="run-link")
 def link(run: wb_domain_types.Run) -> wb_domain_types.Link:
     return wb_domain_types.Link(
         run.sdk_obj.display_name,
-        f"/{run._project._entity.entity_name}/{run._project.project_name}/runs/{run.run_name}",
+        f"/{run._project._entity.entity_name}/{run._project.project_name}/runs/{run.run_id}",
     )
 
 

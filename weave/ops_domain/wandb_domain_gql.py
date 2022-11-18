@@ -76,6 +76,38 @@ def artifact_collection_artifact_type(
     )
 
 
+def entity_projects(
+    entity: wb_domain_types.Entity,
+) -> list[wb_domain_types.Project]:
+    res = _query(
+        """
+        query entity_projects(
+            $entityName: String!,
+        ) {
+            entity(name: $entityName) {
+                id
+                projects {
+                    edges {
+                        node {
+                            id
+                            name
+                        }
+                    }
+                }
+            }
+        }
+        """,
+        {"entityName": entity.entity_name},
+    )
+
+    projectNodes = res["entity"]["projects"]["edges"]
+
+    return [
+        wb_domain_types.Project(entity, projNode["node"]["name"])
+        for projNode in projectNodes
+    ]
+
+
 def entity_portfolios(
     entity: wb_domain_types.Entity,
 ) -> list[wb_domain_types.ArtifactCollection]:
@@ -367,7 +399,7 @@ def artifact_version_created_by(
     project_name = res["project"]["artifactCollection"]["artifactMembership"][
         "artifact"
     ]["createdBy"]["project"]["name"]
-    run_name = res["project"]["artifactCollection"]["artifactMembership"]["artifact"][
+    run_id = res["project"]["artifactCollection"]["artifactMembership"]["artifact"][
         "createdBy"
     ]["name"]
     if (
@@ -378,7 +410,7 @@ def artifact_version_created_by(
     ):
         return wb_domain_types.Run(
             wb_domain_types.Project(wb_domain_types.Entity(entity_name), project_name),
-            run_name,
+            run_id,
         )
     return None
 

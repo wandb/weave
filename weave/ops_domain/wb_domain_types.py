@@ -11,17 +11,17 @@ from ..decorator_type import type as weave_type
 # or what the min data needed to get the object via GQL.
 
 
-@weave_type("org")
+@weave_type("org", True)
 class Org:
     pass
 
 
-@weave_type("entity")
+@weave_type("entity", True)
 class Entity:
     entity_name: str
 
 
-@weave_type("user")  # TODO: How to decailt this is an instance of entity?
+@weave_type("user", True)  # TODO: How to decailt this is an instance of entity?
 class User:
     user_name: str
 
@@ -31,7 +31,7 @@ def _memoed_get_project(entity_name: str, project_name: str):
     return wandb_api.wandb_public_api().project(project_name, entity_name)
 
 
-@weave_type("project")
+@weave_type("project", True)
 class Project:
     _entity: Entity
     project_name: str
@@ -49,14 +49,14 @@ class Project:
 # serialized. Without caching here, the mappers end up loading
 # the run for every tagged cell in the table!
 @safe_cache.safe_lru_cache(1000)
-def _memoed_get_run(entity_name: str, project_name: str, run_name: str):
-    return wandb_api.wandb_public_api().run(f"{entity_name}/{project_name}/{run_name}")
+def _memoed_get_run(entity_name: str, project_name: str, run_id: str):
+    return wandb_api.wandb_public_api().run(f"{entity_name}/{project_name}/{run_id}")
 
 
-@weave_type("run")
+@weave_type("run", True)
 class Run:
     _project: Project
-    run_name: str
+    run_id: str
 
     @property
     def sdk_obj(self) -> public.Run:
@@ -64,7 +64,7 @@ class Run:
             self._sdk_obj = _memoed_get_run(
                 self._project._entity.entity_name,
                 self._project.project_name,
-                self.run_name,
+                self.run_id,
             )
         return self._sdk_obj
 
@@ -75,7 +75,7 @@ class Run:
                 _entity=Entity(entity_name=obj.entity),
                 project_name=obj.project,
             ),
-            run_name=obj.name,
+            run_id=obj.id,
         )
         setattr(inst, "_sdk_obj", obj)
         return inst
@@ -90,7 +90,7 @@ def _memoed_get_artifact_type(
     )
 
 
-@weave_type("artifactType")
+@weave_type("artifactType", True)
 class ArtifactType:
     _project: Project
     artifact_type_name: str
@@ -132,7 +132,7 @@ def _memoed_get_artifact_collection(
 
 
 # Note: the SDK does not support portfolios yet, so we should make a PR to ensure fix that
-@weave_type("artifact")  # Name mismatch intention due to weave0
+@weave_type("artifact", True)  # Name mismatch intention due to weave0
 class ArtifactCollection:
     _project: Project
     artifact_collection_name: str
@@ -165,7 +165,7 @@ class ArtifactCollection:
         return inst
 
 
-@weave_type("artifactMembership")  # Name mismatch intention due to weave0
+@weave_type("artifactMembership", True)  # Name mismatch intention due to weave0
 class ArtifactCollectionMembership:
     _artifact_collection: ArtifactCollection
     # commit_hash: str
@@ -181,7 +181,7 @@ def _memoed_get_artifact_version(
     )
 
 
-@weave_type("artifactVersion")
+@weave_type("artifactVersion", True)
 class ArtifactVersion:
     _artifact_sequence: ArtifactCollection  # home collection
     # digest: str
@@ -214,7 +214,7 @@ class ArtifactVersion:
         return self._sdk_obj
 
 
-@weave_type("artifactAlias")
+@weave_type("artifactAlias", True)
 class ArtifactAlias:
     _artifact_collection: ArtifactCollection
     alias_name: str
@@ -223,12 +223,12 @@ class ArtifactAlias:
 # Simple types (maybe should be put into primtives?)
 
 
-@weave_type("date")
+@weave_type("date", True)
 class Date:
     pass
 
 
-@weave_type("link")
+@weave_type("link", True)
 class Link:
     name: str
     url: str

@@ -23,3 +23,10 @@ def entity_portfolios(
     entity: wb_domain_types.Entity,
 ) -> list[wb_domain_types.ArtifactCollection]:
     return wandb_domain_gql.entity_portfolios(entity)
+
+
+@op(name="entity-projects")
+def entity_projects(
+    entity: wb_domain_types.Entity,
+) -> list[wb_domain_types.Project]:
+    return wandb_domain_gql.entity_projects(entity)
