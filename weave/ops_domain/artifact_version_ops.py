@@ -135,7 +135,7 @@ def files(
     output_type=refs.ArtifactVersionFileType(),
 )
 def file_(artifactVersion: wb_domain_types.ArtifactVersion, path: str):
-    # TODO (tim): This is a total hack - I am not sure why dispatch is sending use thsese
+    # TODO (tim): This is a total hack - I am not sure why dispatch is sending use these
     if isinstance(artifactVersion, artifacts_local.Artifact):
         logging.warning(
             "Expected input to be of type ArtifactVersion, but got artifacts_local.Artifact in artifactVersion-file"
@@ -145,26 +145,7 @@ def file_(artifactVersion: wb_domain_types.ArtifactVersion, path: str):
         art_local = artifacts_local.WandbArtifact.from_wb_artifact(
             artifactVersion.sdk_obj
         )
-    return wbartifact.ArtifactVersion.path.raw_resolve_fn(art_local, path)
-
-
-# WHY DO I NEED THIS AS WELL?
-@op(
-    name="artifactVersion-path",
-    output_type=refs.ArtifactVersionFileType(),
-)
-def path(artifactVersion: wb_domain_types.ArtifactVersion, path: str):
-    # TODO (tim): This is a total hack - I am not sure why dispatch is sending use thsese
-    if isinstance(artifactVersion, artifacts_local.Artifact):
-        logging.warning(
-            "Expected input to be of type ArtifactVersion, but got artifacts_local.Artifact in artifactVersion-file"
-        )
-        art_local = artifactVersion
-    else:
-        art_local = artifacts_local.WandbArtifact.from_wb_artifact(
-            artifactVersion.sdk_obj
-        )
-    return wbartifact.ArtifactVersion.path.raw_resolve_fn(art_local, path)
+    return wbartifact.ArtifactVersion.file.raw_resolve_fn(art_local, path)
 
 
 @op(
@@ -175,7 +156,7 @@ def path_type(artifactVersion: wb_domain_types.ArtifactVersion, path: str):
     # TODO (tim): This is a total hack - I am not sure why dispatch is sending use thsese
     if isinstance(artifactVersion, artifacts_local.Artifact):
         logging.warning(
-            "Expected input to be of type ArtifactVersion, but got artifacts_local.Artifact in artifactVersion-file"
+            "Expected input to be of type ArtifactVersion, but got artifacts_local.Artifact in artifactVersion-fileReturnType"
         )
         art_local = artifactVersion
     else:

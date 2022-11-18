@@ -63,7 +63,7 @@ class ArtifactVersion:
     )
     # TODO: This function should probably be called path, but it return Dir or File.
     # ok...
-    def path(artifactVersion, path):
+    def file(artifactVersion, path):
         if ":" in path:
             # This is a URI
 

@@ -19,7 +19,7 @@ TEST_TABLE_ARTIFACT_PATH = "testdata/wb_artifacts/test_res_1fwmcd3q:v0"
         .artifactType("test_results")
         .artifacts()[0]
         .versions()[0]
-        .path("test_results.table.json"),
+        .file("test_results.table.json"),
         # Path used in artifact browser
         ops.project("stacey", "mendeleev")
         .artifact("test_results")
@@ -39,7 +39,7 @@ def test_table_call(table_file_node, fake_wandb):
     # TODO: fix
     image0_url_node = (
         ops.wbartifact.artifactVersion(table_image0_node)
-        .path(
+        .file(
             "wandb-artifact://stacey/mendeleev/test_res_1fwmcd3q:v0?file=media%2Fimages%2F8f65e54dc684f7675aec.png"
         )
         .direct_url_as_of(1654358491562)
