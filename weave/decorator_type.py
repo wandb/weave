@@ -21,7 +21,10 @@ def type(__override_name: str = None, __is_simple: bool = False):
             target_name = __override_name
 
         if __is_simple:
-            bases = (types._PlainStringNamedType,)
+            bases = (
+                types.ObjectType,
+                types._PlainStringNamedType,
+            )
         else:
             bases = (types.ObjectType,)
         TargetType = _py_type(f"{target_name}Type", bases, {})
