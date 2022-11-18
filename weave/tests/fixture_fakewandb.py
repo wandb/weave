@@ -60,7 +60,8 @@ class FakeVersion:
 class FakeVersions:
     __getitem__ = mock.Mock(return_value=FakeVersion())
 
-    __iter__ = mock.Mock(return_value=iter([FakeVersion()]))
+    def __iter__(self):
+        return iter([FakeVersion()])
 
 
 class FakeArtifact:
@@ -73,7 +74,8 @@ class FakeArtifact:
 class FakeArtifacts:
     __getitem__ = mock.Mock(return_value=FakeArtifact())
 
-    __iter__ = mock.Mock(return_value=iter([FakeArtifact()]))
+    def __iter__(self):
+        return iter([FakeArtifact()])
 
 
 class FakeArtifactType:
