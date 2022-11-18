@@ -40,11 +40,13 @@ def artifacts(
     project: wb_domain_types.Project,
 ) -> list[wb_domain_types.ArtifactCollection]:
     # TODO: Create a custom query for this - very expensive to fetch all artifacts
-    return [
-        wb_domain_types.ArtifactCollection.from_sdk_obj(col)
-        for at in project.sdk_obj.artifact_types()
-        for col in at.collections()
-    ]
+    res: list[wb_domain_types.ArtifactCollection] = []
+    for at in project.sdk_obj.artifact_types():
+        for col in at.collections():
+            if len(res) == 50:
+                break
+            res.append(wb_domain_types.ArtifactCollection.from_sdk_obj(col))
+    return res
 
 
 @op(name="project-artifactTypes")
@@ -52,10 +54,12 @@ def artifact_types(
     project: wb_domain_types.Project,
 ) -> list[wb_domain_types.ArtifactType]:
     # TODO: Create custom query
-    return [
-        wb_domain_types.ArtifactType.from_sdk_obj(at)
-        for at in project.sdk_obj.artifacts_types()
-    ]
+    res: list[wb_domain_types.ArtifactType] = []
+    for at in project.sdk_obj.artifacts_types():
+        if len(res) == 50:
+            break
+        res.append(wb_domain_types.ArtifactType.from_sdk_obj(at))
+    return res
 
 
 @op(name="project-artifactType")
@@ -91,12 +95,14 @@ def artifact_version(
 @op(name="project-runs")
 def runs(project: wb_domain_types.Project) -> list[wb_domain_types.Run]:
     # TODO: Create custom query
-    return [
-        wb_domain_types.Run.from_sdk_obj(run)
-        for run in wandb_public_api().runs(
-            f"{project._entity.entity_name}/{project.project_name}", per_page=500
-        )
-    ]
+    res: list[wb_domain_types.Run] = []
+    for run in wandb_public_api().runs(
+        f"{project._entity.entity_name}/{project.project_name}", per_page=50
+    ):
+        if len(res) == 50:
+            break
+        res.append(wb_domain_types.Run.from_sdk_obj(run))
+    return res
 
 
 @op(name="project-filteredRuns")
@@ -104,15 +110,17 @@ def filtered_runs(
     project: wb_domain_types.Project, filter: str, order: str
 ) -> list[wb_domain_types.Run]:
     # TODO: Create custom query
-    return [
-        wb_domain_types.Run.from_sdk_obj(run)
-        for run in wandb_public_api().runs(
-            f"{project._entity.entity_name}/{project.project_name}",
-            filters=json.loads(filter),
-            order=order,
-            per_page=500,
-        )
-    ]
+    res: list[wb_domain_types.Run] = []
+    for run in wandb_public_api().runs(
+        f"{project._entity.entity_name}/{project.project_name}",
+        filters=json.loads(filter),
+        order=order,
+        per_page=50,
+    ):
+        if len(res) == 50:
+            break
+        res.append(wb_domain_types.Run.from_sdk_obj(run))
+    return res
 
 
 @op(name="project-artifact")

@@ -21,7 +21,7 @@ def should_tag_op_def_outputs(op_def: "OpDef.OpDef") -> bool:
                 isinstance(named_args[0].type, types.ObjectType)
                 and named_args[0].type.name.startswith("Test")
             )
-            or named_args[0].type.__class__.__name__ in ["ProjectType", "RunType"]
+            or named_args[0].type.__class__.__name__ in ["Project", "Run"]
         )
     )
 

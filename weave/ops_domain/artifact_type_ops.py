@@ -12,7 +12,9 @@ def artifacts(
     artifactType: wb_domain_types.ArtifactType,
 ) -> list[wb_domain_types.ArtifactCollection]:
     # TODO: Convert this to its own query
-    return [
-        wb_domain_types.ArtifactCollection.from_sdk_obj(c)
-        for c in artifactType.sdk_obj.collections()
-    ]
+    res: list[wb_domain_types.ArtifactCollection] = []
+    for c in artifactType.sdk_obj.collections():
+        if len(res) == 50:
+            break
+        res.append(wb_domain_types.ArtifactCollection.from_sdk_obj(c))
+    return res

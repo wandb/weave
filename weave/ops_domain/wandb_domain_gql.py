@@ -4,8 +4,6 @@ from wandb.apis import public as wandb_api
 from ..wandb_api import wandb_public_api
 from . import wb_domain_types
 
-# TODO; Check for unused
-
 
 def _query(query_str, variables={}):
     return wandb_public_api().client.execute(
@@ -86,7 +84,7 @@ def entity_projects(
         ) {
             entity(name: $entityName) {
                 id
-                projects {
+                projects(first: 50) {
                     edges {
                         node {
                             id
@@ -118,7 +116,7 @@ def entity_portfolios(
         ) {
             entity(name: $entityName) {
                 id
-                artifactCollections(collectionTypes: [PORTFOLIO]) {
+                artifactCollections(collectionTypes: [PORTFOLIO], first:50) {
                     edges {
                         node {
                             id
@@ -252,7 +250,7 @@ def artifact_collection_aliases(
                 id
                 artifactCollection(name: $artifactCollectionName) {	
                     id	
-                    aliases {
+                    aliases(first: 50) {
                         edges {
                             node {
                                 id

@@ -75,16 +75,20 @@ def artifact_version_used_by(
     artifactVersion: wb_domain_types.ArtifactVersion,
 ) -> list[wb_domain_types.Run]:
     # TODO: Convert this to it's own query
-    return [
-        wb_domain_types.Run(
-            _project=wb_domain_types.Project(
-                _entity=wb_domain_types.Entity(r.entity),
-                project_name=r.project,
-            ),
-            run_id=r.id,
+    res: list[wb_domain_types.Run] = []
+    for r in artifactVersion.sdk_obj.used_by():
+        if len(res) == 50:
+            break
+        res.append(
+            wb_domain_types.Run(
+                _project=wb_domain_types.Project(
+                    _entity=wb_domain_types.Entity(r.entity),
+                    project_name=r.project,
+                ),
+                run_id=r.id,
+            )
         )
-        for r in artifactVersion.sdk_obj.used_by()
-    ]
+    return res
 
 
 @op(name="artifactVersion-id")
