@@ -3,10 +3,9 @@ import shutil
 from unittest import mock
 
 import pytest
+from ..ops_primitives.list_ import list_indexCheckpoint
 from .. import api as weave
 from .. import ops as ops
-from .. import ops_domain
-from .. import wandb_api
 
 TEST_TABLE_ARTIFACT_PATH = "testdata/wb_artifacts/test_res_1fwmcd3q:v0"
 
@@ -71,3 +70,41 @@ def test_missing_file(fake_wandb):
         .file("does_not_exist")
     )
     assert weave.use(node) == None
+
+
+def test_mapped_table_runs_tags(fake_wandb):
+    node = (
+        ops.project("stacey", "mendeleev")
+        .runs()
+        .limit(1)
+        .summary()["table"]
+        .table()
+        .rows()
+        .dropna()
+        .concat()
+    )
+    # This explicit call is needed b/c assignability is not working for tags with refines
+    node = list_indexCheckpoint.call_fn(node)
+    node = node[0]
+    # This explicit call is needed b/c assignability is not working for weave arrow list
+    node = ops.runs_ops.run_tag_getter_op.call_fn(node)
+    node = node.name()
+    assert weave.use(node) == "test_run_name"
+
+
+def test_table_run_tags(fake_wandb):
+    node = (
+        ops.project("stacey", "mendeleev")
+        .runs()
+        .limit(1)[0]
+        .summary()["table"]
+        .table()
+        .rows()
+    )
+    # This explicit call is needed b/c assignability is not working for tags with refines
+    node = list_indexCheckpoint.call_fn(node)
+    node = node[0]
+    # This explicit call is needed b/c assignability is not working for weave arrow list
+    node = ops.runs_ops.run_tag_getter_op.call_fn(node)
+    node = node.name()
+    assert weave.use(node) == "test_run_name"

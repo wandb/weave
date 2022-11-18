@@ -95,6 +95,30 @@ class FakeArtifactType:
     collections = mock.Mock(return_value=FakeArtifacts())
 
 
+class FakeSummary:
+    _json_dict = {
+        "table": {
+            "_type": "table-file",
+            "artifact_path": "wandb-client-artifact://1234567890/test_results.table.json",
+        }
+    }
+
+
+class FakeRun:
+    entity = "stacey"
+    project = "mendeleev"
+    id = "test_run_id"
+    name = "test_run_name"
+    summary = FakeSummary()
+
+
+class FakeRuns:
+    __getitem__ = mock.Mock(return_value=FakeRun())
+
+    def __iter__(self):
+        return iter([FakeRun()])
+
+
 class FakeClient:
     def execute(self, gql, variable_values):
         if gql.definitions[0].operation == "query":
@@ -116,6 +140,28 @@ class FakeClient:
                 gql.definitions[0].name.value == "ArtifactCollection"
             ):  # this is for public.py::ArtifactCollection.load
                 return {"project": {"artifactType": {"artifactSequence": {"id": 1001}}}}
+            elif gql.definitions[0].name.value == "ArtifactVersionFromClientId":
+                return {
+                    "artifact": {
+                        "versionIndex": 0,
+                        "artifactType": {
+                            "id": 1,
+                            "name": "test_data",
+                        },
+                        "artifactSequence": {
+                            "id": 1,
+                            "name": "test_res_1fwmcd3q",
+                            "project": {
+                                "id": 1,
+                                "name": "mendeleev",
+                                "entity": {
+                                    "id": 1,
+                                    "name": "stacey",
+                                },
+                            },
+                        },
+                    }
+                }
 
         raise Exception(
             "Query was not mocked - please fill out in fixture_fakewandb.py"
@@ -127,6 +173,8 @@ class FakeApi:
     project = mock.Mock(return_value=FakeProject())
     artifact_type = mock.Mock(return_value=FakeArtifactType())
     artifact = mock.Mock(return_value=FakeVersion())
+    runs = mock.Mock(return_value=FakeRuns())
+    run = mock.Mock(return_value=FakeRun())
 
 
 fake_api = FakeApi()
