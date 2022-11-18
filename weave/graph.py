@@ -359,3 +359,9 @@ def linearize(node: Node) -> typing.Optional[list[OutputNode]]:
     if not isinstance(node, OutputNode):
         return None
     return _linearize(node)
+
+
+def map_const_nodes_to_x(node: Node) -> Node:
+    return map_nodes(
+        node, lambda n: n if not isinstance(n, ConstNode) else VarNode(n.type, "x")
+    )

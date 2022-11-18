@@ -180,9 +180,6 @@ def execute():
     ):
         current_span.set_tag("response", response)
 
-    if request.headers.get("weave-shadow"):
-        response["data"] = []
-
     return response
 
 

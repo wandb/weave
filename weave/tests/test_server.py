@@ -61,16 +61,3 @@ def test_500_does_raise_jsondecode_error_from_http_server():
         # should not raise json decoder error, but an HTTP error insteard
         with pytest.raises(requests.exceptions.HTTPError):
             weave.use(custom_op_that_should_return_500("abcd"), client=wc)
-
-
-def test_shadow_server(http_server_test_client):
-
-    node = make_const_node(types.Int(), 1)
-    resnode = node + 1
-
-    # test that shadow is executed properly
-    res = http_server_test_client.execute(
-        [resnode],
-        headers={"weave-shadow": True},
-    )
-    assert res == []
