@@ -2,7 +2,7 @@
 
 from wandb.apis import public
 
-from ..wandb_api import wandb_public_api
+from .. import wandb_api
 from .. import safe_cache
 from ..decorator_type import type as weave_type
 
@@ -28,7 +28,7 @@ class User:
 
 @safe_cache.safe_lru_cache(1000)
 def _memoed_get_project(entity_name: str, project_name: str):
-    return wandb_public_api().project(project_name, entity_name)
+    return wandb_api.wandb_public_api().project(project_name, entity_name)
 
 
 @weave_type("project")
@@ -50,7 +50,7 @@ class Project:
 # the run for every tagged cell in the table!
 @safe_cache.safe_lru_cache(1000)
 def _memoed_get_run(entity_name: str, project_name: str, run_name: str):
-    return wandb_public_api().run(f"{entity_name}/{project_name}/{run_name}")
+    return wandb_api.wandb_public_api().run(f"{entity_name}/{project_name}/{run_name}")
 
 
 @weave_type("run")
@@ -85,7 +85,7 @@ class Run:
 def _memoed_get_artifact_type(
     entity_name: str, project_name: str, artifact_type_name: str
 ):
-    return wandb_public_api().artifact_type(
+    return wandb_api.wandb_public_api().artifact_type(
         artifact_type_name, f"{entity_name}/{project_name}"
     )
 
@@ -123,7 +123,11 @@ def _memoed_get_artifact_collection(
     entity_name: str, project_name: str, artifact_name: str, type_name: str
 ):
     return public.ArtifactCollection(
-        wandb_public_api().client, entity_name, project_name, artifact_name, type_name
+        wandb_api.wandb_public_api().client,
+        entity_name,
+        project_name,
+        artifact_name,
+        type_name,
     )
 
 
@@ -172,7 +176,7 @@ class ArtifactCollectionMembership:
 def _memoed_get_artifact_version(
     entity_name: str, project_name: str, artifact_name: str, version_index: int
 ):
-    return wandb_public_api().artifact(
+    return wandb_api.wandb_public_api().artifact(
         f"{entity_name}/{project_name}/{artifact_name}:v{version_index}"
     )
 
@@ -191,7 +195,7 @@ class ArtifactVersion:
                     _entity=Entity(entity_name=obj.entity),
                     project_name=obj.project,
                 ),
-                artifact_collection_name=obj.name,
+                artifact_collection_name=obj.name.split(":")[0],
             ),
             version_index=obj.version.split("v")[1],
         )

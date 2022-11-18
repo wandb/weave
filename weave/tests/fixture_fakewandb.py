@@ -39,6 +39,7 @@ class FakeVersion:
     project = "mendeleev"
     _sequence_name = "test_res_1fwmcd3q"
     version = "v0"
+    name = "test_res_1fwmcd3q:v0"
 
     manifest = FakeManifest()
 
@@ -59,13 +60,20 @@ class FakeVersion:
 class FakeVersions:
     __getitem__ = mock.Mock(return_value=FakeVersion())
 
+    __iter__ = mock.Mock(return_value=iter([FakeVersion()]))
+
 
 class FakeArtifact:
     versions = mock.Mock(return_value=FakeVersions())
+    entity = "stacey"
+    project = "mendeleev"
+    name = "test_res_1fwmcd3q"
 
 
 class FakeArtifacts:
     __getitem__ = mock.Mock(return_value=FakeArtifact())
+
+    __iter__ = mock.Mock(return_value=iter([FakeArtifact()]))
 
 
 class FakeArtifactType:
