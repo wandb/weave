@@ -63,7 +63,7 @@ def test_missing_file():
     assert weave.use(node) == None
 
 
-def test_table_run_tags(fake_wandb):
+def test_table_runs_tags(fake_wandb):
     node = ops.project("stacey", "mendeleev").runs().limit(1).summary()
     assert isinstance(node[0].type, TaggedValueType) and set(
         list(node[0].type.tag.property_types.keys())
@@ -71,5 +71,19 @@ def test_table_run_tags(fake_wandb):
     node = node["table"].table().rows().dropna().concat()
     # This explicit call is needed b/c assignability is not working for weave arrow list
     node = list_indexCheckpoint(node)
+    node = node[0]
+    node = ops.runs_ops.run_tag_getter_op(node)
+    node = node.name()
+    assert weave.use(node) == "test_run_name"
+
+
+def test_table_run_tags(fake_wandb):
+    node = ops.project("stacey", "mendeleev").runs().limit(1)[0].summary()
+    assert isinstance(node.type, TaggedValueType) and set(
+        list(node.type.tag.property_types.keys())
+    ) == set(["project", "run"])
+    node = node["table"].table().rows()
+    # This explicit call is needed b/c assignability is not working for weave arrow list
+    node = list_indexCheckpoint(node)
     node = node[0].run().name()
-    assert weave.use(node) == "1fwmcd3q"
+    assert weave.use(node) == "test_run_name"

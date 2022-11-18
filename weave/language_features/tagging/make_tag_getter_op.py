@@ -39,7 +39,7 @@ def make_tag_getter_op(
                 types.TypedDict({tag_key: tag_type}), base_type
             ),
         },
-        output_type=base_type,
+        output_type=tag_type,
     )
     def tag_getter_op(obj):  # type: ignore
         return tag_store.find_tag(obj, tag_key, tag_type)
