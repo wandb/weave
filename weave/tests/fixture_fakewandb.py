@@ -24,7 +24,16 @@ class FakeEntry:
 class FakeManifest:
     entries = {"fakePath": FakeEntry()}
 
-    get_entry_by_path = mock.Mock(return_value=FakeEntry())
+    def get_entry_by_path(self, path):
+        if path == "test_results.table.json":
+            return FakeEntry()
+        if path == "media/images/8f65e54dc684f7675aec.png":
+            return FakeEntry()
+        # Otherwise, file is missing, return None.
+        return None
+
+    def get_entries_in_directory(self, cur_dir):
+        return []
 
 
 class FakePath:

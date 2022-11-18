@@ -121,6 +121,8 @@ class ArtifactVersion:
                     )
                 else:
                     dir_.dirs[rel_path_parts[1]] = 1
+        if not sub_dirs and not files:
+            return None
         return file_wbartifact.ArtifactVersionDir(path, 1591, sub_dirs, files)
 
 

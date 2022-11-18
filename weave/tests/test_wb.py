@@ -48,3 +48,14 @@ def test_table_call(table_file_node, fake_wandb):
     assert image0_url.endswith(
         "testdata/wb_artifacts/test_res_1fwmcd3q_v0/media/images/8f65e54dc684f7675aec.png"
     )
+
+
+def test_missing_file():
+    node = (
+        ops.project("stacey", "mendeleev")
+        .artifactType("test_results")
+        .artifacts()[0]
+        .versions()[0]
+        .file("does_not_exist")
+    )
+    assert weave.use(node) == None
