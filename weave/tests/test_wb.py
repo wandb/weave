@@ -3,6 +3,8 @@ import shutil
 from unittest import mock
 
 import pytest
+from ..language_features.tagging.tagged_value_type import TaggedValueType
+from ..ops_primitives.list_ import list_indexCheckpoint
 from .. import api as weave
 from .. import ops as ops
 from .. import ops_domain
@@ -59,3 +61,15 @@ def test_missing_file():
         .file("does_not_exist")
     )
     assert weave.use(node) == None
+
+
+def test_table_run_tags(fake_wandb):
+    node = ops.project("stacey", "mendeleev").runs().limit(1).summary()
+    assert isinstance(node[0].type, TaggedValueType) and set(
+        list(node[0].type.tag.property_types.keys())
+    ) == set(["project", "run"])
+    node = node["table"].table().rows().dropna().concat()
+    # This explicit call is needed b/c assignability is not working for weave arrow list
+    node = list_indexCheckpoint(node)
+    node = node[0].run().name()
+    assert weave.use(node) == "1fwmcd3q"

@@ -1,5 +1,5 @@
 import json
-from ..wandb_api import wandb_public_api
+from .. import wandb_api
 from ..api import op
 from . import wb_domain_types
 from ..language_features.tagging import make_tag_getter_op
@@ -96,7 +96,7 @@ def artifact_version(
 def runs(project: wb_domain_types.Project) -> list[wb_domain_types.Run]:
     # TODO: Create custom query
     res: list[wb_domain_types.Run] = []
-    for run in wandb_public_api().runs(
+    for run in wandb_api.wandb_public_api().runs(
         f"{project._entity.entity_name}/{project.project_name}", per_page=50
     ):
         if len(res) == 50:
@@ -111,7 +111,7 @@ def filtered_runs(
 ) -> list[wb_domain_types.Run]:
     # TODO: Create custom query
     res: list[wb_domain_types.Run] = []
-    for run in wandb_public_api().runs(
+    for run in wandb_api.wandb_public_api().runs(
         f"{project._entity.entity_name}/{project.project_name}",
         filters=json.loads(filter),
         order=order,
