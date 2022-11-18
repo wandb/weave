@@ -6,10 +6,7 @@ from . import wandb_domain_gql
 
 @op(name="artifact-type")
 def type_(artifact: wb_domain_types.ArtifactCollection) -> wb_domain_types.ArtifactType:
-    return wb_domain_types.ArtifactType(
-        _project=artifact._project,
-        artifact_type_name=artifact.sdk_obj.type,
-    )
+    return wandb_domain_gql.artifact_collection_artifact_type(artifact)
 
 
 @op(name="artifact-name")
@@ -26,6 +23,7 @@ def description(artifact: wb_domain_types.ArtifactCollection) -> str:
 def versions(
     artifact: wb_domain_types.ArtifactCollection,
 ) -> list[wb_domain_types.ArtifactVersion]:
+    # TODO: Convert this to a direct query
     return [
         wb_domain_types.ArtifactVersion.from_sdk_obj(v)
         for v in artifact.sdk_obj.versions()
@@ -44,13 +42,14 @@ def id(artifact: wb_domain_types.ArtifactCollection) -> str:
 
 @op(name="artifact-isPortfolio")
 def is_portfolio(artifact: wb_domain_types.ArtifactCollection) -> bool:
-    return wandb_domain_gql.artifact_collection_is_portfolio(artifact.sdk_obj)
+    return wandb_domain_gql.artifact_collection_is_portfolio(artifact)
 
 
 @op(name="artifact-memberships")
 def artifact_memberships(
     artifact: wb_domain_types.ArtifactCollection,
 ) -> list[wb_domain_types.ArtifactCollectionMembership]:
+    # TODO: Convert this to a direct query
     return [
         wandb_domain_gql.artifact_collection_membership_for_alias(artifact, v.digest)
         for v in artifact.sdk_obj.versions()

@@ -63,6 +63,7 @@ def summary(run: wb_domain_types.Run) -> dict[str, typing.Any]:
 def used_artifact_versions(
     run: wb_domain_types.Run,
 ) -> list[wb_domain_types.ArtifactVersion]:
+    # TODO: Create custom query
     return [
         wb_domain_types.ArtifactVersion.from_sdk_obj(v)
         for v in run.sdk_obj.used_artifacts()

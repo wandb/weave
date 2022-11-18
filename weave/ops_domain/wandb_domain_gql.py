@@ -26,7 +26,7 @@ def artifact_collection_is_portfolio(
         ) {	
             project(name: $projectName, entityName: $entityName) {	
                 id
-                artifactCollection(name: $artifactName) {	
+                artifactCollection(name: $artifactCollectionName) {	
                     id	
                     __typename
                 }
@@ -54,7 +54,7 @@ def artifact_collection_artifact_type(
         ) {	
             project(name: $projectName, entityName: $entityName) {	
                 id
-                artifactCollection(name: $artifactName) {	
+                artifactCollection(name: $artifactCollectionName) {	
                     id
                     defaultArtifactType {	
                         id	
@@ -135,10 +135,11 @@ def artifact_collection_membership_for_alias(
             $projectName: String!,	
             $entityName: String!,
             $artifactCollectionName: String!,	
+            $identifier: String!,	
         ) {	
             project(name: $projectName, entityName: $entityName) {	
                 id
-                artifactCollection(name: $artifactName) {	
+                artifactCollection(name: $artifactCollectionName) {	
                     id	
                     artifactMembership(aliasName: $identifier) {
                         id
@@ -157,7 +158,7 @@ def artifact_collection_membership_for_alias(
     )
     return wb_domain_types.ArtifactCollectionMembership(
         artifact_collection,
-        res["artifactCollection"]["artifactMembership"]["versionIndex"],
+        res["project"]["artifactCollection"]["artifactMembership"]["versionIndex"],
     )
 
 
@@ -170,11 +171,11 @@ def artifact_membership_aliases(
             $projectName: String!,	
             $entityName: String!,
             $artifactCollectionName: String!,	
-            $indentifier: String!,	
+            $identifier: String!,	
         ) {	
             project(name: $projectName, entityName: $entityName) {	
                 id
-                artifactCollection(name: $artifactName) {	
+                artifactCollection(name: $artifactCollectionName) {	
                     id	
                     artifactMembership(aliasName: $identifier) {
                         id
@@ -199,7 +200,9 @@ def artifact_membership_aliases(
             artifact_collection_membership._artifact_collection,
             alias["alias"],
         )
-        for alias in res["artifactCollection"]["artifactMembership"]["aliases"]
+        for alias in res["project"]["artifactCollection"]["artifactMembership"][
+            "aliases"
+        ]
     ]
 
 
@@ -212,11 +215,10 @@ def artifact_collection_aliases(
             $projectName: String!,	
             $entityName: String!,
             $artifactCollectionName: String!,	
-            $indentifier: String!,	
         ) {	
             project(name: $projectName, entityName: $entityName) {	
                 id
-                artifactCollection(name: $artifactName) {	
+                artifactCollection(name: $artifactCollectionName) {	
                     id	
                     aliases {
                         edges {
@@ -238,7 +240,7 @@ def artifact_collection_aliases(
     )
     return [
         wb_domain_types.ArtifactAlias(artifact_collection, edge["node"]["alias"])
-        for edge in res["artifactCollection"]["aliases"]["edges"]
+        for edge in res["project"]["artifactCollection"]["aliases"]["edges"]
     ]
 
 

@@ -38,6 +38,7 @@ def entity(project: wb_domain_types.Project) -> wb_domain_types.Entity:
 def artifacts(
     project: wb_domain_types.Project,
 ) -> list[wb_domain_types.ArtifactCollection]:
+    # TODO: Create a custom query for this - very expensive to fetch all artifacts
     return [
         wb_domain_types.ArtifactCollection.from_sdk_obj(col)
         for at in project.sdk_obj.artifact_types()
@@ -49,6 +50,7 @@ def artifacts(
 def artifact_types(
     project: wb_domain_types.Project,
 ) -> list[wb_domain_types.ArtifactType]:
+    # TODO: Create custom query
     return [
         wb_domain_types.ArtifactType.from_sdk_obj(at)
         for at in project.sdk_obj.artifacts_types()
@@ -81,6 +83,7 @@ def artifact_version(
 
 @op(name="project-runs")
 def runs(project: wb_domain_types.Project) -> list[wb_domain_types.Run]:
+    # TODO: Create custom query
     return [
         wb_domain_types.Run.from_sdk_obj(run)
         for run in wandb_public_api().runs(
@@ -93,6 +96,7 @@ def runs(project: wb_domain_types.Project) -> list[wb_domain_types.Run]:
 def filtered_runs(
     project: wb_domain_types.Project, filter: str, order: str
 ) -> list[wb_domain_types.Run]:
+    # TODO: Create custom query
     return [
         wb_domain_types.Run.from_sdk_obj(run)
         for run in wandb_public_api().runs(

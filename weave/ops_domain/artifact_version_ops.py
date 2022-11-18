@@ -73,7 +73,7 @@ def artifact_version_artifact_sequence(
 def artifact_version_used_by(
     artifactVersion: wb_domain_types.ArtifactVersion,
 ) -> list[wb_domain_types.Run]:
-    artifactVersion.sdk_obj
+    # TODO: Convert this to it's own query
     return [
         wb_domain_types.Run(
             _project=wb_domain_types.Project(
