@@ -3,6 +3,7 @@ from ..wandb_api import wandb_public_api
 from ..api import op
 from . import wb_domain_types
 from ..language_features.tagging import make_tag_getter_op
+from . import wandb_domain_gql
 
 project_tag_getter_op = make_tag_getter_op.make_tag_getter_op(
     "project", wb_domain_types.Project.WeaveType(), op_name="tag-project"  # type: ignore
@@ -70,14 +71,20 @@ def artifact_type(
 def artifact_version(
     project: wb_domain_types.Project, artifactName: str, artifactVersionAlias: str
 ) -> wb_domain_types.ArtifactVersion:
+    artifact_collection = wb_domain_types.ArtifactCollection(
+        _project=project,
+        artifact_collection_name=artifactName,
+    )
+    version_index = None
+    try:
+        version_index = int(artifactVersionAlias.split("v")[0])
+    except ValueError:
+        version_index = wandb_domain_gql.artifact_collection_membership_for_alias(
+            artifact_collection, artifactVersionAlias
+        ).version_index
+
     return wb_domain_types.ArtifactVersion(
-        _artifact_sequence=wb_domain_types.ArtifactCollection(
-            _project=project,
-            artifact_collection_name=artifactName,
-        ),
-        version_index=int(
-            artifactVersionAlias.split("v")[0]
-        ),  # TODO: I think this could be an alias
+        _artifact_sequence=artifact_collection, version_index=version_index
     )
 
 

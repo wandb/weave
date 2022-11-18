@@ -77,23 +77,16 @@ class FakeClient:
     def execute(self, gql, variable_values):
         if gql.definitions[0].operation == "query":
             if (
-                gql.definitions[0].name.value == "ProjectArtifact"
-            ):  # this is for wandb_domain.gql.py::project_artifact
+                gql.definitions[0].name.value
+                == "artifact_collection_membership_for_alias"
+            ):
                 return {
                     "project": {
                         "artifactCollection": {
-                            "defaultArtifactType": {"name": "test_type"}
-                        }
-                    }
-                }
-            elif (
-                gql.definitions[0].name.value == "ArtifactCollectionMembershipForAlias"
-            ):  # this is for wandb_domain.gql.py::artifact_collection_membership_for_alias
-                return {
-                    "artifactCollection": {
-                        "artifactMembership": {
-                            "commitHash": "xyz",
-                            "versionIndex": "0",
+                            "artifactMembership": {
+                                "commitHash": "xyz",
+                                "versionIndex": "0",
+                            }
                         }
                     }
                 }
