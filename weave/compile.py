@@ -10,6 +10,7 @@ from . import registry_mem
 from . import errors
 from . import dispatch
 from . import graph_debug
+from . import engine_trace
 
 # These call_* functions must match the actual op implementations.
 # But we don't want to import the op definitions themselves here, since
@@ -196,24 +197,26 @@ def compile(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
     This method is used to "compile" a list of nodes. Here we can add any
     optimizations or graph rewrites
     """
-    logging.info("Starting compilation of graph with %s leaf nodes" % len(nodes))
+    tracer = engine_trace.tracer()
+    with tracer.trace("compile"):
+        logging.info("Starting compilation of graph with %s leaf nodes" % len(nodes))
 
-    # Convert the nodes to an editable graph data structure
-    g = graph_editable.EditGraph(nodes)
+        # Convert the nodes to an editable graph data structure
+        g = graph_editable.EditGraph(nodes)
 
-    # Each of the following lines is a transformation pass of the graph:
-    # 1: Adjust any Op calls based on type-based dispatching
-    _compile_phase(g, "dispatch", apply_type_based_dispatch)
+        # Each of the following lines is a transformation pass of the graph:
+        # 1: Adjust any Op calls based on type-based dispatching
+        _compile_phase(g, "dispatch", apply_type_based_dispatch)
 
-    # 2: Add Await nodes for Runs
-    _compile_phase(g, "await", await_run_outputs_edit_graph)
+        # 2: Add Await nodes for Runs
+        _compile_phase(g, "await", await_run_outputs_edit_graph)
 
-    # 3: Execute function nodes
-    _compile_phase(g, "execute", execute_edit_graph)
+        # 3: Execute function nodes
+        _compile_phase(g, "execute", execute_edit_graph)
 
-    # Reconstruct a node list that matches the original order from the transformed graph
-    n = g.to_standard_graph()
+        # Reconstruct a node list that matches the original order from the transformed graph
+        n = g.to_standard_graph()
 
-    logging.info("Compilation complete")
+        logging.info("Compilation complete")
 
     return n
