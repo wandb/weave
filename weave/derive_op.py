@@ -1,6 +1,7 @@
 import copy
 import inspect
 import typing
+from concurrent.futures import ThreadPoolExecutor
 
 from . import weave_types as types
 from . import op_args
@@ -9,6 +10,8 @@ from . import op_def
 from . import errors
 from . import graph
 from . import box
+
+from . import wandb_api
 
 
 class DeriveOpHandler:
@@ -193,6 +196,18 @@ class MappedDeriveOpHandler(DeriveOpHandler):
             list_ = new_inputs.pop(mapped_param_name)
             # TODO: use the vectorization described here:
             # https://paper.dropbox.com/doc/Weave-Python-Weave0-Op-compatibility-workstream-kJ3XSDdgR96XwKPapHwPD
+            wandb_api_key = wandb_api.wandb_public_api().api_key
+
+            def do_one(x):
+                wandb_api.set_wandb_api_key(wandb_api_key)
+                if x == None or types.is_optional(first_arg.type):
+                    return None
+                res = orig_op.resolve_fn(x, **new_inputs)
+                return res
+
+            return list(ThreadPoolExecutor(max_workers=10).map(do_one, list_))
+
+            # Serial implementation
             return [
                 orig_op.resolve_fn(x, **new_inputs)
                 if not (x is None or isinstance(x, box.BoxedNone))
