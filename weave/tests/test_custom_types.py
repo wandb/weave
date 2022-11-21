@@ -83,5 +83,5 @@ def test_constructor():
     point2d_node = geom.Point2d.constructor({"x": 0.5, "y": 0.6})
     assert weave.use(point2d_node) == expected
 
-    with pytest.raises(errors.WeaveExecutionError):
+    with pytest.raises(KeyError):
         weave.use(geom.Point2d.constructor({"x": 0.5}))

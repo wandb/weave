@@ -207,7 +207,7 @@ def test_invalid_explicit_experiment_construction():
     )
     storage.save(segment2)
 
-    with pytest.raises(errors.WeaveExecutionError):
+    with pytest.raises(ValueError):
         api.use(segment2.experiment())
 
 
