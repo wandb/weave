@@ -49,11 +49,11 @@ def _make_output_node(
             else:
                 new_input_type[k] = n.type
 
-        new_input_type = language_autocall.update_input_types(
+        updated_input_type = language_autocall.update_input_types(
             input_type, new_input_type
         )
 
-        output_type = output_type(new_input_type)
+        output_type = output_type(updated_input_type)
 
     name = "OutputNode"
     bases = [graph.OutputNode]

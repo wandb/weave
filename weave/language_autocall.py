@@ -19,6 +19,10 @@ from . import weave_types as types
 from . import op_args
 
 
+def is_function_like(type_: types.Type) -> bool:
+    return types.Function({}, types.Any()).assign_type(type_)
+
+
 def update_input_types(
     op_input_type: typing.Optional[op_args.OpArgs],
     actual_input_types: dict[str, types.Type],
@@ -30,9 +34,7 @@ def update_input_types(
     try:
         for k, t in actual_input_types.items():
             expected_input_type = expected_input_types[k]
-            if t.assign_type(
-                types.Function({}, types.Any())
-            ) and not expected_input_type.assign_type(types.Function({}, types.Any())):
+            if is_function_like(t) and not is_function_like(expected_input_type):
                 t = typing.cast(types.Function, t)
                 result[k] = t.output_type
             else:
