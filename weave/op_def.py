@@ -5,6 +5,8 @@ import inspect
 import typing
 
 import weave
+from . import box
+from . import language_nullability
 from weave.weavejs_fixes import fixup_node
 
 from . import errors
@@ -52,7 +54,7 @@ class OpDef:
             typing.Callable[[typing.Dict[str, types.Type]], types.Type],
         ]
     ]
-
+    _raw_input_type: op_args.OpArgs
     # This is required to be able to determine which ops were derived from this
     # op. Particularly in cases where we need to rename or lookup when
     # versioned, we cannot rely just on naming structure alone.
@@ -77,6 +79,8 @@ class OpDef:
     ):
         self.name = name
         self.input_type = input_type
+        self._raw_input_type = input_type
+        self.input_type = language_nullability.process_input_type(input_type)
         self.raw_output_type = output_type
         self.refine_output_type = refine_output_type
         self.raw_resolve_fn = resolve_fn  # type: ignore
@@ -111,6 +115,8 @@ class OpDef:
         return _self.call_fn(*args, **kwargs)
 
     def resolve_fn(__self, *args, **kwargs):
+        if language_nullability.should_force_none_result(__self, args, kwargs):
+            return box.BoxedNone(None)
         res = __self.raw_resolve_fn(*args, **kwargs)
         return process_opdef_resolve_fn.process_opdef_resolve_fn(
             __self, res, args, kwargs
@@ -128,6 +134,9 @@ class OpDef:
                 "op_get_tag_type",
                 "op_make_type_tagged",
                 "op_make_type_key_tag",
+                "mapped-op_get_tag_type",
+                "mapped-op_make_type_tagged",
+                "mapped-op_make_type_key_tag",
             ]:
                 self._output_type = self.raw_output_type
             else:
@@ -141,6 +150,10 @@ class OpDef:
                 self._output_type = process_opdef_output_type(
                     self.raw_output_type, self
                 )
+
+            self._output_type = language_nullability.process_output_type(
+                self._output_type, self
+            )
         return self._output_type
 
     @property
