@@ -122,7 +122,7 @@ def test_basic_nullability_in_mappability():
                         )
                     ),
                 ),
-                [{"a": 42}],
+                [{"a": 42}, None],
             ),
             [42, None],
         ),
