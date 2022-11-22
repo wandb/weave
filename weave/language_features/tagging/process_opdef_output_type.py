@@ -9,7 +9,7 @@ import typing
 from ... import weave_types as types
 from .opdef_util import should_flow_tags, should_tag_op_def_outputs
 from .tagging_ops import op_get_tag_type, op_make_type_key_tag, op_make_type_tagged
-from ... import graph
+from ..util import currently_weavifying
 
 if typing.TYPE_CHECKING:
     from ... import op_def as OpDef
@@ -35,7 +35,7 @@ def process_opdef_output_type(
         if isinstance(output_type, types.Type):
 
             def ot(input_types: typing.Dict[str, types.Type]) -> types.Type:
-                if _currently_weavifying(input_types):
+                if currently_weavifying(input_types):
                     return op_make_type_key_tag(
                         output_type,
                         first_arg_name,
@@ -53,7 +53,7 @@ def process_opdef_output_type(
             callable_output_type = output_type
 
             def ot(input_types: typing.Dict[str, types.Type]) -> types.Type:
-                if _currently_weavifying(input_types):
+                if currently_weavifying(input_types):
                     return op_make_type_key_tag(
                         callable_output_type(input_types),
                         first_arg_name,
@@ -74,7 +74,7 @@ def process_opdef_output_type(
         if isinstance(output_type, types.Type):
 
             def ot(input_types: typing.Dict[str, types.Type]) -> types.Type:
-                if _currently_weavifying(input_types):
+                if currently_weavifying(input_types):
                     return op_make_type_tagged(
                         output_type, op_get_tag_type(input_types[first_arg_name])
                     )
@@ -89,7 +89,7 @@ def process_opdef_output_type(
             callable_output_type = output_type
 
             def ot(input_types: typing.Dict[str, types.Type]) -> types.Type:
-                if _currently_weavifying(input_types):
+                if currently_weavifying(input_types):
                     return op_make_type_tagged(
                         callable_output_type(input_types),
                         op_get_tag_type(input_types[first_arg_name]),
@@ -105,9 +105,3 @@ def process_opdef_output_type(
             raise Exception("Invalid output_type")
     else:
         return output_type
-
-
-def _currently_weavifying(input_types: typing.Any) -> bool:
-    return isinstance(input_types, graph.Node) and types.TypedDict({}).assign_type(
-        input_types.type
-    )
