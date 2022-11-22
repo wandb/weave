@@ -20,8 +20,6 @@ class Number(object):
         output_type=types.Number(),
     )
     def __add__(lhs, rhs):
-        if lhs == None or rhs == None:
-            return None
         return lhs + rhs
 
     @op(
