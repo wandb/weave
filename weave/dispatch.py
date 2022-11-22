@@ -62,9 +62,8 @@ def get_op_for_input_types(
             )
     candidates: list[Candidate] = []
     for op in shared_name_ops:
-        assigned_param_dict = op.input_type.assign_param_dict(
-            op.input_type.create_param_dict(args, kwargs)
-        )
+        param_dict = op.input_type.create_param_dict(args, kwargs)
+        assigned_param_dict = op.input_type.assign_param_dict(param_dict)
         if op_args.all_types_valid(assigned_param_dict):
             candidates.append(Candidate(op, assigned_param_dict))
     if len(candidates) > 1:
