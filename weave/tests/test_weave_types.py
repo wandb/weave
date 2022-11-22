@@ -1,4 +1,5 @@
 import pytest
+from ..language_features.tagging.tagged_value_type import TaggedValueType
 import weave.weave_types
 from .. import weave_types as types
 from .. import runs
@@ -33,6 +34,25 @@ def test_merge_typedict_keys_are_stable():
         )
         r = types.merge_types(t, t2)
         assert list(r.property_types.keys()) == ["a", "b", "c"]
+
+
+def test_merge_through_tags():
+    t = TaggedValueType(
+        types.TypedDict({"tag": types.Number()}),
+        types.TypedDict(
+            {"a": types.String(), "b": types.Number(), "c": types.String()}
+        ),
+    )
+    t2 = TaggedValueType(
+        types.TypedDict({"tag": types.Number()}),
+        types.TypedDict(
+            {"a": types.String(), "b": types.String(), "d": types.String()}
+        ),
+    )
+    r = types.merge_types(t, t2)
+    correct_type = types.UnionType(t, t2)
+    assert correct_type.assign_type(r)
+    assert r.assign_type(correct_type)
 
 
 def test_typeof_bool():

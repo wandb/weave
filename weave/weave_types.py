@@ -574,6 +574,9 @@ class UnionType(Type):
             return False
         return set(self.members) == set(other.members)
 
+    def __hash__(self):
+        return hash((hash(mem) for mem in self.members))
+
     def _assign_type_inner(self, other):
         if isinstance(other, UnionType):
             if not all(self.assign_type(member) for member in other.members):

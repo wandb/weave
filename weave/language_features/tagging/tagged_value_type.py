@@ -25,6 +25,7 @@ Currently, the degenerate case is that a custom op either copies the object
 drop tags.
 """
 
+import dataclasses
 import json
 import typing
 
@@ -39,21 +40,13 @@ from ... import mappers
 from . import tag_store
 
 # A custom Weave Type used to represent tagged values.
+@dataclasses.dataclass(frozen=True)
 class TaggedValueType(types.Type):
     name = "tagged"
-    tag: types.TypedDict = types.TypedDict({})
-    value: types.Type = types.Any()
-
-    def __init__(
-        self,
-        tag: types.TypedDict = types.TypedDict({}),
-        value: types.Type = types.Any(),
-    ):
-        assert types.TypedDict({}).assign_type(tag), (
-            "Tags must be assignable to TypedDict, found %s" % tag
-        )
-        self.tag = tag
-        self.value = value
+    tag: types.TypedDict = dataclasses.field(
+        default_factory=lambda: types.TypedDict({})
+    )
+    value: types.Type = dataclasses.field(default_factory=lambda: types.Any())
 
     def __getattr__(self, attr: str) -> typing.Any:
         return getattr(self.value, attr)
