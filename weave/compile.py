@@ -81,7 +81,7 @@ def apply_type_based_dispatch(
             v in edit_g.replacements for v in orig_node.from_op.inputs.values()
         )
         if not node.type.assign_type(new_node.type):
-            logging.warn(
+            logging.warning(
                 "Compile phase [dispatch] Changed output type for node %s from %s to %s. This indicates an incompability between WeaveJS and Weave Python",
                 node,
                 node.type,
