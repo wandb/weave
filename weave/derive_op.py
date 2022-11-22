@@ -2,6 +2,8 @@ import copy
 import inspect
 import typing
 
+from .language_features.util import currently_weavifying
+
 from . import weave_types as types
 from . import op_args
 from . import registry_mem
@@ -147,10 +149,7 @@ class MappedDeriveOpHandler(DeriveOpHandler):
                 # Therefore the `inner_input_types[mapped_param_name] = replacement`
                 # line below will not work. This is a temporary fix until we can
                 # implement `merge` as a core op.
-                currently_weavifying = isinstance(
-                    input_types, graph.Node
-                ) and types.TypedDict({}).assign_type(input_types.type)
-                if currently_weavifying:
+                if currently_weavifying(input_types):
                     op_dict = registry_mem.memory_registry.get_op("dict")
                     op_dict.instance = None
                     inner_input_types = input_types.merge(
