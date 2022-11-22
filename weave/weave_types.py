@@ -12,6 +12,7 @@ from . import mappers_python
 if typing.TYPE_CHECKING:
     from .refs import Ref
     from .artifacts_local import Artifact
+    from .graph import Node
 
 
 def to_weavejs_typekey(k: str) -> str:
@@ -236,9 +237,9 @@ class Type(metaclass=_TypeSubclassWatcher):
 
     def assign_type(self, next_type: "Type") -> bool:
         TaggedValueType = type_name_to_type("tagged")
-        if isinstance(next_type, Const):
+        if isinstance(next_type, Const) and not isinstance(self, Const):
             return self.assign_type(next_type.val_type)
-        elif isinstance(next_type, UnionType):
+        elif isinstance(next_type, UnionType) and not isinstance(self, UnionType):
             for t in next_type.members:
                 if not self.assign_type(t):
                     return False
@@ -344,11 +345,11 @@ class Type(metaclass=_TypeSubclassWatcher):
         raise NotImplementedError
 
     @classmethod
-    def make(cls, kwargs={}):
+    def make(cls, kwargs={}) -> "Node":
         return cls._make(cls, kwargs)
 
     @staticmethod
-    def _make(cls, kwargs={}):
+    def _make(cls, kwargs={}) -> "Node":
         raise Exception("Please import `weave` to use `Type.make`.")
 
 
@@ -570,7 +571,7 @@ class UnionType(Type):
             return False
         return set(self.members) == set(other.members)
 
-    def assign_type(self, other):
+    def _assign_type_inner(self, other):
         if isinstance(other, UnionType):
             if not all(self.assign_type(member) for member in other.members):
                 return False
@@ -785,10 +786,6 @@ class ObjectType(Type):
             d[to_weavejs_typekey(k)] = prop_type.to_dict()
         return d
 
-    # def assign_type(self):
-    #     # TODO
-    #     pass
-
     def save_instance(self, obj, artifact, name):
         serializer = mappers_python.map_to_python(self, artifact)
 
@@ -904,7 +901,7 @@ def is_json_compatible(type_):
         return isinstance(type_, BasicType)
 
 
-def optional(type_):
+def optional(type_: Type) -> UnionType:
     return UnionType(none_type, type_)
 
 
@@ -912,10 +909,11 @@ def is_optional(type_: Type) -> bool:
     return isinstance(type_, UnionType) and none_type in type_.members
 
 
-def non_none(type_):
+def non_none(type_: Type) -> Type:
     if type_ == none_type:
         return Invalid()
     if is_optional(type_):
+        type_ = typing.cast(UnionType, type_)
         new_members = [m for m in type_.members if m != none_type]
         # TODO: could put this logic in UnionType.from_members ?
         if len(new_members) == 0:
