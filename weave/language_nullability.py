@@ -62,9 +62,7 @@ def process_output_type(
         return types.optional(output_type)
 
     def wrapped_output_type(input_types: dict[str, types.Type]) -> types.Type:
-        output_type = typing.cast(
-            typing.Callable[[dict[str, types.Type]], types.Type], output_type
-        )
+        assert callable(output_type)
         if currently_weavifying(input_types):
             return types.UnionType.make(  # type: ignore
                 {"a": types.NoneType.make(), "b": output_type(input_types)}
