@@ -93,6 +93,14 @@ def apply_type_based_dispatch(
             edit_g.replace(orig_node, new_node)
 
 
+def is_run_like(type_: types.Type) -> bool:
+    return types.RunType().assign_type(type_)
+
+
+def is_function_like(type_: types.Type) -> bool:
+    return types.Function({}, types.Any()).assign_type(type_)
+
+
 def await_run_outputs_edit_graph(
     edit_g: graph_editable.EditGraph,
 ) -> None:
@@ -118,9 +126,7 @@ def await_run_outputs_edit_graph(
             raise errors.WeaveInternalError(
                 "OpDef (%s) missing input_name: %s" % (op_def.name, edge.input_name)
             )
-        if isinstance(actual_input_type, types.RunType) and not isinstance(
-            expected_input_type, types.RunType
-        ):
+        if is_run_like(actual_input_type) and not is_run_like(expected_input_type):
             if not expected_input_type.assign_type(actual_input_type.output):
                 raise Exception(
                     "invalid type chaining for run. input_type: %s, op_input_type: %s"
@@ -155,8 +161,8 @@ def execute_edit_graph(edit_g: graph_editable.EditGraph) -> None:
             raise errors.WeaveInternalError(
                 "OpDef (%s) missing input_name: %s" % (op_def.name, edge.input_name)
             )
-        if isinstance(actual_input_type, types.Function) and not isinstance(
-            expected_input_type, types.Function
+        if is_function_like(actual_input_type) and not is_function_like(
+            expected_input_type
         ):
             if not expected_input_type.assign_type(actual_input_type.output_type):
                 raise Exception(

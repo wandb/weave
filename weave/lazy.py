@@ -61,7 +61,7 @@ def _make_output_node(
     # If the output type is a run, mixin the Run's output type
     # as well. execute.py automatic inserts await_output operations
     # as needed.
-    if isinstance(output_type, types.RunType) and hasattr(
+    if types.RunType().assign_type(output_type) and hasattr(
         output_type.output, "NodeMethodsClass"
     ):
         name += output_type.output.__class__.__name__

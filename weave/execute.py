@@ -177,7 +177,7 @@ def is_run_op(op_call: graph.Op):
     t = None
     if self_node is not None:
         t = self_node.type
-    if self_node is not None and isinstance(self_node.type, types.RunType):
+    if self_node is not None and types.RunType().assign_type(self_node.type):
         return True
     return False
 

@@ -34,6 +34,8 @@ def update_input_types(
     try:
         for k, t in actual_input_types.items():
             expected_input_type = expected_input_types[k]
+            if callable(expected_input_type):
+                expected_input_type = expected_input_type(result)
             if is_function_like(t) and not is_function_like(expected_input_type):
                 t = typing.cast(types.Function, t)
                 result[k] = t.output_type
