@@ -77,14 +77,21 @@ def get_node_methods_classes(type_: types.Type) -> typing.Sequence[typing.Type]:
     if isinstance(type_, tagged_value_type.TaggedValueType):
         return get_node_methods_classes(type_.value)
 
+    useable_types = [type_]
+    if isinstance(type_, types.UnionType):
+        useable_types = [
+            mem for mem in type_.members if not isinstance(mem, types.NoneType)
+        ]
+
     # Keeping this is still important for overriding dunder methods!
-    for type_class in type_.__class__.mro():
-        if (
-            issubclass(type_class, types.Type)
-            and type_class.NodeMethodsClass is not None
-            and type_class.NodeMethodsClass not in classes
-        ):
-            classes.append(type_class.NodeMethodsClass)
+    for useable_type in useable_types:
+        for type_class in useable_type.__class__.mro():
+            if (
+                issubclass(type_class, types.Type)
+                and type_class.NodeMethodsClass is not None
+                and type_class.NodeMethodsClass not in classes
+            ):
+                classes.append(type_class.NodeMethodsClass)
 
     for mixin in UniversalNodeMixin.__subclasses__():
         # Add a fallback dispatcher which us invoked if nothing else matches.
