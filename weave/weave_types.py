@@ -236,14 +236,18 @@ class Type(metaclass=_TypeSubclassWatcher):
 
     def assign_type(self, next_type: "Type") -> bool:
         TaggedValueType = type_name_to_type("tagged")
-        if isinstance(next_type, Const):
-            return self.assign_type(next_type.val_type)
-        elif isinstance(next_type, UnionType):
+        if isinstance(next_type, UnionType):
             for t in next_type.members:
                 if not self.assign_type(t):
                     return False
             return True
-        elif isinstance(next_type, TaggedValueType) and not isinstance(
+        elif isinstance(self, UnionType):
+            return self._assign_type_inner(next_type)
+
+        if isinstance(next_type, Const) and not isinstance(self, Const):
+            return self.assign_type(next_type.val_type)
+
+        if isinstance(next_type, TaggedValueType) and not isinstance(
             self, TaggedValueType
         ):
             return self.assign_type(next_type.value)
@@ -437,7 +441,7 @@ class Const(Type):
     def type_of_instance(cls, obj):
         return cls(TypeRegistry.type_of(obj.val), obj.val)
 
-    def assign_type(self, next_type):
+    def _assign_type_inner(self, next_type):
         if isinstance(next_type, Const):
             # This does a check on class equality, so won't work for
             # fancier types. We can fix later if we need to.
@@ -570,7 +574,7 @@ class UnionType(Type):
             return False
         return set(self.members) == set(other.members)
 
-    def assign_type(self, other):
+    def _assign_type_inner(self, other):
         if isinstance(other, UnionType):
             if not all(self.assign_type(member) for member in other.members):
                 return False
@@ -912,10 +916,11 @@ def is_optional(type_: Type) -> bool:
     return isinstance(type_, UnionType) and none_type in type_.members
 
 
-def non_none(type_):
+def non_none(type_: Type) -> Type:
     if type_ == none_type:
         return Invalid()
     if is_optional(type_):
+        type_ = typing.cast(UnionType, type_)
         new_members = [m for m in type_.members if m != none_type]
         # TODO: could put this logic in UnionType.from_members ?
         if len(new_members) == 0:

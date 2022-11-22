@@ -27,3 +27,25 @@ def should_force_none_result(
                 if not types.is_optional(input0_type):
                     return True
     return False
+
+
+def adjust_assignable_param_dict_for_dispatch(
+    op: OpDef.OpDef, param_dict: dict[str, types.Type]
+) -> dict[str, types.Type]:
+    if isinstance(op.input_type, op_args.OpNamedArgs):
+        named_args = op.input_type.named_args()
+        if len(named_args) > 0:
+            first_arg = named_args[0]
+            if not first_arg.type.assign_type(types.NoneType()):
+                p_type = param_dict[first_arg.name]
+                if isinstance(p_type, types.Const):
+                    p_type = p_type.val_type
+                if p_type.assign_type(types.NoneType()):
+                    # TODO: non_none does not work with const/tags yet
+                    non_none_type = types.non_none(p_type)
+                    return {**param_dict, first_arg.name: non_none_type}
+    return param_dict
+
+
+def adjust_input_type_for_mixin_dispatch(input_type: types.Type) -> types.Type:
+    return types.union(types.NoneType(), input_type)

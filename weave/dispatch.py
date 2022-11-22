@@ -2,6 +2,8 @@
 from dataclasses import dataclass
 import typing
 
+from . import language_nullability
+
 from . import errors
 from . import types
 from . import op_def
@@ -62,9 +64,11 @@ def get_op_for_input_types(
             )
     candidates: list[Candidate] = []
     for op in shared_name_ops:
-        assigned_param_dict = op.input_type.assign_param_dict(
-            op.input_type.create_param_dict(args, kwargs)
+        param_dict = op.input_type.create_param_dict(args, kwargs)
+        param_dict = language_nullability.adjust_assignable_param_dict_for_dispatch(
+            op, param_dict
         )
+        assigned_param_dict = op.input_type.assign_param_dict(param_dict)
         if op_args.all_types_valid(assigned_param_dict):
             candidates.append(Candidate(op, assigned_param_dict))
     if len(candidates) > 1:
@@ -100,7 +104,13 @@ class FallbackNodeTypeDispatcherMixin(weave_internal.UniversalNodeMixin):
         ops_with_name_and_arg = []
         for op in ops_with_name:
             named_args = op.input_type.named_args()
-            if len(named_args) > 0 and named_args[0].type.assign_type(self.type):
+            if len(
+                named_args
+            ) > 0 and language_nullability.adjust_input_type_for_mixin_dispatch(
+                named_args[0].type
+            ).assign_type(
+                self.type
+            ):
                 if isinstance(self, graph.Node):
                     op.instance = self
                 ops_with_name_and_arg.append(op)
