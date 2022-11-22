@@ -30,9 +30,10 @@ def update_input_types(
     try:
         for k, t in actual_input_types.items():
             expected_input_type = expected_input_types[k]
-            if isinstance(t, types.Function) and not isinstance(
-                expected_input_type, types.Function
-            ):
+            if t.assign_type(
+                types.Function({}, types.Any())
+            ) and not expected_input_type.assign_type(types.Function({}, types.Any())):
+                t = typing.cast(types.Function, t)
                 result[k] = t.output_type
             else:
                 result[k] = t
