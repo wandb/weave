@@ -38,39 +38,15 @@ def getattr_output_type(input_type):
     return types.Invalid()
 
 
-@weave_class(weave_type=types.Type)
-class Object:
-    # Little hack, storage._get_ref expects to be able to check whether
-    # any object hasattr('_ref') including nodes. Set it here so that
-    # our __getattr__ op method doesn't handle that check.
-    _ref = None
-
-    # ipython tries to figure out if we have implemented a __getattr__
-    # by checking for this attribute. But the weave.op() decorator makes
-    # __getattr__ behave oddly, its now a lazy getattr that will always return
-    # something. So add the attribute here to tell ipython that yes we do
-    # have a __getattr__. This fixes Node._ipython_display()_ not getting fired.
-    _ipython_canary_method_should_not_exist_ = None
-
-    # Needed for storage.to_python hacks. Remove after those hacks are fixed.
-    # TODO: fix
-    to_pylist = None
-    as_py = None
-
-    @mutation
-    def obj_settattr(self, attr, v):
-        setattr(self, attr, v)
-        return self
-
-    # TODO: figure out how this conflicts with the above __getattr__ op
-    # particularly for lists
-    def __getitem__(self, name: str):
-        return obj_getattr(self, name)
+@mutation
+def obj_settattr(self, attr, v):
+    setattr(self, attr, v)
+    return self
 
 
 @op(
     name="Object-__getattr__",
-    setter=Object.obj_settattr,
+    setter=obj_settattr,
     output_type=getattr_output_type,
 )
 def obj_getattr(self: typing.Any, name: str):

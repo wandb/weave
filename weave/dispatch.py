@@ -95,6 +95,21 @@ class FallbackNodeTypeDispatcherMixin(weave_internal.UniversalNodeMixin):
     further refine once we get inputs.
     """
 
+    # Little hack, storage._get_ref expects to be able to check whether
+    # any object hasattr('_ref') including nodes. Set it here so that
+    # our __getattr__ op method doesn't handle that check.
+    _ref = None
+    # ipython tries to figure out if we have implemented a __getattr__
+    # by checking for this attribute. But the weave.op() decorator makes
+    # __getattr__ behave oddly, its now a lazy getattr that will always return
+    # something. So add the attribute here to tell ipython that yes we do
+    # have a __getattr__. This fixes Node._ipython_display()_ not getting fired.
+    _ipython_canary_method_should_not_exist_ = None
+    # Needed for storage.to_python hacks. Remove after those hacks are fixed.
+    # TODO: fix
+    to_pylist = None
+    as_py = None
+
     def __getattr__(self, attr: str) -> typing.Any:
         if attr.startswith("__") and attr.endswith("__"):
             return getattr(super(), attr)
@@ -118,9 +133,12 @@ class FallbackNodeTypeDispatcherMixin(weave_internal.UniversalNodeMixin):
             # Here we just return the first op, since the op call itself will dispatch to the correct op
             # if needed
             return ops_with_name_and_arg[0]
-        else:
+        elif (
+            isinstance(self.type, types.ObjectType) or self.type.__class__ == types.Type
+        ):
             obj_getattr = registry_mem.memory_registry.get_op("Object-__getattr__")
             return obj_getattr(self, attr)
+        return None
 
 
 _default_dunders = [

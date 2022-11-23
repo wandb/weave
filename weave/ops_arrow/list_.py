@@ -438,6 +438,10 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         self._mapper = mappers_arrow.map_from_arrow(self.object_type, self._artifact)
         # TODO: construct mapper
 
+    @op(output_type=lambda input_types: types.List(input_types["self"].object_type))
+    def to_py(self):
+        return list(self)
+
     # TODO: doesn't belong here
     @op()
     def sum(self) -> float:
@@ -835,14 +839,35 @@ def vectorize(
                         k: v for k, v in zip(op.input_type.arg_types, inputs.values())
                     }
                     return op.lazy_call(**final_inputs)
-                else:
-                    # see if weave function can be expanded and vectorized
-                    op_def = registry_mem.memory_registry.get_op(node.from_op.name)
-                    if op_def.weave_fn is None:
-                        # this could raise
+                # see if weave function can be expanded and vectorized
+                op_def = registry_mem.memory_registry.get_op(node.from_op.name)
+                if op_def.weave_fn is None:
+                    # this could raise
+                    try:
                         op_def.weave_fn = weavify.op_to_weave_fn(op_def)
+                    except errors.WeavifyError:
+                        pass
+                if op_def.weave_fn is not None:
                     vectorized = vectorize(op_def.weave_fn, stack_depth=stack_depth + 1)
                     return weave_internal.call_fn(vectorized, inputs)
+                else:
+                    # No weave_fn, so we can't vectorize this op. Just
+                    # use map
+                    input0_name, input0_val = list(inputs.items())[0]
+                    py_node = input0_val.to_py()
+                    new_inputs = {input0_name: py_node}
+                    for k, v in list(inputs.items())[1:]:
+                        new_inputs[k] = v
+                    op = dispatch.get_op_for_input_types(
+                        node.from_op.name,
+                        [],
+                        {k: v.type for k, v in new_inputs.items()},
+                    )
+                    if op is None:
+                        raise VectorizeError(
+                            "No fallback mapped op found for: %s" % node.from_op.name
+                        )
+                    return op.lazy_call(**new_inputs)
         elif isinstance(node, graph.VarNode):
             # Vectorize variable
             # NOTE: This is the only line that is specific to the arrow
@@ -859,6 +884,7 @@ def vectorize(
 
     weave_fn = graph.map_nodes(weave_fn, ensure_object_constructors_created)
     weave_fn = graph.map_nodes(weave_fn, expand_nodes)
+    print("WEAVE_FN", weave_fn)
     return graph.map_nodes(weave_fn, convert_node)
 
 

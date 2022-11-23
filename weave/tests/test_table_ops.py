@@ -260,5 +260,6 @@ def test_list_get_and_op():
 
 def test_list_save_and_use():
     saved = storage.save([{"a": 5, "b": 6}], "test-list")
+    get_node = ops.get(str(saved))
     with context.weavejs_client():
-        assert weave.use(ops.get(str(saved))) == [{"a": 5, "b": 6}]
+        assert weave.use(get_node) == [{"a": 5, "b": 6}]

@@ -1,5 +1,6 @@
 import pytest
 from ..language_features.tagging.tagged_value_type import TaggedValueType
+import weave
 import weave.weave_types
 from .. import weave_types as types
 from .. import runs
@@ -198,3 +199,8 @@ def test_union_access():
             weave.weave_types.String(), weave.weave_types.NoneType()
         )
     }
+
+
+def test_type_nodes():
+    t = weave.save(weave.types.TypedDict({"a": weave.types.Int()}))
+    assert weave.use(t.property_types) == {"a": weave.types.Int()}

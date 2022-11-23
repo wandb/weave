@@ -55,19 +55,6 @@ def test_mapped_method_returning_custom_type():
     assert weave.use(mid[1].y) == pytest.approx(0.65)
 
 
-def test_mapped_on_fully_custom_type():
-    data = [
-        {"a": 5, "im": Image.linear_gradient("L").rotate(0)},
-        {"a": 6, "im": Image.linear_gradient("L").rotate(4)},
-    ]
-    arrow_arr = ops_arrow.to_arrow(data)
-
-    assert weave.use(arrow_arr.map(lambda row: row["im"].width_())).to_pylist() == [
-        256,
-        256,
-    ]
-
-
 def test_mapped_pick():
     data = [
         {"a": 5, "b": 9},

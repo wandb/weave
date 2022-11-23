@@ -83,6 +83,7 @@ def enable_stream_logging(level=logging.DEBUG, enable_datadog=False):
     )
 
     logger = logging.getLogger("root")
+    logger.setLevel(level)
     stream_handler = logging.StreamHandler(wsgi_errors_stream)
     stream_handler.setLevel(level)
     if enable_datadog:

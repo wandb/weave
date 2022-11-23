@@ -11,8 +11,6 @@ from .. import execute_fast
 from .. import op_def
 from ..language_features.tagging import make_tag_getter_op, tag_store, tagged_value_type
 
-from . import dict as dict_ops
-
 
 def getitem_output_type(input_types):
     self_type = input_types["arr"]

@@ -195,3 +195,18 @@ def test_cross_artifact_ref():
     node = weave.save(owner, "owner-obj")
     assert weave.use(node["b"]) == {"c": SomeCustomObj(2)}
     # TODO: assert that ref is to original object
+
+
+@weave.type()
+class TestObjType:
+    pass
+
+
+def test_ref_to_node():
+    d = weave.save({"a": TestObjType()})
+    node = d["a"]
+    # Node a Node with weave type ObjectType
+    # We want to make sure dispatch doesn't convert this access to ._ref into
+    # a getattr op call (prevented by ref=None on FallbackNodeTypeDispatcherMixin)
+    # ref should be None here
+    assert node._ref == None

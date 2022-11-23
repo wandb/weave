@@ -81,6 +81,7 @@ def get_node_methods_classes(type_: types.Type) -> typing.Sequence[typing.Type]:
     for type_class in type_.__class__.mro():
         if (
             issubclass(type_class, types.Type)
+            and hasattr(type_class, "NodeMethodsClass")
             and type_class.NodeMethodsClass is not None
             and type_class.NodeMethodsClass not in classes
         ):

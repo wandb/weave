@@ -9,6 +9,7 @@ from . import op_def
 from . import errors
 from . import graph
 from . import box
+from . import weave_internal
 
 
 class DeriveOpHandler:
@@ -213,6 +214,19 @@ class MappedDeriveOpHandler(DeriveOpHandler):
             resolve,
             _mapped_refine_output_type(orig_op),
         )
+
+        def weave_fn_body(list_, *args):
+            def map_item(item):
+                full_named_args = {mapped_param_name: item}
+                for i, na in enumerate(named_args[1:]):
+                    full_named_args[na.name] = args[i]
+
+                # use Any type for OutputNode
+                return graph.OutputNode(types.Any(), orig_op.name, full_named_args)
+
+            return list_.map(lambda item: map_item(item))
+
+        new_op.weave_fn = weave_internal.define_fn(input_type, weave_fn_body)
         op_version = registry_mem.memory_registry.register_op(new_op)
 
         return op_version

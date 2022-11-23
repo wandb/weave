@@ -148,7 +148,8 @@ def _save(name, obj, action=None):
     setter=_save,
     name="get",
     input_type={"uri": types.String()},
-    output_type=op_get_return_type_from_inputs,
+    output_type=types.Any(),
+    refine_output_type=get_returntype,
 )
 def get(uri):
     return storage.get(uri)

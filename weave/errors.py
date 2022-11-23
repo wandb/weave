@@ -42,3 +42,7 @@ class WeaveStorageError(Exception):
 
 class WeaveExecutionError(Exception):
     pass
+
+
+class WeavifyError(Exception):
+    pass
