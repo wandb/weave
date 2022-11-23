@@ -1,4 +1,4 @@
-wandb>0.13
+wandb @ git+https://github.com/wandb/client.git@b18d30b556fda1b75a7e9043bb4ce800453075d4#egg=wandb
 ddtrace
 python-json-logger
 numpy
