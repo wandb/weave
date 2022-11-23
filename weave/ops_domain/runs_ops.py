@@ -1,32 +1,14 @@
 import typing
+
+from . import wb_util
 from ..api import op
 from . import wb_domain_types
-from .wbmedia import TableClientArtifactFileRef
 from .. import weave_types as types
 from ..language_features.tagging import make_tag_getter_op
 
 run_tag_getter_op = make_tag_getter_op.make_tag_getter_op(
     "run", wb_domain_types.Run.WeaveType(), op_name="tag-run"  # type: ignore
 )
-
-
-def process_summary_obj(val):
-    if isinstance(val, dict) and "_type" in val and val["_type"] == "table-file":
-        return TableClientArtifactFileRef(val["artifact_path"])
-    return val
-
-
-def process_summary_type(val):
-    if isinstance(val, dict) and "_type" in val and val["_type"] == "table-file":
-        return TableClientArtifactFileRef.WeaveType()
-    return types.TypeRegistry.type_of(val)
-
-
-@op(render_info={"type": "function"})
-def refine_summary_type(run: wb_domain_types.Run) -> types.Type:
-    return types.TypedDict(
-        {k: process_summary_type(v) for k, v in run.sdk_obj.summary._json_dict.items()}
-    )
 
 
 @op(name="run-jobtype")
@@ -52,11 +34,24 @@ def id(run: wb_domain_types.Run) -> str:
     return run.sdk_obj.id
 
 
+@op(render_info={"type": "function"})
+def refine_summary_type(run: wb_domain_types.Run) -> types.Type:
+    return wb_util.process_run_dict_type(run.sdk_obj.summary._json_dict)
+
+
 @op(name="run-summary", refine_output_type=refine_summary_type)
 def summary(run: wb_domain_types.Run) -> dict[str, typing.Any]:
-    return {
-        k: process_summary_obj(v) for k, v in run.sdk_obj.summary._json_dict.items()
-    }
+    return wb_util.process_run_dict_obj(run.sdk_obj.summary._json_dict)
+
+
+@op(render_info={"type": "function"})
+def refine_config_type(run: wb_domain_types.Run) -> types.Type:
+    return wb_util.process_run_dict_type(run.sdk_obj.config)
+
+
+@op(name="run-config", refine_output_type=refine_config_type)
+def config(run: wb_domain_types.Run) -> dict[str, typing.Any]:
+    return wb_util.process_run_dict_obj(run.sdk_obj.config)
 
 
 @op(name="run-usedArtifactVersions")

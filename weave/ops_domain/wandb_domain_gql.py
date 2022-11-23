@@ -1,3 +1,4 @@
+import datetime
 import typing
 from wandb.apis import public as wandb_api
 
@@ -38,6 +39,21 @@ def artifact_collection_is_portfolio(
         },
     )
     return res["project"]["artifactCollection"]["__typename"] == "ArtifactPortfolio"
+
+
+def root_viewer() -> wb_domain_types.User:
+    res = _query(
+        """	
+        query root_viewer {	
+            viewer {	
+                id
+                username
+            }	
+        }	
+        """,
+        {},
+    )
+    return wb_domain_types.User(res["viewer"]["username"])
 
 
 def artifact_collection_artifact_type(
@@ -234,6 +250,43 @@ def artifact_membership_aliases(
             "aliases"
         ]
     ]
+
+
+def artifact_membership_created_at(
+    artifact_collection_membership: wb_domain_types.ArtifactCollectionMembership,
+) -> wb_domain_types.Date:
+    res = _query(
+        """	
+        query artifact_membership_created_at(	
+            $projectName: String!,	
+            $entityName: String!,
+            $artifactCollectionName: String!,	
+            $identifier: String!,	
+        ) {	
+            project(name: $projectName, entityName: $entityName) {	
+                id
+                artifactCollection(name: $artifactCollectionName) {	
+                    id	
+                    artifactMembership(aliasName: $identifier) {
+                        id
+                        createdAt
+                    }   
+                }
+            }	
+        }
+        """,
+        {
+            "projectName": artifact_collection_membership._artifact_collection._project.project_name,
+            "entityName": artifact_collection_membership._artifact_collection._project._entity.entity_name,
+            "artifactCollectionName": artifact_collection_membership._artifact_collection.artifact_collection_name,
+            "identifier": f"v{artifact_collection_membership.version_index}",
+        },
+    )
+    datetime_val = datetime.datetime.strptime(
+        res["project"]["artifactCollection"]["artifactMembership"]["createdAt"],
+        "%Y-%m-%dT%H:%M:%S",
+    )
+    return wb_domain_types.Date(datetime_val)
 
 
 def artifact_collection_aliases(
@@ -615,3 +668,51 @@ def artifact_version_memberships(
         )
         for memEdge in membershipEdges
     ]
+
+
+def user_entities(
+    user: wb_domain_types.User,
+) -> list[wb_domain_types.Entity]:
+    res = _query(
+        """	
+        query user_entities(	
+            $userName: String!,	
+        ) {	
+            user(userName: $userName) {	
+                id
+                teams(first: 50) {
+                    edges {
+                        node {
+                            id
+                            name
+                        }
+                    }
+                }  
+            }	
+        }
+        """,
+        {"userName": user.user_name},
+    )
+    return [
+        wb_domain_types.Entity(edge["node"]["name"])
+        for edge in res["user"]["teams"]["edges"]
+    ]
+
+
+def entity_is_team(
+    entity: wb_domain_types.Entity,
+) -> bool:
+    res = _query(
+        """	
+        query user_entities(	
+            $entityName: String!,	
+        ) {	
+            entity(name: $entityName) {	
+                id
+                isTeam 
+            }	
+        }
+        """,
+        {"entityName": entity.entity_name},
+    )
+    return res["entity"]["isTeam"]

@@ -13,6 +13,11 @@ def entity_name(entity: wb_domain_types.Entity) -> str:
     return entity.entity_name
 
 
+@op(name="entity-isTeam")
+def entity_is_team(entity: wb_domain_types.Entity) -> bool:
+    return wandb_domain_gql.entity_is_team(entity)
+
+
 @op(name="entity-link")
 def entity_link(entity: wb_domain_types.Entity) -> wb_domain_types.Link:
     return wb_domain_types.Link(entity.entity_name, f"/{entity.entity_name}")

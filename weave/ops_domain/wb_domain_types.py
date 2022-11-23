@@ -1,5 +1,6 @@
 # Note: in the long run we want to eiminate all uses of sdk objects!
 
+import datetime
 from wandb.apis import public
 
 from .. import wandb_api
@@ -225,7 +226,7 @@ class ArtifactAlias:
 
 @weave_type("date", True)
 class Date:
-    pass
+    datetime_value: datetime.datetime
 
 
 @weave_type("link", True)

@@ -32,3 +32,10 @@ def artifact_membership_version(
         _artifact_sequence=artifactMembership._artifact_collection,
         version_index=artifactMembership.version_index,
     )
+
+
+@op(name="artifactMembership-createdAt")
+def artifact_membership_created_at(
+    artifactMembership: wb_domain_types.ArtifactCollectionMembership,
+) -> wb_domain_types.Date:
+    return wandb_domain_gql.artifact_membership_created_at(artifactMembership)
