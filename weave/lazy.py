@@ -14,6 +14,9 @@ from . import dispatch
 from . import pyfunc_type_util
 from . import language_autocall
 from . import engine_trace
+from .language_features.tagging.process_opdef_output_type import (
+    process_opdef_refined_output_type,
+)
 
 
 def _make_output_node(
@@ -41,6 +44,9 @@ def _make_output_node(
         tracer = engine_trace.tracer()
         with tracer.trace("refine.%s" % fq_op_name):
             output_type = api.use(called_refine_output_type)
+        output_type = process_opdef_refined_output_type(
+            output_type, bound_params, registry_mem.memory_registry.get_op(fq_op_name)
+        )
     elif callable(output_type):
         new_input_type = {}
         for k, n in bound_params.items():

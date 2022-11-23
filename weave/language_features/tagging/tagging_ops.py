@@ -1,4 +1,4 @@
-from weave.language_features.tagging.tagged_value_type import TaggedValueType
+from . import tagging_op_logic
 from ... import weave_types as types
 from ... import decorator_op
 
@@ -11,10 +11,7 @@ from ... import decorator_op
     output_type=types.Type(),
 )
 def op_get_tag_type(obj_type):  # type: ignore
-    if isinstance(obj_type, TaggedValueType):
-        return obj_type.tag
-    else:
-        return types.NoneType()
+    return tagging_op_logic.op_get_tag_type_resolver(obj_type)
 
 
 @decorator_op.op(
@@ -26,10 +23,7 @@ def op_get_tag_type(obj_type):  # type: ignore
     output_type=types.Type(),
 )
 def op_make_type_tagged(obj_type, tag_type):  # type: ignore
-    if isinstance(tag_type, types.TypedDict):
-        return TaggedValueType(tag_type, obj_type)
-    else:
-        return obj_type
+    return tagging_op_logic.op_make_type_tagged_resolver(obj_type)
 
 
 @decorator_op.op(
@@ -42,9 +36,4 @@ def op_make_type_tagged(obj_type, tag_type):  # type: ignore
     output_type=types.Type(),
 )
 def op_make_type_key_tag(obj_type, key, tag_type):  # type: ignore
-    tags = {key: tag_type}
-    if isinstance(tag_type, TaggedValueType) and isinstance(
-        tag_type.tag, types.TypedDict
-    ):
-        tags.update(tag_type.tag.property_types)
-    return TaggedValueType(types.TypedDict(tags), obj_type)
+    return tagging_op_logic.op_make_type_key_tag_resolver(obj_type, key, tag_type)

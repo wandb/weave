@@ -48,6 +48,18 @@ class TaggedValueType(types.Type):
     )
     value: types.Type = dataclasses.field(default_factory=lambda: types.Any())
 
+    # We use this technique to apply post-processing to the inputs, but also works
+    # around the frozen dataclass issue.
+    def __post_init__(self) -> None:
+        if isinstance(self.value, TaggedValueType):
+            self.__dict__["tag"] = types.TypedDict(
+                {
+                    **self.tag.property_types,
+                    **self.value.tag.property_types,
+                }
+            )
+            self.__dict__["value"] = self.value.value
+
     def __getattr__(self, attr: str) -> typing.Any:
         return getattr(self.value, attr)
 

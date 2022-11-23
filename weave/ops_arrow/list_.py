@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import pyarrow as pa
 
+
 py_type = type
 
 from ..api import op, weave_class, type, use
@@ -23,6 +24,8 @@ from .. import execute_fast
 from .. import weave_internal
 from .. import context
 from .. import weavify
+from .. import box
+from ..language_features.tagging import tagged_value_type, tag_store
 
 from . import arrow
 
@@ -700,6 +703,25 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
 
 ArrowWeaveListType.instance_classes = ArrowWeaveList
 ArrowWeaveListType.instance_class = ArrowWeaveList
+
+# TODO: This needs to be properly vectorized / arrowed
+# since this bails out out of the arrow implementation
+@op(
+    name="arrowWeaveList-createIndexCheckpointTag",
+    input_type={"arr": ArrowWeaveListType(types.Any())},
+    output_type=lambda input_types: types.List(
+        tagged_value_type.TaggedValueType(
+            types.TypedDict({"index": types.Number()}), input_types["arr"].object_type
+        )
+    ),
+)
+def arrow_weave_list_indexCheckpoint(arr):
+    res = []
+    for item in arr:
+        item = box.box(item)
+        tag_store.add_tags(item, {"index": len(res)})
+        res.append(item)
+    return res
 
 
 @dataclasses.dataclass(frozen=True)

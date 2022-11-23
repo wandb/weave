@@ -15,7 +15,10 @@ from . import uris
 from . import graph
 from . import weave_internal
 from . import pyfunc_type_util
-from .language_features.tagging import process_opdef_resolve_fn
+from .language_features.tagging import (
+    process_opdef_resolve_fn,
+    process_opdef_output_type,
+)
 
 
 def common_name(name: str) -> str:
@@ -131,14 +134,7 @@ class OpDef:
             ]:
                 self._output_type = self.raw_output_type
             else:
-                # This is a circular import: defining an op requires some ops already defined!
-                # We should think about how to get rid of this (probably having a special set of
-                # built-in ops that are defined before the rest of the system is loaded).
-                from .language_features.tagging.process_opdef_output_type import (
-                    process_opdef_output_type,
-                )
-
-                self._output_type = process_opdef_output_type(
+                self._output_type = process_opdef_output_type.process_opdef_output_type(
                     self.raw_output_type, self
                 )
         return self._output_type

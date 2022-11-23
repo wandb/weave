@@ -3,9 +3,13 @@ import shutil
 from unittest import mock
 
 import pytest
+
+from weave.box import BoxedNone
 from ..ops_primitives.list_ import list_indexCheckpoint
 from .. import api as weave
 from .. import ops as ops
+from ..language_features.tagging.tagged_value_type import TaggedValueType
+from ..ops_domain.wb_domain_types import Run, Project
 
 TEST_TABLE_ARTIFACT_PATH = "testdata/wb_artifacts/test_res_1fwmcd3q:v0"
 
@@ -72,8 +76,8 @@ def test_missing_file(fake_wandb):
     assert weave.use(node) == None
 
 
-def test_mapped_table_runs_tags(fake_wandb):
-    node = (
+def test_mapped_table_tags(fake_wandb):
+    cell_node = (
         ops.project("stacey", "mendeleev")
         .runs()
         .limit(1)
@@ -82,29 +86,23 @@ def test_mapped_table_runs_tags(fake_wandb):
         .rows()
         .dropna()
         .concat()
+        .createIndexCheckpointTag()[5]["score_Amphibia"]
     )
-    # This explicit call is needed b/c assignability is not working for tags with refines
-    node = list_indexCheckpoint.call_fn(node)
-    node = node[0]
-    # This explicit call is needed b/c assignability is not working for weave arrow list
-    node = ops.runs_ops.run_tag_getter_op.call_fn(node)
-    node = node.name()
-    assert weave.use(node) == "test_run_name"
+    assert weave.use(cell_node.indexCheckpoint()) == 5
+    assert weave.use(cell_node.run().name()) == "test_run_name"
+    assert weave.use(cell_node.project().name()) == "mendeleev"
 
 
-def test_table_run_tags(fake_wandb):
-    node = (
+def test_table_tags(fake_wandb):
+    cell_node = (
         ops.project("stacey", "mendeleev")
         .runs()
         .limit(1)[0]
         .summary()["table"]
         .table()
         .rows()
+        .createIndexCheckpointTag()[5]["score_Amphibia"]
     )
-    # This explicit call is needed b/c assignability is not working for tags with refines
-    node = list_indexCheckpoint.call_fn(node)
-    node = node[0]
-    # This explicit call is needed b/c assignability is not working for weave arrow list
-    node = ops.runs_ops.run_tag_getter_op.call_fn(node)
-    node = node.name()
-    assert weave.use(node) == "test_run_name"
+    assert weave.use(cell_node.indexCheckpoint()) == 5
+    assert weave.use(cell_node.run().name()) == "test_run_name"
+    assert weave.use(cell_node.project().name()) == "mendeleev"
