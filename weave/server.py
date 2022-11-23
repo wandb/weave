@@ -93,8 +93,10 @@ def handle_request(request, deref=False):
     if not PROFILE:
         return _handle_request(request, deref=deref)
     with cProfile.Profile() as pr:
-        res = _handle_request(request, deref=deref)
-    pr.dump_stats("/tmp/weave/profile-%s" % time.time())
+        try:
+            res = _handle_request(request, deref=deref)
+        finally:
+            pr.dump_stats("/tmp/weave/profile-%s" % time.time())
     return res
 
 
