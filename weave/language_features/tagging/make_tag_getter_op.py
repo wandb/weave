@@ -36,7 +36,8 @@ def make_tag_getter_op(
         name=op_name,
         input_type={
             "obj": tagged_value_type.TaggedValueType(
-                types.TypedDict({tag_key: tag_type}), base_type
+                types.TypedDict({tag_key: types.union(types.NoneType(), tag_type)}),
+                base_type,
             ),
         },
         output_type=lambda input_types: input_types["obj"].tag.property_types[tag_key],

@@ -10,6 +10,7 @@ from . import registry_mem
 from . import errors
 from . import dispatch
 from . import graph_debug
+from . import language_nullability
 
 # These call_* functions must match the actual op implementations.
 # But we don't want to import the op definitions themselves here, since
@@ -69,7 +70,11 @@ def apply_type_based_dispatch(
         params = found_op.bind_params(
             [], found_op.input_type.create_param_dict([], node_inputs)
         )
-        named_param_types = {k: node_type(v) for k, v in params.items()}
+        named_param_types = (
+            language_nullability.adjust_assignable_param_dict_for_dispatch(
+                found_op, {k: node_type(v) for k, v in params.items()}
+            )
+        )
         new_node = _make_output_node(
             found_op.uri,
             params,
