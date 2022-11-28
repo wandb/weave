@@ -22,6 +22,17 @@ def to_weavejs_typekey(k: str) -> str:
     return k
 
 
+def js_to_py_typename(typename: str) -> str:
+    # WeaveJS overrides the table column type if the column name is id-like. See
+    # use of `SPECIAL_ID_COLUMN_NAMES` in `mediaTypes.ts`. Unlike other types,
+    # the "id" type does not describe the underlying data type. Furthermore,
+    # there are no ops based on the "id" type. For that reason, I opted to not
+    # put the id type in the type system for now, and just hap it to string.
+    if typename == "id":
+        return "string"
+    return typename
+
+
 def all_subclasses(cls):
     # Note using a list here... this doesn't dedupe star pattern!
     # But it does preserve tree order.
@@ -81,7 +92,7 @@ def type_name_to_type_map():
 @functools.cache
 def type_name_to_type(type_name):
     mapping = type_name_to_type_map()
-    return mapping.get(type_name)
+    return mapping.get(js_to_py_typename(type_name))
 
 
 class TypeRegistry:
