@@ -27,6 +27,9 @@ from .. import weavify
 from .. import box
 from ..language_features.tagging import tagged_value_type, tag_store
 
+from .. import box
+from ..language_features.tagging import tag_store
+
 from . import arrow
 
 
@@ -218,7 +221,7 @@ class ArrowTableGroupByType(types.Type):
     name = "ArrowTableGroupBy"
 
     object_type: types.Type = types.Any()
-    key: types.String = types.String()
+    key: types.Type = types.Any()
 
     @classmethod
     def type_of_instance(cls, obj):
@@ -355,9 +358,10 @@ ArrowTableGroupByType.instance_class = ArrowTableGroupBy
 
 @dataclasses.dataclass(frozen=True)
 class ArrowWeaveListType(types.Type):
+    _base_type = types.List()
     name = "ArrowWeaveList"
 
-    object_type: types.Type = types.Type()
+    object_type: types.Type = types.Any()
 
     @classmethod
     def type_of_instance(cls, obj):
@@ -560,7 +564,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
 
     @op(
         input_type={
-            "self": ArrowWeaveListType(arrow.ArrowTableType(types.Any())),
+            "self": ArrowWeaveListType(),
             "group_by_fn": lambda input_types: types.Function(
                 {"row": input_types["self"].object_type}, types.Any()
             ),
@@ -855,7 +859,9 @@ def vectorize(
                 op = dispatch.get_op_for_input_types(
                     node.from_op.name, [], {k: v.type for k, v in inputs.items()}
                 )
-                if op:
+                if op and isinstance(
+                    list(op.input_type.arg_types.values())[0], ArrowWeaveListType
+                ):
                     # We have a vectorized implementation of this op already.
                     final_inputs = {
                         k: v for k, v in zip(op.input_type.arg_types, inputs.values())
@@ -906,7 +912,6 @@ def vectorize(
 
     weave_fn = graph.map_nodes(weave_fn, ensure_object_constructors_created)
     weave_fn = graph.map_nodes(weave_fn, expand_nodes)
-    print("WEAVE_FN", weave_fn)
     return graph.map_nodes(weave_fn, convert_node)
 
 

@@ -12,12 +12,10 @@ from . import hfmodel
 
 
 class HFModelTextGenerationType(hfmodel.HFModelType):
-    _base_type = hfmodel.HFModelType()
+    pass
 
 
-class FullTextGenerationPipelineOutputType(weave.types.ObjectType):
-    _base_type = hfmodel.FullPipelineOutputType()
-
+class FullTextGenerationPipelineOutputType(hfmodel.FullPipelineOutputType):
     def property_types(self):
         return {
             "_model": HFModelTextGenerationType(),

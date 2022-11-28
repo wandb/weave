@@ -85,7 +85,7 @@ def multi_distribution(
 
     binned = unnested.groupby(lambda item: bin_func(item)).map(
         lambda group: weave.ops.dict_(
-            value=group.key()["value"], label=group.key()["label"], count=group.count()
+            value=group.key["value"], label=group.key["label"], count=group.count()
         )
     )
     fig = weave_plotly.plotly_barplot(binned)
@@ -122,7 +122,7 @@ def multi_distribution_panel_plot(
 
     binned = unnested.groupby(lambda item: bin_func(item)).map(
         lambda group: weave.ops.dict_(
-            value=group.key()["value"], label=group.key()["label"], count=group.count()
+            value=group.key["value"], label=group.key["label"], count=group.count()
         )
     )
 

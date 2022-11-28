@@ -236,10 +236,6 @@ class GroupResult:
     def var_item(self):
         return weave_internal.make_var_node(self.type.object_type, "row")
 
-    @op(output_type=lambda input_types: input_types["self"].key)
-    def key(self):
-        return self.key
-
     @op(output_type=types.Any())
     def pick(self, key: str):
         return general_picker(self.list, key)
@@ -452,8 +448,7 @@ class WeaveGroupResultInterface:
         output_type=lambda input_types: input_types["obj"].key,
     )
     def key(obj):
-        type_class = types.TypeRegistry.type_class_of(obj)
-        return type_class.NodeMethodsClass.key.resolve_fn(obj)
+        return obj.key
 
 
 # These are only used in tests, to simulate the queries that WeaveJS

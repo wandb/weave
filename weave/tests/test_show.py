@@ -34,6 +34,12 @@ def test_show_simple_call(cereal_csv):
                     "type": {
                         "type": "local_file",
                         "_is_object": True,
+                        "_base_type": {
+                            "type": "file",
+                            "_is_object": True,
+                            "extension": "string",
+                            "wb_object_type": "string",
+                        },
                         "extension": "csv",
                         "path": "string",
                         "mtime": "float",
@@ -86,6 +92,18 @@ actual_SHOW_PARAMS_FINE_TUNE_WEAVE_NODE = {
                     {
                         "type": "gpt3_fine_tune_results_type",
                         "_is_object": True,
+                        "_base_type": {
+                            "type": "openai_stored_file",
+                            "_is_object": True,
+                            "bytes": "int",
+                            "created_at": "int",
+                            "filename": "string",
+                            "id": "string",
+                            "object": "string",
+                            "purpose": "string",
+                            "status": "string",
+                            "status_details": "none",
+                        },
                         "bytes": "int",
                         "created_at": "int",
                         "filename": "string",
@@ -110,6 +128,7 @@ actual_SHOW_PARAMS_FINE_TUNE_WEAVE_NODE = {
                 "nodeType": "output",
                 "type": {
                     "type": "LocalArtifactRef",
+                    "_base_type": {"type": "Ref", "objectType": "unknown"},
                     "objectType": {
                         "type": "list",
                         "objectType": {

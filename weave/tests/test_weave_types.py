@@ -1,3 +1,4 @@
+import dataclasses
 import pytest
 from ..language_features.tagging.tagged_value_type import TaggedValueType
 import weave
@@ -204,3 +205,31 @@ def test_union_access():
 def test_type_nodes():
     t = weave.save(weave.types.TypedDict({"a": weave.types.Int()}))
     assert weave.use(t.property_types) == {"a": weave.types.Int()}
+
+
+def test_typeof_node():
+    n = weave.save(5)
+    assert weave.type_of(n + 5) == types.Function({}, types.Number())
+
+
+@dataclasses.dataclass(frozen=True)
+class SublistType(types.Type):
+    _base_type = types.List(types.Any())
+    object_type: types.Type = types.UnknownType()
+
+
+def test_subtype_list():
+    assert types.List(types.Int()).assign_type(types.List(types.Int()))
+    assert not types.List(types.String()).assign_type(types.List(types.Int()))
+
+    assert types.List(types.Int()).assign_type(SublistType(types.Int()))
+    assert not types.List(types.String()).assign_type(SublistType(types.Int()))
+
+
+def test_typeddict_to_dict():
+    assert types.Dict(types.String(), types.Int()).assign_type(
+        types.TypedDict({"a": types.Int(), "b": types.Int()})
+    )
+    assert not types.Dict(types.String(), types.Int()).assign_type(
+        types.TypedDict({"a": types.Int(), "b": types.String()})
+    )

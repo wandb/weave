@@ -114,7 +114,10 @@ class File:
 
     @op(
         name="file-directUrlAsOf",
-        input_type={"file": types.FileType(), "asOf": types.Int()},
+        input_type={
+            "file": types.union(types.FileType(), ArtifactVersionFileType()),
+            "asOf": types.Int(),
+        },
         output_type=types.String(),
     )
     def direct_url_as_of(file, asOf):
@@ -185,7 +188,7 @@ types.SubDirType.instance_class = SubDir
 
 
 @weave_class(weave_type=types.DirType)
-class Dir(object):
+class Dir:
     def __init__(self, fullPath, size, dirs, files):
         self.fullPath = fullPath
         self.size = size

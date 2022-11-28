@@ -155,6 +155,7 @@ def test_ref_type():
     python_ref = storage.to_python(ref)
     assert python_ref == {
         "_type": {
+            "_base_type": {"objectType": "unknown", "type": "Ref"},
             "type": "LocalArtifactRef",
             "objectType": {"type": "typedDict", "propertyTypes": {"x": "int"}},
         },

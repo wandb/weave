@@ -61,33 +61,7 @@ def _make_output_node(
 
         output_type = output_type(new_input_type)
 
-    name = "OutputNode"
-    bases = [graph.OutputNode]
-
-    # If the output type is a run, mixin the Run's output type
-    # as well. execute.py automatic inserts await_output operations
-    # as needed.
-    if isinstance(output_type, types.RunType) and hasattr(
-        output_type.output, "NodeMethodsClass"
-    ):
-        name += output_type.output.__class__.__name__
-        bases.append(output_type.output.NodeMethodsClass)
-
-    node_methods_class, node_name = language_autocall.node_methods_class(output_type)
-    if node_methods_class is not None:
-        name += node_name
-        if node_methods_class not in bases:
-            bases.append(node_methods_class)
-
-    # Mixin Node methods
-    bases += weave_internal.get_node_methods_classes(output_type)
-
-    unique_bases = []
-    for base in bases:
-        if base not in unique_bases:
-            unique_bases.append(base)
-    return_type = type(name, tuple(unique_bases), {})
-    return return_type(output_type, fq_op_name, bound_params)
+    return dispatch.RuntimeOutputNode(output_type, fq_op_name, bound_params)
 
 
 def _type_of(v: typing.Any):

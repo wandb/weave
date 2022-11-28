@@ -174,11 +174,18 @@ class _TypeSubclassWatcher(type):
         _clear_global_type_class_cache()
         super(_TypeSubclassWatcher, cls).__init__(name, bases, clsdict)
 
+        # Set _base_type to the first base class
+        if bases and bases[0] != Type:
+            if cls.__dict__.get("_base_type") is None:
+                cls._base_type = bases[0]()
+
 
 @dataclasses.dataclass(frozen=True)
 class Type(metaclass=_TypeSubclassWatcher):
-    # @decorator_class.weave_class attaches this
-    NodeMethodsClass: typing.ClassVar[typing.Optional[type]]
+    # This is like Typescript "extends", and is populated by default by
+    # Python inheritance in our metaclass.
+    _base_type: typing.ClassVar[typing.Optional["Type"]] = None
+
     instance_class: typing.ClassVar[typing.Optional[type]]
     instance_classes: typing.ClassVar[
         typing.Union[type, typing.List[type], None]
@@ -262,29 +269,31 @@ class Type(metaclass=_TypeSubclassWatcher):
             self, TaggedValueType
         ):
             return self.assign_type(next_type.value)
+
+        # language feature: autocall
+        if isinstance(next_type, Function) and not isinstance(self, Function):
+            return self.assign_type(next_type.output_type)
+
+        # language feature: auto-await
+        if isinstance(next_type, RunType) and not isinstance(self, RunType):
+            return self.assign_type(next_type.output)
+
         return self._assign_type_inner(next_type)
 
     def _assign_type_inner(self, next_type: "Type") -> bool:
         if self.__class__ == next_type.__class__ or (
-            (self.__class__ != Type and next_type.__class__ != Type)
-            and (
-                isinstance(next_type, self.__class__)
-                or
-                # parent is assignable to child class
-                #     when type variables match
-                # TODO: only valid when python hiearchy matches type hierarchy!
-                #     And no Abstract classes (Type)
-                isinstance(self, next_type.__class__)
-            )
+            next_type._base_type is not None
+            and isinstance(next_type._base_type, self.__class__)
         ):
-            # if isinstance(next_type, self.__class__):
             if callable(self.type_vars):
                 type_vars = self.type_vars()
             else:
                 type_vars = self.type_vars
             for prop_name in type_vars:
                 if not hasattr(next_type, prop_name):
-                    return False
+                    raise errors.WeaveInternalError(
+                        "type %s missing attributes of base type %s" % (next_type, self)
+                    )
                 if not getattr(self, prop_name).assign_type(
                     getattr(next_type, prop_name)
                 ):
@@ -302,6 +311,8 @@ class Type(metaclass=_TypeSubclassWatcher):
     def _to_dict(self):
         fields = dataclasses.fields(self.__class__)
         type_props = {}
+        if self._base_type is not None:
+            type_props["_base_type"] = self._base_type.to_dict()
         for field in fields:
             # TODO: I really don't like this change. Only needed because
             # FileType has optional fields... Remove?
@@ -764,9 +775,12 @@ class Dict(Type):
             if not next_value_type:
                 return False
             return True
-        else:
-            # TODO: we could handle TypedDict here.
-            return False
+        elif isinstance(other_type, TypedDict):
+            return all(
+                self.object_type.assign_type(t)
+                for t in other_type.property_types.values()
+            )
+        return False
 
     @classmethod
     def type_of_instance(cls, obj):
@@ -780,10 +794,7 @@ class Dict(Type):
 
 @dataclasses.dataclass(frozen=True)
 class ObjectType(Type):
-    # TODO: Maybe this belongs on Type?
-    _base_type: typing.ClassVar[Type] = Invalid()
-
-    def property_types(self):
+    def property_types(self) -> dict[str, Type]:
         return {}
 
     @classmethod
@@ -796,8 +807,11 @@ class ObjectType(Type):
         return cls(**variable_prop_types)
 
     def _to_dict(self):
+        # TODO: we don't need _is_object, now that we have base_type everywhere.
+        # Remove the check for self._base_type.__class__ != ObjectType, and get
+        # rid of _is_object (need to update frontend as well).
         d = {"_is_object": True}
-        if not isinstance(self._base_type, Invalid):
+        if self._base_type is not None and self._base_type.__class__ != ObjectType:
             d["_base_type"] = self._base_type.to_dict()
         for k, prop_type in self.property_types().items():
             d[to_weavejs_typekey(k)] = prop_type.to_dict()
@@ -821,30 +835,17 @@ class ObjectType(Type):
         return mapper.apply(result)
 
 
-def fn():
-    pass
-
-
-PythonFunction = type(fn)
-
-
 @dataclasses.dataclass(frozen=True)
 class Function(Type):
     name = "function"
 
-    # TODO: Do I really want PythonFunction here? Why?
-    instance_classes: typing.ClassVar[typing.List[type]] = [PythonFunction]
+    instance_classes: typing.ClassVar[typing.List[type]] = []
 
     input_types: dict[str, Type] = dataclasses.field(default_factory=dict)
     output_type: Type = dataclasses.field(default_factory=lambda: UnknownType())
 
     @classmethod
     def type_of_instance(cls, obj):
-        # obj is either a Python function or a Node
-        if callable(obj):
-            # its a python function
-            return cls()
-        # instance is graph.Node
         if isinstance(obj.type, Function):
             # Its already a Function type, so just return it.
             # TODO: I'm not sure if this is right, this makes FunctionType

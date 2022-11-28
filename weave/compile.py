@@ -69,12 +69,11 @@ def apply_type_based_dispatch(
         params = found_op.bind_params(
             [], found_op.input_type.create_param_dict([], node_inputs)
         )
-        named_param_types = {k: node_type(v) for k, v in params.items()}
         new_node = _make_output_node(
             found_op.uri,
             params,
             found_op.input_type,
-            found_op.return_type_of_arg_types(named_param_types),
+            found_op.output_type,
             found_op.refine_output_type,
         )
         should_replace = new_node.from_op.name != node.from_op.name or any(

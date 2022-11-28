@@ -84,10 +84,6 @@ def ecosystem_render(
         title="Weave ecosystem",
         subtitle="",
         content=[
-            # Have to do lots of "type: ignore", because what we have here is a Node>
-            # But it behaves like a TypedDict, because we mixin NodeMethodsClass for the
-            # target type.
-            # TODO: need to figure out a way to do this without breaking python types
             panels.CardTab(
                 name="Intro",
                 content=panels.PanelMarkdown(INTRO),  # type: ignore

@@ -1,10 +1,7 @@
 import collections
 import copy
-from enum import Enum
-import inspect
 import typing
 
-import weave
 from weave.weavejs_fixes import fixup_node
 
 from . import errors
@@ -103,14 +100,9 @@ class OpDef:
         self._output_type = None
 
     def __get__(self, instance, owner):
-        # This is part of Python's descriptor protocol, and when this op_def
-        # is fetched as a member of a class
-        self.instance = instance
-        return self
+        return BoundOpDef(instance, self)
 
     def __call__(_self, *args, **kwargs):
-        if _self.instance is not None:
-            return _self.call_fn(_self.instance, *args, **kwargs)
         return _self.call_fn(*args, **kwargs)
 
     def resolve_fn(__self, *args, **kwargs):
@@ -246,18 +238,22 @@ class OpDef:
             self.input_type,
         )
 
-    def return_type_of_arg_types(
-        self, param_types: dict[str, types.Type]
-    ) -> types.Type:
-        res_args = self.input_type.assign_param_dict(
-            self.input_type.create_param_dict([], param_types)
-        )
-        if not op_args.all_types_valid(res_args):
-            return types.Invalid()
-        if isinstance(self.output_type, types.Type):
-            return self.output_type
+
+class BoundOpDef(OpDef):
+    bind_self: typing.Optional[graph.Node]
+
+    def __init__(self, bind_self: typing.Optional[graph.Node], op_def: OpDef) -> None:
+        self.bind_self = bind_self
+        self.op_def = op_def
+
+    def __call__(self, *args, **kwargs):
+        if self.bind_self is None:
+            return self.op_def(*args, **kwargs)
         else:
-            return self.output_type(res_args)
+            return self.op_def(self.bind_self, *args, **kwargs)
+
+    def __getattr__(self, name):
+        return getattr(self.op_def, name)
 
 
 def is_op_def(obj):

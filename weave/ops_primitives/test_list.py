@@ -72,7 +72,7 @@ def test_sequence1():
                         types.TypedDict({"y": types.String()}),
                     )
                 },
-                lambda row: row.key()["y"],
+                lambda row: row.key["y"],
             )
         ),
     )

@@ -84,7 +84,7 @@ def test_map_scalar_map():
     assert weave.use(node[4]) == 17
 
 
-def test_complicated():
+def test_groupby_mapped_groupby():
     ref = create_arrow_data(1000)
     node = (
         weave.get(ref)
@@ -138,7 +138,7 @@ def test_custom_saveload():
 
 
 # @pytest.mark.skip()
-def test_custom_groupby():
+def test_custom_groupby_1():
     data = arrow.to_arrow(
         [
             {"a": 5, "im": Image.linear_gradient("L").rotate(0)},
@@ -203,13 +203,6 @@ def test_arrow_list_of_ref_to_item_in_list():
 
     assert weave.use(d_node[0]["c"] == 5) == True
     assert weave.use(d_node[1]["c"] == 7) == True
-
-
-# TODO: move to generic test as Weave types test.
-def test_arrow_list_assign():
-    assert number.ArrowWeaveListNumberType().assign_type(
-        arrow.ArrowWeaveListType(weave.types.Number())
-    )
 
 
 def test_arrow_unnest():
@@ -597,7 +590,7 @@ def test_arrow_dict():
     a = weave.save(arrow.to_arrow([1, 2, 3]))
     b = weave.save(arrow.to_arrow(["a", "b", "c"]))
     expected_output = [{"a": 1, "b": "a"}, {"a": 2, "b": "b"}, {"a": 3, "b": "c"}]
-    weave_func = lambda a, b: dict_(a=a, b=b)
+    weave_func = lambda a, b: ops.dict_(a=a, b=b)
     fn = weave_internal.define_fn(
         {"a": weave.types.Int(), "b": weave.types.String()},
         weave_func,
@@ -623,18 +616,41 @@ def test_vectorize_works_recursively_on_weavifiable_op():
         {"x": weave.types.Int()}, lambda x: add_one(x)
     ).val
     vectorized = arrow.vectorize(weave_fn)
-    assert vectorized.to_json() == {
+    expected = vectorized.to_json()
+    print("test_vectorize_works_recursively_on_weavifiable_op.expected", expected)
+    assert expected == {
         "nodeType": "output",
-        "type": {"type": "ArrowWeaveListNumber", "objectType": "number"},
+        "type": {
+            "type": "ArrowWeaveList",
+            "_base_type": {"type": "list", "objectType": "any"},
+            "objectType": "number",
+        },
         "fromOp": {
             "name": "ArrowWeaveListNumber-add",
             "inputs": {
                 "self": {
                     "nodeType": "var",
-                    "type": {"type": "ArrowWeaveList", "objectType": "int"},
+                    "type": {
+                        "type": "ArrowWeaveList",
+                        "_base_type": {"type": "list", "objectType": "any"},
+                        "objectType": "int",
+                    },
                     "varName": "x",
                 },
                 "other": {"nodeType": "const", "type": "int", "val": 1},
             },
         },
     }
+
+
+def test_grouped_typed_dict_assign():
+    assert arrow.ArrowWeaveListType(
+        object_type=types.TypedDict(property_types={})
+    ).assign_type(
+        arrow.ArrowTableGroupResultType(
+            object_type=types.TypedDict(
+                property_types={"a": types.Int(), "im": types.Int()}
+            ),
+            _key=types.TypedDict(property_types={"a": types.String()}),
+        )
+    )

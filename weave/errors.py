@@ -46,3 +46,7 @@ class WeaveExecutionError(Exception):
 
 class WeavifyError(Exception):
     pass
+
+
+class WeaveDispatchError(WeaveBaseError):
+    pass

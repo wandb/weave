@@ -20,18 +20,25 @@ def type(__override_name: str = None, __is_simple: bool = False):
         if __override_name is not None:
             target_name = __override_name
 
+        base_type = types.ObjectType
+        if target.__bases__:
+            # Add the first base classes as the type base.
+            # TODO: should we add all bases?
+            target_base0 = target.__bases__[0]
+            if hasattr(target_base0, "WeaveType"):
+                base_type = target_base0.WeaveType
+
         if __is_simple:
             bases = (
-                types.ObjectType,
+                base_type,
                 types._PlainStringNamedType,
             )
         else:
-            bases = (types.ObjectType,)
+            bases = (base_type,)
         TargetType = _py_type(f"{target_name}Type", bases, {})
         TargetType.name = target_name
         TargetType.instance_classes = target
         TargetType.instance_class = target
-        TargetType.NodeMethodsClass = dc
 
         type_vars: dict[str, types.Type] = {}
         static_property_types: dict[str, types.Type] = {}
@@ -68,13 +75,6 @@ def type(__override_name: str = None, __is_simple: bool = False):
             for name, prop_type in static_property_types.items():
                 property_types[name] = prop_type
             return property_types
-
-        if target.__bases__:
-            # Add the first base classes as the type base.
-            # TODO: should we add all bases?
-            target_base0 = target.__bases__[0]
-            if hasattr(target_base0, "WeaveType"):
-                TargetType._base_type = target_base0.WeaveType()
 
         TargetType.property_types = property_types_method
         TargetType = dataclasses.dataclass(frozen=True)(TargetType)

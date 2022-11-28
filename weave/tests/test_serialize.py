@@ -46,6 +46,7 @@ def test_serialize_nested_function():
     assert ser == ser2
 
 
+@pytest.mark.skip(reason="we allow this now")
 def test_op_compat():
     ops = registry_mem.memory_registry.list_ops()
     issues = []

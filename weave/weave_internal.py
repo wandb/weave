@@ -7,7 +7,6 @@ from . import context_state
 from . import errors
 from . import client_interface
 from . import op_args
-from .language_features.tagging import tagged_value_type
 from . import language_autocall
 
 
@@ -66,57 +65,18 @@ def use(
     return result
 
 
-class UniversalNodeMixin:
-    pass
-
-
-def get_node_methods_classes(type_: types.Type) -> typing.Sequence[typing.Type]:
-    classes = []
-
-    # When the type is a TaggedValueType, use the inner type to determine methods.
-    if isinstance(type_, tagged_value_type.TaggedValueType):
-        return get_node_methods_classes(type_.value)
-
-    # Keeping this is still important for overriding dunder methods!
-    for type_class in type_.__class__.mro():
-        if (
-            issubclass(type_class, types.Type)
-            and hasattr(type_class, "NodeMethodsClass")
-            and type_class.NodeMethodsClass is not None
-            and type_class.NodeMethodsClass not in classes
-        ):
-            classes.append(type_class.NodeMethodsClass)
-
-    for mixin in UniversalNodeMixin.__subclasses__():
-        # Add a fallback dispatcher which us invoked if nothing else matches.
-        classes.append(mixin)
-    return classes
-
-
 def make_var_node(type_: types.Type, name: str) -> graph.VarNode:
-    node_methods_classes = get_node_methods_classes(type_)
-    if node_methods_classes:
-        return_type = type(
-            "VarNode%s" % type_.__class__.__name__,
-            (graph.VarNode, *node_methods_classes),
-            {},
-        )
-    else:
-        return_type = graph.VarNode
-    return return_type(type_, name)
+    # Circular import. TODO: fix
+    from . import dispatch
+
+    return dispatch.RuntimeVarNode(type_, name)
 
 
 def make_const_node(type_: types.Type, val: typing.Any) -> graph.ConstNode:
-    node_methods_classes = get_node_methods_classes(type_)
-    if node_methods_classes:
-        return_type = type(
-            "ConstNode%s" % type_.__class__.__name__,
-            (graph.ConstNode, *node_methods_classes),
-            {},
-        )
-    else:
-        return_type = graph.ConstNode
-    return return_type(type_, val)
+    # Circular import. TODO: fix
+    from . import dispatch
+
+    return dispatch.RuntimeConstNode(type_, val)
 
 
 def const(val: typing.Any, type: typing.Optional[types.Type] = None) -> graph.ConstNode:
@@ -128,16 +88,10 @@ def const(val: typing.Any, type: typing.Optional[types.Type] = None) -> graph.Co
 def make_output_node(
     type_: types.Type, op_name: str, op_params: dict[str, graph.Node]
 ) -> graph.OutputNode:
-    node_methods_classes = get_node_methods_classes(type_)
-    if node_methods_classes:
-        return_type = type(
-            "OutputNode%s" % type_.__class__.__name__,
-            (graph.OutputNode, *node_methods_classes),
-            {},
-        )
-    else:
-        return_type = graph.OutputNode
-    return return_type(type_, op_name, op_params)
+    # Circular import. TODO: fix
+    from . import dispatch
+
+    return dispatch.RuntimeOutputNode(type_, op_name, op_params)
 
 
 # Given a registered op, make a mapped version of it.

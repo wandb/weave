@@ -6,15 +6,6 @@ from .. import weave_types as types
 @weave_class(weave_type=types.Number)
 class Number(object):
     @op(
-        name="number-set",
-        input_type={"self": types.Number(), "val": types.Number()},
-        output_type=types.Number(),
-    )
-    @mutation
-    def set(self, val):
-        return val
-
-    @op(
         name="number-add",
         input_type={"lhs": types.Number(), "rhs": types.Number()},
         output_type=types.Number(),

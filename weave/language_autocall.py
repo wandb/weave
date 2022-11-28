@@ -39,17 +39,3 @@ def update_input_types(
     except KeyError:
         return actual_input_types
     return result
-
-
-def node_methods_class(
-    type_: types.Type,
-) -> tuple[typing.Optional[type], typing.Optional[str]]:
-    if not isinstance(type_, types.Function):
-        return None, None
-    function_output_type = type_.output_type
-    if not hasattr(function_output_type, "NodeMethodsClass"):
-        return None, None
-    return (
-        function_output_type.NodeMethodsClass,
-        function_output_type.__class__.__name__,
-    )

@@ -66,10 +66,3 @@ def test_skips_list_indexcheckpoint(cereal_csv):
 
     csv = ops.local_path(cereal_csv).readcsv()
     assert weave.use(csv[-1]["type"]) == "XXXX"
-
-
-def test_mutate_const():
-    d = {"a": 5, "b": 3}
-    const_dict = weave_internal.make_const_node(weave.type_of(d), d)
-    res = weave.use(const_dict["a"].set(9))
-    assert res == {"a": 9, "b": 3}

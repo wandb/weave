@@ -107,4 +107,5 @@ def test_panel_container():
             },
         },
     }
+    print("test_panel_container.serialized", serialized)
     assert serialized == expected

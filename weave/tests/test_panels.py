@@ -112,3 +112,28 @@ def test_object_picker_choice_type():
     panel_node = weave_internal.make_var_node(weave.type_of(panel), "panel")
     choice = panel_node.config.choice
     assert choice.type == weave.types.Function({}, weave.types.Int())
+
+
+def test_facet_selected():
+    data = weave.save(
+        [{"guess": "dog", "truth": "cat"}, {"guess": "dog", "truth": "dog"}]
+    )
+    facet = weave.panels.Group2(
+        equalSize=True,
+        items={
+            "confusion": weave.panels.Facet(
+                data,
+                x=lambda row: row["guess"],
+                y=lambda row: row["truth"],
+                select=lambda row: weave.panels.Group2(
+                    layered=True,
+                    items={
+                        "color": weave.panels.Color(row.count() / 50),
+                        "count": row.count(),
+                    },
+                ),
+            ),
+            "selected": lambda confusion: confusion.selected(),
+        },
+    )
+    assert facet.config.items["selected"].type == data.type

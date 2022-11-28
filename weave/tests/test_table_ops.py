@@ -116,7 +116,7 @@ def test_groupby(table_type):
         },
     ]
     grouped = table.groupby(groupby_fn)
-    assert weave.use((grouped[0].key(), grouped[0][0])) == expected
+    assert weave.use((grouped[0].key, grouped[0][0])) == expected
 
 
 @pytest.mark.parametrize("table_type", ["list", "sql"])
@@ -124,7 +124,7 @@ def test_groupby_list(table_type):
     table = get_test_table(table_type)
     grouped = table.groupby(lambda row: row["type"])
     group0 = grouped[0]
-    group0key = group0.key()
+    group0key = group0.key
     group00 = group0[0]
     expected = [
         "C",

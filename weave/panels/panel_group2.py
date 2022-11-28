@@ -56,20 +56,24 @@ class Group2(panel.Panel, typing.Generic[Group2ConfigType]):
         frame = copy.copy(frame)
         frame.update(self.vars)
 
+        items = {}
         for name, p in self.config.items.items():
             injected = panel.run_variable_lambdas(p, frame)
             child = panel_util.child_item(injected)
             if not isinstance(child, graph.Node):
                 child._normalize(frame)
-            self.config.items[name] = child
+            items[name] = child
 
-            # print("SELF CONFIG", self.config)
+            # We build up config one item at a time. Construct a version
+            # with the current items so that we can do type_of on it (type_of
+            # will fail if we have a lambda in the config).
+            partial_config = dataclasses.replace(self.config, items=items)
             config_var = weave_internal.make_var_node(
-                weave.type_of(self.config), "self"
+                weave.type_of(partial_config), "self"
             )
             frame[name] = config_var.items[name]
-            # print("FRAME", frame)
-            # print()
+
+        self.config.items = items
 
     # @property
     # def config(self):

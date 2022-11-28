@@ -11,7 +11,7 @@ def test_dir():
     testdir = ops.local_path("testdata/test_dir")
     # TODO: causes test to fail because of serialization mutatio
 
-    size = api.use(testdir.size())
+    size = api.use(testdir.size)
     assert size == 111
     dir = api.use(testdir)
     assert len(dir.dirs) == 1

@@ -4,12 +4,14 @@ from weave.op_args import OpNamedArgs
 
 from . import op_def
 from . import op_def_type
+from . import op_args
 from . import weave_types
 from . import lazy
 from . import errors
 from . import context_state
 from . import storage
 from . import uris
+from . import op_aliases
 
 
 class Registry:
@@ -20,11 +22,15 @@ class Registry:
     # state.
     _ops: typing.Dict[str, op_def.OpDef]
 
+    # common_name: name: op_def
+    _ops_by_common_name: typing.Dict[str, dict[str, op_def.OpDef]]
+
     _op_versions: typing.Dict[typing.Tuple[str, str], op_def.OpDef]
 
     def __init__(self):
         self._types = {}
         self._ops = {}
+        self._ops_by_common_name = {}
         self._op_versions = {}
 
     def _make_op_calls(
@@ -59,6 +65,7 @@ class Registry:
         self._make_op_calls(op, location)
         # if not is_loading:
         self._ops[op.name] = op
+        self._ops_by_common_name.setdefault(op.common_name, {})[op.name] = op
         if version:
             self._op_versions[(op.name, version)] = op
         return op
@@ -90,7 +97,24 @@ class Registry:
         raise Exception("Op def doesn't exist for %s" % lazy_local_fn)
 
     def find_ops_by_common_name(self, common_name: str) -> typing.List[op_def.OpDef]:
-        return [op for op in self._ops.values() if op.common_name == common_name]
+        aliases = op_aliases.get_op_aliases(common_name)
+        ops: list[op_def.OpDef] = []
+        for alias in aliases:
+            ops.extend(self._ops_by_common_name.get(alias, {}).values())
+        return ops
+
+    def find_chainable_ops(
+        self, arg0_type: weave_types.Type
+    ) -> typing.List[op_def.OpDef]:
+        def is_chainable(op):
+            if not isinstance(op.input_type, op_args.OpNamedArgs):
+                return False
+            args = list(op.input_type.arg_types.values())
+            if not args:
+                return False
+            return args[0].assign_type(arg0_type)
+
+        return [op for op in self._ops.values() if is_chainable(op)]
 
     def load_saved_ops(self):
         for op_ref in storage.objects(op_def_type.OpDefType()):
@@ -123,6 +147,10 @@ class Registry:
         op = self._ops.pop(name)
         op.name = new_name
         self._ops[new_name] = op
+
+        self._ops_by_common_name[op.common_name].pop(name)
+        self._ops_by_common_name.setdefault(op.common_name, {})[new_name] = op
+
         if op.version is not None:
             self._op_versions.pop((name, op.version))
             self._op_versions[(new_name, op.version)] = op

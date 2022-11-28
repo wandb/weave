@@ -12,12 +12,10 @@ from . import hfmodel
 
 
 class HFModelTextClassificationType(hfmodel.HFModelType):
-    _base_type = hfmodel.HFModelType()
+    pass
 
 
-class FullTextClassificationPipelineOutputType(weave.types.ObjectType):
-    _base_type = hfmodel.FullPipelineOutputType()
-
+class FullTextClassificationPipelineOutputType(hfmodel.FullPipelineOutputType):
     def property_types(self):
         return {
             "_model": HFModelTextClassificationType(),

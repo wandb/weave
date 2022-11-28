@@ -55,7 +55,7 @@ class Facet(panel.Panel):
                 ),
                 cellSize=FacetCellSize(w=50, h=50),
                 padding=0,
-                selectedCell={"x": -1, "y": -1},
+                selectedCell=None,
             )
             self.set_x(options["x"])
             self.set_y(options["y"])

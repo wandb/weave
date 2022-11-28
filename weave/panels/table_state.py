@@ -16,7 +16,7 @@ from .. import weave_types
 @decorator_type.type()
 class PanelDef:
     panelId: str
-    panelConfig: typing.Optional[dict[str, str]]  # TODO: WRONG!!!
+    panelConfig: typing.Any
 
 
 @decorator_type.type()

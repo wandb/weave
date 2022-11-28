@@ -226,11 +226,16 @@ class DataFrameTable:
         return list_.List.map.resolve_fn(self_list, map_fn)
 
     @op(
+        input_type={
+            "group_by_fn": lambda input_types: types.Function(
+                {"row": input_types["self"].object_type}, types.Any()
+            ),
+        },
         output_type=lambda input_types: types.List(
             list_.GroupResultType(types.List(input_types["self"].object_type))
         ),
     )
-    def groupby(self, group_by_fn: typing.Any):
+    def groupby(self, group_by_fn):
         group_keys = None
         if group_by_fn.from_op.name == "dict":
             group_keys = list(group_by_fn.from_op.inputs.keys())
