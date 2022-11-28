@@ -1,6 +1,7 @@
 import os
 import logging
 import pathlib
+import time
 import traceback
 import sys
 from flask import json
@@ -160,7 +161,10 @@ def execute():
     # Simulate browser/server latency
     # import time
     # time.sleep(0.1)
+
+    start_time = time.time()
     response = server.handle_request(request.json, deref=True)
+    end_time = time.time()
 
     # remove unions from the response
     response = recursively_unwrap_unions(response)
@@ -175,6 +179,10 @@ def execute():
         final_response.append(weavejs_fixes.fixup_data(r))
     # print("FINAL RESPONSE", final_response)
     response = {"data": final_response}
+
+    if request.headers.get("x-weave-include-execution-time"):
+        response["execution_time"] = (end_time - start_time) * 1000
+
     if current_span and (
         os.getenv("WEAVE_SERVER_DD_LOG_REQUEST_RESPONSES")
         or request.headers.get("weave-dd-log-request-response")
