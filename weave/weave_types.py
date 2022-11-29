@@ -970,7 +970,7 @@ def non_none(type_: Type) -> Type:
         elif len(new_members) == 1:
             return new_members[0]
         else:
-            return UnionType(new_members)
+            return UnionType(*new_members)
     return type_
 
 

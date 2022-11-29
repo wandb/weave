@@ -414,6 +414,11 @@ def test_typeddict_to_dict():
                 ),
             ),
         ),
+        # Union with multiple non-none members
+        (
+            types.union(types.NoneType(), types.Number(), types.String()),
+            types.union(types.Number(), types.String()),
+        ),
     ],
 )
 def test_non_none(in_type, out_type):

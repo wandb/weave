@@ -84,6 +84,7 @@ LocalFileType.instance_class = LocalFile
 # TODO: Make a more general mechanism to do this, with less boilerplate.
 # We want something like `type LocalDir = Dir<LocalFile>`
 class LocalDirType(types.ObjectType):
+    _base_type = types.DirType()
     name = "localdir"
 
     def __init__(self):
