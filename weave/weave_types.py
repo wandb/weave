@@ -1094,6 +1094,13 @@ def merge_types(a: Type, b: Type) -> Type:
     """
     if a == b:
         return a
+    if (
+        isinstance(a, Float)
+        and isinstance(b, Int)
+        or isinstance(a, Int)
+        and isinstance(b, Float)
+    ):
+        return Float()
     if isinstance(a, TypedDict) and isinstance(b, TypedDict):
         all_keys_dict = {}
         for k in a.property_types.keys():

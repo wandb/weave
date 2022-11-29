@@ -423,3 +423,9 @@ def test_typeddict_to_dict():
 )
 def test_non_none(in_type, out_type):
     assert types.non_none(in_type) == out_type
+
+
+def test_floatint_merged():
+    assert weave.type_of([1.0, 2.0]).object_type == types.Float()
+    assert weave.type_of([1.0, 2]).object_type == types.Float()
+    assert weave.type_of([1, 2]).object_type == types.Int()
