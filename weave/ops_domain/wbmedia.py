@@ -14,6 +14,7 @@ from ..ops_primitives import html
 from ..ops_primitives import markdown
 from ..ops_primitives import file
 from . import file_wbartifact
+from . import wbartifact
 
 
 ## This is an ArtifactRefii, that lets us get access to the ref

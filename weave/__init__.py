@@ -15,6 +15,8 @@ from .api import *
 from . import panels
 from .panel import Panel
 
+from .errors import *
+
 # TODO: Don't expose
 from .panel_util import make_node
 

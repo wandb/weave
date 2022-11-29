@@ -14,6 +14,7 @@ from . import weave_internal
 from . import graph
 from . import errors
 from . import op_aliases
+from . import pyfunc_type_util
 
 
 class OpAmbiguityError(Exception):
@@ -55,9 +56,7 @@ def op_args_is_subtype(lhs: op_args.OpArgs, rhs: op_args.OpArgs) -> bool:
         raise errors.WeaveInternalError("unknown op_args types: %s, %s" % (lhs, rhs))
 
 
-def resolve_op_ambiguity(
-    fq_op_name: str, candidates: list[op_def.OpDef]
-) -> op_def.OpDef:
+def resolve_op_ambiguity(candidates: list[op_def.OpDef]) -> op_def.OpDef:
     def cmp(a: op_def.OpDef, b: op_def.OpDef) -> int:
         b_is_subtype = op_args_is_subtype(a.input_type, b.input_type)
         a_is_subtype = op_args_is_subtype(b.input_type, a.input_type)
@@ -79,9 +78,7 @@ def resolve_op_ambiguity(
     return ordered[0]
 
 
-def get_op_for_input_types(
-    fq_op_name: str, args: list[types.Type], kwargs: dict[str, types.Type]
-) -> typing.Optional[op_def.OpDef]:
+def get_ops_by_name(fq_op_name: str) -> list[op_def.OpDef]:
     """Returns a single op that matches the given name and raw inputs (inputs can be python objects or nodes)"""
     shared_name_ops: list[op_def.OpDef]
 
@@ -96,21 +93,25 @@ def get_op_for_input_types(
         shared_name_ops = registry_mem.memory_registry.find_ops_by_common_name(
             op_def.common_name(fq_op_name)
         )
+    return shared_name_ops
+
+
+def choose_op_for_args(
+    op_choices: list[op_def.OpDef],
+    args: list[types.Type],
+    kwargs: dict[str, types.Type],
+) -> typing.Optional[op_def.OpDef]:
     candidates: list[op_def.OpDef] = []
-    for op in shared_name_ops:
+    for op in op_choices:
         param_dict = op.input_type.create_param_dict(args, kwargs)
         param_dict = language_nullability.adjust_assignable_param_dict_for_dispatch(
             op, param_dict
         )
         if op.input_type.params_are_valid(param_dict):
             candidates.append(op)
-    if len(candidates) > 1:
-        # We definitely have overlap in the input types.
-        sorted(candidates, key=lambda c: c.name)
-        return resolve_op_ambiguity(fq_op_name, candidates)
-    if candidates:
-        return candidates[0]
-    return None
+    if not candidates:
+        return None
+    return resolve_op_ambiguity(candidates)
 
 
 def dispatch_by_name_and_type(
@@ -120,13 +121,59 @@ def dispatch_by_name_and_type(
         arg.type if isinstance(arg, graph.Node) else types.TypeRegistry.type_of(arg)
         for arg in args
     ]
-    op = get_op_for_input_types(common_name, arg_types, {})
-    if op is not None:
-        return op(self, *args)
-    aliases = op_aliases.get_op_aliases(common_name)
-    raise errors.WeaveDispatchError(
-        "No implementation of (%s) found for arg types: %s" % (aliases, arg_types)
-    )
+    ops = get_ops_by_name(common_name)
+    op = choose_op_for_args(ops, arg_types, kwargs)
+    if op is None:
+        raise errors.WeaveDispatchError(
+            "No implementation of (%s) found for arg types: %s"
+            % (op_aliases.get_op_aliases(common_name), arg_types)
+        )
+    return op(self, *args)
+
+
+def get_op_for_input_types(fq_op_name, arg_types, kwarg_types):  # type: ignore
+    ops = get_ops_by_name(fq_op_name)
+    return choose_op_for_args(ops, arg_types, kwarg_types)
+
+
+def _type_of(v: typing.Any) -> types.Type:
+    if isinstance(v, graph.Node):
+        # Check if its a Node first, sometimes we mixin a callables with Node!
+        return v.type
+    elif callable(v):
+        input_type = pyfunc_type_util.determine_input_type(v, None, True)
+        output_type = pyfunc_type_util.determine_output_type(v, None, True)
+        if not isinstance(input_type, op_args.OpNamedArgs):
+            raise errors.WeaveInternalError("Function conversion requires named args")
+        if callable(output_type):
+            raise errors.WeaveInternalError(
+                "Function conversion does not support callable output types"
+            )
+        return types.Function(
+            input_type.arg_types,
+            output_type,
+        )
+    else:
+        return types.Const(types.TypeRegistry.type_of(v), v)
+
+
+@dataclass
+class OpDispatch:
+    common_name: str
+    self_node: graph.Node
+    potential_ops: list[op_def.OpDef]
+
+    def __call__(self, *args: typing.Any, **kwargs: typing.Any) -> "RuntimeOutputNode":
+        arg_types = [self.self_node.type] + [_type_of(a) for a in args]
+        kwarg_types = {k: _type_of(v) for k, v in kwargs.items()}
+        op = choose_op_for_args(self.potential_ops, arg_types, kwarg_types)
+        if op is None:
+            raise errors.WeaveDispatchError(
+                "No op named '%s' found for arg types: %s %s"
+                % (self.common_name, arg_types, kwarg_types)
+            )
+
+        return op(self.self_node, *args, **kwargs)
 
 
 class DispatchMixin:
@@ -168,9 +215,13 @@ class DispatchMixin:
             ):
                 ops_with_name_and_arg.append(op)
         if len(ops_with_name_and_arg) > 0:
-            # Here we just return the first op, since the op call itself will dispatch to the correct op
-            # if needed
-            return op_def.BoundOpDef(node_self, ops_with_name_and_arg[0])
+            if len(ops_with_name_and_arg) == 1:
+                # If there's only one candidate, we can just return it.
+                return op_def.BoundOpDef(node_self, ops_with_name_and_arg[0])
+            else:
+                # Otherwise, we need to wait til we know the rest of the args
+                # before we can decide which op to use.
+                return OpDispatch(attr, node_self, ops_with_name_and_arg)
         if node_self.type.__class__ == types.Type:
             # We are doing attribute access on a Weave Type. Let them all through
             # for now.

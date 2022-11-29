@@ -180,15 +180,15 @@ class SqlTable:
 
     @op(
         input_type={
-            "filter_fn": lambda input_types: types.Function(
+            "filterFn": lambda input_types: types.Function(
                 {"row": input_types["self"].object_type}, types.Any()
             ),
         },
         output_type=lambda input_types: input_types["self"],
     )
-    def filter(self, filter_fn):
+    def filter(self, filterFn):
         new_obj = self.copy()
-        new_obj._filter_fn = filter_fn
+        new_obj._filter_fn = filterFn
         return new_obj
 
     @op(

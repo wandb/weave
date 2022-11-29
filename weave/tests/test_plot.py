@@ -60,6 +60,7 @@ def test_multi_series_grouping():
             row["step"], weave.ops.numbers_bins_equal([1, 2000], 2)
         )
     )
+    plot.groupby_x()
 
     plot.set_y(lambda row: weave.ops.numbers_avg(row["metric0"]))
     plot.set_mark_constant("line")
@@ -74,7 +75,6 @@ def test_multi_series_grouping():
     plot2 = copy.deepcopy(plot)
 
     # compare plot-level grouping to series by series grouping
-    plot.groupby_x()
     for series in plot2.config.series:
         series.groupby_x()
     assert plot.config == plot2.config

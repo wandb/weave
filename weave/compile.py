@@ -1,7 +1,6 @@
 import typing
 
 import logging
-from .lazy import _make_output_node
 from . import op_args
 from . import weave_types as types
 from . import graph
@@ -66,15 +65,8 @@ def apply_type_based_dispatch(
             # )
             continue
 
-        params = found_op.bind_params(
-            [], found_op.input_type.create_param_dict([], node_inputs)
-        )
-        new_node = _make_output_node(
-            found_op.uri,
-            params,
-            found_op.input_type,
-            found_op.output_type,
-            found_op.refine_output_type,
+        new_node = found_op.lazy_call(
+            **found_op.input_type.create_param_dict([], node_inputs)
         )
         should_replace = new_node.from_op.name != node.from_op.name or any(
             v in edit_g.replacements for v in orig_node.from_op.inputs.values()

@@ -5,6 +5,7 @@ from .. import weave_types as types
 from . import list_
 from . import dict
 from . import number
+from ..tests import weavejs_ops
 
 
 def test_unnest():
@@ -52,11 +53,11 @@ def test_sequence1():
             }
         ),
     )
-    res = list_.WeaveJSListInterface.groupby(saved, groupby1_fn)
+    res = weavejs_ops.groupby(saved, groupby1_fn)
 
     # Input to PanelPlot
     map1_fn = weave.define_fn({"row": res.type.object_type}, lambda row: row)
-    res = list_.WeaveJSListInterface.map(res, map1_fn)
+    res = weavejs_ops.map(res, map1_fn)
 
     inner_groupby_fn = weave.define_fn(
         {"row": res.type.object_type.object_type},
@@ -76,7 +77,7 @@ def test_sequence1():
             )
         ),
     )
-    res = list_.WeaveJSListInterface.map(res, map2_fn)
+    res = weavejs_ops.map(res, map2_fn)
     res = list_.flatten(res)
     res = list_.unique(res)
     assert list(weave.use(res)) == ["x", "y"]

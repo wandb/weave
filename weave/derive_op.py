@@ -130,7 +130,14 @@ class MappedDeriveOpHandler(DeriveOpHandler):
         # used if the input_type is also optional. However we don't have a
         # weave-way to check that yet :(.
         if not callable(orig_op.output_type):
-            output_type = types.List(types.optional(orig_op.output_type))
+
+            def new_output_type(input_type):
+                object_type = input_type[mapped_param_name].object_type
+                if types.is_optional(object_type):
+                    return types.List(types.optional(object_type))
+                return types.List(object_type)
+
+            output_type = new_output_type
         else:
 
             def make_output_type(input_types):
@@ -183,9 +190,13 @@ class MappedDeriveOpHandler(DeriveOpHandler):
 
                 inner_input_types = copy.copy(input_types)
                 inner_input_types[mapped_param_name] = replacement
-                return types.List(
-                    types.optional(orig_op.output_type(inner_input_types))
-                )
+                inner_output_type = orig_op.output_type(inner_input_types)
+
+                object_type = input_types[mapped_param_name].object_type
+
+                if types.is_optional(object_type):
+                    return types.List(types.optional(inner_output_type))
+                return types.List(inner_output_type)
 
             output_type = make_output_type
 

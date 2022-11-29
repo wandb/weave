@@ -6,7 +6,6 @@ from . import op_def
 from . import op_def_type
 from . import op_args
 from . import weave_types
-from . import lazy
 from . import errors
 from . import context_state
 from . import storage
@@ -33,20 +32,6 @@ class Registry:
         self._ops_by_common_name = {}
         self._op_versions = {}
 
-    def _make_op_calls(
-        self, op: op_def.OpDef, uri: typing.Optional[uris.WeaveURI] = None
-    ):
-        op_uri = uri.uri if uri is not None else op.uri
-        op.lazy_call = lazy.make_lazy_call(
-            op.raw_resolve_fn,
-            op_uri,
-            op.input_type,
-            op.output_type,
-            op.refine_output_type,
-        )
-        op.eager_call = lazy.make_eager_call(op.lazy_call, op)
-        op.call_fn = lazy.make_call(op.eager_call, op.lazy_call)
-
     def register_op(self, op: op_def.OpDef):
         # Always save OpDefs any time they are declared
         location = context_state.get_loading_op_location()
@@ -62,7 +47,6 @@ class Registry:
         op.version = version
         op.location = location
 
-        self._make_op_calls(op, location)
         # if not is_loading:
         self._ops[op.name] = op
         self._ops_by_common_name.setdefault(op.common_name, {})[op.name] = op
@@ -154,7 +138,6 @@ class Registry:
         if op.version is not None:
             self._op_versions.pop((name, op.version))
             self._op_versions[(new_name, op.version)] = op
-        self._make_op_calls(op)
 
     # def register_type(self, type: weave_types.Type):
     #    self._types[type.name] = type

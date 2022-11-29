@@ -27,10 +27,9 @@ class RefNodeMethods:
 # TODO: is this what we want?
 @op(
     name="save",
-    input_type={"obj": types.Any(), "name": types.String()},
     output_type=lambda input_types: input_types["obj"],
 )
-def save(obj, name):
+def save(obj: typing.Any, name: typing.Optional[str]):
     ref = storage.save(obj, name=name)
     return ref.obj
 

@@ -209,14 +209,14 @@ class DataFrameTable:
 
     @op(
         input_type={
-            "filter_fn": lambda input_types: types.Function(
+            "filterFn": lambda input_types: types.Function(
                 {"row": input_types["self"].object_type}, types.Any()
             ),
         },
         output_type=lambda input_types: input_types["self"],
     )
-    def filter(self, filter_fn):
-        return DataFrameTable(self._df[filter_fn_to_pandas_filter(self._df, filter_fn)])
+    def filter(self, filterFn):
+        return DataFrameTable(self._df[filter_fn_to_pandas_filter(self._df, filterFn)])
 
     @op(output_type=lambda input_types: types.List(input_types["self"].object_type))
     def map(self, map_fn: typing.Any):

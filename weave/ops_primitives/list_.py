@@ -196,6 +196,7 @@ class List:
 
 @dataclasses.dataclass(frozen=True)
 class GroupResultType(types.ObjectType):
+    _base_type = types.List()
     name = "groupresult"
 
     list: types.Type = types.List(types.Any())
@@ -236,9 +237,8 @@ class GroupResult:
     def var_item(self):
         return weave_internal.make_var_node(self.type.object_type, "row")
 
-    @op(output_type=types.Any())
-    def pick(self, key: str):
-        return general_picker(self.list, key)
+    def __iter__(self):
+        return iter(self.list)
 
     def __len__(self):
         return len(self.list)
@@ -454,127 +454,6 @@ class WeaveGroupResultInterface:
 # These are only used in tests, to simulate the queries that WeaveJS
 # sends.
 # TODO: We should move to test_table_ops.py
-class WeaveJSListInterface:
-    def count(arr):
-        arr_node = weave_internal._ensure_node("count", arr, None, None)
-        return weave_internal.make_output_node(
-            types.Number(),
-            "count",
-            {
-                "arr": arr_node,
-            },
-        )
-
-    def index(arr, index):
-        arr_node = weave_internal._ensure_node("index", arr, None, None)
-        return weave_internal.make_output_node(
-            arr_node.type.object_type,
-            "index",
-            {
-                "arr": arr_node,
-                "index": weave_internal._ensure_node("index", index, None, None),
-            },
-        )
-
-    def filter(arr, filterFn):
-        arr_node = weave_internal._ensure_node("filter", arr, None, None)
-        return weave_internal.make_output_node(
-            arr_node.type,
-            "filter",
-            {
-                "arr": arr_node,
-                "filterFn": weave_internal._ensure_node(
-                    "filter",
-                    filterFn,
-                    types.Function({"row": arr_node.type.object_type}, types.Any()),
-                    None,
-                ),
-            },
-        )
-
-    def map(arr, mapFn):
-        arr_node = weave_internal._ensure_node("map", arr, None, None)
-        return weave_internal.make_output_node(
-            arr_node.type,
-            "map",
-            {
-                "arr": arr_node,
-                "mapFn": weave_internal._ensure_node(
-                    "map",
-                    mapFn,
-                    types.Function({"row": arr_node.type.object_type}, types.Any()),
-                    None,
-                ),
-            },
-        )
-
-    def sort(arr, compFn, columnDirs):
-        arr_node = weave_internal._ensure_node("sort", arr, None, None)
-        return weave_internal.make_output_node(
-            arr_node.type,
-            "sort",
-            {
-                "arr": arr_node,
-                "compFn": weave_internal._ensure_node(
-                    "sort",
-                    compFn,
-                    types.Function({"row": arr_node.type.object_type}, types.Any()),
-                    None,
-                ),
-                "columnDirs": types.Any(),
-            },
-        )
-
-    def groupby(arr, groupByFn):
-        arr_node = weave_internal._ensure_node("groupby", arr, None, None)
-        groupByFn_node = weave_internal._ensure_node(
-            "groupby",
-            groupByFn,
-            types.Function({"row": arr_node.type.object_type}, types.Any()),
-            None,
-        )
-        return weave_internal.make_output_node(
-            types.List(
-                tagged_value_type.TaggedValueType(
-                    types.TypedDict({"groupKey": groupByFn_node.type}),
-                    types.List(arr_node.type.object_type),
-                )
-            ),
-            "groupby",
-            {"arr": arr_node, "groupByFn": groupByFn_node},
-        )
-
-    def offset(arr, offset):
-        arr_node = weave_internal._ensure_node("offset", arr, None, None)
-        return weave_internal.make_output_node(
-            arr_node.type,
-            "offset",
-            {
-                "arr": arr_node,
-                "offset": weave_internal._ensure_node(
-                    "offset",
-                    offset,
-                    None,
-                    None,
-                ),
-            },
-        )
-
-    def limit(arr, limit):
-        arr_node = weave_internal._ensure_node("limit", arr, None, None)
-        return weave_internal.make_output_node(
-            arr_node.type,
-            "limit",
-            {
-                "arr": arr_node,
-                "limit": weave_internal._ensure_node(
-                    "limit",
-                    limit,
-                    None,
-                    None,
-                ),
-            },
-        )
 
 
 def list_return_type(input_types):
