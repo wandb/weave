@@ -79,7 +79,7 @@ def _slow_map_fn(input_list, map_fn):
             weave_internal.call_fn(
                 map_fn,
                 {
-                    "row": graph.ConstNode(types.Any(), row),
+                    "row": graph.ConstNode(types.TypeRegistry.type_of(row), row),
                     "index": graph.ConstNode(types.Number(), i),
                 },
             )

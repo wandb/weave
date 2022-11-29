@@ -50,23 +50,8 @@ def apply_type_based_dispatch(
     for orig_node in edit_g.topologically_ordered_nodes:
         node = edit_g.get_node(orig_node)
         node_inputs = {k: edit_g.get_node(v) for k, v in node.from_op.inputs.items()}
-        input_types = {k: node_type(v) for k, v in node_inputs.items()}
-        found_op = dispatch.get_op_for_input_types(node.from_op.name, [], input_types)
-        if found_op is None:
-            # There is a parallel spot in lazy.py which has a similar comment
-            # This indicates that we believe there is no valid op to accept the incoming types.
-            # Before productionizing Weave, we should throw here - for now since assignability is
-            # still a bit off, we are a bit more relaxed.
-            logging.warning(
-                f"Compile Dispatch - Unable to find a valid op for {node.from_op.name}."
-            )
-            # raise errors.WeaveInternalError(
-            #     f"Could not find op for input types {input_types} for node {node.from_op.name}"
-            # )
-            continue
-
-        new_node = found_op.lazy_call(
-            **found_op.input_type.create_param_dict([], node_inputs)
+        new_node = dispatch.dispatch_by_name_and_type(
+            node.from_op.name, [], node_inputs
         )
         should_replace = new_node.from_op.name != node.from_op.name or any(
             v in edit_g.replacements for v in orig_node.from_op.inputs.values()
