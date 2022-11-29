@@ -117,14 +117,20 @@ def choose_op_for_args(
 def dispatch_by_name_and_type(
     common_name: str, args: typing.Any, kwargs: typing.Any
 ) -> typing.Any:
-    arg_types = [_type_of(arg) for arg in args]
-    kwarg_types = {k: _type_of(v) for k, v in kwargs.items()}
     ops = get_ops_by_name(common_name)
+    return dispatch_ops_by_type(ops, args, kwargs)
+
+
+def dispatch_ops_by_type(
+    ops: list[op_def.OpDef], args: list[typing.Any], kwargs: dict[str, typing.Any]
+) -> "RuntimeOutputNode":
+    arg_types = [type_of_input_param(arg) for arg in args]
+    kwarg_types = {k: type_of_input_param(v) for k, v in kwargs.items()}
     op = choose_op_for_args(ops, arg_types, kwarg_types)
     if op is None:
         raise errors.WeaveDispatchError(
             "No implementation of (%s) found for arg types: %s %s"
-            % (op_aliases.get_op_aliases(common_name), arg_types, kwarg_types)
+            % (op_aliases.get_op_aliases(ops[0].common_name), arg_types, kwarg_types)
         )
     params = op.input_type.create_param_dict(args, kwargs)
     return op(**params)
@@ -135,7 +141,7 @@ def get_op_for_input_types(fq_op_name, arg_types, kwarg_types):  # type: ignore
     return choose_op_for_args(ops, arg_types, kwarg_types)
 
 
-def _type_of(v: typing.Any) -> types.Type:
+def type_of_input_param(v: typing.Any) -> types.Type:
     if isinstance(v, graph.Node):
         # Check if its a Node first, sometimes we mixin a callables with Node!
         if isinstance(v, graph.ConstNode) and not isinstance(v.type, types.Const):
@@ -160,21 +166,13 @@ def _type_of(v: typing.Any) -> types.Type:
 
 @dataclass
 class BoundPotentialOpDefs:
-    common_name: str
     self_node: graph.Node
     potential_ops: list[op_def.OpDef]
 
     def __call__(self, *args: typing.Any, **kwargs: typing.Any) -> "RuntimeOutputNode":
-        arg_types = [self.self_node.type] + [_type_of(a) for a in args]
-        kwarg_types = {k: _type_of(v) for k, v in kwargs.items()}
-        op = choose_op_for_args(self.potential_ops, arg_types, kwarg_types)
-        if op is None:
-            raise errors.WeaveDispatchError(
-                "No op named '%s' found for arg types: %s %s"
-                % (self.common_name, arg_types, kwarg_types)
-            )
-
-        return op(self.self_node, *args, **kwargs)
+        return dispatch_ops_by_type(
+            self.potential_ops, [self.self_node] + list(args), kwargs
+        )
 
 
 def dispatch_dunder(
@@ -235,7 +233,7 @@ class DispatchMixin:
             else:
                 # Otherwise, we need to wait til we know the rest of the args
                 # before we can decide which op to use.
-                return BoundPotentialOpDefs(attr, node_self, ops_with_name_and_arg)
+                return BoundPotentialOpDefs(node_self, ops_with_name_and_arg)
         if node_self.type.__class__ == types.Type:
             # We are doing attribute access on a Weave Type. Let them all through
             # for now.
@@ -271,8 +269,8 @@ class DispatchMixin:
     __gt__ = dispatch_dunder("__gt__")
     __le__ = dispatch_dunder("__le__")
     __lt__ = dispatch_dunder("__lt__")
-    __eq__ = dispatch_dunder("__eq__")
-    __ne__ = dispatch_dunder("__ne__")
+    __eq__ = dispatch_dunder("__eq__")  # type: ignore
+    __ne__ = dispatch_dunder("__ne__")  # type: ignore
     __neg__ = dispatch_dunder("__neg__")
     __contains__ = dispatch_dunder("__contains__")
 
