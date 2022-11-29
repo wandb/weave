@@ -41,7 +41,7 @@ def test_table_call(table_file_node, fake_wandb):
     # artifactVersion is not currently callable on image node as a method.
     # TODO: fix
     image0_url_node = (
-        ops.wbartifact.artifactVersion(table_image0_node)
+        ops.wbmedia.artifactVersion(table_image0_node)
         .file(
             "wandb-artifact://stacey/mendeleev/test_res_1fwmcd3q:v0?file=media%2Fimages%2F8f65e54dc684f7675aec.png"
         )

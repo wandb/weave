@@ -928,15 +928,34 @@ def optional(type_):
 
 
 def is_optional(type_: Type) -> bool:
-    return isinstance(type_, UnionType) and none_type in type_.members
+    TaggedValueType = type_name_to_type("tagged")
+
+    if isinstance(type_, Const):
+        return is_optional(type_.val_type)
+
+    if isinstance(type_, TaggedValueType):
+        return is_optional(type_.tag)
+
+    return isinstance(type_, UnionType) and any(
+        m.assign_type(none_type) for m in type_.members
+    )
 
 
 def non_none(type_: Type) -> Type:
+    TaggedValueType = type_name_to_type("tagged")
+
     if type_ == none_type:
         return Invalid()
+
+    if isinstance(type_, Const):
+        return non_none(type_.val_type)
+
+    if isinstance(type_, TaggedValueType):
+        return TaggedValueType(type_.tag, non_none(type_.value))
+
     if is_optional(type_):
         type_ = typing.cast(UnionType, type_)
-        new_members = [m for m in type_.members if m != none_type]
+        new_members = [m for m in type_.members if not m.assign_type(none_type)]
         # TODO: could put this logic in UnionType.from_members ?
         if len(new_members) == 0:
             # Should never have a length one union to start with

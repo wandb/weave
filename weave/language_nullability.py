@@ -37,13 +37,8 @@ def adjust_assignable_param_dict_for_dispatch(
         if len(named_args) > 0:
             first_arg = named_args[0]
             if not first_arg.type.assign_type(types.NoneType()):
-                p_type = param_dict[first_arg.name]
-                if isinstance(p_type, types.Const):
-                    p_type = p_type.val_type
-                if p_type.assign_type(types.NoneType()):
-                    # TODO: non_none does not work with const/tags yet
-                    non_none_type = types.non_none(p_type)
-                    return {**param_dict, first_arg.name: non_none_type}
+                non_none_type = types.non_none(param_dict[first_arg.name])
+                return {**param_dict, first_arg.name: non_none_type}
     return param_dict
 
 
