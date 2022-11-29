@@ -284,8 +284,6 @@ class LocalArtifactRef(Ref):
         self.artifact = artifact
         if path is None:
             raise errors.WeaveInternalError("path must not be None")
-        if "/" in path:
-            raise errors.WeaveInternalError('"/" in path not yet supported: %s' % path)
         self.path = path
         self._type = type
         self.obj = obj
@@ -324,8 +322,13 @@ class LocalArtifactRef(Ref):
         #         "Trying to load type from a non-root object. Ref should be instantiated with a type for this object: %s %s"
         #         % (self.artifact, self.path)
         #     )
-        with self.artifact.open(f"{self.path}.type.json") as f:
-            type_json = json.load(f)
+        try:
+            with self.artifact.open(f"{self.path}.type.json") as f:
+                type_json = json.load(f)
+        except (FileNotFoundError, KeyError):
+            # If there's no type file, this is a Ref to the file itself
+            # TODO: refactor
+            return ArtifactVersionFileType()
         self._type = types.TypeRegistry.type_from_dict(type_json)
         return self._type
 

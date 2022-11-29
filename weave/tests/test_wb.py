@@ -106,3 +106,17 @@ def test_table_tags(fake_wandb):
     assert weave.use(cell_node.indexCheckpoint()) == 5
     assert weave.use(cell_node.run().name()) == "test_run_name"
     assert weave.use(cell_node.project().name()) == "mendeleev"
+
+
+def test_table_images(fake_wandb):
+    # Query 1:
+    project_node = ops.project("stacey", "mendeleev")
+    project_runs_node = project_node.runs().limit(1)
+    summary_node = project_runs_node.summary()
+    # this use is important as it models the sequence of calls in UI
+    # and invokes the issues with artifact paths
+    assert list(weave.use(summary_node)[0].keys()) == ["table"]
+
+    # Query 2:
+    table_rows_node = summary_node.pick("table").table().rows()
+    assert len(weave.use(table_rows_node)) == 1
