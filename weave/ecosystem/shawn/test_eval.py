@@ -4,7 +4,7 @@ from . import eval
 
 
 def test_data():
-    model = eval.Model("a")
+    model = eval.EvalModel("a")
 
     proc = eval.PredictionProcess("000", model, [])
     pred1 = eval.Prediction(datetime.datetime(2022, 10, 8, 10, 26), 0, 3)
