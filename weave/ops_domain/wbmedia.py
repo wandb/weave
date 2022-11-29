@@ -144,7 +144,7 @@ def markdown_file(md: markdown.Markdown):
     return file_wbartifact.ArtifactVersionFile(ref.artifact, ref.path + ".md")
 
 
-ArtifactAssetType = types.union(ImageArtifactFileRef.WeaveType())  # type: ignore
+ArtifactAssetType = types.union(ImageArtifactFileRef.WeaveType(), HtmlArtifactFileRef.WeaveType())  # type: ignore
 
 
 @weave.op(
