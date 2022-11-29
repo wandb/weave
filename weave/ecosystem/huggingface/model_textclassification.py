@@ -132,17 +132,17 @@ def full_text_classification_output_render(
 class HFModelTextClassification(hfmodel.HFModel):
     @weave.op()
     def pipeline(
-        self, return_all_scores: bool = True
+        self,
     ) -> transformers.pipelines.text_classification.TextClassificationPipeline:
         return transformers.pipeline(
             self._pipeline_tag,
             model=self._id,
-            return_all_scores=return_all_scores,
+            return_all_scores=True,
         )
 
     @weave.op()
     def call(self, input: str) -> FullTextClassificationPipelineOutput:
-        output = weave.use(self.pipeline(True))(input)
+        output = weave.use(self.pipeline())(input)
         return FullTextClassificationPipelineOutput(self, input, output)
 
     def _call_list(

@@ -64,7 +64,7 @@ def shap_explain(
 ) -> shap.Explanation:
     # TODO: shap has some options, like computing logits is better in some cases?
     # TODO: does shap work for all task styles?
-    pipeline = weave.use(pipeline_output._model.pipeline(return_all_scores=True))
+    pipeline = weave.use(pipeline_output._model.pipeline())
     explainer = shap.Explainer(pipeline)
     return explainer([pipeline_output.model_input])
 
