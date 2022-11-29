@@ -132,7 +132,14 @@ class List:
             ),
         },
         output_type=lambda input_types: types.List(
-            GroupResultType(input_types["arr"], input_types["groupByFn"].output_type)
+            tagged_value_type.TaggedValueType(
+                types.TypedDict(
+                    {
+                        "groupKey": input_types["groupByFn"].output_type,
+                    }
+                ),
+                input_types["arr"],
+            )
         ),
     )
     def groupby(arr, groupByFn):
@@ -145,10 +152,11 @@ class List:
             if group_key_s not in result:
                 result[group_key_s] = (group_key_items, [])
             result[group_key_s][1].append(row)
-        # TODO: relying on dict ordering???
         grs = []
         for group_result in result.values():
-            grs.append(GroupResult(group_result[1], group_result[0]))
+            item = box.box(group_result[1])
+            tag_store.add_tags(item, {"groupKey": group_result[0]})
+            grs.append(item)
         return grs
 
     @op(
@@ -441,19 +449,9 @@ def pick_output_type(input_types):
     return output_type
 
 
-class WeaveGroupResultInterface:
-    @op(
-        name="group-groupkey",
-        input_type={"obj": GroupResultType()},
-        output_type=lambda input_types: input_types["obj"].key,
-    )
-    def key(obj):
-        return obj.key
-
-
-# These are only used in tests, to simulate the queries that WeaveJS
-# sends.
-# TODO: We should move to test_table_ops.py
+group_tag_getter_op = make_tag_getter_op.make_tag_getter_op(
+    "groupKey", types.Any(), op_name="group-groupkey"
+)
 
 
 def list_return_type(input_types):

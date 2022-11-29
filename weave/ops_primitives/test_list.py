@@ -6,6 +6,7 @@ from . import list_
 from . import dict
 from . import number
 from ..tests import weavejs_ops
+from ..language_features.tagging import make_tag_getter_op, tag_store, tagged_value_type
 
 
 def test_unnest():
@@ -68,12 +69,14 @@ def test_sequence1():
         lambda row: row.groupby(inner_groupby_fn).map(
             weave.define_fn(
                 {
-                    "row": list_.GroupResultType(
-                        res.type.object_type.object_type,
-                        types.TypedDict({"y": types.String()}),
+                    "row": tagged_value_type.TaggedValueType(
+                        types.TypedDict(
+                            {"groupKey": types.TypedDict({"y": types.String()})}
+                        ),
+                        res.type.object_type,
                     )
                 },
-                lambda row: row.key["y"],
+                lambda row: row.groupkey()["y"],
             )
         ),
     )

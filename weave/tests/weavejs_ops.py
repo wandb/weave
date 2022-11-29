@@ -89,8 +89,8 @@ def groupby(arr, groupByFn):
     return weave_internal.make_output_node(
         types.List(
             tagged_value_type.TaggedValueType(
-                types.TypedDict({"groupKey": groupByFn_node.type}),
-                types.List(arr_node.type.object_type),
+                types.TypedDict({"groupKey": groupByFn_node.type.output_type}),
+                arr_node.type,
             )
         ),
         "groupby",
