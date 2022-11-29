@@ -191,7 +191,7 @@ class Type(metaclass=_TypeSubclassWatcher):
         typing.Union[type, typing.List[type], None]
     ] = None
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<{self.name}>"
 
     @classmethod
