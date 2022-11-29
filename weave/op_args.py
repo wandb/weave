@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 import typing
 from . import weave_types as types
+from . import debug_types
 
 BT = typing.TypeVar("BT")
 
@@ -28,6 +29,13 @@ class OpArgs:
             return OpVarArgs(types.TypeRegistry.type_from_dict(_type))
 
     def params_are_valid(_self, param_types: dict[str, types.Type]) -> bool:
+        """Attempts to assign the given param types to the op args. Returns the
+        dictionary of assignment results"""
+        raise NotImplementedError()
+
+    def why_are_params_invalid(
+        self, param_dict: dict[str, types.Type]
+    ) -> typing.Optional[str]:
         """Attempts to assign the given param types to the op args. Returns the
         dictionary of assignment results"""
         raise NotImplementedError()
@@ -116,6 +124,26 @@ class OpNamedArgs(OpArgs):
                 return False
             valid_params[k] = t
         return True
+
+    def why_are_params_invalid(
+        self, param_dict: dict[str, types.Type]
+    ) -> typing.Optional[str]:
+        valid_params: dict[str, types.Type] = {}
+        reasons: list[str] = []
+        for k, t in self.arg_types.items():
+            if k not in param_dict:
+                reasons.append(f"Missing parameter {k}")
+                continue
+            if callable(t):
+                t = t(valid_params)
+            if not t.assign_type(param_dict[k]):
+                reasons.append(
+                    f'Parameter "{k}" has invalid type\n{debug_types.why_not_assignable(t, param_dict[k])}'
+                )
+            valid_params[k] = t
+        if reasons:
+            return "\n".join(reasons)
+        return None
 
     def named_args(self) -> typing.List["NamedArg"]:
         return [NamedArg(k, v) for k, v in self.arg_types.items()]

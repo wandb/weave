@@ -30,6 +30,16 @@ def why_not_assignable(to_type: Type, from_type: Type) -> typing.Optional[str]:
                 return None
             reasons.append(f"{short_type(to_member)}: {reason}")
 
+    elif isinstance(from_type, Const) and not isinstance(to_type, Const):
+        reason = why_not_assignable(to_type, from_type.val_type)
+        if reason is not None:
+            reasons.append(reason)
+
+    elif isinstance(from_type, Function) and not isinstance(to_type, Function):
+        reason = why_not_assignable(to_type, from_type.output_type)
+        if reason is not None:
+            reasons.append(reason)
+
     elif to_type.name == from_type.name:
         type_vars = to_type.type_vars()
         for k, to_type_type in type_vars.items():
@@ -43,8 +53,8 @@ def why_not_assignable(to_type: Type, from_type: Type) -> typing.Optional[str]:
                         f"Property {k} is not assignable\n{textwrap.indent(sub_reason, '  ')}"
                     )
     else:
-        return f"Unhandled case: {short_type(to_type)} {short_type(from_type)}"
+        return f"{short_type(to_type)} !<- {short_type(from_type)}"
     if reasons:
         indented_reasons = textwrap.indent("\n".join(reasons), "  ")
-        return f"why_not_assignable is not yet complete and may give you incorrect answers!\n\n{short_type(from_type)} !<- {short_type(to_type)}\n{indented_reasons}"
+        return f"why_not_assignable is not yet complete and may give you incorrect answers!\n\n{short_type(to_type)} !<- {short_type(from_type)}\n{indented_reasons}"
     return None
