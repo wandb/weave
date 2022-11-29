@@ -235,6 +235,10 @@ def test_typeddict_to_dict():
     )
 
 
+# The following test tests all permutionations of container types Consts, Tags,
+# and Unions. Note: we might deicde to disallow consts of unions which would
+# make some of these tests not applicable. However, this is exhastive given our
+# current implementation.
 @pytest.mark.parametrize(
     "in_type, out_type",
     [
@@ -272,7 +276,7 @@ def test_typeddict_to_dict():
         ),
         (
             types.Const(TaggedValueType(types.TypedDict({}), types.NoneType()), None),
-            types.Invalid(),
+            TaggedValueType(types.TypedDict({}), types.Invalid()),
         ),
         # Union Units
         (types.union(types.NoneType(), types.Number()), types.Number()),
