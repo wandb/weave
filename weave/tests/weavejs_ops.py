@@ -120,3 +120,14 @@ def limit(arr, limit):
             "limit": ensure_node(limit),
         },
     )
+
+
+def file_type(file):
+    file_node = ensure_node(file)
+    return weave_internal.make_output_node(
+        file_node.type,
+        "file-type",
+        {
+            "file": file_node,
+        },
+    )

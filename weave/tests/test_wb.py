@@ -11,6 +11,8 @@ from .. import ops as ops
 from ..language_features.tagging.tagged_value_type import TaggedValueType
 from ..ops_domain.wb_domain_types import Run, Project
 
+from . import weavejs_ops
+
 TEST_TABLE_ARTIFACT_PATH = "testdata/wb_artifacts/test_res_1fwmcd3q:v0"
 
 
@@ -51,6 +53,23 @@ def test_table_call(table_file_node, fake_wandb):
     assert image0_url.endswith(
         "testdata/wb_artifacts/test_res_1fwmcd3q_v0/media/images/8f65e54dc684f7675aec.png"
     )
+
+
+def test_avfile_type():
+    f = (
+        ops.project("stacey", "mendeleev")
+        .artifactType("test_results")
+        .artifacts()[0]
+        .versions()[0]
+        .file("test_results.table.json")
+    )
+    t = weavejs_ops.file_type(f)
+    # TODO: totally weird that this is a dict and not a string.
+    assert weave.use(t) == {
+        "type": "file",
+        "extension": "json",
+        "wbObjectType": {"type": "table"},
+    }
 
 
 def test_table_col_order_and_unknown_types(fake_wandb):

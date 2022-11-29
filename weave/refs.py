@@ -161,7 +161,12 @@ def deref(ref: Ref) -> typing.Any:
 # Instead, We probably need a WandbArtifactFileRef.
 # TODO: fix
 class ArtifactVersionFileType(types.Type):
+    _base_type = types.FileType()
+
     name = "ArtifactVersionFile"
+
+    extension = types.String()
+    wb_object_type = types.String()
 
     def save_instance(
         self,
