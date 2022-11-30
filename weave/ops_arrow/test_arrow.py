@@ -654,3 +654,15 @@ def test_grouped_typed_dict_assign():
             _key=types.TypedDict(property_types={"a": types.String()}),
         )
     )
+
+
+def test_concat():
+    a = weave.save(arrow.to_arrow([1, 2, 3]))
+    b = weave.save(arrow.to_arrow([4, 5, 6]))
+    expected_output = [1, 2, 3, 4, 5, 6]
+    concat_input = ops.make_list(a=a, b=b)
+    concatted = arrow.concat(concat_input)
+    awl = weave.use(concatted)
+    assert awl.to_pylist() == expected_output
+    assert weave.type_of(awl) == arrow.ArrowWeaveListType(weave.types.Int())
+    assert awl.object_type == weave.types.Int()

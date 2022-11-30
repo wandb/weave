@@ -549,13 +549,22 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             and arrow_data[0].type == arrow_data[1].type
         ):
             return ArrowWeaveList(
-                pa.chunked_array(arrow_data[0].chunks + arrow_data[1].chunks)
+                pa.chunked_array(arrow_data[0].chunks + arrow_data[1].chunks),
+                self.object_type,
             )
         elif (
             all([isinstance(ad, pa.Table) for ad in arrow_data])
             and arrow_data[0].schema == arrow_data[1].schema
         ):
-            return ArrowWeaveList(pa.concat_tables([arrow_data[0], arrow_data[1]]))
+            return ArrowWeaveList(
+                pa.concat_tables([arrow_data[0], arrow_data[1]]),
+                self.object_type,
+            )
+        elif all([isinstance(ad, pa.Array) for ad in arrow_data]):
+            return ArrowWeaveList(
+                pa.concat_arrays(arrow_data),
+                self.object_type,
+            )
         else:
             raise ValueError(
                 "Can only concatenate two ArrowWeaveLists that both contain "
@@ -715,8 +724,9 @@ def concat(arr: list[ArrowWeaveList[typing.Any]]):
     if len(arr) == 1:
         return arr[0]
     if not all(isinstance(item, ArrowWeaveList) for item in arr):
+        wrong_type = next(item for item in arr if not isinstance(item, ArrowWeaveList))
         raise errors.WeaveInternalError(
-            "Concat only supported for ArrowWeaveList, not %s" % type(arr[0])
+            f"Concat only supported for ArrowWeaveList, not {wrong_type}"
         )
 
     result: ArrowWeaveList = arr[0].concatenate(arr[1])
