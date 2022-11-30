@@ -28,6 +28,11 @@ class Point2:
     x: float
     y: float
 
+    def __eq__(self, other):
+        if isinstance(other, Point2):
+            return self.x == other.x and self.y == other.y
+        return False
+
     @weave.op()
     def get_x(self) -> float:
         return self.x
@@ -186,6 +191,26 @@ def test_map_typeddict():
 def test_map_object():
     data = arrow.to_arrow([Point2(1, 2), Point2(5, 6)])
     assert weave.use(data.map(lambda row: row.get_x())).to_pylist() == [1, 5]
+
+
+def test_python_object():
+    data = arrow.to_arrow([Point2(1, 2), Point2(5, 6)])
+    assert weave.use(data[0]) == Point2(1, 2)
+
+
+def test_python_object_from_to_pylist():
+    data = arrow.to_arrow([Point2(1, 2), Point2(5, 6)])
+    assert data.to_pylist() != [Point2(1, 2), Point2(5, 6)]
+    assert data.to_pylist() == [{"x": 1, "y": 2}, {"x": 5, "y": 6}]
+
+
+# TODO(dg): Implement
+"""
+def test_tagged_python_object():
+    tagging.
+    data = arrow.to_arrow([Point2(1, 2), Point2(5, 6)])
+    assert weave.use(data[0]) == Point2(1, 2)
+"""
 
 
 @pytest.mark.skip("not working yet")
