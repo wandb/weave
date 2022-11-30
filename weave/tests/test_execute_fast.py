@@ -19,3 +19,11 @@ def test_nested_weavejs_call():
         }
     )
     assert weave.use(array.map(lambda row: node_with_fn["a"](row))) == [2, 3]
+
+
+def test_resolve_static_branches():
+    # This relies on auto-execute (since d['a'] is a node), and tests the
+    # resolve_static branches code path.
+    d = weave.save({"a": 5})
+    l = weave.save([1, 2])
+    assert weave.use(l.map(lambda row: row + d["a"])) == [6, 7]

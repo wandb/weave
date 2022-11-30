@@ -187,6 +187,15 @@ types.SubDirType.instance_classes = SubDir
 types.SubDirType.instance_class = SubDir
 
 
+@op(
+    name="dir-pathReturnType",
+    input_type={"dir": types.DirType(), "path": types.String()},
+    output_type=types.Type(),
+)
+def path_return_type(dir, path):
+    return dir._path_return_type(path)
+
+
 @weave_class(weave_type=types.DirType)
 class Dir:
     def __init__(self, fullPath, size, dirs, files):
@@ -203,17 +212,10 @@ class Dir:
         return dir.size
 
     @op(
-        name="dir-pathReturnType",
-        input_type={"dir": types.DirType(), "path": types.String()},
-        output_type=types.Type(),
-    )
-    def path_return_type(dir, path):
-        return dir._path_return_type(path)
-
-    @op(
         name="dir-path",
         input_type={"dir": types.DirType(), "path": types.String()},
         output_type=types.UnionType(types.FileType(), types.DirType(), types.none_type),
+        refine_output_type=path_return_type,
     )
     def open(dir, path):
         return dir._path(path)

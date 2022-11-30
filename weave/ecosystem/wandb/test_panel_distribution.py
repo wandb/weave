@@ -39,5 +39,5 @@ def test_flow():
         rendered_config.dims.label
     ]
     assert plot_select_function_x.type == weave.types.Number()
-    assert plot_select_function_y.type == weave.types.Int()
+    assert plot_select_function_y.type.value == weave.types.Int()
     assert plot_select_function_label.type == weave.types.String()

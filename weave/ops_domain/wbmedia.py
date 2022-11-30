@@ -142,3 +142,15 @@ def markdown_file(md: markdown.Markdown):
     with isolated_tagging_context():
         ref = storage.save(md)
     return file_wbartifact.ArtifactVersionFile(ref.artifact, ref.path + ".md")
+
+
+ArtifactAssetType = types.union(ImageArtifactFileRef.WeaveType(), HtmlArtifactFileRef.WeaveType())  # type: ignore
+
+
+@weave.op(
+    name="asset-artifactVersion",
+    input_type={"asset": ArtifactAssetType},
+    output_type=wbartifact.ArtifactVersionType(),
+)
+def artifactVersion(asset):
+    return asset.artifact

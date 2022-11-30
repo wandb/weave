@@ -14,7 +14,7 @@ class Prediction:
 
 
 @weave.type()
-class Model:
+class EvalModel:
     id: str
 
     @weave.op(pure=False)
@@ -39,14 +39,14 @@ class Model:
 @weave.type()
 class PredictionProcess:
     id: int
-    model: Model
+    model: EvalModel
     predictions: list[Prediction]
 
 
 class Predictor(threading.Thread):
     def __init__(self, model_id, run_for_s):
         threading.Thread.__init__(self)
-        self.model = Model(model_id)
+        self.model = EvalModel(model_id)
         self.prediction_process = PredictionProcess(
             random.randrange(0, 10000000), self.model, []
         )

@@ -89,8 +89,8 @@ def groupby(arr, groupByFn):
     return weave_internal.make_output_node(
         types.List(
             tagged_value_type.TaggedValueType(
-                types.TypedDict({"groupKey": groupByFn_node.type}),
-                types.List(arr_node.type.object_type),
+                types.TypedDict({"groupKey": groupByFn_node.type.output_type}),
+                arr_node.type,
             )
         ),
         "groupby",
@@ -118,5 +118,16 @@ def limit(arr, limit):
         {
             "arr": arr_node,
             "limit": ensure_node(limit),
+        },
+    )
+
+
+def file_type(file):
+    file_node = ensure_node(file)
+    return weave_internal.make_output_node(
+        file_node.type,
+        "file-type",
+        {
+            "file": file_node,
         },
     )

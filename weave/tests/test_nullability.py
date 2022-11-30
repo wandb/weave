@@ -36,12 +36,8 @@ _context.clear_loading_built_ins(_loading_builtins_token)
 
 def test_basic_nullability():
     b = weave.save(2)
-    maybe_int = weave.save(
-        weave.graph.ConstNode(weave.types.optional(weave.types.Int()), 1)
-    )
-    null_int = weave.save(
-        weave.graph.ConstNode(weave.types.optional(weave.types.Int()), None)
-    )
+    maybe_int = weave.save([1, None])[0]
+    null_int = weave.save([1, None])[1]
 
     assert weave.use(no_arg_op()) == 1
 

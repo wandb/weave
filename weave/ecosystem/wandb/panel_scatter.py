@@ -98,7 +98,7 @@ def scatter_config(
 class Scatter(weave.Panel):
     id = "Scatter"
     config: typing.Optional[ScatterConfig] = None
-    _renderAsPanel: weave_plotly.PanelPlotly = dataclasses.field(  # type: ignore
+    _renderAsPanel: typing.Optional[weave_plotly.PanelPlotly] = dataclasses.field(  # type: ignore
         default_factory=lambda: None
     )
 

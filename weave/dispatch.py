@@ -115,20 +115,25 @@ def choose_op_for_args(
 
 
 def dispatch_by_name_and_type(
-    common_name: str, self: typing.Any, *args: typing.Any, **kwargs: typing.Any
+    common_name: str, args: typing.Any, kwargs: typing.Any
 ) -> typing.Any:
-    arg_types = [self.type] + [
-        arg.type if isinstance(arg, graph.Node) else types.TypeRegistry.type_of(arg)
-        for arg in args
-    ]
     ops = get_ops_by_name(common_name)
-    op = choose_op_for_args(ops, arg_types, kwargs)
+    return dispatch_ops_by_type(ops, args, kwargs)
+
+
+def dispatch_ops_by_type(
+    ops: list[op_def.OpDef], args: list[typing.Any], kwargs: dict[str, typing.Any]
+) -> "RuntimeOutputNode":
+    arg_types = [type_of_input_param(arg) for arg in args]
+    kwarg_types = {k: type_of_input_param(v) for k, v in kwargs.items()}
+    op = choose_op_for_args(ops, arg_types, kwarg_types)
     if op is None:
         raise errors.WeaveDispatchError(
-            "No implementation of (%s) found for arg types: %s"
-            % (op_aliases.get_op_aliases(common_name), arg_types)
+            "No implementation of (%s) found for arg types: %s %s"
+            % (op_aliases.get_op_aliases(ops[0].common_name), arg_types, kwarg_types)
         )
-    return op(self, *args)
+    params = op.input_type.create_param_dict(args, kwargs)
+    return op(**params)
 
 
 def get_op_for_input_types(fq_op_name, arg_types, kwarg_types):  # type: ignore
@@ -136,9 +141,11 @@ def get_op_for_input_types(fq_op_name, arg_types, kwarg_types):  # type: ignore
     return choose_op_for_args(ops, arg_types, kwarg_types)
 
 
-def _type_of(v: typing.Any) -> types.Type:
+def type_of_input_param(v: typing.Any) -> types.Type:
     if isinstance(v, graph.Node):
         # Check if its a Node first, sometimes we mixin a callables with Node!
+        if isinstance(v, graph.ConstNode) and not isinstance(v.type, types.Const):
+            return types.Const(v.type, v.val)
         return v.type
     elif callable(v):
         input_type = pyfunc_type_util.determine_input_type(v, None, True)
@@ -158,22 +165,27 @@ def _type_of(v: typing.Any) -> types.Type:
 
 
 @dataclass
-class OpDispatch:
-    common_name: str
+class BoundPotentialOpDefs:
     self_node: graph.Node
     potential_ops: list[op_def.OpDef]
 
     def __call__(self, *args: typing.Any, **kwargs: typing.Any) -> "RuntimeOutputNode":
-        arg_types = [self.self_node.type] + [_type_of(a) for a in args]
-        kwarg_types = {k: _type_of(v) for k, v in kwargs.items()}
-        op = choose_op_for_args(self.potential_ops, arg_types, kwarg_types)
-        if op is None:
-            raise errors.WeaveDispatchError(
-                "No op named '%s' found for arg types: %s %s"
-                % (self.common_name, arg_types, kwarg_types)
-            )
+        return dispatch_ops_by_type(
+            self.potential_ops, [self.self_node] + list(args), kwargs
+        )
 
-        return op(self.self_node, *args, **kwargs)
+
+def dispatch_dunder(
+    name: str,
+) -> typing.Callable[
+    [graph.Node, list[typing.Any], dict[str, typing.Any]], "RuntimeOutputNode"
+]:
+    def dispatch_dunder_inner(
+        self_node: graph.Node, *args: typing.Any, **kwargs: typing.Any
+    ) -> "RuntimeOutputNode":
+        return dispatch_by_name_and_type(name, [self_node] + list(args), kwargs)
+
+    return dispatch_dunder_inner
 
 
 class DispatchMixin:
@@ -221,7 +233,7 @@ class DispatchMixin:
             else:
                 # Otherwise, we need to wait til we know the rest of the args
                 # before we can decide which op to use.
-                return OpDispatch(attr, node_self, ops_with_name_and_arg)
+                return BoundPotentialOpDefs(node_self, ops_with_name_and_arg)
         if node_self.type.__class__ == types.Type:
             # We are doing attribute access on a Weave Type. Let them all through
             # for now.
@@ -242,62 +254,25 @@ class DispatchMixin:
             % (attr, node_self.type)
         )
 
-    def __call__(self, *args: typing.Any, **kwargs: typing.Any) -> typing.Any:
-        return dispatch_by_name_and_type("__call__", self, *args, **kwargs)
-
-    def __getitem__(self, *args: typing.Any, **kwargs: typing.Any) -> typing.Any:
-        return dispatch_by_name_and_type("__getitem__", self, *args, **kwargs)
-
-    def __len__(self, *args: typing.Any, **kwargs: typing.Any) -> typing.Any:
-        return dispatch_by_name_and_type("__len__", self, *args, **kwargs)
-
-    def __add__(self, *args: typing.Any, **kwargs: typing.Any) -> typing.Any:
-        return dispatch_by_name_and_type("__add__", self, *args, **kwargs)
-
-    def __sub__(self, *args: typing.Any, **kwargs: typing.Any) -> typing.Any:
-        return dispatch_by_name_and_type("__sub__", self, *args, **kwargs)
-
-    def __mul__(self, *args: typing.Any, **kwargs: typing.Any) -> typing.Any:
-        return dispatch_by_name_and_type("__mul__", self, *args, **kwargs)
-
-    def __truediv__(self, *args: typing.Any, **kwargs: typing.Any) -> typing.Any:
-        return dispatch_by_name_and_type("__truediv__", self, *args, **kwargs)
-
-    def __floordiv__(self, *args: typing.Any, **kwargs: typing.Any) -> typing.Any:
-        return dispatch_by_name_and_type("__floordiv__", self, *args, **kwargs)
-
-    def __pow__(self, *args: typing.Any, **kwargs: typing.Any) -> typing.Any:
-        return dispatch_by_name_and_type("__pow__", self, *args, **kwargs)
-
-    def __mod__(self, *args: typing.Any, **kwargs: typing.Any) -> typing.Any:
-        return dispatch_by_name_and_type("__mod__", self, *args, **kwargs)
-
-    def __round__(self, *args: typing.Any, **kwargs: typing.Any) -> typing.Any:
-        return dispatch_by_name_and_type("__round__", self, *args, **kwargs)
-
-    def __ge__(self, *args: typing.Any, **kwargs: typing.Any) -> typing.Any:
-        return dispatch_by_name_and_type("__ge__", self, *args, **kwargs)
-
-    def __gt__(self, *args: typing.Any, **kwargs: typing.Any) -> typing.Any:
-        return dispatch_by_name_and_type("__gt__", self, *args, **kwargs)
-
-    def __le__(self, *args: typing.Any, **kwargs: typing.Any) -> typing.Any:
-        return dispatch_by_name_and_type("__le__", self, *args, **kwargs)
-
-    def __lt__(self, *args: typing.Any, **kwargs: typing.Any) -> typing.Any:
-        return dispatch_by_name_and_type("__lt__", self, *args, **kwargs)
-
-    def __eq__(self, *args: typing.Any, **kwargs: typing.Any) -> typing.Any:
-        return dispatch_by_name_and_type("__eq__", self, *args, **kwargs)
-
-    def __ne__(self, *args: typing.Any, **kwargs: typing.Any) -> typing.Any:
-        return dispatch_by_name_and_type("__ne__", self, *args, **kwargs)
-
-    def __neg__(self, *args: typing.Any, **kwargs: typing.Any) -> typing.Any:
-        return dispatch_by_name_and_type("__neg__", self, *args, **kwargs)
-
-    def __contains__(self, *args: typing.Any, **kwargs: typing.Any) -> typing.Any:
-        return dispatch_by_name_and_type("__contains__", self, *args, **kwargs)
+    __call__ = dispatch_dunder("__call__")
+    __getitem__ = dispatch_dunder("__getitem__")
+    __len__ = dispatch_dunder("__len__")
+    __add__ = dispatch_dunder("__add__")
+    __sub__ = dispatch_dunder("__sub__")
+    __mul__ = dispatch_dunder("__mul__")
+    __truediv__ = dispatch_dunder("__truediv__")
+    __floordiv__ = dispatch_dunder("__floordiv__")
+    __pow__ = dispatch_dunder("__pow__")
+    __mod__ = dispatch_dunder("__mod__")
+    __round__ = dispatch_dunder("__round__")
+    __ge__ = dispatch_dunder("__ge__")
+    __gt__ = dispatch_dunder("__gt__")
+    __le__ = dispatch_dunder("__le__")
+    __lt__ = dispatch_dunder("__lt__")
+    __eq__ = dispatch_dunder("__eq__")  # type: ignore
+    __ne__ = dispatch_dunder("__ne__")  # type: ignore
+    __neg__ = dispatch_dunder("__neg__")
+    __contains__ = dispatch_dunder("__contains__")
 
 
 class RuntimeOutputNode(graph.OutputNode, DispatchMixin):

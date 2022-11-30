@@ -233,3 +233,199 @@ def test_typeddict_to_dict():
     assert not types.Dict(types.String(), types.Int()).assign_type(
         types.TypedDict({"a": types.Int(), "b": types.String()})
     )
+
+
+# The following test tests all permutionations of container types Consts, Tags,
+# and Unions. Note: we might deicde to disallow consts of unions which would
+# make some of these tests not applicable. However, this is exhastive given our
+# current implementation.
+@pytest.mark.parametrize(
+    "in_type, out_type",
+    [
+        # Units
+        (types.Number(), types.Number()),
+        (types.NoneType(), types.Invalid()),
+        # Const Units
+        (
+            types.Const(types.Number(), 5),
+            types.Const(types.Number(), 5),
+        ),
+        (types.Const(types.NoneType(), None), types.Invalid()),
+        # Tagged Units
+        (
+            TaggedValueType(types.TypedDict({}), types.Number()),
+            TaggedValueType(types.TypedDict({}), types.Number()),
+        ),
+        (
+            TaggedValueType(types.TypedDict({}), types.NoneType()),
+            TaggedValueType(types.TypedDict({}), types.Invalid()),
+        ),
+        # Tagged Const Units
+        (
+            TaggedValueType(types.TypedDict({}), types.Const(types.Number(), 5)),
+            TaggedValueType(types.TypedDict({}), types.Const(types.Number(), 5)),
+        ),
+        (
+            TaggedValueType(types.TypedDict({}), types.Const(types.NoneType(), None)),
+            TaggedValueType(types.TypedDict({}), types.Invalid()),
+        ),
+        # Const Tagged Units
+        (
+            types.Const(TaggedValueType(types.TypedDict({}), types.Number()), 5),
+            types.Const(TaggedValueType(types.TypedDict({}), types.Number()), 5),
+        ),
+        (
+            types.Const(TaggedValueType(types.TypedDict({}), types.NoneType()), None),
+            TaggedValueType(types.TypedDict({}), types.Invalid()),
+        ),
+        # Union Units
+        (types.union(types.NoneType(), types.Number()), types.Number()),
+        (
+            types.union(types.String(), types.Number()),
+            types.union(types.String(), types.Number()),
+        ),
+        # Union Const Units
+        (
+            types.union(
+                types.Const(types.NoneType(), None), types.Const(types.Number(), 5)
+            ),
+            types.Const(types.Number(), 5),
+        ),
+        (
+            types.union(
+                types.Const(types.String(), "hello"), types.Const(types.Number(), 5)
+            ),
+            types.union(
+                types.Const(types.String(), "hello"), types.Const(types.Number(), 5)
+            ),
+        ),
+        # Union Tagged Units
+        (
+            types.union(
+                TaggedValueType(types.TypedDict({}), types.NoneType()),
+                TaggedValueType(types.TypedDict({}), types.Number()),
+            ),
+            TaggedValueType(types.TypedDict({}), types.Number()),
+        ),
+        (
+            types.union(
+                TaggedValueType(types.TypedDict({}), types.String()),
+                TaggedValueType(types.TypedDict({}), types.Number()),
+            ),
+            types.union(
+                TaggedValueType(types.TypedDict({}), types.String()),
+                TaggedValueType(types.TypedDict({}), types.Number()),
+            ),
+        ),
+        # Union Tagged Consts Units
+        (
+            types.union(
+                TaggedValueType(types.TypedDict({}), types.NoneType()),
+                TaggedValueType(types.TypedDict({}), types.Const(types.Number(), 5)),
+            ),
+            TaggedValueType(types.TypedDict({}), types.Const(types.Number(), 5)),
+        ),
+        (
+            types.union(
+                TaggedValueType(
+                    types.TypedDict({}), types.Const(types.String(), "hello")
+                ),
+                TaggedValueType(types.TypedDict({}), types.Const(types.Number(), 5)),
+            ),
+            types.union(
+                TaggedValueType(
+                    types.TypedDict({}), types.Const(types.String(), "hello")
+                ),
+                TaggedValueType(types.TypedDict({}), types.Const(types.Number(), 5)),
+            ),
+        ),
+        # Const Union Units
+        (
+            types.Const(types.union(types.NoneType(), types.Number()), 5),
+            types.Number(),
+        ),
+        (  # this is a wierd case - maybe we should just disallow const unions?
+            types.Const(types.union(types.NoneType(), types.Number()), None),
+            types.Number(),
+        ),
+        # Const Union Tagged Units
+        (
+            types.Const(
+                types.union(
+                    TaggedValueType(types.TypedDict({}), types.NoneType()),
+                    TaggedValueType(types.TypedDict({}), types.Number()),
+                ),
+                5,
+            ),
+            TaggedValueType(types.TypedDict({}), types.Number()),
+        ),
+        (
+            types.Const(
+                types.union(
+                    TaggedValueType(types.TypedDict({}), types.String()),
+                    TaggedValueType(types.TypedDict({}), types.Number()),
+                ),
+                5,
+            ),
+            types.Const(
+                types.union(
+                    TaggedValueType(types.TypedDict({}), types.String()),
+                    TaggedValueType(types.TypedDict({}), types.Number()),
+                ),
+                5,
+            ),
+        ),
+        # Tagged Union Units
+        (
+            TaggedValueType(
+                types.TypedDict({}), types.union(types.NoneType(), types.Number())
+            ),
+            TaggedValueType(types.TypedDict({}), types.Number()),
+        ),
+        (
+            TaggedValueType(
+                types.TypedDict({}), types.union(types.String(), types.Number())
+            ),
+            TaggedValueType(
+                types.TypedDict({}), types.union(types.String(), types.Number())
+            ),
+        ),
+        # Tagged Union Const Units
+        (
+            TaggedValueType(
+                types.TypedDict({}),
+                types.union(
+                    types.Const(types.NoneType(), None), types.Const(types.Number(), 5)
+                ),
+            ),
+            TaggedValueType(types.TypedDict({}), types.Const(types.Number(), 5)),
+        ),
+        (
+            TaggedValueType(
+                types.TypedDict({}),
+                types.union(
+                    types.Const(types.String(), "hello"), types.Const(types.Number(), 5)
+                ),
+            ),
+            TaggedValueType(
+                types.TypedDict({}),
+                types.union(
+                    types.Const(types.String(), "hello"), types.Const(types.Number(), 5)
+                ),
+            ),
+        ),
+        # Union with multiple non-none members
+        (
+            types.union(types.NoneType(), types.Number(), types.String()),
+            types.union(types.Number(), types.String()),
+        ),
+    ],
+)
+def test_non_none(in_type, out_type):
+    assert types.non_none(in_type) == out_type
+
+
+def test_floatint_merged():
+    assert weave.type_of([1.0, 2.0]).object_type == types.Float()
+    assert weave.type_of([1.0, 2]).object_type == types.Float()
+    assert weave.type_of([1, 2]).object_type == types.Int()

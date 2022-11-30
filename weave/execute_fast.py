@@ -53,7 +53,7 @@ def _resolve_static_branches(map_fn):
             call_inputs = {name: node.val for name, node in inputs.items()}
             tracer = engine_trace.tracer()
             with tracer.trace("resolve_static:op.%s" % op_def.name):
-                return graph.ConstNode(types.Any(), op_def.resolve_fn(**call_inputs))
+                return graph.ConstNode(map_fn.type, op_def.resolve_fn(**call_inputs))
         return graph.OutputNode(map_fn.type, map_fn.from_op.name, inputs)
     elif isinstance(map_fn, graph.ConstNode):
         return map_fn
@@ -79,7 +79,7 @@ def _slow_map_fn(input_list, map_fn):
             weave_internal.call_fn(
                 map_fn,
                 {
-                    "row": graph.ConstNode(types.Any(), row),
+                    "row": graph.ConstNode(types.TypeRegistry.type_of(row), row),
                     "index": graph.ConstNode(types.Number(), i),
                 },
             )

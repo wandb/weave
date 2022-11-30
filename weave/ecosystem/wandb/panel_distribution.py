@@ -11,7 +11,7 @@ from . import weave_plotly
 
 @weave.type()
 class DistributionConfig:
-    value_fn: weave.Node[typing.Union[float, str]] = dataclasses.field(
+    value_fn: weave.Node[typing.Any] = dataclasses.field(
         default_factory=lambda: weave.graph.VoidNode()
     )
     label_fn: weave.Node[typing.Union[str, weave.types.InvalidPy]] = dataclasses.field(
@@ -63,6 +63,14 @@ def multi_distribution_default_config(
 def multi_distribution(
     input_node: weave.Node[list[typing.Any]], config: DistributionConfig
 ) -> weave_plotly.PanelPlotly:
+    # I can't edit the frontend right now and I want to get this test passing.
+    # So doing a little bit of type: ignore here.
+    # TODO: Fix
+    if not weave.types.union(weave.types.String(), weave.types.Float()).assign_type(
+        config.value_fn.type.output_type  # type: ignore
+    ):
+        # TODO: need a nicer way to return error states
+        return weave.panels.PanelHtml(weave.ops.Html("Invalid value_fn"))  # type: ignore
     unnested = weave.ops.unnest(input_node)
     config = multi_distribution_default_config(config, unnested)
     bin_size = weave.ops.execute(config.bin_size)
@@ -85,7 +93,9 @@ def multi_distribution(
 
     binned = unnested.groupby(lambda item: bin_func(item)).map(
         lambda group: weave.ops.dict_(
-            value=group.key["value"], label=group.key["label"], count=group.count()
+            value=group.groupkey()["value"],
+            label=group.groupkey()["label"],
+            count=group.count(),
         )
     )
     fig = weave_plotly.plotly_barplot(binned)
@@ -122,7 +132,9 @@ def multi_distribution_panel_plot(
 
     binned = unnested.groupby(lambda item: bin_func(item)).map(
         lambda group: weave.ops.dict_(
-            value=group.key["value"], label=group.key["label"], count=group.count()
+            value=group.groupkey()["value"],
+            label=group.groupkey()["label"],
+            count=group.count(),
         )
     )
 

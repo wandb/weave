@@ -191,7 +191,7 @@ class Type(metaclass=_TypeSubclassWatcher):
         typing.Union[type, typing.List[type], None]
     ] = None
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<{self.name}>"
 
     @classmethod
@@ -928,15 +928,41 @@ def optional(type_):
 
 
 def is_optional(type_: Type) -> bool:
-    return isinstance(type_, UnionType) and none_type in type_.members
+    TaggedValueType = type_name_to_type("tagged")
+
+    if isinstance(type_, Const):
+        return is_optional(type_.val_type)
+
+    if isinstance(type_, TaggedValueType):
+        return is_optional(type_.tag)
+
+    return isinstance(type_, UnionType) and any(
+        (m.assign_type(none_type) or none_type.assign_type(m)) for m in type_.members
+    )
 
 
 def non_none(type_: Type) -> Type:
+    TaggedValueType = type_name_to_type("tagged")
+
     if type_ == none_type:
         return Invalid()
+
+    if isinstance(type_, Const):
+        val_type = non_none(type_.val_type)
+        if val_type == type_.val_type:
+            return type_
+        return val_type
+
+    if isinstance(type_, TaggedValueType):
+        return TaggedValueType(type_.tag, non_none(type_.value))
+
     if is_optional(type_):
         type_ = typing.cast(UnionType, type_)
-        new_members = [m for m in type_.members if m != none_type]
+        new_members = [
+            m
+            for m in type_.members
+            if (not m.assign_type(none_type)) and (not none_type.assign_type(m))
+        ]
         # TODO: could put this logic in UnionType.from_members ?
         if len(new_members) == 0:
             # Should never have a length one union to start with
@@ -944,7 +970,7 @@ def non_none(type_: Type) -> Type:
         elif len(new_members) == 1:
             return new_members[0]
         else:
-            return UnionType(new_members)
+            return UnionType(*new_members)
     return type_
 
 
@@ -1068,6 +1094,13 @@ def merge_types(a: Type, b: Type) -> Type:
     """
     if a == b:
         return a
+    if (
+        isinstance(a, Float)
+        and isinstance(b, Int)
+        or isinstance(a, Int)
+        and isinstance(b, Float)
+    ):
+        return Float()
     if isinstance(a, TypedDict) and isinstance(b, TypedDict):
         all_keys_dict = {}
         for k in a.property_types.keys():
