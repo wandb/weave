@@ -55,6 +55,51 @@ class ImageArtifactFileRef:
         return self.path.artifact
 
 
+@weave.type(__override_name="audio-file")  # type: ignore
+class AudioArtifactFileRef:
+    path: ArtifactEntry
+
+    @property
+    def artifact(self):
+        return self.path.artifact
+
+
+@weave.type(__override_name="bokeh-file")  # type: ignore
+class BokehArtifactFileRef:
+    path: ArtifactEntry
+
+    @property
+    def artifact(self):
+        return self.path.artifact
+
+
+@weave.type(__override_name="video-file")  # type: ignore
+class VideoArtifactFileRef:
+    path: ArtifactEntry
+
+    @property
+    def artifact(self):
+        return self.path.artifact
+
+
+@weave.type(__override_name="object3D-file")  # type: ignore
+class Object3DArtifactFileRef:
+    path: ArtifactEntry
+
+    @property
+    def artifact(self):
+        return self.path.artifact
+
+
+@weave.type(__override_name="molecule-file")  # type: ignore
+class MoleculeArtifactFileRef:
+    path: ArtifactEntry
+
+    @property
+    def artifact(self):
+        return self.path.artifact
+
+
 table_client_artifact_file_scheme = "wandb-client-artifact://"
 table_artifact_file_scheme = "wandb-artifact://"
 
@@ -144,7 +189,16 @@ def markdown_file(md: markdown.Markdown):
     return file_wbartifact.ArtifactVersionFile(ref.artifact, ref.path + ".md")
 
 
-ArtifactAssetType = types.union(ImageArtifactFileRef.WeaveType(), HtmlArtifactFileRef.WeaveType())  # type: ignore
+ArtifactAssetType = types.union(
+    ImageArtifactFileRef.WeaveType(),  # type: ignore
+    AudioArtifactFileRef.WeaveType(),  # type: ignore
+    BokehArtifactFileRef.WeaveType(),  # type: ignore
+    VideoArtifactFileRef.WeaveType(),  # type: ignore
+    Object3DArtifactFileRef.WeaveType(),  # type: ignore
+    MoleculeArtifactFileRef.WeaveType(),  # type: ignore
+    TableClientArtifactFileRef.WeaveType(),  # type: ignore
+    HtmlArtifactFileRef.WeaveType(),  # type: ignore
+)
 
 
 @weave.op(

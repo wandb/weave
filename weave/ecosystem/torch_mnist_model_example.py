@@ -32,7 +32,7 @@ class ModelType(weave.types.ObjectType):
 
 
 @weave.weave_class(weave_type=ModelType)
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass()
 class Model:
     input_type: weave.types.Type
     output_type: weave.types.Type

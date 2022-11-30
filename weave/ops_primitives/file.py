@@ -7,7 +7,7 @@ from ..api import op, mutation, weave_class
 from .. import weave_types as types
 from .. import wandb_util
 from .. import ops_arrow
-
+from .. import artifacts_local
 
 _py_open = open
 
@@ -78,8 +78,13 @@ class File:
 
         data = json.loads(_py_open(local_path).read())
 
+        wb_artifact = None
+        if hasattr(file, "artifact") and isinstance(
+            file.artifact, artifacts_local.WandbArtifact
+        ):
+            wb_artifact = file.artifact._saved_artifact
         converted_object_type = wandb_util.weave0_type_json_to_weave1_type(
-            data["column_types"]
+            data["column_types"], wb_artifact
         )
 
         # Fix two things:
