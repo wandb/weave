@@ -54,6 +54,11 @@ def config(run: wb_domain_types.Run) -> dict[str, typing.Any]:
     return wb_util.process_run_dict_obj(run.sdk_obj.config)
 
 
+@op(name="run-createdAt")
+def created_at(run: wb_domain_types.Run) -> wb_domain_types.Date:
+    return wb_domain_types.Date(run.sdk_obj.created_at)
+
+
 @op(name="run-usedArtifactVersions")
 def used_artifact_versions(
     run: wb_domain_types.Run,
