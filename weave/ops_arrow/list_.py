@@ -705,6 +705,26 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         )
 
 
+@op(
+    name="ArrowWeaveList-concat",
+    output_type=lambda input_types: input_types["arr"].object_type,
+)
+def concat(arr: list[ArrowWeaveList[typing.Any]]):
+    if not arr:
+        return arr
+    if len(arr) == 1:
+        return arr[0]
+    if not all(isinstance(item, ArrowWeaveList) for item in arr):
+        raise errors.WeaveInternalError(
+            "Concat only supported for ArrowWeaveList, not %s" % type(arr[0])
+        )
+
+    result: ArrowWeaveList = arr[0].concatenate(arr[1])
+    for item in arr[2:]:
+        result = result.concatenate(item)
+    return result
+
+
 ArrowWeaveListType.instance_classes = ArrowWeaveList
 ArrowWeaveListType.instance_class = ArrowWeaveList
 
