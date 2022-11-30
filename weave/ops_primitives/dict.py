@@ -169,3 +169,12 @@ def dict_return_type(input_types):
 )
 def dict_(**d):
     return d
+
+
+@op(
+    input_type=TypedDict.pick.input_type,
+    output_type=TypedDict.pick.output_type,
+    name="pick",
+)
+def pick(self, key):
+    return self.get(key, None)
