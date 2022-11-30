@@ -70,3 +70,26 @@ def test_map_list_with_nan():
     d3 = m2.apply(d2)
     assert d2[0]["a"] == d3[0]["a"]
     assert math.isnan(d3[0]["b"])
+
+
+def test_mapper_list_to_arrow_arr_has_no_type():
+    obj = [
+        {
+            "IDs": [264, 268, 29, 77, 47, 297, 73, 18, 366, 364],
+            "Transformations": "a",
+        },
+        {
+            "IDs": None,
+            "Transformations": "b",
+        },
+    ]
+    ot = types.TypeRegistry.type_of(obj)
+
+    # this should not raise an exception
+    m = mappers_arrow.map_to_arrow(ot, None)
+    m2 = mappers_arrow.map_from_arrow(ot, None)
+    transformed = m.apply(obj)
+    untransformed = m2.apply(transformed)
+
+    # this should work with nulls
+    assert untransformed == obj

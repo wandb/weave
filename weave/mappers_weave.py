@@ -38,6 +38,7 @@ class ObjectMapper(mappers.Mapper):
 
 class ListMapper(mappers.Mapper):
     def __init__(self, type_, mapper, artifact, path=[]):
+        self.type = type_
         self._object_type = mapper(type_.object_type, artifact, path=path)
 
 
