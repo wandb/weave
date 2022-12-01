@@ -118,6 +118,19 @@ def dispatch_by_name_and_type(
     common_name: str, args: typing.Any, kwargs: typing.Any
 ) -> typing.Any:
     ops = get_ops_by_name(common_name)
+    if len(ops) == 0:
+        err = errors.WeaveDispatchError(
+            f'Cannot dispatch op "{common_name}"; no matching op found'
+        )
+        try:
+            import sentry_sdk
+        except ImportError:
+            raise err
+        else:
+            with sentry_sdk.push_scope() as scope:
+                scope.fingerprint = [common_name]
+                raise err
+
     return dispatch_ops_by_type(ops, args, kwargs)
 
 
@@ -128,6 +141,10 @@ def dispatch_ops_by_type(
     kwarg_types = {k: type_of_input_param(v) for k, v in kwargs.items()}
     op = choose_op_for_args(ops, arg_types, kwarg_types)
     if op is None:
+        if len(ops) == 0:
+            raise errors.WeaveDispatchError(
+                f"dispatch_ops_by_type called with no ops. args: {args}, kwargs: {kwargs}"
+            )
         raise errors.WeaveDispatchError(
             "No implementation of (%s) found for arg types: %s %s"
             % (op_aliases.get_op_aliases(ops[0].common_name), arg_types, kwarg_types)
