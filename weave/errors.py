@@ -50,3 +50,7 @@ class WeavifyError(Exception):
 
 class WeaveDispatchError(WeaveBaseError):
     pass
+
+
+class WeaveMissingArtifactPathError(WeaveBaseError):
+    pass

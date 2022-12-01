@@ -322,20 +322,25 @@ class LocalArtifactRef(Ref):
     def type(self) -> types.Type:
         if self._type is not None:
             return self._type
-        # if self.path != "_obj":
-        #     raise errors.WeaveInternalError(
-        #         "Trying to load type from a non-root object. Ref should be instantiated with a type for this object: %s %s"
-        #         % (self.artifact, self.path)
-        #     )
-        try:
+        # First, we check to see if the path follows the `{path}.type.json` convention
+        # meaning it follows the Weave1 style:
+        type_file_path = self.artifact.path(f"{self.path}.type.json")
+        if os.path.exists(type_file_path):
             with self.artifact.open(f"{self.path}.type.json") as f:
                 type_json = json.load(f)
-        except (FileNotFoundError, KeyError):
-            # If there's no type file, this is a Ref to the file itself
-            # TODO: refactor
-            return ArtifactVersionFileType()
-        self._type = types.TypeRegistry.type_from_dict(type_json)
-        return self._type
+            self._type = types.TypeRegistry.type_from_dict(type_json)
+            return self._type
+        # if not, then it could just be a reference to a file itself. We
+        # check to see if the path exists and if it does, we assume it's a file
+        obj_file_path = self.artifact.path(self.path)
+        if os.path.exists(obj_file_path):
+            self._type = ArtifactVersionFileType()
+            return self._type
+
+        # If niether of those are true, then we are in an error state!
+        raise errors.WeaveMissingArtifactPathError(
+            f"Unable to find path {self.path} in artifact when trying to load type"
+        )
 
     @property
     def name(self) -> str:

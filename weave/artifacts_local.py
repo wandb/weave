@@ -245,7 +245,7 @@ class LocalArtifact(Artifact):
                 self._version = os.path.basename(os.path.realpath(self._read_dirname))
                 self._read_dirname = os.path.join(self._root, self._version)
 
-    def path(self, name):
+    def path(self, name: str) -> str:
         return os.path.join(self._read_dirname, name)
 
     @property
