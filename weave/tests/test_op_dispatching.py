@@ -162,3 +162,12 @@ def test_nested_js_dict_pick():
         )
         == 5
     )
+
+
+def test_dispatch_of_ambiguous_ops():
+    artifacts_node = weave.ops.project("a", "b").artifacts()
+    # just making this call is the test since it is
+    # not clear if it should be artifact-project or
+    # tag-project
+    project_node = artifacts_node[0].project()
+    projects_node = artifacts_node.project()

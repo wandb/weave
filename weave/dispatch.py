@@ -1,16 +1,17 @@
 """Functions for determining which op is being called."""
 from dataclasses import dataclass
 import functools
+import logging
 import typing
 
 from . import language_nullability
+from .language_features.tagging.make_tag_getter_op import is_tag_getter
 
 from . import errors
 from . import weave_types as types
 from . import op_def
 from . import op_args
 from . import registry_mem
-from . import weave_internal
 from . import graph
 from . import errors
 from . import op_aliases
@@ -57,6 +58,15 @@ def op_args_is_subtype(lhs: op_args.OpArgs, rhs: op_args.OpArgs) -> bool:
 
 
 def resolve_op_ambiguity(candidates: list[op_def.OpDef]) -> op_def.OpDef:
+    # Currently we deprioritize all tag getter ops below standard ops
+    tag_getter_candidates = []
+    non_tag_getter_candidates = []
+    for candidate in candidates:
+        if is_tag_getter(candidate):
+            tag_getter_candidates.append(candidate)
+        else:
+            non_tag_getter_candidates.append(candidate)
+
     def cmp(a: op_def.OpDef, b: op_def.OpDef) -> int:
         b_is_subtype = op_args_is_subtype(a.input_type, b.input_type)
         a_is_subtype = op_args_is_subtype(b.input_type, a.input_type)
@@ -74,7 +84,15 @@ def resolve_op_ambiguity(candidates: list[op_def.OpDef]) -> op_def.OpDef:
             % (a.name, b.name)
         )
 
-    ordered = sorted(candidates, key=functools.cmp_to_key(cmp))
+    if len(non_tag_getter_candidates) > 0:
+        if len(tag_getter_candidates) > 0:
+            logging.warning(
+                f"Op dispatch candidates contained {len(non_tag_getter_candidates)} non tag-getters and {len(tag_getter_candidates)} tag getters. Ignoring tag getters to avoid ambigious dispatch."
+            )
+        ordered = sorted(non_tag_getter_candidates, key=functools.cmp_to_key(cmp))
+    else:
+        ordered = sorted(tag_getter_candidates, key=functools.cmp_to_key(cmp))
+
     return ordered[0]
 
 
