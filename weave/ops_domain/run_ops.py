@@ -11,7 +11,7 @@ run_tag_getter_op = make_tag_getter_op.make_tag_getter_op(
 )
 
 
-@op(name="run-jobtype")
+@op(name="run-jobType")
 def jobtype(run: wb_domain_types.Run) -> str:
     return run.sdk_obj.jobType
 
