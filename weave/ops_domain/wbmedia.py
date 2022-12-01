@@ -30,7 +30,7 @@ class ArtifactEntryType(types.Type):
         return ArtifactEntry(artifact, name)
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(eq=True, frozen=True)
 class ArtifactEntry:
     artifact: typing.Any  # Artifact
     path: str
