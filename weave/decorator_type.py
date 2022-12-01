@@ -14,7 +14,7 @@ _py_type = type
 def type(__override_name: str = None, __is_simple: bool = False):
     def wrap(target):
 
-        dc = dataclasses.dataclass(target)
+        dc = dataclasses.dataclass(target, unsafe_hash=True, eq=True)
         fields = dataclasses.fields(dc)
         target_name = target.__name__
         if __override_name is not None:
