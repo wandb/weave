@@ -53,6 +53,21 @@ def refine_config_type(run: wb_domain_types.Run) -> types.Type:
 def config(run: wb_domain_types.Run) -> dict[str, typing.Any]:
     return wb_util.process_run_dict_obj(run.sdk_obj.config)
 
+@op()
+def _refine_history(run: wb_domain_types.Run) -> dict[str, typing.Any]:
+    import pdb; pdb.set_trace()
+    return run.sdk_obj._attrs['historyKeys']
+
+@op(name="run-history", refine_output_type=_refine_history)
+def history(run: wb_domain_types.Run) -> dict[str, typing.Any]:
+    # This samples the history - once Shawn's GQL stuff lands and
+    # we get the keys for the columns, we can probably convert this to
+    # `scan_history` which is an iterator over all rows with a key
+    # selection. For now this will suffice in terms of building Weave1.
+    # Additonally, with Shawn's new "runs2" implementation, this might 
+    # be completely rewritten.
+    return [wb_util.process_run_dict_obj(row) for row in run.sdk_obj.scan_history(max_step=500)]
+
 
 @op(name="run-createdAt")
 def created_at(run: wb_domain_types.Run) -> wb_domain_types.Date:
