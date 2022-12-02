@@ -10,6 +10,7 @@ from .. import api as weave
 from .. import ops as ops
 from ..language_features.tagging.tagged_value_type import TaggedValueType
 from ..ops_domain.wb_domain_types import Run, Project
+from .. import weave_internal
 
 from . import weavejs_ops
 
@@ -139,3 +140,29 @@ def test_table_images(fake_wandb):
     # Query 2:
     table_rows_node = summary_node.pick("table").table().rows()
     assert len(weave.use(table_rows_node)) == 1
+
+
+def test_join_on_image_mendeleev(fake_wandb):
+
+    table_file_node = (
+        ops.project("stacey", "mendeleev")
+        .artifactType("test_results")
+        .artifacts()[0]
+        .versions()[0]
+        .file("test_results.table.json")
+    )
+
+    cleaned = table_file_node.table().rows().dropna()
+    tables_to_join = ops.make_list(left=cleaned, right=cleaned)
+
+    def join_fn_body(row):
+        return row["image"]
+
+    join_fn = weave_internal.define_fn({"row": cleaned.type.object_type}, join_fn_body)
+    join_table_node = ops.join_all(tables_to_join, join_fn, False)
+    table = weave.use(join_table_node)
+    assert len(table) == 500
+    for row in table:
+        assert row["image"][0].height == 299
+        assert row["image"][0].width == 299
+        assert row["image"][0] == row["image"][1]

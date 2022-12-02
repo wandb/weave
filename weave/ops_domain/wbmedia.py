@@ -6,7 +6,7 @@ import typing
 
 from wandb.apis import public as wandb_api
 
-from ..artifacts_local import get_wandb_read_client_artifact
+from ..artifacts_local import get_wandb_read_client_artifact, Artifact
 from ..language_features.tagging.tag_store import isolated_tagging_context
 from .. import types
 from .. import api as weave
@@ -32,7 +32,7 @@ class ArtifactEntryType(types.Type):
 
 @dataclasses.dataclass(eq=True, frozen=True)
 class ArtifactEntry:
-    artifact: typing.Any  # Artifact
+    artifact: Artifact
     path: str
 
 
