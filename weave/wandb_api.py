@@ -1,22 +1,26 @@
 import contextvars
 from wandb.apis import public
+from wandb.sdk.internal.internal_api import _thread_local_api_settings
 from .context_state import _wandb_public_api
+
+import typing
 
 
 def wandb_public_api() -> public.Api:
-    api = _wandb_public_api.get()
-    if api:
-        return api
-    else:
-        # The only way this branch works is if the system has an api key
-        # available in a common location (ex: ~/.netrc). This should never
-        # work in production, but is useful for local development.
-        return public.Api()
+    return public.Api()
 
 
-def set_wandb_api_key(key: str):
-    _wandb_public_api.set(public.Api(api_key=key))
+def set_wandb_thread_local_api_settings(
+    api_key: typing.Optional[str],
+    cookies: typing.Optional[typing.Dict],
+    headers: typing.Optional[typing.Dict],
+):
+    _thread_local_api_settings.api_key = api_key
+    _thread_local_api_settings.cookies = cookies
+    _thread_local_api_settings.headers = headers
 
 
-def reset_wandb_api_key(token: contextvars.Token):
-    _wandb_public_api.set(None)
+def reset_wandb_thread_local_api_settings():
+    _thread_local_api_settings.api_key = None
+    _thread_local_api_settings.cookies = None
+    _thread_local_api_settings.headers = None

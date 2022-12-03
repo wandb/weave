@@ -161,7 +161,6 @@ def test_image(sdk_obj, expected_type, fake_wandb):
             "digest": art.digest,
             "aliases": [],
         },
-        api,
     )
     logged_artifact._manifest = art.manifest
     art._logged_artifact = logged_artifact
