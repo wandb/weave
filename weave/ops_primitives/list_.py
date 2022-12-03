@@ -320,7 +320,7 @@ def list_indexCheckpoint(arr):
 
 
 index_checkpoint_tag_getter_op = make_tag_getter_op.make_tag_getter_op(
-    "index", types.Number(), op_name="tag-indexCheckpoint"
+    "index", types.Int(), op_name="tag-indexCheckpoint"
 )
 
 

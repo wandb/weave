@@ -25,7 +25,8 @@ from .. import weave_internal
 from .. import context
 from .. import weavify
 from .. import box
-from ..language_features.tagging import tagged_value_type, tag_store
+from ..language_features.tagging import tagged_value_type
+from ..language_features.tagging import process_opdef_output_type
 
 from .. import box
 from ..language_features.tagging import tag_store
@@ -110,12 +111,20 @@ def _pick_output_type(input_types):
 def rewrite_weavelist_refs(arrow_data, object_type, artifact):
     # TODO: Handle unions
 
-    if isinstance(object_type, types.TypedDict) or isinstance(
-        object_type, types.ObjectType
+    if (
+        isinstance(object_type, types.TypedDict)
+        or isinstance(object_type, types.ObjectType)
+        or isinstance(object_type, tagged_value_type.TaggedValueType)
     ):
-        prop_types = object_type.property_types
-        if callable(prop_types):
-            prop_types = prop_types()
+        if isinstance(object_type, tagged_value_type.TaggedValueType):
+            prop_types = {
+                "_tag": object_type.tag,
+                "_value": object_type.value,
+            }
+        else:
+            prop_types = object_type.property_types
+            if callable(prop_types):
+                prop_types = prop_types()
         if isinstance(arrow_data, pa.Table):
             arrays = {}
             for col_name, col_type in prop_types.items():
@@ -431,6 +440,15 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         for item in self.to_pylist():
             yield self._mapper.apply(item)
 
+    def __repr__(self):
+        return f"<ArrowWeaveList: {self.object_type}>"
+
+    def to_pylist_notags(self):
+        """Only removes tags from the top level."""
+        if isinstance(self.object_type, tagged_value_type.TaggedValueType):
+            return self._arrow_data["_value"].to_pylist()
+        return self._arrow_data.to_pylist()
+
     def to_pylist(self):
         if isinstance(self, graph.Node):
             return []
@@ -588,29 +606,13 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         with context.non_caching_execution_client():
             group_table = use(group_table_node)._arrow_data
 
-        # pyarrow does not currently implement support for grouping / aggregations on keys that are
-        # structs (typed Dicts). to get around this, we unzip struct columns into multiple columns, one for each
-        # struct field. then we group on those columns.
-        if isinstance(group_table, pa.Table):
-            group_cols = []
-            original_col_names = group_table.column_names
-            original_group_table = group_table
-            for i, colname in enumerate(group_table.column_names):
-                if isinstance(group_table[colname].type, pa.StructType):
-                    # convert struct columns to multiple destructured columns
-                    replacement_table = unzip_struct_array(group_table[colname])
-                    group_table = group_table.remove_column(i)
-                    for newcol in replacement_table.column_names:
-                        group_table = group_table.append_column(
-                            newcol, replacement_table[newcol]
-                        )
-                        group_cols.append(newcol)
+        group_table = arrow.arrow_as_array(group_table)
 
-                else:
-                    # if a column is not a struct then just use it
-                    group_cols.append(colname)
-
-        elif isinstance(group_table, (pa.ChunkedArray, pa.Array)):
+        # There was a comment that arrow doesn't allow grouping on struct columns
+        # and another large block of code that tried to avoid passing in a struct column.
+        # But that code was actually never executing due to a bug.
+        # TODO: investigate and fix this (do we really need unzip_struct_array?)
+        if isinstance(group_table, (pa.ChunkedArray, pa.Array, pa.StructArray)):
             if isinstance(group_table, pa.ChunkedArray):
                 group_table = group_table.combine_chunks()
             original_col_names = ["group_key"]
@@ -708,24 +710,44 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
 ArrowWeaveListType.instance_classes = ArrowWeaveList
 ArrowWeaveListType.instance_class = ArrowWeaveList
 
-# TODO: This needs to be properly vectorized / arrowed
-# since this bails out out of the arrow implementation
+
+def awl_object_type_with_index(object_type):
+    return tagged_value_type.TaggedValueType(
+        types.TypedDict({"index": types.Int()}), object_type
+    )
+
+
+def arrow_weave_list_createindexcheckpoint_output_type(input_type):
+    return ArrowWeaveListType(awl_object_type_with_index(input_type["arr"].object_type))
+
+
 @op(
     name="arrowWeaveList-createIndexCheckpointTag",
     input_type={"arr": ArrowWeaveListType(types.Any())},
-    output_type=lambda input_types: types.List(
-        tagged_value_type.TaggedValueType(
-            types.TypedDict({"index": types.Number()}), input_types["arr"].object_type
-        )
-    ),
+    output_type=arrow_weave_list_createindexcheckpoint_output_type,
 )
-def arrow_weave_list_indexCheckpoint(arr):
-    res = []
-    for item in arr:
-        item = box.box(item)
-        tag_store.add_tags(item, {"index": len(res)})
-        res.append(item)
-    return res
+def arrow_weave_list_createindexCheckpoint(arr):
+    # Tags are always stored as a list of dicts, even if there is only one tag
+    tag_array = pa.StructArray.from_arrays(
+        [pa.array(np.arange(len(arr._arrow_data)))],
+        names=["index"],
+    )
+    return awl_add_arrow_tags(
+        arr,
+        tag_array,
+        types.TypedDict({"index": types.Int()}),
+    )
+
+
+@op(
+    name="ArrowWeaveList-concat",
+    input_type={"arr": types.List(ArrowWeaveListType(types.Any()))},
+    output_type=lambda input_types: input_types["arr"].object_type,
+)
+def concat(arr):
+    return ArrowWeaveList(
+        pa.concat_tables([a._arrow_data for a in arr]), arr[0].object_type
+    )
 
 
 @dataclasses.dataclass(frozen=True)
@@ -761,7 +783,7 @@ class ArrowTableGroupResult(ArrowWeaveList):
         self._mapper = mappers_arrow.map_from_arrow(self.object_type, self._artifact)
 
     @op(output_type=lambda input_types: input_types["self"]._key)
-    def key(self):
+    def groupkey(self):
         return self._key
 
 
@@ -961,3 +983,79 @@ def to_arrow(obj, wb_type=None):
         return ref.obj
 
     raise errors.WeaveInternalError("to_arrow not implemented for: %s" % obj)
+
+
+def awl_add_arrow_tags(
+    l: ArrowWeaveList, arrow_tags: pa.StructArray, tag_type: types.Type
+):
+    # get current tags
+    data = l._arrow_data
+    current_tags = None
+    if isinstance(data, pa.Table):
+        if "_tag" in data.column_names:
+            current_tags = data["_tag"].combine_chunks()
+    if current_tags is None:
+        tag_arrays = []
+        tag_names = []
+    else:
+        tag_arrays = [current_tags.field(f.name) for f in current_tags.type]
+        tag_names = [f.name for f in current_tags.type]
+
+    for tag_field in arrow_tags.type:
+        if tag_field.name in tag_names:
+            existing_index = tag_names.index(tag_field.name)
+            tag_arrays[existing_index] = arrow_tags.field(tag_field.name)
+        else:
+            tag_arrays.append(arrow_tags.field(tag_field.name))
+            tag_names.append(tag_field.name)
+
+    tag_array = pa.StructArray.from_arrays(
+        tag_arrays,
+        tag_names,
+    )
+    if isinstance(l._arrow_data, pa.Table):
+        if isinstance(l.object_type, tagged_value_type.TaggedValueType):
+            new_value = l._arrow_data["_value"]
+        else:
+            new_value = pa.StructArray.from_arrays(
+                # TODO: we shouldn't need to combine chunks, we can produce this in the
+                # original chunked form for zero copy
+                [c.combine_chunks() for c in l._arrow_data.columns],
+                names=l._arrow_data.column_names,
+            )
+    else:
+        # Else its an arrow array
+        new_value = l._arrow_data
+    # new_value_list = pa.ListArray.from_arrays([0, 500], new_value)
+    new_value = pa.table([tag_array, new_value], ["_tag", "_value"])
+
+    new_object_type = process_opdef_output_type.op_make_type_tagged_resolver(
+        l.object_type, tag_type
+    )
+    import pyarrow.parquet as pq
+
+    pq.write_table(new_value, "/tmp/test.parquet")
+
+    # TODO: update type
+    return ArrowWeaveList(new_value, new_object_type)
+
+
+def awl_add_py_tags(l: ArrowWeaveList, tags: dict[str, typing.Any]):
+    tag_type = types.TypeRegistry.type_of(tags)
+    mapper = mappers_arrow.map_to_arrow(tag_type, None)
+    pyarrow_type = mapper.result_type()
+
+    if not pa.types.is_struct(pyarrow_type):
+        raise errors.WeaveInternalError("Tags must be a struct")
+    fields = list(pyarrow_type)
+    schema = pa.schema(fields)
+    py_tags = [mapper.apply(tags)] * len(l._arrow_data)
+    arrow_tags_table = pa.Table.from_pylist(py_tags, schema=schema)
+
+    arrow_tags = pa.StructArray.from_arrays(
+        # TODO: we shouldn't need to combine chunks, we can produce this in the
+        # original chunked form for zero copy
+        [c.combine_chunks() for c in arrow_tags_table.columns],
+        names=arrow_tags_table.column_names,
+    )
+    return awl_add_arrow_tags(l, arrow_tags, tag_type)

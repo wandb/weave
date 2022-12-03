@@ -316,7 +316,7 @@ def test_group_by_bins_arrow_vectorized():
     result = api.use(groupby_node)
     assert api.use(result.count()) == 9
 
-    group_key_node = result[4].key()
+    group_key_node = result[4].groupkey()
     key = api.use(group_key_node)
     assert key == {"number_bin_col_name": {"start": 130.0, "stop": 135.0}}
 

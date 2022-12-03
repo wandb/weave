@@ -40,7 +40,7 @@ def process_opdef_resolve_fn(
                 tag_type = types.TypeRegistry.type_of(tag_dict)
                 assert isinstance(tag_type, types.TypedDict)
                 return TaggedValueType(tag_type, res)
-            tag_store.add_tags(res, tag_dict)
+            return tag_store.add_tags(res, tag_dict)
     elif should_flow_tags(op_def):
         key, val = get_first_arg(op_def, args, kwargs)
         if tag_store.is_tagged(val):
@@ -51,5 +51,5 @@ def process_opdef_resolve_fn(
                 tag_type = types.TypeRegistry.type_of(tag_dict)
                 assert isinstance(tag_type, types.TypedDict)
                 return TaggedValueType(tag_type, res)
-            tag_store.add_tags(res, tag_dict)
+            return tag_store.add_tags(res, tag_dict)
     return res

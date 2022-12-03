@@ -9,6 +9,8 @@ from . import registry_mem
 from . import errors
 from . import dispatch
 from . import graph_debug
+from . import plan
+from . import weave_internal
 
 # These call_* functions must match the actual op implementations.
 # But we don't want to import the op definitions themselves here, since
@@ -150,6 +152,37 @@ def execute_edit_graph(edit_g: graph_editable.EditGraph) -> None:
             )
 
 
+def apply_column_pushdown(
+    leaf_nodes: list[graph.Node],
+) -> list[graph.Node]:
+    # Don't try if we don't have a project-runs2
+    if not graph.filter_all_nodes(
+        leaf_nodes,
+        lambda n: isinstance(n, graph.OutputNode) and n.from_op.name == "project-runs2",
+    ):
+        return leaf_nodes
+
+    p = plan.plan(leaf_nodes)
+
+    def _replace_with_column_pushdown(node: graph.Node) -> graph.Node:
+        if isinstance(node, graph.OutputNode) and node.from_op.name == "project-runs2":
+            run_cols = plan.get_cols(p, node)
+            config_cols = list(run_cols.get("config", {}).keys())
+            summary_cols = list(run_cols.get("summary", {}).keys())
+            return graph.OutputNode(
+                node.type,
+                "project-runs2_with_columns",
+                {
+                    "project": node.from_op.inputs["project"],
+                    "config_cols": weave_internal.const(config_cols),
+                    "summary_cols": weave_internal.const(summary_cols),
+                },
+            )
+        return node
+
+    return graph.map_all_nodes(leaf_nodes, _replace_with_column_pushdown)
+
+
 def _compile_phase(
     g: graph_editable.EditGraph,
     phase_name: str,
@@ -189,6 +222,18 @@ def compile(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
 
     # Reconstruct a node list that matches the original order from the transformed graph
     n = g.to_standard_graph()
+
+    loggable_nodes = graph_debug.combine_common_nodes(n)
+    logging.info(
+        "Compile phase [pre-pushdown] Result nodes:\n%s",
+        "\n".join(graph_debug.node_expr_str_full(n) for n in loggable_nodes),
+    )
+    n = apply_column_pushdown(n)
+    loggable_nodes = graph_debug.combine_common_nodes(n)
+    logging.info(
+        "Compile phase [pushdown] Result nodes:\n%s",
+        "\n".join(graph_debug.node_expr_str_full(n) for n in loggable_nodes),
+    )
 
     logging.info("Compilation complete")
 

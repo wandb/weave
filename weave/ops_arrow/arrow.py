@@ -30,6 +30,10 @@ def arrow_type_to_weave_type(pa_type) -> types.Type:
     )
 
 
+def arrow_schema_to_weave_type(schema) -> types.Type:
+    return types.TypedDict({f.name: arrow_type_to_weave_type(f.type) for f in schema})
+
+
 @dataclasses.dataclass(frozen=True)
 class ArrowArrayType(types.Type):
     instance_classes = [pa.ChunkedArray, pa.ExtensionArray, pa.Array]
@@ -64,10 +68,7 @@ class ArrowTableType(types.Type):
 
     @classmethod
     def type_of_instance(cls, obj: pa.Table):
-        obj_prop_types = {}
-        for field in obj.schema:
-            obj_prop_types[field.name] = arrow_type_to_weave_type(field.type)
-        return cls(types.TypedDict(obj_prop_types))
+        return cls(arrow_schema_to_weave_type(obj.schema))
 
     def save_instance(self, obj, artifact, name):
         with artifact.new_file(f"{name}.parquet", binary=True) as f:
@@ -76,3 +77,17 @@ class ArrowTableType(types.Type):
     def load_instance(self, artifact, name, extra=None):
         with artifact.open(f"{name}.parquet", binary=True) as f:
             return pq.read_table(f)
+
+
+def arrow_as_array(obj) -> pa.Array:
+    # assumes obj is table or array
+    if isinstance(obj, pa.Table):
+        return pa.StructArray.from_arrays(
+            # TODO: we shouldn't need to combine chunks, we can produce this in the
+            # original chunked form for zero copy
+            [c.combine_chunks() for c in obj.columns],
+            names=obj.column_names,
+        )
+    if not isinstance(obj, pa.Array):
+        raise TypeError("Expected pyarrow Array or Table, got %s" % type(obj))
+    return obj

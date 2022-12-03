@@ -103,7 +103,7 @@ def test_table_string_histogram():
         .groupby(lambda row: ops.dict_(rotate=row["rotate"]))[0]
         .pick("x")
         .groupby(lambda row: ops.dict_(row=row))
-        .map(lambda row: row.key().merge(ops.dict_(count=row.count())))
+        .map(lambda row: row.groupkey().merge(ops.dict_(count=row.count())))
         .count()
     )
     assert weave.use(node) == 3

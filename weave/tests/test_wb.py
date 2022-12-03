@@ -112,7 +112,7 @@ def test_mapped_table_tags(fake_wandb):
     assert weave.use(cell_node.project().name()) == "mendeleev"
 
 
-def test_table_tags(fake_wandb):
+def test_table_tags_row_first(fake_wandb):
     cell_node = (
         ops.project("stacey", "mendeleev")
         .runs()
@@ -121,6 +121,21 @@ def test_table_tags(fake_wandb):
         .table()
         .rows()
         .createIndexCheckpointTag()[5]["score_Amphibia"]
+    )
+    assert weave.use(cell_node.indexCheckpoint()) == 5
+    assert weave.use(cell_node.run().name()) == "test_run_name"
+    assert weave.use(cell_node.project().name()) == "mendeleev"
+
+
+def test_table_tags_column_first(fake_wandb):
+    cell_node = (
+        ops.project("stacey", "mendeleev")
+        .runs()
+        .limit(1)[0]
+        .summary()["table"]
+        .table()
+        .rows()
+        .createIndexCheckpointTag()["score_Amphibia"][5]
     )
     assert weave.use(cell_node.indexCheckpoint()) == 5
     assert weave.use(cell_node.run().name()) == "test_run_name"

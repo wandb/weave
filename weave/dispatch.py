@@ -234,9 +234,10 @@ class DispatchMixin:
     # something. So add the attribute here to tell ipython that yes we do
     # have a __getattr__. This fixes Node._ipython_display()_ not getting fired.
     _ipython_canary_method_should_not_exist_ = None
+
     # Needed for storage.to_python hacks. Remove after those hacks are fixed.
     # TODO: fix
-    to_pylist = None
+    to_pylist_notags = None
     as_py = None
 
     def __dir__(self) -> list[str]:

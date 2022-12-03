@@ -28,6 +28,7 @@ transformers<4.21
 rich
 plotly
 replicate
+duckdb
 
 # spaCy Requirements:
 spacy>=3.0.0,<4.0.0

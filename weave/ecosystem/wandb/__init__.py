@@ -7,5 +7,6 @@ from .panel_distribution import *
 from .weave_plotly import *
 from .panel_scatter import *
 from .panel_geo import *
+from .runs2 import *
 
 _context.clear_loading_built_ins(_loading_builtins_token)

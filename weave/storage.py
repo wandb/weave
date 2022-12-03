@@ -199,8 +199,8 @@ def objects(
 
 
 def recursively_unwrap_arrow(obj):
-    if getattr(obj, "to_pylist", None):
-        return obj.to_pylist()
+    if getattr(obj, "to_pylist_notags", None):
+        return obj.to_pylist_notags()
     if getattr(obj, "as_py", None):
         return obj.as_py()
     if isinstance(obj, graph.Node):
@@ -212,14 +212,15 @@ def recursively_unwrap_arrow(obj):
     return obj
 
 
-def to_python(obj):
+def to_python(obj, wb_type=None):
     # Arrow hacks for WeaveJS. We want to send the raw Python data
     # to the frontend for these objects. But this will break querying them in Weave
     # Python when not using InProcessServer.
     # TODO: Remove!
     obj = recursively_unwrap_arrow(obj)
 
-    wb_type = types.TypeRegistry.type_of(obj)
+    if wb_type is None:
+        wb_type = types.TypeRegistry.type_of(obj)
     mapper = mappers_python.map_to_python(
         wb_type, artifacts_local.LocalArtifact(_get_name(wb_type, obj))
     )
@@ -228,8 +229,9 @@ def to_python(obj):
     return {"_type": wb_type.to_dict(), "_val": val}
 
 
-def from_python(obj):
-    wb_type = types.TypeRegistry.type_from_dict(obj["_type"])
+def from_python(obj, wb_type=None):
+    if wb_type is None:
+        wb_type = types.TypeRegistry.type_from_dict(obj["_type"])
     mapper = mappers_python.map_from_python(
         wb_type, artifacts_local.LocalArtifact(_get_name(wb_type, obj))
     )

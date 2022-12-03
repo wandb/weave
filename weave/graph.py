@@ -299,21 +299,31 @@ def _map_nodes(
 ) -> Node:
     if node in already_mapped:
         return already_mapped[node]
+    result_node = node
     if isinstance(node, OutputNode):
         inputs = {
             k: _map_nodes(n, map_fn, already_mapped)
             for k, n in node.from_op.inputs.items()
         }
-        node = OutputNode(node.type, node.from_op.name, inputs)
-    mapped_node = map_fn(node)
+        # preserve ref-equality
+        if any(n is not inputs[k] for k, n in node.from_op.inputs.items()):
+            result_node = OutputNode(node.type, node.from_op.name, inputs)
+    mapped_node = map_fn(result_node)
     if mapped_node is None:
-        mapped_node = node
+        mapped_node = result_node
     already_mapped[node] = mapped_node
     return mapped_node
 
 
 def map_nodes(node: Node, map_fn: typing.Callable[[Node], Node]) -> Node:
     return _map_nodes(node, map_fn, {})
+
+
+def map_all_nodes(
+    nodes: list[Node], map_fn: typing.Callable[[Node], Node]
+) -> list[Node]:
+    already_mapped: dict[Node, Node] = {}
+    return [_map_nodes(n, map_fn, already_mapped) for n in nodes]
 
 
 def _all_nodes(node: Node) -> set[Node]:
@@ -328,6 +338,20 @@ def _all_nodes(node: Node) -> set[Node]:
 def filter_nodes(node: Node, filter_fn: typing.Callable[[Node], bool]) -> list[Node]:
     nodes = _all_nodes(node)
     return [n for n in nodes if filter_fn(n)]
+
+
+def filter_all_nodes(
+    nodes: list[Node], filter_fn: typing.Callable[[Node], bool]
+) -> list[Node]:
+    result = []
+
+    def mapped_fn(node: Node) -> Node:
+        if filter_fn(node):
+            result.append(node)
+        return node
+
+    map_all_nodes(nodes, mapped_fn)
+    return result
 
 
 def expr_vars(node: Node) -> list[VarNode]:
