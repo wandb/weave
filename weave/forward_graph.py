@@ -28,7 +28,7 @@ class ForwardNode:
             " ".join([str(id(fn)) for fn in self.input_to]),
         )
 
-    def set_result(self, result):
+    def set_result(self, result: typing.Any) -> None:
         self.has_result = True
         self.result = result
 
@@ -37,19 +37,31 @@ class ForwardGraph:
     roots: set[ForwardNode]
     _node_to_forward_node: typing.Dict[graph.Node, ForwardNode]
 
-    def __init__(self, nodes):
+    def __init__(self, nodes: list[graph.Node], allow_var_nodes=False) -> None:
         self.roots = set()
         self._node_to_forward_node = {}
+        self._allow_var_nodes = allow_var_nodes
 
         for node in nodes:
             self.add_node(node)
 
     def add_node(self, node: graph.Node):
+        if isinstance(node, graph.VoidNode):
+            raise errors.WeaveInternalError(
+                "Found void node when constructing ForwardGraph: %s" % node
+            )
+        elif isinstance(node, graph.ConstNode):
+            return
+        if node in self._node_to_forward_node:
+            return
+        if isinstance(node, graph.VarNode) and not self._allow_var_nodes:
+            raise errors.WeaveInternalError(
+                "Found var node when constructing ForwardGraph: %s" % node
+            )
+
+        forward_node = ForwardNode(node)
+        self._node_to_forward_node[node] = forward_node
         if isinstance(node, graph.OutputNode):
-            if node in self._node_to_forward_node:
-                return
-            forward_node = ForwardNode(node)
-            self._node_to_forward_node[node] = forward_node
             is_root = True
             for param_node in node.from_op.inputs.values():
                 self.add_node(param_node)
@@ -58,12 +70,8 @@ class ForwardGraph:
                     is_root = False
             if is_root:
                 self.roots.add(forward_node)
-        elif not isinstance(node, graph.ConstNode):
-            raise errors.WeaveInternalError(
-                "Found unexecutable node when constructing ForwardGraph: %s" % node
-            )
 
-    def get_forward_node(self, node: graph.OutputNode):
+    def get_forward_node(self, node: typing.Union[graph.OutputNode, graph.VarNode]):
         return self._node_to_forward_node[node]
 
     def has_result(self, node: ExecutableNode):

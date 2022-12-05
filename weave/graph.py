@@ -39,8 +39,7 @@ class Node(typing.Generic[T]):
         return id(self)
 
     def __str__(self) -> str:
-        n = self.node_from_json(self.to_json())
-        return node_expr_str(n)
+        return node_expr_str(self)
 
     def __repr__(self) -> str:
         return "<%s(%s): %s %s>" % (
@@ -54,7 +53,8 @@ class Node(typing.Generic[T]):
         raise errors.WeaveTypeError("Cannot use a node as a boolean predicate.")
 
 
-weave_types.Function.instance_classes = Node
+# weave_types.Function.instance_classes = Node
+weave_types.Function.instance_classes.append(Node)
 
 OpInputNodeT = typing.TypeVar("OpInputNodeT", bound=Node)
 
@@ -166,12 +166,9 @@ class ConstNode(Node):
         val = obj["val"]
         if isinstance(val, dict) and "nodeType" in val:
             val = Node.node_from_json(val)
-        val_type = weave_types.TypeRegistry.type_from_dict(obj["type"])
-        if val_type.__class__ == weave_types.Type:
-            val = weave_types.TypeRegistry.type_from_dict(val)
-        elif isinstance(val_type, weave_types.Const):
-            val = val_type.val
-        return cls(val_type, val)
+        else:
+            val = storage.from_python({"_type": obj["type"], "_val": obj["val"]})  # type: ignore
+        return cls(weave_types.TypeRegistry.type_from_dict(obj["type"]), val)
 
     def equivalent_output_node(self) -> typing.Union[OutputNode, None]:
         if isinstance(self.type, weave_types.Function):
@@ -197,18 +194,19 @@ class ConstNode(Node):
         if equiv_output_node is not None:
             return equiv_output_node.to_json()
 
-        val = self.val
-        if isinstance(self.type, weave_types.Function):
-            val = val.to_json()
-        if self.type.__class__ == weave_types.Type or (
-            isinstance(self.type, weave_types.Const)
-            and self.type.val_type.__class__ == weave_types.Type
-        ):
-            val = val.to_dict()
+        val = storage.to_python(self.val)["_val"]  # type: ignore
+        # mapper = mappers_python.map_to_python(self.type, None)
+        # val = mapper.apply(self.val)
+
+        # val = self.val
+        # if isinstance(self.type, weave_types.Function):
+        #     val = val.to_json()
         return {"nodeType": "const", "type": self.type.to_dict(), "val": val}
 
 
 class VoidNode(Node):
+    type = weave_types.Invalid()
+
     def to_json(self) -> dict:
         return {"nodeType": "void", "type": "invalid"}
 
@@ -247,6 +245,20 @@ def node_expr_str(node: Node) -> str:
                     "%s: %s" % (k, node_expr_str(n))
                     for k, n in node.from_op.inputs.items()
                 )
+            )
+        elif node.from_op.name.endswith("__getattr__"):
+            inputs = list(node.from_op.inputs.values())
+            return "%s.%s" % (
+                node_expr_str(inputs[0]),
+                inputs[1].val,
+            )
+        elif node.from_op.name.endswith("pick") or node.from_op.name.endswith(
+            "__getitem__"
+        ):
+            inputs = list(node.from_op.inputs.values())
+            return "%s[%s]" % (
+                node_expr_str(inputs[0]),
+                node_expr_str(inputs[1]),
             )
         elif all([not isinstance(n, OutputNode) for n in node.from_op.inputs.values()]):
             return "%s(%s)" % (
@@ -287,21 +299,31 @@ def _map_nodes(
 ) -> Node:
     if node in already_mapped:
         return already_mapped[node]
+    result_node = node
     if isinstance(node, OutputNode):
         inputs = {
             k: _map_nodes(n, map_fn, already_mapped)
             for k, n in node.from_op.inputs.items()
         }
-        node = OutputNode(node.type, node.from_op.name, inputs)
-    mapped_node = map_fn(node)
+        # preserve ref-equality
+        if any(n is not inputs[k] for k, n in node.from_op.inputs.items()):
+            result_node = OutputNode(node.type, node.from_op.name, inputs)
+    mapped_node = map_fn(result_node)
     if mapped_node is None:
-        mapped_node = node
+        mapped_node = result_node
     already_mapped[node] = mapped_node
     return mapped_node
 
 
 def map_nodes(node: Node, map_fn: typing.Callable[[Node], Node]) -> Node:
     return _map_nodes(node, map_fn, {})
+
+
+def map_all_nodes(
+    nodes: list[Node], map_fn: typing.Callable[[Node], Node]
+) -> list[Node]:
+    already_mapped: dict[Node, Node] = {}
+    return [_map_nodes(n, map_fn, already_mapped) for n in nodes]
 
 
 def _all_nodes(node: Node) -> set[Node]:
@@ -316,6 +338,20 @@ def _all_nodes(node: Node) -> set[Node]:
 def filter_nodes(node: Node, filter_fn: typing.Callable[[Node], bool]) -> list[Node]:
     nodes = _all_nodes(node)
     return [n for n in nodes if filter_fn(n)]
+
+
+def filter_all_nodes(
+    nodes: list[Node], filter_fn: typing.Callable[[Node], bool]
+) -> list[Node]:
+    result = []
+
+    def mapped_fn(node: Node) -> Node:
+        if filter_fn(node):
+            result.append(node)
+        return node
+
+    map_all_nodes(nodes, mapped_fn)
+    return result
 
 
 def expr_vars(node: Node) -> list[VarNode]:
@@ -347,3 +383,9 @@ def linearize(node: Node) -> typing.Optional[list[OutputNode]]:
     if not isinstance(node, OutputNode):
         return None
     return _linearize(node)
+
+
+def map_const_nodes_to_x(node: Node) -> Node:
+    return map_nodes(
+        node, lambda n: n if not isinstance(n, ConstNode) else VarNode(n.type, "x")
+    )

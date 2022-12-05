@@ -96,7 +96,7 @@ AsyncDemoTrainResultType.instance_class = AsyncDemoTrainResult
     },
     output_type=weave.types.RunType(
         weave.types.TypedDict({}),
-        weave.types.List(weave.types.Any()),
+        weave.types.List(weave.types.TypedDict({})),
         AsyncDemoTrainResultType(),
     ),
 )

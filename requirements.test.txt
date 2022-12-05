@@ -6,3 +6,5 @@ pytest-xdist
 nbmake>=0.5
 rich
 setuptools>=65.5.1 # not directly required, pinned by Snyk to avoid a vulnerability
+bokeh
+soundfile

@@ -1,6 +1,6 @@
-wandb>0.13
+wandb @ git+https://github.com/wandb/client.git@0053559af96df7e87733b74ac237fa064dd31e24
 ddtrace
-json_log_formatter
+python-json-logger
 numpy
 pandas
 h5py
@@ -25,8 +25,10 @@ torchvision
 bertviz
 datasets
 transformers<4.21
-tensorflow>=1.15.2 ; sys_platform!='darwin' or platform_machine!='arm64'
-tensorflow-macos ; sys_platform=='darwin' and platform_machine=='arm64'
+rich
+plotly
+replicate
+duckdb
 
 # spaCy Requirements:
 spacy>=3.0.0,<4.0.0
@@ -34,3 +36,5 @@ en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_
 
 # string-levenshtein op:
 levenshtein
+setuptools>=65.5.1 # not directly required, pinned by Snyk to avoid a vulnerability
+wheel>=0.38.0 # not directly required, pinned by Snyk to avoid a vulnerability

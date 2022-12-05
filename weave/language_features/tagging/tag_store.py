@@ -88,10 +88,15 @@ def with_visited_obj(obj: typing.Any) -> typing.Iterator[None]:
 
 # Adds a dictionary of tags to an object
 def add_tags(obj: typing.Any, tags: dict[str, typing.Any]) -> typing.Any:
+    from ...ops_arrow import list_ as arrow_list
+
+    if isinstance(obj, arrow_list.ArrowWeaveList):
+        return arrow_list.awl_add_py_tags(obj, tags)
     id_val = id(obj)
     assert box.is_boxed(obj), "Can only tag boxed objects"
     existing_tags = get_tags(obj) if is_tagged(obj) else {}
     _current_obj_tag_mem_map()[id_val] = {**existing_tags, **tags}
+    return obj
 
 
 # Gets the dictionary of tags assocaited with the given object

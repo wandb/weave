@@ -23,29 +23,8 @@ def test_show_simple_call(cereal_csv):
     assert actual == {
         "nodeType": "output",
         "type": {
-            "type": "tagged",
-            "tag": {
-                "type": "typedDict",
-                "propertyTypes": {
-                    "self": {
-                        "type": "local_file",
-                        "extension": "csv",
-                        "_property_types": {
-                            "extension": {
-                                "type": "const",
-                                "valType": "string",
-                                "val": "csv",
-                            },
-                            "path": "string",
-                            "mtime": "float",
-                        },
-                    }
-                },
-            },
-            "value": {
-                "type": "list",
-                "objectType": {"type": "typedDict", "propertyTypes": {}},
-            },
+            "type": "list",
+            "objectType": {"type": "typedDict", "propertyTypes": {}},
         },
         "fromOp": {
             "name": "file-readcsv",
@@ -54,16 +33,16 @@ def test_show_simple_call(cereal_csv):
                     "nodeType": "output",
                     "type": {
                         "type": "local_file",
-                        "extension": "csv",
-                        "_property_types": {
-                            "extension": {
-                                "type": "const",
-                                "valType": "string",
-                                "val": "csv",
-                            },
-                            "path": "string",
-                            "mtime": "float",
+                        "_is_object": True,
+                        "_base_type": {
+                            "type": "file",
+                            "_is_object": True,
+                            "extension": "string",
+                            "wb_object_type": "string",
                         },
+                        "extension": "csv",
+                        "path": "string",
+                        "mtime": "float",
                     },
                     "fromOp": {
                         "name": "localpath",
@@ -85,87 +64,60 @@ actual_SHOW_PARAMS_FINE_TUNE_WEAVE_NODE = {
     "nodeType": "output",
     "type": {
         "type": "Run",
+        "_is_object": True,
+        "id": "string",
+        "op_name": "string",
+        "state": {
+            "type": "union",
+            "members": [
+                {"type": "const", "valType": "string", "val": "pending"},
+                {"type": "const", "valType": "string", "val": "running"},
+                {"type": "const", "valType": "string", "val": "finished"},
+                {"type": "const", "valType": "string", "val": "failed"},
+            ],
+        },
+        "prints": {"type": "list", "objectType": "string"},
         "inputs": {"type": "typedDict", "propertyTypes": {}},
         "history": {"type": "list", "objectType": "any"},
         "output": {
             "type": "gpt3_fine_tune_type",
-            "_property_types": {
-                "id": "string",
-                "status": "string",
-                "fine_tuned_model": {"type": "union", "members": ["none", "string"]},
-                "result_file": {
-                    "type": "union",
-                    "members": [
-                        "none",
-                        {
-                            "type": "gpt3_fine_tune_results_type",
-                            "_property_types": {
-                                "bytes": "int",
-                                "created_at": "int",
-                                "filename": "string",
-                                "id": "string",
-                                "object": "string",
-                                "purpose": {
-                                    "type": "const",
-                                    "valType": "string",
-                                    "val": "fine-tune-results",
-                                },
-                                "status": "string",
-                                "status_details": "none",
-                            },
-                        },
-                    ],
-                },
-            },
-        },
-        "_property_types": {
+            "_is_object": True,
             "id": "string",
-            "op_name": "string",
-            "state": {
+            "status": "string",
+            "fine_tuned_model": {"type": "union", "members": ["none", "string"]},
+            "result_file": {
                 "type": "union",
                 "members": [
-                    {"type": "const", "valType": "string", "val": "pending"},
-                    {"type": "const", "valType": "string", "val": "running"},
-                    {"type": "const", "valType": "string", "val": "finished"},
-                    {"type": "const", "valType": "string", "val": "failed"},
+                    "none",
+                    {
+                        "type": "gpt3_fine_tune_results_type",
+                        "_is_object": True,
+                        "_base_type": {
+                            "type": "openai_stored_file",
+                            "_is_object": True,
+                            "bytes": "int",
+                            "created_at": "int",
+                            "filename": "string",
+                            "id": "string",
+                            "object": "string",
+                            "purpose": "string",
+                            "status": "string",
+                            "status_details": "none",
+                        },
+                        "bytes": "int",
+                        "created_at": "int",
+                        "filename": "string",
+                        "id": "string",
+                        "object": "string",
+                        "purpose": {
+                            "type": "const",
+                            "valType": "string",
+                            "val": "fine-tune-results",
+                        },
+                        "status": "string",
+                        "status_details": "none",
+                    },
                 ],
-            },
-            "prints": {"type": "list", "objectType": "string"},
-            "inputs": {"type": "typedDict", "propertyTypes": {}},
-            "history": {"type": "list", "objectType": "any"},
-            "output": {
-                "type": "gpt3_fine_tune_type",
-                "_property_types": {
-                    "id": "string",
-                    "status": "string",
-                    "fine_tuned_model": {
-                        "type": "union",
-                        "members": ["none", "string"],
-                    },
-                    "result_file": {
-                        "type": "union",
-                        "members": [
-                            "none",
-                            {
-                                "type": "gpt3_fine_tune_results_type",
-                                "_property_types": {
-                                    "bytes": "int",
-                                    "created_at": "int",
-                                    "filename": "string",
-                                    "id": "string",
-                                    "object": "string",
-                                    "purpose": {
-                                        "type": "const",
-                                        "valType": "string",
-                                        "val": "fine-tune-results",
-                                    },
-                                    "status": "string",
-                                    "status_details": "none",
-                                },
-                            },
-                        ],
-                    },
-                },
             },
         },
     },
@@ -174,7 +126,21 @@ actual_SHOW_PARAMS_FINE_TUNE_WEAVE_NODE = {
         "inputs": {
             "training_dataset": {
                 "nodeType": "output",
-                "type": {"type": "LocalArtifactRef"},
+                "type": {
+                    "type": "LocalArtifactRef",
+                    "_base_type": {"type": "Ref", "objectType": "unknown"},
+                    "objectType": {
+                        "type": "list",
+                        "objectType": {
+                            "type": "typedDict",
+                            "propertyTypes": {
+                                "id": "int",
+                                "prompt": "string",
+                                "completion": "string",
+                            },
+                        },
+                    },
+                },
                 "fromOp": {
                     "name": "get",
                     "inputs": {
@@ -216,23 +182,24 @@ def test_large_const_node():
 
     model = openai.Gpt3FineTune.model(fine_tune)
     panel = panels.Table(["1 + 9 =", "2 + 14 ="])
-    panel.append_column(lambda row: row)
-    panel.append_column(lambda row: model.complete(row)["choices"][0]["text"])
+    panel.config.tableState.add_column(lambda row: row)
+    panel.config.tableState.add_column(
+        lambda row: model.complete(row)["choices"][0]["text"]
+    )
     show_panel_params = _show_params(panel)
+    panel_params = weave.use(show_panel_params["weave_node"])
 
     # Ensure that we sent the dataset as a get(<ref>) rather than as a const list
     # (this behavior is currently implemented in graph.py:ConstNode)
-    panel_config = show_panel_params["panel_config"]
-    table_state = panel_config["tableState"]
-    col_select_fns = table_state["columnSelectFunctions"]
+    panel_config = panel_params.config
+    table_state = panel_config.tableState
+    col_select_fns = table_state.columnSelectFunctions
     col_sel_fn2 = list(col_select_fns.values())[1]
-    assert "list/" in json.dumps(col_sel_fn2)
-
-    col_sel_fn2_node = graph.Node.node_from_json(col_sel_fn2)
+    assert "list/" in graph.node_expr_str(col_sel_fn2)
 
     # Asserting that weavejs_fixes.remove_opcall_versions_data works
     assert (
-        graph.node_expr_str(col_sel_fn2_node)
-        == 'get("local-artifact://%s/list/4cf1abf0d040d897276e4be3c6aa90df").finetune_gpt3({"n_epochs": 2}).model().complete(row).pick("choices").index(0).pick("text")'
+        graph.node_expr_str(col_sel_fn2)
+        == 'get("local-artifact://%s/list/4cf1abf0d040d897276e4be3c6aa90df").finetune_gpt3({"n_epochs": 2}).model().complete(row)["choices"][0]["text"]'
         % artifacts_local.local_artifact_dir()
     )

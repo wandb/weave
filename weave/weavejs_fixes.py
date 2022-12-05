@@ -8,9 +8,11 @@ import copy
 
 from . import weave_types
 from . import graph
+from . import weave_types
+from . import errors
 
 
-def convert_specific_opname_to_generic_opname(
+def _convert_specific_opname_to_generic_opname(
     name: str, inputs: dict[str, typing.Any]
 ) -> tuple[str, dict[str, typing.Any]]:
     if name == "typedDict-pick" or name == "dict-pick" or name == "list-pick":
@@ -23,16 +25,33 @@ def convert_specific_opname_to_generic_opname(
         return "count", {"arr": inputs["self"]}
     elif name == "groupresult-key":
         return "group-groupkey", {"obj": inputs["self"]}
+    elif name == "list-map":
+        return "map", {"arr": inputs["self"], "mapFn": inputs["map_fn"]}
+    elif name == "list-groupby":
+        return "groupby", {"arr": inputs["self"], "groupByFn": inputs["group_by_fn"]}
     elif name == "list-filter":
         return "filter", {"arr": inputs["self"], "filterFn": inputs["filter_fn"]}
+    elif name == "list-__getitem__":
+        return "index", {"arr": inputs["arr"], "index": inputs["index"]}
     elif (
-        name == "list-__getitem__"
-        or name == "groupresult-__getitem__"
+        name == "groupresult-__getitem__"
         or name == "artifacts-__getitem__"
         or name == "projectArtifactVersions-__getitem__"
     ):
         return "index", {"arr": inputs["self"], "index": inputs["index"]}
     return name, inputs
+
+
+def convert_specific_opname_to_generic_opname(
+    name: str, inputs: dict[str, typing.Any]
+) -> tuple[str, dict[str, typing.Any]]:
+    if name.startswith("mapped_"):
+        unmapped_name = name[7:]
+        res = _convert_specific_opname_to_generic_opname(unmapped_name, inputs)
+        if res[0] == unmapped_name:
+            raise errors.WeaveInternalError("Unable to fix up op: " + name)
+        return res
+    return _convert_specific_opname_to_generic_opname(name, inputs)
 
 
 def convert_specific_ops_to_generic_ops_node(node: graph.Node) -> graph.Node:

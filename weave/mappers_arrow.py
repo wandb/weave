@@ -10,6 +10,7 @@ from . import weave_types as types
 from . import refs
 from . import errors
 from . import node_ref
+from .language_features.tagging import tagged_value_type
 
 
 class TypedDictToArrowStruct(mappers_python.TypedDictToPyDict):
@@ -31,20 +32,33 @@ class ObjectToArrowStruct(mappers_python.ObjectToPyDict):
         return pa.struct(fields)
 
 
+class TaggedValueToArrowStruct(tagged_value_type.TaggedValueToPy):
+    def result_type(self):
+        return pa.struct(
+            [
+                arrow_util.arrow_field("_tag", self._tag_serializer.result_type()),
+                arrow_util.arrow_field("_value", self._value_serializer.result_type()),
+            ]
+        )
+
+
 class ListToArrowArr(mappers_python.ListToPyList):
     def result_type(self):
         return pa.list_(arrow_util.arrow_field("x", self._object_type.result_type()))
 
 
 class UnionToArrowUnion(mappers_weave.UnionMapper):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        non_none_members = [
+    @property
+    def non_none_members(self):
+        return [
             m for m in self._member_mappers if not isinstance(m.type, types.NoneType)
         ]
-        if len(non_none_members) != 1:
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if len(self.non_none_members) != 1:
             raise errors.WeaveInternalError("Unions not yet supported in Weave arrow")
-        self._member_mapper = non_none_members[0]
+        self._member_mapper = self.non_none_members[0]
 
     def result_type(self):
         nullable = False
@@ -62,6 +76,10 @@ class UnionToArrowUnion(mappers_weave.UnionMapper):
         return arrow_util.arrow_type_with_nullable(non_null_mappers[0].result_type())
 
     def apply(self, obj):
+        if len(self.non_none_members) != 1:
+            raise errors.WeaveInternalError("Unions not yet supported in Weave arrow")
+        if obj is None:
+            return None
         return self._member_mapper.apply(obj)
 
 
@@ -207,6 +225,8 @@ def map_to_arrow_(type, mapper, artifact, path=[]):
         return UnionToArrowUnion(type, mapper, artifact, path)
     elif isinstance(type, types.ObjectType):
         return ObjectToArrowStruct(type, mapper, artifact, path)
+    elif isinstance(type, tagged_value_type.TaggedValueType):
+        return TaggedValueToArrowStruct(type, mapper, artifact, path)
     elif isinstance(type, types.Int):
         return IntToArrowInt(type, mapper, artifact, path)
     elif isinstance(type, types.Boolean):
@@ -234,6 +254,8 @@ def map_from_arrow_(type, mapper, artifact, path=[]):
         return ArrowUnionToUnion(type, mapper, artifact, path)
     elif isinstance(type, types.ObjectType):
         return mappers_python.ObjectDictToObject(type, mapper, artifact, path)
+    elif isinstance(type, tagged_value_type.TaggedValueType):
+        return tagged_value_type.TaggedValueFromPy(type, mapper, artifact, path)
     elif isinstance(type, types.Int):
         return mappers_python.IntToPyInt(type, mapper, artifact, path)
     elif isinstance(type, types.Boolean):

@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 import typing
 from . import weave_types as types
+from . import debug_types
 
 BT = typing.TypeVar("BT")
 
@@ -27,9 +28,14 @@ class OpArgs:
         else:
             return OpVarArgs(types.TypeRegistry.type_from_dict(_type))
 
-    def assign_param_dict(
-        _self, param_types: dict[str, types.Type]
-    ) -> dict[str, types.Type]:
+    def params_are_valid(_self, param_types: dict[str, types.Type]) -> bool:
+        """Attempts to assign the given param types to the op args. Returns the
+        dictionary of assignment results"""
+        raise NotImplementedError()
+
+    def why_are_params_invalid(
+        self, param_dict: dict[str, types.Type]
+    ) -> typing.Optional[str]:
         """Attempts to assign the given param types to the op args. Returns the
         dictionary of assignment results"""
         raise NotImplementedError()
@@ -44,14 +50,6 @@ class OpArgs:
         raise NotImplementedError()
 
 
-def assign_param_type_result(
-    param_type: types.Type, arg_type: types.Type
-) -> types.Type:
-    if not arg_type.assign_type(param_type):
-        return types.Invalid()
-    return param_type
-
-
 class OpVarArgs(OpArgs):
     kind = OpArgs.VAR_ARGS
 
@@ -64,13 +62,8 @@ class OpVarArgs(OpArgs):
     def to_dict(self) -> typing.Union[str, dict]:
         return self.arg_type.to_dict()
 
-    def assign_param_dict(
-        _self, param_types: dict[str, types.Type]
-    ) -> dict[str, types.Type]:
-        return {
-            k: assign_param_type_result(v, _self.arg_type)
-            for k, v in param_types.items()
-        }
+    def params_are_valid(self, param_types: dict[str, types.Type]) -> bool:
+        return all(self.arg_type.assign_type(t) for t in param_types.values())
 
     def named_args(self) -> typing.List["NamedArg"]:
         return []
@@ -109,25 +102,48 @@ class OpNamedArgs(OpArgs):
                 arg_types[key] = val
         return {key: val.to_dict() for key, val in arg_types.items()}
 
-    def assign_param_dict(
-        self, param_dict: dict[str, types.Type]
-    ) -> dict[str, types.Type]:
-        res: dict[str, types.Type] = {}
-        has_invalid = False
-        for arg_name, arg_type in self.arg_types.items():
-            if callable(arg_type):
-                if has_invalid:
-                    arg_type = types.Invalid()
-                else:
-                    arg_type = arg_type(res)
-            if arg_name not in param_dict:
-                arg_type = types.Invalid()
+    @property
+    def initial_arg_types(self) -> dict[str, types.Type]:
+        """Returns argument types with functional types resolved"""
+        t: dict[str, types.Type] = {}
+        for k, v in self.arg_types.items():
+            if callable(v):
+                t[k] = v(t)
             else:
-                arg_type = assign_param_type_result(param_dict[arg_name], arg_type)
-            res[arg_name] = arg_type
-            if isinstance(arg_type, types.Invalid):
-                has_invalid = True
-        return res
+                t[k] = v
+        return t
+
+    def params_are_valid(self, param_dict: dict[str, types.Type]) -> bool:
+        valid_params: dict[str, types.Type] = {}
+        for k, t in self.arg_types.items():
+            if k not in param_dict:
+                return False
+            if callable(t):
+                t = t(valid_params)
+            if not t.assign_type(param_dict[k]):
+                return False
+            valid_params[k] = t
+        return True
+
+    def why_are_params_invalid(
+        self, param_dict: dict[str, types.Type]
+    ) -> typing.Optional[str]:
+        valid_params: dict[str, types.Type] = {}
+        reasons: list[str] = []
+        for k, t in self.arg_types.items():
+            if k not in param_dict:
+                reasons.append(f"Missing parameter {k}")
+                continue
+            if callable(t):
+                t = t(valid_params)
+            if not t.assign_type(param_dict[k]):
+                reasons.append(
+                    f'Parameter "{k}" has invalid type\n{debug_types.why_not_assignable(t, param_dict[k])}'
+                )
+            valid_params[k] = t
+        if reasons:
+            return "\n".join(reasons)
+        return None
 
     def named_args(self) -> typing.List["NamedArg"]:
         return [NamedArg(k, v) for k, v in self.arg_types.items()]
@@ -162,7 +178,3 @@ class OpNamedArgs(OpArgs):
 class NamedArg:
     name: str
     type: types.Type
-
-
-def all_types_valid(param_types: dict[str, types.Type]) -> bool:
-    return all([v != types.Invalid() for v in param_types.values()])

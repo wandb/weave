@@ -1,6 +1,8 @@
 import os
+
 from .. import api as weave
 from .. import weave_types as types
+from ..ops_primitives import file_local
 from ..ops_primitives import file as weave_file
 from .. import artifacts_local
 from .. import refs
@@ -46,19 +48,19 @@ class ArtifactVersionDirType(types.ObjectType):
             "fullPath": types.String(),
             "size": types.Int(),
             "dirs": types.Dict(
-                types.String(), types.SubDirType(ArtifactVersionFileType())
+                types.String(), types.SubDirType(refs.ArtifactVersionFileType())
             ),
-            "files": types.Dict(types.String(), ArtifactVersionFileType()),
+            "files": types.Dict(types.String(), refs.ArtifactVersionFileType()),
         }
 
 
 @weave.weave_class(weave_type=ArtifactVersionDirType)
 class ArtifactVersionDir(weave_file.Dir):
     def _path_return_type(self, path):
-        return path_type(os.path.join(self.fullPath, path))
+        return file_local.path_type(os.path.join(self.fullPath, path))
 
     def _path(self, path):
-        return open_(os.path.join(self.fullPath, path))
+        return file_local.open_(os.path.join(self.fullPath, path))
 
 
 ArtifactVersionDirType.instance_classes = ArtifactVersionDir

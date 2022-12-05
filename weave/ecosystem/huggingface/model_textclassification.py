@@ -12,12 +12,10 @@ from . import hfmodel
 
 
 class HFModelTextClassificationType(hfmodel.HFModelType):
-    _base_type = hfmodel.HFModelType()
+    pass
 
 
-class FullTextClassificationPipelineOutputType(weave.types.ObjectType):
-    _base_type = hfmodel.FullPipelineOutputType()
-
+class FullTextClassificationPipelineOutputType(hfmodel.FullPipelineOutputType):
     def property_types(self):
         return {
             "_model": HFModelTextClassificationType(),
@@ -111,13 +109,13 @@ FullTextClassificationPipelineOutputType.instance_classes = (
 @weave.op()
 def full_text_classification_output_render(
     output_node: weave.Node[FullTextClassificationPipelineOutput],
-) -> weave.panels.Group:
+) -> weave.panels.Group2:
     output = typing.cast(FullTextClassificationPipelineOutput, output_node)
-    return weave.panels.Group(
-        prefer_horizontal=True,
-        items=[
-            weave.panels.LabeledItem(label="input", item=output.model_input),
-            weave.panels.LabeledItem(
+    return weave.panels.Group2(
+        preferHorizontal=True,
+        items={
+            "input": weave.panels.LabeledItem(label="input", item=output.model_input),
+            "output": weave.panels.LabeledItem(
                 label="output",
                 item=weave.panels.Plot(
                     input_node=typing.cast(weave.Node, output.model_output),
@@ -125,7 +123,7 @@ def full_text_classification_output_render(
                     y=lambda class_score: class_score["label"],
                 ),
             ),
-        ],
+        },
     )
 
 
@@ -134,17 +132,17 @@ def full_text_classification_output_render(
 class HFModelTextClassification(hfmodel.HFModel):
     @weave.op()
     def pipeline(
-        self, return_all_scores: bool = True
+        self,
     ) -> transformers.pipelines.text_classification.TextClassificationPipeline:
         return transformers.pipeline(
             self._pipeline_tag,
             model=self._id,
-            return_all_scores=return_all_scores,
+            return_all_scores=True,
         )
 
     @weave.op()
     def call(self, input: str) -> FullTextClassificationPipelineOutput:
-        output = weave.use(self.pipeline(True))(input)
+        output = weave.use(self.pipeline())(input)
         return FullTextClassificationPipelineOutput(self, input, output)
 
     def _call_list(

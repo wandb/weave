@@ -1,4 +1,6 @@
 import pytest
+
+from weave.ops_primitives import list_
 from .. import graph
 from ..weave_internal import make_const_node
 from .. import weave_types as types
@@ -7,12 +9,13 @@ from .. import ops
 from .. import serialize
 from .. import registry_mem
 from .. import op_args
+import weave
 
 
-def test_serialize():
+def test_serialize(fake_wandb):
     proj = ops.project("shawn", "show-test")
-    av = proj.artifact_version("show", "v14")
-    file = av.path("obj.table.json")
+    av = proj.artifactVersion("show", "v14")
+    file = av.file("test_results.table.json")
     table = file.table()
     rows = table.rows()
     filter_fn = api.define_fn(
@@ -43,6 +46,7 @@ def test_serialize_nested_function():
     assert ser == ser2
 
 
+@pytest.mark.skip(reason="we allow this now")
 def test_op_compat():
     ops = registry_mem.memory_registry.list_ops()
     issues = []
@@ -97,13 +101,13 @@ def test_op_compat():
 @pytest.mark.parametrize(
     "val_type, val",
     [
-        # Case 1: ConstNode, no const type, normal val
+        # Case 0: ConstNode, no const type, normal val
         (types.String(), "hello"),
-        # Case 2: ConstNode, no const type, type val
+        # Case 1: ConstNode, no const type, type val
         (types.Type(), types.String()),
-        # Case 3: ConstNode, const type, normal val
+        # Case 2: ConstNode, const type, normal val
         (types.Const(types.String(), "hello"), "hello"),
-        # Case 4: ConstNode, const type, type val
+        # Case 3: ConstNode, const type, type val
         (types.Const(types.Type(), types.String()), types.String()),
     ],
 )
@@ -112,3 +116,11 @@ def test_const_node_serialize(val_type, val):
     node = graph.Node.node_from_json(node.to_json())
     assert node.type == val_type
     assert node.val == val
+
+
+def test_union_dicts():
+    nodeA = make_const_node(types.TypedDict({"a": types.Int()}), {"a": 1})
+    nodeB = make_const_node(types.TypedDict({"b": types.Int()}), {"b": 1})
+    nodeC = list_.make_list(a=nodeA, b=nodeB)
+    nodeD = nodeC["a"]
+    assert weave.use(nodeD) == [1, None]

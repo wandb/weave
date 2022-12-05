@@ -5,6 +5,8 @@ from .. import weave_types as types
 from . import list_
 from . import dict
 from . import number
+from ..tests import weavejs_ops
+from ..language_features.tagging import make_tag_getter_op, tag_store, tagged_value_type
 
 
 def test_unnest():
@@ -27,7 +29,7 @@ def test_op_list():
 def test_typeof_groupresult():
     assert types.TypeRegistry.type_of(
         list_.GroupResult([1, 2, 3], "a")
-    ) == list_.GroupResultType(types.Int(), types.String())
+    ) == list_.GroupResultType(types.List(types.Int()), types.String())
 
 
 def test_sequence1():
@@ -52,11 +54,11 @@ def test_sequence1():
             }
         ),
     )
-    res = list_.WeaveJSListInterface.groupby(saved, groupby1_fn)
+    res = weavejs_ops.groupby(saved, groupby1_fn)
 
     # Input to PanelPlot
     map1_fn = weave.define_fn({"row": res.type.object_type}, lambda row: row)
-    res = list_.WeaveJSListInterface.map(res, map1_fn)
+    res = weavejs_ops.map(res, map1_fn)
 
     inner_groupby_fn = weave.define_fn(
         {"row": res.type.object_type.object_type},
@@ -67,16 +69,18 @@ def test_sequence1():
         lambda row: row.groupby(inner_groupby_fn).map(
             weave.define_fn(
                 {
-                    "row": list_.GroupResultType(
-                        res.type.object_type.object_type,
-                        types.TypedDict({"y": types.String()}),
+                    "row": tagged_value_type.TaggedValueType(
+                        types.TypedDict(
+                            {"groupKey": types.TypedDict({"y": types.String()})}
+                        ),
+                        res.type.object_type,
                     )
                 },
-                lambda row: row.key()["y"],
+                lambda row: row.groupkey()["y"],
             )
         ),
     )
-    res = list_.WeaveJSListInterface.map(res, map2_fn)
+    res = weavejs_ops.map(res, map2_fn)
     res = list_.flatten(res)
     res = list_.unique(res)
     assert list(weave.use(res)) == ["x", "y"]

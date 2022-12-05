@@ -38,6 +38,7 @@ class ObjectMapper(mappers.Mapper):
 
 class ListMapper(mappers.Mapper):
     def __init__(self, type_, mapper, artifact, path=[]):
+        self.type = type_
         self._object_type = mapper(type_.object_type, artifact, path=path)
 
 
@@ -57,4 +58,4 @@ class RefMapper(mappers.Mapper):
 class ConstMapper(mappers.Mapper):
     def __init__(self, type_, mapper, artifact, path):
         self._type = type_
-        self._val_type = mapper(type_.val_type, artifact, path=path)
+        self._val_mapper = mapper(type_.val_type, artifact, path=path)

@@ -21,6 +21,7 @@ from . import weave_types as types
 # Ops
 from . import registry_mem
 from . import op_def
+from . import op_args
 
 # Trace / cache
 from . import trace_local
@@ -121,8 +122,11 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
                 ):
                     report = execute_forward_node(fg, forward_node, no_cache=no_cache)
             except:
-                logging.error(
-                    "Exception during execution of: %s" % str(forward_node.node)
+                import traceback
+
+                logging.info(
+                    "Exception during execution of: %s\n%s"
+                    % (str(forward_node.node), traceback.format_exc())
                 )
                 raise
             finally:
@@ -204,105 +208,113 @@ def execute_forward_node(
 
     logging.debug("Executing node: %s" % node)
 
-    op_def = registry_mem.memory_registry.get_op(node.from_op.name)
-    input_nodes = node.from_op.inputs
+    tracer = engine_trace.tracer()
 
-    # disable caching if op is in the cache disallowlist
-    use_cache &= op_def.name not in CACHE_DISALLOWLIST
+    with tracer.trace("execute-read-cache"):
+        op_def = registry_mem.memory_registry.get_op(node.from_op.name)
+        input_nodes = node.from_op.inputs
 
-    input_refs: dict[str, refs.Ref] = {}
-    for input_name, input_node in input_nodes.items():
-        input_refs[input_name] = fg.get_result(input_node)
+        # disable caching if op is in the cache disallowlist
+        use_cache &= op_def.name not in CACHE_DISALLOWLIST
 
-    if use_cache or op_def.is_async:
-        # Compute the run ID, which is deterministic if the op is pure
-        run_id = trace_local.make_run_id(op_def, input_refs)
+        input_refs: dict[str, refs.Ref] = {}
+        for input_name, input_node in input_nodes.items():
+            input_refs[input_name] = fg.get_result(input_node)
 
-    if use_cache and op_def.pure:
-        run = TRACE_LOCAL.get_run(run_id)
-        if run is not None:
-            logging.debug("Cache hit, returning")
-            # Watch out, we handle loading async runs in different ways.
-            if op_def.is_async:
-                forward_node.set_result(run)
-                return {"cache_used": use_cache}
-            else:
-                if run.output is not None:
-                    # if isinstance(run._output, artifacts_local.LocalArtifact):
-                    #     print('OUTPUT REF TYPE OBJ TYPE', )
-                    # This `refs.deref(run.output)` a critical call, even though
-                    # the output is not used. This call ensures that the output
-                    # is loaded, which in turn materializes the tags at the
-                    # currect context scope. Without this call, the first child
-                    # of this node will perform the derefing, which will result
-                    # in the tags being added the the scope of the child. If
-                    # more than 1 direct child exists, the next children will
-                    # not have the tags in their scope.
-                    refs.deref(run.output)
-                    forward_node.set_result(run.output)
+        if use_cache or op_def.is_async:
+            # Compute the run ID, which is deterministic if the op is pure
+            run_id = trace_local.make_run_id(op_def, input_refs)
+
+        if use_cache and op_def.pure:
+            run = TRACE_LOCAL.get_run(run_id)
+            if run is not None:
+                logging.debug("Cache hit, returning")
+                # Watch out, we handle loading async runs in different ways.
+                if op_def.is_async:
+                    forward_node.set_result(run)
                     return {"cache_used": use_cache}
-            logging.debug("Actually nevermind, didnt return")
-            # otherwise, the run's output was not saveable, so we need
-            # to recompute it.
-    inputs = {input_name: refs.deref(input) for input_name, input in input_refs.items()}
+                else:
+                    if run.output is not None:
+                        # if isinstance(run._output, artifacts_local.LocalArtifact):
+                        #     print('OUTPUT REF TYPE OBJ TYPE', )
+                        # This `refs.deref(run.output)` a critical call, even though
+                        # the output is not used. This call ensures that the output
+                        # is loaded, which in turn materializes the tags at the
+                        # currect context scope. Without this call, the first child
+                        # of this node will perform the derefing, which will result
+                        # in the tags being added the the scope of the child. If
+                        # more than 1 direct child exists, the next children will
+                        # not have the tags in their scope.
+                        refs.deref(run.output)
+                        forward_node.set_result(run.output)
+                        return {"cache_used": use_cache}
+                logging.debug("Actually nevermind, didnt return")
+                # otherwise, the run's output was not saveable, so we need
+                # to recompute it.
+        inputs = {
+            input_name: refs.deref(input) for input_name, input in input_refs.items()
+        }
 
     if op_def.is_async:
-        logging.debug("Executing async op")
-        input_refs = {}
-        for input_name, input in inputs.items():
-            ref = refs.get_ref(input)
-            if ref is None:
-                ref = TRACE_LOCAL.save_object(input)
-            input_refs[input_name] = ref
-        run = TRACE_LOCAL.new_run(run_id, op_def.name)
-        run.inputs = input_refs
-        run.save()
+        with tracer.trace("execute-async"):
+            logging.debug("Executing async op")
+            input_refs = {}
+            for input_name, input in inputs.items():
+                ref = refs.get_ref(input)
+                if ref is None:
+                    ref = TRACE_LOCAL.save_object(input)
+                input_refs[input_name] = ref
+            run = TRACE_LOCAL.new_run(run_id, op_def.name)
+            run.inputs = input_refs
+            run.save()
 
-        execute_async_op(op_def, input_refs, run_id)
-        forward_node.set_result(run)
+            execute_async_op(op_def, input_refs, run_id)
+            forward_node.set_result(run)
     else:
         logging.debug("Executing sync op")
-        if language_nullability.should_force_none_result(inputs, op_def):
-            result = None
-        else:
-            result = execute_sync_op(op_def, inputs)
+        with tracer.trace("execute-sync"):
+            if language_nullability.should_force_none_result(inputs, op_def):
+                result = None
+            else:
+                result = execute_sync_op(op_def, inputs)
 
-        ref = refs.get_ref(result)
-        if ref is not None:
-            logging.debug("Op resulted in ref")
-            # If the op produced an object which has a ref (as in the case of get())
-            # the result is the ref. This enables memoization after impure ops. E.g.
-            # if get('x:latest') produces version x:1, we use x:1 for our make_run_id
-            # calculation
-            result = ref
-        else:
-            if use_cache:
-                logging.debug("Saving result")
-                # If an op is impure, its output is saved to a name that does not
-                # include run ID. This means consuming pure runs will hit cache if
-                # the output of an impure op is the same as it was last time.
-                # However that also means we can traceback through impure ops if we want
-                # to see the actual query that run for a given object.
-                # TODO: revisit this behavior
-                output_name = None
-                if op_def.pure:
-                    output_name = "run-%s-output" % run_id
-                result = TRACE_LOCAL.save_object(result, name=output_name)
+        with tracer.trace("execute-write-cache"):
+            ref = refs.get_ref(result)
+            if ref is not None:
+                logging.debug("Op resulted in ref")
+                # If the op produced an object which has a ref (as in the case of get())
+                # the result is the ref. This enables memoization after impure ops. E.g.
+                # if get('x:latest') produces version x:1, we use x:1 for our make_run_id
+                # calculation
+                result = ref
+            else:
+                if use_cache:
+                    logging.debug("Saving result")
+                    # If an op is impure, its output is saved to a name that does not
+                    # include run ID. This means consuming pure runs will hit cache if
+                    # the output of an impure op is the same as it was last time.
+                    # However that also means we can traceback through impure ops if we want
+                    # to see the actual query that run for a given object.
+                    # TODO: revisit this behavior
+                    output_name = None
+                    if op_def.pure:
+                        output_name = "run-%s-output" % run_id
+                    result = TRACE_LOCAL.save_object(result, name=output_name)
 
-        forward_node.set_result(result)
+            forward_node.set_result(result)
 
-        # Don't save run ops as runs themselves.
-        # TODO: This actually should work correctly, but mutation tracing
-        #    does not really work yet. (mutated objects set their run output
-        #    as the original ref rather than the new ref, which causes problems)
-        if use_cache and not is_run_op(node.from_op):
-            logging.debug("Saving run")
-            try:
-                run = TRACE_LOCAL.new_run(run_id, op_def.name)
-                run.inputs = input_refs
-                run.output = result
-                run.save()
-            except errors.WeaveSerializeError:
-                pass
-        logging.debug("Done executing node: %s" % node)
+            # Don't save run ops as runs themselves.
+            # TODO: This actually should work correctly, but mutation tracing
+            #    does not really work yet. (mutated objects set their run output
+            #    as the original ref rather than the new ref, which causes problems)
+            if use_cache and not is_run_op(node.from_op):
+                logging.debug("Saving run")
+                try:
+                    run = TRACE_LOCAL.new_run(run_id, op_def.name)
+                    run.inputs = input_refs
+                    run.output = result
+                    run.save()
+                except errors.WeaveSerializeError:
+                    pass
+            logging.debug("Done executing node: %s" % node)
     return {"cache_used": use_cache}

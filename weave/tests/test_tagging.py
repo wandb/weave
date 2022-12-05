@@ -38,7 +38,10 @@ def test_tagged_types():
     # 3: Assert that we can use tagged values instead of raw values
     seven = add_tester(TestNumber(3), TestNumber(4))
     ten = add_tester_2(three, seven)
-    assert ten.type == tt({"a": 1, "d": 3}, TestNumber.WeaveType())
+    assert tt(
+        {"a": TestNumber.WeaveType(), "d": TestNumber.WeaveType()},
+        TestNumber.WeaveType(),
+    ).assign_type(ten.type)
     assert (
         isinstance(ten.type, tagged_value_type.TaggedValueType)
         and isinstance(

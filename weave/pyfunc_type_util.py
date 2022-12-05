@@ -13,6 +13,7 @@ def determine_input_type(
     expected_input_type: typing.Optional[
         typing.Union[op_args.OpArgs, typing.Dict[str, types.Type]]
     ] = None,
+    # TODO: I really don't like this boolean flag here.
     allow_unknowns: bool = False,
 ) -> op_args.OpArgs:
     python_input_type = _get_type_hints(pyfunc)
@@ -42,6 +43,9 @@ def determine_input_type(
         # iterate through function args in order. The function determines
         # the order of arg_types, which is relied on everywhere.
         for input_name in arg_names:
+            if input_name == "_run":
+                continue
+
             python_type = python_input_type.get(input_name)
             existing_weave_type = weave_input_type.arg_types.get(input_name)
             if python_type is not None:
@@ -66,7 +70,7 @@ def determine_input_type(
         unknown_type_args = set(
             arg_name for arg_name, at in arg_types.items() if at == types.UnknownType()
         )
-        weave_type_missing_arg_names = unknown_type_args - {"self", "_run"}
+        weave_type_missing_arg_names = unknown_type_args - {"self"}
         if weave_type_missing_arg_names and not allow_unknowns:
             raise errors.WeaveDefinitionError(
                 "Missing Weave Types for args: %s." % weave_type_missing_arg_names

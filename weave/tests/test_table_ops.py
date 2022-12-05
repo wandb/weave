@@ -7,6 +7,9 @@ from .. import ops
 from .. import storage
 from .. import context
 from .. import weave_internal
+from .. import graph
+
+from . import weavejs_ops
 
 TABLE_TYPES = ["list", "pandas", "sql"]
 
@@ -28,7 +31,7 @@ def test_count(table_type):
     table = get_test_table(table_type)
     expected = 77
     assert weave.use(table.count()) == expected
-    assert weave.use(ops.WeaveJSListInterface.count(table)) == expected
+    assert weave.use(weavejs_ops.count(table)) == expected
 
 
 @pytest.mark.parametrize("table_type", TABLE_TYPES)
@@ -53,7 +56,7 @@ def test_index(table_type):
         "rating": 68.402973,
     }
     assert weave.use(table[0]) == expected
-    assert weave.use(ops.WeaveJSListInterface.index(table, 0)) == expected
+    assert weave.use(weavejs_ops.index(table, 0)) == expected
 
 
 def js_op_pick(obj, key):
@@ -75,10 +78,9 @@ def test_pick(table_type):
 def test_filter(table_type):
     table = get_test_table(table_type)
     # Use the lambda passing convention here.
-    assert weave.use(table.filter(lambda row: row["potass"] > 280).count()) == 2
-    node = ops.WeaveJSListInterface.filter(
-        table, lambda row: row["potass"] > 280
-    ).count()
+    filter_node = table.filter(lambda row: row["potass"] > 280)
+    assert weave.use(filter_node.count()) == 2
+    node = weavejs_ops.filter(table, filter_node.from_op.inputs["filterFn"]).count()
     assert weave.use(node) == 2
 
 
@@ -115,22 +117,17 @@ def test_groupby(table_type):
         },
     ]
     grouped = table.groupby(groupby_fn)
-    assert weave.use((grouped[0].key(), grouped[0][0])) == expected
-    grouped_js = ops.WeaveJSListInterface.groupby(table, groupby_fn)
-    assert weave.use((grouped_js[0].key(), grouped_js[0][0])) == expected
+    assert weave.use((grouped[0].key, grouped[0][0])) == expected
 
 
 @pytest.mark.parametrize("table_type", ["list", "sql"])
 def test_groupby_list(table_type):
     table = get_test_table(table_type)
-    groupby_fn = weave.define_fn(
-        {"row": weave.types.TypedDict({})}, lambda row: row["type"]
-    )
-    grouped = table.groupby(groupby_fn)
+    grouped = table.groupby(lambda row: row["type"])
     group0 = grouped[0]
-    group0key = group0.key()
+    group0key = group0.groupkey()
     group00 = group0[0]
-    assert weave.use((group0key, group00)) == [
+    expected = [
         "C",
         {
             "name": "100% Bran",
@@ -151,6 +148,25 @@ def test_groupby_list(table_type):
             "rating": 68.402973,
         },
     ]
+    assert weave.use((group0key, group00)) == expected
+
+
+@pytest.mark.parametrize("table_type", ["list", "sql"])
+def test_groupby_list_weavejs_form(table_type):
+    table = get_test_table(table_type)
+    groupby_fn = weave.define_fn(
+        {"row": weave.types.TypedDict({})},
+        lambda row: graph.OutputNode(
+            types.String(),
+            "pick",
+            {"obj": row, "key": graph.ConstNode(types.String(), "type")},
+        ),
+    )
+    grouped = weavejs_ops.groupby(table, groupby_fn)
+    gr0 = weavejs_ops.index(grouped, 0)
+    gr00 = weavejs_ops.index(gr0, 0)
+    gr00name = weavejs_ops.weavejs_pick(gr00, "name")
+    assert weave.use(gr00name) == "100% Bran"
 
 
 @pytest.mark.parametrize("table_type", TABLE_TYPES)
@@ -204,11 +220,18 @@ def test_list_get_and_op():
 
     # The frontend always sends ops.Table.count() (not the same as get_node.count() right
     # now!)
-    count_node = ops.WeaveJSListInterface.count(get_node)
+    count_node = weavejs_ops.count(get_node)
     assert weave.use(count_node) == 2
 
 
 def test_list_save_and_use():
     saved = storage.save([{"a": 5, "b": 6}], "test-list")
+    get_node = ops.get(str(saved))
     with context.weavejs_client():
-        assert weave.use(ops.get(str(saved))) == [{"a": 5, "b": 6}]
+        assert weave.use(get_node) == [{"a": 5, "b": 6}]
+
+
+def test_groupby_pick():
+    items = weave.save([{"a": 5, "b": 6}, {"a": 5, "b": 8}])
+    picked = items.groupby(lambda row: row["a"])[0].pick("b")
+    assert weave.use(picked.sum() == 14)

@@ -1,11 +1,17 @@
 import os
+import shutil
 from unittest import mock
 
 import pytest
+
+from weave.box import BoxedNone
+from ..ops_primitives.list_ import list_indexCheckpoint
 from .. import api as weave
 from .. import ops as ops
-from .. import ops_domain
-from .. import wandb_api
+from ..language_features.tagging.tagged_value_type import TaggedValueType
+from ..ops_domain.wb_domain_types import Run, Project
+
+from . import weavejs_ops
 
 TEST_TABLE_ARTIFACT_PATH = "testdata/wb_artifacts/test_res_1fwmcd3q:v0"
 
@@ -15,10 +21,10 @@ TEST_TABLE_ARTIFACT_PATH = "testdata/wb_artifacts/test_res_1fwmcd3q:v0"
     [
         # Path used in weave demos
         ops.project("stacey", "mendeleev")
-        .artifact_type("test_results")
+        .artifactType("test_results")
         .artifacts()[0]
         .versions()[0]
-        .path("test_results.table.json"),
+        .file("test_results.table.json"),
         # Path used in artifact browser
         ops.project("stacey", "mendeleev")
         .artifact("test_results")
@@ -27,63 +33,7 @@ TEST_TABLE_ARTIFACT_PATH = "testdata/wb_artifacts/test_res_1fwmcd3q:v0"
         .file("test_results.table.json"),
     ],
 )
-def test_table_call(table_file_node):
-    class FakeProject:
-        entity = "stacey"
-        name = "mendeleev"
-
-    class FakeEntry:
-        pass
-
-    class FakeManifest:
-        entries = {"fakePath": FakeEntry()}
-
-        get_entry_by_path = mock.Mock(return_value=FakeEntry())
-
-    class FakePath:
-        def __init__(self, path):
-            self.path = path
-
-        def download(self):
-            return self.path
-
-    class FakeVersion:
-        entity = "stacey"
-        project = "mendeleev"
-        _sequence_name = "test_res_1fwmcd3q"
-        version = "v0"
-
-        manifest = FakeManifest()
-
-        def get_path(self, path):
-            return FakePath(os.path.join(TEST_TABLE_ARTIFACT_PATH, path))
-
-    class FakeVersions:
-        __getitem__ = mock.Mock(return_value=FakeVersion())
-
-    class FakeArtifact:
-        versions = mock.Mock(return_value=FakeVersions())
-
-    class FakeArtifacts:
-        __getitem__ = mock.Mock(return_value=FakeArtifact())
-
-    class FakeArtifactType:
-        # "collections" should be called "artifacts" in the wandb API
-        collections = mock.Mock(return_value=FakeArtifacts())
-
-    class FakeApi:
-        project = mock.Mock(return_value=FakeProject())
-        artifact_type = mock.Mock(return_value=FakeArtifactType())
-        artifact = mock.Mock(return_value=FakeVersion())
-
-    fake_api = FakeApi()
-
-    def wandb_public_api():
-        return fake_api
-
-    ops_domain.wandb_public_api = wandb_public_api
-    wandb_api.wandb_public_api = wandb_public_api
-
+def test_table_call(table_file_node, fake_wandb):
     table_image0_node = table_file_node.table().rows()[0]["image"]
     table_image0 = weave.use(table_image0_node)
     assert table_image0.height == 299
@@ -93,8 +43,8 @@ def test_table_call(table_file_node):
     # artifactVersion is not currently callable on image node as a method.
     # TODO: fix
     image0_url_node = (
-        ops.wbartifact.artifactVersion(table_image0_node)
-        .path(
+        ops.wbmedia.artifactVersion(table_image0_node)
+        .file(
             "wandb-artifact://stacey/mendeleev/test_res_1fwmcd3q:v0?file=media%2Fimages%2F8f65e54dc684f7675aec.png"
         )
         .direct_url_as_of(1654358491562)
@@ -103,3 +53,104 @@ def test_table_call(table_file_node):
     assert image0_url.endswith(
         "testdata/wb_artifacts/test_res_1fwmcd3q_v0/media/images/8f65e54dc684f7675aec.png"
     )
+
+
+def test_avfile_type():
+    f = (
+        ops.project("stacey", "mendeleev")
+        .artifactType("test_results")
+        .artifacts()[0]
+        .versions()[0]
+        .file("test_results.table.json")
+    )
+    t = weavejs_ops.file_type(f)
+    # TODO: totally weird that this is a dict and not a string.
+    assert weave.use(t) == {
+        "type": "file",
+        "extension": "json",
+        "wbObjectType": {"type": "table"},
+    }
+
+
+def test_table_col_order_and_unknown_types(fake_wandb):
+    node = (
+        ops.project("stacey", "mendeleev")
+        .artifactType("test_results")
+        .artifacts()[0]
+        .versions()[0]
+        .file("weird_table.table.json")
+        .table()
+    )
+    assert weave.use(node.rows()[0]["c"]) == 9.93
+
+
+def test_missing_file(fake_wandb):
+    node = (
+        ops.project("stacey", "mendeleev")
+        .artifactType("test_results")
+        .artifacts()[0]
+        .versions()[0]
+        .file("does_not_exist")
+    )
+    assert weave.use(node) == None
+
+
+def test_mapped_table_tags(fake_wandb):
+    cell_node = (
+        ops.project("stacey", "mendeleev")
+        .runs()
+        .limit(1)
+        .summary()["table"]
+        .table()
+        .rows()
+        .dropna()
+        .concat()
+        .createIndexCheckpointTag()[5]["score_Amphibia"]
+    )
+    assert weave.use(cell_node.indexCheckpoint()) == 5
+    assert weave.use(cell_node.run().name()) == "test_run_name"
+    assert weave.use(cell_node.project().name()) == "mendeleev"
+
+
+def test_table_tags_row_first(fake_wandb):
+    cell_node = (
+        ops.project("stacey", "mendeleev")
+        .runs()
+        .limit(1)[0]
+        .summary()["table"]
+        .table()
+        .rows()
+        .createIndexCheckpointTag()[5]["score_Amphibia"]
+    )
+    assert weave.use(cell_node.indexCheckpoint()) == 5
+    assert weave.use(cell_node.run().name()) == "test_run_name"
+    assert weave.use(cell_node.project().name()) == "mendeleev"
+
+
+def test_table_tags_column_first(fake_wandb):
+    cell_node = (
+        ops.project("stacey", "mendeleev")
+        .runs()
+        .limit(1)[0]
+        .summary()["table"]
+        .table()
+        .rows()
+        .createIndexCheckpointTag()["score_Amphibia"][5]
+    )
+    assert weave.use(cell_node.indexCheckpoint()) == 5
+    assert weave.use(cell_node.run().name()) == "test_run_name"
+    assert weave.use(cell_node.project().name()) == "mendeleev"
+
+
+def test_table_images(fake_wandb):
+    # Query 1:
+    project_node = ops.project("stacey", "mendeleev")
+    project_runs_node = project_node.runs().limit(1)
+    summary_node = project_runs_node.summary()
+    # this use is important as it models the sequence of calls in UI
+    # and invokes the issues with artifact paths
+    assert list(weave.use(summary_node)[0].keys()) == ["table"]
+
+    # Query 2:
+    table_rows_node = summary_node.pick("table").table().rows()
+    assert len(weave.use(table_rows_node)) == 1
