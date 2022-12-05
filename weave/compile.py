@@ -1,6 +1,6 @@
 import typing
 
-from .lazy import _make_output_node
+import logging
 from . import op_args
 from . import weave_types as types
 from . import graph
@@ -8,6 +8,9 @@ from . import graph_editable
 from . import registry_mem
 from . import errors
 from . import dispatch
+from . import graph_debug
+from . import plan
+from . import weave_internal
 
 # These call_* functions must match the actual op implementations.
 # But we don't want to import the op definitions themselves here, since
@@ -19,24 +22,13 @@ def call_run_await_final_output(run_node: graph.Node) -> graph.OutputNode:
     return graph.OutputNode(run_node_type.output, "run-await", {"self": run_node})
 
 
-def call_execute(function_node: graph.Node) -> graph.OutputNode:
+# We don't want to import the op definitions themselves here, since
+# those depend on the decorators, which aren't defined in the engine.
+def _call_execute(function_node: graph.Node) -> graph.OutputNode:
     function_node_type = typing.cast(types.Function, function_node.type)
     return graph.OutputNode(
         function_node_type.output_type, "execute", {"node": function_node}
     )
-
-
-def nodes_to_edit_graph(nodes: typing.List[graph.Node]) -> graph_editable.EditGraph:
-    edit_g = graph_editable.EditGraph()
-    for node in nodes:
-        edit_g.add_node(node)
-    return edit_g
-
-
-def edit_graph_to_nodes(
-    edit_g: graph_editable.EditGraph, nodes: typing.List[graph.Node]
-) -> typing.List[graph.Node]:
-    return [edit_g.get_node(n) for n in nodes]
 
 
 # Helper function to get the type of a node safely respecting constant types.
@@ -49,58 +41,42 @@ def node_type(node: graph.Node) -> types.Type:
 
 def apply_type_based_dispatch(
     edit_g: graph_editable.EditGraph,
-) -> graph_editable.EditGraph:
+) -> None:
     """
     This method is responsible for attempting to re-dispatch ops based on their
     types. This is useful to solve for mappability, JS/Py differences, or any
     case where the provided op may not be the true op needed given the provided
     types. Importantly, it does rely on paramter ordering.
     """
-    # Reverse insertion order garuntees that all parents have been processed before the children
-    for orig_node in edit_g.insertion_ordered_nodes[::-1]:
+    # Topological order guarantees that all parents have been processed before the children
+    for orig_node in edit_g.topologically_ordered_nodes:
         node = edit_g.get_node(orig_node)
         node_inputs = {k: edit_g.get_node(v) for k, v in node.from_op.inputs.items()}
-        input_types = {k: node_type(v) for k, v in node_inputs.items()}
-        found_op = dispatch.get_op_for_input_types(node.from_op.name, [], input_types)
-        if found_op is None:
-            # There is a parallel spot in lazy.py which has a similar comment
-            # This indicates that we believe there is no valid op to accept the incoming types.
-            # Before productionizing Weave, we should throw here - for now since assignability is
-            # still a bit off, we are a bit more relaxed.
-            # raise errors.WeaveInternalError(
-            #     f"Could not find op for input types {pos_param_types} for node {node.from_op.name}"
-            # )
-            continue
-
-        found_new_node = found_op.uri != node.from_op.name
-        at_least_one_parent_changed = any(
+        new_node = dispatch.dispatch_by_name_and_type(
+            node.from_op.name, [], node_inputs
+        )
+        should_replace = new_node.from_op.name != node.from_op.name or any(
             v in edit_g.replacements for v in orig_node.from_op.inputs.values()
         )
-
-        if found_new_node or at_least_one_parent_changed:
-            params = found_op.bind_params(
-                [], found_op.input_type.create_param_dict([], node_inputs)
+        if not node.type.assign_type(new_node.type):
+            logging.warning(
+                "Compile phase [dispatch] Changed output type for node %s from %s to %s. This indicates an incompability between WeaveJS and Weave Python",
+                node,
+                node.type,
+                new_node.type,
             )
-            named_param_types = {k: node_type(v) for k, v in params.items()}
-            edit_g.replace(
-                orig_node,
-                _make_output_node(
-                    found_op.uri,
-                    params,
-                    found_op.return_type_of_arg_types(named_param_types),
-                    found_op.refine_output_type,
-                ),
-            )
+            should_replace = True
 
-    return edit_g
+        if should_replace:
+            edit_g.replace(orig_node, new_node)
 
 
 def await_run_outputs_edit_graph(
     edit_g: graph_editable.EditGraph,
-) -> graph_editable.EditGraph:
+) -> None:
     """Automatically insert Run.await_final_output steps as needed."""
 
-    for edge in edit_g.edges_with_replacements:
+    for orig_edge, edge in edit_g.edges_with_replacements:
         actual_input_type = edge.output_of.type
         op_def = registry_mem.memory_registry.get_op(edge.input_to.from_op.name)
         if op_def.name == "tag-indexCheckpoint" or op_def.name == "Object-__getattr__":
@@ -137,13 +113,11 @@ def await_run_outputs_edit_graph(
                 ),
             )
 
-    return edit_g
 
-
-def execute_edit_graph(edit_g: graph_editable.EditGraph) -> graph_editable.EditGraph:
+def execute_edit_graph(edit_g: graph_editable.EditGraph) -> None:
     """In cases where an input is a Node, execute the Node"""
 
-    for edge in edit_g.edges_with_replacements:
+    for orig_edge, edge in edit_g.edges_with_replacements:
         actual_input_type = edge.output_of.type
         op_def = registry_mem.memory_registry.get_op(edge.input_to.from_op.name)
         if not isinstance(op_def.input_type, op_args.OpNamedArgs):
@@ -169,14 +143,61 @@ def execute_edit_graph(edit_g: graph_editable.EditGraph) -> graph_editable.EditG
                 )
             new_inputs = dict(edge.input_to.from_op.inputs)
 
-            new_inputs[edge.input_name] = call_execute(edge.output_of)
+            new_inputs[edge.input_name] = _call_execute(edge.output_of)
             edit_g.replace(
-                edge.input_to,
+                orig_edge.input_to,
                 graph.OutputNode(
                     edge.input_to.type, edge.input_to.from_op.name, new_inputs
                 ),
             )
-    return edit_g
+
+
+def apply_column_pushdown(
+    leaf_nodes: list[graph.Node],
+) -> list[graph.Node]:
+    # Don't try if we don't have a project-runs2
+    if not graph.filter_all_nodes(
+        leaf_nodes,
+        lambda n: isinstance(n, graph.OutputNode) and n.from_op.name == "project-runs2",
+    ):
+        return leaf_nodes
+
+    p = plan.plan(leaf_nodes)
+
+    def _replace_with_column_pushdown(node: graph.Node) -> graph.Node:
+        if isinstance(node, graph.OutputNode) and node.from_op.name == "project-runs2":
+            run_cols = plan.get_cols(p, node)
+            config_cols = list(run_cols.get("config", {}).keys())
+            summary_cols = list(run_cols.get("summary", {}).keys())
+            return graph.OutputNode(
+                node.type,
+                "project-runs2_with_columns",
+                {
+                    "project": node.from_op.inputs["project"],
+                    "config_cols": weave_internal.const(config_cols),
+                    "summary_cols": weave_internal.const(summary_cols),
+                },
+            )
+        return node
+
+    return graph.map_all_nodes(leaf_nodes, _replace_with_column_pushdown)
+
+
+def _compile_phase(
+    g: graph_editable.EditGraph,
+    phase_name: str,
+    phase_fn: typing.Callable[[graph_editable.EditGraph], None],
+):
+    phase_fn(g)
+    edit_log = g.checkpoint()
+    logging.info("Compile phase [%s] Made %s edits", phase_name, len(edit_log))
+    if edit_log:
+        loggable_nodes = graph_debug.combine_common_nodes(g.to_standard_graph())
+        logging.info(
+            "Compile phase [%s] Result nodes:\n%s",
+            phase_name,
+            "\n".join(graph_debug.node_expr_str_full(n) for n in loggable_nodes),
+        )
 
 
 def compile(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
@@ -184,20 +205,36 @@ def compile(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
     This method is used to "compile" a list of nodes. Here we can add any
     optimizations or graph rewrites
     """
+    logging.info("Starting compilation of graph with %s leaf nodes" % len(nodes))
 
     # Convert the nodes to an editable graph data structure
-    g = nodes_to_edit_graph(nodes)
+    g = graph_editable.EditGraph(nodes)
 
     # Each of the following lines is a transformation pass of the graph:
     # 1: Adjust any Op calls based on type-based dispatching
-    g = apply_type_based_dispatch(g)
+    _compile_phase(g, "dispatch", apply_type_based_dispatch)
 
     # 2: Add Await nodes for Runs
-    g = await_run_outputs_edit_graph(g)
+    _compile_phase(g, "await", await_run_outputs_edit_graph)
 
     # 3: Execute function nodes
-    g = execute_edit_graph(g)
+    _compile_phase(g, "execute", execute_edit_graph)
 
     # Reconstruct a node list that matches the original order from the transformed graph
-    n = edit_graph_to_nodes(g, nodes)
+    n = g.to_standard_graph()
+
+    loggable_nodes = graph_debug.combine_common_nodes(n)
+    logging.info(
+        "Compile phase [pre-pushdown] Result nodes:\n%s",
+        "\n".join(graph_debug.node_expr_str_full(n) for n in loggable_nodes),
+    )
+    n = apply_column_pushdown(n)
+    loggable_nodes = graph_debug.combine_common_nodes(n)
+    logging.info(
+        "Compile phase [pushdown] Result nodes:\n%s",
+        "\n".join(graph_debug.node_expr_str_full(n) for n in loggable_nodes),
+    )
+
+    logging.info("Compilation complete")
+
     return n

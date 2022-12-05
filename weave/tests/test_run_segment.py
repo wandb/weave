@@ -1,11 +1,12 @@
 import pytest
 from itertools import chain
 
-from ..ops_domain import RunSegment
-from ..ops_primitives import ArrowWeaveList
+from ..ops_domain.run_segment import RunSegment
+from ..ops_arrow import ArrowWeaveList
 from .. import ops
 from .. import storage
 from .. import api
+from .. import errors
 from .. import weave_types as types
 
 import pyarrow as pa
@@ -131,6 +132,7 @@ def test_experiment_branching(branch_frac, num_steps, num_runs):
     except ValueError:
         assert branch_frac == 0
     else:
+        storage.save(segment)
         experiment = api.use(segment.experiment())
         assert (
             len(experiment)
@@ -163,6 +165,7 @@ def test_explicit_experiment_construction(delta_step):
         4,
         random_metrics(5, 10 * delta_step, delta_step=delta_step),
     )
+    storage.save(segment2)
     experiment = api.use(segment2.experiment())
 
     assert experiment._get_col("step").to_pylist() == list(
@@ -202,6 +205,7 @@ def test_invalid_explicit_experiment_construction():
         5,
         random_metrics(5, 10),
     )
+    storage.save(segment2)
 
     with pytest.raises(ValueError):
         api.use(segment2.experiment())
@@ -312,7 +316,7 @@ def test_group_by_bins_arrow_vectorized():
     result = api.use(groupby_node)
     assert api.use(result.count()) == 9
 
-    group_key_node = result[4].key()
+    group_key_node = result[4].groupkey()
     key = api.use(group_key_node)
     assert key == {"number_bin_col_name": {"start": 130.0, "stop": 135.0}}
 

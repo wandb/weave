@@ -102,7 +102,8 @@ class MemRef(Ref):
 
     def get(self) -> typing.Any:
         if self._name not in MEM_OBJS:
-            raise errors.WeaveStorageError(f"Object {self._name} not found")
+            name = self._name  # pick name off of self for sentry logging
+            raise errors.WeaveStorageError(f"Object {name} not found")
         return MEM_OBJS[self.name]
 
     def __str__(self) -> str:
@@ -160,7 +161,12 @@ def deref(ref: Ref) -> typing.Any:
 # Instead, We probably need a WandbArtifactFileRef.
 # TODO: fix
 class ArtifactVersionFileType(types.Type):
+    _base_type = types.FileType()
+
     name = "ArtifactVersionFile"
+
+    extension = types.String()
+    wb_object_type = types.String()
 
     def save_instance(
         self,
@@ -283,8 +289,6 @@ class LocalArtifactRef(Ref):
         self.artifact = artifact
         if path is None:
             raise errors.WeaveInternalError("path must not be None")
-        if "/" in path:
-            raise errors.WeaveInternalError('"/" in path not yet supported: %s' % path)
         self.path = path
         self._type = type
         self.obj = obj
@@ -294,7 +298,11 @@ class LocalArtifactRef(Ref):
             put_ref(obj, self)
 
     def __repr__(self) -> str:
-        return f"<LocalArtifactRef({id(self)}) artifact={self.artifact} path={self.path} type={self.type} obj={bool(self.obj)} extra={self.extra}"
+        return f"<LocalArtifactRef({id(self)}) artifact={self.artifact} path={self.path} type={self.type} obj={self.obj is not None} extra={self.extra}"
+
+    @property
+    def created_at(self) -> str:
+        return self.artifact.created_at
 
     @property
     def uri(self) -> str:
@@ -314,15 +322,25 @@ class LocalArtifactRef(Ref):
     def type(self) -> types.Type:
         if self._type is not None:
             return self._type
-        # if self.path != "_obj":
-        #     raise errors.WeaveInternalError(
-        #         "Trying to load type from a non-root object. Ref should be instantiated with a type for this object: %s %s"
-        #         % (self.artifact, self.path)
-        #     )
-        with self.artifact.open(f"{self.path}.type.json") as f:
-            type_json = json.load(f)
-        self._type = types.TypeRegistry.type_from_dict(type_json)
-        return self._type
+        # First, we check to see if the path follows the `{path}.type.json` convention
+        # meaning it follows the Weave1 style:
+        type_file_path = self.artifact.path(f"{self.path}.type.json")
+        if os.path.exists(type_file_path):
+            with self.artifact.open(f"{self.path}.type.json") as f:
+                type_json = json.load(f)
+            self._type = types.TypeRegistry.type_from_dict(type_json)
+            return self._type
+        # if not, then it could just be a reference to a file itself. We
+        # check to see if the path exists and if it does, we assume it's a file
+        obj_file_path = self.artifact.path(self.path)
+        if os.path.exists(obj_file_path):
+            self._type = ArtifactVersionFileType()
+            return self._type
+
+        # If niether of those are true, then we are in an error state!
+        raise errors.WeaveMissingArtifactPathError(
+            f"Unable to find path {self.path} in artifact when trying to load type"
+        )
 
     @property
     def name(self) -> str:

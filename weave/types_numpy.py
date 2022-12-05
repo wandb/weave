@@ -47,12 +47,15 @@ class NumpyArrayType(types.Type):
 
     @classmethod
     def from_dict(cls, d):
-        return cls(np.dtype(d["dtype"]), d["shape"])
+        return cls(np.dtype(d.get("dtype", "object")), d["shape"])
 
     def _assign_type_inner(self, next_type):
         if not isinstance(next_type, NumpyArrayType):
             return False
-        if self.dtype != next_type.dtype or self.shape != next_type.shape:
+        if (
+            self.dtype != next_type.dtype
+            and next_type.dtype != np.dtype("object")  # object is like "any"
+        ) or tuple(self.shape) != tuple(next_type.shape):
             return False
         return True
 

@@ -67,17 +67,17 @@ def model_render(
         content=[
             weave.panels.CardTab(
                 name="Model Card",
-                content=weave.panels.Markdown(model.readme()),  # type: ignore
+                content=weave.panels.PanelMarkdown(model.readme()),  # type: ignore
             ),
             weave.panels.CardTab(
                 name="Metadata",
-                content=weave.panels.Group(
-                    items=[
-                        weave.panels.LabeledItem(item=model.id(), label="ID"),
-                        weave.panels.LabeledItem(
+                content=weave.panels.Group2(
+                    items={
+                        "id": weave.panels.LabeledItem(item=model.id(), label="ID"),
+                        "pipeline_tag": weave.panels.LabeledItem(
                             item=model.pipeline_tag(), label="Pipeline tag"
                         ),
-                    ]
+                    }
                 ),
             ),
             weave.panels.CardTab(

@@ -13,18 +13,147 @@ from . import uris
 from . import util
 from . import errors
 from . import wandb_api
+from . import safe_cache
+from . import context_state
 import wandb
-
-
-@functools.lru_cache(1000)
-def get_wandb_read_artifact(path):
-    return wandb_api.wandb_public_api().artifact(path)
+from wandb.apis import public as wb_public
+from wandb.util import hex_to_b64_id
 
 
 def local_artifact_dir() -> str:
-    return os.environ.get("WEAVE_LOCAL_ARTIFACT_DIR") or os.path.join(
+    # This is a directory that all local and wandb artifacts are stored within.
+    # It includes the current cache namespace, which is a safe token per user,
+    # to ensure cache separation.
+    d = os.environ.get("WEAVE_LOCAL_ARTIFACT_DIR") or os.path.join(
         "/tmp", "local-artifacts"
     )
+    cache_namespace = context_state._cache_namespace_token.get()
+    if cache_namespace:
+        d = os.path.join(d, cache_namespace)
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+@contextlib.contextmanager
+def chdir(to_dir: str):
+    curdir = os.getcwd()
+    os.chdir(to_dir)
+    try:
+        yield
+    finally:
+        os.chdir(curdir)
+
+
+@safe_cache.safe_lru_cache(1000)
+def get_wandb_read_artifact(path):
+    with chdir(wandb_artifact_dir()):
+        artifact = wandb_api.wandb_public_api().artifact(path)
+        # Can't download here, too expensive.
+        # artifact.download()
+    return artifact
+
+
+@safe_cache.safe_lru_cache(1000)
+def get_wandb_read_client_artifact(art_id: str):
+    """art_id may be client_id, or seq:alias"""
+    if ":" in art_id:
+        art_id, art_version = art_id.split(":")
+        query = wb_public.gql(
+            """	
+        query ArtifactVersionFromIdAlias(	
+            $id: ID!,	
+            $aliasName: String!	
+        ) {	
+            artifactCollection(id: $id) {	
+                id	
+                name	
+                project {	
+                    id	
+                    name	
+                    entity {	
+                        id	
+                        name	
+                    }	
+                }	
+                artifactMembership(aliasName: $aliasName) {	
+                    id	
+                    versionIndex	
+                }	
+                defaultArtifactType {	
+                    id	
+                    name	
+                }	
+            }	
+        }	
+        """
+        )
+        res = wandb_api.wandb_public_api().client.execute(
+            query,
+            variable_values={
+                "id": art_id,
+                "aliasName": art_version,
+            },
+        )
+        collection = res["artifactCollection"]
+        artifact_type_name = res["artifactCollection"]["defaultArtifactType"]["name"]
+        version_index = res["artifactCollection"]["artifactMembership"]["versionIndex"]
+    else:
+        query = wb_public.gql(
+            """	
+        query ArtifactVersionFromClientId(	
+            $id: ID!,	
+        ) {	
+            artifact(id: $id) {	
+                id
+                versionIndex
+                artifactType {	
+                    id	
+                    name	
+                }	
+                artifactSequence {
+                    id
+                    name
+                    project {
+                        id
+                        name
+                        entity {
+                            id
+                            name
+                        }
+                    }
+                }
+            }	
+        }	
+        """
+        )
+        res = wandb_api.wandb_public_api().client.execute(
+            query,
+            variable_values={"id": hex_to_b64_id(art_id)},
+        )
+        collection = res["artifact"]["artifactSequence"]
+        artifact_type_name = res["artifact"]["artifactType"]["name"]
+        version_index = res["artifact"]["versionIndex"]
+
+    entity_name = collection["project"]["entity"]["name"]
+    project_name = collection["project"]["name"]
+    artifact_name = collection["name"]
+    version = f"v{version_index}"
+
+    weave_art_uri = uris.WeaveWBArtifactURI.from_parts(
+        entity_name,
+        project_name,
+        artifact_name,
+        version,
+    )
+    return WandbArtifact(artifact_name, artifact_type_name, weave_art_uri)
+
+
+def wandb_artifact_dir():
+    # Make this a subdir of local_artifact_dir, since the server
+    # checks for local_artifact_dir to see if it should serve
+    d = os.path.join(local_artifact_dir(), "_wandb_artifacts")
+    os.makedirs(d, exist_ok=True)
+    return d
 
 
 # From sdk/interface/artifacts.py
@@ -116,7 +245,7 @@ class LocalArtifact(Artifact):
                 self._version = os.path.basename(os.path.realpath(self._read_dirname))
                 self._read_dirname = os.path.join(self._root, self._version)
 
-    def path(self, name):
+    def path(self, name: str) -> str:
         return os.path.join(self._read_dirname, name)
 
     @property
@@ -206,27 +335,35 @@ class LocalArtifact(Artifact):
         self._version = commit_hash
         if os.path.exists(os.path.join(self._root, commit_hash)):
             # already have this version!
-            pass
+            shutil.rmtree(self._write_dirname)
         else:
             new_dirname = os.path.join(self._root, commit_hash)
-            os.makedirs(new_dirname, exist_ok=True)
-            self.write_metadata(new_dirname)
-            if self._read_dirname:
-                for path in os.listdir(self._read_dirname):
-                    src_path = os.path.join(self._read_dirname, path)
+            if not self._read_dirname:
+                # we're not read-modify-writing an existing version, so
+                # just rename the write dir
+                os.rename(self._write_dirname, new_dirname)
+                self.write_metadata(new_dirname)
+            else:
+                # read-modify-write of existing version, so copy existing
+                # files into new dir first, then overwrite with new files
+                os.makedirs(new_dirname, exist_ok=True)
+                self.write_metadata(new_dirname)
+                if self._read_dirname:
+                    for path in os.listdir(self._read_dirname):
+                        src_path = os.path.join(self._read_dirname, path)
+                        target_path = os.path.join(new_dirname, path)
+                        if os.path.isdir(src_path):
+                            shutil.copytree(src_path, target_path)
+                        else:
+                            shutil.copyfile(src_path, target_path)
+                for path in os.listdir(self._write_dirname):
+                    src_path = os.path.join(self._write_dirname, path)
                     target_path = os.path.join(new_dirname, path)
                     if os.path.isdir(src_path):
                         shutil.copytree(src_path, target_path)
                     else:
                         shutil.copyfile(src_path, target_path)
-            for path in os.listdir(self._write_dirname):
-                src_path = os.path.join(self._write_dirname, path)
-                target_path = os.path.join(new_dirname, path)
-                if os.path.isdir(src_path):
-                    shutil.copytree(src_path, target_path)
-                else:
-                    shutil.copyfile(src_path, target_path)
-        shutil.rmtree(self._write_dirname)
+                shutil.rmtree(self._write_dirname)
         self._setup_dirs()
 
         # Example of one of many races here
@@ -301,7 +438,9 @@ class WandbArtifact(Artifact):
                     found = True
             if found:
                 return os.path.join(self._saved_artifact._default_root(), name)
-        path = self._saved_artifact.get_path(name).download()
+        art_dir = wandb_artifact_dir()
+        with chdir(art_dir):
+            path = os.path.join(art_dir, self._saved_artifact.get_path(name).download())
         # python module loading does not support colons
         # TODO: This is an extremely expensive fix!
         path_safe = path.replace(":", "_")
@@ -369,6 +508,8 @@ class WandbArtifact(Artifact):
         os.environ["WANDB_SILENT"] = "true"
         wandb.require("service")  # speeds things up
         run = wandb.init(project=project)
+        if run is None:
+            raise errors.WeaveInternalError("unexpected, run is None")
         self._writeable_artifact.save()
         self._writeable_artifact.wait()
         run.finish()

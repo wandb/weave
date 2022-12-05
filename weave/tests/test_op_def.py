@@ -1,8 +1,10 @@
 import typing
+import pytest
 from .. import api as weave
 from .. import context_state
 from dataclasses import dataclass
-from ..ecosystem import keras
+
+# from ..ecosystem import keras
 import json
 
 _loading_builtins_token = context_state.set_loading_built_ins()
@@ -60,18 +62,22 @@ def test_op_def_to_dict():
     assert int_concat.to_dict() == test_data["op_defs"]["int_concat"]["def"]
 
 
+@pytest.mark.skip("callable output type serialization disabled")
 def test_identity():
     assert identity.to_dict() == test_data["op_defs"]["op-identity"]["def"]
 
 
+@pytest.mark.skip("callable output type serialization disabled")
 def test_make_list():
     assert wrap.to_dict() == test_data["op_defs"]["op-wrap"]["def"]
 
 
+@pytest.mark.skip("callable output type serialization disabled")
 def test_custom_datatype():
     assert CustomType.get_1.to_dict() == test_data["op_defs"]["op-get_1"]["def"]
     assert custom_op.to_dict() == test_data["op_defs"]["op-custom_op"]["def"]
 
 
+@pytest.mark.skip("callable output type serialization disabled")
 def test_keras_model():
     assert keras.call_string.to_dict() == test_data["op_defs"]["op-call_string"]["def"]

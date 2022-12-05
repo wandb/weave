@@ -3,10 +3,10 @@ from weave import weave_types as types
 
 
 def typeddict_pick_output_type(input_types):
-    if not isinstance(input_types["key"], types.Const):
-        return types.UnknownType()
-    key = input_types["key"].val
     property_types = input_types["self"].property_types
+    if not isinstance(input_types["key"], types.Const):
+        return types.union(*property_types.values())
+    key = input_types["key"].val
     output_type = property_types.get(key)
     if output_type is None:
         # TODO: we hack this to types.Number() for now! This is relied

@@ -1,15 +1,13 @@
 import os
 import logging
-from logging.config import dictConfig
-from logging.handlers import WatchedFileHandler
 import pathlib
-import warnings
-import json_log_formatter
-
+import time
 import traceback
-import ddtrace
+import sys
+from flask import json
+from pythonjsonlogger import jsonlogger
+from werkzeug.exceptions import HTTPException
 
-ddtrace.patch(logging=True)
 
 from flask import Flask, Blueprint
 from flask import request
@@ -21,48 +19,78 @@ from weave import server
 from weave import registry_mem
 from weave import errors
 from weave import context_state
+from weave import weavejs_fixes
+from weave import automation
+from weave import util
+from weave import engine_trace
+
+tracer = engine_trace.tracer()
+if engine_trace.datadog_is_enabled():
+    # Don't import this if you don't have an Agent! You'll get weird
+    # crashes
+    import ddtrace
+
+    ddtrace.patch(logging=True)
+
 
 from flask.logging import wsgi_errors_stream
 
 # Ensure these are imported and registered
 from weave import ops
 
-# Load and register the ecosystem ops
-# These are all treated as builtins for now.
-loading_builtins_token = context_state.set_loading_built_ins()
-
-from weave import ecosystem
 from .artifacts_local import local_artifact_dir
 
-context_state.clear_loading_built_ins(loading_builtins_token)
+
+# NOTE: Fixes flask dev server's auto-reload capability, by forcing it to use
+# stat mode instead of watchdog mode. It turns out that "import wandb" breaks
+# users of watchdog somehow. We'll need to fix that in wandb.
+# A wandb fix should go out in 0.13.5.
+# TODO: remove this hack when wandb 0.13.5 is released.
+if os.environ.get("FLASK_DEBUG"):
+    print(
+        "!!! Weave server removing watchdog from sys.path for development mode. This could break other libraries"
+    )
+    sys.modules["watchdog.observers"] = None  # type: ignore
+
+
+def silence_mpl():
+    mpl_logger = logging.getLogger("matplotlib")
+    if mpl_logger:
+        mpl_logger.setLevel(logging.CRITICAL)
 
 
 # set up logging
 
 pid = os.getpid()
 default_log_filename = pathlib.Path(f"/tmp/weave/log/{pid}.log")
-log_format = "[%(asctime)s] %(levelname)s in %(module)s (Thread Name: %(threadName)s): %(message)s"
+
+default_log_format = "[%(asctime)s] %(levelname)s in %(module)s (Thread Name: %(threadName)s): %(message)s"
 
 
-def enable_datadog_logging():
+def is_wandb_production():
+    return os.getenv("WEAVE_ENV") == "wandb_production"
+
+
+def enable_stream_logging(level=logging.DEBUG, enable_datadog=False):
+
     log_format = (
-        "%(asctime)s %(levelname)s [%(name)s] [%(filename)s:%(lineno)d] "
-        "[dd.service=%(dd.service)s dd.env=%(dd.env)s dd.version=%(dd.version)s dd.trace_id=%(dd.trace_id)s dd.span_id=%(dd.span_id)s] "
-        "- %(message)s"
+        (
+            "%(asctime)s %(levelname)s [%(name)s] [%(filename)s:%(lineno)d] "
+            "[dd.trace_id=%(dd.trace_id)s dd.span_id=%(dd.span_id)s] "
+            "- %(message)s"
+        )
+        if enable_datadog
+        else default_log_format
     )
-    formatter = json_log_formatter.JSONFormatter(log_format)
-    json_handler = logging.FileHandler(filename="/tmp/weave/log/weave-server.log")
-    json_handler.setFormatter(formatter)
-    logger = logging.getLogger("root")
-    logger.addHandler(json_handler)
-    logger.setLevel(logging.INFO)
 
-
-def enable_stream_logging(level=logging.INFO):
     logger = logging.getLogger("root")
+    logger.setLevel(level)
     stream_handler = logging.StreamHandler(wsgi_errors_stream)
     stream_handler.setLevel(level)
-    formatter = logging.Formatter(log_format)
+    if enable_datadog:
+        formatter = jsonlogger.JsonFormatter(log_format)
+    else:
+        formatter = logging.Formatter(log_format)
     stream_handler.setFormatter(formatter)
     logger.addHandler(stream_handler)
 
@@ -72,50 +100,13 @@ blueprint = Blueprint("weave", "weave-server", static_folder=static_folder)
 
 
 def make_app(log_filename=None):
-    fs_logging_enabled = True
-    log_file = log_filename or default_log_filename
-
-    try:
-        log_file.parent.mkdir(exist_ok=True, parents=True)
-        log_file.touch(exist_ok=True)
-    except OSError:
-        warnings.warn(
-            f"weave: Unable to touch logfile at '{log_file}'. Filesystem logging will be disabled for "
-            f"the remainder of this session. To enable filesystem logging, ensure the path is writable "
-            f"and restart the server."
-        )
-        fs_logging_enabled = False
-
-    logging_config = {
-        "version": 1,
-        "formatters": {
-            "default": {
-                "format": log_format,
-            }
-        },
-        "handlers": {
-            "wsgi_file": {
-                "class": "logging.handlers.WatchedFileHandler",
-                "filename": log_file,
-                "formatter": "default",
-            },
-        },
-        "root": {
-            "level": "INFO",
-            "handlers": ["wsgi_file"] if fs_logging_enabled else [],
-        },
-    }
-
-    dictConfig(logging_config)
-
-    if os.getenv("WEAVE_SERVER_ENABLE_LOGGING"):
-        enable_stream_logging()
-    else:
-        # ensure that errors / exceptions go to stderr
-        enable_stream_logging(level=logging.ERROR)
-
-    if os.getenv("DD_ENV"):
-        enable_datadog_logging()
+    silence_mpl()
+    enable_stream_logging(
+        enable_datadog=os.getenv("DD_ENV"),
+        level=logging.DEBUG
+        if util.parse_boolean_env_var("WEAVE_SERVER_ENABLE_LOGGING")
+        else logging.ERROR,
+    )
 
     app = Flask(__name__)
     app.register_blueprint(blueprint)
@@ -129,13 +120,17 @@ def make_app(log_filename=None):
 
 @blueprint.route("/__weave/ops", methods=["GET"])
 def list_ops():
+    if not is_wandb_production():
+        registry_mem.memory_registry.load_saved_ops()
     ops = registry_mem.memory_registry.list_ops()
     ret = []
     for op in ops:
         try:
-            ret.append(op.to_dict())
+            serialized_op = op.to_dict()
         except errors.WeaveSerializeError:
-            pass
+            continue
+        if serialized_op["output_type"] != "any":
+            ret.append(serialized_op)
     return {"data": ret}
 
 
@@ -154,7 +149,7 @@ def recursively_unwrap_unions(obj):
 def execute():
     """Execute endpoint used by WeaveJS."""
 
-    current_span = ddtrace.tracer.current_span()
+    current_span = tracer.current_span()
     if current_span and (
         os.getenv("WEAVE_SERVER_DD_LOG_REQUEST_BODY_JSON")
         or request.headers.get("weave-dd-log-request-body-json")
@@ -166,7 +161,10 @@ def execute():
     # Simulate browser/server latency
     # import time
     # time.sleep(0.1)
+
+    start_time = time.time()
     response = server.handle_request(request.json, deref=True)
+    end_time = time.time()
 
     # remove unions from the response
     response = recursively_unwrap_unions(response)
@@ -177,19 +175,19 @@ def execute():
     for r in response:
         # final_response.append(n)
         if isinstance(r, dict) and "_val" in r:
-            final_response.append(r["_val"])
-        else:
-            final_response.append(r)
+            r = r["_val"]
+        final_response.append(weavejs_fixes.fixup_data(r))
     # print("FINAL RESPONSE", final_response)
     response = {"data": final_response}
+
+    if request.headers.get("x-weave-include-execution-time"):
+        response["execution_time"] = (end_time - start_time) * 1000
+
     if current_span and (
         os.getenv("WEAVE_SERVER_DD_LOG_REQUEST_RESPONSES")
         or request.headers.get("weave-dd-log-request-response")
     ):
         current_span.set_tag("response", response)
-
-    if request.headers.get("weave-shadow"):
-        response["data"] = []
 
     return response
 
@@ -207,7 +205,7 @@ def execute_v2():
 
 
 @blueprint.route("/__weave/file/<path:path>")
-def send_js(path):
+def send_local_file(path):
     # path is given relative to the FS root. check to see that path is a subdirectory of the
     # local artifacts path. if not, return 403. then if there is a cache scope function defined
     # call it to make sure we have access to the path
@@ -218,6 +216,32 @@ def send_js(path):
     if local_artifacts_path not in list(abspath.parents):
         abort(403)
     return send_from_directory("/", path)
+
+
+@blueprint.route(
+    "/__weave/automate/<string:automation_id>/add_command", methods=["POST"]
+)
+def automation_add_command(automation_id):
+    automation.add_command(automation_id, request.json)
+    return {"status": "ok"}
+
+
+@blueprint.route("/__weave/automate/<string:automation_id>/commands_after/<int:after>")
+def automation_commands_after(automation_id, after):
+    return {"commands": automation.commands_after(automation_id, after)}
+
+
+@blueprint.route(
+    "/__weave/automate/<string:automation_id>/set_status", methods=["POST"]
+)
+def automation_set_status(automation_id):
+    automation.set_status(automation_id, request.json)
+    return {"status": "ok"}
+
+
+@blueprint.route("/__weave/automate/<string:automation_id>/status")
+def automation_status(automation_id):
+    return automation.get_status(automation_id)
 
 
 @blueprint.route("/__frontend", defaults={"path": None})
@@ -238,6 +262,30 @@ def hello():
 
 # This makes all server logs go into the notebook
 app = make_app()
+
+if os.getenv("WEAVE_SERVER_DEBUG"):
+
+    @app.errorhandler(HTTPException)
+    def handle_exception(e):
+        """Return JSON instead of HTML for HTTP errors."""
+        # start with the correct headers and status code from the error
+        response = e.get_response()
+        # replace the body with JSON
+        response.data = json.dumps(
+            {
+                "code": e.code,
+                "name": e.name,
+                "description": e.description,
+                "exc_info": traceback.format_exc(),
+            }
+        )
+        response.content_type = "application/json"
+        return response
+
+
+@app.before_first_request
+def before_first_request():
+    from weave.ecosystem import all
 
 
 if __name__ == "__main__":

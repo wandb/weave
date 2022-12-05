@@ -115,3 +115,26 @@ def test_executing_js_graphs(nodes_with_expected_values):
     nodes = [node for exp_val, node in nodes_with_expected_values]
     exp_vals = [exp_val for exp_val, node in nodes_with_expected_values]
     assert use(nodes) == exp_vals
+
+
+def test_executing_js_multi_root():
+    node = graph.OutputNode(
+        types.Number(),
+        "add",
+        {
+            "lhs": graph.ConstNode(
+                types.List(types.Number()),
+                [1, 2, 3],
+            ),
+            "rhs": graph.ConstNode(types.Number(), 2),
+        },
+    )
+    node2 = graph.OutputNode(
+        types.Number(),
+        "add",
+        {
+            "lhs": node,
+            "rhs": graph.ConstNode(types.Number(), 4),
+        },
+    )
+    assert use([node, node2]) == [[3, 4, 5], [7, 8, 9]]

@@ -8,9 +8,15 @@ from ..api import Node, op, mutation, weave_class, OpVarArgs
 from .. import weave_internal
 from .. import errors
 from .. import execute_fast
+from .. import op_def
 from ..language_features.tagging import make_tag_getter_op, tag_store, tagged_value_type
 
-from . import dict as dict_ops
+
+def getitem_output_type(input_types):
+    self_type = input_types["arr"]
+    if isinstance(self_type, types.UnionType):
+        return types.UnionType(*[t.object_type for t in self_type.members])
+    return self_type.object_type
 
 
 def general_picker(obj, key):
@@ -23,8 +29,7 @@ class List:
     def count(arr: list[typing.Any]) -> int:  # type: ignore
         return len(arr)
 
-    @mutation
-    def __setitem__(self, k, v):
+    def __setitem__(self, k, v, action=None):
         # TODO: copy the whole list to an actual list so we can mutate!
         #    (not good, need to implement on ArrowTableList)
         self_list = list(self)
@@ -32,12 +37,17 @@ class List:
         return self_list
 
     @op(
-        name="index",
         setter=__setitem__,
         input_type={"arr": types.List(types.Any()), "index": types.Int()},
-        output_type=lambda input_types: input_types["arr"].object_type,
+        output_type=getitem_output_type,
     )
     def __getitem__(arr, index):
+        # This is a hack to resolve the fact that WeaveJS expects groupby to
+        # return TaggedValue, while Weave Python currently still returns GroupResult
+        # TODO: Remove when we switch Weave Python over to using TaggedValue for this
+        # case.
+        if isinstance(arr.__getitem__, op_def.OpDef):
+            return arr.__getitem__.raw_resolve_fn(arr, index)
         try:
             return arr.__getitem__(index)
         except IndexError:
@@ -54,11 +64,27 @@ class List:
         output_type=lambda input_types: input_types["arr"],
     )
     def filter(arr, filterFn):
+        from ..ops_arrow import list_ as arrow_list
+
+        # WHOAAAA. Major hacks here.
+        # This handles arrow filtering for a demo.
+        # TODO: Remove
+        arrow_obj = None
+        if isinstance(arr, arrow_list.ArrowWeaveList):
+            arrow_obj = arr
+            arr = arr.to_pylist()
+
         call_results = execute_fast.fast_map_fn(arr, filterFn)
         result = []
         for row, keep in zip(arr, call_results):
             if keep:
                 result.append(row)
+
+        if arrow_obj is not None:
+            return arrow_list.to_arrow_from_list_and_artifact(
+                result, arrow_obj.object_type, arrow_obj._artifact
+            )
+
         return result
 
     @op(
@@ -106,8 +132,13 @@ class List:
             ),
         },
         output_type=lambda input_types: types.List(
-            GroupResultType(
-                input_types["arr"].object_type, input_types["groupByFn"].output_type
+            tagged_value_type.TaggedValueType(
+                types.TypedDict(
+                    {
+                        "groupKey": input_types["groupByFn"].output_type,
+                    }
+                ),
+                input_types["arr"],
             )
         ),
     )
@@ -121,10 +152,11 @@ class List:
             if group_key_s not in result:
                 result[group_key_s] = (group_key_items, [])
             result[group_key_s][1].append(row)
-        # TODO: relying on dict ordering???
         grs = []
         for group_result in result.values():
-            grs.append(GroupResult(group_result[1], group_result[0]))
+            item = box.box(group_result[1])
+            tag_store.add_tags(item, {"groupKey": group_result[0]})
+            grs.append(item)
         return grs
 
     @op(
@@ -151,23 +183,46 @@ class List:
     def dropna(arr):
         return [i for i in arr if i is not None]
 
+    @op(
+        name="concat",
+        input_type={"arr": types.List(types.List(types.Any()))},
+        output_type=lambda input_types: input_types["arr"].object_type,
+    )
+    def concat(arr):
+        res = []
+        for sublist in arr:
+            if not tag_store.is_tagged(sublist):
+                res.extend(sublist)
+            else:
+                tags = tag_store.get_tags(sublist)
+                for i in sublist:
+                    obj = box.box(i)
+                    tag_store.add_tags(obj, tags)
+                    res.append(obj)
+        return res
+
 
 @dataclasses.dataclass(frozen=True)
 class GroupResultType(types.ObjectType):
+    _base_type = types.List()
     name = "groupresult"
 
-    object_type: types.Type = types.Any()
+    list: types.Type = types.List(types.Any())
     key: types.Type = types.Any()
+
+    @property
+    def object_type(self):
+        return self.list.object_type
 
     @classmethod
     def type_of_instance(cls, obj):
         return cls(
-            types.TypeRegistry.type_of(obj.list).object_type,
+            types.TypeRegistry.type_of(obj.list),
             types.TypeRegistry.type_of(obj.key),
         )
 
     def property_types(self):
-        return {"list": types.List(self.object_type), "key": self.key}
+        return {"list": self.list, "key": self.key}
 
 
 def group_result_index_output_type(input_types):
@@ -175,9 +230,9 @@ def group_result_index_output_type(input_types):
     # TODO: need to fix Const type so we don't need this.
     self_type = input_types["self"]
     if isinstance(self_type, types.Const):
-        return self_type.val_type.object_type
+        return self_type.val_type.list.object_type
     else:
-        return self_type.object_type
+        return self_type.list.object_type
 
 
 @weave_class(weave_type=GroupResultType)
@@ -190,13 +245,11 @@ class GroupResult:
     def var_item(self):
         return weave_internal.make_var_node(self.type.object_type, "row")
 
-    @op(output_type=lambda input_types: input_types["self"].key)
-    def key(self):
-        return self.key
+    def __iter__(self):
+        return iter(self.list)
 
-    @op(output_type=types.Any())
-    def pick(self, key: str):
-        return general_picker(self.list, key)
+    def __len__(self):
+        return len(self.list)
 
     @op()
     def count(self) -> int:
@@ -225,7 +278,7 @@ class GroupResult:
             ),
         },
         output_type=lambda input_types: types.List(
-            GroupResultType(input_types["self"].object_type)
+            GroupResultType(input_types["self"])
         ),
     )
     def groupby(self, group_fn):
@@ -239,7 +292,6 @@ GroupResultType.instance_classes = GroupResult
 ### TODO Move these ops onto List class and make part of the List interface
 
 
-@mutation
 def index_checkpoint_setter(arr, new_arr):
     return new_arr
 
@@ -268,7 +320,7 @@ def list_indexCheckpoint(arr):
 
 
 index_checkpoint_tag_getter_op = make_tag_getter_op.make_tag_getter_op(
-    "index", types.Number(), op_name="tag-indexCheckpoint"
+    "index", types.Int(), op_name="tag-indexCheckpoint"
 )
 
 
@@ -307,10 +359,25 @@ def flatten(arr):
     return _flatten(list(arr))
 
 
+def unnest_return_type(input_types):
+    arr_type = input_types["arr"]
+    # if isinstance(arr_type, types.UnionType):
+    #     return types.union(
+    #         *(unnest_return_type({"arr": m}) for m in input_types["self"].members)
+    #     )
+    unnested_object_property_types = {}
+    for k, v_type in arr_type.object_type.property_types.items():
+        if types.List().assign_type(v_type):
+            unnested_object_property_types[k] = v_type.object_type
+        else:
+            unnested_object_property_types[k] = v_type
+    return types.List(types.TypedDict(unnested_object_property_types))
+
+
 @op(
     name="unnest",
     input_type={"arr": types.List(types.TypedDict({}))},
-    output_type=lambda input_types: input_types["arr"],
+    output_type=unnest_return_type,
 )
 def unnest(arr):
     if not arr:
@@ -320,7 +387,7 @@ def unnest(arr):
     # TODO: need a way to get argument types inside of resolver bodies.
     arr_type = types.TypeRegistry.type_of(arr)
     for k, v_type in arr_type.object_type.property_types.items():
-        if types.is_list_like(v_type):
+        if types.List().assign_type(v_type):
             list_cols.append(k)
     if not list_cols:
         return arr
@@ -382,135 +449,9 @@ def pick_output_type(input_types):
     return output_type
 
 
-class WeaveGroupResultInterface:
-    @op(
-        name="group-groupkey",
-        input_type={"obj": GroupResultType()},
-        output_type=lambda input_types: input_types["obj"]._key,
-    )
-    def key(obj):
-        type_class = types.TypeRegistry.type_class_of(obj)
-        return type_class.NodeMethodsClass.key.resolve_fn(obj)
-
-
-class WeaveJSListInterface:
-    def count(arr):
-        arr_node = weave_internal._ensure_node("count", arr, None, None)
-        return weave_internal.make_output_node(
-            types.Number(),
-            "count",
-            {
-                "arr": arr_node,
-            },
-        )
-
-    def index(arr, index):
-        arr_node = weave_internal._ensure_node("index", arr, None, None)
-        return weave_internal.make_output_node(
-            arr_node.type.object_type,
-            "index",
-            {
-                "arr": arr_node,
-                "index": weave_internal._ensure_node("index", index, None, None),
-            },
-        )
-
-    def filter(arr, filterFn):
-        arr_node = weave_internal._ensure_node("filter", arr, None, None)
-        return weave_internal.make_output_node(
-            arr_node.type,
-            "filter",
-            {
-                "arr": arr_node,
-                "filterFn": weave_internal._ensure_node(
-                    "filter",
-                    filterFn,
-                    types.Function({"row": arr_node.type.object_type}, types.Any()),
-                    None,
-                ),
-            },
-        )
-
-    def map(arr, mapFn):
-        arr_node = weave_internal._ensure_node("map", arr, None, None)
-        return weave_internal.make_output_node(
-            arr_node.type,
-            "map",
-            {
-                "arr": arr_node,
-                "mapFn": weave_internal._ensure_node(
-                    "map",
-                    mapFn,
-                    types.Function({"row": arr_node.type.object_type}, types.Any()),
-                    None,
-                ),
-            },
-        )
-
-    def sort(arr, compFn, columnDirs):
-        arr_node = weave_internal._ensure_node("sort", arr, None, None)
-        return weave_internal.make_output_node(
-            arr_node.type,
-            "sort",
-            {
-                "arr": arr_node,
-                "compFn": weave_internal._ensure_node(
-                    "sort",
-                    compFn,
-                    types.Function({"row": arr_node.type.object_type}, types.Any()),
-                    None,
-                ),
-                "columnDirs": types.Any(),
-            },
-        )
-
-    def groupby(arr, groupByFn):
-        arr_node = weave_internal._ensure_node("groupby", arr, None, None)
-        return weave_internal.make_output_node(
-            types.List(GroupResultType(arr_node.type.object_type)),
-            "groupby",
-            {
-                "arr": arr_node,
-                "groupByFn": weave_internal._ensure_node(
-                    "groupby",
-                    groupByFn,
-                    types.Function({"row": arr_node.type.object_type}, types.Any()),
-                    None,
-                ),
-            },
-        )
-
-    def offset(arr, offset):
-        arr_node = weave_internal._ensure_node("offset", arr, None, None)
-        return weave_internal.make_output_node(
-            arr_node.type,
-            "offset",
-            {
-                "arr": arr_node,
-                "offset": weave_internal._ensure_node(
-                    "offset",
-                    offset,
-                    None,
-                    None,
-                ),
-            },
-        )
-
-    def limit(arr, limit):
-        arr_node = weave_internal._ensure_node("limit", arr, None, None)
-        return weave_internal.make_output_node(
-            arr_node.type,
-            "limit",
-            {
-                "arr": arr_node,
-                "limit": weave_internal._ensure_node(
-                    "limit",
-                    limit,
-                    None,
-                    None,
-                ),
-            },
-        )
+group_tag_getter_op = make_tag_getter_op.make_tag_getter_op(
+    "groupKey", types.Any(), op_name="group-groupkey"
+)
 
 
 def list_return_type(input_types):
@@ -530,3 +471,88 @@ def list_return_type(input_types):
 )
 def make_list(**l):
     return list(l.values())
+
+
+def _join_output_type(input_types):
+    arr1_prop_types = input_types["arr1"].object_type.property_types
+    arr2_prop_types = input_types["arr2"].object_type.property_types
+    prop_types = {}
+    for k in set(arr1_prop_types.keys()).union(arr2_prop_types.keys()):
+        prop_types[k] = types.List(types.union(arr1_prop_types[k], arr2_prop_types[k]))
+    return types.List(types.TypedDict(prop_types))
+
+
+@op(
+    input_type={
+        "arr1": types.List(types.TypedDict({})),
+        "arr2": types.List(types.TypedDict({})),
+        "keyFn1": lambda input_types: types.Function(
+            {"row": input_types["arr1"].object_type}, types.Any()
+        ),
+        "keyFn2": lambda input_types: types.Function(
+            {"row": input_types["arr2"].object_type}, types.Any()
+        ),
+    },
+    output_type=_join_output_type,
+)
+def join2(arr1, arr2, keyFn1, keyFn2):  # type: ignore
+    arr1_keys = execute_fast.fast_map_fn(arr1, keyFn1)
+    arr2_keys = execute_fast.fast_map_fn(arr2, keyFn2)
+    all_keys = set(arr1_keys).union(arr2_keys)
+    arr1_lookup = dict(zip(arr1_keys, arr1))
+    arr2_lookup = dict(zip(arr2_keys, arr2))
+    results = []
+    for k in all_keys:
+        arr1_row = arr1_lookup[k]
+        arr2_row = arr2_lookup[k]
+        row_keys = set(arr1_row.keys()).union(arr2_row.keys())
+        row = {}
+        for rk in row_keys:
+            row[rk] = [arr1_row.get(rk), arr2_row.get(rk)]
+        results.append(row)
+    return results
+
+
+def _join_all_output_type(input_types):
+    arr_prop_types = input_types["arrs"].object_type.object_type.property_types
+    prop_types = {}
+    for k in arr_prop_types.keys():
+        prop_types[k] = types.List(arr_prop_types[k])
+    return types.List(types.TypedDict(prop_types))
+
+
+@op(
+    name="joinAll",
+    input_type={
+        "arrs": types.List(types.List(types.TypedDict({}))),
+        "joinFn": lambda input_types: types.Function(
+            {"row": input_types["arrs"].object_type.object_type}, types.Any()
+        ),
+    },
+    output_type=_join_all_output_type,
+)
+def join_all(arrs, joinFn, outer: bool):  # type: ignore
+    arr1 = arrs[0]
+    arr2 = arrs[1]
+    keyFn1 = joinFn
+    keyFn2 = joinFn
+    arr1_keys = execute_fast.fast_map_fn(arr1, keyFn1)
+    arr2_keys = execute_fast.fast_map_fn(arr2, keyFn2)
+    all_keys = set(arr1_keys).union(arr2_keys)
+    arr1_lookup = dict(zip(arr1_keys, arr1))
+    arr2_lookup = dict(zip(arr2_keys, arr2))
+    results = []
+    for k in all_keys:
+        arr1_row = arr1_lookup[k]
+        arr2_row = arr2_lookup[k]
+        row_keys = set(arr1_row.keys()).union(arr2_row.keys())
+        row = {}
+        for rk in row_keys:
+            row[rk] = [arr1_row.get(rk), arr2_row.get(rk)]
+        results.append(row)
+    return results
+
+
+@op(name="range")
+def op_range(start: int, stop: int, step: int) -> list[int]:
+    return list(range(start, stop, step))

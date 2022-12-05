@@ -9,6 +9,7 @@ from . import op_def
 from . import errors
 from . import graph
 from . import box
+from . import weave_internal
 
 
 class DeriveOpHandler:
@@ -43,7 +44,6 @@ class DeriveOpHandler:
 disallow_mapping_type_name_list = [
     "type",
     "list",
-    "wbtable",
     "ndarray",
     "ArrowArray",
     "ArrowTable",
@@ -60,7 +60,6 @@ disallow_mapping_type_name_list = [
     "none",
     "any",
     "groupresult",
-    "table",
     "dataframeTable",
     "ArrowTableGroupResult",
     "ArrowWeaveList",
@@ -131,7 +130,14 @@ class MappedDeriveOpHandler(DeriveOpHandler):
         # used if the input_type is also optional. However we don't have a
         # weave-way to check that yet :(.
         if not callable(orig_op.output_type):
-            output_type = types.List(types.optional(orig_op.output_type))
+
+            def new_output_type(input_type):
+                object_type = input_type[mapped_param_name].object_type
+                if types.is_optional(object_type):
+                    return types.List(types.optional(object_type))
+                return types.List(object_type)
+
+            output_type = new_output_type
         else:
 
             def make_output_type(input_types):
@@ -184,9 +190,13 @@ class MappedDeriveOpHandler(DeriveOpHandler):
 
                 inner_input_types = copy.copy(input_types)
                 inner_input_types[mapped_param_name] = replacement
-                return types.List(
-                    types.optional(orig_op.output_type(inner_input_types))
-                )
+                inner_output_type = orig_op.output_type(inner_input_types)
+
+                object_type = input_types[mapped_param_name].object_type
+
+                if types.is_optional(object_type):
+                    return types.List(types.optional(inner_output_type))
+                return types.List(inner_output_type)
 
             output_type = make_output_type
 
@@ -196,7 +206,7 @@ class MappedDeriveOpHandler(DeriveOpHandler):
             # TODO: use the vectorization described here:
             # https://paper.dropbox.com/doc/Weave-Python-Weave0-Op-compatibility-workstream-kJ3XSDdgR96XwKPapHwPD
             return [
-                orig_op.raw_resolve_fn(x, **new_inputs)
+                orig_op.resolve_fn(x, **new_inputs)
                 if not (x is None or isinstance(x, box.BoxedNone))
                 or types.is_optional(first_arg.type)
                 else None
@@ -215,6 +225,19 @@ class MappedDeriveOpHandler(DeriveOpHandler):
             resolve,
             _mapped_refine_output_type(orig_op),
         )
+
+        def weave_fn_body(list_, *args):
+            def map_item(item):
+                full_named_args = {mapped_param_name: item}
+                for i, na in enumerate(named_args[1:]):
+                    full_named_args[na.name] = args[i]
+
+                # use Any type for OutputNode
+                return graph.OutputNode(types.Any(), orig_op.name, full_named_args)
+
+            return list_.map(lambda item: map_item(item))
+
+        new_op.weave_fn = weave_internal.define_fn(input_type, weave_fn_body)
         op_version = registry_mem.memory_registry.register_op(new_op)
 
         return op_version

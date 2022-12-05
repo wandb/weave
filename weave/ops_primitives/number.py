@@ -6,15 +6,6 @@ from .. import weave_types as types
 @weave_class(weave_type=types.Number)
 class Number(object):
     @op(
-        name="number-set",
-        input_type={"self": types.Number(), "val": types.Number()},
-        output_type=types.Number(),
-    )
-    @mutation
-    def set(self, val):
-        return val
-
-    @op(
         name="number-add",
         input_type={"lhs": types.Number(), "rhs": types.Number()},
         output_type=types.Number(),
@@ -47,6 +38,13 @@ class Number(object):
     )
     def __truediv__(lhs, rhs):
         return lhs / rhs
+
+    @op(
+        input_type={"lhs": types.Number(), "rhs": types.Number()},
+        output_type=types.Number(),
+    )
+    def __floordiv__(lhs, rhs):
+        return lhs // rhs
 
     @op(
         name="number-modulo",
@@ -121,6 +119,14 @@ class Number(object):
         return val * -1
 
     @op(
+        name="number-round",
+        input_type={"val": types.Number()},
+        output_type=types.Number(),
+    )
+    def __round__(val):
+        return round(val)
+
+    @op(
         name="number-floor",
         input_type={"number": types.Number()},
         output_type=types.Number(),
@@ -143,6 +149,22 @@ class Number(object):
     )
     def pow(lhs, rhs):
         return lhs**rhs
+
+    @op(
+        name="number-cos",
+        input_type={"n": types.Number()},
+        output_type=types.Number(),
+    )
+    def cos(n):
+        return math.cos(n)
+
+    @op(
+        name="number-sin",
+        input_type={"n": types.Number()},
+        output_type=types.Number(),
+    )
+    def sin(n):
+        return math.sin(n)
 
 
 @op(

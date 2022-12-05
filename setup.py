@@ -26,13 +26,6 @@ setup(
     author="Weights & Biases",
     author_email="support@wandb.com",
     url="https://github.com/wandb/end-to-end",
-    packages=[
-        "weave",
-        "weave.ops_primitives",
-        "weave.ops_domain",
-        "weave.panels",
-        "weave.ecosystem",
-    ],
     package_dir={"weave": "weave"},
     include_package_data=True,
     install_requires=requirements,

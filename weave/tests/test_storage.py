@@ -154,8 +154,12 @@ def test_ref_type():
     ref = storage.save(obj, "my-dict")
     python_ref = storage.to_python(ref)
     assert python_ref == {
-        "_type": {"type": "LocalArtifactRef"},
-        "_val": f"local-artifact://{artifacts_local.local_artifact_dir()}/my-dict/6036cbf3a05809f1a3f174a1485b1770",
+        "_type": {
+            "_base_type": {"objectType": "unknown", "type": "Ref"},
+            "type": "LocalArtifactRef",
+            "objectType": {"type": "typedDict", "propertyTypes": {"x": "int"}},
+        },
+        "_val": "local-artifact:///tmp/weave/pytest/weave/tests/test_storage.py::test_ref_type (setup)/my-dict/6036cbf3a05809f1a3f174a1485b1770",
     }
     ref2 = storage.from_python(python_ref)
     obj2 = storage.deref(ref2)
@@ -192,3 +196,18 @@ def test_cross_artifact_ref():
     node = weave.save(owner, "owner-obj")
     assert weave.use(node["b"]) == {"c": SomeCustomObj(2)}
     # TODO: assert that ref is to original object
+
+
+@weave.type()
+class TestObjType:
+    pass
+
+
+def test_ref_to_node():
+    d = weave.save({"a": TestObjType()})
+    node = d["a"]
+    # Node a Node with weave type ObjectType
+    # We want to make sure dispatch doesn't convert this access to ._ref into
+    # a getattr op call (prevented by ref=None on FallbackNodeTypeDispatcherMixin)
+    # ref should be None here
+    assert node._ref == None

@@ -1,5 +1,6 @@
 from __future__ import print_function
 
+import os
 import typing
 import logging
 
@@ -16,12 +17,30 @@ import cProfile
 
 from weave.language_features.tagging.tag_store import isolated_tagging_context
 
-from . import graph
 from . import execute
 from . import serialize
 from . import storage
 from . import context
+from . import weave_types
+from . import util
+from . import graph_debug
 
+
+# A function to monkeypatch the request post method
+# def patch_request_post():
+#     r_post = requests.post
+
+#     logging.info = lambda *args, **kwargs: None
+#     logging.warn = lambda *args, **kwargs: None
+#     logging.debug = lambda *args, **kwargs: None
+
+#     def post(*args, **kwargs):
+#         logging.critical(kwargs["json"]["query"].split(' ')[1])
+#         return r_post(*args, **kwargs)
+
+#     requests.post = post
+
+# patch_request_post()
 
 PROFILE = False
 
@@ -43,17 +62,18 @@ def _handle_request(request, deref=False):
         is_tracing = True
         tracer = viztracer.VizTracer()
         tracer.start()
+    # nodes = [graph.Node.node_from_json(n) for n in request["graphs"]]
     nodes = serialize.deserialize(request["graphs"])
 
-    start_time = time.time()
-    logger.info(
-        "Server request running %s nodes.\n%s"
-        % (len(nodes), "\n".join(graph.node_expr_str(n) for n in nodes))
-    )
     with context.execution_client():
-        result = execute.execute_nodes(nodes)
+        result = execute.execute_nodes(
+            nodes, no_cache=util.parse_boolean_env_var("WEAVE_NO_CACHE")
+        )
     if deref:
-        result = [storage.deref(r) for r in result]
+        result = [
+            r if isinstance(n.type, weave_types.RefType) else storage.deref(r)
+            for (n, r) in zip(nodes, result)
+        ]
     # print("Server request %s (%0.5fs): %s..." % (start_time,
     #                                              time.time() - start_time, [n.from_op.name for n in nodes[:3]]))
     if request_trace:
@@ -73,8 +93,10 @@ def handle_request(request, deref=False):
     if not PROFILE:
         return _handle_request(request, deref=deref)
     with cProfile.Profile() as pr:
-        res = _handle_request(request, deref=deref)
-    pr.dump_stats("/tmp/weave/profile-%s" % time.time())
+        try:
+            res = _handle_request(request, deref=deref)
+        finally:
+            pr.dump_stats("/tmp/weave/profile-%s" % time.time())
     return res
 
 
@@ -188,7 +210,7 @@ class HttpServer(threading.Thread):
         return url
 
 
-def capture_weave_server_logs(log_level=logging.INFO):
+def capture_weave_server_logs(log_level=logging.DEBUG):
     from . import weave_server
 
     weave_server.enable_stream_logging(log_level)

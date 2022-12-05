@@ -1,0 +1,20 @@
+# When we push commits to master, fire off a `weave-package-updated`
+# repository dispatch event to wandb/core
+
+name: Notify wandb/core
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  notify-wandb-core:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Repository dispatch
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          token: ${{ secrets.WANDB_CORE_ACCESS_TOKEN }}
+          repository: wandb/core
+          event-type: weave-package-updated

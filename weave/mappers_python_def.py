@@ -1,4 +1,5 @@
 import dataclasses
+import datetime
 import inspect
 import math
 
@@ -10,6 +11,7 @@ from . import weave_types as types
 from . import errors
 from . import box
 from . import mappers_python
+from . import val_const
 from .language_features.tagging import tagged_value_type
 
 
@@ -17,7 +19,7 @@ class TypedDictToPyDict(mappers_weave.TypedDictMapper):
     def apply(self, obj):
         result = {}
         for k, prop_serializer in self._property_serializers.items():
-            result[k] = prop_serializer.apply(obj[k])
+            result[k] = prop_serializer.apply(obj.get(k, None))
         return result
 
 
@@ -43,17 +45,30 @@ class ObjectToPyDict(mappers_weave.ObjectMapper):
 
 class ObjectDictToObject(mappers_weave.ObjectMapper):
     def apply(self, obj):
-        result = obj
-        for k, serializer in self._property_serializers.items():
-            v = serializer.apply(obj[k])
-            result[k] = v
+        # Only add keys that are accepted by the constructor.
+        # This is used for Panels where we have an Class-level id attribute
+        # that we want to include in the serialized representation.
+        result = {}
         result_type = self._obj_type
+
+        # TODO: I think these are hacks in my branch. What do they do?
+        instance_class = result_type._instance_classes()[0]
+        constructor_sig = inspect.signature(instance_class)
+        for k, serializer in self._property_serializers.items():
+            if k in constructor_sig.parameters:
+                # None haxxx
+                # TODO: remove
+                obj_val = obj.get(k)
+                if obj_val is None:
+                    result[k] = None
+                else:
+                    v = serializer.apply(obj_val)
+                    result[k] = v
+
         for prop_name, prop_type in result_type.type_vars().items():
             if isinstance(prop_type, types.Const):
                 result[prop_name] = prop_type.val
 
-        instance_class = result_type._instance_classes()[0]
-        constructor_sig = inspect.signature(instance_class)
         if "artifact" in constructor_sig.parameters:
             result["artifact"] = self._artifact
         res = instance_class(**result)
@@ -133,6 +148,18 @@ class StringToPyString(mappers.Mapper):
         return obj
 
 
+class DatetimeToPyDatetime(mappers.Mapper):
+    def apply(self, obj: datetime.datetime):
+        return int(obj.timestamp() * 1000)
+        return obj.isoformat()
+
+
+class PyDatetimeToDatetime(mappers.Mapper):
+    def apply(self, obj):
+        return datetime.datetime.fromtimestamp(obj / 1000)
+        return datetime.datetime.fromisoformat(obj)
+
+
 class NoneToPyNone(mappers.Mapper):
     def apply(self, obj):
         return None
@@ -167,7 +194,10 @@ class PyTypeToType(mappers.Mapper):
 
 class ConstToPyConst(mappers_weave.ConstMapper):
     def apply(self, obj):
-        return obj
+        val = obj
+        if isinstance(obj, val_const.Const):
+            return val.val
+        return self._val_mapper.apply(obj)
 
 
 class DefaultToPy(mappers.Mapper):
@@ -190,7 +220,7 @@ class DefaultToPy(mappers.Mapper):
             elif existing_ref.artifact != self._artifact:
                 raise errors.WeaveInternalError(
                     "Can't save cross-artifact reference to unsaved artifact. This error was triggered when saving obj %s of type: %s"
-                    % (self.obj, self.type)
+                    % (obj, self.type)
                 )
         name = "-".join(self._path)
         ref = storage.save_to_artifact(obj, self._artifact, name, self.type)
@@ -268,8 +298,12 @@ def map_to_python_(type, mapper, artifact, path=[]):
         return IntToPyInt(type, mapper, artifact, path)
     elif isinstance(type, types.Float):
         return FloatToPyFloat(type, mapper, artifact, path)
+    elif isinstance(type, types.Number):
+        return FloatToPyFloat(type, mapper, artifact, path)
     elif isinstance(type, types.String):
         return StringToPyString(type, mapper, artifact, path)
+    elif isinstance(type, types.Datetime):
+        return DatetimeToPyDatetime(type, mapper, artifact, path)
     elif isinstance(type, types.Const):
         return ConstToPyConst(type, mapper, artifact, path)
     elif isinstance(type, types.NoneType):
@@ -307,8 +341,12 @@ def map_from_python_(type: types.Type, mapper, artifact, path=[]):
         return IntToPyInt(type, mapper, artifact, path)
     elif isinstance(type, types.Float):
         return PyFloatToFloat(type, mapper, artifact, path)
+    elif isinstance(type, types.Number):
+        return PyFloatToFloat(type, mapper, artifact, path)
     elif isinstance(type, types.String):
         return StringToPyString(type, mapper, artifact, path)
+    elif isinstance(type, types.Datetime):
+        return PyDatetimeToDatetime(type, mapper, artifact, path)
     elif isinstance(type, types.Const):
         return ConstToPyConst(type, mapper, artifact, path)
     elif isinstance(type, types.NoneType):

@@ -2,6 +2,8 @@ from weave.server import _handle_request
 
 
 def test_playback():
+    from ..ecosystem import huggingface
+
     for payload in [execute_payloads[-1]]:
         res = _handle_request(payload, True)
         assert "error" not in res
