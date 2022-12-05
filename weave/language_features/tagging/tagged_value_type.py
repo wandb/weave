@@ -25,6 +25,7 @@ Currently, the degenerate case is that a custom op either copies the object
 drop tags.
 """
 
+import dataclasses
 import json
 import typing
 
@@ -39,18 +40,25 @@ from ... import mappers
 from . import tag_store
 
 # A custom Weave Type used to represent tagged values.
+@dataclasses.dataclass(frozen=True)
 class TaggedValueType(types.Type):
     name = "tagged"
-    tag: types.TypedDict = types.TypedDict({})
-    value: types.Type = types.Any()
+    tag: types.TypedDict = dataclasses.field(
+        default_factory=lambda: types.TypedDict({})
+    )
+    value: types.Type = dataclasses.field(default_factory=lambda: types.Any())
 
-    def __init__(
-        self,
-        tag: types.TypedDict = types.TypedDict({}),
-        value: types.Type = types.Any(),
-    ):
-        self.tag = tag
-        self.value = value
+    # We use this technique to apply post-processing to the inputs, but also works
+    # around the frozen dataclass issue.
+    def __post_init__(self) -> None:
+        if isinstance(self.value, TaggedValueType):
+            self.__dict__["tag"] = types.TypedDict(
+                {
+                    **self.tag.property_types,
+                    **self.value.tag.property_types,
+                }
+            )
+            self.__dict__["value"] = self.value.value
 
     def __getattr__(self, attr: str) -> typing.Any:
         return getattr(self.value, attr)
@@ -79,17 +87,19 @@ class TaggedValueType(types.Type):
     def from_dict(cls, d: dict) -> "TaggedValueType":
         tag_type = types.TypeRegistry.type_from_dict(d["tag"])
         if isinstance(tag_type, TaggedValueType):
-            # here, we are coming from JS...
-            assert isinstance(tag_type.tag, types.TypedDict)
-            assert isinstance(tag_type.value, types.TypedDict)
-            tag_type = types.TypedDict(
-                {**tag_type.tag.property_types, **tag_type.value.property_types}
+            # here, we are coming from JS
+            assert types.TypedDict({}).assign_type(tag_type.tag), (
+                "tag_type.tag must be assignable to TypedDict, found %s" % tag_type.tag
             )
-        assert isinstance(tag_type, types.TypedDict), (
-            "Tags must be a dictionary, found %s" % tag_type
-        )
+            assert types.TypedDict({}).assign_type(tag_type.value), (
+                "tag_type.value must be assignable to TypedDict, found %s"
+                % tag_type.value
+            )
+            tag_type = types.TypedDict(
+                {**tag_type.tag.property_types, **tag_type.value.property_types}  # type: ignore
+            )
         return cls(
-            tag_type,
+            tag_type,  # type: ignore
             types.TypeRegistry.type_from_dict(d["value"]),
         )
 

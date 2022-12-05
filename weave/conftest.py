@@ -2,11 +2,13 @@ import os
 import random
 import numpy as np
 
+import typing
 import pytest
 import shutil
 import tempfile
 from . import context_state
 from . import weave_server
+from .tests import fixture_fakewandb
 from . import serialize
 from . import client
 
@@ -67,7 +69,7 @@ def fresh_server_logfile():
     def _clearlog():
         try:
             os.remove(weave_server.default_log_filename)
-        except (OSError, FileNotFoundError):
+        except (OSError, FileNotFoundError) as e:
             pass
 
     _clearlog()
@@ -81,6 +83,13 @@ def cereal_csv():
         cereal_path = os.path.join(d, "cereal.csv")
         shutil.copy("testdata/cereal.csv", cereal_path)
         yield cereal_path
+
+
+@pytest.fixture()
+def fake_wandb():
+    setup_response = fixture_fakewandb.setup()
+    yield
+    fixture_fakewandb.teardown(setup_response)
 
 
 @pytest.fixture()
@@ -114,19 +123,34 @@ class HttpServerTestClient:
         self.flask_test_client = flask_test_client
         self.execute_endpoint = "/__weave/execute"
 
-    def execute(self, nodes, no_cache=False):
+    def execute(
+        self,
+        nodes,
+        headers: typing.Optional[dict[str, typing.Any]] = None,
+        no_cache=False,
+    ):
+
+        _headers: dict[str, typing.Any] = {}
+        if headers is not None:
+            _headers = headers
+
         serialized = serialize.serialize(nodes)
         r = self.flask_test_client.post(
             self.execute_endpoint,
             json={"graphs": serialized},
+            headers=_headers,
         )
-        response = r.json["data"]
-        return response
+
+        return r.json["data"]
 
 
 @pytest.fixture()
-def weave_test_client(app):
+def http_server_test_client(app):
     app = weave_server.make_app()
     flask_client = app.test_client()
-    server = HttpServerTestClient(flask_client)
-    return client.Client(server)
+    return HttpServerTestClient(flask_client)
+
+
+@pytest.fixture()
+def weave_test_client(http_server_test_client):
+    return client.Client(http_server_test_client)

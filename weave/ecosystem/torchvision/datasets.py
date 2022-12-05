@@ -71,12 +71,12 @@ def torch_vision_dataset_card(dataset) -> panels.Card:
         content=[
             panels.CardTab(
                 name="Overview",
-                content=panels.Group(
-                    items=[
-                        panels.LabeledItem(
+                content=panels.Group2(
+                    items={
+                        "description": panels.LabeledItem(
                             item=dataset["description"], label="Description"
                         ),
-                    ]
+                    }
                 ),
             ),
             panels.CardTab(

@@ -2,11 +2,12 @@ import os
 import dataclasses
 import shutil
 
+from ..refs import ArtifactVersionFileType
 from ..api import op, mutation, weave_class
 from .. import weave_types as types
 from .. import wandb_util
-from . import arrow
-
+from .. import ops_arrow
+from .. import artifacts_local
 
 _py_open = open
 
@@ -37,7 +38,7 @@ class TableType(types.ObjectType):
     name = "table"
 
     def property_types(self):
-        return {"_rows": arrow.ArrowWeaveListType(types.TypedDict({}))}
+        return {"_rows": ops_arrow.ArrowWeaveListType(types.TypedDict({}))}
 
 
 @weave_class(weave_type=TableType)
@@ -56,8 +57,9 @@ class Table:
 
     @op(
         name="table-rows",
-        input_type={"table": types.WBTable()},
-        output_type=arrow.ArrowWeaveListType(types.TypedDict({})),
+        input_type={"table": TableType()},
+        output_type=ops_arrow.ArrowWeaveListType(types.TypedDict({})),
+        refine_output_type=rows_type,
     )
     def rows(table):
         return table._rows
@@ -67,7 +69,7 @@ class Table:
 class File:
     @op(
         name="file-table",
-        input_type={"file": types.FileType()},
+        input_type={"file": types.union(types.FileType(), ArtifactVersionFileType())},
         output_type=TableType(),
     )
     def table(file):
@@ -76,7 +78,29 @@ class File:
 
         data = json.loads(_py_open(local_path).read())
 
-        object_type = wandb_util.weave0_type_json_to_weave1_type(data["column_types"])
+        wb_artifact = None
+        if hasattr(file, "artifact") and isinstance(
+            file.artifact, artifacts_local.WandbArtifact
+        ):
+            wb_artifact = file.artifact._saved_artifact
+        converted_object_type = wandb_util.weave0_type_json_to_weave1_type(
+            data["column_types"], wb_artifact
+        )
+
+        # Fix two things:
+        # 1. incoming table column names may not match the order of column_types
+        # 2. if we had an unknown (happens when old type is "PythonObjectType")
+        #    we need to manually detect the type.
+        obj_prop_types = {}
+        for i, key in enumerate(data["columns"]):
+            col_type = converted_object_type.property_types[key]
+            if col_type.assign_type(types.UnknownType()):
+                unknown_col_example_data = [row[i] for row in data["data"]]
+                detected_type = types.TypeRegistry.type_of(unknown_col_example_data)
+                obj_prop_types[key] = detected_type.object_type
+            else:
+                obj_prop_types[key] = col_type
+        object_type = types.TypedDict(obj_prop_types)
 
         # TODO: this will need to recursively convert dicts to Objects in some
         # cases.
@@ -87,13 +111,18 @@ class File:
                 row[col_name] = val
             rows.append(row)
 
-        res = arrow.to_arrow_from_list_and_artifact(rows, object_type, file.artifact)
+        res = ops_arrow.to_arrow_from_list_and_artifact(
+            rows, object_type, file.artifact
+        )
         # I Don't think I need Table now. We won't parse again
         return Table(res)
 
     @op(
         name="file-directUrlAsOf",
-        input_type={"file": types.FileType(), "asOf": types.Int()},
+        input_type={
+            "file": types.union(types.FileType(), ArtifactVersionFileType()),
+            "asOf": types.Int(),
+        },
         output_type=types.String(),
     )
     def direct_url_as_of(file, asOf):
@@ -163,8 +192,17 @@ types.SubDirType.instance_classes = SubDir
 types.SubDirType.instance_class = SubDir
 
 
+@op(
+    name="dir-pathReturnType",
+    input_type={"dir": types.DirType(), "path": types.String()},
+    output_type=types.Type(),
+)
+def path_return_type(dir, path):
+    return dir._path_return_type(path)
+
+
 @weave_class(weave_type=types.DirType)
-class Dir(object):
+class Dir:
     def __init__(self, fullPath, size, dirs, files):
         self.fullPath = fullPath
         self.size = size
@@ -179,17 +217,10 @@ class Dir(object):
         return dir.size
 
     @op(
-        name="dir-pathReturnType",
-        input_type={"dir": types.DirType(), "path": types.String()},
-        output_type=types.Type(),
-    )
-    def path_return_type(dir, path):
-        return dir._path_return_type(path)
-
-    @op(
         name="dir-path",
         input_type={"dir": types.DirType(), "path": types.String()},
         output_type=types.UnionType(types.FileType(), types.DirType(), types.none_type),
+        refine_output_type=path_return_type,
     )
     def open(dir, path):
         return dir._path(path)

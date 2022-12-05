@@ -38,3 +38,19 @@ class WeaveInvalidURIError(Exception):
 
 class WeaveStorageError(Exception):
     pass
+
+
+class WeaveExecutionError(Exception):
+    pass
+
+
+class WeavifyError(Exception):
+    pass
+
+
+class WeaveDispatchError(WeaveBaseError):
+    pass
+
+
+class WeaveMissingArtifactPathError(WeaveBaseError):
+    pass

@@ -31,7 +31,7 @@ def test_logfile_captures_error(fresh_server_logfile):
 
     with context.local_http_client():
         with pytest.raises(requests.exceptions.HTTPError):
-            api.use(ops.Number.__add__(3, "a"))
+            api.use(ops.Number.__add__(4, "a"))
 
         # check that the log file was created
         assert os.path.exists(weave_server.default_log_filename)
@@ -45,7 +45,6 @@ def test_logfile_captures_error(fresh_server_logfile):
 
 def test_log_2_app_instances_different_threads(fresh_server_logfile):
     # kick off two http servers
-
     with context.local_http_client():
         with context.local_http_client():
             with pytest.raises(requests.exceptions.HTTPError):

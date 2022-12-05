@@ -5,17 +5,9 @@ from .. import api as weave
 from .. import ops
 from .. import op_def
 from .. import panels
+from weave import context_state
 
-from . import bertviz
-from . import xgboost
-from . import sklearn
-from . import keras
-from . import torchvision
-from . import huggingface
-from . import craiyon
-from . import openai
-from . import spacy
-from . import wandb
+loading_builtins_token = context_state.set_loading_built_ins()
 
 # TODO: feels odd to call this "ops.Markdown".
 # Maybe make it top level
@@ -77,7 +69,8 @@ def ecosystem() -> Ecosystem:
         # This is not Weavey at all!  We should look for any registered ps of no arguments that produce DatasetCard type
         # We can do that query using... Weave, lazily. In fact, EcosystemType() doesn't need to store any data, just
         # render the panel. Which can lazily fetch / search for everything.
-        _datasets=[sklearn.ca_housing_dataset, torchvision.mnist],
+        # _datasets=[sklearn.ca_housing_dataset, torchvision.mnist],
+        _datasets=[],
         _models=[],
         _ops=registry_mem.memory_registry.list_ops(),
     )
@@ -91,13 +84,9 @@ def ecosystem_render(
         title="Weave ecosystem",
         subtitle="",
         content=[
-            # Have to do lots of "type: ignore", because what we have here is a Node>
-            # But it behaves like a TypedDict, because we mixin NodeMethodsClass for the
-            # target type.
-            # TODO: need to figure out a way to do this without breaking python types
             panels.CardTab(
                 name="Intro",
-                content=panels.Markdown(INTRO),  # type: ignore
+                content=panels.PanelMarkdown(INTRO),  # type: ignore
             ),
             panels.CardTab(
                 name="Organizations",
@@ -142,3 +131,6 @@ def ecosystem_render(
             ),
         ],
     )
+
+
+context_state.clear_loading_built_ins(loading_builtins_token)

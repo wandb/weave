@@ -1,5 +1,9 @@
 import weave
+from ..weave_internal import make_const_node
 from .. import context_state as _context
+from .. import registry_mem
+from .. import graph
+from .. import weave_types as types
 
 _loading_builtins_token = _context.set_loading_built_ins()
 
@@ -7,6 +11,31 @@ _loading_builtins_token = _context.set_loading_built_ins()
 @weave.op()
 def test_add_one(x: int) -> int:
     return x + 1
+
+
+@weave.op(
+    input_type={"x": types.TypedDict({"a": types.Any()})},
+    output_type=lambda input_type: input_type["x"].property_types["a"],
+)
+def _test_mappability_custom_pick_op(x):
+    return x["a"]
+
+
+@weave.op(
+    input_type={"obj": types.TypedDict({}), "key": types.String()},
+    output_type=types.Type(),
+)
+def test_mappability_custom_pick_refine(obj, key):
+    return types.TypeRegistry.type_of(obj[key])
+
+
+@weave.op(
+    input_type={"obj": types.TypedDict({}), "key": types.String()},
+    output_type=types.Any(),
+    refine_output_type=test_mappability_custom_pick_refine,
+)
+def _test_mappability_custom_pick_op_with_refine(obj, key):
+    return obj[key]
 
 
 _context.clear_loading_built_ins(_loading_builtins_token)
@@ -25,7 +54,7 @@ def test_basic_mapping():
 
 
 def test_non_mapped_use():
-    node = test_add_one(1)
+    node = weave.save(1).test_add_one()
     assert node.type == weave.types.Int()
     assert weave.use(node) == 2
 
@@ -40,15 +69,13 @@ def test_non_mapped_serialized():
 
 
 def test_mapped_use():
-    node = test_add_one([1, 2, 3])
-    # TODO: this shold not be optional! Needs to be fixed when we fix the deriveOp class
-    assert node.type == weave.types.List(weave.types.optional(weave.types.Int()))
+    node = weave.save([1, 2, 3]).test_add_one()
+    assert node.type == weave.types.List(weave.types.Int())
     assert weave.use(node) == [2, 3, 4]
 
 
 def test_mapped_nullable_use():
-    node = test_add_one([1, None, 3])
-    # TODO: this shold not be optional! Needs to be fixed when we fix the deriveOp class
+    node = weave.save([1, None, 3]).test_add_one()
     assert node.type == weave.types.List(weave.types.optional(weave.types.Int()))
     assert weave.use(node) == [2, None, 4]
 
@@ -63,8 +90,8 @@ def test_mapped_serialized():
 
 
 def test_mapped_empty_use():
-    node = test_add_one([])
-    assert node.type == weave.types.List(weave.types.optional(weave.types.Int()))
+    node = weave.save([]).test_add_one()
+    assert node.type == weave.types.List(weave.types.Int())
     assert weave.use(node) == []
 
 
@@ -78,11 +105,15 @@ def test_mapped_empty_serialized():
 
 
 def test_custom_class():
+    _loading_builtins_token = _context.set_loading_built_ins()
+
     @weave.type()
     class TestType:
         @weave.op()
         def test_fn(self, a: int) -> int:
             return a + 1
+
+    _context.clear_loading_built_ins(_loading_builtins_token)
 
     node = TestType().test_fn(1)
     assert weave.use(node) == 2
@@ -99,3 +130,31 @@ def test_pick_index_challenge():
 
     pick_index = node["a"][0]
     assert weave.use(pick_index) == 1
+
+
+def test_mapped_maybe_list():
+    a = weave.save([3, None, 4, None, 5])
+    res = a + 1
+    assert res.type == types.List(types.union(types.Number(), types.NoneType()))
+    assert weave.use(res) == [4, None, 5, None, 6]
+
+
+def test_mapped_maybe_custom_pick():
+    a = weave.save([{"a": 3}, None, {"a": 4}, None, {"a": 5}])
+    res = a._test_mappability_custom_pick_op()
+    assert res.type == types.List(types.union(types.Int(), types.NoneType()))
+    assert weave.use(res) == [3, None, 4, None, 5]
+
+
+def test_mapped_maybe_pick():
+    a = weave.save([{"a": 3}, None, {"a": 4}, None, {"a": 5}])
+    res = a.pick("a")
+    assert res.type == types.List(types.union(types.Int(), types.NoneType()))
+    assert weave.use(res) == [3, None, 4, None, 5]
+
+
+def test_mapped_maybe_custom_refine():
+    a = weave.save([{"a": 3}, None, {"a": 4}, None, {"a": 5}])
+    res = a._test_mappability_custom_pick_op_with_refine("a")
+    assert res.type == types.List(types.union(types.Int(), types.NoneType()))
+    assert weave.use(res) == [3, None, 4, None, 5]

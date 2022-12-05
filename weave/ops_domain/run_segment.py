@@ -1,12 +1,17 @@
 import typing
 from typing import Optional, cast
-from ..api import type, op, use, get, type_of, Node
+from ..api import use, get, Node
 from .. import weave_types as types
 from .. import panels
-from ..ops_primitives.arrow import ArrowWeaveList, ArrowWeaveListType
+from .. import context_state as _context
+from ..ops_arrow import ArrowWeaveList, ArrowWeaveListType
+import weave
 
 
-@type()
+_loading_builtins_token = _context.set_loading_built_ins()
+
+
+@weave.type()
 class RunSegment:
     run_name: str
     prior_run_ref: Optional[str]
@@ -53,7 +58,7 @@ class RunSegment:
 
         return prior_experiment.concatenate(limited)
 
-    @op(render_info={"type": "function"})
+    @weave.op(render_info={"type": "function"})
     def refine_experiment_type(self) -> types.Type:
         return ArrowWeaveListType(
             object_type=types.TypedDict(
@@ -61,7 +66,7 @@ class RunSegment:
             )
         )
 
-    @op(refine_output_type=refine_experiment_type)
+    @weave.op(refine_output_type=refine_experiment_type)
     def experiment(self) -> typing.Any:
         result = self._experiment_body()
 
@@ -70,7 +75,7 @@ class RunSegment:
         return result
 
 
-@op()
+@weave.op()
 def run_segment_render(
     run_segment_node: Node[RunSegment],
 ) -> panels.Card:
@@ -90,3 +95,6 @@ def run_segment_render(
             ),
         ],
     )
+
+
+_context.clear_loading_built_ins(_loading_builtins_token)

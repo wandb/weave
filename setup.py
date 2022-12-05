@@ -1,4 +1,5 @@
 from setuptools import setup
+import pkg_resources
 
 
 def convert_git_requirement(req):
@@ -12,8 +13,10 @@ def convert_git_requirement(req):
 
 
 with open("requirements.txt") as requirements_file:
-    requirements = requirements_file.read().splitlines()
-requirements = [convert_git_requirement(req) for req in requirements]
+    requirements = [
+        convert_git_requirement(str(requirement))
+        for requirement in pkg_resources.parse_requirements(requirements_file)
+    ]
 
 
 setup(
@@ -23,13 +26,6 @@ setup(
     author="Weights & Biases",
     author_email="support@wandb.com",
     url="https://github.com/wandb/end-to-end",
-    packages=[
-        "weave",
-        "weave.ops_primitives",
-        "weave.ops_domain",
-        "weave.panels",
-        "weave.ecosystem",
-    ],
     package_dir={"weave": "weave"},
     include_package_data=True,
     install_requires=requirements,

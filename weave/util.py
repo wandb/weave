@@ -24,6 +24,10 @@ def rand_string_n(n):
     )
 
 
+def parse_boolean_env_var(name: str) -> bool:
+    return os.getenv(name, "False").lower() in ("true", "1", "t")
+
+
 def find_names(obj):
     if hasattr(obj, "name"):
         return [obj.name]
@@ -53,6 +57,6 @@ def is_notebook():
                 return False
             if "IPKernelApp" not in ip.config:
                 return False
-            if "VSCODE_PID" in os.environ:
-                return False
+            # if "VSCODE_PID" in os.environ:
+            #     return False
     return True

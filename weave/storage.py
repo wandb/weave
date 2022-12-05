@@ -172,26 +172,35 @@ def all_objects():
     for art_path in obj_paths:
         ref = refs.get_local_version_ref(art_path.name, "latest")
         if ref is not None:
-            result.append(ref)
-    return result
+            result.append((ref.created_at, ref))
+    return [r[1] for r in sorted(result)]
 
 
-def objects(of_type: types.Type, alias: str):
-    objects = []
+def objects(
+    of_type: types.Type, alias: str = "latest"
+) -> typing.List[refs.LocalArtifactRef]:
+    result = []
     for art_name in os.listdir(artifacts_local.local_artifact_dir()):
-        ref = refs.get_local_version_ref(art_name, alias)
-        if ref is not None:
-            if of_type.assign_type(ref.type):
-                obj = ref.get()
-                if isinstance(ref.type, types.RunType) and obj.op_name == "op-objects":
-                    continue
-                objects.append(obj)
-    return objects
+        try:
+            ref = refs.get_local_version_ref(art_name, alias)
+            if ref is not None:
+                if of_type.assign_type(ref.type):
+                    # TODO: Why did I have this here?
+                    # obj = ref.get()
+                    # if isinstance(ref.type, types.RunType) and obj.op_name == "op-objects":
+                    #     continue
+                    result.append((ref.created_at, ref))
+        except errors.WeaveSerializeError:
+            # This happens because we may not have loaded ecosystem stuff that we need
+            # to deserialize
+            continue
+    # Sorted by created_at
+    return [r[1] for r in sorted(result)]
 
 
 def recursively_unwrap_arrow(obj):
-    if getattr(obj, "to_pylist", None):
-        return obj.to_pylist()
+    if getattr(obj, "to_pylist_notags", None):
+        return obj.to_pylist_notags()
     if getattr(obj, "as_py", None):
         return obj.as_py()
     if isinstance(obj, graph.Node):
@@ -203,23 +212,26 @@ def recursively_unwrap_arrow(obj):
     return obj
 
 
-def to_python(obj):
+def to_python(obj, wb_type=None):
     # Arrow hacks for WeaveJS. We want to send the raw Python data
     # to the frontend for these objects. But this will break querying them in Weave
     # Python when not using InProcessServer.
     # TODO: Remove!
     obj = recursively_unwrap_arrow(obj)
 
-    wb_type = types.TypeRegistry.type_of(obj)
+    if wb_type is None:
+        wb_type = types.TypeRegistry.type_of(obj)
     mapper = mappers_python.map_to_python(
         wb_type, artifacts_local.LocalArtifact(_get_name(wb_type, obj))
     )
     val = mapper.apply(obj)
+    # TODO: this should be a ConstNode!
     return {"_type": wb_type.to_dict(), "_val": val}
 
 
-def from_python(obj):
-    wb_type = types.TypeRegistry.type_from_dict(obj["_type"])
+def from_python(obj, wb_type=None):
+    if wb_type is None:
+        wb_type = types.TypeRegistry.type_from_dict(obj["_type"])
     mapper = mappers_python.map_from_python(
         wb_type, artifacts_local.LocalArtifact(_get_name(wb_type, obj))
     )

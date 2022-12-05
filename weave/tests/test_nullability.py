@@ -1,5 +1,12 @@
 import typing
+
+import pytest
 import weave
+from weave.weave_internal import make_const_node, make_output_node
+
+from .. import context_state as _context
+
+_loading_builtins_token = _context.set_loading_built_ins()
 
 
 @weave.op()
@@ -24,14 +31,13 @@ def null_consuming_op(a: typing.Optional[int], b: int) -> int:
     return a + b  # type: ignore
 
 
+_context.clear_loading_built_ins(_loading_builtins_token)
+
+
 def test_basic_nullability():
     b = weave.save(2)
-    maybe_int = weave.save(
-        weave.graph.ConstNode(weave.types.optional(weave.types.Int()), 1)
-    )
-    null_int = weave.save(
-        weave.graph.ConstNode(weave.types.optional(weave.types.Int()), None)
-    )
+    maybe_int = weave.save([1, None])[0]
+    null_int = weave.save([1, None])[1]
 
     assert weave.use(no_arg_op()) == 1
 
@@ -64,3 +70,69 @@ def test_basic_nullability_in_mappability():
 
     assert weave.use(null_consuming_op(b_arr, 2)) == [4]
     assert weave.use(null_consuming_op(maybe_int_arr, 2)) == [3, 20]
+
+
+@pytest.mark.parametrize(
+    "input_node, expected",
+    [
+        # Base Case
+        (
+            make_const_node(
+                weave.types.TypedDict({"a": weave.types.Number()}), {"a": 42}
+            ),
+            42,
+        ),
+        # Maybe Case
+        (
+            make_const_node(
+                weave.types.union(
+                    weave.types.NoneType(),
+                    weave.types.TypedDict({"a": weave.types.Number()}),
+                ),
+                {"a": 42},
+            ),
+            42,
+        ),
+        # List of Maybe Case
+        (
+            make_const_node(
+                weave.types.List(
+                    weave.types.union(
+                        weave.types.NoneType(),
+                        weave.types.TypedDict({"a": weave.types.Number()}),
+                    )
+                ),
+                [{"a": 42}, None],
+            ),
+            [42, None],
+        ),
+        # Maybe list of Maybe Case
+        (
+            make_const_node(
+                weave.types.union(
+                    weave.types.NoneType(),
+                    weave.types.List(
+                        weave.types.union(
+                            weave.types.NoneType(),
+                            weave.types.TypedDict({"a": weave.types.Number()}),
+                        )
+                    ),
+                ),
+                [{"a": 42}, None],
+            ),
+            [42, None],
+        ),
+    ],
+)
+def test_nullability_in_execution(input_node, expected):
+    # JS Weave0 Pick (noteable incorrect op name)
+    js_pick = make_output_node(
+        weave.types.Number(),
+        "pick",
+        {"obj": input_node, "key": make_const_node(weave.types.String(), "a")},
+    )
+    assert weave.use(js_pick) == expected
+
+    # Ensure that this works at the type level so py dispatch works as well.
+    py_pick = input_node.pick("a")
+    assert weave.use(py_pick) == expected

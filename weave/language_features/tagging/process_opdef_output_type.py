@@ -8,11 +8,36 @@ import typing
 
 from ... import weave_types as types
 from .opdef_util import should_flow_tags, should_tag_op_def_outputs
-from .tagging_ops import op_get_tag_type, op_make_type_key_tag, op_make_type_tagged
+from .tagging_op_logic import (
+    op_get_tag_type_resolver,
+    op_make_type_key_tag_resolver,
+    op_make_type_tagged_resolver,
+)
 from ... import graph
+from ... import registry_mem
 
 if typing.TYPE_CHECKING:
     from ... import op_def as OpDef
+
+
+# The following 3 functions are used to get the ops without introducing circular references
+def op_get_tag_type(obj_type: types.Type) -> graph.OutputNode:
+    return registry_mem.memory_registry.get_op("op_get_tag_type")(obj_type)
+
+
+def op_make_type_key_tag(
+    obj_type: types.Type, key: str, tag_type: types.Type
+) -> graph.OutputNode:
+    return registry_mem.memory_registry.get_op("op_make_type_key_tag")(
+        obj_type, key, tag_type
+    )
+
+
+def op_make_type_tagged(obj_type: types.Type, tag_type: types.Type) -> graph.OutputNode:
+    return registry_mem.memory_registry.get_op("op_make_type_tagged")(
+        obj_type, tag_type
+    )
+
 
 # `process_opdef_output_type` will take in an outoput type and an op_def to
 # return a new output type that knows how to handle tags. It handles 3 cases: no
@@ -36,16 +61,16 @@ def process_opdef_output_type(
 
             def ot(input_types: typing.Dict[str, types.Type]) -> types.Type:
                 if _currently_weavifying(input_types):
-                    return op_make_type_key_tag(
-                        output_type,
+                    return op_make_type_key_tag(  # type: ignore
+                        output_type,  # type: ignore
                         first_arg_name,
-                        op_get_tag_type(input_types[first_arg_name]),
+                        input_types[first_arg_name],
                     )
                 else:
-                    return op_make_type_key_tag.resolve_fn(
-                        output_type,
+                    return op_make_type_key_tag_resolver(
+                        output_type,  # type: ignore
                         first_arg_name,
-                        op_get_tag_type.resolve_fn(input_types[first_arg_name]),
+                        input_types[first_arg_name],
                     )
 
             return ot
@@ -54,16 +79,16 @@ def process_opdef_output_type(
 
             def ot(input_types: typing.Dict[str, types.Type]) -> types.Type:
                 if _currently_weavifying(input_types):
-                    return op_make_type_key_tag(
+                    return op_make_type_key_tag(  # type: ignore
                         callable_output_type(input_types),
                         first_arg_name,
-                        op_get_tag_type(input_types[first_arg_name]),
+                        input_types[first_arg_name],
                     )
                 else:
-                    return op_make_type_key_tag.resolve_fn(
+                    return op_make_type_key_tag_resolver(
                         callable_output_type(input_types),
                         first_arg_name,
-                        op_get_tag_type.resolve_fn(input_types[first_arg_name]),
+                        input_types[first_arg_name],
                     )
 
             return ot
@@ -75,13 +100,13 @@ def process_opdef_output_type(
 
             def ot(input_types: typing.Dict[str, types.Type]) -> types.Type:
                 if _currently_weavifying(input_types):
-                    return op_make_type_tagged(
-                        output_type, op_get_tag_type(input_types[first_arg_name])
+                    return op_make_type_tagged(  # type: ignore
+                        output_type, op_get_tag_type(input_types[first_arg_name])  # type: ignore
                     )
                 else:
-                    return op_make_type_tagged.resolve_fn(
-                        output_type,
-                        op_get_tag_type.resolve_fn(input_types[first_arg_name]),
+                    return op_make_type_tagged_resolver(
+                        output_type,  # type: ignore
+                        op_get_tag_type_resolver(input_types[first_arg_name]),
                     )
 
             return ot
@@ -90,14 +115,14 @@ def process_opdef_output_type(
 
             def ot(input_types: typing.Dict[str, types.Type]) -> types.Type:
                 if _currently_weavifying(input_types):
-                    return op_make_type_tagged(
+                    return op_make_type_tagged(  # type: ignore
                         callable_output_type(input_types),
-                        op_get_tag_type(input_types[first_arg_name]),
+                        op_get_tag_type(input_types[first_arg_name]),  # type: ignore
                     )
                 else:
-                    return op_make_type_tagged.resolve_fn(
+                    return op_make_type_tagged_resolver(
                         callable_output_type(input_types),
-                        op_get_tag_type.resolve_fn(input_types[first_arg_name]),
+                        op_get_tag_type_resolver(input_types[first_arg_name]),
                     )
 
             return ot
@@ -105,6 +130,28 @@ def process_opdef_output_type(
             raise Exception("Invalid output_type")
     else:
         return output_type
+
+
+def process_opdef_refined_output_type(
+    refined_output_type: types.Type,
+    bound_params: typing.Dict[str, graph.Node],
+    op_def: "OpDef.OpDef",
+) -> types.Type:
+    if should_tag_op_def_outputs(op_def):
+        first_arg_name = op_def.input_type.named_args()[0].name
+        return op_make_type_key_tag_resolver(
+            refined_output_type,
+            first_arg_name,
+            bound_params[first_arg_name].type,
+        )
+    elif should_flow_tags(op_def):
+        first_arg_name = op_def.input_type.named_args()[0].name
+        return op_make_type_tagged_resolver(
+            refined_output_type,
+            op_get_tag_type_resolver(bound_params[first_arg_name].type),
+        )
+    else:
+        return refined_output_type
 
 
 def _currently_weavifying(input_types: typing.Any) -> bool:

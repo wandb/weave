@@ -1,4 +1,4 @@
-from ..ops import list_, dict_
+from ..ops import make_list, dict_, unnest
 from .. import forward_graph
 from ..execute import execute_forward
 from .. import compile
@@ -6,8 +6,8 @@ from .. import compile
 
 def test_cache_control():
     target = {"t": 1, "b": [1, 2, 3, 4]}
-    node_that_should_not_cache = list_.make_list(**{"0": target})
-    second_node_that_should_not_cache = list_.unnest(node_that_should_not_cache)
+    node_that_should_not_cache = make_list(**{"0": target})
+    second_node_that_should_not_cache = unnest(node_that_should_not_cache)
 
     nodes = compile.compile([second_node_that_should_not_cache])
     fg = forward_graph.ForwardGraph(nodes)

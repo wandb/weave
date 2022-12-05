@@ -162,7 +162,7 @@ class KerasModel(weave.types.Type):
             list[typing.Union[KerasTensorType, weave.types.Any]]
         ] = None,
         outputs_def: Optional[
-            list[typing.Union[KerasTensorType, weave.types.Any]]
+            list[typing.Union[KerasTensorType, weave.types.Type]]
         ] = None,
     ) -> "KerasModel":
         inputs = (
@@ -212,3 +212,20 @@ def call_string(model, input):
     res = model.predict([[input]]).tolist()[0]
     # Special case for strings: we need to convert the bytes to a string
     return byte_vector_to_string(res)
+
+
+# Added back by Shawn to make notebook work for now.
+# call_string has a callable output type. WeaveJS doesn't seem to be able
+# to make use of it.
+# TODO: remove
+@weave.op(
+    input_type={
+        "model": KerasModel.make_type(
+            [KerasTensorType.from_list([None, 1], weave.types.String())],
+            [weave.types.String()],
+        ),
+        "input": weave.types.String(),
+    },
+)
+def call_string_to_number(model, input) -> int:
+    return model.predict([[input]]).tolist()[0][0]

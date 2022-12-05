@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import weave
 
 from .. import huggingface as hf
+from .. import xgboost as weave_xgb
 
 
 @weave.op(
@@ -45,6 +46,10 @@ class ShapExplanationType(weave.types.Type):
         with artifact.new_file(f"{name}.pickle", binary=True) as f:
             pickle.dump(obj, f)
 
+    def load_instance(self, artifact, name, extra=None):
+        with artifact.open(f"{name}.pickle", binary=True) as f:
+            return pickle.load(f)
+
 
 @weave.op()
 def shap_explain_tree(self: xgboost.core.Booster, data: typing.Any) -> ShapValues:
@@ -59,7 +64,7 @@ def shap_explain(
 ) -> shap.Explanation:
     # TODO: shap has some options, like computing logits is better in some cases?
     # TODO: does shap work for all task styles?
-    pipeline = weave.use(pipeline_output._model.pipeline(return_all_scores=True))
+    pipeline = weave.use(pipeline_output._model.pipeline())
     explainer = shap.Explainer(pipeline)
     return explainer([pipeline_output.model_input])
 
@@ -73,5 +78,5 @@ def shap_plot_text(shap_values: shap.Explanation) -> weave.ops.Html:
 @weave.op()
 def shap_plot_text_render(
     shap_values: weave.Node[shap.Explanation],
-) -> weave.panels.Html:
-    return weave.panels.Html(shap_plot_text(shap_values))
+) -> weave.panels.PanelHtml:
+    return weave.panels.PanelHtml(shap_plot_text(shap_values))

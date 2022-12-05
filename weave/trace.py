@@ -6,6 +6,7 @@ from . import refs
 from . import weave_types as types
 from . import graph
 from . import runs
+from . import errors
 
 
 def get_obj_creator(ref: refs.Ref) -> typing.Optional[runs.Run]:
@@ -22,7 +23,12 @@ def get_obj_creator(ref: refs.Ref) -> typing.Optional[runs.Run]:
             and not art_name.endswith("-output")
             and artifacts_local.local_artifact_exists(art_name, "latest")
         ):
-            run = refs.get_local_version(art_name, "latest")
+            try:
+                run = refs.get_local_version(art_name, "latest")
+            except errors.WeaveSerializeError:
+                # This happens because we don't load all ecosystem modules, and so we can't
+                # deserializes everything.
+                continue
             if isinstance(run.output, refs.Ref) and str(run.output) == str(ref):
                 # If any input is also the ref, this run did not create obj, since
                 # the obj already existed. This fixes an infinite loop where list-createIndexCheckpointTag

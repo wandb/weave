@@ -1,34 +1,160 @@
+# We use self-hosted runners for performance: we can rely on docker caching
+# on the runner machines for 0s startup times for our tests.
+# There is an issue with self-hosted runners where if you use a mix of
+# host and container jobs, the host jobs will fail to start
+# (https://github.com/actions/checkout/issues/273).
+# So we create a separate "builder" tagged runner to do the build job on
+# the host, and then all the tests run on "runner" tagged runners.
+
 name: test
 
 on:
   push:
-    branches:
-      - master
-  pull_request:
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
+  build-container:
+    name: Build test container
+    runs-on: [self-hosted, builder]
+    env:
+      REGISTRY: us-east4-docker.pkg.dev/weave-support-367421/weave-images
     steps:
-      - uses: datadog/agent-github-action@v1.3
+      - uses: actions/checkout@v3
         with:
-          api_key: ${{ secrets.DD_API_KEY }}
+          fetch-depth: 2
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          registry: us-east4-docker.pkg.dev
+          username: _json_key
+          password: ${{ secrets.gcp_sa_key }}
+
+      # this script is hardcoded to build for linux/amd64
+      - name: Build test image
+        run: python3 docker_build.py build weave-test . Dockerfile.test
+
+  lint:
+    name: Python lint
+    needs:
+      - build-container
+    runs-on: [self-hosted, runner]
+    container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:${{ github.sha }}
+    steps:
       - uses: actions/checkout@v2
-      - name: Setup Python version
-        uses: actions/setup-python@v2
-        with:
-          python-version: 3.9
-          cache: "pip"
-      - name: Create and start virtual environment
-        run: |
-          python3 -m venv venv
-          source venv/bin/activate
-      - name: Install package
-        run: pip install .
-      - name: Install dev dependencies
-        run: pip install -r requirements.test.txt
+      - run: source /root/venv/bin/activate && pre-commit run --all-files
+
+  test:
+    name: Python unit tests
+    needs:
+      - build-container
+    runs-on: [self-hosted, runner]
+    container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:${{ github.sha }}
+    steps:
+      # - uses: datadog/agent-github-action@v1.3
+      #   with:
+      #     api_key: ${{ secrets.DD_API_KEY }}
+      - uses: actions/checkout@v2
       - name: Run tests
         env:
           DD_SERVICE: weave-python
           DD_ENV: ci
-        run: cd weave && pytest --ddtrace
+        run: source /root/venv/bin/activate && cd weave && pytest --ddtrace
+
+  # nbmake:
+  #   name: Run notebooks with nbmake
+  #   runs-on: self-hosted
+  #   container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:latest
+  #   steps:
+  #     - uses: actions/checkout@v2
+
+  #     - name: Run notebooks
+  #       run: source /root/venv/bin/activate && export PYTHONPATH=$(pwd) && pytest -n=4 --nbmake --overwrite examples
+  #     - name: Upload executed notebooks
+  #       uses: actions/upload-artifact@v3
+  #       if: always()
+  #       with:
+  #         name: notebooks
+  #         path: examples
+
+  cypress-run:
+    name: Notebook and UI tests
+    needs:
+      - build-container
+      # - lint
+      # - test
+    if: always()
+    runs-on: [self-hosted, runner]
+
+    container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:${{ github.sha }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # run copies of the current job in parallel
+        containers: [1, 2, 3, 4, 5, 6]
+    steps:
+      - uses: actions/checkout@v3
+
+      # - name: Download executed notebooks
+      #   uses: actions/download-artifact@v3
+      #   with:
+      #     name: notebooks
+      - name: Setup W&B API key
+        run: echo "WANDB_API_KEY=${{ secrets.WANDB_API_KEY }}" >> $GITHUB_ENV
+      - name: Setup Replicate API token
+        run: echo "REPLICATE_API_TOKEN=${{ secrets.REPLICATE_API_TOKEN }}" > $GITHUB_ENV
+
+      - name: Copy node_modules from container to checkout
+        run: cp -R /root/integration_test/node_modules ./integration_test/
+
+      - name: Activate venv
+        run: source /root/venv/bin/activate && echo "PATH=$PATH" >> $GITHUB_ENV
+      - run: echo $PATH
+      - name: Start weave server
+        # github actions does something funky with the std file descriptors, they end up
+        # being closed. tqdm (for example) raises an exception when the descriptor it
+        # wants to write to is closed.
+        run: nohup ./weave_server_test.sh < /dev/null &> /tmp/weave-server.log &
+        shell: bash
+      - name: Cypress run
+        # Use the following to run just a single test
+        # run: export PYTHONPATH=$(pwd) && cd integration_test && npx cypress run --record --parallel --browser chrome --spec "cypress/e2e/notebooks/Ops that return images.cy.ts"
+        run: export PYTHONPATH=$(pwd) && cd integration_test && npx cypress run --record --parallel --browser chrome
+        # uses: cypress-io/github-action@v4
+        # with:
+        #   working-directory: ./integration_testG
+        #   record: true
+        #   parallel: true
+        env:
+          # pass the Dashboard record key as an environment variable
+          CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
+          # pass GitHub token to allow accurately detecting a build vs a re-run build
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # after the test run completes
+      # store videos and any screenshots
+      # NOTE: screenshots will be generated only if E2E test failed
+      # thus we store screenshots only on failures
+      # Alternative: create and commit an empty cypress/screenshots folder
+      # to always have something to upload
+      - uses: actions/upload-artifact@v3
+        if: failure()
+        with:
+          name: cypress-screenshots
+          path: integration_test/cypress/screenshots
+      # Test run video was always captured, so this action uses "always()" condition
+      - uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: cypress-videos
+          path: integration_test/tcypress/videos
+      - uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: weave-server-logs
+          path: /tmp/weave
+
+      - uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: weave-server-stderrout
+          path: /tmp/weave-server.log

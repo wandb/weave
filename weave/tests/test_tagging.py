@@ -5,7 +5,11 @@ from .. import weave_types as types
 
 
 def test_tagged_value():
-    assert tagged_value_type.TaggedValueType({"a": 1}, 2).value == 2
+    tv = tagged_value_type.TaggedValueType(
+        types.TypedDict({"a": types.Number()}), types.String()
+    )
+    assert tv.value == types.String()
+    assert tv.tag == types.TypedDict({"a": types.Number()})
 
 
 def test_tagged_types():
@@ -34,6 +38,17 @@ def test_tagged_types():
     # 3: Assert that we can use tagged values instead of raw values
     seven = add_tester(TestNumber(3), TestNumber(4))
     ten = add_tester_2(three, seven)
+    assert tt(
+        {"a": TestNumber.WeaveType(), "d": TestNumber.WeaveType()},
+        TestNumber.WeaveType(),
+    ).assign_type(ten.type)
+    assert (
+        isinstance(ten.type, tagged_value_type.TaggedValueType)
+        and isinstance(
+            ten.type.tag.property_types["d"], tagged_value_type.TaggedValueType
+        )
+        and isinstance(ten.type.tag.property_types["d"].value, TestNumber.WeaveType)
+    )
     assert weave.use(ten).inner == 10
 
     # 4: Show that tags flow through
@@ -161,3 +176,15 @@ def test_tag_lookups():
     assert tag_store.find_tag(obj_3, "a") == 2
     assert tag_store.find_tag(tag_store.find_tag(obj_3, "nest"), "b") == 2
     assert tag_store.find_tag(obj_3, "b") == 3
+
+
+def test_tag_scope_with_multiple_children():
+    list_node = weave.save([1, 2, 3])
+    indexed = list_node.createIndexCheckpointTag()
+    count_node = indexed.count()
+    first_node = indexed[0]
+    second_node = indexed[1]
+    first_tag = first_node.indexCheckpoint()
+    second_tag = second_node.indexCheckpoint()
+    assert weave.use(count_node) == 3
+    assert weave.use([first_tag, second_tag]) == [0, 1]

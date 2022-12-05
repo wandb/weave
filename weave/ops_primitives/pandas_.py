@@ -140,9 +140,7 @@ class DataFrameTableType(types.ObjectType):
         return {"_df": self._df.to_dict(), "objectType": self.object_type.to_dict()}
 
     def property_types(self):
-        return {
-            "_df": self._df,
-        }
+        return {"_df": self._df}
 
     @property
     def object_type(self):
@@ -176,6 +174,16 @@ class DataFrameTable:
     def __init__(self, _df):
         self._df = _df
 
+    def __iter__(self):
+        # Iter is implemented to make list_indexCheckpoint work, which
+        # currently expects to be able to iterate. Iteration gets stuck in an
+        # infinite loop without implementing __iter__ here, since Python will
+        # default to using __getitem__, which is a lazy Weave op.
+        # TODO: When we fix arrow/vectorization and tagging, we'll have to
+        # fix this.
+        for row in self._df.itertuples():
+            yield row._asdict()
+
     def _count(self):
         return len(self._df)
 
@@ -191,10 +199,6 @@ class DataFrameTable:
         except IndexError:
             return None
 
-    @op(output_type=lambda input_types: input_types["self"].object_type)
-    def index(self, index: int):
-        return self._index(index)
-
     @op(output_type=index_output_type)
     def __getitem__(self, index: int):
         return self._index(index)
@@ -205,14 +209,14 @@ class DataFrameTable:
 
     @op(
         input_type={
-            "filter_fn": lambda input_types: types.Function(
+            "filterFn": lambda input_types: types.Function(
                 {"row": input_types["self"].object_type}, types.Any()
             ),
         },
         output_type=lambda input_types: input_types["self"],
     )
-    def filter(self, filter_fn):
-        return DataFrameTable(self._df[filter_fn_to_pandas_filter(self._df, filter_fn)])
+    def filter(self, filterFn):
+        return DataFrameTable(self._df[filter_fn_to_pandas_filter(self._df, filterFn)])
 
     @op(output_type=lambda input_types: types.List(input_types["self"].object_type))
     def map(self, map_fn: typing.Any):
@@ -222,11 +226,16 @@ class DataFrameTable:
         return list_.List.map.resolve_fn(self_list, map_fn)
 
     @op(
+        input_type={
+            "group_by_fn": lambda input_types: types.Function(
+                {"row": input_types["self"].object_type}, types.Any()
+            ),
+        },
         output_type=lambda input_types: types.List(
-            list_.GroupResultType(input_types["self"].object_type)
+            list_.GroupResultType(types.List(input_types["self"].object_type))
         ),
     )
-    def groupby(self, group_by_fn: typing.Any):
+    def groupby(self, group_by_fn):
         group_keys = None
         if group_by_fn.from_op.name == "dict":
             group_keys = list(group_by_fn.from_op.inputs.keys())

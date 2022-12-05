@@ -1,5 +1,6 @@
 -r requirements.txt
 types-requests
+types-setuptools
 pre-commit
 black
 rich

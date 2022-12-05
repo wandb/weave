@@ -1,3 +1,5 @@
+import inspect
+
 from . import registry_mem
 from . import op_def
 from . import derive_op
@@ -40,12 +42,21 @@ def op(
             setter=setter,
             render_info=render_info,
             pure=pure,
+            _decl_locals=inspect.currentframe().f_back.f_locals,
         )
 
         op_version = registry_mem.memory_registry.register_op(op)
 
         # After we register the op, create any derived ops
-        derive_op.derive_ops(op)
+
+        # If op.location is set, then its a custom (non-builtin op). We don't
+        # derive custom ops for now, as the derive code doesn't do the right thing.
+        # The op name is the location/uri for custom ops, and the derive code doesn't
+        # fix that up. So we end up double registering ops in WeaveJS which breaks
+        # everything.
+        # TODO: fix so we get mappability for custom (ecosystem) ops!
+        if op.location is None:
+            derive_op.derive_ops(op)
 
         return op_version
 

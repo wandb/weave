@@ -23,6 +23,7 @@ from .context import (
     # lazy_execution,
 )
 from .server import capture_weave_server_logs
+from .val_const import const
 
 from .weave_internal import define_fn
 

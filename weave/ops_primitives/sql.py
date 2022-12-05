@@ -9,6 +9,8 @@ from .. import weave_types as types
 from . import list_
 from . import graph
 
+from ..language_features.tagging import tagged_value_type
+
 
 class SqlConnectionType(types.Type):
     name = "sqlconnection"
@@ -180,23 +182,35 @@ class SqlTable:
 
     @op(
         input_type={
-            "filter_fn": lambda input_types: types.Function(
+            "filterFn": lambda input_types: types.Function(
                 {"row": input_types["self"].object_type}, types.Any()
             ),
         },
         output_type=lambda input_types: input_types["self"],
     )
-    def filter(self, filter_fn):
+    def filter(self, filterFn):
         new_obj = self.copy()
-        new_obj._filter_fn = filter_fn
+        new_obj._filter_fn = filterFn
         return new_obj
 
     @op(
+        input_type={
+            "group_by_fn": lambda input_types: types.Function(
+                {"row": input_types["self"].object_type}, types.Any()
+            ),
+        },
         output_type=lambda input_types: types.List(
-            list_.GroupResultType(input_types["self"].object_type)
+            tagged_value_type.TaggedValueType(
+                types.TypedDict(
+                    {
+                        "groupKey": input_types["group_by_fn"].output_type,
+                    }
+                ),
+                types.List(input_types["self"].object_type),
+            )
         ),
     )
-    def groupby(self, group_by_fn: typing.Any):
+    def groupby(self, group_by_fn):
         return list_.List.groupby.resolve_fn(self._to_list_table(), group_by_fn)
 
 
