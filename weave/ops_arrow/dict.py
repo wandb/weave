@@ -129,8 +129,11 @@ def arrow_dict_(**d):
         return ArrowWeaveList(pa.array([{}]), types.TypedDict({}))
     arrays = []
     prop_types = {}
+    awl_artifact = None
     for k, v in d.items():
         if isinstance(v, ArrowWeaveList):
+            if awl_artifact is None:
+                awl_artifact = v._artifact
             if isinstance(v.object_type, tagged_value_type.TaggedValueType):
                 # We drop the tags for now :(
                 # TODO: Fix
@@ -163,4 +166,4 @@ def arrow_dict_(**d):
             arrays[i] = pa.array([a] * max_len)
 
     table = pa.Table.from_arrays(arrays, list(d.keys()))
-    return ArrowWeaveList(table, types.TypedDict(prop_types))
+    return ArrowWeaveList(table, types.TypedDict(prop_types), awl_artifact)

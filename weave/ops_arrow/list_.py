@@ -454,6 +454,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             return []
         return self._arrow_data.to_pylist()
 
+    # TODO: Refactor to disable None artifact? (Only used in tests)
     def __init__(self, _arrow_data, object_type=None, artifact=None):
         self._arrow_data = _arrow_data
         self.object_type = object_type

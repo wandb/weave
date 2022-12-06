@@ -52,7 +52,9 @@ def __contains__(
             pa.array(
                 other_item.as_py() in my_item.as_py()
                 for my_item, other_item in zip(self._arrow_data, other._arrow_data)
-            )
+            ),
+            None,
+            self._artifact,
         )
     return ArrowWeaveList(
         pc.match_substring(self._arrow_data, other), types.Boolean(), self._artifact

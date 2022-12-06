@@ -100,6 +100,7 @@ def read_runs(
         joined_table = joined.arrow()
 
     with tracer.trace("to_weave"):
+        # TODO: Should this pass an artifact to `weave.ops.ArrowWeaveList`?
         res: weave.ops.ArrowWeaveList[Run2] = weave.ops.ArrowWeaveList(joined_table)
     return res
 
