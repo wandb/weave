@@ -61,3 +61,13 @@ def test_map_const():
     # const is the only case where the mapping is not two-way.
     # TODO: is this a problem?
     assert d3["a"] == 5
+
+
+def test_map_union_none_type():
+    d = None
+    d_type = types.UnionType(types.Type(), types.NoneType())
+    m = mappers_python.map_to_python(d_type, None)
+    d2 = m.apply(d)
+    m2 = mappers_python.map_from_python(d_type, None)
+    d3 = m2.apply(d2)
+    assert d3 is None

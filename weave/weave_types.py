@@ -194,6 +194,20 @@ class Type(metaclass=_TypeSubclassWatcher):
     def __repr__(self) -> str:
         return f"<{self.name}>"
 
+    # This orders types by specificity.
+    # A < B if A is assignable to B.
+    # A == B if A is assignable to B and B is assignable to A.
+    # If the types are not mutually assignable then an order is not defined, so __lt__
+    # returns none.
+    def __lt__(self, other: "Type") -> typing.Optional[bool]:
+        self_assignable_to_other = other.assign_type(self)
+        if self_assignable_to_other:
+            other_assignable_to_self = self.assign_type(other)
+            if other_assignable_to_self:
+                return False
+            return True
+        return None
+
     @classmethod
     def class_type_name(cls):
         if cls == Type:
