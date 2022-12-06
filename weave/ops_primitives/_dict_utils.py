@@ -12,7 +12,7 @@ def typeddict_pick_output_type(input_types):
         # TODO: we hack this to types.Number() for now! This is relied
         # on by tests because readcsv() doesn't properly return a full
         # type right now. Super janky
-        return types.Number()
+        return types.NoneType()
     return output_type
 
 
