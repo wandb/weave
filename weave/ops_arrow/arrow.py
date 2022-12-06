@@ -88,6 +88,8 @@ def arrow_as_array(obj) -> pa.Array:
             [c.combine_chunks() for c in obj.columns],
             names=obj.column_names,
         )
+    if isinstance(obj, pa.ChunkedArray):
+        return obj.combine_chunks()
     if not isinstance(obj, pa.Array):
         raise TypeError("Expected pyarrow Array or Table, got %s" % type(obj))
     return obj

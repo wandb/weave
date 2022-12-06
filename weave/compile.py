@@ -9,7 +9,8 @@ from . import registry_mem
 from . import errors
 from . import dispatch
 from . import graph_debug
-from . import plan
+from . import stitch
+from . import compile_table
 from . import weave_internal
 
 # These call_* functions must match the actual op implementations.
@@ -155,18 +156,20 @@ def execute_edit_graph(edit_g: graph_editable.EditGraph) -> None:
 def apply_column_pushdown(
     leaf_nodes: list[graph.Node],
 ) -> list[graph.Node]:
-    # Don't try if we don't have a project-runs2
+    # This is specific to project-runs2 (not yet used in W&B production) for now. But it
+    # is a general pattern that will work for all arrow tables.
     if not graph.filter_all_nodes(
         leaf_nodes,
         lambda n: isinstance(n, graph.OutputNode) and n.from_op.name == "project-runs2",
     ):
         return leaf_nodes
 
-    p = plan.plan(leaf_nodes)
+    p = stitch.stitch(leaf_nodes)
 
     def _replace_with_column_pushdown(node: graph.Node) -> graph.Node:
         if isinstance(node, graph.OutputNode) and node.from_op.name == "project-runs2":
-            run_cols = plan.get_cols(p, node)
+            forward_obj = p.get_result(node)
+            run_cols = compile_table.get_projection(forward_obj)
             config_cols = list(run_cols.get("config", {}).keys())
             summary_cols = list(run_cols.get("summary", {}).keys())
             return graph.OutputNode(
