@@ -746,15 +746,25 @@ def arrow_weave_list_createindexCheckpoint(arr):
 
 @op(
     name="ArrowWeaveList-concat",
-    input_type={"arr": types.List(ArrowWeaveListType(types.Any()))},
+    input_type={
+        "arr": types.List(
+            types.union(types.NoneType(), ArrowWeaveListType(types.Any()))
+        )
+    },
     output_type=lambda input_types: input_types["arr"].object_type,
 )
 def concat(arr):
-    artifact = arr[0]._artifact if arr else None
-    object_type = arr[0].object_type if arr else None
-    return ArrowWeaveList(
-        pa.concat_tables([a._arrow_data for a in arr]), object_type, artifact
-    )
+    arr = [item for item in arr if item != None]
+    if len(arr) == 0:
+        return to_arrow([])
+    elif len(arr) == 1:
+        return arr[0]
+
+    res = arr[0]
+    res = typing.cast(ArrowWeaveList, res)
+    for i in range(1, len(arr)):
+        res = res.concatenate(arr[i])
+    return res
 
 
 @dataclasses.dataclass(frozen=True)

@@ -104,3 +104,11 @@ def test_concat():
     list_node_3 = list_.make_list(a=list_node_1, b=list_node_2)
     concat_list = list_node_3.concat()
     assert weave.use(concat_list) == [1, 2, 3, 10, 20, 30]
+
+
+def test_nullable_concat():
+    list_node_1 = list_.make_list(a=1, b=2, c=3)
+    list_node_2 = list_.make_list(a=10, b=20, c=30)
+    list_node_3 = list_.make_list(a=list_node_1, b=list_node_2, c=weave.save(None))
+    concat_list = list_node_3.concat()
+    assert weave.use(concat_list) == [1, 2, 3, 10, 20, 30]

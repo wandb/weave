@@ -185,11 +185,14 @@ class List:
 
     @op(
         name="concat",
-        input_type={"arr": types.List(types.List(types.Any()))},
+        input_type={
+            "arr": types.List(types.union(types.NoneType(), types.List(types.Any())))
+        },
         output_type=lambda input_types: input_types["arr"].object_type,
     )
     def concat(arr):
         res = []
+        arr = [item for item in arr if item != None]
         for sublist in arr:
             if not tag_store.is_tagged(sublist):
                 res.extend(sublist)

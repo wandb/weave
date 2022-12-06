@@ -224,6 +224,16 @@ def test_arrow_unnest():
     ]
 
 
+def test_arrow_nullable_concat():
+    ca1 = pa.chunked_array([[1, 2], [3, 4]])
+    ca2 = pa.compute.add(ca1, 1)
+    awl1 = arrow.ArrowWeaveList(ca1)
+    awl2 = arrow.ArrowWeaveList(ca2)
+    list_of_awl = weave._ops.make_list(A=awl1, B=awl2, C=weave.save(None))
+    result = list_of_awl.concat()
+    assert weave.use(result)._arrow_data.to_pylist() == [1, 2, 3, 4, 2, 3, 4, 5]
+
+
 def test_arrow_concat_arrow_weave_list():
 
     # test concatenating two arrow weave lists that contain chunked arrays of the same type
