@@ -22,7 +22,9 @@ ARROW_WEAVE_LIST_NUMBER_TYPE = ArrowWeaveListType(types.Number())
 def __add__(self, other):
     if isinstance(other, ArrowWeaveList):
         other = other._arrow_data
-    return ArrowWeaveList(pc.add(self._arrow_data, other), types.Number())
+    return ArrowWeaveList(
+        pc.add(self._arrow_data, other), types.Number(), self._artifact
+    )
 
 
 @op(
@@ -36,7 +38,9 @@ def __add__(self, other):
 def __mul__(self, other):
     if isinstance(other, ArrowWeaveList):
         other = other._arrow_data
-    return ArrowWeaveList(pc.multiply(self._arrow_data, other), types.Number())
+    return ArrowWeaveList(
+        pc.multiply(self._arrow_data, other), types.Number(), self._artifact
+    )
 
 
 @op(
@@ -50,7 +54,9 @@ def __mul__(self, other):
 def __truediv__(self, other):
     if isinstance(other, ArrowWeaveList):
         other = other._arrow_data
-    return ArrowWeaveList(pc.divide(self._arrow_data, other), types.Number())
+    return ArrowWeaveList(
+        pc.divide(self._arrow_data, other), types.Number(), self._artifact
+    )
 
 
 @op(
@@ -64,7 +70,9 @@ def __truediv__(self, other):
 def __sub__(self, other):
     if isinstance(other, ArrowWeaveList):
         other = other._arrow_data
-    return ArrowWeaveList(pc.subtract(self._arrow_data, other), types.Number())
+    return ArrowWeaveList(
+        pc.subtract(self._arrow_data, other), types.Number(), self._artifact
+    )
 
 
 @op(
@@ -78,7 +86,9 @@ def __sub__(self, other):
 def __pow__(self, other):
     if isinstance(other, ArrowWeaveList):
         other = other._arrow_data
-    return ArrowWeaveList(pc.power(self._arrow_data, other), types.Number())
+    return ArrowWeaveList(
+        pc.power(self._arrow_data, other), types.Number(), self._artifact
+    )
 
 
 @op(
@@ -91,7 +101,9 @@ def __pow__(self, other):
 def __ne__(self, other) -> ArrowWeaveList[bool]:
     if isinstance(other, ArrowWeaveList):
         other = other._arrow_data
-    return ArrowWeaveList(pc.not_equal(self._arrow_data, other), types.Boolean())
+    return ArrowWeaveList(
+        pc.not_equal(self._arrow_data, other), types.Boolean(), self._artifact
+    )
 
 
 @op(
@@ -104,7 +116,9 @@ def __ne__(self, other) -> ArrowWeaveList[bool]:
 def __eq__(self, other) -> ArrowWeaveList[bool]:
     if isinstance(other, ArrowWeaveList):
         other = other._arrow_data
-    return ArrowWeaveList(pc.equal(self._arrow_data, other), types.Boolean())
+    return ArrowWeaveList(
+        pc.equal(self._arrow_data, other), types.Boolean(), self._artifact
+    )
 
 
 @op(
@@ -117,7 +131,9 @@ def __eq__(self, other) -> ArrowWeaveList[bool]:
 def __gt__(self, other) -> ArrowWeaveList[bool]:
     if isinstance(other, ArrowWeaveList):
         other = other._arrow_data
-    return ArrowWeaveList(pc.greater(self._arrow_data, other), types.Boolean())
+    return ArrowWeaveList(
+        pc.greater(self._arrow_data, other), types.Boolean(), self._artifact
+    )
 
 
 @op(
@@ -130,7 +146,9 @@ def __gt__(self, other) -> ArrowWeaveList[bool]:
 def __ge__(self, other) -> ArrowWeaveList[bool]:
     if isinstance(other, ArrowWeaveList):
         other = other._arrow_data
-    return ArrowWeaveList(pc.greater_equal(self._arrow_data, other), types.Boolean())
+    return ArrowWeaveList(
+        pc.greater_equal(self._arrow_data, other), types.Boolean(), self._artifact
+    )
 
 
 @op(
@@ -143,7 +161,9 @@ def __ge__(self, other) -> ArrowWeaveList[bool]:
 def __lt__(self, other) -> ArrowWeaveList[bool]:
     if isinstance(other, ArrowWeaveList):
         other = other._arrow_data
-    return ArrowWeaveList(pc.less(self._arrow_data, other), types.Boolean())
+    return ArrowWeaveList(
+        pc.less(self._arrow_data, other), types.Boolean(), self._artifact
+    )
 
 
 @op(
@@ -156,7 +176,9 @@ def __lt__(self, other) -> ArrowWeaveList[bool]:
 def __le__(self, other) -> ArrowWeaveList[bool]:
     if isinstance(other, ArrowWeaveList):
         other = other._arrow_data
-    return ArrowWeaveList(pc.less_equal(self._arrow_data, other), types.Boolean())
+    return ArrowWeaveList(
+        pc.less_equal(self._arrow_data, other), types.Boolean(), self._artifact
+    )
 
 
 @op(
@@ -167,7 +189,7 @@ def __le__(self, other) -> ArrowWeaveList[bool]:
     output_type=ARROW_WEAVE_LIST_NUMBER_TYPE,
 )
 def __neg__(self):
-    return ArrowWeaveList(pc.negate(self._arrow_data), types.Number())
+    return ArrowWeaveList(pc.negate(self._arrow_data), types.Number(), self._artifact)
 
 
 # todo: fix op decorator to not require name here,
@@ -181,7 +203,7 @@ def __neg__(self):
     output_type=ARROW_WEAVE_LIST_NUMBER_TYPE,
 )
 def floor(self):
-    return ArrowWeaveList(pc.floor(self._arrow_data), types.Number())
+    return ArrowWeaveList(pc.floor(self._arrow_data), types.Number(), self._artifact)
 
 
 @op(
@@ -192,4 +214,4 @@ def floor(self):
     output_type=ARROW_WEAVE_LIST_NUMBER_TYPE,
 )
 def ceil(self):
-    return ArrowWeaveList(pc.ceil(self._arrow_data), types.Number())
+    return ArrowWeaveList(pc.ceil(self._arrow_data), types.Number(), self._artifact)

@@ -86,10 +86,14 @@ def merge(self, other):
     for key in common_keys:
         if isinstance(self.object_type.property_types[key], types.TypedDict):
             self_sub_awl = ArrowWeaveList(
-                self._arrow_data.field(key), self.object_type.property_types[key]
+                self._arrow_data.field(key),
+                self.object_type.property_types[key],
+                self._artifact,
             )
             other_sub_awl = ArrowWeaveList(
-                other._arrow_data.field(key), other.object_type.property_types[key]
+                other._arrow_data.field(key),
+                other.object_type.property_types[key],
+                other._artifact,
             )
             merged = use(merge(self_sub_awl, other_sub_awl))._arrow_data  # type: ignore
             field_arrays[key] = merged

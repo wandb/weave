@@ -558,7 +558,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             raise ValueError(f'Data for new column "{name}" must be nonnull.')
 
         new_data = self._arrow_data.append_column(name, [data])
-        return ArrowWeaveList(new_data)
+        return ArrowWeaveList(new_data, None, self._artifact)
 
     def concatenate(self, other: "ArrowWeaveList") -> "ArrowWeaveList":
         arrow_data = [awl._arrow_data for awl in (self, other)]
@@ -567,13 +567,17 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             and arrow_data[0].type == arrow_data[1].type
         ):
             return ArrowWeaveList(
-                pa.chunked_array(arrow_data[0].chunks + arrow_data[1].chunks)
+                pa.chunked_array(arrow_data[0].chunks + arrow_data[1].chunks),
+                None,
+                self._artifact,
             )
         elif (
             all([isinstance(ad, pa.Table) for ad in arrow_data])
             and arrow_data[0].schema == arrow_data[1].schema
         ):
-            return ArrowWeaveList(pa.concat_tables([arrow_data[0], arrow_data[1]]))
+            return ArrowWeaveList(
+                pa.concat_tables([arrow_data[0], arrow_data[1]]), None, self._artifact
+            )
         else:
             raise ValueError(
                 "Can only concatenate two ArrowWeaveLists that both contain "
@@ -745,8 +749,10 @@ def arrow_weave_list_createindexCheckpoint(arr):
     output_type=lambda input_types: input_types["arr"].object_type,
 )
 def concat(arr):
+    artifact = arr[0]._artifact if arr else None
+    object_type = arr[0].object_type if arr else None
     return ArrowWeaveList(
-        pa.concat_tables([a._arrow_data for a in arr]), arr[0].object_type
+        pa.concat_tables([a._arrow_data for a in arr]), object_type, artifact
     )
 
 
@@ -824,7 +830,9 @@ def make_vectorized_object_constructor(constructor_op_name: str) -> None:
             ot = output_type({"attributes": types.TypeRegistry.type_of(attributes)})
         else:
             ot = output_type
-        return ArrowWeaveList(attributes._arrow_data, ot.object_type)
+        return ArrowWeaveList(
+            attributes._arrow_data, ot.object_type, attributes._artifact
+        )
 
 
 def vectorize(
@@ -1037,7 +1045,7 @@ def awl_add_arrow_tags(
     pq.write_table(new_value, "/tmp/test.parquet")
 
     # TODO: update type
-    return ArrowWeaveList(new_value, new_object_type)
+    return ArrowWeaveList(new_value, new_object_type, l._artifact)
 
 
 def awl_add_py_tags(l: ArrowWeaveList, tags: dict[str, typing.Any]):

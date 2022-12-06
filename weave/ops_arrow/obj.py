@@ -24,4 +24,4 @@ def arrow_getattr(self, name):
     # deserialize objects
     objects = [getattr(self._mapper.apply(i.as_py()), name) for i in ref_array]
     object_type = type_of(objects[0])
-    return ArrowWeaveList(pa.array(objects), object_type)
+    return ArrowWeaveList(pa.array(objects), object_type, self._artifact)
