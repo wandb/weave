@@ -4,6 +4,20 @@ import socket
 import string
 import gc, inspect
 import ipynbname
+import typing
+
+
+def raise_exception_with_sentry_if_available(
+    err: Exception, fingerprint: typing.Any
+) -> typing.NoReturn:
+    try:
+        import sentry_sdk
+    except ImportError:
+        raise err
+    else:
+        with sentry_sdk.push_scope() as scope:
+            scope.fingerprint = fingerprint
+            raise err
 
 
 def get_notebook_name():

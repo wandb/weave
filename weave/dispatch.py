@@ -16,6 +16,7 @@ from . import graph
 from . import errors
 from . import op_aliases
 from . import pyfunc_type_util
+from . import util
 
 
 class OpAmbiguityError(Exception):
@@ -140,14 +141,7 @@ def dispatch_by_name_and_type(
         err = errors.WeaveDispatchError(
             f'Cannot dispatch op "{common_name}"; no matching op found'
         )
-        try:
-            import sentry_sdk
-        except ImportError:
-            raise err
-        else:
-            with sentry_sdk.push_scope() as scope:
-                scope.fingerprint = [common_name]
-                raise err
+        util.raise_exception_with_sentry_if_available(err, [common_name])
 
     return dispatch_ops_by_type(ops, args, kwargs)
 
@@ -158,14 +152,19 @@ def dispatch_ops_by_type(
     arg_types = [type_of_input_param(arg) for arg in args]
     kwarg_types = {k: type_of_input_param(v) for k, v in kwargs.items()}
     op = choose_op_for_args(ops, arg_types, kwarg_types)
+
     if op is None:
         if len(ops) == 0:
-            raise errors.WeaveDispatchError(
+            err = errors.WeaveDispatchError(
                 f"dispatch_ops_by_type called with no ops. args: {args}, kwargs: {kwargs}"
             )
-        raise errors.WeaveDispatchError(
+            util.raise_exception_with_sentry_if_available(err, [args, kwargs])
+        err = errors.WeaveDispatchError(
             "No implementation of (%s) found for arg types: %s %s"
             % (op_aliases.get_op_aliases(ops[0].common_name), arg_types, kwarg_types)
+        )
+        util.raise_exception_with_sentry_if_available(
+            err, [ops, arg_types, kwarg_types]
         )
     params = op.input_type.create_param_dict(args, kwargs)
     return op(**params)
