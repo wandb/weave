@@ -5,6 +5,8 @@ import pyarrow as pa
 import string
 from PIL import Image
 
+from weave.ops_primitives.list_ import make_list
+
 from .. import storage
 from ..ops_primitives import Number, dict_
 from .. import api as weave
@@ -181,6 +183,94 @@ def test_map_array():
 def test_map_typeddict():
     data = arrow.to_arrow([{"a": 1, "b": 2}, {"a": 3, "b": 5}])
     assert weave.use(data.map(lambda row: row["a"])).to_pylist() == [1, 3]
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        # ELEMENT TYPE:
+        ## 0 Depth
+        ### Primitive
+        [1, 2],
+        ## 1 Depth
+        ### list
+        [[1], [2]],
+        ### dict
+        [{"outer_a": 1}, {"outer_a": 2}],
+        ## 2 Depth
+        ### dict of list
+        [{"outer_a": [1]}, {"outer_a": [2]}],
+        ### dict of dict
+        [{"outer_a": {"inner_a": 1}}, {"outer_a": {"inner_a": 2}}],
+        ### list of list
+        # [[[1]], [[2]]],
+        ### list of dict
+        [[{"outer_a": 1}], [{"outer_a": 1}]],
+        ## 3 Depth
+        ### dict of list of list
+        [{"outer_a": [[1]]}, {"outer_a": [[2]]}],
+        ### dict of list of dict
+        [{"outer_a": [{"inner_a": 1}]}, {"outer_a": [{"inner_a": 2}]}],
+        ### dict of dict of list
+        [{"outer_a": {"inner_a": [1]}}, {"outer_a": {"inner_a": [2]}}],
+        ### dict of dict of dict
+        [
+            {"outer_a": {"inner_a": {"inner_inner_a": 1}}},
+            {"outer_a": {"inner_a": {"inner_inner_a": 2}}},
+        ],
+        ### list of list of list
+        [[[[1]]], [[[2]]]],
+        ### list of list of dict
+        [[[{"outer_a": 1}]], [[{"outer_a": 2}]]],
+        ### list of dict of list
+        [[{"outer_a": [1]}], [{"outer_a": [2]}]],
+        ### list of dict of dict
+        [[{"outer_a": {"inner_a": 1}}], [{"outer_a": {"inner_a": 2}}]],
+    ],
+)
+def test_arrow_nested_identity(data):
+    assert weave.use(weave.save(arrow.to_arrow(data))[0]) == data[0]
+
+
+def test_arrow_nested_with_refs():
+    # As of this writing, the first time we call `to_arrow`, the underlying
+    # `save` operation does not convert relative artifact paths to URIs. This is
+    # in `ArrowWeaveList::save_instance`.
+    data_node = arrow.to_arrow(
+        [{"outer": [{"inner": Image.linear_gradient("L").rotate(0)}]}]
+    )
+
+    # First, we assert that the raw oath is not converted to an artifact reference,
+    # something like: "a040718385f492019b33b007a865c49d-pil_image"
+    raw_path = data_node._arrow_data[0]["outer"][0]["inner"].as_py()
+    assert (
+        isinstance(raw_path, str)
+        and not raw_path.startswith("local-artifact:")
+        and raw_path.endswith("-pil_image")
+    )
+
+    # After saving the artifact, we assert that the path is converted to an artifact reference
+    raw_data = weave.use(weave.save(data_node))
+    img_entry_data = raw_data._arrow_data[0]["outer"][0]["inner"].as_py()
+    assert img_entry_data.startswith("local-artifact:")
+
+    # Next, we get a derive node from the data_node, and assert that the path is
+    # converted to an artifact reference when appropriate.
+    col_node = data_node.pick("outer")
+    # Note: we don't need to save the `col_node` because
+    # they are already converted to the node representation via dispatch
+    raw_col_data = weave.use(col_node)
+    img_entry_col = raw_col_data._arrow_data[0][0]["inner"].as_py()
+    # For this case we want the entry to be the short-form - since the underlying artifact is the same
+    assert raw_path == img_entry_col
+    assert data_node._artifact == raw_col_data._artifact
+
+    # Finally, when we have a new artifact (we can force this by saving)
+    # the path is converted to an artifact reference
+    raw_col_data = weave.use(weave.save(col_node, "NewArtifact"))
+    img_entry_col = raw_col_data._arrow_data[0][0]["inner"].as_py()
+    assert img_entry_data == img_entry_col
+    assert data_node._artifact != raw_col_data._artifact
 
 
 def test_map_object():

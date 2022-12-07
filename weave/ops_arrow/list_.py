@@ -109,22 +109,8 @@ def _pick_output_type(input_types):
 
 
 def rewrite_weavelist_refs(arrow_data, object_type, artifact):
-    # TODO: Handle unions
-
-    if (
-        isinstance(object_type, types.TypedDict)
-        or isinstance(object_type, types.ObjectType)
-        or isinstance(object_type, tagged_value_type.TaggedValueType)
-    ):
-        if isinstance(object_type, tagged_value_type.TaggedValueType):
-            prop_types = {
-                "_tag": object_type.tag,
-                "_value": object_type.value,
-            }
-        else:
-            prop_types = object_type.property_types
-            if callable(prop_types):
-                prop_types = prop_types()
+    if _object_type_has_props(object_type):
+        prop_types = _object_type_prop_types(object_type)
         if isinstance(arrow_data, pa.Table):
             arrays = {}
             for col_name, col_type in prop_types.items():
@@ -155,25 +141,85 @@ def rewrite_weavelist_refs(arrow_data, object_type, artifact):
                 "Unions not fully supported yet in Weave arrow"
             )
         return rewrite_weavelist_refs(arrow_data, types.non_none(object_type), artifact)
-    elif isinstance(object_type, types.BasicType) or (
-        isinstance(object_type, types.Const)
-        and isinstance(object_type.val_type, types.BasicType)
-    ):
+    elif _object_type_is_basic(object_type):
         return arrow_data
     elif isinstance(object_type, types.List):
-        return pa.array(rewrite_weavelist_refs(item.as_py(), object_type.object_type, artifact) for item in arrow_data)  # type: ignore
+        # This is a bit unfortunate that we have to loop through all the items - would be nice to do a direct memory replacement.
+        return pa.array(_rewrite_pyliteral_refs(item.as_py(), object_type, artifact) for item in arrow_data)  # type: ignore
 
     else:
         # We have a column of refs
         new_refs = []
         for ref_str in arrow_data:
             ref_str = ref_str.as_py()
-            if ":" in ref_str:
-                new_refs.append(ref_str)
-            else:
-                ref = refs.Ref.from_local_ref(artifact, ref_str, object_type)
-                new_refs.append(str(ref.uri))
+            new_refs.append(_rewrite_ref_entry(ref_str, object_type, artifact))
         return pa.array(new_refs)
+
+
+def _rewrite_pyliteral_refs(pyliteral_data, object_type, artifact):
+    if _object_type_has_props(object_type):
+        prop_types = _object_type_prop_types(object_type)
+        if isinstance(pyliteral_data, dict):
+            return {
+                key: _rewrite_pyliteral_refs(pyliteral_data[key], value, artifact)
+                for key, value in prop_types.items()
+            }
+        else:
+            raise errors.WeaveTypeError('Unhandled type "%s"' % type(pyliteral_data))
+    elif isinstance(object_type, types.UnionType):
+        non_none_members = [
+            m for m in object_type.members if not isinstance(m, types.NoneType)
+        ]
+        if len(non_none_members) > 1:
+            raise errors.WeaveInternalError(
+                "Unions not fully supported yet in Weave arrow"
+            )
+        return _rewrite_pyliteral_refs(
+            pyliteral_data, types.non_none(object_type), artifact
+        )
+    elif _object_type_is_basic(object_type):
+        return pyliteral_data
+    elif isinstance(object_type, types.List):
+        return [
+            _rewrite_pyliteral_refs(item, object_type.object_type, artifact)
+            for item in pyliteral_data
+        ]
+    else:
+        return _rewrite_ref_entry(pyliteral_data, object_type, artifact)
+
+
+def _object_type_has_props(object_type):
+    return (
+        isinstance(object_type, types.TypedDict)
+        or isinstance(object_type, types.ObjectType)
+        or isinstance(object_type, tagged_value_type.TaggedValueType)
+    )
+
+
+def _object_type_prop_types(object_type):
+    if isinstance(object_type, tagged_value_type.TaggedValueType):
+        return {
+            "_tag": object_type.tag,
+            "_value": object_type.value,
+        }
+    prop_types = object_type.property_types
+    if callable(prop_types):
+        prop_types = prop_types()
+    return prop_types
+
+
+def _object_type_is_basic(object_type):
+    return isinstance(object_type, types.BasicType) or (
+        isinstance(object_type, types.Const)
+        and isinstance(object_type.val_type, types.BasicType)
+    )
+
+
+def _rewrite_ref_entry(entry: str, object_type, artifact):
+    if ":" in entry:
+        return entry
+    else:
+        return str(refs.Ref.from_local_ref(artifact, entry, object_type).uri)
 
 
 def rewrite_groupby_refs(arrow_data, group_keys, object_type, artifact):
@@ -377,7 +423,8 @@ class ArrowWeaveListType(types.Type):
         return cls(obj.object_type)
 
     def save_instance(self, obj, artifact, name):
-        # TODO: why do we need this check?
+        # If we are saving to the same artifact as we were written to,
+        # then we don't need to rewrite any references.
         if obj._artifact == artifact:
             arrow_data = obj._arrow_data
         else:
