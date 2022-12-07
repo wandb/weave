@@ -158,13 +158,20 @@ def dispatch_ops_by_type(
             err = errors.WeaveDispatchError(
                 f"dispatch_ops_by_type called with no ops. args: {args}, kwargs: {kwargs}"
             )
-            util.raise_exception_with_sentry_if_available(err, [args, kwargs])
+            util.raise_exception_with_sentry_if_available(
+                err, [args.__repr__(), kwargs.__repr__()]
+            )
         err = errors.WeaveDispatchError(
             "No implementation of (%s) found for arg types: %s %s"
             % (op_aliases.get_op_aliases(ops[0].common_name), arg_types, kwarg_types)
         )
         util.raise_exception_with_sentry_if_available(
-            err, [ops, arg_types, kwarg_types]
+            err,
+            [
+                ops[0].common_name,
+                arg_types.__repr__(),
+                kwarg_types.__repr__(),
+            ],
         )
     params = op.input_type.create_param_dict(args, kwargs)
     return op(**params)
