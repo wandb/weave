@@ -17,6 +17,7 @@ def raise_exception_with_sentry_if_available(
     else:
         with sentry_sdk.push_scope() as scope:
             scope.fingerprint = fingerprint
+            sentry_sdk.capture_exception(err)
             raise err
 
 
