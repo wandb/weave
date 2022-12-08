@@ -169,8 +169,6 @@ def dispatch_ops_by_type(
             err,
             [
                 ops[0].common_name,
-                arg_types.__repr__(),
-                kwarg_types.__repr__(),
             ],
         )
     params = op.input_type.create_param_dict(args, kwargs)
