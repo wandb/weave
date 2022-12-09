@@ -37,7 +37,8 @@ class LocalFile(weave_file.File):
         return self
 
     def _contents(self):
-        return open(self.path, encoding="ISO-8859-1").read()
+        with (open(self.path, encoding="ISO-8859-1")) as f:
+            return f.read()
 
     @property
     def changes_path(self):

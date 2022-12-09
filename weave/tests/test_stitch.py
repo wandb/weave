@@ -10,7 +10,7 @@ _loading_builtins_token = _context.set_loading_built_ins()
 
 
 @weave.type()
-class TestPlanObject:
+class _TestPlanObject:
     _name: str
     val: int
 
@@ -21,36 +21,36 @@ class TestPlanObject:
 
 
 @weave.type()
-class TestPlanHasObject:
+class _TestPlanHasObject:
     name: str
-    _obj: TestPlanObject
+    _obj: _TestPlanObject
 
 
 # Because this is named "Test*", doing .name() will tag the result
 @weave.op()
-def _test_hasobj_obj(self_has_obj: TestPlanHasObject) -> TestPlanObject:
+def _test_hasobj_obj(self_has_obj: _TestPlanHasObject) -> _TestPlanObject:
     return self_has_obj._obj
 
 
-get_object_self_tag = make_tag_getter_op.make_tag_getter_op("self", TestPlanObject.WeaveType())  # type: ignore
-get_hasobject_self_tag = make_tag_getter_op.make_tag_getter_op("self_has_obj", TestPlanHasObject.WeaveType())  # type: ignore
+get_object_self_tag = make_tag_getter_op.make_tag_getter_op("self", _TestPlanObject.WeaveType())  # type: ignore
+get_hasobject_self_tag = make_tag_getter_op.make_tag_getter_op("self_has_obj", _TestPlanHasObject.WeaveType())  # type: ignore
 
 _context.clear_loading_built_ins(_loading_builtins_token)
 
 
 def test_traverse_tags():
-    obj_node = weave.save(TestPlanObject("a", 1))
+    obj_node = weave.save(_TestPlanObject("a", 1))
     obj_from_tag_val_node = get_object_self_tag(obj_node.name() + "hello").val
     p = stitch.stitch([obj_from_tag_val_node])
     obj_recorder = p.get_result(obj_node)
     assert len(obj_recorder.calls) == 2
-    assert obj_recorder.calls[0].op_name == "TestPlanObject-name"
+    assert obj_recorder.calls[0].op_name == "_TestPlanObject-name"
     assert obj_recorder.calls[1].op_name == "Object-__getattr__"
     assert obj_recorder.calls[1].inputs[1].val == "val"
 
 
 def test_traverse_tags_2level():
-    obj_node = weave.save(TestPlanHasObject("has", TestPlanObject("a", 1)))
+    obj_node = weave.save(_TestPlanHasObject("has", _TestPlanObject("a", 1)))
     name_add_node = obj_node._test_hasobj_obj().name() + "hello"
     obj_from_tag_val_node = get_hasobject_self_tag(
         get_object_self_tag(name_add_node)
@@ -76,11 +76,11 @@ def test_enter_filter():
 
 
 def test_travese_dict():
-    obj_node = weave.save(TestPlanObject("a", 1))
+    obj_node = weave.save(_TestPlanObject("a", 1))
     p = stitch.stitch([weave.ops.dict_(x=obj_node)["x"].name()])
     obj_recorder = p.get_result(obj_node)
     assert len(obj_recorder.calls) == 1
-    assert obj_recorder.calls[0].op_name == "TestPlanObject-name"
+    assert obj_recorder.calls[0].op_name == "_TestPlanObject-name"
 
 
 def test_travese_groupby_dict():

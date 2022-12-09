@@ -76,7 +76,8 @@ class File:
         local_path = file.get_local_path()
         import json
 
-        data = json.loads(_py_open(local_path).read())
+        with _py_open(local_path) as f:
+            data = json.load(f)
 
         wb_artifact = None
         if hasattr(file, "artifact") and isinstance(

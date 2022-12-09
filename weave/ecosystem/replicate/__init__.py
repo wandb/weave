@@ -9,9 +9,8 @@ import requests
 import shutil
 
 try:
-    os.environ["REPLICATE_API_TOKEN"] = (
-        open(os.path.expanduser("~/.replicate_api_token")).read().strip()
-    )
+    with open(os.path.expanduser("~/.replicate_api_token")) as f:
+        os.environ["REPLICATE_API_TOKEN"] = f.read().strip()
 except FileNotFoundError:
     pass
 

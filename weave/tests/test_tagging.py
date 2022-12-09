@@ -14,40 +14,40 @@ def test_tagged_value():
 
 def test_tagged_types():
     @weave.type()
-    class TestNumber:
+    class _TestNumber:
         inner: int
 
     @weave.op()
-    def add_tester(a: TestNumber, b: TestNumber) -> TestNumber:
-        return TestNumber(a.inner + b.inner)
+    def add_tester(a: _TestNumber, b: _TestNumber) -> _TestNumber:
+        return _TestNumber(a.inner + b.inner)
 
     @weave.op()
-    def add_tester_2(d: TestNumber, e: TestNumber) -> TestNumber:
-        return TestNumber(d.inner + e.inner)
+    def add_tester_2(d: _TestNumber, e: _TestNumber) -> _TestNumber:
+        return _TestNumber(d.inner + e.inner)
 
-    get_a_tag = make_tag_getter_op.make_tag_getter_op("a", TestNumber.WeaveType())
-    get_d_tag = make_tag_getter_op.make_tag_getter_op("d", TestNumber.WeaveType())
+    get_a_tag = make_tag_getter_op.make_tag_getter_op("a", _TestNumber.WeaveType())
+    get_d_tag = make_tag_getter_op.make_tag_getter_op("d", _TestNumber.WeaveType())
 
     # 1: Assert that that the tester works
-    three = add_tester(TestNumber(1), TestNumber(2))
+    three = add_tester(_TestNumber(1), _TestNumber(2))
     assert weave.use(three).inner == 3
 
     # 2: Assert that we can get a tag
     assert weave.use(get_a_tag(three)).inner == 1
 
     # 3: Assert that we can use tagged values instead of raw values
-    seven = add_tester(TestNumber(3), TestNumber(4))
+    seven = add_tester(_TestNumber(3), _TestNumber(4))
     ten = add_tester_2(three, seven)
     assert tt(
-        {"a": TestNumber.WeaveType(), "d": TestNumber.WeaveType()},
-        TestNumber.WeaveType(),
+        {"a": _TestNumber.WeaveType(), "d": _TestNumber.WeaveType()},
+        _TestNumber.WeaveType(),
     ).assign_type(ten.type)
     assert (
         isinstance(ten.type, tagged_value_type.TaggedValueType)
         and isinstance(
             ten.type.tag.property_types["d"], tagged_value_type.TaggedValueType
         )
-        and isinstance(ten.type.tag.property_types["d"].value, TestNumber.WeaveType)
+        and isinstance(ten.type.tag.property_types["d"].value, _TestNumber.WeaveType)
     )
     assert weave.use(ten).inner == 10
 

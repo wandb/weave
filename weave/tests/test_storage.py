@@ -199,12 +199,12 @@ def test_cross_artifact_ref():
 
 
 @weave.type()
-class TestObjType:
+class _TestObjType:
     pass
 
 
 def test_ref_to_node():
-    d = weave.save({"a": TestObjType()})
+    d = weave.save({"a": _TestObjType()})
     node = d["a"]
     # Node a Node with weave type ObjectType
     # We want to make sure dispatch doesn't convert this access to ._ref into

@@ -9,7 +9,7 @@ _loading_builtins_token = _context.set_loading_built_ins()
 
 
 @weave.op()
-def test_add_one(x: int) -> int:
+def _test_add_one(x: int) -> int:
     return x + 1
 
 
@@ -25,14 +25,14 @@ def _test_mappability_custom_pick_op(x):
     input_type={"obj": types.TypedDict({}), "key": types.String()},
     output_type=types.Type(),
 )
-def test_mappability_custom_pick_refine(obj, key):
+def _test_mappability_custom_pick_refine(obj, key):
     return types.TypeRegistry.type_of(obj[key])
 
 
 @weave.op(
     input_type={"obj": types.TypedDict({}), "key": types.String()},
     output_type=types.Any(),
-    refine_output_type=test_mappability_custom_pick_refine,
+    refine_output_type=_test_mappability_custom_pick_refine,
 )
 def _test_mappability_custom_pick_op_with_refine(obj, key):
     return obj[key]
@@ -54,7 +54,7 @@ def test_basic_mapping():
 
 
 def test_non_mapped_use():
-    node = weave.save(1).test_add_one()
+    node = weave.save(1)._test_add_one()
     assert node.type == weave.types.Int()
     assert weave.use(node) == 2
 
@@ -62,20 +62,20 @@ def test_non_mapped_use():
 def test_non_mapped_serialized():
     node = weave.weave_internal.make_output_node(
         weave.types.Int(),
-        test_add_one.name,
+        _test_add_one.name,
         {"x": weave.graph.ConstNode(weave.types.Int(), 1)},
     )
     assert weave.use(node) == 2
 
 
 def test_mapped_use():
-    node = weave.save([1, 2, 3]).test_add_one()
+    node = weave.save([1, 2, 3])._test_add_one()
     assert node.type == weave.types.List(weave.types.Int())
     assert weave.use(node) == [2, 3, 4]
 
 
 def test_mapped_nullable_use():
-    node = weave.save([1, None, 3]).test_add_one()
+    node = weave.save([1, None, 3])._test_add_one()
     assert node.type == weave.types.List(weave.types.optional(weave.types.Int()))
     assert weave.use(node) == [2, None, 4]
 
@@ -83,14 +83,14 @@ def test_mapped_nullable_use():
 def test_mapped_serialized():
     node = weave.weave_internal.make_output_node(
         weave.types.Int(),
-        test_add_one.name,
+        _test_add_one.name,
         {"x": weave.graph.ConstNode(weave.types.List(weave.types.Int()), [1, 2, 3])},
     )
     assert weave.use(node) == [2, 3, 4]
 
 
 def test_mapped_empty_use():
-    node = weave.save([]).test_add_one()
+    node = weave.save([])._test_add_one()
     assert node.type == weave.types.List(weave.types.Int())
     assert weave.use(node) == []
 
@@ -98,7 +98,7 @@ def test_mapped_empty_use():
 def test_mapped_empty_serialized():
     node = weave.weave_internal.make_output_node(
         weave.types.Int(),
-        test_add_one.name,
+        _test_add_one.name,
         {"x": weave.graph.ConstNode(weave.types.List(weave.types.Int()), [])},
     )
     assert weave.use(node) == []

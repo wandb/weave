@@ -15,7 +15,7 @@ class Point(typing.TypedDict):
 
 
 @weave.op()
-def test_compute_points_compute_points(xs: list[XOnly], freq: float) -> list[Point]:
+def _test_compute_points_compute_points(xs: list[XOnly], freq: float) -> list[Point]:
     res: list[Point] = []
     for row in xs:
         res.append({"x": row["x"], "y": math.sin(freq * row["x"])})
@@ -25,7 +25,7 @@ def test_compute_points_compute_points(xs: list[XOnly], freq: float) -> list[Poi
 def test_compute_points():
 
     xs = [{"x": float(i)} for i in range(2)]
-    points = test_compute_points_compute_points(xs, 1)
+    points = _test_compute_points_compute_points(xs, 1)
     with context.local_http_client():
         assert weave.use(points) == [
             {"x": 0.0, "y": 0.0},
