@@ -63,6 +63,11 @@ class TaggedValueType(types.Type):
     def __getattr__(self, attr: str) -> typing.Any:
         return getattr(self.value, attr)
 
+    def _is_assignable_to(self, assign_to: types.Type) -> bool:
+        if isinstance(assign_to, TaggedValueType):
+            raise NotImplementedError
+        return assign_to.assign_type(self.value)
+
     @classmethod
     def is_instance(cls, obj: typing.Any) -> bool:
         return box.is_boxed(obj) and tag_store.is_tagged(obj)
