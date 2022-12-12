@@ -298,6 +298,7 @@ def _mapped_refine_output_type(orig_op):
             types.Type(),
             mapped_refine_output_type_refiner,
             None,
+            plugins=orig_op.refine_output_type.plugins,
         )
         unioned_mapped_type_refiner_op_def = registry_mem.memory_registry.register_op(
             unioned_mapped_type_refiner_op
@@ -316,4 +317,6 @@ def handler_for_id(handler_id: str) -> type[DeriveOpHandler]:
 def derive_ops(op: op_def.OpDef):
     for handler in DeriveOpHandler.__subclasses__():
         if handler.should_derive_op(op) and handler.handler_id not in op.derived_ops:
-            op.derived_ops[handler.handler_id] = handler.make_derived_op(op)
+            new_op = handler.make_derived_op(op)
+            op.derived_ops[handler.handler_id] = new_op
+            new_op.derived_from = op

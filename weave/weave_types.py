@@ -614,6 +614,20 @@ class UnionType(Type):
         return hash((hash(mem) for mem in self.members))
 
     def _assign_type_inner(self, other):
+        TaggedValueType = type_name_to_type("tagged")
+        # If other is a tagged value and the value is a union, push the tags
+        # down. This pattern is a smell and indicates that the unwrapping logic
+        # in `Type.assign_type` may not be perfect. I think we should get rid of
+        # using `_assign_type_inner` in any container types (const, union,
+        # tagged) and do all the shared unwrapping in the `Type.assign_type``
+        # method. For now, this is fine, but a good opportunity to refactor in
+        # the future.
+        if isinstance(other, TaggedValueType):
+            if isinstance(other.value, UnionType):
+                other = UnionType(
+                    *[TaggedValueType(other.tag, mem) for mem in other.value.members]
+                )
+
         if isinstance(other, UnionType):
             if not all(self.assign_type(member) for member in other.members):
                 return False

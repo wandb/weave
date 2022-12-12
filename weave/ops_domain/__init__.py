@@ -1,4 +1,5 @@
 # Exporting these
+from . import wbgqlquery_op
 from . import entity_ops
 from . import user_ops
 from . import project_ops

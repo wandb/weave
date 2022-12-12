@@ -22,7 +22,9 @@ def get_projection(obj: stitch.ObjectRecorder) -> KeyTree:
     """Given an object returned by stitch, return a tree of all accessed columns."""
     cols: KeyTree = {}
     for call in obj.calls:
-        if call.op_name.endswith("pick") or call.op_name.endswith("__getattr__"):
+        if call.node.from_op.name.endswith("pick") or call.node.from_op.name.endswith(
+            "__getattr__"
+        ):
             key = call.inputs[1].val
             if key is None:
                 raise errors.WeaveInternalError("non-const not yet supported")

@@ -50,11 +50,6 @@ _analytics_enabled: contextvars.ContextVar[bool] = contextvars.ContextVar(
     "analytics_enabled", default=True
 )
 
-_wandb_public_api: contextvars.ContextVar[
-    typing.Optional[public.Api]
-] = contextvars.ContextVar("_wandb_public_api", default=None)
-
-
 _cache_namespace_token: contextvars.ContextVar[
     typing.Optional[str]
 ] = contextvars.ContextVar("_cache_namespace_token", default=None)

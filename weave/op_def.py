@@ -52,11 +52,13 @@ class OpDef:
             typing.Callable[[typing.Dict[str, types.Type]], types.Type],
         ]
     ]
+    plugins: typing.Optional[typing.Dict[str, typing.Any]]
 
     # This is required to be able to determine which ops were derived from this
     # op. Particularly in cases where we need to rename or lookup when
     # versioned, we cannot rely just on naming structure alone.
     derived_ops: typing.Dict[str, "OpDef"]
+    derived_from: typing.Optional["OpDef"]
 
     def __init__(
         self,
@@ -73,6 +75,8 @@ class OpDef:
         pure=True,
         is_builtin: typing.Optional[bool] = None,
         weave_fn: typing.Optional[graph.Node] = None,
+        *,
+        plugins=None,
         _decl_locals=None,  # These are python locals() from the enclosing scope.
     ):
         self.name = name
@@ -93,8 +97,10 @@ class OpDef:
         self.location = None
         self.instance = None
         self.derived_ops = {}
+        self.derived_from = None
         self.weave_fn = weave_fn
         self._output_type = None
+        self.plugins = plugins
 
     def __get__(self, instance, owner):
         return BoundOpDef(instance, self)

@@ -1,37 +1,66 @@
+from ..compile_domain import wb_gql_op_plugin
 from ..api import op
-from . import wb_domain_types
-from . import wandb_domain_gql
+from .. import weave_types as types
+from . import wb_domain_types as wdt
+from ..language_features.tagging.make_tag_getter_op import make_tag_getter_op
+from .wandb_domain_gql import (
+    gql_prop_op,
+    gql_direct_edge_op,
+    gql_connection_op,
+    gql_root_op,
+)
+
+# Section 1/6: Tag Getters
+# None
+
+# Section 2/6: Root Ops
+entity = gql_root_op(
+    "root-entity",
+    "entity",
+    wdt.EntityType,
+    {
+        "entityName": types.String(),
+    },
+    lambda inputs: f'name: "{inputs["entityName"]}"',
+)
 
 
-@op(name="root-entity")
-def entity(entityName: str) -> wb_domain_types.Entity:
-    return wb_domain_types.Entity(entityName)
-
-
+# Section 3/6: Attribute Getters
 @op(name="entity-name")
-def entity_name(entity: wb_domain_types.Entity) -> str:
-    return entity.entity_name
+def entity_name(entity: wdt.Entity) -> str:
+    return entity.gql["name"]
 
 
-@op(name="entity-isTeam")
-def entity_is_team(entity: wb_domain_types.Entity) -> bool:
-    return wandb_domain_gql.entity_is_team(entity)
+gql_prop_op(
+    "entity-isTeam",
+    wdt.EntityType,
+    "isTeam",
+    types.Boolean(),
+)
 
+# Section 4/6: Direct Relationship Ops
+# None
 
+# Section 5/6: Connection Ops
+gql_connection_op(
+    "entity-portfolios",
+    wdt.EntityType,
+    "artifactCollections",
+    wdt.ArtifactCollectionType,
+    {},
+    lambda inputs: f"first: 50 collectionTypes: [PORTFOLIO]",
+)
+
+gql_connection_op(
+    "entity-projects",
+    wdt.EntityType,
+    "projects",
+    wdt.ProjectType,
+    {},
+    lambda inputs: f"first: 50",
+)
+
+# Section 6/6: Non Standard Business Logic Ops
 @op(name="entity-link")
-def entity_link(entity: wb_domain_types.Entity) -> wb_domain_types.Link:
-    return wb_domain_types.Link(entity.entity_name, f"/{entity.entity_name}")
-
-
-@op(name="entity-portfolios")
-def entity_portfolios(
-    entity: wb_domain_types.Entity,
-) -> list[wb_domain_types.ArtifactCollection]:
-    return wandb_domain_gql.entity_portfolios(entity)
-
-
-@op(name="entity-projects")
-def entity_projects(
-    entity: wb_domain_types.Entity,
-) -> list[wb_domain_types.Project]:
-    return wandb_domain_gql.entity_projects(entity)
+def entity_link(entity: wdt.Entity) -> wdt.Link:
+    return wdt.Link(entity.gql["name"], f"/{entity.gql['name']}")

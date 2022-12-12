@@ -1,41 +1,63 @@
+from ..compile_domain import wb_gql_op_plugin
 from ..api import op
-from . import wb_domain_types
-from . import wandb_domain_gql
+from .. import weave_types as types
+from . import wb_domain_types as wdt
+from ..language_features.tagging.make_tag_getter_op import make_tag_getter_op
+from .wandb_domain_gql import (
+    gql_prop_op,
+    gql_direct_edge_op,
+    gql_connection_op,
+    gql_root_op,
+)
 
+# Section 1/6: Tag Getters
+# None
 
+# Section 2/6: Root Ops
+# None
+
+# Section 3/6: Attribute Getters
+# artifact_membership_version_index is written in the plain style
+# because the attribute is part of the required fragment
 @op(name="artifactMembership-versionIndex")
 def artifact_membership_version_index(
-    artifactMembership: wb_domain_types.ArtifactCollectionMembership,
+    artifactMembership: wdt.ArtifactCollectionMembership,
 ) -> int:
-    return artifactMembership.version_index
+    return artifactMembership.gql["versionIndex"]
 
 
-@op(name="artifactMembership-aliases")
-def artifact_membership_aliases(
-    artifactMembership: wb_domain_types.ArtifactCollectionMembership,
-) -> list[wb_domain_types.ArtifactAlias]:
-    return wandb_domain_gql.artifact_membership_aliases(artifactMembership)
+gql_prop_op(
+    "artifactMembership-createdAt",
+    wdt.ArtifactCollectionMembershipType,
+    "createdAt",
+    wdt.DateType,
+)
 
+# Section 4/6: Direct Relationship Ops
+gql_direct_edge_op(
+    "artifactMembership-collection",
+    wdt.ArtifactCollectionMembershipType,
+    "artifactCollection",
+    wdt.ArtifactCollectionType,
+)
 
-@op(name="artifactMembership-collection")
-def artifact_membership_collection(
-    artifactMembership: wb_domain_types.ArtifactCollectionMembership,
-) -> wb_domain_types.ArtifactCollection:
-    return artifactMembership._artifact_collection
+gql_direct_edge_op(
+    "artifactMembership-artifactVersion",
+    wdt.ArtifactCollectionMembershipType,
+    "artifact",
+    wdt.ArtifactVersionType,
+)
 
+gql_direct_edge_op(
+    "artifactMembership-aliases",
+    wdt.ArtifactCollectionMembershipType,
+    "aliases",
+    wdt.ArtifactAliasType,
+    is_many=True,
+)
 
-@op(name="artifactMembership-artifactVersion")
-def artifact_membership_version(
-    artifactMembership: wb_domain_types.ArtifactCollectionMembership,
-) -> wb_domain_types.ArtifactVersion:
-    return wb_domain_types.ArtifactVersion(
-        _artifact_sequence=artifactMembership._artifact_collection,
-        version_index=artifactMembership.version_index,
-    )
+# Section 5/6: Connection Ops
+# None
 
-
-@op(name="artifactMembership-createdAt")
-def artifact_membership_created_at(
-    artifactMembership: wb_domain_types.ArtifactCollectionMembership,
-) -> wb_domain_types.Date:
-    return wandb_domain_gql.artifact_membership_created_at(artifactMembership)
+# Section 6/6: Non Standard Business Logic Ops
+# None

@@ -10,11 +10,20 @@ from .. import serialize
 from .. import registry_mem
 from .. import op_args
 import weave
+from . import fixture_fakewandb as fwb
+
+response = {
+    "project": {
+        **fwb.project_payload,  # type: ignore
+        "artifact_deb0808078813ae7a9f36b68caf5bedc": fwb.artifactVersion_payload,
+    }
+}
 
 
 def test_serialize(fake_wandb):
-    proj = ops.project("shawn", "show-test")
-    av = proj.artifactVersion("show", "v14")
+    fake_wandb.add_mock(lambda q, ndx: response)
+    proj = ops.project("stacey", "mendeleev")
+    av = proj.artifactVersion("test_res_1fwmcd3q", "v0")
     file = av.file("test_results.table.json")
     table = file.table()
     rows = table.rows()

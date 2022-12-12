@@ -10,7 +10,7 @@ from .. import compile_table
 def test_runs2_plan():
     make_runs2_tables(10, 10, 10, 1, 2)
     project = weave.save(
-        wb_domain_types.Project(wb_domain_types.Entity("shawn"), "weavetest-10-10-10-2")
+        wb_domain_types.Project.from_gql({"name": "weavetest-10-10-10-2"})
     )
     runs = runs2(project)
     post_runs = runs.createIndexCheckpointTag()

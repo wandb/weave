@@ -14,6 +14,8 @@ def op(
     setter=None,
     render_info=None,
     pure=True,
+    *,  # Marks the rest of the arguments as keyword-only.
+    plugins=None
 ):
     """Decorator for declaring an op.
 
@@ -42,6 +44,7 @@ def op(
             setter=setter,
             render_info=render_info,
             pure=pure,
+            plugins=plugins,
             _decl_locals=inspect.currentframe().f_back.f_locals,
         )
 

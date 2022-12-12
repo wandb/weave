@@ -1,13 +1,19 @@
 import contextvars
 from wandb.apis import public
 from wandb.sdk.internal.internal_api import _thread_local_api_settings
-from .context_state import _wandb_public_api
 
 import typing
 
 
 def wandb_public_api() -> public.Api:
     return public.Api()
+
+
+def wandb_gql_query(query_str, variables={}):
+    return wandb_public_api().client.execute(
+        public.gql(query_str),
+        variable_values=variables,
+    )
 
 
 def set_wandb_thread_local_api_settings(

@@ -1,718 +1,250 @@
-import datetime
 import typing
-from wandb.apis import public as wandb_api
-
-from ..wandb_api import wandb_public_api
+from ..api import op
+from ..compile_domain import wb_gql_op_plugin
+from .. import weave_types
+from inspect import signature, Parameter
 from . import wb_domain_types
+import hashlib
+
+"""
+This file contains utilities for constructing GQL ops (used by all the ops in
+`ops_domain`). There are explicitly 4 functions:
+    - `gql_prop_op`: used for getting properties of GQL objects
+    - `gql_root_op`: used to start a query (much match to a query on the `Query`
+      type)
+    - `gql_direct_edge_op`: used to get a direct edge of a GQL object leading to
+      another GQL object
+        - Has an additional `is_many` arg to determine if the result is a single
+          or many objects
+    - `gql_connection_op`: used to get a connection of GQL objects (the standard
+      edges/nodes pattern)
+
+All but the prop_op have the ability to specify additional inputs and how to map
+such inputs to a query param string.
+
+Each of these leverage the underlying `wb_gql_op_plugin` to create an op. You
+are always free to directly use `wb_gql_op_plugin` if you need to write custom
+logic - these are just wrappers since these cases are so common. 
+
+Please see `project_ops.py` for examples of all the above cases.
+"""
 
 
-def _query(query_str, variables={}):
-    return wandb_public_api().client.execute(
-        wandb_api.gql(query_str),
-        variable_values=variables,
+def _make_alias(*args: str, prefix: str = "alias") -> str:
+    inputs = "_".join([str(arg) for arg in args])
+    digest = hashlib.md5(inputs.encode()).hexdigest()
+    return f"{prefix}_{digest}"
+
+
+def gql_prop_op(
+    op_name: str,
+    input_type: weave_types.Type,
+    prop_name: str,
+    output_type: weave_types.Type,
+):
+    @op(
+        name=op_name,
+        plugins=wb_gql_op_plugin(
+            lambda inputs, inner: prop_name,
+        ),
+        input_type={"gql_obj": input_type},
+        output_type=output_type,
+    )
+    def gql_property_getter_op(gql_obj):
+        return gql_obj.gql[prop_name]
+
+    return gql_property_getter_op
+
+
+def _get_required_fragment(output_type: weave_types.Type):
+    return (
+        output_type.instance_class.REQUIRED_FRAGMENT  # type: ignore
+        if output_type.instance_class is not None
+        and hasattr(output_type.instance_class, "REQUIRED_FRAGMENT")
+        else ""
     )
 
 
-def artifact_collection_is_portfolio(
-    artifact_collection: wb_domain_types.ArtifactCollection,
-) -> bool:
-    res = _query(
-        """	
-        query artifact_collection_is_portfolio(	
-            $projectName: String!,	
-            $entityName: String!,
-            $artifactCollectionName: String!,	
-        ) {	
-            project(name: $projectName, entityName: $entityName) {	
-                id
-                artifactCollection(name: $artifactCollectionName) {	
-                    id	
-                    __typename
-                }
-            }	
-        }	
-        """,
-        {
-            "projectName": artifact_collection._project.project_name,
-            "entityName": artifact_collection._project._entity.entity_name,
-            "artifactCollectionName": artifact_collection.artifact_collection_name,
-        },
-    )
-    return res["project"]["artifactCollection"]["__typename"] == "ArtifactPortfolio"
-
-
-def root_viewer() -> wb_domain_types.User:
-    res = _query(
-        """	
-        query root_viewer {	
-            viewer {	
-                id
-                username
-            }	
-        }	
-        """,
-        {},
-    )
-    return wb_domain_types.User(res["viewer"]["username"])
-
-
-def artifact_collection_artifact_type(
-    artifact_collection: wb_domain_types.ArtifactCollection,
-) -> wb_domain_types.ArtifactType:
-    res = _query(
-        """	
-        query artifact_collection_artifact_type(	
-            $projectName: String!,	
-            $entityName: String!,
-            $artifactCollectionName: String!,	
-        ) {	
-            project(name: $projectName, entityName: $entityName) {	
-                id
-                artifactCollection(name: $artifactCollectionName) {	
-                    id
-                    defaultArtifactType {	
-                        id	
-                        name	
-                    }	
-                }	
-            }	
-        }	
-        """,
-        {
-            "projectName": artifact_collection._project.project_name,
-            "entityName": artifact_collection._project._entity.entity_name,
-            "artifactCollectionName": artifact_collection.artifact_collection_name,
-        },
-    )
-    return wb_domain_types.ArtifactType(
-        artifact_collection._project,
-        res["project"]["artifactCollection"]["defaultArtifactType"]["name"],
+def gql_root_op(
+    op_name: str,
+    prop_name: str,
+    output_type: weave_types.Type,
+    additional_inputs_types: typing.Optional[dict[str, weave_types.Type]] = None,
+    param_str_fn: typing.Optional[
+        typing.Callable[[typing.Dict[str, typing.Any]], str]
+    ] = None,
+):
+    return gql_direct_edge_op(
+        op_name,
+        None,
+        prop_name,
+        output_type,
+        additional_inputs_types,
+        param_str_fn,
     )
 
 
-def entity_projects(
-    entity: wb_domain_types.Entity,
-) -> list[wb_domain_types.Project]:
-    res = _query(
-        """
-        query entity_projects(
-            $entityName: String!,
-        ) {
-            entity(name: $entityName) {
-                id
-                projects(first: 50) {
-                    edges {
-                        node {
-                            id
-                            name
-                        }
-                    }
-                }
-            }
-        }
-        """,
-        {"entityName": entity.entity_name},
-    )
-
-    projectNodes = res["entity"]["projects"]["edges"]
-
-    return [
-        wb_domain_types.Project(entity, projNode["node"]["name"])
-        for projNode in projectNodes
-    ]
-
-
-def entity_portfolios(
-    entity: wb_domain_types.Entity,
-) -> list[wb_domain_types.ArtifactCollection]:
-    res = _query(
-        """
-        query entity_portfolios(
-            $entityName: String!,
-        ) {
-            entity(name: $entityName) {
-                id
-                artifactCollections(collectionTypes: [PORTFOLIO], first:50) {
-                    edges {
-                        node {
-                            id
-                            name
-                            defaultArtifactType {
-                                id
-                                name
-                            }
-                            project {
-                                id
-                                name
-                                entity {
-                                    id
-                                    name
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        """,
-        {"entityName": entity.entity_name},
-    )
-
-    portNodes = res["entity"]["artifactCollections"]["edges"]
-
-    return [
-        wb_domain_types.ArtifactCollection(
-            wb_domain_types.Project(
-                wb_domain_types.Entity(portNode["node"]["project"]["entity"]["name"]),
-                portNode["node"]["project"]["name"],
-            ),
-            portNode["node"]["name"],
-        )
-        for portNode in portNodes
-    ]
-
-
-def artifact_collection_membership_for_alias(
-    artifact_collection: wb_domain_types.ArtifactCollection, identifier: str
-) -> wb_domain_types.ArtifactCollectionMembership:
-    res = _query(
-        """	
-        query artifact_collection_membership_for_alias(	
-            $projectName: String!,	
-            $entityName: String!,
-            $artifactCollectionName: String!,	
-            $identifier: String!,	
-        ) {	
-            project(name: $projectName, entityName: $entityName) {	
-                id
-                artifactCollection(name: $artifactCollectionName) {	
-                    id	
-                    artifactMembership(aliasName: $identifier) {
-                        id
-                        versionIndex
-                    }   
-                }
-            }	
-        }
-        """,
-        {
-            "projectName": artifact_collection._project.project_name,
-            "entityName": artifact_collection._project._entity.entity_name,
-            "artifactCollectionName": artifact_collection.artifact_collection_name,
-            "identifier": identifier,
-        },
-    )
-    return wb_domain_types.ArtifactCollectionMembership(
-        artifact_collection,
-        res["project"]["artifactCollection"]["artifactMembership"]["versionIndex"],
-    )
-
-
-def artifact_membership_aliases(
-    artifact_collection_membership: wb_domain_types.ArtifactCollectionMembership,
-) -> list[wb_domain_types.ArtifactAlias]:
-    res = _query(
-        """	
-        query artifact_membership_aliases(	
-            $projectName: String!,	
-            $entityName: String!,
-            $artifactCollectionName: String!,	
-            $identifier: String!,	
-        ) {	
-            project(name: $projectName, entityName: $entityName) {	
-                id
-                artifactCollection(name: $artifactCollectionName) {	
-                    id	
-                    artifactMembership(aliasName: $identifier) {
-                        id
-                        aliases {
-                            id
-                            alias
-                        }
-                    }   
-                }
-            }	
-        }
-        """,
-        {
-            "projectName": artifact_collection_membership._artifact_collection._project.project_name,
-            "entityName": artifact_collection_membership._artifact_collection._project._entity.entity_name,
-            "artifactCollectionName": artifact_collection_membership._artifact_collection.artifact_collection_name,
-            "identifier": f"v{artifact_collection_membership.version_index}",
-        },
-    )
-    return [
-        wb_domain_types.ArtifactAlias(
-            artifact_collection_membership._artifact_collection,
-            alias["alias"],
-        )
-        for alias in res["project"]["artifactCollection"]["artifactMembership"][
-            "aliases"
-        ]
-    ]
-
-
-def artifact_membership_created_at(
-    artifact_collection_membership: wb_domain_types.ArtifactCollectionMembership,
-) -> wb_domain_types.Date:
-    res = _query(
-        """	
-        query artifact_membership_created_at(	
-            $projectName: String!,	
-            $entityName: String!,
-            $artifactCollectionName: String!,	
-            $identifier: String!,	
-        ) {	
-            project(name: $projectName, entityName: $entityName) {	
-                id
-                artifactCollection(name: $artifactCollectionName) {	
-                    id	
-                    artifactMembership(aliasName: $identifier) {
-                        id
-                        createdAt
-                    }   
-                }
-            }	
-        }
-        """,
-        {
-            "projectName": artifact_collection_membership._artifact_collection._project.project_name,
-            "entityName": artifact_collection_membership._artifact_collection._project._entity.entity_name,
-            "artifactCollectionName": artifact_collection_membership._artifact_collection.artifact_collection_name,
-            "identifier": f"v{artifact_collection_membership.version_index}",
-        },
-    )
-    datetime_val = datetime.datetime.strptime(
-        res["project"]["artifactCollection"]["artifactMembership"]["createdAt"],
-        "%Y-%m-%dT%H:%M:%S",
-    )
-    return wb_domain_types.Date(datetime_val)
-
-
-def artifact_collection_aliases(
-    artifact_collection: wb_domain_types.ArtifactCollection,
-) -> list[wb_domain_types.ArtifactAlias]:
-    res = _query(
-        """	
-        query artifact_collection_aliases(	
-            $projectName: String!,	
-            $entityName: String!,
-            $artifactCollectionName: String!,	
-        ) {	
-            project(name: $projectName, entityName: $entityName) {	
-                id
-                artifactCollection(name: $artifactCollectionName) {	
-                    id	
-                    aliases(first: 50) {
-                        edges {
-                            node {
-                                id
-                                alias
-                            }
-                        }
-                    } 
-                }  
-            }	
-        }
-        """,
-        {
-            "projectName": artifact_collection._project.project_name,
-            "entityName": artifact_collection._project._entity.entity_name,
-            "artifactCollectionName": artifact_collection.artifact_collection_name,
-        },
-    )
-    return [
-        wb_domain_types.ArtifactAlias(artifact_collection, edge["node"]["alias"])
-        for edge in res["project"]["artifactCollection"]["aliases"]["edges"]
-    ]
-
-
-def artifact_version_aliases(
-    artifact_version: wb_domain_types.ArtifactVersion,
-) -> list[wb_domain_types.ArtifactAlias]:
-    res = _query(
-        """	
-        query artifact_version_aliases(	
-            $entityName: String!,	
-            $projectName: String!,	
-            $artifactCollectionName: String!,	
-            $aliasName: String!,	
-        ) {	
-            project(name: $projectName, entityName: $entityName) {
-                id
-                artifactCollection(name: $artifactCollectionName) {	
-                    id
-                    defaultArtifactType {
-                        id
-                        name
-                    }
-                    artifactMembership(aliasName: $aliasName) {
-                        id
-                        artifact {
-                            aliases {
-                                id
-                                alias
-                                artifactCollection {
-                                    id
-                                    name 
-                                    project {
-                                        id
-                                        name
-                                        entity {
-                                            id
-                                            name
-                                        }
-                                    
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        """,
-        {
-            "entityName": artifact_version._artifact_sequence._project._entity.entity_name,
-            "projectName": artifact_version._artifact_sequence._project.project_name,
-            "artifactCollectionName": artifact_version._artifact_sequence.artifact_collection_name,
-            "aliasName": f"v{artifact_version.version_index}",
-        },
-    )
-    return [
-        wb_domain_types.ArtifactAlias(
-            wb_domain_types.ArtifactCollection(
-                wb_domain_types.Project(
-                    wb_domain_types.Entity(
-                        alias["artifactCollection"]["project"]["entity"]["name"]
-                    ),
-                    alias["artifactCollection"]["project"]["name"],
-                ),
-                alias["artifactCollection"]["name"],
-            ),
-            alias["alias"],
-        )
-        for alias in res["project"]["artifactCollection"]["artifactMembership"][
-            "artifact"
-        ]["aliases"]
-    ]
-
-
-def artifact_version_created_by(
-    artifact_version: wb_domain_types.ArtifactVersion,
-) -> typing.Optional[wb_domain_types.Run]:
-    res = _query(
-        """	
-        query artifact_version_created_by(	
-            $entityName: String!,	
-            $projectName: String!,	
-            $artifactCollectionName: String!,	
-            $aliasName: String!,
-        ) {	
-            project(name: $projectName, entityName: $entityName) {
-                id
-                artifactCollection(name: $artifactCollectionName) {	
-                    id	
-                    artifactMembership(aliasName: $aliasName) {
-                        id
-                        artifact {
-                            id
-                            createdBy {
-                                ... on Run {
-                                    id
-                                    name
-                                    project {
-                                        id
-                                        name 
-                                        entity {
-                                            id
-                                            name
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }   
-                }	
-            }
-        }
-        """,
-        {
-            "entityName": artifact_version._artifact_sequence._project._entity.entity_name,
-            "projectName": artifact_version._artifact_sequence._project.project_name,
-            "artifactCollectionName": artifact_version._artifact_sequence.artifact_collection_name,
-            "aliasName": f"v{artifact_version.version_index}",
-        },
-    )
-    entity_name = res["project"]["artifactCollection"]["artifactMembership"][
-        "artifact"
-    ]["createdBy"]["project"]["entity"]["name"]
-    project_name = res["project"]["artifactCollection"]["artifactMembership"][
-        "artifact"
-    ]["createdBy"]["project"]["name"]
-    run_id = res["project"]["artifactCollection"]["artifactMembership"]["artifact"][
-        "createdBy"
-    ]["name"]
-    if (
-        res["project"]["artifactCollection"]["artifactMembership"]["artifact"][
-            "createdBy"
-        ]
-        == "Run"
+def gql_direct_edge_op(
+    op_name: str,
+    input_type: typing.Optional[weave_types.Type],
+    prop_name: str,
+    output_type: weave_types.Type,
+    additional_inputs_types: typing.Optional[dict[str, weave_types.Type]] = None,
+    param_str_fn: typing.Optional[
+        typing.Callable[[typing.Dict[str, typing.Any]], str]
+    ] = None,
+    is_many: bool = False,
+):
+    is_root = input_type is None
+    first_arg_name = "gql_obj" if input_type is None else input_type.name
+    if not output_type.instance_class or isinstance(
+        output_type.instance_class, wb_domain_types.GQLTypeMixin
     ):
-        return wb_domain_types.Run(
-            wb_domain_types.Project(wb_domain_types.Entity(entity_name), project_name),
-            run_id,
+        raise ValueError(
+            f"output_type must be a GQLTypeMixin, got {output_type} instead"
         )
-    return None
 
+    def query_fn(inputs, inner):
+        alias = ""
+        param_str = ""
+        if param_str_fn:
+            param_str = param_str_fn(inputs)
+            if not is_root:
+                alias = f"{_make_alias(param_str, prefix=prop_name)}:"
+            param_str = f"({param_str})"
+        return f"""
+            {alias} {prop_name}{param_str} {{
+                {_get_required_fragment(output_type)}
+                {inner}
+            }}
+        """
 
-def artifact_version_created_by_user(
-    artifact_version: wb_domain_types.ArtifactVersion,
-) -> typing.Optional[wb_domain_types.User]:
-    res = _query(
-        """	
-        query artifact_version_created_by_user(	
-            $entityName: String!,	
-            $projectName: String!,	
-            $artifactCollectionName: String!,	
-            $aliasName: String!,
-        ) {	
-            project(name: $projectName, entityName: $entityName) {
-                id
-                artifactCollection(name: $artifactCollectionName) {	
-                    id	
-                    artifactMembership(aliasName: $aliasName) {
-                        id
-                        artifact {
-                            id
-                            createdBy {
-                                ... on User {
-                                    id
-                                    name
-                                }
-                            }
-                        }
-                    }   
-                }	
+    additional_inputs_types = additional_inputs_types or {}
+    if is_root:
+
+        def gql_relationship_getter_op(**inputs):
+            raise NotImplementedError(
+                "root-project should not be executed directly. If you see this error, it is a bug in the Weave compiler."
+            )
+
+    else:
+
+        def gql_relationship_getter_op(**inputs):
+            gql_obj = inputs[first_arg_name]
+            additional_inputs = {
+                key: value for key, value in inputs.items() if key != first_arg_name
             }
-        }
-        """,
-        {
-            "entityName": artifact_version._artifact_sequence._project._entity.entity_name,
-            "projectName": artifact_version._artifact_sequence._project.project_name,
-            "artifactCollectionName": artifact_version._artifact_sequence.artifact_collection_name,
-            "aliasName": f"v{artifact_version.version_index}",
-        },
+            name = prop_name
+            if param_str_fn:
+                param_str = param_str_fn(additional_inputs)
+                if not is_root:
+                    name = _make_alias(param_str, prefix=prop_name)
+            if is_many:
+                return [
+                    output_type.instance_class.from_gql(item)
+                    for item in gql_obj.gql[name]
+                ]
+            return output_type.instance_class.from_gql(gql_obj.gql[name])
+
+    sig = signature(gql_relationship_getter_op)
+    base_params = (
+        [Parameter(first_arg_name, Parameter.POSITIONAL_OR_KEYWORD)]
+        if not is_root
+        else []
     )
-    if (
-        res["project"]["artifactCollection"]["artifactMembership"]["artifact"][
-            "createdBy"
-        ]
-        == "User"
+    new_params = [
+        *base_params,
+        *[
+            Parameter(key, Parameter.POSITIONAL_OR_KEYWORD)
+            for key in additional_inputs_types.keys()
+        ],
+    ]
+    sig = sig.replace(parameters=tuple(new_params))
+    gql_relationship_getter_op.__signature__ = sig  # type: ignore
+    gql_relationship_getter_op.sig = sig  # type: ignore
+
+    base_input_type = {first_arg_name: input_type} if not is_root else {}
+    _output_type = output_type
+    if is_many:
+        _output_type = weave_types.List(output_type)
+    gql_relationship_getter_op = op(
+        name=op_name,
+        plugins=wb_gql_op_plugin(query_fn, is_root),
+        input_type={**base_input_type, **additional_inputs_types},
+        output_type=_output_type,
+    )(gql_relationship_getter_op)
+
+    return gql_relationship_getter_op
+
+
+def gql_connection_op(
+    op_name: str,
+    input_type: weave_types.Type,
+    prop_name: str,
+    output_type: weave_types.Type,
+    additional_inputs_types: typing.Optional[dict[str, weave_types.Type]] = None,
+    param_str_fn: typing.Optional[
+        typing.Callable[[typing.Dict[str, typing.Any]], str]
+    ] = None,
+):
+    first_arg_name = "gql_obj" if input_type is None else input_type.name
+    if not output_type.instance_class or isinstance(
+        output_type.instance_class, wb_domain_types.GQLTypeMixin
     ):
-        return wb_domain_types.User(
-            res["project"]["artifactCollection"]["artifactMembership"]["artifact"][
-                "createdBy"
-            ]["name"]
+        raise ValueError(
+            f"output_type must be a GQLTypeMixin, got {output_type} instead"
         )
-    return None
 
+    def query_fn(inputs, inner):
+        alias = ""
+        param_str = ""
+        if param_str_fn:
+            param_str = param_str_fn(inputs)
+            alias = f"{_make_alias(param_str, prefix=prop_name)}:"
+            param_str = f"({param_str})"
+        return f"""
+            {alias} {prop_name}{param_str} {{
+                edges {{
+                    node {{
+                        {_get_required_fragment(output_type)}
+                        {inner}
+                    }}
+                }}
+            }}
+        """
 
-def artifact_version_artifact_collections(
-    artifact_version: wb_domain_types.ArtifactVersion,
-) -> list[wb_domain_types.ArtifactCollection]:
-    res = _query(
-        """	
-        query artifact_version_artifact_collections(	
-            $entityName: String!,	
-            $projectName: String!,	
-            $artifactCollectionName: String!,	
-            $aliasName: String!,
-        ) {	
-            project(name: $projectName, entityName: $entityName) {
-                id
-                artifactCollection(name: $artifactCollectionName) {	
-                    id	
-                    artifactMembership(aliasName: $aliasName) {
-                        id
-                        artifact {
-                            artifactMemberships {
-                                edges {
-                                    node {
-                                        id
-                                        artifactCollection {
-                                            id
-                                            name
-                                            defaultArtifactType {
-                                                id
-                                                name
-                                            }
-                                            project {
-                                                id
-                                                name 
-                                                entity {
-                                                    id
-                                                    name
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }   
-                }	
-            }
+    additional_inputs_types = additional_inputs_types or {}
+
+    def gql_connection_walker_op(**inputs):
+        gql_obj = inputs[first_arg_name]
+        additional_inputs = {
+            key: value for key, value in inputs.items() if key != first_arg_name
         }
-        """,
-        {
-            "entityName": artifact_version._artifact_sequence._project._entity.entity_name,
-            "projectName": artifact_version._artifact_sequence._project.project_name,
-            "artifactCollectionName": artifact_version._artifact_sequence.artifact_collection_name,
-            "aliasName": f"v{artifact_version.version_index}",
-        },
-    )
+        name = prop_name
+        if param_str_fn:
+            param_str = param_str_fn(additional_inputs)
+            name = _make_alias(param_str, prefix=prop_name)
+        return [
+            output_type.instance_class.from_gql(edge["node"])
+            for edge in gql_obj.gql[name]["edges"]
+        ]
 
-    membershipEdges = res["project"]["artifactCollection"]["artifactMembership"][
-        "artifact"
-    ]["artifactMemberships"]["edges"]
-
-    return [
-        wb_domain_types.ArtifactCollection(
-            wb_domain_types.Project(
-                wb_domain_types.Entity(
-                    memEdge["node"]["artifactCollection"]["project"]["entity"]["name"]
-                ),
-                memEdge["node"]["artifactCollection"]["project"]["name"],
-            ),
-            memEdge["node"]["artifactCollection"]["name"],
-        )
-        for memEdge in membershipEdges
+    sig = signature(gql_connection_walker_op)
+    new_params = [
+        Parameter(first_arg_name, Parameter.POSITIONAL_OR_KEYWORD),
+        *[
+            Parameter(key, Parameter.POSITIONAL_OR_KEYWORD)
+            for key in additional_inputs_types.keys()
+        ],
     ]
+    sig = sig.replace(parameters=tuple(new_params))
+    gql_connection_walker_op.__signature__ = sig  # type: ignore
+    gql_connection_walker_op.sig = sig  # type: ignore
+    gql_connection_walker_op = op(
+        name=op_name,
+        plugins=wb_gql_op_plugin(query_fn),
+        input_type={first_arg_name: input_type, **additional_inputs_types},
+        output_type=weave_types.List(output_type),
+    )(gql_connection_walker_op)
 
-
-def artifact_version_memberships(
-    artifact_version: wb_domain_types.ArtifactVersion,
-) -> list[wb_domain_types.ArtifactCollectionMembership]:
-    res = _query(
-        """	
-        query artifact_version_memberships(	
-            $entityName: String!,	
-            $projectName: String!,	
-            $artifactCollectionName: String!,	
-            $aliasName: String!,
-        ) {	
-            project(name: $projectName, entityName: $entityName) {
-                id
-                artifactCollection(name: $artifactCollectionName) {	
-                    id	
-                    artifactMembership(aliasName: $aliasName) {
-                        id
-                        artifact {
-                            artifactMemberships {
-                                edges {
-                                    node {
-                                        id
-                                        versionIndex
-                                        commitHash
-                                        artifactCollection {
-                                            id
-                                            name
-                                            defaultArtifactType {
-                                                id
-                                                name
-                                            }
-                                            project {
-                                                id
-                                                name 
-                                                entity {
-                                                    id
-                                                    name
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }   
-                }	
-            }
-        }
-        """,
-        {
-            "entityName": artifact_version._artifact_sequence._project._entity.entity_name,
-            "projectName": artifact_version._artifact_sequence._project.project_name,
-            "artifactCollectionName": artifact_version._artifact_sequence.artifact_collection_name,
-            "aliasName": f"v{artifact_version.version_index}",
-        },
-    )
-
-    membershipEdges = res["project"]["artifactCollection"]["artifactMembership"][
-        "artifact"
-    ]["artifactMemberships"]["edges"]
-    return [
-        wb_domain_types.ArtifactCollectionMembership(
-            wb_domain_types.ArtifactCollection(
-                wb_domain_types.Project(
-                    wb_domain_types.Entity(
-                        memEdge["node"]["artifactCollection"]["project"]["entity"][
-                            "name"
-                        ]
-                    ),
-                    memEdge["node"]["artifactCollection"]["project"]["name"],
-                ),
-                memEdge["node"]["artifactCollection"]["name"],
-            ),
-            memEdge["node"]["versionIndex"],
-        )
-        for memEdge in membershipEdges
-    ]
-
-
-def user_entities(
-    user: wb_domain_types.User,
-) -> list[wb_domain_types.Entity]:
-    res = _query(
-        """	
-        query user_entities(	
-            $userName: String!,	
-        ) {	
-            user(userName: $userName) {	
-                id
-                teams(first: 50) {
-                    edges {
-                        node {
-                            id
-                            name
-                        }
-                    }
-                }  
-            }	
-        }
-        """,
-        {"userName": user.user_name},
-    )
-    return [
-        wb_domain_types.Entity(edge["node"]["name"])
-        for edge in res["user"]["teams"]["edges"]
-    ]
-
-
-def entity_is_team(
-    entity: wb_domain_types.Entity,
-) -> bool:
-    res = _query(
-        """	
-        query user_entities(	
-            $entityName: String!,	
-        ) {	
-            entity(name: $entityName) {	
-                id
-                isTeam 
-            }	
-        }
-        """,
-        {"entityName": entity.entity_name},
-    )
-    return res["entity"]["isTeam"]
+    return gql_connection_walker_op

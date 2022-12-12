@@ -1,20 +1,19 @@
+from contextvars import Token
+from dataclasses import dataclass, field
 import os
-import pytest
-import shutil
+import random
+import typing
+
+from weave import context_state
+from .. import wandb_api
 from unittest import mock
+import shutil
 
 from .. import artifacts_local
-from .. import ops_domain
-from .. import wandb_api
-from ..ops_domain import wandb_domain_gql
+import graphql
 
 TEST_TABLE_ARTIFACT_PATH = "testdata/wb_artifacts/test_res_1fwmcd3q:v0"
 ABS_TEST_TABLE_ARTIFACT_PATH = os.path.abspath(TEST_TABLE_ARTIFACT_PATH)
-
-
-class FakeProject:
-    entity = "stacey"
-    name = "mendeleev"
 
 
 class FakeEntry:
@@ -83,86 +82,25 @@ class FakeArtifact:
     name = "test_res_1fwmcd3q"
 
 
-class FakeArtifacts:
-    __getitem__ = mock.Mock(return_value=FakeArtifact())
-
-    def __iter__(self):
-        return iter([FakeArtifact()])
-
-
-class FakeArtifactType:
-    # "collections" should be called "artifacts" in the wandb API
-    collections = mock.Mock(return_value=FakeArtifacts())
-
-
-class FakeSummary:
-    _json_dict = {
-        "table": {
-            "_type": "table-file",
-            "artifact_path": "wandb-client-artifact://1234567890/test_results.table.json",
-        }
-    }
-
-
-class FakeRun:
-    entity = "stacey"
-    project = "mendeleev"
-    id = "test_run_id"
-    name = "test_run_name"
-    summary = FakeSummary()
-
-
-class FakeRuns:
-    __getitem__ = mock.Mock(return_value=FakeRun())
-
-    def __iter__(self):
-        return iter([FakeRun()])
-
-
+@dataclass
 class FakeClient:
-    def execute(self, gql, variable_values):
-        if gql.definitions[0].operation == "query":
-            if (
-                gql.definitions[0].name.value
-                == "artifact_collection_membership_for_alias"
-            ):
-                return {
-                    "project": {
-                        "artifactCollection": {
-                            "artifactMembership": {
-                                "commitHash": "xyz",
-                                "versionIndex": "0",
-                            }
-                        }
-                    }
-                }
-            elif (
-                gql.definitions[0].name.value == "ArtifactCollection"
-            ):  # this is for public.py::ArtifactCollection.load
-                return {"project": {"artifactType": {"artifactSequence": {"id": 1001}}}}
-            elif gql.definitions[0].name.value == "ArtifactVersionFromClientId":
-                return {
-                    "artifact": {
-                        "versionIndex": 0,
-                        "artifactType": {
-                            "id": 1,
-                            "name": "test_data",
-                        },
-                        "artifactSequence": {
-                            "id": 1,
-                            "name": "test_res_1fwmcd3q",
-                            "project": {
-                                "id": 1,
-                                "name": "mendeleev",
-                                "entity": {
-                                    "id": 1,
-                                    "name": "stacey",
-                                },
-                            },
-                        },
-                    }
-                }
+    execute_log: typing.List[dict[str, typing.Any]] = field(default_factory=list)
+    mock_handlers: typing.List[
+        typing.Callable[[dict[str, typing.Any], int], typing.Optional[dict]]
+    ] = field(default_factory=list)
 
+    def execute(self, gql, variable_values):
+        args = {"gql": gql, "variable_values": variable_values}
+        self.execute_log.append(args)
+        # This should only print when the test fails
+        print("Executing Mocked Query in fixture_fakewandb.py:")
+        print(graphql.language.print_ast(graphql.language.parse(gql.loc.source.body)))
+        for handler in self.mock_handlers:
+            res = handler(args, len(self.execute_log) - 1)
+            if res is not None:
+                print("RESULT:")
+                print(res)
+                return res
         raise Exception(
             "Query was not mocked - please fill out in fixture_fakewandb.py"
         )
@@ -170,31 +108,88 @@ class FakeClient:
 
 class FakeApi:
     client = FakeClient()
-    project = mock.Mock(return_value=FakeProject())
-    artifact_type = mock.Mock(return_value=FakeArtifactType())
     artifact = mock.Mock(return_value=FakeVersion())
-    runs = mock.Mock(return_value=FakeRuns())
-    run = mock.Mock(return_value=FakeRun())
+
+    def add_mock(
+        self,
+        handler: typing.Callable[[dict[str, typing.Any], int], typing.Optional[dict]],
+    ):
+        self.client.mock_handlers.append(handler)
+
+    def execute_log(self):
+        return self.client.execute_log
+
+    def clear_execute_log(self):
+        self.client.execute_log = []
+
+    def clear_mock_handlers(self):
+        self.client.mock_handlers = []
 
 
-fake_api = FakeApi()
-
-
-def wandb_public_api():
-    return fake_api
+@dataclass
+class SetupResponse:
+    fake_api: FakeApi
+    old_wandb_api_wandb_public_api: typing.Callable
+    token: Token
 
 
 def setup():
+    # set _cache_namespace_token to a random value so that
+    # tests don't share the same namespace (since it defaults to None)
+    token = context_state._cache_namespace_token.set(str(random.randint(0, 1000000)))
+    fake_api = FakeApi()
+
+    def wandb_public_api():
+        return fake_api
+
     old_wandb_api_wandb_public_api = wandb_api.wandb_public_api
     wandb_api.wandb_public_api = wandb_public_api
-    old_wandb_domain_gql_wandb_public_api = wandb_domain_gql.wandb_public_api
-    wandb_domain_gql.wandb_public_api = wandb_public_api
-    return (
+    return SetupResponse(
+        fake_api,
         old_wandb_api_wandb_public_api,
-        old_wandb_domain_gql_wandb_public_api,
+        token,
     )
 
 
-def teardown(setup_response):
-    wandb_api.wandb_public_api = setup_response[0]
-    wandb_domain_gql.wandb_public_api = setup_response[1]
+def teardown(setup_response: SetupResponse):
+    context_state._cache_namespace_token.reset(setup_response.token)
+    setup_response.fake_api.clear_execute_log()
+    setup_response.fake_api.clear_mock_handlers()
+    wandb_api.wandb_public_api = setup_response.old_wandb_api_wandb_public_api
+
+
+entity_payload = {
+    "id": "RW50aXR5OmFoSnpmbmRoYm1SaUxYQnliMlIxWTNScGIyNXlFZ3NTQmtWdWRHbDBlU0lHYzNSaFkyVjVEQQ==",
+    "name": "stacey",
+}
+project_payload = {
+    "id": "UHJvamVjdDp2MTptZW5kZWxlZXY6c3RhY2V5",
+    "name": "mendeleev",
+    "entity": entity_payload,
+}
+run_payload = {
+    "id": "UnVuOnYxOjJlZDV4d3BuOm1lbmRlbGVldjpzdGFjZXk=",
+    "name": "2ed5xwpn",
+    "project": project_payload,
+}
+defaultArtifactType_payload = {
+    "id": "QXJ0aWZhY3RUeXBlOjIzNzc=",
+    "name": "test_results",
+    "project": project_payload,
+}
+artifactSequence_payload = {
+    "id": "QXJ0aWZhY3RDb2xsZWN0aW9uOjE4MDQ0MjY=",
+    "name": "test_res_1fwmcd3q",
+    "defaultArtifactType": defaultArtifactType_payload,
+}
+artifactVersion_payload = {
+    "id": "QXJ0aWZhY3Q6MTQxODgyNDA=",
+    "versionIndex": 0,
+    "artifactSequence": artifactSequence_payload,
+}
+artifactMembership_payload = {
+    "id": "QXJ0aWZhY3RDb2xsZWN0aW9uTWVtYmVyc2hpcDoxNDE4NDI1MQ==",
+    "versionIndex": 0,
+    "artifact": artifactVersion_payload,
+    "artifactCollection": artifactSequence_payload,
+}

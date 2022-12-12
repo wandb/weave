@@ -5,7 +5,7 @@ import numpy as np
 from wandb.sdk.data_types._dtypes import TypeRegistry as SDKTypeRegistry
 from wandb.sdk.data_types.helper_types.classes import Classes as SDKClasses
 
-from .fixture_fakewandb import wandb_public_api
+from .fixture_fakewandb import FakeApi
 
 from ..wandb_util import weave0_type_json_to_weave1_type
 from ..ops_domain import wb_domain_types
@@ -147,7 +147,7 @@ def test_image(sdk_obj, expected_type, fake_wandb):
     obj_json = SDKTypeRegistry.type_of(sdk_obj).to_json(art)
 
     # Create an artifact that looks like it was loaded remotely so we can use it without mocking backend
-    api = wandb_public_api()
+    api = FakeApi()
     logged_artifact = PublicArtifact(
         api.client,
         "test",

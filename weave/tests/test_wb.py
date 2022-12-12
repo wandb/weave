@@ -1,39 +1,129 @@
-import os
-import shutil
-from unittest import mock
-
 import pytest
 
-from weave.box import BoxedNone
-from ..ops_primitives.list_ import list_indexCheckpoint
 from .. import api as weave
 from .. import ops as ops
-from ..language_features.tagging.tagged_value_type import TaggedValueType
-from ..ops_domain.wb_domain_types import Run, Project
 
 from . import weavejs_ops
+import json
+from . import fixture_fakewandb as fwb
+from .. import graph
+from ..ops_domain import wb_domain_types as wdt
+from .. import weave_types as types
 
-TEST_TABLE_ARTIFACT_PATH = "testdata/wb_artifacts/test_res_1fwmcd3q:v0"
+file_path_response = {
+    "project": {
+        **fwb.project_payload,  # type: ignore
+        "artifactType_46d22fef09db004187bb8da4b5e98c58": {
+            **fwb.defaultArtifactType_payload,  # type: ignore
+            "artifactCollections_21303e3890a1b6580998e6aa8a345859": {
+                "edges": [
+                    {
+                        "node": {
+                            **fwb.artifactSequence_payload,  # type: ignore
+                            "artifacts_21303e3890a1b6580998e6aa8a345859": {
+                                "edges": [{"node": fwb.artifactVersion_payload}]
+                            },
+                        }
+                    }
+                ]
+            },
+        },
+    }
+}
+
+artifact_browser_response = {
+    "project": {
+        **fwb.project_payload,  # type: ignore
+        "artifactCollection_d651817074b6a8074e87e9dfd5767726": {
+            **fwb.artifactSequence_payload,  # type: ignore
+            "artifactMembership_78e7a3fd51159b4fdfb0815be0b0f92c": fwb.artifactMembership_payload,
+        },
+    }
+}
+
+
+workspace_response = {
+    "project": {
+        **fwb.project_payload,  # type: ignore
+        "runs_21303e3890a1b6580998e6aa8a345859": {
+            "edges": [
+                {
+                    "node": {
+                        **fwb.run_payload,  # type: ignore
+                        "summaryMetrics": json.dumps(
+                            {
+                                "table": {
+                                    "_type": "table-file",
+                                    "artifact_path": "wandb-client-artifact://1234567890/test_results.table.json",
+                                }
+                            }
+                        ),
+                        "displayName": "amber-glade-100",
+                    }
+                },
+            ]
+        },
+    }
+}
+
+workspace_response_filtered = {
+    "project": {
+        **fwb.project_payload,  # type: ignore
+        "runs_6e908597bd3152c2f0457f6283da76b9": {
+            "edges": [
+                {
+                    "node": {
+                        **fwb.run_payload,  # type: ignore
+                        "summaryMetrics": json.dumps(
+                            {
+                                "table": {
+                                    "_type": "table-file",
+                                    "artifact_path": "wandb-client-artifact://1234567890/test_results.table.json",
+                                }
+                            }
+                        ),
+                        "displayName": "amber-glade-100",
+                    }
+                },
+            ]
+        },
+    }
+}
+
+artifact_version_sdk_response = {
+    "artifact": {
+        **fwb.artifactVersion_payload,  # type: ignore
+        "artifactType": fwb.defaultArtifactType_payload,
+        "artifactSequence": {**fwb.artifactSequence_payload, "project": fwb.project_payload},  # type: ignore
+    }
+}
 
 
 @pytest.mark.parametrize(
-    "table_file_node",
+    "table_file_node, mock_response",
     [
         # Path used in weave demos
-        ops.project("stacey", "mendeleev")
-        .artifactType("test_results")
-        .artifacts()[0]
-        .versions()[0]
-        .file("test_results.table.json"),
+        (
+            ops.project("stacey", "mendeleev")
+            .artifactType("test_results")
+            .artifacts()[0]
+            .versions()[0]
+            .file("test_results.table.json"),
+            file_path_response,
+        ),
         # Path used in artifact browser
-        ops.project("stacey", "mendeleev")
-        .artifact("test_results")
-        .membershipForAlias("v0")
-        .artifactVersion()
-        .file("test_results.table.json"),
+        (
+            ops.project("stacey", "mendeleev")
+            .artifact("test_res_1fwmcd3q")
+            .membershipForAlias("v0")
+            .artifactVersion()
+            .file("test_results.table.json"),
+            artifact_browser_response,
+        ),
     ],
 )
-def test_table_call(table_file_node, fake_wandb):
+def test_table_call(table_file_node, mock_response, fake_wandb):
+    fake_wandb.add_mock(lambda q, ndx: mock_response)
     table_image0_node = table_file_node.table().rows()[0]["image"]
     table_image0 = weave.use(table_image0_node)
     assert table_image0.height == 299
@@ -55,7 +145,8 @@ def test_table_call(table_file_node, fake_wandb):
     )
 
 
-def test_avfile_type():
+def test_avfile_type(fake_wandb):
+    fake_wandb.add_mock(lambda q, ndx: file_path_response)
     f = (
         ops.project("stacey", "mendeleev")
         .artifactType("test_results")
@@ -73,6 +164,7 @@ def test_avfile_type():
 
 
 def test_table_col_order_and_unknown_types(fake_wandb):
+    fake_wandb.add_mock(lambda q, ndx: file_path_response)
     node = (
         ops.project("stacey", "mendeleev")
         .artifactType("test_results")
@@ -85,6 +177,7 @@ def test_table_col_order_and_unknown_types(fake_wandb):
 
 
 def test_missing_file(fake_wandb):
+    fake_wandb.add_mock(lambda q, ndx: file_path_response)
     node = (
         ops.project("stacey", "mendeleev")
         .artifactType("test_results")
@@ -95,7 +188,17 @@ def test_missing_file(fake_wandb):
     assert weave.use(node) == None
 
 
+def table_mock(q, ndx):
+    if ndx == 0:
+        return workspace_response
+    elif ndx == 1:
+        return artifact_version_sdk_response
+    elif ndx == 2:
+        return workspace_response
+
+
 def test_mapped_table_tags(fake_wandb):
+    fake_wandb.add_mock(table_mock)
     cell_node = (
         ops.project("stacey", "mendeleev")
         .runs()
@@ -108,11 +211,12 @@ def test_mapped_table_tags(fake_wandb):
         .createIndexCheckpointTag()[5]["score_Amphibia"]
     )
     assert weave.use(cell_node.indexCheckpoint()) == 5
-    assert weave.use(cell_node.run().name()) == "test_run_name"
+    assert weave.use(cell_node.run().name()) == "amber-glade-100"
     assert weave.use(cell_node.project().name()) == "mendeleev"
 
 
 def test_table_tags_row_first(fake_wandb):
+    fake_wandb.add_mock(table_mock)
     cell_node = (
         ops.project("stacey", "mendeleev")
         .runs()
@@ -123,11 +227,12 @@ def test_table_tags_row_first(fake_wandb):
         .createIndexCheckpointTag()[5]["score_Amphibia"]
     )
     assert weave.use(cell_node.indexCheckpoint()) == 5
-    assert weave.use(cell_node.run().name()) == "test_run_name"
+    assert weave.use(cell_node.run().name()) == "amber-glade-100"
     assert weave.use(cell_node.project().name()) == "mendeleev"
 
 
 def test_table_tags_column_first(fake_wandb):
+    fake_wandb.add_mock(table_mock)
     cell_node = (
         ops.project("stacey", "mendeleev")
         .runs()
@@ -138,11 +243,12 @@ def test_table_tags_column_first(fake_wandb):
         .createIndexCheckpointTag()["score_Amphibia"][5]
     )
     assert weave.use(cell_node.indexCheckpoint()) == 5
-    assert weave.use(cell_node.run().name()) == "test_run_name"
+    assert weave.use(cell_node.run().name()) == "amber-glade-100"
     assert weave.use(cell_node.project().name()) == "mendeleev"
 
 
 def test_table_images(fake_wandb):
+    fake_wandb.add_mock(table_mock)
     # Query 1:
     project_node = ops.project("stacey", "mendeleev")
     project_runs_node = project_node.runs().limit(1)
@@ -154,3 +260,117 @@ def test_table_images(fake_wandb):
     # Query 2:
     table_rows_node = summary_node.pick("table").table().rows()
     assert len(weave.use(table_rows_node)) == 1
+
+
+def table_mock_filtered(q, ndx):
+    if ndx == 0:
+        return workspace_response_filtered
+    elif ndx == 1:
+        return artifact_version_sdk_response
+    elif ndx == 2:
+        return workspace_response_filtered
+
+
+def test_tag_run_color_lookup(fake_wandb):
+    fake_wandb.add_mock(table_mock_filtered)
+    colors_node = weave.save(
+        {"1ht5692d": "rgb(218, 76, 76)", "2ed5xwpn": "rgb(83, 135, 221)"}
+    )
+    run_id = (
+        ops.project("stacey", "mendeleev")
+        .filteredRuns("{}", "-createdAt")
+        .limit(50)
+        .summary()["table"]
+        .table()
+        .rows()
+        .dropna()
+        .concat()
+        .createIndexCheckpointTag()[5]
+        .run()
+        .id()
+    )
+    run_color = colors_node[run_id]
+    assert weave.use(run_color) == "rgb(83, 135, 221)"
+
+
+def test_domain_gql_fragments(fake_wandb):
+    fake_wandb.add_mock(
+        lambda q, ndx: {
+            "project": {
+                **fwb.project_payload,
+                "artifactType_46d22fef09db004187bb8da4b5e98c58": {
+                    **fwb.defaultArtifactType_payload,
+                    "artifactCollections_21303e3890a1b6580998e6aa8a345859": {
+                        "edges": [
+                            {
+                                "node": {
+                                    **fwb.artifactSequence_payload,
+                                    "artifacts_21303e3890a1b6580998e6aa8a345859": {
+                                        "edges": [
+                                            {
+                                                "node": {
+                                                    **fwb.artifactVersion_payload,
+                                                    "createdBy": {
+                                                        "__typename": "Run",
+                                                        **fwb.run_payload,
+                                                        "displayName": "amber-glade-100",
+                                                    },
+                                                }
+                                            }
+                                        ]
+                                    },
+                                }
+                            }
+                        ]
+                    },
+                },
+            }
+        }
+    )
+    node = (
+        ops.project("stacey", "mendeleev")
+        .artifactType("test_results")
+        .artifacts()[0]
+        .versions()[0]
+        .createdBy()
+        .name()
+    )
+    assert weave.use(node) == "amber-glade-100"
+
+
+def test_domain_gql_through_dicts_with_fn_nodes(fake_wandb):
+    fake_wandb.add_mock(lambda q, ndx: workspace_response)
+    project_node = ops.project("stacey", "mendeleev")
+    project_name_node = project_node.name()
+    entity_node = project_node.entity()
+    entity_name_node = entity_node.name()
+    runs_node = project_node.runs()
+
+    # Make a function that returns a dict of the name of the row
+    var_node = graph.VarNode(wdt.RunType, "row")
+    inner_fn = graph.ConstNode(
+        types.Function({"row": wdt.RunType}, types.TypedDict({"name": types.String()})),
+        ops.dict_(name=ops.run_ops.run_name(var_node)),
+    )
+
+    run_names = runs_node.map(inner_fn)
+
+    dict_node = ops.dict_(
+        project_name=project_name_node,
+        entity_name=entity_name_node,
+        run_names=run_names,
+    )
+    assert weave.use(dict_node) == {
+        "project_name": "mendeleev",
+        "entity_name": "stacey",
+        "run_names": [{"name": "amber-glade-100"}],
+    }
+
+
+def test_lambda_gql_stitch(fake_wandb):
+    fake_wandb.add_mock(lambda q, ndx: {"project": fwb.project_payload})
+    weave.use(
+        ops.make_list(a="a", b="b", c="c").map(
+            lambda x: x + ops.project("stacey", "mendeleev").name()
+        )
+    ) == None

@@ -44,8 +44,8 @@ def test_traverse_tags():
     p = stitch.stitch([obj_from_tag_val_node])
     obj_recorder = p.get_result(obj_node)
     assert len(obj_recorder.calls) == 2
-    assert obj_recorder.calls[0].op_name == "_TestPlanObject-name"
-    assert obj_recorder.calls[1].op_name == "Object-__getattr__"
+    assert obj_recorder.calls[0].node.from_op.name == "_TestPlanObject-name"
+    assert obj_recorder.calls[1].node.from_op.name == "Object-__getattr__"
     assert obj_recorder.calls[1].inputs[1].val == "val"
 
 
@@ -58,8 +58,8 @@ def test_traverse_tags_2level():
     p = stitch.stitch([obj_from_tag_val_node])
     obj_recorder = p.get_result(obj_node)
     assert len(obj_recorder.calls) == 2
-    assert obj_recorder.calls[0].op_name == "op-_test_hasobj_obj"
-    assert obj_recorder.calls[1].op_name == "Object-__getattr__"
+    assert obj_recorder.calls[0].node.from_op.name == "op-_test_hasobj_obj"
+    assert obj_recorder.calls[1].node.from_op.name == "Object-__getattr__"
     assert obj_recorder.calls[1].inputs[1].val == "name"
 
 
@@ -69,9 +69,9 @@ def test_enter_filter():
     obj_recorder = p.get_result(objs_node)
     calls = obj_recorder.calls
     assert len(calls) == 2
-    assert calls[0].op_name == "mapped_typedDict-pick"
+    assert calls[0].node.from_op.name == "mapped_typedDict-pick"
     assert calls[0].inputs[1].val == "b"
-    assert calls[1].op_name == "typedDict-pick"
+    assert calls[1].node.from_op.name == "typedDict-pick"
     assert calls[1].inputs[1].val == "a"
 
 
@@ -80,7 +80,7 @@ def test_travese_dict():
     p = stitch.stitch([weave.ops.dict_(x=obj_node)["x"].name()])
     obj_recorder = p.get_result(obj_node)
     assert len(obj_recorder.calls) == 1
-    assert obj_recorder.calls[0].op_name == "_TestPlanObject-name"
+    assert obj_recorder.calls[0].node.from_op.name == "_TestPlanObject-name"
 
 
 def test_travese_groupby_dict():

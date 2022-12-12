@@ -1,6 +1,8 @@
 import typing
 
 import logging
+
+from . import compile_domain
 from . import op_args
 from . import weave_types as types
 from . import graph
@@ -65,6 +67,24 @@ def apply_type_based_dispatch(
                 node,
                 node.type,
                 new_node.type,
+            )
+            should_replace = True
+
+        # Due to a number of locations where the arg names differ between Weave0
+        # and Weave1, it is possible that the types themselves are correct, but
+        # the names are not. This is not a problem in execution but rather a
+        # problem for other graph manipulation steps which leverage edge names.
+        current_names = list(node.from_op.inputs.keys())
+        new_names = list(new_node.from_op.inputs.keys())
+        arg_names_differ = len(node.from_op.inputs) != len(
+            new_node.from_op.inputs
+        ) or any(n_k != o_k for n_k, o_k in zip(current_names, new_names))
+        if arg_names_differ:
+            logging.warning(
+                "Compile phase [dispatch] Changed input arg names node %s from %s to %s. This indicates an mismatch between WeaveJS and Weave Python",
+                node,
+                ",".join(current_names),
+                ",".join(new_names),
             )
             should_replace = True
 
@@ -225,6 +245,8 @@ def compile(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
 
     # Reconstruct a node list that matches the original order from the transformed graph
     n = g.to_standard_graph()
+
+    n = compile_domain.apply_domain_op_gql_translation(n)
 
     loggable_nodes = graph_debug.combine_common_nodes(n)
     logging.info(

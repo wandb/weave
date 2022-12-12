@@ -1,93 +1,111 @@
+from ..compile_domain import wb_gql_op_plugin
 from ..api import op
-from . import wb_domain_types
-from . import wandb_domain_gql
+from .. import weave_types as types
+from . import wb_domain_types as wdt
+from ..language_features.tagging.make_tag_getter_op import make_tag_getter_op
+from .wandb_domain_gql import (
+    gql_prop_op,
+    gql_direct_edge_op,
+    gql_connection_op,
+    gql_root_op,
+)
 
+# Section 1/6: Tag Getters
+# None
 
-@op(name="artifact-type")
-def type_(artifact: wb_domain_types.ArtifactCollection) -> wb_domain_types.ArtifactType:
-    return wandb_domain_gql.artifact_collection_artifact_type(artifact)
+# Section 2/6: Root Ops
+# None
 
+# Section 3/6: Attribute Getters
+gql_prop_op(
+    "artifact-id",
+    wdt.ArtifactCollectionType,
+    "id",
+    types.String(),
+)
+artifact_name = gql_prop_op(
+    "artifact-name",
+    wdt.ArtifactCollectionType,
+    "name",
+    types.String(),
+)
+gql_prop_op(
+    "artifact-description",
+    wdt.ArtifactCollectionType,
+    "description",
+    types.String(),
+)
+gql_prop_op(
+    "artifact-createdAt",
+    wdt.ArtifactCollectionType,
+    "createdAt",
+    wdt.DateType,
+)
 
-@op(name="artifact-name")
-def name_(artifact: wb_domain_types.ArtifactCollection) -> str:
-    return artifact.artifact_collection_name
+# Section 4/6: Direct Relationship Ops
+gql_direct_edge_op(
+    "artifact-type",
+    wdt.ArtifactCollectionType,
+    "defaultArtifactType",
+    wdt.ArtifactTypeType,
+)
+gql_direct_edge_op(
+    "artifact-project",
+    wdt.ArtifactCollectionType,
+    "project",
+    wdt.ProjectType,
+)
 
+gql_direct_edge_op(
+    "artifact-membershipForAlias",
+    wdt.ArtifactCollectionType,
+    "artifactMembership",
+    wdt.ArtifactCollectionMembershipType,
+    {
+        "aliasName": types.String(),
+    },
+    lambda inputs: f'aliasName: "{inputs["aliasName"]}"',
+)
 
-@op(name="artifact-description")
-def description(artifact: wb_domain_types.ArtifactCollection) -> str:
-    return artifact.sdk_obj._attrs.get("description", "")
+gql_direct_edge_op(
+    "artifact-lastMembership",
+    wdt.ArtifactCollectionType,
+    "artifactMembership",
+    wdt.ArtifactCollectionMembershipType,
+    {},
+    lambda inputs: f'aliasName: "latest"',
+)
 
+# Section 5/6: Connection Ops
+gql_connection_op(
+    "artifact-versions",
+    wdt.ArtifactCollectionType,
+    "artifacts",
+    wdt.ArtifactVersionType,
+    {},
+    lambda inputs: f"first: 50",
+)
+gql_connection_op(
+    "artifact-memberships",
+    wdt.ArtifactCollectionType,
+    "artifactMemberships",
+    wdt.ArtifactCollectionMembershipType,
+    {},
+    lambda inputs: f"first: 50",
+)
+gql_connection_op(
+    "artifact-aliases",
+    wdt.ArtifactCollectionType,
+    "aliases",
+    wdt.ArtifactAliasType,
+    {},
+    lambda inputs: f"first: 50",
+)
 
-@op(name="artifact-versions")
-def versions(
-    artifact: wb_domain_types.ArtifactCollection,
-) -> list[wb_domain_types.ArtifactVersion]:
-    # TODO: Convert this to a direct query
-    res: list[wb_domain_types.ArtifactVersion] = []
-    for av in artifact.sdk_obj.versions():
-        if len(res) == 50:
-            break
-        res.append(wb_domain_types.ArtifactVersion.from_sdk_obj(av))
-    return res
-
-
-@op(name="artifact-createdAt")
-def createdAt(artifact: wb_domain_types.ArtifactCollection) -> wb_domain_types.Date:
-    return artifact.sdk_obj._attrs.get("createdAt", None)
-
-
-@op(name="artifact-id")
-def id(artifact: wb_domain_types.ArtifactCollection) -> str:
-    return artifact.sdk_obj.id
-
-
-@op(name="artifact-isPortfolio")
-def is_portfolio(artifact: wb_domain_types.ArtifactCollection) -> bool:
-    return wandb_domain_gql.artifact_collection_is_portfolio(artifact)
-
-
-@op(name="artifact-memberships")
-def artifact_memberships(
-    artifact: wb_domain_types.ArtifactCollection,
-) -> list[wb_domain_types.ArtifactCollectionMembership]:
-    # TODO: Convert this to a direct query
-    res: list[wb_domain_types.ArtifactCollectionMembership] = []
-    for v in artifact.sdk_obj.versions():
-        if len(res) == 50:
-            break
-        res.append(
-            wandb_domain_gql.artifact_collection_membership_for_alias(
-                artifact, v.digest
-            )
-        )
-    return res
-
-
-@op(name="artifact-membershipForAlias")
-def artifact_membership_for_alias(
-    artifact: wb_domain_types.ArtifactCollection, aliasName: str
-) -> wb_domain_types.ArtifactCollectionMembership:
-    return wandb_domain_gql.artifact_collection_membership_for_alias(
-        artifact, aliasName
-    )
-
-
-@op(name="artifact-lastMembership")
-def artifact_last_membership(
-    artifact: wb_domain_types.ArtifactCollection,
-) -> wb_domain_types.ArtifactCollectionMembership:
-    return wandb_domain_gql.artifact_collection_membership_for_alias(artifact, "latest")
-
-
-@op(name="artifact-aliases")
-def artifact_aliases(
-    artifact: wb_domain_types.ArtifactCollection,
-) -> list[wb_domain_types.ArtifactAlias]:
-    return wandb_domain_gql.artifact_collection_aliases(artifact)
-
-
-@op(name="artifact-project")
-def artifact_project(
-    artifact: wb_domain_types.ArtifactCollection,
-) -> wb_domain_types.Project:
-    return artifact._project
+# Section 6/6: Non Standard Business Logic Ops
+@op(
+    name="artifact-isPortfolio",
+    plugins=wb_gql_op_plugin(lambda inputs, inner: "__typename"),
+)
+def is_portfolio(artifact: wdt.ArtifactCollection) -> bool:
+    return artifact.gql["__typename"] == "ArtifactPortfolio"
