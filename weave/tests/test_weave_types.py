@@ -62,12 +62,12 @@ def test_typeof_bool():
 
 
 def test_typeof_type():
-    assert types.TypeRegistry.type_of(types.Int()) == types.Type()
+    assert types.TypeRegistry.type_of(types.Int()) == types.TypeType()
 
 
 def test_type_tofromdict():
-    assert types.Type().to_dict() == "type"
-    assert types.TypeRegistry.type_from_dict("type") == types.Type()
+    d = types.TypeType().to_dict()
+    assert types.TypeRegistry.type_from_dict(d) == types.TypeType()
 
 
 def test_typeof_list_runs():
@@ -200,11 +200,6 @@ def test_union_access():
             weave.weave_types.String(), weave.weave_types.NoneType()
         )
     }
-
-
-def test_type_nodes():
-    t = weave.save(weave.types.TypedDict({"a": weave.types.Int()}))
-    assert weave.use(t.property_types) == {"a": weave.types.Int()}
 
 
 def test_typeof_node():
@@ -429,3 +424,28 @@ def test_floatint_merged():
     assert weave.type_of([1.0, 2.0]).object_type == types.Float()
     assert weave.type_of([1.0, 2]).object_type == types.Float()
     assert weave.type_of([1, 2]).object_type == types.Int()
+
+
+def test_typetype():
+    tt = weave.type_of(weave.types.TypedDict({"a": weave.types.Int()}))
+    assert tt == weave.types.TypeType(
+        attr_types={
+            "property_types": weave.types.Dict(types.String(), types.TypeType())
+        }
+    )
+
+
+def test_typetype_disjoint_from_normal_type_hierarchy():
+    assert not weave.type_of(weave.types.List()).assign_type(weave.type_of(None))
+
+
+def test_typetype_nodes():
+    t = weave.save(weave.types.TypedDict({"a": weave.types.Int()}))
+    assert weave.use(t.property_types) == {"a": weave.types.Int()}
+
+
+def test_typetype_tofrom_dict():
+    t = weave.type_of(types.TypedDict())
+    d = t.to_dict()
+    t2 = types.TypeType.from_dict(d)
+    assert t == t2

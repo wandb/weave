@@ -49,7 +49,7 @@ class Table:
     @op(
         name="table-rowsType",
         input_type={"table": TableType()},
-        output_type=types.Type(),
+        output_type=types.TypeType(),
     )
     def rows_type(table):
         ttype = types.TypeRegistry.type_of(table._rows)
@@ -163,7 +163,11 @@ types.FileType.instance_classes = File
 #     save a serialized version of a given table?
 
 
-@op(name="file-type", input_type={"file": types.FileType()}, output_type=types.Type())
+@op(
+    name="file-type",
+    input_type={"file": types.FileType()},
+    output_type=types.TypeType(),
+)
 def file_type(file):
     # file is an artifact manifest entry for now.
     path = file.path
@@ -196,7 +200,7 @@ types.SubDirType.instance_class = SubDir
 @op(
     name="dir-pathReturnType",
     input_type={"dir": types.DirType(), "path": types.String()},
-    output_type=types.Type(),
+    output_type=types.TypeType(),
 )
 def path_return_type(dir, path):
     return dir._path_return_type(path)

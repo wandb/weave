@@ -28,7 +28,7 @@ class ArtifactVersion:
     @op(
         name="artifactLocalVersion-fileReturnType",
         input_type={"artifactVersion": ArtifactVersionType(), "path": types.String()},
-        output_type=types.Type(),
+        output_type=types.TypeType(),
     )
     def path_type(artifactVersion, path):
         try:

@@ -110,8 +110,6 @@ class TypeRegistry:
 
     @staticmethod
     def type_of(obj: typing.Any) -> "Type":
-        if isinstance(obj, Type):
-            return Type()
 
         obj_type = type_name_to_type("tagged").type_of(obj)
         if obj_type is not None:
@@ -152,8 +150,6 @@ class TypeRegistry:
         # The javascript code sends simple types as just strings
         # instead of {'type': 'string'} for example
         type_name = d["type"] if isinstance(d, dict) else d
-        if type_name == "type":
-            return Type()
         type_ = type_name_to_type(type_name)
         if type_ is None:
             raise errors.WeaveSerializeError("Can't deserialize type from: %s" % d)
@@ -193,20 +189,6 @@ class Type(metaclass=_TypeSubclassWatcher):
 
     def __repr__(self) -> str:
         return f"<{self.name}>"
-
-    # This orders types by specificity.
-    # A < B if A is assignable to B.
-    # A == B if A is assignable to B and B is assignable to A.
-    # If the types are not mutually assignable then an order is not defined, so __lt__
-    # returns none.
-    def __lt__(self, other: "Type") -> typing.Optional[bool]:
-        self_assignable_to_other = other.assign_type(self)
-        if self_assignable_to_other:
-            other_assignable_to_self = self.assign_type(other)
-            if other_assignable_to_self:
-                return False
-            return True
-        return None
 
     @classmethod
     def class_type_name(cls):
@@ -316,8 +298,6 @@ class Type(metaclass=_TypeSubclassWatcher):
         return False
 
     def to_dict(self) -> typing.Union[dict, str]:
-        if self.__class__ == Type:
-            return "type"
         d = {"type": self.name}
         d.update(self._to_dict())
         return d
@@ -346,19 +326,14 @@ class Type(metaclass=_TypeSubclassWatcher):
                 type_attrs[field.name] = TypeRegistry.type_from_dict(d[field_name])
         return cls(**type_attrs)
 
-    # save_instance/load_instance on Type are used to save/load actual Types
-    # since type_of(types.Int()) == types.Type()
     def save_instance(
         self, obj, artifact, name
     ) -> typing.Optional[typing.Union[list[str], "Ref"]]:
         d = None
-        if self.__class__ == Type:
-            d = obj.to_dict()
-        else:
-            try:
-                d = self.instance_to_dict(obj)
-            except NotImplementedError:
-                pass
+        try:
+            d = self.instance_to_dict(obj)
+        except NotImplementedError:
+            pass
         if d is None:
             raise errors.WeaveSerializeError(
                 "Object is not serializable. Provide instance_<to/from>_dict or <save/load>_instance methods on Type: %s"
@@ -373,8 +348,6 @@ class Type(metaclass=_TypeSubclassWatcher):
     ) -> typing.Any:
         with artifact.open(f"{name}.object.json") as f:
             d = json.load(f)
-        if self.__class__ == Type:
-            return TypeRegistry.type_from_dict(d)
         return self.instance_from_dict(d)
 
     def instance_to_dict(self, obj):
@@ -845,10 +818,6 @@ class ObjectType(Type):
             d[to_weavejs_typekey(k)] = prop_type.to_dict()
         return d
 
-    # def assign_type(self):
-    #     # TODO
-    #     pass
-
     def save_instance(self, obj, artifact, name):
         serializer = mappers_python.map_to_python(self, artifact)
 
@@ -861,6 +830,45 @@ class ObjectType(Type):
             result = json.load(f)
         mapper = mappers_python.map_from_python(self, artifact)
         return mapper.apply(result)
+
+
+@dataclasses.dataclass(frozen=True)
+class TypeType(ObjectType):
+    name = "type"
+
+    instance_classes = [Type]
+    attr_types: dict[str, Type] = dataclasses.field(default_factory=dict)
+
+    def property_types(self) -> dict[str, Type]:
+        return self.attr_types
+
+    @classmethod
+    def type_of_instance(cls, obj):
+        from . import infer_types
+
+        attr_types = {}
+        for field in dataclasses.fields(obj):
+            attr_types[field.name] = infer_types.python_type_to_type(field.type)
+        return cls(attr_types)
+
+    def _to_dict(self):
+        # we ensure we match the layout of ObjectType, so WeaveJS
+        # can handle it the same way.
+        d = {"_is_object": True}
+        for k, t in self.attr_types.items():
+            d[k] = t.to_dict()
+        return d
+
+    @classmethod
+    def from_dict(cls, d):
+        # weavejs fix: weavejs uses the plain string 'type' for now.
+        if d == "type":
+            return cls()
+        res = {}
+        for k, t in d.items():
+            if k != "type" and not k.startswith("_"):
+                res[k] = TypeRegistry.type_from_dict(t)
+        return cls(res)
 
 
 @dataclasses.dataclass(frozen=True)

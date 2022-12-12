@@ -373,7 +373,10 @@ def callable_output_type_to_dict(input_type, output_type, op_name):
         # TODO: Make this transformation more sophisticated once the type hierarchy is settled
         arg_types = {
             "input_types": types.TypedDict(
-                {k: types.Type() for k, _ in input_type.arg_types.items()}
+                {
+                    k: types.TypeRegistry.type_of(t)
+                    for k, t in input_type.arg_types.items()
+                }
             )
         }
         return fixup_node(weave_internal.define_fn(arg_types, output_type)).to_json()

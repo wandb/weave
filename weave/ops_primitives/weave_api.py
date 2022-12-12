@@ -127,7 +127,11 @@ def op_get_return_type_from_inputs(inputs):
     return op_get_return_type(get_const_val(inputs["uri"]))
 
 
-@op(name="getReturnType", input_type={"uri": types.String()}, output_type=types.Type())
+@op(
+    name="getReturnType",
+    input_type={"uri": types.String()},
+    output_type=types.TypeType(),
+)
 def get_returntype(uri):
     return op_get_return_type(uri)
 

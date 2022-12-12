@@ -274,24 +274,19 @@ class DispatchMixin:
                 # Otherwise, we need to wait til we know the rest of the args
                 # before we can decide which op to use.
                 return BoundPotentialOpDefs(node_self, ops_with_name_and_arg)
-        if node_self.type.__class__ == types.Type:
-            # We are doing attribute access on a Weave Type. Let them all through
-            # for now.
-            obj_getattr = registry_mem.memory_registry.get_op("Object-__getattr__")
-            return obj_getattr(node_self, attr)
         self_type = node_self.type
-        if not isinstance(self_type, types.ObjectType):
-            raise errors.WeaveDispatchError(
-                'No ops called "%s" are chainable for type "%s"'
-                % (attr, node_self.type)
-            )
-        # Definitely an ObjectType
-        if attr in self_type.property_types():
-            obj_getattr = registry_mem.memory_registry.get_op("Object-__getattr__")
-            return obj_getattr(node_self, attr)
+        if isinstance(self_type, types.ObjectType):
+            # Definitely an ObjectType
+            if attr in self_type.property_types():
+                obj_getattr = registry_mem.memory_registry.get_op("Object-__getattr__")
+                return obj_getattr(node_self, attr)
+            else:
+                raise errors.WeaveDispatchError(
+                    'No attributes called "%s" available on Object "%s"'
+                    % (attr, node_self.type)
+                )
         raise errors.WeaveDispatchError(
-            'No ops or attributes called "%s" available on type "%s"'
-            % (attr, node_self.type)
+            'No ops called "%s" available on type "%s"' % (attr, node_self.type)
         )
 
     __call__ = dispatch_dunder("__call__")

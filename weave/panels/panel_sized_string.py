@@ -30,7 +30,7 @@ class SizedStringConfig(object):
     @op(
         name="sizedstringconfig-setsize",
         input_type={"conf": SizedStringConfigType(), "size": types.String()},
-        output_type=types.Type(),
+        output_type=types.TypeType(),
     )
     def set_size(conf, size):
         conf.size = size

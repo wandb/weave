@@ -34,9 +34,7 @@ def simple_python_type_to_type(py_type: type):
 def python_type_to_type(
     py_type: typing.Union[types.GenericAlias, type]
 ) -> weave_types.Type:
-    if py_type == weave_types.Type:
-        return weave_types.Type()
-    elif py_type == typing.Any:
+    if py_type == typing.Any:
         return weave_types.Any()
     elif isinstance(py_type, typing.TypeVar):
         if py_type.__bound__ is None:

@@ -30,10 +30,10 @@ def getattr_output_type(input_type):
     if isinstance(self_arg, types.Type):
         if isinstance(input_type["name"], types.Const):
             if input_type["name"].val == "property_types":
-                return types.Dict(types.String(), types.Type())
+                return types.Dict(types.String(), types.TypeType())
             elif input_type["name"].val == "members":
-                return types.List(types.Type())
-        return types.Type()
+                return types.List(types.TypeType())
+        return types.TypeType()
 
     return types.Invalid()
 

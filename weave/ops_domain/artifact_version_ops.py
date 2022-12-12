@@ -270,7 +270,7 @@ def file_(artifactVersion: wdt.ArtifactVersion, path: str):
 
 @op(
     name="artifactVersion-fileReturnType",
-    output_type=types.Type(),
+    output_type=types.TypeType(),
 )
 def path_type(artifactVersion: wdt.ArtifactVersion, path: str):
     # TODO (tim): This is a total hack - I am not sure why dispatch is sending use thsese

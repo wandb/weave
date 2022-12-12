@@ -113,11 +113,11 @@ def test_op_compat():
         # Case 0: ConstNode, no const type, normal val
         (types.String(), "hello"),
         # Case 1: ConstNode, no const type, type val
-        (types.Type(), types.String()),
+        (types.TypeType(), types.String()),
         # Case 2: ConstNode, const type, normal val
         (types.Const(types.String(), "hello"), "hello"),
         # Case 3: ConstNode, const type, type val
-        (types.Const(types.Type(), types.String()), types.String()),
+        (types.Const(types.TypeType(), types.String()), types.String()),
     ],
 )
 def test_const_node_serialize(val_type, val):

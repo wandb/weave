@@ -298,8 +298,8 @@ class ArrowTableGroupByType(types.Type):
                 "_table": types.union(arrow.ArrowTableType(), arrow.ArrowArrayType()),
                 "_groups": types.union(arrow.ArrowTableType(), arrow.ArrowArrayType()),
                 "_group_keys": types.List(types.String()),
-                "object_type": types.Type(),
-                "key_type": types.Type(),
+                "object_type": types.TypeType(),
+                "key_type": types.TypeType(),
             }
         )
         serializer = mappers_python.map_to_python(type_of_d, artifact)
@@ -316,8 +316,8 @@ class ArrowTableGroupByType(types.Type):
                 "_table": types.union(arrow.ArrowTableType(), arrow.ArrowArrayType()),
                 "_groups": types.union(arrow.ArrowTableType(), arrow.ArrowArrayType()),
                 "_group_keys": types.List(types.String()),
-                "object_type": types.Type(),
-                "key_type": types.Type(),
+                "object_type": types.TypeType(),
+                "key_type": types.TypeType(),
             }
         )
 
@@ -440,7 +440,7 @@ class ArrowWeaveListType(types.Type):
                 "_arrow_data": types.union(
                     arrow.ArrowTableType(), arrow.ArrowArrayType()
                 ),
-                "object_type": types.Type(),
+                "object_type": types.TypeType(),
             }
         )
         if hasattr(self, "_key"):
@@ -461,7 +461,7 @@ class ArrowWeaveListType(types.Type):
                 "_arrow_data": types.union(
                     arrow.ArrowTableType(), arrow.ArrowArrayType()
                 ),
-                "object_type": types.Type(),
+                "object_type": types.TypeType(),
             }
         )
         if hasattr(self, "_key"):
@@ -826,13 +826,6 @@ class ArrowTableGroupResultType(ArrowWeaveListType):
             obj.object_type,
             types.TypeRegistry.type_of(obj._key),
         )
-
-    # def property_types(self):
-    #     return {
-    #         "_arrow_data": types.union(ArrowTableType(), ArrowArrayType()),
-    #         "object_type": types.Type(),
-    #         "_key": self.key,
-    #     }
 
 
 @weave_class(weave_type=ArrowTableGroupResultType)

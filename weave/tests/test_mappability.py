@@ -23,7 +23,7 @@ def _test_mappability_custom_pick_op(x):
 
 @weave.op(
     input_type={"obj": types.TypedDict({}), "key": types.String()},
-    output_type=types.Type(),
+    output_type=types.TypeType(),
 )
 def _test_mappability_custom_pick_refine(obj, key):
     return types.TypeRegistry.type_of(obj[key])

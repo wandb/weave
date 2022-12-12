@@ -65,7 +65,7 @@ def test_map_const():
 
 def test_map_union_none_type():
     d = None
-    d_type = types.UnionType(types.Type(), types.NoneType())
+    d_type = types.UnionType(types.TypeType(), types.NoneType())
     m = mappers_python.map_to_python(d_type, None)
     d2 = m.apply(d)
     m2 = mappers_python.map_from_python(d_type, None)

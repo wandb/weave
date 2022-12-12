@@ -34,7 +34,7 @@ def _convert_type(old_type: wandb_data_types_dtypes.Type) -> types.Type:
     # Type Type
     #
     if type(old_type) == wandb_data_types_dtypes.Type:
-        return types.Type()
+        return types.TypeType()
     #
     # General Types
     #

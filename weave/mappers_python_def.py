@@ -83,18 +83,12 @@ class ListToPyList(mappers_weave.ListMapper):
 
 
 class UnionToPyUnion(mappers_weave.UnionMapper):
-    def __init__(self, type, mapper, artifact, path):
-        super().__init__(type, mapper, artifact, path)
-        self._type_narrowness_sorted_members = sorted(
-            zip(self.type.members, self._member_mappers, range(len(self.type.members))),
-            key=lambda tup: tup[0],
-        )
-
     def apply(self, obj):
         obj_type = types.TypeRegistry.type_of(obj)
+        for i, (member_type, member_mapper) in enumerate(
+            zip(self.type.members, self._member_mappers)
+        ):
 
-        # sort types by narrowness
-        for (member_type, member_mapper, i) in self._type_narrowness_sorted_members:
             # TODO: assignment isn't right here (a dict with 'a', 'b' int keys is
             # assignable to a dict with an 'a' int key). We want type equality.
             # But that breaks some stuff
@@ -284,7 +278,7 @@ def add_mapper(
 
 
 def map_to_python_(type, mapper, artifact, path=[]):
-    if py_type(type) == types.Type:
+    if isinstance(type, types.TypeType):
         # If we're actually serializing a type itself
         return TypeToPyType(type, mapper, artifact, path)
     elif isinstance(type, types.TypedDict):
@@ -327,7 +321,7 @@ def map_to_python_(type, mapper, artifact, path=[]):
 
 
 def map_from_python_(type: types.Type, mapper, artifact, path=[]):
-    if py_type(type) == types.Type:
+    if isinstance(type, types.TypeType):
         # If we're actually serializing a type itself
         return PyTypeToType(type, mapper, artifact, path)
     elif isinstance(type, types.ObjectType):

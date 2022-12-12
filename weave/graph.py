@@ -140,9 +140,8 @@ class VarNode(Node):
 
 
 def _inner_type_skips_output_node(type: weave_types.Type) -> bool:
-    return (
-        isinstance(type, (weave_types.BasicType, weave_types.TypedDict))
-        or type.__class__ == weave_types.Type
+    return isinstance(
+        type, (weave_types.BasicType, weave_types.TypedDict, weave_types.TypeType)
     )
 
 

@@ -164,7 +164,7 @@ def op_local_path_return_type(input_types):
 @op(
     name="localpathReturnType",
     input_type={"path": types.String()},
-    output_type=types.Type(),
+    output_type=types.TypeType(),
 )
 def local_path_return_type(path):
     return path_type(path)
