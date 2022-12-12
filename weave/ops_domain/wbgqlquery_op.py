@@ -10,7 +10,7 @@ from ..wandb_api import wandb_gql_query
     name="gqlroot-wbgqlquery",
     input_type={
         "query_str": types.String(),
-        "output_type": types.Type(),
+        "output_type": types.TypeType(),
     },
     output_type=types.Any(),
 )
