@@ -18,7 +18,7 @@ def lastLetter(v: str) -> str:
 @weave_class(weave_type=types.String)
 class String:
     @op(
-        name="string-set",
+        name="string-_set",
         input_type={"self": types.String(), "val": types.String()},
         output_type=types.String(),
     )

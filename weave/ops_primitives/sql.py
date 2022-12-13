@@ -256,6 +256,18 @@ def sqlconnection_tables(conn):
 #     return conn.table_names()
 
 
+def _table_to_type(table):
+    table_column_types = {}
+    for column_name, column in table.columns.items():
+        type_class = column.type.__class__.__name__
+        if type_class == "VARCHAR" or type_class == "TEXT":
+            table_column_type = types.String()
+        elif type_class == "INTEGER":
+            table_column_type = types.Number()
+        table_column_types[column_name] = table_column_type
+    return table_column_types
+
+
 @op(
     name="sqlconnection-tablesType",
     input_type={"conn": SqlConnectionType()},
@@ -264,22 +276,27 @@ def sqlconnection_tables(conn):
 def sqlconnection_tables_type(conn):
     properties = {}
     for table_name, table in conn.meta.tables.items():
-        table_column_types = {}
-        for column_name, column in table.columns.items():
-            type_class = column.type.__class__.__name__
-            if type_class == "VARCHAR":
-                table_column_type = types.String()
-            elif type_class == "INTEGER":
-                table_column_type = types.Number()
-            table_column_types[column_name] = table_column_type
-        properties[table_name] = types.List(types.TypedDict(table_column_types))
+        properties[table_name] = types.List(types.TypedDict(_table_to_type(table)))
     return types.TypedDict(properties).to_json()
+
+
+@op(
+    name="sqlconnection-refine_table",
+    input_type={"conn": SqlConnectionType(), "name": types.String()},
+    output_type=types.TypeType(),
+)
+def refine_sqlconnection_table(conn, name):
+    for table_name, table in conn.meta.tables.items():
+        if table_name == name:
+            return SqlTableType(types.TypedDict(_table_to_type(table)))
+    return types.NoneType()
 
 
 @op(
     name="sqlconnection-table",
     input_type={"conn": SqlConnectionType(), "name": types.String()},
     output_type=SqlTableType(types.TypedDict({})),
+    refine_output_type=refine_sqlconnection_table,
 )
 def sqlconnection_table(conn, name):
     return conn.table(name)

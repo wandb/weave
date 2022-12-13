@@ -267,12 +267,39 @@ DataFrameTableType.instance_classes = DataFrameTable
 DataFrameTableType.instance_class = DataFrameTable
 
 
+def _pd_dtype_to_weave(dtype):
+    if dtype.name == "object" or dtype.name == "category":
+        return types.String()
+    elif dtype.name == "int64":
+        return types.Int()
+    elif dtype.name == "float64":
+        return types.Float()
+    elif dtype.name == "bool":
+        return types.Boolean()
+    elif dtype.name == "datetime64" or dtype.name == "timedelta[ns]":
+        return types.Datetime()
+    else:
+        raise NotImplementedError("Unsupported dtype: {}".format(dtype))
+
+
+@op(
+    name="file-refine_pandasreadcsv",
+    input_type={"file": types.FileType()},
+    output_type=types.TypeType(),
+)
+def refine_pandasreadcsv(file):
+    res = pandasreadcsv.raw_resolve_fn(file)
+    columns = res._df.dtypes.index.values.tolist()
+    dtypes = res._df.dtypes.values.tolist()
+    prop_types = {col: _pd_dtype_to_weave(dtype) for col, dtype in zip(columns, dtypes)}
+    return DataFrameTableType(DataFrameType(types.TypedDict(prop_types)))
+
+
 @op(
     name="file-pandasreadcsv",
     input_type={"file": types.FileType()},
-    # TODO: This needs to be implemented. It needs to read the file to
-    #     determine what the type will be.
     output_type=DataFrameTableType(DataFrameType(types.TypedDict({}))),
+    refine_output_type=refine_pandasreadcsv,
 )
 def pandasreadcsv(file):
     local_path = file.get_local_path()

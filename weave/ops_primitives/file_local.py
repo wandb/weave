@@ -18,6 +18,16 @@ class LocalFileType(types.FileType):
         }
 
 
+@op(
+    name="file-refine_readcsv",
+    input_type={"self": types.FileType(types.String())},
+    output_type=types.TypeType(),
+)
+def refine_readcsv(self):
+    res = LocalFile.readcsv.raw_resolve_fn(self)
+    return types.TypeRegistry.type_of(res)
+
+
 @weave_class(weave_type=LocalFileType)
 class LocalFile(weave_file.File):
     def __init__(self, path, mtime=None, extension=None):
@@ -68,6 +78,7 @@ class LocalFile(weave_file.File):
         name="file-readcsv",
         input_type={"self": types.FileType(types.String())},
         output_type=types.List(types.TypedDict({})),
+        refine_output_type=refine_readcsv,
     )
     def readcsv(self):
         # TODO: shouldn't need to do this, we can know the type of the file

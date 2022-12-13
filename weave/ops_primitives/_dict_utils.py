@@ -9,10 +9,7 @@ def typeddict_pick_output_type(input_types):
     key = input_types["key"].val
     output_type = property_types.get(key)
     if output_type is None:
-        # TODO: we hack this to types.Number() for now! This is relied
-        # on by tests because readcsv() doesn't properly return a full
-        # type right now. Super janky
-        return types.Number()
+        return types.NoneType()
     return output_type
 
 

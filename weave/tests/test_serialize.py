@@ -28,7 +28,7 @@ def test_serialize(fake_wandb):
     table = file.table()
     rows = table.rows()
     filter_fn = api.define_fn(
-        {"row": types.TypedDict({})}, lambda row: row["new"] + 100
+        {"row": rows.type.object_type}, lambda row: row["score_Animalia"] + 100
     )
     filtered = rows.map(filter_fn)
 

@@ -24,7 +24,27 @@ def test_show_simple_call(cereal_csv):
         "nodeType": "output",
         "type": {
             "type": "list",
-            "objectType": {"type": "typedDict", "propertyTypes": {}},
+            "objectType": {
+                "type": "typedDict",
+                "propertyTypes": {
+                    "name": "string",
+                    "mfr": "string",
+                    "type": "string",
+                    "calories": "int",
+                    "protein": "int",
+                    "fat": "int",
+                    "sodium": "int",
+                    "fiber": "float",
+                    "carbo": "float",
+                    "sugars": "int",
+                    "potass": "int",
+                    "vitamins": "int",
+                    "shelf": "int",
+                    "weight": "float",
+                    "cups": "float",
+                    "rating": "float",
+                },
+            },
         },
         "fromOp": {
             "name": "file-readcsv",
