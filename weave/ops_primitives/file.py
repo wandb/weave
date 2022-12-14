@@ -2,6 +2,8 @@ import os
 import dataclasses
 import shutil
 
+from . import errors
+
 from ..refs import ArtifactVersionFileType
 from ..api import op, mutation, weave_class
 from .. import weave_types as types
@@ -65,6 +67,58 @@ class Table:
         return table._rows
 
 
+def _data_is_legacy_run_file_format(data):
+    keys = set(data.keys())
+    return keys == {"columns", "data"}
+
+
+def _data_is_weave_file_format(data):
+    return "columns" in data and "data" in data and "column_types" in data
+
+
+def _get_rows_and_object_type_from_legacy_format(data):
+    rows = [dict(zip(data["columns"], row)) for row in data["data"]]
+    object_type = types.TypeRegistry.type_of(rows).object_type
+    return rows, object_type
+
+
+def _get_rows_and_object_type_from_weave_format(data, file):
+    rows = []
+    wb_artifact = None
+    if hasattr(file, "artifact") and isinstance(
+        file.artifact, artifacts_local.WandbArtifact
+    ):
+        wb_artifact = file.artifact._saved_artifact
+    row_data = data["data"]
+    column_types = data["column_types"]
+    converted_object_type = wandb_util.weave0_type_json_to_weave1_type(
+        column_types, wb_artifact
+    )
+    # Fix two things:
+    # 1. incoming table column names may not match the order of column_types
+    # 2. if we had an unknown (happens when old type is "PythonObjectType")
+    #    we need to manually detect the type.
+    obj_prop_types = {}
+    for i, key in enumerate(data["columns"]):
+        col_type = converted_object_type.property_types[key]
+        if col_type.assign_type(types.UnknownType()):
+            unknown_col_example_data = [row[i] for row in row_data]
+            detected_type = types.TypeRegistry.type_of(unknown_col_example_data)
+            obj_prop_types[key] = detected_type.object_type
+        else:
+            obj_prop_types[key] = col_type
+    object_type = types.TypedDict(obj_prop_types)
+
+    # TODO: this will need to recursively convert dicts to Objects in some
+    # cases.
+    for data_row in row_data:
+        row = {}
+        for col_name, val in zip(data["columns"], data_row):
+            row[col_name] = val
+        rows.append(row)
+    return rows, object_type
+
+
 @weave_class(weave_type=types.FileType)
 class File:
     @op(
@@ -79,38 +133,15 @@ class File:
         with _py_open(local_path) as f:
             data = json.load(f)
 
-        wb_artifact = None
-        if hasattr(file, "artifact") and isinstance(
-            file.artifact, artifacts_local.WandbArtifact
-        ):
-            wb_artifact = file.artifact._saved_artifact
-        converted_object_type = wandb_util.weave0_type_json_to_weave1_type(
-            data["column_types"], wb_artifact
-        )
-
-        # Fix two things:
-        # 1. incoming table column names may not match the order of column_types
-        # 2. if we had an unknown (happens when old type is "PythonObjectType")
-        #    we need to manually detect the type.
-        obj_prop_types = {}
-        for i, key in enumerate(data["columns"]):
-            col_type = converted_object_type.property_types[key]
-            if col_type.assign_type(types.UnknownType()):
-                unknown_col_example_data = [row[i] for row in data["data"]]
-                detected_type = types.TypeRegistry.type_of(unknown_col_example_data)
-                obj_prop_types[key] = detected_type.object_type
-            else:
-                obj_prop_types[key] = col_type
-        object_type = types.TypedDict(obj_prop_types)
-
-        # TODO: this will need to recursively convert dicts to Objects in some
-        # cases.
         rows = []
-        for data_row in data["data"]:
-            row = {}
-            for col_name, val in zip(data["columns"], data_row):
-                row[col_name] = val
-            rows.append(row)
+        object_type = None
+
+        if _data_is_legacy_run_file_format(data):
+            rows, object_type = _get_rows_and_object_type_from_legacy_format(data)
+        elif _data_is_weave_file_format(data):
+            rows, object_type = _get_rows_and_object_type_from_weave_format(data, file)
+        else:
+            raise errors.WeaveInternalError("Unknown table file format for data")
 
         res = ops_arrow.to_arrow_from_list_and_artifact(
             rows, object_type, file.artifact

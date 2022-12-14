@@ -1,5 +1,6 @@
 from contextvars import Token
 from dataclasses import dataclass, field
+import json
 import os
 import random
 import typing
@@ -82,6 +83,33 @@ class FakeArtifact:
     name = "test_res_1fwmcd3q"
 
 
+class FakeRunFile:
+    def __init__(self, name):
+        self.name = name
+
+    def download(self, root, replace=False):
+        if self.name == "media/tables/legacy_table.table.json":
+            path = os.path.join(root, "legacy_table.table.json")
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w") as f:
+                f.write(
+                    json.dumps(
+                        {
+                            "columns": ["col1", "col2"],
+                            "data": [["a", "b"], ["c", "d"]],
+                        }
+                    )
+                )
+            return open(path)
+        else:
+            raise Exception(f"Please mock file {self.name} in fixture_fakewandb.py")
+
+
+class FakeRun:
+    def file(self, name):
+        return FakeRunFile(name)
+
+
 @dataclass
 class FakeClient:
     execute_log: typing.List[dict[str, typing.Any]] = field(default_factory=list)
@@ -109,6 +137,7 @@ class FakeClient:
 class FakeApi:
     client = FakeClient()
     artifact = mock.Mock(return_value=FakeVersion())
+    run = mock.Mock(return_value=FakeRun())
 
     def add_mock(
         self,

@@ -54,6 +54,13 @@ def get_wandb_read_artifact(path):
 
 
 @safe_cache.safe_lru_cache(1000)
+def get_wandb_read_run(path):
+    with chdir(wandb_run_dir()):
+        run = wandb_api.wandb_public_api().run(path)
+    return run
+
+
+@safe_cache.safe_lru_cache(1000)
 def get_wandb_read_client_artifact(art_id: str):
     """art_id may be client_id, or seq:alias"""
     if ":" in art_id:
@@ -152,6 +159,12 @@ def wandb_artifact_dir():
     # Make this a subdir of local_artifact_dir, since the server
     # checks for local_artifact_dir to see if it should serve
     d = os.path.join(local_artifact_dir(), "_wandb_artifacts")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+def wandb_run_dir():
+    d = os.path.join(local_artifact_dir(), "_wandb_runs")
     os.makedirs(d, exist_ok=True)
     return d
 
@@ -517,3 +530,22 @@ class WandbArtifact(Artifact):
         self._saved_artifact = wandb_api.wandb_public_api().artifact(
             f"{run.entity}/{project}/{self._writeable_artifact.name}"
         )
+
+
+class WandbRunFilesProxyArtifact(Artifact):
+    def __init__(self, entity_name: str, project_name: str, run_name: str):
+        self.name = f"{entity_name}/{project_name}/{run_name}"
+        self._run = get_wandb_read_run(self.name)
+        self._local_path: dict[str, str] = {}
+
+    def path(self, name):
+        if name in self._local_path:
+            return self._local_path[name]
+        root = f"{wandb_run_dir()}/{self.name}"
+        with self._run.file(name).download(root, replace=True) as fp:
+            path = fp.name
+        path_safe = path.replace(":", "_")
+        pathlib.Path(path_safe).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(path, path_safe)
+        self._local_path[name] = path_safe
+        return path_safe

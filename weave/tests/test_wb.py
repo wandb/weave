@@ -55,7 +55,11 @@ workspace_response = {
                                 "table": {
                                     "_type": "table-file",
                                     "artifact_path": "wandb-client-artifact://1234567890/test_results.table.json",
-                                }
+                                },
+                                "legacy_table": {
+                                    "_type": "table-file",
+                                    "path": "media/tables/legacy_table.table.json",
+                                },
                             }
                         ),
                         "displayName": "amber-glade-100",
@@ -197,6 +201,25 @@ def table_mock(q, ndx):
         return workspace_response
 
 
+def test_legacy_run_file_table_format(fake_wandb):
+    fake_wandb.add_mock(lambda q, ndx: workspace_response)
+    cell_node = (
+        ops.project("stacey", "mendeleev")
+        .runs()
+        .limit(1)
+        .summary()["legacy_table"]
+        .table()
+        .rows()
+        .dropna()
+        .concat()
+        .createIndexCheckpointTag()[1]["col1"]
+    )
+    assert weave.use(cell_node) == "c"
+    assert weave.use(cell_node.indexCheckpoint()) == 1
+    assert weave.use(cell_node.run().name()) == "amber-glade-100"
+    assert weave.use(cell_node.project().name()) == "mendeleev"
+
+
 def test_mapped_table_tags(fake_wandb):
     fake_wandb.add_mock(table_mock)
     cell_node = (
@@ -255,7 +278,7 @@ def test_table_images(fake_wandb):
     summary_node = project_runs_node.summary()
     # this use is important as it models the sequence of calls in UI
     # and invokes the issues with artifact paths
-    assert list(weave.use(summary_node)[0].keys()) == ["table"]
+    assert list(weave.use(summary_node)[0].keys()) == ["table", "legacy_table"]
 
     # Query 2:
     table_rows_node = summary_node.pick("table").table().rows()

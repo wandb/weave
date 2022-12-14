@@ -71,7 +71,14 @@ def refine_config_type(run: wdt.Run) -> types.Type:
     plugins=wb_gql_op_plugin(lambda inputs, inner: "config"),
 )
 def config(run: wdt.Run) -> dict[str, typing.Any]:
-    return wb_util.process_run_dict_obj(json.loads(run.gql["config"] or "{}"))
+    return wb_util.process_run_dict_obj(
+        json.loads(run.gql["config"] or "{}"),
+        wb_util.RunPath(
+            run.gql["project"]["entity"]["name"],
+            run.gql["project"]["name"],
+            run.gql["name"],
+        ),
+    )
 
 
 @op(
@@ -88,7 +95,14 @@ def refine_summary_type(run: wdt.Run) -> types.Type:
     plugins=wb_gql_op_plugin(lambda inputs, inner: "summaryMetrics"),
 )
 def summary(run: wdt.Run) -> dict[str, typing.Any]:
-    return wb_util.process_run_dict_obj(json.loads(run.gql["summaryMetrics"] or "{}"))
+    return wb_util.process_run_dict_obj(
+        json.loads(run.gql["summaryMetrics"] or "{}"),
+        wb_util.RunPath(
+            run.gql["project"]["entity"]["name"],
+            run.gql["project"]["name"],
+            run.gql["name"],
+        ),
+    )
 
 
 # Section 4/6: Direct Relationship Ops

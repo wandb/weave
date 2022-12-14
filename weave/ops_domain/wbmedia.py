@@ -6,7 +6,7 @@ import typing
 
 from wandb.apis import public as wandb_api
 
-from ..artifacts_local import get_wandb_read_client_artifact
+from ..artifacts_local import WandbRunFilesProxyArtifact, get_wandb_read_client_artifact
 from ..language_features.tagging.tag_store import isolated_tagging_context
 from .. import types
 from .. import api as weave
@@ -142,6 +142,34 @@ class TableClientArtifactFileRef:
     def table(self):
         if not hasattr(self, "artifact"):
             self.artifact = self.wb_artifact
+        return file.File.table.resolve_fn(self)
+
+
+@weave.type(__override_name="runtable-file")  # type: ignore
+class TableRunFileRef:
+    entity_name: str
+    project_name: str
+    run_name: str
+    file_path: str
+
+    def __init__(self, entity_name, project_name, run_name, file_path):
+        self.entity_name = entity_name
+        self.project_name = project_name
+        self.run_name = run_name
+        self.file_path = file_path
+        self.artifact = WandbRunFilesProxyArtifact(
+            self.entity_name, self.project_name, self.run_name
+        )
+
+    def get_local_path(self):
+        return self.artifact.path(self.file_path)
+
+    # This is a temp hack until we have better support for _base_type inheritance
+    @weave.op(
+        name="runtablefile-table",
+        output_type=file.TableType(),
+    )
+    def table(self):
         return file.File.table.resolve_fn(self)
 
 
