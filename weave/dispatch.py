@@ -135,7 +135,7 @@ def choose_op_for_args(
 
 def dispatch_by_name_and_type(
     common_name: str, args: typing.Any, kwargs: typing.Any
-) -> typing.Any:
+) -> "RuntimeOutputNode":
     ops = get_ops_by_name(common_name)
     if len(ops) == 0:
         err = errors.WeaveDispatchError(

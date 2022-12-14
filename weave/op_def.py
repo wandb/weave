@@ -25,6 +25,27 @@ def common_name(name: str) -> str:
     return name.split("-")[-1]
 
 
+class OpDefABC:
+    name: str
+
+    def __call__(_self, *args: typing.Any, **kwargs: typing.Any) -> graph.OutputNode:
+        return _self._call_op(_self._bind_params(args, kwargs))
+
+    def input_type(self) -> op_args.OpArgs:
+        raise NotImplementedError()
+
+    def output_type(self, input_type: dict[str, types.Type]) -> types.Type:
+        raise NotImplementedError()
+
+    def _bind_params(
+        self, args: typing.Sequence[typing.Any], kwargs: dict[str, typing.Any]
+    ) -> collections.OrderedDict[str, graph.Node]:
+        raise NotImplementedError()
+
+    def _call_op(self, inputs: dict[str, graph.Node]) -> graph.OutputNode:
+        raise NotImplementedError()
+
+
 class OpDef:
     """An Op Definition.
 
@@ -383,3 +404,16 @@ def callable_output_type_to_dict(input_type, output_type, op_name):
     except errors.WeaveMakeFunctionError as e:
         # print(f"Failed to transform op {op_name}: Invalid output type function")
         return types.Any().to_dict()
+
+
+class VirtualOpDef(OpDef):
+    # TODO: refactor such that OpDef has a minimal ABC interface
+    # currnetly this is a bit wild west
+    def __init__(self, on_call: typing.Callable) -> None:
+        self.on_call = on_call
+
+    def __call__(self, *args, **kwargs):
+        if self.bind_self is None:
+            return self.on_call(*args, **kwargs)
+        else:
+            return self.on_call(self.bind_self, *args, **kwargs)
