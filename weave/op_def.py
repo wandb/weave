@@ -163,9 +163,8 @@ class OpDef:
             return _self.resolve_fn(*args, **kwargs)
 
     def resolve_fn(__self, *args, **kwargs):
-        res = __self.raw_resolve_fn(*args, **kwargs)
         return process_opdef_resolve_fn.process_opdef_resolve_fn(
-            __self, res, args, kwargs
+            __self, __self.raw_resolve_fn, args, kwargs
         )
 
     @property
@@ -342,6 +341,13 @@ class OpDef:
                         v = graph.ConstNode(val_type, v)
                 bound_params_with_constants[k] = v
         return bound_params_with_constants
+
+    def op_def_is_auto_tag_handling_arrow_op(self) -> bool:
+        return isinstance(self, AutoTagHandlingArrowOpDef)
+
+
+class AutoTagHandlingArrowOpDef(OpDef):
+    pass
 
 
 class BoundOpDef(OpDef):

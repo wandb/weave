@@ -19,6 +19,8 @@ import contextvars
 from contextlib import contextmanager
 import typing
 
+import pyarrow as pa
+
 from ... import box
 from ... import weave_types as types
 
@@ -88,10 +90,7 @@ def with_visited_obj(obj: typing.Any) -> typing.Iterator[None]:
 
 # Adds a dictionary of tags to an object
 def add_tags(obj: typing.Any, tags: dict[str, typing.Any]) -> typing.Any:
-    from ...ops_arrow import list_ as arrow_list
 
-    if isinstance(obj, arrow_list.ArrowWeaveList):
-        return arrow_list.awl_add_py_tags(obj, tags)
     id_val = id(obj)
     assert box.is_boxed(obj), "Can only tag boxed objects"
     existing_tags = get_tags(obj) if is_tagged(obj) else {}
@@ -103,9 +102,11 @@ def add_tags(obj: typing.Any, tags: dict[str, typing.Any]) -> typing.Any:
 # Note: this is not recursive, it only returns the tags directly assocaited with
 # the given object
 def get_tags(obj: typing.Any) -> dict[str, typing.Any]:
+
     id_val = id(obj)
     if id_val in _VISITED_OBJ_IDS.get():
         raise ValueError("Cannot get tags for an object that is being visited")
+
     current_mem_map = _current_obj_tag_mem_map()
     if id_val not in current_mem_map:
         raise ValueError("Object is not tagged")
@@ -132,4 +133,7 @@ def find_tag(
 # Returns true if the given object has been tagged
 def is_tagged(obj: typing.Any) -> bool:
     id_val = id(obj)
-    return id_val not in _VISITED_OBJ_IDS.get() and id_val in _current_obj_tag_mem_map()
+    if id_val in _VISITED_OBJ_IDS.get():
+        return False
+
+    return id_val in _current_obj_tag_mem_map()

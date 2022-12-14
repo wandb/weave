@@ -11,6 +11,7 @@ from . import weave_server
 from .tests import fixture_fakewandb
 from . import serialize
 from . import client
+from .language_features.tagging.tag_store import isolated_tagging_context
 
 from flask.testing import FlaskClient
 
@@ -60,7 +61,8 @@ def pre_post_each_test():
     except (FileNotFoundError, OSError):
         pass
     os.environ["WEAVE_LOCAL_ARTIFACT_DIR"] = test_artifact_dir
-    yield
+    with isolated_tagging_context():
+        yield
     del os.environ["WEAVE_LOCAL_ARTIFACT_DIR"]
 
 

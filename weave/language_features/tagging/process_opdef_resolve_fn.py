@@ -13,10 +13,78 @@ from .tagged_value_type import TaggedValueType
 from ... import box
 from ... import weave_types as types
 from . import tag_store
-from .opdef_util import get_first_arg, should_flow_tags, should_tag_op_def_outputs
+from .opdef_util import (
+    get_first_arg,
+    should_flow_tags,
+    should_tag_op_def_outputs,
+)
 
 if typing.TYPE_CHECKING:
     from ... import op_def as OpDef
+
+
+# here we strip the tags from each element of an arrow weave list and create a
+# new arrow weave list that contains just the untagged values. We then pass that
+# to the op resolver. On we get the result back, we re-apply the tags we stripped
+# previously
+def propagate_arrow_tags(
+    op_def: "OpDef.OpDef",
+    resolve_fn: typing.Callable,
+    args: list[typing.Any],
+    kwargs: dict[str, typing.Any],
+) -> typing.Any:
+    from ...ops_arrow import ArrowWeaveList, awl_add_arrow_tags
+
+    tag_type: typing.Optional[types.Type]
+
+    _, first_arg_val = get_first_arg(op_def, args, kwargs)
+    first_arg_val = typing.cast(ArrowWeaveList, first_arg_val)
+    if isinstance(first_arg_val.object_type, TaggedValueType):
+        flow_tags = first_arg_val._arrow_data.field("_tag")
+        tag_type = first_arg_val.object_type.tag
+    else:
+        flow_tags = None
+        tag_type = None
+
+    tag_stripped_args: list[typing.Any] = []
+    tag_stripped_kwargs: dict[str, typing.Any] = {}
+
+    for arg in args:
+        if isinstance(arg, ArrowWeaveList) and isinstance(
+            arg.object_type, TaggedValueType
+        ):
+            tag_stripped_args.append(
+                ArrowWeaveList(
+                    arg._arrow_data.field("_value"),
+                    arg.object_type.value,
+                    arg._artifact,
+                )
+            )
+        else:
+            tag_stripped_args.append(arg)
+
+    for key, val in kwargs.items():
+        if isinstance(val, ArrowWeaveList) and isinstance(
+            val.object_type, TaggedValueType
+        ):
+            tag_stripped_kwargs[key] = ArrowWeaveList(
+                val._arrow_data.field("_value"),
+                val.object_type.value,
+                val._artifact,
+            )
+        else:
+            tag_stripped_kwargs[key] = val
+
+    res = resolve_fn(*tag_stripped_args, **tag_stripped_kwargs)
+
+    # rewrap tags
+    if flow_tags and tag_type:
+        res = awl_add_arrow_tags(
+            res,
+            flow_tags,
+            tag_type,
+        )
+    return res
 
 
 # This function is responcible for post-processing the results of a resolve_fn.
@@ -26,10 +94,15 @@ if typing.TYPE_CHECKING:
 # 3. Else, it will just return the output.
 def process_opdef_resolve_fn(
     op_def: "OpDef.OpDef",
-    res: typing.Any,
+    resolve_fn: typing.Callable,
     args: list[typing.Any],
     kwargs: dict[str, typing.Any],
 ) -> typing.Any:
+    if op_def.op_def_is_auto_tag_handling_arrow_op():
+        res = propagate_arrow_tags(op_def, resolve_fn, args, kwargs)
+    else:
+        res = resolve_fn(*args, **kwargs)
+
     res = box.box(res)
     if should_tag_op_def_outputs(op_def):
         key, val = get_first_arg(op_def, args, kwargs)

@@ -1,13 +1,14 @@
 import pyarrow as pa
 
-from ..api import op, type_of
+from ..api import type_of
+from ..decorator_op import arrow_op
 from .. import weave_types as types
 from ..ops_primitives import obj as primitives_obj
 
 from .list_ import ArrowWeaveList, ArrowWeaveListType
 
 
-@op(
+@arrow_op(
     name="ArrowWeaveListObject-__vectorizedGetattr__",
     input_type={
         "self": ArrowWeaveListType(types.Any()),

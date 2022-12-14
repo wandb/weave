@@ -4,6 +4,7 @@ from . import weave_types as types
 from . import context_state
 from . import errors
 from . import client_interface
+from . import box
 
 
 def dereference_variables(node: graph.Node, var_values: graph.Frame) -> graph.Node:
@@ -12,10 +13,14 @@ def dereference_variables(node: graph.Node, var_values: graph.Frame) -> graph.No
             return var_values[n.name]
         return n
 
-    return graph.map_nodes(node, map_fn)
+    mapped = graph.map_nodes(node, map_fn)
+    return mapped
 
 
-def call_fn(weave_fn: graph.Node, inputs: graph.Frame) -> graph.Node:
+def call_fn(
+    weave_fn: graph.Node,
+    inputs: graph.Frame,
+) -> graph.Node:
     return dereference_variables(weave_fn, inputs)
 
 
@@ -109,3 +114,29 @@ ENInputTypeType = typing.Optional[
     typing.Union[types.Type, typing.Callable[..., types.Type]]
 ]
 ENBoundParamsType = typing.Optional[dict[str, graph.Node]]
+
+
+# this refines all the nodes in a graph. it's useful / needed if you do call_fn on some arguments
+# that have a different type than exact type of the function inputs, e.g., the argument is tagged
+# and the function doesn't explicitly operate on tagged values. this ensures that the input tags
+# are propagated appropriately to the output type of the function.
+def refine_graph(node: graph.Node) -> graph.Node:
+    from .registry_mem import memory_registry
+
+    if isinstance(node, (graph.ConstNode, graph.VoidNode, graph.VarNode)):
+        return node
+    elif isinstance(node, graph.OutputNode):
+        op_name = node.from_op.name
+        op = memory_registry.get_op(op_name)
+        if op is None:
+            raise ValueError("No op named %s" % op_name)
+        refined_inputs: dict[str, typing.Any] = {}
+        for input_name, input_node in node.from_op.inputs.items():
+            refined_input = refine_graph(input_node)
+            refined_inputs[input_name] = refined_input
+        return op(**refined_inputs)
+
+    else:
+        raise NotImplementedError(
+            "refine_graph cannot yet handle nodes of type %s" % type(node)
+        )

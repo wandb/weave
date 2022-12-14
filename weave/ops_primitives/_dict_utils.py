@@ -32,30 +32,4 @@ def typeddict_merge_output_type(
         **other.property_types,
     }
 
-    # merge nested dictionary types
-    self_keys = set(self.property_types.keys())
-    other_keys = set(other.property_types.keys())
-    common_keys = self_keys.intersection(other_keys)
-
-    for key in common_keys:
-        self_property_type = self.property_types[key]
-        other_property_type = other.property_types[key]
-        if isinstance(self_property_type, types.TypedDict) and isinstance(
-            other_property_type, types.TypedDict
-        ):
-            merged_dict_type = typeddict_merge_output_type(
-                {
-                    "self": self_property_type,
-                    "other": other_property_type,
-                }
-            )
-
-            property_types[key] = (
-                types.TypedDict(
-                    property_types=merged_dict_type.property_types,
-                )
-                if isinstance(merged_dict_type, types.TypedDict)
-                else types.UnknownType()
-            )
-
     return types.TypedDict(property_types=property_types)

@@ -2,13 +2,18 @@ import pyarrow as pa
 import pandas as pd
 
 from ..api import op, type, use, OpVarArgs
+from ..decorator_op import arrow_op
 from .. import weave_types as types
 from ..ops_primitives import _dict_utils
 from .. import errors
-from ..language_features.tagging import tagged_value_type, process_opdef_output_type
+from ..language_features.tagging import (
+    tagged_value_type,
+    process_opdef_output_type,
+    tag_store,
+)
 
-from .list_ import ArrowWeaveList, ArrowWeaveListType
-from .arrow import arrow_as_array, arrow_type_to_weave_type
+from .list_ import ArrowWeaveList, ArrowWeaveListType, awl_add_arrow_tags
+from .arrow import arrow_as_array
 
 
 def typeddict_pick_output_type(input_types):
@@ -19,23 +24,20 @@ def typeddict_pick_output_type(input_types):
     )
 
 
-@op(
+@arrow_op(
     name="ArrowWeaveListTypedDict-pick",
-    input_type={"self": ArrowWeaveListType(types.TypedDict({}))},
+    input_type={"self": ArrowWeaveListType(types.TypedDict({})), "key": types.String()},
     output_type=lambda input_types: ArrowWeaveListType(
         typeddict_pick_output_type(
             {"self": input_types["self"].object_type, "key": input_types["key"]}
         )
     ),
 )
-def pick(self, key: str):
+def pick(self, key):
     object_type = typeddict_pick_output_type(
         {"self": self.object_type, "key": types.Const(types.String(), key)}
     )
     data = self._arrow_data
-    if isinstance(self.object_type, tagged_value_type.TaggedValueType):
-        data = data["_value"].combine_chunks()
-
     if isinstance(data, pa.StructArray):
         value = data.field(key)
     elif isinstance(self._arrow_data, pa.Table):
@@ -44,16 +46,10 @@ def pick(self, key: str):
         raise errors.WeaveTypeError(
             f"Unexpected type for pick: {type(self._arrow_data)}"
         )
-
-    if isinstance(self.object_type, tagged_value_type.TaggedValueType):
-        value = pa.Table.from_arrays(
-            [self._arrow_data["_tag"], value], ["_tag", "_value"]
-        )
-
     return ArrowWeaveList(value, object_type, self._artifact)
 
 
-@op(
+@arrow_op(
     name="ArrowWeaveListTypedDict-merge",
     input_type={
         "self": ArrowWeaveListType(types.TypedDict({})),
@@ -69,9 +65,6 @@ def pick(self, key: str):
     ),
 )
 def merge(self, other):
-    self_keys = set(self.object_type.property_types.keys())
-    other_keys = set(other.object_type.property_types.keys())
-    common_keys = self_keys.intersection(other_keys)
 
     field_arrays: dict[str, pa.Array] = {}
     for arrow_weave_list in (self, other):
@@ -80,23 +73,6 @@ def merge(self, other):
                 field_arrays[key] = arrow_weave_list._arrow_data[key].combine_chunks()
             else:
                 field_arrays[key] = arrow_weave_list._arrow_data.field(key)
-
-    # update field names and arrays with merged dicts
-
-    for key in common_keys:
-        if isinstance(self.object_type.property_types[key], types.TypedDict):
-            self_sub_awl = ArrowWeaveList(
-                self._arrow_data.field(key),
-                self.object_type.property_types[key],
-                self._artifact,
-            )
-            other_sub_awl = ArrowWeaveList(
-                other._arrow_data.field(key),
-                other.object_type.property_types[key],
-                other._artifact,
-            )
-            merged = use(merge(self_sub_awl, other_sub_awl))._arrow_data  # type: ignore
-            field_arrays[key] = merged
 
     field_names, arrays = tuple(zip(*field_arrays.items()))
 
@@ -109,19 +85,65 @@ def merge(self, other):
     )
 
 
+# this function handles the following case:
+# types.TypeRegistry.type_of(awl1) == tagged_value_type.TaggedValueType(
+#    types.TypedDict({"outer1": types.String()}), ArrowWeaveListType(types.Int())
+# )
+# types.TypeRegistry.type_of(awl2) == tagged_value_type.TaggedValueType(
+#    types.TypedDict({"outer2": types.String()}), ArrowWeaveListType(types.Int())
+# )
+#
+# push down tags on list to tags on dict elements
+# types.TypeRegistry.type_of(arrow_dict_(a=awl1, b=awl2)) == ArrowWeaveListType(
+#    types.TypedDict(
+#        {
+#            "a": tagged_value_type.TaggedValueType(
+#                types.TypedDict({"outer1": types.String()}), types.Int()
+#            ),
+#            "b": tagged_value_type.TaggedValueType(
+#                types.TypedDict({"outer2": types.String()}), types.Int()
+#            ),
+#        }
+#    )
+# )
+def vectorized_dict_output_type(input_types):
+    prop_types: dict[str, types.Type] = {}
+    for input_name, input_type in input_types.items():
+        if isinstance(input_type, tagged_value_type.TaggedValueType) and (
+            isinstance(input_type.value, ArrowWeaveListType)
+            or types.is_list_like(input_type.value)
+        ):
+            outer_tag_type = input_type.tag
+            object_type = input_type.value.object_type
+            if isinstance(object_type, tagged_value_type.TaggedValueType):
+                new_prop_type = tagged_value_type.TaggedValueType(
+                    types.TypedDict(
+                        {
+                            **outer_tag_type.property_types,
+                            **object_type.tag.property_types,
+                        }
+                    ),
+                    object_type.value,
+                )
+            else:
+                new_prop_type = tagged_value_type.TaggedValueType(
+                    outer_tag_type, object_type
+                )
+            prop_types[input_name] = new_prop_type
+        elif isinstance(input_type, ArrowWeaveListType) or types.is_list_like(
+            input_type
+        ):
+            prop_types[input_name] = input_type.object_type
+        else:  # is scalar
+            prop_types[input_name] = input_type
+
+    return ArrowWeaveListType(types.TypedDict(prop_types))
+
+
 @op(
     name="ArrowWeaveList-vectorizedDict",
     input_type=OpVarArgs(types.Any()),
-    output_type=lambda input_types: ArrowWeaveListType(
-        types.TypedDict(
-            {
-                k: v
-                if not (types.is_list_like(v) or isinstance(v, ArrowWeaveListType))
-                else v.object_type
-                for (k, v) in input_types.items()
-            }
-        )
-    ),
+    output_type=vectorized_dict_output_type,
     render_info={"type": "function"},
 )
 def arrow_dict_(**d):
@@ -134,14 +156,15 @@ def arrow_dict_(**d):
         if isinstance(v, ArrowWeaveList):
             if awl_artifact is None:
                 awl_artifact = v._artifact
-            if isinstance(v.object_type, tagged_value_type.TaggedValueType):
-                # We drop the tags for now :(
-                # TODO: Fix
-                prop_types[k] = v.object_type.value
-                v = v._arrow_data["_value"]
-            else:
-                prop_types[k] = v.object_type
-                v = v._arrow_data
+            if tag_store.is_tagged(v):
+                list_tags = tag_store.get_tags(v)
+                v = awl_add_arrow_tags(
+                    v,
+                    pa.array([list_tags] * len(v)),
+                    types.TypeRegistry.type_of(list_tags),
+                )
+            prop_types[k] = v.object_type
+            v = v._arrow_data
             arrays.append(arrow_as_array(v))
         else:
             prop_types[k] = types.TypeRegistry.type_of(v)

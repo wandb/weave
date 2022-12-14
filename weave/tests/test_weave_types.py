@@ -102,6 +102,7 @@ def test_typeof_list_dict_merge():
 
 
 def test_typeof_nested_dict_merge():
+    """Tests that nested merging is disabled."""
     t1 = weave.weave_types.TypedDict(
         {"a": weave.weave_types.TypedDict({"b": types.Int()})}
     )
@@ -110,7 +111,7 @@ def test_typeof_nested_dict_merge():
     )
     merged_type = _dict_utils.typeddict_merge_output_type({"self": t1, "other": t2})
     assert merged_type == weave.weave_types.TypedDict(
-        {"a": weave.weave_types.TypedDict({"b": types.Int(), "c": types.String()})}
+        {"a": weave.weave_types.TypedDict({"c": types.String()})}
     )
 
 

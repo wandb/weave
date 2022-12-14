@@ -3,7 +3,10 @@ from ... import weave_types as types
 
 
 def op_get_tag_type_resolver(obj_type: types.Type) -> types.Type:
-    if isinstance(obj_type, TaggedValueType):
+    if isinstance(obj_type, TaggedValueType) or (
+        isinstance(obj_type, types.Const)
+        and isinstance(obj_type.val_type, TaggedValueType)
+    ):
         return obj_type.tag
     else:
         return types.NoneType()
