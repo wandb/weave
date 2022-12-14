@@ -522,6 +522,13 @@ def test_arrow_nullable_concat():
     result = list_of_awl.concat()
     assert weave.use(result)._arrow_data.to_pylist() == [1, 2, 3, 4, 2, 3, 4, 5]
 
+    # Second pass - forcing none type to be first in member list
+    list_of_awl.type = types.List(
+        types.union(types.NoneType(), arrow.ArrowWeaveListType(types.Int()))
+    )
+    result = list_of_awl.concat()
+    assert weave.use(result)._arrow_data.to_pylist() == [1, 2, 3, 4, 2, 3, 4, 5]
+
 
 def test_arrow_concat_arrow_weave_list():
 

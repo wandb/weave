@@ -818,6 +818,7 @@ def _concat_output_type(input_types: typing.Dict[str, types.List]) -> types.Type
     if isinstance(arr_object_type, types.UnionType):
         types_to_check = arr_object_type.members
 
+    inner_element_members = []
     for element_type in types_to_check:
         if isinstance(element_type, tagged_value_type.TaggedValueType):
             # push down tags
@@ -840,7 +841,7 @@ def _concat_output_type(input_types: typing.Dict[str, types.List]) -> types.Type
                     element_tag_type = types.TypedDict({})
                     new_value_type = value_type.object_type
 
-                return ArrowWeaveListType(
+                inner_element_members.append(
                     tagged_value_type.TaggedValueType(
                         types.TypedDict(
                             {
@@ -853,7 +854,7 @@ def _concat_output_type(input_types: typing.Dict[str, types.List]) -> types.Type
                 )
 
             else:
-                return ArrowWeaveListType(
+                inner_element_members.append(
                     tagged_value_type.TaggedValueType(
                         tag_type,
                         types.NoneType(),
@@ -861,12 +862,14 @@ def _concat_output_type(input_types: typing.Dict[str, types.List]) -> types.Type
                 )
         elif isinstance(element_type, ArrowWeaveListType):
             return element_type
+        elif isinstance(element_type, types.NoneType):
+            continue
         else:
             raise ValueError(
                 f"Cannot concatenate value of type {element_type} with ArrowWeaveList"
             )
 
-    return ArrowWeaveListType(types.Any())
+    return ArrowWeaveListType(types.union(*inner_element_members))
 
 
 @op(
