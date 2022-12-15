@@ -25,16 +25,19 @@ from .. import execute_fast
 from .. import weave_internal
 from .. import context
 from .. import weavify
-from .. import box
+from .. import op_args
 from ..language_features.tagging import tagged_value_type
 from ..language_features.tagging import process_opdef_output_type
 from . import arrow
 
-from .. import box
 from ..language_features.tagging import tag_store
 
 from . import arrow
 
+from .arrow import arrow_as_array
+
+if typing.TYPE_CHECKING:
+    from .. import artifacts_local
 
 FLATTEN_DELIMITER = "➡️"
 
@@ -995,6 +998,11 @@ def vectorize(
                     "ArrowWeaveList-vectorizedDict"
                 )
                 return op.lazy_call(**inputs)
+            if node.from_op.name == "list":
+                op = registry_mem.memory_registry.get_op(
+                    "ArrowWeaveList-vectorizedList"
+                )
+                return op.lazy_call(**inputs)
             elif node.from_op.name == "Object-__getattr__":
                 op = registry_mem.memory_registry.get_op(
                     "ArrowWeaveListObject-__vectorizedGetattr__"
@@ -1005,8 +1013,12 @@ def vectorize(
                 op = dispatch.get_op_for_input_types(
                     node.from_op.name, [], {k: v.type for k, v in inputs.items()}
                 )
-                if op and isinstance(
-                    list(op.input_type.arg_types.values())[0], ArrowWeaveListType
+                if (
+                    op
+                    and isinstance(op.input_type, op_args.OpNamedArgs)
+                    and isinstance(
+                        list(op.input_type.arg_types.values())[0], ArrowWeaveListType
+                    )
                 ):
                     # We have a vectorized implementation of this op already.
                     final_inputs = {
@@ -1028,10 +1040,13 @@ def vectorize(
                     # No weave_fn, so we can't vectorize this op. Just
                     # use map
                     input0_name, input0_val = list(inputs.items())[0]
-                    py_node = input0_val.to_py()
-                    new_inputs = {input0_name: py_node}
-                    for k, v in list(inputs.items())[1:]:
-                        new_inputs[k] = v
+                    if isinstance(input0_val, ArrowWeaveList):
+                        py_node = input0_val.to_py()
+                        new_inputs = {input0_name: py_node}
+                        for k, v in list(inputs.items())[1:]:
+                            new_inputs[k] = v
+                    else:
+                        new_inputs = inputs
                     op = dispatch.get_op_for_input_types(
                         node.from_op.name,
                         [],
@@ -1171,3 +1186,118 @@ def awl_add_arrow_tags(
     )
 
     return ArrowWeaveList(new_value, new_object_type, l._artifact)
+
+
+def vectorized_input_types(input_types: dict[str, types.Type]) -> dict[str, types.Type]:
+    prop_types: dict[str, types.Type] = {}
+    for input_name, input_type in input_types.items():
+        if isinstance(input_type, tagged_value_type.TaggedValueType) and (
+            isinstance(input_type.value, ArrowWeaveListType)
+            or types.is_list_like(input_type.value)
+        ):
+            outer_tag_type = input_type.tag
+            object_type = input_type.value.object_type  # type: ignore
+            if isinstance(object_type, tagged_value_type.TaggedValueType):
+                new_prop_type = tagged_value_type.TaggedValueType(
+                    types.TypedDict(
+                        {
+                            **outer_tag_type.property_types,
+                            **object_type.tag.property_types,
+                        }
+                    ),
+                    object_type.value,
+                )
+            else:
+                new_prop_type = tagged_value_type.TaggedValueType(
+                    outer_tag_type, object_type
+                )
+            prop_types[input_name] = new_prop_type
+        elif isinstance(input_type, ArrowWeaveListType) or types.is_list_like(
+            input_type
+        ):
+            prop_types[input_name] = input_type.object_type  # type: ignore
+        else:  # is scalar
+            prop_types[input_name] = input_type
+    return prop_types
+
+
+@dataclasses.dataclass
+class VectorizedContainerConstructorResults:
+    arrays: list[pa.Array]
+    prop_types: dict[str, types.Type]
+    max_len: int
+    artifact: typing.Optional["artifacts_local.Artifact"]
+
+
+def vectorized_container_constructor_preprocessor(
+    input_dict: dict[str, typing.Any]
+) -> VectorizedContainerConstructorResults:
+    if len(input_dict) == 0:
+        return VectorizedContainerConstructorResults([], {}, 0, None)
+    arrays = []
+    prop_types = {}
+    awl_artifact = None
+    for k, v in input_dict.items():
+        if isinstance(v, ArrowWeaveList):
+            if awl_artifact is None:
+                awl_artifact = v._artifact
+            if tag_store.is_tagged(v):
+                list_tags = tag_store.get_tags(v)
+                v = awl_add_arrow_tags(
+                    v,
+                    pa.array([list_tags] * len(v)),
+                    types.TypeRegistry.type_of(list_tags),
+                )
+            prop_types[k] = v.object_type
+            v = v._arrow_data
+            arrays.append(arrow_as_array(v))
+        else:
+            prop_types[k] = types.TypeRegistry.type_of(v)
+            arrays.append(v)
+
+    array_lens = []
+    for a, t in zip(arrays, prop_types.values()):
+        if hasattr(a, "to_pylist"):
+            array_lens.append(len(a))
+        else:
+            array_lens.append(0)
+    max_len = max(array_lens)
+    for l in array_lens:
+        if l != 0 and l != max_len:
+            raise errors.WeaveInternalError(
+                f"Cannot create ArrowWeaveDict with different length arrays (scalars are ok): {array_lens}"
+            )
+    if max_len == 0:
+        max_len = 1
+    for i, (a, l) in enumerate(zip(arrays, array_lens)):
+        if l == 0:
+            arrays[i] = pa.array([a] * max_len)
+
+    return VectorizedContainerConstructorResults(
+        arrays, prop_types, max_len, awl_artifact
+    )
+
+
+def vectorized_list_output_type(input_types):
+    element_types = vectorized_input_types(input_types).values()
+    return ArrowWeaveListType(types.List(types.union(*element_types)))
+
+
+@op(
+    name="ArrowWeaveList-vectorizedList",
+    input_type=op_args.OpVarArgs(types.Any()),
+    output_type=vectorized_list_output_type,
+    render_info={"type": "function"},
+)
+def arrow_list_(**e):
+    res = vectorized_container_constructor_preprocessor(e)
+    element_types = res.prop_types.values()
+    values = pa.concat_arrays(res.arrays)
+    offsets = pa.array(
+        [i * len(e) for i in range(res.max_len)] + [res.max_len * len(e)]
+    )
+    return ArrowWeaveList(
+        pa.ListArray.from_arrays(offsets, values),
+        types.List(types.union(*element_types)),
+        res.artifact,
+    )

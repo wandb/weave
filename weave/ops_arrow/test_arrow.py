@@ -19,6 +19,7 @@ from .. import weave_internal
 from .. import context_state
 from .. import graph
 from ..ecosystem.wandb import geom
+from ..ops_primitives import dict_, list_
 
 from ..language_features.tagging import tag_store, tagged_value_type, make_tag_getter_op
 
@@ -626,6 +627,8 @@ string_ops_test_cases = [
     ("startswith-scalar", lambda x: x.startswith("b"), [True, False, False]),
     ("endswith-scalar", lambda x: x.endswith("f"), [False, False, True]),
     ("replace-scalar", lambda x: x.replace("c", "q"), ["bq", "qd", "df"]),
+    ("nest-list", lambda x: list_.make_list(a=x), [["bc"], ["cd"], ["df"]]),
+    ("nest-dict", lambda x: dict_(a=x), [{"a": "bc"}, {"a": "cd"}, {"a": "df"}]),
 ]
 
 
@@ -664,17 +667,38 @@ def test_arrow_vectorizer_string_scalar_tagged(name, weave_func, expected_output
     called = weave_internal.call_fn(vec_fn, {"x": l})
     assert weave.use(called).to_pylist_notags() == expected_output
 
-    # check that tags are propagated
-    assert (
-        weave.use(tag_getter_op(arrow.ArrowWeaveList.__getitem__(called, 0))) == "test1"
-    )
+    item_node = arrow.ArrowWeaveList.__getitem__(called, 0)
 
-    assert arrow.ArrowWeaveListType(
-        tagged_value_type.TaggedValueType(
+    def make_exp_tag(t: types.Type):
+        return tagged_value_type.TaggedValueType(
             types.TypedDict({"mytag": types.String()}),
-            expected_value_type,
+            t,
         )
-    ).assign_type(called.type)
+
+    expected_type_obj_type = make_exp_tag(expected_value_type)
+    # The general test here is not general enough to check these properly.
+    # Specifcially, the general test assumes the vecotrize lambdas contians all
+    # tag flow ops. However, list and dict constructors are explicitly (and
+    # correctly) not tag flow ops and therefore the tags are only present on the
+    # elements of the list and dict.
+    if name == "nest-dict":
+        item_node = item_node["a"]
+        expected_type_obj_type = types.TypedDict(
+            {
+                "a": make_exp_tag(expected_value_type.property_types["a"]),
+                **expected_value_type.property_types,
+            }
+        )
+    elif name == "nest-list":
+        item_node = item_node[0]
+        expected_type_obj_type = types.List(
+            make_exp_tag(expected_value_type.object_type)
+        )
+
+    # check that tags are propagated
+    assert weave.use(tag_getter_op(item_node)) == "test1"
+
+    assert arrow.ArrowWeaveListType(expected_type_obj_type).assign_type(called.type)
 
 
 string_alnum_test_cases = [

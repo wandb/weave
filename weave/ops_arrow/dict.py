@@ -1,19 +1,20 @@
 import pyarrow as pa
-import pandas as pd
 
-from ..api import op, type, use, OpVarArgs
+from ..api import op, type, OpVarArgs
 from ..decorator_op import arrow_op
 from .. import weave_types as types
 from ..ops_primitives import _dict_utils
 from .. import errors
 from ..language_features.tagging import (
-    tagged_value_type,
     process_opdef_output_type,
-    tag_store,
 )
 
-from .list_ import ArrowWeaveList, ArrowWeaveListType, awl_add_arrow_tags
-from .arrow import arrow_as_array
+from .list_ import (
+    ArrowWeaveList,
+    ArrowWeaveListType,
+    vectorized_container_constructor_preprocessor,
+    vectorized_input_types,
+)
 
 
 def typeddict_pick_output_type(input_types):
@@ -106,37 +107,10 @@ def merge(self, other):
 #        }
 #    )
 # )
-def vectorized_dict_output_type(input_types):
-    prop_types: dict[str, types.Type] = {}
-    for input_name, input_type in input_types.items():
-        if isinstance(input_type, tagged_value_type.TaggedValueType) and (
-            isinstance(input_type.value, ArrowWeaveListType)
-            or types.is_list_like(input_type.value)
-        ):
-            outer_tag_type = input_type.tag
-            object_type = input_type.value.object_type
-            if isinstance(object_type, tagged_value_type.TaggedValueType):
-                new_prop_type = tagged_value_type.TaggedValueType(
-                    types.TypedDict(
-                        {
-                            **outer_tag_type.property_types,
-                            **object_type.tag.property_types,
-                        }
-                    ),
-                    object_type.value,
-                )
-            else:
-                new_prop_type = tagged_value_type.TaggedValueType(
-                    outer_tag_type, object_type
-                )
-            prop_types[input_name] = new_prop_type
-        elif isinstance(input_type, ArrowWeaveListType) or types.is_list_like(
-            input_type
-        ):
-            prop_types[input_name] = input_type.object_type
-        else:  # is scalar
-            prop_types[input_name] = input_type
 
+
+def vectorized_dict_output_type(input_types):
+    prop_types = vectorized_input_types(input_types)
     return ArrowWeaveListType(types.TypedDict(prop_types))
 
 
@@ -147,46 +121,6 @@ def vectorized_dict_output_type(input_types):
     render_info={"type": "function"},
 )
 def arrow_dict_(**d):
-    if len(d) == 0:
-        return ArrowWeaveList(pa.array([{}]), types.TypedDict({}))
-    arrays = []
-    prop_types = {}
-    awl_artifact = None
-    for k, v in d.items():
-        if isinstance(v, ArrowWeaveList):
-            if awl_artifact is None:
-                awl_artifact = v._artifact
-            if tag_store.is_tagged(v):
-                list_tags = tag_store.get_tags(v)
-                v = awl_add_arrow_tags(
-                    v,
-                    pa.array([list_tags] * len(v)),
-                    types.TypeRegistry.type_of(list_tags),
-                )
-            prop_types[k] = v.object_type
-            v = v._arrow_data
-            arrays.append(arrow_as_array(v))
-        else:
-            prop_types[k] = types.TypeRegistry.type_of(v)
-            arrays.append(v)
-
-    array_lens = []
-    for a, t in zip(arrays, prop_types.values()):
-        if hasattr(a, "to_pylist"):
-            array_lens.append(len(a))
-        else:
-            array_lens.append(0)
-    max_len = max(array_lens)
-    for l in array_lens:
-        if l != 0 and l != max_len:
-            raise errors.WeaveInternalError(
-                f"Cannot create ArrowWeaveDict with different length arrays (scalars are ok): {array_lens}"
-            )
-    if max_len == 0:
-        max_len = 1
-    for i, (a, l) in enumerate(zip(arrays, array_lens)):
-        if l == 0:
-            arrays[i] = pa.array([a] * max_len)
-
-    table = pa.Table.from_arrays(arrays, list(d.keys()))
-    return ArrowWeaveList(table, types.TypedDict(prop_types), awl_artifact)
+    res = vectorized_container_constructor_preprocessor(d)
+    table = pa.Table.from_arrays(res.arrays, list(d.keys()))
+    return ArrowWeaveList(table, types.TypedDict(res.prop_types), res.artifact)
