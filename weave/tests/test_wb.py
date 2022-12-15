@@ -8,7 +8,10 @@ import json
 from . import fixture_fakewandb as fwb
 from .. import graph
 from ..ops_domain import wb_domain_types as wdt
+from ..ops_primitives import list_
 from .. import weave_types as types
+
+from .. import ops_arrow as arrow
 
 file_path_response = {
     "project": {
@@ -397,3 +400,22 @@ def test_lambda_gql_stitch(fake_wandb):
             lambda x: x + ops.project("stacey", "mendeleev").name()
         )
     ) == None
+
+
+def test_arrow_tag_serialization_can_handle_runs_in_concat(fake_wandb):
+    fake_wandb.add_mock(table_mock_filtered)
+    rows_node = (
+        ops.project("stacey", "mendeleev")
+        .filteredRuns("{}", "-createdAt")
+        .limit(50)
+        .summary()["table"]
+        .table()
+        .rows()
+    )
+
+    const_list = ops.make_list(l=rows_node, r=rows_node)
+    concatted_list = list_.List.concat(const_list)
+    concatted = arrow.concat(arr=concatted_list)
+
+    # now get the run from the tags
+    weave.use(ops.run_ops.run_tag_getter_op(concatted[0]))

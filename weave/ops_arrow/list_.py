@@ -756,8 +756,9 @@ def pushdown_list_tags(arr: ArrowWeaveList) -> ArrowWeaveList:
 
     if tag_store.is_tagged(arr):
         tag = tag_store.get_tags(arr)
-        tags = pa.array([tag] * len(arr))
-        return awl_add_arrow_tags(arr, tags, types.TypeRegistry.type_of(tag))
+        tag_type = types.TypeRegistry.type_of(tag)
+        tags: ArrowWeaveList = to_arrow([tag] * len(arr))
+        return awl_add_arrow_tags(arr, tags._arrow_data, tag_type)
     return arr
 
 
@@ -867,6 +868,7 @@ def _concat_output_type(input_types: typing.Dict[str, types.List]) -> types.Type
 )
 def concat(arr):
     arr = [item for item in arr if item != None]
+
     if len(arr) == 0:
         return to_arrow([])
     elif len(arr) == 1:

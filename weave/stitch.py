@@ -59,6 +59,10 @@ class LiteralDictObjectRecorder(ObjectRecorder):
     val: dict[str, ObjectRecorder]
 
 
+class LiteralListObjectRecorder(ObjectRecorder):
+    val: list[ObjectRecorder]
+
+
 @dataclasses.dataclass
 class StitchedGraph:
     _node_map: typing.Dict[graph.Node, ObjectRecorder]
@@ -151,6 +155,15 @@ def stitch_node_inner(
         inputs[0].tags["index"] = ObjectRecorder()
     elif node.from_op.name == "dict":
         return LiteralDictObjectRecorder(val=input_dict)
+    elif node.from_op.name == "list":
+        # Merge element tags together and place them on the outer list.
+        # This is overly aggressive, but it means we don't need to provide
+        # special handling for concat and other structural list ops for
+        # now.
+        tags: dict[str, ObjectRecorder] = {}
+        for input in input_dict.values():
+            tags.update(input.tags)
+        return LiteralListObjectRecorder(tags=tags, val=list(input_dict.values()))
     elif node.from_op.name.endswith("pick"):
         if isinstance(node.from_op.inputs["key"], graph.ConstNode):
             key = node.from_op.inputs["key"].val
