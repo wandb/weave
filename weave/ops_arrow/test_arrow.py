@@ -9,7 +9,7 @@ import typing
 
 from .. import box
 from .. import storage
-from ..ops_primitives import Number, dict_, list_
+from ..ops_primitives import Number
 from .. import api as weave
 from .. import ops
 from .. import artifacts_local
@@ -23,6 +23,7 @@ from ..ecosystem.wandb import geom
 from ..language_features.tagging import tag_store, tagged_value_type, make_tag_getter_op
 
 from . import list_ as arrow
+from . import dict as arrow_dict
 
 
 _loading_builtins_token = context_state.set_loading_built_ins()
@@ -358,7 +359,7 @@ def test_arrow_nested_with_refs():
 
     # Next, we get a derive node from the data_node, and assert that the path is
     # converted to an artifact reference when appropriate.
-    col_node = data_node.pick("outer")
+    col_node = arrow_dict.pick(data_node, "outer")
     # Note: we don't need to save the `col_node` because
     # they are already converted to the node representation via dispatch
     raw_col_data = weave.use(col_node)

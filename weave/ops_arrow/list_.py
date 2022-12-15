@@ -554,25 +554,6 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
     def __getitem__(self, index: int):
         return self._index(index)
 
-    @op(output_type=_pick_output_type, name="ArrowWeaveList-pickAux")
-    def pick(self, key: str):
-        object_type = self.object_type
-        if isinstance(object_type, types.TypedDict):
-            col_type = object_type.property_types[key]
-        elif isinstance(object_type, types.ObjectType):
-            col_type = object_type.property_types()[key]
-        else:
-            raise errors.WeaveInternalError(
-                "unexpected type for pick: %s" % object_type
-            )
-
-        picked = (
-            self._arrow_data[key]
-            if not isinstance(self._arrow_data, pa.StructArray)
-            else self._arrow_data.field(key)
-        )
-        return ArrowWeaveList(picked, col_type, self._artifact)
-
     @arrow_op(
         input_type={
             "self": ArrowWeaveListType(),
