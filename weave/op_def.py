@@ -325,10 +325,10 @@ class OpDef:
                         # declares. E.g. for List.map I pass either of these:
                         #    lambda row, index: ...
                         #    lambda row: ...
-                        sig = inspect.signature(v)
+                        inner_sig = inspect.signature(v)
                         vars = {}
                         for name in list(param_input_type.input_types.keys())[
-                            : len(sig.parameters)
+                            : len(inner_sig.parameters)
                         ]:
                             vars[name] = param_input_type.input_types[name]
 

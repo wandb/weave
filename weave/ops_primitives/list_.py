@@ -10,6 +10,7 @@ from .. import errors
 from .. import execute_fast
 from .. import op_def
 from ..language_features.tagging import make_tag_getter_op, tag_store, tagged_value_type
+import functools
 
 
 def getitem_output_type(input_types):
@@ -58,32 +59,17 @@ class List:
         input_type={
             "arr": types.List(types.Any()),
             "filterFn": lambda input_types: types.Function(
-                {"row": input_types["arr"].object_type}, types.Any()
+                {"row": input_types["arr"].object_type}, types.Boolean()
             ),
         },
         output_type=lambda input_types: input_types["arr"],
     )
     def filter(arr, filterFn):
-        from ..ops_arrow import list_ as arrow_list
-
-        # WHOAAAA. Major hacks here.
-        # This handles arrow filtering for a demo.
-        # TODO: Remove
-        arrow_obj = None
-        if isinstance(arr, arrow_list.ArrowWeaveList):
-            arrow_obj = arr
-            arr = arr.to_pylist()
-
         call_results = execute_fast.fast_map_fn(arr, filterFn)
         result = []
         for row, keep in zip(arr, call_results):
             if keep:
                 result.append(row)
-
-        if arrow_obj is not None:
-            return arrow_list.to_arrow_from_list_and_artifact(
-                result, arrow_obj.object_type, arrow_obj._artifact
-            )
 
         return result
 
@@ -92,23 +78,28 @@ class List:
         input_type={
             "arr": types.List(types.Any()),
             "compFn": lambda input_types: types.Function(
-                {"row": input_types["arr"].object_type}, types.Any()
+                {"row": input_types["arr"].object_type}, types.List(types.Any())
             ),
-            "columnDirs": types.Any(),
+            "columnDirs": types.List(types.String()),
         },
         output_type=lambda input_types: input_types["arr"],
     )
     def sort(arr, compFn, columnDirs):
+        def cmp(a, b):
+            a_comp_res = a[0]
+            b_comp_res = b[0]
+            for a_res, b_res, c_dir in zip(a_comp_res, b_comp_res, columnDirs):
+                dir_adjust = -1 if c_dir == "desc" else 1
+                if a_res < b_res:
+                    return -1 * dir_adjust
+                elif a_res > b_res:
+                    return 1 * dir_adjust
+            return 0
+
         call_results = execute_fast.fast_map_fn(arr, compFn)
-        # TODO: currently taking first elem of sort directions only, may not account
-        # for all casees
-        sort_direction = True if columnDirs[0] == "desc" else False
-        return [
-            r[1]
-            for r in sorted(
-                zip(call_results, arr), key=lambda tup: tup[0], reverse=sort_direction
-            )
-        ]
+        sortable_results = zip(call_results, arr)
+        sorted_results = sorted(sortable_results, key=functools.cmp_to_key(cmp))
+        return [res[1] for res in sorted_results]
 
     @op(
         name="map",

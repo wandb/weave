@@ -1357,13 +1357,17 @@ def test_arrow_dict_tagged():
     assert weave.use(tag_node) == "tag"
 
 
-def test_arrow_dict_map_tagged():
+def _make_tagged_awl():
     to_tag = box.box(["a", "b", "c"])
     for i, elem in enumerate(to_tag):
         taggable = box.box(elem)
         to_tag[i] = tag_store.add_tags(taggable, {"a": f"{elem}"})
     to_tag = tag_store.add_tags(to_tag, {"outer": "tag"})
-    tagged_awl = weave.save(arrow.to_arrow(to_tag))
+    return weave.save(arrow.to_arrow(to_tag))
+
+
+def test_arrow_dict_map_tagged():
+    tagged_awl = _make_tagged_awl()
     expected_output = [{"a": "a", "b": 1}, {"a": "b", "b": 1}, {"a": "c", "b": 1}]
     weave_func = lambda row: ops.dict_(a=row, b=1)
     fn = weave_internal.define_fn(
@@ -1382,6 +1386,50 @@ def test_arrow_dict_map_tagged():
     tag_getter_op = make_tag_getter_op.make_tag_getter_op("a", types.String())
     tag_node = tag_getter_op(called[0]["a"])
     assert weave.use(tag_node) == "a"
+
+
+def test_arrow_dict_filter_tagged():
+    tagged_awl = _make_tagged_awl()
+    expected_output = ["b", "c"]
+    weave_func = lambda row: (row != "a")
+    fn = weave_internal.define_fn(
+        {"row": tagged_awl.type.object_type},
+        weave_func,
+    )
+
+    called = tagged_awl.filter(fn)
+    awl = weave.use(called)
+    assert awl.to_pylist_notags() == expected_output
+
+    tag_getter_op = make_tag_getter_op.make_tag_getter_op("outer", types.String())
+    tag_node = tag_getter_op(called[0])
+    assert weave.use(tag_node) == "tag"
+
+    tag_getter_op = make_tag_getter_op.make_tag_getter_op("a", types.String())
+    tag_node = tag_getter_op(called[0])
+    assert weave.use(tag_node) == "b"
+
+
+def test_arrow_dict_sort_tagged():
+    tagged_awl = _make_tagged_awl()
+    expected_output = ["c", "b", "a"]
+    weave_func = lambda row: list_.make_list(a=row)
+    fn = weave_internal.define_fn(
+        {"row": tagged_awl.type.object_type},
+        weave_func,
+    )
+
+    called = tagged_awl.sort(fn, ["desc"])
+    awl = weave.use(called)
+    assert awl.to_pylist_notags() == expected_output
+
+    tag_getter_op = make_tag_getter_op.make_tag_getter_op("outer", types.String())
+    tag_node = tag_getter_op(called[0])
+    assert weave.use(tag_node) == "tag"
+
+    tag_getter_op = make_tag_getter_op.make_tag_getter_op("a", types.String())
+    tag_node = tag_getter_op(called[0])
+    assert weave.use(tag_node) == "c"
 
 
 def test_arrow_dict():

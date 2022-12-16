@@ -4,6 +4,7 @@ import json
 import numpy as np
 import pandas as pd
 import pyarrow as pa
+from pyarrow import compute as pc
 
 
 py_type = type
@@ -625,17 +626,75 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         output_type=map_output_type,
     )
     def map(self, map_fn):
-        vectorized_map_fn = vectorize(map_fn)
-        map_result_node = weave_internal.call_fn(
-            vectorized_map_fn,
-            {
-                "row": weave_internal.make_const_node(
-                    ArrowWeaveListType(self.object_type), self
-                )
-            },
+        return _apply_fn_node(self, map_fn)
+
+    @op(
+        input_type={
+            "self": ArrowWeaveListType(),
+            "comp_fn": lambda input_types: types.Function(
+                {"row": input_types["self"].object_type, "index": types.Int()},
+                types.Any(),
+            ),
+            "col_dirs": types.List(types.String()),
+        },
+        output_type=lambda input_types: input_types["self"],
+    )
+    def sort(self, comp_fn, col_dirs):
+        ranking = _apply_fn_node(self, comp_fn)
+        flattened = ranking._arrow_data_asarray_no_tags().flatten()
+
+        columns = (
+            []
+        )  # this is intended to be a pylist and will be small since it is number of sort fields
+        col_len = len(ranking._arrow_data)
+        dir_len = len(col_dirs)
+        col_names = [str(i) for i in range(dir_len)]
+        order = [
+            (col_name, "ascending" if dir_name == "asc" else "descending")
+            for col_name, dir_name in zip(col_names, col_dirs)
+        ]
+        # arrow data: (col_len x dir_len)
+        # [
+        #    [d00, d01]
+        #    [d10, d11]
+        #    [d20, d21]
+        #    [d30, d31]
+        # ]
+        #
+        # Flatten
+        # [d00, d01, d10, d11, d20, d21, d30, d31]
+        #
+        # col_x = [d0x, d1x, d2x, d3x]
+        # .         i * dir_len + x
+        #
+        #
+        for i in range(dir_len):
+            take_array = [j * dir_len + i for j in range(col_len)]
+            columns.append(pc.take(flattened, pa.array(take_array)))
+        table = pa.Table.from_arrays(columns, names=col_names)
+        indicies = pc.sort_indices(table, order)
+        return ArrowWeaveList(
+            pc.take(self._arrow_data, indicies), self.object_type, self._artifact
         )
 
-        return use(map_result_node)
+    @op(
+        input_type={
+            "self": ArrowWeaveListType(),
+            "filter_fn": lambda input_types: types.Function(
+                {"row": input_types["self"].object_type, "index": types.Int()},
+                types.Boolean(),
+            ),
+        },
+        output_type=lambda input_types: input_types["self"],
+    )
+    def filter(self, filter_fn):
+        mask = _apply_fn_node(self, filter_fn)
+        arrow_mask = mask._arrow_data_asarray_no_tags()
+        return ArrowWeaveList(
+            arrow_as_array(self._arrow_data).filter(arrow_mask),
+            self.object_type,
+            self._artifact,
+        )
 
     def _append_column(self, name: str, data) -> "ArrowWeaveList":
         if not data:
@@ -811,6 +870,20 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         return pa.Table.from_pandas(
             df=arrow_obj.to_pandas().explode(list_cols), preserve_index=False
         )
+
+
+def _apply_fn_node(awl: ArrowWeaveList, fn: graph.OutputNode):
+    vectorized_fn = vectorize(fn)
+    fn_res_node = weave_internal.call_fn(
+        vectorized_fn,
+        {
+            "row": weave_internal.make_const_node(
+                ArrowWeaveListType(awl.object_type), awl
+            )
+        },
+    )
+
+    return use(fn_res_node)
 
 
 def pushdown_list_tags(arr: ArrowWeaveList) -> ArrowWeaveList:
@@ -1355,7 +1428,11 @@ def vectorized_list_output_type(input_types):
 def arrow_list_(**e):
     res = vectorized_container_constructor_preprocessor(e)
     element_types = res.prop_types.values()
-    values = pa.concat_arrays(res.arrays)
+    concatted = pa.concat_arrays(res.arrays)
+    take_ndxs = []
+    for row_ndx in range(res.max_len):
+        take_ndxs.extend([row_ndx + i * res.max_len for i in range(len(e))])
+    values = concatted.take(pa.array(take_ndxs))
     offsets = pa.array(
         [i * len(e) for i in range(res.max_len)] + [res.max_len * len(e)]
     )
