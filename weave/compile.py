@@ -254,16 +254,18 @@ def compile(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
     if environment.wandb_production():
         # First try dispatch without refine. If that doesn't work, fallback to the refining
         # version, and suffer a perf hit :(
-        try:
-            with tracer.trace("compile:dispatch1"):
-                n = graph.map_all_nodes(n, _dispatch_map_fn)
-        except errors.WeaveDispatchError:
-            logging.warning("Falling back to refine dispatch.")
-            with tracer.trace("compile:dispatch2"):
-                n = graph.map_all_nodes(n, _dispatch_map_fn_refining)
+        # try:
+        #     with tracer.trace("compile:fast_dispatch"):
+        #         n = graph.map_all_nodes(n, _dispatch_map_fn)
+        # except errors.WeaveDispatchError:
+        #     logging.warning("Falling back to refine dispatch.")
+        #     with tracer.trace("compile:refining_dispatch"):
+        #         n = graph.map_all_nodes(n, _dispatch_map_fn_refining)
+        with tracer.trace("compile:refining_dispatch"):
+            n = graph.map_all_nodes(n, _dispatch_map_fn_refining)
     else:
         # when we're not in production, don't try to recover, we should fix these issues!
-        with tracer.trace("compile:dispatch1"):
+        with tracer.trace("compile:fast_dispatch"):
             n = graph.map_all_nodes(n, _dispatch_map_fn)
 
     with tracer.trace("compile:await"):
