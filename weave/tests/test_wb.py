@@ -13,6 +13,8 @@ from .. import weave_types as types
 
 from .. import ops_arrow as arrow
 
+import cProfile
+
 file_path_response = {
     "project": {
         **fwb.project_payload,  # type: ignore
@@ -402,6 +404,40 @@ def test_lambda_gql_stitch(fake_wandb):
     ) == None
 
 
+def test_arrow_groupby_nested_tag_stripping(fake_wandb):
+    fake_wandb.add_mock(lambda q, ndx: file_path_response)
+    groupby_node = (
+        ops.project("stacey", "mendeleev")
+        .artifactType("test_results")
+        .artifacts()[0]
+        .versions()[0]
+        .file("test_results.table.json")
+        .table()
+        .rows()
+        .createIndexCheckpointTag()
+        .groupby(lambda row: ops.dict_(x=row["truth"]))[0]["truth"]
+    )
+    grouped = weave.use(groupby_node)
+    assert len(grouped) == 50
+
+
+def test_arrow_tag_stripping(fake_wandb):
+    fake_wandb.add_mock(lambda q, ndx: file_path_response)
+    awl_node = (
+        ops.project("stacey", "mendeleev")
+        .artifactType("test_results")
+        .artifacts()[0]
+        .versions()[0]
+        .file("test_results.table.json")
+        .table()
+        .rows()
+        .createIndexCheckpointTag()
+    )
+    awl = weave.use(awl_node)
+    tag_stripped = awl._arrow_data_asarray_no_tags()
+    assert tag_stripped.type[0].name != "_tag"
+
+
 def test_arrow_tag_serialization_can_handle_runs_in_concat(fake_wandb):
     fake_wandb.add_mock(table_mock_filtered)
     rows_node = (
@@ -419,3 +455,27 @@ def test_arrow_tag_serialization_can_handle_runs_in_concat(fake_wandb):
 
     # now get the run from the tags
     weave.use(ops.run_ops.run_tag_getter_op(concatted[0]))
+
+
+@pytest.mark.skip(reason="This test requires communcation with wandb.ai")
+def test_shawn_groupby_profiling_correctness():
+    x = (
+        ops.project("shawn", "dsviz-simple-tables")
+        .artifact("simple_tables")
+        .membershipForAlias("v5")
+        .artifactVersion()
+        .file("my-table.table.json")
+        .table()
+        .rows()
+        .createIndexCheckpointTag()
+        .groupby(lambda row: ops.dict_(x=row["x"]))[0]["c"]
+    )
+
+    cProfile.runctx(
+        "weave.use(x)",
+        globals(),
+        locals(),
+        filename="groupby-dsviz-simple-tables.pstat",
+    )
+
+    assert len(weave.use(x)) == 66311

@@ -29,6 +29,7 @@ from .. import op_args
 from ..language_features.tagging import tagged_value_type
 from ..language_features.tagging import process_opdef_output_type
 from . import arrow
+from .. import arrow_util
 
 from ..language_features.tagging import tag_store
 
@@ -489,6 +490,62 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
     _arrow_data: typing.Union[pa.Table, pa.ChunkedArray, pa.Array]
     object_type: types.Type
 
+    def _arrow_data_asarray_no_tags(self) -> pa.Array:
+        """Cast `self._arrow_data` as an array and recursively strip its tags."""
+
+        # arrow_as_array is idempotent so even though we will hit this on every recursive call,
+        # it will be a no-op after the first time.
+        arrow_data = arrow_as_array(self._arrow_data)
+
+        if isinstance(self.object_type, tagged_value_type.TaggedValueType):
+            return ArrowWeaveList(
+                arrow_data.field("_value"),
+                self.object_type.value,
+                self._artifact,
+            )._arrow_data_asarray_no_tags()
+
+        elif isinstance(self.object_type, (types.TypedDict, types.ObjectType)):
+            # strip tags from each field
+            arrays = []
+            keys = []
+
+            prop_types = self.object_type.property_types
+            if callable(prop_types):
+                prop_types = prop_types()
+
+            for field in arrow_data.type:
+                keys.append(field.name)
+                arrays.append(
+                    ArrowWeaveList(
+                        arrow_data.field(field.name),
+                        prop_types[field.name],
+                        self._artifact,
+                    )._arrow_data_asarray_no_tags()
+                )
+            return pa.StructArray.from_arrays(arrays, names=keys)
+
+        elif isinstance(self.object_type, types.List):
+            offsets = arrow_data.offsets
+            # strip tags from each element
+            flattened = ArrowWeaveList(
+                arrow_data.flatten(),
+                self.object_type.object_type,
+                self._artifact,
+            )._arrow_data_asarray_no_tags()
+
+            # unflatten
+            return pa.ListArray.from_arrays(offsets, flattened)
+
+        elif isinstance(self.object_type, types.UnionType):
+            # strip tags from each element
+            for member in self.object_type.members:
+                if isinstance(member, tagged_value_type.TaggedValueType):
+                    raise NotImplementedError(
+                        'TODO: implement handling of "Union[TaggedValue, ...]'
+                    )
+
+        return arrow_data
+
     def __array__(self, dtype=None):
         return np.asarray(self.to_pylist())
 
@@ -500,7 +557,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         return f"<ArrowWeaveList: {self.object_type}>"
 
     def to_pylist_notags(self):
-        return list(self.__iter__())
+        return self._arrow_data_asarray_no_tags().to_pylist()
 
     def to_pylist(self):
         if isinstance(self, graph.Node):
@@ -646,9 +703,15 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         table = self._arrow_data
 
         with context.non_caching_execution_client():
-            group_table = use(group_table_node)._arrow_data
+            group_table_awl: ArrowWeaveList = use(group_table_node)
 
+        group_table = group_table_awl._arrow_data
         group_table = arrow.arrow_as_array(group_table)
+
+        # strip tags recursively so we group on values only
+        group_table = ArrowWeaveList(
+            group_table, group_table_node.type.object_type, self._artifact
+        )._arrow_data_asarray_no_tags()
 
         # There was a comment that arrow doesn't allow grouping on struct columns
         # and another large block of code that tried to avoid passing in a struct column.
