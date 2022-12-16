@@ -112,6 +112,20 @@ class OpDef:
         else:
             return _self.lazy_call(*args, **kwargs)
 
+    def unrefined_output_type_for_params(self, params: typing.Dict[str, graph.Node]):
+        if not callable(self.output_type):
+            return self.output_type
+        new_input_type: dict[str, types.Type] = {}
+        for k, n in params.items():
+            if isinstance(n, graph.ConstNode) and not isinstance(n.type, types.Const):
+                new_input_type[k] = types.Const(n.type, n.val)
+            else:
+                new_input_type[k] = n.type
+        new_input_type = language_autocall.update_input_types(
+            self.input_type, new_input_type
+        )
+        return self.output_type(new_input_type)
+
     def lazy_call(_self, *args, **kwargs):
         bound_params = _self.bind_params(args, kwargs)
         # Don't try to refine if there are variable nodes, we are building a
@@ -127,30 +141,14 @@ class OpDef:
                 from . import api
 
                 final_output_type = api.use(called_refine_output_type)  # type: ignore
-            from . import registry_mem
 
             final_output_type = (
                 process_opdef_output_type.process_opdef_refined_output_type(
                     final_output_type, bound_params, _self
                 )
             )
-        elif callable(_self.output_type):
-            new_input_type: dict[str, types.Type] = {}
-            for k, n in bound_params.items():
-                if isinstance(n, graph.ConstNode) and not isinstance(
-                    n.type, types.Const
-                ):
-                    new_input_type[k] = types.Const(n.type, n.val)
-                else:
-                    new_input_type[k] = n.type
-
-            new_input_type = language_autocall.update_input_types(
-                _self.input_type, new_input_type
-            )
-
-            final_output_type = _self.output_type(new_input_type)
         else:
-            final_output_type = _self.output_type
+            final_output_type = _self.unrefined_output_type_for_params(bound_params)
         from . import dispatch
 
         return dispatch.RuntimeOutputNode(final_output_type, _self.uri, bound_params)

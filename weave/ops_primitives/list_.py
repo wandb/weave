@@ -305,7 +305,8 @@ def index_checkpoint_setter(arr, new_arr):
     input_type={"arr": types.List(types.Any())},
     output_type=lambda input_types: types.List(
         tagged_value_type.TaggedValueType(
-            types.TypedDict({"index": types.Number()}), input_types["arr"].object_type
+            types.TypedDict({"indexCheckpoint": types.Number()}),
+            input_types["arr"].object_type,
         )
     ),
 )
@@ -317,13 +318,13 @@ def list_indexCheckpoint(arr):
     res = []
     for item in arr:
         item = box.box(item)
-        tag_store.add_tags(item, {"index": len(res)})
+        tag_store.add_tags(item, {"indexCheckpoint": len(res)})
         res.append(item)
     return res
 
 
 index_checkpoint_tag_getter_op = make_tag_getter_op.make_tag_getter_op(
-    "index", types.Int(), op_name="tag-indexCheckpoint"
+    "indexCheckpoint", types.Int(), op_name="tag-indexCheckpoint"
 )
 
 

@@ -4,7 +4,6 @@ python-json-logger
 numpy
 pandas
 h5py
-viztracer
 sqlalchemy
 ipython
 flask>=2.1

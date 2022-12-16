@@ -296,7 +296,7 @@ def node_expr_str(node: Node) -> str:
 
 def _map_nodes(
     node: Node,
-    map_fn: typing.Callable[[Node], Node],
+    map_fn: typing.Callable[[Node], typing.Optional[Node]],
     already_mapped: dict[Node, Node],
 ) -> Node:
     if node in already_mapped:
@@ -317,12 +317,14 @@ def _map_nodes(
     return mapped_node
 
 
-def map_nodes(node: Node, map_fn: typing.Callable[[Node], Node]) -> Node:
+def map_nodes(
+    node: Node, map_fn: typing.Callable[[Node], typing.Optional[Node]]
+) -> Node:
     return _map_nodes(node, map_fn, {})
 
 
 def map_all_nodes(
-    nodes: list[Node], map_fn: typing.Callable[[Node], Node]
+    nodes: list[Node], map_fn: typing.Callable[[Node], typing.Optional[Node]]
 ) -> list[Node]:
     already_mapped: dict[Node, Node] = {}
     return [_map_nodes(n, map_fn, already_mapped) for n in nodes]

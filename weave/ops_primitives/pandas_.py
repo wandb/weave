@@ -157,14 +157,14 @@ def index_output_type(input_types):
         return self_type.object_type
 
 
-def pick_output_type(input_types):
+def mapped_pick_output_type(input_types):
     if not isinstance(input_types["key"], types.Const):
-        return types.UnknownType()
+        return types.List(types.UnknownType())
     key = input_types["key"].val
     prop_type = input_types["self"]._df.object_type.property_types.get(key)
     if prop_type is None:
         return types.Invalid()
-    return prop_type
+    return types.List(prop_type)
 
 
 @weave_class(weave_type=DataFrameTableType)
@@ -203,7 +203,7 @@ class DataFrameTable:
     def __getitem__(self, index: int):
         return self._index(index)
 
-    @op(output_type=pick_output_type)
+    @op(output_type=mapped_pick_output_type)
     def pick(self, key: str):
         return self._df[key]
 
@@ -218,8 +218,15 @@ class DataFrameTable:
     def filter(self, filterFn):
         return DataFrameTable(self._df[filter_fn_to_pandas_filter(self._df, filterFn)])
 
-    @op(output_type=lambda input_types: types.List(input_types["self"].object_type))
-    def map(self, map_fn: typing.Any):
+    @op(
+        input_type={
+            "map_fn": lambda input_types: types.Function(
+                {"row": input_types["self"].object_type}, types.Any()
+            ),
+        },
+        output_type=lambda input_types: types.List(input_types["self"].object_type),
+    )
+    def map(self, map_fn):
         self_list = []
         for i in range(self._count()):
             self_list.append(self._index(i))

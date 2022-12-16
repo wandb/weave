@@ -635,8 +635,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             },
         )
 
-        with context.non_caching_execution_client():
-            return use(map_result_node)
+        return use(map_result_node)
 
     def _append_column(self, name: str, data) -> "ArrowWeaveList":
         if not data:
@@ -702,8 +701,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         )
         table = self._arrow_data
 
-        with context.non_caching_execution_client():
-            group_table_awl: ArrowWeaveList = use(group_table_node)
+        group_table_awl: ArrowWeaveList = use(group_table_node)
 
         group_table = group_table_awl._arrow_data
         group_table = arrow.arrow_as_array(group_table)
@@ -831,7 +829,7 @@ ArrowWeaveListType.instance_class = ArrowWeaveList
 
 def awl_object_type_with_index(object_type):
     return tagged_value_type.TaggedValueType(
-        types.TypedDict({"index": types.Int()}), object_type
+        types.TypedDict({"indexCheckpoint": types.Int()}), object_type
     )
 
 
@@ -848,12 +846,12 @@ def arrow_weave_list_createindexCheckpoint(arr):
     # Tags are always stored as a list of dicts, even if there is only one tag
     tag_array = pa.StructArray.from_arrays(
         [pa.array(np.arange(len(arr._arrow_data)))],
-        names=["index"],
+        names=["indexCheckpoint"],
     )
     return awl_add_arrow_tags(
         arr,
         tag_array,
-        types.TypedDict({"index": types.Int()}),
+        types.TypedDict({"indexCheckpoint": types.Int()}),
     )
 
 

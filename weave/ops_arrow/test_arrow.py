@@ -170,7 +170,7 @@ def test_custom_saveload():
     assert weave.use(data2[0]["im"].width_()) == 256
 
 
-def test_custom_tagged_groupby():
+def test_custom_tagged_groupby1():
 
     im1 = tag_store.add_tags(Image.linear_gradient("L").rotate(0), {"a": 1})
     im2 = tag_store.add_tags(Image.linear_gradient("L").rotate(4), {"a": 2})
@@ -214,6 +214,12 @@ def test_custom_tagged_groupby():
         )
         == 256
     )
+
+
+def test_custom_tagged_groupby2():
+    im1 = tag_store.add_tags(Image.linear_gradient("L").rotate(0), {"a": 1})
+    im2 = tag_store.add_tags(Image.linear_gradient("L").rotate(4), {"a": 2})
+    raw_data = box.box([{"a": 5, "im": im1}, {"a": 6, "im": im2}])
 
     tag_store.add_tags(raw_data, {"list_tag": 3})
 

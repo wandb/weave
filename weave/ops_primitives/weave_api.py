@@ -334,6 +334,6 @@ class Run:
             uri = uris.WeaveLocalArtifactURI.make_uri(
                 artifacts_local.local_artifact_dir(), f"run-{self.id}", "latest"
             )
-            self = weave_internal.use(get(uri))
+            self = storage.get(uri)
 
         return self.output

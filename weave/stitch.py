@@ -152,7 +152,7 @@ def stitch_node_inner(
         tag_name = get_tag_name_from_tag_getter_op(op)
         return inputs[0].tags[tag_name]
     elif node.from_op.name.endswith("createIndexCheckpointTag"):
-        inputs[0].tags["index"] = ObjectRecorder()
+        inputs[0].tags["indexCheckpoint"] = ObjectRecorder()
     elif node.from_op.name == "dict":
         return LiteralDictObjectRecorder(val=input_dict)
     elif node.from_op.name == "list":

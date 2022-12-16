@@ -59,9 +59,9 @@ def test_index(table_type):
     assert weave.use(weavejs_ops.index(table, 0)) == expected
 
 
-def js_op_pick(obj, key):
+def js_op_mapped_pick(obj, key):
     return weave_internal.make_output_node(
-        types.Any(),
+        types.List(obj.type.object_type.property_types[key]),
         "pick",
         {"obj": obj, "key": weave_internal.make_const_node(weave.types.String(), key)},
     )
@@ -71,7 +71,7 @@ def js_op_pick(obj, key):
 def test_pick(table_type):
     table = get_test_table(table_type)
     assert len(weave.use(table.pick("type"))) == 77
-    assert len(weave.use(js_op_pick(table, "type"))) == 77
+    assert len(weave.use(js_op_mapped_pick(table, "type"))) == 77
 
 
 @pytest.mark.parametrize("table_type", TABLE_TYPES)
@@ -155,7 +155,7 @@ def test_groupby_list(table_type):
 def test_groupby_list_weavejs_form(table_type):
     table = get_test_table(table_type)
     groupby_fn = weave.define_fn(
-        {"row": weave.types.TypedDict({})},
+        {"row": table.type.object_type},
         lambda row: graph.OutputNode(
             types.String(),
             "pick",

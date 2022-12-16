@@ -6,21 +6,23 @@ from . import compile_domain
 from . import op_args
 from . import weave_types as types
 from . import graph
-from . import graph_editable
 from . import registry_mem
-from . import errors
 from . import dispatch
 from . import graph_debug
 from . import stitch
 from . import compile_table
 from . import weave_internal
+from . import engine_trace
+from . import errors
+from . import environment
+from .language_features.tagging import tagged_value_type
 
 # These call_* functions must match the actual op implementations.
 # But we don't want to import the op definitions themselves here, since
 # those depend on the decorators, which aren't defined in the engine.
 
 
-def call_run_await_final_output(run_node: graph.Node) -> graph.OutputNode:
+def _call_run_await(run_node: graph.Node) -> graph.OutputNode:
     run_node_type = typing.cast(types.RunType, run_node.type)
     return graph.OutputNode(run_node_type.output, "run-await", {"self": run_node})
 
@@ -34,33 +36,77 @@ def _call_execute(function_node: graph.Node) -> graph.OutputNode:
     )
 
 
-# Helper function to get the type of a node safely respecting constant types.
-# TODO: This should be moved into the core node logic
-def node_type(node: graph.Node) -> types.Type:
-    if isinstance(node, graph.ConstNode) and not isinstance(node.type, types.Const):
-        return types.Const(node.type, node.val)
-    return node.type
+def _fixup_output_type(graph_type: types.Type, op_type: types.Type):
+    # graph_type is the type from the incoming graph, which is always already
+    # refined by the caller.
+
+    # op_type is the unrefined op output type, for the given inputs.
+
+    # This function returns the equivalent to what the refined type should
+    # be if were to refine now, but without actually doing the refine which
+    # would execute the graph up to this point.
+
+    # Doing refinement in the compile phase is bad. It means we have to double
+    # compute ops (or worse). This happens because later phases need access
+    # to the full graph to determine what to do (gql, column pushdown,
+    # future optimizations)
+
+    # We know that WeaveJS provides us with correctly refined types, but that
+    # sometimes we have a more specific output type from the python op than
+    # we do from the js op.
+
+    # For example, file-table in WeavePython outputs an ArrowWeaveList instead
+    # of a list.
+    # In that case, we want to use the refined table object_type that WeaveJS
+    # has already provided, but the more specific ArrowWeaveList container type.
+
+    # Differences:
+    #   we do mapped ops differently in python
+    #   we do less tagging in python
+    #   we have more specific list types in python
+    #   weave python does not account for nullability in op types
+
+    if isinstance(graph_type, tagged_value_type.TaggedValueType):
+        if isinstance(op_type, tagged_value_type.TaggedValueType):
+            # Always accept the graph type tags. Note, we don't try to fix the
+            # tag types. We could...
+            value = _fixup_output_type(graph_type.value, op_type.value)
+        else:
+            value = _fixup_output_type(graph_type.value, op_type)
+        return tagged_value_type.TaggedValueType(graph_type.tag, value)
+
+    graph_type_is_sub = op_type.assign_type(graph_type)
+    op_type_is_sub = graph_type.assign_type(op_type)
+    if graph_type_is_sub and op_type_is_sub:
+        # types are equal
+        return graph_type
+    elif graph_type_is_sub:
+        # graph type is more specific, accept it
+        return graph_type
+    elif op_type_is_sub:
+        # op type is more specific, but its not refined. This happens when
+        # we have a more specific list type.
+        if isinstance(graph_type, types.List) and hasattr(op_type, "object_type"):
+            # op_type is a more specific list type.
+            object_type = _fixup_output_type(graph_type.object_type, op_type.object_type)  # type: ignore
+            return op_type.__class__(object_type)  # type: ignore
+        # This shouldn't happen, it indicates that we have a totally incorrect
+        # type in WeaveJS. But this branch smooths over some issues for now.
+        # TODO: Fix
+        # raise errors.WeaveInternalError("Cannot fixup output type", graph_type, op_type)
+        return op_type
+    # Types disagree. Trust Weave Python type. WeaveJS is probably more "correct" but Weave Python
+    # relies on its incorrectness.
+    return op_type
 
 
-def apply_type_based_dispatch(
-    edit_g: graph_editable.EditGraph,
-) -> None:
-    """
-    This method is responsible for attempting to re-dispatch ops based on their
-    types. This is useful to solve for mappability, JS/Py differences, or any
-    case where the provided op may not be the true op needed given the provided
-    types. Importantly, it does rely on paramter ordering.
-    """
-    # Topological order guarantees that all parents have been processed before the children
-    for orig_node in edit_g.topologically_ordered_nodes:
-        node = edit_g.get_node(orig_node)
-        node_inputs = {k: edit_g.get_node(v) for k, v in node.from_op.inputs.items()}
+def _dispatch_map_fn_refining(node: graph.Node) -> typing.Optional[graph.OutputNode]:
+    if isinstance(node, graph.OutputNode):
+        node_inputs = node.from_op.inputs
         new_node = dispatch.dispatch_by_name_and_type(
             node.from_op.name, [], node_inputs
         )
-        should_replace = new_node.from_op.name != node.from_op.name or any(
-            v in edit_g.replacements for v in orig_node.from_op.inputs.values()
-        )
+        should_replace = new_node.from_op.name != node.from_op.name
         if not node.type.assign_type(new_node.type):
             logging.warning(
                 "Compile phase [dispatch] Changed output type for node %s from %s to %s. This indicates an incompability between WeaveJS and Weave Python",
@@ -89,93 +135,82 @@ def apply_type_based_dispatch(
             should_replace = True
 
         if should_replace:
-            edit_g.replace(orig_node, new_node)
+            return new_node
+    return None
 
 
-def await_run_outputs_edit_graph(
-    edit_g: graph_editable.EditGraph,
-) -> None:
-    """Automatically insert Run.await_final_output steps as needed."""
+def _dispatch_map_fn(node: graph.Node) -> typing.Optional[graph.OutputNode]:
+    if isinstance(node, graph.OutputNode):
+        node_inputs = node.from_op.inputs
+        op = dispatch.get_op_for_inputs(node.from_op.name, [], node_inputs)
+        # params = op.bind_params(node_inputs.values(), {})
+        params = node_inputs
+        if isinstance(op.input_type, op_args.OpNamedArgs):
+            params = {
+                k: n for k, n in zip(op.input_type.arg_types, node_inputs.values())
+            }
+        output_type = op.unrefined_output_type_for_params(params)
+        fixed_type = _fixup_output_type(node.type, output_type)
+        return graph.OutputNode(fixed_type, op.uri, params)
+    return None
 
-    for orig_edge, edge in edit_g.edges_with_replacements:
-        actual_input_type = edge.output_of.type
-        op_def = registry_mem.memory_registry.get_op(edge.input_to.from_op.name)
-        if op_def.name == "tag-indexCheckpoint" or op_def.name == "Object-__getattr__":
-            # These are supposed to be a passthrough op, we don't want to convert
-            # it. TODO: Find a more general way, maybe by type inspection?
-            continue
-        if not isinstance(op_def.input_type, op_args.OpNamedArgs):
-            # Not correct... we'd want to walk these too!
-            # TODO: fix
-            continue
-        # If the Node type is RunType, but the Op argument it is passed to
-        # is not a RunType, insert an await_final_output operation to convert
-        # the Node from a run to the run's output.
-        try:
-            expected_input_type = op_def.input_type.arg_types[edge.input_name]
-        except KeyError:
-            raise errors.WeaveInternalError(
-                "OpDef (%s) missing input_name: %s" % (op_def.name, edge.input_name)
-            )
-        if isinstance(actual_input_type, types.RunType) and not isinstance(
-            expected_input_type, types.RunType
-        ):
-            if not expected_input_type.assign_type(actual_input_type.output):
-                raise Exception(
-                    "invalid type chaining for run. input_type: %s, op_input_type: %s"
-                    % (actual_input_type, expected_input_type)
+
+def make_auto_op_map_fn(when_type: type[types.Type], call_op_fn):
+    def fn(node: graph.Node) -> typing.Optional[graph.Node]:
+        if isinstance(node, graph.OutputNode):
+            node_inputs = node.from_op.inputs
+            op_def = registry_mem.memory_registry.get_op(node.from_op.name)
+            if (
+                op_def.name == "tag-indexCheckpoint"
+                or op_def.name == "Object-__getattr__"
+                or op_def.name == "set"
+                # panel_scatter and panel_distribution have the incorrect
+                # input types for their config arg. They should be weave.Node.
+                # We need a frontend fix to handle that. For now there's a hack
+                # here.
+                # TODO: Fix in frontend and panel_* and remove this hack.
+                or (
+                    isinstance(op_def.output_type, types.Type)
+                    and op_def.output_type._base_type is not None
+                    and op_def.output_type._base_type.name == "Panel"
                 )
-            new_inputs = dict(edge.input_to.from_op.inputs)
-            new_inputs[edge.input_name] = call_run_await_final_output(edge.output_of)
-            edit_g.replace(
-                edge.input_to,
-                graph.OutputNode(
-                    edge.input_to.type, edge.input_to.from_op.name, new_inputs
-                ),
-            )
+            ):
+                # These are supposed to be a passthrough op, we don't want to convert
+                # it. TODO: Find a more general way, maybe by type inspection?
+                return None
+            new_inputs: dict[str, graph.Node] = {}
+            swapped = False
+            for k, input_node in node_inputs.items():
+                actual_input_type = input_node.type
+                new_inputs[k] = input_node
+                if not isinstance(actual_input_type, when_type):
+                    continue
+                if isinstance(op_def.input_type, op_args.OpNamedArgs):
+                    op_input_type = op_def.input_type.arg_types[k]
+                elif isinstance(op_def.input_type, op_args.OpVarArgs):
+                    op_input_type = op_def.input_type.arg_type
+                else:
+                    raise ValueError(
+                        f"Unexpected op input type {op_def.input_type} for op {op_def.name}"
+                    )
+                if callable(op_input_type):
+                    continue
+                if not isinstance(op_input_type, when_type):
+                    new_inputs[k] = call_op_fn(input_node)
+                    swapped = True
+            if swapped:
+                return graph.OutputNode(node.type, node.from_op.name, new_inputs)
+        return None
+
+    return fn
 
 
-def execute_edit_graph(edit_g: graph_editable.EditGraph) -> None:
-    """In cases where an input is a Node, execute the Node"""
+_await_run_outputs_map_fn = make_auto_op_map_fn(types.RunType, _call_run_await)
 
-    for orig_edge, edge in edit_g.edges_with_replacements:
-        actual_input_type = edge.output_of.type
-        op_def = registry_mem.memory_registry.get_op(edge.input_to.from_op.name)
-        if not isinstance(op_def.input_type, op_args.OpNamedArgs):
-            # Not correct... we'd want to walk these too!
-            # TODO: fix
-            continue
-        # If the Node type is RunType, but the Op argument it is passed to
-        # is not a RunType, insert an await_final_output operation to convert
-        # the Node from a run to the run's output.
-        try:
-            expected_input_type = op_def.input_type.arg_types[edge.input_name]
-        except KeyError:
-            raise errors.WeaveInternalError(
-                "OpDef (%s) missing input_name: %s" % (op_def.name, edge.input_name)
-            )
-        if isinstance(actual_input_type, types.Function) and not isinstance(
-            expected_input_type, types.Function
-        ):
-            if not expected_input_type.assign_type(actual_input_type.output_type):
-                raise Exception(
-                    "invalid type chaining for Node. input_type: %s, op_input_type: %s"
-                    % (actual_input_type, expected_input_type)
-                )
-            new_inputs = dict(edge.input_to.from_op.inputs)
-
-            new_inputs[edge.input_name] = _call_execute(edge.output_of)
-            edit_g.replace(
-                orig_edge.input_to,
-                graph.OutputNode(
-                    edge.input_to.type, edge.input_to.from_op.name, new_inputs
-                ),
-            )
+_execute_nodes_map_fn = make_auto_op_map_fn(types.Function, _call_execute)
 
 
-def apply_column_pushdown(
-    leaf_nodes: list[graph.Node],
-) -> list[graph.Node]:
+def apply_column_pushdown(leaf_nodes: list[graph.Node]) -> list[graph.Node]:
     # This is specific to project-runs2 (not yet used in W&B production) for now. But it
     # is a general pattern that will work for all arrow tables.
     if not graph.filter_all_nodes(
@@ -206,60 +241,44 @@ def apply_column_pushdown(
     return graph.map_all_nodes(leaf_nodes, _replace_with_column_pushdown)
 
 
-def _compile_phase(
-    g: graph_editable.EditGraph,
-    phase_name: str,
-    phase_fn: typing.Callable[[graph_editable.EditGraph], None],
-):
-    phase_fn(g)
-    edit_log = g.checkpoint()
-    logging.info("Compile phase [%s] Made %s edits", phase_name, len(edit_log))
-    if edit_log:
-        loggable_nodes = graph_debug.combine_common_nodes(g.to_standard_graph())
-        logging.info(
-            "Compile phase [%s] Result nodes:\n%s",
-            phase_name,
-            "\n".join(graph_debug.node_expr_str_full(n) for n in loggable_nodes),
-        )
-
-
 def compile(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
     """
     This method is used to "compile" a list of nodes. Here we can add any
     optimizations or graph rewrites
     """
+    tracer = engine_trace.tracer()
     logging.info("Starting compilation of graph with %s leaf nodes" % len(nodes))
 
-    # Convert the nodes to an editable graph data structure
-    g = graph_editable.EditGraph(nodes)
+    n = nodes
 
-    # Each of the following lines is a transformation pass of the graph:
-    # 1: Adjust any Op calls based on type-based dispatching
-    _compile_phase(g, "dispatch", apply_type_based_dispatch)
+    if environment.wandb_production():
+        # First try dispatch without refine. If that doesn't work, fallback to the refining
+        # version, and suffer a perf hit :(
+        try:
+            with tracer.trace("compile:dispatch1"):
+                n = graph.map_all_nodes(n, _dispatch_map_fn)
+        except errors.WeaveDispatchError:
+            logging.warning("Falling back to refine dispatch.")
+            with tracer.trace("compile:dispatch2"):
+                n = graph.map_all_nodes(n, _dispatch_map_fn_refining)
+    else:
+        # when we're not in production, don't try to recover, we should fix these issues!
+        with tracer.trace("compile:dispatch1"):
+            n = graph.map_all_nodes(n, _dispatch_map_fn)
 
-    # 2: Add Await nodes for Runs
-    _compile_phase(g, "await", await_run_outputs_edit_graph)
-
-    # 3: Execute function nodes
-    _compile_phase(g, "execute", execute_edit_graph)
-
-    # Reconstruct a node list that matches the original order from the transformed graph
-    n = g.to_standard_graph()
-
-    n = compile_domain.apply_domain_op_gql_translation(n)
+    with tracer.trace("compile:await"):
+        n = graph.map_all_nodes(n, _await_run_outputs_map_fn)
+    with tracer.trace("compile:execute"):
+        n = graph.map_all_nodes(n, _execute_nodes_map_fn)
+    with tracer.trace("compile:gql"):
+        n = compile_domain.apply_domain_op_gql_translation(n)
+    with tracer.trace("compile:column_pushdown"):
+        n = apply_column_pushdown(n)
 
     loggable_nodes = graph_debug.combine_common_nodes(n)
     logging.info(
-        "Compile phase [pre-pushdown] Result nodes:\n%s",
+        "Compilation complete. Result nodes:\n%s",
         "\n".join(graph_debug.node_expr_str_full(n) for n in loggable_nodes),
     )
-    n = apply_column_pushdown(n)
-    loggable_nodes = graph_debug.combine_common_nodes(n)
-    logging.info(
-        "Compile phase [pushdown] Result nodes:\n%s",
-        "\n".join(graph_debug.node_expr_str_full(n) for n in loggable_nodes),
-    )
-
-    logging.info("Compilation complete")
 
     return n

@@ -1,3 +1,4 @@
+import weave
 from .. import weave_types as types
 from .. import weave_internal
 from .. import graph
@@ -44,3 +45,23 @@ def test_linearize():
     assert list(linear[1].from_op.inputs.values())[1].val == 2
     assert linear[2].from_op.name == "number-add"
     assert list(linear[2].from_op.inputs.values())[1].val == 3
+
+
+def test_replace_node():
+    #    2      3
+    #     \      \
+    # 1 -> (a) -> (b)
+    #        \      \
+    #   4 -> (c) -> (d)
+    a = weave_internal.make_const_node(types.Int(), 1) + 2
+    b = a + 3
+    c = a * 4
+    d = b + c
+    assert weave.use(d) == 18
+
+    def replace_c(node):
+        if node is c:
+            return c.from_op.inputs["lhs"] / 4
+
+    x = graph.map_nodes(d, replace_c)
+    assert weave.use(x) == 6.75

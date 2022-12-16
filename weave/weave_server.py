@@ -23,6 +23,7 @@ from weave import weavejs_fixes
 from weave import automation
 from weave import util
 from weave import engine_trace
+from weave import environment
 
 tracer = engine_trace.tracer()
 if engine_trace.datadog_is_enabled():
@@ -65,10 +66,6 @@ pid = os.getpid()
 default_log_filename = pathlib.Path(f"/tmp/weave/log/{pid}.log")
 
 default_log_format = "[%(asctime)s] %(levelname)s in %(module)s (Thread Name: %(threadName)s): %(message)s"
-
-
-def is_wandb_production():
-    return os.getenv("WEAVE_ENV") == "wandb_production"
 
 
 def enable_stream_logging(level=logging.DEBUG, enable_datadog=False):
@@ -120,7 +117,7 @@ def make_app(log_filename=None):
 
 @blueprint.route("/__weave/ops", methods=["GET"])
 def list_ops():
-    if not is_wandb_production():
+    if not environment.wandb_production():
         registry_mem.memory_registry.load_saved_ops()
     ops = registry_mem.memory_registry.list_ops()
     ret = []

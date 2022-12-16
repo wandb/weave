@@ -1,6 +1,5 @@
 from __future__ import print_function
 
-import os
 import typing
 import logging
 
@@ -11,7 +10,6 @@ import threading
 import time
 import requests
 import traceback
-import viztracer
 import time
 import cProfile
 
@@ -23,6 +21,7 @@ from . import storage
 from . import context
 from . import weave_types
 from . import util
+from . import engine_trace
 from . import graph_debug
 
 
@@ -44,8 +43,6 @@ from . import graph_debug
 
 PROFILE = False
 
-is_tracing = True
-
 OptionalAuthType = typing.Optional[
     typing.Union[typing.Tuple[str, str], requests.models.HTTPBasicAuth]
 ]
@@ -54,36 +51,28 @@ logger = logging.getLogger("root")
 
 
 def _handle_request(request, deref=False):
-
-    global is_tracing
     start_time = time.time()
-    request_trace = not is_tracing
-    if request_trace:
-        is_tracing = True
-        tracer = viztracer.VizTracer()
-        tracer.start()
+    tracer = engine_trace.tracer()
     # nodes = [graph.Node.node_from_json(n) for n in request["graphs"]]
-    nodes = serialize.deserialize(request["graphs"])
+    with tracer.trace("request:deserialize"):
+        nodes = serialize.deserialize(request["graphs"])
 
-    with context.execution_client():
-        result = execute.execute_nodes(
-            nodes, no_cache=util.parse_boolean_env_var("WEAVE_NO_CACHE")
-        )
-    if deref:
-        result = [
-            r if isinstance(n.type, weave_types.RefType) else storage.deref(r)
-            for (n, r) in zip(nodes, result)
-        ]
+    with tracer.trace("request:execute"):
+        with context.execution_client():
+            result = execute.execute_nodes(nodes)
+    with tracer.trace("request:deref"):
+        if deref:
+            result = [
+                r if isinstance(n.type, weave_types.RefType) else storage.deref(r)
+                for (n, r) in zip(nodes, result)
+            ]
     # print("Server request %s (%0.5fs): %s..." % (start_time,
     #                                              time.time() - start_time, [n.from_op.name for n in nodes[:3]]))
-    if request_trace:
-        is_tracing = False
-        tracer.stop()
-        tracer.save(output_file="request_%s.json" % time.time())
 
     # Forces output to be untagged
-    with isolated_tagging_context():
-        result = [storage.to_python(r) for r in result]
+    with tracer.trace("request:to_python"):
+        with isolated_tagging_context():
+            result = [storage.to_python(r) for r in result]
 
     logger.info("Server request done in: %ss" % (time.time() - start_time))
     return result

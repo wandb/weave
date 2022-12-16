@@ -6,9 +6,10 @@ import threading
 import typing
 
 # Libraries
-from . import box
 from . import engine_trace
 from . import errors
+from . import context
+from . import environment
 
 # Planner/Compiler
 from . import compile
@@ -84,16 +85,17 @@ def execute_nodes(nodes, no_cache=False):
     )
     nodes = compile.compile(nodes)
 
-    # hack: disable caching for panelplot
-    no_cache |= any([is_panelplot_data_fetch_query(node) for node in nodes])
-    with tag_store.isolated_tagging_context():
-        fg = forward_graph.ForwardGraph(nodes)
+    # context.execution_client ensures that recursive use calls are non-caching
+    # by default.
+    with context.execution_client():
+        with tag_store.isolated_tagging_context():
+            fg = forward_graph.ForwardGraph(nodes)
 
-        stats = execute_forward(fg, no_cache=no_cache)
-        summary = stats.summary()
-        logging.info("Execution summary\n%s" % pprint.pformat(summary))
+            stats = execute_forward(fg, no_cache=no_cache)
+            summary = stats.summary()
+            logging.info("Execution summary\n%s" % pprint.pformat(summary))
 
-        res = [fg.get_result(n) for n in nodes]
+            res = [fg.get_result(n) for n in nodes]
     return res
 
 
@@ -185,13 +187,6 @@ def is_run_op(op_call: graph.Op):
     return False
 
 
-# the results of these ops will not be cached.
-CACHE_DISALLOWLIST = [
-    "list",
-    "unnest",
-]
-
-
 class NodeExecutionReport(typing.TypedDict):
     cache_used: bool
 
@@ -201,8 +196,18 @@ def execute_forward_node(
     forward_node: forward_graph.ForwardNode,
     no_cache=False,
 ) -> NodeExecutionReport:
-    use_cache = not no_cache
     node = forward_node.node
+
+    if environment.no_cache():
+        no_cache = True
+        if node.from_op.name == "file-table":
+            # Always cache file-table for now. file-table converts from the W&B json
+            # table format to the much faster Weave arrow format. Since Weave cache
+            # is like permanent memoization, this means each W&B table we encounter will
+            # only be converted once.
+            no_cache = False
+
+    use_cache = not no_cache
     if isinstance(node, graph.ConstNode):
         return {"cache_used": False}
 
@@ -213,9 +218,6 @@ def execute_forward_node(
     with tracer.trace("execute-read-cache"):
         op_def = registry_mem.memory_registry.get_op(node.from_op.name)
         input_nodes = node.from_op.inputs
-
-        # disable caching if op is in the cache disallowlist
-        use_cache &= op_def.name not in CACHE_DISALLOWLIST
 
         input_refs: dict[str, refs.Ref] = {}
         for input_name, input_node in input_nodes.items():
@@ -232,7 +234,7 @@ def execute_forward_node(
                 # Watch out, we handle loading async runs in different ways.
                 if op_def.is_async:
                     forward_node.set_result(run)
-                    return {"cache_used": use_cache}
+                    return {"cache_used": True}
                 else:
                     if run.output is not None:
                         # if isinstance(run._output, artifacts_local.LocalArtifact):
@@ -247,7 +249,7 @@ def execute_forward_node(
                         # not have the tags in their scope.
                         refs.deref(run.output)
                         forward_node.set_result(run.output)
-                        return {"cache_used": use_cache}
+                        return {"cache_used": True}
                 logging.debug("Actually nevermind, didnt return")
                 # otherwise, the run's output was not saveable, so we need
                 # to recompute it.
@@ -317,4 +319,4 @@ def execute_forward_node(
                 except errors.WeaveSerializeError:
                     pass
             logging.debug("Done executing node: %s" % node)
-    return {"cache_used": use_cache}
+    return {"cache_used": False}

@@ -37,7 +37,7 @@ class OpAmbiguityError(Exception):
 #   1. Make mapped ops automatically handle arrays in their second argument
 #   2. Split arrow ops into two ops, for array/scalar in second arg
 #   3. Figure out some clever way to resolve the above ambiguity here
-def op_args_is_subtype(lhs: op_args.OpArgs, rhs: op_args.OpArgs) -> bool:
+def _op_args_is_subtype(lhs: op_args.OpArgs, rhs: op_args.OpArgs) -> bool:
     """Returns true if rhs is subtype of lhs"""
     if isinstance(lhs, op_args.OpNamedArgs) and isinstance(rhs, op_args.OpNamedArgs):
         if len(lhs.arg_types) != len(rhs.arg_types):
@@ -58,7 +58,7 @@ def op_args_is_subtype(lhs: op_args.OpArgs, rhs: op_args.OpArgs) -> bool:
         raise errors.WeaveInternalError("unknown op_args types: %s, %s" % (lhs, rhs))
 
 
-def resolve_op_ambiguity(candidates: list[op_def.OpDef]) -> op_def.OpDef:
+def _resolve_op_ambiguity(candidates: list[op_def.OpDef]) -> op_def.OpDef:
     # Currently we deprioritize all tag getter ops below standard ops
     tag_getter_candidates = []
     non_tag_getter_candidates = []
@@ -69,8 +69,8 @@ def resolve_op_ambiguity(candidates: list[op_def.OpDef]) -> op_def.OpDef:
             non_tag_getter_candidates.append(candidate)
 
     def cmp(a: op_def.OpDef, b: op_def.OpDef) -> int:
-        b_is_subtype = op_args_is_subtype(a.input_type, b.input_type)
-        a_is_subtype = op_args_is_subtype(b.input_type, a.input_type)
+        b_is_subtype = _op_args_is_subtype(a.input_type, b.input_type)
+        a_is_subtype = _op_args_is_subtype(b.input_type, a.input_type)
         if a_is_subtype and b_is_subtype:
             raise OpAmbiguityError(
                 "Ambiguous ops %s, %s. Ops' input types are equivalent"
@@ -97,7 +97,7 @@ def resolve_op_ambiguity(candidates: list[op_def.OpDef]) -> op_def.OpDef:
     return ordered[0]
 
 
-def get_ops_by_name(fq_op_name: str) -> list[op_def.OpDef]:
+def _get_ops_by_name(fq_op_name: str) -> list[op_def.OpDef]:
     """Returns a single op that matches the given name and raw inputs (inputs can be python objects or nodes)"""
     shared_name_ops: list[op_def.OpDef]
 
@@ -115,7 +115,7 @@ def get_ops_by_name(fq_op_name: str) -> list[op_def.OpDef]:
     return shared_name_ops
 
 
-def choose_op_for_args(
+def _choose_op_by_types(
     op_choices: list[op_def.OpDef],
     args: list[types.Type],
     kwargs: dict[str, types.Type],
@@ -130,28 +130,15 @@ def choose_op_for_args(
             candidates.append(op)
     if not candidates:
         return None
-    return resolve_op_ambiguity(candidates)
+    return _resolve_op_ambiguity(candidates)
 
 
-def dispatch_by_name_and_type(
-    common_name: str, args: typing.Any, kwargs: typing.Any
-) -> typing.Any:
-    ops = get_ops_by_name(common_name)
-    if len(ops) == 0:
-        err = errors.WeaveDispatchError(
-            f'Cannot dispatch op "{common_name}"; no matching op found'
-        )
-        util.raise_exception_with_sentry_if_available(err, [common_name])
-
-    return dispatch_ops_by_type(ops, args, kwargs)
-
-
-def dispatch_ops_by_type(
+def _choose_op_by_args(
     ops: list[op_def.OpDef], args: list[typing.Any], kwargs: dict[str, typing.Any]
-) -> "RuntimeOutputNode":
-    arg_types = [type_of_input_param(arg) for arg in args]
-    kwarg_types = {k: type_of_input_param(v) for k, v in kwargs.items()}
-    op = choose_op_for_args(ops, arg_types, kwarg_types)
+) -> op_def.OpDef:
+    arg_types = [_type_of_input_param(arg) for arg in args]
+    kwarg_types = {k: _type_of_input_param(v) for k, v in kwargs.items()}
+    op = _choose_op_by_types(ops, arg_types, kwarg_types)
 
     if op is None:
         if len(ops) == 0:
@@ -171,16 +158,44 @@ def dispatch_ops_by_type(
                 ops[0].common_name,
             ],
         )
+    return op
+
+
+def _dispatch_ops_by_type(
+    ops: list[op_def.OpDef], args: list[typing.Any], kwargs: dict[str, typing.Any]
+) -> "RuntimeOutputNode":
+    op = _choose_op_by_args(ops, args, kwargs)
+
     params = op.input_type.create_param_dict(args, kwargs)
     return op(**params)
 
 
+def dispatch_by_name_and_type(
+    common_name: str, args: typing.Any, kwargs: typing.Any
+) -> "RuntimeOutputNode":
+    ops = _get_ops_by_name(common_name)
+    if len(ops) == 0:
+        err = errors.WeaveDispatchError(
+            f'Cannot dispatch op "{common_name}"; no matching op found'
+        )
+        util.raise_exception_with_sentry_if_available(err, [common_name])
+
+    return _dispatch_ops_by_type(ops, args, kwargs)
+
+
 def get_op_for_input_types(fq_op_name, arg_types, kwarg_types):  # type: ignore
-    ops = get_ops_by_name(fq_op_name)
-    return choose_op_for_args(ops, arg_types, kwarg_types)
+    ops = _get_ops_by_name(fq_op_name)
+    return _choose_op_by_types(ops, arg_types, kwarg_types)
 
 
-def type_of_input_param(v: typing.Any) -> types.Type:
+def get_op_for_inputs(
+    op_name: str, args: typing.Any, kwargs: typing.Any
+) -> op_def.OpDef:
+    ops = _get_ops_by_name(op_name)
+    return _choose_op_by_args(ops, args, kwargs)
+
+
+def _type_of_input_param(v: typing.Any) -> types.Type:
     if isinstance(v, graph.Node):
         # Check if its a Node first, sometimes we mixin a callables with Node!
         if isinstance(v, graph.ConstNode) and not isinstance(v.type, types.Const):
@@ -209,12 +224,12 @@ class BoundPotentialOpDefs:
     potential_ops: list[op_def.OpDef]
 
     def __call__(self, *args: typing.Any, **kwargs: typing.Any) -> "RuntimeOutputNode":
-        return dispatch_ops_by_type(
+        return _dispatch_ops_by_type(
             self.potential_ops, [self.self_node] + list(args), kwargs
         )
 
 
-def dispatch_dunder(
+def _dispatch_dunder(
     name: str,
 ) -> typing.Callable[
     [graph.Node, list[typing.Any], dict[str, typing.Any]], "RuntimeOutputNode"
@@ -289,25 +304,25 @@ class DispatchMixin:
             'No ops called "%s" available on type "%s"' % (attr, node_self.type)
         )
 
-    __call__ = dispatch_dunder("__call__")
-    __getitem__ = dispatch_dunder("__getitem__")
-    __len__ = dispatch_dunder("__len__")
-    __add__ = dispatch_dunder("__add__")
-    __sub__ = dispatch_dunder("__sub__")
-    __mul__ = dispatch_dunder("__mul__")
-    __truediv__ = dispatch_dunder("__truediv__")
-    __floordiv__ = dispatch_dunder("__floordiv__")
-    __pow__ = dispatch_dunder("__pow__")
-    __mod__ = dispatch_dunder("__mod__")
-    __round__ = dispatch_dunder("__round__")
-    __ge__ = dispatch_dunder("__ge__")
-    __gt__ = dispatch_dunder("__gt__")
-    __le__ = dispatch_dunder("__le__")
-    __lt__ = dispatch_dunder("__lt__")
-    __eq__ = dispatch_dunder("__eq__")  # type: ignore
-    __ne__ = dispatch_dunder("__ne__")  # type: ignore
-    __neg__ = dispatch_dunder("__neg__")
-    __contains__ = dispatch_dunder("__contains__")
+    __call__ = _dispatch_dunder("__call__")
+    __getitem__ = _dispatch_dunder("__getitem__")
+    __len__ = _dispatch_dunder("__len__")
+    __add__ = _dispatch_dunder("__add__")
+    __sub__ = _dispatch_dunder("__sub__")
+    __mul__ = _dispatch_dunder("__mul__")
+    __truediv__ = _dispatch_dunder("__truediv__")
+    __floordiv__ = _dispatch_dunder("__floordiv__")
+    __pow__ = _dispatch_dunder("__pow__")
+    __mod__ = _dispatch_dunder("__mod__")
+    __round__ = _dispatch_dunder("__round__")
+    __ge__ = _dispatch_dunder("__ge__")
+    __gt__ = _dispatch_dunder("__gt__")
+    __le__ = _dispatch_dunder("__le__")
+    __lt__ = _dispatch_dunder("__lt__")
+    __eq__ = _dispatch_dunder("__eq__")  # type: ignore
+    __ne__ = _dispatch_dunder("__ne__")  # type: ignore
+    __neg__ = _dispatch_dunder("__neg__")
+    __contains__ = _dispatch_dunder("__contains__")
 
 
 class RuntimeOutputNode(graph.OutputNode, DispatchMixin):

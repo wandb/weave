@@ -107,8 +107,6 @@ def multi_distribution(
 def multi_distribution_panel_plot(
     input_node: weave.Node[list[typing.Any]], config: DistributionConfig
 ) -> weave.panels.Plot:
-    from rich import print
-
     unnested = weave.ops.unnest(input_node)
     config = multi_distribution_default_config(config, unnested)
     bin_size = weave.ops.execute(config.bin_size)

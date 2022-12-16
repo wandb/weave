@@ -5,6 +5,10 @@ from .. import weave_types as types
 from .. import graph
 from .. import weave_internal
 from ..language_features.tagging import tagged_value_type
+from ..language_features.tagging.tagging_op_logic import (
+    op_get_tag_type_resolver,
+    op_make_type_tagged_resolver,
+)
 
 
 def ensure_node(v):
@@ -14,10 +18,14 @@ def ensure_node(v):
 
 
 def weavejs_pick(obj: graph.Node, key: str):
+    raw_output_type = typeddict_pick_output_type(
+        {"self": obj.type, "key": types.Const(types.String(), key)}
+    )
+    output_type = op_make_type_tagged_resolver(
+        raw_output_type, op_get_tag_type_resolver(obj.type)
+    )
     return weave_internal.make_output_node(
-        typeddict_pick_output_type(
-            {"self": obj.type, "key": types.Const(types.String(), key)}
-        ),
+        output_type,
         "pick",
         {"obj": obj, "key": graph.ConstNode(types.String(), key)},
     )
@@ -36,12 +44,16 @@ def count(arr):
 
 def index(arr, index):
     arr_node = ensure_node(arr)
+    index_node = ensure_node(index)
+    output_type = op_make_type_tagged_resolver(
+        arr_node.type.object_type, op_get_tag_type_resolver(arr_node.type)
+    )
     return weave_internal.make_output_node(
-        arr_node.type.object_type,
+        output_type,
         "index",
         {
             "arr": arr_node,
-            "index": ensure_node(index),
+            "index": index_node,
         },
     )
 
@@ -90,7 +102,7 @@ def groupby(arr, groupByFn):
         types.List(
             tagged_value_type.TaggedValueType(
                 types.TypedDict({"groupKey": groupByFn_node.type.output_type}),
-                arr_node.type,
+                types.List(arr_node.type.object_type),
             )
         ),
         "groupby",
@@ -124,8 +136,11 @@ def limit(arr, limit):
 
 def file_type(file):
     file_node = ensure_node(file)
+    output_type = op_make_type_tagged_resolver(
+        types.TypeType(), op_get_tag_type_resolver(file_node.type)
+    )
     return weave_internal.make_output_node(
-        file_node.type,
+        output_type,
         "file-type",
         {
             "file": file_node,

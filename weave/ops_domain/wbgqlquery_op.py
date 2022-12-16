@@ -2,6 +2,7 @@ from .. import weave_types as types
 from ..api import op
 from . import wb_domain_types as wdt
 from ..wandb_api import wandb_gql_query
+from ..language_features.tagging import tagged_value_type
 
 # This op replaces all domain root ops in the graph during the compilation step.
 # It executes a GQL query (that is constructed inside of `compile_domain.py`)
@@ -19,6 +20,8 @@ def wbgqlquery(query_str, output_type):
     values = list(gql_payload.values())
     if len(values) != 1:
         raise ValueError("GQL query should return exactly one value")
+    if isinstance(output_type, tagged_value_type.TaggedValueType):
+        output_type = output_type.value
     if output_type.instance_class is None or not issubclass(
         output_type.instance_class, wdt.GQLTypeMixin
     ):

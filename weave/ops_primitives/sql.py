@@ -17,6 +17,7 @@ class SqlConnectionType(types.Type):
 
 
 class SqlTableType(types.Type):
+    _base_type = types.List()
     name = "sqltable"
 
     object_type: types.Type
@@ -87,14 +88,14 @@ def index_output_type(input_types):
         return self_type.object_type
 
 
-def pick_output_type(input_types):
+def mapped_pick_output_type(input_types):
     if not isinstance(input_types["key"], types.Const):
-        return types.UnknownType()
+        return types.List(types.UnknownType())
     key = input_types["key"].val
     prop_type = input_types["self"].object_type.property_types.get(key)
     if prop_type is None:
         return types.Invalid()
-    return prop_type
+    return types.List(prop_type)
 
 
 @weave_class(weave_type=SqlTableType)
@@ -172,12 +173,19 @@ class SqlTable:
     def __getitem__(self, index: int):
         return self._index(index)
 
-    @op(output_type=pick_output_type)
+    @op(output_type=mapped_pick_output_type)
     def pick(self, key: str):
         return list_.general_picker(self._to_list_table(), key)
 
-    @op(output_type=lambda input_types: types.List(input_types["self"].object_type))
-    def map(self, map_fn: typing.Any):
+    @op(
+        input_type={
+            "map_fn": lambda input_types: types.Function(
+                {"row": input_types["self"].object_type}, types.Any()
+            ),
+        },
+        output_type=lambda input_types: types.List(input_types["self"].object_type),
+    )
+    def map(self, map_fn):
         return list_.List.map.resolve_fn(self._to_list_table(), map_fn)
 
     @op(
