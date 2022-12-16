@@ -58,6 +58,10 @@ class TaggedValueType(types.Type):
                     **self.value.tag.property_types,
                 }
             )
+            if isinstance(self.value.value, TaggedValueType):
+                raise errors.WeaveTypeError(
+                    f"TaggedValueType value types cannot be TaggedValueType, found {self.value.value}"
+                )
             self.__dict__["value"] = self.value.value
 
     def __getattr__(self, attr: str) -> typing.Any:
@@ -105,13 +109,6 @@ class TaggedValueType(types.Type):
 
     def _to_dict(self) -> dict:
         return {"tag": self.tag.to_dict(), "value": self.value.to_dict()}
-
-    def _assign_type_inner(self, next_type: types.Type) -> bool:
-        return (
-            isinstance(next_type, TaggedValueType)
-            and self.tag.assign_type(next_type.tag)
-            and self.value.assign_type(next_type.value)
-        )
 
     def save_instance(
         self, obj: types.Any, artifact: artifacts_local.Artifact, name: str

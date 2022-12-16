@@ -57,6 +57,15 @@ def test_merge_through_tags():
     assert r.assign_type(correct_type)
 
 
+def test_tag_assignment_through_union():
+    base = TaggedValueType(types.TypedDict({"a": types.Number()}), types.Any())
+    t = TaggedValueType(types.TypedDict({"a": types.Number()}), types.String())
+    t2 = TaggedValueType(types.TypedDict({"a": types.Number()}), types.Number())
+    union = types.union(t, t2)
+    t3 = TaggedValueType(types.TypedDict({"b": types.Number()}), union)
+    assert base.assign_type(t3)
+
+
 def test_typeof_bool():
     assert types.TypeRegistry.type_of(False) == types.Boolean()
 

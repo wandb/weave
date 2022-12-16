@@ -250,13 +250,14 @@ class Type(metaclass=_TypeSubclassWatcher):
 
     def assign_type(self, next_type: "Type") -> bool:
         TaggedValueType = type_name_to_type("tagged")
+
+        self = _normalize_type_for_assignment(self)
+        next_type = _normalize_type_for_assignment(next_type)
+
         if isinstance(next_type, UnionType):
-            for t in next_type.members:
-                if not self.assign_type(t):
-                    return False
-            return True
+            return all(self.assign_type(t) for t in next_type.members)
         elif isinstance(self, UnionType):
-            return self._assign_type_inner(next_type)
+            return any(t.assign_type(next_type) for t in self.members)
 
         if isinstance(next_type, Const) and not isinstance(self, Const):
             return self.assign_type(next_type.val_type)
@@ -365,6 +366,15 @@ class Type(metaclass=_TypeSubclassWatcher):
         raise Exception("Please import `weave` to use `Type.make`.")
 
 
+def _normalize_type_for_assignment(t: Type) -> Type:
+    TaggedValueType = type_name_to_type("tagged")
+
+    # We need to normalize the types (in particular, always push down tags through unions)
+    if isinstance(t, TaggedValueType) and isinstance(t.value, UnionType):
+        return union(*[TaggedValueType(t.tag, mem) for mem in t.value.members])
+    return t
+
+
 # _PlainStringNamedType should only be used for backward compatibility with
 # legacy WeaveJS code.
 class _PlainStringNamedType(Type):
@@ -403,6 +413,17 @@ class Invalid(BasicType):
 class UnknownType(BasicType):
     name = "unknown"
 
+    # TODO: we should strictly define the rules for unknown types. As is, we
+    # allow anything to be assigned to unknown, but unknown can't be assigned to
+    # anything else. This is effectively the same as Any. Is that correct?
+    # Currently we have a single special case in List assign: `if
+    # isinstance(next_type, List) and next_type.object_type == UnknownType():`
+    #
+    # I _think_ we want 'unknown' to be assigned to anything, and this would
+    # allow us to remove the `_assign_type_inner` special case in List.
+    #
+    # This change would need to be implemented in the core `Type.assign_type`
+    # method
     def _assign_type_inner(self, next_type):
         return True
 
@@ -433,7 +454,7 @@ none_type = NoneType()
 class Any(BasicType):
     name = "any"
 
-    def assign_type(self, next_type):
+    def _assign_type_inner(self, next_type):
         return True
 
 
@@ -585,29 +606,6 @@ class UnionType(Type):
 
     def __hash__(self):
         return hash((hash(mem) for mem in self.members))
-
-    def _assign_type_inner(self, other):
-        TaggedValueType = type_name_to_type("tagged")
-        # If other is a tagged value and the value is a union, push the tags
-        # down. This pattern is a smell and indicates that the unwrapping logic
-        # in `Type.assign_type` may not be perfect. I think we should get rid of
-        # using `_assign_type_inner` in any container types (const, union,
-        # tagged) and do all the shared unwrapping in the `Type.assign_type``
-        # method. For now, this is fine, but a good opportunity to refactor in
-        # the future.
-        if isinstance(other, TaggedValueType):
-            if isinstance(other.value, UnionType):
-                other = UnionType(
-                    *[TaggedValueType(other.tag, mem) for mem in other.value.members]
-                )
-
-        if isinstance(other, UnionType):
-            if not all(self.assign_type(member) for member in other.members):
-                return False
-            return True
-        if any(member.assign_type(other) for member in self.members):
-            return True
-        return False
 
     # def instance_to_py(self, obj):
     #     # Figure out which union member this obj is, and delegate to that
@@ -768,20 +766,12 @@ class Dict(Type):
             raise Exception("Dict only supports string keys!")
 
     def _assign_type_inner(self, other_type):
-        if isinstance(other_type, Dict):
-            next_key_type = self.key_type.assign_type(other_type.key_type)
-            if not next_key_type:
-                return False
-            next_value_type = self.object_type.assign_type(other_type.object_type)
-            if not next_value_type:
-                return False
-            return True
-        elif isinstance(other_type, TypedDict):
+        if isinstance(other_type, TypedDict):
             return all(
                 self.object_type.assign_type(t)
                 for t in other_type.property_types.values()
             )
-        return False
+        return super()._assign_type_inner(other_type)
 
     @classmethod
     def type_of_instance(cls, obj):
