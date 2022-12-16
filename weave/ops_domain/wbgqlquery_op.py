@@ -1,8 +1,10 @@
+import logging
 from .. import weave_types as types
 from ..api import op
 from . import wb_domain_types as wdt
 from ..wandb_api import wandb_gql_query
 from ..language_features.tagging import tagged_value_type
+from .. import engine_trace
 
 # This op replaces all domain root ops in the graph during the compilation step.
 # It executes a GQL query (that is constructed inside of `compile_domain.py`)
@@ -16,7 +18,10 @@ from ..language_features.tagging import tagged_value_type
     output_type=types.Any(),
 )
 def wbgqlquery(query_str, output_type):
-    gql_payload = wandb_gql_query(query_str)
+    tracer = engine_trace.tracer()
+    with tracer.trace("wbgqlquery:public_api"):
+        logging.info("Executing GQL query: %s", query_str)
+        gql_payload = wandb_gql_query(query_str)
     values = list(gql_payload.values())
     if len(values) != 1:
         raise ValueError("GQL query should return exactly one value")
