@@ -459,3 +459,8 @@ def test_typetype_tofrom_dict():
     d = t.to_dict()
     t2 = types.TypeType.from_dict(d)
     assert t == t2
+
+
+def test_union_of_typetype_can_be_compared_to_other():
+    t = types.UnionType(types.NoneType(), types.TypeType())
+    assert t == t

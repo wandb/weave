@@ -832,6 +832,10 @@ class TypeType(ObjectType):
     def property_types(self) -> dict[str, Type]:
         return self.attr_types
 
+    def __hash__(self):
+        # Can't hash property_types by default because dict is not hashable
+        return hash(tuple(k, v) for k, v in self.property_types().items())
+
     @classmethod
     def type_of_instance(cls, obj):
         from . import infer_types
