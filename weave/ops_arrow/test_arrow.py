@@ -1371,8 +1371,11 @@ def test_arrow_dict_tagged():
 
 
 def _make_tagged_awl():
-    to_tag = box.box(["a", "b", "c"])
+    to_tag = box.box(["a", None, "b", None, "c"])
     for i, elem in enumerate(to_tag):
+        if elem is None:
+            to_tag[i] = None
+            continue
         taggable = box.box(elem)
         to_tag[i] = tag_store.add_tags(taggable, {"a": f"{elem}"})
     to_tag = tag_store.add_tags(to_tag, {"outer": "tag"})
@@ -1381,7 +1384,13 @@ def _make_tagged_awl():
 
 def test_arrow_dict_map_tagged():
     tagged_awl = _make_tagged_awl()
-    expected_output = [{"a": "a", "b": 1}, {"a": "b", "b": 1}, {"a": "c", "b": 1}]
+    expected_output = [
+        {"a": "a", "b": 1},
+        {"a": None, "b": 1},
+        {"a": "b", "b": 1},
+        {"a": None, "b": 1},
+        {"a": "c", "b": 1},
+    ]
     weave_func = lambda row: ops.dict_(a=row, b=1)
     fn = weave_internal.define_fn(
         {"row": tagged_awl.type.object_type},
@@ -1401,7 +1410,7 @@ def test_arrow_dict_map_tagged():
     assert weave.use(tag_node) == "a"
 
 
-def test_arrow_dict_filter_tagged():
+def test_arrow_filter_tagged():
     tagged_awl = _make_tagged_awl()
     expected_output = ["b", "c"]
     weave_func = lambda row: (row != "a")
@@ -1423,7 +1432,7 @@ def test_arrow_dict_filter_tagged():
     assert weave.use(tag_node) == "b"
 
 
-def test_arrow_dict_sort_tagged():
+def test_arrow_sort_tagged():
     tagged_awl = _make_tagged_awl()
     expected_output = ["c", "b", "a"]
     weave_func = lambda row: list_.make_list(a=row)

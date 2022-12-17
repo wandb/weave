@@ -51,7 +51,9 @@ class UnionToArrowUnion(mappers_weave.UnionMapper):
     @property
     def non_none_members(self):
         return [
-            m for m in self._member_mappers if not isinstance(m.type, types.NoneType)
+            m
+            for m in self._member_mappers
+            if not (types.NoneType().assign_type(m.type))
         ]
 
     def __init__(self, *args, **kwargs):
@@ -64,7 +66,7 @@ class UnionToArrowUnion(mappers_weave.UnionMapper):
         nullable = False
         non_null_mappers: typing.List[mappers.Mapper] = []
         for member_mapper in self._member_mappers:
-            if isinstance(member_mapper.type, types.NoneType):
+            if types.NoneType().assign_type(member_mapper.type):
                 nullable = True
             else:
                 non_null_mappers.append(member_mapper)

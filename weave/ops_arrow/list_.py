@@ -497,20 +497,29 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         # arrow_as_array is idempotent so even though we will hit this on every recursive call,
         # it will be a no-op after the first time.
         arrow_data = arrow_as_array(self._arrow_data)
+        object_type = self.object_type
+        if isinstance(self.object_type, types.UnionType):
+            non_none_members = [
+                member
+                for member in self.object_type.members
+                if not types.NoneType().assign_type(member)
+            ]
+            if len(non_none_members) == 1:
+                object_type = non_none_members[0]
 
-        if isinstance(self.object_type, tagged_value_type.TaggedValueType):
+        if isinstance(object_type, tagged_value_type.TaggedValueType):
             return ArrowWeaveList(
                 arrow_data.field("_value"),
-                self.object_type.value,
+                object_type.value,
                 self._artifact,
             )._arrow_data_asarray_no_tags()
 
-        elif isinstance(self.object_type, (types.TypedDict, types.ObjectType)):
+        elif isinstance(object_type, (types.TypedDict, types.ObjectType)):
             # strip tags from each field
             arrays = []
             keys = []
 
-            prop_types = self.object_type.property_types
+            prop_types = object_type.property_types
             if callable(prop_types):
                 prop_types = prop_types()
 
@@ -525,21 +534,21 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                 )
             return pa.StructArray.from_arrays(arrays, names=keys)
 
-        elif isinstance(self.object_type, types.List):
+        elif isinstance(object_type, types.List):
             offsets = arrow_data.offsets
             # strip tags from each element
             flattened = ArrowWeaveList(
                 arrow_data.flatten(),
-                self.object_type.object_type,
+                object_type.object_type,
                 self._artifact,
             )._arrow_data_asarray_no_tags()
 
             # unflatten
             return pa.ListArray.from_arrays(offsets, flattened)
 
-        elif isinstance(self.object_type, types.UnionType):
+        elif isinstance(object_type, types.UnionType):
             # strip tags from each element
-            for member in self.object_type.members:
+            for member in object_type.members:
                 if isinstance(member, tagged_value_type.TaggedValueType):
                     raise NotImplementedError(
                         'TODO: implement handling of "Union[TaggedValue, ...]'
