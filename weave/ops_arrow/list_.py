@@ -874,12 +874,16 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
 
 def _apply_fn_node(awl: ArrowWeaveList, fn: graph.OutputNode):
     vectorized_fn = vectorize(fn)
+    index_awl: ArrowWeaveList[int] = ArrowWeaveList(pa.array(np.arange(len(awl))))
     fn_res_node = weave_internal.call_fn(
         vectorized_fn,
         {
             "row": weave_internal.make_const_node(
                 ArrowWeaveListType(awl.object_type), awl
-            )
+            ),
+            "index": weave_internal.make_const_node(
+                types.TypeRegistry.type_of(index_awl), index_awl._arrow_data
+            ),
         },
     )
 

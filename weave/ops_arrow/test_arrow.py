@@ -1500,3 +1500,9 @@ def test_grouped_typed_dict_assign():
             _key=types.TypedDict(property_types={"a": types.String()}),
         )
     )
+
+
+def test_arrow_index_var():
+    data = arrow.to_arrow([1, 2, 3])
+    result = data.map(lambda row, index: row + index)
+    assert weave.use(result).to_pylist() == [1, 3, 5]
