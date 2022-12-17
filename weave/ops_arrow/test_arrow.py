@@ -125,7 +125,7 @@ def test_custom_types():
     )
     assert weave.use(data_node[0]["im"].width_()) == 256
 
-    assert weave.use(data_node.map(lambda row: row["im"].width_())) == [
+    assert weave.use(data_node.map(lambda row: row["im"].width_())).to_pylist() == [
         256,
         256,
     ]
@@ -145,7 +145,7 @@ def test_custom_types_tagged():
     )
 
     mapped_width_node = data_node.map(lambda row: row["im"].width_())
-    assert weave.use(mapped_width_node) == [
+    assert weave.use(mapped_width_node).to_pylist() == [
         256,
         256,
     ]
@@ -845,6 +845,12 @@ def test_arrow_vectorizer_number_ops_tagged(name, weave_func, expected_output):
 
     expected_value_type = weave.type_of(expected_output[0])
 
+    # This special condition is needed because the expected output is a list of
+    # booleans is optional booleans. See the comment at the top of `ops_arrow/number.py`
+    # for more details.
+    if types.Boolean().assign_type(expected_value_type):
+        expected_value_type = types.optional(expected_value_type)
+
     list = [1.0, 2.0, 3.0]
     for i, elem in enumerate(list):
         taggable = box.box(elem)
@@ -1388,7 +1394,7 @@ def test_arrow_dict_map_tagged():
     assert weave.use(tag_node) == "a"
 
 
-def test_arrow_dict_filter_tagged():
+def test_arrow_filter_tagged():
     tagged_awl = _make_tagged_awl()
     expected_output = ["b", "c"]
     weave_func = lambda row: (row != "a")
@@ -1410,7 +1416,7 @@ def test_arrow_dict_filter_tagged():
     assert weave.use(tag_node) == "b"
 
 
-def test_arrow_dict_sort_tagged():
+def test_arrow_sort_tagged():
     tagged_awl = _make_tagged_awl()
     expected_output = ["c", "b", "a"]
     weave_func = lambda row: list_.make_list(a=row)
@@ -1430,6 +1436,19 @@ def test_arrow_dict_sort_tagged():
     tag_getter_op = make_tag_getter_op.make_tag_getter_op("a", types.String())
     tag_node = tag_getter_op(called[0])
     assert weave.use(tag_node) == "c"
+
+
+def test_arrow_filter_nulls():
+    awl = weave.save(arrow.to_arrow([-1, 0, 1, None]))
+    weave_func = lambda row: row < 1
+    fn = weave_internal.define_fn(
+        {"row": awl.type.object_type},
+        weave_func,
+    )
+
+    called = awl.filter(fn)
+    awl = weave.use(called)
+    assert awl.to_pylist_notags() == [-1, 0]
 
 
 def test_arrow_dict():
@@ -1469,7 +1488,7 @@ def test_vectorize_works_recursively_on_weavifiable_op():
         "type": {
             "type": "ArrowWeaveList",
             "_base_type": {"type": "list", "objectType": "any"},
-            "objectType": "number",
+            "objectType": "int",
         },
         "fromOp": {
             "name": "ArrowWeaveListNumber-add",

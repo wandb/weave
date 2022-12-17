@@ -54,3 +54,7 @@ class WeaveDispatchError(WeaveBaseError):
 
 class WeaveMissingArtifactPathError(WeaveBaseError):
     pass
+
+
+class WeaveVectorizationError(WeaveBaseError):
+    pass

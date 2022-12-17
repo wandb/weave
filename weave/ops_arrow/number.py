@@ -5,20 +5,38 @@ from .. import weave_types as types
 
 from .list_ import ArrowWeaveList, ArrowWeaveListType
 
-
+# Note on input / output types:
+# It is critical that these functions support optional object types. Primarily
+# because they are often used in vecotrized functions AND those vecotrized functions
+# are typically operating on optional object types (think a column of numbers). However
+# some ops don't return the same dtype as the input (example: less-than). It would be
+# ideal to say that the output type is optional IFF the input is optional. However, since
+# we don't have a way to do that, we just say that the output type is always optional.
+# TODO: Fixing the above would reduce the proliferation of optional types.
 ARROW_WEAVE_LIST_NUMBER_TYPE = ArrowWeaveListType(types.Number())
-ARROW_WEAVE_LIST_BOOLEAN_TYPE = ArrowWeaveListType(types.Boolean())
+ARROW_WEAVE_LIST_MAYBE_NUMBER_TYPE = ArrowWeaveListType(types.optional(types.Number()))
+ARROW_WEAVE_LIST_MAYBE_BOOLEAN_TYPE = ArrowWeaveListType(
+    types.optional(types.Boolean())
+)
+unary_input_type = {
+    "self": ARROW_WEAVE_LIST_MAYBE_NUMBER_TYPE,
+}
+binary_input_type = {
+    "self": ARROW_WEAVE_LIST_MAYBE_NUMBER_TYPE,
+    "other": types.UnionType(types.Number(), ARROW_WEAVE_LIST_NUMBER_TYPE),
+}
+
+self_type_output_type_fn = lambda input_types: input_types["self"]
+boolean_output_type = ARROW_WEAVE_LIST_MAYBE_BOOLEAN_TYPE
+
 
 # TODO: weirdly need to name this "<something>-add" since that's what the base
 # Number op does. But we'd like to get rid of that requirement so we don't
 # need name= for any ops!
 @arrow_op(
     name="ArrowWeaveListNumber-add",
-    input_type={
-        "self": ARROW_WEAVE_LIST_NUMBER_TYPE,
-        "other": types.UnionType(types.Number(), ARROW_WEAVE_LIST_NUMBER_TYPE),
-    },
-    output_type=ARROW_WEAVE_LIST_NUMBER_TYPE,
+    input_type=binary_input_type,
+    output_type=self_type_output_type_fn,
 )
 def __add__(self, other):
     if isinstance(other, ArrowWeaveList):
@@ -30,11 +48,8 @@ def __add__(self, other):
 
 @arrow_op(
     name="ArrowWeaveListNumber-mult",
-    input_type={
-        "self": ARROW_WEAVE_LIST_NUMBER_TYPE,
-        "other": types.UnionType(types.Number(), ARROW_WEAVE_LIST_NUMBER_TYPE),
-    },
-    output_type=ARROW_WEAVE_LIST_NUMBER_TYPE,
+    input_type=binary_input_type,
+    output_type=self_type_output_type_fn,
 )
 def __mul__(self, other):
     if isinstance(other, ArrowWeaveList):
@@ -46,11 +61,8 @@ def __mul__(self, other):
 
 @arrow_op(
     name="ArrowWeaveListNumber-div",
-    input_type={
-        "self": ARROW_WEAVE_LIST_NUMBER_TYPE,
-        "other": types.UnionType(types.Number(), ARROW_WEAVE_LIST_NUMBER_TYPE),
-    },
-    output_type=ARROW_WEAVE_LIST_NUMBER_TYPE,
+    input_type=binary_input_type,
+    output_type=self_type_output_type_fn,
 )
 def __truediv__(self, other):
     if isinstance(other, ArrowWeaveList):
@@ -62,11 +74,8 @@ def __truediv__(self, other):
 
 @arrow_op(
     name="ArrowWeaveListNumber-sub",
-    input_type={
-        "self": ARROW_WEAVE_LIST_NUMBER_TYPE,
-        "other": types.UnionType(types.Number(), ARROW_WEAVE_LIST_NUMBER_TYPE),
-    },
-    output_type=ARROW_WEAVE_LIST_NUMBER_TYPE,
+    input_type=binary_input_type,
+    output_type=self_type_output_type_fn,
 )
 def __sub__(self, other):
     if isinstance(other, ArrowWeaveList):
@@ -78,11 +87,8 @@ def __sub__(self, other):
 
 @arrow_op(
     name="ArrowWeaveListNumber-powBinary",
-    input_type={
-        "self": ARROW_WEAVE_LIST_NUMBER_TYPE,
-        "other": types.UnionType(types.Number(), ARROW_WEAVE_LIST_NUMBER_TYPE),
-    },
-    output_type=ARROW_WEAVE_LIST_NUMBER_TYPE,
+    input_type=binary_input_type,
+    output_type=self_type_output_type_fn,
 )
 def __pow__(self, other):
     if isinstance(other, ArrowWeaveList):
@@ -94,11 +100,8 @@ def __pow__(self, other):
 
 @arrow_op(
     name="ArrowWeaveListNumber-notEqual",
-    input_type={
-        "self": ARROW_WEAVE_LIST_NUMBER_TYPE,
-        "other": types.UnionType(types.Number(), ARROW_WEAVE_LIST_NUMBER_TYPE),
-    },
-    output_type=ARROW_WEAVE_LIST_BOOLEAN_TYPE,
+    input_type=binary_input_type,
+    output_type=boolean_output_type,
 )
 def __ne__(self, other):
     if isinstance(other, ArrowWeaveList):
@@ -110,11 +113,8 @@ def __ne__(self, other):
 
 @arrow_op(
     name="ArrowWeaveListNumber-equal",
-    input_type={
-        "self": ARROW_WEAVE_LIST_NUMBER_TYPE,
-        "other": types.UnionType(types.Number(), ARROW_WEAVE_LIST_NUMBER_TYPE),
-    },
-    output_type=ARROW_WEAVE_LIST_BOOLEAN_TYPE,
+    input_type=binary_input_type,
+    output_type=boolean_output_type,
 )
 def __eq__(self, other):
     if isinstance(other, ArrowWeaveList):
@@ -126,11 +126,8 @@ def __eq__(self, other):
 
 @arrow_op(
     name="ArrowWeaveListNumber-greater",
-    input_type={
-        "self": ARROW_WEAVE_LIST_NUMBER_TYPE,
-        "other": types.UnionType(types.Number(), ARROW_WEAVE_LIST_NUMBER_TYPE),
-    },
-    output_type=ARROW_WEAVE_LIST_BOOLEAN_TYPE,
+    input_type=binary_input_type,
+    output_type=boolean_output_type,
 )
 def __gt__(self, other):
     if isinstance(other, ArrowWeaveList):
@@ -142,11 +139,8 @@ def __gt__(self, other):
 
 @arrow_op(
     name="ArrowWeaveListNumber-greaterEqual",
-    input_type={
-        "self": ARROW_WEAVE_LIST_NUMBER_TYPE,
-        "other": types.UnionType(types.Number(), ARROW_WEAVE_LIST_NUMBER_TYPE),
-    },
-    output_type=ARROW_WEAVE_LIST_BOOLEAN_TYPE,
+    input_type=binary_input_type,
+    output_type=boolean_output_type,
 )
 def __ge__(self, other):
     if isinstance(other, ArrowWeaveList):
@@ -158,11 +152,8 @@ def __ge__(self, other):
 
 @arrow_op(
     name="ArrowWeaveListNumber-less",
-    input_type={
-        "self": ARROW_WEAVE_LIST_NUMBER_TYPE,
-        "other": types.UnionType(types.Number(), ARROW_WEAVE_LIST_NUMBER_TYPE),
-    },
-    output_type=ARROW_WEAVE_LIST_BOOLEAN_TYPE,
+    input_type=binary_input_type,
+    output_type=boolean_output_type,
 )
 def __lt__(self, other):
     if isinstance(other, ArrowWeaveList):
@@ -174,11 +165,8 @@ def __lt__(self, other):
 
 @arrow_op(
     name="ArrowWeaveListNumber-lessEqual",
-    input_type={
-        "self": ARROW_WEAVE_LIST_NUMBER_TYPE,
-        "other": types.UnionType(types.Number(), ARROW_WEAVE_LIST_NUMBER_TYPE),
-    },
-    output_type=ARROW_WEAVE_LIST_BOOLEAN_TYPE,
+    input_type=binary_input_type,
+    output_type=boolean_output_type,
 )
 def __le__(self, other):
     if isinstance(other, ArrowWeaveList):
@@ -190,10 +178,8 @@ def __le__(self, other):
 
 @arrow_op(
     name="ArrowWeaveListNumber-negate",
-    input_type={
-        "self": ARROW_WEAVE_LIST_NUMBER_TYPE,
-    },
-    output_type=ARROW_WEAVE_LIST_NUMBER_TYPE,
+    input_type=unary_input_type,
+    output_type=self_type_output_type_fn,
 )
 def __neg__(self):
     return ArrowWeaveList(pc.negate(self._arrow_data), types.Number(), self._artifact)
@@ -204,10 +190,8 @@ def __neg__(self):
 # also true for ceil below
 @arrow_op(
     name="ArrowWeaveListNumber-floor",
-    input_type={
-        "self": ARROW_WEAVE_LIST_NUMBER_TYPE,
-    },
-    output_type=ARROW_WEAVE_LIST_NUMBER_TYPE,
+    input_type=unary_input_type,
+    output_type=self_type_output_type_fn,
 )
 def floor(self):
     return ArrowWeaveList(pc.floor(self._arrow_data), types.Number(), self._artifact)
@@ -215,10 +199,8 @@ def floor(self):
 
 @arrow_op(
     name="ArrowWeaveListNumber-ceil",
-    input_type={
-        "self": ARROW_WEAVE_LIST_NUMBER_TYPE,
-    },
-    output_type=ARROW_WEAVE_LIST_NUMBER_TYPE,
+    input_type=unary_input_type,
+    output_type=self_type_output_type_fn,
 )
 def ceil(self):
     return ArrowWeaveList(pc.ceil(self._arrow_data), types.Number(), self._artifact)

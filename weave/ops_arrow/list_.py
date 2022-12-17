@@ -1,3 +1,4 @@
+import logging
 import typing
 import dataclasses
 import json
@@ -682,7 +683,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             "self": ArrowWeaveListType(),
             "filter_fn": lambda input_types: types.Function(
                 {"row": input_types["self"].object_type, "index": types.Int()},
-                types.Boolean(),
+                types.optional(types.Boolean()),
             ),
         },
         output_type=lambda input_types: input_types["self"],
@@ -749,25 +750,15 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         ),
     )
     def groupby(self, group_by_fn):
-        vectorized_groupby_fn = vectorize(group_by_fn)
-        group_table_node = weave_internal.call_fn(
-            vectorized_groupby_fn,
-            {
-                "row": weave_internal.make_const_node(
-                    ArrowWeaveListType(self.object_type), self
-                )
-            },
-        )
+        group_table_awl = _apply_fn_node(self, group_by_fn)
         table = self._arrow_data
-
-        group_table_awl: ArrowWeaveList = use(group_table_node)
 
         group_table = group_table_awl._arrow_data
         group_table = arrow.arrow_as_array(group_table)
 
         # strip tags recursively so we group on values only
         group_table = ArrowWeaveList(
-            group_table, group_table_node.type.object_type, self._artifact
+            group_table, group_table_awl.object_type, self._artifact
         )._arrow_data_asarray_no_tags()
 
         # There was a comment that arrow doesn't allow grouping on struct columns
@@ -872,7 +863,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         )
 
 
-def _apply_fn_node(awl: ArrowWeaveList, fn: graph.OutputNode):
+def _apply_fn_node(awl: ArrowWeaveList, fn: graph.OutputNode) -> ArrowWeaveList:
     vectorized_fn = vectorize(fn)
     index_awl: ArrowWeaveList[int] = ArrowWeaveList(pa.array(np.arange(len(awl))))
     fn_res_node = weave_internal.call_fn(
@@ -887,7 +878,31 @@ def _apply_fn_node(awl: ArrowWeaveList, fn: graph.OutputNode):
         },
     )
 
-    return use(fn_res_node)
+    res = use(fn_res_node)
+
+    # Since it is possible that the result of `use` bails out of arrow due to a
+    # mismatch in the types / op support. This is most likely due to gap in the
+    # implementation of vectorized ops. However, there are cases where it is
+    # currently expected - for example calling a custom op on a custom type. An
+    # example of this is in `ops_arrow/test_arrow.py::test_custom_types_tagged`:
+    #
+    #     ` data_node.map(lambda row: row["im"].width_())`
+    #
+    # If such cases did not exist, then we should probably raise in this case.
+    # However, for now, we will just convert the result back to arrow if it is a
+    # list.
+    if not isinstance(res, ArrowWeaveList):
+        err_msg = f"Applying vectorized function {fn} to awl of {awl.object_type} \
+            resulted in a non vectorized result type: {py_type(res)}. This likely \
+            means 1 or more ops in the function were converted to the list \
+            implementation in compile."
+        if isinstance(res, list):
+            res = to_arrow(res)
+            logging.error(err_msg)
+        else:
+            raise errors.WeaveVectorizationError(err_msg)
+
+    return res
 
 
 def pushdown_list_tags(arr: ArrowWeaveList) -> ArrowWeaveList:
@@ -1251,7 +1266,7 @@ def to_arrow(obj, wb_type=None):
 
         # Convert to arrow, serializing Custom objects to the artifact
         mapper = mappers_arrow.map_to_arrow(object_type, artifact)
-        pyarrow_type = mapper.result_type()
+        pyarrow_type = arrow_util.arrow_type(mapper.result_type())
         py_objs = (mapper.apply(o) for o in obj)
 
         # TODO: do I need this branch? Does it work now?
