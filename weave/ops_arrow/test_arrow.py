@@ -856,7 +856,7 @@ def test_arrow_vectorizer_number_ops(name, weave_func, expected_output):
 )
 def test_arrow_vectorizer_number_ops_tagged(name, weave_func, expected_output):
 
-    expected_value_type = weave.type_of(expected_output[0])
+    expected_value_type = types.maybe(weave.type_of(expected_output[0]))
 
     list = [1.0, 2.0, 3.0]
     for i, elem in enumerate(list):

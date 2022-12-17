@@ -1153,6 +1153,10 @@ def union(*members: Type) -> Type:
     return t
 
 
+def maybe(t: Type) -> Type:
+    return union(t, none_type)
+
+
 def is_list_like(t: Type) -> bool:
     return isinstance(non_none(t), List)
 
