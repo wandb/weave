@@ -682,7 +682,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             "self": ArrowWeaveListType(),
             "filter_fn": lambda input_types: types.Function(
                 {"row": input_types["self"].object_type, "index": types.Int()},
-                types.Boolean(),
+                types.Any(),
             ),
         },
         output_type=lambda input_types: input_types["self"],
@@ -887,7 +887,14 @@ def _apply_fn_node(awl: ArrowWeaveList, fn: graph.OutputNode):
         },
     )
 
-    return use(fn_res_node)
+    res = use(fn_res_node)
+
+    # Not all fn implementations are fully vectorized, so we need to handle the
+    # case where the result is a list of values
+    if isinstance(res ,list):
+        res = to_arrow(res)
+
+    return res
 
 
 def pushdown_list_tags(arr: ArrowWeaveList) -> ArrowWeaveList:
@@ -1251,7 +1258,7 @@ def to_arrow(obj, wb_type=None):
 
         # Convert to arrow, serializing Custom objects to the artifact
         mapper = mappers_arrow.map_to_arrow(object_type, artifact)
-        pyarrow_type = mapper.result_type()
+        pyarrow_type = arrow_util.arrow_type(mapper.result_type())
         py_objs = (mapper.apply(o) for o in obj)
 
         # TODO: do I need this branch? Does it work now?

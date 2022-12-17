@@ -123,6 +123,8 @@ class Dict(dict):
         output_type=lambda input_types: input_types["self"].object_type,
     )
     def pick(self, key):
+        if key == None:
+            return None
         if not isinstance(self, dict):
             # won't need this when we fix type-checking, but for now it
             # surfaces an error

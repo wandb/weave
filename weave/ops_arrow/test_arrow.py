@@ -125,7 +125,7 @@ def test_custom_types():
     )
     assert weave.use(data_node[0]["im"].width_()) == 256
 
-    assert weave.use(data_node.map(lambda row: row["im"].width_())) == [
+    assert weave.use(data_node.map(lambda row: row["im"].width_())).to_pylist() == [
         256,
         256,
     ]
@@ -145,7 +145,7 @@ def test_custom_types_tagged():
     )
 
     mapped_width_node = data_node.map(lambda row: row["im"].width_())
-    assert weave.use(mapped_width_node) == [
+    assert weave.use(mapped_width_node).to_pylist() == [
         256,
         256,
     ]
