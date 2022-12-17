@@ -1,3 +1,4 @@
+import typing
 import pytest
 from .. import api as weave
 from ..ops_arrow import list_ as arrow
@@ -8,11 +9,15 @@ def filter_fn(row) -> bool:
     return row < 3
 
 
+def optional_filter_fn(row) -> bool:
+    return row < 3
+
+
 def inv_filter_fn(row) -> bool:
     return row < -3
 
 
-# TODO: Test Tag managmenet
+# TODO: Test Tag management
 @pytest.mark.parametrize(
     "data, fn_name, fn_def, res, extra_args",
     [
@@ -37,6 +42,8 @@ def inv_filter_fn(row) -> bool:
             [],
         ),
         ([1, 2, 3, 4], "filter", filter_fn, [1, 2], []),
+        # Filter on Nones
+        ([1, None, 2, None, 3, None, 4], "filter", optional_filter_fn, [1, 2], []),
         ([1, 2, 3, 4], "filter", inv_filter_fn, [], []),
         (
             [1, 2, 3, 4],

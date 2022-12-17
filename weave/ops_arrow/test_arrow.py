@@ -116,6 +116,19 @@ def test_table_string_histogram():
     assert weave.use(node) == 3
 
 
+@pytest.mark.parametrize(
+    "data, expected_type",
+    [
+        ([1, 2, 3], types.Int()),
+        ([1, None, 3], types.union(types.Int(), types.NoneType())),
+    ],
+)
+def test_to_arrow(data, expected_type):
+    node = weave.save(arrow.to_arrow(data))
+    assert expected_type.assign_type(node.type.object_type)
+    assert weave.use(node).to_pylist() == data
+
+
 def test_custom_types():
     data_node = arrow.to_arrow(
         [

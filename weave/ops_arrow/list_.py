@@ -1247,7 +1247,7 @@ def to_arrow(obj, wb_type=None):
 
         # Convert to arrow, serializing Custom objects to the artifact
         mapper = mappers_arrow.map_to_arrow(object_type, artifact)
-        pyarrow_type = mapper.result_type()
+        pyarrow_type = arrow_util.arrow_type(mapper.result_type())
         py_objs = (mapper.apply(o) for o in obj)
 
         # TODO: do I need this branch? Does it work now?

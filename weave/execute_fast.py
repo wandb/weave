@@ -8,6 +8,7 @@ from . import errors
 from . import op_def
 from . import compile
 from . import engine_trace
+from . import language_nullability
 
 
 def _fast_apply_map_fn(item, index, map_fn):
@@ -17,6 +18,8 @@ def _fast_apply_map_fn(item, index, map_fn):
             for name, node in map_fn.from_op.inputs.items()
         }
         op_def = registry_mem.memory_registry.get_op(map_fn.from_op.name)
+        if language_nullability.should_force_none_result(inputs, op_def):
+            return None
         return op_def.resolve_fn(**inputs)
     elif isinstance(map_fn, graph.ConstNode):
         return map_fn.val

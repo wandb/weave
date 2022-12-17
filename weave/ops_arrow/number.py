@@ -6,8 +6,12 @@ from .. import weave_types as types
 from .list_ import ArrowWeaveList, ArrowWeaveListType
 
 
-ARROW_WEAVE_LIST_NUMBER_TYPE = ArrowWeaveListType(types.Number())
-ARROW_WEAVE_LIST_BOOLEAN_TYPE = ArrowWeaveListType(types.Boolean())
+ARROW_WEAVE_LIST_NUMBER_TYPE = ArrowWeaveListType(
+    types.union(types.Number(), types.NoneType())
+)
+ARROW_WEAVE_LIST_BOOLEAN_TYPE = ArrowWeaveListType(
+    types.union(types.Boolean(), types.NoneType())
+)
 
 # TODO: weirdly need to name this "<something>-add" since that's what the base
 # Number op does. But we'd like to get rid of that requirement so we don't
