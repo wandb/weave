@@ -10,7 +10,35 @@ from .. import weave_types as types
 from .list_ import ArrowWeaveList, ArrowWeaveListType
 
 
+# Note on input / output types:
+# It is critical that these functions support optional object types. Primarily
+# because they are often used in vectorized functions AND those vectorized functions
+# are typically operating on optional object types (think a column of numbers). However
+# some ops don't return the same dtype as the input (example: equal). It would be
+# ideal to say that the output type is optional IFF the input is optional. However, since
+# we don't have a way to do that, we just say that the output type is always optional.
+# TODO: Fixing the above would reduce the proliferation of optional types.
 ARROW_WEAVE_LIST_STRING_TYPE = ArrowWeaveListType(types.String())
+ARROW_WEAVE_LIST_MAYBE_STRING_TYPE = ArrowWeaveListType(types.optional(types.String()))
+ARROW_WEAVE_LIST_MAYBE_BOOLEAN_TYPE = ArrowWeaveListType(
+    types.optional(types.Boolean())
+)
+ARROW_WEAVE_LIST_MAYBE_INT_TYPE = ArrowWeaveListType(types.optional(types.Int()))
+ARROW_WEAVE_LIST_MAYBE_LIST_STR_TYPE = ArrowWeaveListType(
+    types.optional(types.List(types.String()))
+)
+ARROW_WEAVE_LIST_MAYBE_BOOLEAN_TYPE = ArrowWeaveListType(
+    types.optional(types.Boolean())
+)
+unary_input_type = {
+    "self": ARROW_WEAVE_LIST_MAYBE_STRING_TYPE,
+}
+binary_input_type = {
+    "self": ARROW_WEAVE_LIST_MAYBE_STRING_TYPE,
+    "other": types.UnionType(types.String(), ARROW_WEAVE_LIST_STRING_TYPE),
+}
+
+self_type_output_type_fn = lambda input_types: input_types["self"]
 
 
 def _concatenate_strings(
@@ -27,11 +55,8 @@ def _concatenate_strings(
 
 @arrow_op(
     name="ArrowWeaveListString-equal",
-    input_type={
-        "self": ARROW_WEAVE_LIST_STRING_TYPE,
-        "other": types.UnionType(types.String(), ARROW_WEAVE_LIST_STRING_TYPE),
-    },
-    output_type=ArrowWeaveListType(types.Boolean()),
+    input_type=binary_input_type,
+    output_type=ARROW_WEAVE_LIST_MAYBE_BOOLEAN_TYPE,
 )
 def __eq__(self, other):
     if isinstance(other, ArrowWeaveList):
@@ -43,11 +68,8 @@ def __eq__(self, other):
 
 @arrow_op(
     name="ArrowWeaveListString-notEqual",
-    input_type={
-        "self": ARROW_WEAVE_LIST_STRING_TYPE,
-        "other": types.UnionType(types.String(), ARROW_WEAVE_LIST_STRING_TYPE),
-    },
-    output_type=ArrowWeaveListType(types.Boolean()),
+    input_type=binary_input_type,
+    output_type=ARROW_WEAVE_LIST_MAYBE_BOOLEAN_TYPE,
 )
 def __ne__(self, other):
     if isinstance(other, ArrowWeaveList):
@@ -59,11 +81,8 @@ def __ne__(self, other):
 
 @arrow_op(
     name="ArrowWeaveListString-contains",
-    input_type={
-        "self": ARROW_WEAVE_LIST_STRING_TYPE,
-        "other": types.UnionType(types.String(), ARROW_WEAVE_LIST_STRING_TYPE),
-    },
-    output_type=ArrowWeaveListType(types.Boolean()),
+    input_type=binary_input_type,
+    output_type=ARROW_WEAVE_LIST_MAYBE_BOOLEAN_TYPE,
 )
 def __contains__(self, other):
     if isinstance(other, ArrowWeaveList):
@@ -83,11 +102,8 @@ def __contains__(self, other):
 # TODO: fix
 @arrow_op(
     name="ArrowWeaveListString-in",
-    input_type={
-        "self": ARROW_WEAVE_LIST_STRING_TYPE,
-        "other": types.UnionType(types.String(), ARROW_WEAVE_LIST_STRING_TYPE),
-    },
-    output_type=ArrowWeaveListType(types.Boolean()),
+    input_type=binary_input_type,
+    output_type=ARROW_WEAVE_LIST_MAYBE_BOOLEAN_TYPE,
 )
 def in_(self, other):
     if isinstance(other, ArrowWeaveList):
@@ -109,8 +125,8 @@ def in_(self, other):
 
 @arrow_op(
     name="ArrowWeaveListString-len",
-    input_type={"self": ARROW_WEAVE_LIST_STRING_TYPE},
-    output_type=ArrowWeaveListType(types.Int()),
+    input_type=unary_input_type,
+    output_type=ARROW_WEAVE_LIST_MAYBE_INT_TYPE,
 )
 def arrowweavelist_len(self):
     return ArrowWeaveList(
@@ -120,11 +136,8 @@ def arrowweavelist_len(self):
 
 @arrow_op(
     name="ArrowWeaveListString-add",
-    input_type={
-        "self": ARROW_WEAVE_LIST_STRING_TYPE,
-        "other": types.UnionType(types.String(), ARROW_WEAVE_LIST_STRING_TYPE),
-    },
-    output_type=ARROW_WEAVE_LIST_STRING_TYPE,
+    input_type=binary_input_type,
+    output_type=self_type_output_type_fn,
 )
 def __add__(self, other):
     return _concatenate_strings(self, other)
@@ -133,11 +146,8 @@ def __add__(self, other):
 # todo: remove this explicit name, it shouldn't be needed
 @arrow_op(
     name="ArrowWeaveListString-append",
-    input_type={
-        "self": ARROW_WEAVE_LIST_STRING_TYPE,
-        "other": types.UnionType(types.String(), ARROW_WEAVE_LIST_STRING_TYPE),
-    },
-    output_type=ARROW_WEAVE_LIST_STRING_TYPE,
+    input_type=binary_input_type,
+    output_type=self_type_output_type_fn,
 )
 def append(self, other):
     return _concatenate_strings(self, other)
@@ -145,11 +155,8 @@ def append(self, other):
 
 @arrow_op(
     name="ArrowWeaveListString-prepend",
-    input_type={
-        "self": ARROW_WEAVE_LIST_STRING_TYPE,
-        "other": types.UnionType(types.String(), ARROW_WEAVE_LIST_STRING_TYPE),
-    },
-    output_type=ARROW_WEAVE_LIST_STRING_TYPE,
+    input_type=binary_input_type,
+    output_type=self_type_output_type_fn,
 )
 def prepend(self, other):
     if isinstance(other, str):
@@ -162,10 +169,10 @@ def prepend(self, other):
 @arrow_op(
     name="ArrowWeaveListString-split",
     input_type={
-        "self": ARROW_WEAVE_LIST_STRING_TYPE,
+        "self": ARROW_WEAVE_LIST_MAYBE_STRING_TYPE,
         "pattern": types.UnionType(types.String(), ARROW_WEAVE_LIST_STRING_TYPE),
     },
-    output_type=ArrowWeaveListType(types.List(types.String())),
+    output_type=ARROW_WEAVE_LIST_MAYBE_LIST_STR_TYPE,
 )
 def split(self, pattern):
     if isinstance(pattern, str):
@@ -187,10 +194,10 @@ def split(self, pattern):
 @arrow_op(
     name="ArrowWeaveListString-partition",
     input_type={
-        "self": ARROW_WEAVE_LIST_STRING_TYPE,
+        "self": ARROW_WEAVE_LIST_MAYBE_STRING_TYPE,
         "sep": types.UnionType(types.String(), ARROW_WEAVE_LIST_STRING_TYPE),
     },
-    output_type=ArrowWeaveListType(types.List(types.String())),
+    output_type=ARROW_WEAVE_LIST_MAYBE_LIST_STR_TYPE,
 )
 def partition(self, sep):
     return ArrowWeaveList(
@@ -208,10 +215,10 @@ def partition(self, sep):
 @arrow_op(
     name="ArrowWeaveListString-startsWith",
     input_type={
-        "self": ARROW_WEAVE_LIST_STRING_TYPE,
+        "self": ARROW_WEAVE_LIST_MAYBE_STRING_TYPE,
         "prefix": types.UnionType(types.String(), ARROW_WEAVE_LIST_STRING_TYPE),
     },
-    output_type=ArrowWeaveListType(types.Boolean()),
+    output_type=ARROW_WEAVE_LIST_MAYBE_BOOLEAN_TYPE,
 )
 def startswith(self, prefix):
     if isinstance(prefix, str):
@@ -231,10 +238,10 @@ def startswith(self, prefix):
 @arrow_op(
     name="ArrowWeaveListString-endsWith",
     input_type={
-        "self": ARROW_WEAVE_LIST_STRING_TYPE,
+        "self": ARROW_WEAVE_LIST_MAYBE_STRING_TYPE,
         "suffix": types.UnionType(types.String(), ARROW_WEAVE_LIST_STRING_TYPE),
     },
-    output_type=ArrowWeaveListType(types.Boolean()),
+    output_type=ARROW_WEAVE_LIST_MAYBE_BOOLEAN_TYPE,
 )
 def endswith(self, suffix):
     if isinstance(suffix, str):
@@ -253,8 +260,8 @@ def endswith(self, suffix):
 
 @arrow_op(
     name="ArrowWeaveListString-isAlpha",
-    input_type={"self": ARROW_WEAVE_LIST_STRING_TYPE},
-    output_type=ArrowWeaveListType(types.Boolean()),
+    input_type=unary_input_type,
+    output_type=ARROW_WEAVE_LIST_MAYBE_BOOLEAN_TYPE,
 )
 def isalpha(self):
     return ArrowWeaveList(
@@ -264,8 +271,8 @@ def isalpha(self):
 
 @arrow_op(
     name="ArrowWeaveListString-isNumeric",
-    input_type={"self": ARROW_WEAVE_LIST_STRING_TYPE},
-    output_type=ArrowWeaveListType(types.Boolean()),
+    input_type=unary_input_type,
+    output_type=ARROW_WEAVE_LIST_MAYBE_BOOLEAN_TYPE,
 )
 def isnumeric(self):
     return ArrowWeaveList(
@@ -275,8 +282,8 @@ def isnumeric(self):
 
 @arrow_op(
     name="ArrowWeaveListString-isAlnum",
-    input_type={"self": ARROW_WEAVE_LIST_STRING_TYPE},
-    output_type=ArrowWeaveListType(types.Boolean()),
+    input_type=unary_input_type,
+    output_type=ARROW_WEAVE_LIST_MAYBE_BOOLEAN_TYPE,
 )
 def isalnum(self):
     return ArrowWeaveList(
@@ -286,7 +293,7 @@ def isalnum(self):
 
 @arrow_op(
     name="ArrowWeaveListString-lower",
-    input_type={"self": ARROW_WEAVE_LIST_STRING_TYPE},
+    input_type=unary_input_type,
     output_type=ArrowWeaveListType(types.String()),
 )
 def lower(self):
@@ -297,7 +304,7 @@ def lower(self):
 
 @arrow_op(
     name="ArrowWeaveListString-upper",
-    input_type={"self": ARROW_WEAVE_LIST_STRING_TYPE},
+    input_type=unary_input_type,
     output_type=ArrowWeaveListType(types.String()),
 )
 def upper(self):
@@ -309,11 +316,11 @@ def upper(self):
 @arrow_op(
     name="ArrowWeaveListString-slice",
     input_type={
-        "self": ARROW_WEAVE_LIST_STRING_TYPE,
+        "self": ARROW_WEAVE_LIST_MAYBE_STRING_TYPE,
         "begin": types.Int(),
         "end": types.Int(),
     },
-    output_type=ARROW_WEAVE_LIST_STRING_TYPE,
+    output_type=self_type_output_type_fn,
 )
 def slice(self, begin, end):
     return ArrowWeaveList(
@@ -326,11 +333,11 @@ def slice(self, begin, end):
 @arrow_op(
     name="ArrowWeaveListString-replace",
     input_type={
-        "self": ARROW_WEAVE_LIST_STRING_TYPE,
+        "self": ARROW_WEAVE_LIST_MAYBE_STRING_TYPE,
         "pattern": types.String(),
         "replacement": types.String(),
     },
-    output_type=ARROW_WEAVE_LIST_STRING_TYPE,
+    output_type=self_type_output_type_fn,
 )
 def replace(self, pattern, replacement):
     return ArrowWeaveList(

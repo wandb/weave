@@ -32,3 +32,9 @@ def arrow_field(name, type_):
             name, type_.type, nullable=type_.nullable, metadata=type_.metadata
         )
     return pa.field(name, type_)
+
+
+def arrow_type(type_):
+    if isinstance(type_, ArrowTypeWithFieldInfo):
+        return type_.type
+    return type_
