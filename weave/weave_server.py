@@ -146,6 +146,7 @@ def recursively_unwrap_unions(obj):
 def execute():
     """Execute endpoint used by WeaveJS."""
 
+    logging.info("Execute request: %s", request.json)
     current_span = tracer.current_span()
     if current_span and (
         os.getenv("WEAVE_SERVER_DD_LOG_REQUEST_BODY_JSON")

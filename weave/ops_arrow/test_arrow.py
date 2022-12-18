@@ -704,7 +704,11 @@ def test_arrow_vectorizer_string_scalar_tagged(name, weave_func, expected_output
     # check that tags are propagated
     assert weave.use(tag_getter_op(item_node)) == "test1"
 
-    assert arrow.ArrowWeaveListType(expected_type_obj_type).assign_type(called.type)
+    # NOTE: This optionality is needed because some arrow ops eagerly declare
+    # optional returns. See number.py and string.py for commentary on the subject.
+    assert arrow.ArrowWeaveListType(types.optional(expected_type_obj_type)).assign_type(
+        called.type
+    )
 
 
 string_alnum_test_cases = [
@@ -756,7 +760,9 @@ def test_arrow_vectorizer_string_alnum(name, weave_func, expected_output):
 )
 def test_arrow_vectorizer_string_alnum_tagged(name, weave_func, expected_output):
 
-    expected_value_type = weave.type_of(expected_output[0])
+    # NOTE: This optionality is needed because some arrow ops eagerly declare
+    # optional returns. See number.py and string.py for commentary on the subject.
+    expected_value_type = types.optional(weave.type_of(expected_output[0]))
 
     list = ["B22?c", "cd", "DF2", "212", "", "?>!@#"]
     for i, elem in enumerate(list):
@@ -924,7 +930,9 @@ def test_arrow_vectorizer_string_vector(name, weave_func, expected_output):
 )
 def test_arrow_vectorizer_string_vector_ops_tagged(name, weave_func, expected_output):
 
-    expected_value_type = weave.type_of(expected_output[0])
+    # NOTE: This optionality is needed because some arrow ops eagerly declare
+    # optional returns. See number.py and string.py for commentary on the subject.
+    expected_value_type = types.optional(weave.type_of(expected_output[0]))
 
     list = ["bc", "cd", "df"]
     for i, elem in enumerate(list):
