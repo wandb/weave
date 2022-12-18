@@ -4,6 +4,8 @@ import pathlib
 import time
 import traceback
 import sys
+import base64
+import zlib
 from flask import json
 from pythonjsonlogger import jsonlogger
 from werkzeug.exceptions import HTTPException
@@ -68,7 +70,9 @@ default_log_filename = pathlib.Path(f"/tmp/weave/log/{pid}.log")
 default_log_format = "[%(asctime)s] %(levelname)s in %(module)s (Thread Name: %(threadName)s): %(message)s"
 
 
-def enable_stream_logging(level=logging.DEBUG, enable_datadog=False):
+def enable_stream_logging(
+    level=logging.DEBUG, enable_datadog=False, mirror_to_file=False
+):
 
     log_format = (
         (
@@ -90,6 +94,13 @@ def enable_stream_logging(level=logging.DEBUG, enable_datadog=False):
         formatter = logging.Formatter(log_format)
     stream_handler.setFormatter(formatter)
     logger.addHandler(stream_handler)
+
+    # can be used in dev mode to send dev logs to datadog
+    if mirror_to_file:
+        file_handler = logging.FileHandler("/tmp/weave/log/server.log", mode="w")
+        file_handler.setLevel(level)
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
 
 
 static_folder = os.path.join(os.path.dirname(__file__), "frontend")
@@ -145,8 +156,14 @@ def recursively_unwrap_unions(obj):
 @blueprint.route("/__weave/execute", methods=["POST"])
 def execute():
     """Execute endpoint used by WeaveJS."""
+    req_bytes = request.data
+    req_compressed = zlib.compress(req_bytes)
+    req_b64 = base64.b64encode(req_compressed).decode("ascii")
+    logging.info(
+        "Execute request (zlib): %s",
+        req_b64,
+    )
 
-    logging.info("Execute request: %s", request.json)
     current_span = tracer.current_span()
     if current_span and (
         os.getenv("WEAVE_SERVER_DD_LOG_REQUEST_BODY_JSON")
