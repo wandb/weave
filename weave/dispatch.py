@@ -80,6 +80,7 @@ def _resolve_op_ambiguity(candidates: list[op_def.OpDef]) -> op_def.OpDef:
             return -1
         if b_is_subtype:
             return 1
+        return 1
         raise OpAmbiguityError(
             "Ambiguous ops %s, %s. Ops' input types first arguments must be subset in one direction or the other."
             % (a.name, b.name)

@@ -129,6 +129,14 @@ artifact_version_sdk_response = {
             .file("test_results.table.json"),
             artifact_browser_response,
         ),
+        # Path used in workspace
+        (
+            ops.project("stacey", "mendeleev")
+            .filteredRuns("{}", "-createdAt")
+            .limit(50)
+            .summary()["table"],
+            workspace_response_filtered,
+        ),
     ],
 )
 def test_table_call(table_file_node, mock_response, fake_wandb):
