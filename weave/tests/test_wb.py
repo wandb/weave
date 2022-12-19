@@ -108,40 +108,66 @@ artifact_version_sdk_response = {
 }
 
 
+def table_mock(q, ndx):
+    if ndx == 0:
+        return workspace_response
+    elif ndx == 1:
+        return artifact_version_sdk_response
+    elif ndx == 2:
+        return workspace_response
+
+
+def table_mock_filtered(q, ndx):
+    if ndx == 0:
+        return workspace_response_filtered
+    elif ndx == 1:
+        return artifact_version_sdk_response
+    elif ndx == 2:
+        return workspace_response_filtered
+
+
 @pytest.mark.parametrize(
-    "table_file_node, mock_response",
+    "table_file_node_fn, mock_response_fn",
     [
         # Path used in weave demos
         (
-            ops.project("stacey", "mendeleev")
+            lambda: ops.project("stacey", "mendeleev")
             .artifactType("test_results")
             .artifacts()[0]
             .versions()[0]
-            .file("test_results.table.json"),
-            file_path_response,
+            .file("test_results.table.json")
+            .table()
+            .rows(),
+            lambda q, ndx: file_path_response,
         ),
         # Path used in artifact browser
         (
-            ops.project("stacey", "mendeleev")
+            lambda: ops.project("stacey", "mendeleev")
             .artifact("test_res_1fwmcd3q")
             .membershipForAlias("v0")
             .artifactVersion()
-            .file("test_results.table.json"),
-            artifact_browser_response,
+            .file("test_results.table.json")
+            .table()
+            .rows(),
+            lambda q, ndx: artifact_browser_response,
         ),
         # Path used in workspace
         (
-            ops.project("stacey", "mendeleev")
+            lambda: ops.project("stacey", "mendeleev")
             .filteredRuns("{}", "-createdAt")
             .limit(50)
-            .summary()["table"],
-            workspace_response_filtered,
+            .summary()["table"]
+            .table()
+            .rows()
+            .concat(),
+            table_mock_filtered,
         ),
     ],
 )
-def test_table_call(table_file_node, mock_response, fake_wandb):
-    fake_wandb.add_mock(lambda q, ndx: mock_response)
-    table_image0_node = table_file_node.table().rows()[0]["image"]
+def test_table_call(table_file_node_fn, mock_response_fn, fake_wandb):
+    fake_wandb.add_mock(mock_response_fn)
+    table_file_node = table_file_node_fn()
+    table_image0_node = table_file_node[0]["image"]
     table_image0 = weave.use(table_image0_node)
     assert table_image0.height == 299
     assert table_image0.width == 299
@@ -203,15 +229,6 @@ def test_missing_file(fake_wandb):
         .file("does_not_exist")
     )
     assert weave.use(node) == None
-
-
-def table_mock(q, ndx):
-    if ndx == 0:
-        return workspace_response
-    elif ndx == 1:
-        return artifact_version_sdk_response
-    elif ndx == 2:
-        return workspace_response
 
 
 def test_legacy_run_file_table_format(fake_wandb):
@@ -296,15 +313,6 @@ def test_table_images(fake_wandb):
     # Query 2:
     table_rows_node = summary_node.pick("table").table().rows()
     assert len(weave.use(table_rows_node)) == 1
-
-
-def table_mock_filtered(q, ndx):
-    if ndx == 0:
-        return workspace_response_filtered
-    elif ndx == 1:
-        return artifact_version_sdk_response
-    elif ndx == 2:
-        return workspace_response_filtered
 
 
 def test_tag_run_color_lookup(fake_wandb):
