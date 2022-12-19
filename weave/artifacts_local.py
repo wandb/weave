@@ -34,30 +34,14 @@ def local_artifact_dir() -> str:
     return d
 
 
-@contextlib.contextmanager
-def chdir(to_dir: str):
-    curdir = os.getcwd()
-    os.chdir(to_dir)
-    try:
-        yield
-    finally:
-        os.chdir(curdir)
-
-
 @safe_cache.safe_lru_cache(1000)
 def get_wandb_read_artifact(path):
-    with chdir(wandb_artifact_dir()):
-        artifact = wandb_api.wandb_public_api().artifact(path)
-        # Can't download here, too expensive.
-        # artifact.download()
-    return artifact
+    return wandb_api.wandb_public_api().artifact(path)
 
 
 @safe_cache.safe_lru_cache(1000)
 def get_wandb_read_run(path):
-    with chdir(wandb_run_dir()):
-        run = wandb_api.wandb_public_api().run(path)
-    return run
+    return wandb_api.wandb_public_api().run(path)
 
 
 @safe_cache.safe_lru_cache(1000)
@@ -451,9 +435,9 @@ class WandbArtifact(Artifact):
                     found = True
             if found:
                 return os.path.join(self._saved_artifact._default_root(), name)
-        art_dir = wandb_artifact_dir()
-        with chdir(art_dir):
-            path = os.path.join(art_dir, self._saved_artifact.get_path(name).download())
+        path = self._saved_artifact.get_path(name).download(
+            os.path.join(wandb_artifact_dir(), "artifacts", self._saved_artifact.name)
+        )
         # python module loading does not support colons
         # TODO: This is an extremely expensive fix!
         path_safe = path.replace(":", "_")
