@@ -1,6 +1,8 @@
 import typing
 
 import logging
+import contextvars
+import contextlib
 
 from . import compile_domain
 from . import op_args
@@ -13,8 +15,6 @@ from . import stitch
 from . import compile_table
 from . import weave_internal
 from . import engine_trace
-from . import errors
-from . import environment
 from .language_features.tagging import tagged_value_type
 
 # These call_* functions must match the actual op implementations.
@@ -102,6 +102,13 @@ def _fixup_output_type(graph_type: types.Type, op_type: types.Type):
 
 def _dispatch_map_fn_refining(node: graph.Node) -> typing.Optional[graph.OutputNode]:
     if isinstance(node, graph.OutputNode):
+        if node.from_op.name == "gqlroot-wbgqlquery":
+            # the output type of the gqlroot-wbgqlquery op is Any. But the gql
+            # compile phase keeps the original type from the root node that was
+            # swapped in. We need that original type here so that downstream
+            # dispatch works. So just return the node in this case instead of
+            # dispatching.
+            return node
         node_inputs = node.from_op.inputs
         new_node = dispatch.dispatch_by_name_and_type(
             node.from_op.name, [], node_inputs
@@ -139,23 +146,41 @@ def _dispatch_map_fn_refining(node: graph.Node) -> typing.Optional[graph.OutputN
     return None
 
 
-def _dispatch_map_fn(node: graph.Node) -> typing.Optional[graph.OutputNode]:
+def _remove_optional(t: types.Type) -> types.Type:
+    if types.is_optional(t):
+        return types.non_none(t)
+    return t
+
+
+def _dispatch_map_fn_no_refine(node: graph.Node) -> typing.Optional[graph.OutputNode]:
     if isinstance(node, graph.OutputNode):
+        if node.from_op.name == "tag-indexCheckpoint":
+            # I'm seeing that there is no indexCheckpoint tag present
+            # on types that come from WeaveJS (at least by the time we call
+            # this op). Maybe a WeaveJS bug?
+            # TODO
+            return node
+        if node.from_op.name == "file-type":
+            # since we didn't refine, the input to file-type is not correct yet.
+            # if its in the graph, just trust that's what we want
+            # TODO: does this work for mapped case?
+            return node
         node_inputs = node.from_op.inputs
         op = dispatch.get_op_for_inputs(node.from_op.name, [], node_inputs)
-        # params = op.bind_params(node_inputs.values(), {})
         params = node_inputs
         if isinstance(op.input_type, op_args.OpNamedArgs):
             params = {
                 k: n for k, n in zip(op.input_type.arg_types, node_inputs.values())
             }
-        output_type = op.unrefined_output_type_for_params(params)
-        fixed_type = _fixup_output_type(node.type, output_type)
-        return graph.OutputNode(fixed_type, op.uri, params)
+
+        # Weave Python op types don't express that they can handle
+        # optional.
+        output_type = _remove_optional(node.type)
+        return graph.OutputNode(output_type, op.uri, params)
     return None
 
 
-def make_auto_op_map_fn(when_type: type[types.Type], call_op_fn):
+def _make_auto_op_map_fn(when_type: type[types.Type], call_op_fn):
     def fn(node: graph.Node) -> typing.Optional[graph.Node]:
         if isinstance(node, graph.OutputNode):
             node_inputs = node.from_op.inputs
@@ -205,12 +230,12 @@ def make_auto_op_map_fn(when_type: type[types.Type], call_op_fn):
     return fn
 
 
-_await_run_outputs_map_fn = make_auto_op_map_fn(types.RunType, _call_run_await)
+_await_run_outputs_map_fn = _make_auto_op_map_fn(types.RunType, _call_run_await)
 
-_execute_nodes_map_fn = make_auto_op_map_fn(types.Function, _call_execute)
+_execute_nodes_map_fn = _make_auto_op_map_fn(types.Function, _call_execute)
 
 
-def apply_column_pushdown(leaf_nodes: list[graph.Node]) -> list[graph.Node]:
+def _apply_column_pushdown(leaf_nodes: list[graph.Node]) -> list[graph.Node]:
     # This is specific to project-runs2 (not yet used in W&B production) for now. But it
     # is a general pattern that will work for all arrow tables.
     if not graph.filter_all_nodes(
@@ -241,41 +266,40 @@ def apply_column_pushdown(leaf_nodes: list[graph.Node]) -> list[graph.Node]:
     return graph.map_all_nodes(leaf_nodes, _replace_with_column_pushdown)
 
 
-def compile(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
-    """
-    This method is used to "compile" a list of nodes. Here we can add any
-    optimizations or graph rewrites
-    """
+def _compile(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
     tracer = engine_trace.tracer()
     logging.info("Starting compilation of graph with %s leaf nodes" % len(nodes))
 
     n = nodes
 
-    if environment.wandb_production():
-        # First try dispatch without refine. If that doesn't work, fallback to the refining
-        # version, and suffer a perf hit :(
-        # try:
-        #     with tracer.trace("compile:fast_dispatch"):
-        #         n = graph.map_all_nodes(n, _dispatch_map_fn)
-        # except errors.WeaveDispatchError:
-        #     logging.warning("Falling back to refine dispatch.")
-        #     with tracer.trace("compile:refining_dispatch"):
-        #         n = graph.map_all_nodes(n, _dispatch_map_fn_refining)
-        with tracer.trace("compile:refining_dispatch"):
-            n = graph.map_all_nodes(n, _dispatch_map_fn_refining)
-    else:
-        # when we're not in production, don't try to recover, we should fix these issues!
-        with tracer.trace("compile:fast_dispatch"):
-            n = graph.map_all_nodes(n, _dispatch_map_fn)
+    # If we're being called from WeaveJS, we need to use dispatch to determine
+    # which ops to use. Critically, this first phase does not actually refine
+    # op output types, so after this, the types in the graph are not yet correct.
+    with tracer.trace("compile:fix_calls"):
+        n = graph.map_all_nodes(n, _dispatch_map_fn_no_refine)
 
+    # Now that we have the correct calls, we can do our forward-looking pushdown
+    # optimizations. These do not depend on having correct types in the graph.
+    with tracer.trace("compile:gql"):
+        n = compile_domain.apply_domain_op_gql_translation(n)
+    with tracer.trace("compile:column_pushdown"):
+        n = _apply_column_pushdown(n)
+
+    # Auto-transforms, where we insert operations to convert between types
+    # as needed.
+    # TODO: is it ok to have this before final refine?
     with tracer.trace("compile:await"):
         n = graph.map_all_nodes(n, _await_run_outputs_map_fn)
     with tracer.trace("compile:execute"):
         n = graph.map_all_nodes(n, _execute_nodes_map_fn)
-    with tracer.trace("compile:gql"):
-        n = compile_domain.apply_domain_op_gql_translation(n)
-    with tracer.trace("compile:column_pushdown"):
-        n = apply_column_pushdown(n)
+
+    # Final refine, to ensure the graph types are exactly what Weave python
+    # produces. This phase can execute parts of the graph. It's very important
+    # that this is the final phase, so that when we execute the rest of the
+    # graph, we reuse any results produced in this phase, instead of re-executing
+    # those nodes.
+    with tracer.trace("compile:refine"):
+        n = graph.map_all_nodes(n, _dispatch_map_fn_refining)
 
     loggable_nodes = graph_debug.combine_common_nodes(n)
     logging.info(
@@ -284,3 +308,35 @@ def compile(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
     )
 
     return n
+
+
+_currently_compiling: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    "_current_compiling", default=False
+)
+
+
+def _is_compiling() -> bool:
+    return _currently_compiling.get()
+
+
+@contextlib.contextmanager
+def _compiling():
+    token = _currently_compiling.set(True)
+    try:
+        yield
+    finally:
+        _currently_compiling.reset(token)
+
+
+def compile(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
+    """
+    This method is used to "compile" a list of nodes. Here we can add any
+    optimizations or graph rewrites
+    """
+    # The refine phase may execute parts of the graph. Executing recursively
+    # calls compile. Use context to ensure we only compile the top level
+    # graph.
+    if _is_compiling():
+        return nodes
+    with _compiling():
+        return _compile(nodes)

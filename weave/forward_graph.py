@@ -37,11 +37,12 @@ class ForwardGraph:
     roots: set[ForwardNode]
     _node_to_forward_node: typing.Dict[graph.Node, ForwardNode]
 
-    def __init__(self, nodes: list[graph.Node], allow_var_nodes=False) -> None:
+    def __init__(self, allow_var_nodes=False) -> None:
         self.roots = set()
         self._node_to_forward_node = {}
         self._allow_var_nodes = allow_var_nodes
 
+    def add_nodes(self, nodes: typing.Iterable[graph.Node]):
         for node in nodes:
             self.add_node(node)
 

@@ -1346,6 +1346,8 @@ def awl_add_arrow_tags(
 def vectorized_input_types(input_types: dict[str, types.Type]) -> dict[str, types.Type]:
     prop_types: dict[str, types.Type] = {}
     for input_name, input_type in input_types.items():
+        if isinstance(input_type, types.Const):
+            input_type = input_type.val_type
         if isinstance(input_type, tagged_value_type.TaggedValueType) and (
             isinstance(input_type.value, ArrowWeaveListType)
             or types.is_list_like(input_type.value)

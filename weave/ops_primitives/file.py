@@ -36,6 +36,7 @@ def file_dir(file):
 #### TODO: Table does not belong here!
 
 
+@dataclasses.dataclass(frozen=True)
 class TableType(types.ObjectType):
     name = "table"
 

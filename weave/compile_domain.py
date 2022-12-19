@@ -53,7 +53,7 @@ def apply_domain_op_gql_translation(leaf_nodes: list[graph.Node]) -> list[graph.
             "gqlroot-wbgqlquery",
             {
                 "query_str": graph.ConstNode(types.String(), query_str),
-                "output_type": graph.ConstNode(types.Type(), node.type),
+                "output_type": graph.ConstNode(types.TypeType(), node.type),
             },
         )
 

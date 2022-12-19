@@ -90,9 +90,18 @@ def objects_refine_output_type(
     return types.List(types.RefType(of_type))
 
 
+def objects_output_type(input_type):
+    if not isinstance(input_type["of_type"], types.Const):
+        ref_obj_type = types.TypeType()
+    else:
+        ref_obj_type = input_type["of_type"].val
+
+    return types.List(types.RefType(ref_obj_type))
+
+
 @op(
     render_info={"type": "function"},
-    output_type=lambda input_type: types.List(input_type["of_type"]),
+    output_type=objects_output_type,
     refine_output_type=objects_refine_output_type,
     # Not impure now that we have the cache-busting timestamp arg
     # pure=False,

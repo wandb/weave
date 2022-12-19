@@ -953,7 +953,7 @@ def is_json_compatible(type_):
         return isinstance(type_, BasicType)
 
 
-def optional(type_):
+def optional(type_: Type) -> Type:
     return UnionType(none_type, type_)
 
 

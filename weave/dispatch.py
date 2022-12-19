@@ -192,6 +192,8 @@ def get_op_for_inputs(
     op_name: str, args: typing.Any, kwargs: typing.Any
 ) -> op_def.OpDef:
     ops = _get_ops_by_name(op_name)
+    if not ops:
+        raise errors.WeaveDispatchError('No ops found for name: "%s"' % op_name)
     return _choose_op_by_args(ops, args, kwargs)
 
 

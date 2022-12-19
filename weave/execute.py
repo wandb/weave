@@ -1,4 +1,6 @@
 import logging
+import contextlib
+import contextvars
 from collections.abc import Mapping
 import pprint
 import time
@@ -72,6 +74,25 @@ def is_panelplot_data_fetch_query(node: graph.Node) -> bool:
     return False
 
 
+_forward_graph: contextvars.ContextVar[
+    typing.Optional[forward_graph.ForwardGraph]
+] = contextvars.ContextVar("_current_compiling", default=None)
+
+
+@contextlib.contextmanager
+def _new_forward_graph():
+    fg = _forward_graph.get()
+    token = None
+    if fg is None:
+        fg = forward_graph.ForwardGraph()
+        token = _forward_graph.set(fg)
+    try:
+        yield fg
+    finally:
+        if token is not None:
+            _forward_graph.reset(token)
+
+
 def execute_nodes(nodes, no_cache=False):
     logging.info(
         "Executing %s leaf nodes.\n%s"
@@ -83,14 +104,18 @@ def execute_nodes(nodes, no_cache=False):
             ),
         )
     )
-    nodes = compile.compile(nodes)
+    with tag_store.isolated_tagging_context():
+        # Compile can recursively call execute_nodes during the final
+        # refine phase. We are careful in compile to ensure that the nodes that
+        # it executes in its final phase are the same nodes (by reference equality)
+        # that it returns. We share the forward graph with the compile phase, so that
+        # we don't need to expensively re-execute nodes that compile has already
+        # executed.
+        with _new_forward_graph() as fg:
+            nodes = compile.compile(nodes)
+        fg.add_nodes(nodes)
 
-    # context.execution_client ensures that recursive use calls are non-caching
-    # by default.
-    with context.execution_client():
-        with tag_store.isolated_tagging_context():
-            fg = forward_graph.ForwardGraph(nodes)
-
+        with context.execution_client():
             stats = execute_forward(fg, no_cache=no_cache)
             summary = stats.summary()
             logging.info("Execution summary\n%s" % pprint.pformat(summary))
@@ -197,8 +222,14 @@ def execute_forward_node(
     no_cache=False,
 ) -> NodeExecutionReport:
     node = forward_node.node
+    if fg.has_result(node):
+        # TODO: This is a different kind of cache (forward graph cache as
+        # opposed to artifact cache). We should probably denote the cache
+        # hit in a different way.
+        return {"cache_used": True}
 
-    if environment.no_cache():
+    cache_mode = environment.cache_mode()
+    if cache_mode == environment.CacheMode.MINIMAL:
         no_cache = True
         if node.from_op.name == "file-table":
             # Always cache file-table for now. file-table converts from the W&B json

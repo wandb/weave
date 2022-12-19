@@ -23,15 +23,16 @@ import pyarrow as pa
 
 from ... import box
 from ... import weave_types as types
+from ... import errors
 
 from collections import defaultdict
 
 # Private global objects used to store the tags for objects
 _OBJ_TAGS_MEM_MAP: contextvars.ContextVar[
-    defaultdict[
-        int, dict[int, dict[str, typing.Any]]
+    typing.Optional[
+        defaultdict[int, dict[int, dict[str, typing.Any]]]
     ]  # shape: {node_id: {obj_id: {tag_key: tag_value}}}
-] = contextvars.ContextVar("obj_tags_mem_map", default=defaultdict(dict))
+] = contextvars.ContextVar("obj_tags_mem_map", default=None)
 
 # Current node id for scoping tags
 _OBJ_TAGS_CURR_NODE_ID: contextvars.ContextVar[int] = contextvars.ContextVar(
@@ -39,16 +40,22 @@ _OBJ_TAGS_CURR_NODE_ID: contextvars.ContextVar[int] = contextvars.ContextVar(
 )
 
 # gets the current tag memory map for the current node
-def _current_obj_tag_mem_map() -> dict[int, dict[str, typing.Any]]:
-    return _OBJ_TAGS_MEM_MAP.get()[_OBJ_TAGS_CURR_NODE_ID.get()]
+def _current_obj_tag_mem_map() -> typing.Optional[dict[int, dict[str, typing.Any]]]:
+    node_tags = _OBJ_TAGS_MEM_MAP.get()
+    if node_tags is None:
+        return None
+    return node_tags[_OBJ_TAGS_CURR_NODE_ID.get()]
 
 
 # sets the current node with optionally merged in parent tags
 @contextmanager
 def set_curr_node(node_id: int, parent_node_ids: list[int]) -> typing.Iterator[None]:
+    node_tags = _OBJ_TAGS_MEM_MAP.get()
+    if node_tags is None:
+        raise errors.WeaveInternalError("No tag store context")
     token = _OBJ_TAGS_CURR_NODE_ID.set(node_id)
     for parent_id in parent_node_ids:
-        _OBJ_TAGS_MEM_MAP.get()[node_id].update(_OBJ_TAGS_MEM_MAP.get()[parent_id])
+        node_tags[node_id].update(node_tags[parent_id])
     try:
         yield None
     finally:
@@ -64,13 +71,19 @@ _VISITED_OBJ_IDS: contextvars.ContextVar[set[int]] = contextvars.ContextVar(
 # Callers can create an isolated tagging context by using this context manager
 # This is primarily used by the executor to prevent tags from leaking between
 # different executions. See execute.py for it's usage.
+# Only creates a new context for the top-level call in the stack. Re-entrant calls
+# will use the same context.
 @contextmanager
 def isolated_tagging_context() -> typing.Iterator[None]:
-    token = _OBJ_TAGS_MEM_MAP.set(defaultdict(dict))
+    created_context = False
+    if _OBJ_TAGS_MEM_MAP.get() is None:
+        created_context = True
+        token = _OBJ_TAGS_MEM_MAP.set(defaultdict(dict))
     try:
         yield None
     finally:
-        _OBJ_TAGS_MEM_MAP.reset(token)
+        if created_context:
+            _OBJ_TAGS_MEM_MAP.reset(token)
 
 
 # Callers can indicate that an object is being visited by using this context manager
@@ -90,11 +103,13 @@ def with_visited_obj(obj: typing.Any) -> typing.Iterator[None]:
 
 # Adds a dictionary of tags to an object
 def add_tags(obj: typing.Any, tags: dict[str, typing.Any]) -> typing.Any:
-
+    mem_map = _current_obj_tag_mem_map()
+    if mem_map is None:
+        raise errors.WeaveInternalError("No tag store context")
     id_val = id(obj)
     assert box.is_boxed(obj), "Can only tag boxed objects"
     existing_tags = get_tags(obj) if is_tagged(obj) else {}
-    _current_obj_tag_mem_map()[id_val] = {**existing_tags, **tags}
+    mem_map[id_val] = {**existing_tags, **tags}
     return obj
 
 
@@ -108,6 +123,8 @@ def get_tags(obj: typing.Any) -> dict[str, typing.Any]:
         raise ValueError("Cannot get tags for an object that is being visited")
 
     current_mem_map = _current_obj_tag_mem_map()
+    if current_mem_map is None:
+        return {}
     if id_val not in current_mem_map:
         raise ValueError("Object is not tagged")
     return current_mem_map[id_val]
@@ -135,5 +152,8 @@ def is_tagged(obj: typing.Any) -> bool:
     id_val = id(obj)
     if id_val in _VISITED_OBJ_IDS.get():
         return False
+    mem_map = _current_obj_tag_mem_map()
+    if mem_map is None:
+        return False
 
-    return id_val in _current_obj_tag_mem_map()
+    return id_val in mem_map
