@@ -106,13 +106,27 @@ def summary(run: wdt.Run) -> dict[str, typing.Any]:
 
 
 # Section 4/6: Direct Relationship Ops
-# None
+gql_direct_edge_op(
+    "run-user",
+    wdt.RunType,
+    "user",
+    wdt.UserType,
+)
 
 # Section 5/6: Connection Ops
 gql_connection_op(
     "run-usedArtifactVersions",
     wdt.RunType,
     "inputArtifacts",
+    wdt.ArtifactVersionType,
+    {},
+    lambda inputs: f"first: 50",
+)
+
+gql_connection_op(
+    "run-loggedArtifactVersions",
+    wdt.RunType,
+    "outputArtifacts",
     wdt.ArtifactVersionType,
     {},
     lambda inputs: f"first: 50",

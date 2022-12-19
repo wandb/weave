@@ -42,7 +42,7 @@ class FakePath:
     def __init__(self, path):
         self.path = path
 
-    def download(self):
+    def download(self, root=None):
         return self.path
 
 

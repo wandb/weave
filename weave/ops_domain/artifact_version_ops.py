@@ -30,6 +30,9 @@ from .. import uris
 # Section 3/6: Attribute Getters
 gql_prop_op("artifactVersion-id", wdt.ArtifactVersionType, "id", types.String())
 gql_prop_op("artifactVersion-digest", wdt.ArtifactVersionType, "digest", types.String())
+gql_prop_op(
+    "artifactVersion-hash", wdt.ArtifactVersionType, "commitHash", types.String()
+)
 gql_prop_op("artifactVersion-size", wdt.ArtifactVersionType, "size", types.Int())
 gql_prop_op(
     "artifactVersion-description", wdt.ArtifactVersionType, "description", types.Int()
