@@ -94,8 +94,6 @@ def fast_map_fn(input_list, map_fn):
     """Maps a weave function over an input list, without using engine."""
     # TODO: Perform this recursively in the main compile pass
     tracer = engine_trace.tracer()
-    with tracer.trace("fast_map:compile1"):
-        map_fn = compile.compile([map_fn])[0]
 
     if not _can_fast_map(map_fn):
         logging.warning("Cannot fast map, falling back to slow map for: %s", map_fn)

@@ -117,7 +117,6 @@ def stitch(
 def subgraph_stitch(
     function_node: graph.Node, args: dict[str, ObjectRecorder], sg: StitchedGraph
 ) -> ObjectRecorder:
-    function_node = compile.compile([function_node])[0]
     result_graph = stitch([function_node], args)
     sg.add_subgraph_stich_graph(result_graph)
     return result_graph.get_result(function_node)

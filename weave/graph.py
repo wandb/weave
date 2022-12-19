@@ -310,6 +310,10 @@ def _map_nodes(
         # preserve ref-equality
         if any(n is not inputs[k] for k, n in node.from_op.inputs.items()):
             result_node = OutputNode(node.type, node.from_op.name, inputs)
+    elif isinstance(node, ConstNode) and isinstance(node.type, weave_types.Function):
+        new_fn_node = _map_nodes(node.val, map_fn, already_mapped)
+        if new_fn_node is not node.val:
+            result_node = ConstNode(node.type, new_fn_node)
     mapped_node = map_fn(result_node)
     if mapped_node is None:
         mapped_node = result_node

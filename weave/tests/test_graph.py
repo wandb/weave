@@ -34,6 +34,18 @@ def test_map_dag_produces_same_len():
     assert graph.count(mapped_d) == 6
 
 
+def test_map_walks_lambdas():
+    l = weave.save([1, 2, 3])
+    node = l.map(lambda x: x + 1)
+    node_count = {"count": 0}
+
+    def _map_fn(node):
+        node_count["count"] += 1
+
+    graph.map_nodes(node, _map_fn)
+    assert node_count["count"] == 7
+
+
 def test_linearize():
     a = weave_internal.make_var_node(types.Int(), "a")
     dag = ((a + 1) * 2) + 3
