@@ -116,6 +116,19 @@ def test_table_string_histogram():
     assert weave.use(node) == 3
 
 
+def test_table_grouped_sort():
+    ref = create_arrow_data(1000)
+    node = (
+        weave.get(ref)
+        .groupby(lambda row: ops.dict_(rotate=row["rotate"]))
+        .sort(lambda row: row["shear"], ["asc"])
+        .groupby(lambda row: ops.dict_(row=row))
+        .map(lambda row: row.groupkey().merge(ops.dict_(count=row.count())))
+        .count()
+    )
+    assert weave.use(node) == 3
+
+
 def test_custom_types():
     data_node = arrow.to_arrow(
         [
