@@ -1,4 +1,4 @@
-wandb @ git+https://github.com/wandb/client.git@abcdd95c6d0eebf1376988b41d0e10f9ff9592d8
+wandb @ git+https://github.com/wandb/client.git@7fc20a2b8566017b7a5c7b73bb45a808d997597e
 ddtrace
 python-json-logger
 numpy

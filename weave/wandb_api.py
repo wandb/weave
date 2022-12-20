@@ -14,10 +14,6 @@ def wandb_public_api() -> public.Api:
     return public.Api()
 
 
-# If you want to test with your own cookie, set WEAVE_WANDB_COOKIE. This will
-# force the wandb client to use the provided cookie. Moreover, we will delete
-# the ~/.netrc file to avoid using the user's credentials and restore it after
-# the query is done.
 def wandb_gql_query(query_str, variables={}):
     return wandb_public_api().client.execute(
         public.gql(query_str),
