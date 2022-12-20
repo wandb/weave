@@ -58,3 +58,7 @@ class WeaveMissingArtifactPathError(WeaveBaseError):
 
 class WeaveVectorizationError(WeaveBaseError):
     pass
+
+
+class WeaveClientArtifactResolutionFailure(WeaveBaseError):
+    pass

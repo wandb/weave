@@ -130,6 +130,18 @@ def get_wandb_read_client_artifact(art_id: str):
     artifact_name = collection["name"]
     version = f"v{version_index}"
 
+    for var_name, var_val in [
+        ("entity_name", entity_name),
+        ("project_name", project_name),
+        ("artifact_type_name", artifact_type_name),
+        ("artifact_name", artifact_name),
+        ("version_index", version_index),
+    ]:
+        if var_val is None or var_val == "":
+            raise errors.WeaveClientArtifactResolutionFailure(
+                f"Failed to resolve {var_name} for {art_id}. Have {res}."
+            )
+
     weave_art_uri = uris.WeaveWBArtifactURI.from_parts(
         entity_name,
         project_name,
