@@ -387,6 +387,13 @@ class LocalArtifact(Artifact):
             os.rename(temp_path, link_name)
 
 
+def _copy_to_safe_path(path: str) -> str:
+    path_safe = path.replace(":", "_")
+    pathlib.Path(path_safe).parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(path, path_safe)
+    return path_safe
+
+
 class WandbArtifact(Artifact):
     def __init__(self, name, type=None, uri: uris.WeaveWBArtifactURI = None):
         self.name = name
@@ -440,21 +447,22 @@ class WandbArtifact(Artifact):
         if name in self._local_path:
             return self._local_path[name]
         if name not in self._saved_artifact.manifest.entries:
-            found = False
             for entry in self._saved_artifact.manifest.entries:
-                if entry.startswith(name):
-                    _path = self.path(entry)
-                    found = True
-            if found:
-                return os.path.join(self._saved_artifact._default_root(), name)
-        path = self._saved_artifact.get_path(name).download(
-            os.path.join(wandb_artifact_dir(), "artifacts", self._saved_artifact.name)
+                if entry.startswith(f"{name}.") and entry.endswith(".json"):
+                    return self.path(entry)
+        root_path = os.path.join(
+            wandb_artifact_dir(), "artifacts", self._saved_artifact.name
         )
+        expected_download_path = os.path.join(root_path, name)
+        if not os.path.exists(expected_download_path):
+            path = self._saved_artifact.get_path(name).download(root_path)
+            if path != expected_download_path:
+                raise errors.WeaveInternalError(
+                    f"Expected file to be downloaded to {expected_download_path} but it was downloaded to {path}"
+                )
         # python module loading does not support colons
         # TODO: This is an extremely expensive fix!
-        path_safe = path.replace(":", "_")
-        pathlib.Path(path_safe).parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(path, path_safe)
+        path_safe = _copy_to_safe_path(expected_download_path)
         self._local_path[name] = path_safe
         return path_safe
 
@@ -543,8 +551,6 @@ class WandbRunFilesProxyArtifact(Artifact):
         root = f"{wandb_run_dir()}/{self.name}"
         with self._run.file(name).download(root, replace=True) as fp:
             path = fp.name
-        path_safe = path.replace(":", "_")
-        pathlib.Path(path_safe).parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(path, path_safe)
+        path_safe = _copy_to_safe_path(path)
         self._local_path[name] = path_safe
         return path_safe
