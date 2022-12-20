@@ -534,6 +534,9 @@ class WandbRunFilesProxyArtifact(Artifact):
         self._run = get_wandb_read_run(self.name)
         self._local_path: dict[str, str] = {}
 
+    def is_saved(self) -> bool:
+        return True
+
     def path(self, name):
         if name in self._local_path:
             return self._local_path[name]

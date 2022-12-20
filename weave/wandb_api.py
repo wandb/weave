@@ -1,14 +1,23 @@
-import contextvars
 from wandb.apis import public
 from wandb.sdk.internal.internal_api import _thread_local_api_settings
-
+import os
 import typing
 
 
 def wandb_public_api() -> public.Api:
+    if "WEAVE_WANDB_COOKIE" in os.environ:
+        if os.path.exists(os.path.expanduser("~/.netrc")):
+            raise Exception("Please delete ~/.netrc to avoid using your credentials")
+        cookies = {"wandb": os.environ["WEAVE_WANDB_COOKIE"]}
+        headers = {"use-admin-privileges": "true", "x-origin": "https://app.wandb.test"}
+        set_wandb_thread_local_api_settings("<not_used>", cookies, headers)
     return public.Api()
 
 
+# If you want to test with your own cookie, set WEAVE_WANDB_COOKIE. This will
+# force the wandb client to use the provided cookie. Moreover, we will delete
+# the ~/.netrc file to avoid using the user's credentials and restore it after
+# the query is done.
 def wandb_gql_query(query_str, variables={}):
     return wandb_public_api().client.execute(
         public.gql(query_str),
