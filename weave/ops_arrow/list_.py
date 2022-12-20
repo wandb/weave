@@ -1227,9 +1227,11 @@ def vectorize(
         elif isinstance(node, graph.ConstNode):
             return node
 
-    weave_fn = graph.map_nodes(weave_fn, ensure_object_constructors_created)
-    weave_fn = graph.map_nodes(weave_fn, expand_nodes)
-    return graph.map_nodes(weave_fn, convert_node)
+    weave_fn = graph.map_nodes_top_level(
+        [weave_fn], ensure_object_constructors_created
+    )[0]
+    weave_fn = graph.map_nodes_top_level([weave_fn], expand_nodes)[0]
+    return graph.map_nodes_top_level([weave_fn], convert_node)[0]
 
 
 def dataframe_to_arrow(df):

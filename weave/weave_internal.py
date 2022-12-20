@@ -4,7 +4,6 @@ from . import weave_types as types
 from . import context_state
 from . import errors
 from . import client_interface
-from . import box
 
 
 def dereference_variables(node: graph.Node, var_values: graph.Frame) -> graph.Node:
@@ -13,8 +12,7 @@ def dereference_variables(node: graph.Node, var_values: graph.Frame) -> graph.No
             return var_values[n.name]
         return n
 
-    mapped = graph.map_nodes(node, map_fn)
-    return mapped
+    return graph.map_nodes_top_level([node], map_fn)[0]
 
 
 def call_fn(

@@ -25,7 +25,6 @@ import typing
 from . import graph
 from . import errors
 from . import registry_mem
-from . import compile
 from . import op_def
 from .language_features.tagging import opdef_util
 
@@ -109,7 +108,7 @@ def stitch(
             raise errors.WeaveInternalError("Unexpected node type")
         return node
 
-    graph.map_all_nodes(leaf_nodes, handle_node)
+    graph.map_nodes_top_level(leaf_nodes, handle_node)
 
     return sg
 

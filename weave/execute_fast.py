@@ -67,8 +67,8 @@ def _resolve_static_branches(map_fn):
 
 
 def _can_fast_map(map_fn):
-    async_op_nodes = graph.filter_nodes(
-        map_fn,
+    async_op_nodes = graph.filter_nodes_full(
+        [map_fn],
         lambda n: isinstance(n, graph.OutputNode)
         and registry_mem.memory_registry.get_op(n.from_op.name).is_async,
     )

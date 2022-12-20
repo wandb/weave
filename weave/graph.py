@@ -298,20 +298,25 @@ def _map_nodes(
     node: Node,
     map_fn: typing.Callable[[Node], typing.Optional[Node]],
     already_mapped: dict[Node, Node],
+    walk_lambdas: bool,
 ) -> Node:
     if node in already_mapped:
         return already_mapped[node]
     result_node = node
     if isinstance(node, OutputNode):
         inputs = {
-            k: _map_nodes(n, map_fn, already_mapped)
+            k: _map_nodes(n, map_fn, already_mapped, walk_lambdas)
             for k, n in node.from_op.inputs.items()
         }
         # preserve ref-equality
         if any(n is not inputs[k] for k, n in node.from_op.inputs.items()):
             result_node = OutputNode(node.type, node.from_op.name, inputs)
-    elif isinstance(node, ConstNode) and isinstance(node.type, weave_types.Function):
-        new_fn_node = _map_nodes(node.val, map_fn, already_mapped)
+    elif (
+        walk_lambdas
+        and isinstance(node, ConstNode)
+        and isinstance(node.type, weave_types.Function)
+    ):
+        new_fn_node = _map_nodes(node.val, map_fn, already_mapped, walk_lambdas)
         if new_fn_node is not node.val:
             result_node = ConstNode(node.type, new_fn_node)
     mapped_node = map_fn(result_node)
@@ -321,17 +326,62 @@ def _map_nodes(
     return mapped_node
 
 
-def map_nodes(
-    node: Node, map_fn: typing.Callable[[Node], typing.Optional[Node]]
-) -> Node:
-    return _map_nodes(node, map_fn, {})
-
-
-def map_all_nodes(
-    nodes: list[Node], map_fn: typing.Callable[[Node], typing.Optional[Node]]
+def map_nodes_top_level(
+    leaf_nodes: list[Node],
+    map_fn: typing.Callable[[Node], typing.Optional[Node]],
 ) -> list[Node]:
+    """Map nodes in dag represented by leaf nodes, but not sub-lambdas"""
     already_mapped: dict[Node, Node] = {}
-    return [_map_nodes(n, map_fn, already_mapped) for n in nodes]
+    return [_map_nodes(n, map_fn, already_mapped, False) for n in leaf_nodes]
+
+
+def map_nodes_full(
+    leaf_nodes: list[Node], map_fn: typing.Callable[[Node], typing.Optional[Node]]
+) -> list[Node]:
+    """Map nodes in dag represented by leaf nodes, including sub-lambdas"""
+    already_mapped: dict[Node, Node] = {}
+    return [_map_nodes(n, map_fn, already_mapped, True) for n in leaf_nodes]
+
+
+def filter_nodes_top_level(
+    nodes: list[Node], filter_fn: typing.Callable[[Node], bool]
+) -> list[Node]:
+    """Filter nodes in dag represented by leaf nodes, but not sub-lambdas"""
+    result = []
+
+    def mapped_fn(node: Node) -> Node:
+        if filter_fn(node):
+            result.append(node)
+        return node
+
+    map_nodes_top_level(nodes, mapped_fn)
+    return result
+
+
+def filter_nodes_full(
+    nodes: list[Node], filter_fn: typing.Callable[[Node], bool]
+) -> list[Node]:
+    """Filter nodes in dag represented by leaf nodes, including sub-lambdas"""
+    result = []
+
+    def mapped_fn(node: Node) -> Node:
+        if filter_fn(node):
+            result.append(node)
+        return node
+
+    map_nodes_full(nodes, mapped_fn)
+    return result
+
+
+def expr_vars(node: Node) -> list[VarNode]:
+    return typing.cast(
+        list[VarNode], filter_nodes_top_level([node], lambda n: isinstance(n, VarNode))
+    )
+
+
+def is_open(node: Node) -> bool:
+    """A Node is 'open' (as in open function) if there are one or more VarNodes"""
+    return len(filter_nodes_top_level([node], lambda n: isinstance(n, VarNode))) > 0
 
 
 def _all_nodes(node: Node) -> set[Node]:
@@ -341,36 +391,6 @@ def _all_nodes(node: Node) -> set[Node]:
     for input in node.from_op.inputs.values():
         res.update(_all_nodes(input))
     return res
-
-
-def filter_nodes(node: Node, filter_fn: typing.Callable[[Node], bool]) -> list[Node]:
-    nodes = _all_nodes(node)
-    return [n for n in nodes if filter_fn(n)]
-
-
-def filter_all_nodes(
-    nodes: list[Node], filter_fn: typing.Callable[[Node], bool]
-) -> list[Node]:
-    result = []
-
-    def mapped_fn(node: Node) -> Node:
-        if filter_fn(node):
-            result.append(node)
-        return node
-
-    map_all_nodes(nodes, mapped_fn)
-    return result
-
-
-def expr_vars(node: Node) -> list[VarNode]:
-    return typing.cast(
-        list[VarNode], filter_nodes(node, lambda n: isinstance(n, VarNode))
-    )
-
-
-def is_open(node: Node) -> bool:
-    """A Node is 'open' (as in open function) if there are one or more VarNodes"""
-    return len(filter_nodes(node, lambda n: isinstance(n, VarNode))) > 0
 
 
 def count(node: Node) -> int:
@@ -394,6 +414,6 @@ def linearize(node: Node) -> typing.Optional[list[OutputNode]]:
 
 
 def map_const_nodes_to_x(node: Node) -> Node:
-    return map_nodes(
-        node, lambda n: n if not isinstance(n, ConstNode) else VarNode(n.type, "x")
-    )
+    return map_nodes_full(
+        [node], lambda n: n if not isinstance(n, ConstNode) else VarNode(n.type, "x")
+    )[0]

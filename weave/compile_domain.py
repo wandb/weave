@@ -37,7 +37,7 @@ def wb_gql_op_plugin(
 # is made to the server. See the helper functions below for more details.
 def apply_domain_op_gql_translation(leaf_nodes: list[graph.Node]) -> list[graph.Node]:
     # Only apply this transformation at least one of the leaf nodes is a root node
-    if not graph.filter_all_nodes(leaf_nodes, _is_root_node):
+    if not graph.filter_nodes_full(leaf_nodes, _is_root_node):
         return leaf_nodes
     p = stitch.stitch(leaf_nodes)
 
@@ -57,7 +57,7 @@ def apply_domain_op_gql_translation(leaf_nodes: list[graph.Node]) -> list[graph.
             },
         )
 
-    return graph.map_all_nodes(leaf_nodes, _replace_with_merged_gql)
+    return graph.map_nodes_full(leaf_nodes, _replace_with_merged_gql)
 
 
 ### Everything below are helpers for the above function ###

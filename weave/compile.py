@@ -239,7 +239,7 @@ _execute_nodes_map_fn = _make_auto_op_map_fn(types.Function, _call_execute)
 def _apply_column_pushdown(leaf_nodes: list[graph.Node]) -> list[graph.Node]:
     # This is specific to project-runs2 (not yet used in W&B production) for now. But it
     # is a general pattern that will work for all arrow tables.
-    if not graph.filter_all_nodes(
+    if not graph.filter_nodes_full(
         leaf_nodes,
         lambda n: isinstance(n, graph.OutputNode) and n.from_op.name == "project-runs2",
     ):
@@ -264,7 +264,7 @@ def _apply_column_pushdown(leaf_nodes: list[graph.Node]) -> list[graph.Node]:
             )
         return node
 
-    return graph.map_all_nodes(leaf_nodes, _replace_with_column_pushdown)
+    return graph.map_nodes_full(leaf_nodes, _replace_with_column_pushdown)
 
 
 def _compile(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
@@ -277,7 +277,7 @@ def _compile(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
     # which ops to use. Critically, this first phase does not actually refine
     # op output types, so after this, the types in the graph are not yet correct.
     with tracer.trace("compile:fix_calls"):
-        n = graph.map_all_nodes(n, _dispatch_map_fn_no_refine)
+        n = graph.map_nodes_full(n, _dispatch_map_fn_no_refine)
 
     # Now that we have the correct calls, we can do our forward-looking pushdown
     # optimizations. These do not depend on having correct types in the graph.
@@ -290,9 +290,9 @@ def _compile(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
     # as needed.
     # TODO: is it ok to have this before final refine?
     with tracer.trace("compile:await"):
-        n = graph.map_all_nodes(n, _await_run_outputs_map_fn)
+        n = graph.map_nodes_full(n, _await_run_outputs_map_fn)
     with tracer.trace("compile:execute"):
-        n = graph.map_all_nodes(n, _execute_nodes_map_fn)
+        n = graph.map_nodes_full(n, _execute_nodes_map_fn)
 
     # Final refine, to ensure the graph types are exactly what Weave python
     # produces. This phase can execute parts of the graph. It's very important
@@ -300,7 +300,7 @@ def _compile(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
     # graph, we reuse any results produced in this phase, instead of re-executing
     # those nodes.
     with tracer.trace("compile:refine"):
-        n = graph.map_all_nodes(n, _dispatch_map_fn_refining)
+        n = graph.map_nodes_full(n, _dispatch_map_fn_refining)
 
     loggable_nodes = graph_debug.combine_common_nodes(n)
     logging.info(

@@ -75,6 +75,18 @@ def test_enter_filter():
     assert calls[1].inputs[1].val == "a"
 
 
+def test_tag_access_in_filter_expr():
+    objs_node = weave.save([_TestPlanObject("a", 1), _TestPlanObject("b", 2)])
+    leaf = objs_node.name().filter(lambda obj: get_object_self_tag(obj).val > 2)
+    p = stitch.stitch([leaf])
+    obj_recorder = p.get_result(objs_node)
+    calls = obj_recorder.calls
+    assert len(calls) == 2
+    assert calls[0].node.from_op.name == "mapped__TestPlanObject-name"
+    assert calls[1].node.from_op.name == "Object-__getattr__"
+    assert calls[1].inputs[1].val == "val"
+
+
 def test_travese_dict():
     obj_node = weave.save(_TestPlanObject("a", 1))
     p = stitch.stitch([weave.ops.dict_(x=obj_node)["x"].name()])

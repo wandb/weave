@@ -71,7 +71,7 @@ def convert_specific_ops_to_generic_ops_node(node: graph.Node) -> graph.Node:
         )
         return graph.OutputNode(node.type, name, inputs)
 
-    return graph.map_nodes(node, convert_specific_op_to_generic_op)
+    return graph.map_nodes_full([node], convert_specific_op_to_generic_op)[0]
 
 
 def convert_specific_ops_to_generic_ops_data(data):
@@ -100,7 +100,7 @@ def remove_opcall_versions_node(node: graph.Node) -> graph.Node:
             node.from_op.inputs,
         )
 
-    return graph.map_nodes(node, remove_op_version)
+    return graph.map_nodes_full([node], remove_op_version)[0]
 
 
 def remove_opcall_versions_data(data):

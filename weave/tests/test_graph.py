@@ -27,14 +27,14 @@ def test_map_dag_produces_same_len():
             return weave_internal.make_var_node(types.Int(), "b")
         return node
 
-    mapped_d = graph.map_nodes(d, replace_a)
+    mapped_d = graph.map_nodes_top_level([d], replace_a)[0]
     assert id(mapped_d.from_op.inputs["lhs"].from_op.inputs["lhs"]) == id(
         mapped_d.from_op.inputs["rhs"].from_op.inputs["lhs"]
     )
     assert graph.count(mapped_d) == 6
 
 
-def test_map_walks_lambdas():
+def test_map_nodes_toplevel_doesnt_walk_lambdas():
     l = weave.save([1, 2, 3])
     node = l.map(lambda x: x + 1)
     node_count = {"count": 0}
@@ -42,7 +42,19 @@ def test_map_walks_lambdas():
     def _map_fn(node):
         node_count["count"] += 1
 
-    graph.map_nodes(node, _map_fn)
+    graph.map_nodes_top_level([node], _map_fn)[0]
+    assert node_count["count"] == 4
+
+
+def test_map_nodes_full_walks_lambdas():
+    l = weave.save([1, 2, 3])
+    node = l.map(lambda x: x + 1)
+    node_count = {"count": 0}
+
+    def _map_fn(node):
+        node_count["count"] += 1
+
+    graph.map_nodes_full([node], _map_fn)[0]
     assert node_count["count"] == 7
 
 
@@ -75,5 +87,5 @@ def test_replace_node():
         if node is c:
             return c.from_op.inputs["lhs"] / 4
 
-    x = graph.map_nodes(d, replace_c)
+    x = graph.map_nodes_top_level([d], replace_c)[0]
     assert weave.use(x) == 6.75
