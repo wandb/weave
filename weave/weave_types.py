@@ -32,6 +32,8 @@ def js_to_py_typename(typename: str) -> str:
     # put the id type in the type system for now, and just hap it to string.
     if typename == "id":
         return "string"
+    if typename == "date":
+        return "timestamp"
     return typename
 
 
