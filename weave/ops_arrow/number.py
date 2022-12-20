@@ -1,4 +1,5 @@
 import pyarrow.compute as pc
+import pyarrow as pa
 
 from ..decorator_op import arrow_op, op
 from .. import weave_types as types
@@ -203,3 +204,23 @@ def floor(self):
 )
 def ceil(self):
     return ArrowWeaveList(pc.ceil(self._arrow_data), types.Number(), self._artifact)
+
+
+@arrow_op(
+    name="ArrowWeaveListNumber-toTimestamp",
+    input_type=unary_input_type,
+    output_type=ArrowWeaveListType(types.optional(types.Datetime())),
+)
+def to_timestamp(self):
+    # TODO: We may need to handle more conversion points similar to Weave0
+    timestamp_second_upper_bound = 60 * 60 * 24 * 365 * 1000
+    # first 1000 years
+    second_mask = pc.less(self._arrow_data, timestamp_second_upper_bound)
+    data = pc.replace_with_mask(
+        self._arrow_data, second_mask, pc.multiply(self._arrow_data, pa.scalar(1000.0))
+    )
+    return ArrowWeaveList(
+        data.cast("int64").cast(pa.timestamp("ms", tz="+00:00")),
+        types.Datetime(),
+        self._artifact,
+    )

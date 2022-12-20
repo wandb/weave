@@ -53,7 +53,7 @@ gql_prop_op(
     "run-createdAt",
     wdt.RunType,
     "createdAt",
-    wdt.DateType,
+    types.Datetime(),
 )
 
 

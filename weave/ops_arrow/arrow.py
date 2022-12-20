@@ -19,6 +19,8 @@ def arrow_type_to_weave_type(pa_type) -> types.Type:
         return types.Float()
     elif pa_type == pa.bool_():
         return types.Boolean()
+    elif pa.types.is_temporal(pa_type):
+        return types.Datetime()
     elif pa.types.is_list(pa_type):
         return types.List(arrow_type_to_weave_type(pa_type.value_field.type))
     elif pa.types.is_struct(pa_type):

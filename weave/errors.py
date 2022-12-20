@@ -60,5 +60,9 @@ class WeaveVectorizationError(WeaveBaseError):
     pass
 
 
+class WeaveValueError(WeaveBaseError):
+    pass
+
+
 class WeaveClientArtifactResolutionFailure(WeaveBaseError):
     pass

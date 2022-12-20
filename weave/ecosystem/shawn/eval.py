@@ -4,6 +4,7 @@ import random
 import threading
 import time
 import weave
+from weave.timestamp import tz_aware_dt
 
 
 @weave.type()
@@ -32,7 +33,8 @@ class EvalModel:
         return [
             p
             for p in res
-            if p.timestamp > start_datetime and p.timestamp < end_datetime
+            if p.timestamp > tz_aware_dt(start_datetime)
+            and p.timestamp < tz_aware_dt(end_datetime)
         ]
 
 

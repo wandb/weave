@@ -30,7 +30,7 @@ gql_prop_op(
     "artifactMembership-createdAt",
     wdt.ArtifactCollectionMembershipType,
     "createdAt",
-    wdt.DateType,
+    types.Datetime(),
 )
 
 # Section 4/6: Direct Relationship Ops

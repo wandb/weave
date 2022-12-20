@@ -1,3 +1,4 @@
+import datetime
 import pytest
 import itertools
 import hashlib
@@ -1533,3 +1534,61 @@ def test_arrow_index_var():
     data = arrow.to_arrow([1, 2, 3])
     result = data.map(lambda row, index: row + index)
     assert weave.use(result).to_pylist() == [1, 3, 5]
+
+
+class ListLikeNodeInterface:
+    @staticmethod
+    def make_node(value):
+        raise NotImplementedError
+
+    @staticmethod
+    def use_node(node):
+        raise NotImplementedError
+
+
+class ListNode(ListLikeNodeInterface):
+    @staticmethod
+    def make_node(value):
+        return list_.make_list(**{f"{i}": v for i, v, in enumerate(value)})
+
+    @staticmethod
+    def use_node(node):
+        return weave.use(node)
+
+
+class ArrowNode(ListLikeNodeInterface):
+    @staticmethod
+    def make_node(value):
+        return weave.save(arrow.to_arrow(value))
+
+    @staticmethod
+    def use_node(node):
+        return weave.use(node).to_pylist()
+
+
+ListInterfaces = [ListNode, ArrowNode]
+
+
+@pytest.mark.parametrize("li", ListInterfaces)
+def test_arrow_timestamp_conversion(li):
+    dates = [
+        datetime.datetime(2020, 1, 2, 3, 4, 5),
+        datetime.datetime(2020, 1, 2, 3, 4, 5, tzinfo=datetime.timezone.utc),
+    ]
+    utc_dates = [d.astimezone(datetime.timezone.utc) for d in dates]
+    timestamps = [d.timestamp() for d in utc_dates]
+
+    # Direct datetime type
+    data = li.make_node(dates)
+    if li == ArrowNode:
+        # Arrow converts to UTC on read out
+        assert li.use_node(data) == utc_dates
+    else:
+        assert li.use_node(data) == dates
+
+    # Basic Floats to datetime conversion
+    data = li.make_node(timestamps)
+    assert li.use_node(data) == timestamps
+
+    # We are always representing timestamps as UTC
+    assert li.use_node(data.toTimestamp()) == utc_dates

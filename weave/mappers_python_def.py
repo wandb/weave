@@ -3,6 +3,7 @@ import datetime
 import inspect
 import math
 
+
 from . import mappers
 from . import storage
 from . import refs
@@ -12,6 +13,7 @@ from . import errors
 from . import box
 from . import mappers_python
 from . import val_const
+from .timestamp import tz_aware_dt
 from .language_features.tagging import tagged_value_type
 
 
@@ -151,13 +153,13 @@ class StringToPyString(mappers.Mapper):
 
 class DatetimeToPyDatetime(mappers.Mapper):
     def apply(self, obj: datetime.datetime):
-        return int(obj.timestamp() * 1000)
+        return int(tz_aware_dt(obj).timestamp() * 1000)
         return obj.isoformat()
 
 
 class PyDatetimeToDatetime(mappers.Mapper):
     def apply(self, obj):
-        return datetime.datetime.fromtimestamp(obj / 1000)
+        return datetime.datetime.fromtimestamp(obj / 1000, tz=datetime.timezone.utc)
         return datetime.datetime.fromisoformat(obj)
 
 

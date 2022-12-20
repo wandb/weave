@@ -1,3 +1,4 @@
+import datetime
 import math
 from ..api import op, mutation, weave_class
 from .. import weave_types as types
@@ -171,6 +172,19 @@ class Number(object):
     )
     def sin(n):
         return math.sin(n)
+
+    @op(
+        name="number-toTimestamp",
+        input_type={"val": types.Number()},
+        output_type=types.Datetime(),
+    )
+    def to_timestamp(val):
+        # TODO: We may need to handle more conversion points similar to Weave0
+        timestamp_second_upper_bound = 60 * 60 * 24 * 365 * 1000
+        # first 1000 years
+        if val > timestamp_second_upper_bound:
+            val = val / 1000
+        return datetime.datetime.fromtimestamp(val, tz=datetime.timezone.utc)
 
 
 @op(

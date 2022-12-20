@@ -97,6 +97,11 @@ class BoolToArrowBool(mappers_python.BoolToPyBool):
         return pa.bool_()
 
 
+class DatetimeToArrowTimestamp(mappers_python.DatetimeToPyDatetime):
+    def result_type(self):
+        return pa.timestamp("ms", tz="+00:00")
+
+
 class FloatToArrowFloat(mappers.Mapper):
     def result_type(self):
         return pa.float64()
@@ -189,6 +194,8 @@ class DefaultToArrow(mappers_python.DefaultToPy):
         ):
             # Ref type
             return pa.string()
+        elif self.type.name == "timestamp":
+            return pa.timestamp("ms", tz="+00:00")
         elif self.type.name == "type":
             return pa.string()
 
@@ -235,6 +242,8 @@ def map_to_arrow_(type, mapper, artifact, path=[]):
         return FloatToArrowFloat(type, mapper, artifact, path)
     elif isinstance(type, types.String):
         return StringToArrowString(type, mapper, artifact, path)
+    elif isinstance(type, types.Datetime):
+        return DatetimeToArrowTimestamp(type, mapper, artifact, path)
     elif isinstance(type, types.Function):
         return FunctionToArrowFunction(type, mapper, artifact, path)
     elif isinstance(type, types.NoneType):
@@ -264,6 +273,8 @@ def map_from_arrow_(type, mapper, artifact, path=[]):
         return ArrowFloatToFloat(type, mapper, artifact, path)
     elif isinstance(type, types.String):
         return mappers_python.StringToPyString(type, mapper, artifact, path)
+    elif isinstance(type, types.Datetime):
+        return mappers_python.PyDatetimeToDatetime(type, mapper, artifact, path)
     elif isinstance(type, types.Function):
         return ArrowFunctionToFunction(type, mapper, artifact, path)
     elif isinstance(type, types.NoneType):

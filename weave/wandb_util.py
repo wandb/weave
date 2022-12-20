@@ -84,10 +84,7 @@ def _convert_type(old_type: wandb_data_types_dtypes.Type) -> types.Type:
     # Domain Types
     #
     elif isinstance(old_type, wandb_data_types_dtypes.TimestampType):
-        # TODO: Fix this circular import
-        from .ops_domain import wb_domain_types
-
-        return wb_domain_types.Date.WeaveType()  # type: ignore
+        return types.Datetime()
     elif isinstance(old_type, wandb_data_types_dtypes.NDArrayType):
         # returning None here since the data is serialized as a none. The actual data is stored
         # in the artifact at the path specified in `old_type._params["serialization_path"]`. In Weave0

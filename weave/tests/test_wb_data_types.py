@@ -90,7 +90,7 @@ def make_molecule():
         #
         # Domain Types
         #
-        (datetime.datetime.now(), wb_domain_types.Date.WeaveType()),  # type: ignore
+        (datetime.datetime.now(), types.Datetime()),  # type: ignore
         # See comment in wandb_util.py - this may change in the future
         (np.array([1, 2, 3]), types.NoneType()),
         #

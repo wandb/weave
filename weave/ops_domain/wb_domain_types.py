@@ -257,15 +257,6 @@ ArtifactAliasType = typing.cast(types.Type, ArtifactAliasType)
 # Simple types (maybe should be put into primitives?)
 
 
-@weave_type("date", True)
-class Date:
-    datetime_value: datetime.datetime
-
-
-DateType = Date.WeaveType()  # type: ignore
-DateType = typing.cast(types.Type, DateType)
-
-
 @weave_type("link", True)
 class Link:
     name: str

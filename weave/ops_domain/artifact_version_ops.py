@@ -38,7 +38,7 @@ gql_prop_op(
     "artifactVersion-description", wdt.ArtifactVersionType, "description", types.Int()
 )
 gql_prop_op(
-    "artifactVersion-createdAt", wdt.ArtifactVersionType, "createdAt", wdt.DateType
+    "artifactVersion-createdAt", wdt.ArtifactVersionType, "createdAt", types.Datetime()
 )
 
 

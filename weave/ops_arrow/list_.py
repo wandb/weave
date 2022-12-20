@@ -217,9 +217,10 @@ def _object_type_prop_types(object_type):
 
 
 def _object_type_is_basic(object_type):
+    if isinstance(object_type, types.Const):
+        object_type = object_type.val_type
     return isinstance(object_type, types.BasicType) or (
-        isinstance(object_type, types.Const)
-        and isinstance(object_type.val_type, types.BasicType)
+        isinstance(object_type, types.Datetime)
     )
 
 

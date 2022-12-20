@@ -1,6 +1,7 @@
 import datetime
 import weave
 from . import eval
+from weave.timestamp import tz_aware_dt
 
 
 def test_data():
@@ -24,4 +25,9 @@ def test_data():
             datetime.datetime(2022, 10, 8, 10, 40),
         )
     )
+
+    # The weave system will always return tz-aware datetimes, so we need to
+    # convert the expected values to be tz-aware as well.
+    pred2.timestamp = tz_aware_dt(pred2.timestamp)
+    pred3.timestamp = tz_aware_dt(pred3.timestamp)
     assert res == [pred2, pred3]
