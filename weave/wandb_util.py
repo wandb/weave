@@ -60,7 +60,7 @@ def _convert_type(old_type: wandb_data_types_dtypes.Type) -> types.Type:
     # Special Types
     #
     elif isinstance(old_type, wandb_data_types_dtypes.UnionType):
-        return types.UnionType(
+        return types.union(
             *(_convert_type(old_type) for old_type in old_type.params["allowed_types"])
         )
     elif isinstance(old_type, wandb_data_types_dtypes.ConstType):
