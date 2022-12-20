@@ -64,16 +64,22 @@ class Number(object):
 
     @op(
         name="number-equal",
-        input_type={"lhs": types.Number(), "rhs": types.Number()},
-        output_type=types.Boolean(),
+        input_type={
+            "lhs": types.optional(types.Number()),
+            "rhs": types.optional(types.Number()),
+        },
+        output_type=types.optional(types.Boolean()),
     )
     def __eq__(lhs, rhs):
         return lhs == rhs
 
     @op(
         name="number-notEqual",
-        input_type={"lhs": types.Number(), "rhs": types.Number()},
-        output_type=types.Boolean(),
+        input_type={
+            "lhs": types.optional(types.Number()),
+            "rhs": types.optional(types.Number()),
+        },
+        output_type=types.optional(types.Boolean()),
     )
     def __ne__(lhs, rhs):
         return lhs != rhs

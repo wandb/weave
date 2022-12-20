@@ -964,7 +964,7 @@ def is_optional(type_: Type) -> bool:
         return is_optional(type_.val_type)
 
     if isinstance(type_, TaggedValueType):
-        return is_optional(type_.tag)
+        return is_optional(type_.value)
 
     return isinstance(type_, UnionType) and any(
         (m.assign_type(none_type) or none_type.assign_type(m)) for m in type_.members

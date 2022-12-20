@@ -15,6 +15,7 @@ from . import stitch
 from . import compile_table
 from . import weave_internal
 from . import engine_trace
+from . import errors
 from .language_features.tagging import tagged_value_type
 
 # These call_* functions must match the actual op implementations.

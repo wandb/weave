@@ -27,11 +27,11 @@ class String:
         return val
 
     @op(name="string-equal")
-    def __eq__(lhs: str, rhs: str) -> bool:  # type: ignore[misc]
+    def __eq__(lhs: typing.Optional[str], rhs: typing.Optional[str]) -> typing.Optional[bool]:  # type: ignore[misc]
         return lhs == rhs
 
     @op(name="string-notEqual")
-    def __ne__(lhs: str, rhs: str) -> bool:  # type: ignore[misc]
+    def __ne__(lhs: typing.Optional[str], rhs: typing.Optional[str]) -> typing.Optional[bool]:  # type: ignore[misc]
         return lhs != rhs
 
     @op(name="string-contains")

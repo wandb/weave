@@ -146,6 +146,8 @@ class MappedDeriveOpHandler(DeriveOpHandler):
                 # Remove the nulls from the inner type
                 if types.is_optional(replacement):
                     replacement = types.non_none(replacement)
+                if isinstance(replacement, types.NoneType):
+                    return types.List(types.NoneType())
 
                 # This is a special circumstance (aka "God Mode") where we are
                 # inferring when an external caller is trying to weaveify this
@@ -286,6 +288,8 @@ def _mapped_refine_output_type(orig_op):
 
         def mapped_refine_output_type_refiner(*args, **kwargs):
             union_members = mapped_refine_op.raw_resolve_fn(*args, **kwargs)
+            if not union_members:
+                return types.List(types.NoneType())
             return types.List(
                 types.union(
                     *[types.NoneType() if mem == None else mem for mem in union_members]

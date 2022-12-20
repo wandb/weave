@@ -35,7 +35,9 @@ unary_input_type = {
 }
 binary_input_type = {
     "self": ARROW_WEAVE_LIST_MAYBE_STRING_TYPE,
-    "other": types.UnionType(types.String(), ARROW_WEAVE_LIST_STRING_TYPE),
+    "other": types.UnionType(
+        types.optional(types.String()), ARROW_WEAVE_LIST_MAYBE_STRING_TYPE
+    ),
 }
 
 self_type_output_type_fn = lambda input_types: input_types["self"]
