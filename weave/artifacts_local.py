@@ -152,20 +152,12 @@ def get_wandb_read_client_artifact(art_id: str):
     return WandbArtifact(artifact_name, artifact_type_name, weave_art_uri)
 
 
-def wandb_artifact_dir():
-    # Make this a subdir of local_artifact_dir, since the server
-    # checks for local_artifact_dir to see if it should serve
-    d = os.path.join(local_artifact_dir(), "_wandb_artifacts")
-    os.makedirs(d, exist_ok=True)
-    return d
-
-
 @contextlib.contextmanager
 def isolated_download_and_atomic_mover(
     end_path: str,
 ) -> typing.Generator[typing.Tuple[str, typing.Callable[[str], None]], None, None]:
     rand_part = "".join(random.choice("0123456789ABCDEF") for _ in range(16))
-    tmp_dir = os.path.join(wandb_artifact_dir(), f"tmp_{rand_part}")
+    tmp_dir = os.path.join(local_artifact_dir(), f"tmp_{rand_part}")
     os.makedirs(tmp_dir, exist_ok=True)
 
     def mover(tmp_path: str):
@@ -180,6 +172,14 @@ def isolated_download_and_atomic_mover(
         yield tmp_dir, mover
     finally:
         shutil.rmtree(tmp_dir)
+
+
+def wandb_artifact_dir():
+    # Make this a subdir of local_artifact_dir, since the server
+    # checks for local_artifact_dir to see if it should serve
+    d = os.path.join(local_artifact_dir(), "_wandb_artifacts")
+    os.makedirs(d, exist_ok=True)
+    return d
 
 
 def wandb_run_dir():
