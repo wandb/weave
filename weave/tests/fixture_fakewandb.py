@@ -43,6 +43,11 @@ class FakePath:
         self.path = path
 
     def download(self, root=None):
+        # copy file to root
+        if root is not None:
+            os.makedirs(root, exist_ok=True)
+            shutil.copy2(self.path, root)
+            return os.path.join(root, os.path.basename(self.path))
         return self.path
 
 
