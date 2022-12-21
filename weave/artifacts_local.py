@@ -3,6 +3,7 @@ import functools
 import hashlib
 import os
 import json
+import random
 import shutil
 from datetime import datetime
 import pathlib
@@ -433,6 +434,10 @@ class WandbArtifact(Artifact):
     def get_other_version(self, version):
         raise NotImplementedError()
 
+    # @contextlib.contextmanager
+    # def isolated_dir(self, path):
+    # TODO: add the new stuff here and use in run files
+
     def path(self, name):
         # TODO: this is not thread safe if used with a shared filesystem, maybe we should use a local tmp dir?
         if not self._saved_artifact:
@@ -440,23 +445,48 @@ class WandbArtifact(Artifact):
         if name in self._local_path:
             return self._local_path[name]
         if name not in self._saved_artifact.manifest.entries:
-            found = False
             for entry in self._saved_artifact.manifest.entries:
-                if entry.startswith(name):
-                    _path = self.path(entry)
-                    found = True
-            if found:
-                return os.path.join(self._saved_artifact._default_root(), name)
-        path = self._saved_artifact.get_path(name).download(
-            os.path.join(wandb_artifact_dir(), "artifacts", self._saved_artifact.name)
+                if entry.startswith(name + ".") and entry.endswith(".json"):
+                    self._local_path[name] = self.path(entry)
+                    return self._local_path[name]
+
+        # Step 1: Create a temporary directory we can use as the root when downloading this file:
+        rand_part = "".join(random.choice("0123456789ABCDEF") for _ in range(16))
+        tmp_dir = os.path.join(wandb_artifact_dir(), f"tmp_{rand_part}")
+        os.makedirs(tmp_dir, exist_ok=True)
+
+        # Step 2: Download the file to the temporary directory:
+        downloaded_file_path = self._saved_artifact.get_path(name).download(tmp_dir)
+
+        # Step 3: Generate the permanent path for this file:
+        # Here, we include the ID as names might not be unique across all entities/projects
+        # it would be nice to use entity/project name, but that is not available in the artifact
+        # when constructed from ID (todo: update wandb sdk to support this)
+        static_root = os.path.join(
+            wandb_artifact_dir(),
+            "artifacts",
+            f"{self._saved_artifact.name}_{self._saved_artifact.id}",
         )
+        static_file_path = os.path.join(static_root, name)
+
+        # Step 4: Make is safe for loading as a python module:
         # python module loading does not support colons
         # TODO: This is an extremely expensive fix!
-        path_safe = path.replace(":", "_")
-        pathlib.Path(path_safe).parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(path, path_safe)
-        self._local_path[name] = path_safe
-        return path_safe
+        static_file_path = static_file_path.replace(":", "_")
+        pathlib.Path(static_file_path).parent.mkdir(parents=True, exist_ok=True)
+
+        # Step 5: Move the file to the permanent path using atomic operations:
+        # This uses the same technique as WB artifacts
+        try:
+            os.replace(downloaded_file_path, static_file_path)
+        except AttributeError:
+            os.rename(downloaded_file_path, static_file_path)
+
+        # Step 6: Cleanup the temporary directory:
+        os.rmdir(tmp_dir)
+
+        self._local_path[name] = static_file_path
+        return static_file_path
 
     @property
     def location(self):
