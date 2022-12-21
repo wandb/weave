@@ -582,7 +582,7 @@ class WandbRunFilesProxyArtifact(Artifact):
         if name in self._local_path:
             return self._local_path[name]
 
-        static_file_path = os.path.join(wandb_run_dir(), str(self.storage_id), name)
+        static_file_path = os.path.join(wandb_run_dir(), str(self.name), name)
         # Next, check if another process has already downloaded this file:
         if os.path.exists(static_file_path):
             self._local_path[name] = static_file_path
