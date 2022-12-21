@@ -52,6 +52,7 @@ class FakeVersion:
     _sequence_name = "test_res_1fwmcd3q"
     version = "v0"
     name = "test_res_1fwmcd3q:v0"
+    id = "1234567890"
 
     manifest = FakeManifest()
 
