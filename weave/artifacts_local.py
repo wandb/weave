@@ -153,7 +153,7 @@ def get_wandb_read_client_artifact(art_id: str):
 
 
 @contextlib.contextmanager
-def isolated_download_and_atomic_mover(
+def _isolated_download_and_atomic_mover(
     end_path: str,
 ) -> typing.Generator[typing.Tuple[str, typing.Callable[[str], None]], None, None]:
     rand_part = "".join(random.choice("0123456789ABCDEF") for _ in range(16))
@@ -491,7 +491,7 @@ class WandbArtifact(Artifact):
             return static_file_path
 
         # Finally, download the file in an isolated directory:
-        with isolated_download_and_atomic_mover(static_file_path) as (tmp_dir, mover):
+        with _isolated_download_and_atomic_mover(static_file_path) as (tmp_dir, mover):
             downloaded_file_path = self._saved_artifact.get_path(name).download(tmp_dir)
             mover(downloaded_file_path)
 
@@ -589,7 +589,7 @@ class WandbRunFilesProxyArtifact(Artifact):
             return static_file_path
 
         # Finally, download the file in an isolated directory:
-        with isolated_download_and_atomic_mover(static_file_path) as (tmp_dir, mover):
+        with _isolated_download_and_atomic_mover(static_file_path) as (tmp_dir, mover):
             with self._run.file(name).download(tmp_dir, replace=True) as fp:
                 downloaded_file_path = fp.name
             mover(downloaded_file_path)
