@@ -43,6 +43,11 @@ class FakePath:
         self.path = path
 
     def download(self, root=None):
+        # copy file to root
+        if root is not None:
+            os.makedirs(root, exist_ok=True)
+            shutil.copy2(self.path, root)
+            return os.path.join(root, os.path.basename(self.path))
         return self.path
 
 
@@ -52,6 +57,7 @@ class FakeVersion:
     _sequence_name = "test_res_1fwmcd3q"
     version = "v0"
     name = "test_res_1fwmcd3q:v0"
+    id = "1234567890"
 
     manifest = FakeManifest()
 
