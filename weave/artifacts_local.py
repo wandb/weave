@@ -160,6 +160,28 @@ def wandb_artifact_dir():
     return d
 
 
+@contextlib.contextmanager
+def isolated_download_and_atomic_mover(
+    end_path: str,
+) -> typing.Generator[typing.Tuple[str, typing.Callable[[str], None]], None, None]:
+    rand_part = "".join(random.choice("0123456789ABCDEF") for _ in range(16))
+    tmp_dir = os.path.join(wandb_artifact_dir(), f"tmp_{rand_part}")
+    os.makedirs(tmp_dir, exist_ok=True)
+
+    def mover(tmp_path: str):
+        # This uses the same technique as WB artifacts
+        pathlib.Path(end_path).parent.mkdir(parents=True, exist_ok=True)
+        try:
+            os.replace(tmp_path, end_path)
+        except AttributeError:
+            os.rename(tmp_path, end_path)
+
+    try:
+        yield tmp_dir, mover
+    finally:
+        shutil.rmtree(tmp_dir)
+
+
 def wandb_run_dir():
     d = os.path.join(local_artifact_dir(), "_wandb_runs")
     os.makedirs(d, exist_ok=True)
@@ -434,56 +456,44 @@ class WandbArtifact(Artifact):
     def get_other_version(self, version):
         raise NotImplementedError()
 
-    # @contextlib.contextmanager
-    # def isolated_dir(self, path):
-    # TODO: add the new stuff here and use in run files
-
     def path(self, name):
-        # TODO: this is not thread safe if used with a shared filesystem, maybe we should use a local tmp dir?
         if not self._saved_artifact:
             raise errors.WeaveInternalError("cannot download of an unsaved artifact")
+
+        # First, check if we already downloaded this file:
         if name in self._local_path:
             return self._local_path[name]
+
+        # Next, we special case when the user is looking for a file
+        # without the .[type].json extension. This is used for tables.
         if name not in self._saved_artifact.manifest.entries:
             for entry in self._saved_artifact.manifest.entries:
                 if entry.startswith(name + ".") and entry.endswith(".json"):
                     self._local_path[name] = self.path(entry)
                     return self._local_path[name]
 
-        # Step 1: Create a temporary directory we can use as the root when downloading this file:
-        rand_part = "".join(random.choice("0123456789ABCDEF") for _ in range(16))
-        tmp_dir = os.path.join(wandb_artifact_dir(), f"tmp_{rand_part}")
-        os.makedirs(tmp_dir, exist_ok=True)
-
-        # Step 2: Download the file to the temporary directory:
-        downloaded_file_path = self._saved_artifact.get_path(name).download(tmp_dir)
-
-        # Step 3: Generate the permanent path for this file:
+        # Generate the permanent path for this file:
         # Here, we include the ID as names might not be unique across all entities/projects
         # it would be nice to use entity/project name, but that is not available in the artifact
         # when constructed from ID (todo: update wandb sdk to support this)
-        static_root = os.path.join(
+        # python module loading does not support colons
+        # TODO: This is an extremely expensive fix!
+        static_file_path = os.path.join(
             wandb_artifact_dir(),
             "artifacts",
             f"{self._saved_artifact.name}_{self._saved_artifact.id}",
-        )
-        static_file_path = os.path.join(static_root, name)
+            name,
+        ).replace(":", "_")
 
-        # Step 4: Make is safe for loading as a python module:
-        # python module loading does not support colons
-        # TODO: This is an extremely expensive fix!
-        static_file_path = static_file_path.replace(":", "_")
-        pathlib.Path(static_file_path).parent.mkdir(parents=True, exist_ok=True)
+        # Next, check if another process has already downloaded this file:
+        if os.path.exists(static_file_path):
+            self._local_path[name] = static_file_path
+            return static_file_path
 
-        # Step 5: Move the file to the permanent path using atomic operations:
-        # This uses the same technique as WB artifacts
-        try:
-            os.replace(downloaded_file_path, static_file_path)
-        except AttributeError:
-            os.rename(downloaded_file_path, static_file_path)
-
-        # Step 6: Cleanup the temporary directory:
-        os.rmdir(tmp_dir)
+        # Finally, download the file in an isolated directory:
+        with isolated_download_and_atomic_mover(static_file_path) as (tmp_dir, mover):
+            downloaded_file_path = self._saved_artifact.get_path(name).download(tmp_dir)
+            mover(downloaded_file_path)
 
         self._local_path[name] = static_file_path
         return static_file_path
@@ -568,13 +578,21 @@ class WandbRunFilesProxyArtifact(Artifact):
         return True
 
     def path(self, name):
+        # First, check if we already downloaded this file:
         if name in self._local_path:
             return self._local_path[name]
-        root = f"{wandb_run_dir()}/{self.name}"
-        with self._run.file(name).download(root, replace=True) as fp:
-            path = fp.name
-        path_safe = path.replace(":", "_")
-        pathlib.Path(path_safe).parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(path, path_safe)
-        self._local_path[name] = path_safe
-        return path_safe
+
+        static_file_path = os.path.join(wandb_run_dir(), str(self.storage_id), name)
+        # Next, check if another process has already downloaded this file:
+        if os.path.exists(static_file_path):
+            self._local_path[name] = static_file_path
+            return static_file_path
+
+        # Finally, download the file in an isolated directory:
+        with isolated_download_and_atomic_mover(static_file_path) as (tmp_dir, mover):
+            with self._run.file(name).download(tmp_dir, replace=True) as fp:
+                downloaded_file_path = fp.name
+            mover(downloaded_file_path)
+
+        self._local_path[name] = static_file_path
+        return static_file_path
