@@ -52,7 +52,17 @@ def test_merge_through_tags():
         ),
     )
     r = types.merge_types(t, t2)
-    correct_type = types.UnionType(t, t2)
+    correct_type = TaggedValueType(
+        types.TypedDict(property_types={"tag": types.Number()}),
+        types.TypedDict(
+            property_types={
+                "a": types.String(),
+                "b": types.UnionType(types.Number(), types.String()),
+                "c": types.UnionType(types.String(), types.NoneType()),
+                "d": types.UnionType(types.NoneType(), types.String()),
+            }
+        ),
+    )
     assert correct_type.assign_type(r)
     assert r.assign_type(correct_type)
 

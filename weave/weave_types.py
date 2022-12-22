@@ -11,6 +11,7 @@ from . import errors
 from . import mappers_python
 from .timestamp import tz_aware_dt
 
+
 if typing.TYPE_CHECKING:
     from .refs import Ref
     from .artifacts_local import Artifact
@@ -611,6 +612,9 @@ class UnionType(Type):
     def __hash__(self):
         return hash((hash(mem) for mem in self.members))
 
+    def is_simple_nullable(self):
+        return len(set(self.members)) == 2 and none_type in set(self.members)
+
     # def instance_to_py(self, obj):
     #     # Figure out which union member this obj is, and delegate to that
     #     # type.
@@ -1126,6 +1130,8 @@ def merge_types(a: Type, b: Type) -> Type:
     a less specific type when merging TypedDicts for example, to keep
     the type size smaller.
     """
+    from .language_features.tagging import tagged_value_type
+
     if a == b:
         return a
     if (
@@ -1135,6 +1141,12 @@ def merge_types(a: Type, b: Type) -> Type:
         and isinstance(b, Float)
     ):
         return Float()
+    if isinstance(a, tagged_value_type.TaggedValueType) and isinstance(
+        b, tagged_value_type.TaggedValueType
+    ):
+        merged_tag_type: TypedDict = typing.cast(TypedDict, merge_types(a.tag, b.tag))
+        merged_value_type: Type = merge_types(a.value, b.value)
+        return tagged_value_type.TaggedValueType(merged_tag_type, merged_value_type)
     if isinstance(a, TypedDict) and isinstance(b, TypedDict):
         all_keys_dict = {}
         for k in a.property_types.keys():
@@ -1162,7 +1174,7 @@ def union(*members: Type) -> Type:
 
 
 def is_list_like(t: Type) -> bool:
-    return isinstance(non_none(t), List)
+    return List().assign_type(non_none(t))
 
 
 def is_custom_type(t: Type) -> bool:

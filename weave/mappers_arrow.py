@@ -2,6 +2,7 @@ import json
 import pyarrow as pa
 import typing
 
+from . import box
 from . import mappers
 from . import mappers_python_def as mappers_python
 from . import mappers_weave
@@ -10,7 +11,7 @@ from . import weave_types as types
 from . import refs
 from . import errors
 from . import node_ref
-from .language_features.tagging import tagged_value_type
+from .language_features.tagging import tagged_value_type, tag_store
 
 
 class TypedDictToArrowStruct(mappers_python.TypedDictToPyDict):
@@ -54,12 +55,6 @@ class UnionToArrowUnion(mappers_weave.UnionMapper):
             m for m in self._member_mappers if not isinstance(m.type, types.NoneType)
         ]
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        if len(self.non_none_members) != 1:
-            raise errors.WeaveInternalError("Unions not yet supported in Weave arrow")
-        self._member_mapper = self.non_none_members[0]
-
     def result_type(self):
         nullable = False
         non_null_mappers: typing.List[mappers.Mapper] = []
@@ -69,22 +64,51 @@ class UnionToArrowUnion(mappers_weave.UnionMapper):
             else:
                 non_null_mappers.append(member_mapper)
         if not nullable or len(non_null_mappers) > 1:
-            raise errors.WeaveInternalError(
-                "full union handling not yet implement in mappers_arrow. Type: %s"
-                % self.type
-            )
+            fields = [
+                pa.field(
+                    f"{non_null_mappers[i].type.name}_{i}",
+                    non_null_mappers[i].result_type(),
+                    nullable,
+                )
+                for i in range(len(non_null_mappers))
+            ]
+            return pa.union(fields, mode="sparse")
         return arrow_util.arrow_type_with_nullable(non_null_mappers[0].result_type())
 
+    def type_code_of_type(self, type: types.Type) -> int:
+        """Return the arrow type code for the given type."""
+        for i, member_mapper in enumerate(self._member_mappers):
+            if member_mapper.type.assign_type(type) and type.assign_type(
+                member_mapper.type
+            ):
+                return i
+        raise errors.WeaveTypeError(f"Could not find type for {type}")
+
+    def type_code_of_obj(self, obj) -> int:
+        """Return the arrow type code for the given object."""
+        obj_type = types.TypeRegistry.type_of(obj)
+        return self.type_code_of_type(obj_type)
+
     def apply(self, obj):
-        if len(self.non_none_members) != 1:
-            raise errors.WeaveInternalError("Unions not yet supported in Weave arrow")
-        if obj is None:
-            return None
-        return self._member_mapper.apply(obj)
+        obj_type = types.TypeRegistry.type_of(obj)
+        for member_mapper in self._member_mappers:
+            if member_mapper.type.assign_type(obj_type):
+                return member_mapper.apply(obj)
+        raise errors.WeaveTypeError(f"Could not find type for {obj}")
 
 
 class ArrowUnionToUnion(UnionToArrowUnion):
-    pass
+    def apply(self, obj):
+        if self.is_single_object_nullable:
+            if obj is None:
+                return None
+            for mapper in self._member_mappers:
+                if not isinstance(mapper.type, types.NoneType):
+                    return mapper.apply(obj)
+        if not isinstance(obj, pa.UnionScalar):
+            raise errors.WeaveTypeError(f"Expected UnionScalar, got {type(obj)}: {obj}")
+        mapper = self._member_mappers[obj.type_code]
+        return mapper.apply(obj.as_py())
 
 
 class IntToArrowInt(mappers_python.IntToPyInt):
@@ -287,3 +311,58 @@ def map_from_arrow_(type, mapper, artifact, path=[]):
 
 map_to_arrow = mappers.make_mapper(map_to_arrow_)
 map_from_arrow = mappers.make_mapper(map_from_arrow_)
+
+
+def map_from_arrow_scalar(value: pa.Scalar, type_: types.Type, artifact):
+    if isinstance(type_, types.Const):
+        return map_from_arrow_scalar(value, type_.val, artifact)
+    if isinstance(type_, (types.Number, types.String, types.Boolean, types.NoneType)):
+        return value.as_py()
+    elif isinstance(type_, types.List):
+        return [map_from_arrow_scalar(v, type_.object_type, artifact) for v in value]
+    elif isinstance(type_, tagged_value_type.TaggedValueType):
+        val = box.box(map_from_arrow_scalar(value["_value"], type_.value, artifact))
+        tag = map_from_arrow_scalar(value["_tag"], type_.tag, artifact)
+        return tag_store.add_tags(val, tag)
+    elif isinstance(type_, types.TypedDict):
+        return {
+            k: map_from_arrow_scalar(value[k], type_.property_types[k], artifact)
+            for k in type_.property_types
+        }
+    elif isinstance(type_, types.ObjectType):
+        return type_.instance_class(  # type: ignore
+            **map_from_arrow_scalar(
+                value, types.TypedDict(type_.property_types()), artifact
+            ),
+        )
+    elif isinstance(type_, types.UnionType):
+        if type_.is_simple_nullable():
+            if pa.compute.is_null(value).as_py():
+                return None
+            return map_from_arrow_scalar(value, types.non_none(type_), artifact)
+        else:
+            # we have a real union type
+            type_code = value.type_code
+            current_type = type_.members[type_code]
+            return map_from_arrow_scalar(value.value, current_type, artifact)
+    elif isinstance(type_, types.Function):
+        obj: str = value.as_py()
+        ref = refs.Ref.from_str(obj)
+        return node_ref.ref_to_node(ref)
+    else:
+        # default
+        obj = value.as_py()
+        if isinstance(obj, dict):
+            return type_.instance_from_dict(obj)
+        # else its a ref string
+        # TODO: this does not use self.artifact, can we just drop it?
+        # Do we need the type so we can load here? No...
+        if ":" in obj:
+            ref = refs.Ref.from_str(obj)
+            # Note: we are forcing type here, because we already know it
+            # We don't save the types for every file in a remote artifact!
+            # But you can still reference them, because you have to get that
+            # file through an op, and therefore we know the type?
+            ref._type = type_
+            return ref.get()
+        return refs.LocalArtifactRef.from_local_ref(artifact, obj, type_).get()

@@ -570,45 +570,6 @@ def test_arrow_nullable_concat():
     assert weave.use(result)._arrow_data.to_pylist() == [1, 2, 3, 4, 2, 3, 4, 5]
 
 
-def test_arrow_concat_arrow_weave_list():
-
-    # test concatenating two arrow weave lists that contain chunked arrays of the same type
-    ca1 = pa.chunked_array([[1, 2], [3, 4]])
-    ca2 = pa.compute.add(ca1, 1)
-    awl1 = arrow.ArrowWeaveList(ca1)
-    awl2 = arrow.ArrowWeaveList(ca2)
-    result = awl1.concatenate(awl2)
-
-    assert result._arrow_data.chunks == ca1.chunks + ca2.chunks
-
-    # test concatenating two arrow weave lists that contain tables of the same type
-    t1 = pa.table([[1, 2], [3, 4]], names=["col1", "col2"])
-    t2 = pa.table([[2, 3], [4, 5]], names=["col1", "col2"])
-    awl1 = arrow.ArrowWeaveList(t1)
-    awl2 = arrow.ArrowWeaveList(t2)
-    result = awl1.concatenate(awl2)
-
-    assert result._arrow_data == pa.concat_tables([t1, t2])
-
-    # test concatenating two arrow weave lists that contain chunked arrays of different types
-    ca1 = pa.chunked_array([[1, 2], [3, 4]])
-    ca2 = pa.chunked_array([["b", "c"], ["e", "d"]])
-    awl1 = arrow.ArrowWeaveList(ca1)
-    awl2 = arrow.ArrowWeaveList(ca2)
-
-    with pytest.raises(ValueError):
-        awl1.concatenate(awl2)
-
-    # test concatenating two arrow weave lists that contain tables of different types
-    t1 = pa.table([[1, 2], [3, 4]], names=["col1", "col2"])
-    t2 = pa.table([["b", "c"], ["e", "d"]], names=["col1", "col2"])
-    awl1 = arrow.ArrowWeaveList(t1)
-    awl2 = arrow.ArrowWeaveList(t2)
-
-    with pytest.raises(ValueError):
-        awl1.concatenate(awl2)
-
-
 def test_arrow_weave_list_groupby_struct_type_table():
 
     table = pa.Table.from_pylist(
@@ -1565,6 +1526,248 @@ def test_arrow_index_var():
     data = arrow.to_arrow([1, 2, 3])
     result = data.map(lambda row, index: row + index)
     assert weave.use(result).to_pylist() == [1, 3, 5]
+
+
+def test_concat_multiple_table_types():
+    datal = weave.save(
+        arrow.to_arrow([{"prompt": "a"}, {"prompt": None}, {"prompt": "b"}])
+    )
+    datar = weave.save(
+        arrow.to_arrow(
+            [
+                {"prompt": None, "generation_prompt": "a"},
+                {"prompt": "d", "generation_prompt": None},
+                {"prompt": "e", "generation_prompt": "f"},
+            ]
+        )
+    )
+
+    to_concat = ops.make_list(l=datal, r=datar)
+    result = arrow.concat(to_concat)
+
+    assert result.type == arrow.ArrowWeaveListType(
+        object_type=types.TypedDict(
+            property_types={
+                "prompt": types.UnionType(types.String(), types.NoneType()),
+                "generation_prompt": types.UnionType(types.String(), types.NoneType()),
+            }
+        )
+    )
+
+    result = weave.use(result)
+
+    assert result.to_pylist_notags() == [
+        {"prompt": "a", "generation_prompt": None},
+        {"prompt": None, "generation_prompt": None},
+        {"prompt": "b", "generation_prompt": None},
+        {"prompt": None, "generation_prompt": "a"},
+        {"prompt": "d", "generation_prompt": None},
+        {"prompt": "e", "generation_prompt": "f"},
+    ]
+
+
+def test_concat_multiple_table_types_tagged():
+    raw_datal = [{"prompt": "a"}, {"prompt": None}, {"prompt": "b"}]
+    raw_datar = [
+        {"prompt": None, "generation_prompt": "a"},
+        {"prompt": "d", "generation_prompt": None},
+        {"prompt": "e", "generation_prompt": "f"},
+    ]
+
+    tagged_datal = tag_store.add_tags(box.box(raw_datal), {"tag": "datal"})
+    tagged_datar = tag_store.add_tags(box.box(raw_datar), {"tag": "datar"})
+
+    datal = weave.save(arrow.to_arrow(tagged_datal))
+    datar = weave.save(arrow.to_arrow(tagged_datar))
+
+    to_concat = ops.make_list(l=datal, r=datar)
+    result = arrow.concat(to_concat)
+
+    expected = arrow.ArrowWeaveListType(
+        object_type=tagged_value_type.TaggedValueType(
+            types.TypedDict({"tag": types.String()}),
+            types.TypedDict(
+                property_types={
+                    "prompt": types.UnionType(types.String(), types.NoneType()),
+                    "generation_prompt": types.UnionType(
+                        types.String(), types.NoneType()
+                    ),
+                }
+            ),
+        )
+    )
+
+    assert result.type == expected
+
+    result = weave.use(result)
+    assert result.to_pylist_notags() == [
+        {"prompt": "a", "generation_prompt": None},
+        {"prompt": None, "generation_prompt": None},
+        {"prompt": "b", "generation_prompt": None},
+        {"prompt": None, "generation_prompt": "a"},
+        {"prompt": "d", "generation_prompt": None},
+        {"prompt": "e", "generation_prompt": "f"},
+    ]
+
+
+def test_arrow_union_int_string():
+    data = [1, "a", 2]
+    result = weave.save(arrow.to_arrow(data))
+    assert result.type == arrow.ArrowWeaveListType(
+        object_type=types.UnionType(types.Int(), types.String())
+    )
+
+    assert weave.use(result).to_pylist() == data
+
+
+def test_arrow_union_int_string_custom_type():
+    data = [1, "a", 2, Point2(1, 2)]
+    result = weave.save(arrow.to_arrow(data))
+    assert result.type == arrow.ArrowWeaveListType(
+        object_type=types.UnionType(types.Int(), types.String(), Point2.WeaveType())
+    )
+
+    awl = weave.use(result)
+    assert [awl._index(i) for i in range(len(data))] == data
+
+
+def test_arrow_union_two_struct_types_as_single_struct_type():
+    data = [{"a": 1}, {"b": 2, "a": 1}, {"b": 3}]
+    result = weave.save(arrow.to_arrow(data))
+    assert result.type == arrow.ArrowWeaveListType(
+        object_type=types.TypedDict(
+            {
+                "a": types.UnionType(types.Int(), types.NoneType()),
+                "b": types.UnionType(types.Int(), types.NoneType()),
+            }
+        )
+    )
+
+    awl = weave.use(result)
+    assert awl.to_pylist_notags() == [
+        {"a": 1, "b": None},
+        {"b": 2, "a": 1},
+        {"b": 3, "a": None},
+    ]
+
+
+def test_arrow_concat_nested_union():
+
+    raw_datal = [{"b": 1}]
+    raw_datar = [{"b": "c"}]
+
+    datal = weave.save(arrow.to_arrow(raw_datal))
+    datar = weave.save(arrow.to_arrow(raw_datar))
+
+    to_concat = ops.make_list(l=datal, r=datar)
+    result = arrow.concat(to_concat)
+
+    expected = arrow.ArrowWeaveListType(
+        object_type=types.TypedDict(
+            property_types={
+                "b": types.UnionType(types.String(), types.Int()),
+            }
+        ),
+    )
+
+    assert result.type == expected
+
+    result = weave.use(result)
+    assert result.to_pylist_notags() == [
+        {"b": 1},
+        {"b": "c"},
+    ]
+
+
+def test_arrow_concat_nested_union_with_optional_type():
+
+    raw_datal = [{"b": 1}]
+    raw_datar = [{"b": "c", "c": 3.3}]
+
+    datal = weave.save(arrow.to_arrow(raw_datal))
+    datar = weave.save(arrow.to_arrow(raw_datar))
+
+    to_concat = ops.make_list(l=datal, r=datar)
+    result = arrow.concat(to_concat)
+
+    expected = arrow.ArrowWeaveListType(
+        object_type=types.TypedDict(
+            property_types={
+                "b": types.UnionType(types.String(), types.Int()),
+                "c": types.UnionType(types.Float(), types.NoneType()),
+            }
+        ),
+    )
+
+    assert result.type == expected
+
+    result = weave.use(result)
+    assert result.to_pylist_notags() == [
+        {"b": 1, "c": None},
+        {"b": "c", "c": 3.3},
+    ]
+
+
+def test_arrow_concat_nested_union_with_optional_type_and_custom_type():
+
+    raw_datal = [{"b": 1, "x": Point2(1, 2)}]
+    raw_datar = [{"b": "c", "c": 3.3}]
+
+    datal = weave.save(arrow.to_arrow(raw_datal))
+    datar = weave.save(arrow.to_arrow(raw_datar))
+
+    to_concat = ops.make_list(l=datal, r=datar)
+    result = arrow.concat(to_concat)
+
+    expected = arrow.ArrowWeaveListType(
+        object_type=types.TypedDict(
+            property_types={
+                "b": types.UnionType(types.String(), types.Int()),
+                "c": types.UnionType(types.Float(), types.NoneType()),
+                "x": types.UnionType(Point2.WeaveType(), types.NoneType()),
+            }
+        ),
+    )
+
+    assert result.type == expected
+
+    result = weave.use(result)
+    assert [result._index(i) for i in range(len(result))] == [
+        {"b": 1, "c": None, "x": Point2(1, 2)},
+        {"b": "c", "c": 3.3, "x": None},
+    ]
+
+
+def test_arrow_concat_degenerate_types():
+
+    raw_datal = [{"b": 1, "x": Point2(1, 2)}]
+    raw_datar = [{"b": "c", "x": {"x": 1, "y": 2}}]
+
+    datal = weave.save(arrow.to_arrow(raw_datal))
+    datar = weave.save(arrow.to_arrow(raw_datar))
+
+    to_concat = ops.make_list(l=datal, r=datar)
+    result = arrow.concat(to_concat)
+
+    expected = arrow.ArrowWeaveListType(
+        object_type=types.TypedDict(
+            property_types={
+                "b": types.UnionType(types.String(), types.Int()),
+                "x": types.UnionType(
+                    Point2.WeaveType(),
+                    types.TypedDict({"x": types.Int(), "y": types.Int()}),
+                ),
+            }
+        ),
+    )
+
+    assert result.type == expected
+
+    result = weave.use(result)
+    assert [result._index(i) for i in range(len(result))] == [
+        {"b": 1, "x": Point2(1, 2)},
+        {"b": "c", "x": {"x": 1, "y": 2}},
+    ]
 
 
 class ListLikeNodeInterface:

@@ -12,6 +12,7 @@ py_type = type
 
 from ..api import op, weave_class, type, use
 from ..decorator_op import arrow_op
+from .. import box
 from .. import weave_types as types
 from .. import graph
 from .. import errors
@@ -25,10 +26,11 @@ from .. import refs
 from .. import dispatch
 from .. import execute_fast
 from .. import weave_internal
+from .. import node_ref
 from .. import context
 from .. import weavify
 from .. import op_args
-from ..language_features.tagging import tagged_value_type
+from ..language_features.tagging import tagged_value_type, tagged_value_type_helpers
 from ..language_features.tagging import process_opdef_output_type
 from . import arrow
 from .. import arrow_util
@@ -144,10 +146,24 @@ def rewrite_weavelist_refs(arrow_data, object_type, artifact):
         non_none_members = [
             m for m in object_type.members if not isinstance(m, types.NoneType)
         ]
+        nullable = len(non_none_members) < len(object_type.members)
         if len(non_none_members) > 1:
-            raise errors.WeaveInternalError(
-                "Unions not fully supported yet in Weave arrow"
-            )
+            arrow_data = arrow_as_array(arrow_data)
+            if not isinstance(arrow_data.type, pa.UnionType):
+                raise errors.WeaveTypeError(
+                    "Expected UnionType, got %s" % type(arrow_data.type)
+                )
+            arrays = []
+            for i, _ in enumerate(arrow_data.type):
+                rewritten = rewrite_weavelist_refs(
+                    arrow_data.field(i),
+                    non_none_members[i]
+                    if not nullable
+                    else types.UnionType(types.NoneType(), non_none_members[i]),
+                    artifact,
+                )
+                arrays.append(rewritten)
+            return pa.UnionArray.from_sparse(arrow_data.type_codes, arrays)
         return rewrite_weavelist_refs(arrow_data, types.non_none(object_type), artifact)
     elif _object_type_is_basic(object_type):
         return arrow_data
@@ -612,12 +628,44 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             return pa.ListArray.from_arrays(offsets, flattened)
 
         elif isinstance(self.object_type, types.UnionType):
-            # strip tags from each element
-            for member in self.object_type.members:
-                if isinstance(member, tagged_value_type.TaggedValueType):
-                    raise NotImplementedError(
-                        'TODO: implement handling of "Union[TaggedValue, ...]'
+            is_not_simple_nullable_union = (
+                len(
+                    [
+                        member_type
+                        for member_type in self.object_type.members
+                        if not types.NoneType().assign_type(member_type)
+                    ]
+                )
+                > 1
+            )
+
+            if is_not_simple_nullable_union:
+                # strip tags from each element
+                if not isinstance(self._arrow_data, pa.UnionArray):
+                    raise ValueError(
+                        "Expected UnionArray, but got: "
+                        f"{type(self._arrow_data).__name__}"
                     )
+                if not isinstance(self._mapper, mappers_arrow.ArrowUnionToUnion):
+                    raise ValueError(
+                        "Expected ArrowUnionToUnion, but got: "
+                        f"{type(self._mapper).__name__}"
+                    )
+                tag_stripped_members: list[pa.Array] = []
+                for member_type in self.object_type.members:
+                    tag_stripped_member = ArrowWeaveList(
+                        self._arrow_data.field(
+                            # mypy doesn't recognize that this method is inherited from the
+                            # superclass of ArrowUnionToUnion
+                            self._mapper.type_code_of_type(member_type)  # type: ignore
+                        ),
+                        member_type,
+                        self._artifact,
+                    )._arrow_data_asarray_no_tags()
+                    tag_stripped_members.append(tag_stripped_member)
+                return pa.UnionArray.from_sparse(
+                    self._arrow_data.type_codes, tag_stripped_members
+                )
 
         return arrow_data
 
@@ -676,14 +724,16 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         return col
 
     def _index(self, index):
+        self._arrow_data = arrow_as_array(self._arrow_data)
         try:
             row = self._arrow_data.slice(index, 1)
         except IndexError:
             return None
         if not row:
             return None
-        res = self._mapper.apply(row.to_pylist()[0])
-        return res
+        return mappers_arrow.map_from_arrow_scalar(
+            row[0], self.object_type, self._artifact
+        )
 
     @op(output_type=lambda input_types: input_types["self"].object_type)
     def __getitem__(self, index: int):
@@ -743,41 +793,221 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         if not data:
             raise ValueError(f'Data for new column "{name}" must be nonnull.')
 
-        new_data = self._arrow_data.append_column(name, [data])
+        if isinstance(self._arrow_data, pa.Table):
+            new_data = self._arrow_data.append_column(name, [data])
+        elif isinstance(self._arrow_data, pa.StructArray):
+            chunked_arrays = {}
+            for field in self._arrow_data.type:
+                chunked_arrays[field.name] = pa.chunked_array(
+                    self._arrow_data.field(field.name)
+                )
+            arrow_obj = pa.table(chunked_arrays)
+            new_data = arrow_as_array(arrow_obj.append_column(name, [data]))
+        else:
+            raise ValueError(
+                f"Cannot append column to {type(self._arrow_data)} object."
+            )
+
         return ArrowWeaveList(new_data, None, self._artifact)
 
+    def with_object_type(self, desired_type: types.Type) -> "ArrowWeaveList":
+        """Converts this ArrowWeaveList into a new one with the specified object type.
+        Updates the backing arrow data to also match the new type.
+
+        If conversion is not possible, raises a ValueError.
+        """
+        self._arrow_data = arrow_as_array(self._arrow_data)
+        mapper = mappers_arrow.map_to_arrow(desired_type, self._arrow_data)
+
+        result: typing.Optional[ArrowWeaveList] = None
+
+        current_type = self.object_type
+        if current_type.assign_type(desired_type) and desired_type.assign_type(
+            current_type
+        ):
+            result = self
+        elif isinstance(desired_type, tagged_value_type.TaggedValueType):
+            if isinstance(current_type, tagged_value_type.TaggedValueType):
+
+                tag_awl = ArrowWeaveList(
+                    self._arrow_data.field("_tag"),
+                    current_type.tag,
+                    self._artifact,
+                ).with_object_type(desired_type.tag)
+
+                value_awl = ArrowWeaveList(
+                    self._arrow_data.field("_value"),
+                    current_type.value,
+                    self._artifact,
+                ).with_object_type(desired_type.value)
+
+            else:
+                value_awl = self.with_object_type(desired_type.value)
+                tag_array_type = mapper.result_type().field("_tag")
+                tag_awl = ArrowWeaveList(
+                    pa.nulls(len(value_awl), type=tag_array_type),
+                    desired_type.tag,
+                    self._artifact,
+                )
+
+            final_array = pa.StructArray.from_arrays(
+                [tag_awl._arrow_data, value_awl._arrow_data],
+                names=["_tag", "_value"],
+            )
+
+            result = ArrowWeaveList(final_array, desired_type, self._artifact)
+
+        elif isinstance(
+            current_type, tagged_value_type.TaggedValueType
+        ) and not isinstance(desired_type, tagged_value_type.TaggedValueType):
+            result = ArrowWeaveList(
+                self._arrow_data.field("_value"), current_type.value, self._artifact
+            ).with_object_type(desired_type)
+
+        elif isinstance(desired_type, types.TypedDict):
+            if isinstance(current_type, types.TypedDict):
+
+                self_keys = set(current_type.property_types.keys())
+                other_keys = set(desired_type.property_types.keys())
+                common_keys = self_keys.intersection(other_keys)
+
+                field_arrays: dict[str, pa.Array] = {}
+                arrow_type = mapper.result_type()
+
+                for key in desired_type.property_types.keys():
+                    if key in common_keys:
+                        field_arrays[key] = (
+                            ArrowWeaveList(
+                                self._arrow_data.field(key),
+                                current_type.property_types[key],
+                                self._artifact,
+                            )
+                            .with_object_type(desired_type.property_types[key])
+                            ._arrow_data
+                        )
+
+                    elif key in other_keys:
+                        if key not in common_keys:
+                            field_arrays[key] = ArrowWeaveList(
+                                pa.nulls(len(self), type=arrow_type[key].type),
+                                desired_type.property_types[key],
+                                self._artifact,
+                            )._arrow_data
+
+                field_names, arrays = tuple(zip(*field_arrays.items()))
+
+                result = ArrowWeaveList(
+                    pa.StructArray.from_arrays(arrays=arrays, names=field_names),  # type: ignore
+                    desired_type,
+                    self._artifact,
+                )
+
+        elif isinstance(desired_type, types.BasicType):
+            result = ArrowWeaveList(
+                self._arrow_data.cast(mapper.result_type()),
+                desired_type,
+                self._artifact,
+            )
+
+        elif isinstance(desired_type, types.List) and isinstance(
+            current_type, types.List
+        ):
+            offsets = self._arrow_data.offsets
+            flattened = self._arrow_data.flatten()
+            flattened_converted = ArrowWeaveList(
+                flattened,
+                current_type.object_type,
+                self._artifact,
+            ).with_object_type(desired_type.object_type)
+
+            result = ArrowWeaveList(
+                pa.ListArray.from_arrays(
+                    offsets, flattened_converted._arrow_data, type=mapper.result_type()
+                ),
+                desired_type,
+                self._artifact,
+            )
+
+        elif isinstance(desired_type, types.UnionType) and desired_type.assign_type(
+            current_type
+        ):
+
+            non_none_desired = types.non_none(desired_type)
+            if isinstance(non_none_desired, types.UnionType):
+                non_nullable_types = non_none_desired.members
+            else:
+                non_nullable_types = [non_none_desired]
+
+            non_null_current_type = types.non_none(current_type)
+
+            if len(non_nullable_types) > 1:
+                type_code = mapper.type_code_of_type(non_null_current_type)
+
+                def type_code_iterator():
+                    for _ in range(len(self)):
+                        yield type_code
+
+                data_arrays: list[pa.Array] = []
+                for member in non_nullable_types:
+                    if member.assign_type(
+                        non_null_current_type
+                    ) and non_null_current_type.assign_type(member):
+                        data_arrays.append(self.with_object_type(member)._arrow_data)
+                    else:
+                        member_mapper = mappers_arrow.map_to_arrow(
+                            member, self._artifact
+                        )
+                        data_arrays.append(
+                            pa.nulls(len(self), type=member_mapper.result_type())
+                        )
+
+                result = ArrowWeaveList(
+                    pa.UnionArray.from_sparse(
+                        pa.array(type_code_iterator(), type=pa.int8()),
+                        data_arrays,
+                    ),
+                    desired_type,
+                    self._artifact,
+                )
+            else:
+                result = ArrowWeaveList(
+                    self.with_object_type(non_nullable_types[0])._arrow_data,
+                    desired_type,
+                    self._artifact,
+                )
+
+        if result is None:
+            raise ValueError(f"Cannot convert {current_type} to {desired_type}.")
+
+        if tag_store.is_tagged(self):
+            tag_store.add_tags(result, tag_store.get_tags(self))
+
+        return result
+
     def concatenate(self, other: "ArrowWeaveList") -> "ArrowWeaveList":
-        arrow_data = [awl._arrow_data for awl in (self, other)]
-        if (
-            all([isinstance(ad, pa.ChunkedArray) for ad in arrow_data])
-            and arrow_data[0].type == arrow_data[1].type
-        ):
-            return ArrowWeaveList(
-                pa.chunked_array(arrow_data[0].chunks + arrow_data[1].chunks),
-                self.object_type,
-                self._artifact,
-            )
-        elif (
-            all([isinstance(ad, pa.Table) for ad in arrow_data])
-            and arrow_data[0].schema == arrow_data[1].schema
-        ):
-            return ArrowWeaveList(
-                pa.concat_tables([arrow_data[0], arrow_data[1]]),
-                self.object_type,
-                self._artifact,
-            )
-        elif (
-            all([isinstance(ad, pa.StructArray) for ad in arrow_data])
-            and arrow_data[0].type == arrow_data[1].type
-        ):
+        arrow_data = [arrow_as_array(awl._arrow_data) for awl in (self, other)]
+        if arrow_data[0].type == arrow_data[1].type:
             return ArrowWeaveList(
                 pa.concat_arrays(arrow_data), self.object_type, self._artifact
             )
         else:
+            new_object_types_with_pushed_down_tags = [
+                typing.cast(
+                    ArrowWeaveListType,
+                    tagged_value_type_helpers.push_down_tags_from_container_type_to_element_type(
+                        types.TypeRegistry.type_of(a)
+                    ),
+                ).object_type
+                for a in (self, other)
+            ]
 
-            raise ValueError(
-                "Can only concatenate two ArrowWeaveLists that both contain "
-                "ChunkedArrays of the same type or Tables of the same schema."
+            new_object_type = types.merge_types(*new_object_types_with_pushed_down_tags)
+
+            new_arrow_arrays = [
+                a.with_object_type(new_object_type)._arrow_data for a in (self, other)
+            ]
+            return ArrowWeaveList(
+                pa.concat_arrays(new_arrow_arrays), new_object_type, self._artifact
             )
 
     @op(
@@ -991,67 +1221,47 @@ def arrow_weave_list_createindexCheckpoint(arr):
     )
 
 
-# Handle tag pushdown
 def _concat_output_type(input_types: typing.Dict[str, types.List]) -> types.Type:
     arr_type: types.List = input_types["arr"]
-    arr_object_type = arr_type.object_type
+    inner_type = types.non_none(arr_type.object_type)
 
-    types_to_check: typing.List[types.Type] = [arr_object_type]
-    if isinstance(arr_object_type, types.UnionType):
-        types_to_check = arr_object_type.members
-
-    inner_element_members = []
-    for element_type in types_to_check:
-        if isinstance(element_type, tagged_value_type.TaggedValueType):
-            # push down tags
-            value_type = element_type.value
-            tag_type = element_type.tag
-            if not isinstance(value_type, (ArrowWeaveListType, types.NoneType)):
-                raise ValueError(
-                    f"Cannot concatenate tagged value of type {value_type} with ArrowWeaveList"
-                )
-
-            if isinstance(value_type, ArrowWeaveListType):
-                # see if elements are tagged
-                element_tag_type: types.TypedDict
-                if isinstance(
-                    value_type.object_type, tagged_value_type.TaggedValueType
-                ):
-                    element_tag_type = value_type.object_type.tag
-                    new_value_type = value_type.object_type.value
-                else:
-                    element_tag_type = types.TypedDict({})
-                    new_value_type = value_type.object_type
-
-                inner_element_members.append(
-                    tagged_value_type.TaggedValueType(
-                        types.TypedDict(
-                            {
-                                **tag_type.property_types,
-                                **element_tag_type.property_types,
-                            }
-                        ),
-                        new_value_type,
-                    )
-                )
-
-            else:
-                inner_element_members.append(
-                    tagged_value_type.TaggedValueType(
-                        tag_type,
-                        types.NoneType(),
-                    )
-                )
-        elif isinstance(element_type, ArrowWeaveListType):
-            return element_type
-        elif isinstance(element_type, types.NoneType):
-            continue
-        else:
+    if isinstance(inner_type, types.UnionType):
+        if not all(types.is_list_like(t) for t in inner_type.members):
             raise ValueError(
-                f"Cannot concatenate value of type {element_type} with ArrowWeaveList"
+                "opConcat: expected all members of inner type to be list-like"
             )
 
-    return ArrowWeaveListType(types.union(*inner_element_members))
+        new_union_members = [
+            typing.cast(
+                ArrowWeaveListType,
+                tagged_value_type_helpers.push_down_tags_from_container_type_to_element_type(
+                    t
+                ),
+            ).object_type
+            for t in inner_type.members
+        ]
+
+        # merge the types into a single type
+        new_inner_type = new_union_members[0]
+        for t in new_union_members[1:]:
+            new_inner_type = types.merge_types(new_inner_type, t)
+
+        return ArrowWeaveListType(new_inner_type)
+
+    elif isinstance(inner_type, tagged_value_type.TaggedValueType):
+        inner_type_value = inner_type.value
+        inner_type_tag = inner_type.tag
+        inner_type_value_inner_type = typing.cast(
+            ArrowWeaveListType, inner_type_value
+        ).object_type
+
+        return ArrowWeaveListType(
+            tagged_value_type.TaggedValueType(
+                inner_type_tag, inner_type_value_inner_type
+            )
+        )
+
+    return inner_type
 
 
 @op(
@@ -1287,21 +1497,168 @@ def dataframe_to_arrow(df):
     return ArrowWeaveList(pa.Table.from_pandas(df))
 
 
+def recursively_merge_union_types_if_they_are_unions_of_structs(
+    type_: types.Type,
+) -> types.Type:
+    """Input preprocessor for to_arrow()."""
+    if isinstance(type_, types.TypedDict):
+        return types.TypedDict(
+            {
+                k: recursively_merge_union_types_if_they_are_unions_of_structs(v)
+                for k, v in type_.property_types.items()
+            }
+        )
+    elif isinstance(type_, types.UnionType):
+        if type_.is_simple_nullable() or len(type_.members) < 2:
+            return type_
+
+        new_type = type_.members[0]
+        for member in type_.members[1:]:
+            new_type = types.merge_types(new_type, member)
+
+        if isinstance(new_type, types.UnionType):
+            # cant go down any further
+            return new_type
+
+        return recursively_merge_union_types_if_they_are_unions_of_structs(new_type)
+
+    elif isinstance(type_, types.List):
+        return types.List(
+            recursively_merge_union_types_if_they_are_unions_of_structs(
+                type_.object_type
+            )
+        )
+    elif isinstance(type_, ArrowWeaveListType):
+        return ArrowWeaveListType(
+            recursively_merge_union_types_if_they_are_unions_of_structs(
+                type_.object_type
+            )
+        )
+    elif isinstance(type_, tagged_value_type.TaggedValueType):
+        return tagged_value_type.TaggedValueType(
+            typing.cast(
+                types.TypedDict,
+                recursively_merge_union_types_if_they_are_unions_of_structs(type_.tag),
+            ),
+            recursively_merge_union_types_if_they_are_unions_of_structs(type_.value),
+        )
+
+    return type_
+
+
+def recursively_build_pyarrow_array(
+    py_objs: list[typing.Any],
+    pyarrow_type: pa.DataType,
+    mapper,
+    py_objs_already_mapped: bool = False,
+) -> pa.Array:
+    arrays: list[pa.Array] = []
+    if isinstance(mapper.type, types.UnionType) and mapper.type.is_simple_nullable():
+        nonnull_mapper = [
+            m for m in mapper._member_mappers if m.type != types.NoneType()
+        ][0]
+        return recursively_build_pyarrow_array(
+            py_objs, pyarrow_type, nonnull_mapper, py_objs_already_mapped
+        )
+    if pa.types.is_struct(pyarrow_type):
+        keys: list[str] = []
+        assert isinstance(
+            mapper,
+            (
+                mappers_arrow.TypedDictToArrowStruct,
+                mappers_arrow.TaggedValueToArrowStruct,
+                mappers_arrow.ObjectToArrowStruct,
+            ),
+        )
+        for field in pyarrow_type:
+
+            if isinstance(
+                mapper,
+                mappers_arrow.TypedDictToArrowStruct,
+            ):
+                array = recursively_build_pyarrow_array(
+                    [
+                        py_obj.get(field.name, None) if py_obj is not None else None
+                        for py_obj in py_objs
+                    ],
+                    field.type,
+                    mapper._property_serializers[field.name],
+                    py_objs_already_mapped,
+                )
+            if isinstance(
+                mapper,
+                mappers_arrow.ObjectToArrowStruct,
+            ):
+                array = recursively_build_pyarrow_array(
+                    [
+                        getattr(py_obj, field.name, None)
+                        if not py_objs_already_mapped
+                        else py_obj.get(field.name, None)
+                        for py_obj in py_objs
+                    ],
+                    field.type,
+                    mapper._property_serializers[field.name],
+                    py_objs_already_mapped,
+                )
+
+            elif isinstance(mapper, mappers_arrow.TaggedValueToArrowStruct):
+                if field.name == "_tag":
+                    array = recursively_build_pyarrow_array(
+                        [tag_store.get_tags(py_obj) for py_obj in py_objs],
+                        field.type,
+                        mapper._tag_serializer,
+                        py_objs_already_mapped,
+                    )
+                else:
+                    array = recursively_build_pyarrow_array(
+                        [py_obj for py_obj in py_objs],
+                        field.type,
+                        mapper._value_serializer,
+                        py_objs_already_mapped,
+                    )
+
+            arrays.append(array)
+            keys.append(field.name)
+        return pa.StructArray.from_arrays(arrays, keys)
+    elif pa.types.is_union(pyarrow_type):
+        assert isinstance(mapper, mappers_arrow.UnionToArrowUnion)
+        type_codes: list[int] = [mapper.type_code_of_obj(o) for o in py_objs]
+        for type_code, field in enumerate(pyarrow_type):
+            array = recursively_build_pyarrow_array(
+                [
+                    py_obj if type_codes[i] == type_code else None
+                    for i, py_obj in enumerate(py_objs)
+                ],
+                field.type,
+                mapper._member_mappers[type_code],
+            )
+            arrays.append(array)
+        return pa.UnionArray.from_sparse(
+            pa.array(type_codes, type=pa.int8()),
+            arrays,
+        )
+    return pa.array(
+        (mapper.apply(o) for o in py_objs) if not py_objs_already_mapped else py_objs,
+        pyarrow_type,
+    )
+
+
 # This will be a faster version fo to_arrow (below). Its
 # used in op file-table, to convert from a wandb Table to Weave
 # (that code is very experimental and not totally working yet)
 def to_arrow_from_list_and_artifact(obj, object_type, artifact):
     # Get what the parquet type will be.
-    mapper = mappers_arrow.map_to_arrow(object_type, artifact)
+    merged_object_type = recursively_merge_union_types_if_they_are_unions_of_structs(
+        object_type
+    )
+    mapper = mappers_arrow.map_to_arrow(merged_object_type, artifact)
     pyarrow_type = mapper.result_type()
 
-    if pa.types.is_struct(pyarrow_type):
-        fields = list(pyarrow_type)
-        schema = pa.schema(fields)
-        arrow_obj = pa.Table.from_pylist(obj, schema=schema)
-    else:
-        arrow_obj = pa.array(obj, pyarrow_type)
-    weave_obj = ArrowWeaveList(arrow_obj, object_type, artifact)
+    arrow_obj = recursively_build_pyarrow_array(
+        obj, pyarrow_type, mapper, py_objs_already_mapped=True
+    )
+    weave_obj = ArrowWeaveList(arrow_obj, merged_object_type, artifact)
+
     return weave_obj
 
 
@@ -1314,18 +1671,22 @@ def to_arrow(obj, wb_type=None):
         outer_tags = tag_store.get_tags(obj)
         wb_type = wb_type.value
     if isinstance(wb_type, types.List):
-        object_type = wb_type.object_type
+        merged_object_type = (
+            recursively_merge_union_types_if_they_are_unions_of_structs(
+                wb_type.object_type
+            )
+        )
 
         # Convert to arrow, serializing Custom objects to the artifact
-        mapper = mappers_arrow.map_to_arrow(object_type, artifact)
+        mapper = mappers_arrow.map_to_arrow(merged_object_type, artifact)
         pyarrow_type = arrow_util.arrow_type(mapper.result_type())
-        py_objs = (mapper.apply(o) for o in obj)
-
+        # py_objs = (mapper.apply(o) for o in obj)
         # TODO: do I need this branch? Does it work now?
         # if isinstance(wb_type.object_type, types.ObjectType):
         #     arrow_obj = pa.array(py_objs, pyarrow_type)
-        arrow_obj = pa.array(py_objs, pyarrow_type)
-        weave_obj = ArrowWeaveList(arrow_obj, object_type, artifact)
+
+        arrow_obj = recursively_build_pyarrow_array(obj, pyarrow_type, mapper)
+        weave_obj = ArrowWeaveList(arrow_obj, merged_object_type, artifact)
 
         # Save the weave object to the artifact
         ref = storage.save(weave_obj, artifact=artifact)

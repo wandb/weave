@@ -43,19 +43,31 @@ class ListMapper(mappers.Mapper):
 
 
 class UnionMapper(mappers.Mapper):
+    # If true, this is a mapper for an optional type,
+    # like <int> | <none> or <str> | <none>
+    is_single_object_nullable: bool
+
     def __init__(self, type_, mapper, artifact, path=[]):
         self.type = type_
         self._member_mappers = [
             mapper(mem_type, artifact, path=path) for mem_type in type_.members
         ]
 
+        self.is_single_object_nullable = False
+        for mapper in self._member_mappers:
+            if (
+                isinstance(mapper.type, types.NoneType)
+                and len(self._member_mappers) == 2
+            ):
+                self.is_single_object_nullable = True
+
 
 class RefMapper(mappers.Mapper):
     def __init__(self, type_, mapper, artifact, path=[]):
-        self.type_ = type_
+        self.type = type_
 
 
 class ConstMapper(mappers.Mapper):
     def __init__(self, type_, mapper, artifact, path):
-        self._type = type_
+        self.type = type_
         self._val_mapper = mapper(type_.val_type, artifact, path=path)

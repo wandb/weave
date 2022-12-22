@@ -68,11 +68,7 @@ class RunSegment:
 
     @weave.op(refine_output_type=refine_experiment_type)
     def experiment(self) -> typing.Any:
-        result = self._experiment_body()
-
-        # combine chunks to make future takes faster
-        result._arrow_data = result._arrow_data.combine_chunks()
-        return result
+        return self._experiment_body()
 
 
 @weave.op()
