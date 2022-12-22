@@ -66,3 +66,7 @@ class WeaveValueError(WeaveBaseError):
 
 class WeaveClientArtifactResolutionFailure(WeaveBaseError):
     pass
+
+
+class WeaveTableDeserializationError(WeaveBaseError):
+    pass

@@ -101,6 +101,17 @@ def _get_rows_and_object_type_from_weave_format(data, file):
     #    we need to manually detect the type.
     obj_prop_types = {}
     for i, key in enumerate(data["columns"]):
+        if key not in converted_object_type.property_types:
+            # Since when a WB table is saved with a numeric column name, it is
+            # stored as a number in `columns` but a string in the keys of
+            # `properties`. This patch is to handle that case. A similar case
+            # had to be handled in Weave0
+            if str(key) in converted_object_type.property_types:
+                key = str(key)
+            else:
+                raise errors.WeaveTableDeserializationError(
+                    f"Column name {key} not found in column_types"
+                )
         col_type = converted_object_type.property_types[key]
         if col_type.assign_type(types.UnknownType()):
             unknown_col_example_data = [row[i] for row in row_data]
