@@ -13,6 +13,35 @@ from ..language_features.tagging import make_tag_getter_op, tag_store, tagged_va
 import functools
 
 
+def _map_each_function_type(input_types: dict[str, types.Type]) -> types.Function:
+    if types.List().assign_type(input_types["arr"]):
+        return _map_each_function_type(
+            {"arr": typing.cast(types.List, input_types["arr"]).object_type}
+        )
+    return types.Function({"row": input_types["arr"]}, types.Any())
+
+
+def _list_ndims(list_type: types.Type) -> int:
+    if types.List().assign_type(list_type):
+        return 1 + _list_ndims(typing.cast(types.List, list_type).object_type)
+    return 0
+
+
+def _map_each_output_type(input_types: dict[str, types.Type]):
+    map_each_function_type = input_types["mapFn"]
+    list_ndims = _list_ndims(input_types["arr"])
+    output_type = typing.cast(types.Function, map_each_function_type).output_type
+    for _ in range(list_ndims):
+        output_type = types.List(output_type)
+    return output_type
+
+
+def _map_each(arr: list, fn):
+    if isinstance(arr, list) and len(arr) > 0 and isinstance(arr[0], list):
+        return [_map_each(item, fn) for item in arr]
+    return execute_fast.fast_map_fn(arr, fn)
+
+
 def getitem_output_type(input_types):
     self_type = input_types["arr"]
     if isinstance(self_type, types.UnionType):
@@ -113,6 +142,17 @@ class List:
     )
     def map(arr, mapFn):
         return execute_fast.fast_map_fn(arr, mapFn)
+
+    @op(
+        name="mapEach",
+        input_type={
+            "arr": types.List(types.Any()),
+            "mapFn": _map_each_function_type,
+        },
+        output_type=_map_each_output_type,
+    )
+    def map_each(arr, mapFn):
+        return _map_each(arr, mapFn)
 
     @op(
         name="groupby",

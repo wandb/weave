@@ -112,3 +112,11 @@ def test_nullable_concat():
     list_node_3 = list_.make_list(a=list_node_1, b=list_node_2, c=weave.save(None))
     concat_list = list_node_3.concat()
     assert weave.use(concat_list) == [1, 2, 3, 10, 20, 30]
+
+
+def test_mapeach():
+    row_node = list_.make_list(a=1, b=2, c=3)
+    two_d_list_node = list_.make_list(a=row_node, b=row_node, c=row_node)
+    result = list_.List.map_each(two_d_list_node, lambda row: row + 1)
+    assert result.type == types.List(types.List(types.Number()))
+    assert weave.use(result) == [[2, 3, 4], [2, 3, 4], [2, 3, 4]]
