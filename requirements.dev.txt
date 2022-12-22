@@ -4,5 +4,7 @@ types-setuptools
 pre-commit
 black
 rich
+pytest
+pytest-timeout
 
 setuptools>=65.5.1 # not directly required, pinned by Snyk to avoid a vulnerability

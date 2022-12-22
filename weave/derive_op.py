@@ -208,7 +208,7 @@ class MappedDeriveOpHandler(DeriveOpHandler):
             # TODO: use the vectorization described here:
             # https://paper.dropbox.com/doc/Weave-Python-Weave0-Op-compatibility-workstream-kJ3XSDdgR96XwKPapHwPD
             return [
-                orig_op.resolve_fn(x, **new_inputs)
+                orig_op.resolve_fn(**{mapped_param_name: x, **new_inputs})
                 if not (x is None or isinstance(x, box.BoxedNone))
                 or types.is_optional(first_arg.type)
                 else None

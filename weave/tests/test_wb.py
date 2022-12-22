@@ -99,6 +99,32 @@ workspace_response_filtered = {
     }
 }
 
+project_run_artifact_response = {
+    "project": {
+        **fwb.project_payload,  # type: ignore
+        "runs_21303e3890a1b6580998e6aa8a345859": {
+            "edges": [
+                {
+                    "node": {
+                        **fwb.run_payload,  # type: ignore
+                        "outputArtifacts_21303e3890a1b6580998e6aa8a345859": {
+                            "edges": [
+                                {
+                                    "node": {
+                                        "id": "QXJ0aWZhY3Q6MTQyNTg4OTM=",
+                                        "versionIndex": 0,
+                                        "artifactSequence": fwb.artifactSequence_payload,
+                                    }
+                                }
+                            ]
+                        },
+                    }
+                }
+            ]
+        },
+    }
+}
+
 artifact_version_sdk_response = {
     "artifact": {
         **fwb.artifactVersion_payload,  # type: ignore
@@ -204,6 +230,19 @@ def table_mock(q, ndx):
         return artifact_version_sdk_response
     elif ndx == 2:
         return workspace_response
+
+
+def test_map_gql_op(fake_wandb):
+    fake_wandb.add_mock(lambda q, ndx: project_run_artifact_response)
+    node = (
+        ops.project("stacey", "mendeleev")
+        .runs()
+        .limit(1)
+        .loggedArtifactVersions()
+        .limit(1)[0][0]
+        .name()
+    )
+    assert weave.use(node) == "test_res_1fwmcd3q:v0"
 
 
 def test_legacy_run_file_table_format(fake_wandb):
