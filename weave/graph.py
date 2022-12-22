@@ -300,30 +300,45 @@ def _map_nodes(
     already_mapped: dict[Node, Node],
     walk_lambdas: bool,
 ) -> Node:
-    if node in already_mapped:
-        return already_mapped[node]
-    result_node = node
-    if isinstance(node, OutputNode):
-        inputs = {
-            k: _map_nodes(n, map_fn, already_mapped, walk_lambdas)
-            for k, n in node.from_op.inputs.items()
-        }
-        # preserve ref-equality
-        if any(n is not inputs[k] for k, n in node.from_op.inputs.items()):
-            result_node = OutputNode(node.type, node.from_op.name, inputs)
-    elif (
-        walk_lambdas
-        and isinstance(node, ConstNode)
-        and isinstance(node.type, weave_types.Function)
-    ):
-        new_fn_node = _map_nodes(node.val, map_fn, already_mapped, walk_lambdas)
-        if new_fn_node is not node.val:
-            result_node = ConstNode(node.type, new_fn_node)
-    mapped_node = map_fn(result_node)
-    if mapped_node is None:
-        mapped_node = result_node
-    already_mapped[node] = mapped_node
-    return mapped_node
+    # This is an iterative implemenation, to avoid blowing the stack and
+    # to provide friendlier stack traces for exception merging tools.
+    to_consider = [node]
+    while to_consider:
+        node = to_consider[-1]
+        if node in already_mapped:
+            to_consider.pop()
+            continue
+        result_node = node
+        if isinstance(node, OutputNode):
+            inputs = {}
+            need_inputs = False
+            for param_name, param_node in node.from_op.inputs.items():
+                if param_node not in already_mapped:
+                    to_consider.append(param_node)
+                    need_inputs = True
+                else:
+                    inputs[param_name] = already_mapped[param_node]
+            if need_inputs:
+                continue
+            if any(n is not inputs[k] for k, n in node.from_op.inputs.items()):
+                result_node = OutputNode(node.type, node.from_op.name, inputs)
+        elif (
+            walk_lambdas
+            and isinstance(node, ConstNode)
+            and isinstance(node.type, weave_types.Function)
+        ):
+            if node.val not in already_mapped:
+                to_consider.append(node.val)
+                continue
+            if node.val is not already_mapped[node.val]:
+                result_node = ConstNode(node.type, already_mapped[node.val])
+
+        to_consider.pop()
+        mapped_node = map_fn(result_node)
+        if mapped_node is None:
+            mapped_node = result_node
+        already_mapped[node] = mapped_node
+    return already_mapped[node]
 
 
 def map_nodes_top_level(

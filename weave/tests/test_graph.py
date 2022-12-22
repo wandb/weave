@@ -58,6 +58,19 @@ def test_map_nodes_full_walks_lambdas():
     assert node_count["count"] == 7
 
 
+def test_map_nodes_full_replaces_in_lambda():
+    l = weave.save([1, 2, 3])
+    node = l.map(lambda x: x + 1)
+    assert weave.use(node) == [2, 3, 4]
+
+    def _map_fn(node):
+        if isinstance(node, graph.OutputNode) and node.from_op.name == "number-add":
+            return graph.OutputNode(node.type, "number-mult", node.from_op.inputs)
+
+    result = graph.map_nodes_full([node], _map_fn)[0]
+    assert weave.use(result) == [1, 2, 3]
+
+
 def test_linearize():
     a = weave_internal.make_var_node(types.Int(), "a")
     dag = ((a + 1) * 2) + 3
