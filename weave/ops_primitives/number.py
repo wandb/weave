@@ -189,37 +189,41 @@ class Number(object):
 
 @op(
     name="numbers-sum",
-    input_type={"numbers": types.List(types.Number())},
+    input_type={"numbers": types.List(types.optional(types.Number()))},
     output_type=types.Number(),
 )
 def numbers_sum(numbers):
+    numbers = [n for n in numbers if n is not None]
     return sum(numbers)
 
 
 @op(
     name="numbers-avg",
-    input_type={"numbers": types.List(types.Number())},
+    input_type={"numbers": types.List(types.optional(types.Number()))},
     output_type=types.Number(),
 )
 def numbers_avg(numbers):
+    numbers = [n for n in numbers if n is not None]
     return sum(numbers) / len(numbers)
 
 
 @op(
     name="numbers-min",
-    input_type={"numbers": types.List(types.Number())},
+    input_type={"numbers": types.List(types.optional(types.Number()))},
     output_type=types.Number(),
 )
 def numbers_min(numbers):
+    numbers = [n for n in numbers if n is not None]
     return min(numbers)
 
 
 @op(
     name="numbers-max",
-    input_type={"numbers": types.List(types.Number())},
+    input_type={"numbers": types.List(types.optional(types.Number()))},
     output_type=types.Number(),
 )
 def numbers_max(numbers):
+    numbers = [n for n in numbers if n is not None]
     return max(numbers)
 
 
