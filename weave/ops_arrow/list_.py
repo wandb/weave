@@ -342,6 +342,41 @@ class ArrowTableGroupByType(types.Type):
         )
 
 
+def _arrow_sort_ranking_to_indicies(sort_ranking, col_dirs):
+    flattened = sort_ranking._arrow_data_asarray_no_tags().flatten()
+
+    columns = (
+        []
+    )  # this is intended to be a pylist and will be small since it is number of sort fields
+    col_len = len(sort_ranking._arrow_data)
+    dir_len = len(col_dirs)
+    col_names = [str(i) for i in range(dir_len)]
+    order = [
+        (col_name, "ascending" if dir_name == "asc" else "descending")
+        for col_name, dir_name in zip(col_names, col_dirs)
+    ]
+    # arrow data: (col_len x dir_len)
+    # [
+    #    [d00, d01]
+    #    [d10, d11]
+    #    [d20, d21]
+    #    [d30, d31]
+    # ]
+    #
+    # Flatten
+    # [d00, d01, d10, d11, d20, d21, d30, d31]
+    #
+    # col_x = [d0x, d1x, d2x, d3x]
+    # .         i * dir_len + x
+    #
+    #
+    for i in range(dir_len):
+        take_array = [j * dir_len + i for j in range(col_len)]
+        columns.append(pc.take(flattened, pa.array(take_array)))
+    table = pa.Table.from_arrays(columns, names=col_names)
+    return pc.sort_indices(table, order)
+
+
 @weave_class(weave_type=ArrowTableGroupByType)
 class ArrowTableGroupBy:
     def __init__(self, _table, _groups, _group_keys, object_type, key_type, artifact):
@@ -397,6 +432,14 @@ class ArrowTableGroupBy:
             self._artifact,
         )
 
+    @op(output_type=lambda input_types: ArrowWeaveListType(input_types["self"].key))
+    def groupkey(self):
+        return ArrowWeaveList(
+            self._groups.column("group_key").combine_chunks(),
+            self.key_type,
+            self._artifact,
+        )
+
     @op(
         input_type={
             "self": ArrowTableGroupByType(),
@@ -414,6 +457,35 @@ class ArrowTableGroupBy:
     )
     def map(self, map_fn):
         return execute_fast.fast_map_fn(self, map_fn)
+
+    @op(
+        input_type={
+            "self": ArrowTableGroupByType(),
+            "comp_fn": lambda input_types: types.Function(
+                {
+                    "row": ArrowTableGroupResultType(
+                        input_types["self"].object_type,
+                        input_types["self"].key,
+                    ),
+                    "index": types.Int(),
+                },
+                types.Any(),
+            ),
+            "col_dirs": types.List(types.String()),
+        },
+        output_type=lambda input_types: input_types["self"],
+    )
+    def sort(self, comp_fn, col_dirs):
+        ranking = _apply_fn_node(self, comp_fn)
+        indicies = _arrow_sort_ranking_to_indicies(ranking, col_dirs)
+        return ArrowTableGroupBy(
+            _table=self._table,
+            _groups=self._groups.take(indicies),
+            _group_keys=self._group_keys,
+            object_type=self.object_type,
+            key_type=self.key_type,
+            artifact=self._artifact,
+        )
 
 
 ArrowTableGroupByType.instance_classes = ArrowTableGroupBy
@@ -643,38 +715,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
     )
     def sort(self, comp_fn, col_dirs):
         ranking = _apply_fn_node(self, comp_fn)
-        flattened = ranking._arrow_data_asarray_no_tags().flatten()
-
-        columns = (
-            []
-        )  # this is intended to be a pylist and will be small since it is number of sort fields
-        col_len = len(ranking._arrow_data)
-        dir_len = len(col_dirs)
-        col_names = [str(i) for i in range(dir_len)]
-        order = [
-            (col_name, "ascending" if dir_name == "asc" else "descending")
-            for col_name, dir_name in zip(col_names, col_dirs)
-        ]
-        # arrow data: (col_len x dir_len)
-        # [
-        #    [d00, d01]
-        #    [d10, d11]
-        #    [d20, d21]
-        #    [d30, d31]
-        # ]
-        #
-        # Flatten
-        # [d00, d01, d10, d11, d20, d21, d30, d31]
-        #
-        # col_x = [d0x, d1x, d2x, d3x]
-        # .         i * dir_len + x
-        #
-        #
-        for i in range(dir_len):
-            take_array = [j * dir_len + i for j in range(col_len)]
-            columns.append(pc.take(flattened, pa.array(take_array)))
-        table = pa.Table.from_arrays(columns, names=col_names)
-        indicies = pc.sort_indices(table, order)
+        indicies = _arrow_sort_ranking_to_indicies(ranking, col_dirs)
         return ArrowWeaveList(
             pc.take(self._arrow_data, indicies), self.object_type, self._artifact
         )
@@ -867,12 +908,14 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
 def _apply_fn_node(awl: ArrowWeaveList, fn: graph.OutputNode) -> ArrowWeaveList:
     vectorized_fn = vectorize(fn)
     index_awl: ArrowWeaveList[int] = ArrowWeaveList(pa.array(np.arange(len(awl))))
+    if isinstance(awl, ArrowWeaveList):
+        row_type = ArrowWeaveListType(awl.object_type)
+    elif isinstance(awl, ArrowTableGroupBy):
+        row_type = ArrowTableGroupByType(awl.object_type, awl.key_type)
     fn_res_node = weave_internal.call_fn(
         vectorized_fn,
         {
-            "row": weave_internal.make_const_node(
-                ArrowWeaveListType(awl.object_type), awl
-            ),
+            "row": weave_internal.make_const_node(row_type, awl),
             "index": weave_internal.make_const_node(
                 types.TypeRegistry.type_of(index_awl), index_awl._arrow_data
             ),
@@ -1222,6 +1265,12 @@ def vectorize(
             if with_respect_to is None or any(
                 node is wrt_node for wrt_node in with_respect_to
             ):
+                # Special case to handle ArrowTableGroupResultType as a vectorized object
+                if isinstance(node.type, ArrowTableGroupResultType):
+                    return graph.VarNode(
+                        ArrowTableGroupByType(node.type.object_type, node.type._key),
+                        node.name,
+                    )
                 return graph.VarNode(ArrowWeaveListType(node.type), node.name)
             return node
         elif isinstance(node, graph.ConstNode):

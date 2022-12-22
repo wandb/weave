@@ -48,7 +48,7 @@ def make_tag_getter_op(
     return tag_getter_op
 
 
-# This is a heruistic that is used to determine if an op is a tag getter.
+# This is a heuristic that is used to determine if an op is a tag getter.
 # In the future we might just have a single tag getter operation which
 # would make this irrelevant or different.
 def is_tag_getter(op: "OpDef.OpDef") -> bool:

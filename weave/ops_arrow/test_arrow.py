@@ -84,6 +84,37 @@ def test_groupby_index_count():
     assert weave.use(node) == 40
 
 
+@pytest.mark.parametrize(
+    "sort_lambda, sort_dirs, exp_rotation_avg",
+    [
+        (lambda row: list_.make_list(a=row.groupkey().pick("rotate")), ["asc"], 0),
+        (lambda row: list_.make_list(a=row.groupkey().pick("rotate")), ["desc"], 4),
+        # This does not work yet since vectorized groupby does not know how to pick
+        # (or many ops for that matter. The only sort operations that work right now
+        # are those on the key itself. Luckily, that is the only thing you can construct
+        # in the UI anyway)
+        # (lambda row: list_.make_list(a=row.pick("rotate").avg()), ["desc"], 4),
+        (
+            lambda row: list_.make_list(
+                a=row.groupkey().pick("shear"), b=row.groupkey().pick("rotate")
+            ),
+            ["asc", "desc"],
+            4,
+        ),
+    ],
+)
+def test_groupby_sort(sort_lambda, sort_dirs, exp_rotation_avg):
+    ref = create_arrow_data(1000)
+    grouped_node = weave.get(ref).groupby(
+        lambda row: ops.dict_(rotate=row["rotate"], shear=row["shear"])
+    )
+    sorted_node = grouped_node.sort(sort_lambda, sort_dirs)
+    first_group = sorted_node[0]
+    first_group_rotations = first_group.pick("rotate")
+    first_group_rotation_avg = first_group_rotations.avg()
+    assert weave.use(first_group_rotation_avg) == exp_rotation_avg
+
+
 def test_map_scalar_map():
     ref = create_arrow_data(100)
 
