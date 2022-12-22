@@ -125,10 +125,12 @@ def make_molecule():
             weave.ops.MoleculeArtifactFileRef.WeaveType(),  # type: ignore
         ),
         # See comment in wandb_util.py - this may change in the future
-        (
-            SDKClasses([{"id": 1, "name": "foo"}]),
-            types.Number(),
-        ),
+        # Temporarily disabled until we can figure out how to mock
+        # types that need to reach into the artifact
+        # (
+        #     SDKClasses([{"id": 1, "name": "foo"}]),
+        #     types.Number(),
+        # ),
         #
         # Table Types
         # Leaving the table/key types out for now since there are not code paths
