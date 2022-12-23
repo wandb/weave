@@ -1,6 +1,8 @@
 import copy
 import inspect
 import typing
+from concurrent.futures import ThreadPoolExecutor
+
 
 from . import weave_types as types
 from . import op_args
@@ -10,6 +12,8 @@ from . import errors
 from . import graph
 from . import box
 from . import weave_internal
+from . import wandb_api
+from .language_features.tagging import tag_store
 
 
 class DeriveOpHandler:
@@ -205,6 +209,34 @@ class MappedDeriveOpHandler(DeriveOpHandler):
         def resolve(**inputs):
             new_inputs = copy.copy(inputs)
             list_ = new_inputs.pop(mapped_param_name)
+
+            # Just do file-table in parallel for now. We'll do parallelization
+            # more generally in the future.
+            if orig_op.name.endswith("file-table"):
+                # Copy api_settings and tagging_ctx into sub-threads
+                api_settings = wandb_api.copy_thread_local_api_settings()
+
+                def do_one(x):
+                    wandb_api.set_wandb_thread_local_api_settings(
+                        api_settings["api_key"],
+                        api_settings["cookies"],
+                        api_settings["headers"],
+                    )
+                    if x == None or types.is_optional(first_arg.type):
+                        return None
+                    res = orig_op.resolve_fn(**{mapped_param_name: x, **new_inputs})
+                    return res
+
+                res = list(ThreadPoolExecutor(max_workers=10).map(do_one, list_))
+
+                # file-table needs to flow tags, but we lose them going across the
+                # thread boundary.
+                for x, res_val in zip(list_, res):
+                    if tag_store.is_tagged(x):
+                        tag_store.add_tags(res_val, tag_store.get_tags(x))
+
+                return res
+
             # TODO: use the vectorization described here:
             # https://paper.dropbox.com/doc/Weave-Python-Weave0-Op-compatibility-workstream-kJ3XSDdgR96XwKPapHwPD
             return [
