@@ -337,7 +337,8 @@ def _map_nodes(
                     )
                 skipped_var_nodes.add(node)
                 continue
-            result_node.type = already_mapped[bound_node].type
+            # TODO: this assumes the var is a row of a list... be better!)
+            result_node.type = already_mapped[bound_node][0].type  # type: ignore
         if isinstance(node, OutputNode):
             inputs = {}
             input_nodes_needed = []
@@ -362,7 +363,11 @@ def _map_nodes(
                 to_consider.extend(input_nodes_needed[::-1])
                 continue
             if any(n is not inputs[k] for k, n in node.from_op.inputs.items()):
-                result_node = OutputNode(node.type, node.from_op.name, inputs)
+                from . import weave_internal
+
+                result_node = weave_internal.make_output_node(
+                    node.type, node.from_op.name, inputs
+                )
         elif walk_lambdas and _is_const_function_node(node):
             node = typing.cast(ConstNode, node)
             if node.val not in already_mapped:

@@ -177,7 +177,7 @@ def _dispatch_map_fn_no_refine(node: graph.Node) -> typing.Optional[graph.Output
         # Weave Python op types don't express that they can handle
         # optional.
         output_type = _remove_optional(node.type)
-        return graph.OutputNode(output_type, op.uri, params)
+        return weave_internal.make_output_node(output_type, op.uri, params)
     return None
 
 
