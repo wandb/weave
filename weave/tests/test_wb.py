@@ -8,7 +8,7 @@ import json
 from . import fixture_fakewandb as fwb
 from .. import graph
 from ..ops_domain import wb_domain_types as wdt
-from ..ops_primitives import list_
+from ..ops_primitives import list_, dict_
 from .. import weave_types as types
 
 from .. import ops_arrow as arrow
@@ -518,3 +518,346 @@ def test_shawn_groupby_profiling_correctness():
     )
 
     assert len(weave.use(x)) == 66311
+
+
+def test_loading_artifact_browser_request_1(fake_wandb):
+    # Leaf 1: Get's the current artifact collection
+    fake_wandb.add_mock(
+        lambda q, ndx: {
+            "project": {
+                **fwb.project_payload,  # type: ignore
+                "artifactCollection_d651817074b6a8074e87e9dfd5767726": {
+                    **fwb.artifactSequence_payload,  # type: ignore
+                },
+            }
+        }
+    )
+    ac_node = ops.project("stacey", "mendeleev").artifact("test_res_1fwmcd3q")
+    assert weave.use(ac_node) != None
+
+
+def test_loading_artifact_browser_request_2(fake_wandb):
+    ac_node = ops.project("stacey", "mendeleev").artifact("test_res_1fwmcd3q")
+    # Leaf 2: Get collection details
+    fake_wandb.add_mock(
+        lambda q, ndx: {
+            "project": {
+                **fwb.project_payload,  # type: ignore
+                "artifactCollection_d651817074b6a8074e87e9dfd5767726": {
+                    **fwb.artifactSequence_payload,  # type: ignore
+                    "__typename": "ArtifactSequence",
+                    "project": fwb.project_payload,
+                    "artifacts_21303e3890a1b6580998e6aa8a345859": {
+                        "edges": [{"node": {**fwb.artifactVersion_payload}}]
+                    },
+                    "artifactMembership_fe9cc269bee939ccb54ebba88c6087dd": {
+                        **fwb.artifactMembership_payload
+                    },
+                    "artifactMemberships_21303e3890a1b6580998e6aa8a345859": {
+                        "edges": [
+                            {
+                                "node": {
+                                    **fwb.artifactMembership_payload,
+                                    "aliases": [fwb.artifactAlias_payload],
+                                }
+                            }
+                        ]
+                    },
+                },
+            }
+        }
+    )
+    ac_detail_node = dict_(
+        **{
+            "name": ac_node.name(),
+            "isPortfolio": ac_node.isPortfolio(),
+            "versionCount": ac_node.versions().count(),
+            "latestVersionIndex": ac_node.lastMembership().versionIndex(),
+            "projectName": ac_node.project().name(),
+            "entityName": ac_node.project().entity().name(),
+            "artifactTypeName": ac_node._get_op("type")().name(),
+            "memberships": ac_node.memberships().map(
+                lambda row: dict_(
+                    **{
+                        "versionIndex": row.versionIndex(),
+                        "artifactVersion": row.artifactVersion(),
+                        "aliases": row.aliases().alias(),
+                    }
+                )
+            ),
+        }
+    )
+    assert weave.use(ac_detail_node) != None
+
+    # Leaf 3: Get the specific membership
+    fake_wandb.clear_mock_handlers()
+    fake_wandb.add_mock(
+        lambda q, ndx: {
+            "project": {
+                **fwb.project_payload,  # type: ignore
+                "artifactCollection_d651817074b6a8074e87e9dfd5767726": {
+                    **fwb.artifactSequence_payload,  # type: ignore
+                    "artifactMembership_78e7a3fd51159b4fdfb0815be0b0f92c": {
+                        **fwb.artifactMembership_payload
+                    },
+                },
+            }
+        }
+    )
+    mem_node = ac_node.membershipForAlias("v0")
+    assert weave.use(mem_node) != None
+
+    # Leaf 4: Get the specific membership details
+    fake_wandb.clear_mock_handlers()
+    fake_wandb.add_mock(
+        lambda q, ndx: {
+            "project": {
+                **fwb.project_payload,  # type: ignore
+                "artifactCollection_d651817074b6a8074e87e9dfd5767726": {
+                    **fwb.artifactSequence_payload,  # type: ignore
+                    "artifactMembership_a9aa34b91abdb163475121bd51290fcb": {
+                        **fwb.artifactMembership_payload
+                    },
+                },
+            }
+        }
+    )
+    mem_detail_node = dict_(
+        **{
+            "versionIndex": mem_node.versionIndex(),
+            "artifactVersionId": mem_node.artifactVersion().id(),
+        }
+    )
+    assert weave.use(mem_detail_node) != None
+
+
+def test_loading_artifact_browser_request_3(fake_wandb):
+    ac_node = ops.project("stacey", "mendeleev").artifact("test_res_1fwmcd3q")
+    mem_node = ac_node.membershipForAlias("v0")
+    # Leaf 5: Get the specific artifact version details
+    fake_wandb.add_mock(
+        lambda q, ndx: {
+            "project": {
+                **fwb.project_payload,  # type: ignore
+                "artifactCollection_d651817074b6a8074e87e9dfd5767726": {
+                    **fwb.artifactSequence_payload,  # type: ignore
+                    "artifactMembership_78e7a3fd51159b4fdfb0815be0b0f92c": {
+                        **fwb.artifactMembership_payload,  # type: ignore
+                        "artifact": {
+                            **fwb.artifactVersion_payload,  # type: ignore
+                            "description": "",
+                            "digest": "fd2948ad1c05b8d0084609a726a5da68",
+                            "createdAt": "2021-07-10T19:27:32",
+                            "usedBy_21303e3890a1b6580998e6aa8a345859": {
+                                "edges": [
+                                    {
+                                        "node": {
+                                            **fwb.run_payload,  # type: ignore
+                                        }
+                                    }
+                                ]
+                            },
+                            "size": 90574246,
+                            "artifactCollections": {
+                                "edges": [
+                                    {
+                                        "node": {
+                                            **fwb.artifactSequence_payload,  # type: ignore
+                                            "__typename": "ArtifactSequence",
+                                            "project": {
+                                                **fwb.project_payload,  # type: ignore
+                                            },
+                                        }
+                                    }
+                                ]
+                            },
+                            "createdBy": {
+                                "__typename": "Run",
+                                **fwb.run_payload,  # type: ignore
+                                "inputArtifacts_21303e3890a1b6580998e6aa8a345859": {
+                                    "edges": [
+                                        {
+                                            "node": {
+                                                **fwb.artifactVersion_payload,  # type: ignore
+                                                "artifactSequence": {
+                                                    **fwb.artifactSequence_payload,  # type: ignore
+                                                    "project": {
+                                                        **fwb.project_payload,  # type: ignore
+                                                    },
+                                                },
+                                                "artifactType": {
+                                                    **fwb.defaultArtifactType_payload,  # type: ignore
+                                                },
+                                            },
+                                        }
+                                    ]
+                                },
+                            },
+                        },
+                        "artifactCollection": {
+                            **fwb.artifactSequence_payload,  # type: ignore
+                            "aliases_21303e3890a1b6580998e6aa8a345859": {
+                                "edges": [
+                                    {
+                                        "node": {
+                                            **fwb.artifactAlias_payload,  # type: ignore
+                                        }
+                                    }
+                                ]
+                            },
+                            "project": {
+                                **fwb.project_payload,  # type: ignore
+                                "entity": {
+                                    **fwb.entity_payload,  # type: ignore
+                                    "artifactCollections_9dd867443b22f4b22c2b85e7719e3d46": {
+                                        "edges": [
+                                            {
+                                                "node": {
+                                                    **fwb.artifactSequence_payload,  # type: ignore
+                                                }
+                                            }
+                                        ]
+                                    },
+                                },
+                            },
+                            "__typename": "ArtifactSequence",
+                            "artifactMemberships_21303e3890a1b6580998e6aa8a345859": {
+                                "edges": [
+                                    {
+                                        "node": {
+                                            **fwb.artifactMembership_payload,  # type: ignore
+                                            "aliases": [
+                                                {
+                                                    **fwb.artifactAlias_payload,  # type: ignore
+                                                },
+                                            ],
+                                        }
+                                    }
+                                ]
+                            },
+                        },
+                    },
+                },
+            }
+        }
+    )
+    av_node = mem_node.artifactVersion()
+    mem_collection_node = mem_node.collection()
+    av_details_node = dict_(
+        **{
+            "id": av_node.id(),
+            "colId": mem_collection_node.id(),
+            "colAliases": mem_collection_node.aliases().alias(),
+            "colTypeName": mem_collection_node._get_op("type")().name(),
+            "colEntityName": mem_collection_node.project().entity().name(),
+            "colProjectName": mem_collection_node.project().name(),
+            "colName": mem_collection_node.name(),
+            "memVersionIndex": mem_node.versionIndex(),
+            "description": av_node.description(),
+            "digest": av_node.digest(),
+            "createdAt": av_node.createdAt(),
+            "usedByCount": av_node.usedBy().count(),
+            "fileCount": av_node.files().count(),
+            "size": av_node.size(),
+            "isPortfolio": mem_collection_node.isPortfolio(),
+            "memberships": mem_collection_node.memberships().map(
+                lambda row: dict_(
+                    **{
+                        "versionIndex": row.versionIndex(),
+                        "aliases": row.aliases().alias(),
+                    }
+                )
+            ),
+            "filteredCollections": av_node.artifactCollections()
+            .filter(lambda row: row.isPortfolio())
+            .map(
+                lambda row: dict_(
+                    **{
+                        "name": row._get_op("name")(),
+                        "typeName": row._get_op("type")().name(),
+                        "entityName": row.project().entity().name(),
+                        "projectName": row.project().name(),
+                    }
+                )
+            ),
+            "dependencies": av_node.createdBy()
+            .usedArtifactVersions()
+            .map(
+                lambda row: dict_(
+                    **{
+                        "name": row._get_op("name")(),
+                        "typeName": row.artifactType().name(),
+                        "entityName": row.artifactSequence().project().entity().name(),
+                        "projectName": row.artifactSequence().project().name(),
+                    }
+                )
+            ),
+            "hasPortfolios": mem_collection_node.project()
+            .entity()
+            .portfolios()
+            .filter(
+                lambda row: row._get_op("type")().name()
+                == mem_collection_node._get_op("type")().name()
+            )
+            .count()
+            >= 1,
+        }
+    )
+    assert weave.use(av_details_node) != None
+
+    # Leaf 6: Get Portfolios
+    fake_wandb.clear_mock_handlers()
+    fake_wandb.add_mock(
+        lambda q, ndx: {
+            "project": {
+                **fwb.project_payload,  # type: ignore
+                "artifactCollection_d651817074b6a8074e87e9dfd5767726": {
+                    **fwb.artifactSequence_payload,  # type: ignore
+                    "artifactMembership_78e7a3fd51159b4fdfb0815be0b0f92c": {
+                        **fwb.artifactMembership_payload,  # type: ignore
+                        "artifact": {
+                            **fwb.artifactVersion_payload,  # type: ignore
+                            "artifactMemberships": {
+                                "edges": [
+                                    {
+                                        "node": {
+                                            **fwb.artifactMembership_payload,  # type: ignore
+                                            "artifactCollection": {
+                                                **fwb.artifactSequence_payload,  # type: ignore
+                                                "__typename": "ArtifactSequence",
+                                            },
+                                        }
+                                    }
+                                ]
+                            },
+                        },
+                    },
+                },
+            }
+        }
+    )
+    portfolios_node = (
+        av_node.memberships().filter(lambda row: row.collection().isPortfolio()).count()
+    )
+    assert weave.use(portfolios_node) != None
+
+    # Leaf 7: Is Weave
+    fake_wandb.clear_mock_handlers()
+    fake_wandb.add_mock(
+        lambda q, ndx: {
+            "project": {
+                **fwb.project_payload,  # type: ignore
+                "artifactCollection_d651817074b6a8074e87e9dfd5767726": {
+                    **fwb.artifactSequence_payload,  # type: ignore
+                    "artifactMembership_78e7a3fd51159b4fdfb0815be0b0f92c": {
+                        **fwb.artifactMembership_payload,  # type: ignore
+                        "artifact": {
+                            **fwb.artifactVersion_payload,  # type: ignore
+                        },
+                    },
+                },
+            }
+        }
+    )
+    is_weave_node = av_node.isWeaveObject()
+    assert weave.use(is_weave_node) != None

@@ -70,3 +70,7 @@ class WeaveClientArtifactResolutionFailure(WeaveBaseError):
 
 class WeaveTableDeserializationError(WeaveBaseError):
     pass
+
+
+class WeaveStitchGraphMergeError(WeaveBaseError):
+    pass

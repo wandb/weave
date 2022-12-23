@@ -1,4 +1,5 @@
 import weave
+from weave import graph
 
 from .. import stitch
 
@@ -73,6 +74,24 @@ def test_enter_filter():
     assert calls[0].inputs[1].val == "b"
     assert calls[1].node.from_op.name == "typedDict-pick"
     assert calls[1].inputs[1].val == "a"
+
+
+def test_lambda_using_externally_defined_node():
+    objs_node = weave.save([{"a": 5, "b": 6, "c": 10}, {"a": 7, "b": 8, "c": 11}])
+    # Inside the lambda, we use externally defined `objs_node`. This should
+    # result in all 3 calls being recorded
+    p = stitch.stitch(
+        [objs_node["b"], objs_node.filter(lambda obj: obj["a"] > objs_node[0]["b"])]
+    )
+    obj_recorder = p.get_result(objs_node)
+    calls = obj_recorder.calls
+    assert len(calls) == 3
+    assert calls[0].node.from_op.name == "mapped_typedDict-pick"
+    assert calls[0].inputs[1].val == "b"
+    assert calls[1].node.from_op.name == "typedDict-pick"
+    assert calls[1].inputs[1].val == "a"
+    assert calls[2].node.from_op.name == "list-__getitem__"
+    assert calls[2].inputs[1].val == 0
 
 
 def test_tag_access_in_filter_expr():

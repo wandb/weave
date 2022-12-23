@@ -42,6 +42,7 @@ class OpCall:
 
 @dataclasses.dataclass()
 class ObjectRecorder:
+    node: graph.Node
     tags: dict[str, "ObjectRecorder"] = dataclasses.field(default_factory=dict)
     val: typing.Optional[typing.Any] = None
     calls: list[OpCall] = dataclasses.field(default_factory=list)
@@ -49,7 +50,7 @@ class ObjectRecorder:
     def call_node(
         self, node: graph.OutputNode, input_dict: dict[str, "ObjectRecorder"]
     ) -> "ObjectRecorder":
-        output = ObjectRecorder()
+        output = ObjectRecorder(node)
         self.calls.append(OpCall(node, input_dict, output))
         return output
 
@@ -72,8 +73,35 @@ class StitchedGraph:
     def add_result(self, node: graph.Node, result: ObjectRecorder) -> None:
         self._node_map[node] = result
 
+    def _merge_result(self, node: graph.Node, result: ObjectRecorder) -> None:
+        # Performs an in-place merge of the node result into the stitched graph.
+        curr_result = self._node_map[node]
+        if curr_result.val != result.val:
+            raise errors.WeaveStitchGraphMergeError(
+                f"Cannot merge ObjectRecorder with different values: {curr_result.val} and {result.val}"
+            )
+
+        # Merge the calls
+        known_called_nodes = {call.node for call in curr_result.calls}
+        for call in result.calls:
+            if call.node not in known_called_nodes:
+                curr_result.calls.append(call)
+
+        # Merge the tags
+        for tag_name, other_tag_recorder in result.tags.items():
+            if tag_name not in curr_result.tags:
+                if other_tag_recorder.node in self._node_map:
+                    other_tag_recorder = self._node_map[other_tag_recorder.node]
+                else:
+                    self.add_result(other_tag_recorder.node, other_tag_recorder)
+                curr_result.tags[tag_name] = other_tag_recorder
+
     def add_subgraph_stich_graph(self, other: "StitchedGraph") -> None:
-        self._node_map.update(other._node_map)
+        for node, result in other._node_map.items():
+            if node not in self._node_map:
+                self.add_result(node, result)
+            else:
+                self._merge_result(node, result)
 
 
 def stitch(
@@ -88,19 +116,19 @@ def stitch(
             input_dict = {k: sg.get_result(v) for k, v in node.from_op.inputs.items()}
             sg.add_result(node, stitch_node(node, input_dict, sg))
         elif isinstance(node, graph.ConstNode):
-            sg.add_result(node, ObjectRecorder(val=node.val))
+            sg.add_result(node, ObjectRecorder(node, val=node.val))
         elif isinstance(node, graph.VarNode):
             if var_values and node.name in var_values:
                 sg.add_result(node, var_values[node.name])
             else:
                 # Originally, we would raise an error here, but we now allow
                 # unbound vars to be in the graph. This makes sense to me (Tim)
-                # since we could be stitching the compiliation step of a
+                # since we could be stitching the compilation step of a
                 # subgraph, but Shawn has pointed out that this case could be
-                # removed if we stiched the entire graph in 1 pass. For now, we
+                # removed if we stitched the entire graph in 1 pass. For now, we
                 # assign an empty recorder, but this might be able to be
                 # optimized out in the future.
-                sg.add_result(node, ObjectRecorder())
+                sg.add_result(node, ObjectRecorder(node))
                 # raise errors.WeaveInternalError(
                 #     "Encountered var %s but var_values not provided" % node.name
                 # )
@@ -150,9 +178,9 @@ def stitch_node_inner(
         tag_name = get_tag_name_from_tag_getter_op(op)
         return inputs[0].tags[tag_name]
     elif node.from_op.name.endswith("createIndexCheckpointTag"):
-        inputs[0].tags["indexCheckpoint"] = ObjectRecorder()
+        inputs[0].tags["indexCheckpoint"] = ObjectRecorder(node)
     elif node.from_op.name == "dict":
-        return LiteralDictObjectRecorder(val=input_dict)
+        return LiteralDictObjectRecorder(node, val=input_dict)
     elif node.from_op.name == "list":
         # Merge element tags together and place them on the outer list.
         # This is overly aggressive, but it means we don't need to provide
@@ -161,7 +189,7 @@ def stitch_node_inner(
         tags: dict[str, ObjectRecorder] = {}
         for input in input_dict.values():
             tags.update(input.tags)
-        return LiteralListObjectRecorder(tags=tags, val=list(input_dict.values()))
+        return LiteralListObjectRecorder(node, tags=tags, val=list(input_dict.values()))
     elif node.from_op.name.endswith("pick"):
         if isinstance(node.from_op.inputs["key"], graph.ConstNode):
             key = node.from_op.inputs["key"].val
@@ -191,7 +219,7 @@ def stitch_node_inner(
         if fn is None:
             raise errors.WeaveInternalError("non-const not yet supported")
         subgraph_stitch(fn, {"row": inputs[0]}, sg)
-        # Return the original object
+        # # Return the original object
         return inputs[0]
     elif node.from_op.name.endswith("groupby"):
         fn = inputs[1].val

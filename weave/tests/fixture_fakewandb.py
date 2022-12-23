@@ -228,3 +228,9 @@ artifactMembership_payload = {
     "artifact": artifactVersion_payload,
     "artifactCollection": artifactSequence_payload,
 }
+artifactAlias_payload = {
+    "id": "abcdefg",
+    "alias": "custom_alias",
+    "artifact": artifactVersion_payload,
+    "artifactCollection": artifactSequence_payload,
+}

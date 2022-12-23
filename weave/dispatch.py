@@ -267,6 +267,12 @@ class DispatchMixin:
         return [o.common_name for o in ops]
 
     def __getattr__(self, attr: str) -> typing.Any:
+        return self._get_op(attr)
+
+    # This implementation is not directly inside of __getattr__ so that
+    # tests can call it directly in cases where attributes are overrode
+    # by the node class (ex. name, type)
+    def _get_op(self, attr: str) -> typing.Any:
         node_self = typing.cast(graph.Node, self)
         if attr.startswith("__") and attr.endswith("__"):
             return getattr(super(), attr)
