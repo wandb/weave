@@ -102,14 +102,21 @@ def with_visited_obj(obj: typing.Any) -> typing.Iterator[None]:
 
 
 # Adds a dictionary of tags to an object
-def add_tags(obj: typing.Any, tags: dict[str, typing.Any]) -> typing.Any:
+def add_tags(
+    obj: typing.Any,
+    tags: dict[str, typing.Any],
+    give_precedence_to_existing_tags: bool = False,
+) -> typing.Any:
     mem_map = _current_obj_tag_mem_map()
     if mem_map is None:
         raise errors.WeaveInternalError("No tag store context")
     id_val = id(obj)
     assert box.is_boxed(obj), "Can only tag boxed objects"
     existing_tags = get_tags(obj) if is_tagged(obj) else {}
-    mem_map[id_val] = {**existing_tags, **tags}
+    if give_precedence_to_existing_tags:
+        mem_map[id_val] = {**tags, **existing_tags}
+    else:
+        mem_map[id_val] = {**existing_tags, **tags}
     return obj
 
 

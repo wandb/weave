@@ -1,3 +1,4 @@
+import copy
 import logging
 import typing
 import dataclasses
@@ -38,6 +39,7 @@ from .. import arrow_util
 from ..language_features.tagging import tag_store
 
 from . import arrow
+from ..ops_primitives import list_ as base_list
 
 from .arrow import arrow_as_array
 
@@ -116,6 +118,56 @@ def _pick_output_type(input_types):
     if prop_type is None:
         return types.Invalid()
     return ArrowWeaveListType(prop_type)
+
+
+def _map_each_function_type(input_types: dict[str, types.Type]) -> types.Type:
+    base_op_fn_type = base_list._map_each_function_type({"arr": input_types["self"]})
+    base_op_fn_type.input_types["self"] = ArrowWeaveListType(
+        typing.cast(types.List, input_types["self"]).object_type
+    )
+    return base_op_fn_type
+
+
+def _map_each_output_type(input_types: dict[str, types.Type]):
+    base_output_type = base_list._map_each_output_type(
+        {"arr": input_types["self"], "mapFn": input_types["map_fn"]}
+    )
+    return ArrowWeaveListType(base_output_type.object_type)
+
+
+def _map_each(self: "ArrowWeaveList", fn):
+    if types.List().assign_type(self.object_type):
+        as_array = arrow_as_array(self._arrow_data)
+        offsets = as_array.offsets
+        flattened = as_array.flatten()
+        if isinstance(self.object_type, tagged_value_type.TaggedValueType):
+            new_object_type = typing.cast(
+                types.List, self.object_type.value
+            ).object_type
+        else:
+            new_object_type = typing.cast(types.List, self.object_type).object_type
+
+        new_awl: ArrowWeaveList = ArrowWeaveList(
+            flattened,
+            new_object_type,
+            self._artifact,
+        )
+
+        mapped = _map_each(new_awl, fn)
+        reshaped_arrow_data: ArrowWeaveList = ArrowWeaveList(
+            pa.ListArray.from_arrays(offsets, mapped._arrow_data),
+            self.object_type,
+            self._artifact,
+        )
+
+        if isinstance(self.object_type, tagged_value_type.TaggedValueType):
+            return awl_add_arrow_tags(
+                reshaped_arrow_data,
+                self._arrow_data.field("_tag"),
+                self.object_type.tag,
+            )
+        return reshaped_arrow_data
+    return _apply_fn_node(self, fn)
 
 
 def rewrite_weavelist_refs(arrow_data, object_type, artifact):
@@ -751,6 +803,17 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
     )
     def map(self, map_fn):
         return _apply_fn_node(self, map_fn)
+
+    @arrow_op(
+        name="ArrowWeaveList-mapEach",
+        input_type={
+            "self": ArrowWeaveListType(),
+            "map_fn": _map_each_function_type,
+        },
+        output_type=_map_each_output_type,
+    )
+    def map_each(self, map_fn):
+        return _map_each(self, map_fn)
 
     @op(
         input_type={

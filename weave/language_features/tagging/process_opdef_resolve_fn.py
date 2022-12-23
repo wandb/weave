@@ -124,5 +124,7 @@ def process_opdef_resolve_fn(
                 tag_type = types.TypeRegistry.type_of(tag_dict)
                 assert isinstance(tag_type, types.TypedDict)
                 return TaggedValueType(tag_type, res)
-            return tag_store.add_tags(res, tag_dict)
+            return tag_store.add_tags(
+                res, tag_dict, give_precedence_to_existing_tags=True
+            )
     return res

@@ -1826,3 +1826,24 @@ def test_arrow_timestamp_conversion(li):
 
     # We are always representing timestamps as UTC
     assert li.use_node(data.toTimestamp()) == utc_dates
+
+
+def test_mapeach_with_tags():
+    data = [[2, 3, 4], [2, 3, 4], [2, 3, 4]]
+    for i, row in enumerate(data):
+        for j, elem in enumerate(row):
+            row[j] = tag_store.add_tags(box.box(elem), {"tag": f"row{i}_col{j}"})
+        data[i] = tag_store.add_tags(box.box(row), {"tag": f"row{i}"})
+    tagged = tag_store.add_tags(box.box(data), {"tag": "top"})
+
+    awl = arrow.to_arrow(tagged)
+    node = weave.save(awl)
+
+    tag_getter_op = make_tag_getter_op.make_tag_getter_op("tag", types.String())
+
+    result = arrow.ArrowWeaveList.map_each(node, lambda row: row + 1)
+    assert arrow.ArrowWeaveListType(types.List(types.Number())).assign_type(result.type)
+    assert weave.use(result).to_pylist_notags() == [[3, 4, 5]] * 3
+    assert weave.use(tag_getter_op(result)) == "top"
+    assert weave.use(tag_getter_op(result[0])) == "row0"
+    assert weave.use(tag_getter_op(result[0][0])) == "row0_col0"
