@@ -267,16 +267,26 @@ class DispatchMixin:
         return [o.common_name for o in ops]
 
     def __getattr__(self, attr: str) -> typing.Any:
-        return self._get_op(attr)
+        node_self = typing.cast(graph.Node, self)
+        if attr.startswith("__") and attr.endswith("__"):
+            return getattr(super(), attr)
+        possible_bound_op = self._get_op(attr)
+        if possible_bound_op is not None:
+            return possible_bound_op
+        possible_prop_node = self._get_prop(attr)
+        if possible_prop_node is not None:
+            return possible_prop_node
+        raise errors.WeaveDispatchError(
+            'No ops called "%s" available on type "%s"' % (attr, node_self.type)
+        )
 
     # This implementation is not directly inside of __getattr__ so that
     # tests can call it directly in cases where attributes are overrode
     # by the node class (ex. name, type)
-    def _get_op(self, attr: str) -> typing.Any:
+    def _get_op(
+        self, attr: str
+    ) -> typing.Optional[typing.Union[BoundPotentialOpDefs, op_def.BoundOpDef]]:
         node_self = typing.cast(graph.Node, self)
-        if attr.startswith("__") and attr.endswith("__"):
-            return getattr(super(), attr)
-
         # First, we check if the attribute matches a known op name...
         ops_with_name = registry_mem.memory_registry.find_ops_by_common_name(attr)
         ops_with_name_and_arg = []
@@ -298,6 +308,10 @@ class DispatchMixin:
                 # Otherwise, we need to wait til we know the rest of the args
                 # before we can decide which op to use.
                 return BoundPotentialOpDefs(node_self, ops_with_name_and_arg)
+        return None
+
+    def _get_prop(self, attr: str) -> typing.Optional[graph.OutputNode]:
+        node_self = typing.cast(graph.Node, self)
         self_type = node_self.type
         if isinstance(self_type, types.ObjectType):
             # Definitely an ObjectType
@@ -309,9 +323,7 @@ class DispatchMixin:
                     'No attributes called "%s" available on Object "%s"'
                     % (attr, node_self.type)
                 )
-        raise errors.WeaveDispatchError(
-            'No ops called "%s" available on type "%s"' % (attr, node_self.type)
-        )
+        return None
 
     __call__ = _dispatch_dunder("__call__")
     __getitem__ = _dispatch_dunder("__getitem__")
