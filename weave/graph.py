@@ -363,6 +363,8 @@ def _map_nodes(
                 to_consider.extend(input_nodes_needed[::-1])
                 continue
             if any(n is not inputs[k] for k, n in node.from_op.inputs.items()):
+                # TODO: Remove circular import (probably want to make
+                # relationship between ops that take lambdas explicit)
                 from . import weave_internal
 
                 result_node = weave_internal.make_output_node(
