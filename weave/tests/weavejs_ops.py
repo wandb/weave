@@ -1,5 +1,6 @@
 # WeaveJS ops used for testing. These are not used in production.
 
+from ..ops_primitives.file import TableType
 from ..ops_primitives._dict_utils import typeddict_pick_output_type
 from .. import weave_types as types
 from .. import graph
@@ -90,7 +91,7 @@ def sort(arr, compFn, columnDirs):
         {
             "arr": arr_node,
             "compFn": ensure_node(compFn),
-            "columnDirs": types.Any(),
+            "columnDirs": ensure_node(columnDirs),
         },
     )
 
@@ -144,5 +145,23 @@ def file_type(file):
         "file-type",
         {
             "file": file_node,
+        },
+    )
+
+
+def file_table_rows(file, objectType):
+    file_node = ensure_node(file)
+    table_node = weave_internal.make_output_node(
+        TableType(),
+        "file-table",
+        {
+            "file": file_node,
+        },
+    )
+    return weave_internal.make_output_node(
+        types.List(objectType),
+        "table-rows",
+        {
+            "table": table_node,
         },
     )

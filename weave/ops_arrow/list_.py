@@ -1088,13 +1088,19 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         group_table_awl = _apply_fn_node(self, group_by_fn)
         table = self._arrow_data
 
-        group_table = group_table_awl._arrow_data
-        group_table = arrow.arrow_as_array(group_table)
+        raw_group_table = arrow.arrow_as_array(group_table_awl._arrow_data)
 
         # strip tags recursively so we group on values only
-        group_table = ArrowWeaveList(
-            group_table, group_table_awl.object_type, self._artifact
-        )._arrow_data_asarray_no_tags()
+        group_table_tagged = ArrowWeaveList(
+            raw_group_table, group_table_awl.object_type, self._artifact
+        )
+        group_table = group_table_tagged._arrow_data_asarray_no_tags()
+        # We currently strip tags from the group key. This is
+        # different that Weave0 and will cause issues in the case that we need
+        # to get tags off the group key (not sure if these cases exist). If
+        # we ever fix that, then we can use the commented line below instead.
+        # group_table_object_type = group_by_fn.type
+        group_table_object_type = ArrowWeaveList(group_table).object_type
 
         # There was a comment that arrow doesn't allow grouping on struct columns
         # and another large block of code that tried to avoid passing in a struct column.
@@ -1139,7 +1145,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             agged,
             original_col_names,
             self.object_type,
-            group_by_fn.type,
+            group_table_object_type,
             self._artifact,
         )
 

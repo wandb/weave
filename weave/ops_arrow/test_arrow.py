@@ -115,6 +115,25 @@ def test_groupby_sort(sort_lambda, sort_dirs, exp_rotation_avg):
     assert weave.use(first_group_rotation_avg) == exp_rotation_avg
 
 
+# def test_tagged_groupby_sort():
+#     list_data = [{"a": 1, "b": 1}, {"a": 1, "b": 2}, {"a": 2, "b": 1}, {"a": 2, "b": 2}]
+#     list_node = list_.make_list(**{f"{n}": v for n, v in enumerate(list_data)})
+
+#     # nested_list_node = list_.make_list(a=list_node, b=None)
+#     # tagged = nested_list_node.dropna().concat().createIndexCheckpointTag()
+#     grouped_node = tagged.groupby(lambda row: ops.dict_(a=row["a"]))
+#     sorted_node = grouped_node.sort(
+#         lambda row: list_.make_list(a=row.groupkey().pick("a")), ["asc"]
+#     )
+#     val_node = sorted_node[0]["b"].avg()
+
+#     # Patch in arrow
+#     arrow_node = weave.save(arrow.to_arrow(list_data))
+#     nested_list_node.from_op.inputs["a"] = arrow_node
+
+#     assert weave.use(sorted_node) == 1.5
+
+
 def test_map_scalar_map():
     ref = create_arrow_data(100)
 

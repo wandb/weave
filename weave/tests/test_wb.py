@@ -861,3 +861,53 @@ def test_loading_artifact_browser_request_3(fake_wandb):
     )
     is_weave_node = av_node.isWeaveObject()
     assert weave.use(is_weave_node) != None
+
+
+from ..language_features.tagging import tag_store, tagged_value_type, make_tag_getter_op
+
+
+def test_get_issue():
+    node = weavejs_ops.file_table_rows(
+        ops.project("stacey", "mendeleev").runs().limit(50).summary()["test_results"],
+        types.TypedDict(
+            {
+                "truth": types.String(),
+                "prediction": types.String(),
+            }
+        ),
+    )
+    node = weavejs_ops.groupby(
+        node,
+        weave.define_fn(
+            {"row": node.type.object_type},
+            lambda row: ops.dict_(
+                truth=graph.OutputNode(
+                    types.String(),
+                    "pick",
+                    {"obj": row, "key": graph.ConstNode(types.String(), "truth")},
+                )
+            ),
+        ),
+    )
+    node = weavejs_ops.sort(
+        node,
+        weave.define_fn(
+            {"row": node.type.object_type},
+            lambda row: ops.make_list(
+                a=graph.OutputNode(
+                    types.String(),
+                    "pick",
+                    {
+                        "obj": graph.OutputNode(
+                            types.TypedDict({"truth": types.String()}),
+                            "group-groupkey",
+                            {"obj": row},
+                        ),
+                        "key": graph.ConstNode(types.String(), "truth"),
+                    },
+                )
+            ),
+        ),
+        ops.make_list(a="asc"),
+    )
+    assert weave.use(node) != None
