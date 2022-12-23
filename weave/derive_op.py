@@ -13,6 +13,7 @@ from . import graph
 from . import box
 from . import weave_internal
 from . import wandb_api
+from . import box
 from .language_features.tagging import tag_store
 
 
@@ -233,7 +234,7 @@ class MappedDeriveOpHandler(DeriveOpHandler):
                 # thread boundary.
                 for x, res_val in zip(list_, res):
                     if tag_store.is_tagged(x):
-                        tag_store.add_tags(res_val, tag_store.get_tags(x))
+                        tag_store.add_tags(box.box(res_val), tag_store.get_tags(x))
 
                 return res
 
