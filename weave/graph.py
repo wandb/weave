@@ -294,39 +294,78 @@ def node_expr_str(node: Node) -> str:
         return "**PARSE_ERROR**"
 
 
+def _is_const_function_node(node: Node) -> bool:
+    return isinstance(node, ConstNode) and isinstance(node.type, weave_types.Function)
+
+
+def _op_passes_first_arg_as_row_var(op: Op) -> bool:
+    return (
+        op.name.endswith("map")
+        or op.name.endswith("filter")
+        or op.name.endswith("sort")
+        or op.name.endswith("groupby")
+    )
+
+
 def _map_nodes(
-    node: Node,
+    start_node: Node,
     map_fn: typing.Callable[[Node], typing.Optional[Node]],
     already_mapped: dict[Node, Node],
     walk_lambdas: bool,
 ) -> Node:
     # This is an iterative implemenation, to avoid blowing the stack and
     # to provide friendlier stack traces for exception merging tools.
-    to_consider = [node]
+    var_node_binding_map: dict[VarNode, Node] = {}
+    skipped_var_nodes = set()
+    to_consider = [start_node]
     while to_consider:
         node = to_consider[-1]
         if node in already_mapped:
             to_consider.pop()
             continue
         result_node = node
+        # If it is a var node that has been bound to another node...
+        if isinstance(node, VarNode) and node in var_node_binding_map:
+            # Then only process the node once we've processed the node it is bound to.
+            # and update the type accordingly
+            bound_node = var_node_binding_map[node]
+            if bound_node not in already_mapped:
+                if node in skipped_var_nodes:
+                    raise errors.WeaveInternalError(
+                        f"Failed to resolve var node binding while mapping {start_node}. \
+                        This is likely a bug in _map_nodes logic, or an invalid graph."
+                    )
+                skipped_var_nodes.add(node)
+                continue
+            skipped_var_nodes.remove(node)
+            result_node.type = already_mapped[bound_node].type
         if isinstance(node, OutputNode):
             inputs = {}
-            need_inputs = False
+            input_nodes_needed = []
             for param_name, param_node in node.from_op.inputs.items():
                 if param_node not in already_mapped:
-                    to_consider.append(param_node)
-                    need_inputs = True
+                    input_nodes_needed.append(param_node)
+                    # We need to bind the variable inside the lambda to the correct parameter:
+                    if (
+                        walk_lambdas
+                        and _op_passes_first_arg_as_row_var(node.from_op)
+                        and _is_const_function_node(param_node)
+                    ):
+                        for var_node in expr_vars(param_node.val):
+                            if var_node.name == "row":
+                                var_node_binding_map[var_node] = list(
+                                    node.from_op.inputs.values()
+                                )[0]
                 else:
                     inputs[param_name] = already_mapped[param_node]
-            if need_inputs:
+            if len(input_nodes_needed) > 0:
+                # This list reversal is required to ensure we map the params in order (required for dependent params like lambdas)
+                to_consider.extend(input_nodes_needed[::-1])
                 continue
             if any(n is not inputs[k] for k, n in node.from_op.inputs.items()):
                 result_node = OutputNode(node.type, node.from_op.name, inputs)
-        elif (
-            walk_lambdas
-            and isinstance(node, ConstNode)
-            and isinstance(node.type, weave_types.Function)
-        ):
+        elif walk_lambdas and _is_const_function_node(node):
+            node = typing.cast(ConstNode, node)
             if node.val not in already_mapped:
                 to_consider.append(node.val)
                 continue
@@ -338,7 +377,7 @@ def _map_nodes(
         if mapped_node is None:
             mapped_node = result_node
         already_mapped[node] = mapped_node
-    return already_mapped[node]
+    return already_mapped[start_node]
 
 
 def map_nodes_top_level(
