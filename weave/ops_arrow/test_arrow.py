@@ -7,6 +7,8 @@ import string
 from PIL import Image
 import typing
 
+from ..tests import weavejs_ops
+
 
 from .. import box
 from .. import storage
@@ -115,23 +117,47 @@ def test_groupby_sort(sort_lambda, sort_dirs, exp_rotation_avg):
     assert weave.use(first_group_rotation_avg) == exp_rotation_avg
 
 
-# def test_tagged_groupby_sort():
-#     list_data = [{"a": 1, "b": 1}, {"a": 1, "b": 2}, {"a": 2, "b": 1}, {"a": 2, "b": 2}]
-#     list_node = list_.make_list(**{f"{n}": v for n, v in enumerate(list_data)})
-
-#     # nested_list_node = list_.make_list(a=list_node, b=None)
-#     # tagged = nested_list_node.dropna().concat().createIndexCheckpointTag()
-#     grouped_node = tagged.groupby(lambda row: ops.dict_(a=row["a"]))
-#     sorted_node = grouped_node.sort(
-#         lambda row: list_.make_list(a=row.groupkey().pick("a")), ["asc"]
-#     )
-#     val_node = sorted_node[0]["b"].avg()
-
-#     # Patch in arrow
-#     arrow_node = weave.save(arrow.to_arrow(list_data))
-#     nested_list_node.from_op.inputs["a"] = arrow_node
-
-#     assert weave.use(sorted_node) == 1.5
+def test_js_groupby_sort():
+    list_data = [{"a": 1, "b": 1}, {"a": 1, "b": 2}, {"a": 2, "b": 1}, {"a": 2, "b": 2}]
+    list_node = list_.make_list(**{f"{n}": v for n, v in enumerate(list_data)})
+    arrow_node = weave.save(arrow.to_arrow(list_data))
+    node = weavejs_ops.groupby(
+        list_node,
+        weave.define_fn(
+            {"row": list_node.type.object_type},
+            lambda row: ops.dict_(
+                a=graph.OutputNode(
+                    types.String(),
+                    "pick",
+                    {"obj": row, "key": graph.ConstNode(types.String(), "a")},
+                )
+            ),
+        ),
+    )
+    # Critical replacement of the input to use arrow!
+    node.from_op.inputs["arr"] = arrow_node
+    node = weavejs_ops.sort(
+        node,
+        weave.define_fn(
+            {"row": node.type.object_type},
+            lambda row: ops.make_list(
+                a=graph.OutputNode(
+                    types.String(),
+                    "pick",
+                    {
+                        "obj": graph.OutputNode(
+                            types.TypedDict({"a": types.String()}),
+                            "group-groupkey",
+                            {"obj": row},
+                        ),
+                        "key": graph.ConstNode(types.String(), "a"),
+                    },
+                )
+            ),
+        ),
+        ops.make_list(a="asc"),
+    )
+    assert weave.use(node) != None
 
 
 def test_map_scalar_map():
