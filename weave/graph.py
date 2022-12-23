@@ -313,7 +313,7 @@ def _map_nodes(
     already_mapped: dict[Node, Node],
     walk_lambdas: bool,
 ) -> Node:
-    # This is an iterative implemenation, to avoid blowing the stack and
+    # This is an iterative implementation, to avoid blowing the stack and
     # to provide friendlier stack traces for exception merging tools.
     var_node_binding_map: dict[VarNode, Node] = {}
     skipped_var_nodes = set()
@@ -337,7 +337,6 @@ def _map_nodes(
                     )
                 skipped_var_nodes.add(node)
                 continue
-            skipped_var_nodes.remove(node)
             result_node.type = already_mapped[bound_node].type
         if isinstance(node, OutputNode):
             inputs = {}
