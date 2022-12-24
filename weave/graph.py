@@ -313,10 +313,11 @@ def _map_nodes(
     already_mapped: dict[Node, Node],
     walk_lambdas: bool,
 ) -> Node:
+    from . import registry_mem
+    from . import op_args
+
     # This is an iterative implementation, to avoid blowing the stack and
     # to provide friendlier stack traces for exception merging tools.
-    var_node_binding_map: dict[VarNode, Node] = {}
-    skipped_var_nodes = set()
     to_consider = [start_node]
     while to_consider:
         node = to_consider[-1]
@@ -324,38 +325,65 @@ def _map_nodes(
             to_consider.pop()
             continue
         result_node = node
-        # If it is a var node that has been bound to another node...
-        if isinstance(node, VarNode) and node in var_node_binding_map:
-            # Then only process the node once we've processed the node it is bound to.
-            # and update the type accordingly
-            bound_node = var_node_binding_map[node]
-            if bound_node not in already_mapped:
-                if node in skipped_var_nodes:
-                    raise errors.WeaveInternalError(
-                        f"Failed to resolve var node binding while mapping {start_node}. \
-                        This is likely a bug in _map_nodes logic, or an invalid graph."
-                    )
-                skipped_var_nodes.add(node)
-                continue
-            # TODO: this assumes the var is a row of a list... be better!)
-            result_node.type = already_mapped[bound_node][0].type  # type: ignore
         if isinstance(node, OutputNode):
             inputs = {}
-            input_nodes_needed = []
+            input_nodes_needed: list[Node] = []
+            op_def = (
+                registry_mem.memory_registry.get_op(node.from_op.name)
+                if registry_mem.memory_registry.have_op(node.from_op.name)
+                else None
+            )
             for param_name, param_node in node.from_op.inputs.items():
                 if param_node not in already_mapped:
-                    input_nodes_needed.append(param_node)
-                    # We need to bind the variable inside the lambda to the correct parameter:
+                    # We only add params to the list who are not dependent on other params OR all prior params have been mapped
                     if (
                         walk_lambdas
-                        and _op_passes_first_arg_as_row_var(node.from_op)
+                        and op_def is not None
                         and _is_const_function_node(param_node)
                     ):
-                        for var_node in expr_vars(param_node.val):
-                            if var_node.name == "row":
-                                var_node_binding_map[var_node] = list(
-                                    node.from_op.inputs.values()
-                                )[0]
+                        param_is_dependent = isinstance(
+                            op_def.input_type, op_args.OpNamedArgs
+                        ) and callable(op_def.input_type.arg_types[param_name])
+                        if param_is_dependent:
+                            param_is_ready = len(input_nodes_needed) == 0
+                            if not param_is_ready:
+                                # We will be back later to resolve this param - don't append to list yet
+                                continue
+
+                            input_type = typing.cast(
+                                op_args.OpNamedArgs, op_def.input_type
+                            )
+                            dep_input_fn = typing.cast(
+                                typing.Callable[
+                                    [dict[str, weave_types.Type]], typing.Any
+                                ],
+                                input_type.arg_types[param_name],
+                            )
+                            # TODO: This is where the problem is with this alternative implementation... basically dep_input_fn is on the old node
+                            # and instead, we need to use the new node's input fn. For example, by the time we get here, we know that the input
+                            # type is an arrow list, but it is stuck on the old groupby, which generates the incorrect type...
+                            breakpoint()
+                            # Do we need to do the alread_mapped lookup?
+                            resolved_param = dep_input_fn(
+                                {
+                                    key: already_mapped[val].type
+                                    for key, val in node.from_op.inputs.items()
+                                    if val in already_mapped
+                                }
+                            )
+                            if isinstance(resolved_param, weave_types.Function):
+                                # Finally, we can now update the var nodes!
+                                for var_node in expr_vars(param_node.val):
+                                    if var_node.name in resolved_param.input_types:
+                                        if node.from_op.name == "sort":
+                                            print(node.from_op.inputs)
+                                            print(
+                                                f"Replacing {var_node.type} with {resolved_param.input_types[var_node.name]}"
+                                            )
+                                        var_node.type = resolved_param.input_types[
+                                            var_node.name
+                                        ]
+                    input_nodes_needed.append(param_node)
                 else:
                     inputs[param_name] = already_mapped[param_node]
             if len(input_nodes_needed) > 0:
@@ -363,13 +391,7 @@ def _map_nodes(
                 to_consider.extend(input_nodes_needed[::-1])
                 continue
             if any(n is not inputs[k] for k, n in node.from_op.inputs.items()):
-                # TODO: Remove circular import (probably want to make
-                # relationship between ops that take lambdas explicit)
-                from . import weave_internal
-
-                result_node = weave_internal.make_output_node(
-                    node.type, node.from_op.name, inputs
-                )
+                result_node = OutputNode(node.type, node.from_op.name, inputs)
         elif walk_lambdas and _is_const_function_node(node):
             node = typing.cast(ConstNode, node)
             if node.val not in already_mapped:
