@@ -554,6 +554,16 @@ def test_loading_artifact_browser_request_2(fake_wandb):
                     "artifactMembership_fe9cc269bee939ccb54ebba88c6087dd": {
                         **fwb.artifactMembership_payload
                     },
+                    "artifactMemberships": {
+                        "edges": [
+                            {
+                                "node": {
+                                    **fwb.artifactMembership_payload,
+                                    "aliases": [fwb.artifactAlias_payload],
+                                }
+                            }
+                        ]
+                    },
                     "artifactMemberships_21303e3890a1b6580998e6aa8a345859": {
                         "edges": [
                             {

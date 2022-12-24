@@ -67,15 +67,6 @@ gql_direct_edge_op(
     lambda inputs: f'aliasName: "{inputs["aliasName"]}"',
 )
 
-gql_direct_edge_op(
-    "artifact-lastMembership",
-    wdt.ArtifactCollectionType,
-    "artifactMembership",
-    wdt.ArtifactCollectionMembershipType,
-    {},
-    lambda inputs: f'aliasName: "latest"',
-)
-
 # Section 5/6: Connection Ops
 gql_connection_op(
     "artifact-versions",
@@ -109,3 +100,25 @@ gql_connection_op(
 )
 def is_portfolio(artifact: wdt.ArtifactCollection) -> bool:
     return artifact.gql["__typename"] == "ArtifactPortfolio"
+
+
+@op(
+    name="artifact-lastMembership",
+    plugins=wb_gql_op_plugin(
+        lambda inputs, inner: f"""
+            artifactMemberships(first: 1) {{
+                edges {{
+                    node {{
+                        {wdt.ArtifactCollectionMembership.REQUIRED_FRAGMENT}
+                        {inner}
+                    }}
+                }}
+            }}
+        """,
+    ),
+)
+def last_membership(
+    artifact: wdt.ArtifactCollection,
+) -> wdt.ArtifactCollectionMembership:
+    edge = artifact.gql["artifactMemberships"]["edges"][0]
+    return wdt.ArtifactCollectionMembership.from_gql(edge["node"])
