@@ -313,6 +313,9 @@ def _map_nodes(
     already_mapped: dict[Node, Node],
     walk_lambdas: bool,
 ) -> Node:
+    # TODO: Remove circular import (probably want to make
+    # relationship between ops that take lambdas explicit)
+    from . import weave_internal
     # This is an iterative implementation, to avoid blowing the stack and
     # to provide friendlier stack traces for exception merging tools.
     var_node_binding_map: dict[VarNode, Node] = {}
@@ -338,6 +341,7 @@ def _map_nodes(
                 skipped_var_nodes.add(node)
                 continue
             # TODO: this assumes the var is a row of a list... be better!)
+            # This also breaks in some tests since it is not always a "dispatchable" type
             result_node.type = already_mapped[bound_node][0].type  # type: ignore
         if isinstance(node, OutputNode):
             inputs = {}
@@ -363,10 +367,6 @@ def _map_nodes(
                 to_consider.extend(input_nodes_needed[::-1])
                 continue
             if any(n is not inputs[k] for k, n in node.from_op.inputs.items()):
-                # TODO: Remove circular import (probably want to make
-                # relationship between ops that take lambdas explicit)
-                from . import weave_internal
-
                 result_node = weave_internal.make_output_node(
                     node.type, node.from_op.name, inputs
                 )
@@ -376,7 +376,7 @@ def _map_nodes(
                 to_consider.append(node.val)
                 continue
             if node.val is not already_mapped[node.val]:
-                result_node = ConstNode(node.type, already_mapped[node.val])
+                result_node = weave_internal.make_const_node(node.type, already_mapped[node.val])
 
         to_consider.pop()
         mapped_node = map_fn(result_node)
