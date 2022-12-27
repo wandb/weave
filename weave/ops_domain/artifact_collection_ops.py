@@ -1,3 +1,5 @@
+import typing
+
 from ..compile_domain import wb_gql_op_plugin
 from ..api import op
 from .. import weave_types as types
@@ -119,6 +121,9 @@ def is_portfolio(artifact: wdt.ArtifactCollection) -> bool:
 )
 def last_membership(
     artifact: wdt.ArtifactCollection,
-) -> wdt.ArtifactCollectionMembership:
-    edge = artifact.gql["artifactMemberships"]["edges"][0]
+) -> typing.Optional[wdt.ArtifactCollectionMembership]:
+    edges = artifact.gql["artifactMemberships"]["edges"]
+    if len(edges) == 0:
+        return None
+    edge = edges[0]
     return wdt.ArtifactCollectionMembership.from_gql(edge["node"])
