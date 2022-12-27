@@ -23,6 +23,21 @@ class OpAmbiguityError(Exception):
     pass
 
 
+@dataclass
+class OpDispatchCandidates:
+    query: str
+    candidates: list[op_def.OpDef]
+
+    def __len__(self) -> int:
+        return len(self.candidates)
+
+    def __getitem__(self, index: int) -> op_def.OpDef:
+        return self.candidates[index]
+
+    def __iter__(self) -> typing.Iterator[op_def.OpDef]:
+        return iter(self.candidates)
+
+
 # I originally wrote this thinking that we could always choose the more specific
 # op, defined as the one that's input types are strict subtypes of the other.
 # But consider mapped_add(List[number], number) and
@@ -97,9 +112,10 @@ def _resolve_op_ambiguity(candidates: list[op_def.OpDef]) -> op_def.OpDef:
     return ordered[0]
 
 
-def _get_ops_by_name(fq_op_name: str) -> list[op_def.OpDef]:
+def _get_ops_by_name(fq_op_name: str) -> OpDispatchCandidates:
     """Returns a single op that matches the given name and raw inputs (inputs can be python objects or nodes)"""
     shared_name_ops: list[op_def.OpDef]
+    op: typing.Optional[op_def.OpDef]
 
     if fq_op_name.startswith("local-artifact://"):
         # If the incoming op is a locally-defined op, then we are just going to look at the derived op space.
@@ -109,14 +125,15 @@ def _get_ops_by_name(fq_op_name: str) -> list[op_def.OpDef]:
         shared_name_ops = [op] + derived_ops
     # Else, we lookup all the ops with the same common name
     else:
+        op = None
         shared_name_ops = registry_mem.memory_registry.find_ops_by_common_name(
             op_def.common_name(fq_op_name)
         )
-    return shared_name_ops
+    return OpDispatchCandidates(fq_op_name, shared_name_ops)
 
 
 def _choose_op_by_types(
-    op_choices: list[op_def.OpDef],
+    op_choices: OpDispatchCandidates,
     args: list[types.Type],
     kwargs: dict[str, types.Type],
 ) -> typing.Optional[op_def.OpDef]:
@@ -124,7 +141,7 @@ def _choose_op_by_types(
     for op in op_choices:
         param_dict = op.input_type.create_param_dict(args, kwargs)
         param_dict = language_nullability.adjust_assignable_param_dict_for_dispatch(
-            op, param_dict
+            op, param_dict, op_choices.query
         )
         if op.input_type.params_are_valid(param_dict):
             candidates.append(op)
@@ -134,7 +151,7 @@ def _choose_op_by_types(
 
 
 def _choose_op_by_args(
-    ops: list[op_def.OpDef], args: list[typing.Any], kwargs: dict[str, typing.Any]
+    ops: OpDispatchCandidates, args: list[typing.Any], kwargs: dict[str, typing.Any]
 ) -> op_def.OpDef:
     arg_types = [_type_of_input_param(arg) for arg in args]
     kwarg_types = {k: _type_of_input_param(v) for k, v in kwargs.items()}
@@ -162,7 +179,7 @@ def _choose_op_by_args(
 
 
 def _dispatch_ops_by_type(
-    ops: list[op_def.OpDef], args: list[typing.Any], kwargs: dict[str, typing.Any]
+    ops: OpDispatchCandidates, args: list[typing.Any], kwargs: dict[str, typing.Any]
 ) -> "RuntimeOutputNode":
     op = _choose_op_by_args(ops, args, kwargs)
 
@@ -224,7 +241,7 @@ def _type_of_input_param(v: typing.Any) -> types.Type:
 @dataclass
 class BoundPotentialOpDefs:
     self_node: graph.Node
-    potential_ops: list[op_def.OpDef]
+    potential_ops: OpDispatchCandidates
 
     def __call__(self, *args: typing.Any, **kwargs: typing.Any) -> "RuntimeOutputNode":
         return _dispatch_ops_by_type(
@@ -307,7 +324,9 @@ class DispatchMixin:
             else:
                 # Otherwise, we need to wait til we know the rest of the args
                 # before we can decide which op to use.
-                return BoundPotentialOpDefs(node_self, ops_with_name_and_arg)
+                return BoundPotentialOpDefs(
+                    node_self, OpDispatchCandidates(attr, ops_with_name_and_arg)
+                )
         return None
 
     def _get_prop(self, attr: str) -> typing.Optional[graph.OutputNode]:

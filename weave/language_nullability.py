@@ -30,7 +30,7 @@ def should_force_none_result(
 
 
 def adjust_assignable_param_dict_for_dispatch(
-    op: OpDef.OpDef, param_dict: dict[str, types.Type]
+    op: OpDef.OpDef, param_dict: dict[str, types.Type], query: str
 ) -> dict[str, types.Type]:
     if isinstance(op.input_type, op_args.OpNamedArgs):
         named_args = op.input_type.named_args()
