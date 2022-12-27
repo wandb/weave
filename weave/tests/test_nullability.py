@@ -38,20 +38,24 @@ def test_basic_nullability():
     b = weave.save(2)
     maybe_int = weave.save([1, None])[0]
     null_int = weave.save([1, None])[1]
+    explicit_null = weave.save(None)
 
     assert weave.use(no_arg_op()) == 1
 
     assert weave.use(int_arg_op(b)) == 3
     assert weave.use(int_arg_op(maybe_int)) == 2
     assert weave.use(int_arg_op(null_int)) == None
+    assert weave.use(int_arg_op(explicit_null)) == None
 
     assert weave.use(int_args_op(b, b)) == 4
     assert weave.use(int_args_op(maybe_int, b)) == 3
     assert weave.use(int_args_op(null_int, b)) == None
+    assert weave.use(int_args_op(explicit_null, b)) == None
 
     assert weave.use(null_consuming_op(b, b)) == 4
     assert weave.use(null_consuming_op(maybe_int, b)) == 3
     assert weave.use(null_consuming_op(null_int, b)) == 20
+    assert weave.use(null_consuming_op(explicit_null, b)) == 20
 
 
 def test_basic_nullability_in_mappability():
