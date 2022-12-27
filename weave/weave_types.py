@@ -1206,3 +1206,7 @@ def type_is_variable(t: Type) -> bool:
 
 
 NumberBinType = TypedDict({"start": Float(), "stop": Float()})
+
+
+def types_are_mutually_assignable(t1: Type, t2: Type) -> bool:
+    return t1.assign_type(t2) and t2.assign_type(t1)
