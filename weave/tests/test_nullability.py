@@ -60,6 +60,7 @@ def test_basic_nullability():
 
 def test_basic_nullability_in_mappability():
     b_arr = weave.save([2])
+    explicit_null_arr = weave.save([None])
     maybe_int_arr = weave.save(
         weave.graph.ConstNode(
             weave.types.List(weave.types.optional(weave.types.Int())), [1, None]
@@ -68,12 +69,15 @@ def test_basic_nullability_in_mappability():
 
     assert weave.use(int_arg_op(b_arr)) == [3]
     assert weave.use(int_arg_op(maybe_int_arr)) == [2, None]
+    assert weave.use(int_arg_op(explicit_null_arr)) == [None]
 
     assert weave.use(int_args_op(b_arr, 2)) == [4]
     assert weave.use(int_args_op(maybe_int_arr, 2)) == [3, None]
+    assert weave.use(int_args_op(explicit_null_arr, 2)) == [None]
 
     assert weave.use(null_consuming_op(b_arr, 2)) == [4]
     assert weave.use(null_consuming_op(maybe_int_arr, 2)) == [3, 20]
+    assert weave.use(null_consuming_op(explicit_null_arr, 2)) == [20]
 
 
 @pytest.mark.parametrize(
