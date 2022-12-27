@@ -130,6 +130,15 @@ def test_basic_nullability_in_mappability():
             ),
             [42, None],
         ),
+        # Explicit null case
+        # Not supported yet
+        # TODO: support
+        """
+        (
+            make_const_node(weave.types.NoneType(), [None]),
+            [None],
+        ),
+        """,
     ],
 )
 def test_nullability_in_execution(input_node, expected):
