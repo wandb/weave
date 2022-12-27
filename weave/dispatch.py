@@ -150,7 +150,7 @@ def _choose_op_by_types(
         param_dict = language_nullability.adjust_assignable_param_dict_for_dispatch(
             op,
             param_dict,
-            op is exact_match,
+            exact_match is not None and op is exact_match,
         )
         if op.input_type.params_are_valid(param_dict):
             candidates.append(op)
