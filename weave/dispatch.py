@@ -138,21 +138,19 @@ def _choose_op_by_types(
     kwargs: dict[str, types.Type],
 ) -> typing.Optional[op_def.OpDef]:
     candidates: list[op_def.OpDef] = []
-    derived_ops: list[op_def.OpDef]
     exact_match: typing.Optional[op_def.OpDef]
 
     try:
         exact_match = registry_mem.memory_registry.get_op(op_choices.query)
     except errors.WeaveStorageError:
         exact_match = None
-        derived_ops = []
-    else:
-        derived_ops = list(exact_match.derived_ops.values())
 
     for op in op_choices:
         param_dict = op.input_type.create_param_dict(args, kwargs)
         param_dict = language_nullability.adjust_assignable_param_dict_for_dispatch(
-            op, param_dict, op is exact_match, op in derived_ops
+            op,
+            param_dict,
+            op is exact_match,
         )
         if op.input_type.params_are_valid(param_dict):
             candidates.append(op)
