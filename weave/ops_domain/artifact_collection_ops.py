@@ -125,5 +125,4 @@ def last_membership(
     edges = artifact.gql["artifactMemberships"]["edges"]
     if len(edges) == 0:
         return None
-    edge = edges[0]
-    return wdt.ArtifactCollectionMembership.from_gql(edge["node"])
+    return wdt.ArtifactCollectionMembership.from_gql(edges[0]["node"])
