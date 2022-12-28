@@ -313,10 +313,6 @@ def _map_nodes(
     already_mapped: dict[Node, Node],
     walk_lambdas: bool,
 ) -> Node:
-    # TODO: Remove circular import (probably want to make
-    # relationship between ops that take lambdas explicit)
-    from . import weave_internal
-
     # This is an iterative implementation, to avoid blowing the stack and
     # to provide friendlier stack traces for exception merging tools.
     var_node_binding_map: dict[VarNode, Node] = {}
@@ -350,7 +346,11 @@ def _map_nodes(
             # This works for now since we are just plucking the index type (which means we don't need to have the correct op yet...)
             # one fix is to potentially change the object type of the AWL group by?, then use a similar solution to part2 (or generalize this one)
             # - just use bound_node_type.object_type
-            result_node.type = weave_internal.make_const_node(bound_node_type, None)[0].type  # type: ignore
+            if not hasattr(bound_node_type, "object_type"):
+                raise errors.WeaveInternalError(
+                    f"Expected {bound_node_type} to have an `object_type`"
+                )
+            result_node.type = bound_node_type.object_type  # type: ignore
         if isinstance(node, OutputNode):
             inputs = {}
             input_nodes_needed = []
