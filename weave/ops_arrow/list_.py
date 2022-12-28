@@ -434,7 +434,7 @@ class ArrowTableGroupResultType(ArrowWeaveListType):
 class ArrowTableGroupByType(types.Type):
     name = "ArrowTableGroupBy"
 
-    object_type: types.Type = ArrowTableGroupResultType()
+    object_type: ArrowTableGroupResultType = ArrowTableGroupResultType()
 
     @classmethod
     def type_of_instance(cls, obj):
