@@ -315,8 +315,6 @@ def _map_nodes(
 ) -> Node:
     # This is an iterative implementation, to avoid blowing the stack and
     # to provide friendlier stack traces for exception merging tools.
-    var_node_binding_map: dict[VarNode, Node] = {}
-    skipped_var_nodes = set()
     to_consider = [start_node]
     while to_consider:
         node = to_consider[-1]
@@ -324,55 +322,62 @@ def _map_nodes(
             to_consider.pop()
             continue
         result_node = node
-        # If it is a var node that has been bound to another node...
-        if isinstance(node, VarNode) and node in var_node_binding_map:
-            # Then only process the node once we've processed the node it is bound to.
-            # and update the type accordingly
-            bound_node = var_node_binding_map[node]
-            if bound_node not in already_mapped:
-                if node in skipped_var_nodes:
-                    raise errors.WeaveInternalError(
-                        f"Failed to resolve var node binding while mapping {start_node}. \
-                        This is likely a bug in _map_nodes logic, or an invalid graph."
-                    )
-                skipped_var_nodes.add(node)
-                continue
-            # TODO: this assumes the var is a row of a list... be better!)
-            # This also breaks in some tests since it is not always a "dispatchable" type
-            bound_node_type = already_mapped[bound_node].type
-            # THIS MUST BE REMOVED BEFORE MERGING - TOTAL HACK
-            if isinstance(bound_node_type, weave_types.Function):
-                bound_node_type = bound_node_type.output_type
-            # This works for now since we are just plucking the index type (which means we don't need to have the correct op yet...)
-            # one fix is to potentially change the object type of the AWL group by?, then use a similar solution to part2 (or generalize this one)
-            # - just use bound_node_type.object_type
-            if not hasattr(bound_node_type, "object_type"):
-                raise errors.WeaveInternalError(
-                    f"Expected {bound_node_type} to have an `object_type`"
-                )
-            result_node.type = bound_node_type.object_type  # type: ignore
         if isinstance(node, OutputNode):
             inputs = {}
-            input_nodes_needed = []
+            inputs_to_consider: list[Node] = []
             for param_name, param_node in node.from_op.inputs.items():
-                if param_node not in already_mapped:
-                    input_nodes_needed.append(param_node)
-                    # We need to bind the variable inside the lambda to the correct parameter:
-                    if (
-                        walk_lambdas
-                        and _op_passes_first_arg_as_row_var(node.from_op)
-                        and _is_const_function_node(param_node)
-                    ):
-                        for var_node in expr_vars(param_node.val):
-                            if var_node.name == "row":
-                                var_node_binding_map[var_node] = list(
-                                    node.from_op.inputs.values()
-                                )[0]
-                else:
+                # If the param is already mapped, continue on.
+                if param_node in already_mapped:
                     inputs[param_name] = already_mapped[param_node]
-            if len(input_nodes_needed) > 0:
+                    continue
+
+                # Unless the param is a function const needing walking, add it to the list of inputs to consider.
+                if not (
+                    walk_lambdas
+                    and _is_const_function_node(param_node)
+                    and _op_passes_first_arg_as_row_var(node.from_op)
+                ):
+                    inputs_to_consider.append(param_node)
+                    continue
+
+                # If it is such a function node, check if the prior args have been resolved.
+                # We will skip this param if not. We will revisit it on the next visitation of
+                # the lambda node.
+                all_prior_args_have_been_mapped = len(inputs_to_consider) == 0
+                if not all_prior_args_have_been_mapped:
+                    continue
+
+                # Finally, we update the input type of the var node - warning
+                # this is a dangerous in-place mutation which means if the same
+                # function node was used in multiple places where the types
+                # differed, then this would be a problem.
+                bound_node_type = already_mapped[
+                    list(node.from_op.inputs.values())[0]
+                ].type
+                # THIS MUST BE REMOVED BEFORE MERGING - TOTAL HACK
+                if isinstance(bound_node_type, weave_types.Function):
+                    bound_node_type = bound_node_type.output_type
+                if not hasattr(bound_node_type, "object_type"):
+                    raise errors.WeaveInternalError(
+                        f"Expected {bound_node_type} to have an `object_type`"
+                    )
+                row_node_type = bound_node_type.object_type  # type: ignore
+                param_node = typing.cast(ConstNode, param_node)
+                param_node_type = typing.cast(weave_types.Function, param_node.type)
+                if "row" not in param_node_type.input_types:
+                    raise errors.WeaveInternalError(
+                        f"Expected {param_node_type.input_types} to have row"
+                    )
+                param_node_type.input_types["row"] = row_node_type
+                param_node_val = typing.cast(Node, param_node.val)
+                for var_node in expr_vars(param_node_val):
+                    if var_node.name == "row":
+                        var_node.type = row_node_type
+
+                inputs_to_consider.append(param_node)
+            if len(inputs_to_consider) > 0:
                 # This list reversal is required to ensure we map the params in order (required for dependent params like lambdas)
-                to_consider.extend(input_nodes_needed[::-1])
+                to_consider.extend(inputs_to_consider[::-1])
                 continue
             if any(n is not inputs[k] for k, n in node.from_op.inputs.items()):
                 result_node = OutputNode(node.type, node.from_op.name, inputs)
