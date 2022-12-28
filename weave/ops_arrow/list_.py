@@ -228,7 +228,11 @@ def rewrite_weavelist_refs(arrow_data, object_type, artifact):
         new_refs = []
         for ref_str in arrow_data:
             ref_str = ref_str.as_py()
-            new_refs.append(_rewrite_ref_entry(ref_str, object_type, artifact))
+            new_refs.append(
+                _rewrite_ref_entry(ref_str, object_type, artifact)
+                if ref_str is not None
+                else None
+            )
         return pa.array(new_refs)
 
 
@@ -1652,13 +1656,17 @@ def recursively_build_pyarrow_array(
                 mapper,
                 mappers_arrow.ObjectToArrowStruct,
             ):
+                data: list[typing.Any] = []
+                for py_obj in py_objs:
+                    if py_obj is None:
+                        data.append(None)
+                    elif py_objs_already_mapped:
+                        data.append(py_obj.get(field.name, None))
+                    else:
+                        data.append(getattr(py_obj, field.name, None))
+
                 array = recursively_build_pyarrow_array(
-                    [
-                        getattr(py_obj, field.name, None)
-                        if not py_objs_already_mapped
-                        else py_obj.get(field.name, None)
-                        for py_obj in py_objs
-                    ],
+                    data,
                     field.type,
                     mapper._property_serializers[field.name],
                     py_objs_already_mapped,
