@@ -344,6 +344,7 @@ def _map_nodes(
             # TODO: this assumes the var is a row of a list... be better!)
             # This also breaks in some tests since it is not always a "dispatchable" type
             bound_node_type = already_mapped[bound_node].type
+            # THIS MUST BE REMOVED BEFORE MERGING - TOTAL HACK
             if isinstance(bound_node_type, weave_types.Function):
                 bound_node_type = bound_node_type.output_type
             result_node.type = weave_internal.make_const_node(bound_node_type, None)[0].type  # type: ignore
