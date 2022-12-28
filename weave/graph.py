@@ -1,3 +1,4 @@
+import copy
 import json
 import typing
 
@@ -307,6 +308,50 @@ def _op_passes_first_arg_as_row_var(op: Op) -> bool:
     )
 
 
+def _update_lambda_fn_node_var_types(
+    lambda_fn_param_name: str,
+    lambda_fn_node: ConstNode,
+    lambda_op_node: OutputNode,
+    already_mapped: dict[Node, Node],
+) -> ConstNode:
+    if not isinstance(lambda_fn_node.type, weave_types.Function):
+        raise errors.WeaveInternalError(
+            f"Expected {lambda_fn_node} to have a Function type"
+        )
+
+    if "row" not in lambda_fn_node.type.input_types:
+        raise errors.WeaveInternalError(
+            f"Expected {lambda_fn_node.type.input_types} to have row"
+        )
+
+    bound_node_type = already_mapped[
+        list(lambda_op_node.from_op.inputs.values())[0]
+    ].type
+    # THIS MUST BE REMOVED BEFORE MERGING - TOTAL HACK
+    if isinstance(bound_node_type, weave_types.Function):
+        bound_node_type = bound_node_type.output_type
+    if not hasattr(bound_node_type, "object_type"):
+        raise errors.WeaveInternalError(
+            f"Expected {bound_node_type} to have an `object_type`"
+        )
+    row_node_type = bound_node_type.object_type  # type: ignore
+
+    if lambda_fn_node.type.input_types["row"].assign_type(row_node_type):
+        return lambda_fn_node
+
+    _lambda_fn_node = copy.deepcopy(lambda_fn_node)
+    _lambda_fn_node_type = typing.cast(weave_types.Function, _lambda_fn_node.type)
+    lambda_op_node.from_op.inputs[lambda_fn_param_name] = _lambda_fn_node
+
+    _lambda_fn_node_type.input_types["row"] = row_node_type
+    _lambda_fn_node_val = typing.cast(Node, _lambda_fn_node.val)
+    for var_node in expr_vars(_lambda_fn_node_val):
+        if var_node.name == "row":
+            var_node.type = row_node_type
+
+    return _lambda_fn_node
+
+
 def _map_nodes(
     start_node: Node,
     map_fn: typing.Callable[[Node], typing.Optional[Node]],
@@ -331,52 +376,29 @@ def _map_nodes(
                     inputs[param_name] = already_mapped[param_node]
                     continue
 
-                # Unless the param is a function const needing walking, add it to the list of inputs to consider.
-                if not (
+                # When we are walking lambdas, we may need to update the types
+                # of the var nodes in the lambda function node. This is because
+                # the type of the row var is actually dependent on the type of
+                # the prior arg - which may have changed as a result of the
+                # mapping.
+                if (
                     walk_lambdas
                     and _is_const_function_node(param_node)
                     and _op_passes_first_arg_as_row_var(node.from_op)
                 ):
-                    inputs_to_consider.append(param_node)
-                    continue
-
-                # If it is such a function node, check if the prior args have been resolved.
-                # We will skip this param if not. We will revisit it on the next visitation of
-                # the lambda node.
-                all_prior_args_have_been_mapped = len(inputs_to_consider) == 0
-                if not all_prior_args_have_been_mapped:
-                    continue
-
-                # Finally, we update the input type of the var node - warning
-                # this is a dangerous in-place mutation which means if the same
-                # function node was used in multiple places where the types
-                # differed, then this would be a problem.
-                bound_node_type = already_mapped[
-                    list(node.from_op.inputs.values())[0]
-                ].type
-                # THIS MUST BE REMOVED BEFORE MERGING - TOTAL HACK
-                if isinstance(bound_node_type, weave_types.Function):
-                    bound_node_type = bound_node_type.output_type
-                if not hasattr(bound_node_type, "object_type"):
-                    raise errors.WeaveInternalError(
-                        f"Expected {bound_node_type} to have an `object_type`"
+                    # If it is such a function node, check if the prior args
+                    # have been resolved. We will skip this param if not and
+                    # will revisit it on the next visitation of the lambda node.
+                    all_prior_args_have_been_mapped = len(inputs_to_consider) == 0
+                    if not all_prior_args_have_been_mapped:
+                        continue
+                    param_node = _update_lambda_fn_node_var_types(
+                        param_name, param_node, node, already_mapped
                     )
-                row_node_type = bound_node_type.object_type  # type: ignore
-                param_node = typing.cast(ConstNode, param_node)
-                param_node_type = typing.cast(weave_types.Function, param_node.type)
-                if "row" not in param_node_type.input_types:
-                    raise errors.WeaveInternalError(
-                        f"Expected {param_node_type.input_types} to have row"
-                    )
-                param_node_type.input_types["row"] = row_node_type
-                param_node_val = typing.cast(Node, param_node.val)
-                for var_node in expr_vars(param_node_val):
-                    if var_node.name == "row":
-                        var_node.type = row_node_type
-
                 inputs_to_consider.append(param_node)
             if len(inputs_to_consider) > 0:
-                # This list reversal is required to ensure we map the params in order (required for dependent params like lambdas)
+                # This list reversal is required to ensure we map the params in
+                # order (required for dependent params like lambdas)
                 to_consider.extend(inputs_to_consider[::-1])
                 continue
             if any(n is not inputs[k] for k, n in node.from_op.inputs.items()):
