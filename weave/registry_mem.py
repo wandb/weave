@@ -74,6 +74,12 @@ class Registry:
             raise errors.WeaveInternalError("Op not registered: %s" % uri)
         return res
 
+    def get_op_safe(self, uri: str) -> typing.Optional[op_def.OpDef]:
+        try:
+            return self.get_op(uri)
+        except (errors.WeaveInternalError, errors.WeaveStorageError):
+            return None
+
     def find_op_by_fn(self, lazy_local_fn):
         for op_def in self._op_versions.values():
             if op_def.call_fn == lazy_local_fn:

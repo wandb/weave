@@ -316,6 +316,7 @@ def _map_nodes(
     # TODO: Remove circular import (probably want to make
     # relationship between ops that take lambdas explicit)
     from . import weave_internal
+
     # This is an iterative implementation, to avoid blowing the stack and
     # to provide friendlier stack traces for exception merging tools.
     var_node_binding_map: dict[VarNode, Node] = {}
@@ -342,7 +343,10 @@ def _map_nodes(
                 continue
             # TODO: this assumes the var is a row of a list... be better!)
             # This also breaks in some tests since it is not always a "dispatchable" type
-            result_node.type = already_mapped[bound_node][0].type  # type: ignore
+            bound_node_type = already_mapped[bound_node].type
+            if isinstance(bound_node_type, weave_types.Function):
+                bound_node_type = bound_node_type.output_type
+            result_node.type = weave_internal.make_const_node(bound_node_type, None)[0].type  # type: ignore
         if isinstance(node, OutputNode):
             inputs = {}
             input_nodes_needed = []
@@ -367,16 +371,14 @@ def _map_nodes(
                 to_consider.extend(input_nodes_needed[::-1])
                 continue
             if any(n is not inputs[k] for k, n in node.from_op.inputs.items()):
-                result_node = weave_internal.make_output_node(
-                    node.type, node.from_op.name, inputs
-                )
+                result_node = OutputNode(node.type, node.from_op.name, inputs)
         elif walk_lambdas and _is_const_function_node(node):
             node = typing.cast(ConstNode, node)
             if node.val not in already_mapped:
                 to_consider.append(node.val)
                 continue
             if node.val is not already_mapped[node.val]:
-                result_node = weave_internal.make_const_node(node.type, already_mapped[node.val])
+                result_node = ConstNode(node.type, already_mapped[node.val])
 
         to_consider.pop()
         mapped_node = map_fn(result_node)
