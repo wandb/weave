@@ -185,9 +185,7 @@ def _make_auto_op_map_fn(when_type: type[types.Type], call_op_fn):
     def fn(node: graph.Node) -> typing.Optional[graph.Node]:
         if isinstance(node, graph.OutputNode):
             node_inputs = node.from_op.inputs
-            op_def = registry_mem.memory_registry.get_op_safe(node.from_op.name)
-            if op_def is None:
-                return None
+            op_def = registry_mem.memory_registry.get_op(node.from_op.name)
             if (
                 op_def.name == "tag-indexCheckpoint"
                 or op_def.name == "Object-__getattr__"
