@@ -9,7 +9,12 @@ from .. import weave_internal
 from .. import errors
 from .. import execute_fast
 from .. import op_def
-from ..language_features.tagging import make_tag_getter_op, tag_store, tagged_value_type
+from ..language_features.tagging import (
+    make_tag_getter_op,
+    tag_store,
+    tagged_value_type,
+    tagged_value_type_helpers,
+)
 import functools
 
 
@@ -21,25 +26,49 @@ def _map_each_function_type(input_types: dict[str, types.Type]) -> types.Functio
     return types.Function({"row": input_types["arr"]}, types.Any())
 
 
-def _list_ndims(list_type: types.Type) -> int:
-    if types.List().assign_type(list_type):
-        return 1 + _list_ndims(typing.cast(types.List, list_type).object_type)
-    return 0
-
-
 def _map_each_output_type(input_types: dict[str, types.Type]):
+    # propagate tags in output type
     map_each_function_type = input_types["mapFn"]
-    list_ndims = _list_ndims(input_types["arr"])
     output_type = typing.cast(types.Function, map_each_function_type).output_type
-    for _ in range(list_ndims):
-        output_type = types.List(output_type)
-    return output_type
+
+    def get_next_type(t: types.Type) -> types.Type:
+        if types.List().assign_type(t):
+            t_as_list = typing.cast(types.List, t)
+            if tagged_value_type_helpers.is_tagged_value_type(t):
+                t_as_tagged = typing.cast(tagged_value_type.TaggedValueType, t)
+                return tagged_value_type.TaggedValueType(
+                    t_as_tagged.tag,
+                    types.List(
+                        get_next_type(
+                            typing.cast(types.List, t_as_tagged.value).object_type
+                        )
+                    ),
+                )
+            return types.List(get_next_type(t_as_list.object_type))
+        elif tagged_value_type_helpers.is_tagged_value_type(t):
+            t_as_tagged = typing.cast(tagged_value_type.TaggedValueType, t)
+            return tagged_value_type.TaggedValueType(t_as_tagged.tag, output_type)
+        return output_type
+
+    return get_next_type(input_types["arr"])
 
 
 def _map_each(arr: list, fn):
+    existing_tags = [
+        tag_store.get_tags(item) if tag_store.is_tagged(item) else None for item in arr
+    ]
+
     if isinstance(arr, list) and len(arr) > 0 and isinstance(arr[0], list):
-        return [_map_each(item, fn) for item in arr]
-    return execute_fast.fast_map_fn(arr, fn)
+        result = [_map_each(item, fn) for item in arr]
+    else:
+        result = execute_fast.fast_map_fn(arr, fn)
+
+    for i, item in enumerate(result):
+        maybe_existing_tags = existing_tags[i]
+        if maybe_existing_tags is not None:
+            result[i] = tag_store.add_tags(box.box(item), maybe_existing_tags)
+
+    return result
 
 
 def getitem_output_type(input_types):

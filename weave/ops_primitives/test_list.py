@@ -2,9 +2,11 @@ import random
 
 from .. import api as weave
 from .. import weave_types as types
+from .. import box
 from . import list_
 from . import dict
 from . import number
+from .. import weave_internal
 from ..tests import weavejs_ops
 from ..language_features.tagging import make_tag_getter_op, tag_store, tagged_value_type
 
@@ -120,3 +122,44 @@ def test_mapeach():
     result = list_.List.map_each(two_d_list_node, lambda row: row + 1)
     assert result.type == types.List(types.List(types.Number()))
     assert weave.use(result) == [[2, 3, 4], [2, 3, 4], [2, 3, 4]]
+
+
+def test_mapeach_tagged():
+    raw_data = [[i + 3 * j for i in [2, 3, 4]] for j in [0, 1, 2]]
+    for i, row in enumerate(raw_data):
+        for j, value in enumerate(row):
+            raw_data[i][j] = tag_store.add_tags(box.box(value), {"row": i, "col": j})
+        raw_data[i] = tag_store.add_tags(box.box(raw_data[i]), {"row": i})
+    raw_data = tag_store.add_tags(box.box(raw_data), {"tag": "top"})
+    two_d_list_node = weave.save(raw_data)
+
+    result = list_.List.map_each(two_d_list_node, lambda row: row + 1)
+
+    expected_type = tagged_value_type.TaggedValueType(
+        types.TypedDict({"tag": types.String()}),
+        types.List(
+            tagged_value_type.TaggedValueType(
+                types.TypedDict({"row": types.Int()}),
+                types.List(
+                    tagged_value_type.TaggedValueType(
+                        types.TypedDict({"row": types.Int(), "col": types.Int()}),
+                        types.Number(),
+                    )
+                ),
+            )
+        ),
+    )
+
+    assert expected_type.assign_type(result.type)
+    assert weave.use(result) == [[i + 3 * j for i in [3, 4, 5]] for j in [0, 1, 2]]
+
+    tag_getter_op_top = make_tag_getter_op.make_tag_getter_op("tag", types.String())
+    tag_getter_op_row = make_tag_getter_op.make_tag_getter_op("row", types.Int())
+    tag_getter_op_col = make_tag_getter_op.make_tag_getter_op("col", types.Int())
+
+    assert weave.use(tag_getter_op_top(result)) == "top"
+    for i in range(3):
+        assert weave.use(tag_getter_op_row(result[i])) == i
+        for j in range(3):
+            assert weave.use(tag_getter_op_row(result[i][j])) == i
+            assert weave.use(tag_getter_op_col(result[i][j])) == j

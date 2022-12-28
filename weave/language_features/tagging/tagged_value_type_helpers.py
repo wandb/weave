@@ -30,3 +30,11 @@ def push_down_tags_from_container_type_to_element_type(
     )
     container_outer_type = container_type.value.__class__
     return container_outer_type(new_inner_type)  # type: ignore
+
+
+def is_tagged_value_type(t: types.Type) -> bool:
+    return (
+        isinstance(t, tagged_value_type.TaggedValueType)
+        or isinstance(t, types.Const)
+        and isinstance(t.val_type, tagged_value_type.TaggedValueType)
+    )
