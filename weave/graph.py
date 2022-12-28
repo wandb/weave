@@ -324,17 +324,16 @@ def _update_lambda_fn_node_var_types(
             f"Expected {lambda_fn_node.type.input_types} to have row"
         )
 
-    bound_node_type = already_mapped[
-        list(lambda_op_node.from_op.inputs.values())[0]
-    ].type
+    first_arg_node = list(lambda_op_node.from_op.inputs.values())[0]
+    mapped_first_arg_type = already_mapped[first_arg_node].type
     # THIS MUST BE REMOVED BEFORE MERGING - TOTAL HACK
-    if isinstance(bound_node_type, weave_types.Function):
-        bound_node_type = bound_node_type.output_type
-    if not hasattr(bound_node_type, "object_type"):
+    if isinstance(mapped_first_arg_type, weave_types.Function):
+        mapped_first_arg_type = mapped_first_arg_type.output_type
+    if not hasattr(mapped_first_arg_type, "object_type"):
         raise errors.WeaveInternalError(
-            f"Expected {bound_node_type} to have an `object_type`"
+            f"Expected {mapped_first_arg_type} to have an `object_type`"
         )
-    row_node_type = bound_node_type.object_type  # type: ignore
+    row_node_type = mapped_first_arg_type.object_type  # type: ignore
 
     if lambda_fn_node.type.input_types["row"].assign_type(row_node_type):
         return lambda_fn_node
