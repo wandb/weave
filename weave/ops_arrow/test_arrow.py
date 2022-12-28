@@ -257,16 +257,18 @@ def test_custom_tagged_groupby1():
     group1_node = grouped_node[0]
 
     assert grouped_node.type == arrow.ArrowTableGroupByType(
-        types.TypedDict(
-            {
-                "a": types.Int(),
-                "im": tagged_value_type.TaggedValueType(
-                    types.TypedDict({"a": types.Int()}),
-                    weave.type_of(Image.linear_gradient("L").rotate(4)),
-                ),
-            }
-        ),
-        types.TypedDict({"a": types.Int()}),
+        arrow.ArrowTableGroupResultType(
+            types.TypedDict(
+                {
+                    "a": types.Int(),
+                    "im": tagged_value_type.TaggedValueType(
+                        types.TypedDict({"a": types.Int()}),
+                        weave.type_of(Image.linear_gradient("L").rotate(4)),
+                    ),
+                }
+            ),
+            types.TypedDict({"a": types.Int()}),
+        )
     )
 
     assert group1_node.type == arrow.ArrowTableGroupResultType(
@@ -310,16 +312,18 @@ def test_custom_tagged_groupby2():
             }
         ),
         arrow.ArrowTableGroupByType(
-            types.TypedDict(
-                {
-                    "a": types.Int(),
-                    "im": tagged_value_type.TaggedValueType(
-                        types.TypedDict({"a": types.Int()}),
-                        weave.type_of(Image.linear_gradient("L").rotate(4)),
-                    ),
-                }
-            ),
-            types.TypedDict({"a": types.Int()}),
+            arrow.ArrowTableGroupResultType(
+                types.TypedDict(
+                    {
+                        "a": types.Int(),
+                        "im": tagged_value_type.TaggedValueType(
+                            types.TypedDict({"a": types.Int()}),
+                            weave.type_of(Image.linear_gradient("L").rotate(4)),
+                        ),
+                    }
+                ),
+                types.TypedDict({"a": types.Int()}),
+            )
         ),
     )
 

@@ -347,6 +347,9 @@ def _map_nodes(
             # THIS MUST BE REMOVED BEFORE MERGING - TOTAL HACK
             if isinstance(bound_node_type, weave_types.Function):
                 bound_node_type = bound_node_type.output_type
+            # This works for now since we are just plucking the index type (which means we don't need to have the correct op yet...)
+            # one fix is to potentially change the object type of the AWL group by?, then use a similar solution to part2 (or generalize this one)
+            # - just use bound_node_type.object_type
             result_node.type = weave_internal.make_const_node(bound_node_type, None)[0].type  # type: ignore
         if isinstance(node, OutputNode):
             inputs = {}
