@@ -153,23 +153,21 @@ def _remove_optional(t: types.Type) -> types.Type:
     return t
 
 
-def _dispatch_map_fn_no_refine(
-    input_node: graph.Node, input_name: str, curr_node: graph.OutputNode
-) -> typing.Optional[graph.OutputNode]:
-    if isinstance(input_node, graph.OutputNode):
-        if input_node.from_op.name == "tag-indexCheckpoint":
+def _dispatch_map_fn_no_refine(node: graph.Node) -> typing.Optional[graph.OutputNode]:
+    if isinstance(node, graph.OutputNode):
+        if node.from_op.name == "tag-indexCheckpoint":
             # I'm seeing that there is no indexCheckpoint tag present
             # on types that come from WeaveJS (at least by the time we call
             # this op). Maybe a WeaveJS bug?
             # TODO
-            return input_node
-        if input_node.from_op.name == "file-type":
+            return node
+        if node.from_op.name == "file-type":
             # since we didn't refine, the input to file-type is not correct yet.
             # if its in the graph, just trust that's what we want
             # TODO: does this work for mapped case?
-            return input_node
-        node_inputs = input_node.from_op.inputs
-        op = dispatch.get_op_for_inputs(input_node.from_op.name, [], node_inputs)
+            return node
+        node_inputs = node.from_op.inputs
+        op = dispatch.get_op_for_inputs(node.from_op.name, [], node_inputs)
         params = node_inputs
         if isinstance(op.input_type, op_args.OpNamedArgs):
             params = {
@@ -178,86 +176,64 @@ def _dispatch_map_fn_no_refine(
 
         # Weave Python op types don't express that they can handle
         # optional.
-        output_type = _remove_optional(input_node.type)
-        if output_type != input_node.type or input_node.from_op.name != op.uri:
-            return graph.OutputNode(output_type, op.uri, params)
+        output_type = _remove_optional(node.type)
+        return graph.OutputNode(output_type, op.uri, params)
     return None
 
 
-def _make_output_node_input_mapper_fn(
-    call_op_fn: typing.Callable[
-        [graph.Node, str, graph.OutputNode], typing.Optional[graph.Node]
-    ]
-) -> typing.Callable[[graph.Node], typing.Optional[graph.Node]]:
-    def fn(curr_node: graph.Node) -> typing.Optional[graph.Node]:
-        if isinstance(curr_node, graph.OutputNode):
+def _make_auto_op_map_fn(when_type: type[types.Type], call_op_fn):
+    def fn(node: graph.Node) -> typing.Optional[graph.Node]:
+        if isinstance(node, graph.OutputNode):
+            node_inputs = node.from_op.inputs
+            op_def = registry_mem.memory_registry.get_op(node.from_op.name)
+            if (
+                op_def.name == "tag-indexCheckpoint"
+                or op_def.name == "Object-__getattr__"
+                or op_def.name == "set"
+                # panel_scatter and panel_distribution have the incorrect
+                # input types for their config arg. They should be weave.Node.
+                # We need a frontend fix to handle that. For now there's a hack
+                # here.
+                # TODO: Fix in frontend and panel_* and remove this hack.
+                or (
+                    isinstance(op_def.output_type, types.Type)
+                    and op_def.output_type._base_type is not None
+                    and op_def.output_type._base_type.name == "Panel"
+                )
+            ):
+                # These are supposed to be a passthrough op, we don't want to convert
+                # it. TODO: Find a more general way, maybe by type inspection?
+                return None
             new_inputs: dict[str, graph.Node] = {}
             swapped = False
-            for input_node_name, input_node in curr_node.from_op.inputs.items():
-                new_inputs[input_node_name] = input_node
-                new_input_node = call_op_fn(input_node, input_node_name, curr_node)
-                if new_input_node is not None and id(new_input_node) != id(input_node):
-                    new_inputs[input_node_name] = new_input_node
+            for k, input_node in node_inputs.items():
+                actual_input_type = input_node.type
+                new_inputs[k] = input_node
+                if not isinstance(actual_input_type, when_type):
+                    continue
+                if isinstance(op_def.input_type, op_args.OpNamedArgs):
+                    op_input_type = op_def.input_type.arg_types[k]
+                elif isinstance(op_def.input_type, op_args.OpVarArgs):
+                    op_input_type = op_def.input_type.arg_type
+                else:
+                    raise ValueError(
+                        f"Unexpected op input type {op_def.input_type} for op {op_def.name}"
+                    )
+                if callable(op_input_type):
+                    continue
+                if not isinstance(op_input_type, when_type):
+                    new_inputs[k] = call_op_fn(input_node)
                     swapped = True
             if swapped:
-                return graph.OutputNode(
-                    curr_node.type, curr_node.from_op.name, new_inputs
-                )
+                return graph.OutputNode(node.type, node.from_op.name, new_inputs)
         return None
 
     return fn
 
 
-def _make_auto_op_map_fn(when_type: type[types.Type], call_op_fn):
-    def fn(
-        input_node: graph.Node, input_node_name: str, curr_node: graph.OutputNode
-    ) -> typing.Optional[graph.Node]:
-        op_def = registry_mem.memory_registry.get_op(curr_node.from_op.name)
-        if (
-            op_def.name == "tag-indexCheckpoint"
-            or op_def.name == "Object-__getattr__"
-            or op_def.name == "set"
-            # panel_scatter and panel_distribution have the incorrect
-            # input types for their config arg. They should be weave.Node.
-            # We need a frontend fix to handle that. For now there's a hack
-            # here.
-            # TODO: Fix in frontend and panel_* and remove this hack.
-            or (
-                isinstance(op_def.output_type, types.Type)
-                and op_def.output_type._base_type is not None
-                and op_def.output_type._base_type.name == "Panel"
-            )
-        ):
-            # These are supposed to be a passthrough op, we don't want to convert
-            # it. TODO: Find a more general way, maybe by type inspection?
-            return None
-        actual_input_type = input_node.type
-        if not isinstance(actual_input_type, when_type):
-            return None
-        if isinstance(op_def.input_type, op_args.OpNamedArgs):
-            op_input_type = op_def.input_type.arg_types[input_node_name]
-        elif isinstance(op_def.input_type, op_args.OpVarArgs):
-            op_input_type = op_def.input_type.arg_type
-        else:
-            raise ValueError(
-                f"Unexpected op input type {op_def.input_type} for op {op_def.name}"
-            )
-        if callable(op_input_type):
-            return None
-        if not isinstance(op_input_type, when_type):
-            return call_op_fn(input_node)
-        return None
-
-    return _make_output_node_input_mapper_fn(fn)
-
-
 _await_run_outputs_map_fn = _make_auto_op_map_fn(types.RunType, _call_run_await)
 
 _execute_nodes_map_fn = _make_auto_op_map_fn(types.Function, _call_execute)
-
-_dispatch_map_fn_no_refine_auto = _make_output_node_input_mapper_fn(
-    _dispatch_map_fn_no_refine
-)
 
 
 def _apply_column_pushdown(leaf_nodes: list[graph.Node]) -> list[graph.Node]:
@@ -301,7 +277,7 @@ def _compile(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
     # which ops to use. Critically, this first phase does not actually refine
     # op output types, so after this, the types in the graph are not yet correct.
     with tracer.trace("compile:fix_calls"):
-        n = graph.map_nodes_full(n, _dispatch_map_fn_no_refine_auto)
+        n = graph.map_nodes_full(n, _dispatch_map_fn_no_refine)
 
     # Now that we have the correct calls, we can do our forward-looking pushdown
     # optimizations. These do not depend on having correct types in the graph.
