@@ -7,6 +7,8 @@ import string
 from PIL import Image
 import typing
 
+from ..tests import weavejs_ops
+
 
 from .. import box
 from .. import storage
@@ -113,6 +115,55 @@ def test_groupby_sort(sort_lambda, sort_dirs, exp_rotation_avg):
     first_group_rotations = first_group.pick("rotate")
     first_group_rotation_avg = first_group_rotations.avg()
     assert weave.use(first_group_rotation_avg) == exp_rotation_avg
+
+
+def test_js_groupby_sort():
+    list_data = [{"a": 1, "b": 1}, {"a": 1, "b": 2}, {"a": 2, "b": 1}, {"a": 2, "b": 2}]
+    list_node = list_.make_list(**{f"{n}": v for n, v in enumerate(list_data)})
+    arrow_node = weave.save(arrow.to_arrow(list_data))
+    node = weavejs_ops.groupby(
+        list_node,
+        weave.define_fn(
+            {"row": list_node.type.object_type},
+            lambda row: ops.dict_(
+                a=graph.OutputNode(
+                    types.String(),
+                    "pick",
+                    {"obj": row, "key": graph.ConstNode(types.String(), "a")},
+                )
+            ),
+        ),
+    )
+    # Critical replacement of the input to use arrow!
+    node.from_op.inputs["arr"] = arrow_node
+    node = weavejs_ops.sort(
+        node,
+        weave.define_fn(
+            {"row": node.type.object_type},
+            lambda row: ops.make_list(
+                a=graph.OutputNode(
+                    types.String(),
+                    "pick",
+                    {
+                        "obj": graph.OutputNode(
+                            types.TypedDict({"a": types.String()}),
+                            "group-groupkey",
+                            {"obj": row},
+                        ),
+                        "key": graph.ConstNode(types.String(), "a"),
+                    },
+                )
+            ),
+        ),
+        ops.make_list(a="asc"),
+    )
+    assert weave.use(node) != None
+
+
+def test_group_key():
+    data = weave.save(arrow.to_arrow([1, 2, 3]))
+    res = (data.groupby(lambda row: row + 1) + 1)[0].groupkey()
+    assert weave.use(res) == 2
 
 
 def test_map_scalar_map():
