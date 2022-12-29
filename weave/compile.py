@@ -1,3 +1,4 @@
+import copy
 import typing
 
 import logging
@@ -101,8 +102,81 @@ def _fixup_output_type(graph_type: types.Type, op_type: types.Type):
     return op_type
 
 
+def _op_passes_first_arg_as_row_var(op: graph.Op) -> bool:
+    return (
+        op.name.endswith("map")
+        or op.name.endswith("filter")
+        or op.name.endswith("sort")
+        or op.name.endswith("groupby")
+    )
+
+
+def _dispatch_map_fn_lambda_patch(
+    node: graph.OutputNode,
+    map_fn: typing.Callable[[graph.Node], typing.Optional[graph.Node]],
+) -> graph.OutputNode:
+    if isinstance(node, graph.OutputNode) and _op_passes_first_arg_as_row_var(
+        node.from_op
+    ):
+        # The first arg of map, filter, sort, groupby is the row variable.
+        # We need to patch the lambda to take the row variable as the first
+        # arg.
+        first_arg_node = list(node.from_op.inputs.values())[0]
+        first_arg_node_type = first_arg_node.type
+        if not hasattr(first_arg_node_type, "object_type"):
+            raise errors.WeaveInternalError(
+                f"Expected {first_arg_node_type} to have an `object_type`"
+            )
+
+        # TODO: HACK: Since the `_dispatch_map_fn_*` mappers run before the
+        # `_call_run_await` and `_call_execute` mappers , the type is not going
+        # to be correct in these cases. Unfortunately, we can't put those first,
+        # since we need the dispatch to run first since those mappers rely on
+        # the ops being correct. Sigh... this is a chicken/egg issue In the
+        # meantime, we have this small hack to fix the type.
+        if isinstance(first_arg_node_type, types.Function):
+            first_arg_node_type = first_arg_node_type.output_type
+        elif isinstance(first_arg_node_type, types.RunType):
+            first_arg_node_type = first_arg_node_type.output
+
+        row_node_type = first_arg_node_type.object_type  # type: ignore
+        new_inputs = {}
+        needs_replacement = False
+        for param_name, param_node in node.from_op.inputs.items():
+            if (
+                isinstance(param_node, graph.ConstNode)
+                and isinstance(param_node.type, types.Function)
+                and "row" in param_node.type.input_types
+            ):
+                if not param_node.type.input_types["row"].assign_type(row_node_type):
+                    needs_replacement = True
+                    lambda_fn_node = copy.deepcopy(param_node)
+                    # lambda_fn_node_type = typing.cast(types.Function, lambda_fn_node.type)
+
+                    typing.cast(types.Function, lambda_fn_node.type).input_types[
+                        "row"
+                    ] = row_node_type
+                    # lambda_fn_node_val = typing.cast(graph.Node, lambda_fn_node.val)
+                    for var_node in graph.expr_vars(lambda_fn_node.val):
+                        if var_node.name == "row":
+                            var_node.type = row_node_type
+
+                    # TODO: Pass "already mapped" dict to map functions to avoid remapping the same node multiple times
+                    lambda_fn_node.val = graph.map_nodes_full(
+                        [lambda_fn_node.val], map_fn
+                    )[0]
+
+                    param_node = lambda_fn_node
+            new_inputs[param_name] = param_node
+        if needs_replacement:
+            return graph.OutputNode(node.type, node.from_op.name, new_inputs)
+
+    return node
+
+
 def _dispatch_map_fn_refining(node: graph.Node) -> typing.Optional[graph.OutputNode]:
     if isinstance(node, graph.OutputNode):
+        node = _dispatch_map_fn_lambda_patch(node, _dispatch_map_fn_refining)
         if node.from_op.name == "gqlroot-wbgqlquery":
             # the output type of the gqlroot-wbgqlquery op is Any. But the gql
             # compile phase keeps the original type from the root node that was
@@ -153,8 +227,9 @@ def _remove_optional(t: types.Type) -> types.Type:
     return t
 
 
-def _dispatch_map_fn_no_refine(node: graph.Node) -> typing.Optional[graph.OutputNode]:
+def _dispatch_map_fn_no_refine(node: graph.Node) -> typing.Optional[graph.Node]:
     if isinstance(node, graph.OutputNode):
+        node = _dispatch_map_fn_lambda_patch(node, _dispatch_map_fn_no_refine)
         if node.from_op.name == "tag-indexCheckpoint":
             # I'm seeing that there is no indexCheckpoint tag present
             # on types that come from WeaveJS (at least by the time we call
@@ -178,7 +253,7 @@ def _dispatch_map_fn_no_refine(node: graph.Node) -> typing.Optional[graph.Output
         # optional.
         output_type = _remove_optional(node.type)
         return graph.OutputNode(output_type, op.uri, params)
-    return None
+    return node
 
 
 def _make_auto_op_map_fn(when_type: type[types.Type], call_op_fn):

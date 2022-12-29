@@ -359,6 +359,15 @@ def _map_nodes(
 ) -> Node:
     # This is an iterative implementation, to avoid blowing the stack and
     # to provide friendlier stack traces for exception merging tools.
+    # def apply_fn_once(node_to_apply: Node) -> Node:
+    #     if node_to_apply in already_mapped:
+    #         return already_mapped[node_to_apply]
+    #     mapped_node = map_fn(node_to_apply)
+    #     if mapped_node is None:
+    #         mapped_node = node
+    #     already_mapped[node_to_apply] = mapped_node
+    #     return mapped_node
+
     to_consider = [start_node]
     while to_consider:
         node = to_consider[-1]
@@ -375,25 +384,25 @@ def _map_nodes(
                     inputs[param_name] = already_mapped[param_node]
                     continue
 
-                # When we are walking lambdas, we may need to update the types
-                # of the var nodes in the lambda function node. This is because
-                # the type of the row var is actually dependent on the type of
-                # the prior arg - which may have changed as a result of the
-                # mapping.
-                if (
-                    walk_lambdas
-                    and _is_const_function_node(param_node)
-                    and _op_passes_first_arg_as_row_var(node.from_op)
-                ):
-                    # If it is such a function node, check if the prior args
-                    # have been resolved. We will skip this param if not and
-                    # will revisit it on the next visitation of the lambda node.
-                    all_prior_args_have_been_mapped = len(inputs_to_consider) == 0
-                    if not all_prior_args_have_been_mapped:
-                        continue
-                    param_node = _update_lambda_fn_node_var_types(
-                        param_name, param_node, node, already_mapped
-                    )
+                # # When we are walking lambdas, we may need to update the types
+                # # of the var nodes in the lambda function node. This is because
+                # # the type of the row var is actually dependent on the type of
+                # # the prior arg - which may have changed as a result of the
+                # # mapping.
+                # if (
+                #     walk_lambdas
+                #     and _is_const_function_node(param_node)
+                #     and _op_passes_first_arg_as_row_var(node.from_op)
+                # ):
+                #     # If it is such a function node, check if the prior args
+                #     # have been resolved. We will skip this param if not and
+                #     # will revisit it on the next visitation of the lambda node.
+                #     all_prior_args_have_been_mapped = len(inputs_to_consider) == 0
+                #     if not all_prior_args_have_been_mapped:
+                #         continue
+                #     param_node = _update_lambda_fn_node_var_types(
+                #         param_name, param_node, node, already_mapped
+                #     )
                 inputs_to_consider.append(param_node)
             if len(inputs_to_consider) > 0:
                 # This list reversal is required to ensure we map the params in
