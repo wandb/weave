@@ -169,6 +169,11 @@ class UnknownToArrowNone(mappers_python.UnknownToPyUnknown):
         return pa.null()
 
 
+class ArrowDateTimeToDateTime(mappers.Mapper):
+    def apply(self, obj):
+        return obj
+
+
 class DefaultToArrow(mappers_python.DefaultToPy):
     def __init__(self, type_: types.Type, mapper, artifact, path=[]):
         self.type = type_
@@ -298,7 +303,7 @@ def map_from_arrow_(type, mapper, artifact, path=[]):
     elif isinstance(type, types.String):
         return mappers_python.StringToPyString(type, mapper, artifact, path)
     elif isinstance(type, types.Datetime):
-        return mappers_python.PyDatetimeToDatetime(type, mapper, artifact, path)
+        return ArrowDateTimeToDateTime(type, mapper, artifact, path)
     elif isinstance(type, types.Function):
         return ArrowFunctionToFunction(type, mapper, artifact, path)
     elif isinstance(type, types.NoneType):
@@ -316,7 +321,18 @@ map_from_arrow = mappers.make_mapper(map_from_arrow_)
 def map_from_arrow_scalar(value: pa.Scalar, type_: types.Type, artifact):
     if isinstance(type_, types.Const):
         return map_from_arrow_scalar(value, type_.val, artifact)
-    if isinstance(type_, (types.Number, types.String, types.Boolean, types.NoneType)):
+    if isinstance(
+        type_,
+        (
+            types.Number,
+            types.Int,
+            types.Float,
+            types.Boolean,
+            types.String,
+            types.Datetime,
+            types.NoneType,
+        ),
+    ):
         return value.as_py()
     elif isinstance(type_, types.List):
         return [map_from_arrow_scalar(v, type_.object_type, artifact) for v in value]

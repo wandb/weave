@@ -31,6 +31,15 @@ def set_wandb_thread_local_api_settings(
     _thread_local_api_settings.headers = headers
 
 
+def copy_thread_local_api_settings():
+    # Used for copying settings to sub-threads
+    return {
+        "api_key": _thread_local_api_settings.api_key,
+        "cookies": _thread_local_api_settings.cookies,
+        "headers": _thread_local_api_settings.headers,
+    }
+
+
 def reset_wandb_thread_local_api_settings():
     _thread_local_api_settings.api_key = None
     _thread_local_api_settings.cookies = None

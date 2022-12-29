@@ -14,12 +14,13 @@ describe('distribution interactions', () => {
         // modify the expression to select some data
         const valueEe = cy
           .get('[data-test=weave-sidebar]')
-          .find('[data-test=expression-editor-container]')
-          .eq(1)
-          .find('[data-slate-editor=true]')
-          .click({force: true})
-          .type('["loss1"]', {force: true})
-          .type('{enter}', {force: true});
+          .find(
+            '[data-test=expression-editor-container] [contenteditable=true]'
+          )
+          .contains('item')
+          .click()
+          .type('["loss1"]')
+          .type('{enter}');
 
         // Click ok in the sidebar
         cy.get('[data-test=ok-panel-config]').click();

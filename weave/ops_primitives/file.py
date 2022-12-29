@@ -23,10 +23,12 @@ def path_ext(path):
 
 @op(
     name="file-dir",
-    input_type={"file": types.DirType()},
+    input_type={"file": types.UnionType(types.DirType(), types.FileType())},
     output_type=types.DirType(),
 )
 def file_dir(file):
+    if not isinstance(file, Dir):
+        raise ValueError("Not a dir")
     return file
 
 
@@ -208,10 +210,12 @@ types.FileType.instance_classes = File
 
 @op(
     name="file-type",
-    input_type={"file": types.FileType()},
+    input_type={"file": types.UnionType(types.FileType(), types.DirType())},
     output_type=types.TypeType(),
 )
 def file_type(file):
+    if isinstance(file, Dir):
+        return {"type": "dir"}
     # file is an artifact manifest entry for now.
     path = file.path
     parts = path.split(".")

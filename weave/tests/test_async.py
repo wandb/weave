@@ -27,7 +27,7 @@ def test_run_basic():
 
     saved_prints = api.use(run_node.prints)
     assert saved_prints == ["Hello", "Hello again"]
-    saved_logs = api.use(run_node.history)
+    saved_logs = api.use(run_node._get_prop("history"))
     assert saved_logs == [{"x": 49.0}]
     saved_output = api.use(run_node.output)
     assert saved_output == "some-output"

@@ -1846,7 +1846,7 @@ class ArrowNode(ListLikeNodeInterface):
 
     @staticmethod
     def use_node(node):
-        return weave.use(node).to_pylist()
+        return [a for a in weave.use(node)]
 
 
 ListInterfaces = [ListNode, ArrowNode]

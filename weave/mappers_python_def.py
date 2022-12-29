@@ -160,7 +160,6 @@ class DatetimeToPyDatetime(mappers.Mapper):
 class PyDatetimeToDatetime(mappers.Mapper):
     def apply(self, obj):
         return datetime.datetime.fromtimestamp(obj / 1000, tz=datetime.timezone.utc)
-        return datetime.datetime.fromisoformat(obj)
 
 
 class NoneToPyNone(mappers.Mapper):

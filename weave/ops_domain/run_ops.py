@@ -1,4 +1,5 @@
 import json
+import logging
 from ..compile_domain import wb_gql_op_plugin
 from ..api import op
 from .. import weave_types as types
@@ -9,6 +10,7 @@ from .wandb_domain_gql import (
     gql_direct_edge_op,
     gql_connection_op,
     gql_root_op,
+    _make_alias,
 )
 
 import typing
@@ -54,6 +56,12 @@ gql_prop_op(
     wdt.RunType,
     "createdAt",
     types.Datetime(),
+)
+gql_prop_op(
+    "_run-historykeyinfo",
+    wdt.RunType,
+    "historyKeys",
+    types.Dict(types.String(), types.Any()),
 )
 
 
@@ -103,6 +111,106 @@ def summary(run: wdt.Run) -> dict[str, typing.Any]:
             run.gql["name"],
         ),
     )
+
+
+@op(
+    render_info={"type": "function"},
+    plugins=wb_gql_op_plugin(
+        lambda inputs, inner: "historyKeys, first_10_history_rows: history(minStep: 0, maxStep: 10)"
+    ),
+)
+def _refine_history_type(run: wdt.Run) -> types.Type:
+    # The Weave0 implementation loads the entire history & the historyKeys. This
+    # is very inefficient and actually incomplete. Here, for performance
+    # reasons, we will simply scan the first 10 rows and use that to determine
+    # the type. This means that some columns will not be perfectly typed. Once
+    # we have fully implemented a mapping from historyKeys to Weave types, we
+    # can remove the history scan. Critically, Table types could be artifact
+    # tables or run tables. In Weave0 we need to figure this out eagerly.
+    # However, i think we can defer this and that will be the last thing to
+    # remove needing to read any history.
+    prop_types: dict[str, types.Type] = {}
+    historyKeys = run.gql["historyKeys"]["keys"]
+    example_history_rows = run.gql["first_10_history_rows"]
+    keys_needing_type = set()
+
+    for key, key_details in historyKeys.items():
+        key_types = [tc["type"] for tc in key_details["typeCounts"]]
+        if len(key_types) == 1:
+            if key_types[0] == "number":
+                prop_types[key] = types.Number()
+                continue
+            elif key_types[0] == "string":
+                prop_types[key] = types.String()
+                continue
+        # TODO: We need to finish the historyKeys -> Weave type mapping
+        logging.warning(
+            f"Unable to determine history key type for key {key} with types {key_types}"
+        )
+        keys_needing_type.add(key)
+
+    if len(keys_needing_type) > 0:
+        example_row_types = [
+            wb_util.process_run_dict_type(json.loads(row or "{}")).property_types
+            for row in example_history_rows
+        ]
+        for key in keys_needing_type:
+            cell_types = []
+            for row_type in example_row_types:
+                if key in row_type:
+                    cell_types.append(row_type[key])
+                else:
+                    cell_types.append(types.NoneType())
+            prop_types[key] = types.union(*cell_types)
+
+    return types.List(types.TypedDict(prop_types))
+
+
+@op(
+    name="run-history",
+    refine_output_type=_refine_history_type,
+    plugins=wb_gql_op_plugin(lambda inputs, inner: "history"),
+)
+def history(run: wdt.Run) -> list[dict[str, typing.Any]]:
+    return [
+        wb_util.process_run_dict_obj(
+            json.loads(row),
+            wb_util.RunPath(
+                run.gql["project"]["entity"]["name"],
+                run.gql["project"]["name"],
+                run.gql["name"],
+            ),
+        )
+        for row in run.gql["history"]
+    ]
+
+
+def _history_as_of_plugin(inputs, inner):
+    min_step = (
+        inputs["asOfStep"] if "asOfStep" in inputs and inputs["asOfStep"] != None else 0
+    )
+    max_step = min_step + 1
+    alias = _make_alias(str(inputs["asOfStep"]), prefix="history")
+    return f"{alias}: history(minStep: {min_step}, maxStep: {max_step})"
+
+
+@op(
+    render_info={"type": "function"},
+    plugins=wb_gql_op_plugin(_history_as_of_plugin),
+)
+def _refine_history_as_of_type(run: wdt.Run, asOfStep: int) -> types.Type:
+    alias = _make_alias(str(asOfStep), prefix="history")
+    return wb_util.process_run_dict_type(json.loads(run.gql[alias] or "{}"))
+
+
+@op(
+    name="run-historyAsOf",
+    refine_output_type=_refine_history_as_of_type,
+    plugins=wb_gql_op_plugin(_history_as_of_plugin),
+)
+def history_as_of(run: wdt.Run, asOfStep: int) -> dict[str, typing.Any]:
+    alias = _make_alias(str(asOfStep), prefix="history")
+    return json.loads(run.gql[alias] or "{}")
 
 
 # Section 4/6: Direct Relationship Ops

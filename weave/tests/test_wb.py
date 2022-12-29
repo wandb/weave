@@ -12,8 +12,9 @@ from ..ops_primitives import list_, dict_
 from .. import weave_types as types
 
 from .. import ops_arrow as arrow
-
+from ..ops_domain.wbmedia import TableClientArtifactFileRef
 import cProfile
+from ..language_features.tagging.tagged_value_type import TaggedValueType
 
 file_path_response = {
     "project": {
@@ -553,6 +554,16 @@ def test_loading_artifact_browser_request_2(fake_wandb):
                     "artifactMembership_fe9cc269bee939ccb54ebba88c6087dd": {
                         **fwb.artifactMembership_payload
                     },
+                    "artifactMemberships": {
+                        "edges": [
+                            {
+                                "node": {
+                                    **fwb.artifactMembership_payload,
+                                    "aliases": [fwb.artifactAlias_payload],
+                                }
+                            }
+                        ]
+                    },
                     "artifactMemberships_21303e3890a1b6580998e6aa8a345859": {
                         "edges": [
                             {
@@ -861,3 +872,130 @@ def test_loading_artifact_browser_request_3(fake_wandb):
     )
     is_weave_node = av_node.isWeaveObject()
     assert weave.use(is_weave_node) != None
+
+
+example_history = [
+    '{"_step":0,"loss":0.9416526556015015,"_runtime":247,"accuracy":0.7200000286102295,"epoch":0,"val_accuracy":0.7530242204666138,"_timestamp":1625961050,"val_loss":0.7652576565742493}',
+    '{"_step":1,"predictions_10K":{"nrows":1000,"path":"media/table/predictions_10K_1_661a2d7d82a08afe8583.table.json","sha256":"661a2d7d82a08afe858320cc73ff3ac3ff3e5915a958c02e765963409d4716e9","size":147790,"_type":"table-file","artifact_path":"wandb-artifact://41727469666163743a3134323538383933/predictions_10K.table.json","ncols":14},"_runtime":294,"_timestamp":1625961097}',
+    '{"_step":2,"loss":0.6638407707214355,"_runtime":545,"accuracy":0.7916250228881836,"epoch":1,"val_accuracy":0.7641128897666931,"_timestamp":1625961348,"val_loss":0.7551828622817993}',
+    '{"_step":3,"predictions_10K":{"size":146810,"_type":"table-file","artifact_path":"wandb-artifact://41727469666163743a3134323539373631/predictions_10K.table.json","ncols":14,"nrows":1000,"path":"media/table/predictions_10K_3_3247b2550f0007cbaa5f.table.json","sha256":"3247b2550f0007cbaa5f3ad934d5d16bcbf966bcfc2770eb1e98e03b78b671fe"},"_runtime":591,"_timestamp":1625961394}',
+    '{"_step":4,"loss":0.6015360951423645,"_runtime":824,"accuracy":0.8076249957084656,"epoch":2,"val_accuracy":0.7560483813285828,"_timestamp":1625961627,"val_loss":0.7426469326019287}',
+    '{"_step":5,"predictions_10K":{"nrows":1000,"path":"media/table/predictions_10K_5_fa5fdbb0e0e48b873473.table.json","sha256":"fa5fdbb0e0e48b8734733a6a8bd2f460dfc3de35c1fedba5f0ac97eb9438ac17","size":146138,"_type":"table-file","artifact_path":"wandb-artifact://41727469666163743a3134323630353439/predictions_10K.table.json","ncols":14},"_runtime":870,"_timestamp":1625961673}',
+    '{"_step":6,"loss":0.5667485594749451,"_runtime":1103,"accuracy":0.8165000081062317,"epoch":3,"val_accuracy":0.7752016186714172,"_timestamp":1625961906,"val_loss":0.7002165913581848}',
+    '{"_step":7,"predictions_10K":{"ncols":14,"nrows":1000,"path":"media/table/predictions_10K_7_674d715bcfebaf8cc33e.table.json","sha256":"674d715bcfebaf8cc33ec920791498cae6321da393cc4bb8e44fd487eca4fedf","size":144151,"_type":"table-file","artifact_path":"wandb-artifact://41727469666163743a3134323631353532/predictions_10K.table.json"},"_runtime":1150,"_timestamp":1625961953}',
+    '{"_step":8,"loss":0.5219206809997559,"_runtime":1383,"accuracy":0.8242499828338623,"epoch":4,"val_accuracy":0.78125,"_timestamp":1625962186,"val_loss":0.6415265202522278}',
+    '{"_step":9,"predictions_10K":{"ncols":14,"nrows":1000,"path":"media/table/predictions_10K_9_fb0f1f25a0be1a907ec0.table.json","sha256":"fb0f1f25a0be1a907ec0c88efb482078736a40e49055e5251e42a368c12c9b2a","size":144982,"_type":"table-file","artifact_path":"wandb-artifact://41727469666163743a3134323632393738/predictions_10K.table.json"},"_runtime":1427,"_timestamp":1625962230}',
+]
+example_history_keys = {
+    "sets": [],
+    "keys": {
+        "system/gpu.0.powerWatts": {
+            "typeCounts": [{"type": "number", "count": 51}],
+            "monotonic": False,
+            "previousValue": -1,
+        },
+        "epoch": {
+            "typeCounts": [{"type": "number", "count": 5}],
+            "monotonic": True,
+            "previousValue": 4,
+        },
+        "predictions_10K": {
+            "typeCounts": [{"type": "table-file", "count": 5}],
+            "monotonic": True,
+            "previousValue": -1.7976931348623157e308,
+        },
+    },
+    "lastStep": 9,
+}
+
+
+def run_history_mocker(q, ndx):
+    if ndx == 0:
+        return {
+            "project": {
+                **fwb.project_payload,  # type: ignore
+                "runs_21303e3890a1b6580998e6aa8a345859": {
+                    "edges": [
+                        {
+                            "node": {
+                                **fwb.run_payload,  # type: ignore
+                                "first_10_history_rows": example_history,
+                                "historyKeys": example_history_keys,
+                            }
+                        }
+                    ]
+                },
+            }
+        }
+    elif ndx == 1:
+        return {
+            "project": {
+                **fwb.project_payload,  # type: ignore
+                "runs_21303e3890a1b6580998e6aa8a345859": {
+                    "edges": [
+                        {
+                            "node": {
+                                **fwb.run_payload,  # type: ignore
+                                "first_10_history_rows": example_history,
+                                "historyKeys": example_history_keys,
+                                "history": example_history,
+                            }
+                        }
+                    ]
+                },
+            }
+        }
+
+
+def test_run_history(fake_wandb):
+    fake_wandb.add_mock(run_history_mocker)
+    node = ops.project("stacey", "mendeleev").runs()[0].history()
+    assert isinstance(node.type, TaggedValueType)
+    assert types.List(
+        types.TypedDict(
+            {
+                "system/gpu.0.powerWatts": types.Number(),
+                "epoch": types.Number(),
+                "predictions_10K": types.union(
+                    types.NoneType(), TableClientArtifactFileRef.WeaveType()
+                ),
+            }
+        )
+    ).assign_type(node.type.value)
+    assert len(weave.use(node)) == len(example_history)
+
+
+def run_history_as_of_mocker(q, ndx):
+    if ndx == 0:
+        return {
+            "project": {
+                **fwb.project_payload,  # type: ignore
+                "runs_21303e3890a1b6580998e6aa8a345859": {
+                    "edges": [
+                        {
+                            "node": {
+                                **fwb.run_payload,  # type: ignore
+                                "history_d3d9446802a44259755d38e6d163e820": example_history[
+                                    9
+                                ],
+                            }
+                        }
+                    ]
+                },
+            }
+        }
+
+
+def test_run_history_as_of(fake_wandb):
+    fake_wandb.add_mock(run_history_as_of_mocker)
+    node = ops.project("stacey", "mendeleev").runs()[0].historyAsOf(10)
+    assert isinstance(node.type, TaggedValueType)
+    assert types.TypedDict(
+        {
+            "_step": types.Number(),
+            "_timestamp": types.Number(),
+            "_runtime": types.Number(),
+            "predictions_10K": TableClientArtifactFileRef.WeaveType(),
+        }
+    ).assign_type(node.type.value)
+    assert weave.use(node).keys() == json.loads(example_history[9]).keys()
