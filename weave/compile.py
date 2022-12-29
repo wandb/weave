@@ -132,7 +132,7 @@ def _dispatch_map_fn_lambda_patch(
         # `_call_run_await` and `_call_execute` mappers , the type is not going
         # to be correct in these cases. Unfortunately, we can't put those first,
         # since we need the dispatch to run first since those mappers rely on
-        # the ops being correct. Sigh... this is a chicken/egg issue In the
+        # the ops being correct. Sigh... this is a chicken/egg issue. In the
         # meantime, we have this small hack to fix the type.
         if isinstance(first_arg_node_type, types.Function):
             first_arg_node_type = first_arg_node_type.output_type

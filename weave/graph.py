@@ -1,4 +1,3 @@
-import copy
 import json
 import typing
 
@@ -295,80 +294,15 @@ def node_expr_str(node: Node) -> str:
         return "**PARSE_ERROR**"
 
 
-def _is_const_function_node(node: Node) -> bool:
-    return isinstance(node, ConstNode) and isinstance(node.type, weave_types.Function)
-
-
-def _op_passes_first_arg_as_row_var(op: Op) -> bool:
-    return (
-        op.name.endswith("map")
-        or op.name.endswith("filter")
-        or op.name.endswith("sort")
-        or op.name.endswith("groupby")
-    )
-
-
-def _update_lambda_fn_node_var_types(
-    lambda_fn_param_name: str,
-    lambda_fn_node: ConstNode,
-    lambda_op_node: OutputNode,
-    already_mapped: dict[Node, Node],
-) -> ConstNode:
-    if not isinstance(lambda_fn_node.type, weave_types.Function):
-        raise errors.WeaveInternalError(
-            f"Expected {lambda_fn_node} to have a Function type"
-        )
-
-    if "row" not in lambda_fn_node.type.input_types:
-        raise errors.WeaveInternalError(
-            f"Expected {lambda_fn_node.type.input_types} to have row"
-        )
-
-    first_arg_node = list(lambda_op_node.from_op.inputs.values())[0]
-    mapped_first_arg_type = already_mapped[first_arg_node].type
-    # THIS MUST BE REMOVED BEFORE MERGING - TOTAL HACK
-    if isinstance(mapped_first_arg_type, weave_types.Function):
-        mapped_first_arg_type = mapped_first_arg_type.output_type
-    if not hasattr(mapped_first_arg_type, "object_type"):
-        raise errors.WeaveInternalError(
-            f"Expected {mapped_first_arg_type} to have an `object_type`"
-        )
-    row_node_type = mapped_first_arg_type.object_type  # type: ignore
-
-    if lambda_fn_node.type.input_types["row"].assign_type(row_node_type):
-        return lambda_fn_node
-
-    _lambda_fn_node = copy.deepcopy(lambda_fn_node)
-    _lambda_fn_node_type = typing.cast(weave_types.Function, _lambda_fn_node.type)
-    lambda_op_node.from_op.inputs[lambda_fn_param_name] = _lambda_fn_node
-
-    _lambda_fn_node_type.input_types["row"] = row_node_type
-    _lambda_fn_node_val = typing.cast(Node, _lambda_fn_node.val)
-    for var_node in expr_vars(_lambda_fn_node_val):
-        if var_node.name == "row":
-            var_node.type = row_node_type
-
-    return _lambda_fn_node
-
-
 def _map_nodes(
-    start_node: Node,
+    node: Node,
     map_fn: typing.Callable[[Node], typing.Optional[Node]],
     already_mapped: dict[Node, Node],
     walk_lambdas: bool,
 ) -> Node:
-    # This is an iterative implementation, to avoid blowing the stack and
+    # This is an iterative implemenation, to avoid blowing the stack and
     # to provide friendlier stack traces for exception merging tools.
-    # def apply_fn_once(node_to_apply: Node) -> Node:
-    #     if node_to_apply in already_mapped:
-    #         return already_mapped[node_to_apply]
-    #     mapped_node = map_fn(node_to_apply)
-    #     if mapped_node is None:
-    #         mapped_node = node
-    #     already_mapped[node_to_apply] = mapped_node
-    #     return mapped_node
-
-    to_consider = [start_node]
+    to_consider = [node]
     while to_consider:
         node = to_consider[-1]
         if node in already_mapped:
@@ -377,42 +311,22 @@ def _map_nodes(
         result_node = node
         if isinstance(node, OutputNode):
             inputs = {}
-            inputs_to_consider: list[Node] = []
+            need_inputs = False
             for param_name, param_node in node.from_op.inputs.items():
-                # If the param is already mapped, continue on.
-                if param_node in already_mapped:
+                if param_node not in already_mapped:
+                    to_consider.append(param_node)
+                    need_inputs = True
+                else:
                     inputs[param_name] = already_mapped[param_node]
-                    continue
-
-                # # When we are walking lambdas, we may need to update the types
-                # # of the var nodes in the lambda function node. This is because
-                # # the type of the row var is actually dependent on the type of
-                # # the prior arg - which may have changed as a result of the
-                # # mapping.
-                # if (
-                #     walk_lambdas
-                #     and _is_const_function_node(param_node)
-                #     and _op_passes_first_arg_as_row_var(node.from_op)
-                # ):
-                #     # If it is such a function node, check if the prior args
-                #     # have been resolved. We will skip this param if not and
-                #     # will revisit it on the next visitation of the lambda node.
-                #     all_prior_args_have_been_mapped = len(inputs_to_consider) == 0
-                #     if not all_prior_args_have_been_mapped:
-                #         continue
-                #     param_node = _update_lambda_fn_node_var_types(
-                #         param_name, param_node, node, already_mapped
-                #     )
-                inputs_to_consider.append(param_node)
-            if len(inputs_to_consider) > 0:
-                # This list reversal is required to ensure we map the params in
-                # order (required for dependent params like lambdas)
-                to_consider.extend(inputs_to_consider[::-1])
+            if need_inputs:
                 continue
             if any(n is not inputs[k] for k, n in node.from_op.inputs.items()):
                 result_node = OutputNode(node.type, node.from_op.name, inputs)
-        elif walk_lambdas and _is_const_function_node(node):
-            node = typing.cast(ConstNode, node)
+        elif (
+            walk_lambdas
+            and isinstance(node, ConstNode)
+            and isinstance(node.type, weave_types.Function)
+        ):
             if node.val not in already_mapped:
                 to_consider.append(node.val)
                 continue
@@ -424,7 +338,7 @@ def _map_nodes(
         if mapped_node is None:
             mapped_node = result_node
         already_mapped[node] = mapped_node
-    return already_mapped[start_node]
+    return already_mapped[node]
 
 
 def map_nodes_top_level(
