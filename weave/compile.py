@@ -102,31 +102,35 @@ def _fixup_output_type(graph_type: types.Type, op_type: types.Type):
     return op_type
 
 
-def _op_passes_first_arg_as_row_var(op: graph.Op) -> bool:
-    return (
-        op.name.endswith("map")
-        or op.name.endswith("filter")
-        or op.name.endswith("sort")
-        or op.name.endswith("groupby")
-    )
-
-
 def _dispatch_map_fn_lambda_patch(
     node: graph.OutputNode,
     map_fn: typing.Callable[[graph.Node], typing.Optional[graph.Node]],
 ) -> graph.OutputNode:
-    if isinstance(node, graph.OutputNode) and _op_passes_first_arg_as_row_var(
-        node.from_op
+    """
+    This function is a helper function for the `_dispatch_map_fn_*` functions.
+    It patches the "lambda ops", namely: map, filter, sort, and groupby (and
+    their arrow equivalents). Specifically, each of these functions accept a
+    lambda function that accepts a `row` parameter which is the `object_type` of
+    the list-like input. Therefore, when doing the dispatch step in a full map,
+    we need to update the `row` varnode type to be the `object_type` of the
+    input. Ideally this would be a general solution that could leverage the
+    callable input type on the op, but unfortunately, we cannot rely on the
+    opdef of the incoming node to be correct yet! Therefore, we hardcode these
+    specific ops by name ending (and make the assumption that the way to
+    determine the `row` var type is by getting the `object_type` from the first
+    input to the op).
+    """
+    if isinstance(node, graph.OutputNode) and (
+        node.from_op.name.endswith("map")
+        or node.from_op.name.endswith("filter")
+        or node.from_op.name.endswith("sort")
+        or node.from_op.name.endswith("groupby")
     ):
         # The first arg of map, filter, sort, groupby is the row variable.
         # We need to patch the lambda to take the row variable as the first
         # arg.
         first_arg_node = list(node.from_op.inputs.values())[0]
         first_arg_node_type = first_arg_node.type
-        if not hasattr(first_arg_node_type, "object_type"):
-            raise errors.WeaveInternalError(
-                f"Expected {first_arg_node_type} to have an `object_type`"
-            )
 
         # TODO: HACK: Since the `_dispatch_map_fn_*` mappers run before the
         # `_call_run_await` and `_call_execute` mappers , the type is not going
@@ -139,35 +143,82 @@ def _dispatch_map_fn_lambda_patch(
         elif isinstance(first_arg_node_type, types.RunType):
             first_arg_node_type = first_arg_node_type.output
 
+        # Here, we check if there is an `object_type` on the input type. By
+        # convention, our list-like types (list, ArrowWeaveList,
+        # ArrowTableGroupBy) all have `object_type` to specify the type of the
+        # elements.
+        if not hasattr(first_arg_node_type, "object_type"):
+            raise errors.WeaveInternalError(
+                f"Expected {first_arg_node_type} to have an `object_type`"
+            )
         row_node_type = first_arg_node_type.object_type  # type: ignore
+
+        # Next, we iterate through the parameters and perform the patching in each
+        # lambda function. In practice, we only expect there to be one lambda fn.
         new_inputs = {}
         needs_replacement = False
         for param_name, param_node in node.from_op.inputs.items():
+            # Lambda params are identified by being a Const node of Function
+            # type with a "row" input.
             if (
                 isinstance(param_node, graph.ConstNode)
                 and isinstance(param_node.type, types.Function)
                 and "row" in param_node.type.input_types
             ):
+                # If the existing lambda already supports the incoming row type,
+                # then we don't need to patch it.
                 if not param_node.type.input_types["row"].assign_type(row_node_type):
                     needs_replacement = True
-                    lambda_fn_node = copy.deepcopy(param_node)
-                    # lambda_fn_node_type = typing.cast(types.Function, lambda_fn_node.type)
 
+                    # Here we make a shallow copy of the lambda function in case this lambda node
+                    # is shared by multiple ops. In that case, we would do an in-place modification
+                    # which might not be correct for all ops which consume this lambda.
+                    lambda_fn_node = graph.ConstNode(
+                        types.Function(
+                            {**param_node.type.input_types},
+                            param_node.type.output_type,
+                        ),
+                        param_node.val,
+                    )
+
+                    # Patch 1: Set the input type of the function
                     typing.cast(types.Function, lambda_fn_node.type).input_types[
                         "row"
                     ] = row_node_type
-                    # lambda_fn_node_val = typing.cast(graph.Node, lambda_fn_node.val)
-                    for var_node in graph.expr_vars(lambda_fn_node.val):
-                        if var_node.name == "row":
-                            var_node.type = row_node_type
 
-                    # TODO: Pass "already mapped" dict to map functions to avoid remapping the same node multiple times
+                    # Patch 2: Set all row var nodes to the correct type. We use
+                    # a map_nodes_top_level because all we want to do is replace
+                    # the row var node in the current lambda function.
+                    # Importantly, this will retain ref equality for nodes which
+                    # do not have the row var in their ancestry.
+                    def patch_row_var_node(node: graph.Node) -> graph.Node:
+                        if isinstance(node, graph.VarNode) and node.name == "row":
+                            return graph.VarNode(row_node_type, "row")
+                        return node
+
+                    lambda_fn_node.val = graph.map_nodes_top_level(
+                        [lambda_fn_node.val], patch_row_var_node
+                    )[0]
+
+                    # Patch 3: Apply the lambda function to the newly crafted
+                    # node. TODO: There are 2 optimizations which we could do
+                    # here:
+                    # 1. Since this function is being called inside of a
+                    #    map_nodes_full, we could share the `already_mapped`
+                    #    cache to ensure we don't remap any node more than once.
+                    #    This would require refactoring the map_nodes_*
+                    #    functions to pass the cache around.
+                    # 2. We could skip mapping into this lambda on the first
+                    #    pass of map_nodes_full since it will be mapped here again.
                     lambda_fn_node.val = graph.map_nodes_full(
                         [lambda_fn_node.val], map_fn
                     )[0]
 
+                    # Update the param node to be the new lambda node
                     param_node = lambda_fn_node
             new_inputs[param_name] = param_node
+
+        # only return a new node if we actually patched one of the lambdas
         if needs_replacement:
             return graph.OutputNode(node.type, node.from_op.name, new_inputs)
 
