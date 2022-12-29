@@ -153,21 +153,23 @@ def _remove_optional(t: types.Type) -> types.Type:
     return t
 
 
-def _dispatch_map_fn_no_refine(node: graph.Node) -> typing.Optional[graph.OutputNode]:
-    if isinstance(node, graph.OutputNode):
-        if node.from_op.name == "tag-indexCheckpoint":
+def _dispatch_map_fn_no_refine(
+    input_node: graph.Node, input_name: str, curr_node: graph.OutputNode
+) -> typing.Optional[graph.OutputNode]:
+    if isinstance(input_node, graph.OutputNode):
+        if input_node.from_op.name == "tag-indexCheckpoint":
             # I'm seeing that there is no indexCheckpoint tag present
             # on types that come from WeaveJS (at least by the time we call
             # this op). Maybe a WeaveJS bug?
             # TODO
-            return node
-        if node.from_op.name == "file-type":
+            return input_node
+        if input_node.from_op.name == "file-type":
             # since we didn't refine, the input to file-type is not correct yet.
             # if its in the graph, just trust that's what we want
             # TODO: does this work for mapped case?
-            return node
-        node_inputs = node.from_op.inputs
-        op = dispatch.get_op_for_inputs(node.from_op.name, [], node_inputs)
+            return input_node
+        node_inputs = input_node.from_op.inputs
+        op = dispatch.get_op_for_inputs(input_node.from_op.name, [], node_inputs)
         params = node_inputs
         if isinstance(op.input_type, op_args.OpNamedArgs):
             params = {
@@ -176,8 +178,9 @@ def _dispatch_map_fn_no_refine(node: graph.Node) -> typing.Optional[graph.Output
 
         # Weave Python op types don't express that they can handle
         # optional.
-        output_type = _remove_optional(node.type)
-        return graph.OutputNode(output_type, op.uri, params)
+        output_type = _remove_optional(input_node.type)
+        if output_type != input_node.type or input_node.from_op.name != op.uri:
+            return graph.OutputNode(output_type, op.uri, params)
     return None
 
 
@@ -193,7 +196,7 @@ def _make_output_node_input_mapper_fn(
             for input_node_name, input_node in curr_node.from_op.inputs.items():
                 new_inputs[input_node_name] = input_node
                 new_input_node = call_op_fn(input_node, input_node_name, curr_node)
-                if new_input_node is not None and new_input_node != input_node:
+                if new_input_node is not None and id(new_input_node) != id(input_node):
                     new_inputs[input_node_name] = new_input_node
                     swapped = True
             if swapped:
@@ -252,6 +255,10 @@ _await_run_outputs_map_fn = _make_auto_op_map_fn(types.RunType, _call_run_await)
 
 _execute_nodes_map_fn = _make_auto_op_map_fn(types.Function, _call_execute)
 
+_dispatch_map_fn_no_refine_auto = _make_output_node_input_mapper_fn(
+    _dispatch_map_fn_no_refine
+)
+
 
 def _apply_column_pushdown(leaf_nodes: list[graph.Node]) -> list[graph.Node]:
     # This is specific to project-runs2 (not yet used in W&B production) for now. But it
@@ -294,7 +301,7 @@ def _compile(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
     # which ops to use. Critically, this first phase does not actually refine
     # op output types, so after this, the types in the graph are not yet correct.
     with tracer.trace("compile:fix_calls"):
-        n = graph.map_nodes_full(n, _dispatch_map_fn_no_refine)
+        n = graph.map_nodes_full(n, _dispatch_map_fn_no_refine_auto)
 
     # Now that we have the correct calls, we can do our forward-looking pushdown
     # optimizations. These do not depend on having correct types in the graph.
