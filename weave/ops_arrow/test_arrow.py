@@ -162,7 +162,7 @@ def test_js_groupby_sort():
 
 def test_group_key():
     data = weave.save(arrow.to_arrow([1, 2, 3]))
-    res = (data.groupby(lambda row: row + 1) + 1)[0].groupkey()
+    res = data.groupby(lambda row: row + 1)[0].groupkey()
     assert weave.use(res) == 2
 
 
