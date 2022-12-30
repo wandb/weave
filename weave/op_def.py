@@ -17,7 +17,9 @@ from . import engine_trace
 from .language_features.tagging import (
     process_opdef_resolve_fn,
     process_opdef_output_type,
+    tagged_value_type,
 )
+from . import language_nullability
 from . import language_autocall
 
 
@@ -180,24 +182,28 @@ class OpDef:
             ]:
                 self._output_type = self.raw_output_type
             else:
+                output_type = self.raw_output_type
+                output_type = language_nullability.process_opdef_output_type(
+                    self.concrete_output_type, output_type, self.input_type
+                )
                 self._output_type = process_opdef_output_type.process_opdef_output_type(
-                    self.raw_output_type, self
+                    output_type, self
                 )
         return self._output_type
 
     @property
     def concrete_output_type(self) -> types.Type:
-        if callable(self.output_type):
+        if callable(self.raw_output_type):
             if isinstance(self.input_type, op_args.OpVarArgs):
-                return self.output_type({})
+                return self.raw_output_type({})
             elif isinstance(self.input_type, op_args.OpNamedArgs):
                 try:
-                    return self.output_type(self.input_type.to_dict())
+                    return self.raw_output_type(self.input_type.to_dict())
                 except AttributeError:
                     return types.UnknownType()
             else:
                 raise NotImplementedError("Unknown input type for op %s" % self.name)
-        return self.output_type
+        return self.raw_output_type
 
     @property
     def name(self) -> str:

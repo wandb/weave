@@ -196,9 +196,9 @@ def _make_auto_op_map_fn(when_type: type[types.Type], call_op_fn):
                 # here.
                 # TODO: Fix in frontend and panel_* and remove this hack.
                 or (
-                    isinstance(op_def.output_type, types.Type)
-                    and op_def.output_type._base_type is not None
-                    and op_def.output_type._base_type.name == "Panel"
+                    isinstance(op_def.concrete_output_type, types.Type)
+                    and op_def.concrete_output_type._base_type is not None
+                    and op_def.concrete_output_type._base_type.name == "Panel"
                 )
             ):
                 # These are supposed to be a passthrough op, we don't want to convert

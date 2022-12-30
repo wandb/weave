@@ -133,7 +133,7 @@ def get_tags(obj: typing.Any) -> dict[str, typing.Any]:
     if current_mem_map is None:
         return {}
     if id_val not in current_mem_map:
-        raise ValueError("Object is not tagged")
+        return {}
     return current_mem_map[id_val]
 
 
@@ -151,7 +151,7 @@ def find_tag(
                 par_tag = find_tag(parent, key)
                 if par_tag is not None:
                     return par_tag
-    raise ValueError(f"Could not find tag {key} in {obj}")
+    return None
 
 
 # Returns true if the given object has been tagged

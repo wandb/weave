@@ -19,10 +19,6 @@ from . import pyfunc_type_util
 from . import util
 
 
-class OpAmbiguityError(Exception):
-    pass
-
-
 # I originally wrote this thinking that we could always choose the more specific
 # op, defined as the one that's input types are strict subtypes of the other.
 # But consider mapped_add(List[number], number) and
@@ -72,7 +68,7 @@ def _resolve_op_ambiguity(candidates: list[op_def.OpDef]) -> op_def.OpDef:
         b_is_subtype = _op_args_is_subtype(a.input_type, b.input_type)
         a_is_subtype = _op_args_is_subtype(b.input_type, a.input_type)
         if a_is_subtype and b_is_subtype:
-            raise OpAmbiguityError(
+            raise errors.WeaveDispatchError(
                 "Ambiguous ops %s, %s. Ops' input types are equivalent"
                 % (a.name, b.name)
             )
@@ -80,7 +76,7 @@ def _resolve_op_ambiguity(candidates: list[op_def.OpDef]) -> op_def.OpDef:
             return -1
         if b_is_subtype:
             return 1
-        raise OpAmbiguityError(
+        raise errors.WeaveDispatchError(
             "Ambiguous ops %s, %s. Ops' input types first arguments must be subset in one direction or the other."
             % (a.name, b.name)
         )
@@ -130,6 +126,21 @@ def _choose_op_by_types(
             candidates.append(op)
     if not candidates:
         return None
+
+    # nullability, if the first argument is None or List[None], then any
+    # of the candidates can handle it. Choose the first one (choosing the
+    # first ensures we choose a tag getter if there is one).
+    first_arg_type = None
+    if args:
+        first_arg_type = args[0]
+    elif kwargs:
+        first_arg_type = list(kwargs.values())[0]
+    if first_arg_type and (
+        types.NoneType().assign_type(first_arg_type)
+        or types.List(types.NoneType()).assign_type(first_arg_type)
+    ):
+        return candidates[0]
+
     return _resolve_op_ambiguity(candidates)
 
 

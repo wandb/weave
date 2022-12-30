@@ -962,10 +962,15 @@ def is_json_compatible(type_):
 
 
 def optional(type_: Type) -> Type:
+    # TODO: This is not a complete implementation, it doesn't handle
+    # Const for example. Although why would we have a Const optional,
+    # that doesn't make sense (if its a const, we know the concrete type,
+    # its not a union).
     return UnionType(none_type, type_)
 
 
 def is_optional(type_: Type) -> bool:
+    # TODO: This should be implemented by assigning None, don't need all these checks right?
     TaggedValueType = type_name_to_type("tagged")
 
     if isinstance(type_, Const):

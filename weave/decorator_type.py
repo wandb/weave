@@ -77,6 +77,13 @@ def type(__override_name: str = None, __is_simple: bool = False):
             return property_types
 
         TargetType.property_types = property_types_method
+
+        if not type_vars:
+            # workaround rich bug. dataclasses __repr__ doesn't print if the dataclass has no
+            # fields. Insert our own __repr__ in that case so rich doesn't try to do its
+            # special dataclass repr.
+            TargetType.__repr__ = lambda self: f"{self.__class__.__name__}()"
+
         TargetType = dataclasses.dataclass(frozen=True)(TargetType)
 
         dc.WeaveType = TargetType
