@@ -957,6 +957,9 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         group_table_as_array_awl_stripped = (
             group_table_as_array_awl._arrow_data_asarray_no_tags()
         )
+        stripped_type = types.TypeRegistry.type_of(
+            group_table_as_array_awl_stripped
+        ).object_type
 
         # There was a comment that arrow doesn't allow grouping on struct columns
         # and another large block of code that tried to avoid passing in a struct column.
@@ -1026,7 +1029,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         return awl_add_arrow_tags(
             grouped_awl,
             nested_group_keys,
-            types.TypedDict({"groupKey": group_table_awl.object_type}),
+            types.TypedDict({"groupKey": stripped_type}),
         )
 
     @op(output_type=lambda input_types: input_types["self"])
