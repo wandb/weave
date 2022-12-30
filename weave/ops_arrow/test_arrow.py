@@ -7,6 +7,8 @@ import string
 from PIL import Image
 import typing
 
+from ..tests import weavejs_ops
+
 
 from .. import box
 from .. import storage
@@ -115,6 +117,55 @@ def test_groupby_sort(sort_lambda, sort_dirs, exp_rotation_avg):
     assert weave.use(first_group_rotation_avg) == exp_rotation_avg
 
 
+def test_js_groupby_sort():
+    list_data = [{"a": 1, "b": 1}, {"a": 1, "b": 2}, {"a": 2, "b": 1}, {"a": 2, "b": 2}]
+    list_node = list_.make_list(**{f"{n}": v for n, v in enumerate(list_data)})
+    arrow_node = weave.save(arrow.to_arrow(list_data))
+    node = weavejs_ops.groupby(
+        list_node,
+        weave.define_fn(
+            {"row": list_node.type.object_type},
+            lambda row: ops.dict_(
+                a=graph.OutputNode(
+                    types.String(),
+                    "pick",
+                    {"obj": row, "key": graph.ConstNode(types.String(), "a")},
+                )
+            ),
+        ),
+    )
+    # Critical replacement of the input to use arrow!
+    node.from_op.inputs["arr"] = arrow_node
+    node = weavejs_ops.sort(
+        node,
+        weave.define_fn(
+            {"row": node.type.object_type},
+            lambda row: ops.make_list(
+                a=graph.OutputNode(
+                    types.String(),
+                    "pick",
+                    {
+                        "obj": graph.OutputNode(
+                            types.TypedDict({"a": types.String()}),
+                            "group-groupkey",
+                            {"obj": row},
+                        ),
+                        "key": graph.ConstNode(types.String(), "a"),
+                    },
+                )
+            ),
+        ),
+        ops.make_list(a="asc"),
+    )
+    assert weave.use(node) != None
+
+
+def test_group_key():
+    data = weave.save(arrow.to_arrow([1, 2, 3]))
+    res = data.groupby(lambda row: row + 1)[0].groupkey()
+    assert weave.use(res) == 2
+
+
 def test_map_scalar_map():
     ref = create_arrow_data(100)
 
@@ -211,7 +262,7 @@ def test_custom_tagged_groupby1():
     grouped_node = data_node.groupby(lambda row: ops.dict_(a=row["a"]))
     group1_node = grouped_node[0]
 
-    assert grouped_node.type == arrow.ArrowTableGroupByType(
+    assert grouped_node.type == arrow.awl_group_by_result_type(
         types.TypedDict(
             {
                 "a": types.Int(),
@@ -224,7 +275,7 @@ def test_custom_tagged_groupby1():
         types.TypedDict({"a": types.Int()}),
     )
 
-    assert group1_node.type == arrow.ArrowTableGroupResultType(
+    assert group1_node.type == arrow.awl_group_by_result_object_type(
         types.TypedDict(
             {
                 "a": types.Int(),
@@ -264,7 +315,7 @@ def test_custom_tagged_groupby2():
                 "list_tag": types.Int(),
             }
         ),
-        arrow.ArrowTableGroupByType(
+        arrow.awl_group_by_result_type(
             types.TypedDict(
                 {
                     "a": types.Int(),
@@ -586,9 +637,7 @@ def test_arrow_weave_list_groupby_struct_type_table():
 
     group_func = weave_internal.define_fn({"row": awl.object_type}, group_func_body)
     grouped = awl.groupby(group_func)
-    assert weave.use(grouped[0])._arrow_data.to_pylist() == [
-        {"d": {"a": 1, "b": 2}, "c": 1}
-    ]
+    assert weave.use(grouped[0]) == [{"d": {"a": 1, "b": 2}, "c": 1}]
 
 
 def test_arrow_weave_list_groupby_struct_chunked_array_type():
@@ -602,10 +651,7 @@ def test_arrow_weave_list_groupby_struct_chunked_array_type():
         .dropna()[0][0]
     )
 
-    assert (
-        weave.use(node)._arrow_data.to_pylist()
-        == [{"rotate": 0, "shear": 0, "x": "a", "y": 5}] * 5
-    )
+    assert weave.use(node) == [{"rotate": 0, "shear": 0, "x": "a", "y": 5}] * 5
 
 
 string_ops_test_cases = [
@@ -1510,10 +1556,8 @@ def test_vectorize_works_recursively_on_weavifiable_op():
 
 
 def test_grouped_typed_dict_assign():
-    assert arrow.ArrowWeaveListType(
-        object_type=types.TypedDict(property_types={})
-    ).assign_type(
-        arrow.ArrowTableGroupResultType(
+    assert types.List(types.TypedDict(property_types={})).assign_type(
+        arrow.awl_group_by_result_object_type(
             object_type=types.TypedDict(
                 property_types={"a": types.Int(), "im": types.Int()}
             ),

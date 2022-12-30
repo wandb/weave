@@ -90,7 +90,7 @@ def sort(arr, compFn, columnDirs):
         {
             "arr": arr_node,
             "compFn": ensure_node(compFn),
-            "columnDirs": types.Any(),
+            "columnDirs": ensure_node(columnDirs),
         },
     )
 

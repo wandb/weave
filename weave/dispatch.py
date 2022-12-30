@@ -5,7 +5,7 @@ import logging
 import typing
 
 from . import language_nullability
-from .language_features.tagging.make_tag_getter_op import is_tag_getter
+from .language_features.tagging.is_tag_getter import is_tag_getter
 
 from . import errors
 from . import weave_types as types
