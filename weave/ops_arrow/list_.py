@@ -950,7 +950,9 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         group_table_as_array = arrow.arrow_as_array(group_table)
 
         # strip tags recursively so we group on values only
-        # TODO: Disable tag stripping on the group key!
+        # TODO: even though we are stripping tags for the grouping,
+        # the groupkey itself should retain its tags. For now this is not
+        # practically a problem, but we may want to revisit this in the future.
         group_table_as_array_awl = ArrowWeaveList(
             group_table_as_array, group_table_awl.object_type, self._artifact
         )
@@ -1315,9 +1317,18 @@ def vectorize(
         if isinstance(node, graph.OutputNode):
             inputs = node.from_op.inputs
             inputs_items = list(inputs.items())
-            # since dict takes OpVarArgs(typing.Any()) as input, it will always show up
-            # as a candidate for vectorizing itself. We don't want to do that, so we
-            # explicitly force using ArrowWeaveList-dict instead.
+
+            # In a situation where we are trying to vectorize a "lambda"
+            # function and the input is a a weave arrow list, then we are ina
+            # bit of a pickle. This means we are trying to vectorize applying
+            # this lambda to each element of the AWL. For example:
+            # awl([[{"a":1, "b": 1}, {"a": 1, "b": 2}], [{"a": 2, "b": 3}, {"a": 2, "b": 4}]]).map(lambda row: row.groupby(lambda row: row["a"]))
+            # When we hit the inner groupby, we are in this case. This is not
+            # possible to vectorize grouping inside of a map. I think we could
+            # figure out how to support nested mapping, but all the other pairs
+            # are not possible to vectorize (to my knowledge). Therefore, in
+            # these cases, we want to forcibly bail out to the list map which
+            # does a `execute_fast.fast_map_fn` on each element of the list.
             if (
                 (
                     node.from_op.name.endswith("map")
@@ -1329,24 +1340,18 @@ def vectorize(
                 and ArrowWeaveListType().assign_type(inputs_items[0][1].type)
             ):
                 first_input_name, first_input_node = inputs_items[0]
-                # Here, we are in a situation where we are attempting to vectorize a lambda function. THis
-                # is a bit tricky, because these operations can only be applied on the outermost layer. Therefore
-                # we need to bail out to the non-vectorized version
-                # raise errors.WeaveVectorizationError("Cannot vectorize lambda functions")
                 name = node.from_op.name.split("-")[-1]
                 op = registry_mem.memory_registry.get_op(name)
                 map_op = registry_mem.memory_registry.get_op("map")
-                first_input_node_as_list = ArrowWeaveList.to_py(
-                    first_input_node
-                )  # op to eject to py
+                first_input_node_as_list_node = ArrowWeaveList.to_py(first_input_node)
                 input_copy = inputs.copy()
-                input_copy[first_input_name] = first_input_node_as_list
+                input_copy[first_input_name] = first_input_node_as_list_node
                 res = map_op.lazy_call(
                     **{
-                        "arr": first_input_node_as_list,
+                        "arr": first_input_node_as_list_node,
                         "mapFn": graph.ConstNode(
                             types.Function(
-                                {"row": first_input_node_as_list.type.object_type},
+                                {"row": first_input_node_as_list_node.type.object_type},
                                 node.type,
                             ),
                             op.lazy_call(*input_copy.values()),
@@ -1354,6 +1359,9 @@ def vectorize(
                     }
                 )
                 return res
+            # since dict takes OpVarArgs(typing.Any()) as input, it will always show up
+            # as a candidate for vectorizing itself. We don't want to do that, so we
+            # explicitly force using ArrowWeaveList-dict instead.
             if node.from_op.name == "dict":
                 op = registry_mem.memory_registry.get_op(
                     "ArrowWeaveList-vectorizedDict"
