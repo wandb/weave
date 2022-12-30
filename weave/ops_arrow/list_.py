@@ -1316,6 +1316,15 @@ def vectorize(
             # since dict takes OpVarArgs(typing.Any()) as input, it will always show up
             # as a candidate for vectorizing itself. We don't want to do that, so we
             # explicitly force using ArrowWeaveList-dict instead.
+            # if node.from_op.name.endswith("map") or node.from_op.name.endswith("group") or node.from_op.name.endswith("filter") or node.from_op.name.endswith("sort"):
+            #     # Here, we are in a situation where we are attempting to vectorize a lambda function. THis
+            #     # is a bit tricky, because these operations can only be applied on the outermost layer. Therefore
+            #     # we need to bail out to the non-vectorized version
+            #     name = node.from_op.name.split("-")[-1]
+            #     op = registry_mem.memory_registry.get_op(
+            #        name
+            #     )
+            #     return op.lazy_call(**inputs)
             if node.from_op.name == "dict":
                 op = registry_mem.memory_registry.get_op(
                     "ArrowWeaveList-vectorizedDict"
