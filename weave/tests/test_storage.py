@@ -149,7 +149,7 @@ def test_list_of_ref_to_item_in_list():
     assert weave.use(d_node[1]["c"] == 7) == True
 
 
-def test_ref_type():
+def test_ref_type(test_artifact_dir):
     obj = {"x": 14}
     ref = storage.save(obj, "my-dict")
     python_ref = storage.to_python(ref)
@@ -159,7 +159,7 @@ def test_ref_type():
             "type": "LocalArtifactRef",
             "objectType": {"type": "typedDict", "propertyTypes": {"x": "int"}},
         },
-        "_val": "local-artifact:///tmp/weave/pytest/weave/tests/test_storage.py::test_ref_type (setup)/my-dict/6036cbf3a05809f1a3f174a1485b1770",
+        "_val": f"local-artifact://{test_artifact_dir}/my-dict/6036cbf3a05809f1a3f174a1485b1770",
     }
     ref2 = storage.from_python(python_ref)
     obj2 = storage.deref(ref2)

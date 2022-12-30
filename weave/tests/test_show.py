@@ -80,109 +80,7 @@ def test_show_simple_call(cereal_csv):
     }
 
 
-actual_SHOW_PARAMS_FINE_TUNE_WEAVE_NODE = {
-    "nodeType": "output",
-    "type": {
-        "type": "Run",
-        "_is_object": True,
-        "id": "string",
-        "op_name": "string",
-        "state": {
-            "type": "union",
-            "members": [
-                {"type": "const", "valType": "string", "val": "pending"},
-                {"type": "const", "valType": "string", "val": "running"},
-                {"type": "const", "valType": "string", "val": "finished"},
-                {"type": "const", "valType": "string", "val": "failed"},
-            ],
-        },
-        "prints": {"type": "list", "objectType": "string"},
-        "inputs": {"type": "typedDict", "propertyTypes": {}},
-        "history": {"type": "list", "objectType": "any"},
-        "output": {
-            "type": "gpt3_fine_tune_type",
-            "_is_object": True,
-            "id": "string",
-            "status": "string",
-            "fine_tuned_model": {"type": "union", "members": ["none", "string"]},
-            "result_file": {
-                "type": "union",
-                "members": [
-                    "none",
-                    {
-                        "type": "gpt3_fine_tune_results_type",
-                        "_is_object": True,
-                        "_base_type": {
-                            "type": "openai_stored_file",
-                            "_is_object": True,
-                            "bytes": "int",
-                            "created_at": "int",
-                            "filename": "string",
-                            "id": "string",
-                            "object": "string",
-                            "purpose": "string",
-                            "status": "string",
-                            "status_details": "none",
-                        },
-                        "bytes": "int",
-                        "created_at": "int",
-                        "filename": "string",
-                        "id": "string",
-                        "object": "string",
-                        "purpose": {
-                            "type": "const",
-                            "valType": "string",
-                            "val": "fine-tune-results",
-                        },
-                        "status": "string",
-                        "status_details": "none",
-                    },
-                ],
-            },
-        },
-    },
-    "fromOp": {
-        "name": "op-finetune_gpt3",
-        "inputs": {
-            "training_dataset": {
-                "nodeType": "output",
-                "type": {
-                    "type": "LocalArtifactRef",
-                    "_base_type": {"type": "Ref", "objectType": "unknown"},
-                    "objectType": {
-                        "type": "list",
-                        "objectType": {
-                            "type": "typedDict",
-                            "propertyTypes": {
-                                "id": "int",
-                                "prompt": "string",
-                                "completion": "string",
-                            },
-                        },
-                    },
-                },
-                "fromOp": {
-                    "name": "get",
-                    "inputs": {
-                        "uri": {
-                            "nodeType": "const",
-                            "type": "string",
-                            "val": "local-artifact:///tmp/weave/pytest/weave/tests/test_show.py::test_large_const_node (setup)/list/4cf1abf0d040d897276e4be3c6aa90df",
-                        }
-                    },
-                },
-            },
-            "hyperparameters": {
-                "nodeType": "const",
-                "type": {"type": "typedDict", "propertyTypes": {"n_epochs": "int"}},
-                "val": {"n_epochs": 2},
-            },
-        },
-    },
-}
-
-
-def test_large_const_node():
+def test_large_const_node(test_artifact_dir):
     data = []
     for i in range(500):
         a = i
@@ -197,6 +95,107 @@ def test_large_const_node():
     actual = _show_params(fine_tune)["weave_node"].to_json()
 
     print("test_large_const_node.actual", actual)
+
+    actual_SHOW_PARAMS_FINE_TUNE_WEAVE_NODE = {
+        "nodeType": "output",
+        "type": {
+            "type": "Run",
+            "_is_object": True,
+            "id": "string",
+            "op_name": "string",
+            "state": {
+                "type": "union",
+                "members": [
+                    {"type": "const", "valType": "string", "val": "pending"},
+                    {"type": "const", "valType": "string", "val": "running"},
+                    {"type": "const", "valType": "string", "val": "finished"},
+                    {"type": "const", "valType": "string", "val": "failed"},
+                ],
+            },
+            "prints": {"type": "list", "objectType": "string"},
+            "inputs": {"type": "typedDict", "propertyTypes": {}},
+            "history": {"type": "list", "objectType": "any"},
+            "output": {
+                "type": "gpt3_fine_tune_type",
+                "_is_object": True,
+                "id": "string",
+                "status": "string",
+                "fine_tuned_model": {"type": "union", "members": ["none", "string"]},
+                "result_file": {
+                    "type": "union",
+                    "members": [
+                        "none",
+                        {
+                            "type": "gpt3_fine_tune_results_type",
+                            "_is_object": True,
+                            "_base_type": {
+                                "type": "openai_stored_file",
+                                "_is_object": True,
+                                "bytes": "int",
+                                "created_at": "int",
+                                "filename": "string",
+                                "id": "string",
+                                "object": "string",
+                                "purpose": "string",
+                                "status": "string",
+                                "status_details": "none",
+                            },
+                            "bytes": "int",
+                            "created_at": "int",
+                            "filename": "string",
+                            "id": "string",
+                            "object": "string",
+                            "purpose": {
+                                "type": "const",
+                                "valType": "string",
+                                "val": "fine-tune-results",
+                            },
+                            "status": "string",
+                            "status_details": "none",
+                        },
+                    ],
+                },
+            },
+        },
+        "fromOp": {
+            "name": "op-finetune_gpt3",
+            "inputs": {
+                "training_dataset": {
+                    "nodeType": "output",
+                    "type": {
+                        "type": "LocalArtifactRef",
+                        "_base_type": {"type": "Ref", "objectType": "unknown"},
+                        "objectType": {
+                            "type": "list",
+                            "objectType": {
+                                "type": "typedDict",
+                                "propertyTypes": {
+                                    "id": "int",
+                                    "prompt": "string",
+                                    "completion": "string",
+                                },
+                            },
+                        },
+                    },
+                    "fromOp": {
+                        "name": "get",
+                        "inputs": {
+                            "uri": {
+                                "nodeType": "const",
+                                "type": "string",
+                                "val": f"local-artifact://{test_artifact_dir}/list/4cf1abf0d040d897276e4be3c6aa90df",
+                            }
+                        },
+                    },
+                },
+                "hyperparameters": {
+                    "nodeType": "const",
+                    "type": {"type": "typedDict", "propertyTypes": {"n_epochs": "int"}},
+                    "val": {"n_epochs": 2},
+                },
+            },
+        },
+    }
 
     assert actual == actual_SHOW_PARAMS_FINE_TUNE_WEAVE_NODE
 

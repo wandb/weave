@@ -53,9 +53,13 @@ def pytest_sessionstart(session):
     context_state.disable_analytics()
 
 
+@pytest.fixture()
+def test_artifact_dir():
+    return "/tmp/weave/pytest/%s" % os.environ.get("PYTEST_CURRENT_TEST")
+
+
 @pytest.fixture(autouse=True)
-def pre_post_each_test():
-    test_artifact_dir = "/tmp/weave/pytest/%s" % os.environ.get("PYTEST_CURRENT_TEST")
+def pre_post_each_test(test_artifact_dir):
     try:
         shutil.rmtree(test_artifact_dir)
     except (FileNotFoundError, OSError):
