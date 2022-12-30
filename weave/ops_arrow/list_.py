@@ -699,6 +699,17 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             self._artifact,
         )
 
+    @op(
+        name="ArrowWeaveList-dropna",
+        input_type={"self": ArrowWeaveListType()},
+        output_type=lambda input_types: ArrowWeaveListType(
+            types.non_none(input_types["self"].object_type)
+        ),
+    )
+    def dropna(self):
+        res = pc.drop_null(self._arrow_data)
+        return ArrowWeaveList(res, types.non_none(self.object_type), self._artifact)
+
     def _append_column(self, name: str, data) -> "ArrowWeaveList":
         if not data:
             raise ValueError(f'Data for new column "{name}" must be nonnull.')
@@ -1313,18 +1324,41 @@ def vectorize(
     def convert_node(node):
         if isinstance(node, graph.OutputNode):
             inputs = node.from_op.inputs
+            first_input_name, first_input_node = list(inputs.items())[0]
             # since dict takes OpVarArgs(typing.Any()) as input, it will always show up
             # as a candidate for vectorizing itself. We don't want to do that, so we
             # explicitly force using ArrowWeaveList-dict instead.
-            # if node.from_op.name.endswith("map") or node.from_op.name.endswith("group") or node.from_op.name.endswith("filter") or node.from_op.name.endswith("sort"):
-            #     # Here, we are in a situation where we are attempting to vectorize a lambda function. THis
-            #     # is a bit tricky, because these operations can only be applied on the outermost layer. Therefore
-            #     # we need to bail out to the non-vectorized version
-            #     name = node.from_op.name.split("-")[-1]
-            #     op = registry_mem.memory_registry.get_op(
-            #        name
-            #     )
-            #     return op.lazy_call(**inputs)
+            if (
+                node.from_op.name.endswith("map")
+                or node.from_op.name.endswith("groupby")
+                or node.from_op.name.endswith("filter")
+                or node.from_op.name.endswith("sort")
+            ) and ArrowWeaveListType().assign_type(first_input_node.type):
+                # Here, we are in a situation where we are attempting to vectorize a lambda function. THis
+                # is a bit tricky, because these operations can only be applied on the outermost layer. Therefore
+                # we need to bail out to the non-vectorized version
+                # raise errors.WeaveVectorizationError("Cannot vectorize lambda functions")
+                name = node.from_op.name.split("-")[-1]
+                op = registry_mem.memory_registry.get_op(name)
+                map_op = registry_mem.memory_registry.get_op("map")
+                first_input_node_as_list = ArrowWeaveList.to_py(
+                    first_input_node
+                )  # op to eject to py
+                input_copy = inputs.copy()
+                input_copy[first_input_name] = first_input_node_as_list
+                res = map_op.lazy_call(
+                    **{
+                        "arr": first_input_node_as_list,
+                        "mapFn": graph.ConstNode(
+                            types.Function(
+                                {"row": first_input_node_as_list.type.object_type},
+                                node.type,
+                            ),
+                            op.lazy_call(*input_copy.values()),
+                        ),
+                    }
+                )
+                return res
             if node.from_op.name == "dict":
                 op = registry_mem.memory_registry.get_op(
                     "ArrowWeaveList-vectorizedDict"
