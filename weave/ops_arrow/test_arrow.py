@@ -262,7 +262,7 @@ def test_custom_tagged_groupby1():
     grouped_node = data_node.groupby(lambda row: ops.dict_(a=row["a"]))
     group1_node = grouped_node[0]
 
-    assert grouped_node.type == arrow.ArrowTableGroupByType(
+    assert grouped_node.type == arrow.awl_group_by_result_type(
         types.TypedDict(
             {
                 "a": types.Int(),
@@ -275,7 +275,7 @@ def test_custom_tagged_groupby1():
         types.TypedDict({"a": types.Int()}),
     )
 
-    assert group1_node.type == arrow.ArrowTableGroupResultType(
+    assert group1_node.type == arrow.awl_group_by_result_object_type(
         types.TypedDict(
             {
                 "a": types.Int(),
@@ -315,7 +315,7 @@ def test_custom_tagged_groupby2():
                 "list_tag": types.Int(),
             }
         ),
-        arrow.ArrowTableGroupByType(
+        arrow.awl_group_by_result_type(
             types.TypedDict(
                 {
                     "a": types.Int(),
@@ -1557,7 +1557,7 @@ def test_vectorize_works_recursively_on_weavifiable_op():
 
 def test_grouped_typed_dict_assign():
     assert types.List(types.TypedDict(property_types={})).assign_type(
-        arrow.ArrowTableGroupResultType(
+        arrow.awl_group_by_result_object_type(
             object_type=types.TypedDict(
                 property_types={"a": types.Int(), "im": types.Int()}
             ),

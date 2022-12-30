@@ -49,26 +49,6 @@ if typing.TYPE_CHECKING:
 FLATTEN_DELIMITER = "➡️"
 
 
-# Temp function to handle refactor
-def ArrowTableGroupByType(
-    object_type: types.Type, key_type: types.Type
-) -> "ArrowWeaveListType":
-    return ArrowWeaveListType(ArrowTableGroupResultType(object_type, key_type))
-
-
-def ArrowTableGroupResultType(
-    object_type: types.Type, _key: types.Type
-) -> tagged_value_type.TaggedValueType:
-    return tagged_value_type.TaggedValueType(
-        types.TypedDict(
-            {
-                "groupKey": _key,
-            }
-        ),
-        types.List(object_type),
-    )
-
-
 def _recursively_flatten_structs_in_array(
     arr: pa.Array, prefix: str, _stack_depth=0
 ) -> dict[str, pa.Array]:
@@ -473,6 +453,25 @@ ArrowWeaveListObjectTypeVar = typing.TypeVar("ArrowWeaveListObjectTypeVar")
 
 def map_output_type(input_types):
     return ArrowWeaveListType(input_types["map_fn"].output_type)
+
+
+def awl_group_by_result_object_type(
+    object_type: types.Type, _key: types.Type
+) -> tagged_value_type.TaggedValueType:
+    return tagged_value_type.TaggedValueType(
+        types.TypedDict(
+            {
+                "groupKey": _key,
+            }
+        ),
+        types.List(object_type),
+    )
+
+
+def awl_group_by_result_type(
+    object_type: types.Type, key_type: types.Type
+) -> "ArrowWeaveListType":
+    return ArrowWeaveListType(awl_group_by_result_object_type(object_type, key_type))
 
 
 @weave_class(weave_type=ArrowWeaveListType)
@@ -938,7 +937,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                 {"row": input_types["self"].object_type}, types.Any()
             ),
         },
-        output_type=lambda input_types: ArrowTableGroupByType(
+        output_type=lambda input_types: awl_group_by_result_type(
             input_types["self"].object_type, input_types["group_by_fn"].output_type
         ),
     )
