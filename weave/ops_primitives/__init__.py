@@ -19,3 +19,4 @@ from .html import *
 from .markdown import *
 from .op_def import *
 from ..language_features.tagging.tagging_ops import *
+from .list_tag_getters import *
