@@ -1311,16 +1311,21 @@ def vectorize(
     def convert_node(node):
         if isinstance(node, graph.OutputNode):
             inputs = node.from_op.inputs
-            first_input_name, first_input_node = list(inputs.items())[0]
+            inputs_items = list(inputs.items())
             # since dict takes OpVarArgs(typing.Any()) as input, it will always show up
             # as a candidate for vectorizing itself. We don't want to do that, so we
             # explicitly force using ArrowWeaveList-dict instead.
             if (
-                node.from_op.name.endswith("map")
-                or node.from_op.name.endswith("groupby")
-                or node.from_op.name.endswith("filter")
-                or node.from_op.name.endswith("sort")
-            ) and ArrowWeaveListType().assign_type(first_input_node.type):
+                (
+                    node.from_op.name.endswith("map")
+                    or node.from_op.name.endswith("groupby")
+                    or node.from_op.name.endswith("filter")
+                    or node.from_op.name.endswith("sort")
+                )
+                and len(inputs_items) > 0
+                and ArrowWeaveListType().assign_type(inputs_items[0][1].type)
+            ):
+                first_input_name, first_input_node = inputs_items[0]
                 # Here, we are in a situation where we are attempting to vectorize a lambda function. THis
                 # is a bit tricky, because these operations can only be applied on the outermost layer. Therefore
                 # we need to bail out to the non-vectorized version
