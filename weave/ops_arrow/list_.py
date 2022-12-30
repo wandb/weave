@@ -954,9 +954,6 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         group_table_as_array_awl = ArrowWeaveList(
             group_table_as_array, group_table_awl.object_type, self._artifact
         )
-        group_table_as_array_awl_raw = arrow_as_array(
-            group_table_as_array_awl._arrow_data
-        )
         group_table_as_array_awl_stripped = (
             group_table_as_array_awl._arrow_data_asarray_no_tags()
         )
@@ -978,20 +975,12 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                     group_table_as_array_awl_stripped
                 )
 
-            if isinstance(group_table_as_array_awl_raw, pa.ChunkedArray):
-                group_table_as_array_awl_raw_combined = (
-                    group_table_as_array_awl_raw.combine_chunks()
-                )
-            else:
-                group_table_as_array_awl_raw_combined = group_table_as_array_awl_raw
-
             group_table_chunked = pa.chunked_array(
                 pa.StructArray.from_arrays(
                     [
                         group_table_as_array_awl_stripped_combined,
-                        group_table_as_array_awl_raw_combined,
                     ],
-                    names=["group_key", "tagged_group_key"],
+                    names=["group_key"],
                 )
             )
             group_table_chunked_unzipped = unzip_struct_array(group_table_chunked)
@@ -1020,9 +1009,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         awl_grouped_agg_struct = _unflatten_structs_in_flattened_table(awl_grouped_agg)
 
         combined = awl_grouped_agg_struct.column("_index_list").combine_chunks()
-        grouped_keys = awl_grouped_agg_struct.column(
-            "tagged_group_key"
-        ).combine_chunks()
+        grouped_keys = awl_grouped_agg_struct.column("group_key").combine_chunks()
         nested_group_keys = pa.StructArray.from_arrays(
             [grouped_keys], names=["groupKey"]
         )
