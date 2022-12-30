@@ -642,9 +642,7 @@ def test_arrow_weave_list_groupby_struct_type_table():
 
     group_func = weave_internal.define_fn({"row": awl.object_type}, group_func_body)
     grouped = awl.groupby(group_func)
-    assert weave.use(grouped[0])._arrow_data.to_pylist() == [
-        {"d": {"a": 1, "b": 2}, "c": 1}
-    ]
+    assert weave.use(grouped[0]) == [{"d": {"a": 1, "b": 2}, "c": 1}]
 
 
 def test_arrow_weave_list_groupby_struct_chunked_array_type():
@@ -658,10 +656,7 @@ def test_arrow_weave_list_groupby_struct_chunked_array_type():
         .dropna()[0][0]
     )
 
-    assert (
-        weave.use(node)._arrow_data.to_pylist()
-        == [{"rotate": 0, "shear": 0, "x": "a", "y": 5}] * 5
-    )
+    assert weave.use(node) == [{"rotate": 0, "shear": 0, "x": "a", "y": 5}] * 5
 
 
 string_ops_test_cases = [
@@ -1566,9 +1561,7 @@ def test_vectorize_works_recursively_on_weavifiable_op():
 
 
 def test_grouped_typed_dict_assign():
-    assert arrow.ArrowWeaveListType(
-        object_type=types.TypedDict(property_types={})
-    ).assign_type(
+    assert types.List(types.TypedDict(property_types={})).assign_type(
         arrow.ArrowTableGroupResultType(
             object_type=types.TypedDict(
                 property_types={"a": types.Int(), "im": types.Int()}

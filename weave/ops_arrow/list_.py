@@ -1029,7 +1029,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
 
         val_lengths = combined.value_lengths()
         flattened_indexes = combined.flatten()
-        values = table.take(flattened_indexes)
+        values = arrow.arrow_as_array(table).take(flattened_indexes)
         offsets = np.cumsum(np.concatenate(([0], val_lengths)))
         grouped_results = pa.ListArray.from_arrays(offsets, values)
         grouped_awl = ArrowWeaveList(
