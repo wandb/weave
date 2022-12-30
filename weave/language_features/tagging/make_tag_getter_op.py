@@ -1,10 +1,10 @@
 import typing
 
+from ... import op_args
 from ... import weave_types as types
 from ... import decorator_op
 from . import tagged_value_type
 from . import tag_store
-from ...ops_arrow.list_ import ArrowWeaveList, ArrowWeaveListType
 
 if typing.TYPE_CHECKING:
     from ... import op_def as OpDef
@@ -45,28 +45,37 @@ def make_tag_getter_op(
     def tag_getter_op(obj):  # type: ignore
         return tag_store.find_tag(obj, tag_key, tag_type)
 
-    # This is the vectorized version of the tag getter specifically for
-    # ArrowWeaveList. We have discussed the possibility of having a single tag
-    # getter op and a single vectorized tag getter op which can handle any tag
-    # requested, but in the meantime, this matches the Weave0 pattern.
-    @decorator_op.op(  # type: ignore
-        name=f"ArrowWeaveList_{op_name}",
-        input_type={
-            "obj": ArrowWeaveListType(
-                tagged_value_type.TaggedValueType(
-                    types.TypedDict({tag_key: types.optional(tag_type)}), base_type
-                ),
-            )
-        },
-        output_type=lambda input_types: ArrowWeaveListType(
-            input_types["obj"].object_type.tag.property_types[tag_key]
-        ),
-    )
-    def awl_tag_getter_op(obj):  # type: ignore
-        return ArrowWeaveList(
-            obj._arrow_data.field("_tag").field(tag_key),
-            obj.object_type.tag.property_types[tag_key],
-            obj._artifact,
-        )
-
     return tag_getter_op
+
+
+# This is a heuristic that is used to determine if an op is a tag getter.
+# In the future we might just have a single tag getter operation which
+# would make this irrelevant or different.
+def is_tag_getter(op: "OpDef.OpDef") -> bool:
+    return _is_single_tag_getter(op) or _is_mapped_tag_getter(op)
+
+
+def _is_single_tag_getter(op: "OpDef.OpDef") -> bool:
+    return (
+        op.name.startswith("tag-")
+        or op.name.startswith("get_tag-")
+        and isinstance(op.input_type, op_args.OpNamedArgs)
+        and "obj" in op.input_type.arg_types
+        and isinstance(
+            op.input_type.arg_types["obj"], tagged_value_type.TaggedValueType
+        )
+    )
+
+
+def _is_mapped_tag_getter(op: "OpDef.OpDef") -> bool:
+    return (
+        op.name.startswith("mapped_tag-")
+        or op.name.startswith("mapped_get_tag-")
+        and isinstance(op.input_type, op_args.OpNamedArgs)
+        and "obj" in op.input_type.arg_types
+        and isinstance(op.input_type.arg_types["obj"], types.List)
+        and isinstance(
+            op.input_type.arg_types["obj"].object_type,
+            tagged_value_type.TaggedValueType,
+        )
+    )

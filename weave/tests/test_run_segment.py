@@ -409,7 +409,7 @@ def test_map_experiment_profile_post_groupby_map():
 
     map_fn_node = weave_internal.define_fn(
         {
-            "row": ops.arrow.awl_group_by_result_object_type(
+            "row": ops.arrow.ArrowTableGroupResultType(
                 experiment.type.object_type, groupby_node.type.output_type
             )
         },

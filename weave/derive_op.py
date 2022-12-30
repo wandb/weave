@@ -52,6 +52,7 @@ disallow_mapping_type_name_list = [
     "ndarray",
     "ArrowArray",
     "ArrowTable",
+    "ArrowTableGroupBy",
     "ArrowWeaveList",
     "dataframe",
     "sqltable",
@@ -65,6 +66,7 @@ disallow_mapping_type_name_list = [
     "any",
     "groupresult",
     "dataframeTable",
+    "ArrowTableGroupResult",
     "ArrowWeaveList",
 ]
 
