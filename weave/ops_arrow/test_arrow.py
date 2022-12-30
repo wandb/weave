@@ -176,11 +176,6 @@ def test_map_scalar_map():
 
 def test_groupby_mapped_groupby():
     ref = create_arrow_data(1000)
-    # This test is failing since the inner groupby is not vectorized.
-    # in the previous groupby implementation, the inner group by
-    # was executed with fast_map, which essentially bailed out to
-    # the list implementation. Now, then we have a awl<list<x>>.map(row.groupby(),
-    # we have a problem.
     node = (
         weave.get(ref)
         .groupby(lambda row: ops.dict_(rotate=row["rotate"], shear=row["shear"]))
