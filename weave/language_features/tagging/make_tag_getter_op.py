@@ -45,6 +45,10 @@ def make_tag_getter_op(
     def tag_getter_op(obj):  # type: ignore
         return tag_store.find_tag(obj, tag_key, tag_type)
 
+    # This is the vectorized version of the tag getter specifically for
+    # ArrowWeaveList. We have discussed the possibility of having a single tag
+    # getter op and a single vectorized tag getter op which can handle any tag
+    # requested, but in the meantime, this matches the Weave0 pattern.
     @decorator_op.op(  # type: ignore
         name=f"ArrowWeaveList_{op_name}",
         input_type={
