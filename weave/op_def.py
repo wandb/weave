@@ -14,6 +14,7 @@ from . import graph
 from . import weave_internal
 from . import pyfunc_type_util
 from . import engine_trace
+from . import frame
 from .language_features.tagging import (
     process_opdef_resolve_fn,
     process_opdef_output_type,
@@ -130,26 +131,72 @@ class OpDef:
 
     def lazy_call(_self, *args, **kwargs):
         bound_params = _self.bind_params(args, kwargs)
-        # Don't try to refine if there are variable nodes, we are building a
-        # function in that case!
-        final_output_type: types.Type
-        if _self.refine_output_type and not any(
-            graph.expr_vars(arg_node) for arg_node in bound_params.values()
-        ):
-            called_refine_output_type = _self.refine_output_type(**bound_params)
-            tracer = engine_trace.tracer()  # type: ignore
-            with tracer.trace("refine.%s" % _self.uri):
-                # api's use auto-creates client. TODO: Fix inline import
+
+        final_output_type: types.Type = None
+
+        if _self.refine_output_type:
+            # do mapped refinement if we're refining a lambda that is mapped.
+
+            derefed_param_nodes = weave_internal.dereference_variables_nodes(
+                bound_params.values(), frame.get_frame()
+            )
+
+            found_index_by_var = {"val": False}
+
+            def replace_index_n(node: graph.Node) -> typing.Optional[graph.Node]:
+                if (
+                    isinstance(node, graph.OutputNode)
+                    and node.from_op.name.endswith("__getitem__")
+                    and isinstance(node.from_op.inputs["index"], graph.VarNode)
+                ):
+                    found_index_by_var["val"] = True
+                    return node.from_op.inputs["arr"]
+                return None
+
+            replaced_index_var_nodes = graph.map_nodes_top_level(
+                derefed_param_nodes, replace_index_n
+            )
+
+            bound_params_for_refine = {
+                k: n for k, n in zip(bound_params, replaced_index_var_nodes)
+            }
+            if found_index_by_var["val"]:
+                first_arg_name = list(bound_params_for_refine.keys())[0]
+                first_arg = list(bound_params_for_refine.values())[0]
+                called_mapped_refine = first_arg.map(
+                    lambda v: _self.refine_output_type(
+                        **{**bound_params_for_refine, first_arg_name: v}
+                    )
+                )
                 from . import api
 
-                final_output_type = api.use(called_refine_output_type)  # type: ignore
+                union_members = api.use(called_mapped_refine)
+                final_output_type = types.union(*union_members)
 
-            final_output_type = (
-                process_opdef_output_type.process_opdef_refined_output_type(
-                    final_output_type, bound_params, _self
+            elif not any(
+                # TODO: bound_params_for_refine?
+                graph.expr_vars(arg_node)
+                for arg_node in bound_params.values()
+            ):
+                # TODO: not right, what if we have the index variable?
+
+                # Don't try to refine if there are variable nodes, we are building a
+                # function in that case!
+                called_refine_output_type = _self.refine_output_type(**bound_params)
+                tracer = engine_trace.tracer()  # type: ignore
+                with tracer.trace("refine.%s" % _self.uri):
+                    # api's use auto-creates client. TODO: Fix inline import
+                    from . import api
+
+                    final_output_type = api.use(called_refine_output_type)  # type: ignore
+
+                final_output_type = (
+                    process_opdef_output_type.process_opdef_refined_output_type(
+                        final_output_type, bound_params, _self
+                    )
                 )
-            )
-        else:
+
+        if final_output_type is None:
             final_output_type = _self.unrefined_output_type_for_params(bound_params)
         from . import dispatch
 
@@ -338,7 +385,19 @@ class OpDef:
                         ]:
                             vars[name] = param_input_type.input_types[name]
 
-                        v = weave_internal.define_fn(vars, v)
+                        # Insert the lambda variables onto the frame
+                        frame_vars = {}
+                        if self.common_name == "map":
+                            list_arg = list(bound_params_with_constants.values())[0]
+                            row_arg_name = list(vars.keys())[0]
+                            from .ops_primitives import list_
+
+                            frame_vars[row_arg_name] = list_.List.__getitem__(
+                                list_arg, weave_internal.make_var_node(types.Int(), "n")
+                            )
+
+                        with frame.scope_vars(frame_vars):
+                            v = weave_internal.define_fn(vars, v)
                     else:
                         val_type = types.TypeRegistry.type_of(v)
                         # TODO: should type-check v here.

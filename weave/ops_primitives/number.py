@@ -193,7 +193,7 @@ class Number(object):
     output_type=types.Number(),
 )
 def numbers_sum(numbers):
-    numbers = [n for n in numbers if n is not None]
+    numbers = [n for n in numbers if n != None]
     return sum(numbers)
 
 
@@ -203,7 +203,7 @@ def numbers_sum(numbers):
     output_type=types.Number(),
 )
 def numbers_avg(numbers):
-    numbers = [n for n in numbers if n is not None]
+    numbers = [n for n in numbers if n != None]
     return sum(numbers) / len(numbers)
 
 
@@ -213,7 +213,7 @@ def numbers_avg(numbers):
     output_type=types.Number(),
 )
 def numbers_min(numbers):
-    numbers = [n for n in numbers if n is not None]
+    numbers = [n for n in numbers if n != None]
     return min(numbers)
 
 
@@ -223,7 +223,7 @@ def numbers_min(numbers):
     output_type=types.Number(),
 )
 def numbers_max(numbers):
-    numbers = [n for n in numbers if n is not None]
+    numbers = [n for n in numbers if n != None]
     return max(numbers)
 
 
