@@ -66,3 +66,31 @@ def test_out_of_bounds_tag_access():
     tagged = node._test_op_tag_input(1)
     assert weave.use(get_a_tag(tagged[0])) == 1
     assert weave.use(get_a_tag(tagged[2])) == None
+
+
+@weave.op()
+def _test_refining_identity_refine(x: typing.Any) -> weave.types.Type:
+    return weave.type_of(x)
+
+
+@weave.op(refine_output_type=_test_refining_identity_refine)
+def _test_refining_identity(x: typing.Any) -> typing.Any:
+    return x
+
+
+def test_simple_refine():
+    t = _test_refining_identity([1, 2])
+    assert t.type == weave.types.List(weave.types.Int())
+
+
+def test_refine_in_map():
+    l = weave.save([1, 2])
+    assert weave.use(l._test_refining_identity().sum()) == 3
+
+    l = weave.save([[1, 2], [3, 4]])
+    r = l.map(lambda x: x._test_refining_identity().sum())
+    assert weave.use(r) == [3, 7]
+
+    l = weave.save([[{"a": 1}, {"a": 2}], [{"a": 3}, {"a": 4}]])
+    r = l.map(lambda x: x._test_refining_identity()["a"].sum())
+    assert weave.use(r) == [3, 7]

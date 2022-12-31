@@ -114,6 +114,7 @@ def _dispatch_map_fn_refining(node: graph.Node) -> typing.Optional[graph.OutputN
         new_node = dispatch.dispatch_by_name_and_type(
             node.from_op.name, [], node_inputs
         )
+        # return new_node
         should_replace = new_node.from_op.name != node.from_op.name
         if not node.type.assign_type(new_node.type):
             logging.warning(
@@ -300,7 +301,7 @@ def _compile(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
     # graph, we reuse any results produced in this phase, instead of re-executing
     # those nodes.
     with tracer.trace("compile:refine"):
-        n = graph.map_nodes_full(n, _dispatch_map_fn_refining)
+        n = graph.map_nodes_top_level(n, _dispatch_map_fn_refining)
 
     loggable_nodes = graph_debug.combine_common_nodes(n)
     logging.info(

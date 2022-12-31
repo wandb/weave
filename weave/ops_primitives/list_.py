@@ -170,7 +170,20 @@ class List:
         output_type=lambda input_types: types.List(input_types["mapFn"].output_type),
     )
     def map(arr, mapFn):
-        return execute_fast.fast_map_fn(arr, mapFn)
+        # Need to provide frame here, since execute_fast calls compile again.
+        # Should move static branch resolution up to engine
+        # And if we ever have an op that produces a node, we need to compile
+        # the result (which may have a variable that refers to the frame in it!)
+        from .. import frame
+
+        with frame.scope_vars(
+            {
+                "row": weave_internal.make_const_node(
+                    types.TypeRegistry.type_of(arr), arr
+                ).index(weave_internal.make_var_node(types.Int(), "n"))
+            }
+        ):
+            return execute_fast.fast_map_fn(arr, mapFn)
 
     @op(
         name="mapEach",

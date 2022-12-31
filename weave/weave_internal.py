@@ -15,6 +15,17 @@ def dereference_variables(node: graph.Node, var_values: graph.Frame) -> graph.No
     return graph.map_nodes_top_level([node], map_fn)[0]
 
 
+def dereference_variables_nodes(
+    nodes: list[graph.Node], var_values: graph.Frame
+) -> list[graph.Node]:
+    def map_fn(n: graph.Node) -> graph.Node:
+        if isinstance(n, graph.VarNode):
+            return var_values.get(n.name, n)
+        return n
+
+    return graph.map_nodes_top_level(nodes, map_fn)
+
+
 def call_fn(
     weave_fn: graph.Node,
     inputs: graph.Frame,
