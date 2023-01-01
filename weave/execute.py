@@ -11,6 +11,7 @@ import typing
 from . import engine_trace
 from . import errors
 from . import context
+from . import memo
 from . import environment
 
 # Planner/Compiler
@@ -104,23 +105,24 @@ def execute_nodes(nodes, no_cache=False):
             ),
         )
     )
-    with tag_store.isolated_tagging_context():
-        # Compile can recursively call execute_nodes during the final
-        # refine phase. We are careful in compile to ensure that the nodes that
-        # it executes in its final phase are the same nodes (by reference equality)
-        # that it returns. We share the forward graph with the compile phase, so that
-        # we don't need to expensively re-execute nodes that compile has already
-        # executed.
-        with _new_forward_graph() as fg:
-            nodes = compile.compile(nodes)
-        fg.add_nodes(nodes)
+    with memo.memo_storage():
+        with tag_store.isolated_tagging_context():
+            # Compile can recursively call execute_nodes during the final
+            # refine phase. We are careful in compile to ensure that the nodes that
+            # it executes in its final phase are the same nodes (by reference equality)
+            # that it returns. We share the forward graph with the compile phase, so that
+            # we don't need to expensively re-execute nodes that compile has already
+            # executed.
+            with _new_forward_graph() as fg:
+                nodes = compile.compile(nodes)
+            fg.add_nodes(nodes)
 
-        with context.execution_client():
-            stats = execute_forward(fg, no_cache=no_cache)
-            summary = stats.summary()
-            logging.info("Execution summary\n%s" % pprint.pformat(summary))
+            with context.execution_client():
+                stats = execute_forward(fg, no_cache=no_cache)
+                summary = stats.summary()
+                logging.info("Execution summary\n%s" % pprint.pformat(summary))
 
-            res = [fg.get_result(n) for n in nodes]
+                res = [fg.get_result(n) for n in nodes]
     return res
 
 

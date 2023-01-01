@@ -10,7 +10,6 @@ from flask import json
 from pythonjsonlogger import jsonlogger
 from werkzeug.exceptions import HTTPException
 
-
 from flask import Flask, Blueprint
 from flask import request
 from flask import abort
@@ -20,7 +19,6 @@ from flask import send_from_directory, send_file, jsonify
 from weave import server
 from weave import registry_mem
 from weave import errors
-from weave import context_state
 from weave import weavejs_fixes
 from weave import automation
 from weave import util
