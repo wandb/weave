@@ -144,7 +144,12 @@ def gql_direct_edge_op(
                     output_type.instance_class.from_gql(item)
                     for item in gql_obj.gql[name]
                 ]
-            return output_type.instance_class.from_gql(gql_obj.gql[name])
+            if gql_obj.gql == wb_domain_types.UntypedOpaqueDict.from_json_dict(None):
+                return None
+            gql_val = gql_obj.gql.get(name)
+            if gql_val is None:
+                return None
+            return output_type.instance_class.from_gql(gql_val)
 
     sig = signature(gql_relationship_getter_op)
     base_params = (
