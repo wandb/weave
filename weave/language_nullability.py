@@ -51,7 +51,8 @@ def process_opdef_output_type(
         def nullable_output_type(
             input_type: typing.Dict[str, types.Type]
         ) -> types.Type:
-            arg0_type = input_type[named_args[0].name]
+            arg0_name = named_args[0].name
+            arg0_type = input_type[arg0_name]
             if not isinstance(
                 op_concrete_output_type, tagged_value_type.TaggedValueType
             ) and types.NoneType().assign_type(arg0_type):
@@ -60,7 +61,9 @@ def process_opdef_output_type(
                 # could be tagged).
                 return arg0_type
             if callable(op_output_type):
-                non_null_output_type = op_output_type(input_type)
+                non_null_output_type = op_output_type(
+                    {**input_type, arg0_name: types.non_none(input_type[arg0_name])}
+                )
             else:
                 non_null_output_type = op_output_type
             if types.is_optional(arg0_type):
