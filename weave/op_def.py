@@ -313,12 +313,7 @@ class OpDef:
                     already_bound_types = language_autocall.update_input_types(
                         self.input_type, already_bound_types
                     )
-                    try:
-                        param_input_type = param_input_type(already_bound_types)
-                    except AttributeError as e:
-                        raise errors.WeaveInternalError(
-                            f"callable input_type of {self.uri} failed to accept already_bound_types of {already_bound_types}"
-                        )
+                    param_input_type = param_input_type(already_bound_types)
                 if not isinstance(v, graph.Node):
                     if callable(v):
                         if not isinstance(param_input_type, types.Function):

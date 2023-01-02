@@ -384,8 +384,8 @@ def list_indexCheckpoint(arr):
 
 def is_list_like(list_type_or_node):
     if isinstance(list_type_or_node, Node):
-        return is_list_like(list_type_or_node.type)
-    return hasattr(list_type_or_node, "object_type")
+        return types.is_list_like(list_type_or_node.type)
+    return types.is_list_like(list_type_or_node)
 
 
 def flatten_type(list_type):

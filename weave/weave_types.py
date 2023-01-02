@@ -440,6 +440,12 @@ class NoneType(BasicType):
     name = "none"
     instance_classes = [type(None), box.BoxedNone]
 
+    # If we're using NoneType in a place where we expect a list, the object_type
+    # of that list is also NoneType, due to nullability.
+    @property
+    def object_type(self):
+        return NoneType()
+
     def save_instance(self, obj, artifact, name):
         # BoxedNone is actually a box, not a subclass of bool, since
         # we can't subclass bool in Python. So we unbox it here.
