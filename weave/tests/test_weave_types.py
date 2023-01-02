@@ -405,6 +405,16 @@ def test_typeddict_to_dict():
                 types.TypedDict({}), types.union(types.String(), types.Number())
             ),
         ),
+        # Union Tagged Union
+        (
+            types.UnionType(
+                types.NoneType(),
+                TaggedValueType(
+                    types.TypedDict({}), types.union(types.NoneType(), types.Number())
+                ),
+            ),
+            TaggedValueType(types.TypedDict({}), types.Number()),
+        ),
         # Tagged Union Const Units
         (
             TaggedValueType(
