@@ -143,6 +143,9 @@ class OpDef:
                 from . import api
 
                 final_output_type = api.use(called_refine_output_type)  # type: ignore
+            if final_output_type == None:
+                # This can happen due to nullability. In that case, accept the unrefined type.
+                final_output_type = _self.unrefined_output_type_for_params(bound_params)
 
             final_output_type = (
                 process_opdef_output_type.process_opdef_refined_output_type(

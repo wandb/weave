@@ -7,20 +7,6 @@ from weave import box
 from ..language_features.tagging import make_tag_getter_op, tag_store, tagged_value_type
 
 
-def test_none():
-    node = weave.save(None, "null")
-    x = node + 1
-    assert x.type == weave.types.NoneType()
-    assert weave.use(x) == None
-
-
-def test_list_none():
-    node = weave.save([None, None], "null")
-    x = node + 1
-    assert x.type == weave.types.List(weave.types.NoneType())
-    assert weave.use(x) == [None, None]
-
-
 @weave.op(
     output_type=lambda input_types: tagged_value_type.TaggedValueType(
         weave.types.TypedDict({"a_tag": weave.types.Int()}),
@@ -36,6 +22,30 @@ def _test_op_tag_input(x: typing.Any, tag_val: int):
 get_a_tag = make_tag_getter_op.make_tag_getter_op(
     "a_tag", weave.types.Int(), op_name="tag-a_tag"
 )
+
+
+@weave.op()
+def _test_op_refining_refine(x: typing.Any) -> weave.types.Type:
+    return weave.type_of(x)
+
+
+@weave.op(refine_output_type=_test_op_refining_refine)
+def _test_op_refining(x: typing.Any) -> typing.Any:
+    return x
+
+
+def test_none():
+    node = weave.save(None, "null")
+    x = node + 1
+    assert x.type == weave.types.NoneType()
+    assert weave.use(x) == None
+
+
+def test_list_none():
+    node = weave.save([None, None], "null")
+    x = node + 1
+    assert x.type == weave.types.List(weave.types.NoneType())
+    assert weave.use(x) == [None, None]
 
 
 def test_tagged_none():
@@ -66,3 +76,7 @@ def test_out_of_bounds_tag_access():
     tagged = node._test_op_tag_input(1)
     assert weave.use(get_a_tag(tagged[0])) == 1
     assert weave.use(get_a_tag(tagged[2])) == None
+
+
+def test_refine_nullability():
+    assert _test_op_refining(None).type.val_type == weave.types.NoneType()

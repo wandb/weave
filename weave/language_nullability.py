@@ -61,8 +61,11 @@ def process_opdef_output_type(
                 # could be tagged).
                 return arg0_type
             if callable(op_output_type):
+                input_type0 = input_type[arg0_name]
+                if not input_type0.assign_type(types.NoneType()):
+                    input_type0 = types.non_none(input_type0)
                 non_null_output_type = op_output_type(
-                    {**input_type, arg0_name: types.non_none(input_type[arg0_name])}
+                    {**input_type, arg0_name: input_type0}
                 )
             else:
                 non_null_output_type = op_output_type
