@@ -720,6 +720,12 @@ class TypedDict(Type):
         return hash(tuple(k, v) for k, v in self.property_types.items())
 
     def _assign_type_inner(self, other_type):
+        if isinstance(other_type, Dict):
+            for ptype in self.property_types.values():
+                if not ptype.assign_type(other_type.object_type):
+                    return False
+            return True
+
         if not isinstance(other_type, TypedDict):
             return False
 
@@ -771,6 +777,17 @@ class Dict(Type):
 
     key_type: Type = String()
     object_type: Type = Any()
+
+    @property
+    def property_types(self):
+        class DictPropertyTypes:
+            def values(_self):
+                return [self.object_type]
+
+            def get(_self, _):
+                return self.object_type
+
+        return DictPropertyTypes()
 
     def __post_init__(self):
         # Note this differs from Python's Dict in that keys are always strings!

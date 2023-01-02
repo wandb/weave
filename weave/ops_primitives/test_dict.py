@@ -1,4 +1,6 @@
 import weave
+from .. import weave_internal
+from ..language_features.tagging import tagged_value_type
 
 
 def test_keys_type():
@@ -11,3 +13,16 @@ def test_keys_type():
             weave.types.Const(weave.types.String(), "c"),
         )
     )
+
+
+def test_pick():
+    obj = weave_internal.make_const_node(
+        weave.types.Dict(object_type=weave.types.String()), {"a": "x"}
+    )
+    key = weave_internal.make_const_node(
+        tagged_value_type.TaggedValueType(
+            weave.types.TypedDict({"w": weave.types.String()}), weave.types.String()
+        ),
+        "a",
+    )
+    assert weave.use(weave.ops.TypedDict.pick(obj, key)) == "x"

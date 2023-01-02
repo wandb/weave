@@ -484,3 +484,9 @@ def test_typetype_tofrom_dict():
 def test_union_of_typetype_can_be_compared_to_other():
     t = types.UnionType(types.NoneType(), types.TypeType())
     assert t == t
+
+
+def test_assign_dict_to_typeddict():
+    assert weave.types.TypedDict({}).assign_type(
+        weave.types.Dict(weave.types.String(), weave.types.String())
+    )
