@@ -14,8 +14,9 @@ from . import uris
 from . import util
 from . import errors
 from . import wandb_api
-from . import safe_cache
 from . import context_state
+from . import memo
+
 import wandb
 from wandb.apis import public as wb_public
 from wandb.util import hex_to_b64_id
@@ -35,17 +36,17 @@ def local_artifact_dir() -> str:
     return d
 
 
-@safe_cache.safe_lru_cache(1000)
+@memo.memo
 def get_wandb_read_artifact(path):
     return wandb_api.wandb_public_api().artifact(path)
 
 
-@safe_cache.safe_lru_cache(1000)
+@memo.memo
 def get_wandb_read_run(path):
     return wandb_api.wandb_public_api().run(path)
 
 
-@safe_cache.safe_lru_cache(1000)
+@memo.memo
 def get_wandb_read_client_artifact(art_id: str):
     """art_id may be client_id, or seq:alias"""
     if ":" in art_id:

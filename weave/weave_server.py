@@ -10,7 +10,6 @@ from flask import json
 from pythonjsonlogger import jsonlogger
 from werkzeug.exceptions import HTTPException
 
-
 from flask import Flask, Blueprint
 from flask import request
 from flask import abort
@@ -20,7 +19,6 @@ from flask import send_from_directory, send_file, jsonify
 from weave import server
 from weave import registry_mem
 from weave import errors
-from weave import context_state
 from weave import weavejs_fixes
 from weave import automation
 from weave import util
@@ -273,6 +271,44 @@ def frontend(path):
 @blueprint.route("/__weave/hello")
 def hello():
     return "hello"
+
+
+DEBUG_MEM = False
+if not environment.wandb_production() and DEBUG_MEM:
+    # To use, hit /objgraph_getnewids to set a baseline, then do some requests.
+    # Then hit /pdb to drop the server into pdb and do
+    # import objgraph
+    # obj_ids = objgraph.get_new_ids()
+    # This will contain all the ids of objects that have been created since
+    # the last call to objgraph.get_new_ids()
+    # Then you can inspect objects like:
+    # obj_id = obj_ids['TypedDict'][0]
+    # obj = objgraph.at(obj_id)
+    # objgraph.show_backrefs([obj], max_depth=15)
+    #
+    # Other useful objgraph commands:
+    # objgraph.show_most_common_types(limit=20)
+    # obj = objgraph.by_type('TypedDict')[100]
+
+    import gc
+    import objgraph
+
+    @blueprint.route("/pdb")
+    def pdb():
+        breakpoint()
+        return "ok"
+
+    @blueprint.route("/objgraph_showgrowth")
+    def objgraph_showgrowth():
+        gc.collect()
+        objgraph.show_growth()
+        return "see logs"
+
+    @blueprint.route("/objgraph_getnewids")
+    def objgraph_getnewids():
+        gc.collect()
+        objgraph.get_new_ids()
+        return "see logs"
 
 
 # This makes all server logs go into the notebook

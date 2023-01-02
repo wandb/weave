@@ -12,7 +12,7 @@ from . import weave_types as types
 from . import errors
 from . import weave_internal
 from . import storage
-from . import safe_cache
+from . import memo
 
 
 NodeOrOp = typing.Union[graph.Node, graph.Op]
@@ -86,8 +86,7 @@ def serialize(graphs: typing.List[graph.Node]) -> SerializedReturnType:
     return {"nodes": nodes, "rootNodes": root_nodes}
 
 
-# TODO: caching this solves an algorithm issue, but having a limit is scary.
-@safe_cache.safe_lru_cache(maxsize=10000)
+@memo.memo
 def node_id(node: graph.Node):
     hashable = {"type": node.type.to_dict()}
     if isinstance(node, graph.OutputNode):
@@ -195,4 +194,7 @@ def deserialize(serialized: SerializedReturnType) -> "list[graph.Node]":
     # This ensures we don't execute the same node many times.
     hashed_nodes: dict[str, graph.Node] = {}
 
-    return [_deserialize_node(i, nodes, parsed_nodes, hashed_nodes) for i in root_nodes]
+    with memo.memo_storage():
+        return [
+            _deserialize_node(i, nodes, parsed_nodes, hashed_nodes) for i in root_nodes
+        ]

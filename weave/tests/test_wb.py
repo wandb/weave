@@ -231,6 +231,8 @@ def table_mock(q, ndx):
         return artifact_version_sdk_response
     elif ndx == 2:
         return workspace_response
+    elif ndx == 3:
+        return artifact_version_sdk_response
 
 
 def test_map_gql_op(fake_wandb):

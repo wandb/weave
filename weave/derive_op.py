@@ -14,6 +14,8 @@ from . import box
 from . import weave_internal
 from . import wandb_api
 from . import box
+from . import memo
+
 from .language_features.tagging import tag_store
 
 
@@ -214,6 +216,7 @@ class MappedDeriveOpHandler(DeriveOpHandler):
             if orig_op.name.endswith("file-table"):
                 # Copy api_settings and tagging_ctx into sub-threads
                 api_settings = wandb_api.copy_thread_local_api_settings()
+                memo_ctx = memo._memo_storage.get()
 
                 def do_one(x):
                     wandb_api.set_wandb_thread_local_api_settings(
@@ -223,7 +226,11 @@ class MappedDeriveOpHandler(DeriveOpHandler):
                     )
                     if x == None or types.is_optional(first_arg.type):
                         return None
-                    res = orig_op.resolve_fn(**{mapped_param_name: x, **new_inputs})
+                    memo_token = memo._memo_storage.set(memo_ctx)
+                    try:
+                        res = orig_op.resolve_fn(**{mapped_param_name: x, **new_inputs})
+                    finally:
+                        memo._memo_storage.reset(memo_token)
                     return res
 
                 res = list(ThreadPoolExecutor(max_workers=10).map(do_one, list_))

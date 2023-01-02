@@ -1,12 +1,16 @@
 import typing
 import os
 import json
+import weakref
 
 from . import artifacts_local
 from . import weave_types as types
 from . import errors
 from . import box
 from . import uris
+
+# We store Refs here if we can't attach them directly to the object
+REFS: weakref.WeakValueDictionary[int, "Ref"] = weakref.WeakValueDictionary()
 
 if typing.TYPE_CHECKING:
     from .ops_domain.file_wbartifact import ArtifactVersionFile
@@ -113,10 +117,6 @@ class MemRef(Ref):
 def save_mem(obj: typing.Any, name: str) -> MemRef:
     MEM_OBJS[name] = obj
     return MemRef(name)
-
-
-# We store REFS here if we can't attach them directly to the object
-REFS: dict[int, Ref] = {}
 
 
 def get_ref(obj: typing.Any) -> typing.Optional[Ref]:
