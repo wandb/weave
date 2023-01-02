@@ -10,7 +10,6 @@ from .. import errors
 from .. import execute_fast
 from .. import op_def
 from ..language_features.tagging import (
-    make_tag_getter_op,
     tag_store,
     tagged_value_type,
     tagged_value_type_helpers,
@@ -383,11 +382,6 @@ def list_indexCheckpoint(arr):
     return res
 
 
-index_checkpoint_tag_getter_op = make_tag_getter_op.make_tag_getter_op(
-    "indexCheckpoint", types.Int(), op_name="tag-indexCheckpoint"
-)
-
-
 def is_list_like(list_type_or_node):
     if isinstance(list_type_or_node, Node):
         return is_list_like(list_type_or_node.type)
@@ -511,11 +505,6 @@ def pick_output_type(input_types):
     if is_list:
         output_type = types.List(output_type)
     return output_type
-
-
-group_tag_getter_op = make_tag_getter_op.make_tag_getter_op(
-    "groupKey", types.Any(), op_name="group-groupkey"
-)
 
 
 def list_return_type(input_types):
