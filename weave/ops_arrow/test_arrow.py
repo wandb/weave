@@ -19,6 +19,7 @@ from .. import artifacts_local
 from .. import weave_types as types
 from .. import weave_internal
 from .. import context_state
+from .. import graph
 from ..ops_primitives import dict_, list_
 
 from ..language_features.tagging import tag_store, tagged_value_type, make_tag_getter_op
