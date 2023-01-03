@@ -1,5 +1,6 @@
 import weave
-from weave import graph
+import typing
+import pytest
 
 from .. import stitch
 
@@ -19,6 +20,11 @@ class _TestPlanObject:
     @weave.op()
     def name(self) -> str:
         return self._name
+
+
+@weave.op()
+def dummy_no_arg_op() -> typing.List[_TestPlanObject]:
+    return [_TestPlanObject("x", 1)]
 
 
 @weave.type()
@@ -123,3 +129,26 @@ def test_travese_groupby_dict():
     obj_recorder = p.get_result(obj_node)
 
     assert compile_table.get_projection(obj_recorder) == {"o": {"a": {}}, "x": {}}
+
+
+def test_zero_arg_ops():
+    node = dummy_no_arg_op()
+    p = stitch.stitch([node])
+    obj_recorder = p.get_result(node)
+    assert obj_recorder.calls == []
+
+    p = stitch.stitch([node.name()])
+    obj_recorder = p.get_result(node)
+    assert len(obj_recorder.calls) == 1
+    assert obj_recorder.calls[0].node.from_op.name == "mapped__TestPlanObject-name"
+
+    p = stitch.stitch([node.filter(lambda x: x._get_op("name")() != "")])
+    obj_recorder = p.get_result(node)
+    assert len(obj_recorder.calls) == 1
+    assert obj_recorder.calls[0].node.from_op.name == "_TestPlanObject-name"
+
+    p = stitch.stitch([node.filter(lambda x: x._get_op("name")() != ""), node.name()])
+    obj_recorder = p.get_result(node)
+    assert len(obj_recorder.calls) == 2
+    assert obj_recorder.calls[0].node.from_op.name == "_TestPlanObject-name"
+    assert obj_recorder.calls[1].node.from_op.name == "mapped__TestPlanObject-name"

@@ -14,13 +14,13 @@ from .wandb_domain_gql import (
 # None
 
 # Section 2/6: Root Ops
-gql_root_op(
+root_viewer = gql_root_op(
     "root-viewer",
     "viewer",
     wdt.UserType,
 )
 
-gql_root_op(
+root_user = gql_root_op(
     "root-user",
     "user",
     wdt.UserType,

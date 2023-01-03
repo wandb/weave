@@ -96,7 +96,7 @@ class StitchedGraph:
                     self.add_result(other_tag_recorder.node, other_tag_recorder)
                 curr_result.tags[tag_name] = other_tag_recorder
 
-    def add_subgraph_stich_graph(self, other: "StitchedGraph") -> None:
+    def add_subgraph_stitch_graph(self, other: "StitchedGraph") -> None:
         for node, result in other._node_map.items():
             if node not in self._node_map:
                 self.add_result(node, result)
@@ -145,7 +145,7 @@ def subgraph_stitch(
     function_node: graph.Node, args: dict[str, ObjectRecorder], sg: StitchedGraph
 ) -> ObjectRecorder:
     result_graph = stitch([function_node], args)
-    sg.add_subgraph_stich_graph(result_graph)
+    sg.add_subgraph_stitch_graph(result_graph)
     return result_graph.get_result(function_node)
 
 
@@ -231,6 +231,9 @@ def stitch_node_inner(
         inputs[0].tags["groupKey"] = groupkey
         # And we return the original object
         return inputs[0]
+    elif len(inputs) == 0:
+        # op does not have any inputs, just track its downstream calls
+        return ObjectRecorder(node)
     # Otherwise, not a special op, track its call.
     return inputs[0].call_node(node, input_dict)
 
