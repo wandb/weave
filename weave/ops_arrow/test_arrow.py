@@ -16,12 +16,9 @@ from ..ops_primitives import Number
 from .. import api as weave
 from .. import ops
 from .. import artifacts_local
-from . import number
 from .. import weave_types as types
 from .. import weave_internal
 from .. import context_state
-from .. import graph
-from ..ecosystem.wandb import geom
 from ..ops_primitives import dict_, list_
 
 from ..language_features.tagging import tag_store, tagged_value_type, make_tag_getter_op
@@ -1891,3 +1888,25 @@ def test_mapeach_with_tags():
     assert weave.use(tag_getter_op(result)) == "top"
     assert weave.use(tag_getter_op(result[0])) == "row0"
     assert weave.use(tag_getter_op(result[0][0])) == "row0_col0"
+
+
+def test_unflatten_structs_in_flattened_table():
+    flattened_table = pa.table(
+        {
+            "a➡️b➡️c": [1, 2, 3],
+            "a➡️b➡️d": [4, 5, 6],
+            "a➡️e": [7, 8, 9],
+            "g": ["a", "b", "c"],
+        }
+    )
+    result = arrow._unflatten_structs_in_flattened_table(flattened_table)
+    struct_result = pa.array(
+        [
+            {"a": {"b": {"c": 1, "d": 4}, "e": 7}, "g": "a"},
+            {"a": {"b": {"c": 2, "d": 5}, "e": 8}, "g": "b"},
+            {"a": {"b": {"c": 3, "d": 6}, "e": 9}, "g": "c"},
+        ]
+    )
+    assert result == pa.table(
+        {"a": struct_result.field("a"), "g": struct_result.field("g")}
+    )

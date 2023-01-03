@@ -1,4 +1,3 @@
-import copy
 import logging
 import typing
 import dataclasses
@@ -7,13 +6,13 @@ import numpy as np
 import pandas as pd
 import pyarrow as pa
 from pyarrow import compute as pc
+from collections import defaultdict
 
 
 py_type = type
 
 from ..api import op, weave_class, type, use
 from ..decorator_op import arrow_op
-from .. import box
 from .. import weave_types as types
 from .. import graph
 from .. import errors
@@ -27,8 +26,6 @@ from .. import refs
 from .. import dispatch
 from .. import execute_fast
 from .. import weave_internal
-from .. import node_ref
-from .. import context
 from .. import weavify
 from .. import op_args
 from ..language_features.tagging import tagged_value_type, tagged_value_type_helpers
@@ -47,6 +44,8 @@ if typing.TYPE_CHECKING:
     from .. import artifacts_local
 
 FLATTEN_DELIMITER = "➡️"
+
+NestedTableColumns = dict[str, typing.Union[dict, pa.ChunkedArray]]
 
 
 def _recursively_flatten_structs_in_array(
@@ -69,40 +68,51 @@ def _recursively_flatten_structs_in_array(
     return {prefix: arr}
 
 
-# TODO: make more efficient
 def _unflatten_structs_in_flattened_table(table: pa.Table) -> pa.Table:
     """take a table with column names like {a.b.c: [1,2,3], a.b.d: [4,5,6], a.e: [7,8,9]}
     and return a struct array with the following structure:
     [ {a: {b: {c: 1, d: 4}, e: 7}}, {a: {b: {c: 2, d: 5}, e: 8}}, {a: {b: {c: 3, d: 6}, e: 9}} ]"""
 
-    # get all columns in table
-    column_names = list(
-        map(lambda name: name.split(FLATTEN_DELIMITER), table.column_names)
-    )
-    multi_index = pd.MultiIndex.from_tuples(column_names)
-    df = table.to_pandas()
-    df.columns = multi_index
-    records = df.to_dict(orient="records")
+    def recursively_build_nested_struct_array(
+        columns: dict[str, pa.Array]
+    ) -> pa.StructArray:
+        result: NestedTableColumns = defaultdict(lambda: {})
+        for colname in columns:
+            spl_colname = colname.split(FLATTEN_DELIMITER)
+            prefix = spl_colname[0]
+            suffix = FLATTEN_DELIMITER.join(spl_colname[1:])
+            if suffix:
+                result[prefix][suffix] = columns[colname]
+            else:
+                result[prefix] = columns[colname]
 
-    # convert to arrow
-    # records now looks like [{('a', 'b', 'c'): 1, ('a', 'b', 'd'): 2, ('a', 'e', nan): 3},
-    # {('a', 'b', 'c'): 4, ('a', 'b', 'd'): 5, ('a', 'e', nan): 6},
-    # {('a', 'b', 'c'): 7, ('a', 'b', 'd'): 8, ('a', 'e', nan): 9}]
-    new_records = []
-    for record in records:
-        new_record: dict[str, typing.Any] = {}
-        for entry in record:
-            current_pointer = new_record
-            filtered_entry = list(filter(lambda key: key is not np.nan, entry))
-            for i, key in enumerate(filtered_entry):
-                if key not in current_pointer and i != len(filtered_entry) - 1:
-                    current_pointer[key] = {}
-                elif i == len(filtered_entry) - 1:
-                    current_pointer[key] = record[entry]
-                current_pointer = current_pointer[key]
-        new_records.append(new_record)
-    rb = pa.RecordBatch.from_pylist(new_records)
-    return pa.Table.from_batches([rb])
+        for colname in result:
+            if isinstance(result[colname], dict):
+                result[colname] = recursively_build_nested_struct_array(result[colname])
+
+        names: list[str] = []
+        arrays: list[pa.ChunkedArray] = []
+
+        for name, array in result.items():
+            names.append(name)
+            arrays.append(array)
+
+        return pa.StructArray.from_arrays(arrays, names)
+
+    recurse_input = {
+        colname: table[colname].combine_chunks() for colname in table.column_names
+    }
+
+    sa = recursively_build_nested_struct_array(recurse_input)
+
+    names: list[str] = []
+    chunked_arrays: list[pa.ChunkedArray] = []
+
+    for field in sa.type:
+        names.append(field.name)
+        chunked_arrays.append(pa.chunked_array(sa.field(field.name)))
+
+    return pa.Table.from_arrays(chunked_arrays, names=names)
 
 
 def unzip_struct_array(arr: pa.ChunkedArray) -> pa.Table:
