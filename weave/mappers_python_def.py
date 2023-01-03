@@ -1,3 +1,4 @@
+import typing
 import dataclasses
 import datetime
 import inspect
@@ -37,7 +38,7 @@ class DictToPyDict(mappers_weave.DictMapper):
 
 class ObjectToPyDict(mappers_weave.ObjectMapper):
     def apply(self, obj):
-        result = {}
+        result = {"_type": self.type.name}
         for prop_name, prop_serializer in self._property_serializers.items():
             if prop_serializer is not None:
                 v = prop_serializer.apply(getattr(obj, prop_name))
@@ -184,8 +185,48 @@ class PyRefToRef(mappers_weave.RefMapper):
         return refs.Ref.from_str(obj)
 
 
+def map_type(
+    t: types.Type, map_fn: typing.Callable[[types.Type], types.Type]
+) -> types.Type:
+    if isinstance(t, types.NoneType):
+        pass
+    elif isinstance(t, types.Const):
+        t = types.Const(map_type(t.val_type, map_fn), t.val)
+    elif isinstance(t, types.UnionType):
+        t = types.union(*(map_type(m, map_fn) for m in t.members))
+    elif isinstance(t, types.TypedDict):
+        t = types.TypedDict(
+            {k: map_type(v, map_fn) for k, v in t.property_types.items()}
+        )
+    elif isinstance(t, tagged_value_type.TaggedValueType):
+        t = tagged_value_type.TaggedValueType(
+            map_type(t.tag, map_fn), map_type(t.value, map_fn)
+        )
+    elif hasattr(t, "object_type"):
+        mapped_obj_type = map_type(t.object_type, map_fn)
+        print("T LIST", t, t.__class__)
+        t = t.__class__(object_type=mapped_obj_type)
+    mapped_t = map_fn(t)
+    if mapped_t is None:
+        return t
+    return mapped_t
+
+
 class TypeToPyType(mappers.Mapper):
     def apply(self, obj):
+        def map_fn(t):
+            if isinstance(t, tagged_value_type.TaggedValueType) and isinstance(
+                t.value, types.UnionType
+            ):
+                return types.union(
+                    *[
+                        tagged_value_type.TaggedValueType(t.tag, m)
+                        for m in t.value.members
+                        if not isinstance(m, types.NoneType)
+                    ]
+                )
+
+        obj = map_type(obj, map_fn)
         return obj.to_dict()
 
 

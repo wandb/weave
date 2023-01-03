@@ -244,7 +244,7 @@ def execute_forward_node(
     if isinstance(node, graph.ConstNode):
         return {"cache_used": False}
 
-    logging.debug("Executing node: %s" % node)
+    logging.debug("Executing node: %s" % graph_debug.node_expr_str_full(node))
 
     tracer = engine_trace.tracer()
 
@@ -351,5 +351,7 @@ def execute_forward_node(
                     run.save()
                 except errors.WeaveSerializeError:
                     pass
-            logging.debug("Done executing node: %s" % node)
+            logging.debug(
+                "Done executing node: %s" % graph_debug.node_expr_str_full(node)
+            )
     return {"cache_used": False}

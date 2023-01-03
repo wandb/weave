@@ -131,6 +131,10 @@ class TableClientArtifactFileRef:
             self._artifact = get_wandb_read_client_artifact(self._art_id)
         return self._artifact
 
+    @property
+    def artifact(self):
+        return self.wb_artifact
+
     def get_local_path(self):
         return self.wb_artifact.path(self._file_path)
 

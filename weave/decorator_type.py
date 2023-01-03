@@ -92,7 +92,7 @@ def type(__override_name: str = None, __is_simple: bool = False):
         # constructor op for this type. due to a circular dependency with ArrowWeave* types, we
         # define the vectorized constructor ops in vectorize.py instead of here
         @decorator_op.op(
-            name=f"objectConstructor-{target_name.replace('-', '_')}",
+            name=f"objectConstructor-cons_{target_name.replace('-', '_')}",
             input_type={
                 "attributes": types.TypedDict(
                     {

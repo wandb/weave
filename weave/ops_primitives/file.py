@@ -53,10 +53,12 @@ class Table:
 
     @op(
         name="table-rowsType",
-        input_type={"table": TableType()},
+        input_type={"table": types.optional(TableType())},
         output_type=types.TypeType(),
     )
     def rows_type(table):
+        if table == None:
+            return types.NoneType()
         ttype = types.TypeRegistry.type_of(table._rows)
         return ttype
 

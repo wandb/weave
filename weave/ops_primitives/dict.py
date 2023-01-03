@@ -80,7 +80,12 @@ class TypedDict:
         output_type=typeddict_pick_output_type,
     )
     def pick(self, key):
-        return self.get(key, None)
+        if key == None:
+            return None
+        try:
+            return self.get(key, None)
+        except AttributeError:
+            return getattr(self, key, None)
 
     @op(
         output_type=lambda input_type: types.List(

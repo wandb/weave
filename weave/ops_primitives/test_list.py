@@ -163,3 +163,126 @@ def test_mapeach_tagged():
         for j in range(3):
             assert weave.use(tag_getter_op_row(result[i][j])) == i
             assert weave.use(tag_getter_op_col(result[i][j])) == j
+
+
+def test_indexcheckpoint_type():
+    td = {
+        "type": "tagged",
+        "tag": {"type": "typedDict", "propertyTypes": {"project": "project"}},
+        "value": {
+            "type": "union",
+            "members": [
+                "none",
+                {
+                    "type": "tagged",
+                    "tag": {"type": "typedDict", "propertyTypes": {"run": "run"}},
+                    "value": {
+                        "type": "union",
+                        "members": [
+                            {
+                                "type": "list",
+                                "objectType": {
+                                    "type": "typedDict",
+                                    "propertyTypes": {
+                                        "id": {
+                                            "type": "union",
+                                            "members": ["none", "string"],
+                                        },
+                                        "a": {
+                                            "type": "union",
+                                            "members": ["none", "float"],
+                                        },
+                                        "b": {
+                                            "type": "union",
+                                            "members": [
+                                                "none",
+                                                {"type": "list", "objectType": "float"},
+                                            ],
+                                        },
+                                        "c": {
+                                            "type": "union",
+                                            "members": ["none", "float"],
+                                        },
+                                        "x": {
+                                            "type": "union",
+                                            "members": ["none", "float"],
+                                        },
+                                        "y": {
+                                            "type": "union",
+                                            "members": ["none", "string"],
+                                        },
+                                        "n-0": {
+                                            "type": "union",
+                                            "members": ["none", "float"],
+                                        },
+                                        "n-1": {
+                                            "type": "union",
+                                            "members": ["none", "float"],
+                                        },
+                                        "n-2": {
+                                            "type": "union",
+                                            "members": ["none", "float"],
+                                        },
+                                        "n-3": {
+                                            "type": "union",
+                                            "members": ["none", "float"],
+                                        },
+                                    },
+                                },
+                            },
+                            {
+                                "type": "list",
+                                "objectType": {
+                                    "type": "typedDict",
+                                    "propertyTypes": {
+                                        "id": {
+                                            "type": "union",
+                                            "members": ["none", "string"],
+                                        },
+                                        "a": {
+                                            "type": "union",
+                                            "members": ["none", "float"],
+                                        },
+                                        "b": {
+                                            "type": "union",
+                                            "members": [
+                                                "none",
+                                                {"type": "list", "objectType": "float"},
+                                            ],
+                                        },
+                                        "c": {
+                                            "type": "union",
+                                            "members": ["none", "float"],
+                                        },
+                                        "x": {
+                                            "type": "union",
+                                            "members": ["none", "float"],
+                                        },
+                                        "y": {
+                                            "type": "union",
+                                            "members": ["none", "string"],
+                                        },
+                                        "n-0": {
+                                            "type": "union",
+                                            "members": ["none", "float"],
+                                        },
+                                        "n-1": {
+                                            "type": "union",
+                                            "members": ["none", "float"],
+                                        },
+                                    },
+                                },
+                            },
+                        ],
+                    },
+                },
+            ],
+        },
+    }
+    t = types.TypeRegistry.type_from_dict(td)
+    node = weave_internal.make_const_node(t, None)
+    result_node = list_.list_indexCheckpoint(node)
+    from rich import print
+
+    print(result_node.type.to_dict())
+    assert 1 == 2

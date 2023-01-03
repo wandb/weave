@@ -285,6 +285,12 @@ def test_mapped_table_tags(fake_wandb):
     assert weave.use(cell_node.project().name()) == "mendeleev"
 
 
+def test_mapped_table_tags_type(fake_wandb):
+    fake_wandb.add_mock(table_mock)
+    cell_node = ops.project("stacey", "mendeleev").runs().limit(1).summary()["table"]
+    assert 1 == 2
+
+
 def test_table_tags_row_first(fake_wandb):
     fake_wandb.add_mock(table_mock)
     cell_node = (
@@ -338,7 +344,9 @@ def table_mock_filtered(q, ndx):
     elif ndx == 1:
         return artifact_version_sdk_response
     elif ndx == 2:
-        return workspace_response_filtered
+        return artifact_version_sdk_response
+    # elif ndx == 2:
+    #     return workspace_response_filtered
 
 
 def test_tag_run_color_lookup(fake_wandb):
@@ -359,8 +367,10 @@ def test_tag_run_color_lookup(fake_wandb):
         .run()
         .id()
     )
+    print("RUN_ID", weave.use(run_id))
     run_color = colors_node[run_id]
     assert weave.use(run_color) == "rgb(83, 135, 221)"
+    assert 1 == 2
 
 
 def test_domain_gql_fragments(fake_wandb):

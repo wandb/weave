@@ -111,9 +111,16 @@ def _dispatch_map_fn_refining(node: graph.Node) -> typing.Optional[graph.OutputN
             # dispatching.
             return node
         node_inputs = node.from_op.inputs
-        new_node = dispatch.dispatch_by_name_and_type(
-            node.from_op.name, [], node_inputs
-        )
+        try:
+            new_node = dispatch.dispatch_by_name_and_type(
+                node.from_op.name, [], node_inputs
+            )
+        except errors.WeaveDispatchError:
+            logging.error(
+                "Error while dispatching op: %s\n", graph_debug.node_expr_str_full(node)
+            )
+            raise
+
         should_replace = new_node.from_op.name != node.from_op.name
         if not node.type.assign_type(new_node.type):
             logging.warning(
