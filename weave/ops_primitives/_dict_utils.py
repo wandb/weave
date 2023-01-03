@@ -1,5 +1,6 @@
 import typing
-from weave import weave_types as types
+from .. import weave_types as types
+from .. import errors
 
 
 def typeddict_pick_output_type(input_types):
@@ -14,22 +15,38 @@ def typeddict_pick_output_type(input_types):
 
 
 class MergeInputTypes(typing.TypedDict):
-    self: types.TypedDict
+    self: typing.Union[types.TypedDict, types.UnionType, types.NoneType]
     other: types.TypedDict
 
 
 def typeddict_merge_output_type(
     input_types: MergeInputTypes,
-) -> typing.Union[types.TypedDict, types.UnknownType]:
+) -> typing.Union[types.TypedDict, types.UnionType, types.NoneType, types.UnknownType]:
     self = input_types["self"]
     other = input_types["other"]
-    if not isinstance(self, types.TypedDict) or not isinstance(other, types.TypedDict):
+    self_ok = types.UnionType(types.TypedDict({}), types.NoneType()).assign_type(self)
+    if not self_ok or not isinstance(other, types.TypedDict):
         return types.UnknownType()
 
     # create property types without merging nested dictionary types (for now)
-    property_types = {
-        **self.property_types,
-        **other.property_types,
-    }
+    if isinstance(self, types.TypedDict):
+        property_types = {
+            **self.property_types,
+            **other.property_types,
+        }
 
-    return types.TypedDict(property_types=property_types)
+        return types.TypedDict(property_types=property_types)
+    elif isinstance(self, types.UnionType):
+        if not self.is_simple_nullable():
+            return types.UnknownType()
+        non_null_member = types.non_none(self)
+        return types.UnionType(
+            typeddict_merge_output_type(
+                {"self": typing.cast(types.TypedDict, non_null_member), "other": other}
+            ),
+            types.NoneType(),
+        )
+    elif isinstance(self, types.NoneType):
+        return types.NoneType()
+    else:
+        raise errors.WeaveTypeError(f"Unhandled types for dict merge: {self}, {other}")

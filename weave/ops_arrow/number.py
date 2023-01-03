@@ -1,29 +1,19 @@
 import pyarrow.compute as pc
 import pyarrow as pa
 
-from ..decorator_op import arrow_op, op
+from ..decorator_arrow_op import arrow_op
 from .. import weave_types as types
 
 from .list_ import ArrowWeaveList, ArrowWeaveListType
 
-# Note on input / output types:
-# It is critical that these functions support optional object types. Primarily
-# because they are often used in vectorized functions AND those vectorized functions
-# are typically operating on optional object types (think a column of numbers). However
-# some ops don't return the same dtype as the input (example: less-than). It would be
-# ideal to say that the output type is optional IFF the input is optional. However, since
-# we don't have a way to do that, we just say that the output type is always optional.
-# TODO: Fixing the above would reduce the proliferation of optional types.
 ARROW_WEAVE_LIST_NUMBER_TYPE = ArrowWeaveListType(types.Number())
-ARROW_WEAVE_LIST_MAYBE_NUMBER_TYPE = ArrowWeaveListType(types.optional(types.Number()))
-ARROW_WEAVE_LIST_MAYBE_BOOLEAN_TYPE = ArrowWeaveListType(
-    types.optional(types.Boolean())
-)
+ARROW_WEAVE_LIST_BOOLEAN_TYPE = ArrowWeaveListType(types.Boolean())
+
 unary_input_type = {
-    "self": ARROW_WEAVE_LIST_MAYBE_NUMBER_TYPE,
+    "self": ARROW_WEAVE_LIST_NUMBER_TYPE,
 }
 binary_input_type = {
-    "self": ARROW_WEAVE_LIST_MAYBE_NUMBER_TYPE,
+    "self": ARROW_WEAVE_LIST_NUMBER_TYPE,
     "other": types.UnionType(types.Number(), ARROW_WEAVE_LIST_NUMBER_TYPE),
 }
 
@@ -101,7 +91,7 @@ def __pow__(self, other):
 @arrow_op(
     name="ArrowWeaveListNumber-notEqual",
     input_type=binary_input_type,
-    output_type=ARROW_WEAVE_LIST_MAYBE_BOOLEAN_TYPE,
+    output_type=ARROW_WEAVE_LIST_BOOLEAN_TYPE,
 )
 def __ne__(self, other):
     if isinstance(other, ArrowWeaveList):
@@ -114,7 +104,7 @@ def __ne__(self, other):
 @arrow_op(
     name="ArrowWeaveListNumber-equal",
     input_type=binary_input_type,
-    output_type=ARROW_WEAVE_LIST_MAYBE_BOOLEAN_TYPE,
+    output_type=ARROW_WEAVE_LIST_BOOLEAN_TYPE,
 )
 def __eq__(self, other):
     if isinstance(other, ArrowWeaveList):
@@ -127,7 +117,7 @@ def __eq__(self, other):
 @arrow_op(
     name="ArrowWeaveListNumber-greater",
     input_type=binary_input_type,
-    output_type=ARROW_WEAVE_LIST_MAYBE_BOOLEAN_TYPE,
+    output_type=ARROW_WEAVE_LIST_BOOLEAN_TYPE,
 )
 def __gt__(self, other):
     if isinstance(other, ArrowWeaveList):
@@ -140,7 +130,7 @@ def __gt__(self, other):
 @arrow_op(
     name="ArrowWeaveListNumber-greaterEqual",
     input_type=binary_input_type,
-    output_type=ARROW_WEAVE_LIST_MAYBE_BOOLEAN_TYPE,
+    output_type=ARROW_WEAVE_LIST_BOOLEAN_TYPE,
 )
 def __ge__(self, other):
     if isinstance(other, ArrowWeaveList):
@@ -153,7 +143,7 @@ def __ge__(self, other):
 @arrow_op(
     name="ArrowWeaveListNumber-less",
     input_type=binary_input_type,
-    output_type=ARROW_WEAVE_LIST_MAYBE_BOOLEAN_TYPE,
+    output_type=ARROW_WEAVE_LIST_BOOLEAN_TYPE,
 )
 def __lt__(self, other):
     if isinstance(other, ArrowWeaveList):
@@ -166,7 +156,7 @@ def __lt__(self, other):
 @arrow_op(
     name="ArrowWeaveListNumber-lessEqual",
     input_type=binary_input_type,
-    output_type=ARROW_WEAVE_LIST_MAYBE_BOOLEAN_TYPE,
+    output_type=ARROW_WEAVE_LIST_BOOLEAN_TYPE,
 )
 def __le__(self, other):
     if isinstance(other, ArrowWeaveList):

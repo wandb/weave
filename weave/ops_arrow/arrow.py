@@ -1,12 +1,15 @@
 import dataclasses
+import json
 import pyarrow as pa
 import pyarrow.parquet as pq
 import typing
 
 py_type = type
 
+from .. import mappers_python
 from .. import weave_types as types
 from .. import errors
+from .. import refs
 
 
 def arrow_type_to_weave_type(pa_type) -> types.Type:
@@ -79,7 +82,11 @@ def table_with_structs_as_unions(table: pa.Table) -> pa.Table:
 
                     arrays.append(array.combine_chunks())
                     names.append(name)
-                new_col.append(pa.StructArray.from_arrays(arrays, names))
+                new_col.append(
+                    pa.StructArray.from_arrays(
+                        arrays, names, mask=pa.compute.is_null(a)
+                    )
+                )
             return column_name, pa.chunked_array(new_col)
 
         else:
@@ -132,7 +139,11 @@ def table_with_unions_as_structs(table: pa.Table) -> pa.Table:
                     names.append(new_name)
                     arrays.append(chunked_array.combine_chunks())
 
-                new_col.append(pa.StructArray.from_arrays(arrays, names))
+                new_col.append(
+                    pa.StructArray.from_arrays(
+                        arrays, names, mask=pa.compute.invert(a.is_valid())
+                    )
+                )
             column = pa.chunked_array(new_col)
 
         return column_name, column
@@ -181,6 +192,7 @@ class ArrowArrayType(types.Type):
 
         with artifact.open(f"{name}.parquet", binary=True) as f:
             deserialized = pq.read_table(f)
+
             # convert struct to union. parquet does not know how to serialize arrow unions, so
             # we store them in a struct format
             deserialized = table_with_structs_as_unions(deserialized)
@@ -223,3 +235,207 @@ def arrow_as_array(obj) -> pa.Array:
     if not isinstance(obj, pa.Array):
         raise TypeError("Expected pyarrow Array or Table, got %s" % type(obj))
     return obj
+
+
+@dataclasses.dataclass(frozen=True)
+class ArrowWeaveListType(types.Type):
+    _base_type = types.List()
+    name = "ArrowWeaveList"
+
+    object_type: types.Type = types.Any()
+
+    @classmethod
+    def type_of_instance(cls, obj):
+        return cls(obj.object_type)
+
+    def save_instance(self, obj, artifact, name):
+        # If we are saving to the same artifact as we were written to,
+        # then we don't need to rewrite any references.
+        if obj._artifact == artifact:
+            arrow_data = obj._arrow_data
+        else:
+            # super().save_instance(obj, artifact, name)
+            # return
+            arrow_data = rewrite_weavelist_refs(
+                obj._arrow_data, obj.object_type, obj._artifact
+            )
+
+        d = {"_arrow_data": arrow_data, "object_type": obj.object_type}
+        type_of_d = types.TypedDict(
+            {
+                "_arrow_data": types.union(ArrowTableType(), ArrowArrayType()),
+                "object_type": types.TypeType(),
+            }
+        )
+        if hasattr(self, "_key"):
+            d["_key"] = obj._key
+            type_of_d.property_types["_key"] = self._key
+
+        serializer = mappers_python.map_to_python(type_of_d, artifact)
+        result_d = serializer.apply(d)
+
+        with artifact.new_file(f"{name}.ArrowWeaveList.json") as f:
+            json.dump(result_d, f)
+
+    def load_instance(self, artifact, name, extra=None):
+        with artifact.open(f"{name}.ArrowWeaveList.json") as f:
+            result = json.load(f)
+        type_of_d = types.TypedDict(
+            {
+                "_arrow_data": types.union(ArrowTableType(), ArrowArrayType()),
+                "object_type": types.TypeType(),
+            }
+        )
+        if hasattr(self, "_key"):
+            type_of_d.property_types["_key"] = self._key
+
+        mapper = mappers_python.map_from_python(type_of_d, artifact)
+        res = mapper.apply(result)
+        return self.instance_class(artifact=artifact, **res)
+
+
+def rewrite_weavelist_refs(arrow_data, object_type, artifact):
+    if _object_type_has_props(object_type):
+        prop_types = _object_type_prop_types(object_type)
+        if isinstance(arrow_data, pa.Table):
+            arrays = {}
+            for col_name, col_type in prop_types.items():
+                column = arrow_data[col_name]
+                arrays[col_name] = rewrite_weavelist_refs(column, col_type, artifact)
+            return pa.table(arrays)
+        elif isinstance(arrow_data, pa.ChunkedArray):
+            arrays = {}
+            unchunked = arrow_data.combine_chunks()
+            for col_name, col_type in prop_types.items():
+                column = unchunked.field(col_name)
+                arrays[col_name] = rewrite_weavelist_refs(column, col_type, artifact)
+            return pa.StructArray.from_arrays(
+                arrays.values(), names=arrays.keys(), mask=pa.compute.is_null(unchunked)
+            )
+        elif isinstance(arrow_data, pa.StructArray):
+            arrays = {}
+            for col_name, col_type in prop_types.items():
+                column = arrow_data.field(col_name)
+                arrays[col_name] = rewrite_weavelist_refs(column, col_type, artifact)
+            return pa.StructArray.from_arrays(
+                arrays.values(),
+                names=arrays.keys(),
+                mask=pa.compute.is_null(arrow_data),
+            )
+        else:
+            raise errors.WeaveTypeError('Unhandled type "%s"' % type(arrow_data))
+    elif isinstance(object_type, types.UnionType):
+        non_none_members = [
+            m for m in object_type.members if not isinstance(m, types.NoneType)
+        ]
+        nullable = len(non_none_members) < len(object_type.members)
+        if len(non_none_members) > 1:
+            arrow_data = arrow_as_array(arrow_data)
+            if not isinstance(arrow_data.type, pa.UnionType):
+                raise errors.WeaveTypeError(
+                    "Expected UnionType, got %s" % type(arrow_data.type)
+                )
+            arrays = []
+            for i, _ in enumerate(arrow_data.type):
+                rewritten = rewrite_weavelist_refs(
+                    arrow_data.field(i),
+                    non_none_members[i]
+                    if not nullable
+                    else types.UnionType(types.NoneType(), non_none_members[i]),
+                    artifact,
+                )
+                arrays.append(rewritten)
+            return pa.UnionArray.from_sparse(arrow_data.type_codes, arrays)
+        return rewrite_weavelist_refs(arrow_data, types.non_none(object_type), artifact)
+    elif _object_type_is_basic(object_type):
+        return arrow_data
+    elif isinstance(object_type, types.List):
+        # This is a bit unfortunate that we have to loop through all the items - would be nice to do a direct memory replacement.
+        return pa.array(_rewrite_pyliteral_refs(item.as_py(), object_type, artifact) for item in arrow_data)  # type: ignore
+
+    else:
+        # We have a column of refs
+        new_refs = []
+        for ref_str in arrow_data:
+            ref_str = ref_str.as_py()
+            new_refs.append(
+                _rewrite_ref_entry(ref_str, object_type, artifact)
+                if ref_str is not None
+                else None
+            )
+        return pa.array(new_refs)
+
+
+def _rewrite_pyliteral_refs(pyliteral_data, object_type, artifact):
+    if _object_type_has_props(object_type):
+        prop_types = _object_type_prop_types(object_type)
+        if isinstance(pyliteral_data, dict):
+            return {
+                key: _rewrite_pyliteral_refs(pyliteral_data[key], value, artifact)
+                for key, value in prop_types.items()
+            }
+        else:
+            raise errors.WeaveTypeError('Unhandled type "%s"' % type(pyliteral_data))
+    elif isinstance(object_type, types.UnionType):
+        non_none_members = [
+            m for m in object_type.members if not isinstance(m, types.NoneType)
+        ]
+        if len(non_none_members) > 1:
+            raise errors.WeaveInternalError(
+                "Unions not fully supported yet in Weave arrow"
+            )
+        return _rewrite_pyliteral_refs(
+            pyliteral_data, types.non_none(object_type), artifact
+        )
+    elif _object_type_is_basic(object_type):
+        return pyliteral_data
+    elif isinstance(object_type, types.List):
+        return (
+            [
+                _rewrite_pyliteral_refs(item, object_type.object_type, artifact)
+                for item in pyliteral_data
+            ]
+            if pyliteral_data is not None
+            else None
+        )
+    else:
+        return _rewrite_ref_entry(pyliteral_data, object_type, artifact)
+
+
+def _object_type_has_props(object_type):
+    from ..language_features.tagging import tagged_value_type
+
+    return (
+        isinstance(object_type, types.TypedDict)
+        or isinstance(object_type, types.ObjectType)
+        or isinstance(object_type, tagged_value_type.TaggedValueType)
+    )
+
+
+def _object_type_prop_types(object_type):
+    from ..language_features.tagging import tagged_value_type
+
+    if isinstance(object_type, tagged_value_type.TaggedValueType):
+        return {
+            "_tag": object_type.tag,
+            "_value": object_type.value,
+        }
+    prop_types = object_type.property_types
+    if callable(prop_types):
+        prop_types = prop_types()
+    return prop_types
+
+
+def _object_type_is_basic(object_type):
+    if isinstance(object_type, types.Const):
+        object_type = object_type.val_type
+    return isinstance(object_type, types.BasicType) or (
+        isinstance(object_type, types.Datetime)
+    )
+
+
+def _rewrite_ref_entry(entry: str, object_type, artifact):
+    if ":" in entry:
+        return entry
+    else:
+        return str(refs.Ref.from_local_ref(artifact, entry, object_type).uri)

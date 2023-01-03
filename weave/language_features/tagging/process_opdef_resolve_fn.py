@@ -6,10 +6,9 @@ the result of the op_def's resolve_fn.
 """
 
 import typing
+import pyarrow as pa
 
 from .tagged_value_type import TaggedValueType
-
-
 from ... import box
 from ... import weave_types as types
 from . import tag_store
@@ -100,6 +99,11 @@ def process_opdef_resolve_fn(
 ) -> typing.Any:
     if op_def.op_def_is_auto_tag_handling_arrow_op():
         res = propagate_arrow_tags(op_def, resolve_fn, args, kwargs)
+
+        # TODO(DG): implement this for Table, ChunkedArray, etc.
+        if isinstance(res._arrow_data, pa.Array) and res._arrow_data.null_count > 0:
+            res.object_type = types.optional(res.object_type)
+
     else:
         res = resolve_fn(*args, **kwargs)
 

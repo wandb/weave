@@ -1890,6 +1890,232 @@ def test_mapeach_with_tags():
     assert weave.use(tag_getter_op(result[0][0])) == "row0_col0"
 
 
+nullable_number_ops_test_cases = [
+    ("add", lambda x: x + 2, [3.0, None, 5.0]),
+    ("add-vec", lambda x: x + x, [2.0, None, 6.0]),
+    ("subtract", lambda x: x - 1, [0.0, None, 2.0]),
+    ("multiply", lambda x: x * 2, [2.0, None, 6.0]),
+    ("divide", lambda x: x / 2, [0.5, None, 1.5]),
+    ("pow", lambda x: x**2, [1.0, None, 9.0]),
+    ("ne", lambda x: x != 2, [True, None, True]),
+    ("eq", lambda x: x == 2, [False, None, False]),
+    ("gt", lambda x: x > 2, [False, None, True]),
+    ("lt", lambda x: x < 2, [True, None, False]),
+    ("ge", lambda x: x >= 2, [False, None, True]),
+    ("le", lambda x: x <= 2, [True, None, False]),
+    ("neg", lambda x: -x, [-1.0, None, -3.0]),
+]
+
+
+@pytest.mark.parametrize(
+    "name,weave_func,expected_output",
+    nullable_number_ops_test_cases,
+)
+def test_arrow_vectorizer_nullable_number_ops(name, weave_func, expected_output):
+    l = weave.save(arrow.to_arrow([1.0, None, 3.0]))
+
+    fn = weave_internal.define_fn({"x": weave.types.Float()}, weave_func).val
+
+    vec_fn = arrow.vectorize(fn)
+
+    # TODO:  make it nicer to call vec_fn, we shouldn't need to jump through hoops here
+
+    called = weave_internal.call_fn(vec_fn, {"x": l})
+
+    assert weave.use(called).to_pylist() == expected_output
+
+
+string_ops_nullable_test_cases = [
+    ("eq-scalar", lambda x: x == "bc", [True, None, False]),
+    ("ne-scalar", lambda x: x != "bc", [False, None, True]),
+    ("contains-scalar", lambda x: x.__contains__("b"), [True, None, False]),
+    ("in-scalar", lambda x: x.in_("bcd"), [True, None, False]),
+    ("len-scalar", lambda x: x.len(), [2, None, 2]),
+    ("add-scalar", lambda x: x + "q", ["bcq", None, "dfq"]),
+    ("append-scalar", lambda x: x.append("qq"), ["bcqq", None, "dfqq"]),
+    ("prepend-scalar", lambda x: x.prepend("qq"), ["qqbc", None, "qqdf"]),
+    ("split-scalar", lambda x: x.split("c"), [["b", ""], None, ["df"]]),
+    (
+        "partition-scalar",
+        lambda x: x.partition("c"),
+        [["b", "c", ""], None, ["df", "", ""]],
+    ),
+    ("startswith-scalar", lambda x: x.startswith("b"), [True, None, False]),
+    ("endswith-scalar", lambda x: x.endswith("f"), [False, None, True]),
+    ("replace-scalar", lambda x: x.replace("c", "q"), ["bq", None, "df"]),
+    ("nest-list", lambda x: list_.make_list(a=x), [["bc"], [None], ["df"]]),
+    ("nest-dict", lambda x: dict_(a=x), [{"a": "bc"}, {"a": None}, {"a": "df"}]),
+]
+
+
+@pytest.mark.parametrize(
+    "name,weave_func,expected_output",
+    string_ops_nullable_test_cases,
+)
+def test_arrow_vectorizer_string_nullable_scalar_ops_tagged(
+    name, weave_func, expected_output
+):
+    expected_value_type = weave.type_of(expected_output[0])
+
+    list = ["bc", None, "df"]
+    for i, elem in enumerate(list):
+        taggable = box.box(elem)
+        list[i] = tag_store.add_tags(taggable, {"mytag": f"test{i + 1}"})
+
+    tag_getter_op = make_tag_getter_op.make_tag_getter_op("mytag", types.String())
+
+    awl = arrow.to_arrow(list)
+    l = weave.save(awl)
+    fn = weave_internal.define_fn({"x": awl.object_type}, weave_func).val
+    vec_fn = arrow.vectorize(fn)
+
+    called = weave_internal.call_fn(vec_fn, {"x": l})
+    assert weave.use(called).to_pylist_notags() == expected_output
+
+    item_node = arrow.ArrowWeaveList.__getitem__(called, 0)
+
+    def make_exp_tag(t: types.Type):
+        return tagged_value_type.TaggedValueType(
+            types.TypedDict({"mytag": types.String()}),
+            t,
+        )
+
+    expected_type_obj_type = make_exp_tag(expected_value_type)
+    # The general test here is not general enough to check these properly.
+    # Specifcially, the general test assumes the vecotrize lambdas contians all
+    # tag flow ops. However, list and dict constructors are explicitly (and
+    # correctly) not tag flow ops and therefore the tags are only present on the
+    # elements of the list and dict.
+    if name == "nest-dict":
+        item_node = item_node["a"]
+        expected_type_obj_type = types.TypedDict(
+            {
+                **expected_value_type.property_types,
+                "a": make_exp_tag(
+                    types.optional(expected_value_type.property_types["a"])
+                ),
+            }
+        )
+    elif name == "nest-list":
+        item_node = item_node[0]
+        expected_type_obj_type = types.List(
+            make_exp_tag(types.optional(expected_value_type.object_type))
+        )
+
+    # check that tags are propagated
+    assert weave.use(tag_getter_op(item_node)) == "test1"
+
+    # NOTE: This optionality is needed because some arrow ops eagerly declare
+    # optional returns. See number.py and string.py for commentary on the subject.
+    assert arrow.ArrowWeaveListType(types.optional(expected_type_obj_type)).assign_type(
+        called.type
+    )
+
+
+@pytest.mark.parametrize(
+    "name,input_datal,input_datar,weave_func,expected_output",
+    [
+        (
+            "merge",
+            [{"b": "c"}, None, {"b": "q"}],
+            [{"c": 4}, {"c": 5}, {"c": 6}],
+            lambda x, y: x.merge(y),
+            [{"b": "c", "c": 4}, None, {"b": "q", "c": 6}],
+        ),
+        (
+            "merge-overwrite",
+            [{"b": "c"}, None, {"b": "q"}],
+            [{"b": "g"}, {"b": "q"}, {"b": "a"}],
+            lambda x, y: x.merge(y),
+            [{"b": "g"}, None, {"b": "a"}],
+        ),
+        (
+            "merge-dicts",
+            [{"b": "c"}, None, {"b": "q"}],
+            [{"c": {"a": 2}}, {"c": {"a": 3}}, {"c": {"a": 4}}],
+            lambda x, y: x.merge(y),
+            [
+                {"b": "c", "c": {"a": 2}},
+                None,
+                {"b": "q", "c": {"a": 4}},
+            ],
+        ),
+    ],
+)
+def test_arrow_typeddict_nullable_merge(
+    input_datal, input_datar, name, weave_func, expected_output
+):
+    l = weave.save(arrow.to_arrow(input_datal))
+    r = weave.save(arrow.to_arrow(input_datar))
+
+    fn = weave_internal.define_fn(
+        {
+            "x": weave.type_of(input_datal).object_type,
+            "y": weave.type_of(input_datar).object_type,
+        },
+        weave_func,
+    ).val
+    vec_fn = arrow.vectorize(fn)
+    called = weave_internal.call_fn(vec_fn, {"x": l, "y": r})
+    awl = weave.use(called)
+    assert awl.to_pylist() == expected_output
+    assert called.type == arrow.ArrowWeaveListType(
+        weave.type_of(expected_output).object_type
+    )
+    assert awl.object_type == weave.type_of(expected_output).object_type
+
+
+nullable_pick_cases = [
+    (
+        "pick",
+        [None, {"a": 2.0, "b": "G"}, {"a": 3.0, "b": "q"}],
+        lambda x: x.pick("a"),
+        [None, 2.0, 3.0],
+    ),
+    (
+        "pick-nested",
+        [
+            {"a": None, "c": "d"},
+            {"a": {"b": 2.0}, "c": "G"},
+            {"a": {"b": 3.0}, "c": "q"},
+        ],
+        lambda x: x.pick("a").pick("b"),
+        [None, 2.0, 3.0],
+    ),
+]
+
+
+@pytest.mark.parametrize(
+    "name,input_data,weave_func,expected_output", nullable_pick_cases
+)
+def test_arrow_typeddict_pick_nullable(input_data, name, weave_func, expected_output):
+    l = weave.save(arrow.to_arrow(input_data))
+    fn = weave_internal.define_fn(
+        {"x": weave.type_of(input_data).object_type}, weave_func
+    ).val
+    vec_fn = arrow.vectorize(fn)
+    called = weave_internal.call_fn(vec_fn, {"x": l})
+    assert weave.use(called).to_pylist() == expected_output
+    assert called.type == arrow.ArrowWeaveListType(
+        weave.type_of(expected_output).object_type
+    )
+
+
+def test_object_types_nullable():
+    data_node = arrow.to_arrow(
+        [
+            {"a": 5, "point": Point2(256, 256)},
+            {"a": 6, "point": None},
+        ]
+    )
+    assert weave.use(data_node[0]["point"].get_x()) == 256
+
+    assert weave.use(data_node.map(lambda row: row["point"].get_x())).to_pylist() == [
+        256,
+        None,
+    ]
+
+
 def test_unflatten_structs_in_flattened_table():
     flattened_table = pa.table(
         {

@@ -1,7 +1,8 @@
+import typing
 import pyarrow as pa
 
 from ..api import type_of
-from ..decorator_op import arrow_op
+from ..decorator_arrow_op import arrow_op
 from .. import weave_types as types
 from ..ops_primitives import obj as primitives_obj
 
@@ -19,10 +20,17 @@ from .list_ import ArrowWeaveList, ArrowWeaveListType
             {"self": input_types["self"].object_type, "name": input_types["name"]}
         )
     ),
+    all_args_nullable=False,
 )
 def arrow_getattr(self, name):
     ref_array = self._arrow_data
     # deserialize objects
-    objects = [getattr(self._mapper.apply(i.as_py()), name) for i in ref_array]
+    objects: list[typing.Any] = []
+    for ref in ref_array:
+        if ref.as_py() is None:
+            objects.append(None)
+        else:
+            objects.append(getattr(self._mapper.apply(ref.as_py()), name))
+
     object_type = type_of(objects[0])
     return ArrowWeaveList(pa.array(objects), object_type, self._artifact)

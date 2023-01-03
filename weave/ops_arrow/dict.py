@@ -1,7 +1,7 @@
 import pyarrow as pa
 
 from ..api import op, type, OpVarArgs
-from ..decorator_op import arrow_op
+from ..decorator_arrow_op import arrow_op
 from .. import weave_types as types
 from ..ops_primitives import _dict_utils
 from .. import errors
@@ -33,6 +33,7 @@ def typeddict_pick_output_type(input_types):
             {"self": input_types["self"].object_type, "key": input_types["key"]}
         )
     ),
+    all_args_nullable=False,
 )
 def pick(self, key):
     object_type = typeddict_pick_output_type(
@@ -64,9 +65,9 @@ def pick(self, key):
             }
         )
     ),
+    all_args_nullable=False,
 )
 def merge(self, other):
-
     field_arrays: dict[str, pa.Array] = {}
     for arrow_weave_list in (self, other):
         for key in arrow_weave_list.object_type.property_types:
@@ -75,15 +76,24 @@ def merge(self, other):
             else:
                 field_arrays[key] = arrow_weave_list._arrow_data.field(key)
 
-    field_names, arrays = tuple(zip(*field_arrays.items()))
+    if isinstance(self._arrow_data, pa.Array):
+        mask = pa.compute.is_null(self._arrow_data)
+    else:
+        # TODO: implement for table, chunkedarray etc
+        mask = None
 
-    return ArrowWeaveList(
-        pa.StructArray.from_arrays(arrays=arrays, names=field_names),  # type: ignore
+    field_names, arrays = tuple(zip(*field_arrays.items()))
+    new_array = pa.StructArray.from_arrays(arrays=arrays, names=field_names, mask=mask)  # type: ignore
+
+    result = ArrowWeaveList(
+        new_array,
         _dict_utils.typeddict_merge_output_type(
             {"self": self.object_type, "other": other.object_type}
         ),
         self._artifact,
     )
+
+    return result
 
 
 # this function handles the following case:

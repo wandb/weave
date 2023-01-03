@@ -12,8 +12,9 @@ from collections import defaultdict
 py_type = type
 
 from ..api import op, weave_class, type, use
-from ..decorator_op import arrow_op
+from ..decorator_arrow_op import arrow_op
 from .. import weave_types as types
+from .. import box
 from .. import graph
 from .. import errors
 from .. import registry_mem
@@ -34,11 +35,9 @@ from . import arrow
 from .. import arrow_util
 
 from ..language_features.tagging import tag_store
-
-from . import arrow
 from ..ops_primitives import list_ as base_list
 
-from .arrow import arrow_as_array
+from .arrow import arrow_as_array, ArrowWeaveListType, rewrite_weavelist_refs
 
 if typing.TYPE_CHECKING:
     from .. import artifacts_local
@@ -180,139 +179,6 @@ def _map_each(self: "ArrowWeaveList", fn):
     return _apply_fn_node(self, fn)
 
 
-def rewrite_weavelist_refs(arrow_data, object_type, artifact):
-    if _object_type_has_props(object_type):
-        prop_types = _object_type_prop_types(object_type)
-        if isinstance(arrow_data, pa.Table):
-            arrays = {}
-            for col_name, col_type in prop_types.items():
-                column = arrow_data[col_name]
-                arrays[col_name] = rewrite_weavelist_refs(column, col_type, artifact)
-            return pa.table(arrays)
-        elif isinstance(arrow_data, pa.ChunkedArray):
-            arrays = {}
-            unchunked = arrow_data.combine_chunks()
-            for col_name, col_type in prop_types.items():
-                column = unchunked.field(col_name)
-                arrays[col_name] = rewrite_weavelist_refs(column, col_type, artifact)
-            return pa.StructArray.from_arrays(arrays.values(), names=arrays.keys())
-        elif isinstance(arrow_data, pa.StructArray):
-            arrays = {}
-            for col_name, col_type in prop_types.items():
-                column = arrow_data.field(col_name)
-                arrays[col_name] = rewrite_weavelist_refs(column, col_type, artifact)
-            return pa.StructArray.from_arrays(arrays.values(), names=arrays.keys())
-        else:
-            raise errors.WeaveTypeError('Unhandled type "%s"' % type(arrow_data))
-    elif isinstance(object_type, types.UnionType):
-        non_none_members = [
-            m for m in object_type.members if not isinstance(m, types.NoneType)
-        ]
-        nullable = len(non_none_members) < len(object_type.members)
-        if len(non_none_members) > 1:
-            arrow_data = arrow_as_array(arrow_data)
-            if not isinstance(arrow_data.type, pa.UnionType):
-                raise errors.WeaveTypeError(
-                    "Expected UnionType, got %s" % type(arrow_data.type)
-                )
-            arrays = []
-            for i, _ in enumerate(arrow_data.type):
-                rewritten = rewrite_weavelist_refs(
-                    arrow_data.field(i),
-                    non_none_members[i]
-                    if not nullable
-                    else types.UnionType(types.NoneType(), non_none_members[i]),
-                    artifact,
-                )
-                arrays.append(rewritten)
-            return pa.UnionArray.from_sparse(arrow_data.type_codes, arrays)
-        return rewrite_weavelist_refs(arrow_data, types.non_none(object_type), artifact)
-    elif _object_type_is_basic(object_type):
-        return arrow_data
-    elif isinstance(object_type, types.List):
-        # This is a bit unfortunate that we have to loop through all the items - would be nice to do a direct memory replacement.
-        return pa.array(_rewrite_pyliteral_refs(item.as_py(), object_type, artifact) for item in arrow_data)  # type: ignore
-
-    else:
-        # We have a column of refs
-        new_refs = []
-        for ref_str in arrow_data:
-            ref_str = ref_str.as_py()
-            new_refs.append(
-                _rewrite_ref_entry(ref_str, object_type, artifact)
-                if ref_str is not None
-                else None
-            )
-        return pa.array(new_refs)
-
-
-def _rewrite_pyliteral_refs(pyliteral_data, object_type, artifact):
-    if _object_type_has_props(object_type):
-        prop_types = _object_type_prop_types(object_type)
-        if isinstance(pyliteral_data, dict):
-            return {
-                key: _rewrite_pyliteral_refs(pyliteral_data[key], value, artifact)
-                for key, value in prop_types.items()
-            }
-        else:
-            raise errors.WeaveTypeError('Unhandled type "%s"' % type(pyliteral_data))
-    elif isinstance(object_type, types.UnionType):
-        non_none_members = [
-            m for m in object_type.members if not isinstance(m, types.NoneType)
-        ]
-        if len(non_none_members) > 1:
-            raise errors.WeaveInternalError(
-                "Unions not fully supported yet in Weave arrow"
-            )
-        return _rewrite_pyliteral_refs(
-            pyliteral_data, types.non_none(object_type), artifact
-        )
-    elif _object_type_is_basic(object_type):
-        return pyliteral_data
-    elif isinstance(object_type, types.List):
-        return [
-            _rewrite_pyliteral_refs(item, object_type.object_type, artifact)
-            for item in pyliteral_data
-        ]
-    else:
-        return _rewrite_ref_entry(pyliteral_data, object_type, artifact)
-
-
-def _object_type_has_props(object_type):
-    return (
-        isinstance(object_type, types.TypedDict)
-        or isinstance(object_type, types.ObjectType)
-        or isinstance(object_type, tagged_value_type.TaggedValueType)
-    )
-
-
-def _object_type_prop_types(object_type):
-    if isinstance(object_type, tagged_value_type.TaggedValueType):
-        return {
-            "_tag": object_type.tag,
-            "_value": object_type.value,
-        }
-    prop_types = object_type.property_types
-    if callable(prop_types):
-        prop_types = prop_types()
-    return prop_types
-
-
-def _object_type_is_basic(object_type):
-    if isinstance(object_type, types.Const):
-        object_type = object_type.val_type
-    return isinstance(object_type, types.BasicType) or (
-        isinstance(object_type, types.Datetime)
-    )
-
-
-def _rewrite_ref_entry(entry: str, object_type, artifact):
-    if ":" in entry:
-        return entry
-    else:
-        return str(refs.Ref.from_local_ref(artifact, entry, object_type).uri)
-
-
 def rewrite_groupby_refs(arrow_data, group_keys, object_type, artifact):
     # TODO: Handle unions
 
@@ -397,67 +263,6 @@ def _arrow_sort_ranking_to_indicies(sort_ranking, col_dirs):
     return pc.sort_indices(table, order)
 
 
-@dataclasses.dataclass(frozen=True)
-class ArrowWeaveListType(types.Type):
-    _base_type = types.List()
-    name = "ArrowWeaveList"
-
-    object_type: types.Type = types.Any()
-
-    @classmethod
-    def type_of_instance(cls, obj):
-        return cls(obj.object_type)
-
-    def save_instance(self, obj, artifact, name):
-        # If we are saving to the same artifact as we were written to,
-        # then we don't need to rewrite any references.
-        if obj._artifact == artifact:
-            arrow_data = obj._arrow_data
-        else:
-            # super().save_instance(obj, artifact, name)
-            # return
-            arrow_data = rewrite_weavelist_refs(
-                obj._arrow_data, obj.object_type, obj._artifact
-            )
-
-        d = {"_arrow_data": arrow_data, "object_type": obj.object_type}
-        type_of_d = types.TypedDict(
-            {
-                "_arrow_data": types.union(
-                    arrow.ArrowTableType(), arrow.ArrowArrayType()
-                ),
-                "object_type": types.TypeType(),
-            }
-        )
-        if hasattr(self, "_key"):
-            d["_key"] = obj._key
-            type_of_d.property_types["_key"] = self._key
-
-        serializer = mappers_python.map_to_python(type_of_d, artifact)
-        result_d = serializer.apply(d)
-
-        with artifact.new_file(f"{name}.ArrowWeaveList.json") as f:
-            json.dump(result_d, f)
-
-    def load_instance(self, artifact, name, extra=None):
-        with artifact.open(f"{name}.ArrowWeaveList.json") as f:
-            result = json.load(f)
-        type_of_d = types.TypedDict(
-            {
-                "_arrow_data": types.union(
-                    arrow.ArrowTableType(), arrow.ArrowArrayType()
-                ),
-                "object_type": types.TypeType(),
-            }
-        )
-        if hasattr(self, "_key"):
-            type_of_d.property_types["_key"] = self._key
-
-        mapper = mappers_python.map_from_python(type_of_d, artifact)
-        res = mapper.apply(result)
-        return self.instance_class(artifact=artifact, **res)
-
-
 ArrowWeaveListObjectTypeVar = typing.TypeVar("ArrowWeaveListObjectTypeVar")
 
 
@@ -524,6 +329,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             return pa.StructArray.from_arrays(arrays, names=keys)
 
         elif isinstance(self.object_type, types.List):
+
             offsets = arrow_data.offsets
             # strip tags from each element
             flattened = ArrowWeaveList(
@@ -533,7 +339,9 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             )._arrow_data_asarray_no_tags()
 
             # unflatten
-            return pa.ListArray.from_arrays(offsets, flattened)
+            return pa.ListArray.from_arrays(
+                offsets, flattened, mask=pa.compute.is_null(arrow_data)
+            )
 
         elif isinstance(self.object_type, types.UnionType):
             is_not_simple_nullable_union = (
@@ -656,6 +464,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             ),
         },
         output_type=map_output_type,
+        all_args_nullable=False,
     )
     def map(self, map_fn):
         return _apply_fn_node(self, map_fn)
@@ -667,6 +476,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             "map_fn": _map_each_function_type,
         },
         output_type=_map_each_output_type,
+        all_args_nullable=False,
     )
     def map_each(self, map_fn):
         return _map_each(self, map_fn)
@@ -1520,11 +1330,26 @@ def recursively_build_pyarrow_array(
         nonnull_mapper = [
             m for m in mapper._member_mappers if m.type != types.NoneType()
         ][0]
+
+        def none_unboxer(iterator: typing.Iterable):
+            for obj in iterator:
+                if isinstance(obj, box.BoxedNone):
+                    # get rid of box
+                    yield None
+                else:
+                    yield obj
+
         return recursively_build_pyarrow_array(
-            py_objs, pyarrow_type, nonnull_mapper, py_objs_already_mapped
+            list(none_unboxer(py_objs)),
+            pyarrow_type,
+            nonnull_mapper,
+            py_objs_already_mapped,
         )
     if pa.types.is_struct(pyarrow_type):
         keys: list[str] = []
+        # keeps track of null values so that we can null entries at the struct level
+        mask: list[bool] = []
+
         assert isinstance(
             mapper,
             (
@@ -1533,17 +1358,24 @@ def recursively_build_pyarrow_array(
                 mappers_arrow.ObjectToArrowStruct,
             ),
         )
-        for field in pyarrow_type:
 
+        for i, field in enumerate(pyarrow_type):
+            data: list[typing.Any] = []
             if isinstance(
                 mapper,
                 mappers_arrow.TypedDictToArrowStruct,
             ):
+
+                for py_obj in py_objs:
+                    if py_obj is None:
+                        data.append(None)
+                    else:
+                        data.append(py_obj.get(field.name, None))
+                    if i == 0:
+                        mask.append(py_obj is None)
+
                 array = recursively_build_pyarrow_array(
-                    [
-                        py_obj.get(field.name, None) if py_obj is not None else None
-                        for py_obj in py_objs
-                    ],
+                    data,
                     field.type,
                     mapper._property_serializers[field.name],
                     py_objs_already_mapped,
@@ -1552,7 +1384,6 @@ def recursively_build_pyarrow_array(
                 mapper,
                 mappers_arrow.ObjectToArrowStruct,
             ):
-                data: list[typing.Any] = []
                 for py_obj in py_objs:
                     if py_obj is None:
                         data.append(None)
@@ -1560,6 +1391,8 @@ def recursively_build_pyarrow_array(
                         data.append(py_obj.get(field.name, None))
                     else:
                         data.append(getattr(py_obj, field.name, None))
+                    if i == 0:
+                        mask.append(py_obj is None)
 
                 array = recursively_build_pyarrow_array(
                     data,
@@ -1570,15 +1403,31 @@ def recursively_build_pyarrow_array(
 
             elif isinstance(mapper, mappers_arrow.TaggedValueToArrowStruct):
                 if field.name == "_tag":
+                    for py_obj in py_objs:
+                        if py_obj is None:
+                            data.append(None)
+                        else:
+                            data.append(tag_store.get_tags(py_obj))
+                        if i == 0:
+                            mask.append(py_obj is None)
+
                     array = recursively_build_pyarrow_array(
-                        [tag_store.get_tags(py_obj) for py_obj in py_objs],
+                        data,
                         field.type,
                         mapper._tag_serializer,
                         py_objs_already_mapped,
                     )
                 else:
+                    for py_obj in py_objs:
+                        if py_obj is None:
+                            data.append(None)
+                        else:
+                            data.append(box.unbox(py_obj))
+                        if i == 0:
+                            mask.append(py_obj is None)
+
                     array = recursively_build_pyarrow_array(
-                        [py_obj for py_obj in py_objs],
+                        data,
                         field.type,
                         mapper._value_serializer,
                         py_objs_already_mapped,
@@ -1586,7 +1435,7 @@ def recursively_build_pyarrow_array(
 
             arrays.append(array)
             keys.append(field.name)
-        return pa.StructArray.from_arrays(arrays, keys)
+        return pa.StructArray.from_arrays(arrays, keys, mask=pa.array(mask))
     elif pa.types.is_union(pyarrow_type):
         assert isinstance(mapper, mappers_arrow.UnionToArrowUnion)
         type_codes: list[int] = [mapper.type_code_of_obj(o) for o in py_objs]

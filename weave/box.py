@@ -91,5 +91,28 @@ def box(
     return obj
 
 
+def unbox(
+    obj: T,
+) -> typing.Union[T, int, float, str, bool, dict, list, np.ndarray, None]:
+
+    if type(obj) == BoxedInt:
+        return int(obj)
+    elif type(obj) == BoxedFloat:
+        return float(obj)
+    elif type(obj) == BoxedStr:
+        return str(obj)
+    elif type(obj) == BoxedBool:
+        return bool(obj)
+    elif type(obj) == BoxedDict:
+        return dict(obj)
+    elif type(obj) == BoxedList:
+        return list(obj)
+    elif type(obj) == BoxedNDArray:
+        return np.array(obj)
+    elif type(obj) == BoxedNone:
+        return None
+    return obj
+
+
 def is_boxed(obj: typing.Any) -> bool:
     return id(obj) == id(box(obj))
