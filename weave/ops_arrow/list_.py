@@ -782,38 +782,16 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             group_table_as_array_awl_stripped
         ).object_type
 
-        # There was a comment that arrow doesn't allow grouping on struct columns
-        # and another large block of code that tried to avoid passing in a struct column.
-        # But that code was actually never executing due to a bug.
-        # TODO: investigate and fix this (do we really need unzip_struct_array?)
-        if isinstance(
-            group_table_as_array_awl_stripped,
-            (pa.ChunkedArray, pa.Array, pa.StructArray),
-        ):
-            if isinstance(group_table_as_array_awl_stripped, pa.ChunkedArray):
-                group_table_as_array_awl_stripped_combined = (
-                    group_table_as_array_awl_stripped.combine_chunks()
-                )
-            else:
-                group_table_as_array_awl_stripped_combined = (
-                    group_table_as_array_awl_stripped
-                )
-
-            group_table_chunked = pa.chunked_array(
-                pa.StructArray.from_arrays(
-                    [
-                        group_table_as_array_awl_stripped_combined,
-                    ],
-                    names=["group_key"],
-                )
+        group_table_chunked = pa.chunked_array(
+            pa.StructArray.from_arrays(
+                [
+                    group_table_as_array_awl_stripped,
+                ],
+                names=["group_key"],
             )
-            group_table_chunked_unzipped = unzip_struct_array(group_table_chunked)
-            group_cols = group_table_chunked_unzipped.column_names
-        else:
-            raise errors.WeaveInternalError(
-                "Arrow groupby not yet support for map result: %s"
-                % type(group_table_as_array_awl)
-            )
+        )
+        group_table_chunked_unzipped = unzip_struct_array(group_table_chunked)
+        group_cols = group_table_chunked_unzipped.column_names
 
         # Serializing a large arrow table and then reading it back
         # causes it to come back with more than 1 chunk. It seems the aggregation
