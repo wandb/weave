@@ -15,16 +15,140 @@ from . import weave_internal
 from . import pyfunc_type_util
 from . import engine_trace
 from .language_features.tagging import (
+    opdef_util,
     process_opdef_resolve_fn,
     process_opdef_output_type,
     tagged_value_type,
 )
-from . import language_nullability
 from . import language_autocall
 
 
 def common_name(name: str) -> str:
     return name.split("-")[-1]
+
+
+# TODO: Move to weave_types after moving TaggedValueType into weave_types
+def map_type(
+    t: types.Type, map_fn: typing.Callable[[types.Type], types.Type]
+) -> types.Type:
+    if isinstance(t, types.NoneType):
+        pass
+    elif isinstance(t, types.Const):
+        t = types.Const(map_type(t.val_type, map_fn), t.val)
+    elif isinstance(t, types.UnionType):
+        t = types.union(*(map_type(m, map_fn) for m in t.members))
+    elif isinstance(t, types.TypedDict):
+        t = types.TypedDict(
+            {k: map_type(v, map_fn) for k, v in t.property_types.items()}
+        )
+    elif isinstance(t, tagged_value_type.TaggedValueType):
+        mapped_tag = map_type(t.tag, map_fn)
+        if not isinstance(mapped_tag, types.TypedDict):
+            raise errors.WeaveTypeError(
+                f"TaggedValueType tag must be a TypedDict, got {mapped_tag}"
+            )
+        t = tagged_value_type.TaggedValueType(mapped_tag, map_type(t.value, map_fn))
+    elif hasattr(t, "object_type"):
+        t = t.__class__(object_type=map_type(t.object_type, map_fn))  # type: ignore
+    mapped_t = map_fn(t)
+    if mapped_t is None:
+        return t
+    return mapped_t
+
+
+def normalize_type(t: types.Type) -> types.Type:
+    # This produces equivalent types, but normalized in the way Weave0 expects.
+    def _norm(t):
+        # Distribute TaggedValueType over UnionType
+        if isinstance(t, tagged_value_type.TaggedValueType) and isinstance(
+            t.value, types.UnionType
+        ):
+            return types.union(
+                *[
+                    tagged_value_type.TaggedValueType(t.tag, m)
+                    for m in t.value.members
+                    if not isinstance(m, types.NoneType)
+                ]
+            )
+
+    return map_type(t, _norm)
+
+
+def _full_output_type(
+    params: dict[str, types.Type],
+    op_input0_type: types.Type,
+    op_output_type: typing.Union[
+        types.Type, typing.Callable[[typing.Dict[str, types.Type]], types.Type]
+    ],
+    param0_is_const: bool,
+    param0_const_val: typing.Any,
+) -> types.Type:
+    # TODO: I think this would be a lot more clear using a stack, since its tail recursive
+    # and we have to pass down const information.
+
+    param0_name = list(params.keys())[0]
+    param0_type = params[param0_name]
+    # Note isinstance check, won't work if op for some reason handles a union of TaggedValueTypes.
+    # But the only ops that handle TaggedValueTypes should be tag getters...
+    # TODO: formalize?
+    if isinstance(param0_type, types.Const):
+        # We remove the Const type, since we're computing the output type which can't be const
+        # since its derived.
+        return _full_output_type(
+            {**params, param0_name: param0_type.val_type},
+            op_input0_type,
+            op_output_type,
+            param0_is_const=True,
+            param0_const_val=param0_type.val,
+        )
+    if not isinstance(op_input0_type, tagged_value_type.TaggedValueType) and isinstance(
+        param0_type, tagged_value_type.TaggedValueType
+    ):
+        return tagged_value_type.TaggedValueType(
+            param0_type.tag,
+            _full_output_type(
+                {**params, param0_name: param0_type.value},
+                op_input0_type,
+                op_output_type,
+                param0_is_const=param0_is_const,
+                param0_const_val=param0_const_val,
+            ),
+        )
+    elif isinstance(param0_type, types.UnionType):
+        return types.union(
+            *(
+                _full_output_type(
+                    {**params, param0_name: m},
+                    op_input0_type,
+                    op_output_type,
+                    param0_is_const=param0_is_const,
+                    param0_const_val=param0_const_val,
+                )
+                for m in param0_type.members
+            )
+        )
+    elif not op_input0_type.assign_type(types.NoneType()) and isinstance(
+        param0_type, types.NoneType
+    ):
+        return types.NoneType()
+
+    if callable(op_output_type):
+        if param0_is_const:
+            return op_output_type(
+                {**params, param0_name: types.Const(param0_type, param0_const_val)}
+            )
+        return op_output_type(params)
+    return op_output_type
+
+
+def full_output_type(
+    params: dict[str, types.Type],
+    op_input0_type: types.Type,
+    op_output_type: typing.Union[
+        types.Type, typing.Callable[[typing.Dict[str, types.Type]], types.Type]
+    ],
+) -> types.Type:
+    return _full_output_type(params, op_input0_type, op_output_type, False, None)
 
 
 class OpDef:
@@ -144,8 +268,8 @@ class OpDef:
 
                 final_output_type = api.use(called_refine_output_type)  # type: ignore
             if final_output_type == None:
-                # This can happen due to nullability. In that case, accept the unrefined type.
-                final_output_type = _self.unrefined_output_type_for_params(bound_params)
+                # This can happen due to nullability. In that case, accept the output type is null
+                final_output_type = types.NoneType()
 
             final_output_type = (
                 process_opdef_output_type.process_opdef_refined_output_type(
@@ -177,22 +301,44 @@ class OpDef:
         types.Type,
         typing.Callable[[typing.Dict[str, types.Type]], types.Type],
     ]:
-        if self._output_type is None:
-            if self.name in [
-                "op_get_tag_type",
-                "op_make_type_tagged",
-                "op_make_type_key_tag",
-            ]:
-                self._output_type = self.raw_output_type
-            else:
-                output_type = self.raw_output_type
-                output_type = language_nullability.process_opdef_output_type(
-                    self.concrete_output_type, output_type, self.input_type
+        if self.name in [
+            "op_get_tag_type",
+            "op_make_type_tagged",
+            "op_make_type_key_tag",
+        ]:
+            return self.raw_output_type
+        else:
+            if isinstance(self.input_type, op_args.OpVarArgs):
+                return self.raw_output_type
+            elif not isinstance(self.input_type, op_args.OpNamedArgs):
+                raise errors.WeaveInternalError('unknown input type for op "%s"')
+            if not self.input_type.arg_types:
+                return self.raw_output_type
+            first_input_type = list(self.input_type.arg_types.values())[0]
+
+            def handle(input_type):
+                param0_name = list(input_type.keys())[0]
+                param0_type = input_type[param0_name]
+                input_type = {**input_type, param0_name: normalize_type(param0_type)}
+
+                def auto_tagging_output_type(input_type):
+                    if isinstance(self.raw_output_type, types.Type):
+                        result_type = self.raw_output_type
+                    else:
+                        result_type = self.raw_output_type(input_type)
+                    if opdef_util.should_tag_op_def_outputs(self):
+                        return tagged_value_type.TaggedValueType(
+                            types.TypedDict({param0_name: param0_type}), result_type
+                        )
+                    return result_type
+
+                final = full_output_type(
+                    input_type, first_input_type, auto_tagging_output_type
                 )
-                self._output_type = process_opdef_output_type.process_opdef_output_type(
-                    output_type, self
-                )
-        return self._output_type
+
+                return final
+
+            return handle
 
     @property
     def concrete_output_type(self) -> types.Type:

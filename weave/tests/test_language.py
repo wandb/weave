@@ -79,4 +79,4 @@ def test_out_of_bounds_tag_access():
 
 
 def test_refine_nullability():
-    assert _test_op_refining(None).type.val_type == weave.types.NoneType()
+    assert _test_op_refining(None).type == weave.types.NoneType()

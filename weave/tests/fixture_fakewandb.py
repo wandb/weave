@@ -207,6 +207,16 @@ run_payload = {
     "name": "2ed5xwpn",
     "project": project_payload,
 }
+run2_payload = {
+    "id": "run2_id",
+    "name": "run2_name",
+    "project": project_payload,
+}
+run3_payload = {
+    "id": "run3_id",
+    "name": "run3_name",
+    "project": project_payload,
+}
 defaultArtifactType_payload = {
     "id": "QXJ0aWZhY3RUeXBlOjIzNzc=",
     "name": "test_results",

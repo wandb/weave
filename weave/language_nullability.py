@@ -34,49 +34,6 @@ def should_force_none_result(
     return False
 
 
-def process_opdef_output_type(
-    op_concrete_output_type: types.Type,
-    op_output_type: typing.Union[
-        types.Type,
-        typing.Callable[[typing.Dict[str, types.Type]], types.Type],
-    ],
-    op_input_type: op_args.OpArgs,
-) -> typing.Union[
-    types.Type,
-    typing.Callable[[typing.Dict[str, types.Type]], types.Type],
-]:
-    named_args = op_input_type.named_args()
-    if named_args and not types.is_optional(named_args[0].type):
-
-        def nullable_output_type(
-            input_type: typing.Dict[str, types.Type]
-        ) -> types.Type:
-            arg0_name = named_args[0].name
-            arg0_type = input_type[arg0_name]
-            if not isinstance(
-                op_concrete_output_type, tagged_value_type.TaggedValueType
-            ) and types.NoneType().assign_type(arg0_type):
-                # if we're not a tag outputer and we have None as our first
-                # input, then just return the type of the first input (which
-                # could be tagged).
-                return arg0_type
-            if callable(op_output_type):
-                input_type0 = input_type[arg0_name]
-                if not input_type0.assign_type(types.NoneType()):
-                    input_type0 = types.non_none(input_type0)
-                non_null_output_type = op_output_type(
-                    {**input_type, arg0_name: input_type0}
-                )
-            else:
-                non_null_output_type = op_output_type
-            if types.is_optional(arg0_type):
-                return types.optional(non_null_output_type)
-            return non_null_output_type
-
-        return nullable_output_type
-    return op_output_type
-
-
 def adjust_assignable_param_dict_for_dispatch(
     op: "OpDef.OpDef", param_dict: dict[str, types.Type]
 ) -> dict[str, types.Type]:

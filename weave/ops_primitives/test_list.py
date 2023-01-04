@@ -28,12 +28,6 @@ def test_op_list():
     assert types.List(types.Int()).assign_type(node.type)
 
 
-def test_typeof_groupresult():
-    assert types.TypeRegistry.type_of(
-        list_.GroupResult([1, 2, 3], "a")
-    ) == list_.GroupResultType(types.List(types.Int()), types.String())
-
-
 def test_sequence1():
     l = [
         {"a": 0, "b": 0, "y": "x"},

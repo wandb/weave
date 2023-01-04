@@ -69,7 +69,28 @@ workspace_response = {
                             }
                         ),
                         "displayName": "amber-glade-100",
-                    }
+                    },
+                },
+                {
+                    "node": {
+                        **fwb.run2_payload,  # type: ignore
+                        "summaryMetrics": json.dumps({}),
+                        "displayName": "run2-display_name",
+                    },
+                },
+                {
+                    "node": {
+                        **fwb.run3_payload,  # type: ignore
+                        "summaryMetrics": json.dumps(
+                            {
+                                "table": {
+                                    "_type": "table-file",
+                                    "artifact_path": "wandb-client-artifact://1122334455/test_results.table.json",
+                                },
+                            }
+                        ),
+                        "displayName": "run3-display_name",
+                    },
                 },
             ]
         },
@@ -224,7 +245,7 @@ def test_missing_file(fake_wandb):
     assert weave.use(node) == None
 
 
-def table_mock(q, ndx):
+def table_mock1(q, ndx):
     if ndx == 0:
         return workspace_response
     elif ndx == 1:
@@ -232,6 +253,16 @@ def table_mock(q, ndx):
     elif ndx == 2:
         return workspace_response
     elif ndx == 3:
+        return artifact_version_sdk_response
+    pass
+
+
+def table_mock2(q, ndx):
+    if ndx == 0:
+        return workspace_response
+    elif ndx == 1:
+        return artifact_version_sdk_response
+    elif ndx == 2:
         return artifact_version_sdk_response
 
 
@@ -268,7 +299,7 @@ def test_legacy_run_file_table_format(fake_wandb):
 
 
 def test_mapped_table_tags(fake_wandb):
-    fake_wandb.add_mock(table_mock)
+    fake_wandb.add_mock(table_mock1)
     cell_node = (
         ops.project("stacey", "mendeleev")
         .runs()
@@ -286,11 +317,11 @@ def test_mapped_table_tags(fake_wandb):
 
 
 def test_table_tags_row_first(fake_wandb):
-    fake_wandb.add_mock(table_mock)
+    fake_wandb.add_mock(table_mock1)
     cell_node = (
         ops.project("stacey", "mendeleev")
         .runs()
-        .limit(1)[0]
+        .limit(10)[0]
         .summary()["table"]
         .table()
         .rows()
@@ -301,8 +332,63 @@ def test_table_tags_row_first(fake_wandb):
     assert weave.use(cell_node.project().name()) == "mendeleev"
 
 
+def test_workspace_table_type(fake_wandb):
+    fake_wandb.add_mock(table_mock2)
+    cell_node = ops.project("stacey", "mendeleev").runs().summary()["table"].table()
+    assert cell_node.type == TaggedValueType(
+        types.TypedDict(property_types={"project": wdt.ProjectType}),
+        types.List(
+            object_type=types.optional(
+                TaggedValueType(
+                    types.TypedDict(property_types={"run": wdt.RunType}),
+                    ops.TableType(),
+                )
+            )
+        ),
+    )
+
+
+def test_workspace_table_rows_type(fake_wandb):
+    fake_wandb.add_mock(table_mock2)
+    cell_node = (
+        ops.project("stacey", "mendeleev").runs().summary()["table"].table().rows()
+    )
+    assert cell_node.type == TaggedValueType(
+        types.TypedDict(property_types={"project": wdt.ProjectType}),
+        types.List(
+            object_type=types.optional(
+                TaggedValueType(
+                    types.TypedDict(property_types={"run": wdt.RunType}),
+                    ops.ArrowWeaveListType(
+                        object_type=types.TypedDict(
+                            property_types={
+                                "id": types.optional(types.String()),
+                                "image": types.optional(
+                                    ops.ImageArtifactFileRef.WeaveType()
+                                ),
+                                "guess": types.optional(types.String()),
+                                "truth": types.optional(types.String()),
+                                "score_Animalia": types.optional(types.Float()),
+                                "score_Amphibia": types.optional(types.Float()),
+                                "score_Arachnida": types.optional(types.Float()),
+                                "score_Aves": types.optional(types.Float()),
+                                "score_Fungi": types.optional(types.Float()),
+                                "score_Insecta": types.optional(types.Float()),
+                                "score_Mammalia": types.optional(types.Float()),
+                                "score_Mollusca": types.optional(types.Float()),
+                                "score_Plantae": types.optional(types.Float()),
+                                "score_Reptilia": types.optional(types.Float()),
+                            }
+                        )
+                    ),
+                )
+            )
+        ),
+    )
+
+
 def test_table_tags_column_first(fake_wandb):
-    fake_wandb.add_mock(table_mock)
+    fake_wandb.add_mock(table_mock1)
     cell_node = (
         ops.project("stacey", "mendeleev")
         .runs()
@@ -318,7 +404,7 @@ def test_table_tags_column_first(fake_wandb):
 
 
 def test_table_images(fake_wandb):
-    fake_wandb.add_mock(table_mock)
+    fake_wandb.add_mock(table_mock2)
     # Query 1:
     project_node = ops.project("stacey", "mendeleev")
     project_runs_node = project_node.runs().limit(1)
@@ -433,7 +519,11 @@ def test_domain_gql_through_dicts_with_fn_nodes(fake_wandb):
     assert weave.use(dict_node) == {
         "project_name": "mendeleev",
         "entity_name": "stacey",
-        "run_names": [{"name": "amber-glade-100"}],
+        "run_names": [
+            {"name": "amber-glade-100"},
+            {"name": "run2-display_name"},
+            {"name": "run3-display_name"},
+        ],
     }
 
 

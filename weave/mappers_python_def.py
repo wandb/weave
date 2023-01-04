@@ -37,7 +37,10 @@ class DictToPyDict(mappers_weave.DictMapper):
 
 class ObjectToPyDict(mappers_weave.ObjectMapper):
     def apply(self, obj):
-        result = {}
+        # Store the type name in the saved object. W&B for example stores
+        # {"_type": "table-ref", "artifact_path": "..."} objects in run config and summary
+        # fields.
+        result = {"_type": self.type.name}
         for prop_name, prop_serializer in self._property_serializers.items():
             if prop_serializer is not None:
                 v = prop_serializer.apply(getattr(obj, prop_name))

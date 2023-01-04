@@ -11,6 +11,7 @@ from .. import ops
 from .. import panel
 from .. import decorator_type
 from .. import weave_types
+from ..language_features.tagging import tagged_value_type
 
 
 @decorator_type.type()
@@ -79,8 +80,11 @@ class TableState:
 
     def update_col(self, col_id, select_expr):
         object_type = self.input_node.type.object_type
+        # TODO: we are not deriving this type correctly
         if self.groupBy and col_id not in self.groupBy:
-            object_type = ops.GroupResultType(weave_types.List(object_type))
+            object_type = tagged_value_type.TaggedValueType(
+                weave_types.TypedDict({}), weave_types.List(object_type)
+            )
 
         sig = inspect.signature(select_expr)
         kwargs = {}

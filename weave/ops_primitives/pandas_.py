@@ -9,10 +9,13 @@ import pyarrow.parquet as pq
 import numpy
 
 from ..api import op, weave_class
+from .. import box
 from .. import weave_types as types
 from . import list_
+from .. import mappers_python
 from .. import graph
 from .. import errors
+from ..language_features.tagging import tag_store, tagged_value_type
 
 # Hack hack hack
 # TODO: we can do this with Weave instead of writing a giant switch statement
@@ -83,14 +86,12 @@ def numpy_val_to_python(val):
     return val
 
 
+@dataclasses.dataclass(frozen=True)
 class DataFrameType(types.Type):
     instance_classes = pandas.DataFrame
     name = "dataframe"
 
-    object_type: types.Type
-
-    def __init__(self, object_type):
-        self.object_type = object_type
+    object_type: types.Type = types.Any()
 
     def __str__(self):
         return "<DataFrameType %s>" % self.object_type
@@ -131,20 +132,43 @@ class DataFrameType(types.Type):
 
 
 @dataclasses.dataclass(frozen=True)
-class DataFrameTableType(types.ObjectType):
+class DataFrameTableType(types.Type):
+    _base_type = types.List()
     name = "dataframeTable"
 
-    _df: DataFrameType = DataFrameType(types.Any())
+    object_type: types.Type = types.Any()
 
-    def _to_dict(self):
-        return {"_df": self._df.to_dict(), "objectType": self.object_type.to_dict()}
+    @classmethod
+    def type_of_instance(cls, obj):
+        return cls(obj.object_type)
 
-    def property_types(self):
-        return {"_df": self._df}
+    def save_instance(self, obj, artifact, name):
+        d = {"_df": obj._df, "object_type": obj.object_type}
+        type_of_d = types.TypedDict(
+            {
+                "_df": DataFrameType(),
+                "object_type": types.TypeType(),
+            }
+        )
 
-    @property
-    def object_type(self):
-        return self._df.object_type
+        serializer = mappers_python.map_to_python(type_of_d, artifact)
+        result_d = serializer.apply(d)
+
+        with artifact.new_file(f"{name}.DataFrameTable.json") as f:
+            json.dump(result_d, f)
+
+    def load_instance(self, artifact, name, extra=None):
+        with artifact.open(f"{name}.DataFrameTable.json") as f:
+            result = json.load(f)
+        type_of_d = types.TypedDict(
+            {
+                "_df": DataFrameType(),
+                "object_type": types.TypeType(),
+            }
+        )
+        mapper = mappers_python.map_from_python(type_of_d, artifact)
+        res = mapper.apply(result)
+        return self.instance_class(artifact=artifact, **res)
 
 
 def index_output_type(input_types):
@@ -157,22 +181,16 @@ def index_output_type(input_types):
         return self_type.object_type
 
 
-def mapped_pick_output_type(input_types):
-    if not isinstance(input_types["key"], types.Const):
-        return types.List(types.UnknownType())
-    key = input_types["key"].val
-    prop_type = input_types["self"]._df.object_type.property_types.get(key)
-    if prop_type is None:
-        return types.Invalid()
-    return types.List(prop_type)
-
-
 @weave_class(weave_type=DataFrameTableType)
 class DataFrameTable:
     _df: pandas.DataFrame
+    object_type: types.Type
 
-    def __init__(self, _df):
+    def __init__(self, _df, object_type=None, artifact=None):
         self._df = _df
+        self.object_type = object_type
+        if self.object_type is None:
+            self.object_type = types.TypeRegistry.type_of(self._df).object_type
 
     def __iter__(self):
         # Iter is implemented to make list_indexCheckpoint work, which
@@ -203,9 +221,9 @@ class DataFrameTable:
     def __getitem__(self, index: int):
         return self._index(index)
 
-    @op(output_type=mapped_pick_output_type)
-    def pick(self, key: str):
-        return self._df[key]
+    # @op(output_type=mapped_pick_output_type)
+    # def pick(self, key: str):
+    #     return self._df[key]
 
     @op(
         input_type={
@@ -239,7 +257,14 @@ class DataFrameTable:
             ),
         },
         output_type=lambda input_types: types.List(
-            list_.GroupResultType(types.List(input_types["self"].object_type))
+            tagged_value_type.TaggedValueType(
+                types.TypedDict(
+                    {
+                        "groupKey": input_types["group_by_fn"].output_type,
+                    }
+                ),
+                types.List(input_types["self"].object_type),
+            )
         ),
     )
     def groupby(self, group_by_fn):
@@ -266,7 +291,9 @@ class DataFrameTable:
                 if not isinstance(group_key_vals, tuple):
                     group_key_vals = (group_key_vals,)
                 group_key = dict(zip(group_keys, group_key_vals))
-            result.append(list_.GroupResult(row_result, group_key))
+            item = box.box(row_result)
+            tag_store.add_tags(item, {"groupKey": group_key})
+            result.append(item)
         return result
 
 
@@ -299,13 +326,13 @@ def refine_pandasreadcsv(file):
     columns = res._df.dtypes.index.values.tolist()
     dtypes = res._df.dtypes.values.tolist()
     prop_types = {col: _pd_dtype_to_weave(dtype) for col, dtype in zip(columns, dtypes)}
-    return DataFrameTableType(DataFrameType(types.TypedDict(prop_types)))
+    return DataFrameTableType(types.TypedDict(prop_types))
 
 
 @op(
     name="file-pandasreadcsv",
     input_type={"file": types.FileType()},
-    output_type=DataFrameTableType(DataFrameType(types.TypedDict({}))),
+    output_type=DataFrameTableType(),
     refine_output_type=refine_pandasreadcsv,
 )
 def pandasreadcsv(file):

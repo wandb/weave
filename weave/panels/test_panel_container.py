@@ -79,21 +79,30 @@ def test_panel_container():
             },
         },
         "_val": {
+            "_type": "container_panel_type",
             "id": "container",
             "config": {
+                "_type": "container_config_type",
                 "variables": {"slider_value": 5},
                 "panels": [
                     {
+                        "_type": "slider_panel_type",
                         "id": "slider",
                         "input_node": {
                             "nodeType": "var",
                             "type": "number",
                             "varName": "slider_value",
                         },
-                        "config": {"min": 0, "max": 100, "step": 0.1},
+                        "config": {
+                            "_type": "slider_config_type",
+                            "min": 0,
+                            "max": 100,
+                            "step": 0.1,
+                        },
                         "_union_id": 0,
                     },
                     {
+                        "_type": "number_panel_type",
                         "id": "number",
                         "input_node": {
                             "nodeType": "var",

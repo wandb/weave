@@ -104,8 +104,6 @@ class List:
         # return TaggedValue, while Weave Python currently still returns GroupResult
         # TODO: Remove when we switch Weave Python over to using TaggedValue for this
         # case.
-        if isinstance(arr.__getitem__, op_def.OpDef):
-            return arr.__getitem__.raw_resolve_fn(arr, index)
         try:
             return arr.__getitem__(index)
         except IndexError:
@@ -264,29 +262,6 @@ class List:
         return res
 
 
-@dataclasses.dataclass(frozen=True)
-class GroupResultType(types.ObjectType):
-    _base_type = types.List()
-    name = "groupresult"
-
-    list: types.Type = types.List(types.Any())
-    key: types.Type = types.Any()
-
-    @property
-    def object_type(self):
-        return self.list.object_type
-
-    @classmethod
-    def type_of_instance(cls, obj):
-        return cls(
-            types.TypeRegistry.type_of(obj.list),
-            types.TypeRegistry.type_of(obj.key),
-        )
-
-    def property_types(self):
-        return {"list": self.list, "key": self.key}
-
-
 def group_result_index_output_type(input_types):
     # THIS IS NO GOOD
     # TODO: need to fix Const type so we don't need this.
@@ -295,60 +270,6 @@ def group_result_index_output_type(input_types):
         return self_type.val_type.list.object_type
     else:
         return self_type.list.object_type
-
-
-@weave_class(weave_type=GroupResultType)
-class GroupResult:
-    def __init__(self, list, key):
-        self.list = list
-        self.key = key
-
-    @property
-    def var_item(self):
-        return weave_internal.make_var_node(self.type.object_type, "row")
-
-    def __iter__(self):
-        return iter(self.list)
-
-    def __len__(self):
-        return len(self.list)
-
-    @op()
-    def count(self) -> int:
-        return len(self.list)
-
-    @op(output_type=group_result_index_output_type)
-    def __getitem__(self, index: int):
-        return List.__getitem__.resolve_fn(self.list, index)
-
-    @op(
-        input_type={
-            "self": GroupResultType(),
-            "map_fn": lambda input_types: types.Function(
-                {"row": input_types["self"].object_type}, types.Any()
-            ),
-        },
-        output_type=lambda input_types: types.List(input_types["map_fn"].output_type),
-    )
-    def map(self, map_fn):
-        return List.map.resolve_fn(self.list, map_fn)
-
-    @op(
-        input_type={
-            "group_fn": lambda input_types: types.Function(
-                {"row": input_types["self"].object_type}, types.Any()
-            ),
-        },
-        output_type=lambda input_types: types.List(
-            GroupResultType(input_types["self"])
-        ),
-    )
-    def groupby(self, group_fn):
-        return List.groupby.resolve_fn(self.list, group_fn)
-
-
-GroupResultType.instance_class = GroupResult
-GroupResultType.instance_classes = GroupResult
 
 
 ### TODO Move these ops onto List class and make part of the List interface
@@ -402,8 +323,6 @@ def flatten_return_type(input_types):
 def _flatten(l):
     if isinstance(l, list):
         return sum((_flatten(o) for o in l), [])
-    elif isinstance(l, GroupResult):
-        return sum((_flatten(o) for o in l.list), [])
     else:
         return [l]
 

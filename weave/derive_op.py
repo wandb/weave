@@ -243,6 +243,18 @@ class MappedDeriveOpHandler(DeriveOpHandler):
 
                 return res
 
+            if isinstance(orig_op.concrete_output_type, types.TypeType):
+                return types.List(
+                    types.union(
+                        *[
+                            orig_op.resolve_fn(**{mapped_param_name: x, **new_inputs})
+                            if (not x == None or types.is_optional(first_arg.type))
+                            else types.NoneType()
+                            for x in list_
+                        ]
+                    )
+                )
+
             # TODO: use the vectorization described here:
             # https://paper.dropbox.com/doc/Weave-Python-Weave0-Op-compatibility-workstream-kJ3XSDdgR96XwKPapHwPD
             return [
@@ -325,14 +337,15 @@ def _mapped_refine_output_type(orig_op):
     if mapped_refine_op:
 
         def mapped_refine_output_type_refiner(*args, **kwargs):
-            union_members = mapped_refine_op.raw_resolve_fn(*args, **kwargs)
-            if not union_members:
-                return types.List(types.NoneType())
-            return types.List(
-                types.union(
-                    *[types.NoneType() if mem == None else mem for mem in union_members]
-                )
-            )
+            return mapped_refine_op.raw_resolve_fn(*args, **kwargs)
+            # union_members = mapped_refine_op.raw_resolve_fn(*args, **kwargs)
+            # if not union_members:
+            #     return types.List(types.NoneType())
+            # return types.List(
+            #     types.union(
+            #         *[types.NoneType() if mem == None else mem for mem in union_members]
+            #     )
+            # )
 
         unioned_mapped_type_refiner_op = op_def.OpDef(
             f"{mapped_refine_op.name}_unioned",
