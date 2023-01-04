@@ -10,6 +10,9 @@ from .wandb_domain_gql import (
     gql_root_op,
 )
 
+import urllib
+
+
 # Section 1/6: Tag Getters
 # None
 
@@ -61,3 +64,17 @@ gql_direct_edge_op(
 
 # Section 6/6: Non Standard Business Logic Ops
 # None
+
+
+@op(name="artifactMembership-link")
+def artifact_membership_link(
+    artifactMembership: wdt.ArtifactCollectionMembership,
+) -> wdt.Link:
+    return wdt.Link(
+        name=f"{artifactMembership.gql['artifactCollection']['name']}:v{artifactMembership.gql['versionIndex']}",
+        url=f"/{artifactMembership.gql['artifactCollection']['defaultArtifactType']['project']['entity']['name']}/"
+        f"{artifactMembership.gql['artifactCollection']['defaultArtifactType']['project']['name']}/"
+        f"artifacts/{urllib.parse.quote(artifactMembership.gql['artifactCollection']['defaultArtifactType']['name'])}/"
+        f"{urllib.parse.quote(artifactMembership.gql['artifactCollection']['name'])}"
+        f"/v{artifactMembership.gql['versionIndex']}",
+    )

@@ -8,6 +8,7 @@ import json
 from . import fixture_fakewandb as fwb
 from .. import graph
 from ..ops_domain import wb_domain_types as wdt
+from ..ops_domain import artifact_membership_ops as amo
 from ..ops_primitives import list_, dict_
 from .. import weave_types as types
 
@@ -1091,3 +1092,17 @@ def test_run_history_as_of(fake_wandb):
         }
     ).assign_type(node.type.value)
     assert weave.use(node).keys() == json.loads(example_history[9]).keys()
+
+
+def test_artifact_membership_link(fake_wandb):
+    fake_wandb.add_mock(lambda q, ndx: artifact_browser_response)
+    node = amo.artifact_membership_link(
+        ops.project("stacey", "mendeleev")
+        .artifact("test_res_1fwmcd3q")
+        .membershipForAlias("v0")
+    )
+
+    assert weave.use(node) == wdt.Link(
+        name="test_res_1fwmcd3q:v0",
+        url="/stacey/mendeleev/artifacts/test_results/test_res_1fwmcd3q/v0",
+    )
