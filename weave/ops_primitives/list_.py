@@ -490,38 +490,104 @@ def _join_all_output_type(input_types):
     prop_types = {}
     for k in arr_prop_types.keys():
         prop_types[k] = types.List(arr_prop_types[k])
-    return types.List(types.TypedDict(prop_types))
+    inner_type = types.TypedDict(prop_types)
+    tag_type = types.TypedDict({"joinObj": input_types["joinFn"].output_type})
+    tagged_type = tagged_value_type.TaggedValueType(tag_type, inner_type)
+    return types.List(tagged_type)
+
+
+def _all_element_keys(arrs: list[list[dict]]) -> set[str]:
+    all_element_keys: set[str] = set([])
+    for arr in arrs:
+        for element in arr:
+            all_element_keys = all_element_keys.union(element.keys())
+    return all_element_keys
+
+
+def _filter_none(arrs: list[typing.Any]) -> list[typing.Any]:
+    return [a for a in arrs if a != None]
+
+
+def _all_join_keys_mapping(
+    arrs: list[list[dict]], join_keys: list[list[typing.Any]]
+) -> typing.Tuple[set[typing.Any], list[dict[typing.Any, list[typing.Any]]]]:
+    all_join_keys: set[typing.Any] = set([])
+    join_key_mapping = []
+    for arr, keys in zip(arrs, join_keys):
+        arr_map: dict = {}
+        for k, v in zip(keys, arr):
+            if k != None:
+                all_join_keys.add(k)
+                if k in arr_map:
+                    arr_map[k].append(v)
+                else:
+                    arr_map[k] = [v]
+        join_key_mapping.append(arr_map)
+    return all_join_keys, join_key_mapping
 
 
 @op(
     name="joinAll",
     input_type={
-        "arrs": types.List(types.List(types.TypedDict({}))),
+        "arrs": types.List(types.optional(types.List(types.TypedDict({})))),
         "joinFn": lambda input_types: types.Function(
             {"row": input_types["arrs"].object_type.object_type}, types.Any()
         ),
     },
     output_type=_join_all_output_type,
 )
-def join_all(arrs, joinFn, outer: bool):  # type: ignore
-    arr1 = arrs[0]
-    arr2 = arrs[1]
-    keyFn1 = joinFn
-    keyFn2 = joinFn
-    arr1_keys = execute_fast.fast_map_fn(arr1, keyFn1)
-    arr2_keys = execute_fast.fast_map_fn(arr2, keyFn2)
-    all_keys = set(arr1_keys).union(arr2_keys)
-    arr1_lookup = dict(zip(arr1_keys, arr1))
-    arr2_lookup = dict(zip(arr2_keys, arr2))
+def join_all(arrs, joinFn, outer: bool):
+    # This is a pretty complicated op. See list.ts for the original implementation
+
+    # First, filter out Nones
+    arrs = _filter_none(arrs)
+
+    # If nothing remains, simply return.
+    if len(arrs) == 0:
+        return []
+
+    # Execute the joinFn on each of the arrays
+    arrs_keys = [execute_fast.fast_map_fn(arr, joinFn) for arr in arrs]
+
+    # Get the union of all the keys of all the elements
+    all_element_keys = _all_element_keys(arrs)
+    all_join_keys, join_key_mapping = _all_join_keys_mapping(arrs, arrs_keys)
+
+    # Custom function for create a new row with the new value added
+    def _add_val_to_joined_row(joined_row: dict, val: typing.Optional[typing.Any]):
+        val = val or {}
+        # This is a costly copy...
+        copied = {k: [i for i in v] for k, v in joined_row.items()}
+        for key in all_element_keys:
+            copied[key].append(val.get(key, None))
+        return copied
+
+    default_vals = [None] if outer else []
     results = []
-    for k in all_keys:
-        arr1_row = arr1_lookup[k]
-        arr2_row = arr2_lookup[k]
-        row_keys = set(arr1_row.keys()).union(arr2_row.keys())
-        row = {}
-        for rk in row_keys:
-            row[rk] = [arr1_row.get(rk), arr2_row.get(rk)]
-        results.append(row)
+
+    # Each join key may result in several rows
+    for k in all_join_keys:
+        rows_for_join_key: list[dict] = [{k: [] for k in all_element_keys}]
+
+        # Look through each arr mapping to find the rows for this join key
+        for arr_lookup in join_key_mapping:
+
+            # Get the values matching this key for this array
+            arr_vals = arr_lookup.get(k, default_vals)
+
+            # For each value, we will append it to every row in the existing list
+            new_k_rows = []
+            for v in arr_vals:
+                for row in rows_for_join_key:
+                    new_k_rows.append(_add_val_to_joined_row(row, v))
+
+            # Update the main list
+            rows_for_join_key = new_k_rows
+
+        # Tag the elements and add them to the results
+        for row in rows_for_join_key:
+            row = tag_store.add_tags(box.box(row), {"joinObj": k})
+            results.append(row)
     return results
 
 

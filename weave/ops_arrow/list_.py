@@ -1671,3 +1671,125 @@ def arrow_list_(**e):
         types.List(types.union(*element_types)),
         res.artifact,
     )
+
+
+def _join_all_output_type(input_types):
+    arr_prop_types = input_types["arrs"].object_type.object_type.property_types
+    prop_types = {}
+    for k in arr_prop_types.keys():
+        prop_types[k] = types.List(arr_prop_types[k])
+    inner_type = types.TypedDict(prop_types)
+    tag_type = types.TypedDict({"joinObj": input_types["joinFn"].output_type})
+    tagged_type = tagged_value_type.TaggedValueType(tag_type, inner_type)
+    return ArrowWeaveListType(tagged_type)
+
+
+def _all_element_keys(arrs: list) -> set[str]:
+    all_element_keys: set[str] = set([])
+    for arr in arrs:
+        all_element_keys = all_element_keys.union(arr.object_type.property_types.keys())
+    return all_element_keys
+
+
+def _filter_none(arrs: list[typing.Any]) -> list[typing.Any]:
+    return [a for a in arrs if a != None]
+
+
+def _awl_struct_array_to_table(awl: ArrowWeaveList) -> pa.Table:
+    assert isinstance(awl.object_type, types.TypedDict)
+    columns = list(awl.object_type.property_types.keys())
+    arrays = [awl._arrow_data.field(k) for k in columns]
+    return pa.Table.from_arrays(arrays, columns)
+
+
+@op(
+    name="ArrowWeaveList-joinAll",
+    input_type={
+        "arrs": types.List(types.optional(ArrowWeaveListType(types.TypedDict({})))),
+        "joinFn": lambda input_types: types.Function(
+            {"row": input_types["arrs"].object_type.object_type}, types.Any()
+        ),
+    },
+    output_type=_join_all_output_type,
+)
+def join_all(arrs, joinFn, outer: bool):
+    # This is a pretty complicated op. See list.ts for the original implementation
+
+    # First, filter out Nones
+    arrs = _filter_none(arrs)
+
+    # If nothing remains, simply return.
+    if len(arrs) == 0:
+        return ArrowWeaveList(pa.array([]), types.TypedDict({}))
+
+    # Execute the joinFn on each of the arrays
+    arrs_keys = [
+        arrow_as_array(_apply_fn_node(arr, joinFn)._arrow_data) for arr in arrs
+    ]
+
+    # Get the union of all the keys of all the elements
+    all_element_keys = _all_element_keys(arrs)
+    arrs_as_tables = [_awl_struct_array_to_table(arr) for arr in arrs]
+    keyed_tables = []
+    for table, arrs_keys in zip(arrs_as_tables, arrs_keys):
+        keyed_table = table.add_column(0, "__joinobj__", arrs_keys).filter(
+            pc.invert(pc.is_null(pc.field("__joinobj__")))
+        )
+        keyed_tables.append(keyed_table)
+
+    # Iteratively join in all the tables
+    res = keyed_tables[0]
+    join_type = "full outer" if outer else "inner"
+    join_col_key = "__joinobj__"
+    for t_ndx in range(1, len(keyed_tables)):
+        r_suffix = f"__t_{t_ndx}__"
+        res = res.join(
+            keyed_tables[t_ndx],
+            [join_col_key],
+            left_suffix="",
+            right_suffix=r_suffix,
+            join_type=join_type,
+            coalesce_keys=False,
+        )
+        right_join_col_key = f"{join_col_key}{r_suffix}"
+        join_col_data = pc.coalesce(
+            res.column(join_col_key), res.column(right_join_col_key)
+        )
+        # Drop duplicate column
+        res = res.drop([join_col_key, right_join_col_key])
+        res = res.add_column(0, join_col_key, join_col_data)
+
+    # Combine the table into a single result
+    final_columns = []
+    num_inputs = len(arrs)
+    res_len = len(res)
+    for shared_column_name in all_element_keys:
+        concatted = pa.concat_arrays(
+            [arrow_as_array(res.column(shared_column_name))]
+            + [
+                arrow_as_array(res.column(shared_column_name + f"__t_{i}__"))
+                for i in range(1, num_inputs)
+            ]
+        )
+        take_ndxs = (
+            np.arange(num_inputs * res_len).reshape((num_inputs, res_len)).ravel("F")
+        )
+        values = concatted.take(take_ndxs)
+        offsets = np.arange(res_len + 1) * num_inputs
+        combined = pa.ListArray.from_arrays(offsets, values)
+        final_columns.append(combined)
+    final_table = pa.Table.from_arrays(final_columns, list(all_element_keys))
+
+    untagged_result: ArrowWeaveList = ArrowWeaveList(
+        final_table,
+        None,
+        arrs[0]._artifact,
+    )
+
+    return awl_add_arrow_tags(
+        untagged_result,
+        pa.StructArray.from_arrays(
+            [res.column(join_col_key).combine_chunks()], names=["joinObj"]
+        ),
+        types.TypedDict({"joinObj": joinFn.type}),
+    )

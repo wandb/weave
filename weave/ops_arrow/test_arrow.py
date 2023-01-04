@@ -7,6 +7,8 @@ import string
 from PIL import Image
 import typing
 
+from weave.tests import list_arrow_test_helpers as lath
+
 from ..tests import weavejs_ops
 
 
@@ -1813,40 +1815,7 @@ def test_arrow_concat_degenerate_types():
     ]
 
 
-class ListLikeNodeInterface:
-    @staticmethod
-    def make_node(value):
-        raise NotImplementedError
-
-    @staticmethod
-    def use_node(node):
-        raise NotImplementedError
-
-
-class ListNode(ListLikeNodeInterface):
-    @staticmethod
-    def make_node(value):
-        return list_.make_list(**{f"{i}": v for i, v, in enumerate(value)})
-
-    @staticmethod
-    def use_node(node):
-        return weave.use(node)
-
-
-class ArrowNode(ListLikeNodeInterface):
-    @staticmethod
-    def make_node(value):
-        return weave.save(arrow.to_arrow(value))
-
-    @staticmethod
-    def use_node(node):
-        return [a for a in weave.use(node)]
-
-
-ListInterfaces = [ListNode, ArrowNode]
-
-
-@pytest.mark.parametrize("li", ListInterfaces)
+@pytest.mark.parametrize("li", lath.ListInterfaces)
 def test_arrow_timestamp_conversion(li):
     dates = [
         datetime.datetime(2020, 1, 2, 3, 4, 5),
@@ -1857,7 +1826,7 @@ def test_arrow_timestamp_conversion(li):
 
     # Direct datetime type
     data = li.make_node(dates)
-    if li == ArrowNode:
+    if li == lath.ArrowNode:
         # Arrow converts to UTC on read out
         assert li.use_node(data) == utc_dates
     else:

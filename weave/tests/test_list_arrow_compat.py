@@ -2,6 +2,7 @@ import pytest
 from .. import api as weave
 from ..ops_arrow import list_ as arrow
 from ..ops_primitives import list_, dict_
+from . import list_arrow_test_helpers as lath
 
 
 def filter_fn(row) -> bool:
@@ -79,3 +80,172 @@ def test_fn_equality(data, fn_name, fn_def, res, extra_args):
 
     assert weave.use(list_node_mapped) == res
     assert weave.use(arrow_node_mapped).to_pylist() == res
+
+
+# TODO: In Weave0, we also have a `join2` op. This will be done in a followup
+# PR.
+def compare_join_results(results, exp_results):
+    # Currently list join and arrow join return slightly different result
+    # orderings. PyArrow's join pushes all outer join results without a match to
+    # the end of the list, while list join returns the order found. For purposes
+    # of Weave1 development, we will ignore this difference. It would be
+    # unnecessarily costly to resort the results of either join to match the
+    # other.
+    error_msg = f"Expected {exp_results}, got {results}"
+    assert len(results) == len(exp_results), f"Result length is wrong; {error_msg}"
+    for exp_result in exp_results:
+        assert (
+            exp_result in results
+        ), f"Expected result {exp_result} not found; {error_msg}"
+    for result in results:
+        assert (
+            result in exp_results
+        ), f"unexpected result {exp_result} found; {error_msg}"
+
+
+@pytest.mark.parametrize("li", lath.ListInterfaces)
+def test_join_all(li):
+    # This test tests joining a nullable list of lists, with duplicate keys that are partially overlapping and not all entries have the key! (our join logic is quite nuanced.)
+    list_node_1 = li.make_node(
+        [
+            {
+                "id": "1.0",
+            },
+            {
+                "id": "1.a",
+                "val": 1,
+            },
+            {
+                "id": "1.b",
+                "val": 1,
+            },
+            {
+                "id": "1.c",
+                "val": 2,
+            },
+            {
+                "id": "1.d",
+                "val": 2,
+            },
+            {
+                "id": "1.e",
+                "val": 3,
+            },
+        ]
+    )
+    list_node_2 = li.make_node(
+        [
+            {
+                "id": "2.0",
+            },
+            {
+                "id": "2.f",
+                "val": 1,
+            },
+            {
+                "id": "2.g",
+                "val": 1,
+            },
+            {
+                "id": "2.h",
+                "val": 3,
+            },
+            {
+                "id": "2.i",
+                "val": 3,
+            },
+            {
+                "id": "2.j",
+                "val": 5,
+            },
+        ]
+    )
+    join_list = list_.make_list(a=list_node_1, c=None, b=list_node_2)
+    join_fn = weave.define_fn(
+        {"row": list_node_1.type.object_type},
+        lambda row: row["val"],
+    )
+
+    joined_inner_node = join_list.joinAll(join_fn, False)
+    joined_outer_node = join_list.joinAll(join_fn, True)
+
+    # TODO: Arrow and List have different permutation ordering here - probably fix list implementation to match arrow
+    exp_results = [
+        {
+            "val": [1, 1],
+            "id": ["1.a", "2.f"],
+        },
+        {
+            "val": [1, 1],
+            "id": ["1.a", "2.g"],
+        },
+        {
+            "val": [1, 1],
+            "id": ["1.b", "2.f"],
+        },
+        {
+            "val": [1, 1],
+            "id": ["1.b", "2.g"],
+        },
+        {
+            "val": [3, 3],
+            "id": ["1.e", "2.i"],
+        },
+        {
+            "val": [3, 3],
+            "id": ["1.e", "2.h"],
+        },
+    ]
+    compare_join_results(li.use_node(joined_inner_node), exp_results)
+
+    exp_results = [
+        {
+            "val": [1, 1],
+            "id": ["1.a", "2.f"],
+        },
+        {
+            "val": [1, 1],
+            "id": ["1.b", "2.f"],
+        },
+        {
+            "val": [1, 1],
+            "id": ["1.a", "2.g"],
+        },
+        {
+            "val": [1, 1],
+            "id": ["1.b", "2.g"],
+        },
+        {
+            "val": [2, None],
+            "id": ["1.c", None],
+        },
+        {
+            "val": [2, None],
+            "id": ["1.d", None],
+        },
+        {
+            "val": [3, 3],
+            "id": ["1.e", "2.h"],
+        },
+        {
+            "val": [3, 3],
+            "id": ["1.e", "2.i"],
+        },
+        {
+            "val": [None, 5],
+            "id": [None, "2.j"],
+        },
+    ]
+
+    compare_join_results(li.use_node(joined_outer_node), exp_results)
+    # Currently list join and arrow join return slightly different result
+    # orderings. PyArrow's join pushes all outer join results without a match to
+    # the end of the list, while list join returns the order found. For purposes
+    # of Weave1 development, we will ignore this difference. It would be
+    # unnecessarily costly to resort the results of either join to match the
+    # other.
+    if li == lath.ListNode:
+        tag_order = [1, 1, 1, 1, 2, 2, 3, 3, 5]
+    elif li == lath.ArrowNode:
+        tag_order = [1, 1, 1, 1, 3, 3, 2, 2, 5]
+    assert li.use_node(joined_outer_node.joinObj()) == tag_order

@@ -8,3 +8,7 @@ group_tag_getter_op = make_tag_getter_op.make_tag_getter_op(
 index_checkpoint_tag_getter_op = make_tag_getter_op.make_tag_getter_op(
     "indexCheckpoint", types.Int(), op_name="tag-indexCheckpoint"
 )
+
+join_obj_getter_op = make_tag_getter_op.make_tag_getter_op(
+    "joinObj", types.Any(), types.Any(), "tag-joinObj"
+)
