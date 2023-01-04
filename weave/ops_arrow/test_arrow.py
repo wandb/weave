@@ -2139,3 +2139,10 @@ def test_unflatten_structs_in_flattened_table():
     assert result == pa.table(
         {"a": struct_result.field("a"), "g": struct_result.field("g")}
     )
+
+
+def test_map_with_index():
+    ref = create_arrow_data(100)
+
+    node = weave.get(ref).map(lambda row, index: index)
+    assert weave.use(node).to_pylist() == list(range(100))

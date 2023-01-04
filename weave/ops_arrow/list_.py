@@ -895,7 +895,7 @@ def _apply_fn_node(awl: ArrowWeaveList, fn: graph.OutputNode) -> ArrowWeaveList:
         {
             "row": weave_internal.make_const_node(row_type, awl),
             "index": weave_internal.make_const_node(
-                types.TypeRegistry.type_of(index_awl), index_awl._arrow_data
+                ArrowWeaveListType(types.Int()), index_awl
             ),
         },
     )
