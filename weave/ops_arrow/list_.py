@@ -1413,7 +1413,9 @@ def recursively_build_pyarrow_array(
 
             arrays.append(array)
             keys.append(field.name)
-        return pa.StructArray.from_arrays(arrays, keys, mask=pa.array(mask))
+        return pa.StructArray.from_arrays(
+            arrays, keys, mask=pa.array(mask, type=pa.bool_())
+        )
     elif pa.types.is_union(pyarrow_type):
         assert isinstance(mapper, mappers_arrow.UnionToArrowUnion)
         type_codes: list[int] = [mapper.type_code_of_obj(o) for o in py_objs]
