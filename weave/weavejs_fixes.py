@@ -109,7 +109,7 @@ def remove_opcall_versions_data(data):
         return [remove_opcall_versions_data(d) for d in data]
     elif isinstance(data, dict):
         d = data
-        if "name" in data and ":" in data["name"]:
+        if "name" in data and isinstance(data["name"], str) and ":" in data["name"]:
             d = copy.copy(data)
             d["name"] = graph.opuri_full_name(data["name"])
         return {k: remove_opcall_versions_data(v) for k, v in d.items()}
