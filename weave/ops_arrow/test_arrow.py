@@ -859,6 +859,7 @@ number_ops_test_cases = [
     ("ge", lambda x: x >= 2, [False, True, True]),
     ("le", lambda x: x <= 2, [True, True, False]),
     ("neg", lambda x: -x, [-1.0, -2.0, -3.0]),
+    ("toString", lambda x: x.toString(), ["1", "2", "3"]),
 ]
 
 
@@ -1905,6 +1906,7 @@ nullable_number_ops_test_cases = [
     ("ge", lambda x: x >= 2, [False, None, True]),
     ("le", lambda x: x <= 2, [True, None, False]),
     ("neg", lambda x: -x, [-1.0, None, -3.0]),
+    ("toString", lambda x: x.toString(), ["1", None, "3"]),
 ]
 
 

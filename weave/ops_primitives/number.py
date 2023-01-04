@@ -186,6 +186,14 @@ class Number(object):
             val = val / 1000
         return datetime.datetime.fromtimestamp(val, tz=datetime.timezone.utc)
 
+    @op(
+        name="number-toString",
+        input_type={"val": types.Number()},
+        output_type=types.String(),
+    )
+    def to_string(val):
+        return str(val)
+
 
 @op(
     name="numbers-sum",

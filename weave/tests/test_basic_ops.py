@@ -30,6 +30,7 @@ def test_number_ops():
     assert weave.use(nine <= 9) == True
     assert weave.use(-nine) == -9
     assert weave.use(nine.pow(2)) == 81
+    assert weave.use(nine.toString()) == "9"
 
     pi = make_const_node(weave.types.Number(), 3.14)
 

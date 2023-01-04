@@ -8,6 +8,7 @@ from .list_ import ArrowWeaveList, ArrowWeaveListType
 
 ARROW_WEAVE_LIST_NUMBER_TYPE = ArrowWeaveListType(types.Number())
 ARROW_WEAVE_LIST_BOOLEAN_TYPE = ArrowWeaveListType(types.Boolean())
+ARROW_WEAVE_LIST_STRING_TYPE = ArrowWeaveListType(types.String())
 
 unary_input_type = {
     "self": ARROW_WEAVE_LIST_NUMBER_TYPE,
@@ -213,4 +214,15 @@ def to_timestamp(self):
         data.cast("int64").cast(pa.timestamp("ms", tz="+00:00")),
         types.Datetime(),
         self._artifact,
+    )
+
+
+@arrow_op(
+    name="ArrowWeaveListNumber-toString",
+    input_type=unary_input_type,
+    output_type=ARROW_WEAVE_LIST_STRING_TYPE,
+)
+def to_string(self):
+    return ArrowWeaveList(
+        pc.cast(self._arrow_data, "string"), types.String(), self._artifact
     )
