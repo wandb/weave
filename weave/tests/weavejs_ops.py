@@ -1,5 +1,7 @@
 # WeaveJS ops used for testing. These are not used in production.
 
+from ..ops_primitives.file import TableType
+from ..ops_domain import wb_domain_types as wbt
 from ..ops_primitives._dict_utils import typeddict_pick_output_type
 from .. import weave_types as types
 from .. import graph
@@ -144,5 +146,82 @@ def file_type(file):
         "file-type",
         {
             "file": file_node,
+        },
+    )
+
+
+def root_project(entity_name, project_name):
+    return weave_internal.make_output_node(
+        wbt.ProjectType,
+        "root-project",
+        {
+            "entityName": ensure_node(entity_name),
+            "projectName": ensure_node(project_name),
+        },
+    )
+
+def project_artifact(project, artifact_name):
+    return weave_internal.make_output_node(
+        wbt.ArtifactCollectionType,
+        "project-artifact",
+        {
+            "project": project,
+            "artifactName": ensure_node(artifact_name),
+        },
+    )
+
+def artifact_membership_for_alias(artifact_node, alias):
+    return weave_internal.make_output_node(
+        wbt.ArtifactCollectionMembershipType,
+        "artifact-membershipForAlias",
+        {
+            "artifact": artifact_node,
+            "aliasName": ensure_node(alias),
+        },
+    )
+
+def artifact_membership_artifact_version(artifact_membership):
+    return weave_internal.make_output_node(
+        wbt.ArtifactVersionType,
+        "artifactMembership-artifactVersion",
+        {
+            "artifactMembership": artifact_membership,
+        },
+    )
+
+def artifact_version_file(artifact_version, path):
+    return weave_internal.make_output_node(
+        types.optional(types.FileType()),
+        "artifactVersion-file",
+        {
+            "artifactVersion": artifact_version,
+            "path": ensure_node(path)
+        },
+    )
+
+def file_table(file):
+    return weave_internal.make_output_node(
+        types.optional(TableType()),
+        "file-table",
+        {
+            "file": file,
+        },
+    )
+
+def table_rows(table):
+    return weave_internal.make_output_node(
+        types.List(types.TypedDict()),
+        "table-rows",
+        {
+            "table": table,
+        },
+    )
+
+def create_index_checkpoint(list_of_dicts):
+    return weave_internal.make_output_node(
+        types.List(tagged_value_type.TaggedValueType(types.TypedDict({"index": types.Number()}), list_of_dicts.type.object_type)),
+        "list-createIndexCheckpointTag",
+        {
+            "arr": list_of_dicts,
         },
     )

@@ -2,6 +2,7 @@ import pytest
 
 from .. import api as weave
 from .. import ops as ops
+from . import weavejs_ops as wjs
 
 from . import weavejs_ops
 import json
@@ -1106,3 +1107,19 @@ def test_artifact_membership_link(fake_wandb):
         name="test_res_1fwmcd3q:v0",
         url="/stacey/mendeleev/artifacts/test_results/test_res_1fwmcd3q/v0",
     )
+
+def test_artifact_browser_js(fake_wandb):
+    fake_wandb.add_mock(lambda q, ndx: artifact_browser_response)
+    node = wjs.root_project("stacey", "mendeleev")
+    node = wjs.project_artifact(node, "test_res_1fwmcd3q")
+    node = wjs.artifact_membership_for_alias(node, "v0")
+    node = wjs.artifact_membership_artifact_version(node)
+    node = wjs.artifact_version_file(node, "test_results.table.json")
+    node = wjs.file_table(node)
+    node = wjs.table_rows(node)
+    node = wjs.create_index_checkpoint(node)
+    all_nodes = []
+    for ndx in [0, 1, 2, 3]:
+        for key in ["guess", "score_Amphibia", "score_Animalia"]:
+            all_nodes.append(wjs.weavejs_pick(wjs.index(node, ndx), key))
+    assert weave.use(all_nodes) == ['Fungi', 0.0034, 0.0025, 'Fungi', 0.008, 0.0016, 'Fungi', 0.0, 0.0001, 'Fungi', 0.0047, 0.0008]
