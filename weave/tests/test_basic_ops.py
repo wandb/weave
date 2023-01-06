@@ -1,4 +1,5 @@
 from .. import api as weave
+from .. import box
 from .. import ops
 from ..ops_primitives import number
 from ..ops_primitives.string import *
@@ -92,3 +93,28 @@ def test_string_ops():
 
     # assert weave.use(foo in foobar) == True # Broken
     # assert weave.use(foobar in foo) == False # Broken
+
+
+def test_null_consuming_numbers_ops():
+
+    data = [box.box(1), box.box(None), box.box(2)]
+    assert weave.use(number.numbers_sum(data)) == 3
+    assert weave.use(number.numbers_avg(data)) == 1.5
+    assert weave.use(number.numbers_min(data)) == 1
+    assert weave.use(number.numbers_max(data)) == 2
+    assert number.numbers_max(data).type == weave.types.optional(weave.types.Int())
+    assert number.numbers_avg(data).type == weave.types.optional(weave.types.Number())
+
+    data = [box.box(None), box.box(None), box.box(None)]
+    assert weave.use(number.numbers_sum(data)) == None
+    assert weave.use(number.numbers_avg(data)) == None
+    assert weave.use(number.numbers_min(data)) == None
+    assert weave.use(number.numbers_max(data)) == None
+    assert number.numbers_max(data).type == weave.types.NoneType()
+
+    data = []
+    assert weave.use(number.numbers_sum(data)) == None
+    assert weave.use(number.numbers_avg(data)) == None
+    assert weave.use(number.numbers_min(data)) == None
+    assert weave.use(number.numbers_max(data)) == None
+    assert number.numbers_max(data).type == weave.types.NoneType()

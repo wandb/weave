@@ -1,3 +1,4 @@
+import typing
 import datetime
 import math
 from ..api import op, mutation, weave_class
@@ -195,44 +196,64 @@ class Number(object):
         return str(val)
 
 
+def numbers_ops_output_type(input_types: dict[str, types.Type]) -> types.Type:
+    arr_type = typing.cast(types.List, input_types["numbers"])
+    if types.List(types.NoneType()).assign_type(arr_type):
+        return types.NoneType()
+    elif types.List(types.Number()).assign_type(arr_type):
+        return arr_type.object_type
+    else:
+        return types.optional(arr_type.object_type)
+
+
+def avg_output_type(input_types: dict[str, types.Type]) -> types.Type:
+    arr_type = typing.cast(types.List, input_types["numbers"])
+    if types.List(types.NoneType()).assign_type(arr_type):
+        return types.NoneType()
+    elif types.List(types.Number()).assign_type(arr_type):
+        return types.Number()
+    else:
+        return types.optional(types.Number())
+
+
 @op(
     name="numbers-sum",
     input_type={"numbers": types.List(types.optional(types.Number()))},
-    output_type=types.Number(),
+    output_type=numbers_ops_output_type,
 )
 def numbers_sum(numbers):
-    numbers = [n for n in numbers if n is not None]
-    return sum(numbers)
+    numbers = [n for n in numbers if n != None]
+    return sum(numbers) if len(numbers) > 0 else None
 
 
 @op(
     name="numbers-avg",
     input_type={"numbers": types.List(types.optional(types.Number()))},
-    output_type=types.Number(),
+    output_type=avg_output_type,
 )
 def numbers_avg(numbers):
-    numbers = [n for n in numbers if n is not None]
-    return sum(numbers) / len(numbers)
+    numbers = [n for n in numbers if n != None]
+    return sum(numbers) / len(numbers) if len(numbers) > 0 else None
 
 
 @op(
     name="numbers-min",
     input_type={"numbers": types.List(types.optional(types.Number()))},
-    output_type=types.Number(),
+    output_type=numbers_ops_output_type,
 )
 def numbers_min(numbers):
-    numbers = [n for n in numbers if n is not None]
-    return min(numbers)
+    numbers = [n for n in numbers if n != None]
+    return min(numbers) if len(numbers) > 0 else None
 
 
 @op(
     name="numbers-max",
     input_type={"numbers": types.List(types.optional(types.Number()))},
-    output_type=types.Number(),
+    output_type=numbers_ops_output_type,
 )
 def numbers_max(numbers):
-    numbers = [n for n in numbers if n is not None]
-    return max(numbers)
+    numbers = [n for n in numbers if n != None]
+    return max(numbers) if len(numbers) > 0 else None
 
 
 # @weave_class(weave_type=types.Int)

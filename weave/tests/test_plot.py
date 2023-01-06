@@ -105,14 +105,14 @@ def test_multi_series_setting():
         )
     )
 
-    plot.set_y(lambda row: weave.ops.numbers_avg(row["metric0"]))
+    plot.set_y(lambda row: row["metric0"])
     plot.set_mark_constant("line")
 
     series2 = plot.config.series[0].clone()
     plot.add_series(series2)
 
-    series2.set_y(lambda row: weave.ops.numbers_min(row["metric0"]))
-    series2.set_y2(lambda row: weave.ops.numbers_max(row["metric0"]))
+    series2.set_y(lambda row: row["metric0"])
+    series2.set_y2(lambda row: row["metric0"])
     series2.set_mark_constant("area")
 
     plot2 = copy.deepcopy(plot)
