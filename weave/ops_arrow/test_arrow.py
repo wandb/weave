@@ -13,6 +13,7 @@ from ..tests import weavejs_ops
 
 
 from .. import box
+from .. import errors
 from .. import storage
 from ..ops_primitives import Number
 from .. import api as weave
@@ -2115,3 +2116,44 @@ def test_map_with_index():
 
     node = weave.get(ref).map(lambda row, index: index)
     assert weave.use(node).to_pylist() == list(range(100))
+
+
+def verify_pyarrow_array_type_is_valid_for_tag_array(pa_type: pa.DataType):
+    if pa.types.is_string(pa_type):
+        raise errors.WeaveInternalError(
+            "Encountered invalid tag array, expected a DictionaryArray, got a StringArray"
+        )
+    elif pa.types.is_struct(pa_type):
+        for field in pa_type:
+            verify_pyarrow_array_type_is_valid_for_tag_array(field.type)
+    elif pa.types.is_list(pa_type):
+        verify_pyarrow_array_type_is_valid_for_tag_array(pa_type.value_type)
+
+
+def test_verify_dictionary_encoding_of_strings():
+    data = pa.array(["1", "2", "3"])
+
+    # raises
+    with pytest.raises(errors.WeaveInternalError):
+        verify_pyarrow_array_type_is_valid_for_tag_array(data.type)
+
+    data = pa.array([{"a": "1"}, {"a": "2"}, {"a": "3"}])
+
+    # raises
+    with pytest.raises(errors.WeaveInternalError):
+        verify_pyarrow_array_type_is_valid_for_tag_array(data.type)
+
+    converted = arrow.recursively_encode_pyarrow_strings_as_dictionaries(data)
+
+    # does not raise
+    verify_pyarrow_array_type_is_valid_for_tag_array(converted.type)
+
+    data = pa.array([["1"], ["2"], ["3"]])
+    # raises
+    with pytest.raises(errors.WeaveInternalError):
+        verify_pyarrow_array_type_is_valid_for_tag_array(data.type)
+
+    converted = arrow.recursively_encode_pyarrow_strings_as_dictionaries(data)
+
+    # does not raise
+    verify_pyarrow_array_type_is_valid_for_tag_array(converted.type)

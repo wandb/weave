@@ -1,6 +1,7 @@
 import json
 import pyarrow as pa
 import typing
+from contextlib import contextmanager
 
 from . import box
 from . import mappers
@@ -12,6 +13,19 @@ from . import refs
 from . import errors
 from . import node_ref
 from .language_features.tagging import tagged_value_type, tag_store
+
+import contextvars
+
+_in_tagging_context = contextvars.ContextVar("in_tagging_context", default=False)
+
+
+@contextmanager
+def _strings_as_dictionaries():
+    token = _in_tagging_context.set(True)
+    try:
+        yield
+    finally:
+        _in_tagging_context.reset(token)
 
 
 class TypedDictToArrowStruct(mappers_python.TypedDictToPyDict):
@@ -33,12 +47,24 @@ class ObjectToArrowStruct(mappers_python.ObjectToPyDict):
         return pa.struct(fields)
 
 
+class StringToArrow(mappers_python.StringToPyString):
+    def result_type(self):
+        if _in_tagging_context.get():
+            return pa.dictionary(pa.int64(), pa.string(), False)
+        return pa.string()
+
+
 class TaggedValueToArrowStruct(tagged_value_type.TaggedValueToPy):
     def result_type(self):
+
+        with _strings_as_dictionaries():
+            tag_type = self._tag_serializer.result_type()
+        value_type = self._value_serializer.result_type()
+
         return pa.struct(
             [
-                arrow_util.arrow_field("_tag", self._tag_serializer.result_type()),
-                arrow_util.arrow_field("_value", self._value_serializer.result_type()),
+                arrow_util.arrow_field("_tag", tag_type),
+                arrow_util.arrow_field("_value", value_type),
             ]
         )
 
@@ -135,6 +161,11 @@ class FloatToArrowFloat(mappers.Mapper):
 
 
 class ArrowFloatToFloat(mappers.Mapper):
+    def apply(self, obj):
+        return obj
+
+
+class ArrowStringToString(mappers.Mapper):
     def apply(self, obj):
         return obj
 
@@ -269,7 +300,7 @@ def map_to_arrow_(type, mapper, artifact, path=[]):
     elif isinstance(type, types.Float) or isinstance(type, types.Number):
         return FloatToArrowFloat(type, mapper, artifact, path)
     elif isinstance(type, types.String):
-        return StringToArrowString(type, mapper, artifact, path)
+        return StringToArrow(type, mapper, artifact, path)
     elif isinstance(type, types.Datetime):
         return DatetimeToArrowTimestamp(type, mapper, artifact, path)
     elif isinstance(type, types.Function):
@@ -300,7 +331,7 @@ def map_from_arrow_(type, mapper, artifact, path=[]):
     elif isinstance(type, types.Float) or isinstance(type, types.Number):
         return ArrowFloatToFloat(type, mapper, artifact, path)
     elif isinstance(type, types.String):
-        return mappers_python.StringToPyString(type, mapper, artifact, path)
+        return ArrowStringToString(type, mapper, artifact, path)
     elif isinstance(type, types.Datetime):
         return ArrowDateTimeToDateTime(type, mapper, artifact, path)
     elif isinstance(type, types.Function):

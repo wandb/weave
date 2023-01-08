@@ -283,6 +283,28 @@ def awl_group_by_result_object_type(
     )
 
 
+def recursively_encode_pyarrow_strings_as_dictionaries(array: pa.Array) -> pa.Array:
+    if pa.types.is_struct(array.type):
+        return pa.StructArray.from_arrays(
+            [
+                recursively_encode_pyarrow_strings_as_dictionaries(
+                    array.field(field.name)
+                )
+                for field in array.type
+            ],
+            [field.name for field in array.type],
+        )
+    elif pa.types.is_list(array.type):
+        return pa.ListArray.from_arrays(
+            array.offsets,
+            recursively_encode_pyarrow_strings_as_dictionaries(array.flatten()),
+        )
+    elif array.type == pa.string():
+        return pc.dictionary_encode(array)
+    else:
+        return array
+
+
 def awl_group_by_result_type(
     object_type: types.Type, key_type: types.Type
 ) -> "ArrowWeaveListType":
@@ -1497,6 +1519,9 @@ def to_arrow(obj, wb_type=None):
 def awl_add_arrow_tags(
     l: ArrowWeaveList, arrow_tags: pa.StructArray, tag_type: types.Type
 ):
+
+    arrow_tags = recursively_encode_pyarrow_strings_as_dictionaries(arrow_tags)
+
     # get current tags
     data = l._arrow_data
     current_tags = None
