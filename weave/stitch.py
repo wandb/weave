@@ -231,6 +231,17 @@ def stitch_node_inner(
         inputs[0].tags["groupKey"] = groupkey
         # And we return the original object
         return inputs[0]
+    elif node.from_op.name.endswith("joinAll"):
+        fn = inputs[1].val
+        if fn is None:
+            raise errors.WeaveInternalError("non-const not yet supported")
+        # The output of the subgraph function is the joinKey which becomes
+        # the joinkey tag.
+        # TODO: Do we need to do this for each input?
+        joinKey = subgraph_stitch(fn, {"row": inputs[0]}, sg)
+        inputs[0].tags["joinObj"] = joinKey
+        # And we return the original object
+        return inputs[0]
     elif len(inputs) == 0:
         # op does not have any inputs, just track its downstream calls
         return ObjectRecorder(node)
