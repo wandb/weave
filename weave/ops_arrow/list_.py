@@ -1353,7 +1353,7 @@ def vectorize(
                             Vectorized inputs are {new_inputs}. This is likely due to vectorization path of the function\
                                 not leading to the first parameter. Bailing out to manual mapping"
                         util.capture_exception_with_sentry_if_available(
-                            message, [node.from_op.name]
+                            errors.WeaveVectorizationError(message), [node.from_op.name]
                         )
                         return res
                     return op.lazy_call(**new_inputs)
