@@ -28,6 +28,8 @@ rich
 plotly
 replicate
 duckdb
+sklearn
+umap-learn
 
 # spaCy Requirements:
 spacy>=3.0.0,<4.0.0

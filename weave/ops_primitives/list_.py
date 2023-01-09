@@ -2,6 +2,8 @@ import dataclasses
 import numpy as np
 import pandas as pd
 import typing
+
+from ._dict_utils import tag_aware_dict_val_for_escaped_key
 from .. import box
 from .. import weave_types as types
 from ..api import Node, op, mutation, weave_class, OpVarArgs
@@ -15,6 +17,7 @@ from ..language_features.tagging import (
     tagged_value_type_helpers,
 )
 import functools
+import warnings
 
 
 def _map_each_function_type(input_types: dict[str, types.Type]) -> types.Function:
@@ -594,3 +597,124 @@ def join_all(arrs, joinFn, outer: bool):
 @op(name="range")
 def op_range(start: int, stop: int, step: int) -> list[int]:
     return list(range(start, stop, step))
+
+
+def _wrap_new_list_with_tags(new_list: list, old_list: list) -> list:
+    res = []
+    for new_item, old_item in zip(new_list, old_list):
+        if tag_store.is_tagged(old_item):
+            new_item = tag_store.add_tags(
+                box.box(new_item), tag_store.get_tags(old_item)
+            )
+        res.append(new_item)
+    return res
+
+
+# Re-implementation of weave0
+MAX_PROJECTION_RECORDS = 1500
+MAX_PROJECTION_DIMENSIONS = 50
+
+
+@op(
+    name="table-2DProjection",
+    input_type={
+        "table": types.List(types.optional(types.TypedDict({}))),
+        "projectionAlgorithm": types.String(),
+        "inputCardinality": types.String(),
+        "inputColumnNames": types.List(types.String()),
+        "algorithmOptions": types.TypedDict({}),
+    },
+    output_type=lambda input_types: types.List(
+        types.TypedDict(
+            {
+                "projection": types.TypedDict(
+                    {"x": types.Number(), "y": types.Number()}
+                ),
+                "source": input_types["table"].object_type,
+            }
+        )
+    ),
+)
+def list_2d_projection(
+    table,
+    projectionAlgorithm,
+    inputCardinality,
+    inputColumnNames,
+    algorithmOptions,
+):
+    if len(table) > MAX_PROJECTION_RECORDS:
+        table = np.random.choice(table, MAX_PROJECTION_RECORDS)
+
+    if len(inputColumnNames) == 0 or len(table) < 2:
+        projection = [[0, 0] for row in table]
+    else:
+
+        if inputCardinality == "single":
+            inputColumnNames = [inputColumnNames[0]]
+        else:
+            if len(inputColumnNames) > MAX_PROJECTION_DIMENSIONS:
+                inputColumnNames = np.random.choice(
+                    inputColumnNames, MAX_PROJECTION_DIMENSIONS
+                )
+
+        embeddings = []
+        for row in table:
+            if inputCardinality == "single":
+                embeddings.append(
+                    tag_aware_dict_val_for_escaped_key(row, inputColumnNames[0])
+                )
+            else:
+                embeddings.append(
+                    [
+                        tag_aware_dict_val_for_escaped_key(row, c)
+                        for c in inputColumnNames
+                    ]
+                )
+        embeddings = np.array(embeddings)
+        if projectionAlgorithm == "pca":
+            from sklearn.decomposition import PCA
+
+            pca = PCA(n_components=2)
+            pca.fit(embeddings)
+            projection = pca.transform(embeddings)
+        elif projectionAlgorithm == "tsne":
+            from sklearn.manifold import TSNE
+
+            options = algorithmOptions.get("tnse", {})
+            tsne = TSNE(
+                n_components=2,
+                perplexity=options.get("perplexity", 30),
+                n_iter=options.get("iterations", 1000),
+                learning_rate=options.get("learningRate", "auto"),
+                init="random",
+            )
+            projection = tsne.fit_transform(embeddings)
+        elif projectionAlgorithm == "umap":
+            # UMAP emits a warning if TF is not installed, but that is only used
+            # for Parametric UMAP, which we don't use here.
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                import umap
+
+            options = algorithmOptions.get("umap", {})
+            umap = umap.UMAP(
+                n_components=2,
+                n_neighbors=options.get("neighbors", 15),
+                min_dist=options.get("minDist", 0.1),
+                spread=options.get("spread", 1.0),
+            )
+            projection = umap.fit_transform(embeddings)
+        else:
+            raise Exception("Unknown projection algorithm: " + projectionAlgorithm)
+
+    structured_projection = [
+        {
+            "projection": {
+                "x": p[0],
+                "y": p[1],
+            },
+            "source": row,
+        }
+        for p, row in zip(projection.tolist(), table)
+    ]
+    return _wrap_new_list_with_tags(structured_projection, table)

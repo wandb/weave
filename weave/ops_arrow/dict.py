@@ -1,4 +1,7 @@
+import typing
 import pyarrow as pa
+
+from .arrow import arrow_as_array
 
 from ..api import op, type, OpVarArgs
 from ..decorator_arrow_op import arrow_op
@@ -12,6 +15,7 @@ from ..language_features.tagging import (
 from .list_ import (
     ArrowWeaveList,
     ArrowWeaveListType,
+    direct_add_arrow_tags,
     vectorized_container_constructor_preprocessor,
     vectorized_input_types,
 )
@@ -23,6 +27,67 @@ def typeddict_pick_output_type(input_types):
         output_type,
         process_opdef_output_type.op_get_tag_type_resolver(input_types["self"]),
     )
+
+
+def _struct_array_field_names(array: pa.StructArray) -> list[str]:
+    return [array.type.field(i).name for i in range(array.type.num_fields)]
+
+
+def _arrow_val_tag_wrapper(
+    array: pa.Array,
+) -> typing.Tuple[typing.Callable[[pa.Array], pa.Array], pa.Array]:
+    tags = None
+    if isinstance(array, pa.StructArray):
+        fields = _struct_array_field_names(array)
+        if len(fields) == 2 and set(fields) == set(["_tag", "_value"]):
+            tags = array.field("_tag")
+            array = array.field("_value")
+
+    def wrapper(res: pa.Array) -> typing.Any:
+        if tags is not None:
+            return direct_add_arrow_tags(res, tags)
+        else:
+            return res
+
+    return wrapper, array
+
+
+def _awl_pick(array: pa.Array, path: list[str]) -> pa.Array:
+    def default_return():
+        return pa.array([None] * len(array))
+
+    if len(path) == 0:
+        return default_return()
+    tag_wrapper, inner_array = _arrow_val_tag_wrapper(array)
+    key = path[0]
+    next_path = path[1:]
+    if isinstance(inner_array, pa.ListArray) and key == "*":
+        if len(next_path) == 0:
+            return array
+        else:
+            flattened_results = _awl_pick(inner_array.flatten(), next_path)
+            rolled_results = pa.ListArray.from_arrays(
+                inner_array.offsets, flattened_results
+            )
+            return tag_wrapper(rolled_results)
+    elif isinstance(inner_array, pa.StructArray):
+        all_names = _struct_array_field_names(inner_array)
+        if key == "*":
+            all_columns = [
+                _awl_pick(inner_array.field(name), next_path) for name in all_names
+            ]
+            return tag_wrapper(pa.StructArray.from_arrays(all_columns, all_names))
+        else:
+            if key not in all_names:
+                return default_return()
+            key_val = inner_array.field(key)
+            if len(next_path) == 0:
+                res = key_val
+            else:
+                res = _awl_pick(key_val, next_path)
+            return tag_wrapper(res)
+    else:
+        return default_return()
 
 
 @arrow_op(
@@ -39,16 +104,10 @@ def pick(self, key):
     object_type = typeddict_pick_output_type(
         {"self": self.object_type, "key": types.Const(types.String(), key)}
     )
-    data = self._arrow_data
-    if isinstance(data, pa.StructArray):
-        value = data.field(key)
-    elif isinstance(self._arrow_data, pa.Table):
-        value = data[key].combine_chunks()
-    else:
-        raise errors.WeaveTypeError(
-            f"Unexpected type for pick: {type(self._arrow_data)}"
-        )
-    return ArrowWeaveList(value, object_type, self._artifact)
+    data = arrow_as_array(self._arrow_data)
+    path = _dict_utils.split_escaped_string(key)
+    result = _awl_pick(data, path)
+    return ArrowWeaveList(result, object_type, self._artifact)
 
 
 @arrow_op(

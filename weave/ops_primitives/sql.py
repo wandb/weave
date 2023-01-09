@@ -39,7 +39,7 @@ class SqlTableType(types.Type):
 class SqlConnection(object):
     def __init__(self, engine):
         self.engine = engine
-        self.meta = sqlalchemy.MetaData(engine)
+        self.meta = sqlalchemy.MetaData()
         self.meta.reflect(engine)
 
     def table(self, name):
@@ -161,7 +161,7 @@ class SqlTable:
         # print('RESULTS QUERY', results)
         rows = []
         for row in results.all():
-            row = {k: getattr(row, k) for k in row.keys()}
+            row = {k: getattr(row, k) for k in row._fields}
             rows.append(row)
         self._row_cache[page] = rows
         try:

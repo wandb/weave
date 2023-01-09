@@ -1,6 +1,8 @@
+import typing
 from ._dict_utils import typeddict_pick_output_type
 from ..api import op, weave_class, mutation, OpVarArgs
 from .. import weave_types as types
+from ._dict_utils import tag_aware_dict_val_for_escaped_key
 
 # @op(
 #     name='pick',
@@ -65,9 +67,6 @@ def is_const_union_of_type(type_, of_type):
 #     return output_type
 
 
-# TODO: type dict v dict
-
-
 @weave_class(weave_type=types.TypedDict)
 class TypedDict:
     def __setitem__(self, k, v, action=None):
@@ -80,7 +79,7 @@ class TypedDict:
         output_type=typeddict_pick_output_type,
     )
     def pick(self, key):
-        return self.get(key, None)
+        return tag_aware_dict_val_for_escaped_key(self, key)
 
     @op(
         output_type=lambda input_type: types.List(

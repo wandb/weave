@@ -1516,14 +1516,10 @@ def to_arrow(obj, wb_type=None):
     raise errors.WeaveInternalError("to_arrow not implemented for: %s" % obj)
 
 
-def awl_add_arrow_tags(
-    l: ArrowWeaveList, arrow_tags: pa.StructArray, tag_type: types.Type
+def direct_add_arrow_tags(
+    data: typing.Union[pa.Table, pa.Array], arrow_tags: pa.StructArray
 ):
-
     arrow_tags = recursively_encode_pyarrow_strings_as_dictionaries(arrow_tags)
-
-    # get current tags
-    data = l._arrow_data
     current_tags = None
     if isinstance(data, pa.Table):
         if "_tag" in data.column_names:
@@ -1550,30 +1546,35 @@ def awl_add_arrow_tags(
         tag_arrays,
         tag_names,
     )
-    if isinstance(l._arrow_data, pa.Table):
-        if isinstance(l.object_type, tagged_value_type.TaggedValueType):
-            new_value = l._arrow_data["_value"]
+    if isinstance(data, pa.Table):
+        if current_tags is not None:
+            new_value = data["_value"]
         else:
             new_value = pa.StructArray.from_arrays(
                 # TODO: we shouldn't need to combine chunks, we can produce this in the
                 # original chunked form for zero copy
-                [c.combine_chunks() for c in l._arrow_data.columns],
-                names=l._arrow_data.column_names,
+                [c.combine_chunks() for c in data.columns],
+                names=data.column_names,
             )
-    elif isinstance(l._arrow_data, pa.StructArray):
-        if isinstance(l.object_type, tagged_value_type.TaggedValueType):
-            new_value = l._arrow_data.field("_value")
+    elif isinstance(data, pa.StructArray):
+        if current_tags is not None:
+            new_value = data.field("_value")
         else:
-            new_value = l._arrow_data
+            new_value = data
     else:
         # Else its an arrow array
-        new_value = l._arrow_data
-    new_value = pa.StructArray.from_arrays([tag_array, new_value], ["_tag", "_value"])
+        new_value = data
+    return pa.StructArray.from_arrays([tag_array, new_value], ["_tag", "_value"])
 
+
+def awl_add_arrow_tags(
+    l: ArrowWeaveList, arrow_tags: pa.StructArray, tag_type: types.Type
+):
+    data = l._arrow_data
+    new_value = direct_add_arrow_tags(data, arrow_tags)
     new_object_type = process_opdef_output_type.op_make_type_tagged_resolver(
         l.object_type, tag_type
     )
-
     return ArrowWeaveList(new_value, new_object_type, l._artifact)
 
 

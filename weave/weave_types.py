@@ -989,7 +989,7 @@ def optional(type_: Type) -> Type:
     # Const for example. Although why would we have a Const optional,
     # that doesn't make sense (if its a const, we know the concrete type,
     # its not a union).
-    return UnionType(none_type, type_)
+    return union(none_type, type_)
 
 
 def is_optional(type_: Type) -> bool:
