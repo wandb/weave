@@ -111,7 +111,7 @@ def stitch(
     """Given a list of leaf nodes, stitch the graph together."""
     sg = StitchedGraph({})
 
-    def handle_node(node: graph.Node, orig_node: graph.Node) -> graph.Node:
+    def handle_node(node: graph.Node) -> graph.Node:
         if isinstance(node, graph.OutputNode):
             input_dict = {k: sg.get_result(v) for k, v in node.from_op.inputs.items()}
             sg.add_result(node, stitch_node(node, input_dict, sg))
