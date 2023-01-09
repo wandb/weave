@@ -41,7 +41,7 @@ def apply_domain_op_gql_translation(leaf_nodes: list[graph.Node]) -> list[graph.
         return leaf_nodes
     p = stitch.stitch(leaf_nodes)
 
-    def _replace_with_merged_gql(node: graph.Node) -> graph.Node:
+    def _replace_with_merged_gql(node: graph.Node, orig_node: graph.Node) -> graph.Node:
         if not _is_root_node(node):
             return node
         node = typing.cast(graph.OutputNode, node)

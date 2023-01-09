@@ -22,7 +22,7 @@ def test_map_dag_produces_same_len():
 
     assert graph.count(d) == 6
 
-    def replace_a(node: graph.Node) -> graph.Node:
+    def replace_a(node: graph.Node, orig_node: graph.Node) -> graph.Node:
         if isinstance(node, graph.VarNode):
             return weave_internal.make_var_node(types.Int(), "b")
         return node
@@ -39,7 +39,7 @@ def test_map_nodes_toplevel_doesnt_walk_lambdas():
     node = l.map(lambda x: x + 1)
     node_count = {"count": 0}
 
-    def _map_fn(node):
+    def _map_fn(node, orig_node: graph.Node):
         node_count["count"] += 1
 
     graph.map_nodes_top_level([node], _map_fn)[0]
@@ -51,7 +51,7 @@ def test_map_nodes_full_walks_lambdas():
     node = l.map(lambda x: x + 1)
     node_count = {"count": 0}
 
-    def _map_fn(node):
+    def _map_fn(node, orig_node):
         node_count["count"] += 1
 
     graph.map_nodes_full([node], _map_fn)[0]
@@ -63,7 +63,7 @@ def test_map_nodes_full_replaces_in_lambda():
     node = l.map(lambda x: x + 1)
     assert weave.use(node) == [2, 3, 4]
 
-    def _map_fn(node):
+    def _map_fn(node, orig_node: graph.Node):
         if isinstance(node, graph.OutputNode) and node.from_op.name == "number-add":
             return graph.OutputNode(node.type, "number-mult", node.from_op.inputs)
 
@@ -96,7 +96,7 @@ def test_replace_node():
     d = b + c
     assert weave.use(d) == 18
 
-    def replace_c(node):
+    def replace_c(node, orig_node: graph.Node):
         if node is c:
             return c.from_op.inputs["lhs"] / 4
 

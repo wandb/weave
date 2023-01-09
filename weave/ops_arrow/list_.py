@@ -7,7 +7,7 @@ import pandas as pd
 import pyarrow as pa
 from pyarrow import compute as pc
 from collections import defaultdict
-
+from .. import util
 
 py_type = type
 
@@ -147,6 +147,9 @@ def _map_each_output_type(input_types: dict[str, types.Type]):
 def _map_each(self: "ArrowWeaveList", fn):
     if types.List().assign_type(self.object_type):
         as_array = arrow_as_array(self._arrow_data)
+        if isinstance(self.object_type, tagged_value_type.TaggedValueType):
+            as_array = as_array.field("_value")
+
         offsets = as_array.offsets
         flattened = as_array.flatten()
         if isinstance(self.object_type, tagged_value_type.TaggedValueType):
@@ -477,7 +480,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
     def __getitem__(self, index: int):
         return self._index(index)
 
-    @arrow_op(
+    @op(
         input_type={
             "self": ArrowWeaveListType(),
             "map_fn": lambda input_types: types.Function(
@@ -486,19 +489,19 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             ),
         },
         output_type=map_output_type,
-        all_args_nullable=False,
     )
     def map(self, map_fn):
-        return _apply_fn_node(self, map_fn)
+        tagged_awl = pushdown_list_tags(self)
+        res = _apply_fn_node(tagged_awl, map_fn)
+        return res
 
-    @arrow_op(
+    @op(
         name="ArrowWeaveList-mapEach",
         input_type={
             "self": ArrowWeaveListType(),
             "map_fn": _map_each_function_type,
         },
         output_type=_map_each_output_type,
-        all_args_nullable=False,
     )
     def map_each(self, map_fn):
         return _map_each(self, map_fn)
@@ -1099,6 +1102,55 @@ def make_vectorized_object_constructor(constructor_op_name: str) -> None:
         )
 
 
+def _type_is_assignable_to_awl_list(t: types.Type) -> bool:
+    return ArrowWeaveListType().assign_type(t)
+
+
+def _type_is_assignable_to_py_list(t: types.Type) -> bool:
+    return types.List().assign_type(t)
+
+
+def _create_manually_mapped_op(
+    op_name: str,
+    output_type: types.Type,
+    inputs: typing.Dict[str, graph.Node],
+    inputs_to_map: list[str],
+):
+    if len(inputs_to_map) != 1:
+        raise errors.WeaveVectorizationError(
+            f"Can only map over a single input, got {inputs_to_map} - please improve algorithm in ops_arrow/list.py"  # TODO: TS
+        )
+    input_to_map = inputs_to_map[0]
+    op = registry_mem.memory_registry.get_op(op_name)
+    input_to_map_as_list_node: graph.Node
+    if _type_is_assignable_to_awl_list(inputs[input_to_map].type):
+        input_to_map_as_list_node = ArrowWeaveList.to_py(inputs[input_to_map])
+    elif _type_is_assignable_to_py_list(inputs[input_to_map].type):
+        input_to_map_as_list_node = inputs[input_to_map]
+    else:
+        raise errors.WeaveVectorizationError(
+            f"Expected input to map to be a list or ArrowWeaveList, got {input_to_map_as_list_node.type}"
+        )
+    row_type = typing.cast(
+        typing.Union[ArrowWeaveListType, types.List], input_to_map_as_list_node.type
+    ).object_type
+    input_copy = inputs.copy()
+    input_copy[input_to_map] = graph.VarNode(row_type, "row")
+    map_op = registry_mem.memory_registry.get_op("map")
+    return map_op.lazy_call(
+        **{
+            "arr": input_to_map_as_list_node,
+            "mapFn": graph.ConstNode(
+                types.Function(
+                    {"row": row_type},
+                    output_type,
+                ),
+                op.lazy_call(*input_copy.values()),
+            ),
+        }
+    )
+
+
 def vectorize(
     weave_fn,
     with_respect_to: typing.Optional[typing.Iterable[graph.VarNode]] = None,
@@ -1117,13 +1169,15 @@ def vectorize(
     if stack_depth > 10:
         raise VectorizeError("Vectorize recursion depth exceeded")
 
-    def ensure_object_constructors_created(node: graph.Node) -> graph.Node:
+    def ensure_object_constructors_created(
+        node: graph.Node, orig_node: graph.Node
+    ) -> graph.Node:
         if isinstance(node, graph.OutputNode):
             if node.from_op.name.startswith("objectConstructor-"):
                 make_vectorized_object_constructor(node.from_op.name)
         return node
 
-    def expand_nodes(node: graph.Node) -> graph.Node:
+    def expand_nodes(node: graph.Node, orig_node: graph.Node) -> graph.Node:
         if isinstance(node, graph.OutputNode):
             inputs = node.from_op.inputs
             if node.from_op.name == "number-pybin":
@@ -1132,10 +1186,27 @@ def vectorize(
                 return weave_internal.call_fn(bin_fn, {"row": in_})  # type: ignore
         return node
 
-    def convert_node(node):
+    def convert_node(node: graph.Node, orig_node: graph.Node):
         if isinstance(node, graph.OutputNode):
+            if not isinstance(orig_node, graph.OutputNode):
+                raise VectorizeError(
+                    f"Error in vectorization, expected orig_node to be an OutputNode, got {orig_node}"
+                )
+            # We can determine if we are in the vectorization path by
+            # checking to see if the current node is "dirty" (i.e. it
+            # has been modified by a previous pass). If it is dirty,
+            # then we know that somewhere in the ancestry of this node,
+            # we have a vectorized varnode. If it is not dirty, then
+            # we can skip completely. Note: id is used for equality
+            # since `==` results in an op!
+            in_vectorization_path = id(node) != id(orig_node)
+            if not in_vectorization_path:
+                return node
             inputs = node.from_op.inputs
             inputs_items = list(inputs.items())
+            first_arg_is_awl = len(
+                inputs_items
+            ) > 0 and ArrowWeaveListType().assign_type(inputs_items[0][1].type)
 
             # In a situation where we are trying to vectorize a "lambda"
             # function and the input is a a weave arrow list, then we are ina
@@ -1149,15 +1220,11 @@ def vectorize(
             # these cases, we want to forcibly bail out to the list map which
             # does a `execute_fast.fast_map_fn` on each element of the list.
             if (
-                (
-                    node.from_op.name.endswith("map")
-                    or node.from_op.name.endswith("groupby")
-                    or node.from_op.name.endswith("filter")
-                    or node.from_op.name.endswith("sort")
-                )
-                and len(inputs_items) > 0
-                and ArrowWeaveListType().assign_type(inputs_items[0][1].type)
-            ):
+                node.from_op.name.endswith("map")
+                or node.from_op.name.endswith("groupby")
+                or node.from_op.name.endswith("filter")
+                or node.from_op.name.endswith("sort")
+            ) and first_arg_is_awl:
                 first_input_name, first_input_node = inputs_items[0]
                 name = node.from_op.name.split("-")[-1]
                 op = registry_mem.memory_registry.get_op(name)
@@ -1181,17 +1248,27 @@ def vectorize(
             # since dict takes OpVarArgs(typing.Any()) as input, it will always show up
             # as a candidate for vectorizing itself. We don't want to do that, so we
             # explicitly force using ArrowWeaveList-dict instead.
+            awl_transformed_inputs = {
+                k: list_to_arrow(v)
+                if id(v) != id(orig_node.from_op.inputs[k])
+                and (not _type_is_assignable_to_awl_list(v.type))
+                and _type_is_assignable_to_py_list(v.type)
+                else v
+                for k, v in inputs.items()
+            }
             if node.from_op.name == "dict":
                 op = registry_mem.memory_registry.get_op(
                     "ArrowWeaveList-vectorizedDict"
                 )
-                return op.lazy_call(**inputs)
-            if node.from_op.name == "list":
+                return op.lazy_call(**awl_transformed_inputs)
+            elif node.from_op.name == "list":
                 op = registry_mem.memory_registry.get_op(
                     "ArrowWeaveList-vectorizedList"
                 )
-                return op.lazy_call(**inputs)
-            elif node.from_op.name == "Object-__getattr__":
+                return op.lazy_call(**awl_transformed_inputs)
+            # Note: unlike dict and list, Object only supports vectorization of
+            # the first input
+            elif first_arg_is_awl and node.from_op.name == "Object-__getattr__":
                 op = registry_mem.memory_registry.get_op(
                     "ArrowWeaveListObject-__vectorizedGetattr__"
                 )
@@ -1215,18 +1292,23 @@ def vectorize(
                     return op.lazy_call(**final_inputs)
                 # see if weave function can be expanded and vectorized
                 op_def = registry_mem.memory_registry.get_op(node.from_op.name)
-                if op_def.weave_fn is None:
+                if op_def.weave_fn is None and first_arg_is_awl:
                     # this could raise
                     try:
+
                         op_def.weave_fn = weavify.op_to_weave_fn(op_def)
-                    except (errors.WeavifyError, errors.WeaveDispatchError):
+                    except (
+                        errors.WeavifyError,
+                        errors.WeaveDispatchError,
+                    ):
                         pass
                 if op_def.weave_fn is not None:
                     vectorized = vectorize(op_def.weave_fn, stack_depth=stack_depth + 1)
                     return weave_internal.call_fn(vectorized, inputs)
                 else:
                     # No weave_fn, so we can't vectorize this op. Just
-                    # use map
+                    # use the op as if it was a normal list (ideally hitting
+                    # the derived mapped op)
                     input0_name, input0_val = list(inputs.items())[0]
                     if isinstance(input0_val, ArrowWeaveList):
                         py_node = input0_val.to_py()
@@ -1241,9 +1323,39 @@ def vectorize(
                         {k: v.type for k, v in new_inputs.items()},
                     )
                     if op is None:
-                        raise VectorizeError(
-                            "No fallback mapped op found for: %s" % node.from_op.name
+                        # If we hit this, then it means our vectorization has
+                        # created inputs which have no matching op. For example,
+                        # if we are doing a pick operation and the key is a
+                        # vectorized VarNode. This happens when picking a run
+                        # color using a vectorized list of runs for a table
+                        # (since pick(dict, list<string>) is not implemented).
+                        # This can happen for other ops like `add` and `mul` as
+                        # well (imagine `row => 1 + row`)
+                        #
+                        # In order to safely handle this case, we need to simply map
+                        # the original op over all the vectorized inputs.
+                        manually_map_inputs = [
+                            k
+                            for k, v in inputs.items()
+                            if id(orig_node.from_op.inputs[k]) != id(v)
+                            and (
+                                _type_is_assignable_to_awl_list(v.type)
+                                or _type_is_assignable_to_awl_list(v.type)
+                            )
+                        ]
+                        res = _create_manually_mapped_op(
+                            orig_node.from_op.name,
+                            orig_node.type,
+                            inputs,
+                            manually_map_inputs,
                         )
+                        message = f"Encountered non-dispatchable op ({node.from_op.name}) during vectorization. \
+                            Vectorized inputs are {new_inputs}. This is likely due to vectorization path of the function\
+                                not leading to the first parameter. Bailing out to manual mapping"
+                        util.capture_exception_with_sentry_if_available(
+                            message, [node.from_op.name]
+                        )
+                        return res
                     return op.lazy_call(**new_inputs)
         elif isinstance(node, graph.VarNode):
             # Vectorize variable
@@ -1514,6 +1626,18 @@ def to_arrow(obj, wb_type=None):
         return ref.obj
 
     raise errors.WeaveInternalError("to_arrow not implemented for: %s" % obj)
+
+
+@op(
+    input_type={
+        "arr": types.List(),
+    },
+    output_type=lambda input_types: ArrowWeaveListType(input_types["arr"].object_type),
+)
+def list_to_arrow(arr):
+    if not isinstance(arr, list):
+        raise errors.WeaveTypeError("list_to_arrow expected a list, got %s" % type(arr))
+    return to_arrow(arr)
 
 
 def direct_add_arrow_tags(
@@ -1818,4 +1942,39 @@ def join_all(arrs, joinFn, outer: bool):
             [res.column(join_col_key).combine_chunks()], names=["joinObj"]
         ),
         types.TypedDict({"joinObj": joinFn.type}),
+    )
+
+
+def vectorized_arrow_pick_output_type(input_types):
+    inner_type = types.union(*list(input_types["self"].property_types.values()))
+    if isinstance(input_types["key"], ArrowWeaveListType):
+        return ArrowWeaveListType(inner_type)
+    else:
+        return types.List(inner_type)
+
+
+# Combining both list and arrow into the same op since dispatch operates on the
+# first input, and the difference would only be in the second input
+@op(
+    name="_vectorized_list_like-pick",
+    input_type={
+        "self": types.TypedDict({}),
+        "key": types.union(
+            ArrowWeaveListType(types.String()), types.List(types.String())
+        ),
+    },
+    output_type=vectorized_arrow_pick_output_type,
+)
+def vectorized_arrow_pick(self, key):
+    if isinstance(key, list):
+        return [self.get(k, None) for k in key]
+    de = arrow_as_array(key._arrow_data_asarray_no_tags()).dictionary_encode()
+    new_dictionary = pa.array(
+        [self.get(key, None) for key in de.dictionary.to_pylist()]
+    )
+    new_indices = de.indices
+    new_array = pa.DictionaryArray.from_arrays(new_indices, new_dictionary)
+    result = new_array.dictionary_decode()
+    return ArrowWeaveList(
+        result,
     )

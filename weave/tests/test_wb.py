@@ -426,6 +426,8 @@ def table_mock_filtered(q, ndx):
         return artifact_version_sdk_response
     elif ndx == 2:
         return workspace_response_filtered
+    elif ndx == 3:
+        return artifact_version_sdk_response
 
 
 def test_tag_run_color_lookup(fake_wandb):
@@ -1106,3 +1108,29 @@ def test_artifact_membership_link(fake_wandb):
         name="test_res_1fwmcd3q:v0",
         url="/stacey/mendeleev/artifacts/test_results/test_res_1fwmcd3q/v0",
     )
+
+
+def test_run_colors(fake_wandb):
+    fake_wandb.add_mock(table_mock_filtered)
+    colors_node = ops.dict_(
+        **{"1ht5692d": "rgb(218, 76, 76)", "2ed5xwpn": "rgb(83, 135, 221)"}
+    )
+    node = (
+        ops.project("stacey", "mendeleev")
+        .filteredRuns("{}", "-createdAt")
+        .limit(50)
+        .summary()
+        .pick("table")
+        .table()
+        .rows()
+        .dropna()
+        .concat()
+        .map(
+            lambda row: ops.dict_(
+                color=colors_node.pick(row.run().id()), name=row.run().name()
+            )
+        )
+        .index(0)
+        .pick("color")
+    )
+    assert weave.use(node) == "rgb(83, 135, 221)"

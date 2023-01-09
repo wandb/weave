@@ -296,7 +296,7 @@ def node_expr_str(node: Node) -> str:
 
 def _map_nodes(
     node: Node,
-    map_fn: typing.Callable[[Node], typing.Optional[Node]],
+    map_fn: typing.Callable[[Node, Node], typing.Optional[Node]],
     already_mapped: dict[Node, Node],
     walk_lambdas: bool,
 ) -> Node:
@@ -304,15 +304,15 @@ def _map_nodes(
     # to provide friendlier stack traces for exception merging tools.
     to_consider = [node]
     while to_consider:
-        node = to_consider[-1]
-        if node in already_mapped:
+        curr_node = to_consider[-1]
+        if curr_node in already_mapped:
             to_consider.pop()
             continue
-        result_node = node
-        if isinstance(node, OutputNode):
+        result_node = curr_node
+        if isinstance(curr_node, OutputNode):
             inputs = {}
             need_inputs = False
-            for param_name, param_node in node.from_op.inputs.items():
+            for param_name, param_node in curr_node.from_op.inputs.items():
                 if param_node not in already_mapped:
                     to_consider.append(param_node)
                     need_inputs = True
@@ -320,30 +320,30 @@ def _map_nodes(
                     inputs[param_name] = already_mapped[param_node]
             if need_inputs:
                 continue
-            if any(n is not inputs[k] for k, n in node.from_op.inputs.items()):
-                result_node = OutputNode(node.type, node.from_op.name, inputs)
+            if any(n is not inputs[k] for k, n in curr_node.from_op.inputs.items()):
+                result_node = OutputNode(curr_node.type, curr_node.from_op.name, inputs)
         elif (
             walk_lambdas
-            and isinstance(node, ConstNode)
-            and isinstance(node.type, weave_types.Function)
+            and isinstance(curr_node, ConstNode)
+            and isinstance(curr_node.type, weave_types.Function)
         ):
-            if node.val not in already_mapped:
-                to_consider.append(node.val)
+            if curr_node.val not in already_mapped:
+                to_consider.append(curr_node.val)
                 continue
-            if node.val is not already_mapped[node.val]:
-                result_node = ConstNode(node.type, already_mapped[node.val])
+            if curr_node.val is not already_mapped[curr_node.val]:
+                result_node = ConstNode(curr_node.type, already_mapped[curr_node.val])
 
         to_consider.pop()
-        mapped_node = map_fn(result_node)
+        mapped_node = map_fn(result_node, curr_node)
         if mapped_node is None:
             mapped_node = result_node
-        already_mapped[node] = mapped_node
+        already_mapped[curr_node] = mapped_node
     return already_mapped[node]
 
 
 def map_nodes_top_level(
     leaf_nodes: list[Node],
-    map_fn: typing.Callable[[Node], typing.Optional[Node]],
+    map_fn: typing.Callable[[Node, Node], typing.Optional[Node]],
 ) -> list[Node]:
     """Map nodes in dag represented by leaf nodes, but not sub-lambdas"""
     already_mapped: dict[Node, Node] = {}
@@ -351,7 +351,7 @@ def map_nodes_top_level(
 
 
 def map_nodes_full(
-    leaf_nodes: list[Node], map_fn: typing.Callable[[Node], typing.Optional[Node]]
+    leaf_nodes: list[Node], map_fn: typing.Callable[[Node, Node], typing.Optional[Node]]
 ) -> list[Node]:
     """Map nodes in dag represented by leaf nodes, including sub-lambdas"""
     already_mapped: dict[Node, Node] = {}
@@ -364,7 +364,7 @@ def filter_nodes_top_level(
     """Filter nodes in dag represented by leaf nodes, but not sub-lambdas"""
     result = []
 
-    def mapped_fn(node: Node) -> Node:
+    def mapped_fn(node: Node, orig_node: Node) -> Node:
         if filter_fn(node):
             result.append(node)
         return node
@@ -379,7 +379,7 @@ def filter_nodes_full(
     """Filter nodes in dag represented by leaf nodes, including sub-lambdas"""
     result = []
 
-    def mapped_fn(node: Node) -> Node:
+    def mapped_fn(node: Node, orig_node: Node) -> Node:
         if filter_fn(node):
             result.append(node)
         return node
@@ -430,5 +430,6 @@ def linearize(node: Node) -> typing.Optional[list[OutputNode]]:
 
 def map_const_nodes_to_x(node: Node) -> Node:
     return map_nodes_full(
-        [node], lambda n: n if not isinstance(n, ConstNode) else VarNode(n.type, "x")
+        [node],
+        lambda n, on: n if not isinstance(n, ConstNode) else VarNode(n.type, "x"),
     )[0]

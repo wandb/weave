@@ -32,6 +32,13 @@ def op_to_weave_fn(opdef: op_def.OpDef) -> graph.Node:
             "Can't convert objectConstructor to weave_fn: %s" % opdef
         )
 
+    # `merge` is a poison pill. It contains a {**dict1, **dict2} operation,
+    # which, when dict[1/2] are nodes, never returns - it creates an infinite
+    # loop. This will be true for any op def that contains a `**` operation
+    # since `{**ops.dict_(a=1)}` will just hang forever.
+    if opdef.name == "merge":
+        raise errors.WeavifyError("Can't convert merge to weave_fn")
+
     # if is_base_op(opdef):
     #     raise errors.WeaveTypeError("Refusing to convert base op to weave_fn.")
 

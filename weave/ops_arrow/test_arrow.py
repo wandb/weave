@@ -680,7 +680,10 @@ string_ops_test_cases = [
 
 @pytest.mark.parametrize(
     "name,weave_func,expected_output",
-    string_ops_test_cases,
+    string_ops_test_cases
+    + [
+        ("pick", lambda x: dict_(bc=1, cd=2, df=3)[x], [1, 2, 3]),
+    ],
 )
 def test_arrow_vectorizer_string_scalar(name, weave_func, expected_output):
     l = weave.save(arrow.to_arrow(["bc", "cd", "df"]))

@@ -42,18 +42,25 @@ def gql_prop_op(
     prop_name: str,
     output_type: weave_types.Type,
 ):
-    @op(
+    first_arg_name = input_type.name
+
+    def gql_property_getter_op_fn(**inputs):
+        return inputs[first_arg_name].gql[prop_name]
+
+    sig = signature(gql_property_getter_op_fn)
+    params = [Parameter(first_arg_name, Parameter.POSITIONAL_OR_KEYWORD)]
+    sig = sig.replace(parameters=tuple(params))
+    gql_property_getter_op_fn.__signature__ = sig  # type: ignore
+    gql_property_getter_op_fn.sig = sig  # type: ignore
+
+    return op(
         name=op_name,
         plugins=wb_gql_op_plugin(
             lambda inputs, inner: prop_name,
         ),
-        input_type={"gql_obj": input_type},
+        input_type={first_arg_name: input_type},
         output_type=output_type,
-    )
-    def gql_property_getter_op(gql_obj):
-        return gql_obj.gql[prop_name]
-
-    return gql_property_getter_op
+    )(gql_property_getter_op_fn)
 
 
 def _get_required_fragment(output_type: weave_types.Type):

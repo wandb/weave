@@ -7,7 +7,7 @@ from . import client_interface
 
 
 def dereference_variables(node: graph.Node, var_values: graph.Frame) -> graph.Node:
-    def map_fn(n: graph.Node) -> graph.Node:
+    def map_fn(n: graph.Node, orig_node: graph.Node) -> graph.Node:
         if isinstance(n, graph.VarNode):
             return var_values[n.name]
         return n

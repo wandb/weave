@@ -57,7 +57,7 @@ def convert_specific_opname_to_generic_opname(
 def convert_specific_ops_to_generic_ops_node(node: graph.Node) -> graph.Node:
     """Converts specific ops like typedDict-pick to generic ops like pick"""
 
-    def convert_specific_op_to_generic_op(node: graph.Node):
+    def convert_specific_op_to_generic_op(node: graph.Node, orig_node: graph.Node):
         if isinstance(node, graph.ConstNode) and isinstance(
             node.type, weave_types.Function
         ):
@@ -91,7 +91,7 @@ def convert_specific_ops_to_generic_ops_data(data):
 def remove_opcall_versions_node(node: graph.Node) -> graph.Node:
     """Fix op call names"""
 
-    def remove_op_version(node: graph.Node):
+    def remove_op_version(node: graph.Node, orig_node: graph.Node):
         if not isinstance(node, graph.OutputNode):
             return node
         return graph.OutputNode(

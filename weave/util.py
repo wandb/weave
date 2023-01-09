@@ -21,6 +21,19 @@ def raise_exception_with_sentry_if_available(
             raise err
 
 
+def capture_exception_with_sentry_if_available(
+    err: Exception, fingerprint: typing.Any
+) -> None:
+    try:
+        import sentry_sdk
+    except ImportError:
+        pass
+    else:
+        with sentry_sdk.push_scope() as scope:
+            scope.fingerprint = fingerprint
+            sentry_sdk.capture_exception(err)
+
+
 def get_notebook_name():
     return ipynbname.name()
 
