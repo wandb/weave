@@ -101,9 +101,7 @@ def _fixup_output_type(graph_type: types.Type, op_type: types.Type):
     return op_type
 
 
-def _dispatch_map_fn_refining(
-    node: graph.Node, orig_node: graph.Node
-) -> typing.Optional[graph.OutputNode]:
+def _dispatch_map_fn_refining(node: graph.Node) -> typing.Optional[graph.OutputNode]:
     if isinstance(node, graph.OutputNode):
         if node.from_op.name == "gqlroot-wbgqlquery":
             # the output type of the gqlroot-wbgqlquery op is Any. But the gql
@@ -162,9 +160,7 @@ def _remove_optional(t: types.Type) -> types.Type:
     return t
 
 
-def _dispatch_map_fn_no_refine(
-    node: graph.Node, orig_node: graph.Node
-) -> typing.Optional[graph.OutputNode]:
+def _dispatch_map_fn_no_refine(node: graph.Node) -> typing.Optional[graph.OutputNode]:
     if isinstance(node, graph.OutputNode):
         if node.from_op.name == "tag-indexCheckpoint":
             # I'm seeing that there is no indexCheckpoint tag present
@@ -193,7 +189,7 @@ def _dispatch_map_fn_no_refine(
 
 
 def _make_auto_op_map_fn(when_type: type[types.Type], call_op_fn):
-    def fn(node: graph.Node, orig_node: graph.Node) -> typing.Optional[graph.Node]:
+    def fn(node: graph.Node) -> typing.Optional[graph.Node]:
         if isinstance(node, graph.OutputNode):
             node_inputs = node.from_op.inputs
             op_def = registry_mem.memory_registry.get_op(node.from_op.name)
@@ -258,9 +254,7 @@ def _apply_column_pushdown(leaf_nodes: list[graph.Node]) -> list[graph.Node]:
 
     p = stitch.stitch(leaf_nodes)
 
-    def _replace_with_column_pushdown(
-        node: graph.Node, orig_node: graph.Node
-    ) -> graph.Node:
+    def _replace_with_column_pushdown(node: graph.Node) -> graph.Node:
         if isinstance(node, graph.OutputNode) and node.from_op.name == "project-runs2":
             forward_obj = p.get_result(node)
             run_cols = compile_table.get_projection(forward_obj)
