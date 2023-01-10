@@ -1348,6 +1348,7 @@ def vectorize(
                 input_node not in already_vectorized_nodes
                 for input_node in node.from_op.inputs.values()
             ):
+                # not along vectorize path
                 return node
             new_node = vectorize_output_node(node)
             already_vectorized_nodes.add(new_node)
@@ -1360,8 +1361,10 @@ def vectorize(
                 new_node = graph.VarNode(ArrowWeaveListType(node.type), node.name)
                 already_vectorized_nodes.add(new_node)
                 return new_node
+            # not along vectorize path
             return node
         elif isinstance(node, graph.ConstNode):
+            # not along vectorize path
             return node
         else:
             raise errors.WeaveInternalError("Unexpected node: %s" % node)
