@@ -24,7 +24,7 @@ def test_object_union_attr_is_variable():
     class ObjWithUnion:
         a: typing.Union[str, int]
 
-    assert "a" in ObjWithUnion.WeaveType().type_vars()
+    assert "a" in ObjWithUnion.WeaveType().type_vars
 
 
 def test_object_noneunion_attr_is_variable():
@@ -32,4 +32,4 @@ def test_object_noneunion_attr_is_variable():
     class ObjWithUnion:
         a: weave.Node[typing.Union[str, int]]
 
-    assert "a" in ObjWithUnion.WeaveType().type_vars()
+    assert "a" in ObjWithUnion.WeaveType().type_vars

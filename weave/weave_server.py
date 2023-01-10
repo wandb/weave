@@ -1,3 +1,7 @@
+import cProfile
+import dataclasses
+import enum
+import typing
 import os
 import logging
 import pathlib
@@ -6,9 +10,12 @@ import traceback
 import sys
 import base64
 import zlib
+import urllib.parse
+from rich import logging as rich_logging
 from flask import json
 from pythonjsonlogger import jsonlogger
 from werkzeug.exceptions import HTTPException
+from werkzeug.middleware.profiler import ProfilerMiddleware
 
 from flask import Flask, Blueprint
 from flask import request
@@ -24,14 +31,42 @@ from weave import automation
 from weave import util
 from weave import engine_trace
 from weave import environment
+from weave import logs
+
+# PROFILE_DIR = "/tmp/weave/profile"
+PROFILE_DIR = None
+if PROFILE_DIR is not None:
+    pathlib.Path(PROFILE_DIR).mkdir(parents=True, exist_ok=True)
+
 
 tracer = engine_trace.tracer()
+
+
+def custom_dd_patch():
+    import wandb
+    import wandb_gql
+    import wandb_graphql
+
+    orig_execute = wandb_gql.Client.execute
+
+    def execute(self, document, *args, **kwargs):
+        with tracer.trace(
+            "wandb_gql.Client.execute",
+        ) as span:
+            span.set_tag("document", wandb_graphql.print_ast(document))
+            span.set_tag("variable_values", kwargs.get("variable_values", {}))
+            return orig_execute(self, document, *args, **kwargs)
+
+    wandb_gql.Client.execute = execute
+
+
 if engine_trace.datadog_is_enabled():
     # Don't import this if you don't have an Agent! You'll get weird
     # crashes
     import ddtrace
 
-    ddtrace.patch(logging=True)
+    ddtrace.patch_all(logging=True)
+    custom_dd_patch()
 
 
 from flask.logging import wsgi_errors_stream
@@ -68,51 +103,89 @@ default_log_filename = pathlib.Path(f"/tmp/weave/log/{pid}.log")
 default_log_format = "[%(asctime)s] %(levelname)s in %(module)s (Thread Name: %(threadName)s): %(message)s"
 
 
-def enable_stream_logging(
-    level=logging.DEBUG, enable_datadog=False, mirror_to_file=False
-):
+class LogFormat(enum.Enum):
+    PRETTY = "pretty"
+    DATADOG = "datadog"
 
-    log_format = (
-        (
-            "%(asctime)s %(levelname)s [%(name)s] [%(filename)s:%(lineno)d] "
-            "[dd.trace_id=%(dd.trace_id)s dd.span_id=%(dd.span_id)s] "
-            "- %(message)s"
+
+@dataclasses.dataclass
+class LogSettings:
+    format: LogFormat
+    level: str
+
+
+def setup_handler(hander: logging.Handler, settings: LogSettings) -> None:
+    level = logging.getLevelName(settings.level)
+    formatter = logging.Formatter(default_log_format)
+    if settings.format == LogFormat.DATADOG:
+        formatter = jsonlogger.JsonFormatter(
+            "%(levelname)s [%(name)s] [%(filename)s:%(lineno)d] "
+            "[dd.trace_id=%(dd.trace_id)s dd.span_id=%(dd.span_id)s] %(message)s",
+            timestamp=True,
         )
-        if enable_datadog
-        else default_log_format
-    )
+    hander.setFormatter(formatter)
+    hander.setLevel(level)
+
+
+def enable_stream_logging(
+    logger: logging.Logger,
+    wsgi_stream_settings: typing.Optional[LogSettings] = None,
+    rich_settings: typing.Optional[LogSettings] = None,
+    logfile_settings: typing.Optional[LogSettings] = None,
+):
+    handler: logging.Handler
+
+    if wsgi_stream_settings is not None:
+        handler = logging.StreamHandler(wsgi_errors_stream)
+        setup_handler(handler, wsgi_stream_settings)
+        logger.addHandler(handler)
+
+    if rich_settings:
+        handler = rich_logging.RichHandler()
+        setup_handler(handler, rich_settings)
+        logger.addHandler(handler)
+
+    if logfile_settings is not None:
+        handler = logging.FileHandler("/tmp/weave/log/server.log", mode="w")
+        setup_handler(handler, logfile_settings)
+        logger.addHandler(handler)
+
+
+def configure_logger():
+    # Disable ddtrace logs, not sure why they're turned on.
+    log = logging.getLogger("ddtrace")
+    log.setLevel(logging.ERROR)
 
     logger = logging.getLogger("root")
-    logger.setLevel(level)
-    stream_handler = logging.StreamHandler(wsgi_errors_stream)
-    stream_handler.setLevel(level)
-    if enable_datadog:
-        formatter = jsonlogger.JsonFormatter(log_format)
-    else:
-        formatter = logging.Formatter(log_format)
-    stream_handler.setFormatter(formatter)
-    logger.addHandler(stream_handler)
+    log.setLevel(logs.env_log_level())
 
-    # can be used in dev mode to send dev logs to datadog
-    if mirror_to_file:
-        file_handler = logging.FileHandler("/tmp/weave/log/server.log", mode="w")
-        file_handler.setLevel(level)
-        file_handler.setFormatter(formatter)
-        logger.addHandler(file_handler)
+    enable_datadog = os.getenv("DD_ENV")
+    if not enable_datadog:
+        enable_stream_logging(
+            logger,
+            wsgi_stream_settings=LogSettings(LogFormat.PRETTY, "INFO"),
+        )
+    else:
+        if environment.wandb_production():
+            enable_stream_logging(
+                logger,
+                wsgi_stream_settings=LogSettings(LogFormat.DATADOG, "DEBUG"),
+            )
+        else:
+            enable_stream_logging(
+                logger,
+                wsgi_stream_settings=LogSettings(LogFormat.PRETTY, "INFO"),
+                logfile_settings=LogSettings(LogFormat.DATADOG, "DEBUG"),
+            )
 
 
 static_folder = os.path.join(os.path.dirname(__file__), "frontend")
 blueprint = Blueprint("weave", "weave-server", static_folder=static_folder)
 
 
-def make_app(log_filename=None):
+def make_app():
     silence_mpl()
-    enable_stream_logging(
-        enable_datadog=os.getenv("DD_ENV"),
-        level=logging.DEBUG
-        if util.parse_boolean_env_var("WEAVE_SERVER_ENABLE_LOGGING")
-        else logging.ERROR,
-    )
+    configure_logger()
 
     app = Flask(__name__)
     app.register_blueprint(blueprint)
@@ -175,9 +248,25 @@ def execute():
     # import time
     # time.sleep(0.1)
 
-    start_time = time.time()
-    response = server.handle_request(request.json, deref=True)
-    end_time = time.time()
+    if not PROFILE_DIR:
+        start_time = time.time()
+        response = server.handle_request(request.json, deref=True)
+        elapsed = time.time() - start_time
+    else:
+        # Profile the request and add a link to local snakeviz to the trace.
+        profile = cProfile.Profile()
+        start_time = time.time()
+        response = profile.runcall(server.handle_request, request.json, deref=True)
+        elapsed = time.time() - start_time
+        profile_filename = f"/tmp/weave/profile/execute.{start_time*1000:.0f}.{elapsed*1000:.0f}ms.prof"
+        profile.dump_stats(profile_filename)
+        root_span = tracer.current_root_span()
+        if root_span:
+            root_span.set_tag(
+                "profile_url",
+                "http://localhost:8080/snakeviz/"
+                + urllib.parse.quote(profile_filename),
+            )
 
     # remove unions from the response
     response = recursively_unwrap_unions(response)
@@ -194,7 +283,7 @@ def execute():
     response = {"data": final_response}
 
     if request.headers.get("x-weave-include-execution-time"):
-        response["execution_time"] = (end_time - start_time) * 1000
+        response["execution_time"] = (elapsed) * 1000
 
     if current_span and (
         os.getenv("WEAVE_SERVER_DD_LOG_REQUEST_RESPONSES")

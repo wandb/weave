@@ -28,6 +28,7 @@ drop tags.
 import dataclasses
 import json
 import typing
+import functools
 
 from ... import artifacts_local
 from ... import box
@@ -48,6 +49,8 @@ class TaggedValueType(types.Type):
     )
     value: types.Type = dataclasses.field(default_factory=lambda: types.Any())
 
+    _assignment_form_cached = None
+
     # We use this technique to apply post-processing to the inputs, but also works
     # around the frozen dataclass issue.
     def __post_init__(self) -> None:
@@ -63,6 +66,19 @@ class TaggedValueType(types.Type):
                     f"TaggedValueType value types cannot be TaggedValueType, found {self.value.value}"
                 )
             self.__dict__["value"] = self.value.value
+
+    @functools.cached_property
+    def _assignment_form(self) -> types.Type:
+        if isinstance(self.value, types.UnionType):
+            return types.union(
+                *[TaggedValueType(self.tag, mem) for mem in self.value.members]
+            )
+        return self
+
+    def _is_assignable_to(self, other_type: types.Type) -> typing.Optional[bool]:
+        if other_type.__class__ != TaggedValueType:
+            return other_type.assign_type(self.value)
+        return None
 
     def __getattr__(self, attr: str) -> typing.Any:
         return getattr(self.value, attr)

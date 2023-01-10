@@ -74,3 +74,12 @@ class WeaveTableDeserializationError(WeaveBaseError):
 
 class WeaveStitchGraphMergeError(WeaveBaseError):
     pass
+
+
+class WeaveHashConstTypeError(WeaveBaseError):
+    """Raised if __hash__ is called on a Const Type.
+
+    To hash a Const Type, we'd need to hash the value, which is unbounded.
+    """
+
+    pass

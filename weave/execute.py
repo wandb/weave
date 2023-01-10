@@ -115,6 +115,7 @@ def execute_nodes(nodes, no_cache=False):
             # executed.
             with _new_forward_graph() as fg:
                 nodes = compile.compile(nodes)
+
             fg.add_nodes(nodes)
 
             with context.execution_client():
@@ -233,7 +234,9 @@ def execute_forward_node(
     cache_mode = environment.cache_mode()
     if cache_mode == environment.CacheMode.MINIMAL:
         no_cache = True
-        if node.from_op.name == "file-table":
+        if not node.from_op.name.startswith("mapped") and node.from_op.name.endswith(
+            "file-table"
+        ):
             # Always cache file-table for now. file-table converts from the W&B json
             # table format to the much faster Weave arrow format. Since Weave cache
             # is like permanent memoization, this means each W&B table we encounter will
@@ -244,7 +247,11 @@ def execute_forward_node(
     if isinstance(node, graph.ConstNode):
         return {"cache_used": False}
 
-    logging.debug("Executing node: %s" % graph_debug.node_expr_str_full(node))
+    # This is expensive!
+    # logging.debug(
+    #     "Executing op: %s expr: %s"
+    #     % (node.from_op.name, graph_debug.node_expr_str_full(node))
+    # )
 
     tracer = engine_trace.tracer()
 
@@ -283,7 +290,6 @@ def execute_forward_node(
                         refs.deref(run.output)
                         forward_node.set_result(run.output)
                         return {"cache_used": True}
-                logging.debug("Actually nevermind, didnt return")
                 # otherwise, the run's output was not saveable, so we need
                 # to recompute it.
         inputs = {
@@ -292,7 +298,6 @@ def execute_forward_node(
 
     if op_def.is_async:
         with tracer.trace("execute-async"):
-            logging.debug("Executing async op")
             input_refs = {}
             for input_name, input in inputs.items():
                 ref = refs.get_ref(input)
@@ -306,7 +311,6 @@ def execute_forward_node(
             execute_async_op(op_def, input_refs, run_id)
             forward_node.set_result(run)
     else:
-        logging.debug("Executing sync op")
         with tracer.trace("execute-sync"):
             if language_nullability.should_force_none_result(inputs, op_def):
                 result = None
@@ -324,7 +328,6 @@ def execute_forward_node(
                 result = ref
             else:
                 if use_cache:
-                    logging.debug("Saving result")
                     # If an op is impure, its output is saved to a name that does not
                     # include run ID. This means consuming pure runs will hit cache if
                     # the output of an impure op is the same as it was last time.
@@ -351,7 +354,4 @@ def execute_forward_node(
                     run.save()
                 except errors.WeaveSerializeError:
                     pass
-            logging.debug(
-                "Done executing node: %s" % graph_debug.node_expr_str_full(node)
-            )
     return {"cache_used": False}

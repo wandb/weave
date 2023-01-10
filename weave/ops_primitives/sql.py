@@ -25,9 +25,6 @@ class SqlTableType(types.Type):
     def __init__(self, object_type=types.TypedDict({})):
         self.object_type = object_type
 
-    def __str__(self):
-        return "<SqlTableType %s>" % self.object_type
-
     def _to_dict(self):
         return {"objectType": self.object_type.to_dict()}
 

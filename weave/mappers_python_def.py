@@ -70,7 +70,7 @@ class ObjectDictToObject(mappers_weave.ObjectMapper):
                     v = serializer.apply(obj_val)
                     result[k] = v
 
-        for prop_name, prop_type in result_type.type_vars().items():
+        for prop_name, prop_type in result_type.type_vars.items():
             if isinstance(prop_type, types.Const):
                 result[prop_name] = prop_type.val
 

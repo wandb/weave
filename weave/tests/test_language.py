@@ -41,6 +41,13 @@ def test_none():
     assert weave.use(x) == None
 
 
+def test_empty_list():
+    node = weave.save([], "null")
+    x = node + 1
+    assert x.type == weave.types.List(weave.types.Number())
+    assert weave.use(x) == []
+
+
 def test_list_none():
     node = weave.save([None, None], "null")
     x = node + 1

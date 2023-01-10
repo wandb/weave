@@ -74,7 +74,7 @@ def create_arrow_data(n_rows, n_extra_cols=0, images=False):
             im[col] = x_choices[simple_hash(i * 13**j, 11)]
         ims.append(im)
     arr = arrow.to_arrow(ims)
-    return storage.save(arr)
+    return storage._get_ref(arr)
 
 
 def test_groupby_index_count():

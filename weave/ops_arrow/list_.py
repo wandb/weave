@@ -20,6 +20,7 @@ from .. import errors
 from .. import registry_mem
 from .. import mappers_arrow
 from .. import mappers_python_def
+from .. import op_def
 from .. import mappers_python
 from .. import artifacts_local
 from .. import storage
@@ -1190,6 +1191,7 @@ def vectorize(
         first_arg_is_awl = len(inputs_items) > 0 and ArrowWeaveListType().assign_type(
             inputs_items[0][1].type
         )
+        op: typing.Optional[op_def.OpDef]
 
         # In a situation where we are trying to vectorize a "lambda"
         # function and the input is a a weave arrow list, then we are ina
@@ -1254,9 +1256,12 @@ def vectorize(
             return op.lazy_call(**inputs)
         else:
             # Get a version of op that can handle vectorized (ArrowWeaveList) inputs
-            op = dispatch.get_op_for_input_types(
-                node.from_op.name, [], {k: v.type for k, v in inputs.items()}
-            )
+            try:
+                op = dispatch.get_op_for_inputs(
+                    node.from_op.name, {k: v.type for k, v in inputs.items()}
+                )
+            except errors.WeaveDispatchError:
+                op = None
             if (
                 op
                 and isinstance(op.input_type, op_args.OpNamedArgs)
@@ -1270,19 +1275,19 @@ def vectorize(
                 }
                 return op.lazy_call(**final_inputs)
             # see if weave function can be expanded and vectorized
-            op_def = registry_mem.memory_registry.get_op(node.from_op.name)
-            if op_def.weave_fn is None and first_arg_is_awl:
+            op = registry_mem.memory_registry.get_op(node.from_op.name)
+            if op.weave_fn is None and first_arg_is_awl:
                 # this could raise
                 try:
 
-                    op_def.weave_fn = weavify.op_to_weave_fn(op_def)
+                    op.weave_fn = weavify.op_to_weave_fn(op)
                 except (
                     errors.WeavifyError,
                     errors.WeaveDispatchError,
                 ):
                     pass
-            if op_def.weave_fn is not None:
-                vectorized = vectorize(op_def.weave_fn, stack_depth=stack_depth + 1)
+            if op.weave_fn is not None:
+                vectorized = vectorize(op.weave_fn, stack_depth=stack_depth + 1)
                 return weave_internal.call_fn(vectorized, inputs)
             else:
                 # No weave_fn, so we can't vectorize this op. Just
@@ -1296,11 +1301,13 @@ def vectorize(
                         new_inputs[k] = v
                 else:
                     new_inputs = inputs
-                op = dispatch.get_op_for_input_types(
-                    node.from_op.name,
-                    [],
-                    {k: v.type for k, v in new_inputs.items()},
-                )
+                try:
+                    op = dispatch.get_op_for_inputs(
+                        node.from_op.name,
+                        {k: v.type for k, v in new_inputs.items()},
+                    )
+                except errors.WeaveDispatchError:
+                    op = None
                 if op is None:
                     # If we hit this, then it means our vectorization has
                     # created inputs which have no matching op. For example,

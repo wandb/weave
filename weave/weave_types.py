@@ -192,8 +192,10 @@ class Type(metaclass=_TypeSubclassWatcher):
         typing.Union[type, typing.List[type], None]
     ] = None
 
+    # _type_vars_cached = None
+
     def __repr__(self) -> str:
-        return f"<{self.name}>"
+        return f"{self.__class__.__name__}()"
 
     @classmethod
     def class_type_name(cls):
@@ -220,6 +222,7 @@ class Type(metaclass=_TypeSubclassWatcher):
                 type_attrs.append(field.name)
         return type_attrs
 
+    @functools.cached_property
     def type_vars(self) -> dict[str, "Type"]:
         type_vars = {}
         for field in dataclasses.fields(self.__class__):
@@ -254,33 +257,27 @@ class Type(metaclass=_TypeSubclassWatcher):
         return self._instance_classes()[-1]
 
     def assign_type(self, next_type: "Type") -> bool:
-        TaggedValueType = type_name_to_type("tagged")
+        # assign_type needs to be as fast as possible, so there are optimizations
+        # throughout this code path, like checking for class equality instead of using isinstance
 
-        self = _normalize_type_for_assignment(self)
-        next_type = _normalize_type_for_assignment(next_type)
+        # Unions or union-like things (tagged unions) must be handled first
+        if next_type.name == "tagged":
+            next_type = next_type._assignment_form  # type: ignore
 
-        if isinstance(next_type, UnionType):
-            return all(self.assign_type(t) for t in next_type.members)
-        elif isinstance(self, UnionType):
-            return any(t.assign_type(next_type) for t in self.members)
+        # Check class attribute directly instead of isinstance for performance
+        if next_type.__class__ == UnionType:
+            return all(self.assign_type(t) for t in next_type.members)  # type: ignore
+        if self.__class__ == UnionType:
+            return any(t.assign_type(next_type) for t in self.members)  # type: ignore
 
-        if isinstance(next_type, Const) and not isinstance(self, Const):
-            return self.assign_type(next_type.val_type)
-
-        if isinstance(next_type, TaggedValueType) and not isinstance(
-            self, TaggedValueType
-        ):
-            return self.assign_type(next_type.value)
-
-        # language feature: autocall
-        if isinstance(next_type, Function) and not isinstance(self, Function):
-            return self.assign_type(next_type.output_type)
-
-        # language feature: auto-await
-        if isinstance(next_type, RunType) and not isinstance(self, RunType):
-            return self.assign_type(next_type.output)
+        is_assignable_to = next_type._is_assignable_to(self)
+        if is_assignable_to is not None:
+            return is_assignable_to
 
         return self._assign_type_inner(next_type)
+
+    def _is_assignable_to(self, other_type) -> typing.Optional[bool]:
+        return None
 
     def _assign_type_inner(self, next_type: "Type") -> bool:
         if self.__class__ == next_type.__class__ or (
@@ -371,15 +368,6 @@ class Type(metaclass=_TypeSubclassWatcher):
         raise Exception("Please import `weave` to use `Type.make`.")
 
 
-def _normalize_type_for_assignment(t: Type) -> Type:
-    TaggedValueType = type_name_to_type("tagged")
-
-    # We need to normalize the types (in particular, always push down tags through unions)
-    if isinstance(t, TaggedValueType) and isinstance(t.value, UnionType):
-        return union(*[TaggedValueType(t.tag, mem) for mem in t.value.members])
-    return t
-
-
 # _PlainStringNamedType should only be used for backward compatibility with
 # legacy WeaveJS code.
 class _PlainStringNamedType(Type):
@@ -400,9 +388,6 @@ class BasicType(_PlainStringNamedType):
     def load_instance(self, artifact, name, extra=None):
         with artifact.open(f"{name}.object.json") as f:
             return json.load(f)
-
-    def __repr__(self):
-        return "<%s>" % self.__class__.name
 
 
 class InvalidPy:
@@ -475,12 +460,38 @@ class Const(Type):
     val_type: Type
     val: typing.Any
 
+    def __post_init__(self):
+        if isinstance(self.val_type, UnionType):
+            # Const Unions are invalid. If something is Const, that means we know what its value
+            # is, which means it is definitely not a Union.
+            raise errors.WeaveInternalError(
+                "Attempted to initialize Const Union, which is invalid"
+            )
+
+    def __hash__(self):
+        if isinstance(self.val, (int, float, str, bool)):
+            return hash((self.val_type, self.val))
+        elif isinstance(self.val, list):
+            if len(self.val) < 10:
+                return hash((self.val_type, tuple(self.val)))
+            raise errors.WeaveHashConstTypeError(
+                "Attempted to hash Const Type with large list"
+            )
+        raise errors.WeaveHashConstTypeError(
+            "Attempted to Const type with unsupported val_type: %" % self.val_type
+        )
+
     def __getattr__(self, attr):
         return getattr(self.val_type, attr)
 
     @classmethod
     def type_of_instance(cls, obj):
         return cls(TypeRegistry.type_of(obj.val), obj.val)
+
+    def _is_assignable_to(self, other_type) -> typing.Optional[bool]:
+        if other_type.__class__ != Const:
+            return other_type.assign_type(self.val_type)
+        return None
 
     def _assign_type_inner(self, next_type):
         if isinstance(next_type, Const):
@@ -510,11 +521,8 @@ class Const(Type):
         #     pass
         return {"valType": self.val_type.to_dict(), "val": val}
 
-    def __str__(self):
-        return "<Const %s %s>" % (self.val_type, self.val)
-
     def __repr__(self):
-        return "<Const %s %s>" % (self.val_type, self.val)
+        return "Const(%s, %s)" % (self.val_type, self.val)
 
 
 class String(BasicType):
@@ -608,7 +616,12 @@ class UnionType(Type):
             else:
                 if mem not in all_members:
                     all_members.append(mem)
+        if not all_members:
+            raise errors.WeaveInternalError("Attempted to construct empty union")
         object.__setattr__(self, "members", all_members)
+
+    def __repr__(self):
+        return "UnionType(%s)" % ", ".join(repr(mem) for mem in self.members)
 
     def __eq__(self, other):
         if not isinstance(other, UnionType):
@@ -905,6 +918,16 @@ class Function(Type):
     input_types: dict[str, Type] = dataclasses.field(default_factory=dict)
     output_type: Type = dataclasses.field(default_factory=lambda: UnknownType())
 
+    def __hash__(self):
+        return hash(
+            ((tuple(k, v) for k, v in self.input_types.items()), self.output_type)
+        )
+
+    def _is_assignable_to(self, other_type) -> typing.Optional[bool]:
+        if other_type.__class__ != Function:
+            return other_type.assign_type(self.output_type)
+        return None
+
     @classmethod
     def type_of_instance(cls, obj):
         if isinstance(obj.type, Function):
@@ -993,7 +1016,6 @@ def optional(type_: Type) -> Type:
 
 
 def is_optional(type_: Type) -> bool:
-    # TODO: This should be implemented by assigning None, don't need all these checks right?
     TaggedValueType = type_name_to_type("tagged")
 
     if isinstance(type_, Const):
@@ -1003,7 +1025,7 @@ def is_optional(type_: Type) -> bool:
         return is_optional(type_.value)
 
     return isinstance(type_, UnionType) and any(
-        (m.assign_type(none_type) or none_type.assign_type(m)) for m in type_.members
+        (none_type.assign_type(m)) for m in type_.members
     )
 
 
@@ -1064,6 +1086,12 @@ class RunType(ObjectType):
             "history": self.history,
             "output": self.output,
         }
+
+    def _is_assignable_to(self, other_type) -> typing.Optional[bool]:
+        # Use issubclass, we have RunLocalType defined as a subclass of RunType
+        if not issubclass(other_type.__class__, RunType):
+            return other_type.assign_type(self.output)
+        return None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -1195,6 +1223,8 @@ def merge_types(a: Type, b: Type) -> Type:
 
 
 def union(*members: Type) -> Type:
+    if not members:
+        return UnknownType()
     t = UnionType(*members)
     if len(t.members) == 1:
         return t.members[0]
@@ -1230,7 +1260,7 @@ def type_is_variable(t: Type) -> bool:
     elif isinstance(t, Const):
         return type_is_variable(t.val_type)
     else:
-        return any(type_is_variable(sub_t) for sub_t in t.type_vars().values())
+        return any(type_is_variable(sub_t) for sub_t in t.type_vars.values())
 
 
 NumberBinType = TypedDict({"start": Float(), "stop": Float()})

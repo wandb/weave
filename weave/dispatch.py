@@ -4,7 +4,6 @@ import functools
 import logging
 import typing
 
-from . import language_nullability
 from .language_features.tagging.is_tag_getter import is_tag_getter
 
 from . import errors
@@ -14,9 +13,9 @@ from . import op_args
 from . import registry_mem
 from . import graph
 from . import errors
-from . import op_aliases
 from . import pyfunc_type_util
 from . import util
+from . import memo
 
 
 # I originally wrote this thinking that we could always choose the more specific
@@ -54,7 +53,18 @@ def _op_args_is_subtype(lhs: op_args.OpArgs, rhs: op_args.OpArgs) -> bool:
         raise errors.WeaveInternalError("unknown op_args types: %s, %s" % (lhs, rhs))
 
 
-def _resolve_op_ambiguity(candidates: list[op_def.OpDef]) -> op_def.OpDef:
+def _resolve_op_ambiguity(
+    candidates: list[op_def.OpDef], first_arg_type: types.Type
+) -> op_def.OpDef:
+    # nullability, if the first argument is None or List[None], then any
+    # of the candidates can handle it. Choose the first one (choosing the
+    # first ensures we choose a tag getter if there is one).
+    if first_arg_type and (
+        types.NoneType().assign_type(first_arg_type)
+        or types.List(types.NoneType()).assign_type(first_arg_type)
+    ):
+        return candidates[0]
+
     # Currently we deprioritize all tag getter ops below standard ops
     tag_getter_candidates = []
     non_tag_getter_candidates = []
@@ -111,102 +121,85 @@ def _get_ops_by_name(fq_op_name: str) -> list[op_def.OpDef]:
     return shared_name_ops
 
 
-def _choose_op_by_types(
-    op_choices: list[op_def.OpDef],
-    args: list[types.Type],
-    kwargs: dict[str, types.Type],
-) -> typing.Optional[op_def.OpDef]:
+def _dispatch_first_arg_inner(name: str, first_arg: types.Type) -> list[op_def.OpDef]:
+    ops_with_name = _get_ops_by_name(name)
+    ops_with_name_and_arg = []
+    for op in ops_with_name:
+        if op.input_type.first_param_valid(first_arg):
+            ops_with_name_and_arg.append(op)
+
+    return ops_with_name_and_arg
+
+
+@memo.memo
+def _dispatch_first_arg_cached(name: str, first_arg: types.Type) -> list[op_def.OpDef]:
+    return _dispatch_first_arg_inner(name, first_arg)
+
+
+def _dispatch_first_arg(name: str, first_arg: types.Type) -> list[op_def.OpDef]:
+    # We want to memoize on the first argument, so that when there are many ops
+    # hanging off a single node, we don't redo the dispatch for each. If there is
+    # a Const in the Type, we can't hash it (this should be uncommon in the first
+    # argument)
+    # TODO: track stats
+    if not isinstance(first_arg, types.Const):
+        try:
+            return _dispatch_first_arg_cached(name, first_arg)
+        except errors.WeaveHashConstTypeError:
+            pass
+    return _dispatch_first_arg_inner(name, first_arg)
+
+
+def _dispatch_remaining_args(
+    first_arg_ops: list[op_def.OpDef], kwargs: dict[str, types.Type]
+) -> list[op_def.OpDef]:
     candidates: list[op_def.OpDef] = []
-    for op in op_choices:
-        param_dict = op.input_type.create_param_dict(args, kwargs)
-        param_dict = language_nullability.adjust_assignable_param_dict_for_dispatch(
-            op, param_dict
-        )
-        if op.input_type.params_are_valid(param_dict):
+    for op in first_arg_ops:
+        if op.input_type.nonfirst_params_valid(list(kwargs.values())):
             candidates.append(op)
-    if not candidates:
-        return None
-
-    # nullability, if the first argument is None or List[None], then any
-    # of the candidates can handle it. Choose the first one (choosing the
-    # first ensures we choose a tag getter if there is one).
-    first_arg_type = None
-    if args:
-        first_arg_type = args[0]
-    elif kwargs:
-        first_arg_type = list(kwargs.values())[0]
-    if first_arg_type and (
-        types.NoneType().assign_type(first_arg_type)
-        or types.List(types.NoneType()).assign_type(first_arg_type)
-    ):
-        return candidates[0]
-
-    return _resolve_op_ambiguity(candidates)
+    return candidates
 
 
-def _choose_op_by_args(
-    ops: list[op_def.OpDef], args: list[typing.Any], kwargs: dict[str, typing.Any]
-) -> op_def.OpDef:
-    arg_types = [_type_of_input_param(arg) for arg in args]
-    kwarg_types = {k: _type_of_input_param(v) for k, v in kwargs.items()}
-    op = _choose_op_by_types(ops, arg_types, kwarg_types)
-
-    if op is None:
-        if len(ops) == 0:
+def get_op_for_inputs(name: str, kwargs: dict[str, types.Type]) -> op_def.OpDef:
+    if not kwargs:
+        # zero argument ops
+        ops = _get_ops_by_name(name)
+        if not ops:
             err = errors.WeaveDispatchError(
-                f"dispatch_ops_by_type called with no ops. args: {args}, kwargs: {kwargs}"
+                f'Cannot dispatch op "{name}"; no matching op found'
             )
-            util.raise_exception_with_sentry_if_available(
-                err, [args.__repr__(), kwargs.__repr__()]
+            util.raise_exception_with_sentry_if_available(err, [name])
+        elif len(ops) > 1:
+            err = errors.WeaveDispatchError(
+                f'Cannot dispatch zero-arg op "{name}"; multiple matching ops found'
             )
-        err = errors.WeaveDispatchError(
-            "No implementation of (%s) found for arg types: %s %s"
-            % (op_aliases.get_op_aliases(ops[0].common_name), arg_types, kwarg_types)
-        )
-        util.raise_exception_with_sentry_if_available(
-            err,
-            [
-                ops[0].common_name,
-            ],
-        )
-    return op
+            util.raise_exception_with_sentry_if_available(err, [name])
+        return ops[0]
 
+    input_keys = list(kwargs.keys())
+    input_types = list(kwargs.values())
 
-def _dispatch_ops_by_type(
-    ops: list[op_def.OpDef], args: list[typing.Any], kwargs: dict[str, typing.Any]
-) -> "RuntimeOutputNode":
-    op = _choose_op_by_args(ops, args, kwargs)
-
-    params = op.input_type.create_param_dict(args, kwargs)
-    return op(**params)
-
-
-def dispatch_by_name_and_type(
-    common_name: str, args: typing.Any, kwargs: typing.Any
-) -> "RuntimeOutputNode":
-    ops = _get_ops_by_name(common_name)
-    if len(ops) == 0:
-        err = errors.WeaveDispatchError(
-            f'Cannot dispatch op "{common_name}"; no matching op found'
-        )
-        util.raise_exception_with_sentry_if_available(err, [common_name])
-
-    return _dispatch_ops_by_type(ops, args, kwargs)
-
-
-def get_op_for_input_types(fq_op_name, arg_types, kwarg_types):  # type: ignore
-    ops = _get_ops_by_name(fq_op_name)
-    return _choose_op_by_types(ops, arg_types, kwarg_types)
-
-
-def get_op_for_inputs(
-    op_name: str, args: typing.Any, kwargs: typing.Any
-) -> op_def.OpDef:
-    ops = _get_ops_by_name(op_name)
+    # Dispatch first arg first. This is important for performance for two reasons:
+    # 1. We memoize dispatch_first_arg, so we don't do duplicate work in the case
+    #    where executing a graph with lots of fanout. This is common in Weave
+    #    (e.g. some_list[0], some_list[1], some_list[2], ...)
+    # 2. We don't have to check remaining types for ops that don't match the first
+    #    type.
+    ops = _dispatch_first_arg(name, input_types[0])
     if not ops:
-        err = errors.WeaveDispatchError('No ops found for name: "%s"' % op_name)
-        util.raise_exception_with_sentry_if_available(err, [op_name])
-    return _choose_op_by_args(ops, args, kwargs)
+        err = errors.WeaveDispatchError(
+            f'Cannot dispatch op "{name}"; no matching op found'
+        )
+        util.raise_exception_with_sentry_if_available(err, [name])
+
+    ops = _dispatch_remaining_args(ops, dict(zip(input_keys[1:], input_types[1:])))
+    if not ops:
+        err = errors.WeaveDispatchError(
+            f'Cannot dispatch op "{name}"; no matching op found'
+        )
+        util.raise_exception_with_sentry_if_available(err, [name])
+
+    return _resolve_op_ambiguity(ops, input_types[0])
 
 
 def _type_of_input_param(v: typing.Any) -> types.Type:
@@ -232,15 +225,37 @@ def _type_of_input_param(v: typing.Any) -> types.Type:
         return types.Const(types.TypeRegistry.type_of(v), v)
 
 
+def _get_self_bound_input_types(
+    self_node: graph.Node, *args: list[typing.Any], **kwargs: dict[str, typing.Any]
+) -> dict[str, types.Type]:
+    input_types = {"self": _type_of_input_param(self_node)}
+    input_types.update({str(i): _type_of_input_param(v) for i, v in enumerate(args)})
+    input_types.update({k: _type_of_input_param(v) for k, v in kwargs.items()})
+    return input_types
+
+
 @dataclass
 class BoundPotentialOpDefs:
     self_node: graph.Node
     potential_ops: list[op_def.OpDef]
 
     def __call__(self, *args: typing.Any, **kwargs: typing.Any) -> "RuntimeOutputNode":
-        return _dispatch_ops_by_type(
-            self.potential_ops, [self.self_node] + list(args), kwargs
+        inputs = _get_self_bound_input_types(self.self_node, *args, **kwargs)
+        input_keys = list(inputs.keys())
+        input_types = list(inputs.values())
+        ops = _dispatch_remaining_args(
+            self.potential_ops, dict(zip(input_keys[1:], input_types[1:]))
         )
+        if not ops:
+            err = errors.WeaveDispatchError(
+                f'Cannot dispatch choose op from "{self.potential_ops}"; no matching op found'
+            )
+            util.raise_exception_with_sentry_if_available(
+                err, [str(self.potential_ops)]
+            )
+        op = _resolve_op_ambiguity(ops, input_types[0])
+        params = op.input_type.create_param_dict([self.self_node] + list(args), kwargs)
+        return op(**params)
 
 
 def _dispatch_dunder(
@@ -251,7 +266,10 @@ def _dispatch_dunder(
     def dispatch_dunder_inner(
         self_node: graph.Node, *args: typing.Any, **kwargs: typing.Any
     ) -> "RuntimeOutputNode":
-        return dispatch_by_name_and_type(name, [self_node] + list(args), kwargs)
+        input_types = _get_self_bound_input_types(self_node, *args, **kwargs)
+        op = get_op_for_inputs(name, input_types)
+        params = op.input_type.create_param_dict([self_node] + list(args), kwargs)
+        return op(**params)
 
     return dispatch_dunder_inner
 
@@ -273,9 +291,11 @@ class DispatchMixin:
     to_pylist_notags = None
     as_py = None
 
-    def __dir__(self) -> list[str]:
-        ops = registry_mem.memory_registry.find_chainable_ops(self.type)
-        return [o.common_name for o in ops]
+    # This populates jupyter auto-complete, but it also really screws up
+    # the vscode debugger
+    # def __dir__(self) -> list[str]:
+    #     ops = registry_mem.memory_registry.find_chainable_ops(self.type)
+    #     return [o.common_name for o in ops]
 
     def __getattr__(self, attr: str) -> typing.Any:
         node_self = typing.cast(graph.Node, self)
@@ -298,19 +318,7 @@ class DispatchMixin:
         self, attr: str
     ) -> typing.Optional[typing.Union[BoundPotentialOpDefs, op_def.BoundOpDef]]:
         node_self = typing.cast(graph.Node, self)
-        # First, we check if the attribute matches a known op name...
-        ops_with_name = registry_mem.memory_registry.find_ops_by_common_name(attr)
-        ops_with_name_and_arg = []
-        for op in ops_with_name:
-            named_args = op.input_type.named_args()
-            if len(
-                named_args
-            ) > 0 and language_nullability.adjust_input_type_for_mixin_dispatch(
-                named_args[0].type
-            ).assign_type(
-                node_self.type
-            ):
-                ops_with_name_and_arg.append(op)
+        ops_with_name_and_arg = _dispatch_first_arg(attr, node_self.type)
         if len(ops_with_name_and_arg) > 0:
             if len(ops_with_name_and_arg) == 1:
                 # If there's only one candidate, we can just return it.

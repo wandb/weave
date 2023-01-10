@@ -34,7 +34,7 @@ def arrow_type_to_weave_type(pa_type: pa.DataType) -> types.Type:
             {f.name: arrow_type_to_weave_type(f.type) for f in pa_type}
         )
     elif pa.types.is_union(pa_type):
-        return types.UnionType([arrow_type_to_weave_type(f.type) for f in pa_type])
+        return types.UnionType(*[arrow_type_to_weave_type(f.type) for f in pa_type])
     raise errors.WeaveTypeError(
         "Type conversion not implemented for arrow type: %s" % pa_type
     )

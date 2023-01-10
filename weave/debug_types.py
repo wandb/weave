@@ -1,12 +1,13 @@
 import textwrap
 
 from .weave_types import *
+from .language_features.tagging import tagged_value_type
 
 
 def short_type(type: Type) -> str:
     s = type.__repr__()
-    if len(s) > 20:
-        s = s[:20] + "..."
+    if len(s) > 40:
+        s = s[:40] + "..."
     return f"<{s}>"
 
 
@@ -30,6 +31,13 @@ def why_not_assignable(to_type: Type, from_type: Type) -> typing.Optional[str]:
                 return None
             reasons.append(f"{short_type(to_member)}: {reason}")
 
+    elif isinstance(from_type, tagged_value_type.TaggedValueType) and not isinstance(
+        to_type, tagged_value_type.TaggedValueType
+    ):
+        reason = why_not_assignable(to_type, from_type.value)
+        if reason is not None:
+            reasons.append(reason)
+
     elif isinstance(from_type, Const) and not isinstance(to_type, Const):
         reason = why_not_assignable(to_type, from_type.val_type)
         if reason is not None:
@@ -41,7 +49,7 @@ def why_not_assignable(to_type: Type, from_type: Type) -> typing.Optional[str]:
             reasons.append(reason)
 
     elif to_type.name == from_type.name:
-        type_vars = to_type.type_vars()
+        type_vars = to_type.type_vars
         for k, to_type_type in type_vars.items():
             from_type_type = getattr(from_type, k)
             if from_type_type is None:

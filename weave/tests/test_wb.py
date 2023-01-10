@@ -1,3 +1,4 @@
+import graphql
 import pytest
 
 from .. import api as weave
@@ -95,6 +96,13 @@ workspace_response = {
                 },
             ]
         },
+    }
+}
+
+empty_workspace_response = {
+    "project": {
+        **fwb.project_payload,  # type: ignore
+        "runs_21303e3890a1b6580998e6aa8a345859": {"edges": []},
     }
 }
 
@@ -247,24 +255,22 @@ def test_missing_file(fake_wandb):
 
 
 def table_mock1(q, ndx):
-    if ndx == 0:
+    if q["gql"].definitions[0].name.value == "WeavePythonCG":
         return workspace_response
-    elif ndx == 1:
+    else:
         return artifact_version_sdk_response
-    elif ndx == 2:
-        return workspace_response
-    elif ndx == 3:
-        return artifact_version_sdk_response
-    pass
 
 
 def table_mock2(q, ndx):
-    if ndx == 0:
+    if q["gql"].definitions[0].name.value == "WeavePythonCG":
         return workspace_response
-    elif ndx == 1:
+    else:
         return artifact_version_sdk_response
-    elif ndx == 2:
-        return artifact_version_sdk_response
+
+
+def table_mock_empty_workspace(q, ndx):
+    if q["gql"].definitions[0].name.value == "WeavePythonCG":
+        return empty_workspace_response
 
 
 def test_map_gql_op(fake_wandb):
@@ -297,6 +303,24 @@ def test_legacy_run_file_table_format(fake_wandb):
     assert weave.use(cell_node.indexCheckpoint()) == 1
     assert weave.use(cell_node.run().name()) == "amber-glade-100"
     assert weave.use(cell_node.project().name()) == "mendeleev"
+
+
+def test_mapped_table_empty(fake_wandb):
+    fake_wandb.add_mock(table_mock_empty_workspace)
+    cell_node = (
+        ops.project("stacey", "mendeleev")
+        .runs()
+        .limit(1)
+        .summary()["table"]
+        .table()
+        .rows()
+        .dropna()
+        .concat()
+        .createIndexCheckpointTag()[5]["score_Amphibia"]
+    )
+    assert weave.use(cell_node.indexCheckpoint()) == None
+    assert weave.use(cell_node.run().name()) == None
+    assert weave.use(cell_node.project().name()) == None
 
 
 def test_mapped_table_tags(fake_wandb):
@@ -420,13 +444,9 @@ def test_table_images(fake_wandb):
 
 
 def table_mock_filtered(q, ndx):
-    if ndx == 0:
+    if q["gql"].definitions[0].name.value == "WeavePythonCG":
         return workspace_response_filtered
-    elif ndx == 1:
-        return artifact_version_sdk_response
-    elif ndx == 2:
-        return workspace_response_filtered
-    elif ndx == 3:
+    else:
         return artifact_version_sdk_response
 
 

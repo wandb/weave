@@ -1,7 +1,6 @@
 import typing
 from . import box
 from . import weave_types as types
-from . import op_args
 from .language_features.tagging import tagged_value_type
 
 if typing.TYPE_CHECKING:
@@ -32,23 +31,3 @@ def should_force_none_result(
             ):
                 return True
     return False
-
-
-def adjust_assignable_param_dict_for_dispatch(
-    op: "OpDef.OpDef", param_dict: dict[str, types.Type]
-) -> dict[str, types.Type]:
-    if isinstance(op.input_type, op_args.OpNamedArgs):
-        named_args = op.input_type.named_args()
-        if len(named_args) > 0:
-            first_arg = named_args[0]
-            first_param_type = param_dict[first_arg.name]
-            if not first_arg.type.assign_type(types.NoneType()):
-                if types.NoneType().assign_type(first_param_type):
-                    return {**param_dict, first_arg.name: first_arg.type}
-                non_none_type = types.non_none(first_param_type)
-                return {**param_dict, first_arg.name: non_none_type}
-    return param_dict
-
-
-def adjust_input_type_for_mixin_dispatch(input_type: types.Type) -> types.Type:
-    return types.union(types.NoneType(), input_type)

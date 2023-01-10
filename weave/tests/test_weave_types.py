@@ -3,6 +3,7 @@ import pytest
 from ..language_features.tagging.tagged_value_type import TaggedValueType
 import weave
 import weave.weave_types
+from .. import errors
 from .. import weave_types as types
 from .. import runs
 from ..ops_primitives import _dict_utils
@@ -65,6 +66,15 @@ def test_merge_through_tags():
     )
     assert correct_type.assign_type(r)
     assert r.assign_type(correct_type)
+
+
+def test_tagged_unions_simple():
+    assert weave.types.optional(weave.types.Int()).assign_type(
+        TaggedValueType(
+            types.TypedDict({"a": weave.types.String()}),
+            weave.types.optional(weave.types.Int()),
+        )
+    )
 
 
 def test_tag_assignment_through_union():
@@ -354,42 +364,6 @@ def test_typeddict_to_dict():
                 TaggedValueType(types.TypedDict({}), types.Const(types.Number(), 5)),
             ),
         ),
-        # Const Union Units
-        (
-            types.Const(types.union(types.NoneType(), types.Number()), 5),
-            types.Number(),
-        ),
-        (  # this is a wierd case - maybe we should just disallow const unions?
-            types.Const(types.union(types.NoneType(), types.Number()), None),
-            types.Number(),
-        ),
-        # Const Union Tagged Units
-        (
-            types.Const(
-                types.union(
-                    TaggedValueType(types.TypedDict({}), types.NoneType()),
-                    TaggedValueType(types.TypedDict({}), types.Number()),
-                ),
-                5,
-            ),
-            TaggedValueType(types.TypedDict({}), types.Number()),
-        ),
-        (
-            types.Const(
-                types.union(
-                    TaggedValueType(types.TypedDict({}), types.String()),
-                    TaggedValueType(types.TypedDict({}), types.Number()),
-                ),
-                5,
-            ),
-            types.Const(
-                types.union(
-                    TaggedValueType(types.TypedDict({}), types.String()),
-                    TaggedValueType(types.TypedDict({}), types.Number()),
-                ),
-                5,
-            ),
-        ),
         # Tagged Union Units
         (
             TaggedValueType(
@@ -448,6 +422,12 @@ def test_typeddict_to_dict():
 )
 def test_non_none(in_type, out_type):
     assert types.non_none(in_type) == out_type
+
+
+def test_const_union_invalid():
+    # assert that creating a const union type raises an error
+    with pytest.raises(errors.WeaveInternalError):
+        types.Const(types.union(types.NoneType(), types.Number()), 5)
 
 
 def test_floatint_merged():

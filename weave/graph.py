@@ -1,3 +1,4 @@
+import functools
 import json
 import typing
 
@@ -64,11 +65,29 @@ Frame = typing.Mapping[str, Node]
 class Op(typing.Generic[OpInputNodeT]):
     name: str
     inputs: dict[str, OpInputNodeT]
+    _full_name: typing.Optional[str]
 
     def __init__(self, name: str, inputs: dict[str, OpInputNodeT]) -> None:
         # TODO: refactor this variable to be "uri"
         self.name = name
         self.inputs = inputs
+        self._full_name = None
+
+    # Called frequently and expensive, so cache it.
+    @functools.cached_property
+    def full_name(self) -> str:
+        return opuri_full_name(self.name)
+
+    # Called frequently and expensive, so cache it.
+    @functools.cached_property
+    def input_types(self) -> dict[str, weave_types.Type]:
+        its: dict[str, weave_types.Type] = {}
+        for k, v in self.inputs.items():
+            if isinstance(v, ConstNode):
+                its[k] = weave_types.Const(v.type, v.val)
+            else:
+                its[k] = v.type
+        return its
 
     def to_json(self) -> dict:
         json_inputs = {}

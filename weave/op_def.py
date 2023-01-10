@@ -343,15 +343,10 @@ class OpDef:
     @property
     def concrete_output_type(self) -> types.Type:
         if callable(self.raw_output_type):
-            if isinstance(self.input_type, op_args.OpVarArgs):
-                return self.raw_output_type({})
-            elif isinstance(self.input_type, op_args.OpNamedArgs):
-                try:
-                    return self.raw_output_type(self.input_type.to_dict())
-                except AttributeError:
-                    return types.UnknownType()
-            else:
-                raise NotImplementedError("Unknown input type for op %s" % self.name)
+            try:
+                return self.raw_output_type(self.input_type.initial_arg_types)
+            except AttributeError:
+                return types.UnknownType()
         return self.raw_output_type
 
     @property
@@ -444,7 +439,12 @@ class OpDef:
         bound_params_with_constants = collections.OrderedDict()
         for k, v in bound_params.arguments.items():
             param = sig.parameters[k]
-            if param.kind == inspect.Parameter.VAR_KEYWORD:
+            if param.kind == inspect.Parameter.VAR_POSITIONAL:
+                for i, sub_v in enumerate(v):
+                    if not isinstance(sub_v, graph.Node):
+                        sub_v = weave_internal.const(sub_v)
+                    bound_params_with_constants[str(i)] = sub_v
+            elif param.kind == inspect.Parameter.VAR_KEYWORD:
                 for sub_k, sub_v in v.items():
                     if not isinstance(sub_v, graph.Node):
                         sub_v = weave_internal.const(sub_v)

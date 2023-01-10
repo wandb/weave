@@ -73,58 +73,53 @@ def test_basic_nullability_in_mappability():
 
 
 @pytest.mark.parametrize(
-    "input_node, expected",
+    "input_node, expected_type, expected",
     [
         # Base Case
         (
-            make_const_node(
-                weave.types.TypedDict({"a": weave.types.Number()}), {"a": 42}
-            ),
+            lambda: weave.save({"a": 42}),
+            weave.types.TypedDict({"a": weave.types.Int()}),
             42,
         ),
         # Maybe Case
         (
-            make_const_node(
-                weave.types.union(
-                    weave.types.NoneType(),
-                    weave.types.TypedDict({"a": weave.types.Number()}),
-                ),
-                {"a": 42},
+            lambda: weave.save([{"a": 42}, None])[0],
+            weave.types.union(
+                weave.types.NoneType(),
+                weave.types.TypedDict({"a": weave.types.Int()}),
             ),
             42,
         ),
         # List of Maybe Case
         (
-            make_const_node(
-                weave.types.List(
-                    weave.types.union(
-                        weave.types.NoneType(),
-                        weave.types.TypedDict({"a": weave.types.Number()}),
-                    )
-                ),
-                [{"a": 42}, None],
+            lambda: weave.save([{"a": 42}, None]),
+            weave.types.List(
+                weave.types.union(
+                    weave.types.NoneType(),
+                    weave.types.TypedDict({"a": weave.types.Int()}),
+                )
             ),
             [42, None],
         ),
         # Maybe list of Maybe Case
         (
-            make_const_node(
-                weave.types.union(
-                    weave.types.NoneType(),
-                    weave.types.List(
-                        weave.types.union(
-                            weave.types.NoneType(),
-                            weave.types.TypedDict({"a": weave.types.Number()}),
-                        )
-                    ),
+            lambda: weave.save([[{"a": 42}, None], None])[0],
+            weave.types.union(
+                weave.types.NoneType(),
+                weave.types.List(
+                    weave.types.union(
+                        weave.types.NoneType(),
+                        weave.types.TypedDict({"a": weave.types.Int()}),
+                    )
                 ),
-                [{"a": 42}, None],
             ),
             [42, None],
         ),
     ],
 )
-def test_nullability_in_execution(input_node, expected):
+def test_nullability_in_execution(input_node, expected_type, expected):
+    input_node = input_node()
+    assert input_node.type == expected_type
     # JS Weave0 Pick (noteable incorrect op name)
     js_pick = make_output_node(
         weave.types.Number(),

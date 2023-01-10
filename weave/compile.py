@@ -37,70 +37,6 @@ def _call_execute(function_node: graph.Node) -> graph.OutputNode:
     )
 
 
-def _fixup_output_type(graph_type: types.Type, op_type: types.Type):
-    # graph_type is the type from the incoming graph, which is always already
-    # refined by the caller.
-
-    # op_type is the unrefined op output type, for the given inputs.
-
-    # This function returns the equivalent to what the refined type should
-    # be if were to refine now, but without actually doing the refine which
-    # would execute the graph up to this point.
-
-    # Doing refinement in the compile phase is bad. It means we have to double
-    # compute ops (or worse). This happens because later phases need access
-    # to the full graph to determine what to do (gql, column pushdown,
-    # future optimizations)
-
-    # We know that WeaveJS provides us with correctly refined types, but that
-    # sometimes we have a more specific output type from the python op than
-    # we do from the js op.
-
-    # For example, file-table in WeavePython outputs an ArrowWeaveList instead
-    # of a list.
-    # In that case, we want to use the refined table object_type that WeaveJS
-    # has already provided, but the more specific ArrowWeaveList container type.
-
-    # Differences:
-    #   we do mapped ops differently in python
-    #   we do less tagging in python
-    #   we have more specific list types in python
-    #   weave python does not account for nullability in op types
-
-    if isinstance(graph_type, tagged_value_type.TaggedValueType):
-        if isinstance(op_type, tagged_value_type.TaggedValueType):
-            # Always accept the graph type tags. Note, we don't try to fix the
-            # tag types. We could...
-            value = _fixup_output_type(graph_type.value, op_type.value)
-        else:
-            value = _fixup_output_type(graph_type.value, op_type)
-        return tagged_value_type.TaggedValueType(graph_type.tag, value)
-
-    graph_type_is_sub = op_type.assign_type(graph_type)
-    op_type_is_sub = graph_type.assign_type(op_type)
-    if graph_type_is_sub and op_type_is_sub:
-        # types are equal
-        return graph_type
-    elif graph_type_is_sub:
-        # graph type is more specific, accept it
-        return graph_type
-    elif op_type_is_sub:
-        # op type is more specific, but its not refined. This happens when
-        # we have a more specific list type.
-        if isinstance(graph_type, types.List) and hasattr(op_type, "object_type"):
-            # op_type is a more specific list type.
-            object_type = _fixup_output_type(graph_type.object_type, op_type.object_type)  # type: ignore
-            return op_type.__class__(object_type)  # type: ignore
-        # This shouldn't happen, it indicates that we have a totally incorrect
-        # type in WeaveJS. But this branch smooths over some issues for now.
-        # TODO: Fix
-        # raise errors.WeaveInternalError("Cannot fixup output type", graph_type, op_type)
-        return op_type
-    # Types disagree. Trust Weave Python type. WeaveJS is probably more "correct" but Weave Python
-    # relies on its incorrectness.
-    return op_type
-
-
 def _dispatch_map_fn_refining(node: graph.Node) -> typing.Optional[graph.OutputNode]:
     if isinstance(node, graph.OutputNode):
         if node.from_op.name == "gqlroot-wbgqlquery":
@@ -110,47 +46,24 @@ def _dispatch_map_fn_refining(node: graph.Node) -> typing.Optional[graph.OutputN
             # dispatch works. So just return the node in this case instead of
             # dispatching.
             return node
-        node_inputs = node.from_op.inputs
+        from_op = node.from_op
         try:
-            new_node = dispatch.dispatch_by_name_and_type(
-                node.from_op.name, [], node_inputs
-            )
+            op = dispatch.get_op_for_inputs(node.from_op.name, from_op.input_types)
+            params = from_op.inputs
+            if isinstance(op.input_type, op_args.OpNamedArgs):
+                params = {
+                    k: n
+                    for k, n in zip(op.input_type.arg_types, from_op.inputs.values())
+                }
+            return op(**params)
         except errors.WeaveDispatchError:
             logging.error(
-                "Error while dispatching op: %s\n", graph_debug.node_expr_str_full(node)
+                "Error while dispatching name: %s for input types: %s.\n  Expression: %s",
+                from_op.name,
+                from_op.input_types,
+                graph_debug.node_expr_str_full(node),
             )
             raise
-
-        should_replace = new_node.from_op.name != node.from_op.name
-        if not node.type.assign_type(new_node.type):
-            logging.warning(
-                "Compile phase [dispatch] Changed output type for node %s from %s to %s. This indicates an incompability between WeaveJS and Weave Python",
-                node,
-                node.type,
-                new_node.type,
-            )
-            should_replace = True
-
-        # Due to a number of locations where the arg names differ between Weave0
-        # and Weave1, it is possible that the types themselves are correct, but
-        # the names are not. This is not a problem in execution but rather a
-        # problem for other graph manipulation steps which leverage edge names.
-        current_names = list(node.from_op.inputs.keys())
-        new_names = list(new_node.from_op.inputs.keys())
-        arg_names_differ = len(node.from_op.inputs) != len(
-            new_node.from_op.inputs
-        ) or any(n_k != o_k for n_k, o_k in zip(current_names, new_names))
-        if arg_names_differ:
-            logging.warning(
-                "Compile phase [dispatch] Changed input arg names node %s from %s to %s. This indicates an mismatch between WeaveJS and Weave Python",
-                node,
-                ",".join(current_names),
-                ",".join(new_names),
-            )
-            should_replace = True
-
-        if should_replace:
-            return new_node
     return None
 
 
@@ -173,12 +86,12 @@ def _dispatch_map_fn_no_refine(node: graph.Node) -> typing.Optional[graph.Output
             # if its in the graph, just trust that's what we want
             # TODO: does this work for mapped case?
             return node
-        node_inputs = node.from_op.inputs
-        op = dispatch.get_op_for_inputs(node.from_op.name, [], node_inputs)
-        params = node_inputs
+        from_op = node.from_op
+        op = dispatch.get_op_for_inputs(node.from_op.name, from_op.input_types)
+        params = from_op.inputs
         if isinstance(op.input_type, op_args.OpNamedArgs):
             params = {
-                k: n for k, n in zip(op.input_type.arg_types, node_inputs.values())
+                k: n for k, n in zip(op.input_type.arg_types, from_op.inputs.values())
             }
 
         # Weave Python op types don't express that they can handle
@@ -243,7 +156,7 @@ _await_run_outputs_map_fn = _make_auto_op_map_fn(types.RunType, _call_run_await)
 _execute_nodes_map_fn = _make_auto_op_map_fn(types.Function, _call_execute)
 
 
-def _apply_column_pushdown(leaf_nodes: list[graph.Node]) -> list[graph.Node]:
+def compile_apply_column_pushdown(leaf_nodes: list[graph.Node]) -> list[graph.Node]:
     # This is specific to project-runs2 (not yet used in W&B production) for now. But it
     # is a general pattern that will work for all arrow tables.
     if not graph.filter_nodes_full(
@@ -274,9 +187,25 @@ def _apply_column_pushdown(leaf_nodes: list[graph.Node]) -> list[graph.Node]:
     return graph.map_nodes_full(leaf_nodes, _replace_with_column_pushdown)
 
 
+def compile_fix_calls(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
+    return graph.map_nodes_full(nodes, _dispatch_map_fn_no_refine)
+
+
+def compile_await(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
+    return graph.map_nodes_full(nodes, _await_run_outputs_map_fn)
+
+
+def compile_execute(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
+    return graph.map_nodes_full(nodes, _execute_nodes_map_fn)
+
+
+def compile_refine(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
+    return graph.map_nodes_full(nodes, _dispatch_map_fn_refining)
+
+
 def _compile(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
     tracer = engine_trace.tracer()
-    logging.info("Starting compilation of graph with %s leaf nodes" % len(nodes))
+    # logging.info("Starting compilation of graph with %s leaf nodes" % len(nodes))
 
     n = nodes
 
@@ -284,22 +213,22 @@ def _compile(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
     # which ops to use. Critically, this first phase does not actually refine
     # op output types, so after this, the types in the graph are not yet correct.
     with tracer.trace("compile:fix_calls"):
-        n = graph.map_nodes_full(n, _dispatch_map_fn_no_refine)
+        n = compile_fix_calls(n)
 
     # Now that we have the correct calls, we can do our forward-looking pushdown
     # optimizations. These do not depend on having correct types in the graph.
     with tracer.trace("compile:gql"):
         n = compile_domain.apply_domain_op_gql_translation(n)
     with tracer.trace("compile:column_pushdown"):
-        n = _apply_column_pushdown(n)
+        n = compile_apply_column_pushdown(n)
 
     # Auto-transforms, where we insert operations to convert between types
     # as needed.
     # TODO: is it ok to have this before final refine?
     with tracer.trace("compile:await"):
-        n = graph.map_nodes_full(n, _await_run_outputs_map_fn)
+        n = compile_await(n)
     with tracer.trace("compile:execute"):
-        n = graph.map_nodes_full(n, _execute_nodes_map_fn)
+        n = compile_execute(n)
 
     # Final refine, to ensure the graph types are exactly what Weave python
     # produces. This phase can execute parts of the graph. It's very important
@@ -307,13 +236,14 @@ def _compile(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
     # graph, we reuse any results produced in this phase, instead of re-executing
     # those nodes.
     with tracer.trace("compile:refine"):
-        n = graph.map_nodes_full(n, _dispatch_map_fn_refining)
+        n = compile_refine(n)
 
-    loggable_nodes = graph_debug.combine_common_nodes(n)
-    logging.info(
-        "Compilation complete. Result nodes:\n%s",
-        "\n".join(graph_debug.node_expr_str_full(n) for n in loggable_nodes),
-    )
+    # This is very expensive!
+    # loggable_nodes = graph_debug.combine_common_nodes(n)
+    # logging.info(
+    #     "Compilation complete. Result nodes:\n%s",
+    #     "\n".join(graph_debug.node_expr_str_full(n) for n in loggable_nodes),
+    # )
 
     return n
 

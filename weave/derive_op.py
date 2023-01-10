@@ -5,6 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 
 from . import weave_types as types
+from . import context
 from . import op_args
 from . import registry_mem
 from . import op_def
@@ -15,6 +16,8 @@ from . import weave_internal
 from . import wandb_api
 from . import box
 from . import memo
+from . import storage
+from . import weave_internal
 
 from .language_features.tagging import tag_store
 
@@ -209,7 +212,8 @@ class MappedDeriveOpHandler(DeriveOpHandler):
 
         def resolve(**inputs):
             new_inputs = copy.copy(inputs)
-            list_ = new_inputs.pop(mapped_param_name)
+            first_arg_name = list(new_inputs)[0]
+            list_ = new_inputs.pop(first_arg_name)
 
             # Just do file-table in parallel for now. We'll do parallelization
             # more generally in the future.
@@ -228,7 +232,11 @@ class MappedDeriveOpHandler(DeriveOpHandler):
                         return None
                     memo_token = memo._memo_storage.set(memo_ctx)
                     try:
-                        res = orig_op.resolve_fn(**{mapped_param_name: x, **new_inputs})
+                        called = orig_op(x, **new_inputs)
+                        with context.execution_client():
+                            # Use the use path to get caching.
+                            res = weave_internal.use(called)
+                            res = storage.deref(res)
                     finally:
                         memo._memo_storage.reset(memo_token)
                     return res
@@ -244,6 +252,8 @@ class MappedDeriveOpHandler(DeriveOpHandler):
                 return res
 
             if isinstance(orig_op.concrete_output_type, types.TypeType):
+                if not list_:
+                    return types.List(types.NoneType())
                 return types.List(
                     types.union(
                         *[

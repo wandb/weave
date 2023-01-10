@@ -199,7 +199,13 @@ class HttpServer(threading.Thread):
         return url
 
 
-def capture_weave_server_logs(log_level=logging.DEBUG):
+def capture_weave_server_logs(log_level: str = "DEBUG"):
     from . import weave_server
 
-    weave_server.enable_stream_logging(log_level)
+    logger = logging.getLogger("root")
+    weave_server.enable_stream_logging(
+        logger,
+        wsgi_stream_settings=weave_server.LogSettings(
+            weave_server.LogFormat.PRETTY, log_level
+        ),
+    )

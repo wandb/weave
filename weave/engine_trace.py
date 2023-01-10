@@ -29,6 +29,9 @@ class DummyTrace:
     def current_span(self):
         return None
 
+    def current_root_span(self):
+        return None
+
 
 def tracer():
     if os.getenv("DD_ENV"):

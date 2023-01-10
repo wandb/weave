@@ -414,6 +414,8 @@ class LocalArtifact(Artifact):
 class WandbArtifact(Artifact):
     def __init__(self, name, type=None, uri: uris.WeaveWBArtifactURI = None):
         self.name = name
+        self._read_artifact_uri = None
+        self._read_artifact = None
         if not uri:
             self._writeable_artifact = wandb.Artifact(
                 name, type="op_def" if type is None else type
@@ -421,8 +423,21 @@ class WandbArtifact(Artifact):
         else:
             # load an existing artifact, this should be read only,
             # TODO: we could technically support writable artifacts by creating a new version?
-            self._saved_artifact = get_wandb_read_artifact(uri.make_path())
+            self._read_artifact_uri = uri
+            # self._saved_artifact = get_wandb_read_artifact(uri.make_path())
         self._local_path: dict[str, str] = {}
+
+    def _set_read_artifact_uri(self, uri):
+        self._read_artifact = None
+        self._read_artifact_uri = uri
+
+    @property
+    def _saved_artifact(self):
+        if self._read_artifact is None:
+            self._read_artifact = get_wandb_read_artifact(
+                self._read_artifact_uri.make_path()
+            )
+        return self._read_artifact
 
     def __repr__(self):
         return "<WandbArtifact %s>" % self.name
@@ -442,11 +457,11 @@ class WandbArtifact(Artifact):
 
     @property
     def is_saved(self) -> bool:
-        return hasattr(self, "_saved_artifact")
+        return self._read_artifact_uri is not None or self._read_artifact is not None
 
     @property
     def version(self):
-        if not self._saved_artifact:
+        if not self.is_saved:
             raise errors.WeaveInternalError("cannot get version of an unsaved artifact")
         return self._saved_artifact.version
 
@@ -458,7 +473,7 @@ class WandbArtifact(Artifact):
         raise NotImplementedError()
 
     def path(self, name):
-        if not self._saved_artifact:
+        if not self.is_saved:
             raise errors.WeaveInternalError("cannot download of an unsaved artifact")
 
         # First, check if we already downloaded this file:
@@ -501,15 +516,10 @@ class WandbArtifact(Artifact):
 
     @property
     def location(self):
-        return uris.WeaveWBArtifactURI.from_parts(
-            self._saved_artifact.entity,
-            self._saved_artifact.project,
-            self.name,
-            self._saved_artifact.version,
-        )
+        return self._read_artifact_uri
 
     def uri(self) -> str:
-        if not self._saved_artifact:
+        if not self.is_saved:
             raise errors.WeaveInternalError("cannot get uri of an unsaved artifact")
         # TODO: should we include server URL here?
         return self.location.uri
@@ -534,7 +544,7 @@ class WandbArtifact(Artifact):
 
     @contextlib.contextmanager
     def open(self, path, binary=False):
-        if not self._saved_artifact:
+        if not self.is_saved:
             raise errors.WeaveInternalError("cannot load data from an unsaved artifact")
         mode = "r"
         if binary:
@@ -564,9 +574,9 @@ class WandbArtifact(Artifact):
         self._writeable_artifact.wait()
         run.finish()
 
-        self._saved_artifact = wandb_api.wandb_public_api().artifact(
-            f"{run.entity}/{project}/{self._writeable_artifact.name}"
-        )
+        a_name, a_version = self._writeable_artifact.name.split(":")
+        uri = uris.WeaveWBArtifactURI.from_parts(run.entity, project, a_name, a_version)
+        self._set_read_artifact_uri(uri)
 
 
 class WandbRunFilesProxyArtifact(Artifact):
