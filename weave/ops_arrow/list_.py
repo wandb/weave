@@ -1235,6 +1235,9 @@ def vectorize(
         # explicitly force using ArrowWeaveList-dict instead.
         awl_transformed_inputs = {
             k: list_to_arrow(v)
+            # TODO: Tim/Shawn: we should further refine this list to just the
+            # input nodes which are part of the vectorization path. The current
+            # condition is not enough and can result in incorrect broadcasting
             # if id(v) != id(orig_node.from_op.inputs[k])
             if (not _type_is_assignable_to_awl_list(v.type))
             and _type_is_assignable_to_py_list(v.type)
@@ -1324,6 +1327,11 @@ def vectorize(
                         k
                         for k, v in inputs.items()
                         if (
+                            # TODO: Tim/Shawn: we should further refine this
+                            # list to just the input nodes which are part of the
+                            # vectorization path. The current condition is not
+                            # enough and can result in incorrect broadcasting
+                            # if id(v) != id(orig_node.from_op.inputs[k]) and
                             _type_is_assignable_to_awl_list(v.type)
                             or _type_is_assignable_to_awl_list(v.type)
                         )
