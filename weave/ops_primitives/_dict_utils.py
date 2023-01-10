@@ -16,7 +16,11 @@ def typeddict_pick_output_type(input_types):
     return output_type
 
 
-def tag_aware_dict_val_for_escaped_key(obj: dict, key: str) -> typing.Any:
+def tag_aware_dict_val_for_escaped_key(
+    obj: dict, key: typing.Optional[str]
+) -> typing.Any:
+    if key == None:
+        return None
     return _any_val_for_path(obj, split_escaped_string(key))
 
 
@@ -61,11 +65,12 @@ def typeddict_merge_output_type(
 # Re-implementation of helpers2.py
 
 
-def split_escaped_string(s: str) -> list[str]:
+def split_escaped_string(s: typing.Optional[str]) -> list[str]:
     # splits a string on dots, but ignores dots that are escaped
     # e.g. "a.b.c" -> ["a", "b", "c"]
     # e.g. "a\\.b.c" -> ["a.b", "c"]
-
+    if s is None:
+        return []
     placeholder = "___DOT___"
     s = s.replace("\\.", placeholder)
     parts = s.split(".")
