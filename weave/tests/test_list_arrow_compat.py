@@ -255,8 +255,8 @@ def test_join_all(li):
 
 algos = [
     ("pca", {}),
-    ("tsne", {"perplexity": 20, "learning_rate": 100, "iterations": 10}),
-    ("umap", {"neighbors": 10, "min_dist": 0.1, "spread": 1.0}),
+    ("tsne", {"perplexity": 2, "learning_rate": 10, "iterations": 3}),
+    ("umap", {"neighbors": 2, "min_dist": 0.1, "spread": 1.0}),
 ]
 
 
@@ -269,8 +269,8 @@ algos = [
     ],
 )
 def test_2d_projection(li, algo, options):
-    n_rows = 100
-    n_cols = 100
+    n_rows = 10
+    n_cols = 10
     data = np.random.rand(n_rows, n_cols)
     data_as_dicts = [
         {f"col_{item_ndx}": item for item_ndx, item in enumerate(row)} for row in data

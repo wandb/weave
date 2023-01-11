@@ -20,6 +20,25 @@ import functools
 import warnings
 
 
+from sklearn.manifold import TSNE
+from sklearn.decomposition import PCA
+
+umap_lib = {}
+
+
+def _get_umap():
+    # Lazily load a cached version of UMAP - umap import
+    # time is quite expensive so we want to do it once and
+    # only when needed
+    if "lib" not in umap_lib:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            import umap
+
+            umap_lib["lib"] = umap
+    return umap_lib["lib"]
+
+
 def _map_each_function_type(input_types: dict[str, types.Type]) -> types.Function:
     if types.List().assign_type(input_types["arr"]):
         return _map_each_function_type(
@@ -644,6 +663,7 @@ def list_2d_projection(
 ):
     if len(table) > MAX_PROJECTION_RECORDS:
         table = np.random.choice(table, MAX_PROJECTION_RECORDS)
+    n_samples = len(table)
 
     if len(inputColumnNames) == 0 or len(table) < 2:
         projection = [[0, 0] for row in table]
@@ -672,18 +692,14 @@ def list_2d_projection(
                 )
         embeddings = np.array(embeddings)
         if projectionAlgorithm == "pca":
-            from sklearn.decomposition import PCA
-
             pca = PCA(n_components=2)
             pca.fit(embeddings)
             projection = pca.transform(embeddings)
         elif projectionAlgorithm == "tsne":
-            from sklearn.manifold import TSNE
-
             options = algorithmOptions.get("tnse", {})
             tsne = TSNE(
                 n_components=2,
-                perplexity=options.get("perplexity", 30),
+                perplexity=min(n_samples - 1, options.get("perplexity", 30)),
                 n_iter=options.get("iterations", 1000),
                 learning_rate=options.get("learningRate", "auto"),
                 init="random",
@@ -692,18 +708,14 @@ def list_2d_projection(
         elif projectionAlgorithm == "umap":
             # UMAP emits a warning if TF is not installed, but that is only used
             # for Parametric UMAP, which we don't use here.
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                import umap
-
             options = algorithmOptions.get("umap", {})
-            umap = umap.UMAP(
+            umap_model = _get_umap().UMAP(
                 n_components=2,
-                n_neighbors=options.get("neighbors", 15),
+                n_neighbors=min(n_samples - 1, options.get("neighbors", 15)),
                 min_dist=options.get("minDist", 0.1),
                 spread=options.get("spread", 1.0),
             )
-            projection = umap.fit_transform(embeddings)
+            projection = umap_model.fit_transform(embeddings)
         else:
             raise Exception("Unknown projection algorithm: " + projectionAlgorithm)
 
