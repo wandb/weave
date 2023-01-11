@@ -991,8 +991,8 @@ def pushdown_list_tags(arr: ArrowWeaveList) -> ArrowWeaveList:
     if tag_store.is_tagged(arr):
         tag = tag_store.get_tags(arr)
         tag_type = types.TypeRegistry.type_of(tag)
-        tags: ArrowWeaveList = to_arrow([tag] * len(arr))
-        return awl_add_arrow_tags(arr, tags._arrow_data, tag_type)
+        tags = pa.repeat(to_arrow([tag])._arrow_data[0], len(arr))
+        return awl_add_arrow_tags(arr, tags, tag_type)
     return arr
 
 
