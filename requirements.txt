@@ -28,7 +28,7 @@ rich
 plotly
 replicate
 duckdb
-sklearn
+scikit-learn
 umap-learn
 
 # spaCy Requirements:
