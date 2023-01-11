@@ -224,21 +224,21 @@ class Artifact:
         raise NotImplementedError()
 
 
-# This is a prototype implementation. Chock full of races, and other
-# problems
-# Do not use in prod!
-# local-artifact://[path][asdfdsa][asdf]
 class LocalArtifact(Artifact):
     def __init__(self, name: str, version: typing.Optional[str] = None):
+        # LocalArtifacts are created frequently, sometimes in cases where
+        # they will neither be read to or written to. The to_python path does
+        # this, it creates an Artifact in case any of the objects in the tree
+        # we're serializing are custom and therefore would need to write to
+        # the artifact. But most times, there are no custom objects in the tree.
+        #
+        # So for performance, its important to not create the directory structure until
+        # until we actually need to write to the artifact.
         self.name = name
         self._version = version
         self._root = os.path.join(local_artifact_dir(), name)
         self._path_handlers: dict[str, typing.Any] = {}
-        os.makedirs(self._root, exist_ok=True)
         self._setup_dirs()
-
-        pathlib.Path(os.path.join(self._root, ".wandb-artifact")).touch()
-
         self._last_write_path = None
 
     def __repr__(self):
@@ -412,7 +412,9 @@ class LocalArtifact(Artifact):
 
 
 class WandbArtifact(Artifact):
-    def __init__(self, name, type=None, uri: uris.WeaveWBArtifactURI = None):
+    def __init__(
+        self, name, type=None, uri: typing.Optional[uris.WeaveWBArtifactURI] = None
+    ):
         self.name = name
         self._read_artifact_uri = None
         self._read_artifact = None
@@ -585,6 +587,7 @@ class WandbRunFilesProxyArtifact(Artifact):
         self._run = get_wandb_read_run(self.name)
         self._local_path: dict[str, str] = {}
 
+    @property
     def is_saved(self) -> bool:
         return True
 
