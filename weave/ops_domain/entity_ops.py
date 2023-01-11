@@ -21,7 +21,7 @@ entity = gql_root_op(
     {
         "entityName": types.String(),
     },
-    lambda inputs: f'name: "{inputs["entityName"]}"',
+    lambda inputs: f'name: {inputs["entityName"]}',
 )
 
 

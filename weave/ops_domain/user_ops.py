@@ -27,7 +27,7 @@ root_user = gql_root_op(
     {
         "userName": types.String(),
     },
-    lambda inputs: f'userName: "{inputs["userName"]}"',
+    lambda inputs: f'userName: {inputs["userName"]}',
 )
 
 # Section 3/6: Attribute Getters

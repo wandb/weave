@@ -1,9 +1,10 @@
+import json
 import typing
 from . import graph
 from . import weave_types as types
 from . import stitch
 from . import registry_mem
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import graphql
 
 if typing.TYPE_CHECKING:
@@ -11,8 +12,21 @@ if typing.TYPE_CHECKING:
 
 
 @dataclass
+class InputProvider:
+    raw: dict[str, typing.Any]
+    _dumps_cache: dict[str, str] = field(default_factory=dict)
+
+    def __getitem__(self, key: str) -> typing.Any:
+        if key not in self.raw:
+            raise KeyError(f"Input {key} not found")
+        if key not in self._dumps_cache:
+            self._dumps_cache[key] = json.dumps(self.raw[key])
+        return self._dumps_cache[key]
+
+
+@dataclass
 class GqlOpPlugin:
-    query_fn: typing.Callable[[dict[str, typing.Any], str], str]
+    query_fn: typing.Callable[[InputProvider, str], str]
     is_root: bool = False
 
 
@@ -25,7 +39,7 @@ class GqlOpPlugin:
 # see `project_ops.py::artifacts`), most ops use the higher level helpers
 # defined in `wb_domain_gql.py`
 def wb_gql_op_plugin(
-    query_fn: typing.Callable[[dict[str, typing.Any], str], str], is_root: bool = False
+    query_fn: typing.Callable[[InputProvider, str], str], is_root: bool = False
 ) -> dict[str, GqlOpPlugin]:
     return {"wb_domain_gql": GqlOpPlugin(query_fn, is_root)}
 
@@ -113,8 +127,10 @@ def _get_fragment(node: graph.OutputNode, stitchedGraph: stitch.StitchedGraph) -
         for key, value in node.from_op.inputs.items()
         if isinstance(value, graph.ConstNode)
     }
+    ip = InputProvider(const_node_input_vals)
+
     fragment = wb_domain_gql.query_fn(
-        const_node_input_vals,
+        ip,
         child_fragment,
     )
 
@@ -131,7 +147,7 @@ def _get_fragment(node: graph.OutputNode, stitchedGraph: stitch.StitchedGraph) -
         if refine_wb_domain_gql is not None:
             refine_wb_domain_gql = typing.cast(GqlOpPlugin, refine_wb_domain_gql)
             refine_fragment = refine_wb_domain_gql.query_fn(
-                const_node_input_vals,
+                ip,
                 child_fragment,
             )
 

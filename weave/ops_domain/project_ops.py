@@ -1,3 +1,4 @@
+import json
 from ..compile_domain import wb_gql_op_plugin
 from ..api import op
 from . import wb_domain_types as wdt
@@ -24,7 +25,7 @@ project = gql_root_op(
         "entityName": types.String(),
         "projectName": types.String(),
     },
-    lambda inputs: f'name: "{inputs["projectName"]}", entityName: "{inputs["entityName"]}"',
+    lambda inputs: f'name: {inputs["projectName"]}, entityName: {inputs["entityName"]}',
 )
 
 # Section 3/6: Attribute Getters
@@ -46,7 +47,7 @@ gql_direct_edge_op(
     {
         "artifactType": types.String(),
     },
-    lambda inputs: f'name: "{inputs["artifactType"]}"',
+    lambda inputs: f'name: {inputs["artifactType"]}',
 )
 
 gql_direct_edge_op(
@@ -58,7 +59,7 @@ gql_direct_edge_op(
         "artifactName": types.String(),
         "artifactVersionAlias": types.String(),
     },
-    lambda inputs: f'name: "{inputs["artifactName"]}:{inputs["artifactVersionAlias"]}"',
+    lambda inputs: f'name: {json.dumps(inputs.raw["artifactName"] + ":" + inputs.raw["artifactVersionAlias"])}',
 )
 
 gql_direct_edge_op(
@@ -69,7 +70,7 @@ gql_direct_edge_op(
     {
         "artifactName": types.String(),
     },
-    lambda inputs: f'name: "{inputs["artifactName"]}"',
+    lambda inputs: f'name: {inputs["artifactName"]}',
 )
 
 # Section 5/6: Connection Ops
@@ -92,10 +93,6 @@ gql_connection_op(
 )
 
 
-def escape_filter(filter: str) -> str:
-    return filter.replace('"', '\\"')
-
-
 gql_connection_op(
     "project-filteredRuns",
     wdt.ProjectType,
@@ -105,7 +102,7 @@ gql_connection_op(
         "filter": types.String(),
         "order": types.String(),
     },
-    lambda inputs: f'first: 50, filters: "{escape_filter(inputs["filter"])}", order: "{inputs["order"]}"',
+    lambda inputs: f'first: 50, filters: {inputs["filter"]}, order: {inputs["order"]}',
 )
 
 

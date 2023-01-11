@@ -66,7 +66,7 @@ gql_direct_edge_op(
     {
         "aliasName": types.String(),
     },
-    lambda inputs: f'aliasName: "{inputs["aliasName"]}"',
+    lambda inputs: f'aliasName: {inputs["aliasName"]}',
 )
 
 # Section 5/6: Connection Ops

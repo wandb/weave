@@ -187,10 +187,12 @@ def history(run: wdt.Run) -> list[dict[str, typing.Any]]:
 
 def _history_as_of_plugin(inputs, inner):
     min_step = (
-        inputs["asOfStep"] if "asOfStep" in inputs and inputs["asOfStep"] != None else 0
+        inputs.raw["asOfStep"]
+        if "asOfStep" in inputs.raw and inputs.raw["asOfStep"] != None
+        else 0
     )
     max_step = min_step + 1
-    alias = _make_alias(str(inputs["asOfStep"]), prefix="history")
+    alias = _make_alias(str(inputs.raw["asOfStep"]), prefix="history")
     return f"{alias}: history(minStep: {min_step}, maxStep: {max_step})"
 
 

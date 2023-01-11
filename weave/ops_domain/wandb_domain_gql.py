@@ -1,6 +1,6 @@
 import typing
 from ..api import op
-from ..compile_domain import wb_gql_op_plugin
+from ..compile_domain import InputProvider, wb_gql_op_plugin
 from .. import weave_types
 from inspect import signature, Parameter
 from . import wb_domain_types
@@ -77,9 +77,7 @@ def gql_root_op(
     prop_name: str,
     output_type: weave_types.Type,
     additional_inputs_types: typing.Optional[dict[str, weave_types.Type]] = None,
-    param_str_fn: typing.Optional[
-        typing.Callable[[typing.Dict[str, typing.Any]], str]
-    ] = None,
+    param_str_fn: typing.Optional[typing.Callable[[InputProvider], str]] = None,
 ):
     return gql_direct_edge_op(
         op_name,
@@ -97,9 +95,7 @@ def gql_direct_edge_op(
     prop_name: str,
     output_type: weave_types.Type,
     additional_inputs_types: typing.Optional[dict[str, weave_types.Type]] = None,
-    param_str_fn: typing.Optional[
-        typing.Callable[[typing.Dict[str, typing.Any]], str]
-    ] = None,
+    param_str_fn: typing.Optional[typing.Callable[[InputProvider], str]] = None,
     is_many: bool = False,
 ):
     is_root = input_type is None
@@ -143,7 +139,7 @@ def gql_direct_edge_op(
             }
             name = prop_name
             if param_str_fn:
-                param_str = param_str_fn(additional_inputs)
+                param_str = param_str_fn(InputProvider(additional_inputs))
                 if not is_root:
                     name = _make_alias(param_str, prefix=prop_name)
             if is_many:
@@ -195,9 +191,7 @@ def gql_connection_op(
     prop_name: str,
     output_type: weave_types.Type,
     additional_inputs_types: typing.Optional[dict[str, weave_types.Type]] = None,
-    param_str_fn: typing.Optional[
-        typing.Callable[[typing.Dict[str, typing.Any]], str]
-    ] = None,
+    param_str_fn: typing.Optional[typing.Callable[[InputProvider], str]] = None,
 ):
     first_arg_name = "gql_obj" if input_type is None else input_type.name
     if not output_type.instance_class or isinstance(
@@ -234,7 +228,7 @@ def gql_connection_op(
         }
         name = prop_name
         if param_str_fn:
-            param_str = param_str_fn(additional_inputs)
+            param_str = param_str_fn(InputProvider(additional_inputs))
             name = _make_alias(param_str, prefix=prop_name)
         # If we have a None argument, return an empty list.
         if gql_obj.gql == wb_domain_types.UntypedOpaqueDict.from_json_dict(None):
