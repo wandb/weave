@@ -128,12 +128,13 @@ def setup_handler(hander: logging.Handler, settings: LogSettings) -> None:
 
 
 def enable_stream_logging(
-    logger: logging.Logger,
+    logger: typing.Optional[logging.Logger] = None,
     wsgi_stream_settings: typing.Optional[LogSettings] = None,
     rich_settings: typing.Optional[LogSettings] = None,
     logfile_settings: typing.Optional[LogSettings] = None,
 ):
     handler: logging.Handler
+    logger = logger or logging.getLogger("root")
 
     if wsgi_stream_settings is not None:
         handler = logging.StreamHandler(wsgi_errors_stream)

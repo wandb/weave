@@ -74,13 +74,30 @@ def convert_specific_ops_to_generic_ops_node(node: graph.Node) -> graph.Node:
     return graph.map_nodes_full([node], convert_specific_op_to_generic_op)[0]
 
 
+def _dict_is_node_like(data: dict):
+    return data.get("nodeType") in ["const", "output", "var", "void"]
+
+
+# Non-perfect heuristic to determine if a serialized dict is likely an op
+def _dict_is_op_like(data: dict):
+    # Firstly, ops will only have "name" and "input" keys
+    if set(data.keys()) == set(["name", "inputs"]):
+        # Those keys will be str and list respectively.
+        if isinstance(data["name"], str) and isinstance(data["inputs"], dict):
+            # And the inputs will be dicts that are node-like
+            return all(
+                _dict_is_node_like(in_node) for in_node in data["inputs"].values()
+            )
+    return False
+
+
 def convert_specific_ops_to_generic_ops_data(data):
     """Fix op call names for serialized objects containing graphs"""
     if isinstance(data, list):
         return [convert_specific_ops_to_generic_ops_data(d) for d in data]
     elif isinstance(data, dict):
         d = data
-        if "name" in data and "inputs" in data:
+        if _dict_is_op_like(data):
             d["name"], d["inputs"] = convert_specific_opname_to_generic_opname(
                 d["name"], d["inputs"]
             )
@@ -109,7 +126,7 @@ def remove_opcall_versions_data(data):
         return [remove_opcall_versions_data(d) for d in data]
     elif isinstance(data, dict):
         d = data
-        if "name" in data and isinstance(data["name"], str) and ":" in data["name"]:
+        if _dict_is_op_like(data):
             d = copy.copy(data)
             d["name"] = graph.opuri_full_name(data["name"])
         return {k: remove_opcall_versions_data(v) for k, v in d.items()}
