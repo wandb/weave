@@ -576,6 +576,25 @@ def test_arrow_groupby_nested_tag_stripping(fake_wandb):
     assert len(grouped) == 50
 
 
+def test_arrow_groupby_sort(fake_wandb):
+    fake_wandb.add_mock(lambda q, ndx: file_path_response)
+    groupby_node = (
+        ops.project("stacey", "mendeleev")
+        .artifactType("test_results")
+        .artifacts()[0]
+        .versions()[0]
+        .file("test_results.table.json")
+        .table()
+        .rows()
+        .createIndexCheckpointTag()
+        .groupby(lambda row: ops.dict_(x=row["truth"]))
+        .sort(lambda row: ops.make_list(a=row.groupkey()["x"]), ["desc"])[0]
+        .groupkey()["x"]
+    )
+    grouped = weave.use(groupby_node)
+    assert grouped == "Reptilia"
+
+
 def test_arrow_tag_stripping(fake_wandb):
     fake_wandb.add_mock(lambda q, ndx: file_path_response)
     awl_node = (
