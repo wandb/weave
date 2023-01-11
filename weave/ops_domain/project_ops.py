@@ -31,6 +31,13 @@ project = gql_root_op(
 # Section 3/6: Attribute Getters
 gql_prop_op("project-name", wdt.ProjectType, "name", types.String())
 
+gql_prop_op(
+    "project-createdAt",
+    wdt.ProjectType,
+    "createdAt",
+    types.Datetime(),
+)
+
 # Section 4/6: Direct Relationship Ops
 gql_direct_edge_op(
     "project-entity",
