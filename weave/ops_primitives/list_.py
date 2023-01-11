@@ -1,42 +1,21 @@
-import dataclasses
 import numpy as np
 import pandas as pd
 import typing
 
+from . import projection_utils
+
 from ._dict_utils import tag_aware_dict_val_for_escaped_key
 from .. import box
 from .. import weave_types as types
-from ..api import Node, op, mutation, weave_class, OpVarArgs
-from .. import weave_internal
+from ..api import Node, op, weave_class, OpVarArgs
 from .. import errors
 from .. import execute_fast
-from .. import op_def
 from ..language_features.tagging import (
     tag_store,
     tagged_value_type,
     tagged_value_type_helpers,
 )
 import functools
-import warnings
-
-
-from sklearn.manifold import TSNE
-from sklearn.decomposition import PCA
-
-umap_lib = {}
-
-
-def _get_umap():
-    # Lazily load a cached version of UMAP - umap import
-    # time is quite expensive so we want to do it once and
-    # only when needed
-    if "lib" not in umap_lib:
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            import umap
-
-            umap_lib["lib"] = umap
-    return umap_lib["lib"]
 
 
 def _map_each_function_type(input_types: dict[str, types.Type]) -> types.Function:
@@ -618,22 +597,6 @@ def op_range(start: int, stop: int, step: int) -> list[int]:
     return list(range(start, stop, step))
 
 
-def _wrap_new_list_with_tags(new_list: list, old_list: list) -> list:
-    res = []
-    for new_item, old_item in zip(new_list, old_list):
-        if tag_store.is_tagged(old_item):
-            new_item = tag_store.add_tags(
-                box.box(new_item), tag_store.get_tags(old_item)
-            )
-        res.append(new_item)
-    return res
-
-
-# Re-implementation of weave0
-MAX_PROJECTION_RECORDS = 1500
-MAX_PROJECTION_DIMENSIONS = 50
-
-
 @op(
     name="table-2DProjection",
     input_type={
@@ -661,22 +624,10 @@ def list_2d_projection(
     inputColumnNames,
     algorithmOptions,
 ):
-    if len(table) > MAX_PROJECTION_RECORDS:
-        table = np.random.choice(table, MAX_PROJECTION_RECORDS)
-    n_samples = len(table)
-
+    inputColumnNames = list(set(inputColumnNames))
     if len(inputColumnNames) == 0 or len(table) < 2:
         projection = [[0, 0] for row in table]
     else:
-
-        if inputCardinality == "single":
-            inputColumnNames = [inputColumnNames[0]]
-        else:
-            if len(inputColumnNames) > MAX_PROJECTION_DIMENSIONS:
-                inputColumnNames = np.random.choice(
-                    inputColumnNames, MAX_PROJECTION_DIMENSIONS
-                )
-
         embeddings = []
         for row in table:
             if inputCardinality == "single":
@@ -690,36 +641,12 @@ def list_2d_projection(
                         for c in inputColumnNames
                     ]
                 )
-        embeddings = np.array(embeddings)
-        if projectionAlgorithm == "pca":
-            pca = PCA(n_components=2)
-            pca.fit(embeddings)
-            projection = pca.transform(embeddings)
-        elif projectionAlgorithm == "tsne":
-            options = algorithmOptions.get("tnse", {})
-            tsne = TSNE(
-                n_components=2,
-                perplexity=min(n_samples - 1, options.get("perplexity", 30)),
-                n_iter=options.get("iterations", 1000),
-                learning_rate=options.get("learningRate", "auto"),
-                init="random",
-            )
-            projection = tsne.fit_transform(embeddings)
-        elif projectionAlgorithm == "umap":
-            # UMAP emits a warning if TF is not installed, but that is only used
-            # for Parametric UMAP, which we don't use here.
-            options = algorithmOptions.get("umap", {})
-            umap_model = _get_umap().UMAP(
-                n_components=2,
-                n_neighbors=min(n_samples - 1, options.get("neighbors", 15)),
-                min_dist=options.get("minDist", 0.1),
-                spread=options.get("spread", 1.0),
-            )
-            projection = umap_model.fit_transform(embeddings)
-        else:
-            raise Exception("Unknown projection algorithm: " + projectionAlgorithm)
-
-    structured_projection = [
+        np_array_of_embeddings = np.array(embeddings)
+        np_projection = projection_utils.perform_2D_projection(
+            np_array_of_embeddings, projectionAlgorithm, algorithmOptions
+        )
+        projection = np_projection.tolist()
+    return [
         {
             "projection": {
                 "x": p[0],
@@ -727,6 +654,5 @@ def list_2d_projection(
             },
             "source": row,
         }
-        for p, row in zip(projection.tolist(), table)
+        for p, row in zip(projection, table)
     ]
-    return _wrap_new_list_with_tags(structured_projection, table)

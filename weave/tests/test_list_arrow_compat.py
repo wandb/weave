@@ -269,8 +269,8 @@ algos = [
     ],
 )
 def test_2d_projection(li, algo, options):
-    n_rows = 10
-    n_cols = 10
+    n_rows = 15
+    n_cols = 6
     data = np.random.rand(n_rows, n_cols)
     data_as_dicts = [
         {f"col_{item_ndx}": item for item_ndx, item in enumerate(row)} for row in data
@@ -278,7 +278,7 @@ def test_2d_projection(li, algo, options):
     col_names = [f"col_{item_ndx}" for item_ndx in range(n_cols)]
     node = li.make_node(data_as_dicts)
     projection = node._get_op("2DProjection")(algo, "many", col_names, options)
-    res = weave.use(projection)
+    res = li.use_node(projection)
     assert len(res) == n_rows
     assert res[0].get("projection").get("x") is not None
     assert res[0].get("projection").get("y") is not None

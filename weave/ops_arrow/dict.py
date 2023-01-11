@@ -1,13 +1,14 @@
 import typing
 import pyarrow as pa
+import numpy as np
 
 from .arrow import arrow_as_array
 
-from ..api import op, type, OpVarArgs
+from ..api import op, OpVarArgs
 from ..decorator_arrow_op import arrow_op
 from .. import weave_types as types
 from ..ops_primitives import _dict_utils
-from .. import errors
+from ..ops_primitives import projection_utils
 from ..language_features.tagging import (
     process_opdef_output_type,
 )
@@ -193,3 +194,80 @@ def arrow_dict_(**d):
     res = vectorized_container_constructor_preprocessor(d)
     table = pa.Table.from_arrays(res.arrays, list(d.keys()))
     return ArrowWeaveList(table, types.TypedDict(res.prop_types), res.artifact)
+
+
+@op(
+    name="ArrowWeaveList-2DProjection",
+    input_type={
+        "table": ArrowWeaveListType(types.TypedDict({})),
+        "projectionAlgorithm": types.String(),
+        "inputCardinality": types.String(),
+        "inputColumnNames": types.List(types.String()),
+        "algorithmOptions": types.TypedDict({}),
+    },
+    output_type=lambda input_types: ArrowWeaveListType(
+        types.TypedDict(
+            {
+                "projection": types.TypedDict(
+                    {"x": types.Number(), "y": types.Number()}
+                ),
+                "source": input_types["table"].object_type,
+            }
+        )
+    ),
+)
+def awl_2d_projection(
+    table,
+    projectionAlgorithm,
+    inputCardinality,
+    inputColumnNames,
+    algorithmOptions,
+):
+    inputColumnNames = list(set(inputColumnNames))
+    data = arrow_as_array(table._arrow_data)
+    if len(inputColumnNames) == 0 or len(data) < 2:
+        np_projection = np.array([[0, 0] for row in data])
+    else:
+        if inputCardinality == "single":
+            path = _dict_utils.split_escaped_string(inputColumnNames[0])
+            np_array_of_embeddings = np.stack(
+                _awl_pick(data, path).to_numpy(False), axis=0
+            )
+        else:
+            column_data = [
+                _awl_pick(data, _dict_utils.split_escaped_string(c))
+                for c in inputColumnNames
+            ]
+            np_array_of_embeddings = np.array(column_data).T
+
+        np_projection = projection_utils.perform_2D_projection(
+            np_array_of_embeddings, projectionAlgorithm, algorithmOptions
+        )
+    x_column = np_projection[:, 0]
+    y_column = np_projection[:, 1]
+
+    projection_column = pa.StructArray.from_arrays(
+        [pa.array(x_column), pa.array(y_column)], ["x", "y"]
+    )
+
+    source_column = data
+
+    projection_column = pa.StructArray.from_arrays(
+        [projection_column, source_column], ["projection", "source"]
+    )
+
+    return ArrowWeaveList(
+        projection_column,
+        types.TypedDict(
+            {
+                "projection": types.TypedDict(
+                    {
+                        "x": types.Number(),
+                        "y": types.Number(),
+                    }
+                ),
+                "source": table.object_type,
+            }
+        ),
+        table._artifact,
+    )

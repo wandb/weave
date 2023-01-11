@@ -21,7 +21,7 @@ def arrow_type_to_weave_type(pa_type: pa.DataType) -> types.Type:
         return types.String()
     elif pa_type == pa.int64() or pa_type == pa.int32():
         return types.Int()
-    elif pa_type == pa.float64():
+    elif pa_type in [pa.float64(), pa.float32(), pa.float16()]:
         return types.Float()
     elif pa_type == pa.bool_():
         return types.Boolean()
