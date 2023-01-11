@@ -315,6 +315,39 @@ def awl_group_by_result_type(
     return ArrowWeaveListType(awl_group_by_result_object_type(object_type, key_type))
 
 
+def _reshape_struct_array(t: pa.StructType, array: pa.StructArray) -> pa.StructArray:
+    field_names = [f.name for f in t]
+    sub_fields = []
+    for field_name in field_names:
+        sub_field_type = t.field(field_name).type
+        sub_field = array.field(field_name)
+        if not isinstance(sub_field_type, pa.StructType):
+            sub_fields.append(sub_field)
+        else:
+            sub_fields.append(_reshape_struct_array(sub_field_type, sub_field))
+    return pa.StructArray.from_arrays(sub_fields, field_names)
+
+
+# When concatenating arrays, the structs need to have the same key order. This
+# method attempts reshape StructArrays to have the same nested key order in
+# order to safely concat them. If this is not done, arrow will throw an error
+# like: `arrays to be concatenated must be identically typed, but ...`
+def safe_pa_concat_arrays(arrays):
+    if len(arrays) < 2:
+        return pa.concat_arrays(arrays)
+    t = arrays[0].type
+    if all(a.type == t for a in arrays):
+        return pa.concat_arrays(arrays)
+    if isinstance(t, pa.StructType):
+        try:
+            return pa.concat_arrays(
+                [_reshape_struct_array(t, array) for array in arrays]
+            )
+        except KeyError:
+            pass
+    return pa.concat_arrays(arrays)
+
+
 @weave_class(weave_type=ArrowWeaveListType)
 class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
     _arrow_data: typing.Union[pa.Table, pa.ChunkedArray, pa.Array]
@@ -754,7 +787,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         arrow_data = [arrow_as_array(awl._arrow_data) for awl in (self, other)]
         if arrow_data[0].type == arrow_data[1].type:
             return ArrowWeaveList(
-                pa.concat_arrays(arrow_data), self.object_type, self._artifact
+                safe_pa_concat_arrays(arrow_data), self.object_type, self._artifact
             )
         else:
             new_object_types_with_pushed_down_tags = [
@@ -773,7 +806,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                 a.with_object_type(new_object_type)._arrow_data for a in (self, other)
             ]
             return ArrowWeaveList(
-                pa.concat_arrays(new_arrow_arrays), new_object_type, self._artifact
+                safe_pa_concat_arrays(new_arrow_arrays), new_object_type, self._artifact
             )
 
     @op(
@@ -1813,7 +1846,7 @@ def vectorized_list_output_type(input_types):
 def arrow_list_(**e):
     res = vectorized_container_constructor_preprocessor(e)
     element_types = res.prop_types.values()
-    concatted = pa.concat_arrays(res.arrays)
+    concatted = safe_pa_concat_arrays(res.arrays)
     take_ndxs = []
     for row_ndx in range(res.max_len):
         take_ndxs.extend([row_ndx + i * res.max_len for i in range(len(e))])
@@ -1919,7 +1952,7 @@ def join_all(arrs, joinFn, outer: bool):
     num_inputs = len(arrs)
     res_len = len(res)
     for shared_column_name in all_element_keys:
-        concatted = pa.concat_arrays(
+        concatted = safe_pa_concat_arrays(
             [arrow_as_array(res.column(shared_column_name))]
             + [
                 arrow_as_array(res.column(shared_column_name + f"__t_{i}__"))

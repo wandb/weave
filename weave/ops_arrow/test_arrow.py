@@ -2160,3 +2160,54 @@ def test_verify_dictionary_encoding_of_strings():
 
     # does not raise
     verify_pyarrow_array_type_is_valid_for_tag_array(converted.type)
+
+
+@pytest.mark.parametrize(
+    "list_of_data, exp_res",
+    [
+        # Empty Case
+        ([[]], []),
+        # Base Case
+        (
+            [
+                [{"a": 1, "b": 2}, {"a": 2, "b": 3}],
+                [{"a": 4, "b": 5}, {"a": 6, "b": 7}],
+            ],
+            [{"a": 1, "b": 2}, {"a": 2, "b": 3}, {"a": 4, "b": 5}, {"a": 6, "b": 7}],
+        ),
+        # Deeply Mixed Case
+        (
+            [
+                [{"a": {"c": 1, "d": 2}, "b": {"d": 3, "c": 4}}],
+                [{"b": {"d": 5, "c": 6}, "a": {"c": 7, "d": 8}}],
+            ],
+            [
+                {"a": {"c": 1, "d": 2}, "b": {"d": 3, "c": 4}},
+                {"a": {"c": 7, "d": 8}, "b": {"c": 6, "d": 5}},
+            ],
+        ),
+        # Mix of lists and dicts
+        (
+            [
+                [{"a": [{"c": 1, "d": 2}, {"d": 3, "c": 4}]}],
+                [{"a": [{"d": 5, "c": 6}, {"c": 7, "d": 8}]}],
+            ],
+            [
+                {"a": [{"c": 1, "d": 2}, {"d": 3, "c": 4}]},
+                {"a": [{"d": 5, "c": 6}, {"c": 7, "d": 8}]},
+            ],
+        ),
+    ],
+)
+def test_arrow_concat_mixed(list_of_data, exp_res):
+    assert (
+        weave.use(
+            ops.make_list(
+                **{
+                    f"{ndx}": weave.save(arrow.to_arrow(data))
+                    for ndx, data in enumerate(list_of_data)
+                }
+            ).concat()
+        ).to_pylist()
+        == exp_res
+    )
