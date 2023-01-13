@@ -987,11 +987,14 @@ def _apply_fn_node(awl: ArrowWeaveList, fn: graph.OutputNode) -> ArrowWeaveList:
 
 
 def pushdown_list_tags(arr: ArrowWeaveList) -> ArrowWeaveList:
-
     if tag_store.is_tagged(arr):
         tag = tag_store.get_tags(arr)
         tag_type = types.TypeRegistry.type_of(tag)
-        tags = pa.repeat(to_arrow([tag])._arrow_data[0], len(arr))
+        tag_no_dictionary = to_arrow([tag])._arrow_data
+        tag_maybe_dictionary_encoded = (
+            recursively_encode_pyarrow_strings_as_dictionaries(tag_no_dictionary)
+        )
+        tags = pa.repeat(tag_maybe_dictionary_encoded[0], len(arr))
         return awl_add_arrow_tags(arr, tags, tag_type)
     return arr
 
