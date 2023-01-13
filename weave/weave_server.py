@@ -426,7 +426,8 @@ if os.getenv("WEAVE_SERVER_DEBUG"):
 
 @app.before_first_request
 def before_first_request():
-    from weave.ecosystem import all
+    if not util.parse_boolean_env_var("WEAVE_SERVER_DISABLE_ECOSYSTEM"):
+        from weave.ecosystem import all
 
 
 if __name__ == "__main__":
