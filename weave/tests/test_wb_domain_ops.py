@@ -1,6 +1,7 @@
 import weave
 from .. import ops as ops
 import graphql
+from . import fixture_fakewandb as fwb
 
 """
 Tests in this file whould be used to test the graphs that can be constructed
@@ -70,7 +71,7 @@ def test_root_project_runs(fake_wandb):
     assert len(log) == 1
     assert_gql_str_equal(
         log[0]["gql"],
-        # Note: the inner project/entity query is becuase it is part of the required fragment for runs
+        # Note: the inner project/entity query is because it is part of the required fragment for runs
         # this could in theory change in the future.
         """
         query WeavePythonCG { 
@@ -100,4 +101,69 @@ def test_root_project_runs(fake_wandb):
                 }
             }
         }""",
+    )
+
+
+def test_root_project_concat(fake_wandb):
+    runs_node_1 = ops.project("stacey", "mendeleev").filteredRuns("{}", "-createdAt")
+    runs_node_2 = ops.project("stacey", "mendeleev").filteredRuns("{}", "-createdAt")
+    fake_wandb.add_mock(
+        lambda query, ndx: {
+            "project": {
+                **fwb.project_payload,
+                "runs_6e908597bd3152c2f0457f6283da76b9": {
+                    "edges": [
+                        {
+                            "node": {
+                                **fwb.run_payload,
+                                "summaryMetrics": '{"loss": 0.1}',
+                            },
+                        }
+                    ]
+                },
+            }
+        }
+    )
+    summary = (
+        ops.make_list(a=runs_node_1, b=runs_node_2).concat().limit(50).summary()["loss"]
+    )
+
+    assert weave.use(summary) == [0.1, 0.1]
+    log = fake_wandb.execute_log()
+    assert len(log) == 1
+    assert_gql_str_equal(
+        log[0]["gql"],
+        # Note: the inner project/entity query is because it is part of the required fragment for runs
+        # this could in theory change in the future.
+        """query WeavePythonCG {
+            project(name: "mendeleev", entityName: "stacey") {
+                id
+                name
+                entity {
+                id
+                name
+                }
+                runs_6e908597bd3152c2f0457f6283da76b9: runs(
+                first: 50
+                filters: "{}"
+                order: "-createdAt"
+                ) {
+                edges {
+                    node {
+                    id
+                    name
+                    project {
+                        id
+                        name
+                        entity {
+                        id
+                        name
+                        }
+                    }
+                    summaryMetrics
+                    }
+                }
+                }
+            }
+            }""",
     )
