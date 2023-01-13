@@ -172,6 +172,18 @@ def get_tag_name_from_tag_getter_op(op: op_def.OpDef) -> str:
 def stitch_node_inner(
     node: graph.OutputNode, input_dict: dict[str, ObjectRecorder], sg: StitchedGraph
 ) -> ObjectRecorder:
+    """
+    It is the responsibility of the `stitch_node` function to do do two things:
+    1. Ensure that the ObjectRecorder for the node is created (if not existing) and return it
+    2. Ensure that all input `ObjectRecords` are connected to the ObjectRecorder in #1
+        - These are two-way connections:
+                - The ObjectRecorder in #1 has a list of inputs via `input_dict`
+                - The ObjectRecorders in #2 have a list of outputs via `calls`
+
+        Importantly, nodes which are `lambdas` (ex map). Need to traverse the inner function. This
+        is done by calling `subgraph_stitch` and passing the current StitchedGraph. We need to pass
+        the stitch graph so that the `subgraph_stitch` can merge the results of the inner function.
+    """
     op = registry_mem.memory_registry.get_op(node.from_op.name)
     inputs = list(input_dict.values())
     if is_get_tag_op(op):
@@ -189,7 +201,11 @@ def stitch_node_inner(
         tags: dict[str, ObjectRecorder] = {}
         for input in input_dict.values():
             tags.update(input.tags)
-        return LiteralListObjectRecorder(node, tags=tags, val=list(input_dict.values()))
+        res = LiteralListObjectRecorder(node, tags=tags, val=list(input_dict.values()))
+        op_call = OpCall(node, input_dict, res)
+        for input in input_dict.values():
+            input.calls.append(op_call)
+        return res
     elif node.from_op.name.endswith("pick"):
         if isinstance(node.from_op.inputs["key"], graph.ConstNode):
             key = node.from_op.inputs["key"].val
