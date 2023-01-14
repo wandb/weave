@@ -94,10 +94,16 @@ def _dispatch_map_fn_no_refine(node: graph.Node) -> typing.Optional[graph.Output
                 k: n for k, n in zip(op.input_type.arg_types, from_op.inputs.values())
             }
 
-        # Weave Python op types don't express that they can handle
-        # optional.
-        output_type = _remove_optional(node.type)
-        return graph.OutputNode(output_type, op.uri, params)
+        output_type = node.type
+        # In the case where we are dispatching to a new op, we want to use the
+        # new op's `unrefined_output_type_for_params` output type - rather than
+        # blindly trusting the client type.
+        if not node.from_op.name.startswith("local-artifact://") and (
+            node.from_op.name != op.name
+        ):
+            output_type = op.unrefined_output_type_for_params(params)
+
+        return graph.OutputNode(_remove_optional(output_type), op.uri, params)
     return None
 
 
