@@ -1,4 +1,4 @@
-from typing import Tuple, Union, Callable, Any, TypeVar, Type
+from typing import Tuple, Union, Callable, Any, TypeVar, Type, Optional
 
 _T = TypeVar("_T")
 
@@ -13,5 +13,5 @@ def __dataclass_transform__(
 ) -> Callable[[_T], _T]: ...
 @__dataclass_transform__()
 def type(
-    __override_name: str = None, __is_simple: bool = False
+    __override_name: Optional[str] = None, __is_simple: bool = False
 ) -> Callable[[_T], _T]: ...

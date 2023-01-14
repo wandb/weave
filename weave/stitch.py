@@ -20,13 +20,114 @@
 # Not yet implemented: list literals, execute() traversal, and probably a bunch more!
 
 import dataclasses
+import functools
 import typing
 
+from . import weave_types as types
 from . import graph
 from . import errors
 from . import registry_mem
 from . import op_def
 from .language_features.tagging import opdef_util
+
+def node_visitor(node: graph.Node, visit_fn: typing.Callable[[graph.Node]]):
+    if isinstance(node, graph.ConstNode):
+        visit_fn(node)
+    elif isinstance(node, graph.VarNode) or isinstance(node, graph.VoidNode):
+        visit_fn(node)
+    elif isinstance(node, graph.OutputNode):
+        for input_node in node.from_op.inputs.values():
+            node_visitor(input_node, visit_fn)
+        visit_fn(node)
+    else:
+        raise errors.WeaveError(f"Unexpected node type {type(node)}")
+
+@dataclasses.dataclass
+class ForwardStitchedNode:
+    """A node which contains pointers to the nodes which it is an input to, after stitching."""
+    source_node: graph.Node
+    input_to: set["ForwardStitchedNode"] = dataclasses.field(default_factory=set)
+    stitched_input_to: set["ForwardStitchedNode"] = dataclasses.field(default_factory=set)
+
+@dataclasses.dataclass
+class StitchedGraph2:
+    leaf_nodes: set[graph.Node] = dataclasses.field(default_factory=set)
+    forward_graph: dict[graph.Node, ForwardStitchedNode] = dataclasses.field(default_factory=dict)
+
+    def add_node(self, node: graph.Node):
+        node_visitor(node, self._add_node_visitor)
+
+    def _add_node_visitor(self, node: graph.Node):
+        if node in self.forward_graph:
+            forward_node = self.forward_graph[node]
+        else:
+            forward_node = ForwardStitchedNode(node)
+        if isinstance(node, graph.OutputNode):
+            for input_node in node.from_op.inputs.values():
+                if input_node not in self.forward_graph:
+                    raise errors.WeaveError(f"Programming Error: Input node {input_node} not in forward graph")
+                self.forward_graph[input_node].input_to.add(forward_node)
+            self._stitch_lambda(node)
+            
+        self.forward_graph[node] = forward_node
+
+    def _stitch_lambda(self, lambda_node: graph.OutputNode):
+        lambda_node_name_endings = [
+            "map",
+            "sort",
+            "filter",
+            "groupby",
+            "joinAll",
+        ]
+        if not any(lambda_node.from_op.name.endswith(ending) for ending in lambda_node_name_endings):
+            return
+
+        row_arr_node = lambda_node.inputs.values()[0]
+        fn_node = lambda_node.inputs.values()[1]
+        
+        visitor_fn = functools.partial(self._stitch_lambda_visitor, var_node_map={
+            "row": row_arr_node
+        })
+        
+        node_visitor(fn_node.val, visitor_fn)
+
+    def _stitch_lambda_visitor(self, node: graph.Node, var_node_map: dict[str, ForwardStitchedNode]):
+        self._add_node_visitor(node)
+        if isinstance(node, graph.VarNode) and node.name in var_node_map:
+            if node not in self.forward_graph:
+                raise errors.WeaveError(f"Programming Error: Node {node} not in forward graph")
+            var_node_map[node.name].stitched_input_to.update(self.forward_graph[node].input_to)
+    
+
+
+
+    # def add_nodes(self, nodes: list[graph.Node]):
+    #     graph.map_nodes_full(nodes, self._add_node_no_map)
+
+    # def stitch(self):
+
+
+
+# @dataclasses.dataclass
+# class StitchedGraph2:
+#     leaf_nodes: set[graph.Node]
+#     _orig_node_to_distinct_node: dict[graph.Node, graph.Node] = dataclasses.field(default_factory=dict)
+
+#     def stitch():
+#         self.initialize_orig_node_to_distinct_node()
+
+#     def _initialize_orig_node_to_distinct_node(self):
+#         def map_node_fn(node: graph.Node):
+#             if isinstance(node, graph.VarNode):
+#                 return node 
+
+#         graph.map_nodes_full(self.leaf_nodes, self.)
+
+#     # def __init__(self, leaf_nodes: list[graph.Node]):
+#     #     self.leaf_nodes = set(leaf_nodes)
+#     #     self._orig_node_to_distinct_node = {}
+#     #     graph.map_nodes_full(self.leaf_nodes, self.)
+
 
 
 @dataclasses.dataclass
@@ -38,6 +139,13 @@ class OpCall:
     @property
     def inputs(self) -> list["ObjectRecorder"]:
         return list(self.input_dict.values())
+
+    # def __eq__(self, other: "OpCall") -> bool:
+    #     return (
+    #         self.node is other.node
+    #         and all(other.input_dict[k] is v for k, v in self.input_dict.items())
+    #         and self.output is other.output
+    #     )
 
 
 @dataclasses.dataclass()
@@ -54,14 +162,15 @@ class ObjectRecorder:
         self.calls.append(OpCall(node, input_dict, output))
         return output
 
+    # def __hash__(self):
+    #     return id(self)
+
 
 class LiteralDictObjectRecorder(ObjectRecorder):
     val: dict[str, ObjectRecorder]
 
-
 class LiteralListObjectRecorder(ObjectRecorder):
     val: list[ObjectRecorder]
-
 
 @dataclasses.dataclass
 class StitchedGraph:
@@ -78,7 +187,7 @@ class StitchedGraph:
         curr_result = self._node_map[node]
         if curr_result.val != result.val:
             raise errors.WeaveStitchGraphMergeError(
-                f"Cannot merge ObjectRecorder with different values: {curr_result.val} and {result.val}"
+                f"Cannot merge ObjectRecorder with different values"
             )
 
         # Merge the calls
@@ -103,6 +212,10 @@ class StitchedGraph:
             else:
                 self._merge_result(node, result)
 
+def make_var_nodes_referentially_new(fn: graph.Node):
+    res = graph.map_nodes_top_level([fn], lambda n: graph.VarNode(n.type, n.name) if isinstance(n, graph.VarNode) else n)[0]
+    # breakpoint()
+    return res
 
 def stitch(
     leaf_nodes: list[graph.Node],
@@ -144,6 +257,7 @@ def stitch(
 def subgraph_stitch(
     function_node: graph.Node, args: dict[str, ObjectRecorder], sg: StitchedGraph
 ) -> ObjectRecorder:
+    function_node = make_var_nodes_referentially_new(function_node)
     result_graph = stitch([function_node], args)
     sg.add_subgraph_stitch_graph(result_graph)
     return result_graph.get_result(function_node)
