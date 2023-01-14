@@ -71,7 +71,11 @@ class TaggedValueToArrowStruct(tagged_value_type.TaggedValueToPy):
 
 class ListToArrowArr(mappers_python.ListToPyList):
     def result_type(self):
-        return pa.list_(arrow_util.arrow_field("x", self._object_type.result_type()))
+        # It is important to use `item` here since pyarrow auto assigns the
+        # inner field name of a list to `item`. Anything else can cause issues
+        # with concatenation or other pyarrow operations that need type
+        # equality.
+        return pa.list_(arrow_util.arrow_field("item", self._object_type.result_type()))
 
 
 class UnionToArrowUnion(mappers_weave.UnionMapper):

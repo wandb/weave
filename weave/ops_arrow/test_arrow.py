@@ -2197,6 +2197,38 @@ def test_verify_dictionary_encoding_of_strings():
                 {"a": [{"d": 5, "c": 6}, {"c": 7, "d": 8}]},
             ],
         ),
+        # Nested Mixed Types
+        (
+            [
+                [{"a": 1, "b": 2, "c": 4}, {"a": "a", "b": 3, "c": 5}],
+                [{"a": 4, "b": 5, "c": "c"}, {"a": 6, "b": 7}],
+            ],
+            [
+                {"a": 1, "b": 2, "c": 4},
+                {"a": "a", "b": 3, "c": 5},
+                {"a": 4, "b": 5, "c": "c"},
+                {"a": 6, "b": 7, "c": None},
+            ],
+        ),
+        # Nested Mixed Types (flat w/ varying depth)
+        (
+            [
+                [{"a": 1}],
+                [{"a": [1]}],
+                [{"a": "a"}],
+                [{"a": ["a"]}],
+                [{"a": {"b": 1}}],
+                [{"a": [{"b": 1}]}],
+            ],
+            [
+                {"a": 1},
+                {"a": [1]},
+                {"a": "a"},
+                {"a": ["a"]},
+                {"a": {"b": 1}},
+                {"a": [{"b": 1}]},
+            ],
+        ),
     ],
 )
 def test_arrow_concat_mixed(list_of_data, exp_res):

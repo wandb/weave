@@ -11,7 +11,7 @@ def test_map_list():
     res_type = m.result_type()
     assert res_type == pa.list_(
         pa.field(
-            "x", pa.struct([pa.field("a", pa.int64()), pa.field("b", pa.string())])
+            "item", pa.struct([pa.field("a", pa.int64()), pa.field("b", pa.string())])
         )
     )
     d2 = m.apply(d)
@@ -27,7 +27,9 @@ def test_map_list_with_none():
     m = mappers_arrow.map_to_arrow(d_type, None)
     res_type = m.result_type()
     assert res_type == pa.list_(
-        pa.field("x", pa.struct([pa.field("a", pa.int64()), pa.field("b", pa.null())]))
+        pa.field(
+            "item", pa.struct([pa.field("a", pa.int64()), pa.field("b", pa.null())])
+        )
     )
     d2 = m.apply(d)
     assert d == d2
@@ -43,7 +45,7 @@ def test_map_list_with_maybe():
     res_type = m.result_type()
     assert res_type == pa.list_(
         pa.field(
-            "x", pa.struct([pa.field("a", pa.int64()), pa.field("b", pa.string())])
+            "item", pa.struct([pa.field("a", pa.int64()), pa.field("b", pa.string())])
         )
     )
     d2 = m.apply(d)
@@ -60,7 +62,7 @@ def test_map_list_with_nan():
     res_type = m.result_type()
     assert res_type == pa.list_(
         pa.field(
-            "x", pa.struct([pa.field("a", pa.int64()), pa.field("b", pa.float64())])
+            "item", pa.struct([pa.field("a", pa.int64()), pa.field("b", pa.float64())])
         )
     )
     d2 = m.apply(d)

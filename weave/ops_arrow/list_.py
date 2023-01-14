@@ -339,12 +339,7 @@ def safe_pa_concat_arrays(arrays):
     if all(a.type == t for a in arrays):
         return pa.concat_arrays(arrays)
     if isinstance(t, pa.StructType):
-        try:
-            return pa.concat_arrays(
-                [_reshape_struct_array(t, array) for array in arrays]
-            )
-        except KeyError:
-            pass
+        return pa.concat_arrays([_reshape_struct_array(t, array) for array in arrays])
     return pa.concat_arrays(arrays)
 
 
@@ -740,19 +735,66 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             non_null_current_type = types.non_none(current_type)
 
             if len(non_nullable_types) > 1:
-                type_code = mapper.type_code_of_type(non_null_current_type)
+                # At this point, the objective is to build M arrays, where M is
+                # the number of members in the desired union type. Each array
+                # corresponds to the nth member of the desired union type, and
+                # will contains all nulls, except values for the index in which
+                # the current array is the corresponding type. This will then be
+                # combined in the end via `UnionArray.from_sparse`.
+                #
+                # The logic is only slightly different when the current type is a union,
+                # so we handle both cases in the same code block.
 
-                def type_code_iterator():
-                    for _ in range(len(self)):
-                        yield type_code
+                # First, we need to create an array which indicates the type code (type index)
+                # for each value in the current array. In the case that the current array is not
+                # a union, then we can just use the type code of the current type. Else, we need
+                # to map the type codes of the current array to the type codes of the desired array.
+                if not isinstance(non_null_current_type, types.UnionType):
+                    # In this case we have single type:
+                    type_code = mapper.type_code_of_type(non_null_current_type)
+                    type_code_array = pa.repeat(type_code, len(self)).cast(pa.int8())
+                else:
+                    curr_type_code_to_desired_type_code = [
+                        mapper.type_code_of_type(t)
+                        for t in non_null_current_type.members
+                    ]
+                    current_type_code_list = self._arrow_data.type.type_codes
+                    type_code_array = (
+                        pa.DictionaryArray.from_arrays(
+                            current_type_code_list, curr_type_code_to_desired_type_code
+                        )
+                        .dictionary_decode()
+                        .cast(pa.int8())
+                    )
 
+                # Next, we are going to build the M arrays. We will do this by iterating
+                # over the desired types. For each type, we will find the corresponding
+                # type in the current type, and then select the corresponding values from
+                # the current array. If there is no corresponding type, then we will create
+                # an array of nulls.
                 data_arrays: list[pa.Array] = []
+                non_null_current_types = (
+                    non_null_current_type.members
+                    if isinstance(non_null_current_type, types.UnionType)
+                    else [non_null_current_type]
+                )
                 for member in non_nullable_types:
-                    if member.assign_type(
-                        non_null_current_type
-                    ) and non_null_current_type.assign_type(member):
-                        data_arrays.append(self.with_object_type(member)._arrow_data)
+                    for curr_ndx, curr_member in enumerate(non_null_current_types):
+                        if member.assign_type(curr_member) and curr_member.assign_type(
+                            member
+                        ):
+                            # Here we have found the corresponding type in the current array.
+                            # If the current array is a union, then we need to select the
+                            # corresponding field. Else, we can just use the current array.
+                            if isinstance(non_null_current_type, types.UnionType):
+                                selection = self._arrow_data.field(curr_ndx)
+                            else:
+                                selection = self._arrow_data
+                            data_arrays.append(selection)
+                            break
                     else:
+                        # Here we have not found the corresponding type in the current array.
+                        # We will create an array of nulls.
                         member_mapper = mappers_arrow.map_to_arrow(
                             member, self._artifact
                         )
@@ -760,9 +802,10 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                             pa.nulls(len(self), type=member_mapper.result_type())
                         )
 
+                # Finally, combine the M arrays into a single union array.
                 result = ArrowWeaveList(
                     pa.UnionArray.from_sparse(
-                        pa.array(type_code_iterator(), type=pa.int8()),
+                        type_code_array,
                         data_arrays,
                     ),
                     desired_type,

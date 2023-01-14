@@ -563,7 +563,7 @@ class Int(Number):
 
     def _assign_type_inner(self, other_type: Type):
         # Become Float if rhs is Float
-        return isinstance(other_type, Number)
+        return isinstance(other_type, Number) and not isinstance(other_type, Float)
 
 
 class Boolean(BasicType):
@@ -1214,10 +1214,7 @@ def merge_types(a: Type, b: Type) -> Type:
         for key in all_keys_dict.keys():
             self_prop_type = a.property_types.get(key, none_type)
             other_prop_type = b.property_types.get(key, none_type)
-            next_prop_type = self_prop_type
-            if not self_prop_type.assign_type(other_prop_type):
-                next_prop_type = UnionType(self_prop_type, other_prop_type)
-            next_prop_types[key] = next_prop_type
+            next_prop_types[key] = merge_types(self_prop_type, other_prop_type)
         return TypedDict(next_prop_types)
     return UnionType(a, b)
 
