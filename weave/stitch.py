@@ -30,6 +30,7 @@ from . import registry_mem
 from . import op_def
 from .language_features.tagging import opdef_util
 
+
 def node_visitor(node: graph.Node, visit_fn: typing.Callable[[graph.Node]]):
     if isinstance(node, graph.ConstNode):
         visit_fn(node)
@@ -42,20 +43,48 @@ def node_visitor(node: graph.Node, visit_fn: typing.Callable[[graph.Node]]):
     else:
         raise errors.WeaveError(f"Unexpected node type {type(node)}")
 
+
 @dataclasses.dataclass
 class ForwardStitchedNode:
     """A node which contains pointers to the nodes which it is an input to, after stitching."""
+
     source_node: graph.Node
     input_to: set["ForwardStitchedNode"] = dataclasses.field(default_factory=set)
-    stitched_input_to: set["ForwardStitchedNode"] = dataclasses.field(default_factory=set)
+
 
 @dataclasses.dataclass
 class StitchedGraph2:
     leaf_nodes: set[graph.Node] = dataclasses.field(default_factory=set)
-    forward_graph: dict[graph.Node, ForwardStitchedNode] = dataclasses.field(default_factory=dict)
+    forward_graph: dict[graph.Node, ForwardStitchedNode] = dataclasses.field(
+        default_factory=dict
+    )
 
     def add_node(self, node: graph.Node):
         node_visitor(node, self._add_node_visitor)
+
+    def _assert_has_node(self, node: graph.Node):
+        if node not in self.forward_graph:
+            raise errors.WeaveError(
+                f"Programming Error: Node {node} not in forward graph"
+            )
+
+    def _add_edge(self, from_node: graph.Node, to_node: graph.Node):
+        self._assert_has_node(from_node)
+        self._assert_has_node(to_node)
+        self.forward_graph[from_node].input_to.add(self.forward_graph[to_node])
+
+    def _remove_edge(self, from_node: graph.Node, to_node: graph.Node):
+        self._assert_has_node(from_node)
+        self._assert_has_node(to_node)
+        self.forward_graph[from_node].input_to.remove(self.forward_graph[to_node])
+
+    # def _stitch_node(self, from_node: graph.Node, orig_to_node: graph.Node, new_to_node: graph.Node):
+    #     self._assert_has_node(from_node)
+    #     self._assert_has_node(to_node)
+    #     self._add_edge(from_node, to_node)
+    #     if to_node not in self.forward_graph:
+    #         raise errors.WeaveError(f"Programming Error: Node {to_node} not in forward graph")
+    #     self.forward_graph[from_node].input_to.update(self.forward_graph[to_node].input_to)
 
     def _add_node_visitor(self, node: graph.Node):
         if node in self.forward_graph:
@@ -64,11 +93,9 @@ class StitchedGraph2:
             forward_node = ForwardStitchedNode(node)
         if isinstance(node, graph.OutputNode):
             for input_node in node.from_op.inputs.values():
-                if input_node not in self.forward_graph:
-                    raise errors.WeaveError(f"Programming Error: Input node {input_node} not in forward graph")
-                self.forward_graph[input_node].input_to.add(forward_node)
+                self._add_edge(input_node, node)
             self._stitch_lambda(node)
-            
+
         self.forward_graph[node] = forward_node
 
     def _stitch_lambda(self, lambda_node: graph.OutputNode):
@@ -79,33 +106,51 @@ class StitchedGraph2:
             "groupby",
             "joinAll",
         ]
-        if not any(lambda_node.from_op.name.endswith(ending) for ending in lambda_node_name_endings):
+        if not any(
+            lambda_node.from_op.name.endswith(ending)
+            for ending in lambda_node_name_endings
+        ):
             return
 
         row_arr_node = lambda_node.inputs.values()[0]
         fn_node = lambda_node.inputs.values()[1]
-        
-        visitor_fn = functools.partial(self._stitch_lambda_visitor, var_node_map={
-            "row": row_arr_node
-        })
-        
+
+        row_nodes = []
+
+        def visitor_fn(node: graph.Node):
+            self._add_node_visitor(node)
+            if isinstance(node, graph.VarNode) and node.name == "row":
+                row_nodes.append(node)
+
         node_visitor(fn_node.val, visitor_fn)
 
-    def _stitch_lambda_visitor(self, node: graph.Node, var_node_map: dict[str, ForwardStitchedNode]):
+        for row_node in row_nodes:
+            self._add_edge(row_arr_node, row_node)
+            if row_node not in self.forward_graph:
+                raise errors.WeaveError(
+                    f"Programming Error: Node {row_node} not in forward graph"
+                )
+            self.forward_graph[row_arr_node].input_to.update(
+                self.forward_graph[row_node].input_to
+            )
+
+        row_arr_node.input_to.remove(self.forward_graph[lambda_node])
+
+    def _stitch_lambda_visitor(
+        self, node: graph.Node, var_node_map: dict[str, ForwardStitchedNode]
+    ):
         self._add_node_visitor(node)
         if isinstance(node, graph.VarNode) and node.name in var_node_map:
             if node not in self.forward_graph:
-                raise errors.WeaveError(f"Programming Error: Node {node} not in forward graph")
-            var_node_map[node.name].stitched_input_to.update(self.forward_graph[node].input_to)
-    
-
-
+                raise errors.WeaveError(
+                    f"Programming Error: Node {node} not in forward graph"
+                )
+            var_node_map[node.name].input_to.update(self.forward_graph[node].input_to)
 
     # def add_nodes(self, nodes: list[graph.Node]):
     #     graph.map_nodes_full(nodes, self._add_node_no_map)
 
     # def stitch(self):
-
 
 
 # @dataclasses.dataclass
@@ -119,7 +164,7 @@ class StitchedGraph2:
 #     def _initialize_orig_node_to_distinct_node(self):
 #         def map_node_fn(node: graph.Node):
 #             if isinstance(node, graph.VarNode):
-#                 return node 
+#                 return node
 
 #         graph.map_nodes_full(self.leaf_nodes, self.)
 
@@ -127,7 +172,6 @@ class StitchedGraph2:
 #     #     self.leaf_nodes = set(leaf_nodes)
 #     #     self._orig_node_to_distinct_node = {}
 #     #     graph.map_nodes_full(self.leaf_nodes, self.)
-
 
 
 @dataclasses.dataclass
@@ -169,8 +213,10 @@ class ObjectRecorder:
 class LiteralDictObjectRecorder(ObjectRecorder):
     val: dict[str, ObjectRecorder]
 
+
 class LiteralListObjectRecorder(ObjectRecorder):
     val: list[ObjectRecorder]
+
 
 @dataclasses.dataclass
 class StitchedGraph:
@@ -212,10 +258,15 @@ class StitchedGraph:
             else:
                 self._merge_result(node, result)
 
+
 def make_var_nodes_referentially_new(fn: graph.Node):
-    res = graph.map_nodes_top_level([fn], lambda n: graph.VarNode(n.type, n.name) if isinstance(n, graph.VarNode) else n)[0]
+    res = graph.map_nodes_top_level(
+        [fn],
+        lambda n: graph.VarNode(n.type, n.name) if isinstance(n, graph.VarNode) else n,
+    )[0]
     # breakpoint()
     return res
+
 
 def stitch(
     leaf_nodes: list[graph.Node],
