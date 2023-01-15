@@ -1354,6 +1354,7 @@ def vectorize(
                 except (
                     errors.WeavifyError,
                     errors.WeaveDispatchError,
+                    errors.WeaveTypeError,
                 ):
                     pass
             if op.weave_fn is not None:
@@ -1363,9 +1364,9 @@ def vectorize(
                 # No weave_fn, so we can't vectorize this op. Just
                 # use the op as if it was a normal list (ideally hitting
                 # the derived mapped op)
-                input0_name, input0_val = list(inputs.items())[0]
-                if isinstance(input0_val, ArrowWeaveList):
-                    py_node = input0_val.to_py()
+                input0_name, input0_node = list(inputs.items())[0]
+                if isinstance(input0_node.type, ArrowWeaveListType):
+                    py_node = input0_node.to_py()
                     new_inputs = {input0_name: py_node}
                     for k, v in list(inputs.items())[1:]:
                         new_inputs[k] = v
