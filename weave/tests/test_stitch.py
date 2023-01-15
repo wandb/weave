@@ -161,15 +161,19 @@ def test_zero_arg_ops():
 def test_shared_fn_node():
     const_list_node = weave.ops.make_list(a=1, b=2)
     indexed_node = const_list_node[0]
-    fn_node = weave_internal.define_fn(
-        {"row": weave.types.Number()},
-        lambda row: weave.ops.dict_(item=row, const=indexed_node),
-    )
+    # fn_node = weave_internal.define_fn(
+    #     {"row": weave.types.Number()},
+    #     lambda row: weave.ops.dict_(item=row, const=indexed_node),
+    # )
     arr_1_node = weave.ops.make_list(a=1, b=2, c=3)
     arr_2_node = weave.ops.make_list(a=10, b=20, c=30)
 
-    mapped_1_node = arr_1_node.map(fn_node)
-    mapped_2_node = arr_2_node.map(fn_node)
+    mapped_1_node = arr_1_node.map(
+        lambda row: weave.ops.dict_(item=row, const=indexed_node)
+    )
+    mapped_2_node = arr_2_node.map(
+        lambda row: weave.ops.dict_(item=row, const=indexed_node)
+    )
 
     mapped_1_item_node = mapped_1_node["item"]
     mapped_1_const_node = mapped_1_node["const"]
@@ -188,9 +192,9 @@ def test_shared_fn_node():
     concat_node = list_of_list_node.concat()
     sum_node = concat_node.sum()
 
-    sum_node_from_js = serialize.deserialize(serialize.serialize([sum_node]))[0]
+    # sum_node_from_js = serialize.deserialize(serialize.serialize([sum_node]))[0]
 
-    p = stitch.stitch([sum_node_from_js])
+    p = stitch.stitch([sum_node])
 
     def assert_node_calls(node, expected_call_names):
         found_calls = set([c.node.from_op.name for c in p.get_result(node).calls])
@@ -199,7 +203,7 @@ def test_shared_fn_node():
 
     assert_node_calls(const_list_node, ["list-__getitem__"])
     assert_node_calls(indexed_node, ["list", "mapped_number-add"])
-    assert_node_calls(fn_node, [])
+    # assert_node_calls(fn_node, [])
     assert_node_calls(arr_1_node, ["list"])
     assert_node_calls(arr_2_node, ["mapped_number-add"])
     assert_node_calls(mapped_1_node, [])

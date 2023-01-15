@@ -102,7 +102,7 @@ def node_id(node: graph.Node):
         if isinstance(node.val, graph.OutputNode) or isinstance(
             node.val, graph.VarNode
         ):
-            hashable["val"] = random.random()
+            hashable["val"] = str(random.random())
         else:
             hashable["val"] = storage.to_python(node.val)
     else:
