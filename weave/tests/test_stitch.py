@@ -8,6 +8,8 @@ from ..language_features.tagging import make_tag_getter_op
 from .. import compile_table
 from weave import context_state as _context
 
+from weave import weave_internal
+
 _loading_builtins_token = _context.set_loading_built_ins()
 
 
@@ -152,3 +154,32 @@ def test_zero_arg_ops():
     assert len(obj_recorder.calls) == 2
     assert obj_recorder.calls[0].node.from_op.name == "_TestPlanObject-name"
     assert obj_recorder.calls[1].node.from_op.name == "mapped__TestPlanObject-name"
+
+
+def test_shared_fn_node():
+    external_int_node = weave.ops.make_list(a=1, b=2)[0]
+    fn_node = weave_internal.define_fn(
+        {"row": weave.types.Number()},
+        lambda row: weave.ops.dict_(a=row, b=external_int_node),
+    )
+    arr_node_1 = weave.ops.make_list(a=1, b=2, c=3)
+    arr_node_2 = weave.ops.make_list(a=10, b=20, c=30)
+    map_node_1 = arr_node_1.map(fn_node)["a"]
+    map_node_2 = arr_node_2.map(fn_node)["b"]
+    map_node_3 = arr_node_1.map(fn_node)["a"] + 100
+    map_node_4 = arr_node_2.map(fn_node)["b"] + 100
+    concat_node = weave.ops.make_list(
+        a=map_node_1, b=map_node_2, c=map_node_3, d=map_node_4
+    ).concat()
+    sum_node = concat_node.sum()
+
+    p = stitch.stitch([sum_node])
+
+    assert len(p.get_result(external_int_node).calls) == 2
+    assert len(p.get_result(fn_node).calls) == 0
+    assert len(p.get_result(arr_node_1).calls) == 2
+    assert len(p.get_result(arr_node_2).calls) == 0
+    assert len(p.get_result(map_node_1).calls) == 2
+    assert len(p.get_result(map_node_2).calls) == 1
+    assert len(p.get_result(concat_node).calls) == 1
+    assert len(p.get_result(sum_node).calls) == 0

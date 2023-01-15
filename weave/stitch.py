@@ -54,6 +54,9 @@ class ObjectRecorder:
         self.calls.append(OpCall(node, input_dict, output))
         return output
 
+    def __hash__(self) -> int:
+        return id(self)
+
 
 class LiteralDictObjectRecorder(ObjectRecorder):
     val: dict[str, ObjectRecorder]
@@ -76,10 +79,32 @@ class StitchedGraph:
     def _merge_result(self, node: graph.Node, result: ObjectRecorder) -> None:
         # Performs an in-place merge of the node result into the stitched graph.
         curr_result = self._node_map[node]
-        if curr_result.val != result.val:
-            raise errors.WeaveStitchGraphMergeError(
-                f"Cannot merge ObjectRecorder with different values: {curr_result.val} and {result.val}"
-            )
+        if isinstance(node, graph.ConstNode):
+            if curr_result.val != result.val:
+                raise errors.WeaveStitchGraphMergeError(
+                    f"Cannot merge ObjectRecorder with different values: {curr_result.val} and {result.val}"
+                )
+        elif isinstance(curr_result, LiteralListObjectRecorder):
+            if not isinstance(result, LiteralListObjectRecorder):
+                raise errors.WeaveStitchGraphMergeError(
+                    f"Cannot merge LiteralListObjectRecorder with different types: {type(curr_result)} and {type(result)}"
+                )
+            # merge the vals:
+            curr_val_set = set(curr_result.val)
+            for v in result.val:
+                if v not in curr_val_set:
+                    curr_result.val.append(v)
+        elif isinstance(curr_result, LiteralDictObjectRecorder):
+            if not isinstance(result, LiteralDictObjectRecorder):
+                raise errors.WeaveStitchGraphMergeError(
+                    f"Cannot merge LiteralDictObjectRecorder with different types: {type(curr_result)} and {type(result)}"
+                )
+            # merge the vals:
+            for k, v in result.val.items():
+                if k not in curr_result.val:
+                    curr_result.val[k] = v
+                else:
+                    self._merge_result(curr_result.val[k].node, v)
 
         # Merge the calls
         known_called_nodes = {call.node for call in curr_result.calls}
