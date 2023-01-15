@@ -29,6 +29,56 @@ from . import op_def
 from .language_features.tagging import opdef_util
 
 
+# Stitching requires 4 types of modifications:
+# 1.a. We need to bridge inputs to "lambda functions" to their inner function nodes and the fn output to the lambda output.
+# 1.b. We need to to bridge literal constructors and accessors
+# 1.c. We need to "skip" trivial ops stitch as "concat"
+# 2. We need to associate tag getters with tag producers
+
+
+@dataclasses.dataclass
+class StitchResult:
+    from_node_to_nodes: dict[graph.Node, list[graph.Node]] = dataclasses.field(
+        default_factory=dict
+    )
+
+
+# @dataclasses.dataclass
+# class StitchResult:
+#     input_stitch_map: dict[graph.Node, graph.Node] = dataclasses.field(default_factory=dict)
+
+#     def _get_input_node(self, node: graph.Node) -> graph.Node:
+#         if node in self.input_stitch_map:
+#             return self._get_input_node(self.input_stitch_map[node])
+#         return node
+
+#     def _get_node_inputs(self, output_node: graph.OutputNode) -> dict[str, graph.Node]:
+#         return {k: self._get_input_node(v) for k, v in output_node.from_op.inputs.items()}
+
+#     def _stitch_node(self, input_node: graph.Node, with_node: graph.Node) -> None:
+#         if input_node in self.input_stitch_map:
+#             raise errors.WeaveStitchGraphMergeError(
+#                 f"Cannot stitch {input_node} to {with_node} because it is already stitched to {self.input_stitch_map[input_node]}"
+#             )
+#         self.input_stitch_map[input_node] = with_node
+
+#     def add_node(self, node: graph.Node) -> None:
+#         if isinstance(node, graph.OutputNode):
+
+#             # Step 1: In place of Map, stitch in the inner function
+#             if node.from_op.name.endswith("map"):
+#                 map_arr_node
+
+#             for orig_input_node in node.from_op.inputs.values():
+#                 self.add_node(orig_input_node)
+
+
+# def perform_stitch(nodes: list[graph.Node]) -> StitchResult:
+#     sr = StitchResult()
+
+#     # Step 1: In place of Map, stitch in the inner function
+
+
 @dataclasses.dataclass
 class OpCall:
     node: graph.OutputNode
