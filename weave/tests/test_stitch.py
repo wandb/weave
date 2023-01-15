@@ -157,29 +157,55 @@ def test_zero_arg_ops():
 
 
 def test_shared_fn_node():
-    external_int_node = weave.ops.make_list(a=1, b=2)[0]
+    const_list_node = weave.ops.make_list(a=1, b=2)
+    indexed_node = const_list_node[0]
     fn_node = weave_internal.define_fn(
         {"row": weave.types.Number()},
-        lambda row: weave.ops.dict_(a=row, b=external_int_node),
+        lambda row: weave.ops.dict_(item=row, const=indexed_node),
     )
-    arr_node_1 = weave.ops.make_list(a=1, b=2, c=3)
-    arr_node_2 = weave.ops.make_list(a=10, b=20, c=30)
-    map_node_1 = arr_node_1.map(fn_node)["a"]
-    map_node_2 = arr_node_2.map(fn_node)["b"]
-    map_node_3 = arr_node_1.map(fn_node)["a"] + 100
-    map_node_4 = arr_node_2.map(fn_node)["b"] + 100
-    concat_node = weave.ops.make_list(
-        a=map_node_1, b=map_node_2, c=map_node_3, d=map_node_4
-    ).concat()
+    arr_1_node = weave.ops.make_list(a=1, b=2, c=3)
+    arr_2_node = weave.ops.make_list(a=10, b=20, c=30)
+
+    mapped_1_node = arr_1_node.map(fn_node)
+    mapped_2_node = arr_2_node.map(fn_node)
+
+    mapped_1_item_node = mapped_1_node["item"]
+    mapped_1_const_node = mapped_1_node["const"]
+    mapped_2_item_node = mapped_2_node["item"]
+    mapped_2_const_node = mapped_2_node["const"]
+
+    mapped_2_item_add_node = mapped_2_item_node + 100
+    mapped_2_const_add_node = mapped_2_const_node + 100
+
+    list_of_list_node = weave.ops.make_list(
+        a=mapped_1_item_node,
+        b=mapped_1_const_node,
+        c=mapped_2_item_add_node,
+        d=mapped_2_const_add_node,
+    )
+    concat_node = list_of_list_node.concat()
     sum_node = concat_node.sum()
 
     p = stitch.stitch([sum_node])
 
-    assert len(p.get_result(external_int_node).calls) == 2
-    assert len(p.get_result(fn_node).calls) == 0
-    assert len(p.get_result(arr_node_1).calls) == 2
-    assert len(p.get_result(arr_node_2).calls) == 0
-    assert len(p.get_result(map_node_1).calls) == 2
-    assert len(p.get_result(map_node_2).calls) == 1
-    assert len(p.get_result(concat_node).calls) == 1
-    assert len(p.get_result(sum_node).calls) == 0
+    def assert_node_calls(node, expected_call_names):
+        found_calls = set([c.node.from_op.name for c in p.get_result(node).calls])
+        expected_calls = set(expected_call_names)
+        assert found_calls == expected_calls
+
+    assert_node_calls(const_list_node, ["list-__getitem__"])
+    assert_node_calls(indexed_node, ["list", "mapped_number-add"])
+    assert_node_calls(fn_node, [])
+    assert_node_calls(arr_1_node, ["list"])
+    assert_node_calls(arr_2_node, ["mapped_number-add"])
+    assert_node_calls(mapped_1_node, [])
+    assert_node_calls(mapped_2_node, [])
+    assert_node_calls(mapped_1_item_node, ["list"])
+    assert_node_calls(mapped_1_const_node, ["list"])
+    assert_node_calls(mapped_2_item_node, ["mapped_number-add"])
+    assert_node_calls(mapped_2_const_node, ["mapped_number-add"])
+    assert_node_calls(mapped_2_item_add_node, ["list"])
+    assert_node_calls(mapped_2_const_add_node, ["list"])
+    assert_node_calls(list_of_list_node, ["concat"])
+    assert_node_calls(concat_node, ["numbers-sum"])
+    assert_node_calls(sum_node, [])
