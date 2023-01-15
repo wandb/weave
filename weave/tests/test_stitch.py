@@ -2,6 +2,8 @@ import weave
 import typing
 import pytest
 
+from weave import serialize
+
 from .. import stitch
 
 from ..language_features.tagging import make_tag_getter_op
@@ -186,7 +188,9 @@ def test_shared_fn_node():
     concat_node = list_of_list_node.concat()
     sum_node = concat_node.sum()
 
-    p = stitch.stitch([sum_node])
+    sum_node_from_js = serialize.deserialize(serialize.serialize([sum_node]))[0]
+
+    p = stitch.stitch([sum_node_from_js])
 
     def assert_node_calls(node, expected_call_names):
         found_calls = set([c.node.from_op.name for c in p.get_result(node).calls])

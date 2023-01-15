@@ -47,11 +47,14 @@ class ObjectRecorder:
     val: typing.Optional[typing.Any] = None
     calls: list[OpCall] = dataclasses.field(default_factory=list)
 
+    def add_call(self, call: OpCall) -> None:
+        self.calls.append(call)
+
     def call_node(
         self, node: graph.OutputNode, input_dict: dict[str, "ObjectRecorder"]
     ) -> "ObjectRecorder":
         output = ObjectRecorder(node)
-        self.calls.append(OpCall(node, input_dict, output))
+        self.add_call(OpCall(node, input_dict, output))
         return output
 
     def __hash__(self) -> int:
@@ -74,6 +77,8 @@ class StitchedGraph:
         return self._node_map[node]
 
     def add_result(self, node: graph.Node, result: ObjectRecorder) -> None:
+        if node in self._node_map:
+            self._merge_result(node, result)
         self._node_map[node] = result
 
     def _merge_result(self, node: graph.Node, result: ObjectRecorder) -> None:
@@ -110,7 +115,7 @@ class StitchedGraph:
         known_called_nodes = {call.node for call in curr_result.calls}
         for call in result.calls:
             if call.node not in known_called_nodes:
-                curr_result.calls.append(call)
+                curr_result.add_call(call)
 
         # Merge the tags
         for tag_name, other_tag_recorder in result.tags.items():
@@ -229,7 +234,7 @@ def stitch_node_inner(
         res = LiteralListObjectRecorder(node, tags=tags, val=list(input_dict.values()))
         op_call = OpCall(node, input_dict, res)
         for input in input_dict.values():
-            input.calls.append(op_call)
+            input.add_call(op_call)
         return res
     elif node.from_op.name.endswith("pick"):
         if isinstance(node.from_op.inputs["key"], graph.ConstNode):
