@@ -10,7 +10,7 @@ from .. import wandb_api
 from unittest import mock
 import shutil
 
-from .. import artifacts_local
+from .. import artifact_wandb
 import graphql
 
 TEST_TABLE_ARTIFACT_PATH = "testdata/wb_artifacts/test_res_1fwmcd3q:v0"
@@ -63,7 +63,7 @@ class FakeVersion:
 
     def get_path(self, path):
         full_artifact_dir = os.path.join(
-            artifacts_local.wandb_artifact_dir(), TEST_TABLE_ARTIFACT_PATH
+            artifact_wandb.wandb_artifact_dir(), TEST_TABLE_ARTIFACT_PATH
         )
         full_artifact_path = os.path.join(full_artifact_dir, path)
         os.makedirs(os.path.dirname(full_artifact_path), exist_ok=True)

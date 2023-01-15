@@ -1,6 +1,5 @@
 from .. import node_ref
 from .. import api as weave
-from .. import refs
 from .. import graph
 
 

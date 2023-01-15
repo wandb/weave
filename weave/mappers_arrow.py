@@ -9,7 +9,7 @@ from . import mappers_python_def as mappers_python
 from . import mappers_weave
 from . import arrow_util
 from . import weave_types as types
-from . import refs
+from . import ref_base
 from . import errors
 from . import node_ref
 from .language_features.tagging import tagged_value_type, tag_store
@@ -190,7 +190,7 @@ class FunctionToArrowFunction(mappers.Mapper):
 
 class ArrowFunctionToFunction(mappers.Mapper):
     def apply(self, obj):
-        ref = refs.Ref.from_str(obj)
+        ref = ref_base.Ref.from_str(obj)
         return node_ref.ref_to_node(ref)
 
 
@@ -397,7 +397,7 @@ def map_from_arrow_scalar(value: pa.Scalar, type_: types.Type, artifact):
             return map_from_arrow_scalar(value.value, current_type, artifact)
     elif isinstance(type_, types.Function):
         obj: str = value.as_py()
-        ref = refs.Ref.from_str(obj)
+        ref = ref_base.Ref.from_str(obj)
         return node_ref.ref_to_node(ref)
     else:
         # default
@@ -408,11 +408,11 @@ def map_from_arrow_scalar(value: pa.Scalar, type_: types.Type, artifact):
         # TODO: this does not use self.artifact, can we just drop it?
         # Do we need the type so we can load here? No...
         if ":" in obj:
-            ref = refs.Ref.from_str(obj)
+            ref = ref_base.Ref.from_str(obj)
             # Note: we are forcing type here, because we already know it
             # We don't save the types for every file in a remote artifact!
             # But you can still reference them, because you have to get that
             # file through an op, and therefore we know the type?
             ref._type = type_
             return ref.get()
-        return refs.LocalArtifactRef.from_local_ref(artifact, obj, type_).get()
+        return artifact.ref_from_local_str(obj, type_).get()

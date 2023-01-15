@@ -4,20 +4,21 @@ from ..api import op, weave_class
 from .. import weave_types as types
 from . import file_wbartifact
 from ..ops_primitives import file_local
-from .. import artifacts_local
-from .. import refs
+from .. import ref_base
+from .. import artifact_local
+from .. import artifact_wandb
 from ..ops_primitives import file as weave_file
 
 
 class ArtifactVersionType(types._PlainStringNamedType):
     name = "artifactLocalVersion"
-    instance_classes = artifacts_local.WandbArtifact
-    instance_class = artifacts_local.WandbArtifact
+    instance_classes = artifact_wandb.WandbArtifact
+    instance_class = artifact_wandb.WandbArtifact
 
     # TODO: what should these do?
     #   return an ArtifactRef
     def save_instance(self, obj, artifact, name):
-        return refs.WandbArtifactRef(obj, None)
+        return artifact_wandb.WandbArtifactRef(obj, None)
 
     def load_instance(self, artifact, name, extra=None):
         return artifact
@@ -47,7 +48,7 @@ class ArtifactVersion:
         )
 
     @op(name="artifactLocalVersion-name")
-    def name(artifactVersion: artifacts_local.WandbArtifact) -> str:  # type: ignore
+    def name(artifactVersion: artifact_wandb.WandbArtifact) -> str:  # type: ignore
         # TODO: we actually get an artifact version file here because
         # we get refs types messed up somehow
         return getattr(artifactVersion, "name", "BUG a192bx (search weave code)")
@@ -57,7 +58,7 @@ class ArtifactVersion:
         input_type={"artifactVersion": ArtifactVersionType(), "path": types.String()},
         # TODO: This Type is not complete (missing DirType())
         # TODO: This needs to call ArtifactVersion.path_type()
-        output_type=refs.ArtifactVersionFileType(),
+        output_type=artifact_wandb.ArtifactVersionFileType(),
     )
     # TODO: This function should probably be called path, but it return Dir or File.
     # ok...
@@ -65,7 +66,7 @@ class ArtifactVersion:
         if ":" in path:
             # This is a URI
 
-            ref = refs.Ref.from_str(path)
+            ref = ref_base.Ref.from_str(path)
             artifactVersion = ref.artifact
             path = ref.path
 
@@ -73,7 +74,7 @@ class ArtifactVersion:
         # TODO: hideous type-switching here. Need to follow the
         # generic WeaveJS op pattern in list_.py
 
-        if isinstance(self, artifacts_local.LocalArtifact):
+        if isinstance(self, artifact_local.LocalArtifact):
             return file_local.LocalFile(os.path.join(self._read_dirname, path))
 
         # rest of implementation if for WandbArtifact

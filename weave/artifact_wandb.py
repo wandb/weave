@@ -1,39 +1,28 @@
 import contextlib
-import functools
-import hashlib
-import os
 import json
+import os
 import random
 import shutil
-from datetime import datetime
 import pathlib
 import tempfile
 import typing
-
-from . import uris
-from . import util
-from . import errors
-from . import wandb_api
-from . import context_state
-from . import memo
 
 import wandb
 from wandb.apis import public as wb_public
 from wandb.util import hex_to_b64_id
 
+from . import uris
+from . import errors
+from . import wandb_api
+from . import memo
 
-def local_artifact_dir() -> str:
-    # This is a directory that all local and wandb artifacts are stored within.
-    # It includes the current cache namespace, which is a safe token per user,
-    # to ensure cache separation.
-    d = os.environ.get("WEAVE_LOCAL_ARTIFACT_DIR") or os.path.join(
-        "/tmp", "local-artifacts"
-    )
-    cache_namespace = context_state._cache_namespace_token.get()
-    if cache_namespace:
-        d = os.path.join(d, cache_namespace)
-    os.makedirs(d, exist_ok=True)
-    return d
+from . import weave_types as types
+from . import ref_artifact
+from . import artifact_base
+from . import artifact_util
+
+if typing.TYPE_CHECKING:
+    from .ops_domain.file_wbartifact import ArtifactVersionFile
 
 
 @memo.memo
@@ -44,6 +33,20 @@ def get_wandb_read_artifact(path):
 @memo.memo
 def get_wandb_read_run(path):
     return wandb_api.wandb_public_api().run(path)
+
+
+def wandb_artifact_dir():
+    # Make this a subdir of local_artifact_dir, since the server
+    # checks for local_artifact_dir to see if it should serve
+    d = os.path.join(artifact_util.local_artifact_dir(), "_wandb_artifacts")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+def wandb_run_dir():
+    d = os.path.join(artifact_util.local_artifact_dir(), "_wandb_runs")
+    os.makedirs(d, exist_ok=True)
+    return d
 
 
 @memo.memo
@@ -144,7 +147,7 @@ def get_wandb_read_client_artifact(art_id: str):
                 f"Failed to resolve {var_name} for {art_id}. Have {res}."
             )
 
-    weave_art_uri = uris.WeaveWBArtifactURI.from_parts(
+    weave_art_uri = WeaveWBArtifactURI.from_parts(
         entity_name,
         project_name,
         artifact_name,
@@ -158,7 +161,7 @@ def _isolated_download_and_atomic_mover(
     end_path: str,
 ) -> typing.Generator[typing.Tuple[str, typing.Callable[[str], None]], None, None]:
     rand_part = "".join(random.choice("0123456789ABCDEF") for _ in range(16))
-    tmp_dir = os.path.join(local_artifact_dir(), f"tmp_{rand_part}")
+    tmp_dir = os.path.join(artifact_util.local_artifact_dir(), f"tmp_{rand_part}")
     os.makedirs(tmp_dir, exist_ok=True)
 
     def mover(tmp_path: str):
@@ -175,245 +178,9 @@ def _isolated_download_and_atomic_mover(
         shutil.rmtree(tmp_dir)
 
 
-def wandb_artifact_dir():
-    # Make this a subdir of local_artifact_dir, since the server
-    # checks for local_artifact_dir to see if it should serve
-    d = os.path.join(local_artifact_dir(), "_wandb_artifacts")
-    os.makedirs(d, exist_ok=True)
-    return d
-
-
-def wandb_run_dir():
-    d = os.path.join(local_artifact_dir(), "_wandb_runs")
-    os.makedirs(d, exist_ok=True)
-    return d
-
-
-# From sdk/interface/artifacts.py
-def md5_hash_file(path):
-    hash_md5 = hashlib.md5()
-    with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(64 * 1024), b""):
-            hash_md5.update(chunk)
-    return hash_md5.hexdigest()
-
-
-def md5_string(string: str) -> str:
-    hash_md5 = hashlib.md5()
-    hash_md5.update(string.encode())
-    return hash_md5.hexdigest()
-
-
-def local_artifact_exists(name: str, branch: str) -> bool:
-    return os.path.exists(os.path.join(local_artifact_dir(), name, branch))
-
-
-class Artifact:
-    name: str
-
-    @property
-    def is_saved(self) -> bool:
-        raise NotImplementedError()
-
-    @contextlib.contextmanager
-    def open(self, path: str, binary: bool = False):
-        raise NotImplementedError()
-
-    @contextlib.contextmanager
-    def new_file(self, path: str, binary: bool = False):
-        raise NotImplementedError()
-
-
-class LocalArtifact(Artifact):
-    def __init__(self, name: str, version: typing.Optional[str] = None):
-        # LocalArtifacts are created frequently, sometimes in cases where
-        # they will neither be read to or written to. The to_python path does
-        # this, it creates an Artifact in case any of the objects in the tree
-        # we're serializing are custom and therefore would need to write to
-        # the artifact. But most times, there are no custom objects in the tree.
-        #
-        # So for performance, its important to not create the directory structure until
-        # until we actually need to write to the artifact.
-        self.name = name
-        self._version = version
-        self._root = os.path.join(local_artifact_dir(), name)
-        self._path_handlers: dict[str, typing.Any] = {}
-        self._setup_dirs()
-        self._last_write_path = None
-
-    def __repr__(self):
-        return "<LocalArtifact(%s) %s %s>" % (id(self), self.name, self._version)
-
-    @property
-    def is_saved(self) -> bool:
-        return self._version is not None
-
-    @property
-    def version(self):
-        if not self.is_saved:
-            raise errors.WeaveInternalError(
-                "artifact must be saved before calling version!"
-            )
-        return self._version
-
-    @property
-    def created_at(self):
-        return self.read_metadata()["created_at"]
-
-    def get_other_version(self, version: str) -> typing.Optional["LocalArtifact"]:
-        if not local_artifact_exists(self.name, version):
-            return None
-        return LocalArtifact(self.name, version)
-
-    def _setup_dirs(self):
-        self._write_dirname = os.path.join(
-            self._root, "working-%s" % util.rand_string_n(12)
-        )
-        self._read_dirname = None
-        if self._version:
-            self._read_dirname = os.path.join(self._root, self._version)
-
-            # if this is a branch, set to the actual specific version it points to
-            if os.path.islink(self._read_dirname):
-                self._version = os.path.basename(os.path.realpath(self._read_dirname))
-                self._read_dirname = os.path.join(self._root, self._version)
-
-    def path(self, name: str) -> str:
-        return os.path.join(self._read_dirname, name)
-
-    @property
-    def location(self) -> uris.WeaveURI:
-        return uris.WeaveLocalArtifactURI.from_parts(
-            os.path.abspath(local_artifact_dir()), self.name, self.version
-        )
-
-    def uri(self) -> str:
-        return self.location.uri
-
-    @contextlib.contextmanager
-    def new_file(self, path, binary=False):
-        self._last_write_path = path
-
-        os.makedirs(self._write_dirname, exist_ok=True)
-        mode = "w"
-        if binary:
-            mode = "wb"
-        f = open(os.path.join(self._write_dirname, path), mode)
-        yield f
-        f.close()
-
-    @contextlib.contextmanager
-    def new_dir(self, path):
-        full_path = os.path.abspath(os.path.join(self._write_dirname, path))
-        os.makedirs(full_path, exist_ok=True)
-        yield full_path
-
-    def make_last_file_content_addressed(self):
-        # Warning: This function is really bad and a terrible smell!
-        # We need to fix the type saving API so we don't need to do this!!!!
-        # It also causes double hashing.
-        # TODO: fix
-        # DO NOT MERGE
-        last_write_path = self._last_write_path
-        if last_write_path is None:
-            return
-        self._last_write_path = None
-        orig_full_path = os.path.join(self._write_dirname, last_write_path)
-        hash = md5_hash_file(orig_full_path)
-        target_name = f"{hash}-{last_write_path}"
-        os.rename(orig_full_path, os.path.join(self._write_dirname, target_name))
-        return hash
-
-    @contextlib.contextmanager
-    def open(self, path, binary=False):
-        mode = "r"
-        if binary:
-            mode = "rb"
-        f = open(os.path.join(self._read_dirname, path), mode)
-        yield f
-        f.close()
-
-    def get_path_handler(self, path, handler_constructor):
-        handler = self._path_handlers.get(path)
-        if handler is None:
-            handler = handler_constructor(self, path)
-            self._path_handlers[path] = handler
-        return handler
-
-    def read_metadata(self):
-        with open(os.path.join(self._read_dirname, ".artifact-version.json")) as f:
-            obj = json.load(f)
-            obj["created_at"] = datetime.fromisoformat(obj["created_at"])
-            return obj
-
-    def write_metadata(self, dirname):
-        with open(os.path.join(dirname, ".artifact-version.json"), "w") as f:
-            json.dump({"created_at": datetime.now().isoformat()}, f)
-
-    def save(self, branch="latest"):
-        for handler in self._path_handlers.values():
-            handler.close()
-        self._path_handlers = {}
-        manifest = {}
-        if self._read_dirname:
-            for dirpath, dnames, fnames in os.walk(self._read_dirname):
-                for f in fnames:
-                    full_path = os.path.join(dirpath, f)
-                    manifest[f] = md5_hash_file(full_path)
-        for dirpath, dnames, fnames in os.walk(self._write_dirname):
-            for f in fnames:
-                full_path = os.path.join(dirpath, f)
-                manifest[f] = md5_hash_file(full_path)
-        commit_hash = md5_string(json.dumps(manifest, sort_keys=True, indent=2))
-        self._version = commit_hash
-        if os.path.exists(os.path.join(self._root, commit_hash)):
-            # already have this version!
-            shutil.rmtree(self._write_dirname)
-        else:
-            new_dirname = os.path.join(self._root, commit_hash)
-            if not self._read_dirname:
-                # we're not read-modify-writing an existing version, so
-                # just rename the write dir
-                os.rename(self._write_dirname, new_dirname)
-                self.write_metadata(new_dirname)
-            else:
-                # read-modify-write of existing version, so copy existing
-                # files into new dir first, then overwrite with new files
-                os.makedirs(new_dirname, exist_ok=True)
-                self.write_metadata(new_dirname)
-                if self._read_dirname:
-                    for path in os.listdir(self._read_dirname):
-                        src_path = os.path.join(self._read_dirname, path)
-                        target_path = os.path.join(new_dirname, path)
-                        if os.path.isdir(src_path):
-                            shutil.copytree(src_path, target_path)
-                        else:
-                            shutil.copyfile(src_path, target_path)
-                for path in os.listdir(self._write_dirname):
-                    src_path = os.path.join(self._write_dirname, path)
-                    target_path = os.path.join(new_dirname, path)
-                    if os.path.isdir(src_path):
-                        shutil.copytree(src_path, target_path)
-                    else:
-                        shutil.copyfile(src_path, target_path)
-                shutil.rmtree(self._write_dirname)
-        self._setup_dirs()
-
-        # Example of one of many races here
-        # ensure tempdir root exists
-        tmpdir_root = pathlib.Path(os.path.join(local_artifact_dir(), "tmp"))
-        tmpdir_root.mkdir(exist_ok=True)
-
-        link_name = os.path.join(self._root, branch)
-        with tempfile.TemporaryDirectory(dir=tmpdir_root) as d:
-            temp_path = os.path.join(d, "tmplink")
-            os.symlink(self._version, temp_path)
-            os.rename(temp_path, link_name)
-
-
-class WandbArtifact(Artifact):
+class WandbArtifact(artifact_base.Artifact):
     def __init__(
-        self, name, type=None, uri: typing.Optional[uris.WeaveWBArtifactURI] = None
+        self, name, type=None, uri: typing.Optional["WeaveWBArtifactURI"] = None
     ):
         self.name = name
         self._read_artifact_uri = None
@@ -577,11 +344,11 @@ class WandbArtifact(Artifact):
         run.finish()
 
         a_name, a_version = self._writeable_artifact.name.split(":")
-        uri = uris.WeaveWBArtifactURI.from_parts(run.entity, project, a_name, a_version)
+        uri = WeaveWBArtifactURI.from_parts(run.entity, project, a_name, a_version)
         self._set_read_artifact_uri(uri)
 
 
-class WandbRunFilesProxyArtifact(Artifact):
+class WandbRunFilesProxyArtifact(artifact_base.Artifact):
     def __init__(self, entity_name: str, project_name: str, run_name: str):
         self.name = f"{entity_name}/{project_name}/{run_name}"
         self._run = get_wandb_read_run(self.name)
@@ -610,3 +377,123 @@ class WandbRunFilesProxyArtifact(Artifact):
 
         self._local_path[name] = static_file_path
         return static_file_path
+
+
+# This should not be declared here, but WandbArtifactRef.type needs to
+# be able to create it right now, because of a series of hacks.
+# Instead, We probably need a WandbArtifactFileRef.
+# TODO: fix
+class ArtifactVersionFileType(types.Type):
+    _base_type = types.FileType()
+
+    name = "ArtifactVersionFile"
+
+    extension = types.String()
+    wb_object_type = types.String()
+
+    def save_instance(
+        self,
+        obj: "ArtifactVersionFile",
+        artifact: artifact_base.Artifact,
+        name: str,
+    ) -> "WandbArtifactRef":
+        return WandbArtifactRef(obj.artifact, obj.path)
+
+    # load_instance is injected by file_wbartifact.py in ops_domain.
+    # Bad bad bad!
+    # TODO: fix
+
+
+class WandbArtifactRef(ref_artifact.ArtifactRef):
+    FileType = ArtifactVersionFileType
+
+    artifact: WandbArtifact
+
+    def versions(self) -> list[ref_artifact.ArtifactRef]:
+        # TODO: implement versions on wandb artifact
+        return [self]
+
+    @classmethod
+    def from_uri(cls, uri: uris.WeaveURI) -> "WandbArtifactRef":
+        if not isinstance(uri, WeaveWBArtifactURI):
+            raise errors.WeaveInternalError(
+                f"Invalid URI class passed to WandbArtifactRef.from_uri: {type(uri)}"
+            )
+        # TODO: potentially need to pass full entity/project/name instead
+        return cls(
+            WandbArtifact(uri.full_name, uri=uri),
+            path=uri.file,
+        )
+
+
+types.WandbArtifactRefType.instance_class = WandbArtifactRef
+types.WandbArtifactRefType.instance_classes = WandbArtifactRef
+
+WandbArtifact.RefClass = WandbArtifactRef
+
+# Used to refer to objects stored in WB Artifacts. This URI must not change and
+# matches the existing artifact schemes
+class WeaveWBArtifactURI(uris.WeaveURI):
+    scheme = "wandb-artifact"
+    _entity_name: str
+    _project_name: str
+    _artifact_name: str
+
+    def __init__(self, uri: str) -> None:
+        super().__init__(uri)
+        all_parts = self.path.split(":")
+        if len(all_parts) != 2:
+            raise errors.WeaveInternalError("invalid uri version ", uri)
+        parts = all_parts[0].split("/")
+        if len(parts) < 3:
+            raise errors.WeaveInternalError("invalid uri parts ", uri)
+
+        self._entity_name = parts[0].strip("/")
+        self._project_name = parts[1].strip("/")
+        self._artifact_name = parts[2].strip("/")
+        self._full_name = parts[2].strip("/")
+        self._version = all_parts[1]
+
+    @classmethod
+    def from_parts(
+        cls,
+        entity_name: str,
+        project_name: str,
+        artifact_name: str,
+        version: str,
+        extra: typing.Optional[list[str]] = None,
+        file: typing.Optional[str] = None,
+    ):
+        return cls(
+            cls.make_uri(entity_name, project_name, artifact_name, version, extra, file)
+        )
+
+    @staticmethod
+    def make_uri(
+        entity_name: str,
+        project_name: str,
+        artifact_name: str,
+        version: str,
+        extra: typing.Optional[list[str]] = None,
+        file: typing.Optional[str] = None,
+    ):
+        uri = (
+            WeaveWBArtifactURI.scheme
+            + "://"
+            + entity_name
+            + "/"
+            + project_name
+            + "/"
+            + artifact_name
+            + ":"
+            + version
+        )
+
+        uri = uri + uris.WeaveURI._generate_query_str(extra, file)
+        return uri
+
+    def make_path(self) -> str:
+        return f"{self._entity_name}/{self._project_name}/{self._artifact_name}:{self._version}"
+
+    def to_ref(self) -> WandbArtifactRef:
+        return WandbArtifactRef.from_uri(self)

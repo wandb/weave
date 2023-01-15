@@ -8,7 +8,7 @@ import os
 import sys
 import ast
 
-from . import artifacts_local
+from . import artifact_util
 from . import op_def
 from . import errors
 from . import context_state
@@ -115,7 +115,7 @@ class OpDefType(types.Type):
             pass
 
         path_with_ext = os.path.relpath(
-            artifact.path(f"{name}.py"), start=artifacts_local.local_artifact_dir()
+            artifact.path(f"{name}.py"), start=artifact_util.local_artifact_dir()
         )
         # remove the .py extension
         path = os.path.splitext(path_with_ext)[0]
@@ -123,7 +123,7 @@ class OpDefType(types.Type):
         parts = path.split("/")
         module_path = ".".join(parts)
 
-        sys.path.insert(0, artifacts_local.local_artifact_dir())
+        sys.path.insert(0, artifact_util.local_artifact_dir())
         with context_state.loading_op_location(artifact.location):
             # This has a side effect of registering the op
             mod = __import__(module_path)

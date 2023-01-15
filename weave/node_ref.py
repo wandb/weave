@@ -2,11 +2,11 @@ import typing
 import copy
 
 from . import graph
-from . import refs
+from . import ref_base
 from . import ops
 
 
-def node_to_ref(node: graph.Node) -> typing.Optional[refs.Ref]:
+def node_to_ref(node: graph.Node) -> typing.Optional[ref_base.Ref]:
     """Converts a Node to equivalent Ref if possible.
 
     Specific call sequences can be converted to refs. For example:
@@ -51,7 +51,7 @@ def node_to_ref(node: graph.Node) -> typing.Optional[refs.Ref]:
     if not isinstance(get_arg0, graph.ConstNode):
         return None
     uri = get_arg0.val
-    ref = refs.Ref.from_str(uri)
+    ref = ref_base.Ref.from_str(uri)
     if ref.extra is None:
         ref.extra = []
 
@@ -76,7 +76,7 @@ def node_to_ref(node: graph.Node) -> typing.Optional[refs.Ref]:
     return ref
 
 
-def ref_to_node(ref: refs.Ref) -> typing.Optional[graph.Node]:
+def ref_to_node(ref: ref_base.Ref) -> typing.Optional[graph.Node]:
     """Inverse of node_to_ref, see docstring for node_to_ref."""
 
     if ref.extra is None:

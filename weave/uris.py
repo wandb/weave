@@ -3,6 +3,9 @@ from urllib import parse
 
 from . import errors
 
+if typing.TYPE_CHECKING:
+    from . import ref_base
+
 
 class WeaveURI:
     # classvar to identify the URI type
@@ -97,126 +100,5 @@ class WeaveURI:
                 return candidate_class(uri)
         raise errors.WeaveInternalError("invalid scheme ", uri)
 
-
-# Used when the Weave object is constructed at runtime (eg. weave-builtins or user-defined objects)
-class WeaveRuntimeURI(WeaveURI):
-    scheme = ""
-
-    def __init__(self, uri: str):
-        super().__init__(uri)
-        parts = self.path.split(":", 1)
-        self._full_name = parts[0]
-        if len(parts) == 2:
-            self._version = parts[1]
-        else:
-            self._version = None
-
-    def __repr__(self):
-        return f"<RuntimeURI({self.uri})>"
-
-
-# Used when the Weave object is located on disk (eg after saving locally).
-#
-# Note: this can change over time as it is only used in-process
-# local-artifact://user/timothysweeney/workspace/.../local-artifacts/<friendly_name>/<version>?extra=<extra_parts>
-class WeaveLocalArtifactURI(WeaveURI):
-    scheme = "local-artifact"
-
-    def __init__(self, uri: str) -> None:
-        super().__init__(uri)
-        parts = self.path.split("/")
-        if len(parts) < 2:
-            raise errors.WeaveInternalError("invalid uri ", uri)
-        self._full_name = parts[-2]
-        self._version = parts[-1]
-
-    @classmethod
-    def from_parts(
-        cls: typing.Type["WeaveLocalArtifactURI"],
-        root: str,
-        friendly_name: str,
-        version: typing.Optional[str] = None,
-        extra: typing.Optional[list[str]] = None,
-        file: typing.Optional[str] = None,
-    ) -> "WeaveLocalArtifactURI":
-        return cls(cls.make_uri(root, friendly_name, version, extra, file))
-
-    @staticmethod
-    def make_uri(
-        root: str,
-        friendly_name: str,
-        version: typing.Optional[str] = None,
-        extra: typing.Optional[list[str]] = None,
-        file: typing.Optional[str] = None,
-    ) -> str:
-        uri = WeaveLocalArtifactURI.scheme + "://" + root + "/" + friendly_name
-        if version is not None:
-            uri += "/" + version
-
-        uri = uri + WeaveURI._generate_query_str(extra, file)
-        return uri
-
-
-# Used to refer to objects stored in WB Artifacts. This URI must not change and
-# matches the existing artifact schemes
-class WeaveWBArtifactURI(WeaveURI):
-    scheme = "wandb-artifact"
-    _entity_name: str
-    _project_name: str
-    _artifact_name: str
-
-    def __init__(self, uri: str) -> None:
-        super().__init__(uri)
-        all_parts = self.path.split(":")
-        if len(all_parts) != 2:
-            raise errors.WeaveInternalError("invalid uri version ", uri)
-        parts = all_parts[0].split("/")
-        if len(parts) < 3:
-            raise errors.WeaveInternalError("invalid uri parts ", uri)
-
-        self._entity_name = parts[0].strip("/")
-        self._project_name = parts[1].strip("/")
-        self._artifact_name = parts[2].strip("/")
-        self._full_name = parts[2].strip("/")
-        self._version = all_parts[1]
-
-    @classmethod
-    def from_parts(
-        cls,
-        entity_name: str,
-        project_name: str,
-        artifact_name: str,
-        version: str,
-        extra: typing.Optional[list[str]] = None,
-        file: typing.Optional[str] = None,
-    ):
-        return cls(
-            cls.make_uri(entity_name, project_name, artifact_name, version, extra, file)
-        )
-
-    @staticmethod
-    def make_uri(
-        entity_name: str,
-        project_name: str,
-        artifact_name: str,
-        version: str,
-        extra: typing.Optional[list[str]] = None,
-        file: typing.Optional[str] = None,
-    ):
-        uri = (
-            WeaveWBArtifactURI.scheme
-            + "://"
-            + entity_name
-            + "/"
-            + project_name
-            + "/"
-            + artifact_name
-            + ":"
-            + version
-        )
-
-        uri = uri + WeaveURI._generate_query_str(extra, file)
-        return uri
-
-    def make_path(self) -> str:
-        return f"{self._entity_name}/{self._project_name}/{self._artifact_name}:{self._version}"
+    def to_ref(self) -> "ref_base.Ref":
+        raise NotImplementedError

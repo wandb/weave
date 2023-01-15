@@ -18,7 +18,7 @@ from .. import storage
 from ..ops_primitives import Number
 from .. import api as weave
 from .. import ops
-from .. import artifacts_local
+from .. import artifact_util
 from .. import weave_types as types
 from .. import weave_internal
 from .. import context_state
@@ -364,7 +364,7 @@ def test_custom_groupby_intermediate_save():
     saved_node = weave.save(node, "test_custom_groupby_intermediate_save")
     weave.use(saved_node)
     loaded_node = ops.get(
-        f"local-artifact://{artifacts_local.local_artifact_dir()}/test_custom_groupby_intermediate_save/latest"
+        f"local-artifact://{artifact_util.local_artifact_dir()}/test_custom_groupby_intermediate_save/latest"
     )
     assert weave.use(loaded_node.pick("im").offset(0)[0].width_()) == 256
 

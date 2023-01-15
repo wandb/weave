@@ -30,12 +30,13 @@ import json
 import typing
 import functools
 
-from ... import artifacts_local
+from ... import artifact_base
 from ... import box
 from ... import weave_types as types
 from ... import mappers_python
 from ... import errors
-from ... import refs
+from ... import ref_base
+from ... import ref_mem
 from ... import mappers
 
 from . import tag_store
@@ -127,7 +128,7 @@ class TaggedValueType(types.Type):
         return {"tag": self.tag.to_dict(), "value": self.value.to_dict()}
 
     def save_instance(
-        self, obj: types.Any, artifact: artifacts_local.Artifact, name: str
+        self, obj: types.Any, artifact: artifact_base.Artifact, name: str
     ) -> None:
         serializer = mappers_python.map_to_python(self, artifact)
 
@@ -137,7 +138,7 @@ class TaggedValueType(types.Type):
 
     def load_instance(
         self,
-        artifact: artifacts_local.Artifact,
+        artifact: artifact_base.Artifact,
         name: str,
         extra: typing.Optional[list[str]] = None,
     ) -> typing.Any:
@@ -155,7 +156,7 @@ class TaggedValueMapper(mappers.Mapper):
         self,
         type_: TaggedValueType,
         mapper: typing.Callable,  # TODO: Make this more specific
-        artifact: artifacts_local.Artifact,
+        artifact: artifact_base.Artifact,
         path: list[str] = [],
     ):
         self.type = type_
@@ -186,8 +187,9 @@ class TaggedValueFromPy(TaggedValueMapper):
             types.String()
         ):
             try:
-                ref = refs.Ref.from_str(obj["_value"])
-                if not isinstance(ref, refs.MemRef) and ref.type == self.type:
+                ref = ref_base.Ref.from_str(obj["_value"])
+                # TODO: why this logic?
+                if not isinstance(ref, ref_mem.MemRef) and ref.type == self.type:
                     return ref.get()
             except (errors.WeaveInvalidURIError, errors.WeaveStorageError):
                 # This would indicate that the value is not a reference.

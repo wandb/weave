@@ -4,12 +4,12 @@ import shutil
 
 from . import errors
 
-from ..refs import ArtifactVersionFileType
+from ..artifact_wandb import ArtifactVersionFileType
 from ..api import op, mutation, weave_class
 from .. import weave_types as types
 from .. import wandb_util
 from .. import ops_arrow
-from .. import artifacts_local
+from .. import artifact_wandb
 
 _py_open = open
 
@@ -89,7 +89,7 @@ def _get_rows_and_object_type_from_weave_format(data, file):
     rows = []
     wb_artifact = None
     if hasattr(file, "artifact") and isinstance(
-        file.artifact, artifacts_local.WandbArtifact
+        file.artifact, artifact_wandb.WandbArtifact
     ):
         wb_artifact = file.artifact._saved_artifact
     row_data = data["data"]

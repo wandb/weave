@@ -7,7 +7,7 @@ import random
 from . import storage
 from . import errors
 from . import runs_local
-from . import refs
+from . import ref_base
 from . import op_def
 
 
@@ -66,7 +66,7 @@ class TraceLocal:
 
     def save_object(
         self, obj: typing.Any, name: typing.Optional[str] = None
-    ) -> refs.Ref:
+    ) -> ref_base.Ref:
         try:
             # Passing the node.type through here will really speed things up!
             # But we can't do it yet because Weave Python function aren't all

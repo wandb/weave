@@ -4,13 +4,13 @@ import typing
 
 if typing.TYPE_CHECKING:
     from . import mappers
-    from . import artifacts_local
+    from . import artifact_base
     from . import weave_types
 
 
 def map_to_python(
     type_: "weave_types.Type",
-    artifact: "artifacts_local.Artifact",
+    artifact: "artifact_base.Artifact",
     path: list[str] = [],
 ) -> "mappers.Mapper":
     pass
@@ -18,7 +18,7 @@ def map_to_python(
 
 def map_from_python(
     type_: "weave_types.Type",
-    artifact: "artifacts_local.Artifact",
+    artifact: "artifact_base.Artifact",
     path: list[str] = [],
 ) -> "mappers.Mapper":
     pass

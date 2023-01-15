@@ -15,11 +15,10 @@ import typing
 from . import wb_util
 from urllib.parse import quote
 from . import file_wbartifact
-from .. import refs
-from .. import artifacts_local
+from .. import artifact_base
+from .. import artifact_wandb
 import logging
 from . import wbartifact
-from .. import uris
 
 # Section 1/6: Tag Getters
 # None
@@ -246,10 +245,10 @@ def _artifact_version_to_wb_artifact(artifactVersion: wdt.ArtifactVersion):
     type_name = artifactVersion.gql["artifactSequence"]["defaultArtifactType"]["name"]
     home_sequence_name = artifactVersion.gql["artifactSequence"]["name"]
     home_version_index = artifactVersion.gql["versionIndex"]
-    return artifacts_local.WandbArtifact(
+    return artifact_wandb.WandbArtifact(
         name=home_sequence_name,
         type=type_name,
-        uri=uris.WeaveWBArtifactURI(
+        uri=artifact_wandb.WeaveWBArtifactURI(
             f"wandb-artifact://{entity_name}/{project_name}/{home_sequence_name}:v{home_version_index}"
         ),
     )
@@ -257,13 +256,13 @@ def _artifact_version_to_wb_artifact(artifactVersion: wdt.ArtifactVersion):
 
 @op(
     name="artifactVersion-file",
-    output_type=refs.ArtifactVersionFileType(),
+    output_type=artifact_wandb.ArtifactVersionFileType(),
 )
 def file_(artifactVersion: wdt.ArtifactVersion, path: str):
     # TODO (tim): This is a total hack - I am not sure why dispatch is sending use these
-    if isinstance(artifactVersion, artifacts_local.Artifact):
+    if isinstance(artifactVersion, artifact_base.Artifact):
         logging.warning(
-            "Expected input to be of type ArtifactVersion, but got artifacts_local.Artifact in artifactVersion-file"
+            "Expected input to be of type ArtifactVersion, but got artifact_base.Artifact in artifactVersion-file"
         )
         art_local = artifactVersion
     else:
@@ -277,9 +276,9 @@ def file_(artifactVersion: wdt.ArtifactVersion, path: str):
 )
 def path_type(artifactVersion: wdt.ArtifactVersion, path: str):
     # TODO (tim): This is a total hack - I am not sure why dispatch is sending use thsese
-    if isinstance(artifactVersion, artifacts_local.Artifact):
+    if isinstance(artifactVersion, artifact_base.Artifact):
         logging.warning(
-            "Expected input to be of type ArtifactVersion, but got artifacts_local.Artifact in artifactVersion-fileReturnType"
+            "Expected input to be of type ArtifactVersion, but got artifact_base.Artifact in artifactVersion-fileReturnType"
         )
         art_local = artifactVersion
     else:
