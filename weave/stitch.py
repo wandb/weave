@@ -78,7 +78,10 @@ class StitchedGraph:
 
     def add_result(self, node: graph.Node, result: ObjectRecorder) -> None:
         if node in self._node_map:
-            self._merge_result(node, result)
+            raise errors.WeaveInternalError(
+                f"Programming Error: Attempting to add result for existing node"
+            )
+            # self._merge_result(node, result)
         self._node_map[node] = result
 
     def _merge_result(self, node: graph.Node, result: ObjectRecorder) -> None:

@@ -2,7 +2,6 @@
 # needlessly adds an entry for nodes and ops. It'd be simpler to just encode
 # nodes and inline the ops in their respective output nodes.
 
-import random
 import typing
 import hashlib
 import json
@@ -102,7 +101,7 @@ def node_id(node: graph.Node):
         if isinstance(node.val, graph.OutputNode) or isinstance(
             node.val, graph.VarNode
         ):
-            hashable["val"] = str(random.random())
+            hashable["val"] = node.val.to_json()
         else:
             hashable["val"] = storage.to_python(node.val)
     else:
