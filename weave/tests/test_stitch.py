@@ -221,10 +221,10 @@ def test_shared_fn_node():
     mapped_2_const_add_node = mapped_2_const_node + 100
 
     list_of_list_node = weave.ops.make_list(
-        a=mapped_1_item_node,
-        b=mapped_1_const_node,
-        c=mapped_2_item_add_node,
-        d=mapped_2_const_add_node,
+        a=mapped_1_item_node,  # [1,2,3]
+        b=mapped_1_const_node,  # [1,1,1]
+        c=mapped_2_item_add_node,  # [110,120,130]
+        d=mapped_2_const_add_node,  # [101,101,101]
     )
     concat_node = list_of_list_node.concat()
     sum_node = concat_node.sum()
@@ -257,3 +257,27 @@ def test_shared_fn_node():
     assert_node_calls(list_of_list_node, ["concat"])
     assert_node_calls(concat_node, ["numbers-sum"])
     assert_node_calls(sum_node, [])
+
+    assert weave.use(sum_node) == 672
+
+
+def test_shared_fn_node_with_tags():
+    list_node = weave.ops.make_list(
+        a=weave.ops.dict_(a=1, b=2),
+        b=weave.ops.dict_(a=1, b=4),
+        c=weave.ops.dict_(a=2, b=20),
+        d=weave.ops.dict_(a=2, b=40),
+    )
+    grouped_node = list_node.groupby(lambda x: weave.ops.dict_(c=x["a"]))
+    sort_fn = weave_internal.define_fn(
+        {"row": grouped_node.type.object_type},
+        lambda row: weave.ops.make_list(d=row.groupkey()["c"]),
+    )
+    # These two simulate real-world use cases where the same node is used in multiple places
+    sorted_node_1 = grouped_node.sort(sort_fn, ["asc"])
+    sorted_node_2 = grouped_node.sort(sort_fn, ["asc"])
+    first_node = sorted_node_1[0]["a"][0]
+    second_node = sorted_node_2[1]["a"][1]
+    p = stitch.stitch([first_node, second_node])
+
+    assert weave.use([first_node, second_node]) == [1, 2]

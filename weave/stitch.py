@@ -44,6 +44,10 @@ class StitchedOutputNode:
     node: graph.OutputNode
     _stitched_graph: "StitchedGraph"
 
+    # Note: if a node is used in multiple places (should only be possible with)
+    # inner lambda functions, then the input recorder dict will only be "correct"
+    # of the first occurrence of the node. To fix this, we should not merge lambda
+    # var nodes in deserialization of graphs.
     @property
     def input_recorder_dict(self) -> dict[str, "ObjectRecorder"]:
         return {
@@ -98,6 +102,23 @@ class ObjectRecorder:
         for k, v in tag_recorder_dict.items():
             self.set_tag_recorder_for_key(k, v)
 
+    def merge_in(self, other: "ObjectRecorder") -> None:
+        if self == other:
+            return
+        if type(self) != type(other):
+            raise errors.WeaveInternalError(
+                f"Programming error: ObjectRecorder can only merge in other ObjectRecorders of the same type. Found {type(self)} and {type(other)}"
+            )
+        for other_key, other_node in other._tag_source_node_map.items():
+            if other_key in self._tag_source_node_map:
+                self.tag_recorder_for_key(other_key).merge_in(
+                    self._stitched_graph.get_recorder_for_node(other_node)
+                )
+
+        for c in other._calls_target_nodes:
+            if c not in self._calls_target_nodes:
+                self.add_call(c)
+
 
 @dataclasses.dataclass
 class ConstNodeObjectRecorder(ObjectRecorder):
@@ -108,6 +129,17 @@ class ConstNodeObjectRecorder(ObjectRecorder):
                 f"Programming error: ConstNodeObjectRecorder must be constructed with a `ConstNode`. Found {self.original_node}"
             )
         return self.original_node.val
+
+    def merge_in(self, other: "ObjectRecorder") -> None:
+        if not isinstance(other, ConstNodeObjectRecorder):
+            raise errors.WeaveInternalError(
+                f"Programming error: ConstNodeObjectRecorder can only merge in other ConstNodeObjectRecorders. Found {other}"
+            )
+        if self.const_val != other.const_val:
+            raise errors.WeaveInternalError(
+                f"Programming error: ConstNodeObjectRecorder can only merge in other ConstNodeObjectRecorders with the same value. Found {self.const_val} and {other.const_val}"
+            )
+        super().merge_in(other)
 
 
 @dataclasses.dataclass
@@ -136,15 +168,6 @@ class _SetOnceDict(dict):
         super().__setitem__(key, value)
 
 
-class _SetOnceExceptVarNodeDict(dict):
-    def __setitem__(self, key: str, value: typing.Any) -> None:
-        if key in self and not isinstance(key, graph.VarNode):
-            raise errors.WeaveInternalError(
-                f"Programming error: Attempted to set key {key} twice."
-            )
-        super().__setitem__(key, value)
-
-
 @dataclasses.dataclass
 class StitchedGraph:
     # There should always be a 1-1 correspondence between output nodes and stitched output nodes.
@@ -155,7 +178,7 @@ class StitchedGraph:
     # The ObjectRecorder for a Node my not be produced by that node. Therefore, the set of all
     # ObjectRecords is upper bounded by the set of all Nodes.
     _node_to_recorder_map: typing.Dict[graph.Node, ObjectRecorder] = dataclasses.field(
-        default_factory=_SetOnceExceptVarNodeDict
+        default_factory=dict
     )
 
     def get_recorder_for_node(self, node: graph.Node) -> ObjectRecorder:
@@ -173,6 +196,17 @@ class StitchedGraph:
     def _set_recorder_for_node(
         self, node: graph.Node, recorder: ObjectRecorder
     ) -> None:
+        if node in self._node_to_recorder_map and not isinstance(node, graph.VarNode):
+            # Normally, this would be a programming error. However, it is possible that actually
+            # we are re-processing processing an inner lambda function which is shared by multiple nodes.
+            # If this is the case, what we actually want to do is merge the object recorders. Ideally, this
+            # can go back to being an error if we treat every var node as it's own logical node - this will
+            # require refactoring the deserializer to create new const-function nodes for each lambda function
+            # usage.
+            self._node_to_recorder_map[node].merge_in(recorder)
+            # raise errors.WeaveInternalError(
+            #     f"Programming error: Attempted to set key {node} twice."
+            # )
         self._node_to_recorder_map[node] = recorder
 
     def _get_stitched_node_for_node(self, node: graph.OutputNode) -> StitchedOutputNode:
@@ -191,6 +225,7 @@ class StitchedGraph:
         """Given a list of leaf nodes, stitch the graph together."""
 
         def handle_node(node: graph.Node) -> graph.Node:
+            # print(f"Handling node ({type(node).__name__})<{id(node)}>{node}")
             if isinstance(node, graph.OutputNode):
                 input_dict = {
                     k: self.get_recorder_for_node(v)
@@ -201,6 +236,7 @@ class StitchedGraph:
                 if frame and node.name in frame:
                     self._set_recorder_for_node(node, frame[node.name])
                 else:
+                    # This effectively "clears" the recorder for the var node.
                     self._set_recorder_for_node(node, ObjectRecorder(node, self))
             return node
 
