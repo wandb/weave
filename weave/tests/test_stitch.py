@@ -98,10 +98,10 @@ def test_lambda_using_externally_defined_node():
     assert len(calls) == 3
     assert calls[0].node.from_op.name == "mapped_typedDict-pick"
     assert calls[0].inputs[1].val == "b"
-    assert calls[1].node.from_op.name == "typedDict-pick"
-    assert calls[1].inputs[1].val == "a"
-    assert calls[2].node.from_op.name == "list-__getitem__"
-    assert calls[2].inputs[1].val == 0
+    assert calls[1].node.from_op.name == "list-__getitem__"
+    assert calls[1].inputs[1].val == 0
+    assert calls[2].node.from_op.name == "typedDict-pick"
+    assert calls[2].inputs[1].val == "a"
 
 
 def test_tag_access_in_filter_expr():
@@ -128,7 +128,8 @@ def test_travese_groupby_dict():
     obj_node = weave.save([{"o": {"a": 5}, "x": 1}])
     grouped = obj_node.groupby(lambda row: weave.ops.dict_(x=row["o"]))
     output = grouped[0]["x"]
-    groupkey_output = grouped[0].groupkey()["x"]["a"]
+    grouped_x_o = grouped[0].groupkey()["x"]
+    groupkey_output = grouped_x_o["a"]
     p = stitch.stitch([output, groupkey_output])
     obj_recorder = p.get_result(obj_node)
 
@@ -161,19 +162,15 @@ def test_zero_arg_ops():
 def test_shared_fn_node():
     const_list_node = weave.ops.make_list(a=1, b=2)
     indexed_node = const_list_node[0]
-    # fn_node = weave_internal.define_fn(
-    #     {"row": weave.types.Number()},
-    #     lambda row: weave.ops.dict_(item=row, const=indexed_node),
-    # )
+    fn_node = weave_internal.define_fn(
+        {"row": weave.types.Number()},
+        lambda row: weave.ops.dict_(item=row, const=indexed_node),
+    )
     arr_1_node = weave.ops.make_list(a=1, b=2, c=3)
     arr_2_node = weave.ops.make_list(a=10, b=20, c=30)
 
-    mapped_1_node = arr_1_node.map(
-        lambda row: weave.ops.dict_(item=row, const=indexed_node)
-    )
-    mapped_2_node = arr_2_node.map(
-        lambda row: weave.ops.dict_(item=row, const=indexed_node)
-    )
+    mapped_1_node = arr_1_node.map(fn_node)
+    mapped_2_node = arr_2_node.map(fn_node)
 
     mapped_1_item_node = mapped_1_node["item"]
     mapped_1_const_node = mapped_1_node["const"]
@@ -192,8 +189,6 @@ def test_shared_fn_node():
     concat_node = list_of_list_node.concat()
     sum_node = concat_node.sum()
 
-    # sum_node_from_js = serialize.deserialize(serialize.serialize([sum_node]))[0]
-
     p = stitch.stitch([sum_node])
 
     def assert_node_calls(node, expected_call_names):
@@ -203,15 +198,15 @@ def test_shared_fn_node():
 
     assert_node_calls(const_list_node, ["list-__getitem__"])
     assert_node_calls(indexed_node, ["list", "mapped_number-add"])
-    # assert_node_calls(fn_node, [])
+    assert_node_calls(fn_node, [])
     assert_node_calls(arr_1_node, ["list"])
     assert_node_calls(arr_2_node, ["mapped_number-add"])
     assert_node_calls(mapped_1_node, [])
     assert_node_calls(mapped_2_node, [])
     assert_node_calls(mapped_1_item_node, ["list"])
-    assert_node_calls(mapped_1_const_node, ["list"])
+    assert_node_calls(mapped_1_const_node, ["list", "mapped_number-add"])
     assert_node_calls(mapped_2_item_node, ["mapped_number-add"])
-    assert_node_calls(mapped_2_const_node, ["mapped_number-add"])
+    assert_node_calls(mapped_2_const_node, ["list", "mapped_number-add"])
     assert_node_calls(mapped_2_item_add_node, ["list"])
     assert_node_calls(mapped_2_const_add_node, ["list"])
     assert_node_calls(list_of_list_node, ["concat"])

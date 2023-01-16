@@ -25,10 +25,14 @@ def get_projection(obj: stitch.ObjectRecorder) -> KeyTree:
         if call.node.from_op.name.endswith("pick") or call.node.from_op.name.endswith(
             "__getattr__"
         ):
-            key = call.inputs[1].val
-            if key is None:
+            if isinstance(call.inputs[1], stitch.ConstNodeObjectRecorder):
+                key = call.inputs[1].val
+                if key is not None:
+                    tree_merge(cols.setdefault(key, {}), get_projection(call.output))
+                else:
+                    raise errors.WeaveInternalError("null const not yet supported")
+            else:
                 raise errors.WeaveInternalError("non-const not yet supported")
-            tree_merge(cols.setdefault(key, {}), get_projection(call.output))
         else:
             tree_merge(cols, get_projection(call.output))
     return cols

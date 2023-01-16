@@ -29,6 +29,16 @@ from . import op_def
 from .language_features.tagging import opdef_util
 
 
+def stitch(
+    leaf_nodes: list[graph.Node],
+    # var_values: typing.Optional[dict[str, ObjectRecorder]] = None,
+) -> "StitchedGraph":
+    """Given a list of leaf nodes, stitch the graph together."""
+    sg = StitchedGraph()
+    sg.stitch(leaf_nodes)
+    return sg
+
+
 @dataclasses.dataclass
 class OpCall:
     node: graph.OutputNode
@@ -40,289 +50,239 @@ class OpCall:
         return list(self.input_dict.values())
 
 
-@dataclasses.dataclass()
+@dataclasses.dataclass
 class ObjectRecorder:
     node: graph.Node
     tags: dict[str, "ObjectRecorder"] = dataclasses.field(default_factory=dict)
-    val: typing.Optional[typing.Any] = None
     calls: list[OpCall] = dataclasses.field(default_factory=list)
 
-    def add_call(self, call: OpCall) -> None:
-        self.calls.append(call)
-
-    def call_node(
-        self, node: graph.OutputNode, input_dict: dict[str, "ObjectRecorder"]
-    ) -> "ObjectRecorder":
-        output = ObjectRecorder(node)
-        self.add_call(OpCall(node, input_dict, output))
-        return output
+    # def __post_init__(self) -> None:
+    #     print(f"ObjectRecorder.__post_init__ <{id(self)}, {id(self.node)}>{self.node}")
+    #     # if str(self.node) == "list(1, 2)[0]":
+    #     #     print("here")
 
     def __hash__(self) -> int:
         return id(self)
 
 
+@dataclasses.dataclass
+class ConstNodeObjectRecorder(ObjectRecorder):
+    val: typing.Optional[typing.Any] = None
+
+
+@dataclasses.dataclass
 class LiteralDictObjectRecorder(ObjectRecorder):
-    val: dict[str, ObjectRecorder]
+    val: dict[str, ObjectRecorder] = dataclasses.field(default_factory=dict)
 
 
+@dataclasses.dataclass
 class LiteralListObjectRecorder(ObjectRecorder):
-    val: list[ObjectRecorder]
+    val: list[ObjectRecorder] = dataclasses.field(default_factory=list)
 
 
 @dataclasses.dataclass
 class StitchedGraph:
-    _node_map: typing.Dict[graph.Node, ObjectRecorder]
-
-    def get_result(self, node: graph.Node) -> ObjectRecorder:
-        return self._node_map[node]
-
-    def add_result(self, node: graph.Node, result: ObjectRecorder) -> None:
-        if node in self._node_map:
-            raise errors.WeaveInternalError(
-                f"Programming Error: Attempting to add result for existing node"
-            )
-            # self._merge_result(node, result)
-        self._node_map[node] = result
-
-    def _merge_result(self, node: graph.Node, result: ObjectRecorder) -> None:
-        # Performs an in-place merge of the node result into the stitched graph.
-        curr_result = self._node_map[node]
-        if isinstance(node, graph.ConstNode):
-            if curr_result.val != result.val:
-                raise errors.WeaveStitchGraphMergeError(
-                    f"Cannot merge ObjectRecorder with different values: {curr_result.val} and {result.val}"
-                )
-        elif isinstance(curr_result, LiteralListObjectRecorder):
-            if not isinstance(result, LiteralListObjectRecorder):
-                raise errors.WeaveStitchGraphMergeError(
-                    f"Cannot merge LiteralListObjectRecorder with different types: {type(curr_result)} and {type(result)}"
-                )
-            # merge the vals:
-            curr_val_set = set(curr_result.val)
-            for v in result.val:
-                if v not in curr_val_set:
-                    curr_result.val.append(v)
-        elif isinstance(curr_result, LiteralDictObjectRecorder):
-            if not isinstance(result, LiteralDictObjectRecorder):
-                raise errors.WeaveStitchGraphMergeError(
-                    f"Cannot merge LiteralDictObjectRecorder with different types: {type(curr_result)} and {type(result)}"
-                )
-            # merge the vals:
-            for k, v in result.val.items():
-                if k not in curr_result.val:
-                    curr_result.val[k] = v
-                else:
-                    self._merge_result(curr_result.val[k].node, v)
-
-        # Merge the calls
-        known_called_nodes = {call.node for call in curr_result.calls}
-        for call in result.calls:
-            if call.node not in known_called_nodes:
-                curr_result.add_call(call)
-
-        # Merge the tags
-        for tag_name, other_tag_recorder in result.tags.items():
-            if tag_name not in curr_result.tags:
-                if other_tag_recorder.node in self._node_map:
-                    other_tag_recorder = self._node_map[other_tag_recorder.node]
-                else:
-                    self.add_result(other_tag_recorder.node, other_tag_recorder)
-                curr_result.tags[tag_name] = other_tag_recorder
-
-    def add_subgraph_stitch_graph(self, other: "StitchedGraph") -> None:
-        for node, result in other._node_map.items():
-            if node not in self._node_map:
-                self.add_result(node, result)
-            else:
-                self._merge_result(node, result)
-
-
-def stitch(
-    leaf_nodes: list[graph.Node],
-    var_values: typing.Optional[dict[str, ObjectRecorder]] = None,
-) -> StitchedGraph:
-    """Given a list of leaf nodes, stitch the graph together."""
-    sg = StitchedGraph({})
-
-    def handle_node(node: graph.Node) -> graph.Node:
-        if isinstance(node, graph.OutputNode):
-            input_dict = {k: sg.get_result(v) for k, v in node.from_op.inputs.items()}
-            sg.add_result(node, stitch_node(node, input_dict, sg))
-        elif isinstance(node, graph.ConstNode):
-            sg.add_result(node, ObjectRecorder(node, val=node.val))
-        elif isinstance(node, graph.VarNode):
-            if var_values and node.name in var_values:
-                sg.add_result(node, var_values[node.name])
-            else:
-                # Originally, we would raise an error here, but we now allow
-                # unbound vars to be in the graph. This makes sense to me (Tim)
-                # since we could be stitching the compilation step of a
-                # subgraph, but Shawn has pointed out that this case could be
-                # removed if we stitched the entire graph in 1 pass. For now, we
-                # assign an empty recorder, but this might be able to be
-                # optimized out in the future.
-                sg.add_result(node, ObjectRecorder(node))
-                # raise errors.WeaveInternalError(
-                #     "Encountered var %s but var_values not provided" % node.name
-                # )
-        else:
-            raise errors.WeaveInternalError("Unexpected node type")
-        return node
-
-    graph.map_nodes_top_level(leaf_nodes, handle_node)
-
-    return sg
-
-
-def subgraph_stitch(
-    function_node: graph.Node, args: dict[str, ObjectRecorder], sg: StitchedGraph
-) -> ObjectRecorder:
-    result_graph = stitch([function_node], args)
-    sg.add_subgraph_stitch_graph(result_graph)
-    return result_graph.get_result(function_node)
-
-
-def is_root_op(op: op_def.OpDef) -> bool:
-    return (
-        op.name == "root-project"
-        or op.name == "get"
-        or op.name == "getReturnType"
-        or op.name == "render_table_runs2"
-        or op.name == "project-runs2"
+    _node_recorder_map: typing.Dict[graph.Node, ObjectRecorder] = dataclasses.field(
+        default_factory=dict
+    )
+    _node_call_map: typing.Dict[graph.Node, OpCall] = dataclasses.field(
+        default_factory=dict
     )
 
+    def get_result(self, node: graph.Node) -> ObjectRecorder:
+        return self._recorder_for_node(node)
 
-def is_get_tag_op(op: op_def.OpDef) -> bool:
+    def _set_object_recorder(self, node: graph.Node, recorder: ObjectRecorder) -> None:
+        if node in self._node_recorder_map and not isinstance(node, graph.VarNode):
+            raise errors.WeaveInternalError(
+                f"Non VarNode {node} already has an object recorder"
+            )
+        self._node_recorder_map[node] = recorder
+
+    def _recorder_for_node(self, node: graph.Node) -> ObjectRecorder:
+        if (
+            isinstance(node, graph.OutputNode)
+            and node.from_op.name.endswith("pick")
+            and "groupkey" in str(node)
+        ):
+            print(f"recorder_for_node {node}")
+        if node not in self._node_recorder_map:
+            if isinstance(node, graph.OutputNode) and node.from_op.name.endswith(
+                "pick"
+            ):
+                print("minting new")
+            if isinstance(node, graph.OutputNode) and node.from_op.name.endswith(
+                "dict"
+            ):
+                self._node_recorder_map[node] = LiteralDictObjectRecorder(node)
+            elif isinstance(node, graph.OutputNode) and node.from_op.name.endswith(
+                "list"
+            ):
+                self._node_recorder_map[node] = LiteralListObjectRecorder(node)
+            elif isinstance(node, graph.ConstNode):
+                self._node_recorder_map[node] = ConstNodeObjectRecorder(
+                    node, val=node.val
+                )
+            else:
+                self._node_recorder_map[node] = ObjectRecorder(node)
+        return self._node_recorder_map[node]
+
+    def _call_for_node(self, node: graph.OutputNode) -> OpCall:
+        if node not in self._node_call_map:
+            inputs = {
+                k: self._recorder_for_node(v) for k, v in node.from_op.inputs.items()
+            }
+            output = self._recorder_for_node(node)
+            self._node_call_map[node] = OpCall(node, inputs, output)
+        return self._node_call_map[node]
+
+    def _add_call(self, from_node: graph.Node, to_node: graph.OutputNode) -> None:
+        self._recorder_for_node(from_node).calls.append(self._call_for_node(to_node))
+
+    def stitch(
+        self,
+        leaf_nodes: list[graph.Node],
+        frame: typing.Optional[dict[str, graph.Node]] = None,
+    ) -> None:
+        """Given a list of leaf nodes, stitch the graph together."""
+
+        def handle_node(node: graph.Node) -> graph.Node:
+            if isinstance(node, graph.OutputNode):
+                input_dict = {
+                    k: self.get_result(v) for k, v in node.from_op.inputs.items()
+                }
+                self._stitch_node_mapper(node, input_dict)
+            elif isinstance(node, graph.VarNode):
+                if frame and node.name in frame:
+                    self._set_object_recorder(
+                        node, self._node_recorder_map[frame[node.name]]
+                    )
+                else:
+                    self._set_object_recorder(node, ObjectRecorder(node))
+            return node
+
+        graph.map_nodes_top_level(leaf_nodes, handle_node)
+
+    def _stitch_node_mapper(
+        self, node: graph.OutputNode, input_dict: dict[str, ObjectRecorder]
+    ) -> None:
+        op = registry_mem.memory_registry.get_op(node.from_op.name)
+        input_names = list(input_dict.keys())
+        inputs = list(input_dict.values())
+
+        result = self._stitch_node_inner(node, input_dict)
+        if result is not None:
+            self._set_object_recorder(node, result)
+        recorder = self._recorder_for_node(node)
+
+        # Tag logic
+        # If the op is a mapped, derived op, then we need the tags to flow
+        # internally. We know we need to do this because there is special tag
+        # handling logic in the mapped ops which does a parallel job. Note: This is
+        # probably somehting that needs to be done for arrow as well.
+        if op.derived_from and op.derived_from.derived_ops.get("mapped"):
+            if opdef_util.should_tag_op_def_outputs(op.derived_from):
+                recorder.tags = inputs[0].tags
+                recorder.tags[input_names[0]] = inputs[0]
+            elif opdef_util.should_flow_tags(op.derived_from):
+                recorder.tags = inputs[0].tags
+        # Always do this, even for mapped
+        if opdef_util.should_tag_op_def_outputs(op):
+            recorder.tags = inputs[0].tags
+            recorder.tags[input_names[0]] = inputs[0]
+        elif opdef_util.should_flow_tags(op):
+            recorder.tags = inputs[0].tags
+
+    def _stitch_node_inner(
+        self, node: graph.OutputNode, input_dict: dict[str, ObjectRecorder]
+    ) -> typing.Optional[ObjectRecorder]:
+        op = registry_mem.memory_registry.get_op(node.from_op.name)
+        inputs = list(input_dict.values())
+        if _is_get_tag_op(op):
+            tag_name = _get_tag_name_from_tag_getter_op(op)
+            return inputs[0].tags[tag_name]
+        elif node.from_op.name.endswith("createIndexCheckpointTag"):
+            inputs[0].tags["indexCheckpoint"] = self._recorder_for_node(node)
+        elif node.from_op.name.endswith("dict"):
+            recorder = self._recorder_for_node(node)
+            assert isinstance(recorder, LiteralDictObjectRecorder)
+            recorder.val.update(input_dict)
+            # for input in input_dict.values():
+            #     self._add_call(input.node, node)
+        elif node.from_op.name.endswith("list"):
+            # Merge element tags together and place them on the outer list.
+            # This is overly aggressive, but it means we don't need to provide
+            # special handling for concat and other structural list ops for
+            # now.
+            recorder = self._recorder_for_node(node)
+            assert isinstance(recorder, LiteralListObjectRecorder)
+            for input in input_dict.values():
+                recorder.tags.update(input.tags)
+            for input in input_dict.values():
+                self._add_call(input.node, node)
+        elif node.from_op.name.endswith("pick"):
+            if isinstance(node.from_op.inputs["key"], graph.ConstNode):
+                key = node.from_op.inputs["key"].val
+                dict_recorder = self._recorder_for_node(inputs[0].node)
+                if isinstance(dict_recorder, LiteralDictObjectRecorder):
+                    return dict_recorder.val[key]
+            self._add_call(inputs[0].node, node)
+        elif node.from_op.name.endswith("map"):
+            fn_recorder = inputs[1]
+            if not isinstance(fn_recorder, ConstNodeObjectRecorder):
+                raise errors.WeaveInternalError("non-const not yet supported")
+            fn = fn_recorder.val
+            if fn is None:
+                raise errors.WeaveInternalError("Expected fn to be set")
+            # Return the resulting object from map!
+            self.stitch([fn], {"row": inputs[0].node})
+            return self._recorder_for_node(fn)
+        elif node.from_op.name.endswith("sort") or node.from_op.name.endswith("filter"):
+            fn_recorder = inputs[1]
+            if not isinstance(fn_recorder, ConstNodeObjectRecorder):
+                raise errors.WeaveInternalError("non-const not yet supported")
+            fn = fn_recorder.val
+            if fn is None:
+                raise errors.WeaveInternalError("Expected fn to be set")
+            self.stitch([fn], {"row": inputs[0].node})
+            return inputs[0]
+        elif node.from_op.name.endswith("groupby"):
+            fn_recorder = inputs[1]
+            if not isinstance(fn_recorder, ConstNodeObjectRecorder):
+                raise errors.WeaveInternalError("non-const not yet supported")
+            fn = fn_recorder.val
+            if fn is None:
+                raise errors.WeaveInternalError("Expected fn to be set")
+            self.stitch([fn], {"row": inputs[0].node})
+            inputs[0].tags["groupKey"] = fn_recorder
+            return inputs[0]
+        elif node.from_op.name.endswith("joinAll"):
+            fn_recorder = inputs[1]
+            if not isinstance(fn_recorder, ConstNodeObjectRecorder):
+                raise errors.WeaveInternalError("non-const not yet supported")
+            fn = fn_recorder.val
+            if fn is None:
+                raise errors.WeaveInternalError("Expected fn to be set")
+            self.stitch([fn], {"row": inputs[0].node})
+            inputs[0].tags["joinObj"] = fn_recorder
+            return inputs[0]
+        elif len(inputs) == 0:
+            # op does not have any inputs, just track its downstream calls
+            pass
+        else:
+            # Otherwise, not a special op, track its call.
+            self._add_call(inputs[0].node, node)
+        return None
+
+
+### Helpers ###
+
+
+def _is_get_tag_op(op: op_def.OpDef) -> bool:
     return "tag_getter_op" in str(op.raw_resolve_fn.__name__)
 
 
-def get_tag_name_from_tag_getter_op(op: op_def.OpDef) -> str:
+def _get_tag_name_from_tag_getter_op(op: op_def.OpDef) -> str:
     # Read the tag name from the resolve_fn closure.
     # TODO: Fragile!
     return op.raw_resolve_fn.__closure__[0].cell_contents  # type: ignore
-
-
-def stitch_node_inner(
-    node: graph.OutputNode, input_dict: dict[str, ObjectRecorder], sg: StitchedGraph
-) -> ObjectRecorder:
-    """
-    It is the responsibility of the `stitch_node` function to do do two things:
-    1. Ensure that the ObjectRecorder for the node is created (if not existing) and return it
-    2. Ensure that all input `ObjectRecords` are connected to the ObjectRecorder in #1
-        - These are two-way connections:
-                - The ObjectRecorder in #1 has a list of inputs via `input_dict`
-                - The ObjectRecorders in #2 have a list of outputs via `calls`
-
-        Importantly, nodes which are `lambdas` (ex map). Need to traverse the inner function. This
-        is done by calling `subgraph_stitch` and passing the current StitchedGraph. We need to pass
-        the stitch graph so that the `subgraph_stitch` can merge the results of the inner function.
-    """
-    op = registry_mem.memory_registry.get_op(node.from_op.name)
-    inputs = list(input_dict.values())
-    if is_get_tag_op(op):
-        tag_name = get_tag_name_from_tag_getter_op(op)
-        return inputs[0].tags[tag_name]
-    elif node.from_op.name.endswith("createIndexCheckpointTag"):
-        inputs[0].tags["indexCheckpoint"] = ObjectRecorder(node)
-    elif node.from_op.name == "dict":
-        return LiteralDictObjectRecorder(node, val=input_dict)
-    elif node.from_op.name == "list":
-        # Merge element tags together and place them on the outer list.
-        # This is overly aggressive, but it means we don't need to provide
-        # special handling for concat and other structural list ops for
-        # now.
-        tags: dict[str, ObjectRecorder] = {}
-        for input in input_dict.values():
-            tags.update(input.tags)
-        res = LiteralListObjectRecorder(node, tags=tags, val=list(input_dict.values()))
-        op_call = OpCall(node, input_dict, res)
-        for input in input_dict.values():
-            input.add_call(op_call)
-        return res
-    elif node.from_op.name.endswith("pick"):
-        if isinstance(node.from_op.inputs["key"], graph.ConstNode):
-            key = node.from_op.inputs["key"].val
-            if isinstance(inputs[0], LiteralDictObjectRecorder):
-                return inputs[0].val[key]
-            else:
-                # This is the case that the picked key is not found in the
-                # dictionary. In this case, we just ignore the pick and don't
-                # stitch any further.
-                pass
-        else:
-            # In this case, we don't have a constant key. This case comes up
-            # very often as it is used for run colors. in particular, run colors
-            # in the table is something like {"run_name":
-            # "run_color"}.pick([long_graph].name()) In this case, we don't know
-            # which key to pick, so we just ignore. In the future, we may need
-            # to act as if we are picking every key?
-            pass
-    elif node.from_op.name.endswith("map"):
-        fn = inputs[1].val
-        if fn is None:
-            raise errors.WeaveInternalError("non-const not yet supported")
-        # Return the resulting object from map!
-        return subgraph_stitch(fn, {"row": inputs[0]}, sg)
-    elif node.from_op.name.endswith("sort") or node.from_op.name.endswith("filter"):
-        fn = inputs[1].val
-        if fn is None:
-            raise errors.WeaveInternalError("non-const not yet supported")
-        subgraph_stitch(fn, {"row": inputs[0]}, sg)
-        # # Return the original object
-        return inputs[0]
-    elif node.from_op.name.endswith("groupby"):
-        fn = inputs[1].val
-        if fn is None:
-            raise errors.WeaveInternalError("non-const not yet supported")
-        # The output of the subgraph function is the group key which becomes
-        # the groupKey tag.
-        groupkey = subgraph_stitch(fn, {"row": inputs[0]}, sg)
-        inputs[0].tags["groupKey"] = groupkey
-        # And we return the original object
-        return inputs[0]
-    elif node.from_op.name.endswith("joinAll"):
-        fn = inputs[1].val
-        if fn is None:
-            raise errors.WeaveInternalError("non-const not yet supported")
-        # The output of the subgraph function is the joinKey which becomes
-        # the joinkey tag.
-        # TODO: Do we need to do this for each input?
-        joinKey = subgraph_stitch(fn, {"row": inputs[0]}, sg)
-        inputs[0].tags["joinObj"] = joinKey
-        # And we return the original object
-        return inputs[0]
-    elif len(inputs) == 0:
-        # op does not have any inputs, just track its downstream calls
-        return ObjectRecorder(node)
-    # Otherwise, not a special op, track its call.
-    return inputs[0].call_node(node, input_dict)
-
-
-def stitch_node(
-    node: graph.OutputNode, input_dict: dict[str, ObjectRecorder], sg: StitchedGraph
-) -> ObjectRecorder:
-    op = registry_mem.memory_registry.get_op(node.from_op.name)
-    input_names = list(input_dict.keys())
-    inputs = list(input_dict.values())
-
-    result = stitch_node_inner(node, input_dict, sg)
-
-    # Tag logic
-    # If the op is a mapped, derived op, then we need the tags to flow
-    # internally. We know we need to do this because there is special tag
-    # handling logic in the mapped ops which does a parallel job. Note: This is
-    # probably somehting that needs to be done for arrow as well.
-    if op.derived_from and op.derived_from.derived_ops.get("mapped"):
-        if opdef_util.should_tag_op_def_outputs(op.derived_from):
-            result.tags = inputs[0].tags
-            result.tags[input_names[0]] = inputs[0]
-        elif opdef_util.should_flow_tags(op.derived_from):
-            result.tags = inputs[0].tags
-    # Always do this, even for mapped
-    if opdef_util.should_tag_op_def_outputs(op):
-        result.tags = inputs[0].tags
-        result.tags[input_names[0]] = inputs[0]
-    elif opdef_util.should_flow_tags(op):
-        result.tags = inputs[0].tags
-
-    return result
