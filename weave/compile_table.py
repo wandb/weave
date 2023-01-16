@@ -27,7 +27,7 @@ def get_projection(obj: stitch.ObjectRecorder) -> KeyTree:
         ):
             inputs = list(call.input_recorder_dict.values())
             if isinstance(inputs[1], stitch.ConstNodeObjectRecorder):
-                key = inputs[1].const_value
+                key = inputs[1].const_val
                 if key is not None:
                     tree_merge(
                         cols.setdefault(key, {}), get_projection(call.output_recorder)

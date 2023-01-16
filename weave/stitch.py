@@ -102,7 +102,7 @@ class ObjectRecorder:
 @dataclasses.dataclass
 class ConstNodeObjectRecorder(ObjectRecorder):
     @property
-    def const_value(self) -> typing.Optional[typing.Any]:
+    def const_val(self) -> typing.Optional[typing.Any]:
         if not isinstance(self.original_node, graph.ConstNode):
             raise errors.WeaveInternalError(
                 f"Programming error: ConstNodeObjectRecorder must be constructed with a `ConstNode`. Found {self.original_node}"
@@ -113,7 +113,7 @@ class ConstNodeObjectRecorder(ObjectRecorder):
 @dataclasses.dataclass
 class LiteralDictObjectRecorder(ObjectRecorder):
     @property
-    def input_recorder_dict(self) -> dict[str, "ObjectRecorder"]:
+    def input_recorder_dict_val(self) -> dict[str, "ObjectRecorder"]:
         if not (
             isinstance(self.original_node, graph.OutputNode)
             and self.original_node.from_op.name.endswith("dict")
@@ -125,23 +125,6 @@ class LiteralDictObjectRecorder(ObjectRecorder):
             k: self._stitched_graph.get_recorder_for_node(v)
             for k, v in self.original_node.from_op.inputs.items()
         }
-
-
-@dataclasses.dataclass
-class LiteralListObjectRecorder(ObjectRecorder):
-    @property
-    def input_recorder_list(self) -> list["ObjectRecorder"]:
-        if not (
-            isinstance(self.original_node, graph.OutputNode)
-            and self.original_node.from_op.name.endswith("list")
-        ):
-            raise errors.WeaveInternalError(
-                f"Programming error: LiteralListObjectRecorder must be constructed with a `list` op. Found {self.original_node}"
-            )
-        return [
-            self._stitched_graph.get_recorder_for_node(v)
-            for v in self.original_node.from_op.inputs.values()
-        ]
 
 
 class _SetOnceDict(dict):
@@ -181,10 +164,6 @@ class StitchedGraph:
                 "dict"
             ):
                 self._set_recorder_for_node(node, LiteralDictObjectRecorder(node, self))
-            elif isinstance(node, graph.OutputNode) and node.from_op.name.endswith(
-                "list"
-            ):
-                self._set_recorder_for_node(node, LiteralListObjectRecorder(node, self))
             elif isinstance(node, graph.ConstNode):
                 self._set_recorder_for_node(node, ConstNodeObjectRecorder(node, self))
             else:
@@ -277,19 +256,14 @@ class StitchedGraph:
                 "indexCheckpoint", self.get_recorder_for_node(node)
             )
         elif node.from_op.name.endswith("dict"):
+            # We return early here because we don't want to do any call logic
             return None
-            # recorder = self.get_recorder_for_node(node)
-            # assert isinstance(recorder, LiteralDictObjectRecorder)
-            # recorder.val.update(stitched_input_recorder_dict)
-            # # for input in stitched_input_recorder_dict.values():
-            # #     self._add_call(input.node, node)
         elif node.from_op.name.endswith("list"):
             # Merge element tags together and place them on the outer list.
             # This is overly aggressive, but it means we don't need to provide
             # special handling for concat and other structural list ops for
             # now.
             recorder = self.get_recorder_for_node(node)
-            assert isinstance(recorder, LiteralListObjectRecorder)
             for input in stitched_input_recorder_dict.values():
                 recorder.update_tag_recorder_dict(input.tag_recorder_dict)
                 input.add_call(node)
@@ -299,12 +273,12 @@ class StitchedGraph:
                 key = node.from_op.inputs["key"].val
                 dict_recorder = inputs[0]
                 if isinstance(dict_recorder, LiteralDictObjectRecorder):
-                    return dict_recorder.input_recorder_dict[key]
+                    return dict_recorder.input_recorder_dict_val[key]
         elif node.from_op.name.endswith("map"):
             fn_recorder = inputs[1]
             if not isinstance(fn_recorder, ConstNodeObjectRecorder):
                 raise errors.WeaveInternalError("non-const not yet supported")
-            fn = fn_recorder.const_value
+            fn = fn_recorder.const_val
             if fn is None:
                 raise errors.WeaveInternalError("Expected fn to be set")
             # Return the resulting object from map!
@@ -314,7 +288,7 @@ class StitchedGraph:
             fn_recorder = inputs[1]
             if not isinstance(fn_recorder, ConstNodeObjectRecorder):
                 raise errors.WeaveInternalError("non-const not yet supported")
-            fn = fn_recorder.const_value
+            fn = fn_recorder.const_val
             if fn is None:
                 raise errors.WeaveInternalError("Expected fn to be set")
             self.stitch([fn], {"row": inputs[0]})
@@ -323,7 +297,7 @@ class StitchedGraph:
             fn_recorder = inputs[1]
             if not isinstance(fn_recorder, ConstNodeObjectRecorder):
                 raise errors.WeaveInternalError("non-const not yet supported")
-            fn = fn_recorder.const_value
+            fn = fn_recorder.const_val
             if fn is None:
                 raise errors.WeaveInternalError("Expected fn to be set")
             self.stitch([fn], {"row": inputs[0]})
@@ -333,7 +307,7 @@ class StitchedGraph:
             fn_recorder = inputs[1]
             if not isinstance(fn_recorder, ConstNodeObjectRecorder):
                 raise errors.WeaveInternalError("non-const not yet supported")
-            fn = fn_recorder.const_value
+            fn = fn_recorder.const_val
             if fn is None:
                 raise errors.WeaveInternalError("Expected fn to be set")
             self.stitch([fn], {"row": inputs[0]})

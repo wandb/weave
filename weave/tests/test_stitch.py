@@ -67,7 +67,7 @@ def test_traverse_tags():
         obj_recorder.calls_stitched_output_node_list[1].input_recorder_dict.values()
     )[1]
     assert isinstance(call_1_input_1, stitch.ConstNodeObjectRecorder)
-    assert call_1_input_1.const_value == "val"
+    assert call_1_input_1.const_val == "val"
 
 
 def test_traverse_tags_2level():
@@ -84,7 +84,7 @@ def test_traverse_tags_2level():
     assert calls[1].node.from_op.name == "Object-__getattr__"
     call_1_input_1 = list(calls[1].input_recorder_dict.values())[1]
     assert isinstance(call_1_input_1, stitch.ConstNodeObjectRecorder)
-    assert call_1_input_1.const_value == "name"
+    assert call_1_input_1.const_val == "name"
 
 
 def test_enter_filter():
@@ -96,11 +96,11 @@ def test_enter_filter():
     assert calls[0].node.from_op.name == "mapped_typedDict-pick"
     call_0_input_1 = list(calls[0].input_recorder_dict.values())[1]
     assert isinstance(call_0_input_1, stitch.ConstNodeObjectRecorder)
-    assert call_0_input_1.const_value == "b"
+    assert call_0_input_1.const_val == "b"
     assert calls[1].node.from_op.name == "typedDict-pick"
     call_1_input_1 = list(calls[1].input_recorder_dict.values())[1]
     assert isinstance(call_1_input_1, stitch.ConstNodeObjectRecorder)
-    assert call_1_input_1.const_value == "a"
+    assert call_1_input_1.const_val == "a"
 
 
 def test_lambda_using_externally_defined_node():
@@ -116,15 +116,15 @@ def test_lambda_using_externally_defined_node():
     assert calls[0].node.from_op.name == "mapped_typedDict-pick"
     call_0_input_1 = list(calls[0].input_recorder_dict.values())[1]
     assert isinstance(call_0_input_1, stitch.ConstNodeObjectRecorder)
-    assert call_0_input_1.const_value == "b"
+    assert call_0_input_1.const_val == "b"
     assert calls[1].node.from_op.name == "list-__getitem__"
     call_1_input_1 = list(calls[1].input_recorder_dict.values())[1]
     assert isinstance(call_1_input_1, stitch.ConstNodeObjectRecorder)
-    assert call_1_input_1.const_value == 0
+    assert call_1_input_1.const_val == 0
     assert calls[2].node.from_op.name == "typedDict-pick"
     call_2_input_1 = list(calls[2].input_recorder_dict.values())[1]
     assert isinstance(call_2_input_1, stitch.ConstNodeObjectRecorder)
-    assert call_2_input_1.const_value == "a"
+    assert call_2_input_1.const_val == "a"
 
 
 def test_tag_access_in_filter_expr():
@@ -138,7 +138,7 @@ def test_tag_access_in_filter_expr():
     assert calls[1].node.from_op.name == "Object-__getattr__"
     call_1_input_1 = list(calls[1].input_recorder_dict.values())[1]
     assert isinstance(call_1_input_1, stitch.ConstNodeObjectRecorder)
-    assert call_1_input_1.const_value == "val"
+    assert call_1_input_1.const_val == "val"
 
 
 def test_travese_dict():
