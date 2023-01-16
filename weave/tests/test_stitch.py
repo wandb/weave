@@ -53,11 +53,21 @@ def test_traverse_tags():
     obj_node = weave.save(_TestPlanObject("a", 1))
     obj_from_tag_val_node = get_object_self_tag(obj_node.name() + "hello").val
     p = stitch.stitch([obj_from_tag_val_node])
-    obj_recorder = p.get_result(obj_node)
-    assert len(obj_recorder.calls) == 2
-    assert obj_recorder.calls[0].node.from_op.name == "_TestPlanObject-name"
-    assert obj_recorder.calls[1].node.from_op.name == "Object-__getattr__"
-    assert obj_recorder.calls[1].inputs[1].val == "val"
+    obj_recorder = p.get_recorder_for_node(obj_node)
+    assert len(obj_recorder.calls_stitched_output_node_list) == 2
+    assert (
+        obj_recorder.calls_stitched_output_node_list[0].node.from_op.name
+        == "_TestPlanObject-name"
+    )
+    assert (
+        obj_recorder.calls_stitched_output_node_list[1].node.from_op.name
+        == "Object-__getattr__"
+    )
+    call_1_input_1 = list(
+        obj_recorder.calls_stitched_output_node_list[1].input_recorder_dict.values()
+    )[1]
+    assert isinstance(call_1_input_1, stitch.ConstNodeObjectRecorder)
+    assert call_1_input_1.const_value == "val"
 
 
 def test_traverse_tags_2level():
@@ -67,23 +77,30 @@ def test_traverse_tags_2level():
         get_object_self_tag(name_add_node)
     ).name
     p = stitch.stitch([obj_from_tag_val_node])
-    obj_recorder = p.get_result(obj_node)
-    assert len(obj_recorder.calls) == 2
-    assert obj_recorder.calls[0].node.from_op.name == "op-_test_hasobj_obj"
-    assert obj_recorder.calls[1].node.from_op.name == "Object-__getattr__"
-    assert obj_recorder.calls[1].inputs[1].val == "name"
+    obj_recorder = p.get_recorder_for_node(obj_node)
+    calls = obj_recorder.calls_stitched_output_node_list
+    assert len(calls) == 2
+    assert calls[0].node.from_op.name == "op-_test_hasobj_obj"
+    assert calls[1].node.from_op.name == "Object-__getattr__"
+    call_1_input_1 = list(calls[1].input_recorder_dict.values())[1]
+    assert isinstance(call_1_input_1, stitch.ConstNodeObjectRecorder)
+    assert call_1_input_1.const_value == "name"
 
 
 def test_enter_filter():
     objs_node = weave.save([{"a": 5, "b": 6, "c": 10}, {"a": 7, "b": 8, "c": 11}])
     p = stitch.stitch([objs_node["b"], objs_node.filter(lambda obj: obj["a"] > 6)])
-    obj_recorder = p.get_result(objs_node)
-    calls = obj_recorder.calls
+    obj_recorder = p.get_recorder_for_node(objs_node)
+    calls = obj_recorder.calls_stitched_output_node_list
     assert len(calls) == 2
     assert calls[0].node.from_op.name == "mapped_typedDict-pick"
-    assert calls[0].inputs[1].val == "b"
+    call_0_input_1 = list(calls[0].input_recorder_dict.values())[1]
+    assert isinstance(call_0_input_1, stitch.ConstNodeObjectRecorder)
+    assert call_0_input_1.const_value == "b"
     assert calls[1].node.from_op.name == "typedDict-pick"
-    assert calls[1].inputs[1].val == "a"
+    call_1_input_1 = list(calls[1].input_recorder_dict.values())[1]
+    assert isinstance(call_1_input_1, stitch.ConstNodeObjectRecorder)
+    assert call_1_input_1.const_value == "a"
 
 
 def test_lambda_using_externally_defined_node():
@@ -93,35 +110,46 @@ def test_lambda_using_externally_defined_node():
     p = stitch.stitch(
         [objs_node["b"], objs_node.filter(lambda obj: obj["a"] > objs_node[0]["b"])]
     )
-    obj_recorder = p.get_result(objs_node)
-    calls = obj_recorder.calls
+    obj_recorder = p.get_recorder_for_node(objs_node)
+    calls = obj_recorder.calls_stitched_output_node_list
     assert len(calls) == 3
     assert calls[0].node.from_op.name == "mapped_typedDict-pick"
-    assert calls[0].inputs[1].val == "b"
+    call_0_input_1 = list(calls[0].input_recorder_dict.values())[1]
+    assert isinstance(call_0_input_1, stitch.ConstNodeObjectRecorder)
+    assert call_0_input_1.const_value == "b"
     assert calls[1].node.from_op.name == "list-__getitem__"
-    assert calls[1].inputs[1].val == 0
+    call_1_input_1 = list(calls[1].input_recorder_dict.values())[1]
+    assert isinstance(call_1_input_1, stitch.ConstNodeObjectRecorder)
+    assert call_1_input_1.const_value == 0
     assert calls[2].node.from_op.name == "typedDict-pick"
-    assert calls[2].inputs[1].val == "a"
+    call_2_input_1 = list(calls[2].input_recorder_dict.values())[1]
+    assert isinstance(call_2_input_1, stitch.ConstNodeObjectRecorder)
+    assert call_2_input_1.const_value == "a"
 
 
 def test_tag_access_in_filter_expr():
     objs_node = weave.save([_TestPlanObject("a", 1), _TestPlanObject("b", 2)])
     leaf = objs_node.name().filter(lambda obj: get_object_self_tag(obj).val > 2)
     p = stitch.stitch([leaf])
-    obj_recorder = p.get_result(objs_node)
-    calls = obj_recorder.calls
+    obj_recorder = p.get_recorder_for_node(objs_node)
+    calls = obj_recorder.calls_stitched_output_node_list
     assert len(calls) == 2
     assert calls[0].node.from_op.name == "mapped__TestPlanObject-name"
     assert calls[1].node.from_op.name == "Object-__getattr__"
-    assert calls[1].inputs[1].val == "val"
+    call_1_input_1 = list(calls[1].input_recorder_dict.values())[1]
+    assert isinstance(call_1_input_1, stitch.ConstNodeObjectRecorder)
+    assert call_1_input_1.const_value == "val"
 
 
 def test_travese_dict():
     obj_node = weave.save(_TestPlanObject("a", 1))
     p = stitch.stitch([weave.ops.dict_(x=obj_node)["x"].name()])
-    obj_recorder = p.get_result(obj_node)
-    assert len(obj_recorder.calls) == 1
-    assert obj_recorder.calls[0].node.from_op.name == "_TestPlanObject-name"
+    obj_recorder = p.get_recorder_for_node(obj_node)
+    assert len(obj_recorder.calls_stitched_output_node_list) == 1
+    assert (
+        obj_recorder.calls_stitched_output_node_list[0].node.from_op.name
+        == "_TestPlanObject-name"
+    )
 
 
 def test_travese_groupby_dict():
@@ -131,7 +159,7 @@ def test_travese_groupby_dict():
     grouped_x_o = grouped[0].groupkey()["x"]
     groupkey_output = grouped_x_o["a"]
     p = stitch.stitch([output, groupkey_output])
-    obj_recorder = p.get_result(obj_node)
+    obj_recorder = p.get_recorder_for_node(obj_node)
 
     assert compile_table.get_projection(obj_recorder) == {"o": {"a": {}}, "x": {}}
 
@@ -139,24 +167,36 @@ def test_travese_groupby_dict():
 def test_zero_arg_ops():
     node = dummy_no_arg_op()
     p = stitch.stitch([node])
-    obj_recorder = p.get_result(node)
-    assert obj_recorder.calls == []
+    obj_recorder = p.get_recorder_for_node(node)
+    assert obj_recorder.calls_stitched_output_node_list == []
 
     p = stitch.stitch([node.name()])
-    obj_recorder = p.get_result(node)
-    assert len(obj_recorder.calls) == 1
-    assert obj_recorder.calls[0].node.from_op.name == "mapped__TestPlanObject-name"
+    obj_recorder = p.get_recorder_for_node(node)
+    assert len(obj_recorder.calls_stitched_output_node_list) == 1
+    assert (
+        obj_recorder.calls_stitched_output_node_list[0].node.from_op.name
+        == "mapped__TestPlanObject-name"
+    )
 
     p = stitch.stitch([node.filter(lambda x: x._get_op("name")() != "")])
-    obj_recorder = p.get_result(node)
-    assert len(obj_recorder.calls) == 1
-    assert obj_recorder.calls[0].node.from_op.name == "_TestPlanObject-name"
+    obj_recorder = p.get_recorder_for_node(node)
+    assert len(obj_recorder.calls_stitched_output_node_list) == 1
+    assert (
+        obj_recorder.calls_stitched_output_node_list[0].node.from_op.name
+        == "_TestPlanObject-name"
+    )
 
     p = stitch.stitch([node.filter(lambda x: x._get_op("name")() != ""), node.name()])
-    obj_recorder = p.get_result(node)
-    assert len(obj_recorder.calls) == 2
-    assert obj_recorder.calls[0].node.from_op.name == "_TestPlanObject-name"
-    assert obj_recorder.calls[1].node.from_op.name == "mapped__TestPlanObject-name"
+    obj_recorder = p.get_recorder_for_node(node)
+    assert len(obj_recorder.calls_stitched_output_node_list) == 2
+    assert (
+        obj_recorder.calls_stitched_output_node_list[0].node.from_op.name
+        == "_TestPlanObject-name"
+    )
+    assert (
+        obj_recorder.calls_stitched_output_node_list[1].node.from_op.name
+        == "mapped__TestPlanObject-name"
+    )
 
 
 def test_shared_fn_node():
@@ -192,7 +232,12 @@ def test_shared_fn_node():
     p = stitch.stitch([sum_node])
 
     def assert_node_calls(node, expected_call_names):
-        found_calls = set([c.node.from_op.name for c in p.get_result(node).calls])
+        found_calls = set(
+            [
+                c.node.from_op.name
+                for c in p.get_recorder_for_node(node).calls_stitched_output_node_list
+            ]
+        )
         expected_calls = set(expected_call_names)
         assert found_calls == expected_calls
 

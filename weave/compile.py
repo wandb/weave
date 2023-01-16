@@ -175,7 +175,7 @@ def compile_apply_column_pushdown(leaf_nodes: list[graph.Node]) -> list[graph.No
 
     def _replace_with_column_pushdown(node: graph.Node) -> graph.Node:
         if isinstance(node, graph.OutputNode) and node.from_op.name == "project-runs2":
-            forward_obj = p.get_result(node)
+            forward_obj = p.get_recorder_for_node(node)
             run_cols = compile_table.get_projection(forward_obj)
             config_cols = list(run_cols.get("config", {}).keys())
             summary_cols = list(run_cols.get("summary", {}).keys())

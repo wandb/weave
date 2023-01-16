@@ -108,8 +108,8 @@ def _get_fragment(node: graph.OutputNode, stitchedGraph: stitch.StitchedGraph) -
     if wb_domain_gql is None and not is_passthrough:
         return ""
 
-    forward_obj = stitchedGraph.get_result(node)
-    calls = forward_obj.calls
+    forward_obj = stitchedGraph.get_recorder_for_node(node)
+    calls = forward_obj.calls_stitched_output_node_list
     child_fragment = "\n".join(
         [
             _get_fragment(call.node, stitchedGraph)
