@@ -301,7 +301,9 @@ class StitchedGraph:
             if fn is None:
                 raise errors.WeaveInternalError("Expected fn to be set")
             self.stitch([fn], {"row": inputs[0]})
-            inputs[0].set_tag_recorder_for_key("groupKey", fn_recorder)
+            inputs[0].set_tag_recorder_for_key(
+                "groupKey", self.get_recorder_for_node(fn)
+            )
             return inputs[0]
         elif node.from_op.name.endswith("joinAll"):
             fn_recorder = inputs[1]
@@ -311,7 +313,9 @@ class StitchedGraph:
             if fn is None:
                 raise errors.WeaveInternalError("Expected fn to be set")
             self.stitch([fn], {"row": inputs[0]})
-            inputs[0].set_tag_recorder_for_key("joinObj", fn_recorder)
+            inputs[0].set_tag_recorder_for_key(
+                "joinObj", self.get_recorder_for_node(fn)
+            )
             return inputs[0]
         elif len(inputs) == 0:
             return None
