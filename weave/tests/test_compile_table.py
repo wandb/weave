@@ -22,6 +22,6 @@ def test_runs2_plan():
         for j in range(1, 15):
             nodes.append(row["config"][f"key{j}"])
     p = stitch.stitch(nodes)
-    run_cols = compile_table.get_projection(p.get_result(runs))
+    run_cols = compile_table.get_projection(p.get_recorder_for_node(runs))
     assert list(run_cols.keys()) == ["config"]
     assert list(run_cols["config"].keys()) == [f"key{i}" for i in range(15)]
