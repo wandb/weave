@@ -217,14 +217,14 @@ def test_shared_fn_node():
     mapped_2_item_node = mapped_2_node["item"]
     mapped_2_const_node = mapped_2_node["const"]
 
-    mapped_2_item_add_node = mapped_2_item_node + 100
-    mapped_2_const_add_node = mapped_2_const_node + 100
+    mapped_2_item_add_node = mapped_2_item_node * 10
+    mapped_2_const_add_node = mapped_2_const_node * 10
 
     list_of_list_node = weave.ops.make_list(
         a=mapped_1_item_node,  # [1,2,3]
         b=mapped_1_const_node,  # [1,1,1]
-        c=mapped_2_item_add_node,  # [110,120,130]
-        d=mapped_2_const_add_node,  # [101,101,101]
+        c=mapped_2_item_add_node,  # [100,200,300]
+        d=mapped_2_const_add_node,  # [10,10,10]
     )
     concat_node = list_of_list_node.concat()
     sum_node = concat_node.sum()
@@ -242,23 +242,23 @@ def test_shared_fn_node():
         assert found_calls == expected_calls
 
     assert_node_calls(const_list_node, ["list-__getitem__"])
-    assert_node_calls(indexed_node, ["list", "mapped_number-add"])
+    assert_node_calls(indexed_node, ["list", "mapped_number-mult"])
     assert_node_calls(fn_node, [])
     assert_node_calls(arr_1_node, ["list"])
-    assert_node_calls(arr_2_node, ["mapped_number-add"])
+    assert_node_calls(arr_2_node, ["mapped_number-mult"])
     assert_node_calls(mapped_1_node, [])
     assert_node_calls(mapped_2_node, [])
     assert_node_calls(mapped_1_item_node, ["list"])
-    assert_node_calls(mapped_1_const_node, ["list", "mapped_number-add"])
-    assert_node_calls(mapped_2_item_node, ["mapped_number-add"])
-    assert_node_calls(mapped_2_const_node, ["list", "mapped_number-add"])
+    assert_node_calls(mapped_1_const_node, ["list", "mapped_number-mult"])
+    assert_node_calls(mapped_2_item_node, ["mapped_number-mult"])
+    assert_node_calls(mapped_2_const_node, ["list", "mapped_number-mult"])
     assert_node_calls(mapped_2_item_add_node, ["list"])
     assert_node_calls(mapped_2_const_add_node, ["list"])
     assert_node_calls(list_of_list_node, ["concat"])
     assert_node_calls(concat_node, ["numbers-sum"])
     assert_node_calls(sum_node, [])
 
-    assert weave.use(sum_node) == 672
+    assert weave.use(sum_node) == 639
 
 
 def test_shared_fn_node_with_tags():
