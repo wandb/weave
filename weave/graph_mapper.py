@@ -1,6 +1,6 @@
 from . import graph
 from . import mappers
-from . import refs
+from . import ref_base
 from . import mappers_python_def as mappers_python
 from . import node_ref
 from . import weave_types as types
@@ -17,7 +17,7 @@ class FunctionToPyFunction(mappers.Mapper):
 class PyFunctionToFunction(mappers.Mapper):
     def apply(self, obj):
         if isinstance(obj, str):
-            ref = refs.Ref.from_str(obj)
+            ref = ref_base.Ref.from_str(obj)
             return node_ref.ref_to_node(ref)
         # Obj is graph.Node
         return graph.Node.node_from_json(obj)

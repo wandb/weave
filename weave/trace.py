@@ -1,15 +1,16 @@
 import os
 import typing
 
-from . import artifacts_local
-from . import refs
+from . import artifact_local
+from . import artifact_util
+from . import ref_base
 from . import weave_types as types
 from . import graph
 from . import runs
 from . import errors
 
 
-def get_obj_creator(ref: refs.Ref) -> typing.Optional[runs.Run]:
+def get_obj_creator(ref: ref_base.Ref) -> typing.Optional[runs.Run]:
     # ref.backend.references(ref.artifact, "Run", {"dir": "input"})
 
     # creator = ref.backend.get_creator(ref.artifact)
@@ -17,19 +18,19 @@ def get_obj_creator(ref: refs.Ref) -> typing.Optional[runs.Run]:
     # backend = ref.backend.filter(type="Run", referenced=ref.artifact)
     # Extremely inefficient!
     # TODO
-    for art_name in os.listdir(artifacts_local.local_artifact_dir()):
+    for art_name in os.listdir(artifact_util.local_artifact_dir()):
         if (
             art_name.startswith("run-")
             and not art_name.endswith("-output")
-            and artifacts_local.local_artifact_exists(art_name, "latest")
+            and artifact_local.local_artifact_exists(art_name, "latest")
         ):
             try:
-                run = refs.get_local_version(art_name, "latest")
+                run = artifact_local.get_local_version(art_name, "latest")
             except errors.WeaveSerializeError:
                 # This happens because we don't load all ecosystem modules, and so we can't
                 # deserializes everything.
                 continue
-            if isinstance(run.output, refs.Ref) and str(run.output) == str(ref):
+            if isinstance(run.output, ref_base.Ref) and str(run.output) == str(ref):
                 # If any input is also the ref, this run did not create obj, since
                 # the obj already existed. This fixes an infinite loop where list-createIndexCheckpointTag
                 # which just returns its input would be treated as a the obj creator
@@ -46,7 +47,7 @@ def get_obj_creator(ref: refs.Ref) -> typing.Optional[runs.Run]:
 
 def get_obj_expr(obj):
     obj_type = types.TypeRegistry.type_of(obj)
-    if not isinstance(obj, refs.Ref):
+    if not isinstance(obj, ref_base.Ref):
         return graph.ConstNode(obj_type, obj)
     run = get_obj_creator(obj)
     if run is None:
@@ -60,14 +61,17 @@ def get_obj_expr(obj):
 
 def used_by(ref, op_name: str) -> list[runs.Run]:
     users = []
-    for artifact_name in os.listdir(artifacts_local.local_artifact_dir()):
+    for artifact_name in os.listdir(artifact_util.local_artifact_dir()):
         if artifact_name.startswith("run-") and not artifact_name.endswith("-output"):
-            run = refs.get_local_version(artifact_name, "latest")
+            run = artifact_local.get_local_version(artifact_name, "latest")
             if run is None:
                 continue
             run_inputs = list(run.inputs.values())
             if run.op_name == op_name and run_inputs:
                 input0 = run_inputs[0]
-                if isinstance(input0, refs.LocalArtifactRef) and ref.uri == input0.uri:
+                if (
+                    isinstance(input0, artifact_local.LocalArtifactRef)
+                    and ref.uri == input0.uri
+                ):
                     users.append(run)
     return users

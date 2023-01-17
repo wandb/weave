@@ -9,7 +9,6 @@ from IPython.display import IFrame
 from . import context
 from . import graph
 from . import panel
-from . import refs
 from . import weave_types as types
 from . import weavejs_fixes
 from . import storage
@@ -17,6 +16,7 @@ from . import util
 from . import errors
 from . import usage_analytics
 from . import automation
+from . import ref_base
 
 
 # Broken out into to separate function for testing
@@ -126,4 +126,4 @@ def _ipython_display_method_(self):
 # show when the last expression in a notebook cell produces them.
 graph.Node._ipython_display_ = _ipython_display_method_  # type: ignore
 panel.Panel._ipython_display_ = _ipython_display_method_  # type: ignore
-refs.Ref._ipython_display_ = _ipython_display_method_  # type: ignore
+ref_base.Ref._ipython_display_ = _ipython_display_method_  # type: ignore

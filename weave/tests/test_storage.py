@@ -8,7 +8,7 @@ import re
 import wandb
 
 from .. import api as weave
-from .. import artifacts_local
+from .. import artifact_local
 from .. import weave_types as types
 from .. import storage
 from ..weave_internal import make_const_node

@@ -29,7 +29,7 @@ from . import op_args
 
 # Trace / cache
 from . import trace_local
-from . import refs
+from . import ref_base
 
 # Language Features
 from . import language_nullability
@@ -182,7 +182,7 @@ def async_op_body(run_id, run_body, inputs):
     run.save()
     dereffed_inputs = {}
     for input_name, input in inputs.items():
-        dereffed_inputs[input_name] = refs.deref(input)
+        dereffed_inputs[input_name] = ref_base.deref(input)
     run_body(**dereffed_inputs, _run=run)
     run.state = "finished"
     run.save()
@@ -259,7 +259,7 @@ def execute_forward_node(
         op_def = registry_mem.memory_registry.get_op(node.from_op.name)
         input_nodes = node.from_op.inputs
 
-        input_refs: dict[str, refs.Ref] = {}
+        input_refs: dict[str, ref_base.Ref] = {}
         for input_name, input_node in input_nodes.items():
             input_refs[input_name] = fg.get_result(input_node)
 
@@ -287,20 +287,21 @@ def execute_forward_node(
                         # in the tags being added the the scope of the child. If
                         # more than 1 direct child exists, the next children will
                         # not have the tags in their scope.
-                        refs.deref(run.output)
+                        ref_base.deref(run.output)
                         forward_node.set_result(run.output)
                         return {"cache_used": True}
                 # otherwise, the run's output was not saveable, so we need
                 # to recompute it.
         inputs = {
-            input_name: refs.deref(input) for input_name, input in input_refs.items()
+            input_name: ref_base.deref(input)
+            for input_name, input in input_refs.items()
         }
 
     if op_def.is_async:
         with tracer.trace("execute-async"):
             input_refs = {}
             for input_name, input in inputs.items():
-                ref = refs.get_ref(input)
+                ref = ref_base.get_ref(input)
                 if ref is None:
                     ref = TRACE_LOCAL.save_object(input)
                 input_refs[input_name] = ref
@@ -318,7 +319,7 @@ def execute_forward_node(
                 result = execute_sync_op(op_def, inputs)
 
         with tracer.trace("execute-write-cache"):
-            ref = refs.get_ref(result)
+            ref = ref_base.get_ref(result)
             if ref is not None:
                 logging.debug("Op resulted in ref")
                 # If the op produced an object which has a ref (as in the case of get())

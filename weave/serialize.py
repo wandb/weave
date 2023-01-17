@@ -5,7 +5,8 @@
 import typing
 import hashlib
 import json
-import functools
+import random
+
 
 from . import graph
 from . import weave_types as types
@@ -96,12 +97,14 @@ def node_id(node: graph.Node):
             for arg_name, arg_node in node.from_op.inputs.items()
         }
     elif isinstance(node, graph.VarNode):
-        hashable["name"] = node.name
+        # Ensure we don't share var nodes. That's invalid!
+        hashable["name"] = str(random.random())
     elif isinstance(node, graph.ConstNode):
         if isinstance(node.val, graph.OutputNode) or isinstance(
             node.val, graph.VarNode
         ):
-            hashable["val"] = node.val.to_json()
+            # Ensure we don't share function nodes. That's invalid!
+            hashable["val"] = str(random.random())
         else:
             hashable["val"] = storage.to_python(node.val)
     else:

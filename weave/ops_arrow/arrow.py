@@ -9,7 +9,6 @@ py_type = type
 from .. import mappers_python
 from .. import weave_types as types
 from .. import errors
-from .. import refs
 
 
 def arrow_type_to_weave_type(pa_type: pa.DataType) -> types.Type:
@@ -442,4 +441,4 @@ def _rewrite_ref_entry(entry: str, object_type, artifact):
     if ":" in entry:
         return entry
     else:
-        return str(refs.Ref.from_local_ref(artifact, entry, object_type).uri)
+        return str(artifact.ref_from_local_str(entry, object_type).uri)

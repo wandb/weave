@@ -6,9 +6,10 @@ import typing
 
 from wandb.apis import public as wandb_api
 
-from ..artifacts_local import WandbRunFilesProxyArtifact, get_wandb_read_client_artifact
+from ..artifact_wandb import WandbRunFilesProxyArtifact, get_wandb_read_client_artifact
 from ..language_features.tagging.tag_store import isolated_tagging_context
 from .. import types
+from .. import errors
 from .. import api as weave
 from ..ops_primitives import html
 from ..ops_primitives import markdown
@@ -192,9 +193,11 @@ def html_file(html: html.Html) -> HtmlArtifactFileRef:
     # This is a ref to the html object
     with isolated_tagging_context():
         ref = storage.save(html)
-    ref = copy.copy(ref)
-    ref.path += ".html"
-    return HtmlArtifactFileRef(ref)  # type: ignore
+    path = ref.path
+    if path is None:
+        raise errors.WeaveInternalError("storage save returned None path")
+    artifact_entry = ArtifactEntry(ref.artifact, path + ".html")
+    return HtmlArtifactFileRef(artifact_entry)
 
 
 # Yet another pattern for returning a file inside an artifact!
@@ -214,7 +217,10 @@ def markdown_file(md: markdown.Markdown):
 
     with isolated_tagging_context():
         ref = storage.save(md)
-    return file_wbartifact.ArtifactVersionFile(ref.artifact, ref.path + ".md")
+    path = ref.path
+    if path is None:
+        raise errors.WeaveInternalError("storage save returned None path")
+    return file_wbartifact.ArtifactVersionFile(ref.artifact, path + ".md")
 
 
 ArtifactAssetType = types.union(

@@ -5,15 +5,18 @@ import typing
 import pathlib
 
 from . import errors
-from . import artifacts_local
+from . import ref_base
+from . import ref_mem
+from . import artifact_local
+from . import artifact_wandb
+from . import artifact_util
 from . import weave_types as types
 from . import mappers_python
 from . import box
 from . import errors
-from . import refs
 from . import graph
 
-Ref = refs.Ref
+Ref = ref_base.Ref
 
 
 def split_path_dotfile(path, dotfile_name):
@@ -24,7 +27,7 @@ def split_path_dotfile(path, dotfile_name):
     raise FileNotFoundError
 
 
-def save_to_artifact(obj, artifact: artifacts_local.LocalArtifact, name, type_):
+def save_to_artifact(obj, artifact: artifact_local.LocalArtifact, name, type_):
     # print("SAVE TO ARTIFACT", obj, artifact, name, type_)
     # Tell types what name to use if not obj
     # We need to fix the save/load API so this is unnecessary.
@@ -39,7 +42,7 @@ def save_to_artifact(obj, artifact: artifacts_local.LocalArtifact, name, type_):
     ref_extra = type_.save_instance(obj, artifact, name)
     # If save_instance returned a Ref, return that directly.
     # TODO: refactor
-    if isinstance(ref_extra, refs.Ref):
+    if isinstance(ref_extra, ref_base.Ref):
         return ref_extra
     if name != "_obj":
         # Warning: This is hacks to force files to be content addressed
@@ -54,7 +57,7 @@ def save_to_artifact(obj, artifact: artifacts_local.LocalArtifact, name, type_):
         json.dump(type_.to_dict(), f)
         artifact._last_write_path = None
     # TODO: return ObjectRootRef (ArtifactRootRef?) here
-    return refs.LocalArtifactRef(
+    return artifact_local.LocalArtifactRef(
         artifact, path=name, type=type_, obj=obj, extra=ref_extra
     )
     # Jason's code does this, however, we can't do that, since save_to_artifact()
@@ -100,9 +103,9 @@ def _save_or_publish(obj, name=None, type=None, publish: bool = False, artifact=
         # TODO: refactor types to artifacts have a common base class
         if publish:
             # TODO: Potentially add entity and project to namespace the artifact explicitly.
-            artifact = artifacts_local.WandbArtifact(name, type=wb_type.name)
+            artifact = artifact_wandb.WandbArtifact(name, type=wb_type.name)
         else:
-            artifact = artifacts_local.LocalArtifact(name)
+            artifact = artifact_local.LocalArtifact(name)
     artifact.mapper = mappers_python.map_to_python(wb_type, artifact)
     ref = save_to_artifact(obj, artifact, "_obj", wb_type)
 
@@ -113,7 +116,7 @@ def _save_or_publish(obj, name=None, type=None, publish: bool = False, artifact=
             artifact.save(project)
         else:
             artifact.save()
-        refs.put_ref(obj, ref)
+        ref_base.put_ref(obj, ref)
 
     return ref
 
@@ -123,10 +126,10 @@ def publish(obj, name=None, type=None):
     return _save_or_publish(obj, name, type, True)
 
 
-save_mem = refs.save_mem
+save_mem = ref_mem.save_mem
 
 
-def save(obj, name=None, type=None, artifact=None) -> refs.LocalArtifactRef:
+def save(obj, name=None, type=None, artifact=None) -> artifact_local.LocalArtifactRef:
     # print("STORAGE SAVE", name, obj, type, artifact)
     # ref = _get_ref(obj)
     # if ref is not None:
@@ -135,29 +138,29 @@ def save(obj, name=None, type=None, artifact=None) -> refs.LocalArtifactRef:
     return _save_or_publish(obj, name, type, False, artifact=artifact)
 
 
-def get(uri_s: typing.Union[str, refs.Ref]) -> typing.Any:
-    if isinstance(uri_s, refs.Ref):
+def get(uri_s: typing.Union[str, ref_base.Ref]) -> typing.Any:
+    if isinstance(uri_s, ref_base.Ref):
         return uri_s.get()
-    return refs.Ref.from_str(uri_s).get()
+    return ref_base.Ref.from_str(uri_s).get()
 
 
-get_local_version = refs.get_local_version
+get_local_version = artifact_local.get_local_version
 
 
 def deref(ref):
-    if isinstance(ref, refs.Ref):
+    if isinstance(ref, ref_base.Ref):
         return ref.get()
     return ref
 
 
-def _get_ref(obj: typing.Any) -> typing.Optional[refs.Ref]:
-    if isinstance(obj, refs.Ref):
+def _get_ref(obj: typing.Any) -> typing.Optional[ref_base.Ref]:
+    if isinstance(obj, ref_base.Ref):
         return obj
-    return refs.get_ref(obj)
+    return ref_base.get_ref(obj)
 
 
 def clear_ref(obj):
-    refs.clear_ref(obj)
+    ref_base.clear_ref(obj)
 
 
 get_ref = _get_ref
@@ -166,11 +169,11 @@ get_ref = _get_ref
 def all_objects():
     result = []
     obj_paths = sorted(
-        pathlib.Path(artifacts_local.local_artifact_dir()).iterdir(),
+        pathlib.Path(artifact_util.local_artifact_dir()).iterdir(),
         key=os.path.getctime,
     )
     for art_path in obj_paths:
-        ref = refs.get_local_version_ref(art_path.name, "latest")
+        ref = artifact_local.get_local_version_ref(art_path.name, "latest")
         if ref is not None:
             result.append((ref.created_at, ref))
     return [r[1] for r in sorted(result)]
@@ -178,11 +181,11 @@ def all_objects():
 
 def objects(
     of_type: types.Type, alias: str = "latest"
-) -> typing.List[refs.LocalArtifactRef]:
+) -> typing.List[artifact_local.LocalArtifactRef]:
     result = []
-    for art_name in os.listdir(artifacts_local.local_artifact_dir()):
+    for art_name in os.listdir(artifact_util.local_artifact_dir()):
         try:
-            ref = refs.get_local_version_ref(art_name, alias)
+            ref = artifact_local.get_local_version_ref(art_name, alias)
             if ref is not None:
                 if of_type.assign_type(ref.type):
                     # TODO: Why did I have this here?
@@ -222,7 +225,7 @@ def to_python(obj, wb_type=None):
     if wb_type is None:
         wb_type = types.TypeRegistry.type_of(obj)
     mapper = mappers_python.map_to_python(
-        wb_type, artifacts_local.LocalArtifact(_get_name(wb_type, obj))
+        wb_type, artifact_local.LocalArtifact(_get_name(wb_type, obj))
     )
     val = mapper.apply(obj)
     # TODO: this should be a ConstNode!
@@ -233,17 +236,7 @@ def from_python(obj, wb_type=None):
     if wb_type is None:
         wb_type = types.TypeRegistry.type_from_dict(obj["_type"])
     mapper = mappers_python.map_from_python(
-        wb_type, artifacts_local.LocalArtifact(_get_name(wb_type, obj))
+        wb_type, artifact_local.LocalArtifact(_get_name(wb_type, obj))
     )
     res = mapper.apply(obj["_val"])
     return res
-
-
-# Converting table algorithm
-# construct the parquet file
-#     first, determine type of raw table data
-#        this is done by mapping weave type to arrow type
-#     then write
-# Then construct a WeaveList, with the weave type and which artifact it came from
-# Then save the WeaveList...
-# So we don't actually have to save it.

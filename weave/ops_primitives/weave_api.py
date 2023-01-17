@@ -9,10 +9,11 @@ from .. import storage
 from .. import registry_mem
 from .. import weave_internal
 from .. import trace
-from .. import refs
+from .. import ref_base
 from .. import uris
 from .. import graph
-from .. import artifacts_local
+from .. import artifact_local
+from .. import artifact_util
 from .. import compile
 
 
@@ -120,7 +121,7 @@ def objects(of_type: types.Type, alias: str, timestamp: int):
 
 
 def op_get_return_type(uri):
-    return refs.Ref.from_str(uri).type
+    return ref_base.Ref.from_str(uri).type
 
 
 def get_const_val(list_type_or_node):
@@ -339,10 +340,6 @@ class Run:
             sleep_mult *= 1.3
             time.sleep(sleep_time)
 
-            # TODO: this should support full URIS instead of hard coding
-            uri = uris.WeaveLocalArtifactURI.make_uri(
-                artifacts_local.local_artifact_dir(), f"run-{self.id}", "latest"
-            )
-            self = storage.get(uri)
+            self = artifact_local.get_local_version(f"run-{self.id}", "latest")
 
         return self.output

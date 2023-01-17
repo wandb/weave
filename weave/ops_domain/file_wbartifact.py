@@ -4,8 +4,7 @@ from .. import api as weave
 from .. import weave_types as types
 from ..ops_primitives import file_local
 from ..ops_primitives import file as weave_file
-from .. import artifacts_local
-from .. import refs
+from .. import artifact_wandb
 
 
 def load_instance(self, artifact, name, extra=None):
@@ -14,12 +13,12 @@ def load_instance(self, artifact, name, extra=None):
 
 # Inject onto the type, which lives in refs right now :(
 # TODO: fix
-refs.ArtifactVersionFileType.load_instance = load_instance  # type: ignore
+artifact_wandb.ArtifactVersionFileType.load_instance = load_instance  # type: ignore
 
 
-@weave.weave_class(weave_type=refs.ArtifactVersionFileType)
+@weave.weave_class(weave_type=artifact_wandb.ArtifactVersionFileType)
 class ArtifactVersionFile(weave_file.File):
-    artifact: artifacts_local.WandbArtifact
+    artifact: artifact_wandb.WandbArtifact
     path: str
 
     def __init__(self, artifact, path):
@@ -33,8 +32,8 @@ class ArtifactVersionFile(weave_file.File):
         return open(self.get_local_path(), encoding="ISO-8859-1").read()
 
 
-refs.ArtifactVersionFileType.instance_class = ArtifactVersionFile
-refs.ArtifactVersionFileType.instance_classes = ArtifactVersionFile
+artifact_wandb.ArtifactVersionFileType.instance_class = ArtifactVersionFile
+artifact_wandb.ArtifactVersionFileType.instance_classes = ArtifactVersionFile
 
 
 class ArtifactVersionDirType(types.ObjectType):
@@ -48,9 +47,12 @@ class ArtifactVersionDirType(types.ObjectType):
             "fullPath": types.String(),
             "size": types.Int(),
             "dirs": types.Dict(
-                types.String(), types.SubDirType(refs.ArtifactVersionFileType())
+                types.String(),
+                types.SubDirType(artifact_wandb.ArtifactVersionFileType()),
             ),
-            "files": types.Dict(types.String(), refs.ArtifactVersionFileType()),
+            "files": types.Dict(
+                types.String(), artifact_wandb.ArtifactVersionFileType()
+            ),
         }
 
 

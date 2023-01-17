@@ -12,7 +12,7 @@ from .. import panels
 from ..show import _show_params
 from ..ecosystem import openai
 from . import test_helpers
-from .. import artifacts_local
+from .. import artifact_util
 from rich import print
 
 
@@ -220,5 +220,5 @@ def test_large_const_node(test_artifact_dir):
     assert (
         graph.node_expr_str(col_sel_fn2)
         == 'get("local-artifact://%s/list/4cf1abf0d040d897276e4be3c6aa90df").finetune_gpt3({"n_epochs": 2}).model().complete(row)["choices"][0]["text"]'
-        % artifacts_local.local_artifact_dir()
+        % artifact_util.local_artifact_dir()
     )

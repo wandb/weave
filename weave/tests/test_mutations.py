@@ -1,7 +1,7 @@
 from .. import ops
 from .. import storage
 from .. import api as weave
-from .. import artifacts_local
+from .. import artifact_util
 from .. import weave_internal
 
 
@@ -45,7 +45,7 @@ def test_mutate_with_use(cereal_csv):
 def test_mutate_artifact():
     storage.save({"a": 5, "b": 6}, "my-dict")
     dict_obj = ops.get(
-        f"local-artifact://{artifacts_local.local_artifact_dir()}/my-dict/latest"
+        f"local-artifact://{artifact_util.local_artifact_dir()}/my-dict/latest"
     )
     weave.use(ops.set(weave_internal.const(dict_obj["a"]), 17))
     assert weave.use(dict_obj["a"]) == 17

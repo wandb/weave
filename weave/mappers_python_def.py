@@ -6,7 +6,7 @@ import math
 
 from . import mappers
 from . import storage
-from . import refs
+from . import ref_base
 from . import mappers_weave
 from . import weave_types as types
 from . import errors
@@ -184,7 +184,7 @@ class RefToPyRef(mappers_weave.RefMapper):
 
 class PyRefToRef(mappers_weave.RefMapper):
     def apply(self, obj):
-        return refs.Ref.from_str(obj)
+        return ref_base.Ref.from_str(obj)
 
 
 class TypeToPyType(mappers.Mapper):
@@ -248,16 +248,14 @@ class DefaultFromPy(mappers.Mapper):
         # TODO: this does not use self.artifact, can we just drop it?
         # Do we need the type so we can load here? No...
         if ":" in obj:
-            ref = refs.Ref.from_str(obj)
+            ref = ref_base.Ref.from_str(obj)
             # Note: we are forcing type here, because we already know it
             # We don't save the types for every file in a remote artifact!
             # But you can still reference them, because you have to get that
             # file through an op, and therefore we know the type?
             ref._type = self.type
             return ref.get()
-        return refs.LocalArtifactRef.from_local_ref(
-            self._artifact, obj, self.type
-        ).get()
+        return self._artifact.ref_from_local_str(obj, self.type).get()
 
 
 py_type = type

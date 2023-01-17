@@ -1,6 +1,6 @@
 import shutil
 from .. import api as weave
-from .. import artifacts_local
+from .. import artifact_util
 
 
 def test_op_versioning():
@@ -25,7 +25,7 @@ def test_op_versioning():
     # This should refer to v1, even though we just loaded v0
     v_latest = weave.use(
         weave.get(
-            f"local-artifact://{artifacts_local.local_artifact_dir()}/op-versioned_op/latest"
+            f"local-artifact://{artifact_util.local_artifact_dir()}/op-versioned_op/latest"
         )
     )
     assert weave.use(v_latest(4, 20)) == -16
@@ -36,7 +36,7 @@ def test_op_versioning():
 
     v0_again = weave.use(
         weave.get(
-            f"local-artifact://{artifacts_local.local_artifact_dir()}/op-versioned_op/"
+            f"local-artifact://{artifact_util.local_artifact_dir()}/op-versioned_op/"
             + v0.version
         )
     )

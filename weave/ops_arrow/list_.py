@@ -1,9 +1,7 @@
 import logging
 import typing
 import dataclasses
-import json
 import numpy as np
-import pandas as pd
 import pyarrow as pa
 from pyarrow import compute as pc
 from collections import defaultdict
@@ -12,7 +10,6 @@ from .. import util
 py_type = type
 
 from ..api import op, weave_class, type, use
-from ..decorator_arrow_op import arrow_op
 from .. import weave_types as types
 from .. import box
 from .. import graph
@@ -21,12 +18,9 @@ from .. import registry_mem
 from .. import mappers_arrow
 from .. import mappers_python_def
 from .. import op_def
-from .. import mappers_python
-from .. import artifacts_local
+from .. import artifact_local
 from .. import storage
-from .. import refs
 from .. import dispatch
-from .. import execute_fast
 from .. import weave_internal
 from .. import weavify
 from .. import op_args
@@ -38,10 +32,9 @@ from .. import arrow_util
 from ..language_features.tagging import tag_store
 from ..ops_primitives import list_ as base_list
 
-from .arrow import arrow_as_array, ArrowWeaveListType, rewrite_weavelist_refs
+from .arrow import arrow_as_array, ArrowWeaveListType
+from .. import artifact_base
 
-if typing.TYPE_CHECKING:
-    from .. import artifacts_local
 
 FLATTEN_DELIMITER = "➡️"
 
@@ -224,9 +217,7 @@ def rewrite_groupby_refs(arrow_data, group_keys, object_type, artifact):
                 if ":" in ref_str:
                     new_ref_str_list.append(ref_str)
                 else:
-                    ref = refs.LocalArtifactRef.from_local_ref(
-                        artifact, ref_str, object_type
-                    )
+                    ref = artifact.from_local_ref_str(ref_str, object_type)
                     new_ref_str_list.append(str(ref.uri))
             new_refs.append(new_ref_str_list)
         return pa.array(new_refs)
@@ -1363,6 +1354,7 @@ def vectorize(
                 except (
                     errors.WeavifyError,
                     errors.WeaveDispatchError,
+                    errors.WeaveTypeError,
                 ):
                     pass
             if op.weave_fn is not None:
@@ -1372,9 +1364,9 @@ def vectorize(
                 # No weave_fn, so we can't vectorize this op. Just
                 # use the op as if it was a normal list (ideally hitting
                 # the derived mapped op)
-                input0_name, input0_val = list(inputs.items())[0]
-                if isinstance(input0_val, ArrowWeaveList):
-                    py_node = input0_val.to_py()
+                input0_name, input0_node = list(inputs.items())[0]
+                if isinstance(input0_node.type, ArrowWeaveListType):
+                    py_node = input0_node.to_py()
                     new_inputs = {input0_name: py_node}
                     for k, v in list(inputs.items())[1:]:
                         new_inputs[k] = v
@@ -1679,7 +1671,7 @@ def to_arrow_from_list_and_artifact(obj, object_type, artifact):
 def to_arrow(obj, wb_type=None):
     if wb_type is None:
         wb_type = types.TypeRegistry.type_of(obj)
-    artifact = artifacts_local.LocalArtifact("to-arrow-%s" % wb_type.name)
+    artifact = artifact_local.LocalArtifact("to-arrow-%s" % wb_type.name)
     outer_tags: typing.Optional[dict[str, typing.Any]] = None
     if isinstance(wb_type, tagged_value_type.TaggedValueType):
         outer_tags = tag_store.get_tags(obj)
@@ -1826,7 +1818,7 @@ class VectorizedContainerConstructorResults:
     arrays: list[pa.Array]
     prop_types: dict[str, types.Type]
     max_len: int
-    artifact: typing.Optional["artifacts_local.Artifact"]
+    artifact: typing.Optional[artifact_base.Artifact]
 
 
 def vectorized_container_constructor_preprocessor(

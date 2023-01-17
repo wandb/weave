@@ -11,10 +11,10 @@ from . import errors
 from . import mappers_python
 from .timestamp import tz_aware_dt
 
+from .artifact_base import Artifact
 
 if typing.TYPE_CHECKING:
     from .refs import Ref
-    from .artifacts_local import Artifact
 
 
 def to_weavejs_typekey(k: str) -> str:

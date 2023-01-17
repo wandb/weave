@@ -74,7 +74,7 @@ from flask.logging import wsgi_errors_stream
 # Ensure these are imported and registered
 from weave import ops
 
-from .artifacts_local import local_artifact_dir
+from .artifact_util import local_artifact_dir
 
 
 # NOTE: Fixes flask dev server's auto-reload capability, by forcing it to use

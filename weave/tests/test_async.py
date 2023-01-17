@@ -4,7 +4,7 @@ from .. import ops
 from .. import async_demo
 import pytest
 from .. import runs
-from .. import artifacts_local
+from .. import artifact_util
 
 
 def test_run_basic():
@@ -14,7 +14,7 @@ def test_run_basic():
     storage.save(run, name=run_name)
 
     run_node = ops.get(
-        f"local-artifact://{artifacts_local.local_artifact_dir()}/{run_name}/latest"
+        f"local-artifact://{artifact_util.local_artifact_dir()}/{run_name}/latest"
     )
     # run = api.use(run_node)
     assert api.use(run_node.state) == "pending"
@@ -88,5 +88,5 @@ def test_async_op_expr():
 
     assert (
         str(saved_model)
-        == f'get("local-artifact://{artifacts_local.local_artifact_dir()}/list/6b6c14ba4268dc8c0bd47d5ee549721b").train().model().save("model")'
+        == f'get("local-artifact://{artifact_util.local_artifact_dir()}/list/6b6c14ba4268dc8c0bd47d5ee549721b").train().model().save("model")'
     )

@@ -1,7 +1,7 @@
 import typing
 
 if typing.TYPE_CHECKING:
-    from . import artifacts_local
+    from . import artifact_local
     from . import weave_types as types
 
 
