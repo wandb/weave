@@ -31,9 +31,8 @@ from .language_features.tagging import opdef_util
 
 def stitch(
     leaf_nodes: list[graph.Node],
-    # var_values: typing.Optional[dict[str, ObjectRecorder]] = None,
 ) -> "StitchedGraph":
-    """Given a list of leaf nodes, stitch the graph together."""
+    """Given a list of leaf nodes, stitch the graph together. This is the primary entry point for this module."""
     sg = StitchedGraph()
     sg.stitch(leaf_nodes)
     return sg
@@ -41,9 +40,20 @@ def stitch(
 
 @dataclasses.dataclass
 class StitchedOutputNode:
+    """Represents the user-facing data structure for a node after stitching. Importantly,
+    each OutputNode in the original graph will have a single StitchedOutputNode and visa-versa.
+    In other words, it is a 1:1 mapping."""
+
+    # `node` is the original node in the user graph which this stitched node
+    # represents.
     node: graph.OutputNode
+
+    # `_stitched_graph` is a private reference to the stitched graph which is used
+    # to lazily compute the input and output recorders
     _stitched_graph: "StitchedGraph"
 
+    # `input_recorder_dict` is a dictionary of the input recorders for this node
+    # with keys matching the op input keys.
     # Note: if a node is used in multiple places (should only be possible with)
     # inner lambda functions, then the input recorder dict will only be "correct"
     # of the first occurrence of the node. To fix this, we should not merge lambda
@@ -55,6 +65,11 @@ class StitchedOutputNode:
             for k, v in self.node.from_op.inputs.items()
         }
 
+    # `output_recorder` is the output recorder for this node. Note: it is possible,
+    # and expected that the `output_recorder` for the node may not have an `original_node`
+    # that is the same as the `node` for this stitched node. This is one of the purposes
+    # of stitch in the first place. For example, if a node is a `pick` operation, then the
+    # output recorder will be the recorder for the node that was picked.
     @property
     def output_recorder(self) -> "ObjectRecorder":
         return self._stitched_graph.get_recorder_for_node(self.node)
@@ -62,15 +77,28 @@ class StitchedOutputNode:
 
 @dataclasses.dataclass
 class ObjectRecorder:
+    """Represents the user-facing data structure for node's value after stitching. Since some
+    nodes will share ObjectRecorders, a StitchedGraph's total ObjectRecorders is always less than or equal to
+    the total number of nodes in the original graph."""
+
+    # `original_node` is the original node which produced this object recorder.
     original_node: graph.Node
+
+    # `_stitched_graph` is a private reference to the stitched graph which is used
+    # to lazily compute other properties.
     _stitched_graph: "StitchedGraph"
+
+    # `_tag_source_node_map` is a dictionary of nodes which produce tags for this object
     _tag_source_node_map: dict[str, graph.Node] = dataclasses.field(
         default_factory=dict
     )
+
+    # `_calls_target_nodes` is a list of node which this object recorder feeds into
     _calls_target_nodes: list[graph.OutputNode] = dataclasses.field(
         default_factory=list
     )
 
+    # `tag_recorder_dict` is a dictionary of recorders which are the tags for this object.
     @property
     def tag_recorder_dict(self) -> dict[str, "ObjectRecorder"]:
         return {
@@ -78,11 +106,13 @@ class ObjectRecorder:
             for k, v in self._tag_source_node_map.items()
         }
 
+    # `tag_recorder_for_key` fetches a specific tag recorder for a given key
     def tag_recorder_for_key(self, key: str) -> "ObjectRecorder":
         return self._stitched_graph.get_recorder_for_node(
             self._tag_source_node_map[key]
         )
 
+    # `calls_stitched_output_node_list` is a list of stitched output nodes which this object recorder feeds into
     @property
     def calls_stitched_output_node_list(self) -> list[StitchedOutputNode]:
         return [
@@ -90,18 +120,24 @@ class ObjectRecorder:
             for c in self._calls_target_nodes
         ]
 
+    # `add_call` is used to record that this object feeds into a target node
     def add_call(self, target_node: graph.OutputNode) -> None:
         self._calls_target_nodes.append(target_node)
 
+    # `set_tag_recorder_for_key` sets the tag recorder for a given key
     def set_tag_recorder_for_key(self, key: str, recorder: "ObjectRecorder") -> None:
         self._tag_source_node_map[key] = recorder.original_node
 
+    # `update_tag_recorder_dict` updates the tag recorder dict with a dictionary of tag recorders
     def update_tag_recorder_dict(
         self, tag_recorder_dict: dict[str, "ObjectRecorder"]
     ) -> None:
         for k, v in tag_recorder_dict.items():
             self.set_tag_recorder_for_key(k, v)
 
+    # `merge_in` merges the contents of another object recorder into this one.
+    # Note: once we have an invariant that all const function node var nodes are
+    # unique, we can completely remove this function
     def merge_in(self, other: "ObjectRecorder") -> None:
         if self == other:
             return
@@ -122,6 +158,8 @@ class ObjectRecorder:
 
 @dataclasses.dataclass
 class ConstNodeObjectRecorder(ObjectRecorder):
+    """Specific ObjectRecorder for ConstNodes."""
+
     @property
     def const_val(self) -> typing.Optional[typing.Any]:
         if not isinstance(self.original_node, graph.ConstNode):
@@ -144,6 +182,8 @@ class ConstNodeObjectRecorder(ObjectRecorder):
 
 @dataclasses.dataclass
 class LiteralDictObjectRecorder(ObjectRecorder):
+    """Specific ObjectRecorder for Dictionary Literals."""
+
     @property
     def input_recorder_dict_val(self) -> dict[str, "ObjectRecorder"]:
         if not (
@@ -159,21 +199,11 @@ class LiteralDictObjectRecorder(ObjectRecorder):
         }
 
 
-class _SetOnceDict(dict):
-    def __setitem__(self, key: str, value: typing.Any) -> None:
-        if key in self:
-            raise errors.WeaveInternalError(
-                f"Programming error: Attempted to set key {key} twice."
-            )
-        super().__setitem__(key, value)
-
-
 @dataclasses.dataclass
 class StitchedGraph:
-    # There should always be a 1-1 correspondence between output nodes and stitched output nodes.
-    _node_to_stitched_map: typing.Dict[
-        graph.OutputNode, StitchedOutputNode
-    ] = dataclasses.field(default_factory=_SetOnceDict)
+    """A StitchedGraph is a graph is the primary data structure produced in this module.
+    The main user-facing method is `get_recorder_for_node` which returns an ObjectRecorder
+    for a given node."""
 
     # The ObjectRecorder for a Node my not be produced by that node. Therefore, the set of all
     # ObjectRecords is upper bounded by the set of all Nodes.
@@ -181,7 +211,9 @@ class StitchedGraph:
         default_factory=dict
     )
 
+    # `get_recorder_for_node` returns the ObjectRecorder for a given node.
     def get_recorder_for_node(self, node: graph.Node) -> ObjectRecorder:
+        # Internally, we create a default ObjectRecorder if one does not exist already.
         if node not in self._node_to_recorder_map:
             if isinstance(node, graph.OutputNode) and node.from_op.name.endswith(
                 "dict"
@@ -210,12 +242,7 @@ class StitchedGraph:
         self._node_to_recorder_map[node] = recorder
 
     def _get_stitched_node_for_node(self, node: graph.OutputNode) -> StitchedOutputNode:
-        if node not in self._node_to_stitched_map:
-            self._node_to_stitched_map[node] = StitchedOutputNode(node, self)
-        return self._node_to_stitched_map[node]
-
-    # def _add_call(self, from_node: graph.Node, to_node: graph.OutputNode) -> None:
-    #     self.get_recorder_for_node(from_node).add_call(to_node)
+        return StitchedOutputNode(node, self)
 
     def stitch(
         self,
@@ -225,14 +252,16 @@ class StitchedGraph:
         """Given a list of leaf nodes, stitch the graph together."""
 
         def handle_node(node: graph.Node) -> graph.Node:
-            # print(f"Handling node ({type(node).__name__})<{id(node)}>{node}")
             if isinstance(node, graph.OutputNode):
+                # If the node is an output node, we perform stitching
                 input_dict = {
                     k: self.get_recorder_for_node(v)
                     for k, v in node.from_op.inputs.items()
                 }
                 self._stitch_output_node_with_stitched_inputs(node, input_dict)
             elif isinstance(node, graph.VarNode):
+                # If it is a var node, then we update it ito the frame value
+                # if it exists, or a dummy recorder
                 if frame and node.name in frame:
                     self._set_recorder_for_node(node, frame[node.name])
                 else:
