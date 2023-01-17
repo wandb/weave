@@ -283,3 +283,16 @@ def test_2d_projection(li, algo, options):
     assert res[0].get("projection").get("x") is not None
     assert res[0].get("projection").get("y") is not None
     assert res[0].get("source") == data_as_dicts[0]
+
+
+def test_join_to_str():
+    data = ["1", None, "2", None, "3"]
+    res = "1,,2,,3"  # note, Weave0 uses "" for Nones - we may consider changing this in the future
+    list_node = lath.ListNode.make_node(data)
+    arrow_node = lath.ArrowNode.make_node([data, data])
+
+    list_joined = list_node.joinToStr(",")
+    arrow_joined = arrow_node.joinToStr(",")
+
+    assert lath.ListNode.use_node(list_joined) == res
+    assert lath.ArrowNode.use_node(arrow_joined) == [res, res]

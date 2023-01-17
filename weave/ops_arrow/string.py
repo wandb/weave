@@ -381,3 +381,23 @@ def rstrip(self):
     return ArrowWeaveList(
         pc.utf8_rtrim_whitespace(self._arrow_data), types.String(), self._artifact
     )
+
+
+@arrow_op(
+    name="ArrowWeaveListString-joinToStr",
+    input_type={
+        "arr": ArrowWeaveListType(types.List(types.optional(types.String()))),
+        "sep": types.UnionType(types.String(), ArrowWeaveListType(types.String())),
+    },
+    output_type=ArrowWeaveListType(types.String()),
+)
+def join_to_str(arr, sep):
+    if isinstance(sep, ArrowWeaveList):
+        sep = sep._arrow_data
+    # match Weave0 - join nulls to empty string
+    filled_arr = pa.ListArray.from_arrays(
+        arr._arrow_data.offsets, arr._arrow_data.flatten().fill_null("")
+    )
+    return ArrowWeaveList(
+        pc.binary_join(filled_arr, sep), types.String(), arr._artifact
+    )

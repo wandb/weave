@@ -656,3 +656,13 @@ def list_2d_projection(
         }
         for p, row in zip(projection, table)
     ]
+
+
+@op(
+    name="joinToStr",
+    input_type={"arr": types.List(types.Any()), "sep": types.String()},
+    output_type=types.String(),
+)
+def join_to_str(arr, sep):
+    # This logic matches Weave0 (nulls are treated as empty strings)
+    return sep.join([str(i) if i is not None else "" for i in arr])
