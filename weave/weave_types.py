@@ -1216,6 +1216,12 @@ def merge_types(a: Type, b: Type) -> Type:
             other_prop_type = b.property_types.get(key, none_type)
             next_prop_types[key] = merge_types(self_prop_type, other_prop_type)
         return TypedDict(next_prop_types)
+    if isinstance(a, List) and isinstance(b, List):
+        return List(merge_types(a.object_type, b.object_type))
+    if isinstance(a, UnknownType):
+        return b
+    if isinstance(a, UnknownType):
+        return a
     return UnionType(a, b)
 
 

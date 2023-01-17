@@ -7,6 +7,8 @@ import re
 
 import wandb
 
+from ..weave_server import recursively_unwrap_unions
+
 from .. import api as weave
 from .. import artifact_local
 from .. import weave_types as types
@@ -211,3 +213,49 @@ def test_ref_to_node():
     # a getattr op call (prevented by ref=None on FallbackNodeTypeDispatcherMixin)
     # ref should be None here
     assert node._ref == None
+
+
+@pytest.mark.parametrize(
+    "obj, wb_type, expected",
+    [
+        ([], None, {"_type": {"type": "list", "objectType": "unknown"}, "_val": []}),
+        (
+            [{"a": []}, {"a": [1]}],
+            None,
+            {
+                "_type": {
+                    "type": "list",
+                    "objectType": {
+                        "type": "typedDict",
+                        "propertyTypes": {"a": {"type": "list", "objectType": "int"}},
+                    },
+                },
+                "_val": [{"a": []}, {"a": [1]}],
+            },
+        ),
+        (
+            [{"a": []}, {"a": [1]}, {"a": [None]}],
+            None,
+            {
+                "_type": {
+                    "type": "list",
+                    "objectType": {
+                        "type": "typedDict",
+                        "propertyTypes": {
+                            "a": {
+                                "type": "list",
+                                "objectType": {
+                                    "type": "union",
+                                    "members": ["int", "none"],
+                                },
+                            }
+                        },
+                    },
+                },
+                "_val": [{"a": []}, {"a": [1]}, {"a": [None]}],
+            },
+        ),
+    ],
+)
+def test_to_python_object(obj, wb_type, expected):
+    assert recursively_unwrap_unions(storage.to_python(obj, wb_type)) == expected
