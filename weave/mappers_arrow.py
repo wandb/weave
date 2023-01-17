@@ -12,6 +12,7 @@ from . import weave_types as types
 from . import ref_base
 from . import errors
 from . import node_ref
+from . import artifact_base
 from .language_features.tagging import tagged_value_type, tag_store
 
 import contextvars
@@ -210,11 +211,6 @@ class ArrowDateTimeToDateTime(mappers.Mapper):
 
 
 class DefaultToArrow(mappers_python.DefaultToPy):
-    def __init__(self, type_: types.Type, mapper, artifact, path=[]):
-        self.type = type_
-        self._artifact = artifact
-        self._path = path
-
     def result_type(self):
         # TODO: hard-coding for the moment. Need to generalize this.
         # There are two cases, either there's a instance_to_dict() method
@@ -284,7 +280,7 @@ class DefaultFromArrow(mappers_python.DefaultFromPy):
         return super().apply(obj)
 
 
-def map_to_arrow_(type, mapper, artifact, path=[]):
+def map_to_arrow_(type, mapper, artifact: artifact_base.Artifact, path=[]):
     if isinstance(type, types.Const):
         type = type.val_type
     if isinstance(type, types.TypedDict):
@@ -296,7 +292,7 @@ def map_to_arrow_(type, mapper, artifact, path=[]):
     elif isinstance(type, types.ObjectType):
         return ObjectToArrowStruct(type, mapper, artifact, path)
     elif isinstance(type, tagged_value_type.TaggedValueType):
-        return TaggedValueToArrowStruct(type, mapper, artifact, path)
+        return TaggedValueToArrowStruct(type, mapper, artifact, path)  # type: ignore
     elif isinstance(type, types.Int):
         return IntToArrowInt(type, mapper, artifact, path)
     elif isinstance(type, types.Boolean):
@@ -415,4 +411,5 @@ def map_from_arrow_scalar(value: pa.Scalar, type_: types.Type, artifact):
             # file through an op, and therefore we know the type?
             ref._type = type_
             return ref.get()
-        return artifact.ref_from_local_str(obj, type_).get()
+
+        return artifact.get(obj, type_)

@@ -1,43 +1,36 @@
-import contextlib
+# Object hierarchy:
+# Artifact (set, get methods)
+#   MemArtifact
+#   FilesystemArtifact (adds open_file, new_file, etc method)
+#     LocalArtifact
+#     WandbArtifact
+
 import typing
 
-from . import ref_util
-
-if typing.TYPE_CHECKING:
-    from . import ref_artifact
-    from . import weave_types as types
+from . import weave_types as types
+from . import ref_base
 
 
 class Artifact:
-    RefClass: typing.ClassVar[typing.Type["ref_artifact.ArtifactRef"]]
-    name: str
-
-    @property
-    def is_saved(self) -> bool:
+    def set(self, key: str, type_: types.Type, obj: typing.Any) -> "ArtifactRef":
         raise NotImplementedError
 
-    @contextlib.contextmanager
-    def open(self, path: str, binary: bool = False):
+    def get(self, key: str, type_: types.Type) -> typing.Any:
         raise NotImplementedError
 
-    @contextlib.contextmanager
-    def new_file(self, path: str, binary: bool = False):
-        raise NotImplementedError
 
-    def ref_from_local_str(
-        self, s: str, type: "types.Type"
-    ) -> "ref_artifact.ArtifactRef":
-        path, extra = ref_util.parse_local_ref_str(s)
-        return self.RefClass(self, path=path, extra=extra, type=type)
+class ArtifactRef(ref_base.Ref):
+    def __init__(
+        self,
+        artifact: Artifact,
+        path: typing.Optional[str],
+        type: typing.Optional[types.Type] = None,
+        obj: typing.Optional[typing.Any] = None,
+        extra: typing.Optional[list[str]] = None,
+    ):
+        self.artifact = artifact
+        self.path = path
+        super().__init__(obj=obj, type=type, extra=extra)
 
-    @property
-    def created_at(self):
-        raise NotImplementedError
-
-    @property
-    def version(self):
-        raise NotImplementedError
-
-    @property
-    def location(self):
+    def local_ref_str(self) -> str:
         raise NotImplementedError

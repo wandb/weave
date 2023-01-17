@@ -49,7 +49,7 @@ def get_pid():
     return os.getpid()
 
 
-def rand_string_n(n):
+def rand_string_n(n: int) -> str:
     return "".join(
         random.choice(string.ascii_uppercase + string.digits) for _ in range(n)
     )

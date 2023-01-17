@@ -17,8 +17,7 @@ from . import wandb_api
 from . import memo
 
 from . import weave_types as types
-from . import ref_artifact
-from . import artifact_base
+from . import artifact_fs
 from . import artifact_util
 
 if typing.TYPE_CHECKING:
@@ -178,7 +177,7 @@ def _isolated_download_and_atomic_mover(
         shutil.rmtree(tmp_dir)
 
 
-class WandbArtifact(artifact_base.Artifact):
+class WandbArtifact(artifact_fs.FilesystemArtifact):
     def __init__(
         self, name, type=None, uri: typing.Optional["WeaveWBArtifactURI"] = None
     ):
@@ -220,9 +219,6 @@ class WandbArtifact(artifact_base.Artifact):
             art.version,
         )
         return cls(art._sequence_name, uri=uri)
-
-    def make_last_file_content_addressed(self):
-        return None
 
     @property
     def is_saved(self) -> bool:
@@ -348,7 +344,7 @@ class WandbArtifact(artifact_base.Artifact):
         self._set_read_artifact_uri(uri)
 
 
-class WandbRunFilesProxyArtifact(artifact_base.Artifact):
+class WandbRunFilesProxyArtifact(artifact_fs.FilesystemArtifact):
     def __init__(self, entity_name: str, project_name: str, run_name: str):
         self.name = f"{entity_name}/{project_name}/{run_name}"
         self._run = get_wandb_read_run(self.name)
@@ -394,7 +390,7 @@ class ArtifactVersionFileType(types.Type):
     def save_instance(
         self,
         obj: "ArtifactVersionFile",
-        artifact: artifact_base.Artifact,
+        artifact: artifact_fs.FilesystemArtifact,
         name: str,
     ) -> "WandbArtifactRef":
         return WandbArtifactRef(obj.artifact, obj.path)
@@ -404,12 +400,12 @@ class ArtifactVersionFileType(types.Type):
     # TODO: fix
 
 
-class WandbArtifactRef(ref_artifact.ArtifactRef):
+class WandbArtifactRef(artifact_fs.FilesystemArtifactRef):
     FileType = ArtifactVersionFileType
 
     artifact: WandbArtifact
 
-    def versions(self) -> list[ref_artifact.ArtifactRef]:
+    def versions(self) -> list[artifact_fs.FilesystemArtifactRef]:
         # TODO: implement versions on wandb artifact
         return [self]
 

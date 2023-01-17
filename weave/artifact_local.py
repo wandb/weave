@@ -13,8 +13,7 @@ from . import util
 from . import errors
 
 from . import weave_types as types
-from . import ref_artifact
-from . import artifact_base
+from . import artifact_fs
 from . import artifact_util
 
 
@@ -39,7 +38,9 @@ def local_artifact_exists(name: str, branch: str) -> bool:
     )
 
 
-class LocalArtifact(artifact_base.Artifact):
+class LocalArtifact(artifact_fs.FilesystemArtifact):
+    _existing_dirs: list[str]
+
     def __init__(self, name: str, version: typing.Optional[str] = None):
         # LocalArtifacts are created frequently, sometimes in cases where
         # they will neither be read to or written to. The to_python path does
@@ -54,7 +55,7 @@ class LocalArtifact(artifact_base.Artifact):
         self._root = os.path.join(artifact_util.local_artifact_dir(), name)
         self._path_handlers: dict[str, typing.Any] = {}
         self._setup_dirs()
-        self._last_write_path = None
+        self._existing_dirs = []
 
     def __repr__(self):
         return "<LocalArtifact(%s) %s %s>" % (id(self), self.name, self._version)
@@ -99,45 +100,39 @@ class LocalArtifact(artifact_base.Artifact):
     @property
     def location(self) -> uris.WeaveURI:
         return WeaveLocalArtifactURI.from_parts(
-            os.path.abspath(artifact_util.local_artifact_dir()), self.name, self.version
+            os.path.abspath(artifact_util.local_artifact_dir()),
+            self.name,
+            self._version,
         )
 
     def uri(self) -> str:
         return self.location.uri
 
+    def _makedir(self, dirname: str):
+        # Keep track of directories we've already created so we don't
+        # create them multiple times, makedir is expensive if you call
+        # it a million times, especially on a network file store!
+        if dirname not in self._existing_dirs:
+            os.makedirs(dirname, exist_ok=True)
+            self._existing_dirs.append(dirname)
+
     @contextlib.contextmanager
     def new_file(self, path, binary=False):
-        self._last_write_path = path
-
-        os.makedirs(self._write_dirname, exist_ok=True)
+        full_path = os.path.join(self._write_dirname, path)
+        self._makedir(os.path.dirname(full_path))
         mode = "w"
         if binary:
             mode = "wb"
-        f = open(os.path.join(self._write_dirname, path), mode)
+        f = open(full_path, mode)
         yield f
         f.close()
 
     @contextlib.contextmanager
     def new_dir(self, path):
         full_path = os.path.abspath(os.path.join(self._write_dirname, path))
+        self._makedir(full_path)
         os.makedirs(full_path, exist_ok=True)
         yield full_path
-
-    def make_last_file_content_addressed(self):
-        # Warning: This function is really bad and a terrible smell!
-        # We need to fix the type saving API so we don't need to do this!!!!
-        # It also causes double hashing.
-        # TODO: fix
-        # DO NOT MERGE
-        last_write_path = self._last_write_path
-        if last_write_path is None:
-            return
-        self._last_write_path = None
-        orig_full_path = os.path.join(self._write_dirname, last_write_path)
-        hash = md5_hash_file(orig_full_path)
-        target_name = f"{hash}-{last_write_path}"
-        os.rename(orig_full_path, os.path.join(self._write_dirname, target_name))
-        return hash
 
     @contextlib.contextmanager
     def open(self, path, binary=False):
@@ -228,12 +223,12 @@ class LocalArtifact(artifact_base.Artifact):
             os.rename(temp_path, link_name)
 
 
-class LocalArtifactRef(ref_artifact.ArtifactRef):
+class LocalArtifactRef(artifact_fs.FilesystemArtifactRef):
     FileType = types.FileType
 
     artifact: LocalArtifact
 
-    def versions(self) -> list[ref_artifact.ArtifactRef]:
+    def versions(self) -> list[artifact_fs.FilesystemArtifactRef]:
         artifact_path = os.path.join(
             artifact_util.local_artifact_dir(), self.artifact.name
         )

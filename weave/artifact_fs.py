@@ -1,33 +1,76 @@
+import contextlib
 import typing
 import json
+import datetime
 
-from . import weave_types as types
-from . import ref_base
 from . import artifact_base
+from . import ref_base
+from . import ref_util
+from . import weave_types as types
 from . import uris
 from . import errors
 
 
-class ArtifactRef(ref_base.Ref):
+class FilesystemArtifact(artifact_base.Artifact):
+    RefClass: typing.ClassVar[typing.Type["FilesystemArtifactRef"]]
+    name: str
+
+    def set(
+        self, key: str, type_: types.Type, obj: typing.Any
+    ) -> artifact_base.ArtifactRef:
+        ref_extra = type_.save_instance(obj, self, key)
+        # If save_instance returned a Ref, return that directly.
+        # TODO: refactor
+        if isinstance(ref_extra, ref_base.Ref):
+            return ref_extra
+        with self.new_file(f"{key}.type.json") as f:
+            json.dump(type_.to_dict(), f)
+        return self.RefClass(self, path=key, type=type_, obj=obj, extra=ref_extra)
+
+    def get(self, key: str, type_: types.Type) -> typing.Any:
+        return self.ref_from_local_str(key, type_).get()
+
+    @property
+    def is_saved(self) -> bool:
+        raise NotImplementedError
+
+    @contextlib.contextmanager
+    def open(
+        self, path: str, binary: bool = False
+    ) -> typing.Generator[typing.IO, None, None]:
+        raise NotImplementedError
+
+    @contextlib.contextmanager
+    def new_file(
+        self, path: str, binary: bool = False
+    ) -> typing.Generator[typing.IO, None, None]:
+        raise NotImplementedError
+
+    def ref_from_local_str(self, s: str, type: "types.Type") -> "FilesystemArtifactRef":
+        path, extra = ref_util.parse_local_ref_str(s)
+        return self.RefClass(self, path=path, extra=extra, type=type)
+
+    @property
+    def created_at(self) -> datetime.datetime:
+        raise NotImplementedError
+
+    @property
+    def version(self) -> str:
+        raise NotImplementedError
+
+    @property
+    def location(self) -> uris.WeaveURI:
+        raise NotImplementedError
+
+
+class FilesystemArtifactRef(artifact_base.ArtifactRef):
     FileType: typing.ClassVar[typing.Type[types.Type]]
 
-    artifact: artifact_base.Artifact
+    artifact: FilesystemArtifact
     path: typing.Optional[str]
 
-    def __init__(
-        self,
-        artifact: artifact_base.Artifact,
-        path: typing.Optional[str],
-        type: typing.Optional[types.Type] = None,
-        obj: typing.Optional[typing.Any] = None,
-        extra: typing.Optional[list[str]] = None,
-    ):
-        super().__init__(obj=obj, type=type, extra=extra)
-        self.artifact = artifact
-        self.path = path
-
     @classmethod
-    def from_uri(cls, uri: uris.WeaveURI) -> "ArtifactRef":
+    def from_uri(cls, uri: uris.WeaveURI) -> "FilesystemArtifactRef":
         raise NotImplementedError
 
     def __repr__(self) -> str:
@@ -38,7 +81,7 @@ class ArtifactRef(ref_base.Ref):
         return self.artifact.is_saved
 
     @property
-    def created_at(self) -> str:
+    def created_at(self) -> datetime.datetime:
         return self.artifact.created_at
 
     @property
@@ -73,7 +116,7 @@ class ArtifactRef(ref_base.Ref):
         uri.file = self.path
         return uri.uri
 
-    def versions(self) -> list["ArtifactRef"]:
+    def versions(self) -> list["FilesystemArtifactRef"]:
         raise NotImplementedError
 
     def _get(self) -> typing.Any:

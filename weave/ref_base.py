@@ -3,7 +3,6 @@ import weakref
 
 from . import uris
 from . import box
-from . import errors
 
 # We store Refs here if we can't attach them directly to the object
 REFS: weakref.WeakValueDictionary[int, "Ref"] = weakref.WeakValueDictionary()
@@ -23,12 +22,12 @@ class Ref:
         type: typing.Optional["types.Type"] = None,
         extra: typing.Optional[list[str]] = None,
     ):
-        self._obj = obj
-        if obj is not None:
-            obj = box.box(obj)
-            put_ref(obj, self)
         self._type = type
         self.extra = extra
+        if obj is not None and type is not None and type.name != "tagged":
+            obj = box.box(obj)
+            _put_ref(obj, self)
+        self._obj = obj
 
     @property
     def obj(self) -> typing.Any:
@@ -36,7 +35,8 @@ class Ref:
             return self._obj
         obj = self._get()
         obj = box.box(obj)
-        put_ref(obj, self)
+        if self.type.name != "tagged":
+            _put_ref(obj, self)
         self._obj = obj
         return obj
 
@@ -79,7 +79,12 @@ def get_ref(obj: typing.Any) -> typing.Optional[Ref]:
     return None
 
 
-def put_ref(obj: typing.Any, ref: Ref) -> None:
+# TODO: this cannot be used on tagged objects, since we don't know
+# whether obj is intended to be the tagged or untagged version
+# So for now we never call it on tagged objects. But this probably
+# breaks some behaviors (like automatic cross-artifact references
+# for tagged objects)
+def _put_ref(obj: typing.Any, ref: Ref) -> None:
     try:
         obj._ref = ref
     except AttributeError:

@@ -9,6 +9,7 @@ from . import errors
 from . import runs_local
 from . import ref_base
 from . import op_def
+from . import util
 
 
 def _value_id(val):
@@ -44,6 +45,28 @@ def make_run_id(op_def: op_def.OpDef, inputs_refs: Mapping[str, typing.Any]) -> 
     return "%s-%s" % (op_def.simple_name, hash.hexdigest())
 
 
+# This wraps object that can't be serialized in the Ref interface,
+# which is what the execute engine expects.
+class _MemRef(ref_base.Ref):
+    _name: str
+
+    def __init__(
+        self,
+        name: str,
+        obj: typing.Optional[typing.Any] = None,
+    ):
+        super().__init__(obj=obj)
+        self._name = name
+        # We do not actually use this for lookups
+        self._id = f"_MemRef-{self._name}-{util.rand_string_n(12)}"
+
+    # We do not actually use this for lookups, but its required by the
+    # Ref Interface.
+    @property
+    def uri(self) -> str:
+        return self._id
+
+
 class TraceLocal:
     @classmethod
     def _run_artifact_name(cls, run_id: str) -> str:
@@ -77,8 +100,11 @@ class TraceLocal:
             # Not everything can be serialized currently. But instead of storing
             # the result directly here, we save a MemRef with the same run_artifact_name.
             # This is required to make downstream run_ids path dependent.
+
+            # This only happens for the Types in sql.py! We should fix that and then get rid of this
+            # branch.
             if name is None:
                 raise errors.WeaveInternalError(
                     "TraceLocal.save_object requires a non-null name"
                 )
-            return storage.save_mem(obj, name=name)
+            return _MemRef(name, obj=obj)

@@ -31,12 +31,11 @@ import typing
 import functools
 
 from ... import artifact_base
+from ... import artifact_fs
 from ... import box
 from ... import weave_types as types
 from ... import mappers_python
 from ... import errors
-from ... import ref_base
-from ... import ref_mem
 from ... import mappers
 
 from . import tag_store
@@ -128,7 +127,7 @@ class TaggedValueType(types.Type):
         return {"tag": self.tag.to_dict(), "value": self.value.to_dict()}
 
     def save_instance(
-        self, obj: types.Any, artifact: artifact_base.Artifact, name: str
+        self, obj: types.Any, artifact: artifact_fs.FilesystemArtifact, name: str
     ) -> None:
         serializer = mappers_python.map_to_python(self, artifact)
 
@@ -138,7 +137,7 @@ class TaggedValueType(types.Type):
 
     def load_instance(
         self,
-        artifact: artifact_base.Artifact,
+        artifact: artifact_fs.FilesystemArtifact,
         name: str,
         extra: typing.Optional[list[str]] = None,
     ) -> typing.Any:
@@ -180,20 +179,6 @@ class TaggedValueToPy(TaggedValueMapper):
 
 class TaggedValueFromPy(TaggedValueMapper):
     def apply(self, obj: dict) -> typing.Any:
-        # If the value is a string, but the type is not, then we assume it is a reference.
-        # In this case, we should follow the reference before deserializing the value.
-        # We only want to use that target reference if the value is actually the true value
-        if isinstance(obj["_value"], str) and not self.type.value.assign_type(
-            types.String()
-        ):
-            try:
-                ref = ref_base.Ref.from_str(obj["_value"])
-                # TODO: why this logic?
-                if not isinstance(ref, ref_mem.MemRef) and ref.type == self.type:
-                    return ref.get()
-            except (errors.WeaveInvalidURIError, errors.WeaveStorageError):
-                # This would indicate that the value is not a reference.
-                pass
         value = self._value_serializer.apply(obj["_value"])
         tags = self._tag_serializer.apply(obj["_tag"])
         value = box.box(value)

@@ -1,12 +1,10 @@
-import pyarrow as pa
 import os
-import json
 import typing
 import pathlib
 
 from . import errors
 from . import ref_base
-from . import ref_mem
+from . import artifact_mem
 from . import artifact_local
 from . import artifact_wandb
 from . import artifact_util
@@ -25,50 +23,6 @@ def split_path_dotfile(path, dotfile_name):
         if os.path.exists(os.path.join(path, dotfile_name)):
             return path, tail
     raise FileNotFoundError
-
-
-def save_to_artifact(obj, artifact: artifact_local.LocalArtifact, name, type_):
-    # print("SAVE TO ARTIFACT", obj, artifact, name, type_)
-    # Tell types what name to use if not obj
-    # We need to fix the save/load API so this is unnecessary.
-    # This is also necessary to prevent saving the same obj at different
-    # key paths (as the Default mappers try to do now). That breaks saving
-    # references in new objects currently. Will be fixed when we make saving
-    # references to existing artifacts work.
-    # TODO: Fix
-    # DO NOT MERGE
-    if name != "_obj":
-        name = type_.name
-    ref_extra = type_.save_instance(obj, artifact, name)
-    # If save_instance returned a Ref, return that directly.
-    # TODO: refactor
-    if isinstance(ref_extra, ref_base.Ref):
-        return ref_extra
-    if name != "_obj":
-        # Warning: This is hacks to force files to be content addressed
-        # If the type saved a file, rename with its content hash included
-        #     in its name.
-        # TODO: fix
-        # DO NOT MERGE
-        hash = artifact.make_last_file_content_addressed()
-        if hash is not None:
-            name = f"{hash}-{name}"
-    with artifact.new_file(f"{name}.type.json") as f:
-        json.dump(type_.to_dict(), f)
-        artifact._last_write_path = None
-    # TODO: return ObjectRootRef (ArtifactRootRef?) here
-    return artifact_local.LocalArtifactRef(
-        artifact, path=name, type=type_, obj=obj, extra=ref_extra
-    )
-    # Jason's code does this, however, we can't do that, since save_to_artifact()
-    # needs to return an artifact local ref (the artifact is not yet saved at this
-    # point).
-    # ref_cls = (
-    #     refs.WandbArtifactRef
-    #     if isinstance(artifact, artifacts_local.WandbArtifact)
-    #     else refs.LocalArtifactRef
-    # )
-    # return ref_cls(artifact, path=name, type=type_, obj=obj, extra=ref_extra)
 
 
 def _get_name(wb_type: types.Type, obj: typing.Any) -> str:
@@ -106,8 +60,7 @@ def _save_or_publish(obj, name=None, type=None, publish: bool = False, artifact=
             artifact = artifact_wandb.WandbArtifact(name, type=wb_type.name)
         else:
             artifact = artifact_local.LocalArtifact(name)
-    artifact.mapper = mappers_python.map_to_python(wb_type, artifact)
-    ref = save_to_artifact(obj, artifact, "_obj", wb_type)
+    ref = artifact.set("_obj", wb_type, obj)
 
     # Only save if we have a ref into the artifact we created above. Otherwise
     #     nothing new was created, so just return the existing ref.
@@ -116,7 +69,6 @@ def _save_or_publish(obj, name=None, type=None, publish: bool = False, artifact=
             artifact.save(project)
         else:
             artifact.save()
-        ref_base.put_ref(obj, ref)
 
     return ref
 
@@ -124,9 +76,6 @@ def _save_or_publish(obj, name=None, type=None, publish: bool = False, artifact=
 def publish(obj, name=None, type=None):
     # TODO: should we only expose save for our API with a "remote" flag or something
     return _save_or_publish(obj, name, type, True)
-
-
-save_mem = ref_mem.save_mem
 
 
 def save(obj, name=None, type=None, artifact=None) -> artifact_local.LocalArtifactRef:
@@ -224,9 +173,10 @@ def to_python(obj, wb_type=None):
 
     if wb_type is None:
         wb_type = types.TypeRegistry.type_of(obj)
-    mapper = mappers_python.map_to_python(
-        wb_type, artifact_local.LocalArtifact(_get_name(wb_type, obj))
-    )
+    # Note, we use ArtifactMem here, which means the serialized object
+    # may have refs to non-saved objects.
+    # TODO: need to revisit this as we start to use custom objects.
+    mapper = mappers_python.map_to_python(wb_type, artifact_mem.MemArtifact())
     val = mapper.apply(obj)
     # TODO: this should be a ConstNode!
     return {"_type": wb_type.to_dict(), "_val": val}
@@ -235,8 +185,6 @@ def to_python(obj, wb_type=None):
 def from_python(obj, wb_type=None):
     if wb_type is None:
         wb_type = types.TypeRegistry.type_from_dict(obj["_type"])
-    mapper = mappers_python.map_from_python(
-        wb_type, artifact_local.LocalArtifact(_get_name(wb_type, obj))
-    )
+    mapper = mappers_python.map_from_python(wb_type, None)
     res = mapper.apply(obj["_val"])
     return res

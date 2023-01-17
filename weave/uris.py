@@ -102,3 +102,20 @@ class WeaveURI:
 
     def to_ref(self) -> "ref_base.Ref":
         raise NotImplementedError
+
+
+# Used when the Weave object is constructed at runtime (eg. weave-builtins or user-defined objects)
+class WeaveRuntimeURI(WeaveURI):
+    scheme = ""
+
+    def __init__(self, uri: str):
+        super().__init__(uri)
+        parts = self.path.split(":", 1)
+        self._full_name = parts[0]
+        if len(parts) == 2:
+            self._version = parts[1]
+        else:
+            self._version = None
+
+    def __repr__(self) -> str:
+        return f"<RuntimeURI({self.uri})>"

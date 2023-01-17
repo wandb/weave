@@ -9,6 +9,7 @@ py_type = type
 from .. import mappers_python
 from .. import weave_types as types
 from .. import errors
+from .. import artifact_fs
 
 
 def arrow_type_to_weave_type(pa_type: pa.DataType) -> types.Type:
@@ -260,7 +261,7 @@ class ArrowWeaveListType(types.Type):
             # super().save_instance(obj, artifact, name)
             # return
             arrow_data = rewrite_weavelist_refs(
-                obj._arrow_data, obj.object_type, obj._artifact
+                obj._arrow_data, obj.object_type, obj._artifact, artifact
             )
 
         d = {"_arrow_data": arrow_data, "object_type": obj.object_type}
@@ -280,7 +281,9 @@ class ArrowWeaveListType(types.Type):
         with artifact.new_file(f"{name}.ArrowWeaveList.json") as f:
             json.dump(result_d, f)
 
-    def load_instance(self, artifact, name, extra=None):
+    def load_instance(
+        self, artifact: artifact_fs.FilesystemArtifact, name: str, extra=None
+    ):
         with artifact.open(f"{name}.ArrowWeaveList.json") as f:
             result = json.load(f)
         type_of_d = types.TypedDict(
@@ -290,28 +293,32 @@ class ArrowWeaveListType(types.Type):
             }
         )
         if hasattr(self, "_key"):
-            type_of_d.property_types["_key"] = self._key
+            type_of_d.property_types["_key"] = self._key  # type: ignore
 
         mapper = mappers_python.map_from_python(type_of_d, artifact)
         res = mapper.apply(result)
-        return self.instance_class(artifact=artifact, **res)
+        return self.instance_class(artifact=artifact, **res)  # type: ignore
 
 
-def rewrite_weavelist_refs(arrow_data, object_type, artifact):
+def rewrite_weavelist_refs(arrow_data, object_type, source_artifact, target_artifact):
     if _object_type_has_props(object_type):
         prop_types = _object_type_prop_types(object_type)
         if isinstance(arrow_data, pa.Table):
             arrays = {}
             for col_name, col_type in prop_types.items():
                 column = arrow_data[col_name]
-                arrays[col_name] = rewrite_weavelist_refs(column, col_type, artifact)
+                arrays[col_name] = rewrite_weavelist_refs(
+                    column, col_type, source_artifact, target_artifact
+                )
             return pa.table(arrays)
         elif isinstance(arrow_data, pa.ChunkedArray):
             arrays = {}
             unchunked = arrow_data.combine_chunks()
             for col_name, col_type in prop_types.items():
                 column = unchunked.field(col_name)
-                arrays[col_name] = rewrite_weavelist_refs(column, col_type, artifact)
+                arrays[col_name] = rewrite_weavelist_refs(
+                    column, col_type, source_artifact, target_artifact
+                )
             return pa.StructArray.from_arrays(
                 arrays.values(), names=arrays.keys(), mask=pa.compute.is_null(unchunked)
             )
@@ -319,7 +326,9 @@ def rewrite_weavelist_refs(arrow_data, object_type, artifact):
             arrays = {}
             for col_name, col_type in prop_types.items():
                 column = arrow_data.field(col_name)
-                arrays[col_name] = rewrite_weavelist_refs(column, col_type, artifact)
+                arrays[col_name] = rewrite_weavelist_refs(
+                    column, col_type, source_artifact, target_artifact
+                )
             return pa.StructArray.from_arrays(
                 arrays.values(),
                 names=arrays.keys(),
@@ -345,36 +354,47 @@ def rewrite_weavelist_refs(arrow_data, object_type, artifact):
                     non_none_members[i]
                     if not nullable
                     else types.UnionType(types.NoneType(), non_none_members[i]),
-                    artifact,
+                    source_artifact,
+                    target_artifact,
                 )
                 arrays.append(rewritten)
             return pa.UnionArray.from_sparse(arrow_data.type_codes, arrays)
-        return rewrite_weavelist_refs(arrow_data, types.non_none(object_type), artifact)
+        return rewrite_weavelist_refs(
+            arrow_data, types.non_none(object_type), source_artifact, target_artifact
+        )
     elif _object_type_is_basic(object_type):
         return arrow_data
     elif isinstance(object_type, types.List):
         # This is a bit unfortunate that we have to loop through all the items - would be nice to do a direct memory replacement.
-        return pa.array(_rewrite_pyliteral_refs(item.as_py(), object_type, artifact) for item in arrow_data)  # type: ignore
+        return pa.array(_rewrite_pyliteral_refs(item.as_py(), object_type, source_artifact, target_artifact) for item in arrow_data)  # type: ignore
 
     else:
+        from . import storage
+
         # We have a column of refs
         new_refs = []
         for ref_str in arrow_data:
             ref_str = ref_str.as_py()
             new_refs.append(
-                _rewrite_ref_entry(ref_str, object_type, artifact)
+                _rewrite_ref_for_save(
+                    ref_str, object_type, source_artifact, target_artifact
+                )
                 if ref_str is not None
                 else None
             )
         return pa.array(new_refs)
 
 
-def _rewrite_pyliteral_refs(pyliteral_data, object_type, artifact):
+def _rewrite_pyliteral_refs(
+    pyliteral_data, object_type, source_artifact, target_artifact
+):
     if _object_type_has_props(object_type):
         prop_types = _object_type_prop_types(object_type)
         if isinstance(pyliteral_data, dict):
             return {
-                key: _rewrite_pyliteral_refs(pyliteral_data[key], value, artifact)
+                key: _rewrite_pyliteral_refs(
+                    pyliteral_data[key], value, source_artifact, target_artifact
+                )
                 for key, value in prop_types.items()
             }
         else:
@@ -388,21 +408,28 @@ def _rewrite_pyliteral_refs(pyliteral_data, object_type, artifact):
                 "Unions not fully supported yet in Weave arrow"
             )
         return _rewrite_pyliteral_refs(
-            pyliteral_data, types.non_none(object_type), artifact
+            pyliteral_data,
+            types.non_none(object_type),
+            source_artifact,
+            target_artifact,
         )
     elif _object_type_is_basic(object_type):
         return pyliteral_data
     elif isinstance(object_type, types.List):
         return (
             [
-                _rewrite_pyliteral_refs(item, object_type.object_type, artifact)
+                _rewrite_pyliteral_refs(
+                    item, object_type.object_type, source_artifact, target_artifact
+                )
                 for item in pyliteral_data
             ]
             if pyliteral_data is not None
             else None
         )
     else:
-        return _rewrite_ref_entry(pyliteral_data, object_type, artifact)
+        return _rewrite_ref_for_save(
+            pyliteral_data, object_type, source_artifact, target_artifact
+        )
 
 
 def _object_type_has_props(object_type):
@@ -437,8 +464,19 @@ def _object_type_is_basic(object_type):
     )
 
 
-def _rewrite_ref_entry(entry: str, object_type, artifact):
+def _rewrite_ref_for_save(entry: str, object_type, source_artifact, target_artifact):
+    # TODO: This should be simpler. We take a ref string, which may be absolute or
+    # relative, and want to ensure the object is referencable from the target_artifact.
+    # This function should be written in those terms.
     if ":" in entry:
+        # Already a URI
         return entry
-    else:
-        return str(artifact.ref_from_local_str(entry, object_type).uri)
+
+    if isinstance(source_artifact, artifact_fs.FilesystemArtifact):
+        # Our source is an artifact, construct a full URI.
+        return str(source_artifact.ref_from_local_str(entry, object_type).uri)
+
+    # Source is ObjLookupMem, save to the artifact
+    return target_artifact.set(
+        entry, object_type, source_artifact.get(entry, object_type)
+    ).local_ref_str()

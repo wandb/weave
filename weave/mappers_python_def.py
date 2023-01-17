@@ -13,6 +13,7 @@ from . import errors
 from . import box
 from . import mappers_python
 from . import val_const
+from . import util
 from .timestamp import tz_aware_dt
 from .language_features.tagging import tagged_value_type
 
@@ -179,7 +180,10 @@ class UnknownToPyUnknown(mappers.Mapper):
 
 class RefToPyRef(mappers_weave.RefMapper):
     def apply(self, obj):
-        return obj.uri
+        try:
+            return obj.uri
+        except NotImplementedError:
+            raise errors.WeaveSerializeError('Cannot serialize ref "%s"' % obj)
 
 
 class PyRefToRef(mappers_weave.RefMapper):
@@ -210,25 +214,25 @@ class DefaultToPy(mappers.Mapper):
         self.type = type_
         self._artifact = artifact
         self._path = path
+        self._row_id = 0
 
     def apply(self, obj):
         try:
             return self.type.instance_to_dict(obj)
         except NotImplementedError:
             pass
+        # If the ref exists elsewhere, just return its uri.
+        # TODO: This doesn't deal with MemArtifactRef!
         existing_ref = storage._get_ref(obj)
         if existing_ref:
             if existing_ref.is_saved:
-                # TODO: should we assert type compatibility here or are they
-                #     guaranteed to be equal already?
                 return existing_ref.uri
-            elif existing_ref.artifact != self._artifact:
-                raise errors.WeaveInternalError(
-                    "Can't save cross-artifact reference to unsaved artifact. This error was triggered when saving obj %s of type: %s"
-                    % (obj, self.type)
-                )
-        name = "-".join(self._path)
-        ref = storage.save_to_artifact(obj, self._artifact, name, self.type)
+
+        # This defines the artifact layout!
+        name = "/".join(self._path + [str(self._row_id)])
+        self._row_id += 1
+
+        ref = self._artifact.set(name, self.type, obj)
         if ref.artifact == self._artifact:
             return ref.local_ref_str()
         else:
@@ -255,7 +259,7 @@ class DefaultFromPy(mappers.Mapper):
             # file through an op, and therefore we know the type?
             ref._type = self.type
             return ref.get()
-        return self._artifact.ref_from_local_str(obj, self.type).get()
+        return self._artifact.get(obj, self.type)
 
 
 py_type = type

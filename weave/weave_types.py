@@ -11,10 +11,10 @@ from . import errors
 from . import mappers_python
 from .timestamp import tz_aware_dt
 
-from .artifact_base import Artifact
 
 if typing.TYPE_CHECKING:
-    from .refs import Ref
+    from .artifact_fs import FilesystemArtifact
+    from . import artifact_base
 
 
 def to_weavejs_typekey(k: str) -> str:
@@ -331,7 +331,7 @@ class Type(metaclass=_TypeSubclassWatcher):
 
     def save_instance(
         self, obj, artifact, name
-    ) -> typing.Optional[typing.Union[list[str], "Ref"]]:
+    ) -> typing.Optional[typing.Union[list[str], "artifact_base.ArtifactRef"]]:
         d = None
         try:
             d = self.instance_to_dict(obj)
@@ -347,7 +347,10 @@ class Type(metaclass=_TypeSubclassWatcher):
         return None
 
     def load_instance(
-        self, artifact: "Artifact", name: str, extra: typing.Optional[list[str]] = None
+        self,
+        artifact: "FilesystemArtifact",
+        name: str,
+        extra: typing.Optional[list[str]] = None,
     ) -> typing.Any:
         with artifact.open(f"{name}.object.json") as f:
             d = json.load(f)

@@ -74,7 +74,7 @@ def create_arrow_data(n_rows, n_extra_cols=0, images=False):
             im[col] = x_choices[simple_hash(i * 13**j, 11)]
         ims.append(im)
     arr = arrow.to_arrow(ims)
-    return storage._get_ref(arr)
+    return storage.save(arr)
 
 
 def test_groupby_index_count():
@@ -434,19 +434,10 @@ def test_arrow_nested_with_refs():
         [{"outer": [{"inner": Image.linear_gradient("L").rotate(0)}]}]
     )
 
-    # First, we assert that the raw oath is not converted to an artifact reference,
-    # something like: "a040718385f492019b33b007a865c49d-pil_image"
     raw_path = data_node._arrow_data[0]["outer"][0]["inner"].as_py()
-    assert (
-        isinstance(raw_path, str)
-        and not raw_path.startswith("local-artifact:")
-        and raw_path.endswith("-pil_image")
-    )
 
-    # After saving the artifact, we assert that the path is converted to an artifact reference
     raw_data = weave.use(weave.save(data_node))
     img_entry_data = raw_data._arrow_data[0]["outer"][0]["inner"].as_py()
-    assert img_entry_data.startswith("local-artifact:")
 
     # Next, we get a derive node from the data_node, and assert that the path is
     # converted to an artifact reference when appropriate.

@@ -17,8 +17,8 @@ from .. import errors
 from .. import registry_mem
 from .. import mappers_arrow
 from .. import mappers_python_def
+from .. import artifact_mem
 from .. import op_def
-from .. import artifact_local
 from .. import storage
 from .. import dispatch
 from .. import weave_internal
@@ -339,6 +339,21 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
     _arrow_data: typing.Union[pa.Table, pa.ChunkedArray, pa.Array]
     object_type: types.Type
 
+    # TODO: Refactor to disable None artifact? (Only used in tests)
+    def __init__(
+        self,
+        _arrow_data,
+        object_type=None,
+        artifact: typing.Optional[artifact_base.Artifact] = None,
+    ) -> None:
+        self._arrow_data = _arrow_data
+        self.object_type = object_type
+        if self.object_type is None:
+            self.object_type = types.TypeRegistry.type_of(self._arrow_data).object_type
+        self._artifact = artifact
+        self._mapper = mappers_arrow.map_from_arrow(self.object_type, self._artifact)
+        # TODO: construct mapper
+
     def _arrow_data_asarray_no_tags(self) -> pa.Array:
         """Cast `self._arrow_data` as an array and recursively strip its tags."""
 
@@ -447,16 +462,6 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         if isinstance(self, graph.Node):
             return []
         return self._arrow_data.to_pylist()
-
-    # TODO: Refactor to disable None artifact? (Only used in tests)
-    def __init__(self, _arrow_data, object_type=None, artifact=None) -> None:
-        self._arrow_data = _arrow_data
-        self.object_type = object_type
-        if self.object_type is None:
-            self.object_type = types.TypeRegistry.type_of(self._arrow_data).object_type
-        self._artifact = artifact
-        self._mapper = mappers_arrow.map_from_arrow(self.object_type, self._artifact)
-        # TODO: construct mapper
 
     @op(output_type=lambda input_types: types.List(input_types["self"].object_type))
     def to_py(self):
@@ -1654,7 +1659,9 @@ def recursively_build_pyarrow_array(
 # This will be a faster version fo to_arrow (below). Its
 # used in op file-table, to convert from a wandb Table to Weave
 # (that code is very experimental and not totally working yet)
-def to_arrow_from_list_and_artifact(obj, object_type, artifact):
+def to_arrow_from_list_and_artifact(
+    obj: typing.Any, object_type: types.Type, artifact: artifact_base.Artifact
+) -> ArrowWeaveList:
     # Get what the parquet type will be.
     merged_object_type = recursively_merge_union_types_if_they_are_unions_of_structs(
         object_type
@@ -1665,15 +1672,13 @@ def to_arrow_from_list_and_artifact(obj, object_type, artifact):
     arrow_obj = recursively_build_pyarrow_array(
         obj, pyarrow_type, mapper, py_objs_already_mapped=True
     )
-    weave_obj = ArrowWeaveList(arrow_obj, merged_object_type, artifact)
-
-    return weave_obj
+    return ArrowWeaveList(arrow_obj, merged_object_type, artifact)
 
 
 def to_arrow(obj, wb_type=None):
     if wb_type is None:
         wb_type = types.TypeRegistry.type_of(obj)
-    artifact = artifact_local.LocalArtifact("to-arrow-%s" % wb_type.name)
+    artifact = artifact_mem.MemArtifact()
     outer_tags: typing.Optional[dict[str, typing.Any]] = None
     if isinstance(wb_type, tagged_value_type.TaggedValueType):
         outer_tags = tag_store.get_tags(obj)
@@ -1688,20 +1693,16 @@ def to_arrow(obj, wb_type=None):
         # Convert to arrow, serializing Custom objects to the artifact
         mapper = mappers_arrow.map_to_arrow(merged_object_type, artifact)
         pyarrow_type = arrow_util.arrow_type(mapper.result_type())
-        # py_objs = (mapper.apply(o) for o in obj)
-        # TODO: do I need this branch? Does it work now?
-        # if isinstance(wb_type.object_type, types.ObjectType):
-        #     arrow_obj = pa.array(py_objs, pyarrow_type)
 
         arrow_obj = recursively_build_pyarrow_array(obj, pyarrow_type, mapper)
         weave_obj = ArrowWeaveList(arrow_obj, merged_object_type, artifact)
 
         # Save the weave object to the artifact
-        ref = storage.save(weave_obj, artifact=artifact)
+        # ref = storage.save(weave_obj, artifact=artifact)
         if outer_tags is not None:
-            tag_store.add_tags(ref.obj, outer_tags)
+            tag_store.add_tags(weave_obj, outer_tags)
 
-        return ref.obj
+        return weave_obj
 
     raise errors.WeaveInternalError("to_arrow not implemented for: %s" % obj)
 
