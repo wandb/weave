@@ -64,6 +64,13 @@ gql_prop_op(
     types.Dict(types.String(), types.Any()),
 )
 
+gql_prop_op(
+    "run-runtime",
+    wdt.RunType,
+    "computeSeconds",
+    types.Number(),
+)
+
 
 @op(
     render_info={"type": "function"},
