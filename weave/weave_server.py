@@ -33,8 +33,8 @@ from weave import engine_trace
 from weave import environment
 from weave import logs
 
-PROFILE_DIR = "/tmp/weave/profile"
-# PROFILE_DIR = None
+# PROFILE_DIR = "/tmp/weave/profile"
+PROFILE_DIR = None
 if PROFILE_DIR is not None:
     pathlib.Path(PROFILE_DIR).mkdir(parents=True, exist_ok=True)
 
