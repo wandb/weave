@@ -17,7 +17,10 @@ def raise_exception_with_sentry_if_available(
     else:
         with sentry_sdk.push_scope() as scope:
             scope.fingerprint = fingerprint
-            sentry_sdk.capture_exception(err)
+            # I (Tim) don't think we need to explicitly capture the exception
+            # here, since we're raising it anyway. Explicitly capturing it
+            # ends dropping the stack trace in Sentry.
+            # sentry_sdk.capture_exception(err)
             raise err
 
 
