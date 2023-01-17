@@ -7,6 +7,7 @@ from .. import stitch
 from ..language_features.tagging import make_tag_getter_op
 from .. import compile_table
 from weave import context_state as _context
+from .. import weave_internal
 
 _loading_builtins_token = _context.set_loading_built_ins()
 
@@ -94,10 +95,10 @@ def test_lambda_using_externally_defined_node():
     assert len(calls) == 3
     assert calls[0].node.from_op.name == "mapped_typedDict-pick"
     assert calls[0].inputs[1].val == "b"
-    assert calls[1].node.from_op.name == "typedDict-pick"
-    assert calls[1].inputs[1].val == "a"
-    assert calls[2].node.from_op.name == "list-__getitem__"
-    assert calls[2].inputs[1].val == 0
+    assert calls[1].node.from_op.name == "list-__getitem__"
+    assert calls[1].inputs[1].val == 0
+    assert calls[2].node.from_op.name == "typedDict-pick"
+    assert calls[2].inputs[1].val == "a"
 
 
 def test_tag_access_in_filter_expr():
@@ -152,3 +153,57 @@ def test_zero_arg_ops():
     assert len(obj_recorder.calls) == 2
     assert obj_recorder.calls[0].node.from_op.name == "_TestPlanObject-name"
     assert obj_recorder.calls[1].node.from_op.name == "mapped__TestPlanObject-name"
+
+
+def test_shared_fn_node():
+    const_list_node = weave.ops.make_list(a=1, b=2)
+    indexed_node = const_list_node[0]
+    arr_1_node = weave.ops.make_list(a=1, b=2, c=3)
+    arr_2_node = weave.ops.make_list(a=10, b=20, c=30)
+
+    mapped_1_node = arr_1_node.map(
+        lambda row: weave.ops.dict_(item=row, const=indexed_node)
+    )
+    mapped_2_node = arr_2_node.map(
+        lambda row: weave.ops.dict_(item=row, const=indexed_node)
+    )
+
+    mapped_1_item_node = mapped_1_node["item"]
+    mapped_1_const_node = mapped_1_node["const"]
+    mapped_2_item_node = mapped_2_node["item"]
+    mapped_2_const_node = mapped_2_node["const"]
+
+    mapped_2_item_add_node = mapped_2_item_node + 100
+    mapped_2_const_add_node = mapped_2_const_node + 100
+
+    list_of_list_node = weave.ops.make_list(
+        a=mapped_1_item_node,
+        b=mapped_1_const_node,
+        c=mapped_2_item_add_node,
+        d=mapped_2_const_add_node,
+    )
+    concat_node = list_of_list_node.concat()
+    sum_node = concat_node.sum()
+
+    p = stitch.stitch([sum_node])
+
+    def assert_node_calls(node, expected_call_names):
+        found_calls = set([c.node.from_op.name for c in p.get_result(node).calls])
+        expected_calls = set(expected_call_names)
+        assert found_calls == expected_calls
+
+    assert_node_calls(const_list_node, ["list-__getitem__"])
+    assert_node_calls(indexed_node, ["list", "mapped_number-add"])
+    assert_node_calls(arr_1_node, ["list"])
+    assert_node_calls(arr_2_node, ["mapped_number-add"])
+    assert_node_calls(mapped_1_node, [])
+    assert_node_calls(mapped_2_node, [])
+    assert_node_calls(mapped_1_item_node, ["list"])
+    assert_node_calls(mapped_1_const_node, ["list", "mapped_number-add"])
+    assert_node_calls(mapped_2_item_node, ["mapped_number-add"])
+    assert_node_calls(mapped_2_const_node, ["list", "mapped_number-add"])
+    assert_node_calls(mapped_2_item_add_node, ["list"])
+    assert_node_calls(mapped_2_const_add_node, ["list"])
+    assert_node_calls(list_of_list_node, ["concat"])
+    assert_node_calls(concat_node, ["numbers-sum"])
+    assert_node_calls(sum_node, [])

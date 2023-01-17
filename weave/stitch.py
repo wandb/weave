@@ -67,51 +67,31 @@ class LiteralListObjectRecorder(ObjectRecorder):
 class StitchedGraph:
     _node_map: typing.Dict[graph.Node, ObjectRecorder]
 
+    def has_result(self, node: graph.Node) -> bool:
+        return node in self._node_map
+
     def get_result(self, node: graph.Node) -> ObjectRecorder:
         return self._node_map[node]
 
     def add_result(self, node: graph.Node, result: ObjectRecorder) -> None:
         self._node_map[node] = result
 
-    def _merge_result(self, node: graph.Node, result: ObjectRecorder) -> None:
-        # Performs an in-place merge of the node result into the stitched graph.
-        curr_result = self._node_map[node]
-        if curr_result.val != result.val:
-            raise errors.WeaveStitchGraphMergeError(
-                f"Cannot merge ObjectRecorder with different values: {curr_result.val} and {result.val}"
-            )
-
-        # Merge the calls
-        known_called_nodes = {call.node for call in curr_result.calls}
-        for call in result.calls:
-            if call.node not in known_called_nodes:
-                curr_result.calls.append(call)
-
-        # Merge the tags
-        for tag_name, other_tag_recorder in result.tags.items():
-            if tag_name not in curr_result.tags:
-                if other_tag_recorder.node in self._node_map:
-                    other_tag_recorder = self._node_map[other_tag_recorder.node]
-                else:
-                    self.add_result(other_tag_recorder.node, other_tag_recorder)
-                curr_result.tags[tag_name] = other_tag_recorder
-
-    def add_subgraph_stitch_graph(self, other: "StitchedGraph") -> None:
-        for node, result in other._node_map.items():
-            if node not in self._node_map:
-                self.add_result(node, result)
-            else:
-                self._merge_result(node, result)
-
 
 def stitch(
     leaf_nodes: list[graph.Node],
     var_values: typing.Optional[dict[str, ObjectRecorder]] = None,
+    stitched_graph: typing.Optional[StitchedGraph] = None,
 ) -> StitchedGraph:
     """Given a list of leaf nodes, stitch the graph together."""
-    sg = StitchedGraph({})
+
+    if stitched_graph is None:
+        sg = StitchedGraph({})
+    else:
+        sg = stitched_graph
 
     def handle_node(node: graph.Node) -> graph.Node:
+        if sg.has_result(node):
+            return node
         if isinstance(node, graph.OutputNode):
             input_dict = {k: sg.get_result(v) for k, v in node.from_op.inputs.items()}
             sg.add_result(node, stitch_node(node, input_dict, sg))
@@ -144,8 +124,7 @@ def stitch(
 def subgraph_stitch(
     function_node: graph.Node, args: dict[str, ObjectRecorder], sg: StitchedGraph
 ) -> ObjectRecorder:
-    result_graph = stitch([function_node], args)
-    sg.add_subgraph_stitch_graph(result_graph)
+    result_graph = stitch([function_node], args, stitched_graph=sg)
     return result_graph.get_result(function_node)
 
 
