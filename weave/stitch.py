@@ -164,6 +164,15 @@ class LiteralDictObjectRecorder(ObjectRecorder):
         }
 
 
+class SetOnceDict(dict):
+    def __setitem__(self, key: str, value: typing.Any) -> None:
+        if key in self:
+            raise errors.WeaveInternalError(
+                f"Programming error: Attempted to set key {key} twice."
+            )
+        super().__setitem__(key, value)
+
+
 @dataclasses.dataclass
 class StitchedGraph:
     """A StitchedGraph is a graph is the primary data structure produced in this module.
@@ -173,7 +182,7 @@ class StitchedGraph:
     # The ObjectRecorder for a Node my not be produced by that node. Therefore, the set of all
     # ObjectRecords is upper bounded by the set of all Nodes.
     _node_to_recorder_map: typing.Dict[graph.Node, ObjectRecorder] = dataclasses.field(
-        default_factory=dict
+        default_factory=SetOnceDict
     )
 
     # `get_recorder_for_node` returns the ObjectRecorder for a given node.
@@ -193,10 +202,6 @@ class StitchedGraph:
     def _set_recorder_for_node(
         self, node: graph.Node, recorder: ObjectRecorder
     ) -> None:
-        if node in self._node_to_recorder_map and not isinstance(node, graph.VarNode):
-            raise errors.WeaveInternalError(
-                f"Programming error: Attempted to set key {node} twice."
-            )
         self._node_to_recorder_map[node] = recorder
 
     def _get_stitched_node_for_node(self, node: graph.OutputNode) -> StitchedOutputNode:
@@ -217,14 +222,8 @@ class StitchedGraph:
                     for k, v in node.from_op.inputs.items()
                 }
                 self._stitch_output_node_with_stitched_inputs(node, input_dict)
-            elif isinstance(node, graph.VarNode):
-                # If it is a var node, then we update it ito the frame value
-                # if it exists, or a dummy recorder
-                if frame and node.name in frame:
-                    self._set_recorder_for_node(node, frame[node.name])
-                else:
-                    # This effectively "clears" the recorder for the var node.
-                    self._set_recorder_for_node(node, ObjectRecorder(node, self))
+            elif isinstance(node, graph.VarNode) and frame and node.name in frame:
+                self._set_recorder_for_node(node, frame[node.name])
             return node
 
         graph.map_nodes_top_level(leaf_nodes, handle_node)
