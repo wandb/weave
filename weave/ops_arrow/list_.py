@@ -1405,12 +1405,14 @@ def vectorize(
                         inputs,
                         manually_map_inputs,
                     )
-                    message = f"Encountered non-dispatchable op ({node.from_op.name}) during vectorization. \
-                        Vectorized inputs are {new_inputs}. This is likely due to vectorization path of the function\
-                            not leading to the first parameter. Bailing out to manual mapping"
-                    util.capture_exception_with_sentry_if_available(
-                        errors.WeaveVectorizationError(message), [node.from_op.name]
-                    )
+                    message = f"Encountered non-dispatchable op ({node.from_op.name}) during vectorization."
+                    message += f"This is likely due to vectorization path of the function not leading to the"
+                    message += f"first parameter. Bailing out to manual mapping"
+                    logging.warning(message)
+                    # Leaving this commented out for now, in case we want to bring it back
+                    # util.capture_exception_with_sentry_if_available(
+                    #     errors.WeaveVectorizationError(message), [node.from_op.name]
+                    # )
                     return res
                 return op.lazy_call(**new_inputs)
 
