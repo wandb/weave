@@ -164,11 +164,11 @@ class LiteralDictObjectRecorder(ObjectRecorder):
         }
 
 
-class SetOnceDict(dict):
-    def __setitem__(self, key: str, value: typing.Any) -> None:
-        if key in self:
+class SetOnceExceptVarNodeDict(dict):
+    def __setitem__(self, key: graph.Node, value: typing.Any) -> None:
+        if key in self and not isinstance(key, graph.VarNode):
             raise errors.WeaveInternalError(
-                f"Programming error: Attempted to set key {key} twice."
+                f"Programming error: Attempted to set non-var node key {key} twice."
             )
         super().__setitem__(key, value)
 
@@ -182,7 +182,7 @@ class StitchedGraph:
     # The ObjectRecorder for a Node my not be produced by that node. Therefore, the set of all
     # ObjectRecords is upper bounded by the set of all Nodes.
     _node_to_recorder_map: typing.Dict[graph.Node, ObjectRecorder] = dataclasses.field(
-        default_factory=SetOnceDict
+        default_factory=SetOnceExceptVarNodeDict
     )
 
     # `get_recorder_for_node` returns the ObjectRecorder for a given node.
