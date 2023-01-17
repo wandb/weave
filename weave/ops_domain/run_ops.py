@@ -30,6 +30,13 @@ gql_prop_op(
     types.String(),
 )
 
+gql_prop_op(
+    "run-jobtype",
+    wdt.RunType,
+    "jobType",
+    types.String(),
+)
+
 run_name = gql_prop_op(
     "run-name",
     wdt.RunType,
