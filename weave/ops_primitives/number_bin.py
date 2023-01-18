@@ -29,7 +29,7 @@ def number_bins_fixed(step):
 
 
 @op(
-    name="numbers-pybinsequal",
+    name="numbers-binsequal",
     input_type={"arr": types.List(types.Number()), "bins": types.Number()},
     output_type=Function(
         input_types={"row": types.Number()}, output_type=NumberBinType  # type: ignore
@@ -44,7 +44,7 @@ def numbers_bins_equal(arr, bins):
 
 
 @op(
-    name="number-pybin",
+    name="number-bin",
     input_type={
         "in_": types.Number(),
         "bin_fn": Function(

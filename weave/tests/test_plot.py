@@ -630,7 +630,7 @@ def test_actual_config_value(fixed_random_seed):
                                     },
                                 },
                                 "fromOp": {
-                                    "name": "number-pybin",
+                                    "name": "number-bin",
                                     "inputs": {
                                         "in_": {
                                             "nodeType": "output",
@@ -771,7 +771,7 @@ def test_actual_config_value(fixed_random_seed):
                                                 },
                                             },
                                             "fromOp": {
-                                                "name": "numbers-pybinsequal",
+                                                "name": "numbers-binsequal",
                                                 "inputs": {
                                                     "arr": {
                                                         "nodeType": "output",
@@ -1257,7 +1257,7 @@ def test_actual_config_value(fixed_random_seed):
                                     },
                                 },
                                 "fromOp": {
-                                    "name": "number-pybin",
+                                    "name": "number-bin",
                                     "inputs": {
                                         "in_": {
                                             "nodeType": "output",
@@ -1398,7 +1398,7 @@ def test_actual_config_value(fixed_random_seed):
                                                 },
                                             },
                                             "fromOp": {
-                                                "name": "numbers-pybinsequal",
+                                                "name": "numbers-binsequal",
                                                 "inputs": {
                                                     "arr": {
                                                         "nodeType": "output",

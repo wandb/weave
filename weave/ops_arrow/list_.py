@@ -1263,7 +1263,7 @@ def vectorize(
     def expand_nodes(node: graph.Node) -> graph.Node:
         if isinstance(node, graph.OutputNode):
             inputs = node.from_op.inputs
-            if node.from_op.name == "number-pybin":
+            if node.from_op.name == "number-bin":
                 bin_fn = weave_internal.use(inputs["bin_fn"])
                 in_ = inputs["in_"]
                 return weave_internal.call_fn(bin_fn, {"row": in_})  # type: ignore
