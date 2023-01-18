@@ -1,4 +1,5 @@
 import typing
+import urllib
 
 from ..compile_domain import wb_gql_op_plugin
 from ..api import op
@@ -126,3 +127,22 @@ def last_membership(
     if len(edges) == 0:
         return None
     return wdt.ArtifactCollectionMembership.from_gql(edges[0]["node"])
+
+
+@op(
+    name="artifact-link",
+)
+def link(
+    artifact: wdt.ArtifactCollection,
+) -> wdt.Link:
+    artifact_type = artifact.gql["defaultArtifactType"]
+    project = artifact_type["project"]
+    entity = project["entity"]
+    entity_name = entity["name"]
+    project_name = project["name"]
+    artifact_type_name = artifact_type["name"]
+    artifact_name = artifact.gql["name"]
+    return wdt.Link(
+        artifact.gql["name"],
+        f"/{entity_name}/{project_name}/artifacts/{urllib.parse.quote(artifact_type_name)}/{urllib.parse.quote(artifact_name)}",
+    )

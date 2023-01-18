@@ -39,7 +39,12 @@ gql_prop_op(
 )
 
 # Section 4/6: Direct Relationship Ops
-# None
+gql_direct_edge_op(
+    "entity-org",
+    wdt.EntityType,
+    "organization",
+    wdt.OrgType,
+)
 
 # Section 5/6: Connection Ops
 gql_connection_op(

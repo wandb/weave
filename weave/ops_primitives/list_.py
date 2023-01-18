@@ -666,3 +666,12 @@ def list_2d_projection(
 def join_to_str(arr, sep):
     # This logic matches Weave0 (nulls are treated as empty strings)
     return sep.join([str(i) if i is not None else "" for i in arr])
+
+
+@op(
+    name="contains",
+    input_type={"arr": types.List(types.Any()), "element": types.Any()},
+    output_type=types.Boolean(),
+)
+def contains(arr, element):
+    return element in arr

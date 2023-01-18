@@ -3,7 +3,7 @@ import pyarrow as pa
 
 from ..decorator_arrow_op import arrow_op
 from .. import weave_types as types
-
+from ..api import op
 from .list_ import ArrowWeaveList, ArrowWeaveListType
 
 ARROW_WEAVE_LIST_NUMBER_TYPE = ArrowWeaveListType(types.Number())
@@ -195,6 +195,60 @@ def floor(self):
 )
 def ceil(self):
     return ArrowWeaveList(pc.ceil(self._arrow_data), types.Number(), self._artifact)
+
+
+@arrow_op(
+    name="ArrowWeaveListNumber-abs",
+    input_type={"self": ArrowWeaveListType(types.optional(types.Number()))},
+    output_type=self_type_output_type_fn,
+)
+def abs(self):
+    return ArrowWeaveList(pc.abs(self._arrow_data), types.Number(), self._artifact)
+
+
+@arrow_op(
+    name="ArrowWeaveListNumber-toFixed",
+    input_type={
+        "self": ArrowWeaveListType(types.optional(types.Number())),
+        "digits": types.Number(),
+    },
+    output_type=self_type_output_type_fn,
+)
+def to_fixed(self, digits):
+    return ArrowWeaveList(
+        pc.round(self._arrow_data, int(digits)), types.Number(), self._artifact
+    )
+
+
+# TODO: Do we need to vectorize these in 1 more dimension?
+@op(
+    name="ArrowWeaveListNumber-argmax",
+    input_type={"self": ArrowWeaveListType(types.optional(types.Number()))},
+    output_type=types.Number(),
+)
+def argmax(self):
+    array = self._arrow_data_asarray_no_tags()
+    return pc.index(array, pc.max(array)).as_py()
+
+
+@op(
+    name="ArrowWeaveListNumber-argmin",
+    input_type={"self": ArrowWeaveListType(types.optional(types.Number()))},
+    output_type=types.Number(),
+)
+def argmin(self):
+    array = self._arrow_data_asarray_no_tags()
+    return pc.index(array, pc.min(array)).as_py()
+
+
+@op(
+    name="ArrowWeaveListNumber-stddev",
+    input_type={"self": ArrowWeaveListType(types.optional(types.Number()))},
+    output_type=types.Number(),
+)
+def stddev(self):
+    array = self._arrow_data_asarray_no_tags()
+    return pc.stddev(array).as_py()
 
 
 @arrow_op(

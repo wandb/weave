@@ -2236,6 +2236,31 @@ def test_arrow_concat_mixed(list_of_data, exp_res):
     )
 
 
+def test_abs():
+    data = [-10, -2.2, 5, None, 3.3]
+    arrow_node = weave.save(arrow.to_arrow(data))
+    assert weave.use(arrow_node.abs()).to_pylist() == [10, 2.2, 5, None, 3.3]
+
+
+def test_argmax():
+    data = [10, 20, None, 30, 40, None, 30, 20, None, 10]
+    arrow_node = weave.save(arrow.to_arrow(data))
+    assert weave.use(arrow_node.argmax()) == 4
+
+
+def test_argmin():
+    data = [10, 20, None, 30, 40, None, 0, 20, None, 10]
+    arrow_node = weave.save(arrow.to_arrow(data))
+    assert weave.use(arrow_node.argmin()) == 6
+
+
+def test_stddev():
+    data = [10, 20, None, 30, 40, None, 0, 20, None, 10]
+    arrow_node = weave.save(arrow.to_arrow(data))
+    res = round(weave.use(arrow_node.stddev()), 3)
+    assert res == 12.454
+
+
 def test_join_all_struct_val():
     t1 = arrow.to_arrow([{"a": 5, "b": {"c": 6}}])
     t2 = arrow.to_arrow([{"a": 9, "b": {"c": 10}}, {"a": 5, "b": {"c": 11}}])

@@ -2045,3 +2045,24 @@ def vectorized_arrow_pick(self, key):
     return ArrowWeaveList(
         result,
     )
+
+
+# # Putting this here instead of in number b/c it is just a map function
+# bin_type = types.TypedDict({"start": types.Number(), "stop": types.Number()})
+
+
+# @op(
+#     name="ArrowWeaveListNumber-bin",
+#     input_type={
+#         "val": ArrowWeaveListType(types.optional(types.Number())),
+#         "binFn": types.Function(
+#             {"row": types.Number()},
+#             types.TypedDict({"start": types.Number(), "stop": types.Number()}),
+#         ),
+#     },
+#     output_type=ArrowWeaveListType(types.optional(bin_type)),
+# )
+# def number_bin(val, binFn):
+#     tagged_awl = pushdown_list_tags(val)
+#     res = _apply_fn_node(tagged_awl, binFn)
+#     return res

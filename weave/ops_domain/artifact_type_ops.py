@@ -4,6 +4,7 @@ from .. import weave_types as types
 from . import wb_domain_types as wdt
 from ..language_features.tagging.make_tag_getter_op import make_tag_getter_op
 from .wandb_domain_gql import (
+    _make_alias,
     gql_prop_op,
     gql_direct_edge_op,
     gql_connection_op,
@@ -38,4 +39,38 @@ gql_connection_op(
 )
 
 # Section 6/6: Non Standard Business Logic Ops
-# None
+# This is a horrible op due to the double limits - we should remove this.
+first_50_collections_alias = _make_alias("first: 50", prefix="artifactCollections")
+first_50_artifacts_alias = _make_alias("first: 50", prefix="artifacts")
+
+
+@op(
+    name="artifactType-artifactVersions",
+    plugins=wb_gql_op_plugin(
+        lambda inputs, inner: f"""
+    {first_50_collections_alias}: artifactCollections(first: 50) {{
+        edges {{
+            node {{
+                {first_50_artifacts_alias}: artifacts(first: 50) {{
+                    edges {{
+                        node {{
+                            {wdt.ArtifactVersion.REQUIRED_FRAGMENT}
+                            {inner}
+                        }}
+                    }}
+                }}
+            }}
+        }}
+    }}"""
+    ),
+)
+def artifact_versions(
+    artifactType: wdt.ArtifactType,
+) -> list[wdt.ArtifactVersion]:
+    res = []
+    for artifactCollectionEdge in artifactType.gql[first_50_collections_alias]["edges"]:
+        for artifactEdge in artifactCollectionEdge["node"][first_50_artifacts_alias][
+            "edges"
+        ]:
+            res.append(wdt.ArtifactVersion(artifactEdge["node"]))
+    return res

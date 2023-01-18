@@ -31,7 +31,19 @@ root_user = gql_root_op(
 )
 
 # Section 3/6: Attribute Getters
-# None
+gql_prop_op(
+    "user-username",
+    wdt.UserType,
+    "username",
+    types.String(),
+)
+
+gql_prop_op(
+    "user-name",
+    wdt.UserType,
+    "name",
+    types.String(),
+)
 
 # Section 4/6: Direct Relationship Ops
 # None

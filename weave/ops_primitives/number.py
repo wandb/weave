@@ -3,6 +3,8 @@ import datetime
 import math
 from ..api import op, mutation, weave_class
 from .. import weave_types as types
+import numpy as np
+from .. import execute_fast
 
 
 @weave_class(weave_type=types.Number)
@@ -195,6 +197,22 @@ class Number(object):
     def to_string(val):
         return str(val)
 
+    @op(
+        name="number-abs",
+        input_type={"val": types.Number()},
+        output_type=types.Number(),
+    )
+    def abs(val):
+        return abs(val)
+
+    @op(
+        name="number-toFixed",
+        input_type={"val": types.Number(), "digits": types.Number()},
+        output_type=types.Number(),
+    )
+    def to_fixed(val, digits):
+        return round(val, int(digits))
+
 
 def numbers_ops_output_type(input_types: dict[str, types.Type]) -> types.Type:
     arr_type = typing.cast(types.List, input_types["numbers"])
@@ -254,6 +272,57 @@ def numbers_min(numbers):
 def numbers_max(numbers):
     numbers = [n for n in numbers if n != None]
     return max(numbers) if len(numbers) > 0 else None
+
+
+@op(
+    name="numbers-argmax",
+    input_type={"numbers": types.List(types.optional(types.Number()))},
+    output_type=numbers_ops_output_type,
+)
+def numbers_argmax(numbers):
+    non_null_numbers = [n for n in numbers if n != None]
+    if len(non_null_numbers) == 0:
+        return None
+    return numbers.index(max(non_null_numbers))
+
+
+@op(
+    name="numbers-argmin",
+    input_type={"numbers": types.List(types.optional(types.Number()))},
+    output_type=numbers_ops_output_type,
+)
+def numbers_argmin(numbers):
+    non_null_numbers = [n for n in numbers if n != None]
+    if len(non_null_numbers) == 0:
+        return None
+    return numbers.index(min(non_null_numbers))
+
+
+@op(
+    name="numbers-stddev",
+    input_type={"numbers": types.List(types.optional(types.Number()))},
+    output_type=numbers_ops_output_type,
+)
+def stddev(numbers):
+    non_null_numbers = [n for n in numbers if n != None]
+    if len(non_null_numbers) == 0:
+        return None
+    return np.std(non_null_numbers).tolist()
+
+
+# bin_type = types.TypedDict({"start": types.Number(), "stop": types.Number()})
+
+
+# @op(
+#     name="number-bin",
+#     input_type={
+#         "val": types.Number(),
+#         "binFn": types.Function({"row": types.Number()}, bin_type),
+#     },
+#     output_type=bin_type,
+# )
+# def number_bin(val, binFn):
+#     return execute_fast.fast_map_fn([val], binFn)[0]
 
 
 # @weave_class(weave_type=types.Int)

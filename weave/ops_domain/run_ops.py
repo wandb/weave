@@ -78,6 +78,13 @@ gql_prop_op(
     types.Number(),
 )
 
+gql_prop_op(
+    "run-heartbeatAt",
+    wdt.RunType,
+    "heartbeatAt",
+    types.Datetime(),
+)
+
 
 @op(
     render_info={"type": "function"},
@@ -237,6 +244,13 @@ gql_direct_edge_op(
     wdt.UserType,
 )
 
+gql_direct_edge_op(
+    "run-project",
+    wdt.RunType,
+    "project",
+    wdt.ProjectType,
+)
+
 # Section 5/6: Connection Ops
 gql_connection_op(
     "run-usedArtifactVersions",
@@ -264,3 +278,29 @@ def link(run: wdt.Run) -> wdt.Link:
         run.gql["displayName"],
         f'/{run.gql["project"]["entity"]["name"]}/{run.gql["project"]["name"]}/runs/{run.gql["name"]}',
     )
+
+
+def run_logged_artifact_version_gql_plugin(inputs, inner):
+    artifact_name = inputs.raw["artifactVersionName"]
+    alias = _make_alias(artifact_name, prefix="artifact")
+    if ":" not in artifact_name:
+        artifact_name += ":latest"
+    artifact_name = json.dumps(artifact_name)
+    return f"""
+    project {{
+        {alias}: artifact(name: {artifact_name}) {{
+            {wdt.ArtifactVersion.REQUIRED_FRAGMENT}
+            {inner}
+        }}
+    }}"""
+
+
+@op(
+    name="run-loggedArtifactVersion",
+    plugins=wb_gql_op_plugin(run_logged_artifact_version_gql_plugin),
+)
+def run_logged_artifact_version(
+    run: wdt.Run, artifactVersionName: str
+) -> wdt.ArtifactVersion:
+    alias = _make_alias(artifactVersionName, prefix="artifact")
+    return wdt.ArtifactVersion(run.gql["project"][alias])

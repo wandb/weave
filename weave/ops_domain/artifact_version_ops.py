@@ -40,6 +40,17 @@ gql_prop_op(
     "artifactVersion-createdAt", wdt.ArtifactVersionType, "createdAt", types.Datetime()
 )
 
+gql_prop_op(
+    "artifactVersion-versionId", wdt.ArtifactVersionType, "versionIndex", types.Number()
+)
+
+gql_prop_op(
+    "artifactVersion-referenceCount",
+    wdt.ArtifactVersionType,
+    "usedCount",
+    types.Number(),
+)
+
 
 @op(
     plugins=wb_gql_op_plugin(lambda inputs, inner: "metadata"),
