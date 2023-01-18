@@ -28,11 +28,9 @@ def arrow_type_to_weave_type(pa_type: pa.DataType) -> types.Type:
     elif pa.types.is_temporal(pa_type):
         return types.Datetime()
     elif pa.types.is_list(pa_type):
-        return types.List(arrow_type_to_weave_type(pa_type.value_field.type))
+        return types.List(arrow_field_to_weave_type(pa_type.value_field))
     elif pa.types.is_struct(pa_type):
-        return types.TypedDict(
-            {f.name: arrow_type_to_weave_type(f.type) for f in pa_type}
-        )
+        return types.TypedDict({f.name: arrow_field_to_weave_type(f) for f in pa_type})
     elif pa.types.is_union(pa_type):
         return types.UnionType(*[arrow_type_to_weave_type(f.type) for f in pa_type])
     raise errors.WeaveTypeError(
@@ -40,8 +38,15 @@ def arrow_type_to_weave_type(pa_type: pa.DataType) -> types.Type:
     )
 
 
+def arrow_field_to_weave_type(pa_field: pa.Field) -> types.Type:
+    t = arrow_type_to_weave_type(pa_field.type)
+    if pa_field.nullable:
+        return types.optional(t)
+    return t
+
+
 def arrow_schema_to_weave_type(schema) -> types.Type:
-    return types.TypedDict({f.name: arrow_type_to_weave_type(f.type) for f in schema})
+    return types.TypedDict({f.name: arrow_field_to_weave_type(f) for f in schema})
 
 
 def table_with_structs_as_unions(table: pa.Table) -> pa.Table:
@@ -407,6 +412,8 @@ def _rewrite_pyliteral_refs(
             raise errors.WeaveInternalError(
                 "Unions not fully supported yet in Weave arrow"
             )
+        if pyliteral_data == None:
+            return None
         return _rewrite_pyliteral_refs(
             pyliteral_data,
             types.non_none(object_type),

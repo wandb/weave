@@ -1915,7 +1915,7 @@ def _join_all_output_type(input_types):
     arr_prop_types = input_types["arrs"].object_type.object_type.property_types
     prop_types = {}
     for k in arr_prop_types.keys():
-        prop_types[k] = types.List(arr_prop_types[k])
+        prop_types[k] = types.List(types.optional(arr_prop_types[k]))
     inner_type = types.TypedDict(prop_types)
     tag_type = types.TypedDict({"joinObj": input_types["joinFn"].output_type})
     tagged_type = tagged_value_type.TaggedValueType(tag_type, inner_type)
