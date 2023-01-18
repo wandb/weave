@@ -2234,3 +2234,16 @@ def test_arrow_concat_mixed(list_of_data, exp_res):
         ).to_pylist()
         == exp_res
     )
+
+
+def test_join_all_struct_val():
+    t1 = arrow.to_arrow([{"a": 5, "b": {"c": 6}}])
+    t2 = arrow.to_arrow([{"a": 9, "b": {"c": 10}}, {"a": 5, "b": {"c": 11}}])
+
+    tables = weave.save([t1, t2])
+    res = weave.use(tables.joinAll(lambda row: row["a"], True)).to_pylist()
+    # TODO: not correct, not because of join, because artifact saving is broken.
+    assert res == [
+        {"_tag": {"joinObj": 9}, "_value": {"a": [9, 9], "b": [{"c": 10}, {"c": 10}]}},
+        {"_tag": {"joinObj": 5}, "_value": {"a": [5, 5], "b": [{"c": 11}, {"c": 11}]}},
+    ]

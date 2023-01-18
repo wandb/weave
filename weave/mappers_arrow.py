@@ -367,7 +367,15 @@ def map_from_arrow_scalar(value: pa.Scalar, type_: types.Type, artifact):
     elif isinstance(type_, types.List):
         return [map_from_arrow_scalar(v, type_.object_type, artifact) for v in value]
     elif isinstance(type_, tagged_value_type.TaggedValueType):
-        val = box.box(map_from_arrow_scalar(value["_value"], type_.value, artifact))
+        # :( This can fail because we still sometimes have the wrong types
+        # from WeaveJS, because we don't refine lambdas in compile currently.
+        # So sometimes we think we have a tagged type here, but the value is
+        # actually a plain value.
+        # TODO: fix!
+        try:
+            val = box.box(map_from_arrow_scalar(value["_value"], type_.value, artifact))
+        except TypeError:
+            return value.as_py()
         tag = map_from_arrow_scalar(value["_tag"], type_.tag, artifact)
         return tag_store.add_tags(val, tag)
     elif isinstance(type_, types.TypedDict):

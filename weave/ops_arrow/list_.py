@@ -1,11 +1,12 @@
 import logging
 import typing
+import contextlib
 import dataclasses
 import numpy as np
 import pyarrow as pa
 from pyarrow import compute as pc
 from collections import defaultdict
-from .. import util
+import duckdb
 
 py_type = type
 
@@ -35,10 +36,18 @@ from ..ops_primitives import list_ as base_list
 from .arrow import arrow_as_array, ArrowWeaveListType
 from .. import artifact_base
 
-
 FLATTEN_DELIMITER = "➡️"
 
 NestedTableColumns = dict[str, typing.Union[dict, pa.ChunkedArray]]
+
+
+@contextlib.contextmanager
+def duckdb_con() -> typing.Generator[duckdb.DuckDBPyConnection, None, None]:
+    con = duckdb.connect()
+    try:
+        yield con
+    finally:
+        con.close()
 
 
 def _recursively_flatten_structs_in_array(
@@ -1960,68 +1969,47 @@ def join_all(arrs, joinFn, outer: bool):
     all_element_keys = _all_element_keys(arrs)
     arrs_as_tables = [_awl_struct_array_to_table(arr) for arr in arrs]
     keyed_tables = []
-    for table, arrs_keys in zip(arrs_as_tables, arrs_keys):
-        keyed_table = table.add_column(0, "__joinobj__", arrs_keys).filter(
-            pc.invert(pc.is_null(pc.field("__joinobj__")))
-        )
-        keyed_tables.append(keyed_table)
+    with duckdb_con() as con:
+        for i, (table, arrs_keys) in enumerate(zip(arrs_as_tables, arrs_keys)):
+            keyed_table = table.add_column(0, "__joinobj__", arrs_keys).filter(
+                pc.invert(pc.is_null(pc.field("__joinobj__")))
+            )
+            keyed_tables.append(keyed_table)
+            con.register(f"t{i}", keyed_table)
 
-    # Iteratively join in all the tables
-    res = keyed_tables[0]
-    join_type = "full outer" if outer else "inner"
-    join_col_key = "__joinobj__"
-    for t_ndx in range(1, len(keyed_tables)):
-        r_suffix = f"__t_{t_ndx}__"
-        res = res.join(
-            keyed_tables[t_ndx],
-            [join_col_key],
-            left_suffix="",
-            right_suffix=r_suffix,
-            join_type=join_type,
-            coalesce_keys=False,
-        )
-        right_join_col_key = f"{join_col_key}{r_suffix}"
-        join_col_data = pc.coalesce(
-            res.column(join_col_key), res.column(right_join_col_key)
-        )
-        # Drop duplicate column
-        res = res.drop([join_col_key, right_join_col_key])
-        res = res.add_column(0, join_col_key, join_col_data)
+        join_type = "full outer" if outer else "inner"
 
-    # Combine the table into a single result
-    final_columns = []
-    num_inputs = len(arrs)
-    res_len = len(res)
-    for shared_column_name in all_element_keys:
-        concatted = safe_pa_concat_arrays(
-            [arrow_as_array(res.column(shared_column_name))]
-            + [
-                arrow_as_array(res.column(shared_column_name + f"__t_{i}__"))
-                for i in range(1, num_inputs)
-            ]
+        query = "SELECT COALESCE(%s) as __joinobj__" % ", ".join(
+            f"t{i}.__joinobj__" for i in range(len(keyed_tables))
         )
-        take_ndxs = (
-            np.arange(num_inputs * res_len).reshape((num_inputs, res_len)).ravel("F")
+        for k in all_element_keys:
+            query += ", list_value(%s) as %s" % (
+                ", ".join(f"t{i}.{k}" for i in range(len(keyed_tables))),
+                k,
+            )
+        query += "\nFROM t0"
+        for t_ndx in range(1, len(keyed_tables)):
+            query += (
+                f" {join_type} join t{t_ndx} ON t0.__joinobj__ = t{t_ndx}.__joinobj__"
+            )
+
+        res = con.execute(query)
+
+        final_table = res.arrow()
+        join_obj = final_table.column("__joinobj__").combine_chunks()
+        final_table = final_table.drop(["__joinobj__"])
+
+        untagged_result: ArrowWeaveList = ArrowWeaveList(
+            final_table,
+            None,
+            arrs[0]._artifact,
         )
-        values = concatted.take(take_ndxs)
-        offsets = np.arange(res_len + 1) * num_inputs
-        combined = pa.ListArray.from_arrays(offsets, values)
-        final_columns.append(combined)
-    final_table = pa.Table.from_arrays(final_columns, list(all_element_keys))
 
-    untagged_result: ArrowWeaveList = ArrowWeaveList(
-        final_table,
-        None,
-        arrs[0]._artifact,
-    )
-
-    return awl_add_arrow_tags(
-        untagged_result,
-        pa.StructArray.from_arrays(
-            [res.column(join_col_key).combine_chunks()], names=["joinObj"]
-        ),
-        types.TypedDict({"joinObj": joinFn.type}),
-    )
+        return awl_add_arrow_tags(
+            untagged_result,
+            pa.StructArray.from_arrays([join_obj], names=["joinObj"]),
+            types.TypedDict({"joinObj": joinFn.type}),
+        )
 
 
 def vectorized_arrow_pick_output_type(input_types):

@@ -241,15 +241,15 @@ def test_join_all(li):
 
     compare_join_results(li.use_node(joined_outer_node), exp_results)
     # Currently list join and arrow join return slightly different result
-    # orderings. PyArrow's join pushes all outer join results without a match to
-    # the end of the list, while list join returns the order found. For purposes
+    # orderings. DuckDB's join order is not obvious, while
+    # list join returns the order found. For purposes
     # of Weave1 development, we will ignore this difference. It would be
     # unnecessarily costly to resort the results of either join to match the
     # other.
     if li == lath.ListNode:
         tag_order = [1, 1, 1, 1, 2, 2, 3, 3, 5]
     elif li == lath.ArrowNode:
-        tag_order = [1, 1, 1, 1, 3, 3, 2, 2, 5]
+        tag_order = [1, 1, 3, 1, 1, 3, 2, 2, 5]
     assert li.use_node(joined_outer_node.joinObj()) == tag_order
 
 
