@@ -37,10 +37,22 @@ def process_run_dict_type(run_dict):
 
 
 def _process_run_dict_item_type(val):
-    if isinstance(val, dict) and "_type" in val and val["_type"] == "table-file":
-        if "artifact_path" in val:
-            return TableClientArtifactFileRef.WeaveType()
-        else:
-            return TableRunFileRef.WeaveType()
+    if isinstance(val, dict):
+        type = val.get("_type")
+        if type == "histogram":
+            # type_of below would return the same type, but short-circuiting
+            # it here is much cheaper.
+            # In the future, we can return a nicer custom Histogram type.
+            return types.TypedDict(
+                {
+                    "bins": types.List(types.Float()),
+                    "values": types.List(types.Int()),
+                }
+            )
+        elif type == "table-file":
+            if "artifact_path" in val:
+                return TableClientArtifactFileRef.WeaveType()
+            else:
+                return TableRunFileRef.WeaveType()
 
     return types.TypeRegistry.type_of(val)
