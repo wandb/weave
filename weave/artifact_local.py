@@ -176,37 +176,45 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
                 manifest[f] = md5_hash_file(full_path)
         commit_hash = md5_string(json.dumps(manifest, sort_keys=True, indent=2))
         self._version = commit_hash
-        if os.path.exists(os.path.join(self._root, commit_hash)):
-            # already have this version!
-            shutil.rmtree(self._write_dirname)
-        else:
-            new_dirname = os.path.join(self._root, commit_hash)
-            if not self._read_dirname:
-                # we're not read-modify-writing an existing version, so
-                # just rename the write dir
+        new_dirname = os.path.join(self._root, commit_hash)
+        if not self._read_dirname:
+            # we're not read-modify-writing an existing version, so
+            # just rename the write dir
+            try:
                 os.rename(self._write_dirname, new_dirname)
-                self.write_metadata(new_dirname)
-            else:
-                # read-modify-write of existing version, so copy existing
-                # files into new dir first, then overwrite with new files
-                os.makedirs(new_dirname, exist_ok=True)
-                self.write_metadata(new_dirname)
-                if self._read_dirname:
-                    for path in os.listdir(self._read_dirname):
-                        src_path = os.path.join(self._read_dirname, path)
-                        target_path = os.path.join(new_dirname, path)
-                        if os.path.isdir(src_path):
-                            shutil.copytree(src_path, target_path)
-                        else:
-                            shutil.copyfile(src_path, target_path)
-                for path in os.listdir(self._write_dirname):
-                    src_path = os.path.join(self._write_dirname, path)
-                    target_path = os.path.join(new_dirname, path)
+            except OSError:
+                # Someone already created this version.
+                shutil.rmtree(self._write_dirname)
+        else:
+            # read-modify-write of existing version, so copy existing
+            # files into new dir first, then overwrite with new files
+
+            # using a working directory so we can atomic rename at end
+            tmpdir = os.path.join(self._root, "tmpwritedir-%s" % util.rand_string_n(12))
+            os.makedirs(tmpdir, exist_ok=True)
+            self.write_metadata(tmpdir)
+            if self._read_dirname:
+                for path in os.listdir(self._read_dirname):
+                    src_path = os.path.join(self._read_dirname, path)
+                    target_path = os.path.join(tmpdir, path)
                     if os.path.isdir(src_path):
                         shutil.copytree(src_path, target_path)
                     else:
                         shutil.copyfile(src_path, target_path)
-                shutil.rmtree(self._write_dirname)
+            for path in os.listdir(self._write_dirname):
+                src_path = os.path.join(self._write_dirname, path)
+                target_path = os.path.join(tmpdir, path)
+                if os.path.isdir(src_path):
+                    shutil.copytree(src_path, target_path)
+                else:
+                    shutil.copyfile(src_path, target_path)
+            try:
+                os.rename(tmpdir, new_dirname)
+            except OSError:
+                shutil.rmtree(tmpdir)
+            shutil.rmtree(self._write_dirname)
+
+        self.write_metadata(new_dirname)
         self._setup_dirs()
 
         # Example of one of many races here
