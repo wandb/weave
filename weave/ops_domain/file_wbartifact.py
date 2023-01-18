@@ -25,6 +25,9 @@ class ArtifactVersionFile(weave_file.File):
         self.artifact = artifact
         self.path = path
 
+    def get_entry(self):
+        return self.artifact.entry_at_path(self.path)
+
     def get_local_path(self):
         return self.artifact.path(self.path)
 

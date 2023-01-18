@@ -3,6 +3,7 @@ from hashlib import sha256
 from .. import api
 
 from .. import ops
+from .. import api as weave
 
 import pytest
 
@@ -25,12 +26,14 @@ def test_nonexistent_file():
         ops.local_path("fake_file_.idontexist")
 
 
-# def test_wbartifact_file_table():
-#     proj = ops.project("shawn", "show-test")
-#     av = proj.artifactVersion("show", "v14")
-#     file = av.file("obj.table.json")
-#     table = file.table()
-#     assert table[0]["total"] == 46
+def test_wbartifact_file_table():
+    proj = ops.project("shawn", "show-test")
+    av = proj.artifactVersion("show", "v14")
+    file = av.file("obj.table.json")
+    table = file.table().rows()
+    # assert weave.use(file.size()) == 66217
+    # assert weave.use(file.path()) == "obj.table.json"
+    assert weave.use(table[0]["total"]) == 46
 
 
 # def test_localartifact_file_table():

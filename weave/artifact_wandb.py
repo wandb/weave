@@ -10,6 +10,7 @@ import typing
 import wandb
 from wandb.apis import public as wb_public
 from wandb.util import hex_to_b64_id
+from wandb.sdk.interface import artifacts as wb_artifact_interface
 
 from . import uris
 from . import errors
@@ -194,6 +195,7 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
             self._read_artifact_uri = uri
             # self._saved_artifact = get_wandb_read_artifact(uri.make_path())
         self._local_path: dict[str, str] = {}
+        self._path_to_entry_cache: dict[str, wb_artifact_interface.ArtifactEntry] = {}
 
     def _set_read_artifact_uri(self, uri):
         self._read_artifact = None
@@ -236,6 +238,23 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
 
     def get_other_version(self, version):
         raise NotImplementedError()
+
+    def entry_at_path(self, path) -> wb_artifact_interface.ArtifactEntry:
+        if not self.is_saved:
+            raise errors.WeaveInternalError("cannot download of an unsaved artifact")
+
+        if path in self._path_to_entry_cache:
+            return self._path_to_entry_cache[path]
+
+        if path in self._saved_artifact.manifest.entries:
+            return self._saved_artifact.manifest.entries[path]
+
+        for entry in self._saved_artifact.manifest.entries:
+            if entry.startswith(path + ".") and entry.endswith(".json"):
+                self._path_to_entry_cache[path] = self.entry_at_path(entry)
+                return self._path_to_entry_cache[path]
+
+        raise errors.WeaveInternalError(f"Could not find entry at path {path}")
 
     def path(self, name):
         if not self.is_saved:

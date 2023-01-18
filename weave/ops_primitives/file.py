@@ -1,3 +1,4 @@
+import json
 import os
 import dataclasses
 import shutil
@@ -181,9 +182,8 @@ class File:
         name="file-size", input_type={"file": types.FileType()}, output_type=types.Int()
     )
     def file_size(file):
-        # file is an artifact manifest entry for now.
-        return 10
-        return file.size
+        # file is an ArtifactVersionFile
+        return file.get_entry().size or 0
 
     @mutation
     def file_contents_set(self, val):
@@ -197,6 +197,34 @@ class File:
     )
     def file_contents(file):
         return file._contents()
+
+    @op(
+        name="file-path",
+        input_type={"file": types.FileType()},
+        output_type=types.String(),
+    )
+    def file_path(file):
+        return file.path
+
+    @op(
+        name="file-digest",
+        input_type={"file": types.FileType()},
+        output_type=types.String(),
+    )
+    def file_digest(file):
+        # file is an ArtifactVersionFile
+        return file.get_entry().digest or ""
+
+    # # TODO: This isn't quite right. In Weave0 - the file has a `wbobjecttype` which is the type
+    # # of the return. This is basically saying -> please convert a file pointer into the weave
+    # # runtime object.
+    # @op(
+    #     name="file-media", input_type={"file": types.FileType()}, output_type=types.TypedDict({})
+    # )
+    # def file_media(file):
+    #     # file is an ArtifactVersionFile
+    #     data = json.loads(file._contents())
+    #     return types.TypedRegistry.type_of(data).instance_from_dict(data)
 
 
 types.FileType.instance_class = File

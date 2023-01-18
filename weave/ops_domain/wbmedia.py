@@ -242,3 +242,11 @@ ArtifactAssetType = types.union(
 )
 def artifactVersion(asset):
     return asset.artifact
+
+
+@weave.op(
+    name="asset-file",
+    input_type={"asset": ArtifactAssetType},
+)
+def assetFile(asset) -> file_wbartifact.ArtifactVersionFile:
+    return file_wbartifact.ArtifactVersionFile(asset.path.artifact, asset.path.path)
