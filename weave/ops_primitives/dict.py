@@ -129,3 +129,33 @@ def dict_return_type(input_types):
 )
 def dict_(**d):
     return d
+
+
+@op(
+    name="object-keytypes",
+    input_type={
+        "obj": types.TypedDict({}),
+    },
+    output_type=types.List(
+        types.TypedDict(
+            {
+                "key": types.String(),
+                "type": types.Type(),
+            }
+        )
+    ),
+)
+def object_keytypes(obj):
+    # Unlike Weave0, we don't have the type information of inputs, so
+    # unfortunately we have to figure out the types using the data....
+    weave_type = types.TypeRegistry.type_of(obj)
+    res = []
+    if isinstance(weave_type, types.TypedDict):
+        for k, v in weave_type.property_types.items():
+            res.append(
+                {
+                    "key": k,
+                    "type": v,
+                }
+            )
+    return res

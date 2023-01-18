@@ -253,6 +253,28 @@ ArtifactAliasType = ArtifactAlias.WeaveType()  # type: ignore
 ArtifactAliasType = typing.cast(types.Type, ArtifactAliasType)
 
 
+@weave_type("report", True)
+class Report(GQLTypeMixin):
+    REQUIRED_FRAGMENT = f"""
+        id
+    """
+
+
+ReportType = Report.WeaveType()  # type: ignore
+ReportType = typing.cast(types.Type, ReportType)
+
+
+@weave_type("runQueue", True)
+class RunQueue(GQLTypeMixin):
+    REQUIRED_FRAGMENT = f"""
+        id
+    """
+
+
+RunQueueType = Report.WeaveType()  # type: ignore
+RunQueueType = typing.cast(types.Type, RunQueueType)
+
+
 # Simple types (maybe should be put into primitives?)
 
 

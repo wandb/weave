@@ -127,7 +127,7 @@ def gql_direct_edge_op(
 
         def gql_relationship_getter_op(**inputs):
             raise NotImplementedError(
-                "root-project should not be executed directly. If you see this error, it is a bug in the Weave compiler."
+                f"{op_name} should not be executed directly. If you see this error, it is a bug in the Weave compiler."
             )
 
     else:

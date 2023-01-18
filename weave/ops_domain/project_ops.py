@@ -46,6 +46,14 @@ gql_direct_edge_op(
 )
 
 gql_direct_edge_op(
+    "project-runQueues",
+    wdt.ProjectType,
+    "runQueues",
+    wdt.RunQueueType,
+    is_many=True,
+)
+
+gql_direct_edge_op(
     "project-artifactType",
     wdt.ProjectType,
     "artifactType",
@@ -83,7 +91,7 @@ gql_direct_edge_op(
 gql_connection_op(
     "project-artifactTypes",
     wdt.ProjectType,
-    "entity",
+    "artifactTypes",
     wdt.ArtifactTypeType,
     {},
     lambda inputs: f"first: 50",
