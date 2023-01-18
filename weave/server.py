@@ -57,6 +57,10 @@ def _handle_request(request, deref=False):
     with tracer.trace("request:deserialize"):
         nodes = serialize.deserialize(request["graphs"])
 
+    # import json
+
+    # open("/tmp/graph.txt", "w").write(json.dumps(request["graphs"]))
+
     with tracer.trace("request:execute"):
         with context.execution_client():
             result = execute.execute_nodes(nodes)

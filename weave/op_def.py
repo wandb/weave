@@ -21,6 +21,7 @@ from .language_features.tagging import (
     tagged_value_type,
 )
 from . import language_autocall
+from . import memo
 
 
 def common_name(name: str) -> str:
@@ -56,6 +57,7 @@ def map_type(
     return mapped_t
 
 
+@memo.memo
 def normalize_type(t: types.Type) -> types.Type:
     # This produces equivalent types, but normalized in the way Weave0 expects.
     def _norm(t):
@@ -250,7 +252,17 @@ class OpDef:
         new_input_type = language_autocall.update_input_types(
             self.input_type, new_input_type
         )
-        return self.output_type(new_input_type)
+        try:
+            return self._memo_output_type(**new_input_type)
+        except errors.WeaveHashConstTypeError:
+            # If we have a hash const type error, we can't memoize this call.
+            # This is because we can't hash the type, and we can't memoize
+            # without hashing the type.
+            return self.output_type(new_input_type)
+
+    @memo.memo
+    def _memo_output_type(_self, **param_type):
+        return _self.output_type(param_type)
 
     def lazy_call(_self, *args, **kwargs):
         bound_params = _self.bind_params(args, kwargs)
@@ -316,6 +328,7 @@ class OpDef:
                 return self.raw_output_type
             first_input_type = list(self.input_type.arg_types.values())[0]
 
+            # @memo.mem
             def handle(input_type):
                 param0_name = list(input_type.keys())[0]
                 param0_type = input_type[param0_name]

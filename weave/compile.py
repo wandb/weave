@@ -67,6 +67,10 @@ def _dispatch_map_fn_refining(node: graph.Node) -> typing.Optional[graph.OutputN
     return None
 
 
+from . import memo
+
+
+@memo.memo
 def _remove_optional(t: types.Type) -> types.Type:
     if types.is_optional(t):
         return types.non_none(t)

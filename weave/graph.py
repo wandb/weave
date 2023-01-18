@@ -427,6 +427,17 @@ def _all_nodes(node: Node) -> set[Node]:
     return res
 
 
+def count_all(node: list[Node]) -> Node:
+    result = {"count": 0}
+
+    def _count_node(node):
+        result["count"] += 1
+        return node
+
+    map_nodes_full(node, _count_node)
+    return result["count"]
+
+
 def count(node: Node) -> int:
     return len(_all_nodes(node))
 

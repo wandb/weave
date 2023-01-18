@@ -98,7 +98,7 @@ def node_id(node: graph.Node):
         }
     elif isinstance(node, graph.VarNode):
         # Ensure we don't share var nodes. That's invalid!
-        hashable["name"] = str(random.random())
+        hashable["name"] = random.random()
     elif isinstance(node, graph.ConstNode):
         if isinstance(node.val, graph.OutputNode) or isinstance(
             node.val, graph.VarNode

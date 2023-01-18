@@ -184,3 +184,6 @@ class TaggedValueFromPy(TaggedValueMapper):
         value = box.box(value)
         tag_store.add_tags(value, tags)
         return value
+
+
+types.TaggedValueType = TaggedValueType

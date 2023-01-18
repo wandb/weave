@@ -28,19 +28,18 @@ NO_VALUE = NoValue()
 
 
 def memo(f: typing.Any) -> typing.Any:
-    sig = inspect.signature(f)
-
     def call_memo(*args: typing.Any, **kwargs: typing.Any) -> typing.Any:
         storage = _memo_storage.get()
         if storage is None:
+            # TODO: should raise here!
             return f(*args, **kwargs)
-        f_storage = storage.setdefault(f.__name__, {})
-        params = sig.bind(*args, **kwargs)
-        params_key = tuple(params.arguments.values())
-        result = f_storage.get(params_key, NO_VALUE)
-        if result is NO_VALUE:
-            result = f(*args, **kwargs)
-            f_storage[params_key] = result
+        key = (f, args, tuple(kwargs.items()))
+        try:
+            return storage[key]
+        except KeyError:
+            pass
+        result = f(*args, **kwargs)
+        storage[key] = result
         return result
 
     return call_memo
