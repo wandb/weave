@@ -275,7 +275,7 @@ class ArrowWeaveListType(types.Type):
             d["_key"] = obj._key
             type_of_d.property_types["_key"] = self._key
 
-        serializer = mappers_python.map_to_python(type_of_d, artifact)
+        serializer = mappers_python.map_to_python(type_of_d, artifact, path=[name])
         result_d = serializer.apply(d)
 
         with artifact.new_file(f"{name}.ArrowWeaveList.json") as f:
