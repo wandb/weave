@@ -476,3 +476,14 @@ def test_type_of_empty_array_union():
     assert weave.type_of([{"a": []}, {"a": [1]},]) == weave.types.List(
         weave.types.TypedDict({"a": weave.types.List(weave.types.Int())})
     )
+
+
+def test_type_hash():
+    assert hash(types.NoneType()) == hash(types.NoneType())
+    assert hash(types.List(types.Int())) == hash(types.List(types.Int()))
+    assert hash(types.TypedDict({"a": types.Int()})) == hash(
+        types.TypedDict({"a": types.Int()})
+    )
+    assert hash(types.UnionType(types.NoneType(), types.String())) == hash(
+        types.UnionType(types.String(), types.NoneType())
+    )

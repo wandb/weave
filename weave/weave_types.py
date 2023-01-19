@@ -167,6 +167,15 @@ def _clear_global_type_class_cache():
     type_name_to_type.cache_clear()
 
 
+def _cached_hash(self):
+    try:
+        return self.__dict__["_hash"]
+    except KeyError:
+        hashed = hash((self.__class__, self._hashable()))
+        self.__dict__["_hash"] = hashed
+        return hashed
+
+
 # Addapted from https://stackoverflow.com/questions/18126552/how-to-run-code-when-a-class-is-subclassed
 class _TypeSubclassWatcher(type):
     def __init__(cls, name, bases, clsdict):
@@ -180,6 +189,9 @@ class _TypeSubclassWatcher(type):
             if cls.__dict__.get("_base_type") is None:
                 cls._base_type = bases[0]()
 
+        # Override the dataclass __hash__ with our own version
+        cls.__hash__ = _cached_hash
+
 
 @dataclasses.dataclass(frozen=True)
 class Type(metaclass=_TypeSubclassWatcher):
@@ -192,7 +204,14 @@ class Type(metaclass=_TypeSubclassWatcher):
         typing.Union[type, typing.List[type], None]
     ] = None
 
-    # _type_vars_cached = None
+    _type_attrs = None
+    _hash = None
+
+    def _hashable(self):
+        return tuple((k, hash(t)) for k, t in self.type_vars_tuple)
+
+    def __lt__(self, other):
+        return hash(self) < hash(other)
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}()"
@@ -222,13 +241,16 @@ class Type(metaclass=_TypeSubclassWatcher):
                 type_attrs.append(field.name)
         return type_attrs
 
-    @functools.cached_property
+    @property
+    def type_vars_tuple(self):
+        type_vars = []
+        for field in self.type_attrs():
+            type_vars.append((field, getattr(self, field)))
+        return tuple(type_vars)
+
+    @property
     def type_vars(self) -> dict[str, "Type"]:
-        type_vars = {}
-        for field in dataclasses.fields(self.__class__):
-            if issubclass(field.type, Type):
-                type_vars[field.name] = getattr(self, field.name)
-        return type_vars
+        return dict(self.type_vars_tuple)
 
     @classmethod
     def is_instance(cls, obj):
@@ -471,18 +493,8 @@ class Const(Type):
                 "Attempted to initialize Const Union, which is invalid"
             )
 
-    def __hash__(self):
-        if isinstance(self.val, (int, float, str, bool)):
-            return hash((self.val_type, self.val))
-        elif isinstance(self.val, list):
-            if len(self.val) < 10:
-                return hash((self.val_type, tuple(self.val)))
-            raise errors.WeaveHashConstTypeError(
-                "Attempted to hash Const Type with large list"
-            )
-        raise errors.WeaveHashConstTypeError(
-            "Attempted to Const type with unsupported val_type: %" % self.val_type
-        )
+    def _hashable(self):
+        return (hash(self.val_type), id(self.val))
 
     def __getattr__(self, attr):
         return getattr(self.val_type, attr)
@@ -631,8 +643,8 @@ class UnionType(Type):
             return False
         return set(self.members) == set(other.members)
 
-    def __hash__(self):
-        return hash((hash(mem) for mem in self.members))
+    def _hashable(self):
+        return tuple(hash(mem) for mem in sorted(self.members))
 
     def is_simple_nullable(self):
         return len(set(self.members)) == 2 and none_type in set(self.members)
@@ -731,9 +743,8 @@ class TypedDict(Type):
     instance_classes = [dict]
     property_types: dict[str, Type] = dataclasses.field(default_factory=dict)
 
-    def __hash__(self):
-        # Can't hash property_types by default because dict is not hashable
-        return hash(tuple(k, v) for k, v in self.property_types.items())
+    def _hashable(self):
+        return tuple((k, hash(v)) for k, v in self.property_types.items())
 
     def _assign_type_inner(self, other_type):
         if isinstance(other_type, Dict):
@@ -879,9 +890,8 @@ class TypeType(ObjectType):
     def property_types(self) -> dict[str, Type]:
         return self.attr_types
 
-    def __hash__(self):
-        # Can't hash property_types by default because dict is not hashable
-        return hash(tuple(k, v) for k, v in self.property_types().items())
+    def _hashable(self):
+        return tuple((k, hash(v)) for k, v in self.property_types().items())
 
     @classmethod
     def type_of_instance(cls, obj):
@@ -921,9 +931,10 @@ class Function(Type):
     input_types: dict[str, Type] = dataclasses.field(default_factory=dict)
     output_type: Type = dataclasses.field(default_factory=lambda: UnknownType())
 
-    def __hash__(self):
-        return hash(
-            ((tuple(k, v) for k, v in self.input_types.items()), self.output_type)
+    def _hashable(self):
+        return (
+            tuple((k, hash(v)) for k, v in self.input_types.items()),
+            hash(self.output_type),
         )
 
     def _is_assignable_to(self, other_type) -> typing.Optional[bool]:

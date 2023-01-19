@@ -14,6 +14,7 @@ from . import graph
 from . import weave_internal
 from . import pyfunc_type_util
 from . import engine_trace
+from . import memo
 from .language_features.tagging import (
     opdef_util,
     process_opdef_resolve_fn,
@@ -56,6 +57,7 @@ def map_type(
     return mapped_t
 
 
+@memo.memo
 def normalize_type(t: types.Type) -> types.Type:
     # This produces equivalent types, but normalized in the way Weave0 expects.
     def _norm(t):
