@@ -233,8 +233,10 @@ def execute_forward_node(
     cache_mode = environment.cache_mode()
     if cache_mode == environment.CacheMode.MINIMAL:
         no_cache = True
-        if not node.from_op.name.startswith("mapped") and node.from_op.name.endswith(
-            "file-table"
+        if not node.from_op.name.startswith("mapped") and (
+            node.from_op.name.endswith("file-table")
+            or node.from_op.name.endswith("artifactVersion-file")
+            or node.from_op.name.endswith("artifactLocalVersion-file")
         ):
             # Always cache file-table for now. file-table converts from the W&B json
             # table format to the much faster Weave arrow format. Since Weave cache

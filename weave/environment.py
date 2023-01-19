@@ -26,3 +26,7 @@ def cache_mode() -> CacheMode:
 
 def wandb_production() -> bool:
     return os.getenv("WEAVE_ENV") == "wandb_production"
+
+
+def weave_server_url() -> str:
+    return os.getenv("WEAVE_SERVER_URL", "")

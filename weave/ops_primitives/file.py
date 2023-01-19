@@ -9,6 +9,7 @@ from ..api import op, mutation, weave_class
 from .. import weave_types as types
 from .. import wandb_util
 from .. import ops_arrow
+from .. import environment
 from .. import artifact_wandb
 
 _py_open = open
@@ -71,8 +72,7 @@ class Table:
 
 
 def _data_is_legacy_run_file_format(data):
-    keys = set(data.keys())
-    return keys == {"columns", "data"}
+    return "columns" in data and "data" in data
 
 
 def _data_is_weave_file_format(data):
@@ -82,7 +82,16 @@ def _data_is_weave_file_format(data):
 def _get_rows_and_object_type_from_legacy_format(data):
     rows = [dict(zip(data["columns"], row)) for row in data["data"]]
     object_type = types.TypeRegistry.type_of(rows).object_type
-    return rows, object_type
+    prop_types = {}
+    from ..ops_domain import wbmedia
+
+    for k, pt in object_type.property_types.items():
+        if isinstance(pt, types.TypedDict) and "_type" in pt.property_types:
+            prop_types[k] = wbmedia.ImageArtifactFileRef.WeaveType()
+        else:
+            prop_types[k] = pt
+
+    return rows, types.TypedDict(prop_types)
 
 
 def _get_rows_and_object_type_from_weave_format(data, file):
@@ -175,7 +184,7 @@ class File:
         # TODO: This should depend on whether its local or an artifact
         #    etc
         local_path = os.path.abspath(file.get_local_path())
-        return "/__weave/file/%s" % local_path
+        return f"{environment.weave_server_url()}/__weave/file/%s" % local_path
 
     @op(
         name="file-size", input_type={"file": types.FileType()}, output_type=types.Int()
