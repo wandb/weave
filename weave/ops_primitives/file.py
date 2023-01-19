@@ -34,6 +34,9 @@ def file_dir(file):
 
 ##### End path ops
 
+file_or_artifact_version_file_type = types.union(
+    types.FileType(), ArtifactVersionFileType()
+)
 
 #### TODO: Table does not belong here!
 
@@ -68,6 +71,52 @@ class Table:
     )
     def rows(table):
         return table._rows
+
+
+@dataclasses.dataclass(frozen=True)
+class PartitionedTableType(types.ObjectType):
+    name = "partitioned-table"
+
+    def property_types(self):
+        return {
+            "_rows": ops_arrow.ArrowWeaveListType(types.TypedDict({})),
+            "partitionedTable": types.TypedDict({"parts_path": types.String()}),
+            "file": ArtifactVersionFileType(),
+        }
+
+
+@weave_class(weave_type=PartitionedTableType)
+class PartitionedTable:
+    def __init__(self, _rows, partitionedTable, file):
+        self._rows = _rows
+        self.partitionedTable = partitionedTable
+        self.file = file
+
+    @op(
+        name="partitionedtable-file",
+        input_type={"partitionedTable": PartitionedTableType()},
+        output_type=ArtifactVersionFileType(),
+    )
+    def partitioned_file(partitionedTable):
+        return partitionedTable.file
+
+    @op(
+        name="partitionedtable-rowsType",
+        input_type={"partitionedtable": PartitionedTableType()},
+        output_type=types.TypeType(),
+    )
+    def partitioned_rows_type(partitionedtable):
+        ttype = types.TypeRegistry.type_of(partitionedtable._rows)
+        return ttype
+
+    @op(
+        name="partitionedtable-rows",
+        input_type={"partitionedtable": PartitionedTableType()},
+        output_type=ops_arrow.ArrowWeaveListType(types.TypedDict({})),
+        refine_output_type=partitioned_rows_type,
+    )
+    def rows(partitionedtable):
+        return partitionedtable._rows
 
 
 def _data_is_legacy_run_file_format(data):
@@ -137,7 +186,7 @@ def _get_rows_and_object_type_from_weave_format(data, file):
 class File:
     @op(
         name="file-table",
-        input_type={"file": types.union(types.FileType(), ArtifactVersionFileType())},
+        input_type={"file": file_or_artifact_version_file_type},
         output_type=TableType(),
     )
     def table(file):
@@ -164,9 +213,51 @@ class File:
         return Table(res)
 
     @op(
+        name="file-partitionedTable",
+        input_type={"file": file_or_artifact_version_file_type},
+        output_type=PartitionedTableType(),
+    )
+    def partitioned_table(file):
+        local_path = file.get_local_path()
+        import json
+
+        with _py_open(local_path) as f:
+            data = json.load(f)
+
+        parts_path_root = data["parts_path"]
+
+        all_rows = []
+        all_object_type = types.UnknownType()
+        for entry_path in file.artifact._saved_artifact.manifest.entries.keys():
+            if entry_path.startswith(parts_path_root) and entry_path.endswith(
+                ".table.json"
+            ):
+                local_part_path = file.artifact.path(entry_path)
+                with _py_open(local_part_path) as part_file:
+                    part_data = json.load(part_file)
+                if _data_is_legacy_run_file_format(part_data):
+                    rows, object_type = _get_rows_and_object_type_from_legacy_format(
+                        part_data
+                    )
+                elif _data_is_weave_file_format(part_data):
+                    rows, object_type = _get_rows_and_object_type_from_weave_format(
+                        part_data, file
+                    )
+                else:
+                    raise errors.WeaveInternalError(
+                        "Unknown table file format for data"
+                    )
+                all_rows.extend(rows)
+                all_object_type = types.merge_types(all_object_type, object_type)
+        arrow_rows = ops_arrow.to_arrow_from_list_and_artifact(
+            all_rows, all_object_type, file.artifact
+        )
+        return PartitionedTable(arrow_rows, data, file)
+
+    @op(
         name="file-directUrlAsOf",
         input_type={
-            "file": types.union(types.FileType(), ArtifactVersionFileType()),
+            "file": file_or_artifact_version_file_type,
             "asOf": types.Int(),
         },
         output_type=types.String(),

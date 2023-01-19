@@ -102,7 +102,7 @@ class ArtifactVersion:
             if len(rel_path_parts) == 1:
                 # Its a file within cur_dir
                 # TODO: I haven't tested this since changin ArtifactVersionFile implementation
-                files[entry_path] = file_wbartifact.ArtifactVersionFile(
+                files[rel_path_parts[0]] = file_wbartifact.ArtifactVersionFile(
                     self,
                     entry_path,
                 )
@@ -123,3 +123,14 @@ class ArtifactVersion:
         if not sub_dirs and not files:
             return None
         return file_wbartifact.ArtifactVersionDir(path, 1591, sub_dirs, files)
+
+
+@op(
+    name="file-artifactVersion",
+    input_type={
+        "file": types.union(types.FileType(), artifact_wandb.ArtifactVersionFileType())
+    },
+    output_type=ArtifactVersionType(),
+)
+def artifactVersion(file):
+    return file.artifact
