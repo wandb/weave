@@ -13,14 +13,51 @@ from .wandb_domain_gql import (
 )
 from .. import weave_types as types
 import urllib
+from .. import errors
 
 # Section 1/6: Tag Getters
 #
 
 # Section 2/6: Root Ops
-# root-allReports
-# Since root-allProjects is not a top-level query, we need to write the gql explicitly
-# instead of using gql_root_op
+@op(
+    name="root-allReportsGQLResolver",
+    input_type={"gql_result": types.TypedDict({})},
+    output_type=types.List(wdt.ReportType),
+)
+def root_all_reports_gql_resolver(gql_result):
+    return [
+        wdt.Report.from_gql(report["node"])
+        for report in gql_result["instance"]["views"]["edges"]
+        if report["node"]["type"] == "runs"  # yes, this is how we filter to Reports!?
+    ]
+
+
+@op(
+    name="root-allReports",
+    input_type={},
+    output_type=types.List(wdt.ReportType),
+    plugins=wb_gql_op_plugin(
+        lambda inputs, inner: f"""
+        instance {{
+            views(limit: 500) {{
+                edges {{
+                    node {{
+                        type
+                        {wdt.Report.REQUIRED_FRAGMENT}
+                        {inner}
+                    }}
+                }}
+            }}
+        }}""",
+        is_root=True,
+        root_resolver=root_all_reports_gql_resolver,
+    ),
+)
+def root_all_reports():
+    raise errors.WeaveGQLCompileError(
+        "root-allReports should not be executed directly. If you see this error, it is a bug in the Weave compiler."
+    )
+
 
 # Section 3/6: Attribute Getters
 gql_prop_op(

@@ -35,3 +35,19 @@ def wbgqlquery(query_str, output_type):
         )
     res = output_type.instance_class.from_gql(values[0])
     return res
+
+
+# This variant is used by root ops which need custom logic to parse the results
+@op(
+    name="gqlroot-wbgqlquery_custom",
+    input_type={
+        "query_str": types.String(),
+    },
+    output_type=types.TypedDict({}),
+)
+def wbgqlquery_custom(query_str):
+    tracer = engine_trace.tracer()
+    with tracer.trace("wbgqlquery_custom:public_api"):
+        logging.info("Executing GQL query: %s", query_str)
+        gql_payload = wandb_gql_query(query_str)
+    return gql_payload

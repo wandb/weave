@@ -28,6 +28,7 @@ class InputProvider:
 class GqlOpPlugin:
     query_fn: typing.Callable[[InputProvider, str], str]
     is_root: bool = False
+    root_resolver: typing.Optional["op_def.OpDef"] = None
 
 
 # Ops in `domain_ops` can add this plugin to their op definition to indicate
@@ -39,9 +40,11 @@ class GqlOpPlugin:
 # see `project_ops.py::artifacts`), most ops use the higher level helpers
 # defined in `wb_domain_gql.py`
 def wb_gql_op_plugin(
-    query_fn: typing.Callable[[InputProvider, str], str], is_root: bool = False
+    query_fn: typing.Callable[[InputProvider, str], str],
+    is_root: bool = False,
+    root_resolver: typing.Optional["op_def.OpDef"] = None,
 ) -> dict[str, GqlOpPlugin]:
-    return {"wb_domain_gql": GqlOpPlugin(query_fn, is_root)}
+    return {"wb_domain_gql": GqlOpPlugin(query_fn, is_root, root_resolver)}
 
 
 # This is the primary exposed function of this module and is called in `compile.py`. It's primary role
@@ -62,14 +65,25 @@ def apply_domain_op_gql_translation(leaf_nodes: list[graph.Node]) -> list[graph.
         query_fragment = _get_fragment(node, p)
         query_str = f"query WeavePythonCG {{ {query_fragment} }}"
         query_str = _normalize_query_str(query_str)
-        return graph.OutputNode(
-            node.type,
-            "gqlroot-wbgqlquery",
-            {
-                "query_str": graph.ConstNode(types.String(), query_str),
-                "output_type": graph.ConstNode(types.TypeType(), node.type),
-            },
-        )
+        custom_resolver = _custom_root_resolver(node)
+        if custom_resolver is None:
+            return graph.OutputNode(
+                node.type,
+                "gqlroot-wbgqlquery",
+                {
+                    "query_str": graph.ConstNode(types.String(), query_str),
+                    "output_type": graph.ConstNode(types.TypeType(), node.type),
+                },
+            )
+        else:
+            raw_result_node = graph.OutputNode(
+                node.type,
+                "gqlroot-wbgqlquery_custom",
+                {
+                    "query_str": graph.ConstNode(types.String(), query_str),
+                },
+            )
+            return custom_resolver(raw_result_node, **node.from_op.inputs)
 
     return graph.map_nodes_full(leaf_nodes, _replace_with_merged_gql)
 
@@ -268,3 +282,14 @@ def _is_root_node(node: graph.Node) -> bool:
     op_def = registry_mem.memory_registry.get_op(node.from_op.name)
     wb_domain_gql = _get_gql_plugin(op_def)
     return wb_domain_gql is not None and wb_domain_gql.is_root
+
+
+def _custom_root_resolver(node: graph.Node) -> typing.Optional["op_def.OpDef"]:
+    if not isinstance(node, graph.OutputNode):
+        return None
+
+    op_def = registry_mem.memory_registry.get_op(node.from_op.name)
+    wb_domain_gql = _get_gql_plugin(op_def)
+    if wb_domain_gql is not None:
+        return wb_domain_gql.root_resolver
+    return None

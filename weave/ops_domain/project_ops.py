@@ -10,6 +10,7 @@ from .wandb_domain_gql import (
     gql_root_op,
 )
 from .. import weave_types as types
+from .. import errors
 
 # Section 1/6: Tag Getters
 make_tag_getter_op("project", wdt.ProjectType, op_name="tag-project")
@@ -27,6 +28,46 @@ project = gql_root_op(
     },
     lambda inputs: f'name: {inputs["projectName"]}, entityName: {inputs["entityName"]}',
 )
+
+
+@op(
+    name="root-allProjectsGQLResolver",
+    input_type={"gql_result": types.TypedDict({})},
+    output_type=types.List(wdt.ProjectType),
+)
+def root_all_projects_gql_resolver(gql_result):
+    return [
+        wdt.Project.from_gql(project["node"])
+        for project in gql_result["instance"]["projects"]["edges"]
+    ]
+
+
+@op(
+    name="root-allProjects",
+    input_type={},
+    output_type=types.List(wdt.ProjectType),
+    plugins=wb_gql_op_plugin(
+        lambda inputs, inner: f"""
+    instance {{
+        projects(limit: 500) {{
+            edges {{
+                node {{
+                    {wdt.Project.REQUIRED_FRAGMENT}
+                    {inner}
+                }}
+            }}
+        }}
+    }}
+    """,
+        is_root=True,
+        root_resolver=root_all_projects_gql_resolver,
+    ),
+)
+def root_all_projects():
+    raise errors.WeaveGQLCompileError(
+        "root-allProjects should not be executed directly. If you see this error, it is a bug in the Weave compiler."
+    )
+
 
 # Section 3/6: Attribute Getters
 gql_prop_op("project-name", wdt.ProjectType, "name", types.String())

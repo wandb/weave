@@ -5,6 +5,7 @@ from .. import weave_types
 from inspect import signature, Parameter
 from . import wb_domain_types
 import hashlib
+from .. import errors
 
 """
 This file contains utilities for constructing GQL ops (used by all the ops in
@@ -126,7 +127,7 @@ def gql_direct_edge_op(
     if is_root:
 
         def gql_relationship_getter_op(**inputs):
-            raise NotImplementedError(
+            raise errors.WeaveGQLCompileError(
                 f"{op_name} should not be executed directly. If you see this error, it is a bug in the Weave compiler."
             )
 

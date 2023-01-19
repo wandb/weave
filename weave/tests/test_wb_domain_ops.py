@@ -1,7 +1,9 @@
+import json
 import weave
 from .. import ops as ops
 import graphql
 from . import fixture_fakewandb as fwb
+from .. import registry_mem
 
 """
 Tests in this file whould be used to test the graphs that can be constructed
@@ -166,4 +168,121 @@ def test_root_project_concat(fake_wandb):
                 }
             }
             }""",
+    )
+
+
+def test_all_projects(fake_wandb):
+    all_projects = ops.project_ops.root_all_projects().runs().flatten().name()
+    fake_wandb.add_mock(
+        lambda query, ndx: {
+            "instance": {
+                "projects": {
+                    "edges": [
+                        {
+                            "node": {
+                                **fwb.project_payload,
+                                "runs_21303e3890a1b6580998e6aa8a345859": {
+                                    "edges": [
+                                        {
+                                            "node": {
+                                                **fwb.run_payload,
+                                                "displayName": "crazy-cat-5",
+                                            },
+                                        }
+                                    ]
+                                },
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+    )
+    assert weave.use(all_projects) == ["crazy-cat-5"]
+    log = fake_wandb.execute_log()
+    assert len(log) == 1
+    assert_gql_str_equal(
+        log[0]["gql"],
+        # Note: the inner project/entity query is because it is part of the required fragment for runs
+        # this could in theory change in the future.
+        """query WeavePythonCG {
+            instance {
+                projects(limit: 500) {
+                    edges {
+                        node {
+                            id
+                            name
+                            entity {
+                                id
+                                name
+                            }
+                            runs_21303e3890a1b6580998e6aa8a345859: runs(first: 50) {
+                                edges {
+                                    node {
+                                        id
+                                        name
+                                        project {
+                                            id
+                                            name
+                                            entity {
+                                                id
+                                                name
+                                            }
+                                        }
+                                        displayName
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }""",
+    )
+
+
+def test_rpt_op(fake_wandb):
+    rpt_op = registry_mem.memory_registry.get_op("rpt_weekly_users_by_country_by_repo")
+    data = rpt_op("stacey")["rows"]["user_fraction"]
+    fake_wandb.add_mock(
+        lambda query, ndx: {
+            "repoInsightsPlotData_4e9f072efe8654dcd5ec36dc20f77486": {
+                "edges": [
+                    {"node": {"row": [0.5, "US", 1674068711.643377, "pytorch"]}},
+                    {"node": {"row": [0.75, "CA", 1674068711.643377, "pytorch"]}},
+                ],
+                "schema": json.dumps(
+                    [
+                        {"Name": "user_fraction", "Type": "FLOAT"},
+                        {"Name": "country", "Type": "STRING"},
+                        {"Name": "created_week", "Type": "TIMESTAMP"},
+                        {"Name": "framework", "Type": "STRING"},
+                    ]
+                ),
+                "isNormalizedUserCount": True,
+            }  #
+        }
+    )
+    assert weave.use(data) == [0.5, 0.75]
+    log = fake_wandb.execute_log()
+    assert len(log) == 1
+    assert_gql_str_equal(
+        log[0]["gql"],
+        # Note: the inner project/entity query is because it is part of the required fragment for runs
+        # this could in theory change in the future.
+        """query WeavePythonCG {
+            repoInsightsPlotData_4e9f072efe8654dcd5ec36dc20f77486: repoInsightsPlotData(
+                plotName: "weekly_users_by_country_by_repo"
+                repoName: "stacey"
+                first: 100000
+            ) {
+                edges {
+                    node {
+                        row
+                    }
+                }
+                schema
+                isNormalizedUserCount
+            }
+        }""",
     )

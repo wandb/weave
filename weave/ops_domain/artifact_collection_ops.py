@@ -12,12 +12,50 @@ from .wandb_domain_gql import (
     gql_connection_op,
     gql_root_op,
 )
+from .. import errors
 
 # Section 1/6: Tag Getters
 # None
 
 # Section 2/6: Root Ops
-# None
+@op(
+    name="root-allArtifactsGQLResolver",
+    input_type={"gql_result": types.TypedDict({})},
+    output_type=types.List(wdt.ArtifactCollectionType),
+)
+def root_all_artifacts_gql_resolver(gql_result):
+    return [
+        wdt.ArtifactCollection.from_gql(artifact_collection["node"])
+        for artifact_collection in gql_result["instance"]["artifactSequences"]["edges"]
+    ]
+
+
+@op(
+    name="root-allArtifacts",
+    input_type={},
+    output_type=types.List(wdt.ArtifactCollectionType),
+    plugins=wb_gql_op_plugin(
+        lambda inputs, inner: f"""
+    instance {{
+        artifactSequences(limit: 500) {{
+            edges {{
+                node {{
+                    {wdt.ArtifactCollection.REQUIRED_FRAGMENT}
+                    {inner}
+                }}
+            }}
+        }}
+    }}
+    """,
+        is_root=True,
+        root_resolver=root_all_artifacts_gql_resolver,
+    ),
+)
+def root_all_artifacts():
+    raise errors.WeaveGQLCompileError(
+        "root-allArtifacts should not be executed directly. If you see this error, it is a bug in the Weave compiler."
+    )
+
 
 # Section 3/6: Attribute Getters
 gql_prop_op(

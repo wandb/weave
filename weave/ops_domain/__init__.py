@@ -12,6 +12,7 @@ from . import artifact_version_ops
 from . import org_ops
 from . import report_ops
 from . import run_queue_ops
+from . import repo_insight_ops
 
 
 # TODO: Investigate these
