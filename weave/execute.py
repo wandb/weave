@@ -81,16 +81,12 @@ _forward_graph: contextvars.ContextVar[
 
 @contextlib.contextmanager
 def _new_forward_graph():
-    fg = _forward_graph.get()
-    token = None
-    if fg is None:
-        fg = forward_graph.ForwardGraph()
-        token = _forward_graph.set(fg)
+    fg = forward_graph.ForwardGraph()
+    token = _forward_graph.set(fg)
     try:
         yield fg
     finally:
-        if token is not None:
-            _forward_graph.reset(token)
+        _forward_graph.reset(token)
 
 
 def execute_nodes(nodes, no_cache=False):

@@ -1,6 +1,12 @@
 import os
 import dataclasses
 import shutil
+import typing
+
+
+from ..artifact_mem import MemArtifact
+
+from ..weave_internal import define_fn
 
 from . import errors
 
@@ -10,6 +16,12 @@ from .. import weave_types as types
 from .. import wandb_util
 from .. import ops_arrow
 from .. import artifact_wandb
+
+if typing.TYPE_CHECKING:
+    from .. import artifact_base
+    from ..ops_arrow.list_ import ArrowWeaveList
+    from ..ops_domain.file_wbartifact import ArtifactVersionFile
+
 
 _py_open = open
 
@@ -119,6 +131,52 @@ class PartitionedTable:
         return partitionedtable._rows
 
 
+@dataclasses.dataclass(frozen=True)
+class JoinedTableType(types.ObjectType):
+    name = "joined-table"
+
+    def property_types(self):
+        return {
+            "_rows": ops_arrow.ArrowWeaveListType(types.TypedDict({})),
+            # "joinedTable": types.TypedDict({"parts_path": types.String()}),
+            "file": ArtifactVersionFileType(),
+        }
+
+
+@weave_class(weave_type=JoinedTableType)
+class JoinedTable:
+    def __init__(self, _rows, file):
+        self._rows = _rows
+        # self.joinedTable = joinedTable
+        self.file = file
+
+    @op(
+        name="joinedtable-file",
+        input_type={"joinedTable": JoinedTableType()},
+        output_type=ArtifactVersionFileType(),
+    )
+    def joined_file(joinedTable):
+        return joinedTable.file
+
+    @op(
+        name="joinedtable-rowsType",
+        input_type={"joinedtable": JoinedTableType()},
+        output_type=types.TypeType(),
+    )
+    def joined_rows_type(joinedtable):
+        ttype = types.TypeRegistry.type_of(joinedtable._rows)
+        return ttype
+
+    @op(
+        name="joinedtable-rows",
+        input_type={"joinedtable": JoinedTableType()},
+        output_type=ops_arrow.ArrowWeaveListType(types.TypedDict({})),
+        refine_output_type=joined_rows_type,
+    )
+    def rows(joinedtable):
+        return joinedtable._rows
+
+
 def _data_is_legacy_run_file_format(data):
     keys = set(data.keys())
     return keys == {"columns", "data"}
@@ -182,6 +240,89 @@ def _get_rows_and_object_type_from_weave_format(data, file):
     return rows, object_type
 
 
+@dataclasses.dataclass
+class _TableLikeAWLFromFileResult:
+    awl: "ArrowWeaveList"
+    data: dict
+
+
+def _get_table_like_awl_from_file(
+    file: "ArtifactVersionFile",
+) -> _TableLikeAWLFromFileResult:
+    import json
+
+    local_path = file.get_local_path()
+    with _py_open(local_path) as f:
+        data = json.load(f)
+
+    if local_path.endswith(".joined-table.json"):
+        awl = _get_joined_table_awl_from_file(data, file)
+    elif local_path.endswith(".partitioned-table.json"):
+        awl = _get_partitioned_table_awl_from_file(data, file)
+    elif local_path.endswith(".table.json"):
+        awl = _get_table_awl_from_file(data, file)
+    else:
+        raise errors.WeaveInternalError(
+            f"Unknown table file format for path: {local_path}"
+        )
+    return _TableLikeAWLFromFileResult(awl, data)
+
+
+def _get_table_awl_from_file(
+    data: dict, file: "ArtifactVersionFile"
+) -> "ArrowWeaveList":
+    rows = []
+    object_type = None
+
+    if _data_is_legacy_run_file_format(data):
+        rows, object_type = _get_rows_and_object_type_from_legacy_format(data)
+    elif _data_is_weave_file_format(data):
+        rows, object_type = _get_rows_and_object_type_from_weave_format(data, file)
+    else:
+        raise errors.WeaveInternalError("Unknown table file format for data")
+
+    return ops_arrow.to_arrow_from_list_and_artifact(rows, object_type, file.artifact)
+
+
+def _get_partitioned_table_awl_from_file(
+    data: dict, file: "ArtifactVersionFile"
+) -> "ArrowWeaveList":
+    parts_path_root = data["parts_path"]
+
+    all_aws = []
+    for entry_path in file.artifact._saved_artifact.manifest.entries.keys():
+        if entry_path.startswith(parts_path_root) and entry_path.endswith("table.json"):
+            all_aws.append(
+                _get_table_like_awl_from_file(file.artifact.get_file(entry_path)).awl
+            )
+    arrow_weave_list = ops_arrow.list_.concat.raw_resolve_fn(all_aws)
+    return arrow_weave_list
+
+
+def _get_joined_table_awl_from_file(
+    data: dict, file: "ArtifactVersionFile"
+) -> "ArrowWeaveList":
+    join_key = data["join_key"]
+
+    table_1_path = data["table1"]
+    table_2_path = data["table2"]
+
+    awl_1 = _get_table_like_awl_from_file(file.artifact.get_file(table_1_path)).awl
+    awl_2 = _get_table_like_awl_from_file(file.artifact.get_file(table_2_path)).awl
+
+    join_fn_1 = define_fn({"row": awl_1.object_type}, lambda row: row[join_key])
+    join_fn_2 = define_fn({"row": awl_2.object_type}, lambda row: row[join_key])
+
+    # Note: in WeaveJS, we allow the user to specify the join type, but
+    # in practice it is always a full-outer join. If we want to parameterize that
+    # then we need to filter out the unneeded rows in joinedTable-rows since we
+    # eagerly construct the rows here.
+    arrow_weave_list = ops_arrow.list_.join_2.raw_resolve_fn(
+        awl_1, awl_2, join_fn_1.val, join_fn_2.val, "0", "1", True, True
+    )
+    return arrow_weave_list
+
+
 @weave_class(weave_type=types.FileType)
 class File:
     @op(
@@ -190,27 +331,7 @@ class File:
         output_type=TableType(),
     )
     def table(file):
-        local_path = file.get_local_path()
-        import json
-
-        with _py_open(local_path) as f:
-            data = json.load(f)
-
-        rows = []
-        object_type = None
-
-        if _data_is_legacy_run_file_format(data):
-            rows, object_type = _get_rows_and_object_type_from_legacy_format(data)
-        elif _data_is_weave_file_format(data):
-            rows, object_type = _get_rows_and_object_type_from_weave_format(data, file)
-        else:
-            raise errors.WeaveInternalError("Unknown table file format for data")
-
-        res = ops_arrow.to_arrow_from_list_and_artifact(
-            rows, object_type, file.artifact
-        )
-        # I Don't think I need Table now. We won't parse again
-        return Table(res)
+        return Table(_get_table_like_awl_from_file(file).awl)
 
     @op(
         name="file-partitionedTable",
@@ -218,41 +339,16 @@ class File:
         output_type=PartitionedTableType(),
     )
     def partitioned_table(file):
-        local_path = file.get_local_path()
-        import json
+        res = _get_table_like_awl_from_file(file)
+        return PartitionedTable(res.awl, res.data, file)
 
-        with _py_open(local_path) as f:
-            data = json.load(f)
-
-        parts_path_root = data["parts_path"]
-
-        all_rows = []
-        all_object_type = types.UnknownType()
-        for entry_path in file.artifact._saved_artifact.manifest.entries.keys():
-            if entry_path.startswith(parts_path_root) and entry_path.endswith(
-                ".table.json"
-            ):
-                local_part_path = file.artifact.path(entry_path)
-                with _py_open(local_part_path) as part_file:
-                    part_data = json.load(part_file)
-                if _data_is_legacy_run_file_format(part_data):
-                    rows, object_type = _get_rows_and_object_type_from_legacy_format(
-                        part_data
-                    )
-                elif _data_is_weave_file_format(part_data):
-                    rows, object_type = _get_rows_and_object_type_from_weave_format(
-                        part_data, file
-                    )
-                else:
-                    raise errors.WeaveInternalError(
-                        "Unknown table file format for data"
-                    )
-                all_rows.extend(rows)
-                all_object_type = types.merge_types(all_object_type, object_type)
-        arrow_rows = ops_arrow.to_arrow_from_list_and_artifact(
-            all_rows, all_object_type, file.artifact
-        )
-        return PartitionedTable(arrow_rows, data, file)
+    @op(
+        name="file-joinedTable",
+        input_type={"file": file_or_artifact_version_file_type},
+        output_type=JoinedTableType(),
+    )
+    def joined_table(file):
+        return JoinedTable(_get_table_like_awl_from_file(file).awl, file)
 
     @op(
         name="file-directUrlAsOf",

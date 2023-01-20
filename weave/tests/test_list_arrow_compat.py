@@ -253,6 +253,142 @@ def test_join_all(li):
     assert li.use_node(joined_outer_node.joinObj()) == tag_order
 
 
+@pytest.mark.parametrize("li", lath.ListInterfaces)
+def test_join_2(li):
+    # This test tests joining a nullable list of lists, with duplicate keys that are partially overlapping and not all entries have the key! (our join logic is quite nuanced.)
+    list_node_1 = li.make_node(
+        [
+            {
+                "id": "1.0",
+            },
+            {
+                "id": "1.a",
+                "val": 1,
+            },
+            {
+                "id": "1.b",
+                "val": 1,
+            },
+            {
+                "id": "1.c",
+                "val": 2,
+            },
+            {
+                "id": "1.d",
+                "val": 2,
+            },
+            {
+                "id": "1.e",
+                "val": 3,
+            },
+        ]
+    )
+    list_node_2 = li.make_node(
+        [
+            {
+                "id": "2.0",
+            },
+            {
+                "id": "2.f",
+                "val": 1,
+            },
+            {
+                "id": "2.g",
+                "val": 1,
+            },
+            {
+                "id": "2.h",
+                "val": 3,
+            },
+            {
+                "id": "2.i",
+                "val": 3,
+            },
+            {
+                "id": "2.j",
+                "val": 5,
+            },
+        ]
+    )
+    # join_list = list_.make_list(a=list_node_1, c=None, b=list_node_2)
+    join_fn = weave.define_fn(
+        {"row": list_node_1.type.object_type},
+        lambda row: row["val"],
+    )
+
+    joined_inner_node = list_node_1.join(
+        list_node_2, join_fn, join_fn, "a0", "a1", False, False
+    )
+    joined_left_outer_node = list_node_1.join(
+        list_node_2, join_fn, join_fn, "a0", "a1", True, False
+    )
+    joined_right_outer_node = list_node_1.join(
+        list_node_2, join_fn, join_fn, "a0", "a1", False, True
+    )
+    joined_full_outer_node = list_node_1.join(
+        list_node_2, join_fn, join_fn, "a0", "a1", True, True
+    )
+
+    # TODO: Arrow and List have different permutation ordering here - probably fix list implementation to match arrow
+    exp_results = [
+        {"a0": {"id": "1.a", "val": 1}, "a1": {"id": "2.g", "val": 1}},
+        {"a0": {"id": "1.b", "val": 1}, "a1": {"id": "2.g", "val": 1}},
+        {"a0": {"id": "1.e", "val": 3}, "a1": {"id": "2.i", "val": 3}},
+        {"a0": {"id": "1.a", "val": 1}, "a1": {"id": "2.f", "val": 1}},
+        {"a0": {"id": "1.b", "val": 1}, "a1": {"id": "2.f", "val": 1}},
+        {"a0": {"id": "1.e", "val": 3}, "a1": {"id": "2.h", "val": 3}},
+    ]
+    compare_join_results(li.use_node(joined_inner_node), exp_results)
+
+    exp_results = [
+        {"a0": {"id": "1.a", "val": 1}, "a1": {"id": "2.g", "val": 1}},
+        {"a0": {"id": "1.b", "val": 1}, "a1": {"id": "2.g", "val": 1}},
+        {"a0": {"id": "1.e", "val": 3}, "a1": {"id": "2.i", "val": 3}},
+        {"a0": {"id": "1.a", "val": 1}, "a1": {"id": "2.f", "val": 1}},
+        {"a0": {"id": "1.b", "val": 1}, "a1": {"id": "2.f", "val": 1}},
+        {"a0": {"id": "1.e", "val": 3}, "a1": {"id": "2.h", "val": 3}},
+        {"a0": {"id": "1.c", "val": 2}, "a1": None},
+        {"a0": {"id": "1.d", "val": 2}, "a1": None},
+    ]
+    compare_join_results(li.use_node(joined_left_outer_node), exp_results)
+
+    exp_results = [
+        {"a0": {"id": "1.b", "val": 1}, "a1": {"id": "2.f", "val": 1}},
+        {"a0": {"id": "1.b", "val": 1}, "a1": {"id": "2.g", "val": 1}},
+        {"a0": {"id": "1.e", "val": 3}, "a1": {"id": "2.h", "val": 3}},
+        {"a0": {"id": "1.e", "val": 3}, "a1": {"id": "2.i", "val": 3}},
+        {"a0": {"id": "1.a", "val": 1}, "a1": {"id": "2.f", "val": 1}},
+        {"a0": {"id": "1.a", "val": 1}, "a1": {"id": "2.g", "val": 1}},
+        {"a0": None, "a1": {"id": "2.j", "val": 5}},
+    ]
+    compare_join_results(li.use_node(joined_right_outer_node), exp_results)
+
+    exp_results = [
+        {"a0": {"id": "1.a", "val": 1}, "a1": {"id": "2.g", "val": 1}},
+        {"a0": {"id": "1.b", "val": 1}, "a1": {"id": "2.g", "val": 1}},
+        {"a0": {"id": "1.e", "val": 3}, "a1": {"id": "2.i", "val": 3}},
+        {"a0": {"id": "1.a", "val": 1}, "a1": {"id": "2.f", "val": 1}},
+        {"a0": {"id": "1.b", "val": 1}, "a1": {"id": "2.f", "val": 1}},
+        {"a0": {"id": "1.e", "val": 3}, "a1": {"id": "2.h", "val": 3}},
+        {"a0": {"id": "1.c", "val": 2}, "a1": None},
+        {"a0": {"id": "1.d", "val": 2}, "a1": None},
+        {"a0": None, "a1": {"id": "2.j", "val": 5}},
+    ]
+    compare_join_results(li.use_node(joined_full_outer_node), exp_results)
+
+    # Currently list join and arrow join return slightly different result
+    # orderings. DuckDB's join order is not obvious, while
+    # list join returns the order found. For purposes
+    # of Weave1 development, we will ignore this difference. It would be
+    # unnecessarily costly to resort the results of either join to match the
+    # other.
+    if li == lath.ListNode:
+        tag_order = [1, 1, 1, 1, 2, 2, 3, 3, 5]
+    elif li == lath.ArrowNode:
+        tag_order = [1, 1, 3, 1, 1, 3, 2, 2, 5]
+    assert li.use_node(joined_full_outer_node.joinObj()) == tag_order
+
+
 algos = [
     ("pca", {}),
     ("tsne", {"perplexity": 2, "learning_rate": 10, "iterations": 3}),

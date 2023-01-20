@@ -194,6 +194,7 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
             self._read_artifact_uri = uri
             # self._saved_artifact = get_wandb_read_artifact(uri.make_path())
         self._local_path: dict[str, str] = {}
+        self._file_cache: dict[str, "ArtifactVersionFile"] = {}
 
     def _set_read_artifact_uri(self, uri):
         self._read_artifact = None
@@ -236,6 +237,44 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
 
     def get_other_version(self, version):
         raise NotImplementedError()
+
+    def get_file(self, name):
+        """
+        Returns a ArtifactVersionFile for the provided path. Users should use
+        this method instead of `path`. `path` gives a path to the literal file
+        on disk. However, this method returns a ArtifactVersionFile which has a
+        reference to the source artifact. Importantly, the source artifact may
+        not be the same as the artifact that the file is being downloaded from.
+        This is because the file may be a reference to another artifact.
+        """
+        if not self.is_saved:
+            raise errors.WeaveInternalError("cannot download of an unsaved artifact")
+
+        if name in self._file_cache:
+            return self._file_cache[name]
+
+        # Next, we special case when the user is looking for a file
+        # without the .[type].json extension. This is used for tables.
+        if name not in self._saved_artifact.manifest.entries:
+            for entry in self._saved_artifact.manifest.entries:
+                if entry.startswith(name + ".") and entry.endswith(".json"):
+                    self._file_cache[name] = self.path(entry)
+                    return self._file_cache[name]
+
+        # TODO: Get rid of circular dependency
+        from .ops_domain.file_wbartifact import ArtifactVersionFile
+
+        # Handle if entry is an art reference:
+        if name in self._saved_artifact.manifest.entries:
+            entry = self._saved_artifact.get_path(name)
+            ref_prefix = "wandb-artifact://"
+            if isinstance(entry.ref, str) and entry.ref.startswith(ref_prefix):
+                # This is a reference to another artifact
+                art_id, target_path = entry.ref[len(ref_prefix) :].split("/", 1)
+                return ArtifactVersionFile(
+                    get_wandb_read_client_artifact(art_id), target_path
+                )
+        return ArtifactVersionFile(self, name)
 
     def path(self, name):
         if not self.is_saved:

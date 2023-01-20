@@ -2012,6 +2012,100 @@ def join_all(arrs, joinFn, outer: bool):
         )
 
 
+def _join_2_output_type(input_types):
+    return ArrowWeaveListType(base_list._join_2_output_row_type(input_types))
+
+
+@op(
+    name="ArrowWeaveList-join",
+    input_type={
+        "arr1": ArrowWeaveListType(types.TypedDict({})),
+        "arr2": ArrowWeaveListType(types.TypedDict({})),
+        "joinFn1": lambda input_types: types.Function(
+            {"row": input_types["arr1"].object_type}, types.Any()
+        ),
+        "joinFn2": lambda input_types: types.Function(
+            {"row": input_types["arr2"].object_type}, types.Any()
+        ),
+        "alias1": types.String(),
+        "alias2": types.String(),
+        "leftOuter": types.Boolean(),
+        "rightOuter": types.Boolean(),
+    },
+    output_type=_join_2_output_type,
+)
+def join_2(arr1, arr2, joinFn1, joinFn2, alias1, alias2, leftOuter, rightOuter):
+    # This is a pretty complicated op. See list.ts for the original implementation
+
+    table1 = _awl_struct_array_to_table(arr1)
+    table2 = _awl_struct_array_to_table(arr2)
+
+    # Execute the joinFn on each of the arrays
+    table1_join_keys = arrow_as_array(_apply_fn_node(arr1, joinFn1)._arrow_data)
+    table2_join_keys = arrow_as_array(_apply_fn_node(arr2, joinFn2)._arrow_data)
+    join_obj_type = types.optional(types.union(joinFn1.type, joinFn2.type))
+
+    table1_columns_names = arr1.object_type.property_types.keys()
+    table2_columns_names = arr2.object_type.property_types.keys()
+
+    with duckdb_con() as con:
+
+        def create_keyed_table(table_name, table, keys):
+            keyed_table = table.add_column(0, "__joinobj__", keys).filter(
+                pc.invert(pc.is_null(pc.field("__joinobj__")))
+            )
+            con.register(table_name, keyed_table)
+            return keyed_table
+
+        create_keyed_table("t1", table1, table1_join_keys)
+        create_keyed_table("t2", table2, table2_join_keys)
+
+        if leftOuter and rightOuter:
+            join_type = "full outer"
+        elif leftOuter:
+            join_type = "left outer"
+        elif rightOuter:
+            join_type = "right outer"
+        else:
+            join_type = "inner"
+
+        query = f"""
+        SELECT 
+            COALESCE(t1.__joinobj__, t2.__joinobj__) as __joinobj__,
+            CASE WHEN t1.__joinobj__ IS NULL THEN NULL ELSE
+                struct_pack({
+                    ", ".join(f'"{col}" := t1."{col}"' for col in table1_columns_names)
+                })
+            END as "{alias1}",
+            CASE WHEN t2.__joinobj__ IS NULL THEN NULL ELSE
+                struct_pack({
+                    ", ".join(f'"{col}" := t2."{col}"' for col in table2_columns_names)
+                })
+            END as "{alias2}",
+        FROM t1 {join_type} JOIN t2 ON t1.__joinobj__ = t2.__joinobj__
+        """
+        print(query)
+
+        res = con.execute(query)
+
+        final_table = res.arrow()
+    join_obj = final_table.column("__joinobj__").combine_chunks()
+    final_table = final_table.drop(["__joinobj__"])
+
+    untagged_result: ArrowWeaveList = ArrowWeaveList(
+        final_table,
+        None,
+        arr1._artifact,
+    )
+
+    res = awl_add_arrow_tags(
+        untagged_result,
+        pa.StructArray.from_arrays([join_obj], names=["joinObj"]),
+        types.TypedDict({"joinObj": join_obj_type}),
+    )
+    return res
+
+
 def vectorized_arrow_pick_output_type(input_types):
     inner_type = types.union(*list(input_types["self"].property_types.values()))
     if isinstance(input_types["key"], ArrowWeaveListType):

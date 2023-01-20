@@ -84,7 +84,7 @@ class ArtifactVersion:
         manifest_entry = manifest.get_entry_by_path(path)
         if manifest_entry is not None:
             # This is a file
-            return file_wbartifact.ArtifactVersionFile(self, path)
+            return self.get_file(path)
         # This is not a file, assume its a directory. If not, we'll return an empty result.
         cur_dir = (
             path  # give better name so the rest of this code block is more readable
@@ -102,10 +102,7 @@ class ArtifactVersion:
             if len(rel_path_parts) == 1:
                 # Its a file within cur_dir
                 # TODO: I haven't tested this since changin ArtifactVersionFile implementation
-                files[rel_path_parts[0]] = file_wbartifact.ArtifactVersionFile(
-                    self,
-                    entry_path,
-                )
+                files[rel_path_parts[0]] = self.get_file(entry_path)
             else:
                 dir_name = rel_path_parts[0]
                 if dir_name not in sub_dirs:
@@ -114,10 +111,7 @@ class ArtifactVersion:
                 dir_ = sub_dirs[dir_name]
                 if len(rel_path_parts) == 2:
                     # TODO: I haven't tested this since changin ArtifactVersionFile implementation
-                    dir_.files[rel_path_parts[1]] = file_wbartifact.ArtifactVersionFile(
-                        self,
-                        entry_path,
-                    )
+                    dir_.files[rel_path_parts[1]] = self.get_file(entry_path)
                 else:
                     dir_.dirs[rel_path_parts[1]] = 1
         if not sub_dirs and not files:

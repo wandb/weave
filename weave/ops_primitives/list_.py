@@ -486,6 +486,96 @@ def join2(arr1, arr2, keyFn1, keyFn2):  # type: ignore
     return results
 
 
+def _join_2_output_row_type(input_types):
+    both_aliases_are_consts = isinstance(
+        input_types["alias1"], types.Const
+    ) and isinstance(input_types["alias2"], types.Const)
+    arr1_obj_type = input_types["arr1"].object_type
+    arr2_obj_type = input_types["arr2"].object_type
+    if both_aliases_are_consts:
+        alias_1 = input_types["alias1"].val
+        alias_2 = input_types["alias2"].val
+        result_row_type = types.TypedDict(
+            {
+                # Technically this optionality should depend on the `outers` flags
+                # but making the implementation more loose for now to match Weave1
+                alias_1: types.optional(arr1_obj_type),
+                alias_2: types.optional(arr2_obj_type),
+            }
+        )
+    else:
+        result_row_type = types.Dict(
+            types.String(),
+            types.union(types.optional(arr1_obj_type), types.optional(arr2_obj_type)),
+        )
+
+    join_obj_type = types.optional(
+        types.union(
+            input_types["joinFn1"].output_type,
+            input_types["joinFn2"].output_type,
+        )
+    )
+    row_tag_type = types.TypedDict({"joinObj": join_obj_type})
+
+    return tagged_value_type.TaggedValueType(row_tag_type, result_row_type)
+
+
+def _join_2_output_type(input_types):
+    return types.List(_join_2_output_row_type(input_types))
+
+
+@op(
+    name="join",
+    input_type={
+        "arr1": types.List(types.TypedDict({})),
+        "arr2": types.List(types.TypedDict({})),
+        "joinFn1": lambda input_types: types.Function(
+            {"row": input_types["arr1"].object_type}, types.Any()
+        ),
+        "joinFn2": lambda input_types: types.Function(
+            {"row": input_types["arr2"].object_type}, types.Any()
+        ),
+        "alias1": types.String(),
+        "alias2": types.String(),
+        "leftOuter": types.Boolean(),
+        "rightOuter": types.Boolean(),
+    },
+    output_type=_join_2_output_type,
+)
+def join_2(arr1, arr2, joinFn1, joinFn2, alias1, alias2, leftOuter, rightOuter):
+    table1_join_keys = execute_fast.fast_map_fn(arr1, joinFn1)
+    table2_join_keys = execute_fast.fast_map_fn(arr2, joinFn2)
+
+    jk_to_idx: dict[str, typing.Tuple[list[int], list[int]]] = {}
+    for i, jk in enumerate(table1_join_keys):
+        if jk != None:
+            jk_to_idx.setdefault(jk, ([], []))[0].append(i)
+    for i, jk in enumerate(table2_join_keys):
+        if jk != None:
+            jk_to_idx.setdefault(jk, ([], []))[1].append(i)
+
+    rows = []
+    for jk, (idx1, idx2) in jk_to_idx.items():
+        tag = {"joinObj": jk}
+        if len(idx1) == 0 and rightOuter:
+            idx1 = [None]
+        if len(idx2) == 0 and leftOuter:
+            idx2 = [None]
+        for i1 in idx1:
+            for i2 in idx2:
+                row = {}
+                if i1 != None:
+                    row[alias1] = arr1[i1]
+                else:
+                    row[alias1] = None
+                if i2 != None:
+                    row[alias2] = arr2[i2]
+                else:
+                    row[alias2] = None
+                rows.append(tag_store.add_tags(box.box(row), tag))
+    return rows
+
+
 def _join_all_output_type(input_types):
     arr_prop_types = input_types["arrs"].object_type.object_type.property_types
     prop_types = {}
