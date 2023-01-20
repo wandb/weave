@@ -167,3 +167,31 @@ def make_rpt_op(plot_name, output_row_type):
 # Make all the ops!
 for plot_name, output_row_type in rpt_op_configs.items():
     make_rpt_op(plot_name, output_row_type)
+
+
+@op(
+    name="normalizeUserCounts",
+    input_type={
+        "arr": types.List(
+            types.TypedDict(
+                {
+                    "created_week": types.Datetime(),
+                    "user_count": types.Number(),
+                }
+            )
+        ),
+        "normalize": types.Boolean(),
+    },
+    output_type=lambda input_types: input_types["arr"],
+)
+def normalize_user_counts(arr, normalize):
+    if len(arr) == 0 or not normalize:
+        return arr
+    min_date = min(arr, key=lambda x: x["created_week"])["created_week"]
+    norm_factor = sum(x["user_count"] for x in arr if x["created_week"] == min_date)
+    res = []
+    for row in arr:
+        r = row.copy()
+        r["user_count"] = row["user_count"] / norm_factor
+        res.append(r)
+    return res

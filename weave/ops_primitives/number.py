@@ -310,6 +310,40 @@ def stddev(numbers):
     return np.std(non_null_numbers).tolist()
 
 
+@op(
+    name="number-toByteString",
+    input_type={"number": types.Number()},
+    output_type=types.String(),
+)
+def to_byte_string(number):
+    # Convert the number to a byte string.
+    # JS version: String(numeral(inputs.in).format('0.00b'))
+    unit_maxes = [
+        (10**3, "B"),
+        (10**6, "KB"),
+        (10**9, "MB"),
+        (10**12, "GB"),
+        (10**15, "TB"),
+        (10**18, "PB"),
+        (10**21, "EB"),
+        (10**24, "ZB"),
+        (10**27, "YB"),
+    ]
+    unit = ""
+    number_str = ""
+    for unit_ndx, (unit_max, unit_str) in enumerate(unit_maxes):
+        if number < unit_max or unit_ndx == len(unit_maxes) - 1:
+            unit = unit_str
+            if unit_ndx > 0:
+                reduced = number / unit_maxes[unit_ndx - 1][0]
+                number_str = f"{reduced:.2f}"
+            else:
+                number_str = f"{number}"
+            break
+
+    return f"{number_str}{unit}"
+
+
 # bin_type = types.TypedDict({"start": types.Number(), "stop": types.Number()})
 
 
