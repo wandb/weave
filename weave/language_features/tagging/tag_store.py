@@ -18,6 +18,8 @@ The primary user-facing functions are:
 import contextvars
 from contextlib import contextmanager
 import typing
+import weakref
+
 
 import pyarrow as pa
 
@@ -101,6 +103,18 @@ def with_visited_obj(obj: typing.Any) -> typing.Iterator[None]:
         visited_obj_ids.remove(id_val)
 
 
+def _remove_tags(mem_map: dict[int, typing.Any], id_val: int) -> None:
+    node_tags = _OBJ_TAGS_MEM_MAP.get()
+    if node_tags is None:
+        return
+    # The tags can be on any node, so we need to check all of them.
+    # This is algorithmically inefficient and could be a serious performance
+    # problem.
+    for node_id, tag_map in node_tags.items():
+        if id_val in tag_map:
+            del tag_map[id_val]
+
+
 # Adds a dictionary of tags to an object
 def add_tags(
     obj: typing.Any,
@@ -111,6 +125,17 @@ def add_tags(
     if mem_map is None:
         raise errors.WeaveInternalError("No tag store context")
     id_val = id(obj)
+    if id_val not in mem_map:
+        # Ensure we cleanup the tags when the object is garbage collected.
+        # Python is happy to reuse IDs after they are freed!
+        try:
+            weakref.finalize(obj, _remove_tags, mem_map, id_val)
+        except TypeError:
+            # This happens for BoxedInt and probably other boxed types.
+            # You're not allow to use weakrefs on classes that inherit
+            # from basic python types.
+            # TODO: probably an issue.
+            pass
     assert box.is_boxed(obj), "Can only tag boxed objects"
     existing_tags = get_tags(obj) if is_tagged(obj) else {}
     if give_precedence_to_existing_tags:
