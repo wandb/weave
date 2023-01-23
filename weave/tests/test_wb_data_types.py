@@ -167,4 +167,4 @@ def test_image(sdk_obj, expected_type, fake_wandb):
     logged_artifact._manifest = art.manifest
     art._logged_artifact = logged_artifact
 
-    assert weave0_type_json_to_weave1_type(obj_json, art) == expected_type
+    assert weave0_type_json_to_weave1_type(obj_json) == expected_type

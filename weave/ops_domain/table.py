@@ -171,12 +171,9 @@ def _get_rows_and_object_type_from_weave_format(
         raise errors.WeaveInternalError(
             "Weave table file format is only supported for wandb artifacts"
         )
-    wb_artifact = artifact._read_artifact
     row_data = data["data"]
     column_types = data["column_types"]
-    converted_object_type = wandb_util.weave0_type_json_to_weave1_type(
-        column_types, wb_artifact
-    )
+    converted_object_type = wandb_util.weave0_type_json_to_weave1_type(column_types)
     if not isinstance(converted_object_type, types.TypedDict):
         raise errors.WeaveInternalError(
             "Weave table file format only supports typed dicts"
