@@ -228,8 +228,7 @@ FilesystemArtifactFileType.instance_classes = FilesystemArtifactFile
 
 class FilesystemArtifactDirType(file_base.BaseDirType):
     name = "dir"
-
-    artifact: types.Type = types.Any()
+    artifact: "FilesystemArtifactType" = FilesystemArtifactType()
 
     def property_types(self) -> dict[str, types.Type]:
         return {
