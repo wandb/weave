@@ -13,3 +13,4 @@ MNIST
 food-101
 food-101.tar.gz
 gha-creds-*.json
+.vscode/launch.json
