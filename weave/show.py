@@ -15,7 +15,6 @@ from . import storage
 from . import util
 from . import errors
 from . import usage_analytics
-from . import automation
 from . import ref_base
 
 
@@ -78,7 +77,7 @@ def _show_params(obj):
         )
 
 
-def show_url(obj=None, enable_automation=False):
+def show_url(obj=None):
     params = _show_params(obj)
     panel_url = f"{context.get_frontend_url()}/__frontend/weave_jupyter?fullScreen"
     if "weave_node" in params:
@@ -94,7 +93,7 @@ def show_url(obj=None, enable_automation=False):
     return panel_url
 
 
-def show(obj=None, height=400, enable_automation=False):
+def show(obj=None, height=400):
     if not util.is_notebook():
         raise RuntimeError(
             "`weave.show()` can only be called within notebooks. To extract the value of "
@@ -102,20 +101,10 @@ def show(obj=None, height=400, enable_automation=False):
         )
 
     usage_analytics.show_called()
-    panel_url = show_url(obj, enable_automation)
-
-    automation_handle = None
-    if enable_automation:
-        automation_id = "".join(
-            random.choice(string.ascii_uppercase + string.digits) for _ in range(14)
-        )
-        automation_handle = automation.AutomationHandle(automation_id)
-        panel_url += "&automationId=%s" % automation_id
+    panel_url = show_url(obj)
 
     iframe = IFrame(panel_url, "100%", "%spx" % height)
     display(iframe)
-
-    return automation_handle
 
 
 def _ipython_display_method_(self):
