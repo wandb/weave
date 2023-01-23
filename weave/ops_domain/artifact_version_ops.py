@@ -262,12 +262,10 @@ def _artifact_version_to_wb_artifact(artifactVersion: wdt.ArtifactVersion):
     )
 
 
+# Warning: see comment on ops_primitives/artifacts:artifact_file
 @op(name="artifactVersion-file")
 def file_(
     artifactVersion: wdt.ArtifactVersion, path: str
 ) -> typing.Optional[artifact_fs.FilesystemArtifactFile]:
     art_local = _artifact_version_to_wb_artifact(artifactVersion)
-    item = art_local.path_info(path)
-    if not isinstance(item, artifact_fs.FilesystemArtifactFile):
-        return None
-    return item
+    return art_local.path_info(path)  # type: ignore

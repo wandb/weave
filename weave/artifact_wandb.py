@@ -346,14 +346,17 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         manifest = av.manifest
         manifest_entry = manifest.get_entry_by_path(path)
         if manifest_entry is not None:
-            if manifest_entry.ref:
-                # A ref to another artifact, just return it.
-                ref = uris.WeaveURI.parse(manifest_entry.ref).to_ref()
-                if not isinstance(ref, artifact_fs.FilesystemArtifactRef):
-                    raise errors.WeaveInternalError(
-                        "unexpected ref type contained in artifact: %s" % ref
-                    )
-                return ref
+            # This is not a WeaveURI! Its the artifact reference style used
+            # by the W&B Artifacts/media layer.
+            ref_prefix = "wandb-artifact://"
+            if manifest_entry.ref and manifest_entry.ref.startswith(ref_prefix):
+                # This is a reference to another artifact
+                art_id, target_path = manifest_entry.ref[len(ref_prefix) :].split(
+                    "/", 1
+                )
+                return artifact_fs.FilesystemArtifactFile(
+                    get_wandb_read_client_artifact(art_id), target_path
+                )
             # This is a file
             return artifact_fs.FilesystemArtifactFile(self, path)
 
@@ -383,8 +386,8 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
                     sub_dirs[dir_name] = dir_
                 dir_ = sub_dirs[dir_name]
                 if len(rel_path_parts) == 2:
-                    files = typing.cast(dict, dir_.files)
-                    files[rel_path_parts[1]] = artifact_fs.FilesystemArtifactFile(
+                    dir_files = typing.cast(dict, dir_.files)
+                    dir_files[rel_path_parts[1]] = artifact_fs.FilesystemArtifactFile(
                         self,
                         entry_path,
                     )
@@ -483,7 +486,7 @@ class WeaveWBArtifactURI(uris.WeaveURI):
         project_name = parts[1]
         name, version = parts[2].split(":", 1)
         file_path: typing.Optional[str] = None
-        if len(parts) > 1:
+        if len(parts) > 3:
             file_path = "/".join(parts[3:])
         extra: typing.Optional[list[str]] = None
         if fragment:

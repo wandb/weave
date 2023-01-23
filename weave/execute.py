@@ -229,13 +229,18 @@ def execute_forward_node(
     cache_mode = environment.cache_mode()
     if cache_mode == environment.CacheMode.MINIMAL:
         no_cache = True
-        if not node.from_op.name.startswith("mapped") and node.from_op.name.endswith(
-            "file-table"
+        if not node.from_op.name.startswith("mapped") and (
+            node.from_op.name.endswith("file-table")
+            or node.from_op.name.endswith("artifactVersion-file")
+            or node.from_op.name.endswith("FilesystemArtifact-file")
         ):
             # Always cache file-table for now. file-table converts from the W&B json
             # table format to the much faster Weave arrow format. Since Weave cache
             # is like permanent memoization, this means each W&B table we encounter will
             # only be converted once.
+            # Also cache artifactVersion-file and FilesystemArtifact-file. They require
+            # loading a wandb artifact, which right now makes a sequence of 3-5 requests
+            # to the W&B API.
             no_cache = False
 
     use_cache = not no_cache

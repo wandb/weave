@@ -11,6 +11,7 @@ from .. import artifact_wandb
 from .. import errors
 from .. import wandb_util
 from .. import weave_internal
+from . import wbmedia
 
 
 @dataclasses.dataclass(frozen=True)
@@ -136,8 +137,7 @@ class JoinedTable:
 
 
 def _data_is_legacy_run_file_format(data):
-    keys = set(data.keys())
-    return keys == {"columns", "data"}
+    return "columns" in data and "data" in data
 
 
 def _data_is_weave_file_format(data):
@@ -147,7 +147,19 @@ def _data_is_weave_file_format(data):
 def _get_rows_and_object_type_from_legacy_format(data):
     rows = [dict(zip(data["columns"], row)) for row in data["data"]]
     object_type = types.TypeRegistry.type_of(rows).object_type
-    return rows, object_type
+
+    prop_types = {}
+
+    # Quick hack to support just images for legacy tables.
+    # TODO: better / more general support for other types. E.g. this doesn't
+    # handle nullable
+    for k, pt in object_type.property_types.items():
+        if isinstance(pt, types.TypedDict) and "_type" in pt.property_types:
+            prop_types[k] = wbmedia.ImageArtifactFileRef.WeaveType()
+        else:
+            prop_types[k] = pt
+
+    return rows, types.TypedDict(prop_types)
 
 
 def _get_rows_and_object_type_from_weave_format(
@@ -242,10 +254,10 @@ def _get_table_awl_from_file(
     rows = []
     object_type = None
 
-    if _data_is_legacy_run_file_format(data):
-        rows, object_type = _get_rows_and_object_type_from_legacy_format(data)
-    elif _data_is_weave_file_format(data):
+    if _data_is_weave_file_format(data):
         rows, object_type = _get_rows_and_object_type_from_weave_format(data, file)
+    elif _data_is_legacy_run_file_format(data):
+        rows, object_type = _get_rows_and_object_type_from_legacy_format(data)
     else:
         raise errors.WeaveInternalError("Unknown table file format for data")
 

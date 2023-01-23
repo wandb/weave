@@ -245,7 +245,7 @@ class FilesystemArtifactDirType(file_base.BaseDirType):
 
 
 @dataclasses.dataclass
-class FilesystemArtifactDir:
+class FilesystemArtifactDir(file_base.Dir):
     artifact: "FilesystemArtifact"
     fullPath: str
     size: int
