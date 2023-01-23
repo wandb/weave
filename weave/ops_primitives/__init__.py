@@ -10,6 +10,7 @@ from .dict import *
 from .set_ import *
 from .file import *
 from .file_local import *
+from .file_artifact import *
 from .weave_api import *
 from .pandas_ import *
 from .csv_ import *

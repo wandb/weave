@@ -187,6 +187,7 @@ def get_op_for_inputs(name: str, kwargs: dict[str, types.Type]) -> op_def.OpDef:
     #    type.
     ops = _dispatch_first_arg(name, input_types[0])
     if not ops:
+        logging.info('No ops found for "%s" with first arg "%s"', name, input_types[0])
         err = errors.WeaveDispatchError(
             f'Cannot dispatch op "{name}"; no matching op found'
         )

@@ -1,7 +1,9 @@
 import contextlib
+import dataclasses
 import typing
 import json
 import datetime
+import os
 
 from . import artifact_base
 from . import ref_base
@@ -9,6 +11,14 @@ from . import ref_util
 from . import weave_types as types
 from . import uris
 from . import errors
+from . import file_base
+
+
+class FilesystemArtifactType(types.Type):
+    def save_instance(
+        self, obj: "FilesystemArtifact", artifact: "FilesystemArtifact", name: str
+    ) -> "FilesystemArtifactRef":
+        return FilesystemArtifactRef(obj, None)
 
 
 class FilesystemArtifact(artifact_base.Artifact):
@@ -59,8 +69,45 @@ class FilesystemArtifact(artifact_base.Artifact):
         raise NotImplementedError
 
     @property
-    def location(self) -> uris.WeaveURI:
+    def uri_obj(self) -> uris.WeaveURI:
         raise NotImplementedError
+
+    @property
+    def uri(self) -> str:
+        return str(self.uri_obj)
+
+    def path(self, path: str) -> str:
+        raise NotImplementedError
+
+    def path_info(
+        self, path: str
+    ) -> typing.Optional[
+        typing.Union["FilesystemArtifactFile", "FilesystemArtifactDir"]
+    ]:
+        if ":" in path:
+            # This is a full URI, not a local path.
+            ref = uris.WeaveURI.parse(path).to_ref()
+            if not isinstance(ref, FilesystemArtifactRef) or ref.path is None:
+                raise errors.WeaveInternalError(f"Cannot get path info for {path}")
+            return ref.artifact.path_info(ref.path)
+        res = self._path_info(path)
+        if isinstance(res, FilesystemArtifactRef):
+            if res.path is None:
+                raise errors.WeaveInternalError(f"Cannot get path info for {path}")
+            return res.artifact.path_info(res.path)
+        return res
+
+    def _path_info(
+        self, path: str
+    ) -> typing.Optional[
+        typing.Union[
+            "FilesystemArtifactFile", "FilesystemArtifactDir", "FilesystemArtifactRef"
+        ]
+    ]:
+        raise NotImplementedError
+
+
+FilesystemArtifactType.instance_classes = FilesystemArtifact
 
 
 class FilesystemArtifactRef(artifact_base.ArtifactRef):
@@ -77,44 +124,37 @@ class FilesystemArtifactRef(artifact_base.ArtifactRef):
         return f"<{self.__class__}({id(self)}) artifact={self.artifact} path={self.path} type={self.type} obj={self.obj is not None} extra={self.extra}"
 
     @property
-    def is_saved(self) -> bool:
-        return self.artifact.is_saved
+    def type(self) -> types.Type:
+        if self._type is not None:
+            return self._type
+        if self.path is None:
+            return types.TypeRegistry.type_of(self.artifact)
+        try:
+            with self.artifact.open(f"{self.path}.type.json") as f:
+                type_json = json.load(f)
+        except (FileNotFoundError, KeyError):
+            return types.TypeRegistry.type_of(self.artifact.path_info(self.path))
+        self._type = types.TypeRegistry.type_from_dict(type_json)
+        return self._type
 
     @property
-    def created_at(self) -> datetime.datetime:
-        return self.artifact.created_at
+    def name(self) -> str:
+        return self.artifact.name
 
     @property
     def version(self) -> str:
         return self.artifact.version
 
     @property
-    def name(self) -> str:
-        return self.artifact.location.full_name
-
-    @property
-    def type(self) -> types.Type:
-        if self._type is not None:
-            return self._type
-        try:
-            with self.artifact.open(f"{self.path}.type.json") as f:
-                type_json = json.load(f)
-        except (FileNotFoundError, KeyError):
-            # If there's no type file, this is a Ref to the file itself
-            # TODO: refactor
-            return self.FileType()
-        self._type = types.TypeRegistry.type_from_dict(type_json)
-        return self._type
+    def is_saved(self) -> bool:
+        return self.artifact.is_saved
 
     @property
     def uri(self) -> str:
-        # TODO: should artifacts themselves be "extras" aware??
-        # this is really clunky but we cannot use artifact URI since we need
-        # to handle extras here which is not present in the artifact
-        uri = self.artifact.location
+        uri = typing.cast("FilesystemArtifactURI", self.artifact.uri_obj)
+        uri.path = self.path
         uri.extra = self.extra
-        uri.file = self.path
-        return uri.uri
+        return str(uri)
 
     def versions(self) -> list["FilesystemArtifactRef"]:
         raise NotImplementedError
@@ -131,3 +171,87 @@ class FilesystemArtifactRef(artifact_base.ArtifactRef):
         if self.extra is not None:
             s += "#%s" % "/".join(self.extra)
         return s
+
+
+@dataclasses.dataclass
+class FilesystemArtifactURI(uris.WeaveURI):
+    name: str
+    version: str
+    path: typing.Optional[str] = None
+    extra: typing.Optional[list[str]] = None
+
+    def __init__(*args: list[typing.Any], **kwargs: dict[str, typing.Any]) -> None:
+        raise NotImplementedError
+
+
+@dataclasses.dataclass(frozen=True)
+class FilesystemArtifactFileType(file_base.FileBaseType):
+    # Note the name! When Weave0 uses "file" it means FilesystemArtifactFile.
+    name = "file"
+
+    def save_instance(
+        self,
+        obj: "FilesystemArtifactFile",
+        artifact: FilesystemArtifact,
+        name: str,
+    ) -> FilesystemArtifactRef:
+        return FilesystemArtifactRef(obj.artifact, obj.path)
+
+    def load_instance(
+        self,
+        artifact: FilesystemArtifact,
+        name: str,
+        extra: typing.Optional[list[str]] = None,
+    ) -> "FilesystemArtifactFile":
+        return FilesystemArtifactFile(artifact, name)
+
+
+@dataclasses.dataclass
+class FilesystemArtifactFile(file_base.File):
+    artifact: "FilesystemArtifact"
+    path: str
+
+    @contextlib.contextmanager
+    def open(self, mode: str = "r") -> typing.Generator[typing.IO, None, None]:
+        if "r" in mode:
+            binary = False
+            if "b" in mode:
+                binary = True
+            with self.artifact.open(self.path, binary=binary) as f:
+                yield f
+        else:
+            raise NotImplementedError
+
+
+FilesystemArtifactFileType.instance_classes = FilesystemArtifactFile
+
+
+class FilesystemArtifactDirType(file_base.BaseDirType):
+    name = "dir"
+
+    artifact: types.Type = types.Any()
+
+    def property_types(self) -> dict[str, types.Type]:
+        return {
+            "artifact": self.artifact,
+            "fullPath": types.String(),
+            "size": types.Int(),
+            "dirs": types.Dict(
+                types.String(),
+                file_base.SubDirType(FilesystemArtifactFileType()),
+            ),
+            "files": types.Dict(types.String(), FilesystemArtifactFileType()),
+        }
+
+
+@dataclasses.dataclass
+class FilesystemArtifactDir:
+    artifact: "FilesystemArtifact"
+    fullPath: str
+    size: int
+    # TODO: these should be mappings instead!
+    dirs: dict[str, file_base.SubDir]
+    files: dict[str, FilesystemArtifactFile]
+
+
+FilesystemArtifactDirType.instance_classes = FilesystemArtifactDir

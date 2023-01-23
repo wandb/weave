@@ -8,6 +8,7 @@ from . import weavejs_ops
 import json
 from . import fixture_fakewandb as fwb
 from .. import graph
+from .. import artifact_fs
 from ..ops_domain import wb_domain_types as wdt
 from ..ops_domain import artifact_membership_ops as amo
 from ..ops_primitives import list_, dict_
@@ -201,7 +202,7 @@ def test_table_call(table_file_node, mock_response, fake_wandb):
     image0_url_node = (
         ops.wbmedia.artifactVersion(table_image0_node)
         .file(
-            "wandb-artifact://stacey/mendeleev/test_res_1fwmcd3q:v0?file=media%2Fimages%2F8f65e54dc684f7675aec.png"
+            "wandb-artifact:///stacey/mendeleev/test_res_1fwmcd3q:v0/media/images/8f65e54dc684f7675aec.png"
         )
         .direct_url_as_of(1654358491562)
     )
@@ -221,12 +222,13 @@ def test_avfile_type(fake_wandb):
         .file("test_results.table.json")
     )
     t = weavejs_ops.file_type(f)
-    # TODO: totally weird that this is a dict and not a string.
-    assert weave.use(t) == {
-        "type": "file",
-        "extension": "json",
-        "wbObjectType": {"type": "table"},
-    }
+    assert weave.use(t) == TaggedValueType(
+        types.TypedDict(property_types={"project": wdt.ProjectType}),
+        artifact_fs.FilesystemArtifactFileType(
+            extension=types.Const(types.String(), "json"),
+            wbObjectType=ops.TableType(),
+        ),
+    )
 
 
 def test_table_col_order_and_unknown_types(fake_wandb):
@@ -287,7 +289,7 @@ def test_map_gql_op(fake_wandb):
 
 
 def test_legacy_run_file_table_format(fake_wandb):
-    fake_wandb.add_mock(lambda q, ndx: workspace_response)
+    fake_wandb.add_mock(table_mock1)
     cell_node = (
         ops.project("stacey", "mendeleev")
         .runs()

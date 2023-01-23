@@ -368,12 +368,12 @@ class OpDef:
         return common_name(self.name)
 
     @property
-    def uri(self):
-        return self.location.uri if self.location is not None else self.name
+    def uri(self) -> str:
+        return str(self.location) if self.location is not None else self.name
 
     @property
     def simple_name(self):
-        return uris.WeaveURI.parse(self.name).full_name
+        return uris.WeaveURI.parse(self.name).name
 
     @property
     def is_mutation(self):

@@ -73,6 +73,11 @@ class Op(typing.Generic[OpInputNodeT]):
         self.inputs = inputs
         self._full_name = None
 
+    @property
+    def friendly_name(self) -> str:
+        full_name = self.full_name
+        return full_name.split("-", 1)[-1]
+
     # Called frequently and expensive, so cache it.
     @functools.cached_property
     def full_name(self) -> str:
@@ -242,16 +247,11 @@ def for_each(graph: Node, visitor: typing.Callable[[Node], None]) -> None:
 
 def opuri_full_name(op_uri: str) -> str:
     uri = uris.WeaveURI.parse(op_uri)
-    return uri.full_name
+    return uri.name
 
 
 def op_full_name(op: Op) -> str:
     return opuri_full_name(op.name)
-
-
-def opuri_expr_str(op_uri: str) -> str:
-    # TODO(jason): maybe this should return something different compared to opname_without_version??
-    return uris.WeaveURI.parse(op_uri).friendly_name
 
 
 def node_expr_str(node: Node) -> str:
@@ -280,17 +280,17 @@ def node_expr_str(node: Node) -> str:
             )
         elif node.from_op.name == "gqlroot-wbgqlquery":
             query_hash = "_query_"  # TODO: make a hash from the query for idenity
-            return f'{opuri_expr_str(node.from_op.name)}({query_hash}, {", ".join(node_expr_str(node.from_op.inputs[n]) for n in param_names[1:])})'
+            return f'{node.from_op.friendly_name}({query_hash}, {", ".join(node_expr_str(node.from_op.inputs[n]) for n in param_names[1:])})'
         elif all([not isinstance(n, OutputNode) for n in node.from_op.inputs.values()]):
             return "%s(%s)" % (
-                opuri_expr_str(node.from_op.name),
+                node.from_op.friendly_name,
                 ", ".join(node_expr_str(node.from_op.inputs[n]) for n in param_names),
             )
         if not param_names:
-            return "%s()" % opuri_expr_str(node.from_op.name)
+            return "%s()" % node.from_op.friendly_name
         return "%s.%s(%s)" % (
             node_expr_str(node.from_op.inputs[param_names[0]]),
-            opuri_expr_str(node.from_op.name),
+            node.from_op.friendly_name,
             ", ".join(node_expr_str(node.from_op.inputs[n]) for n in param_names[1:]),
         )
     elif isinstance(node, ConstNode):

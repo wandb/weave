@@ -42,7 +42,7 @@ class Registry:
             # if we're not loading an existing op, save it.
             ref = storage.save(op, name=op.name)
             version = ref.version
-            location = ref.artifact.location
+            location = ref.artifact.uri_obj
         version = location.version if location is not None else None
         op.version = version
         op.location = location
@@ -60,15 +60,17 @@ class Registry:
     def get_op(self, uri: str) -> op_def.OpDef:
         object_uri = uris.WeaveURI.parse(uri)
         if object_uri.version is not None:
-            object_key = (object_uri.full_name, object_uri.version)
+            object_key = (object_uri.name, object_uri.version)
             if object_key in self._op_versions:
                 res = self._op_versions[object_key]
             else:
                 res = storage.get(uri)
                 self._op_versions[object_key] = res
-        elif object_uri.full_name in self._ops:
-            res = self._ops[object_uri.full_name]
+        elif object_uri.name in self._ops:
+            res = self._ops[object_uri.name]
         else:
+            if not ":" in uri:
+                raise errors.WeaveInternalError("Op not registered: %s" % uri)
             res = storage.get(uri)
         if res is None:
             raise errors.WeaveInternalError("Op not registered: %s" % uri)

@@ -44,7 +44,7 @@ def test_trace():
     mult_run = trace.get_obj_creator(storage._get_ref(res))
     assert mult_run.op_name == "number-mult"
     assert re.match(
-        "^local-artifact://.*run-number-add-.*-output/.*$", str(mult_run.inputs["lhs"])
+        "^local-artifact://.*run-number-add-.*-output:.*$", str(mult_run.inputs["lhs"])
     )
     assert mult_run.inputs["rhs"] == 4
     add_run = trace.get_obj_creator(mult_run.inputs["lhs"])

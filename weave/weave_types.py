@@ -78,17 +78,12 @@ def instance_class_to_potential_type(cls):
     return result
 
 
-def type_class_type_name(type_class):
-    if hasattr(type_class, "class_type_name"):
-        return type_class.class_type_name()
-
-
 @functools.cache
 def type_name_to_type_map():
     res = {}
     type_classes = get_type_classes()
     for type_class in type_classes:
-        name = type_class_type_name(type_class)
+        name = type_class.name
         if name is not None:
             res[name] = type_class
     return res
@@ -134,15 +129,6 @@ class TypeRegistry:
         if "function" in (t.name for t in potential_types):
             potential_types = [Function]
 
-        # FileType and ArtifactFileVersionFileType are peers because
-        # one is an ObjectType and one is a base type, and we don't
-        # know python class hierarchy. This is a major major hack
-        # to force ArtifactVersionFile in that case.
-        # TODO: fix in refactor!!
-        for t in potential_types:
-            if t.name == "ArtifactVersionFile":
-                return t()
-
         for type_ in reversed(potential_types):
             obj_type = type_.type_of(obj)
             if obj_type is not None:
@@ -176,6 +162,14 @@ def _cached_hash(self):
         return hashed
 
 
+class classproperty(object):
+    def __init__(self, f):
+        self.f = f
+
+    def __get__(self, obj, owner):
+        return self.f(owner)
+
+
 # Addapted from https://stackoverflow.com/questions/18126552/how-to-run-code-when-a-class-is-subclassed
 class _TypeSubclassWatcher(type):
     def __init__(cls, name, bases, clsdict):
@@ -187,7 +181,7 @@ class _TypeSubclassWatcher(type):
         # Set _base_type to the first base class
         if bases and bases[0] != Type:
             if cls.__dict__.get("_base_type") is None:
-                cls._base_type = bases[0]()
+                cls._base_type = bases[0]
 
         # Override the dataclass __hash__ with our own version
         cls.__hash__ = _cached_hash
@@ -197,7 +191,7 @@ class _TypeSubclassWatcher(type):
 class Type(metaclass=_TypeSubclassWatcher):
     # This is like Typescript "extends", and is populated by default by
     # Python inheritance in our metaclass.
-    _base_type: typing.ClassVar[typing.Optional["Type"]] = None
+    _base_type: typing.ClassVar[typing.Optional[typing.Type["Type"]]] = None
 
     instance_class: typing.ClassVar[typing.Optional[type]]
     instance_classes: typing.ClassVar[
@@ -215,14 +209,6 @@ class Type(metaclass=_TypeSubclassWatcher):
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}()"
-
-    @classmethod
-    def class_type_name(cls):
-        if cls == Type:
-            return "type"
-        if hasattr(cls, "name") and type(cls.name) == str:
-            return cls.name
-        return cls.__name__.removesuffix("Type")
 
     @classmethod
     def _instance_classes(cls):
@@ -270,9 +256,11 @@ class Type(metaclass=_TypeSubclassWatcher):
         # Default implementation for Types that take no arguments.
         return cls()
 
-    @property
-    def name(self):
-        return self.class_type_name()
+    @classproperty
+    def name(cls):
+        if cls == Type:
+            return "type"
+        return cls.__name__.removesuffix("Type")
 
     @property  # type: ignore
     def instance_class(self):
@@ -302,36 +290,44 @@ class Type(metaclass=_TypeSubclassWatcher):
         return None
 
     def _assign_type_inner(self, next_type: "Type") -> bool:
-        if self.__class__ == next_type.__class__ or (
-            next_type._base_type is not None
-            and isinstance(next_type._base_type, self.__class__)
-        ):
-            if callable(self.type_vars):
-                type_vars = self.type_vars()
-            else:
-                type_vars = self.type_vars
-            for prop_name in type_vars:
-                if not hasattr(next_type, prop_name):
-                    raise errors.WeaveInternalError(
-                        "type %s missing attributes of base type %s" % (next_type, self)
-                    )
-                if not getattr(self, prop_name).assign_type(
-                    getattr(next_type, prop_name)
-                ):
-                    return False
-            return True
-        return False
+        # First check that we match next_type class or one of
+        # its bases.
+        next_type_class = next_type.__class__
+        while True:
+            if self.__class__ == next_type_class:
+                break
+            elif next_type_class._base_type is None:
+                # nothing left in base chain, no match
+                return False
+            next_type_class = next_type_class._base_type
+
+        # Now check that all type vars match
+        for prop_name in self.type_vars:
+            if not hasattr(next_type, prop_name):
+                raise errors.WeaveInternalError(
+                    "type %s missing attributes of base type %s" % (next_type, self)
+                )
+            if not getattr(self, prop_name).assign_type(getattr(next_type, prop_name)):
+                return False
+        return True
+
+    @classmethod
+    def class_to_dict(cls) -> dict[str, typing.Any]:
+        d = {"type": cls.name}
+        if cls._base_type is not None:
+            d["_base_type"] = cls._base_type.class_to_dict()
+        return d
 
     def to_dict(self) -> typing.Union[dict, str]:
         d = {"type": self.name}
         d.update(self._to_dict())
         return d
 
-    def _to_dict(self):
+    def _to_dict(self) -> dict:
         fields = dataclasses.fields(self.__class__)
         type_props = {}
         if self._base_type is not None:
-            type_props["_base_type"] = self._base_type.to_dict()
+            type_props["_base_type"] = {"type": self._base_type.name}
         for field in fields:
             # TODO: I really don't like this change. Only needed because
             # FileType has optional fields... Remove?
@@ -354,6 +350,7 @@ class Type(metaclass=_TypeSubclassWatcher):
     def save_instance(
         self, obj, artifact, name
     ) -> typing.Optional[typing.Union[list[str], "artifact_base.ArtifactRef"]]:
+        print("OBJ", obj)
         d = None
         try:
             d = self.instance_to_dict(obj)
@@ -621,7 +618,7 @@ class UnionType(Type):
 
     members: list[Type]
 
-    def __init__(self, *members):
+    def __init__(self, *members: Type) -> None:
         all_members = []
         for mem in members:
             if isinstance(mem, UnionType):
@@ -855,13 +852,13 @@ class ObjectType(Type):
             variable_prop_types[prop_name] = prop_type
         return cls(**variable_prop_types)
 
-    def _to_dict(self):
+    def _to_dict(self) -> dict:
+        d: dict = {"_is_object": True}
+        d = self.class_to_dict()
         # TODO: we don't need _is_object, now that we have base_type everywhere.
         # Remove the check for self._base_type.__class__ != ObjectType, and get
         # rid of _is_object (need to update frontend as well).
-        d = {"_is_object": True}
-        if self._base_type is not None and self._base_type.__class__ != ObjectType:
-            d["_base_type"] = self._base_type.to_dict()
+        d["_is_object"] = True
         for k, prop_type in self.property_types().items():
             d[to_weavejs_typekey(k)] = prop_type.to_dict()
         return d
@@ -1080,6 +1077,10 @@ def string_enum_type(*vals):
     return UnionType(*[Const(String(), v) for v in vals])
 
 
+def literal(val: typing.Any) -> Const:
+    return Const(TypeRegistry.type_of(val), val)
+
+
 RUN_STATE_TYPE = string_enum_type("pending", "running", "finished", "failed")
 
 # TODO: get rid of all the underscores. This is another
@@ -1106,91 +1107,6 @@ class RunType(ObjectType):
         if not issubclass(other_type.__class__, RunType):
             return other_type.assign_type(self.output)
         return None
-
-
-@dataclasses.dataclass(frozen=True)
-class FileType(ObjectType):
-    name = "file"
-
-    extension: String = String()
-    wb_object_type: dataclasses.InitVar[String] = String()
-
-    def _to_dict(self):
-        # NOTE: js_compat
-        # In the js Weave code, file is a non-standard type that
-        # puts a const string at extension as just a plain string.
-        d = super()._to_dict()
-        if isinstance(self.extension, Const):
-            d["extension"] = self.extension.val
-        if isinstance(self.wb_object_type, Const):
-            d["wbObjectType"] = {"type": self.wb_object_type.val}
-        return d
-
-    @classmethod
-    def from_dict(cls, d):
-        # NOTE: js_compat
-        # In the js Weave code, file is a non-standard type that
-        # puts a const string at extension as just a plain string.
-        d = {i: d[i] for i in d if i != "type"}
-        extension = String()
-        if "extension" in d:
-            extension = TypeRegistry.type_from_dict(
-                {
-                    "type": "const",
-                    "valType": "string",
-                    "val": d["extension"],
-                }
-            )
-        wb_object_type = None
-        if "wbObjectType" in d:
-            wb_object_type = TypeRegistry.type_from_dict(
-                {
-                    "type": "const",
-                    "valType": "string",
-                    "val": d["wbObjectType"]["type"],
-                }
-            )
-        return cls(extension, wb_object_type)
-
-    def property_types(self):
-        return {
-            "extension": self.extension,
-            "wb_object_type": self.extension,
-        }
-
-
-@dataclasses.dataclass(frozen=True)
-class SubDirType(ObjectType):
-    # TODO doesn't match frontend
-    name = "subdir"
-
-    file_type: FileType = FileType()
-
-    def property_types(self):
-        return {
-            "fullPath": String(),
-            "size": Int(),
-            "dirs": Dict(String(), Int()),
-            "files": Dict(String(), self.file_type),
-        }
-
-
-class DirType(ObjectType):
-    # Fronend src/model/types.ts switches on this (and PanelDir)
-    # TODO: We actually want to be localdir here. But then the
-    # frontend needs to use a different mechanism for type checking
-    name = "dir"
-
-    def __init__(self):
-        pass
-
-    def property_types(self):
-        return {
-            "fullPath": String(),
-            "size": Int(),
-            "dirs": Dict(String(), SubDirType()),
-            "files": Dict(String(), FileType()),
-        }
 
 
 def merge_types(a: Type, b: Type) -> Type:

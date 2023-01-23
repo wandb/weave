@@ -157,11 +157,11 @@ def test_ref_type(test_artifact_dir):
     python_ref = storage.to_python(ref)
     assert python_ref == {
         "_type": {
-            "_base_type": {"objectType": "unknown", "type": "Ref"},
+            "_base_type": {"type": "Ref"},
             "type": "LocalArtifactRef",
             "objectType": {"type": "typedDict", "propertyTypes": {"x": "int"}},
         },
-        "_val": f"local-artifact://{test_artifact_dir}/my-dict/6036cbf3a05809f1a3f174a1485b1770",
+        "_val": f"local-artifact:///my-dict:10e1804d2dd19195ac2d236f357b9288/obj",
     }
     ref2 = storage.from_python(python_ref)
     obj2 = storage.deref(ref2)

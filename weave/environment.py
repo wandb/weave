@@ -4,7 +4,7 @@
 
 import enum
 import os
-import typing
+import pathlib
 from . import util
 
 # There are currently two cache modes:
@@ -26,3 +26,13 @@ def cache_mode() -> CacheMode:
 
 def wandb_production() -> bool:
     return os.getenv("WEAVE_ENV") == "wandb_production"
+
+
+def is_public() -> bool:
+    return wandb_production()
+
+
+def weave_data_dir() -> pathlib.Path:
+    return pathlib.Path(
+        os.environ.get("WEAVE_LOCAL_ARTIFACT_DIR") or "/tmp/local-artifacts"
+    )

@@ -124,7 +124,7 @@ class OpDefType(types.Type):
         module_path = ".".join(parts)
 
         sys.path.insert(0, artifact_util.local_artifact_dir())
-        with context_state.loading_op_location(artifact.location):
+        with context_state.loading_op_location(artifact.uri_obj):
             # This has a side effect of registering the op
             mod = __import__(module_path)
         sys.path.pop(0)

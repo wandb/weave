@@ -24,6 +24,7 @@ from .context import (
 )
 from .server import capture_weave_server_logs
 from .val_const import const
+from .file_base import File, Dir
 
 from .weave_internal import define_fn
 

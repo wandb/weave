@@ -49,12 +49,12 @@ class Ref:
         return uris.WeaveURI.parse(s).to_ref()
 
     @property
-    def name(self) -> str:
-        raise NotImplementedError()
+    def uri(self) -> str:
+        raise NotImplementedError
 
     @property
-    def uri(self) -> str:
-        raise NotImplementedError()
+    def is_saved(self) -> bool:
+        raise NotImplementedError
 
     def get(self) -> typing.Any:
         return self.obj
@@ -63,7 +63,7 @@ class Ref:
         raise NotImplementedError
 
     def __str__(self) -> str:
-        return self.uri
+        return str(self.uri)
 
 
 def get_ref(obj: typing.Any) -> typing.Optional[Ref]:

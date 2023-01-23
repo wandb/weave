@@ -1,12 +1,13 @@
 import contextlib
+import dataclasses
 import hashlib
 import os
 import json
+import typing
 import shutil
 from datetime import datetime
 import pathlib
 import tempfile
-import typing
 
 from . import uris
 from . import util
@@ -15,6 +16,8 @@ from . import errors
 from . import weave_types as types
 from . import artifact_fs
 from . import artifact_util
+from . import file_base
+from . import file_util
 
 
 # From sdk/interface/artifacts.py
@@ -38,6 +41,14 @@ def local_artifact_exists(name: str, branch: str) -> bool:
     )
 
 
+class LocalArtifactType(artifact_fs.FilesystemArtifactType):
+    def save_instance(self, obj, artifact, name) -> "LocalArtifactRef":
+        return LocalArtifactRef(obj, None)
+
+    # No load_instance because we're returning a ref from save_instance.
+    # Weave handles loading from that Ref automatically.
+
+
 class LocalArtifact(artifact_fs.FilesystemArtifact):
     _existing_dirs: list[str]
 
@@ -50,12 +61,17 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
         #
         # So for performance, its important to not create the directory structure until
         # until we actually need to write to the artifact.
+        if "/" in name or "\\" in name or ".." in name or ":" in name:
+            raise ValueError('Artifact name cannot contain "/" or "\\" or ".." or ":"')
         self.name = name
         self._version = version
         self._root = os.path.join(artifact_util.local_artifact_dir(), name)
         self._path_handlers: dict[str, typing.Any] = {}
         self._setup_dirs()
         self._existing_dirs = []
+
+    def ref(self) -> "LocalArtifactRef":
+        return LocalArtifactRef(self, None, None)
 
     def __repr__(self):
         return "<LocalArtifact(%s) %s %s>" % (id(self), self.name, self._version)
@@ -94,19 +110,36 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
                 self._version = os.path.basename(os.path.realpath(self._read_dirname))
                 self._read_dirname = os.path.join(self._root, self._version)
 
+    def _get_read_path(self, path: str) -> pathlib.Path:
+        read_dirname = pathlib.Path(self._read_dirname)
+        full_path = read_dirname / path
+        if not pathlib.Path(full_path).resolve().is_relative_to(read_dirname.resolve()):
+            raise errors.WeaveAccessDeniedError()
+        return full_path
+
+    def _get_write_path(self, path: str) -> pathlib.Path:
+        write_dirname = pathlib.Path(self._write_dirname)
+        full_path = write_dirname / path
+        if (
+            not pathlib.Path(full_path)
+            .resolve()
+            .is_relative_to(write_dirname.resolve())
+        ):
+            raise errors.WeaveAccessDeniedError()
+        return full_path
+
     def path(self, name: str) -> str:
-        return os.path.join(self._read_dirname, name)
+        return str(self._get_read_path(name))
 
     @property
-    def location(self) -> uris.WeaveURI:
-        return WeaveLocalArtifactURI.from_parts(
-            os.path.abspath(artifact_util.local_artifact_dir()),
+    def uri_obj(self) -> uris.WeaveURI:
+        version = self._version
+        if version is None:
+            raise errors.WeaveInternalError("Cannot get uri for unsaved artifact!")
+        return WeaveLocalArtifactURI(
             self.name,
-            self._version,
+            version,
         )
-
-    def uri(self) -> str:
-        return self.location.uri
 
     def _makedir(self, dirname: str):
         # Keep track of directories we've already created so we don't
@@ -123,13 +156,13 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
         mode = "w"
         if binary:
             mode = "wb"
-        f = open(full_path, mode)
+        f = file_util.safe_open(full_path, mode)
         yield f
         f.close()
 
     @contextlib.contextmanager
     def new_dir(self, path):
-        full_path = os.path.abspath(os.path.join(self._write_dirname, path))
+        full_path = self._get_write_path(path)
         self._makedir(full_path)
         os.makedirs(full_path, exist_ok=True)
         yield full_path
@@ -139,7 +172,7 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
         mode = "r"
         if binary:
             mode = "rb"
-        f = open(os.path.join(self._read_dirname, path), mode)
+        f = file_util.safe_open(os.path.join(self._read_dirname, path), mode)
         yield f
         f.close()
 
@@ -151,13 +184,17 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
         return handler
 
     def read_metadata(self):
-        with open(os.path.join(self._read_dirname, ".artifact-version.json")) as f:
+        with file_util.safe_open(
+            os.path.join(self._read_dirname, ".artifact-version.json")
+        ) as f:
             obj = json.load(f)
             obj["created_at"] = datetime.fromisoformat(obj["created_at"])
             return obj
 
     def write_metadata(self, dirname):
-        with open(os.path.join(dirname, ".artifact-version.json"), "w") as f:
+        with file_util.safe_open(
+            os.path.join(dirname, ".artifact-version.json"), "w"
+        ) as f:
             json.dump({"created_at": datetime.now().isoformat()}, f)
 
     def save(self, branch="latest"):
@@ -230,10 +267,46 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
             os.symlink(self._version, temp_path)
             os.rename(temp_path, link_name)
 
+    def _path_info(
+        self, path: str
+    ) -> typing.Optional[
+        typing.Union[
+            "artifact_fs.FilesystemArtifactFile", "artifact_fs.FilesystemArtifactDir"
+        ]
+    ]:
+        read_dirname = pathlib.Path(self._read_dirname)
+        local_path = self._get_read_path(path)
+        if local_path.is_file():
+            return artifact_fs.FilesystemArtifactFile(self, path)
+        elif local_path.is_dir():
+            sub_files = {}
+            sub_dirs = {}
+            for sub_path in local_path.iterdir():
+                relpath = str(sub_path.relative_to(read_dirname))
+                if relpath == ".artifact-version.json":
+                    continue
+                if sub_path.is_file():
+                    sub_files[sub_path.name] = artifact_fs.FilesystemArtifactFile(
+                        self, relpath
+                    )
+                else:
+                    sub_dirs[sub_path.name] = file_base.SubDir(
+                        relpath,
+                        25,  # TODO: size
+                        {},
+                        {},
+                    )
+            return artifact_fs.FilesystemArtifactDir(
+                self, path, 14, sub_dirs, sub_files
+            )
+        else:
+            return None
+
+
+LocalArtifactType.instance_classes = LocalArtifact
+
 
 class LocalArtifactRef(artifact_fs.FilesystemArtifactRef):
-    FileType = types.FileType
-
     artifact: LocalArtifact
 
     def versions(self) -> list[artifact_fs.FilesystemArtifactRef]:
@@ -256,7 +329,7 @@ class LocalArtifactRef(artifact_fs.FilesystemArtifactRef):
                         "Could not get other version: %s %s"
                         % (self.artifact, version_name)
                     )
-                ref = LocalArtifactRef(art, path="_obj")
+                ref = LocalArtifactRef(art, path="obj")
                 # obj = uri.get()
                 # ref = get_ref(obj)
                 versions.append(ref)
@@ -269,8 +342,8 @@ class LocalArtifactRef(artifact_fs.FilesystemArtifactRef):
                 f"Invalid URI class passed to WandbLocalArtifactRef.from_uri: {type(uri)}"
             )
         return cls(
-            LocalArtifact(uri.full_name, uri.version),
-            path=uri.file,
+            LocalArtifact(uri.name, uri.version),
+            path=uri.path,
             obj=None,
             extra=uri.extra,
         )
@@ -282,45 +355,39 @@ types.LocalArtifactRefType.instance_classes = LocalArtifactRef
 LocalArtifact.RefClass = LocalArtifactRef
 
 
-# Used when the Weave object is located on disk (eg after saving locally).
-#
-# Note: this can change over time as it is only used in-process
-# local-artifact://user/timothysweeney/workspace/.../local-artifacts/<friendly_name>/<version>?extra=<extra_parts>
+@dataclasses.dataclass
 class WeaveLocalArtifactURI(uris.WeaveURI):
-    scheme = "local-artifact"
-
-    def __init__(self, uri: str) -> None:
-        super().__init__(uri)
-        parts = self.path.split("/")
-        if len(parts) < 2:
-            raise errors.WeaveInternalError("invalid uri ", uri)
-        self._full_name = parts[-2]
-        self._version = parts[-1]
+    SCHEME = "local-artifact"
+    path: typing.Optional[str] = None
+    extra: typing.Optional[list[str]] = None
 
     @classmethod
-    def from_parts(
-        cls: typing.Type["WeaveLocalArtifactURI"],
-        root: str,
-        friendly_name: str,
-        version: typing.Optional[str] = None,
-        extra: typing.Optional[list[str]] = None,
-        file: typing.Optional[str] = None,
-    ) -> "WeaveLocalArtifactURI":
-        return cls(cls.make_uri(root, friendly_name, version, extra, file))
+    def from_parsed_uri(
+        cls,
+        uri: str,
+        schema: str,
+        netloc: str,
+        path: str,
+        params: str,
+        query: dict[str, list[str]],
+        fragment: str,
+    ):
+        parts = path.strip("/").split("/")
+        name, version = parts[0].split(":", 1)
+        file_path: typing.Optional[str] = None
+        if len(parts) > 1:
+            file_path = "/".join(parts[1:])
+        extra: typing.Optional[list[str]] = None
+        if fragment:
+            extra = fragment.split("/")
+        return cls(name, version, file_path, extra)
 
-    @staticmethod
-    def make_uri(
-        root: str,
-        friendly_name: str,
-        version: typing.Optional[str] = None,
-        extra: typing.Optional[list[str]] = None,
-        file: typing.Optional[str] = None,
-    ) -> str:
-        uri = WeaveLocalArtifactURI.scheme + "://" + root + "/" + friendly_name
-        if version is not None:
-            uri += "/" + version
-
-        uri = uri + uris.WeaveURI._generate_query_str(extra, file)
+    def __str__(self) -> str:
+        uri = f"{self.SCHEME}:///{self.name}:{self.version}"
+        if self.path:
+            uri += f"/{self.path}"
+        if self.extra:
+            uri += f"#{'/'.join(self.extra)}"
         return uri
 
     def to_ref(self) -> LocalArtifactRef:
@@ -336,7 +403,7 @@ def get_local_version_ref(name: str, version: str) -> typing.Optional[LocalArtif
     if not local_artifact_exists(name, version):
         return None
     art = LocalArtifact(name, version)
-    return LocalArtifactRef(art, path="_obj")
+    return LocalArtifactRef(art, path="obj")
 
 
 # Should probably be "get_version_object()"

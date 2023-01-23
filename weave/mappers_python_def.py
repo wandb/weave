@@ -226,7 +226,7 @@ class DefaultToPy(mappers.Mapper):
         existing_ref = storage._get_ref(obj)
         if existing_ref:
             if existing_ref.is_saved:
-                return existing_ref.uri
+                return str(existing_ref)
 
         # This defines the artifact layout!
         name = "/".join(self._path + [str(self._row_id)])
@@ -236,7 +236,7 @@ class DefaultToPy(mappers.Mapper):
         if ref.artifact == self._artifact:
             return ref.local_ref_str()
         else:
-            return ref.uri
+            return str(ref)
 
 
 class DefaultFromPy(mappers.Mapper):

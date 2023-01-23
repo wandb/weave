@@ -239,7 +239,7 @@ def test_typeof_node():
 
 @dataclasses.dataclass(frozen=True)
 class SublistType(types.Type):
-    _base_type = types.List(types.Any())
+    _base_type = types.List
     object_type: types.Type = types.UnknownType()
 
 

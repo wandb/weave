@@ -23,10 +23,12 @@ def test_panel_container():
     expected = {
         "_type": {
             "type": "container_panel_type",
+            "_base_type": {"type": "Object"},
             "_is_object": True,
             "id": {"type": "const", "valType": "string", "val": "container"},
             "config": {
                 "type": "container_config_type",
+                "_base_type": {"type": "Object"},
                 "_is_object": True,
                 "variables": {
                     "type": "typedDict",
@@ -39,6 +41,7 @@ def test_panel_container():
                         "members": [
                             {
                                 "type": "slider_panel_type",
+                                "_base_type": {"type": "Object"},
                                 "_is_object": True,
                                 "id": {
                                     "type": "const",
@@ -52,6 +55,7 @@ def test_panel_container():
                                 },
                                 "config": {
                                     "type": "slider_config_type",
+                                    "_base_type": {"type": "Object"},
                                     "_is_object": True,
                                     "min": "int",
                                     "max": "int",
@@ -60,6 +64,7 @@ def test_panel_container():
                             },
                             {
                                 "type": "number_panel_type",
+                                "_base_type": {"type": "Object"},
                                 "_is_object": True,
                                 "id": {
                                     "type": "const",

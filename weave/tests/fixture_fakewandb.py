@@ -18,7 +18,7 @@ ABS_TEST_TABLE_ARTIFACT_PATH = os.path.abspath(TEST_TABLE_ARTIFACT_PATH)
 
 
 class FakeEntry:
-    pass
+    ref = None
 
 
 class FakeManifest:

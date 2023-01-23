@@ -1,21 +1,19 @@
 # Implements backward compatibilty for existing W&B Media types.
 
-import copy
+import contextlib
 import dataclasses
 import typing
-
-from wandb.apis import public as wandb_api
 
 from ..artifact_wandb import WandbRunFilesProxyArtifact, get_wandb_read_client_artifact
 from ..language_features.tagging.tag_store import isolated_tagging_context
 from .. import types
 from .. import errors
 from .. import api as weave
+from .. import artifact_fs
+from .. import file_util
 from ..ops_primitives import html
 from ..ops_primitives import markdown
-from ..ops_primitives import file
-from . import file_wbartifact
-from . import wbartifact
+from . import table
 
 
 ## This is an ArtifactRefii, that lets us get access to the ref
@@ -126,11 +124,24 @@ class TableClientArtifactFileRef:
         self._artifact = None
         self._art_id, self._file_path = _parse_artifact_path(artifact_path)
 
+    # file_base.File interface
+    @contextlib.contextmanager
+    def open(self, mode: str = "r") -> typing.Generator[typing.IO, None, None]:
+        if "r" in mode:
+            with file_util.safe_open(self.artifact.path(self._file_path)) as f:
+                yield f
+        else:
+            raise NotImplementedError
+
     @property
-    def wb_artifact(self):
+    def artifact(self):
         if self._artifact == None:
             self._artifact = get_wandb_read_client_artifact(self._art_id)
         return self._artifact
+
+    @property
+    def path(self):
+        return self._file_path
 
     def get_local_path(self):
         return self.wb_artifact.path(self._file_path)
@@ -138,12 +149,12 @@ class TableClientArtifactFileRef:
     # This is a temp hack until we have better support for _base_type inheritance
     @weave.op(
         name="tablefile-table",
-        output_type=file.TableType(),
+        output_type=table.TableType(),
     )
     def table(self):
-        if not hasattr(self, "artifact"):
-            self.artifact = self.wb_artifact
-        return file.File.table.resolve_fn(self)
+        # if not hasattr(self, "artifact"):
+        #     self.artifact = self.wb_artifact
+        return table.file_table.resolve_fn(self)
 
 
 @weave.type(__override_name="runtable-file")  # type: ignore
@@ -162,16 +173,26 @@ class TableRunFileRef:
             self.entity_name, self.project_name, self.run_name
         )
 
-    def get_local_path(self):
-        return self.artifact.path(self.file_path)
+    # file_base.File interface
+    @contextlib.contextmanager
+    def open(self, mode: str = "r") -> typing.Generator[typing.IO, None, None]:
+        if "r" in mode:
+            with file_util.safe_open(self.artifact.path(self.file_path)) as f:
+                yield f
+        else:
+            raise NotImplementedError
+
+    @property
+    def path(self):
+        return self.file_path
 
     # This is a temp hack until we have better support for _base_type inheritance
     @weave.op(
         name="runtablefile-table",
-        output_type=file.TableType(),
+        output_type=table.TableType(),
     )
     def table(self):
-        return file.File.table.resolve_fn(self)
+        return table.file_table.resolve_fn(self)
 
 
 @weave.type(__override_name="html-file")  # type: ignore
@@ -205,10 +226,7 @@ def html_file(html: html.Html) -> HtmlArtifactFileRef:
 # (with extension in the type).
 # TODO: merge all these patterns!!!!
 @weave.op(
-    # Oof, returning a different type than the op returns. Ugly
-    # Still haven't nailed type interfaces
-    # TODO: fix
-    output_type=weave.types.FileType(
+    output_type=artifact_fs.FilesystemArtifactFileType(
         weave.types.Const(weave.types.String(), "md")  # type: ignore
     )
 )
@@ -220,7 +238,7 @@ def markdown_file(md: markdown.Markdown):
     path = ref.path
     if path is None:
         raise errors.WeaveInternalError("storage save returned None path")
-    return file_wbartifact.ArtifactVersionFile(ref.artifact, path + ".md")
+    return artifact_fs.FilesystemArtifactFile(ref.artifact, path + ".md")
 
 
 ArtifactAssetType = types.union(
@@ -238,7 +256,7 @@ ArtifactAssetType = types.union(
 @weave.op(
     name="asset-artifactVersion",
     input_type={"asset": ArtifactAssetType},
-    output_type=wbartifact.ArtifactVersionType(),
+    output_type=artifact_fs.FilesystemArtifactType(),
 )
 def artifactVersion(asset):
     return asset.artifact

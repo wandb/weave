@@ -26,7 +26,7 @@ def weave_class(weave_type: type[types.Type]):
                 requires_rename = current_name.startswith("op-")
                 if requires_rename:
                     new_name = "%s-%s" % (
-                        types.type_class_type_name(weave_type),
+                        weave_type.name,
                         current_name[3:],
                     )
                     registry_mem.memory_registry.rename_op(

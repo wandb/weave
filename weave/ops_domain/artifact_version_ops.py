@@ -3,22 +3,19 @@ from ..compile_domain import wb_gql_op_plugin
 from ..api import op
 from .. import weave_types as types
 from . import wb_domain_types as wdt
-from ..language_features.tagging.make_tag_getter_op import make_tag_getter_op
 from .wandb_domain_gql import (
     gql_prop_op,
     gql_direct_edge_op,
     gql_connection_op,
-    gql_root_op,
 )
 
 import typing
 from . import wb_util
 from urllib.parse import quote
-from . import file_wbartifact
+from .. import artifact_fs
 from .. import artifact_base
 from .. import artifact_wandb
 import logging
-from . import wbartifact
 
 # Section 1/6: Tag Getters
 # None
@@ -222,7 +219,7 @@ def artifact_version_is_weave_object(
 @op(name="artifactVersion-files")
 def files(
     artifactVersion: wdt.ArtifactVersion,
-) -> list[file_wbartifact.ArtifactVersionFile]:
+) -> list[artifact_fs.FilesystemArtifactFile]:
     # TODO: What is the correct data model here? - def don't want to go download everything
     return []
 
@@ -260,38 +257,17 @@ def _artifact_version_to_wb_artifact(artifactVersion: wdt.ArtifactVersion):
         name=home_sequence_name,
         type=type_name,
         uri=artifact_wandb.WeaveWBArtifactURI(
-            f"wandb-artifact://{entity_name}/{project_name}/{home_sequence_name}:v{home_version_index}"
+            home_sequence_name, f"v{home_version_index}", entity_name, project_name
         ),
     )
 
 
-@op(
-    name="artifactVersion-file",
-    output_type=artifact_wandb.ArtifactVersionFileType(),
-)
-def file_(artifactVersion: wdt.ArtifactVersion, path: str):
-    # TODO (tim): This is a total hack - I am not sure why dispatch is sending use these
-    if isinstance(artifactVersion, artifact_base.Artifact):
-        logging.warning(
-            "Expected input to be of type ArtifactVersion, but got artifact_base.Artifact in artifactVersion-file"
-        )
-        art_local = artifactVersion
-    else:
-        art_local = _artifact_version_to_wb_artifact(artifactVersion)
-    return wbartifact.ArtifactVersion.file.raw_resolve_fn(art_local, path)
-
-
-@op(
-    name="artifactVersion-fileReturnType",
-    output_type=types.TypeType(),
-)
-def path_type(artifactVersion: wdt.ArtifactVersion, path: str):
-    # TODO (tim): This is a total hack - I am not sure why dispatch is sending use thsese
-    if isinstance(artifactVersion, artifact_base.Artifact):
-        logging.warning(
-            "Expected input to be of type ArtifactVersion, but got artifact_base.Artifact in artifactVersion-fileReturnType"
-        )
-        art_local = artifactVersion
-    else:
-        art_local = _artifact_version_to_wb_artifact(artifactVersion)
-    return wbartifact.ArtifactVersion.path_type.raw_resolve_fn(art_local, path)
+@op(name="artifactVersion-file")
+def file_(
+    artifactVersion: wdt.ArtifactVersion, path: str
+) -> typing.Optional[artifact_fs.FilesystemArtifactFile]:
+    art_local = _artifact_version_to_wb_artifact(artifactVersion)
+    item = art_local.path_info(path)
+    if not isinstance(item, artifact_fs.FilesystemArtifactFile):
+        return None
+    return item

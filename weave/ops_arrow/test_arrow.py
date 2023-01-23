@@ -364,7 +364,7 @@ def test_custom_groupby_intermediate_save():
     saved_node = weave.save(node, "test_custom_groupby_intermediate_save")
     weave.use(saved_node)
     loaded_node = ops.get(
-        f"local-artifact://{artifact_util.local_artifact_dir()}/test_custom_groupby_intermediate_save/latest"
+        f"local-artifact:///test_custom_groupby_intermediate_save:latest/obj"
     )
     assert weave.use(loaded_node.pick("im").offset(0)[0].width_()) == 256
 
@@ -1530,7 +1530,7 @@ def test_vectorize_works_recursively_on_weavifiable_op():
         "nodeType": "output",
         "type": {
             "type": "ArrowWeaveList",
-            "_base_type": {"type": "list", "objectType": "any"},
+            "_base_type": {"type": "list"},
             "objectType": "int",
         },
         "fromOp": {
@@ -1540,7 +1540,7 @@ def test_vectorize_works_recursively_on_weavifiable_op():
                     "nodeType": "var",
                     "type": {
                         "type": "ArrowWeaveList",
-                        "_base_type": {"type": "list", "objectType": "any"},
+                        "_base_type": {"type": "list"},
                         "objectType": "int",
                     },
                     "varName": "x",

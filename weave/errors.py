@@ -87,3 +87,7 @@ class WeaveHashConstTypeError(WeaveBaseError):
 
 class WeaveGQLCompileError(WeaveBaseError):
     pass
+
+
+class WeaveAccessDeniedError(WeaveBaseError):
+    pass

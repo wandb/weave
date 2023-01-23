@@ -2,7 +2,9 @@ import inspect
 
 from . import registry_mem
 from . import op_def
+from . import op_args
 from . import derive_op
+from . import weave_types as types
 from . import pyfunc_type_util
 
 
@@ -16,7 +18,7 @@ def op(
     pure=True,
     _op_def_class=op_def.OpDef,
     *,  # Marks the rest of the arguments as keyword-only.
-    plugins=None
+    plugins=None,
 ):
     """Decorator for declaring an op.
 
@@ -25,16 +27,26 @@ def op(
     """
 
     def wrap(f):
-        fq_op_name = name
-        if fq_op_name is None:
-            fq_op_name = "op-%s" % f.__name__
-            # Don't use fully qualified names (which are URIs) for
-            # now.
-            # Ah crap this isn't right yet.
-            # fq_op_name = op_def.fully_qualified_opname(f)
 
         weave_input_type = pyfunc_type_util.determine_input_type(f, input_type)
         weave_output_type = pyfunc_type_util.determine_output_type(f, output_type)
+
+        fq_op_name = name
+        if fq_op_name is None:
+            op_prefix = "op"
+
+            # This would be a much nicer: automatically use first type name.
+            # But what about Unions? I'm not going to solve in this PR.
+            # TODO: implement this.
+            # if (
+            #     isinstance(weave_input_type, op_args.OpNamedArgs)
+            #     and weave_input_type.arg_types
+            # ):
+            #     arg_type0 = next(iter(weave_input_type.arg_types.values()))
+            #     if arg_type0 != types.UnknownType():
+            #         op_prefix = arg_type0.name
+
+            fq_op_name = f"{op_prefix}-{f.__name__}"
 
         op = _op_def_class(
             fq_op_name,

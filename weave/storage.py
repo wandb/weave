@@ -60,7 +60,7 @@ def _save_or_publish(obj, name=None, type=None, publish: bool = False, artifact=
             artifact = artifact_wandb.WandbArtifact(name, type=wb_type.name)
         else:
             artifact = artifact_local.LocalArtifact(name)
-    ref = artifact.set("_obj", wb_type, obj)
+    ref = artifact.set("obj", wb_type, obj)
 
     # Only save if we have a ref into the artifact we created above. Otherwise
     #     nothing new was created, so just return the existing ref.
@@ -141,7 +141,7 @@ def objects(
                     # obj = ref.get()
                     # if isinstance(ref.type, types.RunType) and obj.op_name == "op-objects":
                     #     continue
-                    result.append((ref.created_at, ref))
+                    result.append((ref.artifact.created_at, ref))
         except errors.WeaveSerializeError:
             # This happens because we may not have loaded ecosystem stuff that we need
             # to deserialize

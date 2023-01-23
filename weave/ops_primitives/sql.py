@@ -17,7 +17,7 @@ class SqlConnectionType(types.Type):
 
 
 class SqlTableType(types.Type):
-    _base_type = types.List()
+    _base_type = types.List
     name = "sqltable"
 
     object_type: types.Type

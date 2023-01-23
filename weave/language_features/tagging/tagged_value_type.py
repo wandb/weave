@@ -30,8 +30,6 @@ import json
 import typing
 import functools
 
-from ... import artifact_base
-from ... import artifact_fs
 from ... import box
 from ... import weave_types as types
 from ... import mappers_python
@@ -39,6 +37,10 @@ from ... import errors
 from ... import mappers
 
 from . import tag_store
+
+if typing.TYPE_CHECKING:
+    from ... import artifact_base
+    from ... import artifact_fs
 
 # A custom Weave Type used to represent tagged values.
 @dataclasses.dataclass(frozen=True)
@@ -127,7 +129,7 @@ class TaggedValueType(types.Type):
         return {"tag": self.tag.to_dict(), "value": self.value.to_dict()}
 
     def save_instance(
-        self, obj: types.Any, artifact: artifact_fs.FilesystemArtifact, name: str
+        self, obj: types.Any, artifact: "artifact_fs.FilesystemArtifact", name: str
     ) -> None:
         serializer = mappers_python.map_to_python(self, artifact)
 
@@ -137,7 +139,7 @@ class TaggedValueType(types.Type):
 
     def load_instance(
         self,
-        artifact: artifact_fs.FilesystemArtifact,
+        artifact: "artifact_fs.FilesystemArtifact",
         name: str,
         extra: typing.Optional[list[str]] = None,
     ) -> typing.Any:
@@ -155,7 +157,7 @@ class TaggedValueMapper(mappers.Mapper):
         self,
         type_: TaggedValueType,
         mapper: typing.Callable,  # TODO: Make this more specific
-        artifact: artifact_base.Artifact,
+        artifact: "artifact_base.Artifact",
         path: list[str] = [],
     ):
         self.type = type_

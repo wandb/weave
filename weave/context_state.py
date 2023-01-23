@@ -2,8 +2,6 @@ import contextvars
 import contextlib
 import typing
 
-from wandb.apis import public
-
 from . import client_interface
 from . import server_interface
 from . import uris

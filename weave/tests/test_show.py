@@ -53,16 +53,8 @@ def test_show_simple_call(cereal_csv):
                     "nodeType": "output",
                     "type": {
                         "type": "local_file",
-                        "_is_object": True,
-                        "_base_type": {
-                            "type": "file",
-                            "_is_object": True,
-                            "extension": "string",
-                            "wb_object_type": "string",
-                        },
+                        "_base_type": {"type": "FileBase"},
                         "extension": "csv",
-                        "path": "string",
-                        "mtime": "float",
                     },
                     "fromOp": {
                         "name": "localpath",
@@ -100,6 +92,7 @@ def test_large_const_node(test_artifact_dir):
         "nodeType": "output",
         "type": {
             "type": "Run",
+            "_base_type": {"type": "Object"},
             "_is_object": True,
             "id": "string",
             "op_name": "string",
@@ -117,6 +110,7 @@ def test_large_const_node(test_artifact_dir):
             "history": {"type": "list", "objectType": "any"},
             "output": {
                 "type": "gpt3_fine_tune_type",
+                "_base_type": {"type": "Object"},
                 "_is_object": True,
                 "id": "string",
                 "status": "string",
@@ -127,19 +121,11 @@ def test_large_const_node(test_artifact_dir):
                         "none",
                         {
                             "type": "gpt3_fine_tune_results_type",
-                            "_is_object": True,
                             "_base_type": {
                                 "type": "openai_stored_file",
-                                "_is_object": True,
-                                "bytes": "int",
-                                "created_at": "int",
-                                "filename": "string",
-                                "id": "string",
-                                "object": "string",
-                                "purpose": "string",
-                                "status": "string",
-                                "status_details": "none",
+                                "_base_type": {"type": "Object"},
                             },
+                            "_is_object": True,
                             "bytes": "int",
                             "created_at": "int",
                             "filename": "string",
@@ -164,7 +150,7 @@ def test_large_const_node(test_artifact_dir):
                     "nodeType": "output",
                     "type": {
                         "type": "LocalArtifactRef",
-                        "_base_type": {"type": "Ref", "objectType": "unknown"},
+                        "_base_type": {"type": "Ref"},
                         "objectType": {
                             "type": "list",
                             "objectType": {
@@ -183,7 +169,7 @@ def test_large_const_node(test_artifact_dir):
                             "uri": {
                                 "nodeType": "const",
                                 "type": "string",
-                                "val": f"local-artifact://{test_artifact_dir}/list/4cf1abf0d040d897276e4be3c6aa90df",
+                                "val": "local-artifact:///list:f909a3e7a090a0a57dbd03801ddebd51/obj",
                             }
                         },
                     },
@@ -196,7 +182,6 @@ def test_large_const_node(test_artifact_dir):
             },
         },
     }
-
     assert actual == actual_SHOW_PARAMS_FINE_TUNE_WEAVE_NODE
 
     model = openai.Gpt3FineTune.model(fine_tune)
@@ -214,11 +199,10 @@ def test_large_const_node(test_artifact_dir):
     table_state = panel_config.tableState
     col_select_fns = table_state.columnSelectFunctions
     col_sel_fn2 = list(col_select_fns.values())[1]
-    assert "list/" in graph.node_expr_str(col_sel_fn2)
+    assert "list:" in graph.node_expr_str(col_sel_fn2)
 
     # Asserting that weavejs_fixes.remove_opcall_versions_data works
     assert (
         graph.node_expr_str(col_sel_fn2)
-        == 'get("local-artifact://%s/list/4cf1abf0d040d897276e4be3c6aa90df").finetune_gpt3({"n_epochs": 2}).model().complete(row)["choices"][0]["text"]'
-        % artifact_util.local_artifact_dir()
+        == 'get("local-artifact:///list:f909a3e7a090a0a57dbd03801ddebd51/obj").finetune_gpt3({"n_epochs": 2}).model().complete(row)["choices"][0]["text"]'
     )

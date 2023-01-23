@@ -10,7 +10,7 @@ def dirsize(path) -> int:
 
 @weave.type()
 class SlackReadExportApi:
-    data_dir: weave.ops.VersionedDir  # TODO: change to weave.Dir
+    data_dir: weave.Dir
 
     def channel_names(self):
         return (n.name for n in pathlib.Path(self.data_dir.path).glob("*"))

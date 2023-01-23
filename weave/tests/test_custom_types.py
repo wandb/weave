@@ -7,7 +7,7 @@ from .. import context_state as _context
 from weave.ecosystem.wandb import geom
 
 from .. import api as weave
-from ..ops_primitives import ops_arrow
+from .. import ops_arrow
 from .. import errors
 
 

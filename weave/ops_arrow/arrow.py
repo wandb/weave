@@ -248,7 +248,7 @@ def arrow_as_array(obj) -> pa.Array:
 
 @dataclasses.dataclass(frozen=True)
 class ArrowWeaveListType(types.Type):
-    _base_type = types.List()
+    _base_type = types.List
     name = "ArrowWeaveList"
 
     object_type: types.Type = types.Any()

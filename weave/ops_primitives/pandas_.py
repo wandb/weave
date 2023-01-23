@@ -15,6 +15,7 @@ from . import list_
 from .. import mappers_python
 from .. import graph
 from .. import errors
+from .. import file_base
 from ..language_features.tagging import tag_store, tagged_value_type
 
 # Hack hack hack
@@ -133,7 +134,7 @@ class DataFrameType(types.Type):
 
 @dataclasses.dataclass(frozen=True)
 class DataFrameTableType(types.Type):
-    _base_type = types.List()
+    _base_type = types.List
     name = "dataframeTable"
 
     object_type: types.Type = types.Any()
@@ -318,7 +319,7 @@ def _pd_dtype_to_weave(dtype):
 
 @op(
     name="file-refine_pandasreadcsv",
-    input_type={"file": types.FileType()},
+    input_type={"file": file_base.FileBaseType()},
     output_type=types.TypeType(),
 )
 def refine_pandasreadcsv(file):
@@ -331,7 +332,7 @@ def refine_pandasreadcsv(file):
 
 @op(
     name="file-pandasreadcsv",
-    input_type={"file": types.FileType()},
+    input_type={"file": file_base.FileBaseType()},
     output_type=DataFrameTableType(),
     refine_output_type=refine_pandasreadcsv,
 )

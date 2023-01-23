@@ -13,9 +13,7 @@ def test_run_basic():
     run_name = "run-%s" % run_id
     storage.save(run, name=run_name)
 
-    run_node = ops.get(
-        f"local-artifact://{artifact_util.local_artifact_dir()}/{run_name}/latest"
-    )
+    run_node = ops.get(f"local-artifact:///{run_name}:latest/obj")
     # run = api.use(run_node)
     assert api.use(run_node.state) == "pending"
     api.use(run_node.set_state("running"))
@@ -88,5 +86,5 @@ def test_async_op_expr():
 
     assert (
         str(saved_model)
-        == f'get("local-artifact://{artifact_util.local_artifact_dir()}/list/6b6c14ba4268dc8c0bd47d5ee549721b").train().model().save("model")'
+        == f'get("local-artifact:///list:54643291a9d1a0f06a45032bb2e19273/obj").train().model().save("model")'
     )
