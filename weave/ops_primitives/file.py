@@ -44,3 +44,13 @@ def artifactfile_dir(
 @op(name="file-type")
 def file_type(file: typing.Union[file_base.File, file_base.Dir]) -> types.Type:
     return types.TypeRegistry.type_of(file)
+
+
+@op(name="file-path")
+def file_path(file: file_base.File) -> str:
+    return file.path
+
+
+@op(name="file-size")
+def file_size(file: file_base.File) -> int:
+    return file.size()
