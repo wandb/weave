@@ -1269,7 +1269,7 @@ def vectorize(
                 return weave_internal.call_fn(bin_fn, {"row": in_})  # type: ignore
         return node
 
-    def vectorize_output_node(node: graph.OutputNode):
+    def vectorize_output_node(node: graph.OutputNode, vectorized_keys: set[str]):
         inputs = node.from_op.inputs
         inputs_items = list(inputs.items())
         first_arg_is_awl = len(inputs_items) > 0 and ArrowWeaveListType().assign_type(
@@ -1319,9 +1319,11 @@ def vectorize(
         # explicitly force using ArrowWeaveList-dict instead.
         awl_transformed_inputs = {
             k: list_to_arrow(v)
-            # if id(v) != id(orig_node.from_op.inputs[k])
-            if (not _type_is_assignable_to_awl_list(v.type))
-            and _type_is_assignable_to_py_list(v.type)
+            if (
+                not _type_is_assignable_to_awl_list(v.type)
+                and _type_is_assignable_to_py_list(v.type)
+                and k in vectorized_keys
+            )
             else v
             for k, v in inputs.items()
         }
@@ -1408,9 +1410,10 @@ def vectorize(
                     manually_map_inputs = [
                         k
                         for k, v in inputs.items()
-                        if (
+                        if k in vectorized_keys
+                        and (
                             _type_is_assignable_to_awl_list(v.type)
-                            or _type_is_assignable_to_awl_list(v.type)
+                            or _type_is_assignable_to_py_list(v.type)
                         )
                     ]
                     res = _create_manually_mapped_op(
@@ -1438,13 +1441,14 @@ def vectorize(
 
     def vectorize_along_wrt_paths(node: graph.Node):
         if isinstance(node, graph.OutputNode):
-            if all(
-                input_node not in already_vectorized_nodes
-                for input_node in node.from_op.inputs.values()
-            ):
+            vectorized_keys = set()
+            for input_key, input_node in node.from_op.inputs.items():
+                if input_node in already_vectorized_nodes:
+                    vectorized_keys.add(input_key)
+            if len(vectorized_keys) == 0:
                 # not along vectorize path
                 return node
-            new_node = vectorize_output_node(node)
+            new_node = vectorize_output_node(node, vectorized_keys)
             already_vectorized_nodes.add(new_node)
             return new_node
         elif isinstance(node, graph.VarNode):
