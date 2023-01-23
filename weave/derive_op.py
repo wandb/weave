@@ -6,6 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from . import weave_types as types
 from . import context
+from . import context_state
 from . import op_args
 from . import registry_mem
 from . import op_def
@@ -221,6 +222,7 @@ class MappedDeriveOpHandler(DeriveOpHandler):
                 # Copy api_settings and tagging_ctx into sub-threads
                 api_settings = wandb_api.copy_thread_local_api_settings()
                 memo_ctx = memo._memo_storage.get()
+                cache_namespace_ctx = context_state._cache_namespace_token.get()
 
                 def do_one(x):
                     wandb_api.set_wandb_thread_local_api_settings(
@@ -231,6 +233,9 @@ class MappedDeriveOpHandler(DeriveOpHandler):
                     if x == None or types.is_optional(first_arg.type):
                         return None
                     memo_token = memo._memo_storage.set(memo_ctx)
+                    cache_namespace_token = context_state._cache_namespace_token.set(
+                        cache_namespace_ctx
+                    )
                     try:
                         called = orig_op(x, **new_inputs)
                         with context.execution_client():
@@ -239,6 +244,9 @@ class MappedDeriveOpHandler(DeriveOpHandler):
                             res = storage.deref(res)
                     finally:
                         memo._memo_storage.reset(memo_token)
+                        context_state._cache_namespace_token.reset(
+                            cache_namespace_token
+                        )
                     return res
 
                 res = list(ThreadPoolExecutor(max_workers=10).map(do_one, list_))
