@@ -16,25 +16,49 @@ import graphql
 TEST_TABLE_ARTIFACT_PATH = "testdata/wb_artifacts/test_res_1fwmcd3q:v0"
 ABS_TEST_TABLE_ARTIFACT_PATH = os.path.abspath(TEST_TABLE_ARTIFACT_PATH)
 
+shared_artifact_dir = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "testdata", "shared_artifact_dir")
+)
+
 
 class FakeEntry:
     ref = None
 
+    def __init__(self, path):
+        self.path = path
+
 
 class FakeManifest:
-    entries = {"fakePath": FakeEntry()}
+    entries = {"fakeentry": FakeEntry("fakeentry")}
+
+    def __init__(self, dir_to_use=None):
+        self.dir_to_use = dir_to_use
 
     def get_entry_by_path(self, path):
+        if self.dir_to_use != None:
+            target = os.path.join(self.dir_to_use, path)
+            if os.path.exists(target):
+                if os.path.isdir(target):
+                    return None
+                return FakeEntry(path)
         if path == "test_results.table.json":
-            return FakeEntry()
+            return FakeEntry(path)
         if path == "media/images/8f65e54dc684f7675aec.png":
-            return FakeEntry()
+            return FakeEntry(path)
         if path == "weird_table.table.json":
-            return FakeEntry()
+            return FakeEntry(path)
         # Otherwise, file is missing, return None.
         return None
 
     def get_entries_in_directory(self, cur_dir):
+        if self.dir_to_use != None:
+            target = os.path.join(self.dir_to_use, cur_dir)
+            if os.path.exists(target) and os.path.isdir(target):
+                return [
+                    FakeEntry(os.path.join(cur_dir, sub_path))
+                    for sub_path in os.listdir(target)
+                    if os.path.isfile(os.path.join(target, sub_path))
+                ]
         return []
 
 
@@ -51,6 +75,11 @@ class FakePath:
         return self.path
 
 
+shared_artifact_dir = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "testdata", "shared_artifact_dir")
+)
+
+
 class FakeVersion:
     entity = "stacey"
     project = "mendeleev"
@@ -59,9 +88,17 @@ class FakeVersion:
     name = "test_res_1fwmcd3q:v0"
     id = "1234567890"
 
-    manifest = FakeManifest()
+    def __init__(self, requested_path=None):
+        self._local_path = None
+        if requested_path != None:
+            target = os.path.abspath(os.path.join(shared_artifact_dir, requested_path))
+            if os.path.exists(target):
+                self._local_path = target
+        self.manifest = FakeManifest(self._local_path)
 
     def get_path(self, path):
+        if self._local_path != None:
+            return FakePath(os.path.join(self._local_path, path))
         full_artifact_dir = os.path.join(
             artifact_wandb.wandb_artifact_dir(), TEST_TABLE_ARTIFACT_PATH
         )
@@ -142,8 +179,10 @@ class FakeClient:
 
 class FakeApi:
     client = FakeClient()
-    artifact = mock.Mock(return_value=FakeVersion())
     run = mock.Mock(return_value=FakeRun())
+
+    def artifact(self, path):
+        return FakeVersion(path.replace(":", "_"))
 
     def add_mock(
         self,

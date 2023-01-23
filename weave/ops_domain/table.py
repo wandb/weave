@@ -52,17 +52,17 @@ class PartitionedTableType(types.ObjectType):
     def property_types(self):
         return {
             "_rows": ops_arrow.ArrowWeaveListType(types.TypedDict({})),
+            "_file": artifact_fs.FilesystemArtifactFileType(),
             "partitionedTable": types.TypedDict({"parts_path": types.String()}),
-            "file": artifact_fs.FilesystemArtifactFileType(),
         }
 
 
 @weave_class(weave_type=PartitionedTableType)
 class PartitionedTable:
-    def __init__(self, _rows, partitionedTable, file):
+    def __init__(self, _rows, _file, partitionedTable):
         self._rows = _rows
+        self._file = _file
         self.partitionedTable = partitionedTable
-        self.file = file
 
     @op(
         name="partitionedtable-file",
@@ -70,7 +70,7 @@ class PartitionedTable:
         output_type=artifact_fs.FilesystemArtifactFileType(),
     )
     def partitioned_file(partitionedTable):
-        return partitionedTable.file
+        return partitionedTable._file
 
     @op(
         name="partitionedtable-rowsType",
@@ -98,17 +98,15 @@ class JoinedTableType(types.ObjectType):
     def property_types(self):
         return {
             "_rows": ops_arrow.ArrowWeaveListType(types.TypedDict({})),
-            # "joinedTable": types.TypedDict({"parts_path": types.String()}),
-            "file": artifact_fs.FilesystemArtifactType(),
+            "_file": artifact_fs.FilesystemArtifactFileType(),
         }
 
 
 @weave_class(weave_type=JoinedTableType)
 class JoinedTable:
-    def __init__(self, _rows, file):
+    def __init__(self, _rows, _file):
         self._rows = _rows
-        # self.joinedTable = joinedTable
-        self.file = file
+        self._file = _file
 
     @op(
         name="joinedtable-file",
@@ -116,7 +114,7 @@ class JoinedTable:
         output_type=artifact_fs.FilesystemArtifactType(),
     )
     def joined_file(joinedTable):
-        return joinedTable.file
+        return joinedTable._file
 
     @op(
         name="joinedtable-rowsType",
@@ -260,14 +258,10 @@ def _get_partitioned_table_awl_from_file(
     parts_path_root = data["parts_path"]
 
     all_aws: list[ops_arrow.ArrowWeaveList] = []
-    # TODO(Tim): We can't reach into manifest here. (NOTE from Shawn: I think what
-    # we need to do instead is parse the partition table json to tell us which files
-    # to read?)
-    # for entry_path in file.artifact._saved_artifact.manifest.entries.keys():
-    #     if entry_path.startswith(parts_path_root) and entry_path.endswith("table.json"):
-    #         all_aws.append(
-    #             _get_table_like_awl_from_file(file.artifact.path_info(entry_path)).awl
-    #         )
+    part_dir = file.artifact.path_info(parts_path_root)
+    if isinstance(part_dir, artifact_fs.FilesystemArtifactDir):
+        for file in part_dir.files.values():
+            all_aws.append(_get_table_like_awl_from_file(file).awl)
     arrow_weave_list = ops_arrow.list_.concat.raw_resolve_fn(all_aws)
     return arrow_weave_list
 
@@ -308,7 +302,7 @@ def file_table(file: artifact_fs.FilesystemArtifactFile) -> Table:
 @op(name="file-partitionedTable")
 def partitioned_table(file: artifact_fs.FilesystemArtifactFile) -> PartitionedTable:
     res = _get_table_like_awl_from_file(file)
-    return PartitionedTable(res.awl, res.data, file)
+    return PartitionedTable(res.awl, file, res.data)
 
 
 @op(name="file-joinedTable")
