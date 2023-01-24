@@ -82,6 +82,9 @@ class FilesystemArtifact(artifact_base.Artifact):
     def path(self, path: str) -> str:
         raise NotImplementedError
 
+    def size(self, path: str) -> int:
+        return os.path.getsize(self.path(path))
+
     def path_info(
         self, path: str
     ) -> typing.Optional[
@@ -224,6 +227,9 @@ class FilesystemArtifactFile(file_base.File):
                 yield f
         else:
             raise NotImplementedError
+
+    def size(self) -> int:
+        return self.artifact.size(self.path)
 
 
 FilesystemArtifactFileType.instance_classes = FilesystemArtifactFile

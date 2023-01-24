@@ -45,6 +45,9 @@ class LocalFile(file_base.File):
         finally:
             f.close()
 
+    def size(self) -> int:
+        return os.path.getsize(self.path)
+
     def get_local_path(self) -> str:
         return self.path
 

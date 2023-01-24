@@ -281,6 +281,11 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         self._local_path[name] = static_file_path
         return static_file_path
 
+    def size(self, path: str) -> int:
+        if path in self._saved_artifact.manifest.entries:
+            return self._saved_artifact.manifest.entries[path].size
+        return super().size(path)
+
     @property
     def uri_obj(self) -> "WeaveWBArtifactURI":
         if not self.is_saved or not self._read_artifact_uri:
