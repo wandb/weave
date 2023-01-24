@@ -6,6 +6,7 @@ from .. import weave_internal
 from .. import ops
 from .. import execute
 from .. import environment
+from . import test_wb
 import pytest
 
 execute_test_count_op_run_count = 0
@@ -78,3 +79,25 @@ def test_execute_cache_mode_minimal_no_recursive_refinement(weave_cache_mode_min
     # But, when we execute with cache mode minimal, we only call each refine
     # once.
     assert REFINE_CALLED == 5
+
+
+def test_we_dont_over_execute(fake_wandb):
+    fake_wandb.add_mock(test_wb.table_mock1)
+    cell_node = (
+        ops.project("stacey", "mendeleev")
+        .runs()
+        .limit(1)
+        .summary()["table"]
+        .table()
+        .rows()
+        .dropna()
+        .concat()
+        .createIndexCheckpointTag()[5]["score_Amphibia"]
+    )
+    with execute.top_level_stats() as stats:
+        assert weave.use(cell_node.indexCheckpoint()) == 5
+
+    # If this check fails, please be very careful! It means that something
+    # has changed in the engine that is causing us to over-execute nodes
+    # and is an indication of a serious performance regression.
+    assert stats["node_count"] == 15

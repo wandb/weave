@@ -1,23 +1,55 @@
+import contextlib
+import contextvars
+import collections
 import typing
 
 from . import graph
 from . import errors
 
+
 ExecutableNode = typing.Union[graph.OutputNode, graph.ConstNode]
+
+
+class NoResult:
+    pass
+
+
+_node_result_store: contextvars.ContextVar[
+    typing.Optional[dict[graph.Node, typing.Any]]
+] = contextvars.ContextVar("_top_level_forward_graph_ctx", default=None)
+
+
+# Each top level call to execute.execute_nodes creates its own result store.
+# Recursive calls share the top level result store.
+@contextlib.contextmanager
+def node_result_store():
+    store = _node_result_store.get()
+    token = None
+    if store is None:
+        store = collections.defaultdict(lambda: NoResult)
+        token = _node_result_store.set(store)
+    try:
+        yield store
+    finally:
+        if token is not None:
+            _node_result_store.reset(token)
+
+
+def get_node_result_store():
+    store = _node_result_store.get()
+    if store is None:
+        raise errors.WeaveInternalError("No node result store found")
+    return store
 
 
 class ForwardNode:
     node: graph.OutputNode[ExecutableNode]
     input_to: typing.Set["ForwardNode"]
-    result: typing.Any
-    has_result: bool
 
     def __init__(self, node):
         self.node = node
         self.input_to = set()
-        self.result = None
         self.cache_id = None
-        self.has_result = False
 
     def __str__(self):
         return "<ForwardNode(%s): %s input_to %s>" % (
@@ -28,11 +60,21 @@ class ForwardNode:
             " ".join([str(id(fn)) for fn in self.input_to]),
         )
 
+    @property
+    def result(self) -> typing.Any:
+        return get_node_result_store()[self.node]
+
+    @property
+    def has_result(self) -> bool:
+        return self.result is not NoResult
+
     def set_result(self, result: typing.Any) -> None:
-        self.has_result = True
-        self.result = result
+        get_node_result_store()[self.node] = result
 
 
+# Each execute.execute_nodes call gets its own ForwardGraph, and walks all
+# the nodes in it. But it will skip executing nodes if the result already
+# exist for that node in the top-level result store.
 class ForwardGraph:
     roots: set[ForwardNode]
     _node_to_forward_node: typing.Dict[graph.Node, ForwardNode]

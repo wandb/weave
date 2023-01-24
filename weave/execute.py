@@ -36,23 +36,39 @@ from . import language_nullability
 TRACE_LOCAL = trace_local.TraceLocal()
 
 
+class OpExecuteStats(typing.TypedDict):
+    avg_time: float
+    cached_used: int
+    already_executed: int
+    count: int
+    total_time: float
+
+
 class ExecuteStats:
     def __init__(self):
         self.node_stats = []
 
-    def add_node(self, node, execution_time, cache_used):
-        self.node_stats.append((node, execution_time, cache_used))
+    def add_node(self, node, execution_time, cache_used, already_executed):
+        self.node_stats.append((node, execution_time, cache_used, already_executed))
 
-    def summary(self):
-        op_counts = {}
-        for node, t, cache_used in self.node_stats:
+    def summary(self) -> dict[str, OpExecuteStats]:
+        op_counts: dict = {}
+        for node, t, cache_used, already_executed in self.node_stats:
             if isinstance(node, graph.OutputNode):
                 op_counts.setdefault(
-                    node.from_op.name, {"count": 0, "total_time": 0, "cache_used": 0}
+                    node.from_op.name,
+                    {
+                        "count": 0,
+                        "total_time": 0,
+                        "cache_used": 0,
+                        "already_executed": 0,
+                    },
                 )
                 op_counts[node.from_op.name]["count"] += 1
                 op_counts[node.from_op.name]["total_time"] += t
                 op_counts[node.from_op.name]["cache_used"] += int(cache_used)
+                if already_executed:
+                    op_counts[node.from_op.name]["already_executed"] += 1
         for stats in op_counts.values():
             stats["avg_time"] = stats["total_time"] / stats["count"]
         sortable_stats = [(k, v) for k, v in op_counts.items()]
@@ -74,19 +90,32 @@ def is_panelplot_data_fetch_query(node: graph.Node) -> bool:
     return False
 
 
-_forward_graph: contextvars.ContextVar[
-    typing.Optional[forward_graph.ForwardGraph]
-] = contextvars.ContextVar("_current_compiling", default=None)
+class FullStats(typing.TypedDict):
+    node_count: int
+
+
+_top_level_stats_ctx: contextvars.ContextVar[
+    typing.Optional[FullStats]
+] = contextvars.ContextVar("_top_level_stats_ctx", default=None)
 
 
 @contextlib.contextmanager
-def _new_forward_graph():
-    fg = forward_graph.ForwardGraph()
-    token = _forward_graph.set(fg)
+def top_level_stats():
+    """Will keep stats for nodes executed within this context, including recurisvely."""
+    stats = _top_level_stats_ctx.get()
+    token = None
+    if stats is None:
+        stats = {"node_count": 0}
+        token = _top_level_stats_ctx.set(stats)
     try:
-        yield fg
+        yield stats
     finally:
-        _forward_graph.reset(token)
+        if token is not None:
+            _top_level_stats_ctx.reset(token)
+
+
+def get_top_level_stats() -> typing.Optional[FullStats]:
+    return _top_level_stats_ctx.get()
 
 
 def execute_nodes(nodes, no_cache=False):
@@ -105,20 +134,28 @@ def execute_nodes(nodes, no_cache=False):
             # Compile can recursively call execute_nodes during the final
             # refine phase. We are careful in compile to ensure that the nodes that
             # it executes in its final phase are the same nodes (by reference equality)
-            # that it returns. We share the forward graph with the compile phase, so that
-            # we don't need to expensively re-execute nodes that compile has already
-            # executed.
-            with _new_forward_graph() as fg:
+            # that it returns, because those nodes are we look up in the result
+            # graph to determine if we need to execute or not.
+            # The test_execute:test_we_dont_over_execute test will fail if this
+            # assumption is violated.
+            with forward_graph.node_result_store():
                 nodes = compile.compile(nodes)
+                fg = forward_graph.ForwardGraph()
+                fg.add_nodes(nodes)
 
-            fg.add_nodes(nodes)
+                with context.execution_client():
+                    stats = execute_forward(fg, no_cache=no_cache)
+                    summary = stats.summary()
+                    logging.info("Execution summary\n%s" % pprint.pformat(summary))
 
-            with context.execution_client():
-                stats = execute_forward(fg, no_cache=no_cache)
-                summary = stats.summary()
-                logging.info("Execution summary\n%s" % pprint.pformat(summary))
+                    res = [fg.get_result(n) for n in nodes]
 
-                res = [fg.get_result(n) for n in nodes]
+    top_level_stats = get_top_level_stats()
+    if top_level_stats is not None:
+        top_level_stats["node_count"] += sum(
+            stats["count"] for stats in summary.values()
+        ) - sum(stats["already_executed"] for stats in summary.values())
+
     return res
 
 
@@ -158,7 +195,10 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
                 if span is not None:
                     span.finish()
             stats.add_node(
-                forward_node.node, time.time() - start_time, report["cache_used"]
+                forward_node.node,
+                time.time() - start_time,
+                report["cache_used"],
+                report.get("already_executed"),
             )
         for forward_node in running_now:
             for downstream_forward_node in forward_node.input_to:
@@ -212,6 +252,7 @@ def is_run_op(op_call: graph.Op):
 
 class NodeExecutionReport(typing.TypedDict):
     cache_used: bool
+    already_executed: typing.Optional[bool]
 
 
 def execute_forward_node(
@@ -221,10 +262,7 @@ def execute_forward_node(
 ) -> NodeExecutionReport:
     node = forward_node.node
     if fg.has_result(node):
-        # TODO: This is a different kind of cache (forward graph cache as
-        # opposed to artifact cache). We should probably denote the cache
-        # hit in a different way.
-        return {"cache_used": True}
+        return {"cache_used": False, "already_executed": True}
 
     cache_mode = environment.cache_mode()
     if cache_mode == environment.CacheMode.MINIMAL:
@@ -274,7 +312,7 @@ def execute_forward_node(
                 # Watch out, we handle loading async runs in different ways.
                 if op_def.is_async:
                     forward_node.set_result(run)
-                    return {"cache_used": True}
+                    return {"cache_used": True, "already_executed": False}
                 else:
                     if run.output is not None:
                         # if isinstance(run._output, artifacts_local.LocalArtifact):
@@ -289,7 +327,7 @@ def execute_forward_node(
                         # not have the tags in their scope.
                         ref_base.deref(run.output)
                         forward_node.set_result(run.output)
-                        return {"cache_used": True}
+                        return {"cache_used": True, "already_executed": False}
                 # otherwise, the run's output was not saveable, so we need
                 # to recompute it.
         inputs = {
@@ -355,4 +393,4 @@ def execute_forward_node(
                     run.save()
                 except errors.WeaveSerializeError:
                     pass
-    return {"cache_used": False}
+    return {"cache_used": False, "already_executed": False}
