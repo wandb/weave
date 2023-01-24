@@ -1910,13 +1910,6 @@ def _join_all_output_type(input_types):
     return ArrowWeaveListType(tagged_type)
 
 
-def _all_element_keys(arrs: list) -> set[str]:
-    all_element_keys: set[str] = set([])
-    for arr in arrs:
-        all_element_keys = all_element_keys.union(arr.object_type.property_types.keys())
-    return all_element_keys
-
-
 def _filter_none(arrs: list[typing.Any]) -> list[typing.Any]:
     return [a for a in arrs if a != None]
 
@@ -1954,11 +1947,15 @@ def join_all(arrs, joinFn, outer: bool):
     ]
 
     # Get the union of all the keys of all the elements
-    all_element_keys = list(_all_element_keys(arrs))
-    safe_element_keys_map = {
-        key: f"c_{ndx}" for ndx, key in enumerate(all_element_keys)
-    }
-    safe_element_keys = list(safe_element_keys_map.values())
+    arr_keys = []
+    all_element_keys: set[str] = set([])
+    for arr in arrs:
+        keys = set(arr.object_type.property_types.keys())
+        arr_keys.append(keys)
+        all_element_keys = all_element_keys.union(keys)
+    raw_key_to_safe_key = {key: f"c_{ndx}" for ndx, key in enumerate(all_element_keys)}
+    safe_key_to_raw_key = {v: k for k, v in raw_key_to_safe_key.items()}
+    safe_element_keys = list(raw_key_to_safe_key.values())
     arrs_as_tables = [_awl_struct_array_to_table(arr) for arr in arrs]
     keyed_tables = []
     join_key_col_name = "__joinobj__"
@@ -1970,7 +1967,7 @@ def join_all(arrs, joinFn, outer: bool):
                 .rename_columns(
                     [join_key_col_name]
                     + [
-                        safe_element_keys_map[lookup_name]
+                        raw_key_to_safe_key[lookup_name]
                         for lookup_name in table.column_names
                     ]
                 )
@@ -1985,8 +1982,13 @@ def join_all(arrs, joinFn, outer: bool):
             join_key_col_name,
         )
         for k in safe_element_keys:
+            raw_key = safe_key_to_raw_key[k]
             query += ", list_value(%s) as %s" % (
-                ", ".join(f"t{i}.{k}" for i in range(len(keyed_tables))),
+                ", ".join(
+                    f"t{i}.{k}"
+                    for i in range(len(keyed_tables))
+                    if raw_key in arr_keys[i]
+                ),
                 k,
             )
         query += "\nFROM t0"
