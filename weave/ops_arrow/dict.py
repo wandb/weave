@@ -224,7 +224,8 @@ def awl_2d_projection(
     algorithmOptions,
 ):
     inputColumnNames = list(set(inputColumnNames))
-    data = arrow_as_array(table._arrow_data)
+    source_column = arrow_as_array(table._arrow_data)
+    data = table._arrow_data_asarray_no_tags()
     if len(inputColumnNames) == 0 or len(data) < 2:
         np_projection = np.array([[0, 0] for row in data])
     else:
@@ -249,8 +250,6 @@ def awl_2d_projection(
     projection_column = pa.StructArray.from_arrays(
         [pa.array(x_column), pa.array(y_column)], ["x", "y"]
     )
-
-    source_column = data
 
     projection_column = pa.StructArray.from_arrays(
         [projection_column, source_column], ["projection", "source"]
