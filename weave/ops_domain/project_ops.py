@@ -80,6 +80,17 @@ gql_prop_op(
 
 # Section 4/6: Direct Relationship Ops
 gql_direct_edge_op(
+    "project-run",
+    wdt.ProjectType,
+    "run",
+    wdt.RunType,
+    {
+        "name": types.String(),
+    },
+    lambda inputs: f'name: {inputs["name"]}',
+)
+
+gql_direct_edge_op(
     "project-entity",
     wdt.ProjectType,
     "entity",
