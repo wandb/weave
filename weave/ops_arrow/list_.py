@@ -1,3 +1,4 @@
+import json
 import logging
 import typing
 import contextlib
@@ -1975,38 +1976,52 @@ def join_all(arrs, joinFn, outer: bool):
     ]
 
     # Get the union of all the keys of all the elements
-    all_element_keys = _all_element_keys(arrs)
+    all_element_keys = list(_all_element_keys(arrs))
+    safe_element_keys_map = {
+        key: f"c_{ndx}" for ndx, key in enumerate(all_element_keys)
+    }
+    safe_element_keys = list(safe_element_keys_map.values())
     arrs_as_tables = [_awl_struct_array_to_table(arr) for arr in arrs]
     keyed_tables = []
+    join_key_col_name = "__joinobj__"
     with duckdb_con() as con:
         for i, (table, arrs_keys) in enumerate(zip(arrs_as_tables, arrs_keys)):
-            keyed_table = table.add_column(0, "__joinobj__", arrs_keys).filter(
-                pc.invert(pc.is_null(pc.field("__joinobj__")))
+            keyed_table = (
+                table.add_column(0, join_key_col_name, arrs_keys)
+                .filter(pc.invert(pc.is_null(pc.field(join_key_col_name))))
+                .rename_columns(
+                    [join_key_col_name]
+                    + [
+                        safe_element_keys_map[lookup_name]
+                        for lookup_name in table.column_names
+                    ]
+                )
             )
             keyed_tables.append(keyed_table)
             con.register(f"t{i}", keyed_table)
 
         join_type = "full outer" if outer else "inner"
 
-        query = "SELECT COALESCE(%s) as __joinobj__" % ", ".join(
-            f"t{i}.__joinobj__" for i in range(len(keyed_tables))
+        query = "SELECT COALESCE(%s) as %s" % (
+            ", ".join(f"t{i}.{join_key_col_name}" for i in range(len(keyed_tables))),
+            join_key_col_name,
         )
-        for k in all_element_keys:
+        for k in safe_element_keys:
             query += ", list_value(%s) as %s" % (
                 ", ".join(f"t{i}.{k}" for i in range(len(keyed_tables))),
                 k,
             )
         query += "\nFROM t0"
         for t_ndx in range(1, len(keyed_tables)):
-            query += (
-                f" {join_type} join t{t_ndx} ON t0.__joinobj__ = t{t_ndx}.__joinobj__"
-            )
+            query += f" {join_type} join t{t_ndx} ON t0.{join_key_col_name} = t{t_ndx}.{join_key_col_name}"
 
         res = con.execute(query)
 
         final_table = res.arrow()
-        join_obj = final_table.column("__joinobj__").combine_chunks()
-        final_table = final_table.drop(["__joinobj__"])
+        join_obj = final_table.column(join_key_col_name).combine_chunks()
+        final_table = final_table.drop([join_key_col_name]).rename_columns(
+            all_element_keys
+        )
 
         untagged_result: ArrowWeaveList = ArrowWeaveList(
             final_table,
@@ -2057,17 +2072,27 @@ def join_2(arr1, arr2, joinFn1, joinFn2, alias1, alias2, leftOuter, rightOuter):
     table1_columns_names = arr1.object_type.property_types.keys()
     table2_columns_names = arr2.object_type.property_types.keys()
 
+    table1_safe_column_names = [f"c_{ndx}" for ndx in range(len(table1_columns_names))]
+    table2_safe_column_names = [f"c_{ndx}" for ndx in range(len(table2_columns_names))]
+
+    table1_safe_alias = "a_1"
+    table2_safe_alias = "a_2"
+
+    join_key_col_name = "__joinobj__"
+
     with duckdb_con() as con:
 
-        def create_keyed_table(table_name, table, keys):
-            keyed_table = table.add_column(0, "__joinobj__", keys).filter(
-                pc.invert(pc.is_null(pc.field("__joinobj__")))
+        def create_keyed_table(table_name, table, keys, safe_column_names):
+            keyed_table = (
+                table.add_column(0, join_key_col_name, keys)
+                .filter(pc.invert(pc.is_null(pc.field(join_key_col_name))))
+                .rename_columns([join_key_col_name] + safe_column_names)
             )
             con.register(table_name, keyed_table)
             return keyed_table
 
-        create_keyed_table("t1", table1, table1_join_keys)
-        create_keyed_table("t2", table2, table2_join_keys)
+        create_keyed_table("t1", table1, table1_join_keys, table1_safe_column_names)
+        create_keyed_table("t2", table2, table2_join_keys, table2_safe_column_names)
 
         if leftOuter and rightOuter:
             join_type = "full outer"
@@ -2080,27 +2105,41 @@ def join_2(arr1, arr2, joinFn1, joinFn2, alias1, alias2, leftOuter, rightOuter):
 
         query = f"""
         SELECT 
-            COALESCE(t1.__joinobj__, t2.__joinobj__) as __joinobj__,
-            CASE WHEN t1.__joinobj__ IS NULL THEN NULL ELSE
+            COALESCE(t1.{join_key_col_name}, t2.{join_key_col_name}) as {join_key_col_name},
+            CASE WHEN t1.{join_key_col_name} IS NULL THEN NULL ELSE
                 struct_pack({
-                    ", ".join(f'"{col}" := t1."{col}"' for col in table1_columns_names)
+                    ", ".join(f'{col} := t1.{col}' for col in table1_safe_column_names)
                 })
-            END as "{alias1}",
-            CASE WHEN t2.__joinobj__ IS NULL THEN NULL ELSE
+            END as {table1_safe_alias},
+            CASE WHEN t2.{join_key_col_name} IS NULL THEN NULL ELSE
                 struct_pack({
-                    ", ".join(f'"{col}" := t2."{col}"' for col in table2_columns_names)
+                    ", ".join(f'{col} := t2.{col}' for col in table2_safe_column_names)
                 })
-            END as "{alias2}",
-        FROM t1 {join_type} JOIN t2 ON t1.__joinobj__ = t2.__joinobj__
+            END as {table2_safe_alias},
+        FROM t1 {join_type} JOIN t2 ON t1.{join_key_col_name} = t2.{join_key_col_name}
         """
-        print(query)
 
         res = con.execute(query)
 
-        final_table = res.arrow()
-    join_obj = final_table.column("__joinobj__").combine_chunks()
-    final_table = final_table.drop(["__joinobj__"])
-
+        duck_table = res.arrow()
+    join_obj = duck_table.column(join_key_col_name).combine_chunks()
+    duck_table = duck_table.drop([join_key_col_name])
+    alias_1_res = duck_table.column(table1_safe_alias).combine_chunks()
+    alias_1_renamed = pa.StructArray.from_arrays(
+        [alias_1_res.field(col_name) for col_name in table1_safe_column_names],
+        table1_columns_names,
+        mask=alias_1_res.is_null(),
+    )
+    alias_2_res = duck_table.column(table2_safe_alias).combine_chunks()
+    alias_2_renamed = pa.StructArray.from_arrays(
+        [alias_2_res.field(col_name) for col_name in table2_safe_column_names],
+        table2_columns_names,
+        mask=alias_2_res.is_null(),
+    )
+    final_table = pa.StructArray.from_arrays(
+        [alias_1_renamed, alias_2_renamed],
+        [alias1, alias2],
+    )
     untagged_result: ArrowWeaveList = ArrowWeaveList(
         final_table,
         None,
