@@ -1150,7 +1150,7 @@ def merge_types(a: Type, b: Type) -> Type:
         return List(merge_types(a.object_type, b.object_type))
     if isinstance(a, UnknownType):
         return b
-    if isinstance(a, UnknownType):
+    if isinstance(b, UnknownType):
         return a
     return UnionType(a, b)
 

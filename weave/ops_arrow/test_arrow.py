@@ -2292,3 +2292,12 @@ def test_to_arrow_union_list():
     val = [{"a": 5.0}, {"a": [1.0]}]
     arrow_val = arrow.to_arrow([{"a": 5.0}, {"a": [1.0]}])
     assert arrow_val.to_pylist() == val
+
+
+def test_concat_empty_arrays():
+    val = arrow.to_arrow([])
+    val2 = arrow.to_arrow([{"a": 5}])
+    assert val.concatenate(val).to_pylist() == []
+    assert val.concatenate(val2).to_pylist() == val2.to_pylist()
+    assert val2.concatenate(val).to_pylist() == val2.to_pylist()
+    assert val2.concatenate(val2).to_pylist() == [{"a": 5}, {"a": 5}]

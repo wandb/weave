@@ -837,6 +837,10 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         return result
 
     def concatenate(self, other: "ArrowWeaveList") -> "ArrowWeaveList":
+        if len(self) == 0:
+            return other
+        if len(other) == 0:
+            return self
         arrow_data = [arrow_as_array(awl._arrow_data) for awl in (self, other)]
         if arrow_data[0].type == arrow_data[1].type:
             return ArrowWeaveList(

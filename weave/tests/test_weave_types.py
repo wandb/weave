@@ -68,6 +68,31 @@ def test_merge_through_tags():
     assert r.assign_type(correct_type)
 
 
+def test_merge_tag_union_unknown():
+    t = TaggedValueType(
+        types.TypedDict(property_types={"run": types.Int()}),
+        types.TypedDict(
+            property_types={
+                "step": types.UnionType(types.NoneType(), types.Float()),
+                "prompt": types.UnionType(types.NoneType(), types.String()),
+                "image": types.UnionType(types.String(), types.NoneType()),
+            }
+        ),
+    )
+    t2 = TaggedValueType(
+        types.TypedDict(property_types={"run": types.Int()}),
+        types.TypedDict(
+            property_types={
+                "step": types.UnknownType(),
+                "prompt": types.UnknownType(),
+                "image": types.UnknownType(),
+            }
+        ),
+    )
+    r = types.merge_types(t, t2)
+    assert r == t
+
+
 def test_tagged_unions_simple():
     assert weave.types.optional(weave.types.Int()).assign_type(
         TaggedValueType(
