@@ -453,8 +453,11 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                         self._artifact,
                     )._arrow_data_asarray_no_tags()
                     tag_stripped_members.append(tag_stripped_member)
-                return pa.UnionArray.from_sparse(
-                    self._arrow_data.type_codes, tag_stripped_members
+
+                return pa.UnionArray.from_dense(
+                    self._arrow_data.type_codes,
+                    self._arrow_data.offsets,
+                    tag_stripped_members,
                 )
 
         return arrow_data
@@ -763,19 +766,23 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                     # In this case we have single type:
                     type_code = mapper.type_code_of_type(non_null_current_type)
                     type_code_array = pa.repeat(type_code, len(self)).cast(pa.int8())
+                    offsets = pa.array(range(len(self)), type=pa.int32())
                 else:
                     curr_type_code_to_desired_type_code = [
                         mapper.type_code_of_type(t)
                         for t in non_null_current_type.members
                     ]
                     current_type_code_list = self._arrow_data.type.type_codes
-                    type_code_array = (
-                        pa.DictionaryArray.from_arrays(
-                            current_type_code_list, curr_type_code_to_desired_type_code
-                        )
-                        .dictionary_decode()
-                        .cast(pa.int8())
+                    type_encoding = dict(
+                        zip(current_type_code_list, curr_type_code_to_desired_type_code)
                     )
+
+                    def new_type_code_gen():
+                        for code in self._arrow_data.type_codes:
+                            yield type_encoding[code.as_py()]
+
+                    type_code_array = pa.array(new_type_code_gen(), type=pa.int8())
+                    offsets = self._arrow_data.offsets
 
                 # Next, we are going to build the M arrays. We will do this by iterating
                 # over the desired types. For each type, we will find the corresponding
@@ -814,8 +821,9 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
 
                 # Finally, combine the M arrays into a single union array.
                 result = ArrowWeaveList(
-                    pa.UnionArray.from_sparse(
+                    pa.UnionArray.from_dense(
                         type_code_array,
+                        offsets,
                         data_arrays,
                     ),
                     desired_type,
@@ -1632,18 +1640,27 @@ def recursively_build_pyarrow_array(
     elif pa.types.is_union(pyarrow_type):
         assert isinstance(mapper, mappers_arrow.UnionToArrowUnion)
         type_codes: list[int] = [mapper.type_code_of_obj(o) for o in py_objs]
-        for type_code, field in enumerate(pyarrow_type):
+        offsets: list[int] = []
+        py_data: list[list] = []
+        for _ in range(len(pyarrow_type)):
+            py_data.append([])
+
+        for row_index, type_code in enumerate(type_codes):
+            offsets.append(len(py_data[type_code]))
+            py_data[type_code].append(py_objs[row_index])
+
+        for i, raw_py_data in enumerate(py_data):
             array = recursively_build_pyarrow_array(
-                [
-                    py_obj if type_codes[i] == type_code else None
-                    for i, py_obj in enumerate(py_objs)
-                ],
-                field.type,
-                mapper._member_mappers[type_code],
+                raw_py_data,
+                pyarrow_type.field(i).type,
+                mapper.mapper_of_type_code(i),
+                py_objs_already_mapped,
             )
             arrays.append(array)
-        return pa.UnionArray.from_sparse(
+
+        return pa.UnionArray.from_dense(
             pa.array(type_codes, type=pa.int8()),
+            pa.array(offsets, type=pa.int32()),
             arrays,
         )
     if py_objs_already_mapped:

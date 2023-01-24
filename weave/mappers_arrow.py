@@ -80,6 +80,21 @@ class ListToArrowArr(mappers_python.ListToPyList):
 
 
 class UnionToArrowUnion(mappers_weave.UnionMapper):
+    def __init__(self, type_, mapper, artifact, path=[]):
+        super().__init__(type_, mapper, artifact, path)
+        if not self.is_single_object_nullable:
+            self._type_codes: dict[types.Type, int] = {}
+            self._type_code_to_member_mapper: dict[int, mappers.Mapper] = {}
+
+            i: int = 0
+            for member_mapper in self._member_mappers:
+                member_type = member_mapper.type
+                if isinstance(member_type, types.NoneType):
+                    continue
+                self._type_codes[member_type] = i
+                self._type_code_to_member_mapper[i] = member_mapper
+                i += 1
+
     @property
     def non_none_members(self):
         return [
@@ -103,22 +118,40 @@ class UnionToArrowUnion(mappers_weave.UnionMapper):
                 )
                 for i in range(len(non_null_mappers))
             ]
-            return pa.union(fields, mode="sparse")
+            return pa.union(fields, mode="dense")
         return arrow_util.arrow_type_with_nullable(non_null_mappers[0].result_type())
 
     def type_code_of_type(self, type: types.Type) -> int:
         """Return the arrow type code for the given type."""
-        for i, member_mapper in enumerate(self._member_mappers):
-            if member_mapper.type.assign_type(type) and type.assign_type(
-                member_mapper.type
-            ):
-                return i
-        raise errors.WeaveTypeError(f"Could not find type for {type}")
+        if self.is_single_object_nullable:
+            raise errors.WeaveTypeError(
+                "Cannot get type code of type in a union that is nullable"
+            )
+        elif isinstance(type, types.NoneType):
+            raise errors.WeaveTypeError("Cannot get type code of NoneType")
+        else:
+            try:
+                return self._type_codes[type]
+            except KeyError:
+                raise errors.WeaveTypeError(f"Could not find type code for {type}")
 
     def type_code_of_obj(self, obj) -> int:
         """Return the arrow type code for the given object."""
         obj_type = types.TypeRegistry.type_of(obj)
         return self.type_code_of_type(obj_type)
+
+    def mapper_of_type_code(self, type_code: int) -> mappers.Mapper:
+        """Return the mapper for the given type code."""
+        if self.is_single_object_nullable:
+            raise errors.WeaveTypeError(
+                "Cannot get mapper of type code in a union that is nullable"
+            )
+        try:
+            return self._type_code_to_member_mapper[type_code]
+        except KeyError:
+            raise errors.WeaveTypeError(
+                f"Could not find mapper for type code {type_code}"
+            )
 
     def apply(self, obj):
         obj_type = types.TypeRegistry.type_of(obj)
@@ -397,7 +430,10 @@ def map_from_arrow_scalar(value: pa.Scalar, type_: types.Type, artifact):
         else:
             # we have a real union type
             type_code = value.type_code
-            current_type = type_.members[type_code]
+            non_null_members = [
+                m for m in type_.members if not isinstance(m, types.NoneType)
+            ]
+            current_type = non_null_members[type_code]
             return map_from_arrow_scalar(value.value, current_type, artifact)
     elif isinstance(type_, types.Function):
         obj: str = value.as_py()

@@ -1,6 +1,7 @@
 import dataclasses
 import json
 import pyarrow as pa
+from pyarrow import compute as pc
 import pyarrow.parquet as pq
 import typing
 
@@ -10,6 +11,126 @@ from .. import mappers_python
 from .. import weave_types as types
 from .. import errors
 from .. import artifact_fs
+
+
+def dense_union_to_sparse_union(array: pa.Array) -> pa.Array:
+    if not pa.types.is_union(array.type):
+        raise ValueError(f"Expected UnionArray, got {type(array)}")
+    if array.type.mode != "dense":
+        raise ValueError(f"Expected dense UnionArray, got {array.type.mode}")
+
+    type_codes = array.type_codes
+    arrays = []
+
+    for field_index, field in enumerate(array.type):
+        # convert dense representation to sparse representation
+        value_array = array.field(field_index)
+        mask = pc.equal(type_codes, pa.scalar(field_index, type=pa.int8()))
+        offsets_for_type = pc.filter(array.offsets, mask)
+        replacements = pc.take(value_array, offsets_for_type)
+        empty_array = pa.nulls(len(array), type=field.type)
+        result = safe_replace_with_mask(empty_array, mask, replacements)
+        arrays.append(result)
+
+    return pa.UnionArray.from_sparse(
+        type_codes,
+        arrays,
+    )
+
+
+def safe_replace_with_mask(
+    array: pa.Array, mask: pa.Array, replacements: pa.Array
+) -> pa.Array:
+
+    if pa.types.is_struct(array.type):
+        arrays = []
+        names = []
+        for field_index, field in enumerate(array.type):
+            value_array = array.field(field_index)
+            replacement_array = replacements.field(field_index)
+            result = safe_replace_with_mask(value_array, mask, replacement_array)
+            arrays.append(result)
+            names.append(field.name)
+
+        return pa.StructArray.from_arrays(arrays, names)
+    elif pa.types.is_list(array.type):
+        offsets = array.offsets
+        value_array = array.flatten()
+        replacement_array = replacements.flatten()
+
+        flat_mask_pydata = []
+        for i in range(len(mask)):
+            if not pc.is_null(array[i]).as_py():
+                for _ in range(len(array[i])):
+                    flat_mask_pydata.append(mask[i])
+
+        flat_mask = pa.array(flat_mask_pydata, type=pa.bool_())
+
+        result = safe_replace_with_mask(value_array, flat_mask, replacement_array)
+        return pa.ListArray.from_arrays(offsets, result)
+    return pc.replace_with_mask(array, mask, replacements)
+
+
+def fallback_dictionary_encode(array: pa.Array) -> pa.DictionaryArray:
+    """Dictionary encoding not implemented for this type, need to break out to python."""
+    pydata = array.to_pylist()
+
+    # we need to json encode because dicts and lists are not hashable, but we need them to be
+    json_encoded = [json.dumps(v) for v in pydata]
+    unique_values_json = list(set(json_encoded))
+    unique_values = [json.loads(v) for v in unique_values_json]
+
+    indices = [unique_values_json.index(v) for v in json_encoded]
+    indices_array = pa.array(indices, type=pa.int32())
+    unique_values_array = pa.array(unique_values)
+    return pa.DictionaryArray.from_arrays(indices_array, unique_values_array)
+
+
+def sparse_union_to_dense_union(array: pa.Array) -> pa.Array:
+    if not pa.types.is_union(array.type):
+        raise ValueError(f"Expected UnionArray, got {type(array)}")
+    if array.type.mode != "sparse":
+        raise ValueError(f"Expected sparse UnionArray, got {array.type.mode}")
+
+    type_codes = array.type_codes
+    arrays: list[pa.Array] = []
+    offsets_for_each_type: list[pa.Array] = []
+    mask_for_each_type: list[pa.Array] = []
+
+    for field_index, _ in enumerate(array.type):
+        # convert sparse representation to dense representation
+
+        # looks like [None, 1, None, 3, 4, None]
+        value_array = array.field(field_index)
+
+        mask_for_type = pc.equal(type_codes, pa.scalar(field_index, type=pa.int8()))
+
+        # dictionary encode it to get offsets and values array
+        try:
+            value_array_encoded = value_array.dictionary_encode(null_encoding="encode")
+        except pa.ArrowNotImplementedError:
+            # dictionary encoding not implemented for this type, need to break out to python.
+            value_array_encoded = fallback_dictionary_encode(value_array)
+
+        offsets_for_type = pc.filter(value_array_encoded.indices, mask_for_type)
+        unique_values_for_type = value_array_encoded.dictionary
+
+        arrays.append(unique_values_for_type)
+        offsets_for_each_type.append(offsets_for_type)
+        mask_for_each_type.append(mask_for_type)
+
+    # merge offsets for each type together into a single offsets array
+    combined_offsets_array = pa.nulls(len(array), type=pa.int32())
+    for offset, mask in zip(offsets_for_each_type, mask_for_each_type):
+        combined_offsets_array = safe_replace_with_mask(
+            combined_offsets_array, mask, offset
+        )
+
+    return pa.UnionArray.from_dense(
+        type_codes,
+        combined_offsets_array,
+        arrays,
+    )
 
 
 def arrow_type_to_weave_type(pa_type: pa.DataType) -> types.Type:
@@ -70,13 +191,13 @@ def table_with_structs_as_unions(table: pa.Table) -> pa.Table:
                         ArrowArrayType.UNION_TO_STRUCT_TYPE_CODE_COLNAME
                     )
                 else:
-                    # arrays.append(a.field(field.name).slice(0, len(a)))
                     arrays.append(a.field(field.name))
             if type_code_array is None:
                 raise errors.WeaveTypeError(
                     "Expected struct array with type code field"
                 )
-            new_col = pa.UnionArray.from_sparse(type_code_array, arrays)
+            sparse = pa.UnionArray.from_sparse(type_code_array, arrays)
+            new_col = sparse_union_to_dense_union(sparse)
             column_name = column_name[len(ArrowArrayType.UNION_PREFIX) :]
             return column_name, pa.chunked_array([new_col])
 
@@ -123,6 +244,9 @@ def table_with_unions_as_structs(table: pa.Table) -> pa.Table:
             new_col = []
             for a in column.chunks:
                 if isinstance(a, pa.UnionArray):
+                    # a is a dense union, we need sparse here
+                    a = dense_union_to_sparse_union(a)
+
                     arrays = []
                     names = []
 
@@ -367,7 +491,9 @@ def rewrite_weavelist_refs(arrow_data, object_type, source_artifact, target_arti
                     target_artifact,
                 )
                 arrays.append(rewritten)
-            return pa.UnionArray.from_sparse(arrow_data.type_codes, arrays)
+            return pa.UnionArray.from_dense(
+                arrow_data.type_codes, arrow_data.offsets, arrays
+            )
         return rewrite_weavelist_refs(
             arrow_data, types.non_none(object_type), source_artifact, target_artifact
         )

@@ -27,6 +27,7 @@ from ..ops_primitives import dict_, list_
 
 from ..language_features.tagging import tag_store, tagged_value_type, make_tag_getter_op
 
+from . import arrow as arrow_type
 from . import list_ as arrow
 from . import dict as arrow_dict
 
@@ -2286,6 +2287,22 @@ def test_join_all_struct_val():
         {"_tag": {"joinObj": 5}, "_value": {"a": [5, 5], "b": [{"c": 6}, {"c": 11}]}},
         {"_tag": {"joinObj": 9}, "_value": {"a": [None, 9], "b": [None, {"c": 10}]}},
     ]
+
+
+def test_dense_sparse_conversion():
+    xs = pa.array([None, 6, 7])
+    ys = pa.array([False, True])
+    types = pa.array([0, 1, 1, 0, 0], type=pa.int8())
+    offsets = pa.array([0, 0, 1, 1, 2], type=pa.int32())
+    union_arr = pa.UnionArray.from_dense(types, offsets, [xs, ys])
+
+    sparse = arrow_type.dense_union_to_sparse_union(union_arr)
+    assert sparse.type.mode == "sparse"
+    assert sparse.to_pylist() == union_arr.to_pylist()
+
+    dense = arrow_type.sparse_union_to_dense_union(sparse)
+    assert dense.type.mode == "dense"
+    assert dense.to_pylist() == sparse.to_pylist()
 
 
 def test_to_arrow_union_list():
