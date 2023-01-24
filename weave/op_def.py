@@ -15,6 +15,8 @@ from . import weave_internal
 from . import pyfunc_type_util
 from . import engine_trace
 from . import memo
+from . import weavify
+
 from .language_features.tagging import (
     opdef_util,
     process_opdef_resolve_fn,
@@ -486,9 +488,10 @@ class OpDef:
 
                         v = weave_internal.define_fn(vars, v)
                     else:
-                        val_type = types.TypeRegistry.type_of(v)
                         # TODO: should type-check v here.
-                        v = graph.ConstNode(val_type, v)
+                        v = weave_internal.make_const_node(
+                            types.TypeRegistry.type_of(v), v
+                        )
                 bound_params_with_constants[k] = v
         return bound_params_with_constants
 

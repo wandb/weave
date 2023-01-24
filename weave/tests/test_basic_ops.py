@@ -98,6 +98,7 @@ def test_string_ops():
 def test_null_consuming_numbers_ops():
 
     data = [box.box(1), box.box(None), box.box(2)]
+
     assert weave.use(number.numbers_sum(data)) == 3
     assert weave.use(number.numbers_avg(data)) == 1.5
     assert weave.use(number.numbers_min(data)) == 1

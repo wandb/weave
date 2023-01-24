@@ -1,16 +1,18 @@
 import dataclasses
 import typing
 
-from . import op_def
+from . import val_const
 from . import op_args
 from . import graph
 from . import errors
 from . import weave_types as types
 from . import weave_internal
-from .ops_primitives import make_list, dict_
+
+if typing.TYPE_CHECKING:
+    from . import op_def
 
 
-def op_to_weave_fn(opdef: op_def.OpDef) -> graph.Node:
+def op_to_weave_fn(opdef: "op_def.OpDef") -> graph.Node:
 
     # TODO: remove this condition. we should be able to convert mutations to weave functions but
     # we need to figure out how to do it
@@ -63,14 +65,20 @@ def op_to_weave_fn(opdef: op_def.OpDef) -> graph.Node:
 
 
 def weavify_object(obj: typing.Any) -> graph.Node:
+    from .ops_primitives import make_list, dict_
+
     if isinstance(obj, graph.Node):
         return obj
+    elif isinstance(obj, val_const.Const):
+        return weave_internal.make_const_node(
+            types.Const(types.TypeRegistry.type_of(obj.val), obj.val), obj.val
+        )
     elif isinstance(obj, list):
         return make_list(**{str(i): weavify_object(o) for i, o in enumerate(obj)})
     elif isinstance(obj, dict):
         return dict_(**{i: weavify_object(o) for i, o in obj.items()})
-    # this covers all weave created objects by @weave.type()
-    elif dataclasses.is_dataclass(obj.__class__):
+
+    try:
         return obj.__class__.constructor(
             dict_(
                 **{
@@ -79,16 +87,6 @@ def weavify_object(obj: typing.Any) -> graph.Node:
                 }
             )
         )
-    # bool needs to come first because int is a subclass of bool
-    elif isinstance(obj, bool):
-        return weave_internal.make_const_node(types.Boolean(), obj)
-    elif isinstance(obj, int):
-        return weave_internal.make_const_node(types.Int(), obj)
-    elif isinstance(obj, float):
-        return weave_internal.make_const_node(types.Float(), obj)
-    elif isinstance(obj, str):
-        return weave_internal.make_const_node(types.String(), obj)
-    elif obj is None:
-        return weave_internal.make_const_node(types.NoneType(), obj)
-    else:
-        raise errors.WeaveTypeError(f"Cannot weavify object of type {obj.__class__}")
+    except AttributeError:
+        pass
+    return weave_internal.make_const_node(types.TypeRegistry.type_of(obj), obj)

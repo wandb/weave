@@ -428,13 +428,7 @@ def pick_output_type(input_types):
 
 
 def list_return_type(input_types):
-    its = []
-    for input_type in input_types.values():
-        if isinstance(input_type, types.Const):
-            input_type = input_type.val_type
-        its.append(input_type)
-    ret = types.List(types.union(*its))
-    return ret
+    return types.List(types.union(*input_types.values()))
 
 
 @op(

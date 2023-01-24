@@ -694,7 +694,7 @@ def test_arrow_vectorizer_string_scalar(name, weave_func, expected_output):
     fn = weave_internal.define_fn({"x": weave.types.String()}, weave_func).val
     vec_fn = arrow.vectorize(fn)
     called = weave_internal.call_fn(vec_fn, {"x": l})
-    assert weave.use(called).to_pylist() == expected_output
+    assert list(weave.use(called)) == expected_output
 
 
 @pytest.mark.parametrize(
@@ -2301,3 +2301,45 @@ def test_concat_empty_arrays():
     assert val.concatenate(val2).to_pylist() == val2.to_pylist()
     assert val2.concatenate(val).to_pylist() == val2.to_pylist()
     assert val2.concatenate(val2).to_pylist() == [{"a": 5}, {"a": 5}]
+
+
+_loading_builtins_token = context_state.set_loading_built_ins()
+
+
+def _test_arrow_do_body(a: int, b: int, c: list[int]) -> int:
+    return a * b + a ** c[0]
+
+
+@weave.op()
+def _test_arrow_do_op(a: int, b: int, c: list[int]) -> int:
+    if isinstance(a, graph.Node):
+        raise errors.WeavifyError("weavifying")
+    return _test_arrow_do_body(a, b, c)
+
+
+context_state.clear_loading_built_ins(_loading_builtins_token)
+
+
+def test_automap_more_than_one():
+    data = [1, 2, -5, -100]
+    arrow_data = weave.save(arrow.to_arrow(data))
+
+    assert weave.use(
+        arrow_data.map(lambda x: _test_arrow_do_op(x, x, [4]))
+    ).to_pylist() == [_test_arrow_do_body(x, x, [4]) for x in data]
+
+    assert weave.use(
+        arrow_data.map(lambda x: _test_arrow_do_op(x + 1, x, [4]))
+    ).to_pylist() == [_test_arrow_do_body(x + 1, x, [4]) for x in data]
+
+    assert weave.use(
+        arrow_data.map(lambda x: _test_arrow_do_op(x + 1, x, ops.make_list(a=x * 2)))
+    ).to_pylist() == [_test_arrow_do_body(x + 1, x, [x * 2]) for x in data]
+
+    assert weave.use(
+        arrow_data.map(lambda x: _test_arrow_do_op(-1, x, ops.make_list(a=x * 2)))
+    ).to_pylist() == [_test_arrow_do_body(-1, x, [x * 2]) for x in data]
+
+    assert weave.use(
+        arrow_data.map(lambda x: _test_arrow_do_op(-1, -9, ops.make_list(a=x * 2)))
+    ).to_pylist() == [_test_arrow_do_body(-1, -9, [x * 2]) for x in data]

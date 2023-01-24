@@ -350,7 +350,6 @@ class Type(metaclass=_TypeSubclassWatcher):
     def save_instance(
         self, obj, artifact, name
     ) -> typing.Optional[typing.Union[list[str], "artifact_base.ArtifactRef"]]:
-        print("OBJ", obj)
         d = None
         try:
             d = self.instance_to_dict(obj)

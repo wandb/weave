@@ -260,7 +260,7 @@ def node_expr_str(node: Node) -> str:
         if node.from_op.name == "dict":
             return "{%s}" % ", ".join(
                 (
-                    "%s: %s" % (k, node_expr_str(n))
+                    '"%s": %s' % (k, node_expr_str(n))
                     for k, n in node.from_op.inputs.items()
                 )
             )

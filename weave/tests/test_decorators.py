@@ -37,7 +37,7 @@ def test_attr_access():
 
 
 @weave.type()
-class LineSegment:
+class _TestDecoratorLineSegment:
     start: Point
     end: Point
 
@@ -58,18 +58,18 @@ def test_weave_obj():
 
 
 def test_nested_weave_obj():
-    line = LineSegment(Point(1, 2), Point(3, 4))
+    line = _TestDecoratorLineSegment(Point(1, 2), Point(3, 4))
     line_type = weave.type_of(line)
-    assert line_type == LineSegment.WeaveType()
+    assert line_type == _TestDecoratorLineSegment.WeaveType()
     ref = storage.save(line)
     line2 = ref.get()
     assert line == line2
 
 
-def make_lines() -> list[LineSegment]:
+def make_lines() -> list[_TestDecoratorLineSegment]:
     lines = []
     for i in range(2):
-        line = LineSegment(
+        line = _TestDecoratorLineSegment(
             Point(float(i), float(i + 2)),
             Point(float(i * 2), float(i * 2 + 1)),
         )
@@ -80,7 +80,7 @@ def make_lines() -> list[LineSegment]:
 def test_list_nested_weave_obj():
     lines = make_lines()
     lines_type = weave.type_of(lines)
-    assert lines_type == types.List(LineSegment.WeaveType())
+    assert lines_type == types.List(_TestDecoratorLineSegment.WeaveType())
     ref = storage.save(lines)
     lines2 = ref.get()
     assert lines2 == lines
