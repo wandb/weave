@@ -254,6 +254,19 @@ def test_custom_saveload():
     assert weave.use(data2[0]["im"].width_()) == 256
 
 
+def test_custom_in_list_saveload():
+    data = arrow.to_arrow(
+        [
+            {"a": 5, "im": [Image.linear_gradient("L").rotate(0)]},
+            {"a": 6, "im": [Image.linear_gradient("L").rotate(4)]},
+        ]
+    )
+    ref = storage.save(data)
+    data2 = storage.get(str(ref))
+    # print("data2", data2._artifact)
+    assert weave.use(data2[0]["im"].width_()) == [256]
+
+
 def test_custom_tagged_groupby1():
 
     im1 = tag_store.add_tags(Image.linear_gradient("L").rotate(0), {"a": 1})
@@ -2273,3 +2286,9 @@ def test_join_all_struct_val():
         {"_tag": {"joinObj": 5}, "_value": {"a": [5, 5], "b": [{"c": 6}, {"c": 11}]}},
         {"_tag": {"joinObj": 9}, "_value": {"a": [None, 9], "b": [None, {"c": 10}]}},
     ]
+
+
+def test_to_arrow_union_list():
+    val = [{"a": 5.0}, {"a": [1.0]}]
+    arrow_val = arrow.to_arrow([{"a": 5.0}, {"a": [1.0]}])
+    assert arrow_val.to_pylist() == val

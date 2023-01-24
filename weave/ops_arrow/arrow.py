@@ -56,25 +56,29 @@ def table_with_structs_as_unions(table: pa.Table) -> pa.Table:
 
         if column_name.startswith(ArrowArrayType.UNION_PREFIX):
             # we have a union field
-            new_col = []
-            for a in column.chunks:
-                arrays = []
-                type_code_array: typing.Optional[pa.Array] = None
+            # As of pyarrow 10.0.1 there seems to be a bug with constructing a Union array
+            # from a sub-chunk of a chunked array. from_sparse fails with a size mismatch
+            # error. That function thinks the last chunk size is the size of the whole
+            # chunked array. So we combine chunks here.
+            a = column.combine_chunks()
+            arrays = []
+            type_code_array: typing.Optional[pa.Array] = None
 
-                for field in a.type:
-                    if field.name == ArrowArrayType.UNION_TO_STRUCT_TYPE_CODE_COLNAME:
-                        type_code_array = a.field(
-                            ArrowArrayType.UNION_TO_STRUCT_TYPE_CODE_COLNAME
-                        )
-                    else:
-                        arrays.append(a.field(field.name))
-                if type_code_array is None:
-                    raise errors.WeaveTypeError(
-                        "Expected struct array with type code field"
+            for field in a.type:
+                if field.name == ArrowArrayType.UNION_TO_STRUCT_TYPE_CODE_COLNAME:
+                    type_code_array = a.field(
+                        ArrowArrayType.UNION_TO_STRUCT_TYPE_CODE_COLNAME
                     )
-                new_col.append(pa.UnionArray.from_sparse(type_code_array, arrays))
-                column_name = column_name[len(ArrowArrayType.UNION_PREFIX) :]
-            return column_name, pa.chunked_array(new_col)
+                else:
+                    # arrays.append(a.field(field.name).slice(0, len(a)))
+                    arrays.append(a.field(field.name))
+            if type_code_array is None:
+                raise errors.WeaveTypeError(
+                    "Expected struct array with type code field"
+                )
+            new_col = pa.UnionArray.from_sparse(type_code_array, arrays)
+            column_name = column_name[len(ArrowArrayType.UNION_PREFIX) :]
+            return column_name, pa.chunked_array([new_col])
 
         elif pa.types.is_struct(column.type):
             # we have a struct field - recurse it and convert all subfields to unions where applicable
@@ -370,12 +374,16 @@ def rewrite_weavelist_refs(arrow_data, object_type, source_artifact, target_arti
     elif _object_type_is_basic(object_type):
         return arrow_data
     elif isinstance(object_type, types.List):
-        # This is a bit unfortunate that we have to loop through all the items - would be nice to do a direct memory replacement.
-        return pa.array(_rewrite_pyliteral_refs(item.as_py(), object_type, source_artifact, target_artifact) for item in arrow_data)  # type: ignore
-
+        return pa.ListArray.from_arrays(
+            arrow_data.offsets,
+            rewrite_weavelist_refs(
+                arrow_data.values,
+                object_type.object_type,
+                source_artifact,
+                target_artifact,
+            ),
+        )
     else:
-        from . import storage
-
         # We have a column of refs
         new_refs = []
         for ref_str in arrow_data:
@@ -388,55 +396,6 @@ def rewrite_weavelist_refs(arrow_data, object_type, source_artifact, target_arti
                 else None
             )
         return pa.array(new_refs)
-
-
-def _rewrite_pyliteral_refs(
-    pyliteral_data, object_type, source_artifact, target_artifact
-):
-    if _object_type_has_props(object_type):
-        prop_types = _object_type_prop_types(object_type)
-        if isinstance(pyliteral_data, dict):
-            return {
-                key: _rewrite_pyliteral_refs(
-                    pyliteral_data[key], value, source_artifact, target_artifact
-                )
-                for key, value in prop_types.items()
-            }
-        else:
-            raise errors.WeaveTypeError('Unhandled type "%s"' % type(pyliteral_data))
-    elif isinstance(object_type, types.UnionType):
-        non_none_members = [
-            m for m in object_type.members if not isinstance(m, types.NoneType)
-        ]
-        if len(non_none_members) > 1:
-            raise errors.WeaveInternalError(
-                "Unions not fully supported yet in Weave arrow"
-            )
-        if pyliteral_data == None:
-            return None
-        return _rewrite_pyliteral_refs(
-            pyliteral_data,
-            types.non_none(object_type),
-            source_artifact,
-            target_artifact,
-        )
-    elif _object_type_is_basic(object_type):
-        return pyliteral_data
-    elif isinstance(object_type, types.List):
-        return (
-            [
-                _rewrite_pyliteral_refs(
-                    item, object_type.object_type, source_artifact, target_artifact
-                )
-                for item in pyliteral_data
-            ]
-            if pyliteral_data is not None
-            else None
-        )
-    else:
-        return _rewrite_ref_for_save(
-            pyliteral_data, object_type, source_artifact, target_artifact
-        )
 
 
 def _object_type_has_props(object_type):

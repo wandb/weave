@@ -315,17 +315,21 @@ def awl_group_by_result_type(
     return ArrowWeaveListType(awl_group_by_result_object_type(object_type, key_type))
 
 
-def _reshape_struct_array(t: pa.StructType, array: pa.StructArray) -> pa.StructArray:
-    field_names = [f.name for f in t]
-    sub_fields = []
-    for field_name in field_names:
-        sub_field_type = t.field(field_name).type
-        sub_field = array.field(field_name)
-        if not isinstance(sub_field_type, pa.StructType):
-            sub_fields.append(sub_field)
-        else:
-            sub_fields.append(_reshape_struct_array(sub_field_type, sub_field))
-    return pa.StructArray.from_arrays(sub_fields, field_names)
+def _sort_structs(array: pa.Array) -> pa.Array:
+    if isinstance(array, pa.ChunkedArray):
+        return pa.chunked_array(
+            [_sort_structs(chunk) for chunk in array.chunks], array.type
+        )
+    if pa.types.is_struct(array.type):
+        field_names = sorted([f.name for f in array.type])
+        sub_fields = [_sort_structs(array.field(f)) for f in field_names]
+        return pa.StructArray.from_arrays(sub_fields, field_names)
+    elif pa.types.is_list(array.type):
+        return pa.ListArray.from_arrays(
+            array.offsets,
+            _sort_structs(array.flatten()),
+        )
+    return array
 
 
 # When concatenating arrays, the structs need to have the same key order. This
@@ -339,7 +343,7 @@ def safe_pa_concat_arrays(arrays):
     if all(a.type == t for a in arrays):
         return pa.concat_arrays(arrays)
     if isinstance(t, pa.StructType):
-        return pa.concat_arrays([_reshape_struct_array(t, array) for array in arrays])
+        return pa.concat_arrays([_sort_structs(array) for array in arrays])
     return pa.concat_arrays(arrays)
 
 
@@ -1663,9 +1667,10 @@ def recursively_build_pyarrow_array(
             pa.array(type_codes, type=pa.int8()),
             arrays,
         )
+    if py_objs_already_mapped:
+        return pa.array(py_objs, pyarrow_type)
     return pa.array(
-        (mapper.apply(o) for o in py_objs) if not py_objs_already_mapped else py_objs,
-        pyarrow_type,
+        [mapper.apply(o) if o is not None else None for o in py_objs], pyarrow_type
     )
 
 

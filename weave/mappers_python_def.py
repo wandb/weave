@@ -77,10 +77,7 @@ class ObjectDictToObject(mappers_weave.ObjectMapper):
 
         if "artifact" in constructor_sig.parameters:
             result["artifact"] = self._artifact
-        res = instance_class(**result)
-        if not hasattr(res, "artifact"):
-            res.artifact = self._artifact
-        return res
+        return instance_class(**result)
 
 
 class ListToPyList(mappers_weave.ListMapper):

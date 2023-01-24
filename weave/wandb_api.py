@@ -11,7 +11,7 @@ def wandb_public_api() -> public.Api:
         cookies = {"wandb": os.environ["WEAVE_WANDB_COOKIE"]}
         headers = {"use-admin-privileges": "true", "x-origin": "https://app.wandb.test"}
         set_wandb_thread_local_api_settings("<not_used>", cookies, headers)
-    return public.Api()
+    return public.Api(timeout=30)
 
 
 def wandb_gql_query(query_str, variables={}):

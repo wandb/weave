@@ -11,6 +11,7 @@ from .. import artifact_wandb
 from .. import errors
 from .. import wandb_util
 from .. import weave_internal
+from .. import engine_trace
 from . import wbmedia
 
 
@@ -197,7 +198,17 @@ def _get_rows_and_object_type_from_weave_format(
                 )
         col_type = converted_object_type.property_types[key]
         if col_type.assign_type(types.UnknownType()):
-            unknown_col_example_data = [row[i] for row in row_data]
+            # Sample some data to detect the type. Otherwise this
+            # can be very expensive. This could cause down-stream crashes,
+            # for example if we don't realize that a column is union of string
+            # and int, saving to arrow will crash.
+            n_examples = 1000
+            if len(row_data) < n_examples:
+                example_rows = row_data
+            else:
+                # Sample from beginning and end.
+                example_rows = row_data[:500] + row_data[-500:]
+            unknown_col_example_data = [row[i] for row in example_rows]
             detected_type = typing.cast(
                 types.List, types.TypeRegistry.type_of(unknown_col_example_data)
             )
@@ -227,10 +238,12 @@ def _get_table_like_awl_from_file(
         artifact_fs.FilesystemArtifactFile, artifact_fs.FilesystemArtifactDir, None
     ],
 ) -> _TableLikeAWLFromFileResult:
+    tracer = engine_trace.tracer()
     if file is None or isinstance(file, artifact_fs.FilesystemArtifactDir):
         raise errors.WeaveInternalError("File is None or a directory")
     with file.open() as f:
-        data = json.load(f)
+        with tracer.trace("get_table:jsonload"):
+            data = json.load(f)
 
     if file.path.endswith(".joined-table.json"):
         awl = _get_joined_table_awl_from_file(data, file)
@@ -248,17 +261,22 @@ def _get_table_like_awl_from_file(
 def _get_table_awl_from_file(
     data: dict, file: artifact_fs.FilesystemArtifactFile
 ) -> "ops_arrow.ArrowWeaveList":
+    tracer = engine_trace.tracer()
     rows = []
     object_type = None
 
-    if _data_is_weave_file_format(data):
-        rows, object_type = _get_rows_and_object_type_from_weave_format(data, file)
-    elif _data_is_legacy_run_file_format(data):
-        rows, object_type = _get_rows_and_object_type_from_legacy_format(data)
-    else:
-        raise errors.WeaveInternalError("Unknown table file format for data")
+    with tracer.trace("get_table:get_rows_and_object_type"):
+        if _data_is_weave_file_format(data):
+            rows, object_type = _get_rows_and_object_type_from_weave_format(data, file)
+        elif _data_is_legacy_run_file_format(data):
+            rows, object_type = _get_rows_and_object_type_from_legacy_format(data)
+        else:
+            raise errors.WeaveInternalError("Unknown table file format for data")
 
-    return ops_arrow.to_arrow_from_list_and_artifact(rows, object_type, file.artifact)
+    with tracer.trace("get_table:to_arrow"):
+        return ops_arrow.to_arrow_from_list_and_artifact(
+            rows, object_type, file.artifact
+        )
 
 
 def _get_partitioned_table_awl_from_file(
