@@ -1,5 +1,6 @@
 import numpy as np
 from .. import errors
+import threading
 import warnings
 
 from sklearn.manifold import TSNE
@@ -73,17 +74,24 @@ def perform_2D_projection_tsne(np_array_of_embeddings: np.array, options) -> np.
     ).fit_transform(limit_embedding_dimensions(np_array_of_embeddings))
 
 
+# TODO: we need lock stats in datadog
+# UMAP is not thread safe, it crashes the server when called at the same
+# time on parallel threads.
+umap_lock = threading.Lock()
+
+
 def perform_2D_projection_umap(
     np_array_of_embeddings: np.array, options: dict
 ) -> np.array:
     n_samples = len(np_array_of_embeddings)
-    return (
-        _get_umap()
-        .UMAP(
-            n_components=2,
-            n_neighbors=min(n_samples - 1, options.get("neighbors", 15)),
-            min_dist=options.get("minDist", 0.1),
-            spread=options.get("spread", 1.0),
+    with umap_lock:
+        return (
+            _get_umap()
+            .UMAP(
+                n_components=2,
+                n_neighbors=min(n_samples - 1, options.get("neighbors", 15)),
+                min_dist=options.get("minDist", 0.1),
+                spread=options.get("spread", 1.0),
+            )
+            .fit_transform(np_array_of_embeddings)
         )
-        .fit_transform(np_array_of_embeddings)
-    )
