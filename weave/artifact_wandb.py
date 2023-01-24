@@ -389,7 +389,7 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
             rel_path = os.path.relpath(entry_path, path)
             rel_path_parts = rel_path.split("/")
             if len(rel_path_parts) == 1:
-                files[entry_path] = artifact_fs.FilesystemArtifactFile(
+                files[rel_path_parts[0]] = artifact_fs.FilesystemArtifactFile(
                     self,
                     entry_path,
                 )

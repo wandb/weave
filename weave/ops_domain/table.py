@@ -145,27 +145,54 @@ def _data_is_weave_file_format(data):
     return "columns" in data and "data" in data and "column_types" in data
 
 
-def _get_rows_and_object_type_from_legacy_format(data):
+def _sample_rows(data: list, max_rows: int = 1000) -> list:
+    data_len = len(data)
+    if data_len > max_rows:
+        split_size = max_rows // 3
+        gap_size = (data_len - max_rows) // 2
+        start_split = data[:split_size]
+        middle_start = split_size + gap_size
+        middle_split = data[middle_start : middle_start + split_size]
+        end_split = data[-split_size:]
+        return start_split + middle_split + end_split
+    return data
+
+
+def _infer_type_from_cell(cell: typing.Any) -> types.Type:
+    if isinstance(cell, dict) and "_type" in cell and isinstance(cell["_type"], str):
+        maybe_type = types.type_name_to_type(cell["_type"])
+        if maybe_type is not None:
+            return maybe_type()
+    return types.TypeRegistry.type_of(cell)
+
+
+def _infer_type_from_row_dict(row: dict) -> types.Type:
+    return types.TypedDict({k: _infer_type_from_cell(v) for k, v in row.items()})
+
+
+def _infer_type_from_col_list(row: list) -> types.Type:
+    running_type: types.Type = types.UnknownType()
+    for cell in row:
+        running_type = types.merge_types(running_type, _infer_type_from_cell(cell))
+    return running_type
+
+
+def _infer_type_from_row_dicts(rows: list[dict]) -> types.Type:
+    running_type: types.Type = types.UnknownType()
+    for row in rows:
+        running_type = types.merge_types(running_type, _infer_type_from_row_dict(row))
+    return running_type
+
+
+def _get_rows_and_object_type_from_legacy_format(data: dict) -> tuple[list, types.Type]:
     rows = [dict(zip(data["columns"], row)) for row in data["data"]]
-    object_type = types.TypeRegistry.type_of(rows).object_type
-
-    prop_types = {}
-
-    # Quick hack to support just images for legacy tables.
-    # TODO: better / more general support for other types. E.g. this doesn't
-    # handle nullable
-    for k, pt in object_type.property_types.items():
-        if isinstance(pt, types.TypedDict) and "_type" in pt.property_types:
-            prop_types[k] = wbmedia.ImageArtifactFileRef.WeaveType()
-        else:
-            prop_types[k] = pt
-
-    return rows, types.TypedDict(prop_types)
+    object_type = _infer_type_from_row_dicts(_sample_rows(rows))
+    return rows, object_type
 
 
 def _get_rows_and_object_type_from_weave_format(
     data: typing.Any, file: artifact_fs.FilesystemArtifactFile
-):
+) -> tuple[list, types.Type]:
     rows = []
     artifact = file.artifact
     if not isinstance(artifact, artifact_wandb.WandbArtifact):
@@ -202,17 +229,8 @@ def _get_rows_and_object_type_from_weave_format(
             # can be very expensive. This could cause down-stream crashes,
             # for example if we don't realize that a column is union of string
             # and int, saving to arrow will crash.
-            n_examples = 1000
-            if len(row_data) < n_examples:
-                example_rows = row_data
-            else:
-                # Sample from beginning and end.
-                example_rows = row_data[:500] + row_data[-500:]
-            unknown_col_example_data = [row[i] for row in example_rows]
-            detected_type = typing.cast(
-                types.List, types.TypeRegistry.type_of(unknown_col_example_data)
-            )
-            obj_prop_types[key] = detected_type.object_type
+            unknown_col_example_data = [row[i] for row in _sample_rows(row_data)]
+            obj_prop_types[key] = _infer_type_from_col_list(unknown_col_example_data)
         else:
             obj_prop_types[key] = col_type
     object_type = types.TypedDict(obj_prop_types)
@@ -262,7 +280,7 @@ def _get_table_awl_from_file(
     data: dict, file: artifact_fs.FilesystemArtifactFile
 ) -> "ops_arrow.ArrowWeaveList":
     tracer = engine_trace.tracer()
-    rows = []
+    rows: list = []
     object_type = None
 
     with tracer.trace("get_table:get_rows_and_object_type"):
