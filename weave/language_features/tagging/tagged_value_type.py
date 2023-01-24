@@ -42,6 +42,131 @@ if typing.TYPE_CHECKING:
     from ... import artifact_base
     from ... import artifact_fs
 
+
+def flatten_tag_type_to_typed_dict(tag_type: types.Type) -> types.TypedDict:
+    """
+    In Weave0, we have a more loose definition of what a TaggedValue is. Specifically,
+    a TaggedValue type in Weave0 must conform to the following:
+        * Tag: Anything, but in practice is either (or a union of):
+                * A TypedDict
+                * A TaggedValue (where the value side of the chain are TypedDicts)
+        * Value: Must not be a TaggedValue
+
+    This means your data shape looks like a chain of TaggedValues. Consider the following:
+
+    b_0 = type_0
+    l_1 = Tag({t_1: tv_1}, b_0) =
+    Tagged<
+        Dict<
+            t_1: tv_1
+        >,
+        b_0
+    >
+    l_2 = Tag({t_2: tv_2}, l_1) =
+    Tagged<
+        Tagged<
+            Dict<
+                t_1: tv_1
+            >,
+            Dict<
+                t_2: tv_2
+            >
+        >,
+        b_0
+    >
+    l_3 = Tag({t_3: tv_3}, l_2) =
+    Tagged<
+        Tagged<
+            Tagged<
+                Dict<
+                    t_1: tv_1
+                >,
+                Dict<
+                    t_2: tv_2
+                >
+            >,
+            Dict<
+                t_3: tv_3
+            >
+        >,
+        b_0
+    >
+
+    When deciding if a type has a specific tag, we traverse the tag chain. essentially,
+    perform the following logic:
+
+    def find_tag(obj):
+        if isinstance(obj, TaggedValue):
+            return _find_tag_inner(obj.tag)
+        else:
+            return None
+
+    def _find_tag_inner(obj):
+        if isinstance(type.val, TypedDict) and tag_name in type.val:
+            return type.val[tag_name]
+        elif isinstance(type.tag, TypedDict) and tag_name in type.tag:
+            return type.tag[tag_name]
+        elif isinstance(type.tag, TaggedValue):
+            return _find_tag_inner(type.tag, tag_name)
+        else:
+            return None
+
+    However, in Weave1, we have a more strict definition of what a TaggedValue is. Specifically:
+        * Tag: Must be a TypedDict (values can be TaggedValues)
+        * Value: Must not be a TaggedValue
+
+    This means that we need to flatten the tag chain into a single TypedDict.The primary
+    disadvantage of this approach to Weave0 is that if we have a tag-key collision then
+    only the most recent tag is available. So, the above example becomes:
+    Tagged<
+        Dict<
+            t_1: tv_1,
+            t_2: tv_2,
+            t_3: tv_3
+        >,
+        b_0
+    >
+
+    This is not strictly necessary - i think if we want we can convert to Weave0's
+    definition of TaggedValue. However, this is much nicer to work with and understand.
+
+
+    This function is used to perform the above described flattening of the tag-side of the
+    TaggedValue chain.
+    """
+
+    # First, if the tag is already a TypedDict, then we are good
+    if isinstance(tag_type, types.TypedDict):
+        return tag_type
+
+    # Next, if the tag_type is a union, then we want to merge the results.
+    # This is subtly different than Weave0, but ensures that the result
+    # is always a TypedDict.
+    elif isinstance(tag_type, types.UnionType):
+        base_type = types.TypedDict({})
+        for member in tag_type.members:
+            if not isinstance(member, types.NoneType):
+                base_type = types.merge_types(base_type, flatten_tag_type_to_typed_dict(member))  # type: ignore
+        return base_type
+
+    # Finally, if the tag_type is a TaggedValue, then we want to merge the tag
+    # and value props together.
+    elif isinstance(tag_type, TaggedValueType):
+        assert types.TypedDict({}).assign_type(tag_type.tag), (
+            "tag_type.tag must be assignable to TypedDict, found %s" % tag_type.tag
+        )
+        assert types.TypedDict({}).assign_type(tag_type.value), (
+            "tag_type.value must be assignable to TypedDict, found %s" % tag_type.value
+        )
+        return types.TypedDict(
+            {**tag_type.tag.property_types, **tag_type.value.property_types}  # type: ignore
+        )
+    else:
+        raise errors.WeaveTypeError(
+            f"tag_type must be TypedDict, UnionType, or TaggedValueType, found {tag_type}"
+        )
+
+
 # A custom Weave Type used to represent tagged values.
 @dataclasses.dataclass(frozen=True)
 class TaggedValueType(types.Type):
@@ -107,23 +232,15 @@ class TaggedValueType(types.Type):
 
     @classmethod
     def from_dict(cls, d: dict) -> "TaggedValueType":
-        tag_type = types.TypeRegistry.type_from_dict(d["tag"])
-        if isinstance(tag_type, TaggedValueType):
-            # here, we are coming from JS
-            assert types.TypedDict({}).assign_type(tag_type.tag), (
-                "tag_type.tag must be assignable to TypedDict, found %s" % tag_type.tag
-            )
-            assert types.TypedDict({}).assign_type(tag_type.value), (
-                "tag_type.value must be assignable to TypedDict, found %s"
-                % tag_type.value
-            )
-            tag_type = types.TypedDict(
-                {**tag_type.tag.property_types, **tag_type.value.property_types}  # type: ignore
-            )
-        return cls(
-            tag_type,  # type: ignore
-            types.TypeRegistry.type_from_dict(d["value"]),
+        tag_type = flatten_tag_type_to_typed_dict(
+            types.TypeRegistry.type_from_dict(d["tag"])
         )
+        value_type = types.TypeRegistry.type_from_dict(d["value"])
+        res = cls(
+            tag_type,
+            value_type,
+        )
+        return res
 
     def _to_dict(self) -> dict:
         return {"tag": self.tag.to_dict(), "value": self.value.to_dict()}

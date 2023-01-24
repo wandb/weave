@@ -1,5 +1,7 @@
 import pytest
 import weave
+from weave.artifact_fs import FilesystemArtifactFileType
+from weave.ops_domain.wb_domain_types import ProjectType, RunType
 from ..language_features.tagging import make_tag_getter_op, tagged_value_type, tag_store
 from .. import weave_types as types
 
@@ -188,3 +190,56 @@ def test_tag_scope_with_multiple_children():
     second_tag = second_node.indexCheckpoint()
     assert weave.use(count_node) == 3
     assert weave.use([first_tag, second_tag]) == [0, 1]
+
+
+def test_nested_deserialization_of_weave0_tags():
+    weave_0_tag_dict = {
+        "type": "tagged",
+        "tag": {
+            "type": "union",
+            "members": [
+                {
+                    "type": "tagged",
+                    "tag": {
+                        "type": "typedDict",
+                        "propertyTypes": {"a": "string"},
+                    },
+                    "value": {
+                        "type": "typedDict",
+                        "propertyTypes": {"b": "number"},
+                    },
+                },
+                {
+                    "type": "tagged",
+                    "tag": {
+                        "type": "typedDict",
+                        "propertyTypes": {"c": "boolean"},
+                    },
+                    "value": {
+                        "type": "typedDict",
+                        "propertyTypes": {"d": "project"},
+                    },
+                },
+            ],
+        },
+        "value": {
+            "type": "typedDict",
+            "propertyTypes": {"e": "run"},
+        },
+    }
+    weave_1_type = tagged_value_type.TaggedValueType.from_dict(weave_0_tag_dict)
+    assert weave_1_type == tagged_value_type.TaggedValueType(
+        types.TypedDict(
+            {
+                "a": types.optional(types.String()),
+                "b": types.optional(types.Number()),
+                "c": types.optional(types.Boolean()),
+                "d": types.optional(ProjectType),
+            }
+        ),
+        types.TypedDict(
+            {
+                "e": RunType,
+            }
+        ),
+    )
