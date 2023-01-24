@@ -3,7 +3,6 @@ import dataclasses
 import typing
 import json
 import datetime
-import os
 
 from . import artifact_base
 from . import ref_base
@@ -28,6 +27,10 @@ class FilesystemArtifact(artifact_base.Artifact):
     def set(
         self, key: str, type_: types.Type, obj: typing.Any
     ) -> artifact_base.ArtifactRef:
+        # We should do this, but it doesn't work yet!
+        # existing_ref = ref_base.get_ref(obj)
+        # if isinstance(existing_ref, artifact_base.ArtifactRef):
+        #     return existing_ref
         ref_extra = type_.save_instance(obj, self, key)
         # If save_instance returned a Ref, return that directly.
         # TODO: refactor

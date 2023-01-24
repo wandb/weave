@@ -70,7 +70,11 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
         self._setup_dirs()
         self._existing_dirs = []
 
-    def ref(self) -> "LocalArtifactRef":
+    # If an object has a _ref property, it will be used by ref_base._get_ref()
+    @property
+    def _ref(self) -> "LocalArtifactRef":
+        if not self.is_saved:
+            raise errors.WeaveInternalError("cannot get ref of an unsaved artifact")
         return LocalArtifactRef(self, None, None)
 
     def __repr__(self):

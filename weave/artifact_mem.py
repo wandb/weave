@@ -11,7 +11,12 @@ class MemArtifact(artifact_base.Artifact):
     def __init__(self) -> None:
         self._refs = {}
 
-    def set(self, key: str, type_: types.Type, obj: typing.Any) -> "MemArtifactRef":
+    def set(
+        self, key: str, type_: types.Type, obj: typing.Any
+    ) -> artifact_base.ArtifactRef:
+        # existing_ref = ref_base.get_ref(obj)
+        # if isinstance(existing_ref, artifact_base.ArtifactRef):
+        #     return existing_ref
         self._refs[key] = obj
         return MemArtifactRef(self, key, type_, obj)
 

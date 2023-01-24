@@ -198,6 +198,15 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
             self._read_artifact_uri = uri
         self._local_path: dict[str, str] = {}
 
+    @property
+    def _ref(self) -> "WandbArtifactRef":
+        # existing_ref = ref_base.get_ref(obj)
+        # if isinstance(existing_ref, artifact_base.ArtifactRef):
+        #     return existing_ref
+        if not self.is_saved:
+            raise errors.WeaveInternalError("cannot get ref of an unsaved artifact")
+        return WandbArtifactRef(self, None, None)
+
     def _set_read_artifact_uri(self, uri):
         self._read_artifact = None
         self._read_artifact_uri = uri
