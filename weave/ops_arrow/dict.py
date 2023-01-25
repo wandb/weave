@@ -196,7 +196,7 @@ def arrow_dict_(**d):
     return ArrowWeaveList(table, types.TypedDict(res.prop_types), res.artifact)
 
 
-@op(
+@arrow_op(
     name="ArrowWeaveList-2DProjection",
     input_type={
         "table": ArrowWeaveListType(types.TypedDict({})),
