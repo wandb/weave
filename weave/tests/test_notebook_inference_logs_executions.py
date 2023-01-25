@@ -88,7 +88,7 @@ execute_payloads = [
                                 },
                             },
                         },
-                        "name": "model_node",
+                        "varName": "model_node",
                     },
                 },
                 {
@@ -123,7 +123,7 @@ execute_payloads = [
                             },
                         },
                     },
-                    "name": "model_node",
+                    "varName": "model_node",
                 },
             ],
             "rootNodes": [0],
