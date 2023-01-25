@@ -130,9 +130,17 @@ def _deserialize_node(
             fn_body_node = node["val"]
             parsed_fn_body_node: graph.Node
             if fn_body_node["nodeType"] == "var":
+                if "name" in fn_body_node:
+                    # Currently `WeaveBackend` (non user facing) creates var nodes
+                    # with `name` as the name key. This is different than the
+                    # rest of the application which uses `varName`. Unfortunately,
+                    # we can't fix this right now since the FE build is broken. Once
+                    # that is fixed, this can be removed.
+                    var_name = fn_body_node["name"]
+                else:
+                    var_name = fn_body_node["varName"]
                 parsed_fn_body_node = weave_internal.make_var_node(
-                    types.TypeRegistry.type_from_dict(fn_body_node["type"]),
-                    fn_body_node["name"],
+                    types.TypeRegistry.type_from_dict(fn_body_node["type"]), var_name
                 )
             elif fn_body_node["nodeType"] == "const":
                 parsed_fn_body_node = weave_internal.make_const_node(
