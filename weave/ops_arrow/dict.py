@@ -240,10 +240,18 @@ def awl_2d_projection(
                 for c in inputColumnNames
             ]
             np_array_of_embeddings = np.array(column_data).T
-
-        np_projection = projection_utils.perform_2D_projection(
-            np_array_of_embeddings, projectionAlgorithm, algorithmOptions
-        )
+        # If the selected data is not a 2D array, or if it has less than 2 columns, then
+        # we can't perform a 2D projection. In this case, we just return a 2D array of
+        # zeros.
+        if (
+            len(np_array_of_embeddings.shape) != 2
+            or np_array_of_embeddings.shape[1] < 2
+        ):
+            np_projection = np.array([[0, 0] for row in data])
+        else:
+            np_projection = projection_utils.perform_2D_projection(
+                np_array_of_embeddings, projectionAlgorithm, algorithmOptions
+            )
     x_column = np_projection[:, 0]
     y_column = np_projection[:, 1]
 
