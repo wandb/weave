@@ -1477,6 +1477,7 @@ def vectorize(
         # First, we need to handle a a few special cases:
         # 1. If the node is a lambda function, then we know we can't vectorize it
         if _is_lambda_output_node(node):
+            # Example: [[1,2,3], [3,4,5]].map(row => row.map(x => x + 1))
             return _vectorize_lambda_output_node(node, vectorized_keys)
 
         # 2. If the op is `dict` or `list` then we manually hard code the vectorized version
