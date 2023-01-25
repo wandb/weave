@@ -1,10 +1,9 @@
 import typing
 import datetime
 import math
-from ..api import op, mutation, weave_class
+from ..api import op, weave_class
 from .. import weave_types as types
 import numpy as np
-from .. import execute_fast
 
 binary_number_op_input_type = {
     "lhs": types.Number(),
@@ -85,7 +84,7 @@ class Number(object):
     @op(
         name="number-equal",
         input_type=binary_number_op_input_type,
-        output_type=types.optional(types.Boolean()),
+        output_type=types.Boolean(),
     )
     def __eq__(lhs, rhs):
         rhs = rhs or 0
@@ -94,7 +93,7 @@ class Number(object):
     @op(
         name="number-notEqual",
         input_type=binary_number_op_input_type,
-        output_type=types.optional(types.Boolean()),
+        output_type=types.Boolean(),
     )
     def __ne__(lhs, rhs):
         rhs = rhs or 0
@@ -196,7 +195,7 @@ class Number(object):
     @op(
         name="number-toTimestamp",
         input_type={"val": types.Number()},
-        output_type=types.Datetime(),
+        output_type=types.Timestamp(),
     )
     def to_timestamp(val):
         # TODO: We may need to handle more conversion points similar to Weave0

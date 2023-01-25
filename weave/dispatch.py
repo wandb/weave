@@ -6,7 +6,6 @@ import typing
 
 from .language_features.tagging.is_tag_getter import is_tag_getter
 
-from . import errors
 from . import weave_types as types
 from . import op_def
 from . import op_args
@@ -75,6 +74,14 @@ def _resolve_op_ambiguity(
             non_tag_getter_candidates.append(candidate)
 
     def cmp(a: op_def.OpDef, b: op_def.OpDef) -> int:
+        # TODO: make this less hacky
+        # If we're mapping contains, don't do substring matching
+        ambiguous_contains = ["mapped_string-contains", "contains"]
+        if a.name in ambiguous_contains and b.name in ambiguous_contains:
+            if a.name == "contains":
+                return -1
+            else:
+                return 1
         b_is_subtype = _op_args_is_subtype(a.input_type, b.input_type)
         a_is_subtype = _op_args_is_subtype(b.input_type, a.input_type)
         if a_is_subtype and b_is_subtype:

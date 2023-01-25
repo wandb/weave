@@ -75,7 +75,7 @@ gql_prop_op(
     "project-createdAt",
     wdt.ProjectType,
     "createdAt",
-    types.Datetime(),
+    types.Timestamp(),
 )
 
 # Section 4/6: Direct Relationship Ops
@@ -146,7 +146,7 @@ gql_connection_op(
     "artifactTypes",
     wdt.ArtifactTypeType,
     {},
-    lambda inputs: f"first: 50",
+    lambda inputs: "first: 50",
 )
 
 gql_connection_op(
@@ -155,7 +155,7 @@ gql_connection_op(
     "runs",
     wdt.RunType,
     {},
-    lambda inputs: f"first: 50",
+    lambda inputs: "first: 50",
 )
 
 

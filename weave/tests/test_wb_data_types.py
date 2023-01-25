@@ -3,12 +3,10 @@ import wandb
 from wandb import data_types as wb_data_types
 import numpy as np
 from wandb.sdk.data_types._dtypes import TypeRegistry as SDKTypeRegistry
-from wandb.sdk.data_types.helper_types.classes import Classes as SDKClasses
 
 from .fixture_fakewandb import FakeApi
 
 from ..wandb_util import weave0_type_json_to_weave1_type
-from ..ops_domain import wb_domain_types
 import weave
 from .. import weave_types as types
 import datetime
@@ -90,7 +88,7 @@ def make_molecule():
         #
         # Domain Types
         #
-        (datetime.datetime.now(), types.Datetime()),  # type: ignore
+        (datetime.datetime.now(), types.Timestamp()),  # type: ignore
         # See comment in wandb_util.py - this may change in the future
         (np.array([1, 2, 3]), types.NoneType()),
         #

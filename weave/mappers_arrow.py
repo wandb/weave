@@ -185,7 +185,7 @@ class BoolToArrowBool(mappers_python.BoolToPyBool):
         return pa.bool_()
 
 
-class DatetimeToArrowTimestamp(mappers_python.DatetimeToPyDatetime):
+class TimestampToArrowTimestamp(mappers_python.TimestampToPyTimestamp):
     def result_type(self):
         return pa.timestamp("ms", tz="+00:00")
 
@@ -288,6 +288,8 @@ class DefaultToArrow(mappers_python.DefaultToPy):
             return pa.string()
         elif self.type.name == "timestamp":
             return pa.timestamp("ms", tz="+00:00")
+        elif self.type.name == "date":
+            return pa.timestamp("ms", tz="+00:00")
         elif self.type.name == "type":
             return pa.string()
 
@@ -334,8 +336,8 @@ def map_to_arrow_(type, mapper, artifact: artifact_base.Artifact, path=[]):
         return FloatToArrowFloat(type, mapper, artifact, path)
     elif isinstance(type, types.String):
         return StringToArrow(type, mapper, artifact, path)
-    elif isinstance(type, types.Datetime):
-        return DatetimeToArrowTimestamp(type, mapper, artifact, path)
+    elif isinstance(type, types.Timestamp):
+        return TimestampToArrowTimestamp(type, mapper, artifact, path)
     elif isinstance(type, types.Function):
         return FunctionToArrowFunction(type, mapper, artifact, path)
     elif isinstance(type, types.NoneType):
@@ -365,7 +367,7 @@ def map_from_arrow_(type, mapper, artifact, path=[]):
         return ArrowFloatToFloat(type, mapper, artifact, path)
     elif isinstance(type, types.String):
         return ArrowStringToString(type, mapper, artifact, path)
-    elif isinstance(type, types.Datetime):
+    elif isinstance(type, types.Timestamp):
         return ArrowDateTimeToDateTime(type, mapper, artifact, path)
     elif isinstance(type, types.Function):
         return ArrowFunctionToFunction(type, mapper, artifact, path)
@@ -392,7 +394,7 @@ def map_from_arrow_scalar(value: pa.Scalar, type_: types.Type, artifact):
             types.Float,
             types.Boolean,
             types.String,
-            types.Datetime,
+            types.Timestamp,
             types.NoneType,
         ),
     ):

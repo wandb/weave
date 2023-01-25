@@ -9,7 +9,6 @@ from .wandb_domain_gql import (
     gql_prop_op,
     gql_direct_edge_op,
     gql_connection_op,
-    gql_root_op,
     _make_alias,
 )
 
@@ -62,7 +61,7 @@ gql_prop_op(
     "run-createdAt",
     wdt.RunType,
     "createdAt",
-    types.Datetime(),
+    types.Timestamp(),
 )
 gql_prop_op(
     "_run-historykeyinfo",
@@ -82,7 +81,7 @@ gql_prop_op(
     "run-heartbeatAt",
     wdt.RunType,
     "heartbeatAt",
-    types.Datetime(),
+    types.Timestamp(),
 )
 
 
@@ -258,7 +257,7 @@ gql_connection_op(
     "inputArtifacts",
     wdt.ArtifactVersionType,
     {},
-    lambda inputs: f"first: 50",
+    lambda inputs: "first: 50",
 )
 
 gql_connection_op(
@@ -267,7 +266,7 @@ gql_connection_op(
     "outputArtifacts",
     wdt.ArtifactVersionType,
     {},
-    lambda inputs: f"first: 50",
+    lambda inputs: "first: 50",
 )
 
 

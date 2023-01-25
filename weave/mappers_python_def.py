@@ -13,7 +13,6 @@ from . import errors
 from . import box
 from . import mappers_python
 from . import val_const
-from . import util
 from .timestamp import tz_aware_dt
 from .language_features.tagging import tagged_value_type
 
@@ -152,15 +151,23 @@ class StringToPyString(mappers.Mapper):
         return obj
 
 
-class DatetimeToPyDatetime(mappers.Mapper):
+class TimestampToPyTimestamp(mappers.Mapper):
     def apply(self, obj: datetime.datetime):
         return int(tz_aware_dt(obj).timestamp() * 1000)
-        return obj.isoformat()
 
 
-class PyDatetimeToDatetime(mappers.Mapper):
+class PyTimestampToTimestamp(mappers.Mapper):
     def apply(self, obj):
-        return datetime.datetime.fromtimestamp(obj / 1000, tz=datetime.timezone.utc)
+        # This is here to support the legacy "date" type, the frontend passes
+        # RFC 3339 formatted strings
+        if isinstance(obj, dict):
+            if obj.get("type") != "date":
+                raise errors.WeaveInternalError(
+                    f'expected object with type date but got "{obj}"'
+                )
+            return datetime.datetime.strptime(obj["val"], "%Y-%m-%dT%H:%M:%S.%fZ")
+        else:
+            return datetime.datetime.fromtimestamp(obj / 1000, tz=datetime.timezone.utc)
 
 
 class NoneToPyNone(mappers.Mapper):
@@ -306,8 +313,8 @@ def map_to_python_(type, mapper, artifact, path=[]):
         return FloatToPyFloat(type, mapper, artifact, path)
     elif isinstance(type, types.String):
         return StringToPyString(type, mapper, artifact, path)
-    elif isinstance(type, types.Datetime):
-        return DatetimeToPyDatetime(type, mapper, artifact, path)
+    elif isinstance(type, types.Timestamp):
+        return TimestampToPyTimestamp(type, mapper, artifact, path)
     elif isinstance(type, types.Const):
         return ConstToPyConst(type, mapper, artifact, path)
     elif isinstance(type, types.NoneType):
@@ -349,8 +356,10 @@ def map_from_python_(type: types.Type, mapper, artifact, path=[]):
         return PyFloatToFloat(type, mapper, artifact, path)
     elif isinstance(type, types.String):
         return StringToPyString(type, mapper, artifact, path)
-    elif isinstance(type, types.Datetime):
-        return PyDatetimeToDatetime(type, mapper, artifact, path)
+    elif isinstance(type, types.Timestamp):
+        return PyTimestampToTimestamp(type, mapper, artifact, path)
+    elif isinstance(type, types.LegacyDate):
+        return PyTimestampToTimestamp(type, mapper, artifact, path)
     elif isinstance(type, types.Const):
         return ConstToPyConst(type, mapper, artifact, path)
     elif isinstance(type, types.NoneType):

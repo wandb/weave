@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import json
 import typing
 
 from . import projection_utils
@@ -10,6 +11,7 @@ from .. import weave_types as types
 from ..api import Node, op, weave_class, OpVarArgs
 from .. import errors
 from .. import execute_fast
+from .. import storage
 from ..language_features.tagging import (
     tag_store,
     tagged_value_type,
@@ -204,9 +206,7 @@ class List:
         call_results = execute_fast.fast_map_fn(arr, groupByFn)
         result = {}
         for row, group_key_items in zip(arr, call_results):
-            import json
-
-            group_key_s = json.dumps(group_key_items)
+            group_key_s = json.dumps(storage.to_python(group_key_items))
             if group_key_s not in result:
                 result[group_key_s] = (group_key_items, [])
             result[group_key_s][1].append(row)

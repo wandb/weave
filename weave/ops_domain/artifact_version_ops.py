@@ -13,9 +13,7 @@ import typing
 from . import wb_util
 from urllib.parse import quote
 from .. import artifact_fs
-from .. import artifact_base
 from .. import artifact_wandb
-import logging
 
 # Section 1/6: Tag Getters
 # None
@@ -34,7 +32,7 @@ gql_prop_op(
     "artifactVersion-description", wdt.ArtifactVersionType, "description", types.Int()
 )
 gql_prop_op(
-    "artifactVersion-createdAt", wdt.ArtifactVersionType, "createdAt", types.Datetime()
+    "artifactVersion-createdAt", wdt.ArtifactVersionType, "createdAt", types.Timestamp()
 )
 
 gql_prop_op(
@@ -162,7 +160,7 @@ gql_connection_op(
     "usedBy",
     wdt.RunType,
     {},
-    lambda inputs: f"first: 50",
+    lambda inputs: "first: 50",
 )
 
 
@@ -170,12 +168,12 @@ gql_connection_op(
 @op(
     name="artifactVersion-name",
     plugins=wb_gql_op_plugin(
-        lambda inputs, inner: f"""
+        lambda inputs, inner: """
             versionIndex
-            artifactSequence {{
+            artifactSequence {
                 id
                 name
-            }}
+            }
         """,
     ),
 )

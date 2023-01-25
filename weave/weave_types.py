@@ -33,8 +33,6 @@ def js_to_py_typename(typename: str) -> str:
     # put the id type in the type system for now, and just hap it to string.
     if typename == "id":
         return "string"
-    if typename == "date":
-        return "timestamp"
     return typename
 
 
@@ -590,11 +588,34 @@ class Boolean(BasicType):
             json.dump(obj, f)
 
 
-class Datetime(Type):
-    # TODO: Should be datetime but weavejs expects date
-    # name = "datetime"
+class LegacyDate(Type):
+    # TODO: For historic reasons we had "date" and "timestamp" types.  Now we only
+    # use "timestamp" but we need to keep this around for backwards compatibility.
+    name = "date"
+
+    def save_instance(self, obj, artifact, name):
+        if artifact is None:
+            raise errors.WeaveSerializeError(
+                "save_instance invalid when artifact is None for type: %s" % self
+            )
+        with artifact.new_file(f"{name}.object.json") as f:
+            v = int(tz_aware_dt(obj).timestamp() * 1000)
+            json.dump(v, f)
+
+    def load_instance(self, artifact, name, extra=None):
+        with artifact.open(f"{name}.object.json") as f:
+            v = json.load(f)
+            return datetime.datetime.fromtimestamp(v / 1000, tz=datetime.timezone.utc)
+
+
+class Timestamp(Type):
     name = "timestamp"
     instance_classes = datetime.datetime
+
+    def from_isostring(self, iso: str) -> datetime.datetime:
+        # NOTE: This assumes ISO 8601 format from GQL endpoints, it does NOT
+        # support RFC 3339 strings with a "Z" at the end before python 3.11
+        return datetime.datetime.fromisoformat(iso)
 
     def save_instance(self, obj, artifact, name):
         if artifact is None:

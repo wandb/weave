@@ -2,14 +2,8 @@ import datetime
 import json
 from ..compile_domain import wb_gql_op_plugin
 from ..api import op
-from . import wb_domain_types as wdt
-from ..language_features.tagging.make_tag_getter_op import make_tag_getter_op
 from .wandb_domain_gql import (
     _make_alias,
-    gql_prop_op,
-    gql_direct_edge_op,
-    gql_connection_op,
-    gql_root_op,
 )
 from .. import weave_types as types
 from .. import errors
@@ -20,13 +14,13 @@ rpt_op_configs = {
         {
             "user_fraction": types.Number(),
             "country": types.String(),
-            "created_week": types.Datetime(),
+            "created_week": types.Timestamp(),
             "framework": types.String(),
         }
     ),
     "weekly_repo_users_by_persona": types.TypedDict(
         {
-            "created_week": types.Datetime(),
+            "created_week": types.Timestamp(),
             "framework": types.String(),
             "persona": types.String(),
             "percentage": types.Number(),
@@ -34,14 +28,14 @@ rpt_op_configs = {
     ),
     "weekly_engaged_user_count_by_repo": types.TypedDict(
         {
-            "created_week": types.Datetime(),
+            "created_week": types.Timestamp(),
             "framework": types.String(),
             "user_count": types.Number(),
         }
     ),
     "repo_gpu_backends": types.TypedDict(
         {
-            "created_week": types.Datetime(),
+            "created_week": types.Timestamp(),
             "framework": types.String(),
             "gpu": types.String(),
             "percentage": types.Number(),
@@ -49,14 +43,14 @@ rpt_op_configs = {
     ),
     "versus_other_repos": types.TypedDict(
         {
-            "created_week": types.Datetime(),
+            "created_week": types.Timestamp(),
             "framework": types.String(),
             "percentage": types.Number(),
         }
     ),
     "runtime_buckets": types.TypedDict(
         {
-            "created_week": types.Datetime(),
+            "created_week": types.Timestamp(),
             "framework": types.String(),
             "bucket": types.String(),
             "bucket_run_percentage": types.Number(),
@@ -64,7 +58,7 @@ rpt_op_configs = {
     ),
     "user_model_train_freq": types.TypedDict(
         {
-            "created_week": types.Datetime(),
+            "created_week": types.Timestamp(),
             "framework": types.String(),
             "train_freq": types.String(),
             "percentage": types.Number(),
@@ -72,14 +66,14 @@ rpt_op_configs = {
     ),
     "runs_versus_other_repos": types.TypedDict(
         {
-            "created_week": types.Datetime(),
+            "created_week": types.Timestamp(),
             "framework": types.String(),
             "percentage": types.Number(),
         }
     ),
     "product_usage": types.TypedDict(
         {
-            "created_week": types.Datetime(),
+            "created_week": types.Timestamp(),
             "framework": types.String(),
             "product": types.String(),
             "percentage": types.Number(),
@@ -175,7 +169,7 @@ for plot_name, output_row_type in rpt_op_configs.items():
         "arr": types.List(
             types.TypedDict(
                 {
-                    "created_week": types.Datetime(),
+                    "created_week": types.Timestamp(),
                     "user_count": types.Number(),
                 }
             )

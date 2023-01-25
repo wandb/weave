@@ -18,7 +18,9 @@ binary_input_type = {
     "other": types.UnionType(types.Number(), ARROW_WEAVE_LIST_NUMBER_TYPE),
 }
 
-self_type_output_type_fn = lambda input_types: input_types["self"]
+
+def self_type_output_type_fn(input_types):
+    return input_types["self"]
 
 
 # TODO: weirdly need to name this "<something>-add" since that's what the base
@@ -254,7 +256,7 @@ def stddev(self):
 @arrow_op(
     name="ArrowWeaveListNumber-toTimestamp",
     input_type=unary_input_type,
-    output_type=ArrowWeaveListType(types.optional(types.Datetime())),
+    output_type=ArrowWeaveListType(types.optional(types.Timestamp())),
 )
 def to_timestamp(self):
     # TODO: We may need to handle more conversion points similar to Weave0
@@ -266,7 +268,7 @@ def to_timestamp(self):
     )
     return ArrowWeaveList(
         data.cast("int64").cast(pa.timestamp("ms", tz="+00:00")),
-        types.Datetime(),
+        types.Timestamp(),
         self._artifact,
     )
 

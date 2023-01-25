@@ -78,7 +78,7 @@ def _convert_type(old_type: Weave0TypeJson) -> types.Type:
     # Domain Types
     #
     elif old_type_name == "timestamp":
-        return types.Datetime()
+        return types.Timestamp()
     elif old_type_name == "ndarray":
         # returning None here since the data is serialized as a none. The actual data is stored
         # in the artifact at the path specified in `old_type._params["serialization_path"]`. In Weave0

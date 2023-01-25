@@ -55,6 +55,8 @@ def _resolve_static_branches(map_fn):
             op_def = registry_mem.memory_registry.get_op(map_fn.from_op.name)
             call_inputs = {name: node.val for name, node in inputs.items()}
             tracer = engine_trace.tracer()
+            # TODO: if map_fn.type is UnionType we should do something about it here
+            # before we blow up in the Const(Type) constructor
             with tracer.trace("resolve_static:op.%s" % op_def.name):
                 return graph.ConstNode(map_fn.type, op_def.resolve_fn(**call_inputs))
         return graph.OutputNode(map_fn.type, map_fn.from_op.name, inputs)

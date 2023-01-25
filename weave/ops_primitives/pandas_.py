@@ -1,5 +1,4 @@
 import dataclasses
-import typing
 import json
 import math
 import pandas
@@ -312,7 +311,7 @@ def _pd_dtype_to_weave(dtype):
     elif dtype.name == "bool":
         return types.Boolean()
     elif dtype.name == "datetime64" or dtype.name == "timedelta[ns]":
-        return types.Datetime()
+        return types.Timestamp()
     else:
         raise NotImplementedError("Unsupported dtype: {}".format(dtype))
 

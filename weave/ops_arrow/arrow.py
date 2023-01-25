@@ -147,7 +147,7 @@ def arrow_type_to_weave_type(pa_type: pa.DataType) -> types.Type:
     elif pa_type == pa.bool_():
         return types.Boolean()
     elif pa.types.is_temporal(pa_type):
-        return types.Datetime()
+        return types.Timestamp()
     elif pa.types.is_list(pa_type):
         return types.List(arrow_field_to_weave_type(pa_type.value_field))
     elif pa.types.is_struct(pa_type):
@@ -552,7 +552,7 @@ def _object_type_is_basic(object_type):
     if isinstance(object_type, types.Const):
         object_type = object_type.val_type
     return isinstance(object_type, types.BasicType) or (
-        isinstance(object_type, types.Datetime)
+        isinstance(object_type, types.Timestamp)
     )
 
 
