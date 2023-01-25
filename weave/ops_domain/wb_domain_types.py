@@ -271,7 +271,7 @@ class RunQueue(GQLTypeMixin):
     """
 
 
-RunQueueType = Report.WeaveType()  # type: ignore
+RunQueueType = RunQueue.WeaveType()  # type: ignore
 RunQueueType = typing.cast(types.Type, RunQueueType)
 
 
