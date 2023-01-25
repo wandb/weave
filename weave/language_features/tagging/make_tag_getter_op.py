@@ -71,4 +71,7 @@ def make_tag_getter_op(
             obj._artifact,
         )
 
+    tag_getter_op._gets_tag_by_name = tag_key
+    awl_tag_getter_op._gets_tag_by_name = tag_key
+
     return tag_getter_op

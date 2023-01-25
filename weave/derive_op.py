@@ -275,8 +275,18 @@ class MappedDeriveOpHandler(DeriveOpHandler):
 
             # TODO: use the vectorization described here:
             # https://paper.dropbox.com/doc/Weave-Python-Weave0-Op-compatibility-workstream-kJ3XSDdgR96XwKPapHwPD
+            list_tags = None
+            if tag_store.is_tagged(list_) and orig_op._gets_tag_by_name != None:
+                list_tags = tag_store.get_tags(list_)
             return [
-                orig_op.resolve_fn(**{mapped_param_name: x, **new_inputs})
+                orig_op.resolve_fn(
+                    **{
+                        mapped_param_name: tag_store.add_tags(box.box(x), list_tags)
+                        if list_tags is not None
+                        else x,
+                        **new_inputs,
+                    }
+                )
                 if not (x is None or isinstance(x, box.BoxedNone))
                 or types.is_optional(first_arg.type)
                 else None

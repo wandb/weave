@@ -190,6 +190,12 @@ class OpDef:
     derived_ops: typing.Dict[str, "OpDef"]
     derived_from: typing.Optional["OpDef"]
 
+    # Only used by Tag Getter Ops
+    # TODO: How should we support additional info
+    # in OpDefs? Maybe we should convert to using plugins
+    # like th GQL ops?
+    _gets_tag_by_name: typing.Optional[str] = None
+
     def __init__(
         self,
         name: str,

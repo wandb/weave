@@ -1,5 +1,8 @@
 import graphql
 import pytest
+from weave import stitch
+
+from weave.tests.test_wb_domain_ops import assert_gql_str_equal
 
 from .. import api as weave
 from .. import ops as ops
@@ -550,6 +553,18 @@ def test_domain_gql_through_dicts_with_fn_nodes(fake_wandb):
             {"name": "run3-display_name"},
         ],
     }
+
+
+def test_domain_gql_around_fn_nodes(fake_wandb):
+    fake_wandb.add_mock(lambda q, ndx: workspace_response)
+    project_node = ops.project("stacey", "mendeleev")
+    runs_node = project_node.runs()
+    sorted_runs = runs_node.sort(lambda row: ops.make_list(a=row.createdAt()), ["asc"])
+    names_node = sorted_runs.name()
+
+    p = stitch.stitch([names_node])
+    obj_recorder = p.get_result(runs_node)
+    assert len(obj_recorder.calls) == 2
 
 
 def test_lambda_gql_stitch(fake_wandb):
@@ -1175,3 +1190,25 @@ def test_run_colors(fake_wandb):
         .pick("color")
     )
     assert weave.use(node) == "rgb(83, 135, 221)"
+
+
+def test_arrow_groupby_external_tag(fake_wandb):
+    fake_wandb.add_mock(table_mock_filtered)
+    run_names = (
+        ops.project("stacey", "mendeleev")
+        .filteredRuns("{}", "-createdAt")
+        .limit(50)
+        .summary()
+        .pick("table")
+        .table()
+        .rows()
+        .dropna()
+        .concat()
+        .createIndexCheckpointTag()
+        .groupby(lambda row: ops.dict_(x=row["truth"]))
+        .sort(lambda row: ops.make_list(a=row.groupkey()["x"]), ["desc"])[0]
+        .run()
+        .name()[0]
+    )
+    run_names_res = weave.use(run_names)
+    assert run_names_res == "amber-glade-100"

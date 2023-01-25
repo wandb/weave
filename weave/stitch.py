@@ -138,14 +138,28 @@ def is_root_op(op: op_def.OpDef) -> bool:
     )
 
 
+def is_mapped_get_tag_op(op: op_def.OpDef) -> bool:
+    if op.derived_from and op.derived_from.derived_ops.get("mapped") == op:
+        return is_get_tag_op(op.derived_from)
+    return False
+
+
 def is_get_tag_op(op: op_def.OpDef) -> bool:
-    return "tag_getter_op" in str(op.raw_resolve_fn.__name__)
+    return op._gets_tag_by_name != None
 
 
 def get_tag_name_from_tag_getter_op(op: op_def.OpDef) -> str:
-    # Read the tag name from the resolve_fn closure.
-    # TODO: Fragile!
-    return op.raw_resolve_fn.__closure__[0].cell_contents  # type: ignore
+    assert (
+        op._gets_tag_by_name != None
+    ), "Caller should verify that this is a tag getter op"
+    return op._gets_tag_by_name  # type: ignore
+
+
+def get_tag_name_from_mapped_tag_getter_op(op: op_def.OpDef) -> str:
+    assert (
+        op.derived_from != None
+    ), "Caller should verify that this is a mapped tag getter op"
+    return get_tag_name_from_tag_getter_op(op.derived_from)  # type: ignore
 
 
 def stitch_node_inner(
@@ -167,6 +181,9 @@ def stitch_node_inner(
     inputs = list(input_dict.values())
     if is_get_tag_op(op):
         tag_name = get_tag_name_from_tag_getter_op(op)
+        return inputs[0].tags[tag_name]
+    elif is_mapped_get_tag_op(op):
+        tag_name = get_tag_name_from_mapped_tag_getter_op(op)
         return inputs[0].tags[tag_name]
     elif node.from_op.name.endswith("createIndexCheckpointTag"):
         inputs[0].tags["indexCheckpoint"] = ObjectRecorder(node)
