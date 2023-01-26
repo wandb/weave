@@ -18,16 +18,14 @@ def should_force_none_result(
     # TODO: not implemented for async ops
     if inputs:
         input0 = list(inputs.values())[0]
-        if input0 is None or isinstance(input0, box.BoxedNone):
-            named_args = op_def.input_type.named_args()
-            if len(named_args) == 0 or (
-                not isinstance(
-                    op_def.concrete_output_type, tagged_value_type.TaggedValueType
-                )
-                and not isinstance(
-                    named_args[0].type, tagged_value_type.TaggedValueType
-                )
-                and not types.is_optional(named_args[0].type)
-            ):
-                return True
+        named_args = op_def.input_type.named_args()
+        return (
+            len(named_args) > 0
+            and (input0 is None or isinstance(input0, box.BoxedNone))
+            and not isinstance(
+                op_def.concrete_output_type, tagged_value_type.TaggedValueType
+            )
+            and not isinstance(named_args[0].type, tagged_value_type.TaggedValueType)
+            and not types.is_optional(named_args[0].type)
+        )
     return False

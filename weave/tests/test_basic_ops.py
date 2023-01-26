@@ -119,3 +119,8 @@ def test_null_consuming_numbers_ops():
     assert weave.use(number.numbers_min(data)) == None
     assert weave.use(number.numbers_max(data)) == None
     assert number.numbers_max(data).type == weave.types.NoneType()
+
+
+def test_null_vararg_ops():
+    assert weave.use(ops.dict_(index=None, id=None)) == {"index": None, "id": None}
+    assert weave.use(ops.make_list(index=None, id=None)) == [None, None]
