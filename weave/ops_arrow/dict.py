@@ -249,6 +249,7 @@ def awl_2d_projection(
         ):
             np_projection = np.array([[0, 0] for row in data])
         else:
+            np_array_of_embeddings = np.nan_to_num(np_array_of_embeddings, copy=False)
             np_projection = projection_utils.perform_2D_projection(
                 np_array_of_embeddings, projectionAlgorithm, algorithmOptions
             )
