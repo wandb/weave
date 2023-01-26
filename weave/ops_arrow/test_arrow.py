@@ -2367,3 +2367,16 @@ def test_automap_more_than_one():
     assert weave.use(
         arrow_data.map(lambda x: _test_arrow_do_op(-1, -9, ops.make_list(a=x * 2)))
     ).to_pylist() == [_test_arrow_do_body(-1, -9, [x * 2]) for x in data]
+
+
+def test_vectorize_inner_lambdas():
+    l = weave.save(arrow.to_arrow([[1, 2, 3], [4, 5, 6], [7, 8, 9]]))
+    inner_fn = weave_internal.define_fn(
+        {"row": l.type.object_type.object_type}, lambda row: row + 1
+    )
+    fn = weave_internal.define_fn(
+        {"row": l.type.object_type}, lambda row: row.map(inner_fn)
+    ).val
+    vec_fn = arrow.vectorize(fn)
+    called = weave_internal.call_fn(vec_fn, {"row": l})
+    assert list(weave.use(called)) == [[2, 3, 4], [5, 6, 7], [8, 9, 10]]
