@@ -3,6 +3,7 @@ import typing
 import logging
 import contextvars
 import contextlib
+from . import debug_compile
 
 from . import compile_domain
 from . import op_args
@@ -16,11 +17,12 @@ from . import compile_table
 from . import weave_internal
 from . import engine_trace
 from . import errors
-from .language_features.tagging import tagged_value_type
 
 # These call_* functions must match the actual op implementations.
 # But we don't want to import the op definitions themselves here, since
 # those depend on the decorators, which aren't defined in the engine.
+
+DEBUG_COMPILE = False
 
 
 def _call_run_await(run_node: graph.Node) -> graph.OutputNode:
@@ -250,6 +252,9 @@ def _compile(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
     #     "Compilation complete. Result nodes:\n%s",
     #     "\n".join(graph_debug.node_expr_str_full(n) for n in loggable_nodes),
     # )
+
+    if DEBUG_COMPILE:
+        debug_compile.check_weave0_compile_result(nodes, n)
 
     return n
 

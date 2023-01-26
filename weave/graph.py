@@ -377,6 +377,12 @@ def map_nodes_full(
     return [_map_nodes(n, map_fn, already_mapped, True) for n in leaf_nodes]
 
 
+def all_nodes_full(leaf_nodes: list[Node]) -> list[Node]:
+    result: list[Node] = []
+    map_nodes_full(leaf_nodes, lambda n: result.append(n))
+    return result
+
+
 def filter_nodes_top_level(
     nodes: list[Node], filter_fn: typing.Callable[[Node], bool]
 ) -> list[Node]:

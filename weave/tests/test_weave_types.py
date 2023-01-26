@@ -523,7 +523,7 @@ def test_tagged_value_flow():
     tt_2 = types.TypedDict({"d": types.Float()})
     t_2 = TaggedValueType(vt_2, tt_2)
 
-    ut = types.TypedDict({"e": types.Datetime()})
+    ut = types.TypedDict({"e": types.Timestamp()})
     uv = types.union(t_1, t_2)
 
     tut = TaggedValueType(ut, uv)

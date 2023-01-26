@@ -48,6 +48,18 @@ def why_not_assignable(to_type: Type, from_type: Type) -> typing.Optional[str]:
         if reason is not None:
             reasons.append(reason)
 
+    elif isinstance(from_type, TypedDict) and isinstance(to_type, TypedDict):
+        for k, to_type_type in to_type.property_types.items():
+            from_type_type = from_type.property_types.get(k)
+            if from_type_type is None:
+                reasons.append(f"Missing property {k}")
+            else:
+                sub_reason = why_not_assignable(to_type_type, from_type_type)
+                if sub_reason is not None:
+                    reasons.append(
+                        f"Property {k} is not assignable\n{textwrap.indent(sub_reason, '  ')}"
+                    )
+
     elif to_type.name == from_type.name:
         type_vars = to_type.type_vars
         for k, to_type_type in type_vars.items():
@@ -60,9 +72,26 @@ def why_not_assignable(to_type: Type, from_type: Type) -> typing.Optional[str]:
                     reasons.append(
                         f"Property {k} is not assignable\n{textwrap.indent(sub_reason, '  ')}"
                     )
-    else:
-        return f"{short_type(to_type)} !<- {short_type(from_type)}"
     if reasons:
         indented_reasons = textwrap.indent("\n".join(reasons), "  ")
-        return f"why_not_assignable is not yet complete and may give you incorrect answers!\n\n{short_type(to_type)} !<- {short_type(from_type)}\n{indented_reasons}"
+        return f"{short_type(to_type)} !<- {short_type(from_type)}\n{indented_reasons}"
+
+    # Check if our implementation above matches the actual assignability
+    # implementation.
+    is_assignable = to_type.assign_type(from_type)
+    if reasons and is_assignable:
+        print(
+            "why_not_assignable programming error. reasons but assignable",
+            to_type,
+            from_type,
+            reasons,
+        )
+    elif not reasons and not is_assignable:
+        print(
+            "why_not_assignable programming error. reasons but assignable",
+            to_type,
+            from_type,
+            reasons,
+        )
+
     return None
