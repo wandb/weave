@@ -185,6 +185,8 @@ def _infer_type_from_row_dicts(rows: list[dict]) -> types.Type:
 
 
 def _get_rows_and_object_type_from_legacy_format(data: dict) -> tuple[list, types.Type]:
+    # W&B dataframe columns are ints, we always want strings
+    data["columns"] = [str(c) for c in data["columns"]]
     rows = [dict(zip(data["columns"], row)) for row in data["data"]]
     object_type = _infer_type_from_row_dicts(_sample_rows(rows))
     return rows, object_type
