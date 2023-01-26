@@ -533,8 +533,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         output_type=map_output_type,
     )
     def map(self, map_fn):
-        tagged_awl = pushdown_list_tags(self)
-        res = _apply_fn_node(tagged_awl, map_fn)
+        res = _apply_fn_node_with_tag_pushdown(self, map_fn)
         return res
 
     @op(
@@ -560,7 +559,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         output_type=lambda input_types: input_types["self"],
     )
     def sort(self, comp_fn, col_dirs):
-        ranking = _apply_fn_node(self, comp_fn)
+        ranking = _apply_fn_node_with_tag_pushdown(self, comp_fn)
         indicies = _arrow_sort_ranking_to_indicies(ranking, col_dirs)
         return ArrowWeaveList(
             pc.take(self._arrow_data, indicies), self.object_type, self._artifact
@@ -577,7 +576,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         output_type=lambda input_types: input_types["self"],
     )
     def filter(self, filter_fn):
-        mask = _apply_fn_node(self, filter_fn)
+        mask = _apply_fn_node_with_tag_pushdown(self, filter_fn)
         arrow_mask = mask._arrow_data_asarray_no_tags()
         return ArrowWeaveList(
             arrow_as_array(self._arrow_data).filter(arrow_mask),
@@ -886,7 +885,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         ),
     )
     def groupby(self, group_by_fn):
-        group_table_awl = _apply_fn_node(self, group_by_fn)
+        group_table_awl = _apply_fn_node_with_tag_pushdown(self, group_by_fn)
         table = self._arrow_data
 
         group_table = group_table_awl._arrow_data
@@ -1008,6 +1007,13 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         return pa.Table.from_pandas(
             df=arrow_obj.to_pandas().explode(list_cols), preserve_index=False
         )
+
+
+def _apply_fn_node_with_tag_pushdown(
+    awl: ArrowWeaveList, fn: graph.OutputNode
+) -> ArrowWeaveList:
+    tagged_awl = pushdown_list_tags(awl)
+    return _apply_fn_node(tagged_awl, fn)
 
 
 def _apply_fn_node(awl: ArrowWeaveList, fn: graph.OutputNode) -> ArrowWeaveList:
@@ -2103,7 +2109,8 @@ def join_all(arrs, joinFn, outer: bool):
 
     # Execute the joinFn on each of the arrays
     arrs_keys = [
-        arrow_as_array(_apply_fn_node(arr, joinFn)._arrow_data) for arr in arrs
+        arrow_as_array(_apply_fn_node_with_tag_pushdown(arr, joinFn)._arrow_data)
+        for arr in arrs
     ]
 
     # Get the union of all the keys of all the elements
@@ -2205,8 +2212,12 @@ def join_2(arr1, arr2, joinFn1, joinFn2, alias1, alias2, leftOuter, rightOuter):
     table2 = _awl_struct_array_to_table(arr2)
 
     # Execute the joinFn on each of the arrays
-    table1_join_keys = arrow_as_array(_apply_fn_node(arr1, joinFn1)._arrow_data)
-    table2_join_keys = arrow_as_array(_apply_fn_node(arr2, joinFn2)._arrow_data)
+    table1_join_keys = arrow_as_array(
+        _apply_fn_node_with_tag_pushdown(arr1, joinFn1)._arrow_data
+    )
+    table2_join_keys = arrow_as_array(
+        _apply_fn_node_with_tag_pushdown(arr2, joinFn2)._arrow_data
+    )
     join_obj_type = types.optional(types.union(joinFn1.type, joinFn2.type))
 
     table1_columns_names = arr1.object_type.property_types.keys()
