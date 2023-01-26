@@ -306,9 +306,13 @@ class MappedDeriveOpHandler(DeriveOpHandler):
             _mapped_refine_output_type(orig_op),
         )
 
-        # This was causing a lot of problems and was never executing
-        # in old code. Now that we properly hit `weave_fn`, this can't
-        # be incorrect.
+        # Note: The following commented out code block was written to
+        # create a `weave_op` for every mapped op. This is then used
+        # in vectorize as a faster fallback if an arrow equivalent does
+        # not exist. However, before this writing, that code block was
+        # not getting called / exercised. This is buggy in some way
+        # and I could not get it working. Commenting out for now b/c I think
+        # it is a good optimization, but not worth debugging right now.
         # def weave_fn_body(list_, *args):
         #     def map_item(item):
         #         full_named_args = {mapped_param_name: item}
@@ -318,9 +322,8 @@ class MappedDeriveOpHandler(DeriveOpHandler):
         #         # use Any type for OutputNode
         #         return graph.OutputNode(types.Any(), orig_op.name, full_named_args)
 
-        #     return list_.map(lambda row: map_item(row))
+        #     return list_.map(lambda item: map_item(item))
 
-        # We MUST use 'row' as the var name here, else our mappers get mad.
         # new_op.weave_fn = weave_internal.define_fn(input_type, weave_fn_body).val
         op_version = registry_mem.memory_registry.register_op(new_op)
 
