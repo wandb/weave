@@ -552,15 +552,43 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             "self": ArrowWeaveListType(),
             "comp_fn": lambda input_types: types.Function(
                 {"row": input_types["self"].object_type, "index": types.Int()},
-                types.List(types.union(types.String(), types.Number())),
+                types.Any(),
             ),
             "col_dirs": types.List(types.String()),
         },
         output_type=lambda input_types: input_types["self"],
     )
     def sort(self, comp_fn, col_dirs):
-        ranking = _apply_fn_node_with_tag_pushdown(self, comp_fn)
-        indicies = _arrow_sort_ranking_to_indicies(ranking, col_dirs)
+        # Protection! Arrow cannot handle executing a sort on non-primitives.
+        # We will defer to Python for this case
+        if not types.optional(types.union(types.String(), types.Number())).assign_type(
+            comp_fn.type.object_type
+        ):
+            awl_or_list = _apply_fn_node_maybe_awl(pushdown_list_tags(self), comp_fn)
+            if isinstance(awl_or_list, ArrowWeaveList):
+                awl_or_list = awl_or_list.to_pylist_notags()
+            py_columns = {}
+            for row in awl_or_list:
+                for col_ndx, cell in enumerate(row):
+                    col_name = f"c_{col_ndx}"
+                    if col_name not in py_columns:
+                        py_columns[col_name] = []
+                    if not isinstance(cell, (str, int, float)):
+                        cell = str(cell)
+                    py_columns[col_name].append(
+                        cell
+                    )  # This is the crazy line - we need to convert it to something sane
+            table = pa.table(py_columns)
+            indicies = pc.sort_indices(
+                table,
+                sort_keys=[
+                    (col_name, "ascending" if dir_name == "asc" else "descending")
+                    for col_name, dir_name in zip(py_columns.keys(), col_dirs)
+                ],
+            )
+        else:
+            ranking = _apply_fn_node_with_tag_pushdown(self, comp_fn)
+            indicies = _arrow_sort_ranking_to_indicies(ranking, col_dirs)
         return ArrowWeaveList(
             pc.take(self._arrow_data, indicies), self.object_type, self._artifact
         )
@@ -1017,21 +1045,7 @@ def _apply_fn_node_with_tag_pushdown(
 
 
 def _apply_fn_node(awl: ArrowWeaveList, fn: graph.OutputNode) -> ArrowWeaveList:
-    vectorized_fn = vectorize(fn)
-    index_awl: ArrowWeaveList[int] = ArrowWeaveList(pa.array(np.arange(len(awl))))
-    row_type = ArrowWeaveListType(awl.object_type)
-    fn_res_node = weave_internal.call_fn(
-        vectorized_fn,
-        {
-            "row": weave_internal.make_const_node(row_type, awl),
-            "index": weave_internal.make_const_node(
-                ArrowWeaveListType(types.Int()), index_awl
-            ),
-        },
-    )
-
-    res = use(fn_res_node)
-
+    res = _apply_fn_node_maybe_awl(awl, fn)
     # Since it is possible that the result of `use` bails out of arrow due to a
     # mismatch in the types / op support. This is most likely due to gap in the
     # implementation of vectorized ops. However, there are cases where it is
@@ -1055,6 +1069,25 @@ def _apply_fn_node(awl: ArrowWeaveList, fn: graph.OutputNode) -> ArrowWeaveList:
             raise errors.WeaveVectorizationError(err_msg)
 
     return res
+
+
+def _apply_fn_node_maybe_awl(
+    awl: ArrowWeaveList, fn: graph.OutputNode
+) -> typing.Optional[ArrowWeaveList]:
+    vectorized_fn = vectorize(fn)
+    index_awl: ArrowWeaveList[int] = ArrowWeaveList(pa.array(np.arange(len(awl))))
+    row_type = ArrowWeaveListType(awl.object_type)
+    fn_res_node = weave_internal.call_fn(
+        vectorized_fn,
+        {
+            "row": weave_internal.make_const_node(row_type, awl),
+            "index": weave_internal.make_const_node(
+                ArrowWeaveListType(types.Int()), index_awl
+            ),
+        },
+    )
+
+    return use(fn_res_node)
 
 
 def pushdown_list_tags(arr: ArrowWeaveList) -> ArrowWeaveList:
@@ -1217,9 +1250,7 @@ def _create_manually_mapped_op(
 ):
     op = registry_mem.memory_registry.get_op(op_name)
 
-    mapped_inputs = {
-        k: list_to_arrow(v) for k, v in inputs.items() if k in inputs_to_map
-    }
+    mapped_inputs = {k: v for k, v in inputs.items() if k in inputs_to_map}
     rest_inputs = {k: v for k, v in inputs.items() if k not in inputs_to_map}
     if any(isinstance(v.type, ArrowWeaveList) for v in rest_inputs.values()):
         raise errors.WeaveVectorizationError(
@@ -1487,12 +1518,33 @@ def vectorize(
                 )
             )
         if node_name == "list":
-            op = registry_mem.memory_registry.get_op("ArrowWeaveList-vectorizedList")
-            return op.lazy_call(
-                **_vectorized_inputs_as_awl_non_vectorized_as_lists(
-                    node_inputs, vectorized_keys
-                )
+            # Unfortunately, we need to check to see if the types are all the same
+            # else arrow cannot make the list.
+            possible_inputs = _vectorized_inputs_as_awl_non_vectorized_as_lists(
+                node_inputs, vectorized_keys
             )
+            running_type = None
+            is_valid = True
+            for v in possible_inputs.values():
+                if isinstance(v.type, ArrowWeaveListType):
+                    obj_type = v.type.object_type
+                    if running_type is None:
+                        running_type = obj_type
+                    elif not running_type.assign_type(obj_type):
+                        is_valid = False
+                        break
+            if is_valid:
+                # TODO: If the AWL types are not all the same, it will bust here.
+                op = registry_mem.memory_registry.get_op(
+                    "ArrowWeaveList-vectorizedList"
+                )
+                return op.lazy_call(**possible_inputs)
+            else:
+                return _create_manually_mapped_op(
+                    node_name,
+                    possible_inputs,
+                    list(vectorized_keys),
+                )
 
         # 3. In the case of `Object-__getattr__`, we need to special case it will only work when the first arg is AWL
         # and the second is a string:
@@ -1551,7 +1603,7 @@ def vectorize(
         # the original op over all the vectorized inputs.
         res = _create_manually_mapped_op(
             node_name,
-            inputs_as_list,
+            inputs_as_awl,
             list(vectorized_keys),
         )
         message = f"Encountered non-dispatchable op ({node_name}) during vectorization."

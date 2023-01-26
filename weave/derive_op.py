@@ -306,18 +306,22 @@ class MappedDeriveOpHandler(DeriveOpHandler):
             _mapped_refine_output_type(orig_op),
         )
 
-        def weave_fn_body(list_, *args):
-            def map_item(row):
-                full_named_args = {mapped_param_name: row}
-                for i, na in enumerate(named_args[1:]):
-                    full_named_args[na.name] = args[i]
+        # This was causing a lot of problems and was never executing
+        # in old code. Now that we properly hit `weave_fn`, this can't
+        # be incorrect.
+        # def weave_fn_body(list_, *args):
+        #     def map_item(item):
+        #         full_named_args = {mapped_param_name: item}
+        #         for i, na in enumerate(named_args[1:]):
+        #             full_named_args[na.name] = args[i]
 
-                # use Any type for OutputNode
-                return graph.OutputNode(types.Any(), orig_op.name, full_named_args)
+        #         # use Any type for OutputNode
+        #         return graph.OutputNode(types.Any(), orig_op.name, full_named_args)
 
-            return list_.map(lambda row: map_item(row))
+        #     return list_.map(lambda row: map_item(row))
 
-        new_op.weave_fn = weave_internal.define_fn(input_type, weave_fn_body).val
+        # We MUST use 'row' as the var name here, else our mappers get mad.
+        # new_op.weave_fn = weave_internal.define_fn(input_type, weave_fn_body).val
         op_version = registry_mem.memory_registry.register_op(new_op)
 
         return op_version
