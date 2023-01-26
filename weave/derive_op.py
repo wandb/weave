@@ -317,7 +317,7 @@ class MappedDeriveOpHandler(DeriveOpHandler):
 
             return list_.map(lambda item: map_item(item))
 
-        new_op.weave_fn = weave_internal.define_fn(input_type, weave_fn_body)
+        # new_op.weave_fn = weave_internal.define_fn(input_type, weave_fn_body).val
         op_version = registry_mem.memory_registry.register_op(new_op)
 
         return op_version

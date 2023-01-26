@@ -1078,9 +1078,7 @@ def non_none(type_: Type) -> Type:
     if is_optional(type_):
         type_ = typing.cast(UnionType, type_)
         new_members = [
-            non_none(m)
-            for m in type_.members
-            if (not m.assign_type(none_type)) and (not none_type.assign_type(m))
+            non_none(m) for m in type_.members if not none_type.assign_type(m)
         ]
         # TODO: could put this logic in UnionType.from_members ?
         if len(new_members) == 0:

@@ -233,38 +233,38 @@ def rewrite_groupby_refs(arrow_data, group_keys, object_type, artifact):
         return pa.array(new_refs)
 
 
-def _arrow_sort_ranking_to_indicies(sort_ranking, col_dirs):
-    flattened = sort_ranking._arrow_data_asarray_no_tags().flatten()
+def _arrow_sort_ranking_to_indicies(ranking_columns, col_dirs):
+    # flattened = sort_ranking._arrow_data_asarray_no_tags().flatten()
 
-    columns = (
-        []
-    )  # this is intended to be a pylist and will be small since it is number of sort fields
-    col_len = len(sort_ranking._arrow_data)
+    # columns = (
+    #     []
+    # )  # this is intended to be a pylist and will be small since it is number of sort fields
+    # col_len = len(sort_ranking._arrow_data)
     dir_len = len(col_dirs)
     col_names = [str(i) for i in range(dir_len)]
     order = [
         (col_name, "ascending" if dir_name == "asc" else "descending")
         for col_name, dir_name in zip(col_names, col_dirs)
     ]
-    # arrow data: (col_len x dir_len)
-    # [
-    #    [d00, d01]
-    #    [d10, d11]
-    #    [d20, d21]
-    #    [d30, d31]
-    # ]
-    #
-    # Flatten
-    # [d00, d01, d10, d11, d20, d21, d30, d31]
-    #
-    # col_x = [d0x, d1x, d2x, d3x]
-    # .         i * dir_len + x
-    #
-    #
-    for i in range(dir_len):
-        take_array = [j * dir_len + i for j in range(col_len)]
-        columns.append(pc.take(flattened, pa.array(take_array)))
-    table = pa.Table.from_arrays(columns, names=col_names)
+    # # arrow data: (col_len x dir_len)
+    # # [
+    # #    [d00, d01]
+    # #    [d10, d11]
+    # #    [d20, d21]
+    # #    [d30, d31]
+    # # ]
+    # #
+    # # Flatten
+    # # [d00, d01, d10, d11, d20, d21, d30, d31]
+    # #
+    # # col_x = [d0x, d1x, d2x, d3x]
+    # # .         i * dir_len + x
+    # #
+    # #
+    # for i in range(dir_len):
+    #     take_array = [j * dir_len + i for j in range(col_len)]
+    #     columns.append(pc.take(flattened, pa.array(take_array)))
+    table = pa.Table.from_arrays(ranking_columns, names=col_names)
     return pc.sort_indices(table, order)
 
 
@@ -560,8 +560,26 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         output_type=lambda input_types: input_types["self"],
     )
     def sort(self, comp_fn, col_dirs):
-        ranking = _apply_fn_node(self, comp_fn)
-        indicies = _arrow_sort_ranking_to_indicies(ranking, col_dirs)
+        # Edge case handling:
+        # If the comp function produces
+        ranking_columns = []
+        ranking_dirs = []
+        for col_ndx, col_dir in enumerate(col_dirs):
+            col_selection = comp_fn[col_ndx]
+            col_res = _apply_fn_node(self, col_selection)
+            col_type = col_res.object_type
+            if types.TypedDict({}).assign_type(col_type) or types.List().assign_type(
+                col_type
+            ):
+                # Arrow does not like sorting on structured things. We will need to extend this to
+                # handle all sorts of ids/sortables
+                continue
+            ranking_columns.append(col_res._arrow_data_asarray_no_tags())
+            ranking_dirs.append(col_dir)
+        if len(ranking_columns) == 0:
+            return self
+        # ranking = _apply_fn_node(self, comp_fn)
+        indicies = _arrow_sort_ranking_to_indicies(ranking_columns, ranking_dirs)
         return ArrowWeaveList(
             pc.take(self._arrow_data, indicies), self.object_type, self._artifact
         )
@@ -1218,27 +1236,38 @@ def _create_manually_mapped_op(
     inputs_to_map: list[str],
 ):
     op = registry_mem.memory_registry.get_op(op_name)
-
-    mapped_inputs = {
-        k: list_to_arrow(v) for k, v in inputs.items() if k in inputs_to_map
-    }
     rest_inputs = {k: v for k, v in inputs.items() if k not in inputs_to_map}
-    if any(isinstance(v.type, ArrowWeaveList) for v in rest_inputs.values()):
-        raise errors.WeaveVectorizationError(
-            "Not yet handling unmapped ArrowWeaveList inputs. Please improve the algorithm in _create_manually_mapped_op. Hint: you just need to convert any ArrowWeaveLists in rest_inputs to py lists."
-        )
-
-    from . import dict
-
-    input_arr = dict.arrow_dict_(**mapped_inputs).to_py()
-
     map_op = registry_mem.memory_registry.get_op("map")
-    return map_op(
-        input_arr,
-        lambda input_dict: op(
-            **{k: input_dict[k] for k in mapped_inputs}, **rest_inputs
-        ),
-    )
+    if len(inputs_to_map) > 1:
+        mapped_inputs = {
+            k: list_to_arrow(v) for k, v in inputs.items() if k in inputs_to_map
+        }
+        if any(isinstance(v.type, ArrowWeaveList) for v in rest_inputs.values()):
+            raise errors.WeaveVectorizationError(
+                "Not yet handling unmapped ArrowWeaveList inputs. Please improve the algorithm in _create_manually_mapped_op. Hint: you just need to convert any ArrowWeaveLists in rest_inputs to py lists."
+            )
+
+        from . import dict
+
+        input_arr = dict.arrow_dict_(**mapped_inputs).to_py()
+        return map_op(
+            input_arr,
+            lambda input_dict: op(
+                **{k: input_dict[k] for k in mapped_inputs}, **rest_inputs
+            ),
+        )
+    else:
+        # Here we do a special case for length 1 since it is is possible
+        # that `list_to_arrow` is not always safe to call. For example,
+        # when the list contains sufficiently different types. We probably
+        # should solve this more generally...
+        input_arr = inputs[inputs_to_map[0]]
+        if isinstance(input_arr.type, ArrowWeaveListType):
+            input_arr = ArrowWeaveList.to_py(input_arr)
+        return map_op(
+            input_arr,
+            lambda row: op(**{inputs_to_map[0]: row}, **rest_inputs),
+        )
 
 
 def vectorize(
@@ -1342,9 +1371,41 @@ def vectorize(
         if node.from_op.name == "dict":
             op = registry_mem.memory_registry.get_op("ArrowWeaveList-vectorizedDict")
             return op.lazy_call(**awl_transformed_inputs)
-        elif node.from_op.name == "list":
-            op = registry_mem.memory_registry.get_op("ArrowWeaveList-vectorizedList")
-            return op.lazy_call(**awl_transformed_inputs)
+        if node.from_op.name == "list":
+            # Unfortunately, we need to check to see if the types are all the same
+            # else arrow cannot make the list.
+            possible_inputs = awl_transformed_inputs
+            running_type = None
+            is_valid = True
+            for k, v in possible_inputs.items():
+                if isinstance(v.type, ArrowWeaveListType):
+                    obj_type = v.type.object_type
+                    if running_type is None:
+                        running_type = obj_type
+                    elif not running_type.assign_type(obj_type):
+                        is_valid = False
+                        break
+            if is_valid:
+                # TODO: If the AWL types are not all the same, it will bust here.
+                op = registry_mem.memory_registry.get_op(
+                    "ArrowWeaveList-vectorizedList"
+                )
+                return op.lazy_call(**awl_transformed_inputs)
+            else:
+                manually_map_inputs = [
+                    k
+                    for k, v in inputs.items()
+                    if k in vectorized_keys
+                    and (
+                        _type_is_assignable_to_awl_list(v.type)
+                        or _type_is_assignable_to_py_list(v.type)
+                    )
+                ]
+                return _create_manually_mapped_op(
+                    node.from_op.name,
+                    inputs,
+                    manually_map_inputs,
+                )
         # Note: unlike dict and list, Object only supports vectorization of
         # the first input
         elif first_arg_is_awl and node.from_op.name == "Object-__getattr__":
