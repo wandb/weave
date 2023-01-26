@@ -1267,9 +1267,7 @@ def _ensure_list_like_node_is_awl(node: graph.Node) -> graph.Node:
         else:
             return list_to_arrow(node)
     else:
-        raise errors.WeaveVectorizationError(
-            f"Unexpected. Expected node {node} to be a list-like type, but it is {node.type}"
-        )
+        return node
 
 
 def _ensure_list_like_node_is_list(node: graph.Node) -> graph.Node:
@@ -1288,9 +1286,7 @@ def _ensure_list_like_node_is_list(node: graph.Node) -> graph.Node:
         else:
             return ArrowWeaveList.to_py(node)
     else:
-        raise errors.WeaveVectorizationError(
-            f"Unexpected. Expected node {node} to be a list-like type, but it is {node.type}"
-        )
+        return node
 
 
 def _process_vectorized_inputs(
@@ -1331,17 +1327,11 @@ def _vectorized_inputs_as_awl(
 def _vectorized_inputs_as_awl_non_vectorized_as_lists(
     inputs: dict[str, graph.Node], vectorized_keys: set[str]
 ) -> dict[str, graph.Node]:
-    def safe_off_path(node: graph.Node):
-        if _type_is_list_like(node.type):
-            return _ensure_list_like_node_is_list(node)
-        else:
-            return node
-
     return _process_vectorized_inputs(
         inputs,
         vectorized_keys,
         on_path=_ensure_list_like_node_is_awl,
-        off_path=safe_off_path,
+        off_path=_ensure_list_like_node_is_list,
     )
 
 
@@ -1531,14 +1521,14 @@ def vectorize(
 
         # Part 2: We still want to use Arrow if possible. Here we are going to attempt to
         # weavify, then vectorize the op implementation.
-        node_op = registry_mem.memory_registry.get_op(node_name)
-        maybe_weavified_op = _safe_get_weavified_op(node_op)
-        if maybe_weavified_op is not None:
-            with_respect_to = None  # TODO: only vectorize the vectorization path!
-            vectorized = vectorize(
-                maybe_weavified_op, with_respect_to, stack_depth=stack_depth + 1
-            )
-            return weave_internal.call_fn(vectorized, inputs_as_awl)
+        # node_op = registry_mem.memory_registry.get_op(node_name)
+        # maybe_weavified_op = _safe_get_weavified_op(node_op)
+        # if maybe_weavified_op is not None:
+        #     with_respect_to = None  # TODO: only vectorize the vectorization path!
+        #     vectorized = vectorize(
+        #         maybe_weavified_op, with_respect_to, stack_depth=stack_depth + 1
+        #     )
+        #     return weave_internal.call_fn(vectorized, inputs_as_awl)
 
         # Part 3: Attempt to dispatch using the list-like inputs (this is preferred to the final case)
         inputs_as_list = _vectorized_inputs_as_list(node_inputs, vectorized_keys)
