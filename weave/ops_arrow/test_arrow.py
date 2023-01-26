@@ -322,9 +322,8 @@ def test_custom_tagged_groupby2():
     tag_store.add_tags(raw_data, {"list_tag": 3})
 
     data_node = weave.save(arrow.to_arrow(raw_data))
-    grouped_node = data_node.groupby(lambda row: ops.dict_(a=row["a"]))
-
-    assert grouped_node.type == tagged_value_type.TaggedValueType(
+    grouped_node = data_node.groupby(lambda row: ops.dict_(inner_group_key=row["a"]))
+    target = tagged_value_type.TaggedValueType(
         types.TypedDict(
             {
                 "list_tag": types.Int(),
@@ -340,9 +339,17 @@ def test_custom_tagged_groupby2():
                     ),
                 }
             ),
-            types.TypedDict({"a": types.Int()}),
+            # types.TypedDict({"a": types.Int()}),
+            types.TypedDict(
+                {
+                    "inner_group_key": tagged_value_type.TaggedValueType(
+                        types.TypedDict({"list_tag": types.Int()}), types.Int()
+                    )
+                }
+            ),
         ),
     )
+    assert grouped_node.type == target
 
     get_list_tag = make_tag_getter_op.make_tag_getter_op("list_tag", types.Int())
     assert weave.use(get_list_tag(grouped_node)) == 3

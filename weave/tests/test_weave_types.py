@@ -512,3 +512,46 @@ def test_type_hash():
     assert hash(types.UnionType(types.NoneType(), types.String())) == hash(
         types.UnionType(types.String(), types.NoneType())
     )
+
+
+def test_tagged_value_flow():
+    vt_1 = types.TypedDict({"a": types.Int()})
+    tt_1 = types.TypedDict({"b": types.String()})
+    t_1 = TaggedValueType(vt_1, tt_1)
+
+    vt_2 = types.TypedDict({"c": types.Boolean()})
+    tt_2 = types.TypedDict({"d": types.Float()})
+    t_2 = TaggedValueType(vt_2, tt_2)
+
+    ut = types.TypedDict({"e": types.Datetime()})
+    uv = types.union(t_1, t_2)
+
+    tut = TaggedValueType(ut, uv)
+
+    assert tut.members == [TaggedValueType(ut, t_1), TaggedValueType(ut, t_2)]
+    assert tut.property_types == {
+        "d": TaggedValueType(ut, types.optional(TaggedValueType(vt_2, types.Float()))),
+        "b": TaggedValueType(ut, types.optional(TaggedValueType(vt_1, types.String()))),
+    }
+
+    row_type = types.TypedDict({"a": types.Int(), "b": types.String()})
+    list_type = types.List(row_type)
+    list_tag_type = types.TypedDict({"t_1": types.Boolean()})
+    tagged_list_type = TaggedValueType(list_tag_type, list_type)
+
+    row_type_2 = types.TypedDict({"c": types.Int(), "b": types.String()})
+    list_type_2 = types.List(row_type_2)
+    list_tag_type_2 = types.TypedDict({"t_2": types.Boolean()})
+    tagged_list_type_2 = TaggedValueType(list_tag_type_2, list_type_2)
+
+    union_type = types.union(tagged_list_type, tagged_list_type_2)
+    list_of_unions = types.List(union_type)
+
+    pts = list_of_unions.object_type.object_type.property_types
+
+    assert pts["a"] == types.optional(TaggedValueType(list_tag_type, types.Int()))
+    assert pts["b"] == types.union(
+        TaggedValueType(list_tag_type, types.String()),
+        TaggedValueType(list_tag_type_2, types.String()),
+    )
+    assert pts["c"] == types.optional(TaggedValueType(list_tag_type_2, types.Int()))

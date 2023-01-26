@@ -208,7 +208,19 @@ class TaggedValueType(types.Type):
         return None
 
     def __getattr__(self, attr: str) -> typing.Any:
-        return getattr(self.value, attr)
+        # When getting a property from a tagged value, we want the request to
+        # flow through to the inner type. However, if we are getting a type
+        # property, we want to wrap the type correctly on the way out. There are
+        # two special cases: 1 for property_types and 1 for members. (typeddict
+        # and union).
+        res = getattr(self.value, attr)
+        if isinstance(res, types.Type):
+            res = TaggedValueType(self.tag, res)
+        elif attr == "property_types" and isinstance(res, dict):
+            res = {k: TaggedValueType(self.tag, v) for k, v in res.items()}
+        elif attr == "members" and isinstance(res, list):
+            res = [TaggedValueType(self.tag, v) for v in res]
+        return res
 
     @classmethod
     def is_instance(cls, obj: typing.Any) -> bool:
