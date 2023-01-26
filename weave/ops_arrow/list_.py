@@ -552,7 +552,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             "self": ArrowWeaveListType(),
             "comp_fn": lambda input_types: types.Function(
                 {"row": input_types["self"].object_type, "index": types.Int()},
-                types.Any(),
+                types.List(types.union(types.String(), types.Number())),
             ),
             "col_dirs": types.List(types.String()),
         },
