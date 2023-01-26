@@ -307,15 +307,15 @@ class MappedDeriveOpHandler(DeriveOpHandler):
         )
 
         def weave_fn_body(list_, *args):
-            def map_item(item):
-                full_named_args = {mapped_param_name: item}
+            def map_item(row):
+                full_named_args = {mapped_param_name: row}
                 for i, na in enumerate(named_args[1:]):
                     full_named_args[na.name] = args[i]
 
                 # use Any type for OutputNode
                 return graph.OutputNode(types.Any(), orig_op.name, full_named_args)
 
-            return list_.map(lambda item: map_item(item))
+            return list_.map(lambda row: map_item(row))
 
         new_op.weave_fn = weave_internal.define_fn(input_type, weave_fn_body).val
         op_version = registry_mem.memory_registry.register_op(new_op)

@@ -1521,14 +1521,14 @@ def vectorize(
 
         # Part 2: We still want to use Arrow if possible. Here we are going to attempt to
         # weavify, then vectorize the op implementation.
-        # node_op = registry_mem.memory_registry.get_op(node_name)
-        # maybe_weavified_op = _safe_get_weavified_op(node_op)
-        # if maybe_weavified_op is not None:
-        #     with_respect_to = None  # TODO: only vectorize the vectorization path!
-        #     vectorized = vectorize(
-        #         maybe_weavified_op, with_respect_to, stack_depth=stack_depth + 1
-        #     )
-        #     return weave_internal.call_fn(vectorized, inputs_as_awl)
+        node_op = registry_mem.memory_registry.get_op(node_name)
+        maybe_weavified_op = _safe_get_weavified_op(node_op)
+        if maybe_weavified_op is not None:
+            with_respect_to = None  # TODO: only vectorize the vectorization path!
+            vectorized = vectorize(
+                maybe_weavified_op, with_respect_to, stack_depth=stack_depth + 1
+            )
+            return weave_internal.call_fn(vectorized, inputs_as_awl)
 
         # Part 3: Attempt to dispatch using the list-like inputs (this is preferred to the final case)
         inputs_as_list = _vectorized_inputs_as_list(node_inputs, vectorized_keys)
