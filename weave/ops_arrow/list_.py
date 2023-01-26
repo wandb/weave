@@ -1246,16 +1246,17 @@ def make_vectorized_object_constructor(constructor_op_name: str) -> None:
 def _create_manually_mapped_op(
     op_name: str,
     inputs: typing.Dict[str, graph.Node],
-    inputs_to_map: list[str],
+    vectorized_keys: set[str],
 ):
-    op = registry_mem.memory_registry.get_op(op_name)
-
-    mapped_inputs = {k: v for k, v in inputs.items() if k in inputs_to_map}
-    rest_inputs = {k: v for k, v in inputs.items() if k not in inputs_to_map}
-    if any(isinstance(v.type, ArrowWeaveList) for v in rest_inputs.values()):
-        raise errors.WeaveVectorizationError(
-            "Not yet handling unmapped ArrowWeaveList inputs. Please improve the algorithm in _create_manually_mapped_op. Hint: you just need to convert any ArrowWeaveLists in rest_inputs to py lists."
+    if len(vectorized_keys) == 1:
+        return _create_manually_mapped_op_singular(
+            op_name, inputs, list(vectorized_keys)[0]
         )
+    op = registry_mem.memory_registry.get_op(op_name)
+    inputs = _vectorized_inputs_as_awl_non_vectorized_as_lists(inputs, vectorized_keys)
+
+    mapped_inputs = {k: v for k, v in inputs.items() if k in vectorized_keys}
+    rest_inputs = {k: v for k, v in inputs.items() if k not in vectorized_keys}
 
     from . import dict
 
@@ -1270,16 +1271,31 @@ def _create_manually_mapped_op(
     )
 
 
+def _create_manually_mapped_op_singular(
+    op_name: str,
+    inputs: typing.Dict[str, graph.Node],
+    vectorized_key: str,
+):
+    op = registry_mem.memory_registry.get_op(op_name)
+    inputs = _vectorized_inputs_as_list(inputs, set([vectorized_key]))
+
+    rest_inputs = {k: v for k, v in inputs.items() if k != vectorized_key}
+
+    input_arr = inputs[vectorized_key]
+
+    map_op = registry_mem.memory_registry.get_op("map")
+    return map_op(
+        input_arr,
+        lambda row: op(**{vectorized_key: row}, **rest_inputs),
+    )
+
+
 def _type_is_assignable_to_awl_list(t: types.Type) -> bool:
     return ArrowWeaveListType().assign_type(t)
 
 
 def _type_is_assignable_to_py_list_not_awl_list(t: types.Type) -> bool:
     return types.List().assign_type(t) and not _type_is_assignable_to_awl_list(t)
-
-
-def _type_is_list_like(t: types.Type) -> bool:
-    return types.List().assign_type(t)
 
 
 def _ensure_list_like_node_is_awl(node: graph.Node) -> graph.Node:
@@ -1378,22 +1394,32 @@ def _vectorize_lambda_output_node(node: graph.OutputNode, vectorized_keys: set[s
     # are not possible to vectorize (to my knowledge). Therefore, in
     # these cases, we want to forcibly bail out to the list map which
     # does a `execute_fast.fast_map_fn` on each element of the list.
-    inputs_as_lists = _vectorized_inputs_as_list(node.from_op.inputs, vectorized_keys)
-    _, first_input_node = list(inputs_as_lists.items())[0]
-    op = registry_mem.memory_registry.get_op(node.from_op.name)
-    map_op = registry_mem.memory_registry.get_op("map")
-    row_type = typing.cast(types.List, first_input_node.type)
-    return map_op.lazy_call(
-        **{
-            "arr": first_input_node,
-            "mapFn": graph.ConstNode(
-                types.Function(
-                    {"row": row_type.object_type},
-                    node.type,
-                ),
-                op.lazy_call(*inputs_as_lists.values()),
-            ),
-        }
+    # inputs_as_lists = _vectorized_inputs_as_list(node.from_op.inputs, vectorized_keys)
+    # first_input_name, first_input_node = list(inputs_as_lists.items())[0]
+    # op = registry_mem.memory_registry.get_op(node.from_op.name)
+    # map_op = registry_mem.memory_registry.get_op("map")
+    # row_type = typing.cast(types.List, first_input_node.type)
+    # mapped_inputs_copy = inputs_as_lists.copy()
+    # del mapped_inputs_copy[first_input_name]
+    # mapped_inputs = {
+    #     first_input_name:
+    # }
+    # return map_op.lazy_call(
+    #     **{
+    #         "arr": first_input_node,
+    #         "mapFn": graph.ConstNode(
+    #             types.Function(
+    #                 {"row": row_type.object_type},
+    #                 node.type,
+    #             ),
+    #             op.lazy_call(*inputs_as_lists.values()),
+    #         ),
+    #     }
+    # )
+    return _create_manually_mapped_op_singular(
+        node.from_op.name,
+        node.from_op.inputs,
+        "arr",
     )
 
 
@@ -1543,7 +1569,7 @@ def vectorize(
                 return _create_manually_mapped_op(
                     node_name,
                     possible_inputs,
-                    list(vectorized_keys),
+                    vectorized_keys,
                 )
 
         # 3. In the case of `Object-__getattr__`, we need to special case it will only work when the first arg is AWL
@@ -1603,8 +1629,8 @@ def vectorize(
         # the original op over all the vectorized inputs.
         res = _create_manually_mapped_op(
             node_name,
-            inputs_as_awl,
-            list(vectorized_keys),
+            node_inputs,
+            vectorized_keys,
         )
         message = f"Encountered non-dispatchable op ({node_name}) during vectorization."
         message += f"This is likely due to vectorization path of the function not leading to the"
