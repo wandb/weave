@@ -233,7 +233,42 @@ def rewrite_groupby_refs(arrow_data, group_keys, object_type, artifact):
         return pa.array(new_refs)
 
 
-def _arrow_sort_ranking_to_indicies(ranking_columns, col_dirs):
+def _arrow_sort_ranking_to_indicies(sort_ranking, col_dirs):
+    flattened = sort_ranking._arrow_data_asarray_no_tags().flatten()
+
+    columns = (
+        []
+    )  # this is intended to be a pylist and will be small since it is number of sort fields
+    col_len = len(sort_ranking._arrow_data)
+    dir_len = len(col_dirs)
+    col_names = [str(i) for i in range(dir_len)]
+    order = [
+        (col_name, "ascending" if dir_name == "asc" else "descending")
+        for col_name, dir_name in zip(col_names, col_dirs)
+    ]
+    # arrow data: (col_len x dir_len)
+    # [
+    #    [d00, d01]
+    #    [d10, d11]
+    #    [d20, d21]
+    #    [d30, d31]
+    # ]
+    #
+    # Flatten
+    # [d00, d01, d10, d11, d20, d21, d30, d31]
+    #
+    # col_x = [d0x, d1x, d2x, d3x]
+    # .         i * dir_len + x
+    #
+    #
+    for i in range(dir_len):
+        take_array = [j * dir_len + i for j in range(col_len)]
+        columns.append(pc.take(flattened, pa.array(take_array)))
+    table = pa.Table.from_arrays(columns, names=col_names)
+    return pc.sort_indices(table, order)
+
+
+def _arrow_sort_columns_to_indicies(ranking_columns, col_dirs):
     # flattened = sort_ranking._arrow_data_asarray_no_tags().flatten()
 
     # columns = (
@@ -246,24 +281,6 @@ def _arrow_sort_ranking_to_indicies(ranking_columns, col_dirs):
         (col_name, "ascending" if dir_name == "asc" else "descending")
         for col_name, dir_name in zip(col_names, col_dirs)
     ]
-    # # arrow data: (col_len x dir_len)
-    # # [
-    # #    [d00, d01]
-    # #    [d10, d11]
-    # #    [d20, d21]
-    # #    [d30, d31]
-    # # ]
-    # #
-    # # Flatten
-    # # [d00, d01, d10, d11, d20, d21, d30, d31]
-    # #
-    # # col_x = [d0x, d1x, d2x, d3x]
-    # # .         i * dir_len + x
-    # #
-    # #
-    # for i in range(dir_len):
-    #     take_array = [j * dir_len + i for j in range(col_len)]
-    #     columns.append(pc.take(flattened, pa.array(take_array)))
     table = pa.Table.from_arrays(ranking_columns, names=col_names)
     return pc.sort_indices(table, order)
 
@@ -562,24 +579,26 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
     def sort(self, comp_fn, col_dirs):
         # Edge case handling:
         # If the comp function produces
-        ranking_columns = []
-        ranking_dirs = []
-        for col_ndx, col_dir in enumerate(col_dirs):
-            col_selection = comp_fn[col_ndx]
-            col_res = _apply_fn_node(self, col_selection)
-            col_type = col_res.object_type
-            if types.TypedDict({}).assign_type(col_type) or types.List().assign_type(
-                col_type
-            ):
-                # Arrow does not like sorting on structured things. We will need to extend this to
-                # handle all sorts of ids/sortables
-                continue
-            ranking_columns.append(col_res._arrow_data_asarray_no_tags())
-            ranking_dirs.append(col_dir)
-        if len(ranking_columns) == 0:
-            return self
-        # ranking = _apply_fn_node(self, comp_fn)
-        indicies = _arrow_sort_ranking_to_indicies(ranking_columns, ranking_dirs)
+        ranking = _unsafe_apply_fn_node(self, comp_fn)
+        if isinstance(ranking, ArrowWeaveList):
+            indicies = _arrow_sort_ranking_to_indicies(ranking, col_dirs)
+        else:
+            ranking_columns = []
+            ranking_dirs = []
+            for col_ndx, col_dir in enumerate(col_dirs):
+                col_res = pa.array([row[col_ndx] for row in ranking])
+                col_type = col_res.object_type
+                if types.TypedDict({}).assign_type(
+                    col_type
+                ) or types.List().assign_type(col_type):
+                    # Arrow does not like sorting on structured things. We will need to extend this to
+                    # handle all sorts of ids/sortables
+                    continue
+                ranking_columns.append(col_res._arrow_data_asarray_no_tags())
+                ranking_dirs.append(col_dir)
+            if len(ranking_columns) == 0:
+                return self
+            indicies = _arrow_sort_columns_to_indicies(ranking_columns, ranking_dirs)
         return ArrowWeaveList(
             pc.take(self._arrow_data, indicies), self.object_type, self._artifact
         )
@@ -1028,7 +1047,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         )
 
 
-def _apply_fn_node(awl: ArrowWeaveList, fn: graph.OutputNode) -> ArrowWeaveList:
+def _unsafe_apply_fn_node(awl: ArrowWeaveList, fn: graph.OutputNode) -> ArrowWeaveList:
     vectorized_fn = vectorize(fn)
     index_awl: ArrowWeaveList[int] = ArrowWeaveList(pa.array(np.arange(len(awl))))
     row_type = ArrowWeaveListType(awl.object_type)
@@ -1042,7 +1061,11 @@ def _apply_fn_node(awl: ArrowWeaveList, fn: graph.OutputNode) -> ArrowWeaveList:
         },
     )
 
-    res = use(fn_res_node)
+    return use(fn_res_node)
+
+
+def _apply_fn_node(awl: ArrowWeaveList, fn: graph.OutputNode) -> ArrowWeaveList:
+    res = _unsafe_apply_fn_node(awl, fn)
 
     # Since it is possible that the result of `use` bails out of arrow due to a
     # mismatch in the types / op support. This is most likely due to gap in the
