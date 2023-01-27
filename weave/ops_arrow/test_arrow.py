@@ -2344,6 +2344,33 @@ def _test_arrow_do_op(a: int, b: int, c: list[int]) -> int:
 context_state.clear_loading_built_ins(_loading_builtins_token)
 
 
+def test_concat_nulls():
+    datal = weave.save(
+        arrow.to_arrow([{"prompt": None}, {"prompt": None}, {"prompt": None}])
+    )
+    datar = weave.save(
+        arrow.to_arrow(
+            [
+                {"prompt": ["a"]},
+                {"prompt": ["d"]},
+                {"prompt": ["e"]},
+            ]
+        )
+    )
+
+    list_nodes = weave._ops.make_list(l1=datal, l2=datar)
+    concatenated = arrow.concat(list_nodes)
+
+    assert weave.use(concatenated.to_py()) == [
+        {"prompt": None},
+        {"prompt": None},
+        {"prompt": None},
+        {"prompt": ["a"]},
+        {"prompt": ["d"]},
+        {"prompt": ["e"]},
+    ]
+
+
 def test_automap_more_than_one():
     data = [1, 2, -5, -100]
     arrow_data = weave.save(arrow.to_arrow(data))
