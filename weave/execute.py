@@ -269,6 +269,7 @@ def execute_forward_node(
         no_cache = True
         if not node.from_op.name.startswith("mapped") and (
             node.from_op.name.endswith("file-table")
+            or node.from_op.name.endswith("file-joinedTable")
             or node.from_op.name.endswith("artifactVersion-file")
             or node.from_op.name.endswith("FilesystemArtifact-file")
         ):

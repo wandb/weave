@@ -2598,7 +2598,14 @@ def join_2(arr1, arr2, joinFn1, joinFn2, alias1, alias2, leftOuter, rightOuter):
 
         res = con.execute(query)
 
-        duck_table = res.arrow()
+        # If we have any array columns goto pandas first then back to arrow otherwise
+        # we segfault: https://github.com/duckdb/duckdb/issues/6004
+        if any(pa.types.is_list(c.type) for c in table1.columns) or any(
+            pa.types.is_list(c.type) for c in table2.columns
+        ):
+            duck_table = pa.Table.from_pandas(res.df())
+        else:
+            duck_table = res.arrow()
     join_obj = duck_table.column(join_key_col_name).combine_chunks()
     duck_table = duck_table.drop([join_key_col_name])
     alias_1_res = duck_table.column(table1_safe_alias).combine_chunks()

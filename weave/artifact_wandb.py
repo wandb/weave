@@ -1,3 +1,4 @@
+import binascii
 import contextlib
 import dataclasses
 import os
@@ -9,7 +10,7 @@ import typing
 
 import wandb
 from wandb.apis import public as wb_public
-from wandb.util import hex_to_b64_id
+from wandb.util import hex_to_b64_id, b64_to_hex_id
 
 from . import uris
 from . import errors
@@ -49,7 +50,27 @@ def wandb_run_dir():
 
 @memo.memo
 def get_wandb_read_client_artifact(art_id: str):
-    """art_id may be client_id, or seq:alias"""
+    """art_id may be client_id, seq:alias, or server_id"""
+    # For joined or partioned tables it's unfortunately possible that
+    # we need to exchange our client_id for a server_id.
+    if len(art_id) == 128 and ":" not in art_id:
+        query = wb_public.gql(
+            """
+            query ClientIDMapping($clientID: ID!) {
+                clientIDMapping(clientID: $clientID) {
+                    serverID
+                }
+            }
+        """
+        )
+        res = wandb_api.wandb_public_api().client.execute(
+            query,
+            variable_values={
+                "clientID": art_id,
+            },
+        )
+        art_id = b64_to_hex_id(res["clientIDMapping"]["serverID"])
+
     if ":" in art_id:
         art_id, art_version = art_id.split(":")
         query = wb_public.gql(
@@ -98,7 +119,7 @@ def get_wandb_read_client_artifact(art_id: str):
     else:
         query = wb_public.gql(
             """	
-        query ArtifactVersionFromClientId(	
+        query ArtifactVersionFromServerId(	
             $id: ID!,	
         ) {	
             artifact(id: $id) {	

@@ -113,7 +113,7 @@ class JoinedTable:
     @op(
         name="joinedtable-file",
         input_type={"joinedTable": JoinedTableType()},
-        output_type=artifact_fs.FilesystemArtifactType(),
+        output_type=artifact_fs.FilesystemArtifactFileType(),
     )
     def joined_file(joinedTable):
         return joinedTable._file

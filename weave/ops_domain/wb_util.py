@@ -1,5 +1,10 @@
 import typing
-from .wbmedia import TableClientArtifactFileRef, TableRunFileRef
+from .wbmedia import (
+    TableClientArtifactFileRef,
+    TableRunFileRef,
+    JoinedTableClientArtifactFileRef,
+    JoinedTableRunFileRef,
+)
 from .. import weave_types as types
 
 from dataclasses import dataclass
@@ -17,16 +22,29 @@ def process_run_dict_obj(run_dict, run_path: typing.Optional[RunPath] = None):
 
 
 def _process_run_dict_item(val, run_path: typing.Optional[RunPath] = None):
-    if isinstance(val, dict) and "_type" in val and val["_type"] == "table-file":
-        if "artifact_path" in val:
-            return TableClientArtifactFileRef(val["artifact_path"])
-        elif "path" in val and run_path is not None:
-            return TableRunFileRef(
-                run_path.entity_name,
-                run_path.project_name,
-                run_path.run_name,
-                val["path"],
-            )
+    if isinstance(val, dict) and "_type" in val:
+        if val["_type"] == "table-file":
+            if "artifact_path" in val:
+                return TableClientArtifactFileRef(val["artifact_path"])
+            elif "path" in val and run_path is not None:
+                return TableRunFileRef(
+                    run_path.entity_name,
+                    run_path.project_name,
+                    run_path.run_name,
+                    val["path"],
+                )
+
+        if val["_type"] == "joined-table":
+            if "artifact_path" in val:
+                return JoinedTableClientArtifactFileRef(val["artifact_path"])
+            elif "path" in val and run_path is not None:
+                return JoinedTableRunFileRef(
+                    run_path.entity_name,
+                    run_path.project_name,
+                    run_path.run_name,
+                    val["path"],
+                )
+
     return val
 
 
@@ -49,7 +67,13 @@ def _process_run_dict_item_type(val):
                     "values": types.List(types.Int()),
                 }
             )
-        elif type == "table-file":
+        if type == "joined-table":
+            if "artifact_path" in val:
+                return JoinedTableClientArtifactFileRef.WeaveType()
+            else:
+                return JoinedTableRunFileRef.WeaveType()
+
+        if type == "table-file":
             if "artifact_path" in val:
                 return TableClientArtifactFileRef.WeaveType()
             else:

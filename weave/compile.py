@@ -1,3 +1,4 @@
+import re
 import typing
 
 import logging
@@ -53,10 +54,10 @@ def _dispatch_map_fn_refining(node: graph.Node) -> typing.Optional[graph.OutputN
             return op(**params)
         except errors.WeaveDispatchError:
             logging.error(
-                "Error while dispatching name: %s for input types: %s.\n  Expression: %s",
+                "Error while dispatching\n!=!=!=!=!\nName: %s\nInput Types: %s\nExpression: %s",
                 from_op.name,
                 from_op.input_types,
-                graph_debug.node_expr_str_full(node),
+                re.sub(r'[\\]+"', '"', graph_debug.node_expr_str_full(node)),
             )
             raise
     return None

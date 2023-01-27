@@ -218,7 +218,9 @@ class MappedDeriveOpHandler(DeriveOpHandler):
 
             # Just do file-table in parallel for now. We'll do parallelization
             # more generally in the future.
-            if orig_op.name.endswith("file-table"):
+            if orig_op.name.endswith("file-table") or orig_op.name.endswith(
+                "file-joinedTable"
+            ):
                 # Copy api_settings and tagging_ctx into sub-threads
                 api_settings = wandb_api.copy_thread_local_api_settings()
                 memo_ctx = memo._memo_storage.get()
