@@ -1127,6 +1127,17 @@ class RunType(ObjectType):
         return None
 
 
+def merge_many_types(types: list[Type]) -> Type:
+    if len(types) == 0:
+        return Invalid()
+    if len(types) == 1:
+        return types[0]
+    t = types[0]
+    for t2 in types[1:]:
+        t = merge_types(t, t2)
+    return t
+
+
 def merge_types(a: Type, b: Type) -> Type:
     """Given two types return a new type that both are assignable to
 

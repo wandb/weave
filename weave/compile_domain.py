@@ -66,13 +66,14 @@ def apply_domain_op_gql_translation(leaf_nodes: list[graph.Node]) -> list[graph.
         query_str = f"query WeavePythonCG {{ {query_fragment} }}"
         query_str = _normalize_query_str(query_str)
         custom_resolver = _custom_root_resolver(node)
+        output_type = _get_plugin_output_type(node)
         if custom_resolver is None:
             return graph.OutputNode(
                 node.type,
                 "gqlroot-wbgqlquery",
                 {
                     "query_str": graph.ConstNode(types.String(), query_str),
-                    "output_type": graph.ConstNode(types.TypeType(), node.type),
+                    "output_type": graph.ConstNode(types.TypeType(), output_type),
                 },
             )
         else:
@@ -95,6 +96,11 @@ def _get_gql_plugin(op_def: "op_def.OpDef") -> typing.Optional[GqlOpPlugin]:
     if op_def.plugins is not None and "wb_domain_gql" in op_def.plugins:
         return op_def.plugins["wb_domain_gql"]
     return None
+
+
+def _get_plugin_output_type(node: graph.OutputNode) -> types.Type:
+    op_def = registry_mem.memory_registry.get_op(node.from_op.name)
+    return op_def.concrete_output_type
 
 
 def _get_fragment(node: graph.OutputNode, stitchedGraph: stitch.StitchedGraph) -> str:

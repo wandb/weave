@@ -41,13 +41,6 @@ def _call_execute(function_node: graph.Node) -> graph.OutputNode:
 
 def _dispatch_map_fn_refining(node: graph.Node) -> typing.Optional[graph.OutputNode]:
     if isinstance(node, graph.OutputNode):
-        if node.from_op.name == "gqlroot-wbgqlquery":
-            # the output type of the gqlroot-wbgqlquery op is Any. But the gql
-            # compile phase keeps the original type from the root node that was
-            # swapped in. We need that original type here so that downstream
-            # dispatch works. So just return the node in this case instead of
-            # dispatching.
-            return node
         from_op = node.from_op
         try:
             op = dispatch.get_op_for_inputs(node.from_op.name, from_op.input_types)

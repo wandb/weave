@@ -1212,3 +1212,24 @@ def test_arrow_groupby_external_tag(fake_wandb):
     )
     run_names_res = weave.use(run_names)
     assert run_names_res == "amber-glade-100"
+
+
+def test_join_all_tables(fake_wandb):
+    fake_wandb.add_mock(table_mock_filtered)
+    joined_row = (
+        ops.project("stacey", "mendeleev")
+        .filteredRuns("{}", "-createdAt")
+        .limit(50)
+        .summary()
+        .pick("table")
+        .table()
+        .rows()
+        .dropna()
+        .joinAll(lambda row: row["truth"], True)
+        .createIndexCheckpointTag()[0]
+        .joinObj()
+    )
+    run_names_res = weave.use(joined_row.run().name())
+    assert run_names_res == "amber-glade-100"
+    run_names_res = weave.use(joined_row.project().name())
+    assert run_names_res == "mendeleev"

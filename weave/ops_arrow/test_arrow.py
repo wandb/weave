@@ -31,6 +31,8 @@ from . import arrow as arrow_type
 from . import list_ as arrow
 from . import dict as arrow_dict
 
+from ..tests import tag_test_util as ttu
+
 
 _loading_builtins_token = context_state.set_loading_built_ins()
 # T in `conftest::pre_post_each_test` we set a custom artifact directory for each test for isolation
@@ -2413,6 +2415,104 @@ def test_vectorize_inner_lambdas():
     vec_fn = arrow.vectorize(fn)
     called = weave_internal.call_fn(vec_fn, {"row": l})
     assert list(weave.use(called)) == [[2, 3, 4], [5, 6, 7], [8, 9, 10]]
+
+
+def test_join_tag_support():
+    # tagged<list<tagged<awl<tagged<dict<id: tagged<number>, col: tagged<string>>>>>>>
+    cst = weave_internal.const
+    tag = ttu.op_add_tag
+
+    def cst_list(data):
+        return ops.make_list(**{str(i): l for i, l in enumerate(data)})
+
+    def cst_dict(data):
+        return ops.dict_(**data)
+
+    lists_rows = []
+    for l_i in range(3):
+        list_rows = []
+        for r_i in range(4):
+            row_key = f"{l_i}_{r_i}"
+            # Purposely having id duplicated for purposes of joining
+            list_rows.append(
+                tag(
+                    cst_dict(
+                        {
+                            "id": tag(
+                                cst(f"id_val_{r_i}"), {"id_tag": f"id_{row_key}"}
+                            ),
+                            "col": tag(
+                                cst(f"col_val_{row_key}"), {"col_tag": f"col_{row_key}"}
+                            ),
+                        }
+                    ),
+                    {"row_tag": f"row_{row_key}"},
+                )
+            )
+        raw_list = cst_list(list_rows)
+        raw_awl = arrow.list_to_arrow(raw_list)
+        tagged_awl = tag(raw_awl, {"awl_tag": f"awl_{l_i}"})
+        lists_rows.append(tagged_awl)
+    raw_lists = cst_list(lists_rows)
+
+    get_id = ttu.make_get_tag("id_tag")
+    get_col = ttu.make_get_tag("col_tag")
+    get_row = ttu.make_get_tag("row_tag")
+    get_awl = ttu.make_get_tag("awl_tag")
+
+    second_list = weave.use(raw_lists[1])
+    assert second_list.to_pylist() == [
+        {
+            "_tag": {"_ct_row_tag": "row_1_0"},
+            "_value": {
+                "id": {"_tag": {"_ct_id_tag": "id_1_0"}, "_value": "id_val_0"},
+                "col": {"_tag": {"_ct_col_tag": "col_1_0"}, "_value": "col_val_1_0"},
+            },
+        },
+        {
+            "_tag": {"_ct_row_tag": "row_1_1"},
+            "_value": {
+                "id": {"_tag": {"_ct_id_tag": "id_1_1"}, "_value": "id_val_1"},
+                "col": {"_tag": {"_ct_col_tag": "col_1_1"}, "_value": "col_val_1_1"},
+            },
+        },
+        {
+            "_tag": {"_ct_row_tag": "row_1_2"},
+            "_value": {
+                "id": {"_tag": {"_ct_id_tag": "id_1_2"}, "_value": "id_val_2"},
+                "col": {"_tag": {"_ct_col_tag": "col_1_2"}, "_value": "col_val_1_2"},
+            },
+        },
+        {
+            "_tag": {"_ct_row_tag": "row_1_3"},
+            "_value": {
+                "id": {"_tag": {"_ct_id_tag": "id_1_3"}, "_value": "id_val_3"},
+                "col": {"_tag": {"_ct_col_tag": "col_1_3"}, "_value": "col_val_1_3"},
+            },
+        },
+    ]
+
+    joined = raw_lists.joinAll(lambda row: row["id"], True)
+    joined_row = joined[1]
+
+    assert weave.use(joined_row) == {
+        "id": ["id_val_1", "id_val_1", "id_val_1"],
+        "col": ["col_val_0_1", "col_val_1_1", "col_val_2_1"],
+    }
+
+    joined_row_item = joined_row["col"][1]
+
+    assert (weave.use(joined_row_item)) == "col_val_1_1"
+    assert (weave.use(get_col(joined_row_item))) == "col_1_1"
+    assert (weave.use(get_row(joined_row_item))) == "row_1_1"
+    assert (weave.use(get_awl(joined_row_item))) == "awl_1"
+
+    joined_row_obj = joined_row_item.joinObj()
+
+    assert (weave.use(joined_row_obj)) == "id_val_1"
+    assert (weave.use(get_id(joined_row_obj))) == "id_0_1"
+    assert (weave.use(get_row(joined_row_obj))) == "row_0_1"
+    assert (weave.use(get_awl(joined_row_obj))) == "awl_0"
 
 
 def test_arrow_handling_of_empty_structs():

@@ -9,13 +9,20 @@ from .. import engine_trace
 # This op replaces all domain root ops in the graph during the compilation step.
 # It executes a GQL query (that is constructed inside of `compile_domain.py`)
 # and returns the results as a weave type.
+def _output_type(input_types: dict[str, types.Type]) -> types.Type:
+    ot = input_types["output_type"]
+    if isinstance(ot, types.Const) and isinstance(ot.val, types.Type):
+        return ot.val
+    return types.Any()
+
+
 @op(
     name="gqlroot-wbgqlquery",
     input_type={
         "query_str": types.String(),
         "output_type": types.TypeType(),
     },
-    output_type=types.Any(),
+    output_type=_output_type,
 )
 def wbgqlquery(query_str, output_type):
     tracer = engine_trace.tracer()
