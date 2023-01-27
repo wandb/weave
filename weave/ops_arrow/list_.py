@@ -1750,18 +1750,19 @@ def recursively_build_pyarrow_array(
     py_objs_already_mapped: bool = False,
 ) -> pa.Array:
     arrays: list[pa.Array] = []
+
+    def none_unboxer(iterator: typing.Iterable):
+        for obj in iterator:
+            if isinstance(obj, box.BoxedNone):
+                # get rid of box
+                yield None
+            else:
+                yield obj
+
     if isinstance(mapper.type, types.UnionType) and mapper.type.is_simple_nullable():
         nonnull_mapper = [
             m for m in mapper._member_mappers if m.type != types.NoneType()
         ][0]
-
-        def none_unboxer(iterator: typing.Iterable):
-            for obj in iterator:
-                if isinstance(obj, box.BoxedNone):
-                    # get rid of box
-                    yield None
-                else:
-                    yield obj
 
         return recursively_build_pyarrow_array(
             list(none_unboxer(py_objs)),
@@ -1769,7 +1770,12 @@ def recursively_build_pyarrow_array(
             nonnull_mapper,
             py_objs_already_mapped,
         )
-    if pa.types.is_struct(pyarrow_type):
+    elif pa.types.is_null(pyarrow_type):
+        return pa.array(
+            none_unboxer(py_objs),
+            type=pyarrow_type,
+        )
+    elif pa.types.is_struct(pyarrow_type):
         keys: list[str] = []
         # keeps track of null values so that we can null entries at the struct level
         mask: list[bool] = []

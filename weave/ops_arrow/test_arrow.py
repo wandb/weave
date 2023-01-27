@@ -2396,6 +2396,12 @@ def test_automap_more_than_one():
     ).to_pylist() == [_test_arrow_do_body(-1, -9, [x * 2]) for x in data]
 
 
+def test_serialization_of_boxed_nones():
+    data = [{"a": 1, "b": box.box(None)}, {"a": 2, "b": box.box(None)}]
+    arrow_data = weave.save(arrow.to_arrow(data))
+    assert weave.use(arrow_data).to_pylist() == data
+
+
 def test_vectorize_inner_lambdas():
     l = weave.save(arrow.to_arrow([[1, 2, 3], [4, 5, 6], [7, 8, 9]]))
     inner_fn = weave_internal.define_fn(
