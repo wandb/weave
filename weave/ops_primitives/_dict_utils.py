@@ -63,6 +63,8 @@ def typeddict_merge_output_type(
 
 
 # Re-implementation of helpers2.py
+def unescape_dots(s: str) -> str:
+    return s.replace("\\.", ".")
 
 
 def split_escaped_string(s: typing.Optional[str]) -> list[str]:

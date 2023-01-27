@@ -22,6 +22,8 @@
 import dataclasses
 import typing
 
+from .ops_primitives import _dict_utils
+
 from . import graph
 from . import errors
 from . import registry_mem
@@ -204,7 +206,7 @@ def stitch_node_inner(
         return res
     elif node.from_op.name.endswith("pick"):
         if isinstance(node.from_op.inputs["key"], graph.ConstNode):
-            key = node.from_op.inputs["key"].val
+            key = _dict_utils.unescape_dots(node.from_op.inputs["key"].val)
             if isinstance(inputs[0], LiteralDictObjectRecorder):
                 return inputs[0].val[key]
             else:
