@@ -13,6 +13,60 @@ from .. import errors
 from .. import artifact_fs
 
 
+def type_has_dictionary_as_child(type_: pa.DataType) -> bool:
+    if pa.types.is_dictionary(type_):
+        return True
+    if pa.types.is_struct(type_):
+        return any(type_has_dictionary_as_child(field.type) for field in type_)
+    if pa.types.is_list(type_):
+        return type_has_dictionary_as_child(type_.value_type)
+    if pa.types.is_union(type_):
+        return any(type_has_dictionary_as_child(field.type) for field in type_)
+    return False
+
+
+def _safe_to_pylist_array(array: pa.Array) -> list:
+    if not type_has_dictionary_as_child(array.type):
+        # end recursion early if possible
+        return array.to_pylist()
+    elif pa.types.is_dictionary(array.type):
+        dictionary = array.dictionary.to_pylist()
+        indices = array.indices.to_pylist()
+        if not pa.types.is_string(array.dictionary.type):
+            raise ValueError(
+                f"Expected dictionary encoded string array, got {array.type}"
+            )
+
+        return [dictionary[index] for index in indices]
+    elif pa.types.is_struct(array.type):
+        field_names = [field.name for field in array.type]
+        field_pylists = [
+            _safe_to_pylist_array(array.field(field_name)) for field_name in field_names
+        ]
+        result = []
+        for i in range(len(field_pylists[0])):
+            result.append(
+                {
+                    field_name: field_pylist[i]
+                    for field_name, field_pylist in zip(field_names, field_pylists)
+                }
+            )
+        return result
+    elif pa.types.is_union(array.type):
+        raise NotImplementedError("Dictionary encoding not yet supported for unions.")
+    elif pa.types.is_list(array.type):
+        raise NotImplementedError(
+            "Lists of dictionary encoded strings not supported in arrow"
+        )
+    return array.to_pylist()
+
+
+def safe_array_to_pylist(pyarrow_object: pa.Array) -> list:
+    """Convert a pyarrow object to a python list, but if any column is a dictionary encoded
+    string, use our DictionaryEncodedString class instead."""
+    return _safe_to_pylist_array(pyarrow_object)
+
+
 def dense_union_to_sparse_union(array: pa.Array) -> pa.Array:
     if not pa.types.is_union(array.type):
         raise ValueError(f"Expected UnionArray, got {type(array)}")

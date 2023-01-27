@@ -490,22 +490,22 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         return arrow_data
 
     def __array__(self, dtype=None):
-        return np.asarray(self.to_pylist())
+        return np.asarray(arrow.safe_array_to_pylist(arrow_as_array(self._arrow_data)))
 
     def __iter__(self):
-        for item in self.to_pylist():
+        for item in arrow.safe_array_to_pylist(arrow_as_array(self._arrow_data)):
             yield self._mapper.apply(item)
 
     def __repr__(self):
         return f"<ArrowWeaveList: {self.object_type}>"
 
     def to_pylist_notags(self):
-        return self._arrow_data_asarray_no_tags().to_pylist()
+        return arrow.safe_array_to_pylist(self._arrow_data_asarray_no_tags())
 
     def to_pylist(self):
         if isinstance(self, graph.Node):
             return []
-        return self._arrow_data.to_pylist()
+        return arrow.safe_array_to_pylist(arrow_as_array(self._arrow_data))
 
     @op(output_type=lambda input_types: types.List(input_types["self"].object_type))
     def to_py(self):
