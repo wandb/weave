@@ -90,7 +90,11 @@ def get_wandb_read_client_artifact(art_id: str):
         )
         collection = res["artifactCollection"]
         artifact_type_name = res["artifactCollection"]["defaultArtifactType"]["name"]
-        version_index = res["artifactCollection"]["artifactMembership"]["versionIndex"]
+        artifact_membership = res["artifactCollection"]["artifactMembership"]
+        if artifact_membership is not None:
+            version_index = artifact_membership["versionIndex"]
+        else:
+            version_index = None
     else:
         query = wb_public.gql(
             """	
