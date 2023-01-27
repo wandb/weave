@@ -240,9 +240,9 @@ def _get_rows_and_object_type_from_weave_format(
     # TODO: this will need to recursively convert dicts to Objects in some
     # cases.
     for data_row in row_data:
-        row = {}
+        row: dict[str, typing.Any] = {}
         for col_name, val in zip(data["columns"], data_row):
-            row[col_name] = val
+            row[str(col_name)] = val
         rows.append(row)
     return rows, object_type
 
