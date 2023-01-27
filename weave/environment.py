@@ -40,3 +40,7 @@ def weave_data_dir() -> pathlib.Path:
 
 def weave_server_url() -> str:
     return os.getenv("WEAVE_SERVER_URL", "")
+
+
+def strict_mode() -> bool:
+    return os.getenv("DEBUG_STRICT") == "true"

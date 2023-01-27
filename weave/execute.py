@@ -33,6 +33,9 @@ from . import ref_base
 # Language Features
 from . import language_nullability
 
+# Debugging
+from . import strict_debug_mode
+
 TRACE_LOCAL = trace_local.TraceLocal()
 
 
@@ -355,6 +358,7 @@ def execute_forward_node(
                 result = None
             else:
                 result = execute_sync_op(op_def, inputs)
+                strict_debug_mode.log_safe(node, op_def, inputs, result)
 
         with tracer.trace("execute-write-cache"):
             ref = ref_base.get_ref(result)

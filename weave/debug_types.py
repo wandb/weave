@@ -72,6 +72,10 @@ def why_not_assignable(to_type: Type, from_type: Type) -> typing.Optional[str]:
                     reasons.append(
                         f"Property {k} is not assignable\n{textwrap.indent(sub_reason, '  ')}"
                     )
+    else:
+        reasons.append(
+            f"Type {short_type(to_type)} is not assignable from {short_type(from_type)}"
+        )
     if reasons:
         indented_reasons = textwrap.indent("\n".join(reasons), "  ")
         return f"{short_type(to_type)} !<- {short_type(from_type)}\n{indented_reasons}"
@@ -88,7 +92,7 @@ def why_not_assignable(to_type: Type, from_type: Type) -> typing.Optional[str]:
         )
     elif not reasons and not is_assignable:
         print(
-            "why_not_assignable programming error. reasons but assignable",
+            "why_not_assignable programming error. no reasons but not assignable",
             to_type,
             from_type,
             reasons,
