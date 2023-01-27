@@ -170,8 +170,8 @@ def arrow_schema_to_weave_type(schema) -> types.Type:
     return types.TypedDict({f.name: arrow_field_to_weave_type(f) for f in schema})
 
 
-def table_with_structs_as_unions(table: pa.Table) -> pa.Table:
-    def convert_struct_to_union(
+def adjust_table_after_parquet_deserialization(table: pa.Table) -> pa.Table:
+    def convert_struct_to_union_and_nullify_dummy_empty_structs(
         column: pa.ChunkedArray, column_name: str
     ) -> tuple[str, pa.ChunkedArray]:
 
@@ -202,23 +202,47 @@ def table_with_structs_as_unions(table: pa.Table) -> pa.Table:
             return column_name, pa.chunked_array([new_col])
 
         elif pa.types.is_struct(column.type):
-            # we have a struct field - recurse it and convert all subfields to unions where applicable
             new_col = []
-            for a in column.chunks:
-                arrays = []
-                names = []
-                for field in a.type:
-                    name, array = convert_struct_to_union(
-                        pa.chunked_array(a.field(field.name)), field.name
-                    )
 
-                    arrays.append(array.combine_chunks())
-                    names.append(name)
-                new_col.append(
-                    pa.StructArray.from_arrays(
-                        arrays, names, mask=pa.compute.is_null(a)
+            if (
+                len(column.type) == 1
+                and column.type[0].name == ArrowArrayType.EMPTY_STRUCT_DUMMY_FIELD_NAME
+            ):
+                # serialized representation of empty struct,
+                for a in column.chunks:
+
+                    def empty_struct_generator():
+                        for _ in range(len(a)):
+                            yield {}
+
+                    new_col.append(
+                        pa.array(
+                            empty_struct_generator(),
+                            mask=pa.compute.invert(a.is_valid()),
+                        )
                     )
-                )
+            else:
+
+                # we have a struct field - recurse it and convert all subfields to unions where applicable
+
+                for a in column.chunks:
+                    arrays = []
+                    names = []
+                    for field in a.type:
+                        (
+                            name,
+                            array,
+                        ) = convert_struct_to_union_and_nullify_dummy_empty_structs(
+                            pa.chunked_array(a.field(field.name)), field.name
+                        )
+
+                        arrays.append(array.combine_chunks())
+                        names.append(name)
+                    new_col.append(
+                        pa.StructArray.from_arrays(
+                            arrays, names, mask=pa.compute.is_null(a)
+                        )
+                    )
             return column_name, pa.chunked_array(new_col)
 
         else:
@@ -227,7 +251,9 @@ def table_with_structs_as_unions(table: pa.Table) -> pa.Table:
 
     for i, column_name in enumerate(table.column_names):
         current_column = table[column_name]
-        new_name, new_column = convert_struct_to_union(current_column, column_name)
+        new_name, new_column = convert_struct_to_union_and_nullify_dummy_empty_structs(
+            current_column, column_name
+        )
         if new_column is not current_column:
             table = table.remove_column(i)
             table = table.add_column(i, new_name, new_column)
@@ -235,8 +261,8 @@ def table_with_structs_as_unions(table: pa.Table) -> pa.Table:
     return table
 
 
-def table_with_unions_as_structs(table: pa.Table) -> pa.Table:
-    def recursively_convert_unions_to_structs(
+def adjust_table_for_parquet_serialization(table: pa.Table) -> pa.Table:
+    def recursively_convert_unions_to_structs_and_impute_empty_structs(
         column: pa.ChunkedArray, column_name: str
     ) -> tuple[str, pa.ChunkedArray]:
 
@@ -264,28 +290,55 @@ def table_with_unions_as_structs(table: pa.Table) -> pa.Table:
 
         if pa.types.is_struct(column.type):
             new_col = []
-            for a in column.chunks:
-                names = []
-                arrays = []
-                for field in a.type:
-                    new_name, chunked_array = recursively_convert_unions_to_structs(
-                        pa.chunked_array(a.field(field.name)), field.name
-                    )
-                    names.append(new_name)
-                    arrays.append(chunked_array.combine_chunks())
 
-                new_col.append(
-                    pa.StructArray.from_arrays(
-                        arrays, names, mask=pa.compute.invert(a.is_valid())
+            if len(column.type) == 0:
+                # empty struct, add dummy field so we can serialize to parquet
+                # (parquet does not support empty structs)
+                for a in column.chunks:
+                    dummy_values = [""]
+                    indices = []
+                    for i in range(len(a)):
+                        indices.append(0)
+                    dummy_array = pa.DictionaryArray.from_arrays(
+                        pa.array(indices, pa.int32()), pa.array(dummy_values)
                     )
-                )
+                    new_col.append(
+                        pa.StructArray.from_arrays(
+                            [dummy_array],
+                            [ArrowArrayType.EMPTY_STRUCT_DUMMY_FIELD_NAME],
+                            mask=pa.compute.invert(a.is_valid()),
+                        )
+                    )
+
+            else:
+                for a in column.chunks:
+                    names = []
+                    arrays = []
+                    for field in a.type:
+                        (
+                            new_name,
+                            chunked_array,
+                        ) = recursively_convert_unions_to_structs_and_impute_empty_structs(
+                            pa.chunked_array(a.field(field.name)), field.name
+                        )
+                        names.append(new_name)
+                        arrays.append(chunked_array.combine_chunks())
+
+                    new_col.append(
+                        pa.StructArray.from_arrays(
+                            arrays, names, mask=pa.compute.invert(a.is_valid())
+                        )
+                    )
             column = pa.chunked_array(new_col)
 
         return column_name, column
 
     for i, column_name in enumerate(table.column_names):
         current_column = table[column_name]
-        new_name, new_column = recursively_convert_unions_to_structs(
+        (
+            new_name,
+            new_column,
+        ) = recursively_convert_unions_to_structs_and_impute_empty_structs(
             current_column, column_name
         )
         if new_column is not current_column:
@@ -303,6 +356,7 @@ class ArrowArrayType(types.Type):
     object_type: types.Type = types.Any()
     UNION_PREFIX = "__weave_union"
     UNION_TO_STRUCT_TYPE_CODE_COLNAME = "__weave_type_code"
+    EMPTY_STRUCT_DUMMY_FIELD_NAME = "__weave_empty_struct"
 
     @classmethod
     def type_of_instance(cls, obj: pa.Array):
@@ -318,7 +372,7 @@ class ArrowArrayType(types.Type):
         # convert unions to structs. parquet does not know how to serialize arrow unions, so
         # we store them in a struct format that we convert back to a union on deserialization
 
-        table = table_with_unions_as_structs(table)
+        table = adjust_table_for_parquet_serialization(table)
 
         with artifact.new_file(f"{name}.parquet", binary=True) as f:
             pq.write_table(table, f)
@@ -330,7 +384,7 @@ class ArrowArrayType(types.Type):
 
             # convert struct to union. parquet does not know how to serialize arrow unions, so
             # we store them in a struct format
-            deserialized = table_with_structs_as_unions(deserialized)
+            deserialized = adjust_table_after_parquet_deserialization(deserialized)
             deserialized = deserialized["arr"].combine_chunks()
 
             return deserialized
@@ -436,6 +490,11 @@ class ArrowWeaveListType(types.Type):
 def rewrite_weavelist_refs(arrow_data, object_type, source_artifact, target_artifact):
     if _object_type_has_props(object_type):
         prop_types = _object_type_prop_types(object_type)
+
+        # handle empty struct case - the case where the struct has no fields
+        if len(prop_types) == 0:
+            return arrow_data
+
         if isinstance(arrow_data, pa.Table):
             arrays = {}
             for col_name, col_type in prop_types.items():

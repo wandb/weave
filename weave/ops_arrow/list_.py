@@ -1789,6 +1789,10 @@ def recursively_build_pyarrow_array(
             ),
         )
 
+        # handle empty struct case - the case where the struct has no fields
+        if len(pyarrow_type) == 0:
+            return pa.array(py_objs, type=pyarrow_type)
+
         for i, field in enumerate(pyarrow_type):
             data: list[typing.Any] = []
             if isinstance(

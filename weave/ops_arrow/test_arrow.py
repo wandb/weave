@@ -2413,3 +2413,10 @@ def test_vectorize_inner_lambdas():
     vec_fn = arrow.vectorize(fn)
     called = weave_internal.call_fn(vec_fn, {"row": l})
     assert list(weave.use(called)) == [[2, 3, 4], [5, 6, 7], [8, 9, 10]]
+
+
+def test_arrow_handling_of_empty_structs():
+    data = [{"a": 5, "b": {}}, {"a": 6, "b": {}}, {"a": 7, "b": None}]
+    arrow_data = weave.save(arrow.to_arrow(data))
+    assert weave.use(arrow_data.map(lambda x: x["b"])).to_pylist() == [{}, {}, None]
+    assert weave.use(arrow_data.map(lambda x: x["a"])).to_pylist() == [5, 6, 7]
