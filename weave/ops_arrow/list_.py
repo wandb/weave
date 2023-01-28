@@ -263,7 +263,10 @@ def _arrow_sort_ranking_to_indicies(sort_ranking, col_dirs):
     #
     for i in range(dir_len):
         take_array = [j * dir_len + i for j in range(col_len)]
-        columns.append(pc.take(flattened, pa.array(take_array)))
+        if len(take_array) > 0:
+            columns.append(pc.take(flattened, pa.array(take_array)))
+        else:
+            columns.append(flattened)
     table = pa.Table.from_arrays(columns, names=col_names)
     return pc.sort_indices(table, order)
 
@@ -2107,22 +2110,27 @@ def vectorized_container_constructor_preprocessor(
             prop_types[k] = types.TypeRegistry.type_of(v)
             arrays.append(v)
 
-    array_lens = []
+    # array len of None means we have a scalar
+    array_lens: list[typing.Optional[int]] = []
     for a, t in zip(arrays, prop_types.values()):
         if hasattr(a, "to_pylist"):
             array_lens.append(len(a))
         else:
-            array_lens.append(0)
-    max_len = max(array_lens)
+            array_lens.append(None)
+
+    if all(l is None for l in array_lens):
+        max_len = 1
+    else:
+        max_len = max(a for a in array_lens if a is not None)
+
     for l in array_lens:
-        if l != 0 and l != max_len:
+        if l is not None and l != max_len:
             raise errors.WeaveInternalError(
                 f"Cannot create ArrowWeaveDict with different length arrays (scalars are ok): {array_lens}"
             )
-    if max_len == 0:
-        max_len = 1
+
     for i, (a, l) in enumerate(zip(arrays, array_lens)):
-        if l == 0:
+        if l is None:
             arrays[i] = pa.array([a] * max_len)
 
     return VectorizedContainerConstructorResults(
@@ -2145,10 +2153,14 @@ def arrow_list_(**e):
     res = vectorized_container_constructor_preprocessor(e)
     element_types = res.prop_types.values()
     concatted = safe_pa_concat_arrays(res.arrays)
-    take_ndxs = []
-    for row_ndx in range(res.max_len):
-        take_ndxs.extend([row_ndx + i * res.max_len for i in range(len(e))])
-    values = concatted.take(pa.array(take_ndxs))
+
+    if len(concatted) == 0:
+        values = concatted
+    else:
+        take_ndxs = []
+        for row_ndx in range(res.max_len):
+            take_ndxs.extend([row_ndx + i * res.max_len for i in range(len(e))])
+        values = concatted.take(pa.array(take_ndxs))
     offsets = pa.array(
         [i * len(e) for i in range(res.max_len)] + [res.max_len * len(e)]
     )
