@@ -2520,3 +2520,31 @@ def test_arrow_handling_of_empty_structs():
     arrow_data = weave.save(arrow.to_arrow(data))
     assert weave.use(arrow_data.map(lambda x: x["b"])).to_pylist() == [{}, {}, None]
     assert weave.use(arrow_data.map(lambda x: x["a"])).to_pylist() == [5, 6, 7]
+
+
+def test_unboxing_in_broadcasting():
+    col1 = weave.save(arrow.to_arrow([1, 2, 3]))
+    col2 = box.box(True)
+    col2 = tag_store.add_tags(col2, {"col2_tag": "col2_val"})
+    col2 = weave.save(col2)
+
+    fn_body = lambda v: ops.dict_(col1=v, col2=col2)
+    fn = weave_internal.define_fn({"v": types.Int()}, fn_body).val
+    vectorized_fn = arrow.vectorize(fn)
+    called_fn = weave_internal.call_fn(vectorized_fn, {"v": col1})
+    result = weave.use(called_fn)
+
+    answer = [
+        {"col1": 1, "col2": True},
+        {"col1": 2, "col2": True},
+        {"col1": 3, "col2": True},
+    ]
+
+    for i in range(3):
+        assert result._index(i) == answer[i]
+
+    tag_getter = make_tag_getter_op.make_tag_getter_op("col2_tag")
+    tag_getter_result = weave.use(
+        tag_getter(arrow.ArrowWeaveList.__getitem__(called_fn, 0)["col2"])
+    )
+    assert tag_getter_result == "col2_val"

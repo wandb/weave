@@ -2131,7 +2131,21 @@ def vectorized_container_constructor_preprocessor(
 
     for i, (a, l) in enumerate(zip(arrays, array_lens)):
         if l is None:
+            tags: typing.Optional[dict] = None
+            if tag_store.is_tagged(a):
+                tags = tag_store.get_tags(a)
+            if box.is_boxed(a):
+                a = box.unbox(a)
             arrays[i] = pa.array([a] * max_len)
+            if tags is not None:
+                tag_no_dictionary = pa.array([tags])
+                tag_maybe_dictionary_encoded = (
+                    recursively_encode_pyarrow_strings_as_dictionaries(
+                        tag_no_dictionary
+                    )
+                )
+                tag_array = pa.repeat(tag_maybe_dictionary_encoded[0], len(arrays[i]))
+                arrays[i] = direct_add_arrow_tags(arrays[i], tag_array)
 
     return VectorizedContainerConstructorResults(
         arrays, prop_types, max_len, awl_artifact
