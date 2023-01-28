@@ -589,15 +589,14 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         output_type=lambda input_types: input_types["self"],
     )
     def sort(self, comp_fn, col_dirs):
+        ranking = _apply_fn_node_with_tag_pushdown(self, comp_fn)
         if not types.optional(types.union(types.String(), types.Number())).assign_type(
             comp_fn.type.object_type
         ):
             # Protection! Arrow cannot handle executing a sort on non-primitives.
             # We will defer to a slower python implementation in these cases.
-            awl_or_list = _apply_fn_node_maybe_awl(pushdown_list_tags(self), comp_fn)
-            indicies = _slow_arrow_or_list_ranking(awl_or_list, col_dirs)
+            indicies = _slow_arrow_or_list_ranking(ranking, col_dirs)
         else:
-            ranking = _apply_fn_node_with_tag_pushdown(self, comp_fn)
             indicies = _arrow_sort_ranking_to_indicies(ranking, col_dirs)
         return ArrowWeaveList(
             pc.take(self._arrow_data, indicies), self.object_type, self._artifact
