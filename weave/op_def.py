@@ -340,6 +340,11 @@ class OpDef:
                         return tagged_value_type.TaggedValueType(
                             types.TypedDict({param0_name: param0_type}), result_type
                         )
+                    # elif opdef_util.should_flow_tags(self):
+                    #     if isinstance(input_type[param0_name], tagged_value_type.TaggedValueType):
+                    #         return tagged_value_type.TaggedValueType(
+                    #             types.TypedDict(input_type[param0_name].tag), result_type
+                    #         )
                     return result_type
 
                 final = full_output_type(

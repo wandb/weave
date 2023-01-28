@@ -313,6 +313,7 @@ def node_expr_str(node: Node) -> str:
         return "**PARSE_ERROR**"
 
 
+# TODO: We need to fix var node types when the arr changes (need to figure out the correct place for this.)
 def _map_nodes(
     node: Node,
     map_fn: typing.Callable[[Node], typing.Optional[Node]],
