@@ -69,7 +69,7 @@ def apply_domain_op_gql_translation(leaf_nodes: list[graph.Node]) -> list[graph.
         output_type = _get_plugin_output_type(node)
         if custom_resolver is None:
             return graph.OutputNode(
-                node.type,
+                output_type,
                 "gqlroot-wbgqlquery",
                 {
                     "query_str": graph.ConstNode(types.String(), query_str),
