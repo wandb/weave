@@ -1112,6 +1112,25 @@ def _call_and_ensure_awl(
     return res
 
 
+def _apply_fn_node_maybe_awl(
+    awl: ArrowWeaveList, fn: graph.OutputNode
+) -> typing.Optional[ArrowWeaveList]:
+    vectorized_fn = vectorize(fn)
+    index_awl: ArrowWeaveList[int] = ArrowWeaveList(pa.array(np.arange(len(awl))))
+    row_type = ArrowWeaveListType(awl.object_type)
+    fn_res_node = weave_internal.call_fn(
+        vectorized_fn,
+        {
+            "row": weave_internal.make_const_node(row_type, awl),
+            "index": weave_internal.make_const_node(
+                ArrowWeaveListType(types.Int()), index_awl
+            ),
+        },
+    )
+
+    return use(fn_res_node)
+
+
 def _call_vectorized_fn_node_maybe_awl(
     awl: ArrowWeaveList, vectorized_fn: graph.OutputNode
 ) -> graph.OutputNode:
