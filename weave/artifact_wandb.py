@@ -65,7 +65,7 @@ def get_wandb_read_client_artifact(art_id: str):
             }
         """
         )
-        res = wandb_api.wandb_public_api().client.execute(
+        res = wandb_client_api.wandb_public_api().client.execute(
             query,
             variable_values={
                 "clientID": art_id,

@@ -37,7 +37,7 @@ class WandbFileManagerAsync:
         self._manifests: dict[str, typing.Optional[artifacts.ArtifactManifest]] = {}
 
     def manifest_path(self, uri: artifact_wandb.WeaveWBArtifactURI) -> str:
-        return f"{uri.entity_name}/{uri.project_name}/{uri.name}/manifest.json"
+        return f"{uri.entity_name}/{uri.project_name}/{uri.name}/manifest-{uri.version}.json"
 
     async def _manifest(
         self, art_uri: artifact_wandb.WeaveWBArtifactURI, manifest_path: str
