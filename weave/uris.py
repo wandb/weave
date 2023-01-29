@@ -34,7 +34,7 @@ class WeaveURI:
         scheme, netloc, path, params, query_s, fragment = parse.urlparse(uri)
         query = parse.parse_qs(query_s)
 
-        for candidate_class in cls.__subclasses__():
+        for candidate_class in [cls] + cls.__subclasses__():
             if candidate_class.SCHEME == scheme:
                 return candidate_class.from_parsed_uri(
                     uri, scheme, netloc, path, params, query, fragment

@@ -91,3 +91,11 @@ class WeaveGQLCompileError(WeaveBaseError):
 
 class WeaveAccessDeniedError(WeaveBaseError):
     pass
+
+
+class WeaveWandbArtifactManagerError(WeaveBaseError):
+    pass
+
+
+class WeaveHttpError(WeaveBaseError):
+    pass

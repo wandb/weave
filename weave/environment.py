@@ -40,3 +40,11 @@ def weave_data_dir() -> pathlib.Path:
 
 def weave_server_url() -> str:
     return os.getenv("WEAVE_SERVER_URL", "")
+
+
+def weave_filesystem_dir() -> str:
+    # WEAVE_LOCAL_ARTIFACT_DIR should be renamed to WEAVE_FILESYSTEM_DIR
+    # TODO
+    return os.environ.get("WEAVE_LOCAL_ARTIFACT_DIR") or os.path.join(
+        "/tmp", "weave", "fs"
+    )

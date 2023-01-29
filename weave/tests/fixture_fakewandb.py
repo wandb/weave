@@ -6,14 +6,16 @@ import random
 import typing
 
 from weave import context_state
-from .. import wandb_api
+from .. import wandb_client_api
 from unittest import mock
 import shutil
 
-from .. import artifact_wandb
-import graphql
+# Note: We're mocking out the whole io_service right now. This is too
+# high level and doesn't test the actual io implementation. We should
+# mock wandb_api instead probably.
+from .. import io_service
 
-TEST_TABLE_ARTIFACT_PATH = "testdata/wb_artifacts/test_res_1fwmcd3q:v0"
+TEST_TABLE_ARTIFACT_PATH = "testdata/wb_artifacits/test_res_1fwmcd3q:v0"
 ABS_TEST_TABLE_ARTIFACT_PATH = os.path.abspath(TEST_TABLE_ARTIFACT_PATH)
 
 shared_artifact_dir = os.path.abspath(
@@ -88,29 +90,6 @@ class FakeVersion:
     name = "test_res_1fwmcd3q:v0"
     id = "1234567890"
 
-    def __init__(self, requested_path=None):
-        self._local_path = None
-        if requested_path != None:
-            target = os.path.abspath(os.path.join(shared_artifact_dir, requested_path))
-            if os.path.exists(target):
-                self._local_path = target
-        self.manifest = FakeManifest(self._local_path)
-
-    def get_path(self, path):
-        if self._local_path != None:
-            return FakePath(os.path.join(self._local_path, path))
-        full_artifact_dir = os.path.join(
-            artifact_wandb.wandb_artifact_dir(), TEST_TABLE_ARTIFACT_PATH
-        )
-        full_artifact_path = os.path.join(full_artifact_dir, path)
-        os.makedirs(os.path.dirname(full_artifact_path), exist_ok=True)
-        artifact_path = os.path.join(ABS_TEST_TABLE_ARTIFACT_PATH, path)
-        shutil.copy2(artifact_path, full_artifact_path)
-        return FakePath(artifact_path)
-
-    def download(self):
-        pass
-
 
 class FakeVersions:
     __getitem__ = mock.Mock(return_value=FakeVersion())
@@ -164,13 +143,13 @@ class FakeClient:
         args = {"gql": gql, "variable_values": variable_values}
         self.execute_log.append(args)
         # This should only print when the test fails
-        print("Executing Mocked Query in fixture_fakewandb.py:")
-        print(graphql.language.print_ast(graphql.language.parse(gql.loc.source.body)))
+        # print("Executing Mocked Query in fixture_fakewandb.py:")
+        # print(graphql.language.print_ast(graphql.language.parse(gql.loc.source.body)))
         for handler in self.mock_handlers:
             res = handler(args, len(self.execute_log) - 1)
             if res is not None:
-                print("RESULT:")
-                print(res)
+                # print("RESULT:")
+                # print(res)
                 return res
         raise Exception(
             "Query was not mocked - please fill out in fixture_fakewandb.py"
@@ -200,10 +179,31 @@ class FakeApi:
         self.client.mock_handlers = []
 
 
+class FakeIoServiceClient:
+    def manifest(self, artifact_uri):
+        requested_path = f"{artifact_uri.entity_name}/{artifact_uri.project_name}/{artifact_uri.name}_{artifact_uri.version}"
+        target = os.path.abspath(os.path.join(shared_artifact_dir, requested_path))
+        return FakeManifest(target)
+
+    @property
+    def fs(self):
+        class FakeFs:
+            root = shared_artifact_dir
+
+            def path(self, path):
+                return os.path.join(self.root, path)
+
+        return FakeFs()
+
+    def ensure_file(self, artifact_uri):
+        return f"{artifact_uri.entity_name}/{artifact_uri.project_name}/{artifact_uri.name}_{artifact_uri.version}/{artifact_uri.path}"
+
+
 @dataclass
 class SetupResponse:
     fake_api: FakeApi
     old_wandb_api_wandb_public_api: typing.Callable
+    orig_io_service_client: FakeIoServiceClient
     token: Token
 
 
@@ -212,15 +212,24 @@ def setup():
     # tests don't share the same namespace (since it defaults to None)
     token = context_state._cache_namespace_token.set(str(random.randint(0, 1000000)))
     fake_api = FakeApi()
+    fake_io_service_client = FakeIoServiceClient()
 
     def wandb_public_api():
         return fake_api
 
-    old_wandb_api_wandb_public_api = wandb_api.wandb_public_api
-    wandb_api.wandb_public_api = wandb_public_api
+    old_wandb_api_wandb_public_api = wandb_client_api.wandb_public_api
+    wandb_client_api.wandb_public_api = wandb_public_api
+
+    def get_sync_client():
+        return fake_io_service_client
+
+    orig_io_service_client = io_service.get_sync_client
+    io_service.get_sync_client = get_sync_client
+
     return SetupResponse(
         fake_api,
         old_wandb_api_wandb_public_api,
+        orig_io_service_client,
         token,
     )
 
@@ -229,7 +238,8 @@ def teardown(setup_response: SetupResponse):
     context_state._cache_namespace_token.reset(setup_response.token)
     setup_response.fake_api.clear_execute_log()
     setup_response.fake_api.clear_mock_handlers()
-    wandb_api.wandb_public_api = setup_response.old_wandb_api_wandb_public_api
+    wandb_client_api.wandb_public_api = setup_response.old_wandb_api_wandb_public_api
+    io_service.get_sync_client = setup_response.orig_io_service_client  # type: ignore
 
 
 entity_payload = {

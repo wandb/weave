@@ -14,7 +14,7 @@ from . import errors
 from . import graph
 from . import box
 from . import weave_internal
-from . import wandb_api
+from . import wandb_client_api
 from . import box
 from . import memo
 from . import storage
@@ -222,12 +222,12 @@ class MappedDeriveOpHandler(DeriveOpHandler):
                 "file-joinedTable"
             ):
                 # Copy api_settings and tagging_ctx into sub-threads
-                api_settings = wandb_api.copy_thread_local_api_settings()
+                api_settings = wandb_client_api.copy_thread_local_api_settings()
                 memo_ctx = memo._memo_storage.get()
                 cache_namespace_ctx = context_state._cache_namespace_token.get()
 
                 def do_one(x):
-                    wandb_api.set_wandb_thread_local_api_settings(
+                    wandb_client_api.set_wandb_thread_local_api_settings(
                         api_settings["api_key"],
                         api_settings["cookies"],
                         api_settings["headers"],

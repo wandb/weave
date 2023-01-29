@@ -2,7 +2,7 @@ import logging
 from .. import weave_types as types
 from ..api import op
 from . import wb_domain_types as wdt
-from ..wandb_api import wandb_gql_query
+from ..wandb_client_api import wandb_gql_query
 from ..language_features.tagging import tagged_value_type
 from .. import engine_trace
 

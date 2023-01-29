@@ -14,7 +14,7 @@ from wandb.util import hex_to_b64_id, b64_to_hex_id
 
 from . import uris
 from . import errors
-from . import wandb_api
+from . import wandb_client_api
 from . import memo
 from . import file_base
 from . import file_util
@@ -24,14 +24,16 @@ from . import artifact_fs
 from . import artifact_util
 
 
+# TODO: Get rid of this, we have the new wandb api service! But this
+# is still used in a couple places.
 @memo.memo
 def get_wandb_read_artifact(path: str):
-    return wandb_api.wandb_public_api().artifact(path)
+    return wandb_client_api.wandb_public_api().artifact(path)
 
 
 @memo.memo
 def get_wandb_read_run(path):
-    return wandb_api.wandb_public_api().run(path)
+    return wandb_client_api.wandb_public_api().run(path)
 
 
 def wandb_artifact_dir():
@@ -102,7 +104,7 @@ def get_wandb_read_client_artifact(art_id: str):
         }	
         """
         )
-        res = wandb_api.wandb_public_api().client.execute(
+        res = wandb_client_api.wandb_public_api().client.execute(
             query,
             variable_values={
                 "id": art_id,
@@ -145,7 +147,7 @@ def get_wandb_read_client_artifact(art_id: str):
         }	
         """
         )
-        res = wandb_api.wandb_public_api().client.execute(
+        res = wandb_client_api.wandb_public_api().client.execute(
             query,
             variable_values={"id": hex_to_b64_id(art_id)},
         )
@@ -210,6 +212,9 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
     def __init__(
         self, name, type=None, uri: typing.Optional["WeaveWBArtifactURI"] = None
     ):
+        from . import io_service
+
+        self.sync_client = io_service.get_sync_client()
         self.name = name
         self._read_artifact_uri = None
         self._read_artifact = None
@@ -236,6 +241,8 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         self._read_artifact = None
         self._read_artifact_uri = uri
 
+    # TODO: still using wandb lib for this, but we should switch to the new
+    # wandb api service
     @property
     def _saved_artifact(self):
         if self._read_artifact is None:
@@ -268,43 +275,15 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         if not self.is_saved:
             raise errors.WeaveInternalError("cannot download of an unsaved artifact")
 
-        # First, check if we already downloaded this file:
-        if name in self._local_path:
-            return self._local_path[name]
-
-        # Next, we special case when the user is looking for a file
-        # without the .[type].json extension. This is used for tables.
-        if name not in self._saved_artifact.manifest.entries:
-            for entry in self._saved_artifact.manifest.entries:
-                if entry.startswith(name + ".") and entry.endswith(".json"):
-                    self._local_path[name] = self.path(entry)
-                    return self._local_path[name]
-
-        # Generate the permanent path for this file:
-        # Here, we include the ID as names might not be unique across all entities/projects
-        # it would be nice to use entity/project name, but that is not available in the artifact
-        # when constructed from ID (todo: update wandb sdk to support this)
-        # python module loading does not support colons
-        # TODO: This is an extremely expensive fix!
-        static_file_path = os.path.join(
-            wandb_artifact_dir(),
-            "artifacts",
-            f"{self._saved_artifact.name}_{self._saved_artifact.id}",
-            name,
-        ).replace(":", "_")
-
-        # Next, check if another process has already downloaded this file:
-        if os.path.exists(static_file_path):
-            self._local_path[name] = static_file_path
-            return static_file_path
-
-        # Finally, download the file in an isolated directory:
-        with _isolated_download_and_atomic_mover(static_file_path) as (tmp_dir, mover):
-            downloaded_file_path = self._saved_artifact.get_path(name).download(tmp_dir)
-            mover(downloaded_file_path)
-
-        self._local_path[name] = static_file_path
-        return static_file_path
+        uri = WeaveWBArtifactURI(
+            self._read_artifact_uri.name,
+            self._read_artifact_uri.version,
+            self._read_artifact_uri.entity_name,
+            self._read_artifact_uri.project_name,
+            path=name,
+        )
+        fs_path = self.sync_client.ensure_file(uri)
+        return self.sync_client.fs.path(fs_path)
 
     def size(self, path: str) -> int:
         if path in self._saved_artifact.manifest.entries:
@@ -380,9 +359,20 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
             "artifact_fs.FilesystemArtifactRef",
         ]
     ]:
-        av = self._saved_artifact
-
-        manifest = av.manifest
+        if self._read_artifact_uri is None:
+            raise errors.WeaveInternalError(
+                'cannot get path info for unsaved artifact"'
+            )
+        uri = WeaveWBArtifactURI(
+            self._read_artifact_uri.name,
+            self._read_artifact_uri.version,
+            self._read_artifact_uri.entity_name,
+            self._read_artifact_uri.project_name,
+            path=path,
+        )
+        manifest = self.sync_client.manifest(uri)
+        if manifest is None:
+            return None
         manifest_entry = manifest.get_entry_by_path(path)
         if manifest_entry is not None:
             # This is not a WeaveURI! Its the artifact reference style used
@@ -404,9 +394,9 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
             path  # give better name so the rest of this code block is more readable
         )
         if cur_dir == "":
-            dir_ents = av.manifest.entries.values()
+            dir_ents = manifest.entries.values()
         else:
-            dir_ents = av.manifest.get_entries_in_directory(cur_dir)
+            dir_ents = manifest.get_entries_in_directory(cur_dir)
         sub_dirs: dict[str, file_base.SubDir] = {}
         files = {}
         for entry in dir_ents:
@@ -440,15 +430,22 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
 WandbArtifactType.instance_classes = WandbArtifact
 
 
+# TODO: Switch to new wandb api service
 class WandbRunFilesProxyArtifact(artifact_fs.FilesystemArtifact):
     def __init__(self, entity_name: str, project_name: str, run_name: str):
         self.name = f"{entity_name}/{project_name}/{run_name}"
-        self._run = get_wandb_read_run(self.name)
         self._local_path: dict[str, str] = {}
+        self._run = None
 
     @property
     def is_saved(self) -> bool:
         return True
+
+    @property
+    def run(self):
+        if self._run is None:
+            self._run = get_wandb_read_run(self.name)
+        return self._run
 
     def path(self, name):
         # First, check if we already downloaded this file:
@@ -463,7 +460,7 @@ class WandbRunFilesProxyArtifact(artifact_fs.FilesystemArtifact):
 
         # Finally, download the file in an isolated directory:
         with _isolated_download_and_atomic_mover(static_file_path) as (tmp_dir, mover):
-            with self._run.file(name).download(tmp_dir, replace=True) as fp:
+            with self.run.file(name).download(tmp_dir, replace=True) as fp:
                 downloaded_file_path = fp.name
             mover(downloaded_file_path)
 
@@ -531,6 +528,10 @@ class WeaveWBArtifactURI(uris.WeaveURI):
         if fragment:
             extra = fragment.split("/")
         return cls(name, version, entity_name, project_name, netloc, file_path, extra)
+
+    @classmethod
+    def parse(cls: typing.Type["WeaveWBArtifactURI"], uri: str) -> "WeaveWBArtifactURI":
+        return super().parse(uri)  # type: ignore
 
     def __str__(self) -> str:
         netloc = self.netloc or ""

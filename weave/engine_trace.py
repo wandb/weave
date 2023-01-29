@@ -1,5 +1,5 @@
 import os
-
+import typing
 
 # Thanks co-pilot!
 class DummySpan:
@@ -22,9 +22,29 @@ class DummySpan:
         pass
 
 
+class TraceContext:
+    def __getstate__(self) -> dict:
+        return {}
+
+    def __setstate__(self, state: dict) -> None:
+        pass
+
+
+class ContextProvider:
+    def activate(self, context: TraceContext) -> None:
+        pass
+
+
 class DummyTrace:
     def trace(self, *args, **kwargs):
         return DummySpan()
+
+    @property
+    def context_provider(self) -> ContextProvider:
+        return ContextProvider()
+
+    def current_trace_context(self) -> typing.Optional[TraceContext]:
+        return None
 
     def current_span(self):
         return None
@@ -40,6 +60,20 @@ def tracer():
         return ddtrace_tracer
     else:
         return DummyTrace()
+
+
+def new_trace_context() -> typing.Optional[TraceContext]:
+    if os.getenv("DD_ENV"):
+        from ddtrace import context as ddtrace_context
+
+        return ddtrace_context.Context()  # type: ignore
+    else:
+        return None
+
+
+from ddtrace import tracer as ddtrace_tracer
+
+x = ddtrace_tracer.current_trace_context()
 
 
 def datadog_is_enabled():

@@ -30,6 +30,8 @@ replicate
 duckdb
 scikit-learn
 umap-learn
+aiofiles>=22.1.0
+gql>=3.4.0
 
 # spaCy Requirements:
 spacy>=3.0.0,<4.0.0
