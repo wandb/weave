@@ -271,8 +271,8 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
     def get_other_version(self, version):
         raise NotImplementedError()
 
-    def path(self, name):
-        if not self.is_saved:
+    def path(self, name: str) -> str:
+        if not self.is_saved or not self._read_artifact_uri:
             raise errors.WeaveInternalError("cannot download of an unsaved artifact")
 
         uri = WeaveWBArtifactURI(
@@ -283,6 +283,8 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
             path=name,
         )
         fs_path = self.sync_client.ensure_file(uri)
+        if fs_path is None:
+            raise errors.WeaveInternalError("Path not in artifact")
         return self.sync_client.fs.path(fs_path)
 
     def size(self, path: str) -> int:

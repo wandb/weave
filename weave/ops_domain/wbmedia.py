@@ -124,15 +124,6 @@ class TableClientArtifactFileRef:
         self._artifact = None
         self._art_id, self._file_path = _parse_artifact_path(artifact_path)
 
-    # file_base.File interface
-    @contextlib.contextmanager
-    def open(self, mode: str = "r") -> typing.Generator[typing.IO, None, None]:
-        if "r" in mode:
-            with file_util.safe_open(self.artifact.path(self._file_path)) as f:
-                yield f
-        else:
-            raise NotImplementedError
-
     @property
     def artifact(self):
         if self._artifact == None:
@@ -149,7 +140,10 @@ class TableClientArtifactFileRef:
         output_type=table.TableType(),
     )
     def table(self):
-        return table.file_table.resolve_fn(self)
+        path_info = self.artifact.path_info(self._file_path)
+        if path_info is None:
+            return None
+        return table.file_table.resolve_fn(path_info)
 
 
 @weave.type(__override_name="joinedtable-file")  # type: ignore
@@ -160,15 +154,6 @@ class JoinedTableClientArtifactFileRef:
         self.artifact_path = artifact_path
         self._artifact = None
         self._art_id, self._file_path = _parse_artifact_path(artifact_path)
-
-    # file_base.File interface
-    @contextlib.contextmanager
-    def open(self, mode: str = "r") -> typing.Generator[typing.IO, None, None]:
-        if "r" in mode:
-            with file_util.safe_open(self.artifact.path(self._file_path)) as f:
-                yield f
-        else:
-            raise NotImplementedError
 
     @property
     def artifact(self):
@@ -185,6 +170,9 @@ class JoinedTableClientArtifactFileRef:
         output_type=table.JoinedTableType(),
     )
     def joined_table(self):
+        path_info = self.artifact.path_info(self._file_path)
+        if path_info is None:
+            return None
         return table.joined_table.resolve_fn(self)
 
 

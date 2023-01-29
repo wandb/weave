@@ -356,7 +356,9 @@ class SyncClient:
         with self.fs.open_read(manifest_path) as f:
             return artifacts.ArtifactManifest.from_manifest_json(None, json.load(f))
 
-    def ensure_file(self, artifact_uri: artifact_wandb.WeaveWBArtifactURI) -> str:
+    def ensure_file(
+        self, artifact_uri: artifact_wandb.WeaveWBArtifactURI
+    ) -> typing.Optional[str]:
         return self.request("ensure_file", str(artifact_uri))
 
 
