@@ -2548,3 +2548,24 @@ def test_unboxing_in_broadcasting():
         tag_getter(arrow.ArrowWeaveList.__getitem__(called_fn, 0)["col2"])
     )
     assert tag_getter_result == "col2_val"
+
+
+def test_count_on_group():
+    col = weave.save(arrow.to_arrow([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]))
+    col = col.groupby(lambda x: x % 2)
+    col = col.map(lambda x: x.count())
+    assert weave.use(col).to_pylist() == [5, 5]
+
+
+def test_limit_on_group():
+    col = weave.save(arrow.to_arrow([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]))
+    col = col.groupby(lambda x: x % 2)
+    col = col.map(lambda x: x.limit(3))
+    assert weave.use(col).to_pylist() == [[1, 3, 5], [2, 4, 6]]
+
+
+def test_offset_on_group():
+    col = weave.save(arrow.to_arrow([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]))
+    col = col.groupby(lambda x: x % 2)
+    col = col.map(lambda x: x.offset(2))
+    assert weave.use(col).to_pylist() == [[5, 7, 9], [6, 8, 10]]

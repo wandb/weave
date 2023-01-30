@@ -224,7 +224,7 @@ def to_fixed(self, digits):
 
 # TODO: Do we need to vectorize these in 1 more dimension?
 @op(
-    name="ArrowWeaveListNumber-argmax",
+    name="ArrowWeaveListNumbers-argmax",
     input_type={"self": ArrowWeaveListType(types.optional(types.Number()))},
     output_type=types.Number(),
 )
@@ -234,7 +234,7 @@ def argmax(self):
 
 
 @op(
-    name="ArrowWeaveListNumber-argmin",
+    name="ArrowWeaveListNumbers-argmin",
     input_type={"self": ArrowWeaveListType(types.optional(types.Number()))},
     output_type=types.Number(),
 )
@@ -244,7 +244,7 @@ def argmin(self):
 
 
 @op(
-    name="ArrowWeaveListNumber-stddev",
+    name="ArrowWeaveListNumbers-stddev",
     input_type={"self": ArrowWeaveListType(types.optional(types.Number()))},
     output_type=types.Number(),
 )

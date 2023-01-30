@@ -1448,6 +1448,36 @@ def _is_lambda_output_node(node: graph.OutputNode):
     )
 
 
+def _is_non_simd_node(node: graph.OutputNode, vectorized_keys: set[str]):
+    # These are ops (List/AWL) that are NOT SIMD (Single instruction, multiple data). This list is a hand
+    # curated list from looking at Weave0. We probably need to refactor this entire vectorize to have a more
+    # rigorous ruleset that can be applied, but in the interest of time, we are hand-crafting this for now
+    non_vectorized_awl_op_names = [
+        "count",
+        "limit",
+        "offset",
+        "unnest",
+        "flatten",
+        "2DProjection",
+        "count",
+        "joinToStr",
+        "index",
+        "dropna",
+        "unique",
+        "numbers-sum",
+        "numbers-avg",
+        "numbers-argmax",
+        "numbers-argmin",
+        "numbers-stddev",
+        "numbers-min",
+        "numbers-max",
+    ]
+    first_arg_is_vectorized = list(node.from_op.inputs.keys())[0] in vectorized_keys
+    return first_arg_is_vectorized and any(
+        node.from_op.name.endswith(op_name) for op_name in non_vectorized_awl_op_names
+    )
+
+
 def _safe_get_op_for_inputs(
     name: str, inputs: dict[str, graph.Node]
 ) -> typing.Optional[op_def.OpDef]:
@@ -1606,6 +1636,14 @@ def vectorize(
                         arg_names[1]: node_inputs[arg_names[1]],
                     }
                 )
+
+        # 4. Non SIMD ops (List/AWL)
+        if _is_non_simd_node(node, vectorized_keys):
+            return _create_manually_mapped_op(
+                node.from_op.name,
+                node_inputs,
+                vectorized_keys,
+            )
 
         # Now, if we have not returned by now, then we can move on to the main logic of this function.
 
