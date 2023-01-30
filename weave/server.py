@@ -72,7 +72,7 @@ def _handle_request(request, deref=False):
     # Forces output to be untagged
     with tracer.trace("request:to_python"):
         with isolated_tagging_context():
-            result = [storage.to_python(r) for r in result]
+            result = [storage.to_python(r, n.type) for (n, r) in zip(nodes, result)]
 
     logger.info("Server request done in: %ss" % (time.time() - start_time))
     return result
