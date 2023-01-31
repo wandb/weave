@@ -71,7 +71,7 @@ def file_media(file: FilesystemArtifactFile):
             data = json.load(f)
     if "path" not in data or data["path"] is None:
         raise errors.WeaveInternalError("Media File is missing path")
-    file_path = file.path
+    file_path = data["path"]
     artifact_entry = file.artifact.path_info(file_path)
     if not isinstance(artifact_entry, FilesystemArtifactFile):
         raise errors.WeaveArtifactMediaFileLookupError(
@@ -79,13 +79,12 @@ def file_media(file: FilesystemArtifactFile):
         )
     if file.path.endswith(".image-file.json"):
         res = ImageArtifactFileRef(
-            path=artifact_entry,
+            _artifact_file=artifact_entry,
+            path=file_path,
             format=data["format"],
             height=data["height"],
             width=data["width"],
-            sha256=data[
-                "path"
-            ],  # TODO: This is not correct, but i don't think it is used.
+            sha256=file_path,  # TODO: This is not correct, but i don't think it is used.
         )
     elif any(
         file.path.endswith(path_suffix)
@@ -103,7 +102,7 @@ def file_media(file: FilesystemArtifactFile):
             raise errors.WeaveInternalError(
                 f"op file-media: Media Type has not bound instance_class: {file.path}: {type_cls}"
             )
-        res = type_cls.instance_class(artifact_entry)
+        res = type_cls.instance_class(artifact_entry, file_path)
     else:
         raise errors.WeaveInternalError(
             f"op file-media: Unknown media file type: {file.path}"

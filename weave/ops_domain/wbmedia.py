@@ -22,7 +22,8 @@ from . import table
 
 @weave.type(__override_name="image-file")  # type: ignore
 class ImageArtifactFileRef:
-    path: artifact_fs.FilesystemArtifactFile
+    _artifact_file: artifact_fs.FilesystemArtifactFile
+    path: str
     format: str
     height: int
     width: int
@@ -30,52 +31,57 @@ class ImageArtifactFileRef:
 
     @property
     def artifact(self):
-        return self.path.artifact
+        return self._artifact_file.artifact
 
 
 @weave.type(__override_name="audio-file")  # type: ignore
 class AudioArtifactFileRef:
-    path: artifact_fs.FilesystemArtifactFile
+    _artifact_file: artifact_fs.FilesystemArtifactFile
+    path: str
 
     @property
     def artifact(self):
-        return self.path.artifact
+        return self._artifact_file.artifact
 
 
 @weave.type(__override_name="bokeh-file")  # type: ignore
 class BokehArtifactFileRef:
-    path: artifact_fs.FilesystemArtifactFile
+    _artifact_file: artifact_fs.FilesystemArtifactFile
+    path: str
 
     @property
     def artifact(self):
-        return self.path.artifact
+        return self._artifact_file.artifact
 
 
 @weave.type(__override_name="video-file")  # type: ignore
 class VideoArtifactFileRef:
-    path: artifact_fs.FilesystemArtifactFile
+    _artifact_file: artifact_fs.FilesystemArtifactFile
+    path: str
 
     @property
     def artifact(self):
-        return self.path.artifact
+        return self._artifact_file.artifact
 
 
 @weave.type(__override_name="object3D-file")  # type: ignore
 class Object3DArtifactFileRef:
-    path: artifact_fs.FilesystemArtifactFile
+    _artifact_file: artifact_fs.FilesystemArtifactFile
+    path: str
 
     @property
     def artifact(self):
-        return self.path.artifact
+        return self._artifact_file.artifact
 
 
 @weave.type(__override_name="molecule-file")  # type: ignore
 class MoleculeArtifactFileRef:
-    path: artifact_fs.FilesystemArtifactFile
+    _artifact_file: artifact_fs.FilesystemArtifactFile
+    path: str
 
     @property
     def artifact(self):
-        return self.path.artifact
+        return self._artifact_file.artifact
 
 
 table_client_artifact_file_scheme = "wandb-client-artifact://"
@@ -233,11 +239,12 @@ class JoinedTableRunFileRef:
 
 @weave.type(__override_name="html-file")  # type: ignore
 class HtmlArtifactFileRef:
-    path: artifact_fs.FilesystemArtifactFile
+    _artifact_file: artifact_fs.FilesystemArtifactFile
+    path: str
 
     @property
     def artifact(self):
-        return self.path.artifact
+        return self._artifact_file.artifact
 
 
 # This shows a pattern for how to convert an in memory object (Html)
@@ -259,7 +266,7 @@ def html_file(html: html.Html) -> HtmlArtifactFileRef:
         raise errors.WeaveArtifactMediaFileLookupError(
             f"Expected artifact entry at path {file_path} to be `FilesystemArtifactFile`, found {type(artifact_entry)}"
         )
-    return HtmlArtifactFileRef(artifact_entry)
+    return HtmlArtifactFileRef(artifact_entry, file_path)
 
 
 # Yet another pattern for returning a file inside an artifact!
