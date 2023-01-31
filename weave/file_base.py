@@ -5,6 +5,19 @@ import typing
 from . import weave_types as types
 
 
+def wb_object_type_from_path(path: str) -> typing.Tuple[types.Type, str]:
+    parts = path.split(".")
+    ext = ""
+    wbObjectType: types.Type = types.NoneType()
+    if len(parts) != 1:
+        ext = parts[-1]
+    if len(parts) > 2 and ext == "json":
+        pathext_wbobjecttype = types.type_name_to_type(parts[-2])
+        if pathext_wbobjecttype != None:
+            wbObjectType = pathext_wbobjecttype()
+    return wbObjectType, ext
+
+
 @dataclasses.dataclass(frozen=True)
 # It'd be nice to just name this FileType, but Weave0 uses that to mean
 # ArtifactFile
@@ -16,15 +29,7 @@ class FileBaseType(types.Type):
     @classmethod
     def type_of_instance(cls, obj: "File") -> "FileBaseType":
         # Default implementation for Types that take no arguments.
-        parts = obj.path.split(".")
-        ext = ""
-        wbObjectType: types.Type = types.NoneType()
-        if len(parts) != 1:
-            ext = parts[-1]
-        if len(parts) > 2 and ext == "json":
-            pathext_wbobjecttype = types.type_name_to_type(parts[-2])
-            if pathext_wbobjecttype != None:
-                wbObjectType = pathext_wbobjecttype()
+        wbObjectType, ext = wb_object_type_from_path(obj.path)
         return cls(
             extension=types.Const(types.String(), ext), wbObjectType=wbObjectType
         )
