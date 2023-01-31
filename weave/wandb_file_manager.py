@@ -17,6 +17,7 @@ from . import engine_trace
 from . import filesystem
 from . import http
 from . import wandb_api
+from . import environment as weave_env
 
 
 tracer = engine_trace.tracer()  # type: ignore
@@ -116,7 +117,9 @@ class WandbFileManagerAsync:
                 return file_path
             # TODO: storage_region
             storage_region = "default"
-            artifact_url = "https://api.wandb.ai/artifactsV2/{}/{}/{}/{}".format(
+            base_url = weave_env.wandb_base_url()
+            artifact_url = "{}/artifactsV2/{}/{}/{}/{}".format(
+                base_url,
                 storage_region,
                 art_uri.entity_name,
                 urllib.parse.quote(

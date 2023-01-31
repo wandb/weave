@@ -115,4 +115,4 @@ class HttpAsync:
                         async for data in r.content.iter_chunked(16 * 1024):
                             await f.write(data)
                 else:
-                    raise errors.WeaveHttpError("Download failed", r.status)
+                    raise errors.WeaveHttpError("Download failed", r.status, r.url)

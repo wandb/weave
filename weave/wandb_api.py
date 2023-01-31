@@ -3,7 +3,6 @@
 # module.
 
 import dataclasses
-import os
 import typing
 import graphql
 import gql
@@ -15,6 +14,7 @@ from gql.transport.aiohttp import AIOHTTPTransport
 
 
 from . import engine_trace
+from . import environment as weave_env
 
 
 tracer = engine_trace.tracer()  # type: ignore
@@ -67,7 +67,7 @@ class WandbApiAsync:
         self, query: graphql.DocumentNode, **kwargs: typing.Any
     ) -> typing.Any:
         wandb_context = get_wandb_api_context()
-        url_base = os.environ.get("WANDB_BASE_URL", "https://api.wandb.ai")
+        url_base = weave_env.wandb_base_url()
         transport = AIOHTTPTransport(
             url=url_base + "/graphql",
             client_session_args={
