@@ -22,6 +22,7 @@ def _wbgqlquery_output_type(input_types: dict[str, types.Type]) -> types.Type:
     name="gqlroot-wbgqlquery",
     input_type={"query_str": types.String(), "alias_list": types.List(types.String())},
     output_type=_wbgqlquery_output_type,
+    pure=False,
 )
 def wbgqlquery(query_str, alias_list):
     tracer = engine_trace.tracer()
