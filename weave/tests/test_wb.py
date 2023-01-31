@@ -23,7 +23,7 @@ import cProfile
 from ..language_features.tagging.tagged_value_type import TaggedValueType
 
 file_path_response = {
-    "project": {
+    "project_518fa79465d8ffaeb91015dce87e092f": {
         **fwb.project_payload,  # type: ignore
         "artifactType_46d22fef09db004187bb8da4b5e98c58": {
             **fwb.defaultArtifactType_payload,  # type: ignore
@@ -44,7 +44,7 @@ file_path_response = {
 }
 
 artifact_browser_response = {
-    "project": {
+    "project_518fa79465d8ffaeb91015dce87e092f": {
         **fwb.project_payload,  # type: ignore
         "artifactCollection_d651817074b6a8074e87e9dfd5767726": {
             **fwb.artifactSequence_payload,  # type: ignore
@@ -55,7 +55,7 @@ artifact_browser_response = {
 
 
 workspace_response = {
-    "project": {
+    "project_518fa79465d8ffaeb91015dce87e092f": {
         **fwb.project_payload,  # type: ignore
         "runs_21303e3890a1b6580998e6aa8a345859": {
             "edges": [
@@ -104,14 +104,14 @@ workspace_response = {
 }
 
 empty_workspace_response = {
-    "project": {
+    "project_518fa79465d8ffaeb91015dce87e092f": {
         **fwb.project_payload,  # type: ignore
         "runs_21303e3890a1b6580998e6aa8a345859": {"edges": []},
     }
 }
 
 workspace_response_filtered = {
-    "project": {
+    "project_518fa79465d8ffaeb91015dce87e092f": {
         **fwb.project_payload,  # type: ignore
         "runs_6e908597bd3152c2f0457f6283da76b9": {
             "edges": [
@@ -135,7 +135,7 @@ workspace_response_filtered = {
 }
 
 project_run_artifact_response = {
-    "project": {
+    "project_518fa79465d8ffaeb91015dce87e092f": {
         **fwb.project_payload,  # type: ignore
         "runs_21303e3890a1b6580998e6aa8a345859": {
             "edges": [
@@ -480,7 +480,7 @@ def test_tag_run_color_lookup(fake_wandb):
 def test_domain_gql_fragments(fake_wandb):
     fake_wandb.add_mock(
         lambda q, ndx: {
-            "project": {
+            "project_518fa79465d8ffaeb91015dce87e092f": {
                 **fwb.project_payload,
                 "artifactType_46d22fef09db004187bb8da4b5e98c58": {
                     **fwb.defaultArtifactType_payload,
@@ -568,7 +568,9 @@ def test_domain_gql_around_fn_nodes(fake_wandb):
 
 
 def test_lambda_gql_stitch(fake_wandb):
-    fake_wandb.add_mock(lambda q, ndx: {"project": fwb.project_payload})
+    fake_wandb.add_mock(
+        lambda q, ndx: {"project_518fa79465d8ffaeb91015dce87e092f": fwb.project_payload}
+    )
     weave.use(
         ops.make_list(a="a", b="b", c="c").map(
             lambda x: x + ops.project("stacey", "mendeleev").name()
@@ -676,7 +678,7 @@ def test_loading_artifact_browser_request_1(fake_wandb):
     # Leaf 1: Get's the current artifact collection
     fake_wandb.add_mock(
         lambda q, ndx: {
-            "project": {
+            "project_518fa79465d8ffaeb91015dce87e092f": {
                 **fwb.project_payload,  # type: ignore
                 "artifactCollection_d651817074b6a8074e87e9dfd5767726": {
                     **fwb.artifactSequence_payload,  # type: ignore
@@ -693,7 +695,7 @@ def test_loading_artifact_browser_request_2(fake_wandb):
     # Leaf 2: Get collection details
     fake_wandb.add_mock(
         lambda q, ndx: {
-            "project": {
+            "project_518fa79465d8ffaeb91015dce87e092f": {
                 **fwb.project_payload,  # type: ignore
                 "artifactCollection_d651817074b6a8074e87e9dfd5767726": {
                     **fwb.artifactSequence_payload,  # type: ignore
@@ -755,7 +757,7 @@ def test_loading_artifact_browser_request_2(fake_wandb):
     fake_wandb.clear_mock_handlers()
     fake_wandb.add_mock(
         lambda q, ndx: {
-            "project": {
+            "project_518fa79465d8ffaeb91015dce87e092f": {
                 **fwb.project_payload,  # type: ignore
                 "artifactCollection_d651817074b6a8074e87e9dfd5767726": {
                     **fwb.artifactSequence_payload,  # type: ignore
@@ -773,7 +775,7 @@ def test_loading_artifact_browser_request_2(fake_wandb):
     fake_wandb.clear_mock_handlers()
     fake_wandb.add_mock(
         lambda q, ndx: {
-            "project": {
+            "project_518fa79465d8ffaeb91015dce87e092f": {
                 **fwb.project_payload,  # type: ignore
                 "artifactCollection_d651817074b6a8074e87e9dfd5767726": {
                     **fwb.artifactSequence_payload,  # type: ignore
@@ -799,7 +801,7 @@ def test_loading_artifact_browser_request_3(fake_wandb):
     # Leaf 5: Get the specific artifact version details
     fake_wandb.add_mock(
         lambda q, ndx: {
-            "project": {
+            "project_518fa79465d8ffaeb91015dce87e092f": {
                 **fwb.project_payload,  # type: ignore
                 "artifactCollection_d651817074b6a8074e87e9dfd5767726": {
                     **fwb.artifactSequence_payload,  # type: ignore
@@ -971,7 +973,7 @@ def test_loading_artifact_browser_request_3(fake_wandb):
     fake_wandb.clear_mock_handlers()
     fake_wandb.add_mock(
         lambda q, ndx: {
-            "project": {
+            "project_518fa79465d8ffaeb91015dce87e092f": {
                 **fwb.project_payload,  # type: ignore
                 "artifactCollection_d651817074b6a8074e87e9dfd5767726": {
                     **fwb.artifactSequence_payload,  # type: ignore
@@ -1007,7 +1009,7 @@ def test_loading_artifact_browser_request_3(fake_wandb):
     fake_wandb.clear_mock_handlers()
     fake_wandb.add_mock(
         lambda q, ndx: {
-            "project": {
+            "project_518fa79465d8ffaeb91015dce87e092f": {
                 **fwb.project_payload,  # type: ignore
                 "artifactCollection_d651817074b6a8074e87e9dfd5767726": {
                     **fwb.artifactSequence_payload,  # type: ignore
@@ -1063,7 +1065,7 @@ example_history_keys = {
 def run_history_mocker(q, ndx):
     if ndx == 0:
         return {
-            "project": {
+            "project_518fa79465d8ffaeb91015dce87e092f": {
                 **fwb.project_payload,  # type: ignore
                 "runs_21303e3890a1b6580998e6aa8a345859": {
                     "edges": [
@@ -1080,7 +1082,7 @@ def run_history_mocker(q, ndx):
         }
     elif ndx == 1:
         return {
-            "project": {
+            "project_518fa79465d8ffaeb91015dce87e092f": {
                 **fwb.project_payload,  # type: ignore
                 "runs_21303e3890a1b6580998e6aa8a345859": {
                     "edges": [
@@ -1119,7 +1121,7 @@ def test_run_history(fake_wandb):
 def run_history_as_of_mocker(q, ndx):
     if ndx == 0:
         return {
-            "project": {
+            "project_518fa79465d8ffaeb91015dce87e092f": {
                 **fwb.project_payload,  # type: ignore
                 "runs_21303e3890a1b6580998e6aa8a345859": {
                     "edges": [
