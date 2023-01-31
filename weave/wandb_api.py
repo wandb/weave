@@ -3,6 +3,7 @@
 # module.
 
 import dataclasses
+import os
 import typing
 import graphql
 import gql
@@ -66,9 +67,9 @@ class WandbApiAsync:
         self, query: graphql.DocumentNode, **kwargs: typing.Any
     ) -> typing.Any:
         wandb_context = get_wandb_api_context()
-
+        url_base = os.environ.get("WANDB_BASE_URL", "https://api.wandb.ai")
         transport = AIOHTTPTransport(
-            url="https://api.wandb.ai/graphql",
+            url=url_base + "/graphql",
             client_session_args={
                 "connector": self.connector,
                 "connector_owner": False,
