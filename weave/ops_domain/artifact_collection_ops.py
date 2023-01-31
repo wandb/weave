@@ -182,3 +182,34 @@ def link(
         artifact.gql["name"],
         f"/{entity_name}/{project_name}/artifacts/{urllib.parse.quote(artifact_type_name)}/{urllib.parse.quote(artifact_name)}",
     )
+
+
+@op(
+    name="artifact-rawTags",
+    output_type=types.List(
+        types.TypedDict(
+            {
+                "id": types.String(),
+                "name": types.String(),
+                "tagCategoryName": types.String(),
+                "attributes": types.String(),
+            }
+        )
+    ),
+    plugins=wb_gql_op_plugin(
+        lambda inputs, inner: """
+        tags {
+            edges {
+                node {
+                    id
+                    name
+                    tagCategoryName
+                    attributes
+                }
+            }
+        }
+        """
+    ),
+)
+def raw_tags(artifact: wdt.ArtifactCollection):
+    return [n["node"] for n in artifact.gql["tags"]["edges"]]
