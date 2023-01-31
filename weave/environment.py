@@ -42,6 +42,10 @@ def weave_server_url() -> str:
     return os.getenv("WEAVE_SERVER_URL", "")
 
 
+def wandb_base_url() -> str:
+    return os.environ.get("WANDB_BASE_URL", "https://api.wandb.ai")
+
+
 def weave_filesystem_dir() -> str:
     # WEAVE_LOCAL_ARTIFACT_DIR should be renamed to WEAVE_FILESYSTEM_DIR
     # TODO
