@@ -407,10 +407,11 @@ def map_from_arrow_scalar(value: pa.Scalar, type_: types.Type, artifact):
         # So sometimes we think we have a tagged type here, but the value is
         # actually a plain value.
         # TODO: fix!
-        try:
-            val = box.box(map_from_arrow_scalar(value["_value"], type_.value, artifact))
-        except TypeError:
+        field_names = set([f.name for f in value.type])
+        if "_value" not in field_names or "_tag" not in field_names:
             return value.as_py()
+
+        val = box.box(map_from_arrow_scalar(value["_value"], type_.value, artifact))
         tag = map_from_arrow_scalar(value["_tag"], type_.tag, artifact)
         return tag_store.add_tags(val, tag)
     elif isinstance(type_, types.TypedDict):

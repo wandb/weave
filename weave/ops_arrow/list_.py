@@ -1964,7 +1964,7 @@ def to_arrow_from_list_and_artifact(
     pyarrow_type = mapper.result_type()
 
     arrow_obj = recursively_build_pyarrow_array(
-        obj, pyarrow_type, mapper, py_objs_already_mapped=True
+        obj, pyarrow_type, mapper, py_objs_already_mapped=False
     )
     return ArrowWeaveList(arrow_obj, merged_object_type, artifact)
 
