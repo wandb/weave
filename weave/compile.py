@@ -93,9 +93,14 @@ def _dispatch_map_fn_no_refine(node: graph.Node) -> typing.Optional[graph.Output
         output_type = node.type
         # In the case where we are dispatching to a new op, we want to use the
         # new op's `unrefined_output_type_for_params` output type - rather than
-        # blindly trusting the client type.
-        if not node.from_op.name.startswith("local-artifact://") and (
-            node.from_op.name != op.name
+        # blindly trusting the client type. We only use Weave1 output when there
+        # is not a refiner. If there is a refiner, then this type is nearly
+        # always under-defined. By respecting the Weave0 type, we can continue
+        # with dispatch. The types will be solved at the refine path anyway.
+        if (
+            not node.from_op.name.startswith("local-artifact://")
+            and node.from_op.name != op.name
+            and op.refine_output_type is None
         ):
             output_type = op.unrefined_output_type_for_params(params)
 
