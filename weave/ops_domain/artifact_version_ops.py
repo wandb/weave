@@ -1,4 +1,6 @@
 import json
+
+from ..file_base import wb_object_type_from_path
 from ..compile_domain import wb_gql_op_plugin
 from ..api import op
 from .. import weave_types as types
@@ -260,10 +262,18 @@ def _artifact_version_to_wb_artifact(artifactVersion: wdt.ArtifactVersion):
     )
 
 
+def _file_output_type(input_types):
+    ft = artifact_fs.FilesystemArtifactFileType()
+    if isinstance(input_types["path"], types.Const):
+        wbObjectType, ext = wb_object_type_from_path(input_types["path"].val)
+        ft = artifact_fs.FilesystemArtifactFileType(
+            extension=types.Const(types.String(), ext), wbObjectType=wbObjectType
+        )
+    return types.optional(ft)
+
+
 # Warning: see comment on ops_primitives/artifacts:artifact_file
-@op(name="artifactVersion-file")
-def file_(
-    artifactVersion: wdt.ArtifactVersion, path: str
-) -> typing.Optional[artifact_fs.FilesystemArtifactFile]:
+@op(name="artifactVersion-file", output_type=_file_output_type)
+def file_(artifactVersion: wdt.ArtifactVersion, path: str):
     art_local = _artifact_version_to_wb_artifact(artifactVersion)
     return art_local.path_info(path)  # type: ignore
