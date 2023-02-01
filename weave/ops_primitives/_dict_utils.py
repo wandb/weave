@@ -157,11 +157,11 @@ def _type_tag_wrapper(
 def _tag_aware_dict_or_list_type_for_path(
     type: types.Type, path: list[str]
 ) -> types.Type:
+    if len(path) == 0:
+        return type
     if isinstance(type, types.Const):
         type = type.val_type
     tag_wrapper, inner_type = _type_tag_wrapper(type)
-    if len(path) == 0:
-        return types.NoneType()
     if isinstance(inner_type, types.UnionType):
         return tag_wrapper(
             types.union(
@@ -171,53 +171,39 @@ def _tag_aware_dict_or_list_type_for_path(
                 ]
             )
         )
-    if not (
-        isinstance(inner_type, types.List) or isinstance(inner_type, types.TypedDict)
-    ):
-        return types.NoneType()
+    if isinstance(inner_type, types.Any):
+        return tag_wrapper(types.UnknownType())
     key = path[0]
     next_path = path[1:]
     if isinstance(inner_type, types.List) and key == "*":
-        if len(next_path) == 0:
-            return type
-        else:
-            return tag_wrapper(
-                types.List(
-                    _tag_aware_dict_or_list_type_for_path(
-                        inner_type.object_type, next_path
-                    )
-                )
+        return tag_wrapper(
+            types.List(
+                _tag_aware_dict_or_list_type_for_path(inner_type.object_type, next_path)
             )
+        )
     elif isinstance(inner_type, types.TypedDict):
-        return _dict_type_for_path(type, path)
+        return tag_wrapper(_dict_type_for_path(inner_type, path))
+    elif isinstance(inner_type, types.Dict):
+        return tag_wrapper(
+            _tag_aware_dict_or_list_type_for_path(inner_type.object_type, next_path)
+        )
     else:
         return types.NoneType()
 
 
-def _dict_type_for_path(type: types.Type, path: list[str]) -> types.Type:
-    tag_wrapper, inner_type = _type_tag_wrapper(type)
-    if len(path) == 0:
-        return types.NoneType()
-    if not isinstance(inner_type, types.TypedDict):
-        return types.NoneType()
-    prop_types = inner_type.property_types
+def _dict_type_for_path(type: types.TypedDict, path: list[str]) -> types.Type:
+    prop_types = type.property_types
     key = path[0]
     next_path = path[1:]
     if key == "*":
-        return tag_wrapper(
-            types.TypedDict(
-                {
-                    sub_key: _tag_aware_dict_or_list_type_for_path(sub_val, next_path)
-                    for sub_key, sub_val in prop_types.items()
-                }
-            )
+        return types.TypedDict(
+            {
+                sub_key: _tag_aware_dict_or_list_type_for_path(sub_val, next_path)
+                for sub_key, sub_val in prop_types.items()
+            }
         )
+
     if key not in prop_types:
         return types.NoneType()
     key_val = typing.cast(types.Type, prop_types.get(key))
-    if len(next_path) == 0:
-        res = key_val
-    else:
-        res = _tag_aware_dict_or_list_type_for_path(key_val, next_path)
-
-    return tag_wrapper(res)
+    return _tag_aware_dict_or_list_type_for_path(key_val, next_path)

@@ -1,3 +1,4 @@
+import pytest
 import weave
 from .. import weave_internal
 from ..language_features.tagging import tagged_value_type
@@ -31,3 +32,24 @@ def test_pick():
 def test_pick_none_key():
     d = weave.save({"a": 5})
     assert weave.use(d[None]) == None
+
+
+@pytest.mark.parametrize(
+    "in_obj, key, out_obj",
+    [
+        (
+            {},
+            "",
+            None,
+        ),
+        (
+            {"a": [{"b": {"c": [1, 2, 3]}}, {"b": {"c": ["1", "2", "3"]}}, {"b": {}}]},
+            "a.*.b.c",
+            [[1, 2, 3], ["1", "2", "3"], None],
+        ),
+    ],
+)
+def test_typeddict_pick_output_type(in_obj, key, out_obj):
+    node = weave_internal.const(in_obj)[key]
+    assert node.type == weave.types.TypeRegistry.type_of(out_obj)
+    assert weave.use(node) == out_obj
