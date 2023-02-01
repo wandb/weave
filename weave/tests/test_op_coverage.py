@@ -119,6 +119,7 @@ js_op_exceptions = set(
         # Ops which can't be accessed and are not used
         "asset-file",
         "file-digest",
+        "file-media",
     ]
 )
 

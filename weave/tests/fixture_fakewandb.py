@@ -45,7 +45,7 @@ class FakeManifest:
                 return FakeEntry(path)
         if path == "test_results.table.json":
             return FakeEntry(path)
-        if path.startswith("media/images") and path.endswith(".png"):
+        if path == "media/images/8f65e54dc684f7675aec.png":
             return FakeEntry(path)
         if path == "weird_table.table.json":
             return FakeEntry(path)
@@ -152,8 +152,7 @@ class FakeClient:
                 # print(res)
                 return res
         raise Exception(
-            "Query was not mocked - please fill out in fixture_fakewandb.py",
-            gql.loc.source.body,
+            "Query was not mocked - please fill out in fixture_fakewandb.py"
         )
 
 

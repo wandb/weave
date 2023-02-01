@@ -20,10 +20,30 @@ from . import table
 # artifact/path during loading.
 
 
+class ArtifactEntryType(types.Type):
+    def save_instance(self, obj, artifact, name):
+        # No-op, this is already a saved ArtifactEntry!
+        pass
+
+    def load_instance(self, artifact, name, extra=None):
+        return ArtifactEntry(artifact, name)
+
+
+@dataclasses.dataclass
+class ArtifactEntry:
+    artifact: typing.Any  # Artifact
+    path: str
+
+
+ArtifactEntryType.instance_classes = ArtifactEntry
+ArtifactEntryType.instance_class = ArtifactEntry
+
+
 @weave.type(__override_name="image-file")  # type: ignore
 class ImageArtifactFileRef:
-    _artifact_file: artifact_fs.FilesystemArtifactFile
-    path: str
+    # TODO: just File? No, because the frontend is going to call .artifactVersion()
+    #     on us. So we need to be ImageArtifactEntry
+    path: ArtifactEntry  # This should be a Ref<File<ImageExtensions>>
     format: str
     height: int
     width: int
@@ -31,57 +51,52 @@ class ImageArtifactFileRef:
 
     @property
     def artifact(self):
-        return self._artifact_file.artifact
+        return self.path.artifact
 
 
 @weave.type(__override_name="audio-file")  # type: ignore
 class AudioArtifactFileRef:
-    _artifact_file: artifact_fs.FilesystemArtifactFile
-    path: str
+    path: ArtifactEntry
 
     @property
     def artifact(self):
-        return self._artifact_file.artifact
+        return self.path.artifact
 
 
 @weave.type(__override_name="bokeh-file")  # type: ignore
 class BokehArtifactFileRef:
-    _artifact_file: artifact_fs.FilesystemArtifactFile
-    path: str
+    path: ArtifactEntry
 
     @property
     def artifact(self):
-        return self._artifact_file.artifact
+        return self.path.artifact
 
 
 @weave.type(__override_name="video-file")  # type: ignore
 class VideoArtifactFileRef:
-    _artifact_file: artifact_fs.FilesystemArtifactFile
-    path: str
+    path: ArtifactEntry
 
     @property
     def artifact(self):
-        return self._artifact_file.artifact
+        return self.path.artifact
 
 
 @weave.type(__override_name="object3D-file")  # type: ignore
 class Object3DArtifactFileRef:
-    _artifact_file: artifact_fs.FilesystemArtifactFile
-    path: str
+    path: ArtifactEntry
 
     @property
     def artifact(self):
-        return self._artifact_file.artifact
+        return self.path.artifact
 
 
 @weave.type(__override_name="molecule-file")  # type: ignore
 class MoleculeArtifactFileRef:
-    _artifact_file: artifact_fs.FilesystemArtifactFile
-    path: str
+    path: ArtifactEntry
 
     @property
     def artifact(self):
-        return self._artifact_file.artifact
+        return self.path.artifact
 
 
 table_client_artifact_file_scheme = "wandb-client-artifact://"
@@ -239,12 +254,11 @@ class JoinedTableRunFileRef:
 
 @weave.type(__override_name="html-file")  # type: ignore
 class HtmlArtifactFileRef:
-    _artifact_file: artifact_fs.FilesystemArtifactFile
-    path: str
+    path: ArtifactEntry
 
     @property
     def artifact(self):
-        return self._artifact_file.artifact
+        return self.path.artifact
 
 
 # This shows a pattern for how to convert an in memory object (Html)
@@ -260,13 +274,8 @@ def html_file(html: html.Html) -> HtmlArtifactFileRef:
     path = ref.path
     if path is None:
         raise errors.WeaveInternalError("storage save returned None path")
-    file_path = path + ".html"
-    artifact_entry = ref.artifact.path_info(file_path)
-    if not isinstance(artifact_entry, artifact_fs.FilesystemArtifactFile):
-        raise errors.WeaveArtifactMediaFileLookupError(
-            f"Expected artifact entry at path {file_path} to be `FilesystemArtifactFile`, found {type(artifact_entry)}"
-        )
-    return HtmlArtifactFileRef(artifact_entry, file_path)
+    artifact_entry = ArtifactEntry(ref.artifact, path + ".html")
+    return HtmlArtifactFileRef(artifact_entry)
 
 
 # Yet another pattern for returning a file inside an artifact!

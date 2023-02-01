@@ -282,7 +282,7 @@ class DefaultToArrow(mappers_python.DefaultToPy):
             or self.type.name == "pil_image"
             or self.type.name == "ArrowArray"
             or self.type.name == "ArrowTable"
-            or self.type.name == "file"
+            or self.type.name == "ArtifactEntry"
         ):
             # Ref type
             return pa.string()
@@ -407,11 +407,10 @@ def map_from_arrow_scalar(value: pa.Scalar, type_: types.Type, artifact):
         # So sometimes we think we have a tagged type here, but the value is
         # actually a plain value.
         # TODO: fix!
-        field_names = set([f.name for f in value.type])
-        if "_value" not in field_names or "_tag" not in field_names:
+        try:
+            val = box.box(map_from_arrow_scalar(value["_value"], type_.value, artifact))
+        except TypeError:
             return value.as_py()
-
-        val = box.box(map_from_arrow_scalar(value["_value"], type_.value, artifact))
         tag = map_from_arrow_scalar(value["_tag"], type_.tag, artifact)
         return tag_store.add_tags(val, tag)
     elif isinstance(type_, types.TypedDict):

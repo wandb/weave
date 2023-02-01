@@ -242,13 +242,6 @@ def _get_rows_and_object_type_from_weave_format(
     for data_row in row_data:
         row: dict[str, typing.Any] = {}
         for col_name, val in zip(data["columns"], data_row):
-            if isinstance(val, dict) and "_type" in val and "path" in val:
-                type_cls = types.type_name_to_type(val["_type"])
-                if type_cls is not None and type_cls.instance_class is not None:
-                    art_file = file.artifact.path_info(val["path"])
-                    val = type_cls.instance_class(
-                        art_file, **{k: v for k, v in val.items() if k != "_type"}
-                    )
             row[str(col_name)] = val
         rows.append(row)
     return rows, object_type

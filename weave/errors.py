@@ -89,10 +89,6 @@ class WeaveGQLCompileError(WeaveBaseError):
     pass
 
 
-class WeaveGQLExecuteMissingAliasError(WeaveBaseError):
-    pass
-
-
 class WeaveAccessDeniedError(WeaveBaseError):
     pass
 
@@ -102,8 +98,4 @@ class WeaveWandbArtifactManagerError(WeaveBaseError):
 
 
 class WeaveHttpError(WeaveBaseError):
-    pass
-
-
-class WeaveArtifactMediaFileLookupError(WeaveBaseError):
     pass

@@ -23,7 +23,7 @@ from .. import errors
 def root_all_reports_gql_resolver(gql_result):
     return [
         wdt.Report.from_gql(report["node"])
-        for report in gql_result["views_500"]["edges"]
+        for report in gql_result["instance"]["views"]["edges"]
         if report["node"]["type"] == "runs"  # yes, this is how we filter to Reports!?
     ]
 
@@ -35,7 +35,7 @@ def root_all_reports_gql_resolver(gql_result):
     plugins=wb_gql_op_plugin(
         lambda inputs, inner: f"""
         instance {{
-            views_500: views(limit: 500) {{
+            views(limit: 500) {{
                 edges {{
                     node {{
                         type
