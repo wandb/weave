@@ -58,31 +58,7 @@ def _resolve_static_branches(map_fn):
             # TODO: if map_fn.type is UnionType we should do something about it here
             # before we blow up in the Const(Type) constructor
             with tracer.trace("resolve_static:op.%s" % op_def.name):
-                res = op_def.resolve_fn(**call_inputs)
-                use_type = map_fn.type
-                #
-                # Note from Tim: It is completely possible and logically sound
-                # to encounter a union type here. However during execution, we
-                # will hit an error since const types raise when they are
-                # unions. This raise is also logical and sound. The unfortunate
-                # truth is that at this point we could be in any number of valid
-                # member states of the union and don't "know" which one we are
-                # in until we open the box and look inside. So, correctly
-                # resolving the type requires looking at the data itself. I
-                # wrote this code below to implement the fix, but it ended up
-                # not being needed for the problem I was working on. Leaving
-                # here for future reference, when it inevitably comes up again.
-                #
-                # if isinstance(use_type, types.UnionType):
-                #     # WARNING: Expensive! maybe we should just allow unions in ConstNode?
-                #     # Another idea: just strip off None or choose None based on null.
-                #     res_type = types.TypeRegistry.type_of(res)
-                #     if use_type.assign_type(res_type):
-                #         use_type = res_type
-                #     else:
-                #         # Should we error here?
-                #         pass
-                return graph.ConstNode(use_type, res)
+                return graph.ConstNode(map_fn.type, op_def.resolve_fn(**call_inputs))
         return graph.OutputNode(map_fn.type, map_fn.from_op.name, inputs)
     elif isinstance(map_fn, graph.ConstNode):
         return map_fn

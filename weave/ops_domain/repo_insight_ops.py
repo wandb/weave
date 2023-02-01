@@ -97,9 +97,12 @@ def make_rpt_op(plot_name, output_row_type):
     )
     def root_all_projects_gql_resolver(gql_result, repoName):
         # Copied from root.ts
-        raw_rows = [edge["node"]["row"] for edge in gql_result["edges"]]
-        schema = json.loads(gql_result.get("schema", "[]"))
-        is_normalized_user_count = gql_result.get("isNormalizedUserCount", False)
+        alias = _make_alias(repoName, plot_name, prefix="repoInsightsPlotData")
+        results = gql_result[alias]
+
+        raw_rows = [edge["node"]["row"] for edge in results["edges"]]
+        schema = json.loads(results.get("schema", "[]"))
+        is_normalized_user_count = results.get("isNormalizedUserCount", False)
 
         if not schema:
             raise errors.WeaveInternalError(f"No schema for {alias}")
@@ -124,10 +127,7 @@ def make_rpt_op(plot_name, output_row_type):
 
     def plugin_fn(inputs, inner):
         alias = _make_alias(
-            inputs.raw["repoName"],
-            plot_name,
-            "first: 100000",
-            prefix="repoInsightsPlotData",
+            inputs.raw["repoName"], plot_name, prefix="repoInsightsPlotData"
         )
         return f"""
                 {alias}: repoInsightsPlotData(plotName: {json.dumps(plot_name)}, repoName: {inputs["repoName"]}, first: 100000) {{

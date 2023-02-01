@@ -38,7 +38,7 @@ project = gql_root_op(
 def root_all_projects_gql_resolver(gql_result):
     return [
         wdt.Project.from_gql(project["node"])
-        for project in gql_result["projects_500"]["edges"]
+        for project in gql_result["instance"]["projects"]["edges"]
     ]
 
 
@@ -49,7 +49,7 @@ def root_all_projects_gql_resolver(gql_result):
     plugins=wb_gql_op_plugin(
         lambda inputs, inner: f"""
     instance {{
-        projects_500: projects(limit: 500) {{
+        projects(limit: 500) {{
             edges {{
                 node {{
                     {wdt.Project.REQUIRED_FRAGMENT}

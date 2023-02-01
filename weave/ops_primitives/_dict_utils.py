@@ -6,8 +6,6 @@ from .. import box
 
 
 def typeddict_pick_output_type(input_types):
-    if isinstance(input_types["self"], types.Dict):
-        return types.optional(input_types["self"].object_type)
     property_types = input_types["self"].property_types
     if not isinstance(input_types["key"], types.Const):
         return types.union(*property_types.values())

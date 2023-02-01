@@ -20,7 +20,7 @@ def use_static_artifact_node(
 ) -> weave.graph.Node:
     fake_wandb.add_mock(
         lambda ndx, q: {
-            "project_5702147f0293fd7538d402af13069708": {
+            "project": {
                 "id": "p1",
                 "name": project_name,
                 "entity": {"id": "e1", "name": entity_name},

@@ -280,7 +280,7 @@ def node_expr_str(node: Node) -> str:
             )
         elif node.from_op.name == "gqlroot-wbgqlquery":
             query_hash = "_query_"  # TODO: make a hash from the query for idenity
-            return f"{node.from_op.friendly_name}({query_hash})"
+            return f'{node.from_op.friendly_name}({query_hash}, {", ".join(node_expr_str(node.from_op.inputs[n]) for n in param_names[1:])})'
         elif all([not isinstance(n, OutputNode) for n in node.from_op.inputs.values()]):
             return "%s(%s)" % (
                 node.from_op.friendly_name,
