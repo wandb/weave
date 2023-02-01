@@ -24,7 +24,7 @@ from .. import errors
 def root_all_artifacts_gql_resolver(gql_result):
     return [
         wdt.ArtifactCollection.from_gql(artifact_collection["node"])
-        for artifact_collection in gql_result["instance"]["artifactSequences"]["edges"]
+        for artifact_collection in gql_result["artifacts_500"]["edges"]
     ]
 
 
@@ -35,7 +35,7 @@ def root_all_artifacts_gql_resolver(gql_result):
     plugins=wb_gql_op_plugin(
         lambda inputs, inner: f"""
     instance {{
-        artifactSequences(limit: 500) {{
+        artifacts_500: artifactSequences(limit: 500) {{
             edges {{
                 node {{
                     {wdt.ArtifactCollection.REQUIRED_FRAGMENT}
@@ -182,3 +182,34 @@ def link(
         artifact.gql["name"],
         f"/{entity_name}/{project_name}/artifacts/{urllib.parse.quote(artifact_type_name)}/{urllib.parse.quote(artifact_name)}",
     )
+
+
+@op(
+    name="artifact-rawTags",
+    output_type=types.List(
+        types.TypedDict(
+            {
+                "id": types.String(),
+                "name": types.String(),
+                "tagCategoryName": types.String(),
+                "attributes": types.String(),
+            }
+        )
+    ),
+    plugins=wb_gql_op_plugin(
+        lambda inputs, inner: """
+        tags {
+            edges {
+                node {
+                    id
+                    name
+                    tagCategoryName
+                    attributes
+                }
+            }
+        }
+        """
+    ),
+)
+def raw_tags(artifact: wdt.ArtifactCollection):
+    return [n["node"] for n in artifact.gql["tags"]["edges"]]

@@ -669,9 +669,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         result: typing.Optional[ArrowWeaveList] = None
 
         current_type = self.object_type
-        if current_type.assign_type(desired_type) and desired_type.assign_type(
-            current_type
-        ):
+        if current_type == desired_type:
             result = self
         elif isinstance(desired_type, tagged_value_type.TaggedValueType):
             if isinstance(current_type, tagged_value_type.TaggedValueType):
