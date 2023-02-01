@@ -89,12 +89,12 @@ def file_media(file: FilesystemArtifactFile):
     elif any(
         file.path.endswith(path_suffix)
         for path_suffix in [
-            "audio-file",
-            "bokeh-file",
-            "video-file",
-            "object3D-file",
-            "molecule-file",
-            "html-file",
+            ".audio-file.json",
+            ".bokeh-file.json",
+            ".video-file.json",
+            ".object3D-file.json",
+            ".molecule-file.json",
+            ".html-file.json",
         ]
     ):
         type_cls, _ = file_base.wb_object_type_from_path(file.path)
