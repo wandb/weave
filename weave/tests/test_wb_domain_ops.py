@@ -132,7 +132,7 @@ def test_root_project_concat(fake_wandb):
 
     assert weave.use(summary) == [0.1, 0.1]
     log = fake_wandb.execute_log()
-    assert len(log) == 1
+    assert len(log) == 2
     assert_gql_str_equal(
         log[0]["gql"],
         # Note: the inner project/entity query is because it is part of the required fragment for runs

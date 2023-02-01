@@ -1119,24 +1119,23 @@ def test_run_history(fake_wandb):
 
 
 def run_history_as_of_mocker(q, ndx):
-    if ndx == 0:
-        return {
-            "project_518fa79465d8ffaeb91015dce87e092f": {
-                **fwb.project_payload,  # type: ignore
-                "runs_21303e3890a1b6580998e6aa8a345859": {
-                    "edges": [
-                        {
-                            "node": {
-                                **fwb.run_payload,  # type: ignore
-                                "history_d3d9446802a44259755d38e6d163e820": example_history[
-                                    9
-                                ],
-                            }
+    return {
+        "project_518fa79465d8ffaeb91015dce87e092f": {
+            **fwb.project_payload,  # type: ignore
+            "runs_21303e3890a1b6580998e6aa8a345859": {
+                "edges": [
+                    {
+                        "node": {
+                            **fwb.run_payload,  # type: ignore
+                            "history_d3d9446802a44259755d38e6d163e820": example_history[
+                                9
+                            ],
                         }
-                    ]
-                },
-            }
+                    }
+                ]
+            },
         }
+    }
 
 
 def test_run_history_as_of(fake_wandb):
