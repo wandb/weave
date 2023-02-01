@@ -251,6 +251,13 @@ def _get_rows_and_object_type_from_weave_format(
                     )
             row[str(col_name)] = val
         rows.append(row)
+
+    # TODO:
+    # We need to expand the table if it is a linked table
+    for col_nam, col_type in object_type.property_types.items():
+        pass
+
+
     return rows, object_type
 
 
