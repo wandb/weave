@@ -268,7 +268,7 @@ def _get_rows_and_object_type_from_weave_format(
                 ]:
                     type_cls = types.type_name_to_type(val["_type"])
                     if type_cls is not None and type_cls.instance_class is not None:
-                        val = type_cls.instance_class(art_file)
+                        val = type_cls.instance_class(art_file, file_path)
             row[str(col_name)] = val
         rows.append(row)
     return rows, object_type
