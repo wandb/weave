@@ -45,7 +45,7 @@ class FakeManifest:
                 return FakeEntry(path)
         if path == "test_results.table.json":
             return FakeEntry(path)
-        if path == "media/images/8f65e54dc684f7675aec.png":
+        if path.startswith("media/images") and path.endswith(".png"):
             return FakeEntry(path)
         if path == "weird_table.table.json":
             return FakeEntry(path)
