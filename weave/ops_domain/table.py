@@ -252,6 +252,16 @@ def _in_place_join_in_linked_tables(
     column_types: wandb_util.Weave0TypeJson,
     file: artifact_fs.FilesystemArtifactFile,
 ) -> typing.Tuple[list[dict], types.TypedDict]:
+    """
+    This function will join in any peer linked tables. This is done by replacing
+    the column with the source table's index (or key) with the peer table's row.
+    This is done in place, and the object type is updated to reflect the new
+    column types.
+
+    Note: We are currently doing this "eagerly". However, it is reasonable to
+    assume that once we can read table types quickly, we can differ this
+    calculate in the form of a ref.
+    """
     type_map = column_types["params"]["type_map"]
     for column_name, column_type in type_map.items():
         if (
