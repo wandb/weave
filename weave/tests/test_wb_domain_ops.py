@@ -33,7 +33,7 @@ def test_root_project_runs(fake_wandb):
     concat_node = runs_0_id.add(runs_1_iid).add(runs_2_name)
     fake_wandb.add_mock(
         lambda query, ndx: {
-            "project": {
+            "project_518fa79465d8ffaeb91015dce87e092f": {
                 "id": 1,
                 "name": "mendeleev",
                 "entity": {
@@ -77,7 +77,7 @@ def test_root_project_runs(fake_wandb):
         # this could in theory change in the future.
         """
         query WeavePythonCG { 
-            project(name: "mendeleev", entityName: "stacey") {
+            project_518fa79465d8ffaeb91015dce87e092f: project(name: "mendeleev", entityName: "stacey") {
                 id
                 name
                 entity {
@@ -111,7 +111,7 @@ def test_root_project_concat(fake_wandb):
     runs_node_2 = ops.project("stacey", "mendeleev").filteredRuns("{}", "-createdAt")
     fake_wandb.add_mock(
         lambda query, ndx: {
-            "project": {
+            "project_518fa79465d8ffaeb91015dce87e092f": {
                 **fwb.project_payload,
                 "runs_6e908597bd3152c2f0457f6283da76b9": {
                     "edges": [
@@ -138,7 +138,7 @@ def test_root_project_concat(fake_wandb):
         # Note: the inner project/entity query is because it is part of the required fragment for runs
         # this could in theory change in the future.
         """query WeavePythonCG {
-            project(name: "mendeleev", entityName: "stacey") {
+            project_518fa79465d8ffaeb91015dce87e092f: project(name: "mendeleev", entityName: "stacey") {
                 id
                 name
                 entity {
@@ -176,7 +176,7 @@ def test_all_projects(fake_wandb):
     fake_wandb.add_mock(
         lambda query, ndx: {
             "instance": {
-                "projects": {
+                "projects_500": {
                     "edges": [
                         {
                             "node": {
@@ -207,7 +207,7 @@ def test_all_projects(fake_wandb):
         # this could in theory change in the future.
         """query WeavePythonCG {
             instance {
-                projects(limit: 500) {
+                projects_500: projects(limit: 500) {
                     edges {
                         node {
                             id
@@ -246,7 +246,7 @@ def test_rpt_op(fake_wandb):
     data = rpt_op("stacey")["rows"]["user_fraction"]
     fake_wandb.add_mock(
         lambda query, ndx: {
-            "repoInsightsPlotData_4e9f072efe8654dcd5ec36dc20f77486": {
+            "repoInsightsPlotData_541e3882f7cccacef0f697358bac12e3": {
                 "edges": [
                     {"node": {"row": [0.5, "US", 1674068711.643377, "pytorch"]}},
                     {"node": {"row": [0.75, "CA", 1674068711.643377, "pytorch"]}},
@@ -271,7 +271,7 @@ def test_rpt_op(fake_wandb):
         # Note: the inner project/entity query is because it is part of the required fragment for runs
         # this could in theory change in the future.
         """query WeavePythonCG {
-            repoInsightsPlotData_4e9f072efe8654dcd5ec36dc20f77486: repoInsightsPlotData(
+            repoInsightsPlotData_541e3882f7cccacef0f697358bac12e3: repoInsightsPlotData(
                 plotName: "weekly_users_by_country_by_repo"
                 repoName: "stacey"
                 first: 100000
@@ -285,4 +285,127 @@ def test_rpt_op(fake_wandb):
                 isNormalizedUserCount
             }
         }""",
+    )
+
+
+def test_mutli_root_merging(fake_wandb):
+    fake_wandb.add_mock(
+        lambda query, ndx: {
+            "project_8d1592567720841659de23c02c97d594": {
+                **fwb.project_payload,
+                "name": "p_0",
+                "createdAt": "2020-01-01T00:00:00.000+00:00",
+            },
+            "project_3c237e5b25fed9a705b21513dd7921c6": {
+                **fwb.project_payload,
+                "name": "p_1",
+                "runs_21303e3890a1b6580998e6aa8a345859": {
+                    "edges": [
+                        {
+                            "node": {
+                                **fwb.run_payload,
+                            }
+                        }
+                    ]
+                },
+            },
+            "instance": {
+                "projects_500": {
+                    "edges": [
+                        {
+                            "node": {
+                                **fwb.project_payload,
+                                "name": "p_0",
+                                "createdAt": "2021-01-01T00:00:00.000+00:00",
+                            }
+                        },
+                        {
+                            "node": {
+                                **fwb.project_payload,
+                                "name": "p_1",
+                                "createdAt": "2022-01-01T00:00:00.000+00:00",
+                            }
+                        },
+                    ]
+                }
+            },
+        }
+    )
+    p_0_a = ops.project("e_0", "p_0")
+    p_0_b = ops.project("e_0", "p_0")
+    p_1_a = ops.project("e_1", "p_1")
+
+    p_0_name = p_0_a.name()
+    p_0_ca = p_0_b.createdAt().toNumber()
+    p_1_a_runs = p_1_a.runs().count()
+
+    r_p_a = ops.project_ops.root_all_projects()
+    r_p_b = ops.project_ops.root_all_projects()
+    r_p_a_name = r_p_a.name()
+    r_p_b_ca = r_p_b.createdAt().toNumber()
+
+    assert weave.use([p_0_name, p_0_ca, p_1_a_runs, r_p_a_name, r_p_b_ca]) == [
+        "p_0",
+        1577836800,
+        1,
+        ["p_0", "p_1"],
+        [1609459200, 1640995200],
+    ]
+
+    log = fake_wandb.execute_log()
+    assert len(log) == 1
+    assert_gql_str_equal(
+        log[0]["gql"],
+        """
+        query WeavePythonCG{
+            project_8d1592567720841659de23c02c97d594:project(name:"p_0" entityName:"e_0"){
+                id 
+                name 
+                entity{
+                    id 
+                    name
+                }
+                createdAt
+            }
+            project_3c237e5b25fed9a705b21513dd7921c6:project(name:"p_1" entityName:"e_1"){
+                id 
+                name 
+                entity{
+                    id 
+                    name
+                }
+                runs_21303e3890a1b6580998e6aa8a345859:runs(first:50){
+                    edges{
+                        node{
+                            id 
+                            name 
+                            project{
+                                id 
+                                name 
+                                entity{
+                                    id 
+                                    name
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            instance{
+                projects_500:projects(limit:500){
+                    edges{
+                        node{
+                            id 
+                            name 
+                            entity{
+                                id 
+                                name
+                            }
+                            createdAt
+                        }
+                    }
+                }
+            }
+        }
+        """,
     )

@@ -115,8 +115,7 @@ def gql_direct_edge_op(
         param_str = ""
         if param_str_fn:
             param_str = param_str_fn(inputs)
-            if not is_root:
-                alias = f"{_make_alias(param_str, prefix=prop_name)}:"
+            alias = f"{_make_alias(param_str, prefix=prop_name)}:"
             param_str = f"({param_str})"
         return f"""
             {alias} {prop_name}{param_str} {{
@@ -143,8 +142,7 @@ def gql_direct_edge_op(
             name = prop_name
             if param_str_fn:
                 param_str = param_str_fn(InputProvider(additional_inputs))
-                if not is_root:
-                    name = _make_alias(param_str, prefix=prop_name)
+                name = _make_alias(param_str, prefix=prop_name)
             if is_many:
                 return [
                     output_type.instance_class.from_gql(item)

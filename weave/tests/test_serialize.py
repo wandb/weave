@@ -13,7 +13,7 @@ import weave
 from . import fixture_fakewandb as fwb
 
 response = {
-    "project": {
+    "project_518fa79465d8ffaeb91015dce87e092f": {
         **fwb.project_payload,  # type: ignore
         "artifact_deb0808078813ae7a9f36b68caf5bedc": fwb.artifactVersion_payload,
     }

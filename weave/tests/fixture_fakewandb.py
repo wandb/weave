@@ -152,7 +152,8 @@ class FakeClient:
                 # print(res)
                 return res
         raise Exception(
-            "Query was not mocked - please fill out in fixture_fakewandb.py"
+            "Query was not mocked - please fill out in fixture_fakewandb.py",
+            gql.loc.source.body,
         )
 
 

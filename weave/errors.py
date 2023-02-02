@@ -89,6 +89,10 @@ class WeaveGQLCompileError(WeaveBaseError):
     pass
 
 
+class WeaveGQLExecuteMissingAliasError(WeaveBaseError):
+    pass
+
+
 class WeaveAccessDeniedError(WeaveBaseError):
     pass
 

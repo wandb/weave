@@ -4,6 +4,7 @@ from . import graph
 from . import weave_types as types
 from . import stitch
 from . import registry_mem
+from . import errors
 from dataclasses import dataclass, field
 import graphql
 
@@ -58,35 +59,58 @@ def apply_domain_op_gql_translation(leaf_nodes: list[graph.Node]) -> list[graph.
         return leaf_nodes
     p = stitch.stitch(leaf_nodes)
 
+    query_str_const_node = graph.ConstNode(types.String(), "")
+    alias_list_const_node = graph.ConstNode(types.List(types.String()), [])
+    query_root_node = graph.OutputNode(
+        types.Dict(types.String(), types.TypedDict({})),
+        "gqlroot-wbgqlquery",
+        {
+            "query_str": query_str_const_node,
+            "alias_list": alias_list_const_node,
+        },
+    )
+    fragments = []
+    aliases = []
+
     def _replace_with_merged_gql(node: graph.Node) -> graph.Node:
         if not _is_root_node(node):
             return node
         node = typing.cast(graph.OutputNode, node)
-        query_fragment = _get_fragment(node, p)
-        query_str = f"query WeavePythonCG {{ {query_fragment} }}"
-        query_str = _normalize_query_str(query_str)
+        inner_fragment = _get_fragment(node, p)
+        fragments.append(inner_fragment)
+        alias = _get_outermost_alias(inner_fragment)
+        aliases.append(alias)
+        result_selection = graph.OutputNode(
+            types.TypedDict({}),
+            "typedDict-pick",
+            {
+                "obj": query_root_node,
+                "key": graph.ConstNode(types.String(), alias),
+            },
+        )
         custom_resolver = _custom_root_resolver(node)
-        output_type = _get_plugin_output_type(node)
-        if custom_resolver is None:
+        if custom_resolver is not None:
+            return custom_resolver(result_selection, **node.from_op.inputs)
+        else:
+            output_type = _get_plugin_output_type(node)
             return graph.OutputNode(
                 output_type,
-                "gqlroot-wbgqlquery",
+                "gqlroot-querytoobj",
                 {
-                    "query_str": graph.ConstNode(types.String(), query_str),
+                    "result_dict": result_selection,
                     "output_type": graph.ConstNode(types.TypeType(), output_type),
                 },
             )
-        else:
-            raw_result_node = graph.OutputNode(
-                node.type,
-                "gqlroot-wbgqlquery_custom",
-                {
-                    "query_str": graph.ConstNode(types.String(), query_str),
-                },
-            )
-            return custom_resolver(raw_result_node, **node.from_op.inputs)
 
-    return graph.map_nodes_full(leaf_nodes, _replace_with_merged_gql)
+    res = graph.map_nodes_full(leaf_nodes, _replace_with_merged_gql)
+
+    combined_query_fragment = "\n".join(fragments)
+    query_str_const_node.val = _normalize_query_str(
+        f"query WeavePythonCG {{ {combined_query_fragment} }}"
+    )
+    alias_list_const_node.val = aliases
+
+    return res
 
 
 ### Everything below are helpers for the above function ###
@@ -279,6 +303,21 @@ def _normalize_query_str(query_str: str) -> str:
     return graphql.utilities.strip_ignored_characters(
         graphql.language.print_ast(gql_doc)
     )
+
+
+def _get_outermost_alias(query_str: str) -> str:
+    gql_doc = graphql.language.parse(f"query innerquery {{ {query_str} }}")
+    root_operation = gql_doc.definitions[0]
+    if not isinstance(root_operation, graphql.language.ast.OperationDefinitionNode):
+        raise errors.WeaveInternalError("Only operation definitions are supported.")
+    if len(root_operation.selection_set.selections) != 1:
+        raise errors.WeaveInternalError("Only one root selection is supported")
+    inner_selection = root_operation.selection_set.selections[0]
+    if not isinstance(inner_selection, graphql.language.ast.FieldNode):
+        raise errors.WeaveInternalError("Only field selections are supported")
+    if inner_selection.alias is not None:
+        return inner_selection.alias.value
+    return inner_selection.name.value
 
 
 def _is_root_node(node: graph.Node) -> bool:
