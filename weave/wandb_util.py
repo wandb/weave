@@ -136,10 +136,8 @@ def _convert_type(old_type: Weave0TypeJson) -> types.Type:
     elif old_type_name == "primaryKey" or old_type_name == "wandb.TablePrimaryKey":
         return types.String()
     elif old_type_name == "foreignKey" or old_type_name == "wandb.TableForeignKey":
-        # TODO: Handle this correctly and bring in the peer table data
         return types.String()
     elif old_type_name == "foreignIndex" or old_type_name == "wandb.TableForeignIndex":
-        # TODO: Handle this correctly and bring in the peer table data
         return types.Number()
     #
     # Legacy Fallback Types

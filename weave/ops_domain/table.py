@@ -180,8 +180,8 @@ def _infer_type_from_col_list(row: list) -> types.Type:
 def _infer_type_from_row_dicts(rows: list[dict]) -> types.TypedDict:
     if len(rows) == 0:
         return types.TypedDict({})
-    running_type: types.TypedDict = _infer_type_from_row_dict(rows[0])
-    for row in rows[1:]:
+    running_type: types.Type = types.UnknownType()
+    for row in rows:
         running_type = types.merge_types(running_type, _infer_type_from_row_dict(row))
     if not isinstance(running_type, types.TypedDict):
         raise errors.WeaveInternalError(
