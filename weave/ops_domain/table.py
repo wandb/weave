@@ -177,14 +177,22 @@ def _infer_type_from_col_list(row: list) -> types.Type:
     return running_type
 
 
-def _infer_type_from_row_dicts(rows: list[dict]) -> types.Type:
-    running_type: types.Type = types.UnknownType()
-    for row in rows:
+def _infer_type_from_row_dicts(rows: list[dict]) -> types.TypedDict:
+    if len(rows) == 0:
+        return types.TypedDict({})
+    running_type: types.TypedDict = _infer_type_from_row_dict(rows[0])
+    for row in rows[1:]:
         running_type = types.merge_types(running_type, _infer_type_from_row_dict(row))
+    if not isinstance(running_type, types.TypedDict):
+        raise errors.WeaveInternalError(
+            f"Expected running_type to be a TypedDict, but got {running_type}"
+        )
     return running_type
 
 
-def _get_rows_and_object_type_from_legacy_format(data: dict) -> tuple[list, types.Type]:
+def _get_rows_and_object_type_from_legacy_format(
+    data: dict,
+) -> tuple[list, types.TypedDict]:
     # W&B dataframe columns are ints, we always want strings
     data["columns"] = [str(c) for c in data["columns"]]
     rows = [dict(zip(data["columns"], row)) for row in data["data"]]
@@ -192,9 +200,96 @@ def _get_rows_and_object_type_from_legacy_format(data: dict) -> tuple[list, type
     return rows, object_type
 
 
+@dataclasses.dataclass
+class PeerTableReader:
+    """
+    Provides a simple interface for reading rows from a peer table. Peer tables
+    can be read via index - which is straight forward. Peer tables can be read
+    via a column key - which we want to return the first row which matches this
+    value (think of it like a join but just getting the first value.) We can
+    optimize this by saving the reverse index map while reading and only read
+    the necessary rows. This means we will only visit each "cell" in the table
+    at most 1 time.
+    """
+
+    peer_rows: list[dict]
+    peer_object_type: types.TypedDict
+    lookup_map: dict[str, dict[str, int]] = dataclasses.field(default_factory=dict)
+    scan_loc: dict[str, int] = dataclasses.field(default_factory=dict)
+
+    def row_at_index(self, index: int) -> dict:
+        return self.peer_rows[index]
+
+    def row_at_key(self, column: str, key: str) -> typing.Optional[dict]:
+        # First, we create a default index map for this column if it doesn't
+        # exist.
+        if column not in self.lookup_map:
+            self.lookup_map[column] = {}
+            self.scan_loc[column] = 0
+        index_map = self.lookup_map[column]
+
+        # If we have already seen this key, we can just return the row
+        if key in index_map:
+            return self.peer_rows[index_map[key]]
+
+        # Otherwise, we scan the table until we find the key
+        # creating a reverse index map as we go. This allows
+        # us to break early, and continue the scan later if needed.
+        while self.scan_loc[column] < len(self.peer_rows):
+            curr_row = self.peer_rows[self.scan_loc[column]]
+            cell_val = curr_row[column]
+            if cell_val not in index_map:
+                index_map[cell_val] = self.scan_loc[column]
+            if cell_val == key:
+                return curr_row
+            self.scan_loc[column] += 1
+        return None
+
+
+def _in_place_join_in_linked_tables(
+    rows: list[dict],
+    object_type: types.TypedDict,
+    column_types: wandb_util.Weave0TypeJson,
+    file: artifact_fs.FilesystemArtifactFile,
+) -> typing.Tuple[list[dict], types.TypedDict]:
+    type_map = column_types["params"]["type_map"]
+    for column_name, column_type in type_map.items():
+        if (
+            column_type["wb_type"] == "wandb.TableForeignIndex"
+            or column_type["wb_type"] == "wandb.TableForeignKey"
+        ):
+            peer_file = file.artifact.path_info(column_type["params"]["table"])
+            if peer_file is None or isinstance(
+                peer_file, artifact_fs.FilesystemArtifactDir
+            ):
+                raise errors.WeaveInternalError("Peer file is None or a directory")
+            with peer_file.open() as f:
+                tracer = engine_trace.tracer()
+                with tracer.trace("peer_table:jsonload"):
+                    peer_data = json.load(f)
+            peer_rows, peer_object_type = _get_rows_and_object_type_from_weave_format(
+                peer_data, peer_file
+            )
+            peer_reader = PeerTableReader(peer_rows, peer_object_type)
+
+            # Update the row values
+            for row in rows:
+                if column_type["wb_type"] == "wandb.TableForeignIndex":
+                    row[column_name] = peer_reader.row_at_index(row[column_name])
+                else:
+                    row[column_name] = peer_reader.row_at_key(
+                        column_type["params"]["col_name"], row[column_name]
+                    )
+
+            # update the object type
+            object_type.property_types[column_name] = peer_object_type
+
+    return rows, object_type
+
+
 def _get_rows_and_object_type_from_weave_format(
     data: typing.Any, file: artifact_fs.FilesystemArtifactFile
-) -> tuple[list, types.Type]:
+) -> tuple[list, types.TypedDict]:
     rows = []
     artifact = file.artifact
     if not isinstance(artifact, artifact_wandb.WandbArtifact):
@@ -244,6 +339,11 @@ def _get_rows_and_object_type_from_weave_format(
         for col_name, val in zip(data["columns"], data_row):
             row[str(col_name)] = val
         rows.append(row)
+
+    rows, object_type = _in_place_join_in_linked_tables(
+        rows, object_type, column_types, file
+    )
+
     return rows, object_type
 
 
