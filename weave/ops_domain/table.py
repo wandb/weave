@@ -243,12 +243,32 @@ def _get_rows_and_object_type_from_weave_format(
         row: dict[str, typing.Any] = {}
         for col_name, val in zip(data["columns"], data_row):
             if isinstance(val, dict) and "_type" in val and "path" in val:
-                type_cls = types.type_name_to_type(val["_type"])
-                if type_cls is not None and type_cls.instance_class is not None:
-                    art_file = file.artifact.path_info(val["path"])
-                    val = type_cls.instance_class(
-                        art_file, **{k: v for k, v in val.items() if k != "_type"}
+                file_path = val["path"]
+                art_file = file.artifact.path_info(file_path)
+                if not isinstance(art_file, artifact_fs.FilesystemArtifactFile):
+                    raise errors.WeaveArtifactMediaFileLookupError(
+                        f"Expected artifact entry at path {file_path} to be `FilesystemArtifactFile`, found {type(art_file)}"
                     )
+                if val["_type"] == "image-file":
+                    val = wbmedia.ImageArtifactFileRef(
+                        _artifact_file=art_file,
+                        path=file_path,
+                        format=val["format"],
+                        height=val["height"],
+                        width=val["width"],
+                        sha256=val["sha256"],
+                    )
+                elif val["_type"] in [
+                    "audio-file",
+                    "bokeh-file",
+                    "video-file",
+                    "object3D-file",
+                    "molecule-file",
+                    "html-file",
+                ]:
+                    type_cls = types.type_name_to_type(val["_type"])
+                    if type_cls is not None and type_cls.instance_class is not None:
+                        val = type_cls.instance_class(art_file, file_path)
             row[str(col_name)] = val
         rows.append(row)
     return rows, object_type
