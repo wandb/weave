@@ -15,6 +15,11 @@ def weave0_type_json_to_weave1_type(old_type_json: Weave0TypeJson) -> types.Type
     return _convert_type(old_type_json)
 
 
+primary_key_type_names = set(["primaryKey", "wandb.TablePrimaryKey"])
+foreign_key_type_names = set(["foreignKey", "wandb.TableForeignKey"])
+foreign_index_type_names = set(["foreignIndex", "wandb.TableForeignIndex"])
+
+
 # This should ideally match `mediaTable.ts` in Weave0.
 def _convert_type(old_type: Weave0TypeJson) -> types.Type:
     old_type_name = old_type["wb_type"]
@@ -133,11 +138,11 @@ def _convert_type(old_type: Weave0TypeJson) -> types.Type:
     elif old_type_name == "partitioned-table":
         # TODO: this is not implemented in mediaTable.ts, leaving it as a TODO for now
         pass
-    elif old_type_name == "primaryKey" or old_type_name == "wandb.TablePrimaryKey":
+    elif old_type_name in primary_key_type_names:
         return types.String()
-    elif old_type_name == "foreignKey" or old_type_name == "wandb.TableForeignKey":
+    elif old_type_name in foreign_key_type_names:
         return types.String()
-    elif old_type_name == "foreignIndex" or old_type_name == "wandb.TableForeignIndex":
+    elif old_type_name in foreign_index_type_names:
         return types.Number()
     #
     # Legacy Fallback Types
