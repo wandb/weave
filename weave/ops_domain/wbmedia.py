@@ -1,7 +1,6 @@
-# Implements backward compatibilty for existing W&B Media types.
+# Implements backward compatibility for existing W&B Media types.
 
 import contextlib
-import dataclasses
 import typing
 
 from ..artifact_wandb import WandbRunFilesProxyArtifact, get_wandb_read_client_artifact
@@ -16,84 +15,56 @@ from ..ops_primitives import markdown
 from . import table
 
 
-## This is an ArtifactRefii, that lets us get access to the ref
-# artifact/path during loading.
-
-
 @weave.type(__override_name="image-file")  # type: ignore
 class ImageArtifactFileRef:
-    _artifact_file: artifact_fs.FilesystemArtifactFile
+    artifact: artifact_fs.FilesystemArtifact
     path: str
     format: str
     height: int
     width: int
     sha256: str
 
-    @property
-    def artifact(self):
-        return self._artifact_file.artifact
-
 
 @weave.type(__override_name="audio-file")  # type: ignore
 class AudioArtifactFileRef:
-    _artifact_file: artifact_fs.FilesystemArtifactFile
+    artifact: artifact_fs.FilesystemArtifact
     path: str
-
-    @property
-    def artifact(self):
-        return self._artifact_file.artifact
 
 
 @weave.type(__override_name="bokeh-file")  # type: ignore
 class BokehArtifactFileRef:
-    _artifact_file: artifact_fs.FilesystemArtifactFile
+    artifact: artifact_fs.FilesystemArtifact
     path: str
-
-    @property
-    def artifact(self):
-        return self._artifact_file.artifact
 
 
 @weave.type(__override_name="video-file")  # type: ignore
 class VideoArtifactFileRef:
-    _artifact_file: artifact_fs.FilesystemArtifactFile
+    artifact: artifact_fs.FilesystemArtifact
     path: str
-
-    @property
-    def artifact(self):
-        return self._artifact_file.artifact
 
 
 @weave.type(__override_name="object3D-file")  # type: ignore
 class Object3DArtifactFileRef:
-    _artifact_file: artifact_fs.FilesystemArtifactFile
+    artifact: artifact_fs.FilesystemArtifact
     path: str
-
-    @property
-    def artifact(self):
-        return self._artifact_file.artifact
 
 
 @weave.type(__override_name="molecule-file")  # type: ignore
 class MoleculeArtifactFileRef:
-    _artifact_file: artifact_fs.FilesystemArtifactFile
+    artifact: artifact_fs.FilesystemArtifact
     path: str
 
-    @property
-    def artifact(self):
-        return self._artifact_file.artifact
 
-
-table_client_artifact_file_scheme = "wandb-client-artifact://"
-table_artifact_file_scheme = "wandb-artifact://"
+table_client_artifact_scheme = "wandb-client-artifact://"
+table_artifact_scheme = "wandb-artifact://"
 
 
 def _parse_artifact_path(path: str) -> typing.Tuple[str, str]:
     """Returns art_id, file_path. art_id might be client_id or seq:alias"""
-    if path.startswith(table_artifact_file_scheme):
-        path = path[len(table_artifact_file_scheme) :]
-    elif path.startswith(table_client_artifact_file_scheme):
-        path = path[len(table_client_artifact_file_scheme) :]
+    if path.startswith(table_artifact_scheme):
+        path = path[len(table_artifact_scheme) :]
+    elif path.startswith(table_client_artifact_scheme):
+        path = path[len(table_client_artifact_scheme) :]
     else:
         raise ValueError('unknown artifact path scheme: "%s"' % path)
     art_identifier, file_path = path.split("/", 1)
@@ -239,12 +210,8 @@ class JoinedTableRunFileRef:
 
 @weave.type(__override_name="html-file")  # type: ignore
 class HtmlArtifactFileRef:
-    _artifact_file: artifact_fs.FilesystemArtifactFile
+    artifact: artifact_fs.FilesystemArtifact
     path: str
-
-    @property
-    def artifact(self):
-        return self._artifact_file.artifact
 
 
 # This shows a pattern for how to convert an in memory object (Html)
@@ -261,12 +228,7 @@ def html_file(html: html.Html) -> HtmlArtifactFileRef:
     if path is None:
         raise errors.WeaveInternalError("storage save returned None path")
     file_path = path + ".html"
-    artifact_entry = ref.artifact.path_info(file_path)
-    if not isinstance(artifact_entry, artifact_fs.FilesystemArtifactFile):
-        raise errors.WeaveArtifactMediaFileLookupError(
-            f"Expected artifact entry at path {file_path} to be `FilesystemArtifactFile`, found {type(artifact_entry)}"
-        )
-    return HtmlArtifactFileRef(artifact_entry, file_path)
+    return HtmlArtifactFileRef(ref.artifact, file_path)
 
 
 # Yet another pattern for returning a file inside an artifact!
@@ -274,7 +236,7 @@ def html_file(html: html.Html) -> HtmlArtifactFileRef:
 # (with extension in the type).
 # TODO: merge all these patterns!!!!
 @weave.op(
-    output_type=artifact_fs.FilesystemArtifactFileType(
+    output_type=artifact_fs.FilesystemArtifactType(
         weave.types.Const(weave.types.String(), "md")  # type: ignore
     )
 )

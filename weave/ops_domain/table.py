@@ -244,14 +244,9 @@ def _get_rows_and_object_type_from_weave_format(
         for col_name, val in zip(data["columns"], data_row):
             if isinstance(val, dict) and "_type" in val and "path" in val:
                 file_path = val["path"]
-                art_file = file.artifact.path_info(file_path)
-                if not isinstance(art_file, artifact_fs.FilesystemArtifactFile):
-                    raise errors.WeaveArtifactMediaFileLookupError(
-                        f"Expected artifact entry at path {file_path} to be `FilesystemArtifactFile`, found {type(art_file)}"
-                    )
                 if val["_type"] == "image-file":
                     val = wbmedia.ImageArtifactFileRef(
-                        _artifact_file=art_file,
+                        artifact=file.artifact,
                         path=file_path,
                         format=val["format"],
                         height=val["height"],
@@ -268,7 +263,7 @@ def _get_rows_and_object_type_from_weave_format(
                 ]:
                     type_cls = types.type_name_to_type(val["_type"])
                     if type_cls is not None and type_cls.instance_class is not None:
-                        val = type_cls.instance_class(art_file, file_path)
+                        val = type_cls.instance_class(file.artifact, file_path)
             row[str(col_name)] = val
         rows.append(row)
     return rows, object_type
