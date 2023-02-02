@@ -594,7 +594,7 @@ class WeaveWBLoggedArtifactURI(uris.WeaveURI):
         query: dict[str, list[str]],
         fragment: str,
     ):
-
+        path = path.strip("/")
         spl_netloc = netloc.split(":")
         if len(spl_netloc) == 1:
             name = spl_netloc[0]
@@ -610,14 +610,18 @@ class WeaveWBLoggedArtifactURI(uris.WeaveURI):
         netloc = self.name
         if self.version:
             netloc += f":{self.version}"
-        return f"{self.SCHEME}://{netloc}{self.path or ''}"
+        path = self.path or ""
+        if path != "":
+            path = f"/{path}"
+        return f"{self.SCHEME}://{netloc}{path}"
 
     @property
     def wb_artifact_uri(self) -> WeaveWBArtifactURI:
         if self._weave_wb_artifact_uri is None:
-            self._weave_wb_artifact_uri, _ = get_wandb_read_client_artifact_uri(
-                self.name
-            )
+            art_id = self.name
+            if self.version:
+                art_id += f":{self.version}"
+            self._weave_wb_artifact_uri, _ = get_wandb_read_client_artifact_uri(art_id)
         return self._weave_wb_artifact_uri.with_path(self.path or "")
 
     @property
