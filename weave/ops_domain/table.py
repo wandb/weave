@@ -239,13 +239,50 @@ def _get_rows_and_object_type_from_weave_format(
             obj_prop_types[key] = col_type
     object_type = types.TypedDict(obj_prop_types)
 
-    # TODO: this will need to recursively convert dicts to Objects in some
-    # cases.
+    def _create_media_type_for_cell(cell: dict) -> typing.Any:
+        file_type = cell["_type"]
+        file_path = cell["path"]
+        if file_type == "image-file":
+            return wbmedia.ImageArtifactFileRef(
+                artifact=file.artifact,
+                path=file_path,
+                format=cell["format"],
+                height=cell["height"],
+                width=cell["width"],
+                sha256=cell.get("sha256", file_path),
+            )
+        elif file_type in [
+            "audio-file",
+            "bokeh-file",
+            "video-file",
+            "object3D-file",
+            "molecule-file",
+            "html-file",
+        ]:
+            type_cls = types.type_name_to_type(file_type)
+            if type_cls is not None and type_cls.instance_class is not None:
+                return type_cls.instance_class(file.artifact, file_path)
+        else:
+            raise errors.WeaveTableDeserializationError(
+                f"Unsupported media type {file_type}"
+            )
+
+    def _process_cell_value(cell: typing.Any) -> typing.Any:
+        if isinstance(cell, list):
+            cell = [_process_cell_value(c) for c in cell]
+        elif isinstance(cell, dict):
+            if "_type" in cell and "path" in cell:
+                cell = _create_media_type_for_cell(cell)
+            else:
+                cell = {k: _process_cell_value(v) for k, v in cell.items()}
+        return cell
+
     for data_row in row_data:
         row: dict[str, typing.Any] = {}
         for col_name, val in zip(data["columns"], data_row):
-            row[str(col_name)] = val
+            row[str(col_name)] = _process_cell_value(val)
         rows.append(row)
+
     return rows, object_type
 
 

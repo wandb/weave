@@ -1,8 +1,13 @@
-import os
+import json
 import typing
+
+from ..artifact_fs import FilesystemArtifactDir, FilesystemArtifactFile
+from ..ops_domain.wbmedia import ImageArtifactFileRef
 from ..api import op
 from .. import weave_types as types
 from .. import file_base
+from .. import engine_trace
+from .. import errors
 
 
 @op(name="dir-pathReturnType")
@@ -54,3 +59,47 @@ def file_path(file: file_base.File) -> str:
 @op(name="file-size")
 def file_size(file: file_base.File) -> int:
     return file.size()
+
+
+@op(name="file-media", output_type=lambda input_types: input_types["file"].wbObjectType)
+def file_media(file: FilesystemArtifactFile):
+    if file is None or isinstance(file, FilesystemArtifactDir):
+        raise errors.WeaveInternalError("File is None or a directory")
+    tracer = engine_trace.tracer()
+    with file.open() as f:
+        with tracer.trace("file_media:jsonload"):
+            data = json.load(f)
+    if "path" not in data or data["path"] is None:
+        raise errors.WeaveInternalError("Media File is missing path")
+    file_path = data["path"]
+    if file.path.endswith(".image-file.json"):
+        res = ImageArtifactFileRef(
+            artifact=file.artifact,
+            path=file_path,
+            format=data["format"],
+            height=data["height"],
+            width=data["width"],
+            sha256=file_path,  # TODO: This is not correct, but i don't think it is used.
+        )
+    elif any(
+        file.path.endswith(path_suffix)
+        for path_suffix in [
+            ".audio-file.json",
+            ".bokeh-file.json",
+            ".video-file.json",
+            ".object3D-file.json",
+            ".molecule-file.json",
+            ".html-file.json",
+        ]
+    ):
+        type_cls, _ = file_base.wb_object_type_from_path(file.path)
+        if type_cls.instance_class is None:
+            raise errors.WeaveInternalError(
+                f"op file-media: Media Type has not bound instance_class: {file.path}: {type_cls}"
+            )
+        res = type_cls.instance_class(file.artifact, file_path)
+    else:
+        raise errors.WeaveInternalError(
+            f"op file-media: Unknown media file type: {file.path}"
+        )
+    return res

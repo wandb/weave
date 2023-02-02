@@ -22,6 +22,8 @@ from . import weave_internal
 
 from .language_features.tagging import tag_store
 
+USE_PARALLEL_DOWNLOAD = True
+
 
 class DeriveOpHandler:
     """
@@ -251,7 +253,10 @@ class MappedDeriveOpHandler(DeriveOpHandler):
                         )
                     return res
 
-                res = list(ThreadPoolExecutor(max_workers=10).map(do_one, list_))
+                if USE_PARALLEL_DOWNLOAD:
+                    res = list(ThreadPoolExecutor(max_workers=10).map(do_one, list_))
+                else:
+                    res = list(map(do_one, list_))
 
                 # file-table needs to flow tags, but we lose them going across the
                 # thread boundary.
