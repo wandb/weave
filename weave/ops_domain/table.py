@@ -20,7 +20,9 @@ class TableType(types.ObjectType):
     name = "table"
 
     def property_types(self):
-        return {"_rows": ops_arrow.ArrowWeaveListType(types.TypedDict({}))}
+        return {
+            "_rows": ops_arrow.ArrowWeaveListType(types.TypedDict({})),
+        }
 
 
 @weave_class(weave_type=TableType)

@@ -264,16 +264,13 @@ class MappedDeriveOpHandler(DeriveOpHandler):
             if isinstance(orig_op.concrete_output_type, types.TypeType):
                 if not list_:
                     return types.List(types.NoneType())
-                return types.List(
-                    types.union(
-                        *[
-                            orig_op.resolve_fn(**{mapped_param_name: x, **new_inputs})
-                            if (not x == None or types.is_optional(first_arg.type))
-                            else types.NoneType()
-                            for x in list_
-                        ]
-                    )
-                )
+                types_to_merge = [
+                    orig_op.resolve_fn(**{mapped_param_name: x, **new_inputs})
+                    if (not x == None or types.is_optional(first_arg.type))
+                    else types.NoneType()
+                    for x in list_
+                ]
+                return types.List(types.union(*types_to_merge))
 
             # TODO: use the vectorization described here:
             # https://paper.dropbox.com/doc/Weave-Python-Weave0-Op-compatibility-workstream-kJ3XSDdgR96XwKPapHwPD

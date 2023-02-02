@@ -21,6 +21,7 @@ from .. import ops_arrow as arrow
 from ..ops_domain.wbmedia import TableClientArtifactFileRef
 import cProfile
 from ..language_features.tagging.tagged_value_type import TaggedValueType
+from ..ops_domain import table
 
 file_path_response = {
     "project_518fa79465d8ffaeb91015dce87e092f": {
@@ -364,7 +365,8 @@ def test_table_tags_row_first(fake_wandb):
 
 def test_workspace_table_type(fake_wandb):
     fake_wandb.add_mock(table_mock2)
-    cell_node = ops.project("stacey", "mendeleev").runs().summary()["table"].table()
+    summary_node = ops.project("stacey", "mendeleev").runs().summary()
+    cell_node = summary_node["table"].table()
     assert cell_node.type == TaggedValueType(
         types.TypedDict(property_types={"project": wdt.ProjectType}),
         types.List(
@@ -1110,7 +1112,10 @@ def test_run_history(fake_wandb):
                 "system/gpu.0.powerWatts": types.Number(),
                 "epoch": types.Number(),
                 "predictions_10K": types.union(
-                    types.NoneType(), TableClientArtifactFileRef.WeaveType()
+                    types.NoneType(),
+                    artifact_fs.FilesystemArtifactFileType(
+                        types.Const(types.String(), "json"), table.TableType()
+                    ),
                 ),
             }
         )
@@ -1147,7 +1152,9 @@ def test_run_history_as_of(fake_wandb):
             "_step": types.Number(),
             "_timestamp": types.Number(),
             "_runtime": types.Number(),
-            "predictions_10K": TableClientArtifactFileRef.WeaveType(),
+            "predictions_10K": artifact_fs.FilesystemArtifactFileType(
+                types.Const(types.String(), "json"), table.TableType()
+            ),
         }
     ).assign_type(node.type.value)
     assert weave.use(node).keys() == json.loads(example_history[9]).keys()

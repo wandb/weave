@@ -23,6 +23,8 @@ from . import weave_types as types
 from . import artifact_fs
 from . import artifact_util
 
+from urllib import parse
+
 
 # TODO: Get rid of this, we have the new wandb api service! But this
 # is still used in a couple places.
@@ -51,10 +53,11 @@ def wandb_run_dir():
 
 
 @memo.memo
-def get_wandb_read_client_artifact(art_id: str):
+def get_wandb_read_client_artifact_uri(art_id: str):
     """art_id may be client_id, seq:alias, or server_id"""
     # For joined or partioned tables it's unfortunately possible that
     # we need to exchange our client_id for a server_id.
+
     if len(art_id) == 128 and ":" not in art_id:
         query = wb_public.gql(
             """
@@ -178,7 +181,14 @@ def get_wandb_read_client_artifact(art_id: str):
         entity_name,
         project_name,
     )
-    return WandbArtifact(artifact_name, artifact_type_name, weave_art_uri)
+
+    return weave_art_uri, artifact_type_name
+
+
+def get_wandb_read_client_artifact(art_id: str) -> "WandbArtifact":
+    """art_id may be client_id, seq:alias, or server_id"""
+    weave_art_uri, artifact_type_name = get_wandb_read_client_artifact_uri(art_id)
+    return WandbArtifact(weave_art_uri.name, artifact_type_name, weave_art_uri)
 
 
 @contextlib.contextmanager
@@ -210,13 +220,18 @@ class WandbArtifactType(artifact_fs.FilesystemArtifactType):
 
 class WandbArtifact(artifact_fs.FilesystemArtifact):
     def __init__(
-        self, name, type=None, uri: typing.Optional["WeaveWBArtifactURI"] = None
+        self,
+        name,
+        type=None,
+        uri: typing.Optional[
+            typing.Union["WeaveWBArtifactURI", "WeaveWBLoggedArtifactURI"]
+        ] = None,
     ):
         from . import io_service
 
         self.sync_client = io_service.get_sync_client()
         self.name = name
-        self._read_artifact_uri = None
+        self._read_artifact_uri_or_client_uri = None
         self._read_artifact = None
         if not uri:
             self._writeable_artifact = wandb.Artifact(
@@ -225,8 +240,16 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         else:
             # load an existing artifact, this should be read only,
             # TODO: we could technically support writable artifacts by creating a new version?
-            self._read_artifact_uri = uri
+            self._read_artifact_uri_or_client_uri = uri
         self._local_path: dict[str, str] = {}
+
+    @property
+    def _read_artifact_uri(self) -> typing.Optional["WeaveWBArtifactURI"]:
+        if isinstance(self._read_artifact_uri_or_client_uri, WeaveWBLoggedArtifactURI):
+            self._read_artifact_uri_or_client_uri = (
+                self._read_artifact_uri_or_client_uri.wb_artifact_uri
+            )
+        return self._read_artifact_uri_or_client_uri
 
     @property
     def _ref(self) -> "WandbArtifactRef":
@@ -239,7 +262,7 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
 
     def _set_read_artifact_uri(self, uri):
         self._read_artifact = None
-        self._read_artifact_uri = uri
+        self._read_artifact_uri_or_client_uri = uri
 
     # TODO: still using wandb lib for this, but we should switch to the new
     # wandb api service
@@ -256,7 +279,10 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
 
     @property
     def is_saved(self) -> bool:
-        return self._read_artifact_uri is not None or self._read_artifact is not None
+        return (
+            self._read_artifact_uri_or_client_uri is not None
+            or self._read_artifact is not None
+        )
 
     @property
     def version(self):
@@ -275,13 +301,7 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         if not self.is_saved or not self._read_artifact_uri:
             raise errors.WeaveInternalError("cannot download of an unsaved artifact")
 
-        uri = WeaveWBArtifactURI(
-            self._read_artifact_uri.name,
-            self._read_artifact_uri.version,
-            self._read_artifact_uri.entity_name,
-            self._read_artifact_uri.project_name,
-            path=name,
-        )
+        uri = self._read_artifact_uri.with_path(name)
         fs_path = self.sync_client.ensure_file(uri)
         if fs_path is None:
             raise errors.WeaveInternalError("Path not in artifact")
@@ -293,10 +313,10 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         return super().size(path)
 
     @property
-    def uri_obj(self) -> "WeaveWBArtifactURI":
-        if not self.is_saved or not self._read_artifact_uri:
+    def uri_obj(self) -> typing.Union["WeaveWBArtifactURI", "WeaveWBLoggedArtifactURI"]:
+        if not self.is_saved or not self._read_artifact_uri_or_client_uri:
             raise errors.WeaveInternalError("cannot get uri of an unsaved artifact")
-        return self._read_artifact_uri
+        return self._read_artifact_uri_or_client_uri
 
     @contextlib.contextmanager
     def new_file(self, path, binary=False):
@@ -365,13 +385,7 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
             raise errors.WeaveInternalError(
                 'cannot get path info for unsaved artifact"'
             )
-        uri = WeaveWBArtifactURI(
-            self._read_artifact_uri.name,
-            self._read_artifact_uri.version,
-            self._read_artifact_uri.entity_name,
-            self._read_artifact_uri.project_name,
-            path=path,
-        )
+        uri = self._read_artifact_uri.with_path(path)
         manifest = self.sync_client.manifest(uri)
         if manifest is None:
             return None
@@ -479,7 +493,7 @@ class WandbArtifactRef(artifact_fs.FilesystemArtifactRef):
 
     @classmethod
     def from_uri(cls, uri: uris.WeaveURI) -> "WandbArtifactRef":
-        if not isinstance(uri, WeaveWBArtifactURI):
+        if not isinstance(uri, (WeaveWBArtifactURI, WeaveWBLoggedArtifactURI)):
             raise errors.WeaveInternalError(
                 f"Invalid URI class passed to WandbArtifactRef.from_uri: {type(uri)}"
             )
@@ -543,6 +557,90 @@ class WeaveWBArtifactURI(uris.WeaveURI):
         if self.extra:
             uri += f"#{'/'.join(self.extra)}"
         return uri
+
+    def with_path(self, path: str) -> "WeaveWBArtifactURI":
+        return WeaveWBArtifactURI(
+            self.name,
+            self.version,
+            self.entity_name,
+            self.project_name,
+            self.netloc,
+            path,
+            self.extra,
+        )
+
+    def to_ref(self) -> WandbArtifactRef:
+        return WandbArtifactRef.from_uri(self)
+
+
+@dataclasses.dataclass
+class WeaveWBLoggedArtifactURI(uris.WeaveURI):
+    SCHEME = "wandb-logged-artifact"
+    # wandb-logged-artifact://afdsjaksdjflkasjdf12341234hv12h3v4k12j3hv41kh4v1423k14v1k2j3hv1k2j3h4v1k23h4v:[version|latest]/path
+    #  scheme                                 name                                                              version      path
+    path: typing.Optional[str] = None
+
+    # private attrs
+    _weave_wb_artifact_uri: typing.Optional[WeaveWBArtifactURI] = None
+
+    @classmethod
+    def from_parsed_uri(
+        cls,
+        uri: str,
+        schema: str,
+        netloc: str,
+        path: str,
+        params: str,
+        query: dict[str, list[str]],
+        fragment: str,
+    ):
+
+        spl_netloc = netloc.split(":")
+        if len(spl_netloc) == 1:
+            name = spl_netloc[0]
+            version = None
+        elif len(spl_netloc) == 2:
+            name, version = spl_netloc
+        else:
+            raise errors.WeaveInvalidURIError(f"Invalid WB Client Artifact URI: {uri}")
+
+        return WeaveWBLoggedArtifactURI(name=name, version=version, path=path)
+
+    def __str__(self) -> str:
+        netloc = self.name
+        if self.version:
+            netloc += f":{self.version}"
+        return f"{self.SCHEME}://{netloc}{self.path or ''}"
+
+    @property
+    def wb_artifact_uri(self) -> WeaveWBArtifactURI:
+        if self._weave_wb_artifact_uri is None:
+            self._weave_wb_artifact_uri, _ = get_wandb_read_client_artifact_uri(
+                self.name
+            )
+        return self._weave_wb_artifact_uri.with_path(self.path or "")
+
+    @property
+    def entity_name(self) -> str:
+        return self.wb_artifact_uri.entity_name
+
+    @property
+    def project_name(self) -> str:
+        return self.wb_artifact_uri.project_name
+
+    def with_path(self, path: str) -> "WeaveWBLoggedArtifactURI":
+        return WeaveWBLoggedArtifactURI(
+            self.name,
+            self.version,
+            path,
+        )
+
+    @classmethod
+    def parse(cls, uri: str) -> "WeaveWBLoggedArtifactURI":
+        scheme, netloc, path, params, query_s, fragment = parse.urlparse(uri)
+        return cls.from_parsed_uri(
+            uri, scheme, netloc, path, params, parse.parse_qs(query_s), fragment
+        )
 
     def to_ref(self) -> WandbArtifactRef:
         return WandbArtifactRef.from_uri(self)
