@@ -198,7 +198,7 @@ def test_table_call(table_file_node, mock_response, fake_wandb):
     table_image0 = weave.use(table_image0_node)
     assert table_image0.height == 299
     assert table_image0.width == 299
-    assert table_image0._artifact_file.path == "media/images/6274b7484d7ed4b6ad1b.png"
+    assert table_image0.path.path == "media/images/6274b7484d7ed4b6ad1b.png"
 
     # artifactVersion is not currently callable on image node as a method.
     # TODO: fix
@@ -1119,24 +1119,23 @@ def test_run_history(fake_wandb):
 
 
 def run_history_as_of_mocker(q, ndx):
-    if ndx == 0:
-        return {
-            "project_518fa79465d8ffaeb91015dce87e092f": {
-                **fwb.project_payload,  # type: ignore
-                "runs_21303e3890a1b6580998e6aa8a345859": {
-                    "edges": [
-                        {
-                            "node": {
-                                **fwb.run_payload,  # type: ignore
-                                "history_d3d9446802a44259755d38e6d163e820": example_history[
-                                    9
-                                ],
-                            }
+    return {
+        "project_518fa79465d8ffaeb91015dce87e092f": {
+            **fwb.project_payload,  # type: ignore
+            "runs_21303e3890a1b6580998e6aa8a345859": {
+                "edges": [
+                    {
+                        "node": {
+                            **fwb.run_payload,  # type: ignore
+                            "history_d3d9446802a44259755d38e6d163e820": example_history[
+                                9
+                            ],
                         }
-                    ]
-                },
-            }
+                    }
+                ]
+            },
         }
+    }
 
 
 def test_run_history_as_of(fake_wandb):
