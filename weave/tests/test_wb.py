@@ -198,7 +198,7 @@ def test_table_call(table_file_node, mock_response, fake_wandb):
     table_image0 = weave.use(table_image0_node)
     assert table_image0.height == 299
     assert table_image0.width == 299
-    assert table_image0._artifact_file.path == "media/images/6274b7484d7ed4b6ad1b.png"
+    assert table_image0.path == "media/images/6274b7484d7ed4b6ad1b.png"
 
     # artifactVersion is not currently callable on image node as a method.
     # TODO: fix

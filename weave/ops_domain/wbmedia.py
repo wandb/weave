@@ -236,7 +236,7 @@ def html_file(html: html.Html) -> HtmlArtifactFileRef:
 # (with extension in the type).
 # TODO: merge all these patterns!!!!
 @weave.op(
-    output_type=artifact_fs.FilesystemArtifactType(
+    output_type=artifact_fs.FilesystemArtifactFileType(
         weave.types.Const(weave.types.String(), "md")  # type: ignore
     )
 )
