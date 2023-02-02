@@ -22,7 +22,7 @@ from . import weave_internal
 
 from .language_features.tagging import tag_store
 
-USE_PARALLEL_WORKERS = False
+USE_PARALLEL_DOWNLOAD = True
 
 
 class DeriveOpHandler:
@@ -253,7 +253,7 @@ class MappedDeriveOpHandler(DeriveOpHandler):
                         )
                     return res
 
-                if USE_PARALLEL_WORKERS:
+                if USE_PARALLEL_DOWNLOAD:
                     res = list(ThreadPoolExecutor(max_workers=10).map(do_one, list_))
                 else:
                     res = list(map(do_one, list_))
