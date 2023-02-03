@@ -226,8 +226,12 @@ def awl_2d_projection(
     inputColumnNames = list(set(inputColumnNames))
     source_column = arrow_as_array(table._arrow_data)
     data = table._arrow_data_asarray_no_tags()
+
+    def default_projection():
+        return np.array([[0, 0] for row in data])
+
     if len(inputColumnNames) == 0 or len(data) < 2:
-        np_projection = np.array([[0, 0] for row in data])
+        np_projection = default_projection()
     else:
         if inputCardinality == "single":
             path = _dict_utils.split_escaped_string(inputColumnNames[0])
@@ -239,6 +243,10 @@ def awl_2d_projection(
                 _awl_pick(data, _dict_utils.split_escaped_string(c))
                 for c in inputColumnNames
             ]
+            # Filter out null columns
+            column_data = [
+                col for col in column_data if not isinstance(col, pa.NullArray)
+            ]
             np_array_of_embeddings = np.array(column_data).T
         # If the selected data is not a 2D array, or if it has less than 2 columns, then
         # we can't perform a 2D projection. In this case, we just return a 2D array of
@@ -247,7 +255,7 @@ def awl_2d_projection(
             len(np_array_of_embeddings.shape) != 2
             or np_array_of_embeddings.shape[1] < 2
         ):
-            np_projection = np.array([[0, 0] for row in data])
+            np_projection = default_projection()
         else:
             np_array_of_embeddings = np.nan_to_num(np_array_of_embeddings, copy=False)
             np_projection = projection_utils.perform_2D_projection(
