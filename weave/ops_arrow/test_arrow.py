@@ -2598,3 +2598,11 @@ def test_map_column():
     # only see the innermost type
     assert res.object_type == types.Int()
     assert res.to_pylist_raw() == [6, 14]
+
+
+def test_encode_decode_list_of_dictionary_encoded_strings():
+    data = [["a", "b", "c"], ["b", "c"], ["a", "b", None], None, ["d"], []]
+    array = pa.array(data)
+    encoded = arrow.recursively_encode_pyarrow_strings_as_dictionaries(array)
+    result = arrow_type.safe_array_to_pylist(encoded)
+    assert result == data

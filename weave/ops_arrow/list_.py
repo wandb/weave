@@ -328,11 +328,13 @@ def recursively_encode_pyarrow_strings_as_dictionaries(array: pa.Array) -> pa.Ar
                 for field in array.type
             ],
             [field.name for field in array.type],
+            mask=pa.compute.invert(array.is_valid()),
         )
     elif pa.types.is_list(array.type):
         return pa.ListArray.from_arrays(
             array.offsets,
             recursively_encode_pyarrow_strings_as_dictionaries(array.flatten()),
+            mask=pa.compute.invert(array.is_valid()),
         )
     elif array.type == pa.string():
         return pc.dictionary_encode(array)

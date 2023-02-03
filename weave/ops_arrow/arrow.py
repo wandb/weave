@@ -37,7 +37,7 @@ def _safe_to_pylist_array(array: pa.Array) -> list:
                 f"Expected dictionary encoded string array, got {array.type}"
             )
 
-        return [dictionary[index] for index in indices]
+        return [dictionary[index] if index is not None else None for index in indices]
     elif pa.types.is_struct(array.type):
         field_names = [field.name for field in array.type]
         field_pylists = [
@@ -55,9 +55,21 @@ def _safe_to_pylist_array(array: pa.Array) -> list:
     elif pa.types.is_union(array.type):
         raise NotImplementedError("Dictionary encoding not yet supported for unions.")
     elif pa.types.is_list(array.type):
-        raise NotImplementedError(
-            "Lists of dictionary encoded strings not supported in arrow"
-        )
+        offsets = array.offsets.to_pylist()
+        flattened = array.flatten()
+        coerced = _safe_to_pylist_array(flattened)
+        mask = pa.compute.invert(array.is_valid()).to_pylist()
+
+        # now put the array back in the proper shape as a list
+        unflattened: list[typing.Optional[list]] = []
+        for i, mask_val in enumerate(mask):
+            if mask_val:
+                unflattened.append(None)
+            else:
+                sl = slice(offsets[i], offsets[i + 1])
+                unflattened.append(coerced[sl])
+        return unflattened
+
     return array.to_pylist()
 
 
