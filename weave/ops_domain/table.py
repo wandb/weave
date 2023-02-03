@@ -193,16 +193,6 @@ def _infer_type_from_row_dicts(rows: list[dict]) -> types.TypedDict:
     return running_type
 
 
-def _get_rows_and_object_type_from_legacy_format(
-    data: dict,
-) -> tuple[list, types.TypedDict]:
-    # W&B dataframe columns are ints, we always want strings
-    data["columns"] = [str(c) for c in data["columns"]]
-    rows = [dict(zip(data["columns"], row)) for row in data["data"]]
-    object_type = _infer_type_from_row_dicts(_sample_rows(rows))
-    return rows, object_type
-
-
 @dataclasses.dataclass
 class PeerTableReader:
     """
@@ -301,6 +291,55 @@ def _in_place_join_in_linked_tables(
     return rows, object_type
 
 
+def _transform_rows_into_media_objects(
+    row_data: list[dict], file: artifact_fs.FilesystemArtifactFile
+) -> list[dict]:
+    def _create_media_type_for_cell(cell: dict) -> typing.Any:
+        file_type = cell["_type"]
+        file_path = cell["path"]
+        if file_type == "image-file":
+            return wbmedia.ImageArtifactFileRef(
+                artifact=file.artifact,
+                path=file_path,
+                format=cell["format"],
+                height=cell["height"],
+                width=cell["width"],
+                sha256=cell.get("sha256", file_path),
+            )
+        elif file_type in [
+            "audio-file",
+            "bokeh-file",
+            "video-file",
+            "object3D-file",
+            "molecule-file",
+            "html-file",
+        ]:
+            type_cls = types.type_name_to_type(file_type)
+            if type_cls is not None and type_cls.instance_class is not None:
+                return type_cls.instance_class(file.artifact, file_path)
+        else:
+            raise errors.WeaveTableDeserializationError(
+                f"Unsupported media type {file_type}"
+            )
+
+    def _process_cell_value(cell: typing.Any) -> typing.Any:
+        if isinstance(cell, list):
+            cell = [_process_cell_value(c) for c in cell]
+        elif isinstance(cell, dict):
+            if "_type" in cell and "path" in cell:
+                cell = _create_media_type_for_cell(cell)
+            else:
+                cell = {k: _process_cell_value(v) for k, v in cell.items()}
+        return cell
+
+    rows: list[dict] = []
+    for data_row in row_data:
+        new_row = {k: _process_cell_value(v) for k, v in data_row.items()}
+        rows.append(new_row)
+
+    return rows
+
+
 def _get_rows_and_object_type_from_weave_format(
     data: typing.Any, file: artifact_fs.FilesystemArtifactFile
 ) -> tuple[list, types.TypedDict]:
@@ -346,53 +385,25 @@ def _get_rows_and_object_type_from_weave_format(
             obj_prop_types[key] = col_type
     object_type = types.TypedDict(obj_prop_types)
 
-    def _create_media_type_for_cell(cell: dict) -> typing.Any:
-        file_type = cell["_type"]
-        file_path = cell["path"]
-        if file_type == "image-file":
-            return wbmedia.ImageArtifactFileRef(
-                artifact=file.artifact,
-                path=file_path,
-                format=cell["format"],
-                height=cell["height"],
-                width=cell["width"],
-                sha256=cell.get("sha256", file_path),
-            )
-        elif file_type in [
-            "audio-file",
-            "bokeh-file",
-            "video-file",
-            "object3D-file",
-            "molecule-file",
-            "html-file",
-        ]:
-            type_cls = types.type_name_to_type(file_type)
-            if type_cls is not None and type_cls.instance_class is not None:
-                return type_cls.instance_class(file.artifact, file_path)
-        else:
-            raise errors.WeaveTableDeserializationError(
-                f"Unsupported media type {file_type}"
-            )
-
-    def _process_cell_value(cell: typing.Any) -> typing.Any:
-        if isinstance(cell, list):
-            cell = [_process_cell_value(c) for c in cell]
-        elif isinstance(cell, dict):
-            if "_type" in cell and "path" in cell:
-                cell = _create_media_type_for_cell(cell)
-            else:
-                cell = {k: _process_cell_value(v) for k, v in cell.items()}
-        return cell
-
-    for data_row in row_data:
-        row: dict[str, typing.Any] = {}
-        for col_name, val in zip(data["columns"], data_row):
-            row[str(col_name)] = _process_cell_value(val)
-        rows.append(row)
+    raw_rows = [dict(zip(data["columns"], row)) for row in row_data]
+    rows = _transform_rows_into_media_objects(raw_rows, file)
 
     rows, object_type = _in_place_join_in_linked_tables(
         rows, object_type, column_types, file
     )
+
+    return rows, object_type
+
+
+def _get_rows_and_object_type_from_legacy_format(
+    data: dict, file: artifact_fs.FilesystemArtifactFile
+) -> tuple[list, types.TypedDict]:
+    # W&B dataframe columns are ints, we always want strings
+    data["columns"] = [str(c) for c in data["columns"]]
+    raw_rows = [dict(zip(data["columns"], row)) for row in data["data"]]
+    object_type = _infer_type_from_row_dicts(_sample_rows(raw_rows))
+
+    rows = _transform_rows_into_media_objects(raw_rows, file)
 
     return rows, object_type
 
@@ -438,7 +449,7 @@ def _get_table_awl_from_file(
         if _data_is_weave_file_format(data):
             rows, object_type = _get_rows_and_object_type_from_weave_format(data, file)
         elif _data_is_legacy_run_file_format(data):
-            rows, object_type = _get_rows_and_object_type_from_legacy_format(data)
+            rows, object_type = _get_rows_and_object_type_from_legacy_format(data, file)
         else:
             raise errors.WeaveInternalError("Unknown table file format for data")
 
