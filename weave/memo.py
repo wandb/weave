@@ -1,10 +1,7 @@
-import inspect
 import typing
 
 import contextvars
 import contextlib
-
-from . import errors
 
 _memo_storage: contextvars.ContextVar[typing.Optional[dict]] = contextvars.ContextVar(
     "memo_storage", default=None

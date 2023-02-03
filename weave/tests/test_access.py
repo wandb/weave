@@ -1,8 +1,7 @@
 import pytest
-import os
 
 from .. import environment
-from .. import context_state
+from .. import wandb_api
 from .. import errors
 from .. import artifact_fs
 from .. import artifact_local
@@ -14,12 +13,12 @@ import weave
 def public_env():
     orig_is_public = environment.is_public
     environment.is_public = lambda: True
-    token = context_state._cache_namespace_token.set("test-user-id")
+    token = wandb_api.set_wandb_api_context("test-user-id", None, None, None)
     try:
         yield
     finally:
         environment.is_public = orig_is_public
-        context_state._cache_namespace_token.reset(token)
+        wandb_api.reset_wandb_api_context(token)
 
 
 def test_access_file(public_env):

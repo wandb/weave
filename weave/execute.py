@@ -7,6 +7,9 @@ import time
 import threading
 import typing
 
+# Configuration
+from . import wandb_api
+
 # Libraries
 from . import engine_trace
 from . import errors
@@ -129,26 +132,27 @@ def execute_nodes(nodes, no_cache=False):
             ),
         )
     )
-    with memo.memo_storage():
-        with tag_store.isolated_tagging_context():
-            # Compile can recursively call execute_nodes during the final
-            # refine phase. We are careful in compile to ensure that the nodes that
-            # it executes in its final phase are the same nodes (by reference equality)
-            # that it returns, because those nodes are we look up in the result
-            # graph to determine if we need to execute or not.
-            # The test_execute:test_we_dont_over_execute test will fail if this
-            # assumption is violated.
-            with forward_graph.node_result_store():
-                nodes = compile.compile(nodes)
-                fg = forward_graph.ForwardGraph()
-                fg.add_nodes(nodes)
+    with wandb_api.from_environment():
+        with memo.memo_storage():
+            with tag_store.isolated_tagging_context():
+                # Compile can recursively call execute_nodes during the final
+                # refine phase. We are careful in compile to ensure that the nodes that
+                # it executes in its final phase are the same nodes (by reference equality)
+                # that it returns, because those nodes are we look up in the result
+                # graph to determine if we need to execute or not.
+                # The test_execute:test_we_dont_over_execute test will fail if this
+                # assumption is violated.
+                with forward_graph.node_result_store():
+                    nodes = compile.compile(nodes)
+                    fg = forward_graph.ForwardGraph()
+                    fg.add_nodes(nodes)
 
-                with context.execution_client():
-                    stats = execute_forward(fg, no_cache=no_cache)
-                    summary = stats.summary()
-                    logging.info("Execution summary\n%s" % pprint.pformat(summary))
+                    with context.execution_client():
+                        stats = execute_forward(fg, no_cache=no_cache)
+                        summary = stats.summary()
+                        logging.info("Execution summary\n%s" % pprint.pformat(summary))
 
-                    res = [fg.get_result(n) for n in nodes]
+                        res = [fg.get_result(n) for n in nodes]
 
     top_level_stats = get_top_level_stats()
     if top_level_stats is not None:

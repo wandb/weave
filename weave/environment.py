@@ -5,7 +5,9 @@
 import enum
 import os
 import pathlib
+import typing
 from . import util
+from . import errors
 
 # There are currently two cache modes:
 # - full: cache all cacheable intermediate results
@@ -52,3 +54,17 @@ def weave_filesystem_dir() -> str:
     return os.environ.get("WEAVE_LOCAL_ARTIFACT_DIR") or os.path.join(
         "/tmp", "weave", "fs"
     )
+
+
+def weave_wandb_cookie() -> typing.Optional[str]:
+    cookie = os.environ.get("WEAVE_WANDB_COOKIE")
+    if cookie:
+        if is_public():
+            raise errors.WeaveConfigurationError(
+                "WEAVE_WANDB_COOKIE should not be set in public mode."
+            )
+        if os.path.exists(os.path.expanduser("~/.netrc")):
+            raise errors.WeaveConfigurationError(
+                "Please delete ~/.netrc while using WEAVE_WANDB_COOKIE to avoid using your credentials"
+            )
+    return cookie

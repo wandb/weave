@@ -47,32 +47,31 @@ class ArtifactMetadata(typing.TypedDict):
 @dataclasses.dataclass
 class ServerRequestContext:
     trace_context: typing.Optional[engine_trace.TraceContext]
-    wandb_api_context: wandb_api.WandbApiContext
-    filesystem_context: filesystem.FilesystemContext
+    wandb_api_context: typing.Optional[wandb_api.WandbApiContext]
 
     @classmethod
     def from_json(cls, json: typing.Any) -> "ServerRequestContext":
         trace_context = engine_trace.new_trace_context()
         if trace_context:
             trace_context.__setstate__(json["trace_context"])
-        return cls(
-            trace_context=trace_context,
-            wandb_api_context=wandb_api.WandbApiContext.from_json(
-                json["wandb_api_context"]
-            ),
-            filesystem_context=filesystem.FilesystemContext.from_json(
-                json["filesystem_context"]
-            ),
-        )
+        wandb_api_context = None
+        wandb_api_context_json = json.get("wandb_api_context")
+        if wandb_api_context_json:
+            wandb_api_context = wandb_api.WandbApiContext.from_json(
+                wandb_api_context_json
+            )
+        return cls(trace_context=trace_context, wandb_api_context=wandb_api_context)
 
     def to_json(self) -> typing.Any:
         trace_context = None
         if self.trace_context:
             trace_context = self.trace_context.__getstate__()
+        wandb_ctx = None
+        if self.wandb_api_context:
+            wandb_ctx = self.wandb_api_context.to_json()
         return {
             "trace_context": trace_context,
-            "wandb_api_context": self.wandb_api_context.to_json(),
-            "filesystem_context": self.filesystem_context.to_json(),
+            "wandb_api_context": wandb_ctx,
         }
 
 
@@ -161,7 +160,10 @@ class Server:
             running_tasks.discard(task)
             e = task.exception()
             if e is not None:
-                logging.error("WBArtifactManager crash: %s", traceback.format_exc())
+                logging.error(
+                    "WBArtifactManager crash: %s",
+                    traceback.format_exception(e.__class__, e, e.__traceback__),
+                )
 
         while True:
             req = await reader.readline()
@@ -185,10 +187,7 @@ class Server:
         try:
             tracer.context_provider.activate(server_req.context.trace_context)
             with wandb_api.wandb_api_context(server_req.context.wandb_api_context):
-                with filesystem.filesystem_context(
-                    server_req.context.filesystem_context
-                ):
-                    resp = await self.handle(server_req)
+                resp = await self.handle(server_req)
         except Exception as e:
             logging.error(
                 "WBArtifactManager request error: %s\n", traceback.format_exc()
@@ -306,16 +305,12 @@ class SyncClient:
         self.server = server
 
     def request(self, name: str, *args: typing.Any) -> typing.Any:
-        wb_settings = wandb_client_api.copy_thread_local_api_settings()
+        wb_ctx = wandb_api.get_wandb_api_context()
         cur_trace_context = tracer.current_trace_context()
         request = ServerRequest(
             name,
             args,
-            ServerRequestContext(
-                cur_trace_context,
-                wandb_api.WandbApiContext(**wb_settings),
-                filesystem.get_filesystem_context(),
-            ),
+            ServerRequestContext(cur_trace_context, wb_ctx),
         )
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
             sock.connect(self.server.socket_path)

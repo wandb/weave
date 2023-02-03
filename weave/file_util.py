@@ -2,16 +2,15 @@ import os
 import pathlib
 import typing
 
-from . import context_state
 from . import environment
-from . import errors
 from . import path_util
+from . import cache
 
 
 def get_allowed_dir() -> pathlib.Path:
     if not environment.is_public():
         return pathlib.Path("/")
-    cache_namespace = context_state._cache_namespace_token.get()
+    cache_namespace = cache.get_user_cache_key()
     if cache_namespace is None:
         raise ValueError("cache_namespace is None but is_public() is True")
     return pathlib.Path(environment.weave_data_dir()) / cache_namespace

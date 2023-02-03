@@ -9,10 +9,8 @@
 # Note: The above is not the case yet! We're in the middle of migrating
 # to this interface.
 
-import dataclasses
 import typing
 import contextlib
-import contextvars
 import os
 import aiofiles
 import aiofiles.os as aiofiles_os
@@ -23,45 +21,10 @@ from . import engine_trace
 from . import errors
 from . import util
 from . import environment
-from . import context_state
+from . import cache
 
 
 tracer = engine_trace.tracer()  # type: ignore
-
-
-@dataclasses.dataclass
-class FilesystemContext:
-    path: typing.Optional[str]
-
-    @classmethod
-    def from_json(cls, json: typing.Any) -> "FilesystemContext":
-        return cls(**json)
-
-    def to_json(self) -> typing.Any:
-        return dataclasses.asdict(self)
-
-
-_filesystem_context: contextvars.ContextVar[
-    typing.Optional[FilesystemContext]
-] = contextvars.ContextVar("_filesystem_context", default=None)
-
-
-@contextlib.contextmanager
-def filesystem_context(ctx: FilesystemContext) -> typing.Generator[None, None, None]:
-    token = _filesystem_context.set(ctx)
-    try:
-        yield
-    finally:
-        _filesystem_context.reset(token)
-
-
-def get_filesystem_context() -> FilesystemContext:
-    context = _filesystem_context.get()
-    if context is not None:
-        return context
-    # Default to cache namespace if no context is set.
-    cache_namespace = context_state._cache_namespace_token.get()
-    return FilesystemContext(cache_namespace)
 
 
 def is_subdir(path: str, root: str) -> bool:
@@ -71,9 +34,9 @@ def is_subdir(path: str, root: str) -> bool:
 
 
 def safe_path(path: str, root: str) -> str:
-    ctx = get_filesystem_context()
-    if ctx is not None and ctx.path is not None:
-        root = os.path.join(root, ctx.path)
+    cache_key = cache.get_user_cache_key()
+    if cache_key is not None:
+        root = os.path.join(root, cache_key)
     result = os.path.join(root, path)
     if not is_subdir(result, root):
         raise errors.WeaveAccessDeniedError(f"Path {path} is not allowed")

@@ -48,11 +48,6 @@ _analytics_enabled: contextvars.ContextVar[bool] = contextvars.ContextVar(
     "analytics_enabled", default=True
 )
 
-_cache_namespace_token: contextvars.ContextVar[
-    typing.Optional[str]
-] = contextvars.ContextVar("_cache_namespace_token", default=None)
-
-
 _weave_client: contextvars.ContextVar[
     typing.Optional[client_interface.ClientInterface]
 ] = contextvars.ContextVar("weave_client", default=None)
@@ -144,15 +139,6 @@ def analytics_disabled():
         yield
     finally:
         _analytics_enabled.reset(analytics_token)
-
-
-@contextlib.contextmanager
-def cache_namespace(token: str):
-    cache_token = _cache_namespace_token.set(token)
-    try:
-        yield
-    finally:
-        _cache_namespace_token.reset(cache_token)
 
 
 def analytics_enabled():

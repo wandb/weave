@@ -6,6 +6,8 @@ import random
 import typing
 
 from weave import context_state
+from weave import wandb_api
+from weave import util
 from .. import wandb_client_api
 from unittest import mock
 import shutil
@@ -209,9 +211,9 @@ class SetupResponse:
 
 
 def setup():
-    # set _cache_namespace_token to a random value so that
-    # tests don't share the same namespace (since it defaults to None)
-    token = context_state._cache_namespace_token.set(str(random.randint(0, 1000000)))
+    # Set user id to random string, its used as the cache namepsace and we want
+    # each test to use a fresh one.
+    token = wandb_api.set_wandb_api_context(util.rand_string_n(10), None, None, None)
     fake_api = FakeApi()
     fake_io_service_client = FakeIoServiceClient()
 
@@ -236,7 +238,7 @@ def setup():
 
 
 def teardown(setup_response: SetupResponse):
-    context_state._cache_namespace_token.reset(setup_response.token)
+    wandb_api.reset_wandb_api_context(setup_response.token)
     setup_response.fake_api.clear_execute_log()
     setup_response.fake_api.clear_mock_handlers()
     wandb_client_api.wandb_public_api = setup_response.old_wandb_api_wandb_public_api

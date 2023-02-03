@@ -2,6 +2,7 @@
 # as the core of a fast artifact downloader, or a safe multiplexed
 # file manager in the Weave server.
 
+import datetime
 import json
 import typing
 import base64
@@ -18,6 +19,7 @@ from . import filesystem
 from . import http
 from . import wandb_api
 from . import environment as weave_env
+from . import cache
 
 
 tracer = engine_trace.tracer()  # type: ignore
@@ -33,9 +35,9 @@ class WandbFileManagerAsync:
         self.fs = filesystem
         self.http = http
         self.wandb_api = wandb_api
-        # Note these are not currently cleaned up.
-        # TODO: fix
-        self._manifests: dict[str, typing.Optional[artifacts.ArtifactManifest]] = {}
+        self._manifests: cache.LruTimeWindowCache[
+            str, typing.Optional[artifacts.ArtifactManifest]
+        ] = cache.LruTimeWindowCache(datetime.timedelta(minutes=5))
 
     def manifest_path(self, uri: artifact_wandb.WeaveWBArtifactURI) -> str:
         return f"{uri.entity_name}/{uri.project_name}/{uri.name}/manifest-{uri.version}.json"
@@ -77,10 +79,11 @@ class WandbFileManagerAsync:
     ) -> typing.Optional[artifacts.ArtifactManifest]:
         with tracer.trace("wandb_file_manager.manifest") as span:
             manifest_path = self.manifest_path(art_uri)
-            if manifest_path in self._manifests:
-                return self._manifests[manifest_path]
+            manifest = self._manifests.get(manifest_path)
+            if not isinstance(manifest, cache.LruTimeWindowCache.NotFound):
+                return manifest
             manifest = await self._manifest(art_uri, manifest_path)
-            self._manifests[manifest_path] = manifest
+            self._manifests.set(manifest_path, manifest)
             return manifest
 
     def file_path(self, uri: artifact_wandb.WeaveWBArtifactURI, md5_hex: str) -> str:
@@ -130,10 +133,15 @@ class WandbFileManagerAsync:
                 md5_hex,
             )
             wandb_api_context = wandb_api.get_wandb_api_context()
+            headers = None
+            cookies = None
+            if wandb_api_context is not None:
+                headers = wandb_api_context.headers
+                cookies = wandb_api_context.cookies
             await self.http.download_file(
                 artifact_url,
                 file_path,
-                headers=wandb_api_context.headers,
-                cookies=wandb_api_context.cookies,
+                headers=headers,
+                cookies=cookies,
             )
             return file_path

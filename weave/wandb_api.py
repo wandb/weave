@@ -9,12 +9,14 @@ import gql
 import aiohttp
 import contextlib
 import contextvars
+import os
 
 from gql.transport.aiohttp import AIOHTTPTransport
 
 
 from . import engine_trace
 from . import environment as weave_env
+from . import wandb_client_api
 
 
 tracer = engine_trace.tracer()  # type: ignore
@@ -22,6 +24,7 @@ tracer = engine_trace.tracer()  # type: ignore
 
 @dataclasses.dataclass
 class WandbApiContext:
+    user_id: str
     api_key: typing.Optional[str] = None
     headers: typing.Optional[dict[str, str]] = None
     cookies: typing.Optional[dict[str, str]] = None
@@ -39,24 +42,63 @@ _wandb_api_context: contextvars.ContextVar[
 ] = contextvars.ContextVar("_weave_api_context", default=None)
 
 
+def set_wandb_api_context(
+    user_id: str,
+    api_key: typing.Optional[str],
+    headers: typing.Optional[dict],
+    cookies: typing.Optional[dict],
+) -> typing.Optional[contextvars.Token[typing.Optional[WandbApiContext]]]:
+    cur_ctx = get_wandb_api_context()
+    if cur_ctx:
+        # WANDB API context is only allowed to be set once per thread, since we
+        # need to use thread local storage to communicate the context to the wandb
+        # lib right now.
+        return None
+    wandb_client_api.set_wandb_thread_local_api_settings(api_key, cookies, headers)
+    return _wandb_api_context.set(WandbApiContext(user_id, api_key, headers, cookies))
+
+
+def reset_wandb_api_context(
+    token: typing.Optional[contextvars.Token[typing.Optional[WandbApiContext]]],
+) -> None:
+    if token is None:
+        return
+    wandb_client_api.reset_wandb_thread_local_api_settings()
+    _wandb_api_context.reset(token)
+
+
 @contextlib.contextmanager
-def wandb_api_context(ctx: WandbApiContext) -> typing.Generator[None, None, None]:
-    token = _wandb_api_context.set(ctx)
+def wandb_api_context(
+    ctx: typing.Optional[WandbApiContext],
+) -> typing.Generator[None, None, None]:
+    if ctx:
+        token = set_wandb_api_context(
+            ctx.user_id, ctx.api_key, ctx.headers, ctx.cookies
+        )
     try:
         yield
     finally:
-        _wandb_api_context.reset(token)
+        if ctx:
+            reset_wandb_api_context(token)
 
 
-def get_wandb_api_context() -> WandbApiContext:
-    context = _wandb_api_context.get()
-    if context is not None:
-        return context
-    return WandbApiContext(
-        api_key="",
-        headers={},
-        cookies={},
-    )
+def get_wandb_api_context() -> typing.Optional[WandbApiContext]:
+    return _wandb_api_context.get()
+
+
+@contextlib.contextmanager
+def from_environment() -> typing.Generator[None, None, None]:
+    cookie = weave_env.weave_wandb_cookie()
+    token = None
+    if cookie:
+        cookies = {"wandb": cookie}
+        headers = {"use-admin-privileges": "true", "x-origin": "https://app.wandb.test"}
+        token = set_wandb_api_context("admin", "<not_used>", headers, cookies)
+    try:
+        yield
+    finally:
+        if token:
+            reset_wandb_api_context(token)
 
 
 class WandbApiAsync:
@@ -67,6 +109,11 @@ class WandbApiAsync:
         self, query: graphql.DocumentNode, **kwargs: typing.Any
     ) -> typing.Any:
         wandb_context = get_wandb_api_context()
+        headers = None
+        cookies = None
+        if wandb_context is not None:
+            headers = wandb_context.headers
+            cookies = wandb_context.cookies
         url_base = weave_env.wandb_base_url()
         transport = AIOHTTPTransport(
             url=url_base + "/graphql",
@@ -74,8 +121,8 @@ class WandbApiAsync:
                 "connector": self.connector,
                 "connector_owner": False,
             },
-            headers=wandb_context.headers,
-            cookies=wandb_context.cookies,
+            headers=headers,
+            cookies=cookies,
         )
         # Warning: we do not use the recommended context manager pattern, because we're
         # using connector_owner to tell the session not to close our connection pool.

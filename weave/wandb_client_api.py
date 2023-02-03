@@ -3,17 +3,10 @@
 
 from wandb.apis import public
 from wandb.sdk.internal.internal_api import _thread_local_api_settings
-import os
 import typing
 
 
 def wandb_public_api() -> public.Api:
-    if "WEAVE_WANDB_COOKIE" in os.environ:
-        if os.path.exists(os.path.expanduser("~/.netrc")):
-            raise Exception("Please delete ~/.netrc to avoid using your credentials")
-        cookies = {"wandb": os.environ["WEAVE_WANDB_COOKIE"]}
-        headers = {"use-admin-privileges": "true", "x-origin": "https://app.wandb.test"}
-        set_wandb_thread_local_api_settings("<not_used>", cookies, headers)
     return public.Api(timeout=30)
 
 
@@ -40,15 +33,6 @@ class WandbThreadLocalApiSettings(typing.TypedDict):
     api_key: typing.Optional[str]
     cookies: typing.Optional[dict]
     headers: typing.Optional[dict]
-
-
-def copy_thread_local_api_settings() -> WandbThreadLocalApiSettings:
-    # Used for copying settings to sub-threads
-    return {
-        "api_key": _thread_local_api_settings.api_key,
-        "cookies": _thread_local_api_settings.cookies,
-        "headers": _thread_local_api_settings.headers,
-    }
 
 
 def reset_wandb_thread_local_api_settings() -> None:

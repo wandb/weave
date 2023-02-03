@@ -1,5 +1,5 @@
 import os
-from . import context_state
+from . import cache
 
 
 def local_artifact_dir() -> str:
@@ -9,7 +9,7 @@ def local_artifact_dir() -> str:
     d = os.environ.get("WEAVE_LOCAL_ARTIFACT_DIR") or os.path.join(
         "/tmp", "local-artifacts"
     )
-    cache_namespace = context_state._cache_namespace_token.get()
+    cache_namespace = cache.get_user_cache_key()
     if cache_namespace:
         d = os.path.join(d, cache_namespace)
     os.makedirs(d, exist_ok=True)
