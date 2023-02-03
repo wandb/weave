@@ -434,7 +434,6 @@ def _get_table_awl_from_file(
     tracer = engine_trace.tracer()
     rows: list = []
     object_type = None
-    logging.error(json.dumps(data))
     with tracer.trace("get_table:get_rows_and_object_type"):
         if _data_is_weave_file_format(data):
             rows, object_type = _get_rows_and_object_type_from_weave_format(data, file)
