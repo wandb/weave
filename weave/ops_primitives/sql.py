@@ -1,10 +1,12 @@
 import copy
 import math
 import sqlalchemy
-import typing
+import functools
 from sqlalchemy import orm
 
+
 from ..api import op, weave_class
+from .. import decorator_type
 from .. import weave_types as types
 from . import list_
 from . import graph
@@ -12,39 +14,22 @@ from . import graph
 from ..language_features.tagging import tagged_value_type
 
 
-class SqlConnectionType(types.Type):
-    name = "sqlconnection"
+@decorator_type.type("sqlconnection")
+class SqlConnection:
+    path: str
 
+    @functools.cached_property
+    def engine(self):
+        return sqlalchemy.create_engine(self.path)
 
-class SqlTableType(types.Type):
-    _base_type = types.List
-    name = "sqltable"
-
-    object_type: types.Type
-
-    def __init__(self, object_type=types.TypedDict({})):
-        self.object_type = object_type
-
-    def _to_dict(self):
-        return {"objectType": self.object_type.to_dict()}
-
-    @classmethod
-    def from_dict(cls, d):
-        return cls(types.TypeRegistry.type_from_dict(d["objectType"]))
-
-
-class SqlConnection(object):
-    def __init__(self, engine):
-        self.engine = engine
-        self.meta = sqlalchemy.MetaData()
-        self.meta.reflect(engine)
+    @functools.cached_property
+    def meta(self):
+        meta = sqlalchemy.MetaData()
+        meta.reflect(self.engine)
+        return meta
 
     def table(self, name):
-        return SqlTable(self, self.meta.tables[name])
-
-
-SqlConnectionType.instance_class = SqlConnection
-SqlConnectionType.instance_classes = SqlConnection
+        return SqlTable(self, name)
 
 
 def filter_fn_to_sql_filter(table, filter_fn_node):
@@ -95,18 +80,45 @@ def mapped_pick_output_type(input_types):
     return types.List(prop_type)
 
 
+class SqlTableType(types.ObjectType):
+    _base_type = types.List
+    name = "sqltable"
+
+    object_type: types.Type
+
+    def property_types(self):
+        return {
+            "conn": SqlConnection.WeaveType(),
+            "table_name": types.String(),
+        }
+
+    def __init__(self, object_type=types.TypedDict({})):
+        self.object_type = object_type
+
+    def _to_dict(self):
+        return {"objectType": self.object_type.to_dict()}
+
+    @classmethod
+    def from_dict(cls, d):
+        return cls(types.TypeRegistry.type_from_dict(d["objectType"]))
+
+
 @weave_class(weave_type=SqlTableType)
 class SqlTable:
     PAGE_SIZE = 100
 
-    def __init__(self, conn, table):
+    def __init__(self, conn, table_name):
         self.conn = conn
-        self.table = table
+        self.table_name = table_name
 
         # We always fetch results in pages of PAGE_SIZE, and store the results
         # here in _row_cache.
         self._row_cache = {}
         self._filter_fn = None
+
+    @functools.cached_property
+    def table(self):
+        return self.conn.meta.tables[self.table_name]
 
     def _to_list_table(self):
         self_list = []
@@ -115,7 +127,7 @@ class SqlTable:
         return self_list
 
     def copy(self):
-        new_obj = self.__class__(self.conn, self.table)
+        new_obj = self.__class__(self.conn, self.table_name)
         new_obj._filter_fn = copy.deepcopy(self._filter_fn)
         return new_obj
 
@@ -226,15 +238,15 @@ SqlTableType.instance_classes = SqlTable
 @op(
     name="local-sqlconnection",
     input_type={"path": types.String()},
-    output_type=SqlConnectionType(),
+    output_type=SqlConnection.WeaveType(),  # type: ignore
 )
 def local_sqlconnection(path):
-    return SqlConnection(sqlalchemy.create_engine(path))
+    return SqlConnection(path)
 
 
 @op(
     name="sqlconnection-tables",
-    input_type={"conn": SqlConnectionType()},
+    input_type={"conn": SqlConnection.WeaveType()},  # type: ignore
     output_type=types.TypedDict({}),
 )
 def sqlconnection_tables(conn):
@@ -275,7 +287,7 @@ def _table_to_type(table):
 
 @op(
     name="sqlconnection-tablesType",
-    input_type={"conn": SqlConnectionType()},
+    input_type={"conn": SqlConnection.WeaveType()},  # type: ignore
     output_type=types.TypeType(),
 )
 def sqlconnection_tables_type(conn):
@@ -287,7 +299,7 @@ def sqlconnection_tables_type(conn):
 
 @op(
     name="sqlconnection-refine_table",
-    input_type={"conn": SqlConnectionType(), "name": types.String()},
+    input_type={"conn": SqlConnection.WeaveType(), "name": types.String()},  # type: ignore
     output_type=types.TypeType(),
 )
 def refine_sqlconnection_table(conn, name):
@@ -299,7 +311,7 @@ def refine_sqlconnection_table(conn, name):
 
 @op(
     name="sqlconnection-table",
-    input_type={"conn": SqlConnectionType(), "name": types.String()},
+    input_type={"conn": SqlConnection.WeaveType(), "name": types.String()},  # type: ignore
     output_type=SqlTableType(types.TypedDict({})),
     refine_output_type=refine_sqlconnection_table,
 )

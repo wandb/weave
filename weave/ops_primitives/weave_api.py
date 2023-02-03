@@ -13,7 +13,6 @@ from .. import ref_base
 from .. import uris
 from .. import graph
 from .. import artifact_local
-from .. import artifact_util
 from .. import compile
 
 

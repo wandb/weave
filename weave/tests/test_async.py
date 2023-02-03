@@ -4,7 +4,6 @@ from .. import ops
 from .. import async_demo
 import pytest
 from .. import runs
-from .. import artifact_util
 
 
 def test_run_basic():

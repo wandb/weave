@@ -21,7 +21,7 @@ from . import file_util
 
 from . import weave_types as types
 from . import artifact_fs
-from . import artifact_util
+from . import filesystem
 
 from urllib import parse
 
@@ -34,9 +34,7 @@ def get_wandb_read_artifact(path: str):
 
 
 def wandb_artifact_dir():
-    # Make this a subdir of local_artifact_dir, since the server
-    # checks for local_artifact_dir to see if it should serve
-    d = os.path.join(artifact_util.local_artifact_dir(), "_wandb_artifacts")
+    d = os.path.join(filesystem.get_filesystem_dir(), "wandb_artifacts")
     os.makedirs(d, exist_ok=True)
     return d
 
@@ -271,7 +269,9 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         uri = self._read_artifact_uri.with_path(name)
         fs_path = self.sync_client.ensure_file(uri)
         if fs_path is None:
-            raise errors.WeaveInternalError("Path not in artifact")
+            # Important to raise FileNotFoundError here, FileSystemArtifactRef.type
+            # relies on this.
+            raise FileNotFoundError("Path not in artifact")
         return self.sync_client.fs.path(fs_path)
 
     def size(self, path: str) -> int:

@@ -12,7 +12,6 @@ from .. import panels
 from ..show import _show_params
 from ..ecosystem import openai
 from . import test_helpers
-from .. import artifact_util
 from rich import print
 
 

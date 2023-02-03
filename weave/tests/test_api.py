@@ -1,7 +1,6 @@
 import shutil
 
 from .. import api as weave
-from .. import artifact_util
 from ..show import _show_params
 
 

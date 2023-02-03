@@ -15,9 +15,15 @@ from . import errors
 
 from . import weave_types as types
 from . import artifact_fs
-from . import artifact_util
 from . import file_base
 from . import file_util
+from . import filesystem
+
+
+def local_artifact_dir() -> str:
+    d = os.path.join(filesystem.get_filesystem_dir(), "local-artifacts")
+    os.makedirs(d, exist_ok=True)
+    return d
 
 
 # From sdk/interface/artifacts.py
@@ -36,9 +42,7 @@ def md5_string(string: str) -> str:
 
 
 def local_artifact_exists(name: str, branch: str) -> bool:
-    return os.path.exists(
-        os.path.join(artifact_util.local_artifact_dir(), name, branch)
-    )
+    return os.path.exists(os.path.join(local_artifact_dir(), name, branch))
 
 
 class LocalArtifactType(artifact_fs.FilesystemArtifactType):
@@ -65,7 +69,7 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
             raise ValueError('Artifact name cannot contain "/" or "\\" or ".." or ":"')
         self.name = name
         self._version = version
-        self._root = os.path.join(artifact_util.local_artifact_dir(), name)
+        self._root = os.path.join(local_artifact_dir(), name)
         self._path_handlers: dict[str, typing.Any] = {}
         self._setup_dirs()
         self._existing_dirs = []
@@ -260,9 +264,7 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
 
         # Example of one of many races here
         # ensure tempdir root exists
-        tmpdir_root = pathlib.Path(
-            os.path.join(artifact_util.local_artifact_dir(), "tmp")
-        )
+        tmpdir_root = pathlib.Path(os.path.join(local_artifact_dir(), "tmp"))
         tmpdir_root.mkdir(exist_ok=True)
 
         link_name = os.path.join(self._root, branch)
@@ -314,9 +316,7 @@ class LocalArtifactRef(artifact_fs.FilesystemArtifactRef):
     artifact: LocalArtifact
 
     def versions(self) -> list[artifact_fs.FilesystemArtifactRef]:
-        artifact_path = os.path.join(
-            artifact_util.local_artifact_dir(), self.artifact.name
-        )
+        artifact_path = os.path.join(local_artifact_dir(), self.artifact.name)
         versions = []
         for version_name in os.listdir(artifact_path):
             if (

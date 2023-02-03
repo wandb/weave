@@ -18,7 +18,6 @@ from .. import storage
 from ..ops_primitives import Number
 from .. import api as weave
 from .. import ops
-from .. import artifact_util
 from .. import weave_types as types
 from .. import weave_internal
 from .. import context_state

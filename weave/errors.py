@@ -56,7 +56,7 @@ class WeaveDispatchError(WeaveBaseError):
     pass
 
 
-class WeaveMissingArtifactPathError(WeaveBaseError):
+class WeaveArtifactFileNotFound(WeaveBaseError):
     pass
 
 

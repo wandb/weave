@@ -40,7 +40,7 @@ class WandbFileManagerAsync:
         ] = cache.LruTimeWindowCache(datetime.timedelta(minutes=5))
 
     def manifest_path(self, uri: artifact_wandb.WeaveWBArtifactURI) -> str:
-        return f"{uri.entity_name}/{uri.project_name}/{uri.name}/manifest-{uri.version}.json"
+        return f"wandb_file_manager/{uri.entity_name}/{uri.project_name}/{uri.name}/manifest-{uri.version}.json"
 
     async def _manifest(
         self, art_uri: artifact_wandb.WeaveWBArtifactURI, manifest_path: str
@@ -96,7 +96,7 @@ class WandbFileManagerAsync:
             extension = "." + path_parts[1]
         else:
             extension = ""
-        return f"{uri.entity_name}/{uri.project_name}/{uri.name}/{md5_hex}{extension}"
+        return f"wandb_file_manager/{uri.entity_name}/{uri.project_name}/{uri.name}/{md5_hex}{extension}"
 
     async def ensure_file(
         self, art_uri: artifact_wandb.WeaveWBArtifactURI

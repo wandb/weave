@@ -1,7 +1,6 @@
 from .. import ops
 from .. import storage
 from .. import api as weave
-from .. import artifact_util
 from .. import weave_internal
 
 

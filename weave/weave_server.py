@@ -32,6 +32,7 @@ from weave import util
 from weave import engine_trace
 from weave import environment
 from weave import logs
+from weave import filesystem
 
 # PROFILE_DIR = "/tmp/weave/profile"
 PROFILE_DIR = None
@@ -73,8 +74,6 @@ from flask.logging import wsgi_errors_stream
 
 # Ensure these are imported and registered
 from weave import ops
-
-from .artifact_util import local_artifact_dir
 
 
 # NOTE: Fixes flask dev server's auto-reload capability, by forcing it to use
@@ -296,7 +295,7 @@ def send_local_file(path):
     abspath = "/" / pathlib.Path(
         path
     )  # add preceding slash as werkzeug strips this by default and it is reappended below in send_from_directory
-    local_artifacts_path = pathlib.Path(local_artifact_dir()).absolute()
+    local_artifacts_path = pathlib.Path(filesystem.get_filesystem_dir()).absolute()
     if local_artifacts_path not in list(abspath.parents):
         abort(403)
     return send_from_directory("/", path)

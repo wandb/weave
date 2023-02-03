@@ -14,7 +14,7 @@ from . import memo
 from . import file_util
 from . import weave_types as types
 from . import artifact_fs
-from . import artifact_util
+from . import filesystem
 
 if typing.TYPE_CHECKING:
     from wandb.apis.public import Run as WBRun
@@ -26,7 +26,7 @@ def get_wandb_read_run(path: str) -> "WBRun":
 
 
 def wandb_run_dir() -> str:
-    d = os.path.join(artifact_util.local_artifact_dir(), "_wandb_runs")
+    d = os.path.join(filesystem.get_filesystem_dir(), "_wandb_runs")
     os.makedirs(d, exist_ok=True)
     return d
 
@@ -36,7 +36,7 @@ def _isolated_download_and_atomic_mover(
     end_path: str,
 ) -> typing.Generator[typing.Tuple[str, typing.Callable[[str], None]], None, None]:
     rand_part = "".join(random.choice("0123456789ABCDEF") for _ in range(16))
-    tmp_dir = os.path.join(artifact_util.local_artifact_dir(), f"tmp_{rand_part}")
+    tmp_dir = os.path.join(wandb_run_dir(), f"tmp_{rand_part}")
     os.makedirs(tmp_dir, exist_ok=True)
 
     def mover(tmp_path: str) -> None:

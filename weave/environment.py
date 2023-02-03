@@ -34,12 +34,6 @@ def is_public() -> bool:
     return wandb_production()
 
 
-def weave_data_dir() -> pathlib.Path:
-    return pathlib.Path(
-        os.environ.get("WEAVE_LOCAL_ARTIFACT_DIR") or "/tmp/local-artifacts"
-    )
-
-
 def weave_server_url() -> str:
     return os.getenv("WEAVE_SERVER_URL", "")
 

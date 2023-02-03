@@ -7,7 +7,6 @@ from . import ref_base
 from . import artifact_mem
 from . import artifact_local
 from . import artifact_wandb
-from . import artifact_util
 from . import weave_types as types
 from . import mappers_python
 from . import box
@@ -118,7 +117,7 @@ get_ref = _get_ref
 def all_objects():
     result = []
     obj_paths = sorted(
-        pathlib.Path(artifact_util.local_artifact_dir()).iterdir(),
+        pathlib.Path(artifact_local.local_artifact_dir()).iterdir(),
         key=os.path.getctime,
     )
     for art_path in obj_paths:
@@ -132,7 +131,7 @@ def objects(
     of_type: types.Type, alias: str = "latest"
 ) -> typing.List[artifact_local.LocalArtifactRef]:
     result = []
-    for art_name in os.listdir(artifact_util.local_artifact_dir()):
+    for art_name in os.listdir(artifact_local.local_artifact_dir()):
         try:
             ref = artifact_local.get_local_version_ref(art_name, alias)
             if ref is not None:
@@ -172,6 +171,19 @@ def to_python(obj, wb_type=None):
     # TODO: need to revisit this as we start to use custom objects.
     mapper = mappers_python.map_to_python(wb_type, artifact_mem.MemArtifact())
     val = mapper.apply(obj)
+    # TODO: this should be a ConstNode!
+    return {"_type": wb_type.to_dict(), "_val": val}
+
+
+def to_hashable(obj):
+    wb_type = types.TypeRegistry.type_of(obj)
+    art = artifact_mem.MemArtifact()
+    mapper = mappers_python.map_to_python(wb_type, art)
+    val = mapper.apply(obj)
+    if art.ref_count() > 0:
+        raise errors.WeaveSerializeError(
+            "Cannot hash object that contains custom objects"
+        )
     # TODO: this should be a ConstNode!
     return {"_type": wb_type.to_dict(), "_val": val}
 

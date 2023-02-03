@@ -2,7 +2,6 @@ import os
 import typing
 
 from . import artifact_local
-from . import artifact_util
 from . import ref_base
 from . import weave_types as types
 from . import graph
@@ -18,7 +17,7 @@ def get_obj_creator(ref: ref_base.Ref) -> typing.Optional[runs.Run]:
     # backend = ref.backend.filter(type="Run", referenced=ref.artifact)
     # Extremely inefficient!
     # TODO
-    for art_name in os.listdir(artifact_util.local_artifact_dir()):
+    for art_name in os.listdir(artifact_local.local_artifact_dir()):
         if (
             art_name.startswith("run-")
             and not art_name.endswith("-output")
@@ -61,7 +60,7 @@ def get_obj_expr(obj):
 
 def used_by(ref, op_name: str) -> list[runs.Run]:
     users = []
-    for artifact_name in os.listdir(artifact_util.local_artifact_dir()):
+    for artifact_name in os.listdir(artifact_local.local_artifact_dir()):
         if artifact_name.startswith("run-") and not artifact_name.endswith("-output"):
             run = artifact_local.get_local_version(artifact_name, "latest")
             if run is None:

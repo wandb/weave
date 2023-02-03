@@ -1,6 +1,5 @@
 import shutil
 from .. import api as weave
-from .. import artifact_util
 
 
 def test_op_versioning():

@@ -3,6 +3,7 @@ import weakref
 
 from . import uris
 from . import box
+from . import weave_types as types
 
 # We store Refs here if we can't attach them directly to the object
 REFS: weakref.WeakValueDictionary[int, "Ref"] = weakref.WeakValueDictionary()
@@ -42,7 +43,7 @@ class Ref:
 
     @property
     def type(self) -> "types.Type":
-        raise NotImplemented
+        raise NotImplementedError
 
     @classmethod
     def from_str(cls, s: str) -> "Ref":
@@ -106,3 +107,6 @@ def deref(ref: Ref) -> typing.Any:
     if isinstance(ref, Ref):
         return ref.get()
     return ref
+
+
+types.RefType.instance_classes = Ref

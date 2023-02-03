@@ -1,5 +1,4 @@
 from .. import artifact_local
-from .. import artifact_util
 from .. import ref_util
 
 

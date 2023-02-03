@@ -274,8 +274,8 @@ def execute_forward_node(
         if not node.from_op.name.startswith("mapped") and (
             node.from_op.name.endswith("file-table")
             or node.from_op.name.endswith("file-joinedTable")
-            or node.from_op.name.endswith("artifactVersion-file")
-            or node.from_op.name.endswith("FilesystemArtifact-file")
+            # or node.from_op.name.endswith("artifactVersion-file")
+            # or node.from_op.name.endswith("FilesystemArtifact-file")
         ):
             # Always cache file-table for now. file-table converts from the W&B json
             # table format to the much faster Weave arrow format. Since Weave cache
@@ -391,11 +391,8 @@ def execute_forward_node(
             #    as the original ref rather than the new ref, which causes problems)
             if use_cache and not is_run_op(node.from_op):
                 logging.debug("Saving run")
-                try:
-                    run = TRACE_LOCAL.new_run(run_id, op_def.name)
-                    run.inputs = input_refs
-                    run.output = result
-                    run.save()
-                except errors.WeaveSerializeError:
-                    pass
+                run = TRACE_LOCAL.new_run(run_id, op_def.name)
+                run.inputs = input_refs
+                run.output = result
+                run.save()
     return {"cache_used": False, "already_executed": False}

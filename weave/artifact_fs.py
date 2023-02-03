@@ -139,7 +139,7 @@ class FilesystemArtifactRef(artifact_base.ArtifactRef):
         try:
             with self.artifact.open(f"{self.path}.type.json") as f:
                 type_json = json.load(f)
-        except (FileNotFoundError, KeyError):
+        except FileNotFoundError:
             return types.TypeRegistry.type_of(self.artifact.path_info(self.path))
         self._type = types.TypeRegistry.type_from_dict(type_json)
         return self._type
@@ -217,6 +217,12 @@ class FilesystemArtifactFileType(file_base.FileBaseType):
 class FilesystemArtifactFile(file_base.File):
     artifact: "FilesystemArtifact"
     path: str
+
+    # Providing a _ref property means that get_ref on this object will return the
+    # ref.
+    @property
+    def _ref(self) -> FilesystemArtifactRef:
+        return FilesystemArtifactRef(self.artifact, self.path, obj=self)
 
     @contextlib.contextmanager
     def open(self, mode: str = "r") -> typing.Generator[typing.IO, None, None]:

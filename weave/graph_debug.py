@@ -111,6 +111,9 @@ def node_expr_str_full(node: graph.Node) -> str:
     This function is a copy/modification of of node_expr_str.
     """
     if isinstance(node, graph.OutputNode):
+        if node.from_op.name == "gqlroot-wbgqlquery":
+            query_hash = "_query_"  # TODO: make a hash from the query for idenity
+            return f"{node.from_op.friendly_name}({query_hash})"
         param_names = list(node.from_op.inputs.keys())
         if all(
             [not isinstance(n, graph.OutputNode) for n in node.from_op.inputs.values()]

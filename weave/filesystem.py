@@ -33,10 +33,8 @@ def is_subdir(path: str, root: str) -> bool:
     return os.path.commonpath([path, root]) == root
 
 
-def safe_path(path: str, root: str) -> str:
-    cache_key = cache.get_user_cache_key()
-    if cache_key is not None:
-        root = os.path.join(root, cache_key)
+def safe_path(path: str) -> str:
+    root = get_filesystem_dir()
     result = os.path.join(root, path)
     if not is_subdir(result, root):
         raise errors.WeaveAccessDeniedError(f"Path {path} is not allowed")
@@ -44,11 +42,8 @@ def safe_path(path: str, root: str) -> str:
 
 
 class Filesystem:
-    def __init__(self, root: str) -> None:
-        self.root = root
-
     def path(self, path: str) -> str:
-        return safe_path(path, self.root)
+        return safe_path(path)
 
     def exists(self, path: str) -> bool:
         return os.path.exists(self.path(path))
@@ -80,11 +75,8 @@ class Filesystem:
 
 
 class FilesystemAsync:
-    def __init__(self, root: str) -> None:
-        self.root = root
-
     def path(self, path: str) -> str:
-        return safe_path(path, self.root)
+        return safe_path(path)
 
     async def exists(self, path: str) -> bool:
         return await aiofiles_os.path.exists(self.path(path))
@@ -154,8 +146,16 @@ class FilesystemAsync:
 
 
 def get_filesystem() -> Filesystem:
-    return Filesystem(environment.weave_filesystem_dir())
+    return Filesystem()
 
 
 def get_filesystem_async() -> FilesystemAsync:
-    return FilesystemAsync(environment.weave_filesystem_dir())
+    return FilesystemAsync()
+
+
+def get_filesystem_dir() -> str:
+    root = environment.weave_filesystem_dir()
+    cache_key = cache.get_user_cache_key()
+    if cache_key is None:
+        return root
+    return os.path.join(root, cache_key)
