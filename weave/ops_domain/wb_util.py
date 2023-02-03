@@ -89,7 +89,7 @@ def _process_run_dict_item_type(val):
                     types.String(), val["artifact_path"].split(".")[-1]
                 )
                 # extension_node = make_const_node(types.String(), extension)
-                return artifact_fs.FileSystemArtifactType(
+                return artifact_fs.FilesystemArtifactFileType(
                     extension, table.JoinedTableType()
                 )
             else:
