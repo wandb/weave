@@ -172,6 +172,20 @@ class List:
     def map(arr, mapFn):
         return execute_fast.fast_map_fn(arr, mapFn)
 
+    # TODO: This should be hidden!
+    @op(
+        name="_listmap",
+        input_type={
+            "arr": types.List(types.Any()),
+            "mapFn": lambda input_types: types.Function(
+                {"row": input_types["arr"].object_type}, types.Any()
+            ),
+        },
+        output_type=lambda input_types: types.List(input_types["mapFn"].output_type),
+    )
+    def _listmap(arr, mapFn):
+        return execute_fast.fast_map_fn(arr, mapFn)
+
     @op(
         name="mapEach",
         input_type={

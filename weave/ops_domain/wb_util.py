@@ -4,6 +4,8 @@ from .wbmedia import (
     JoinedTableRunFileRef,
 )
 from .. import weave_types as types
+from .. import decorator_type
+
 
 from . import table
 from .. import artifact_fs
@@ -24,6 +26,12 @@ class RunPath:
     run_name: str
 
 
+@decorator_type.type("histogram")
+class Histogram:
+    bins: list[float]
+    values: list[int]
+
+
 def filesystem_artifact_file_from_artifact_path(artifact_path: str):
     uri = WeaveWBLoggedArtifactURI.parse(artifact_path)
     artifact = WandbArtifact(uri=uri, name=uri.name)
@@ -39,6 +47,20 @@ def process_run_dict_obj(run_dict, run_path: typing.Optional[RunPath] = None):
 
 def _process_run_dict_item(val, run_path: typing.Optional[RunPath] = None):
     if isinstance(val, dict) and "_type" in val:
+        if val["_type"] == "histogram":
+            if "packedBins" in val:
+                bins = []
+                bin_min = val["packedBins"]["min"]
+                for i in range(val["packedBins"]["count"]):
+                    bins.append(bin_min)
+                    bin_min += val["packedBins"]["size"]
+                bins = val["packedBins"]
+            else:
+                bins = val["bins"]
+            return Histogram(
+                bins=bins,
+                values=val["values"],
+            )
         if val["_type"] == "table-file":
             if "artifact_path" in val:
                 return filesystem_artifact_file_from_artifact_path(val["artifact_path"])
@@ -74,15 +96,7 @@ def _process_run_dict_item_type(val):
     if isinstance(val, dict):
         type = val.get("_type")
         if type == "histogram":
-            # type_of below would return the same type, but short-circuiting
-            # it here is much cheaper.
-            # In the future, we can return a nicer custom Histogram type.
-            return types.TypedDict(
-                {
-                    "bins": types.List(types.Float()),
-                    "values": types.List(types.Int()),
-                }
-            )
+            return Histogram.WeaveType()
         if type == "joined-table":
             if "artifact_path" in val:
                 extension = types.Const(

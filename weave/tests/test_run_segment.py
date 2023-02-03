@@ -243,7 +243,7 @@ def test_vectorized_unnest_list_for_panelplot():
     )
 
     res = root_segment.metrics.map(fn_node)
-    mapped = api.use(res).to_pylist()
+    mapped = api.use(res).to_pylist_raw()
     metrics_arr = metrics._arrow_data.to_pylist()
     assert mapped == [
         {
@@ -366,12 +366,12 @@ def test_map_merge_cache_busting():
 
     assert result1._arrow_data != result2._arrow_data
     assert (
-        result1._arrow_data.type.get_field_index("metric0") != -1
-        and result2._arrow_data.type.get_field_index("metric0") == -1
+        result1._arrow_data.schema.get_field_index("metric0") != -1
+        and result2._arrow_data.schema.get_field_index("metric0") == -1
     )
     assert (
-        result1._arrow_data.type.get_field_index("metric1") == -1
-        and result2._arrow_data.type.get_field_index("metric1") != -1
+        result1._arrow_data.schema.get_field_index("metric1") == -1
+        and result2._arrow_data.schema.get_field_index("metric1") != -1
     )
 
 

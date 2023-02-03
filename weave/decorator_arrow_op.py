@@ -84,7 +84,7 @@ def _make_new_vector_output_type_callable(old_type_func: TypeCallable) -> TypeCa
 
         tag_propagated_output_type = _handle_arrow_tags(old_type, first_input_type)
 
-        if types.is_optional(first_input_type):
+        if types.is_optional(first_input_type.object_type):
             return _nullify_vector_type(tag_propagated_output_type)
         return tag_propagated_output_type
 

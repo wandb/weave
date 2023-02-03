@@ -50,7 +50,7 @@ OptionalAuthType = typing.Optional[
 logger = logging.getLogger("root")
 
 
-def _handle_request(request, deref=False):
+def handle_request(request, deref=False, serialize_fn=storage.to_python):
     start_time = time.time()
     tracer = engine_trace.tracer()
     # nodes = [graph.Node.node_from_json(n) for n in request["graphs"]]
@@ -70,23 +70,12 @@ def _handle_request(request, deref=False):
     #                                              time.time() - start_time, [n.from_op.name for n in nodes[:3]]))
 
     # Forces output to be untagged
-    with tracer.trace("request:to_python"):
+    with tracer.trace("serialize_response"):
         with isolated_tagging_context():
-            result = [storage.to_python(r) for r in result]
+            result = [serialize_fn(r) for r in result]
 
     logger.info("Server request done in: %ss" % (time.time() - start_time))
     return result
-
-
-def handle_request(request, deref=False):
-    if not PROFILE:
-        return _handle_request(request, deref=deref)
-    with cProfile.Profile() as pr:
-        try:
-            res = _handle_request(request, deref=deref)
-        finally:
-            pr.dump_stats("/tmp/weave/profile-%s" % time.time())
-    return res
 
 
 class SubprocessServer(multiprocessing.Process):

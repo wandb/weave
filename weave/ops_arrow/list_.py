@@ -8,6 +8,7 @@ import pyarrow as pa
 from pyarrow import compute as pc
 from collections import defaultdict
 import duckdb
+import enum
 
 py_type = type
 
@@ -21,7 +22,6 @@ from .. import mappers_arrow
 from .. import mappers_python_def
 from .. import artifact_mem
 from .. import op_def
-from .. import storage
 from .. import dispatch
 from .. import weave_internal
 from .. import weavify
@@ -314,7 +314,7 @@ def awl_group_by_result_object_type(
                 "groupKey": _key,
             }
         ),
-        types.List(object_type),
+        ArrowWeaveListType(object_type),
     )
 
 
@@ -378,6 +378,52 @@ def safe_pa_concat_arrays(arrays):
     return pa.concat_arrays(arrays)
 
 
+class SpecialPathItem(enum.Enum):
+    PATH_LIST_ITEMS = 0
+    PATH_TAGGED_TAG = 1
+    PATH_TAGGED_VALUE = 2
+
+
+PathType = tuple[typing.Union[str, SpecialPathItem], ...]
+
+
+def set_path(
+    v: typing.Any,
+    path: PathType,
+    value_fn: typing.Callable[[typing.Any, int], typing.Any],
+    offset: int = 0,
+):
+    # Helper function for convert arrow to python. Set the value at a path
+    # within the value v, using value_fn to get the new value.
+    # Path must be of length 1 or greater. Caller needs to handle the case
+    # where we want to set v itself (path is of length 0).
+    for i, el in enumerate(path[:-1]):
+        if isinstance(el, str):
+            v = v[el]
+        elif el == SpecialPathItem.PATH_TAGGED_TAG:
+            v = v["_tag"]
+        elif el == SpecialPathItem.PATH_TAGGED_VALUE:
+            v = v["_value"]
+        elif el == SpecialPathItem.PATH_LIST_ITEMS:
+            # its a list
+            for j, vi in enumerate(v):
+                set_path(vi, path[i + 1 :], value_fn, offset + j)
+            return
+        else:
+            raise ValueError(f"Unexpected path element: {el}")
+    if isinstance(path[-1], str):
+        v[path[-1]] = value_fn(v[path[-1]], offset)
+    elif el == SpecialPathItem.PATH_TAGGED_TAG:
+        v["_tag"] = value_fn(v["_tag"], offset)
+    elif el == SpecialPathItem.PATH_TAGGED_VALUE:
+        v["_value"] = value_fn(v["_value"], offset)
+    elif el == SpecialPathItem.PATH_LIST_ITEMS:
+        for j, vi in enumerate(v):
+            v[j] = value_fn(vi, offset + j)
+    else:
+        raise ValueError(f"Unexpected path element: {el}")
+
+
 @weave_class(weave_type=ArrowWeaveListType)
 class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
     _arrow_data: typing.Union[pa.Table, pa.ChunkedArray, pa.Array]
@@ -397,6 +443,165 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         self._artifact = artifact
         self._mapper = mappers_arrow.map_from_arrow(self.object_type, self._artifact)
         # TODO: construct mapper
+
+    def map_column(
+        self,
+        fn: typing.Callable[
+            ["ArrowWeaveList", PathType], typing.Optional["ArrowWeaveList"]
+        ],
+    ) -> "ArrowWeaveList":
+        return self._map_column(fn, ())
+
+    def _map_column(
+        self,
+        fn: typing.Callable[
+            ["ArrowWeaveList", PathType], typing.Optional["ArrowWeaveList"]
+        ],
+        path: PathType,
+    ) -> "ArrowWeaveList":
+        with_mapped_children = self
+        if isinstance(self.object_type, types.Const):
+            with_mapped_children = ArrowWeaveList(
+                self._arrow_data, self.object_type.val_type, self._artifact
+            )._map_column(fn, path)
+        elif isinstance(self.object_type, types.TypedDict):
+            arr = arrow.arrow_as_array(self._arrow_data)
+            properties: dict[str, ArrowWeaveList] = {
+                k: ArrowWeaveList(arr.field(k), v, self._artifact)._map_column(
+                    fn, path + (k,)
+                )
+                for k, v in self.object_type.property_types.items()
+            }
+            with_mapped_children = ArrowWeaveList(
+                pa.StructArray.from_arrays(
+                    [v._arrow_data for v in properties.values()],
+                    list(properties.keys()),
+                ),
+                types.TypedDict({k: v.object_type for k, v in properties.items()}),
+                self._artifact,
+            )
+        elif isinstance(self.object_type, types.ObjectType):
+            arr = arrow.arrow_as_array(self._arrow_data)
+            attrs: dict[str, ArrowWeaveList] = {
+                k: ArrowWeaveList(arr.field(k), v, self._artifact)._map_column(
+                    fn, path + (k,)
+                )
+                for k, v in self.object_type.property_types().items()
+            }
+            with_mapped_children = ArrowWeaveList(
+                pa.StructArray.from_arrays(
+                    [v._arrow_data for v in attrs.values()],
+                    list(attrs.keys()),
+                ),
+                self.object_type.__class__(
+                    **{k: attrs[k].object_type for k in self.object_type.type_attrs()}
+                ),
+                self._artifact,
+            )
+        elif isinstance(self.object_type, types.List):
+            items: ArrowWeaveList = ArrowWeaveList(
+                self._arrow_data.values, self.object_type.object_type, self._artifact
+            )._map_column(fn, path + (SpecialPathItem.PATH_LIST_ITEMS,))
+            with_mapped_children = ArrowWeaveList(
+                pa.ListArray.from_arrays(self._arrow_data.offsets, items._arrow_data),
+                types.List(items.object_type),
+                self._artifact,
+            )
+        elif isinstance(self.object_type, tagged_value_type.TaggedValueType):
+            arr = arrow.arrow_as_array(self._arrow_data)
+            tag: ArrowWeaveList = ArrowWeaveList(
+                self._arrow_data.field("_tag"), self.object_type.tag, self._artifact
+            )._map_column(fn, path + (SpecialPathItem.PATH_TAGGED_TAG,))
+            if not isinstance(tag.object_type, types.TypedDict):
+                raise errors.WeaveInternalError("Tag must be a TypedDict")
+            value: ArrowWeaveList = ArrowWeaveList(
+                self._arrow_data.field("_value"), self.object_type.value, self._artifact
+            )._map_column(fn, path + (SpecialPathItem.PATH_TAGGED_VALUE,))
+            with_mapped_children = ArrowWeaveList(
+                pa.StructArray.from_arrays(
+                    [tag._arrow_data, value._arrow_data],
+                    ["_tag", "_value"],
+                ),
+                tagged_value_type.TaggedValueType(tag.object_type, value.object_type),
+                self._artifact,
+            )
+        elif isinstance(self.object_type, types.UnionType):
+            non_none_members = [
+                m for m in self.object_type.members if not isinstance(m, types.NoneType)
+            ]
+            nullable = len(non_none_members) < len(self.object_type.members)
+            if len(non_none_members) > 1:
+                arr = arrow.arrow_as_array(self._arrow_data)
+                members: list[ArrowWeaveList] = [
+                    ArrowWeaveList(
+                        arr.field(i), member_type, self._artifact
+                    )._map_column(fn, path + (str(i),))
+                    for i, member_type in enumerate(non_none_members)
+                ]
+                new_type_members = [m.object_type for m in members]
+                if nullable:
+                    new_type_members.append(types.NoneType())
+                with_mapped_children = ArrowWeaveList(
+                    pa.UnionArray.from_dense(
+                        self._arrow_data.type_codes,
+                        self._arrow_data.offsets,
+                        [m._arrow_data for m in members],
+                    ),
+                    types.UnionType(*new_type_members),
+                    self._artifact,
+                )
+        mapped = fn(with_mapped_children, path)
+        if mapped is None:
+            mapped = with_mapped_children
+        return mapped
+
+    def separate_tags(
+        self,
+    ) -> typing.Tuple["ArrowWeaveList", dict[PathType, "ArrowWeaveList"]]:
+        tag_columns: dict[PathType, ArrowWeaveList] = {}
+
+        def _remove_tags(list: ArrowWeaveList, path: PathType) -> ArrowWeaveList:
+            if isinstance(list.object_type, tagged_value_type.TaggedValueType):
+                # We need to remove _value components in the case that we are inside
+                # tagged value here.
+                path = tuple(
+                    [e for e in path if e != SpecialPathItem.PATH_TAGGED_VALUE]
+                )
+                tag_columns[path] = ArrowWeaveList(
+                    list._arrow_data.field("_tag"), list.object_type.tag, list._artifact
+                )
+                return ArrowWeaveList(
+                    list._arrow_data.field("_value"),
+                    list.object_type.value,
+                    list._artifact,
+                )
+            return list
+
+        return self.map_column(_remove_tags), tag_columns
+
+    def without_tags(self) -> "ArrowWeaveList":
+        return self.separate_tags()[0]
+
+    def separate_dictionaries(
+        self,
+    ) -> typing.Tuple["ArrowWeaveList", dict[PathType, "ArrowWeaveList"]]:
+        dictionary_columns: dict[PathType, ArrowWeaveList] = {}
+
+        def _remove_dictionaries(
+            list: ArrowWeaveList, path: PathType
+        ) -> typing.Optional[ArrowWeaveList]:
+            if pa.types.is_dictionary(list._arrow_data.type):
+                dictionary_columns[path] = ArrowWeaveList(
+                    list._arrow_data.dictionary, list.object_type, list._artifact
+                )
+                return ArrowWeaveList(
+                    list._arrow_data.indices,
+                    types.Int(),
+                    list._artifact,
+                )
+            return None
+
+        return self.map_column(_remove_dictionaries), dictionary_columns
 
     def _arrow_data_asarray_no_tags(self) -> pa.Array:
         """Cast `self._arrow_data` as an array and recursively strip its tags."""
@@ -493,26 +698,85 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         return arrow_data
 
     def __array__(self, dtype=None):
+        # TODO: replace with to_pylist_tagged once refs are supported
         return np.asarray(arrow.safe_array_to_pylist(arrow_as_array(self._arrow_data)))
 
     def __iter__(self):
+        # TODO: replace with to_pylist_tagged once refs are supported, then we can
+        # get rid of a bunch of older functions
         for item in arrow.safe_array_to_pylist(arrow_as_array(self._arrow_data)):
             yield self._mapper.apply(item)
 
     def __repr__(self):
         return f"<ArrowWeaveList: {self.object_type}>"
 
-    def to_pylist_notags(self):
-        return arrow.safe_array_to_pylist(self._arrow_data_asarray_no_tags())
+    def to_pylist_raw(self):
+        """Used for testing, preserves _tag and _value fields"""
+        return self._to_pylist_dictsafe()
 
-    def to_pylist(self):
-        if isinstance(self, graph.Node):
-            return []
-        return arrow.safe_array_to_pylist(arrow_as_array(self._arrow_data))
+    def _to_pylist_dictsafe(self) -> "ArrowWeaveList":
+        value_awl, dict_columns = self.separate_dictionaries()
+        value_py = value_awl._arrow_data.to_pylist()
+
+        dict_columns = {p: c._arrow_data.to_pylist() for p, c in dict_columns.items()}
+
+        # Dictionary decode the value
+        if dict_columns:
+            for i, row in enumerate(value_py):
+                for path, dict_col in dict_columns.items():
+                    if not path:
+                        value_py[i] = dict_col[row]
+                    else:
+                        set_path(row, path, lambda v, j: dict_col[v])
+
+        return value_py
+
+    def to_pylist_notags(self) -> "ArrowWeaveList":
+        """Convert the ArrowWeaveList to a python list, stripping tags"""
+        value_awl, _ = self.separate_tags()
+        return value_awl._to_pylist_dictsafe()
+
+    def to_pylist_tagged(self):
+        """Convert the ArrowWeaveList to a python list, tagging objects correctly"""
+        # TODO: this does not undo refs. We should convert them to ref objects. Not needed
+        # for Weave0 compat
+
+        value_awl, tag_columns = self.separate_tags()
+
+        # Convert the tag columns to python, safely undoing the dictionary encoding
+        tag_py_columns: dict[PathType, list] = {
+            p: c._to_pylist_dictsafe() for p, c in tag_columns.items()
+        }
+
+        value_awl, dict_columns = value_awl.separate_dictionaries()
+        value_py = value_awl._arrow_data.to_pylist()
+
+        dict_columns = {p: c._arrow_data.to_pylist() for p, c in dict_columns.items()}
+
+        # Dictionary decode the value, and add the tags to the tag store,
+        # in a single pass.
+        if tag_py_columns or dict_columns:
+            for i, row in enumerate(value_py):
+                for path, tag_col in tag_py_columns.items():
+                    if not path:
+                        tag_store.add_tags(box.box(row), tag_col[i])
+                    else:
+                        set_path(
+                            row,
+                            path,
+                            lambda v, j: tag_store.add_tags(box.box(v), tag_col[i + j]),
+                        )
+                for path, dict_col in dict_columns.items():
+                    if not path:
+                        value_py[i] = dict_col[row]
+                    else:
+                        set_path(row, path, lambda v, j: dict_col[v])
+
+        return value_py
 
     @op(output_type=lambda input_types: types.List(input_types["self"].object_type))
     def to_py(self):
-        return list(self)
+        return self.to_pylist_tagged()
 
     def _count(self):
         return len(self._arrow_data)
@@ -524,6 +788,38 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
     def count(self) -> int:
         return self._count()
 
+    def replace_column(
+        self,
+        name: typing.Union[str, PathType],
+        fn: typing.Callable[["ArrowWeaveList"], "ArrowWeaveList"],
+    ):
+        replaced = {"v": False}
+
+        def _do_replace(
+            list: ArrowWeaveList, path: PathType
+        ) -> typing.Optional[ArrowWeaveList]:
+            if (
+                isinstance(name, tuple)
+                and path == name
+                or len(path) == 1
+                and path[0] == name
+            ):
+                replaced["v"] = True
+                return fn(list)
+            return None
+
+        res = self.map_column(_do_replace)
+        if not replaced["v"]:
+            raise ValueError("Column {} not found".format(name))
+        return res
+
+    def dictionary_encode(self) -> "ArrowWeaveList":
+        return ArrowWeaveList(
+            self._arrow_data.dictionary_encode(), self.object_type, self._artifact
+        )
+
+    # TODO: this is only used in one test. If we get rid of it, we can get rid
+    # of some mapper stuff too.
     def _get_col(self, name):
         if isinstance(self._arrow_data, pa.Table):
             col = self._arrow_data[name]
@@ -1004,7 +1300,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         offsets = np.cumsum(np.concatenate(([0], val_lengths)))
         grouped_results = pa.ListArray.from_arrays(offsets, values)
         grouped_awl = ArrowWeaveList(
-            grouped_results, types.List(self.object_type), self._artifact
+            grouped_results, ArrowWeaveListType(self.object_type), self._artifact
         )
 
         return awl_add_arrow_tags(
@@ -1046,9 +1342,13 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             return self
 
         list_cols = []
+        new_obj_prop_types = {}
         for k, v_type in self.object_type.property_types.items():
             if types.is_list_like(v_type):
                 list_cols.append(k)
+                new_obj_prop_types[k] = v_type.object_type
+            else:
+                new_obj_prop_types[k] = v_type
         if not list_cols:
             return self
 
@@ -1063,8 +1363,12 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         # todo: make this more efficient. we shouldn't have to convert back and forth
         # from the arrow in-memory representation to pandas just to call the explode
         # function. but there is no native pyarrow implementation of this
-        return pa.Table.from_pandas(
-            df=arrow_obj.to_pandas().explode(list_cols), preserve_index=False
+        return ArrowWeaveList(
+            pa.Table.from_pandas(
+                df=arrow_obj.to_pandas().explode(list_cols), preserve_index=False
+            ),
+            types.TypedDict(new_obj_prop_types),
+            self._artifact,
         )
 
 
@@ -1076,7 +1380,8 @@ def _apply_fn_node_with_tag_pushdown(
 
 
 def _apply_fn_node(awl: ArrowWeaveList, fn: graph.OutputNode) -> ArrowWeaveList:
-    called = _call_vectorized_fn_node_maybe_awl(awl, vectorize(fn))
+    vecced = vectorize(fn)
+    called = _call_vectorized_fn_node_maybe_awl(awl, vecced)
     return _call_and_ensure_awl(awl, called)
 
 
@@ -1229,7 +1534,7 @@ def concat(arr):
     if len(arr) == 0:
         return to_arrow([])
     elif len(arr) == 1:
-        return arr[0]
+        return pushdown_list_tags(arr[0])
 
     res = arr[0]
     res = typing.cast(ArrowWeaveList, res)
@@ -1313,13 +1618,23 @@ def _create_manually_mapped_op_singular(
     vectorized_key: str,
 ):
     op = registry_mem.memory_registry.get_op(op_name)
-    inputs = _vectorized_inputs_as_list(inputs, set([vectorized_key]))
+
+    # We want to keep our vectorized inputs as AWL, even though we're going to use
+    # listmap. Converting to python converts recursively, so if there are inner AWLs
+    # -- as is the case in the output of AWL.groupby() which is
+    # AWL<Tagged<..., AWL<...>> -- we want to keep those as AWLs. This way
+    # AWL.groupby().map(lambda x: x.groupby()) will correctly keep all of the data
+    # in arrow and use the arrow groupby for the inner call.
+
+    inputs = _vectorized_inputs_as_awl_non_vectorized_as_lists(
+        inputs, set([vectorized_key])
+    )
 
     rest_inputs = {k: v for k, v in inputs.items() if k != vectorized_key}
 
     input_arr = inputs[vectorized_key]
 
-    map_op = registry_mem.memory_registry.get_op("map")
+    map_op = registry_mem.memory_registry.get_op("_listmap")
     return map_op(
         input_arr,
         lambda row: op(**{vectorized_key: row}, **rest_inputs),
@@ -1433,7 +1748,7 @@ def _vectorize_lambda_output_node(node: graph.OutputNode, vectorized_keys: set[s
     return _create_manually_mapped_op_singular(
         node.from_op.name,
         node.from_op.inputs,
-        "arr",
+        next(iter(node.from_op.inputs)),
     )
 
 
@@ -2030,10 +2345,8 @@ def direct_add_arrow_tags(
         tag_names = [f.name for f in current_tags.type]
 
     for tag_field in arrow_tags.type:
-        if tag_field.name in tag_names:
-            existing_index = tag_names.index(tag_field.name)
-            tag_arrays[existing_index] = arrow_tags.field(tag_field.name)
-        else:
+        # Don't overwrite tags that already exist, we want to keep the innermost ones!
+        if tag_field.name not in tag_names:
             tag_arrays.append(arrow_tags.field(tag_field.name))
             tag_names.append(tag_field.name)
 

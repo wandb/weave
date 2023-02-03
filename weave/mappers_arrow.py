@@ -316,11 +316,13 @@ class DefaultFromArrow(mappers_python.DefaultFromPy):
 
 
 def map_to_arrow_(type, mapper, artifact: artifact_base.Artifact, path=[]):
+    from .ops_arrow import arrow
+
     if isinstance(type, types.Const):
         type = type.val_type
     if isinstance(type, types.TypedDict):
         return TypedDictToArrowStruct(type, mapper, artifact, path)
-    elif isinstance(type, types.List):
+    elif isinstance(type, types.List) or isinstance(type, arrow.ArrowWeaveListType):
         return ListToArrowArr(type, mapper, artifact, path)
     elif isinstance(type, types.UnionType):
         return UnionToArrowUnion(type, mapper, artifact, path)
@@ -349,9 +351,11 @@ def map_to_arrow_(type, mapper, artifact: artifact_base.Artifact, path=[]):
 
 
 def map_from_arrow_(type, mapper, artifact, path=[]):
+    from .ops_arrow import arrow
+
     if isinstance(type, types.TypedDict):
         return mappers_python.TypedDictToPyDict(type, mapper, artifact, path)
-    elif isinstance(type, types.List):
+    elif isinstance(type, (types.List, arrow.ArrowWeaveListType)):
         return mappers_python.ListToPyList(type, mapper, artifact, path)
     elif isinstance(type, types.UnionType):
         return ArrowUnionToUnion(type, mapper, artifact, path)
@@ -384,6 +388,11 @@ map_from_arrow = mappers.make_mapper(map_from_arrow_)
 
 
 def map_from_arrow_scalar(value: pa.Scalar, type_: types.Type, artifact):
+    from .ops_arrow import arrow, list_
+
+    if isinstance(type_, arrow.ArrowWeaveListType):
+        return list_.ArrowWeaveList(value.values, type_.object_type, artifact)
+
     if isinstance(type_, types.Const):
         return map_from_arrow_scalar(value, type_.val, artifact)
     if isinstance(

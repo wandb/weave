@@ -24,6 +24,7 @@ from flask_cors import CORS, cross_origin
 from flask import send_from_directory, send_file, jsonify
 
 from weave import server
+from weave import storage
 from weave import registry_mem
 from weave import errors
 from weave import weavejs_fixes
@@ -241,15 +242,20 @@ def execute():
     # import time
     # time.sleep(0.1)
 
+    execute_args = {
+        "request": request.json,
+        "deref": True,
+        "serialize_fn": storage.to_weavejs,
+    }
     if not PROFILE_DIR:
         start_time = time.time()
-        response = server.handle_request(request.json, deref=True)
+        response = server.handle_request(**execute_args)
         elapsed = time.time() - start_time
     else:
         # Profile the request and add a link to local snakeviz to the trace.
         profile = cProfile.Profile()
         start_time = time.time()
-        response = profile.runcall(server.handle_request, request.json, deref=True)
+        response = profile.runcall(server.handle_request, **execute_args)
         elapsed = time.time() - start_time
         profile_filename = f"/tmp/weave/profile/execute.{start_time*1000:.0f}.{elapsed*1000:.0f}ms.prof"
         profile.dump_stats(profile_filename)
@@ -260,20 +266,9 @@ def execute():
                 "http://localhost:8080/snakeviz/"
                 + urllib.parse.quote(profile_filename),
             )
+    fixed_response = [weavejs_fixes.fixup_data(r) for r in response]
 
-    # remove unions from the response
-    response = recursively_unwrap_unions(response)
-
-    # MAJOR HACKING HERE
-    # TODO: fix me
-    final_response = []
-    for r in response:
-        # final_response.append(n)
-        if isinstance(r, dict) and "_val" in r:
-            r = r["_val"]
-        final_response.append(weavejs_fixes.fixup_data(r))
-    # print("FINAL RESPONSE", final_response)
-    response = {"data": final_response}
+    response = {"data": fixed_response}
 
     if request.headers.get("x-weave-include-execution-time"):
         response["execution_time"] = (elapsed) * 1000

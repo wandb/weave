@@ -212,7 +212,7 @@ def test_custom_types():
     )
     assert weave.use(data_node[0]["im"].width_()) == 256
 
-    assert weave.use(data_node.map(lambda row: row["im"].width_())).to_pylist() == [
+    assert weave.use(data_node.map(lambda row: row["im"].width_())).to_pylist_raw() == [
         256,
         256,
     ]
@@ -232,7 +232,7 @@ def test_custom_types_tagged():
     )
 
     mapped_width_node = data_node.map(lambda row: row["im"].width_())
-    assert weave.use(mapped_width_node).to_pylist() == [
+    assert weave.use(mapped_width_node).to_pylist_raw() == [
         256,
         256,
     ]
@@ -394,12 +394,12 @@ def test_custom_groupby_intermediate_save():
 
 def test_map_array():
     data = arrow.to_arrow([1, 2, 3])
-    assert weave.use(data.map(lambda i: i + 1)).to_pylist() == [2, 3, 4]
+    assert weave.use(data.map(lambda i: i + 1)).to_pylist_raw() == [2, 3, 4]
 
 
 def test_map_typeddict():
     data = arrow.to_arrow([{"a": 1, "b": 2}, {"a": 3, "b": 5}])
-    assert weave.use(data.map(lambda row: row["a"])).to_pylist() == [1, 3]
+    assert weave.use(data.map(lambda row: row["a"])).to_pylist_raw() == [1, 3]
 
 
 @pytest.mark.parametrize(
@@ -483,13 +483,13 @@ def test_arrow_nested_with_refs():
 
 def test_map_object():
     data = arrow.to_arrow([Point2(1, 2), Point2(5, 6)])
-    assert weave.use(data.map(lambda row: row.get_x())).to_pylist() == [1, 5]
+    assert weave.use(data.map(lambda row: row.get_x())).to_pylist_raw() == [1, 5]
 
 
 @pytest.mark.skip("not working yet")
 def test_map_typeddict_object():
     data = arrow.to_arrow([{"a": 0, "p": Point2(1, 2)}, {"a": 3, "p": Point2(9, 12)}])
-    assert weave.use(data.map(lambda row: row["p"])).to_pylist() == []
+    assert weave.use(data.map(lambda row: row["p"])).to_pylist_raw() == []
 
 
 def test_arrow_list_of_ref_to_item_in_list():
@@ -609,7 +609,7 @@ def test_arrow_unnest():
     assert unnest_node.type == arrow.ArrowWeaveListType(
         types.TypedDict({"a": types.Int(), "b": types.String()})
     )
-    assert weave.use(data.unnest()).to_pylist() == [
+    assert weave.use(data.unnest()).to_pylist_raw() == [
         {"a": 1, "b": "c"},
         {"a": 2, "b": "c"},
         {"a": 3, "b": "c"},
@@ -626,14 +626,14 @@ def test_arrow_nullable_concat():
     awl2 = arrow.ArrowWeaveList(ca2)
     list_of_awl = weave._ops.make_list(A=awl1, B=awl2, C=weave.save(None))
     result = list_of_awl.concat()
-    assert weave.use(result)._arrow_data.to_pylist() == [1, 2, 3, 4, 2, 3, 4, 5]
+    assert weave.use(result).to_pylist_raw() == [1, 2, 3, 4, 2, 3, 4, 5]
 
     # Second pass - forcing none type to be first in member list
     list_of_awl.type = types.List(
         types.union(types.NoneType(), arrow.ArrowWeaveListType(types.Int()))
     )
     result = list_of_awl.concat()
-    assert weave.use(result)._arrow_data.to_pylist() == [1, 2, 3, 4, 2, 3, 4, 5]
+    assert weave.use(result).to_pylist_raw() == [1, 2, 3, 4, 2, 3, 4, 5]
 
 
 def test_arrow_weave_list_groupby_struct_type_table():
@@ -652,7 +652,7 @@ def test_arrow_weave_list_groupby_struct_type_table():
 
     group_func = weave_internal.define_fn({"row": awl.object_type}, group_func_body)
     grouped = awl.groupby(group_func)
-    assert weave.use(grouped[0]) == [{"d": {"a": 1, "b": 2}, "c": 1}]
+    assert weave.use(grouped[0]).to_pylist_raw() == [{"d": {"a": 1, "b": 2}, "c": 1}]
 
 
 def test_arrow_weave_list_groupby_struct_chunked_array_type():
@@ -666,7 +666,10 @@ def test_arrow_weave_list_groupby_struct_chunked_array_type():
         .dropna()[0][0]
     )
 
-    assert weave.use(node) == [{"rotate": 0, "shear": 0, "x": "a", "y": 5}] * 5
+    assert (
+        weave.use(node).to_pylist_raw()
+        == [{"rotate": 0, "shear": 0, "x": "a", "y": 5}] * 5
+    )
 
 
 string_ops_test_cases = [
@@ -808,7 +811,7 @@ def test_arrow_vectorizer_string_alnum(name, weave_func, expected_output):
     fn = weave_internal.define_fn({"x": weave.types.String()}, weave_func).val
     vec_fn = arrow.vectorize(fn)
     called = weave_internal.call_fn(vec_fn, {"x": l})
-    assert weave.use(called).to_pylist() == expected_output
+    assert weave.use(called).to_pylist_raw() == expected_output
 
 
 @pytest.mark.parametrize(
@@ -862,7 +865,7 @@ def test_arrow_vectorizer_string_strip(name, weave_func, expected_output):
     fn = weave_internal.define_fn({"x": weave.types.String()}, weave_func).val
     vec_fn = arrow.vectorize(fn)
     called = weave_internal.call_fn(vec_fn, {"x": l})
-    assert weave.use(called).to_pylist() == expected_output
+    assert weave.use(called).to_pylist_raw() == expected_output
 
 
 number_ops_test_cases = [
@@ -898,7 +901,7 @@ def test_arrow_vectorizer_number_ops(name, weave_func, expected_output):
 
     called = weave_internal.call_fn(vec_fn, {"x": l})
 
-    assert weave.use(called).to_pylist() == expected_output
+    assert weave.use(called).to_pylist_raw() == expected_output
 
 
 @pytest.mark.parametrize(
@@ -979,7 +982,7 @@ def test_arrow_vectorizer_string_vector(name, weave_func, expected_output):
 
     vec_fn = arrow.vectorize(fn)
     called = weave_internal.call_fn(vec_fn, {"x": l, "y": l2})
-    assert weave.use(called).to_pylist() == expected_output
+    assert weave.use(called).to_pylist_raw() == expected_output
 
 
 @pytest.mark.parametrize(
@@ -1054,7 +1057,7 @@ def test_arrow_floor_ceil_vectorized(name, weave_func, expected_output):
     fn = weave_internal.define_fn({"x": weave.types.Float()}, weave_func).val
     vec_fn = arrow.vectorize(fn)
     called = weave_internal.call_fn(vec_fn, {"x": l})
-    assert weave.use(called).to_pylist() == expected_output
+    assert weave.use(called).to_pylist_raw() == expected_output
 
 
 pick_cases = [
@@ -1085,7 +1088,7 @@ def test_arrow_typeddict_pick(input_data, name, weave_func, expected_output):
     ).val
     vec_fn = arrow.vectorize(fn)
     called = weave_internal.call_fn(vec_fn, {"x": l})
-    assert weave.use(called).to_pylist() == expected_output
+    assert weave.use(called).to_pylist_raw() == expected_output
     assert called.type == arrow.ArrowWeaveListType(
         weave.type_of(expected_output).object_type
     )
@@ -1190,7 +1193,7 @@ def test_arrow_typeddict_merge(
     vec_fn = arrow.vectorize(fn)
     called = weave_internal.call_fn(vec_fn, {"x": l, "y": r})
     awl = weave.use(called)
-    assert awl.to_pylist() == expected_output
+    assert awl.to_pylist_raw() == expected_output
     assert called.type == arrow.ArrowWeaveListType(
         weave.type_of(expected_output).object_type
     )
@@ -1529,7 +1532,7 @@ def test_arrow_dict():
     vec_fn = arrow.vectorize(fn)
     called = weave_internal.call_fn(vec_fn, {"a": a, "b": b})
     awl = weave.use(called)
-    assert awl.to_pylist() == expected_output
+    assert awl.to_pylist_raw() == expected_output
     assert called.type == arrow.ArrowWeaveListType(
         weave.type_of(expected_output).object_type
     )
@@ -1588,7 +1591,7 @@ def test_grouped_typed_dict_assign():
 def test_arrow_index_var():
     data = arrow.to_arrow([1, 2, 3])
     result = data.map(lambda row, index: row + index)
-    assert weave.use(result).to_pylist() == [1, 3, 5]
+    assert weave.use(result).to_pylist_raw() == [1, 3, 5]
 
 
 def test_concat_multiple_table_types():
@@ -1680,7 +1683,7 @@ def test_arrow_union_int_string():
         object_type=types.UnionType(types.Int(), types.String())
     )
 
-    assert weave.use(result).to_pylist() == data
+    assert weave.use(result).to_pylist_raw() == data
 
 
 def test_arrow_union_int_string_custom_type():
@@ -1912,7 +1915,7 @@ def test_arrow_vectorizer_nullable_number_ops(name, weave_func, expected_output)
 
     called = weave_internal.call_fn(vec_fn, {"x": l})
 
-    assert weave.use(called).to_pylist() == expected_output
+    assert weave.use(called).to_pylist_raw() == expected_output
 
 
 string_ops_nullable_test_cases = [
@@ -1945,7 +1948,7 @@ string_ops_nullable_test_cases = [
 def test_arrow_vectorizer_string_nullable_scalar_ops_tagged(
     name, weave_func, expected_output
 ):
-    expected_value_type = weave.type_of(expected_output[0])
+    expected_value_type = weave.type_of(expected_output).object_type
 
     list = ["bc", None, "df"]
     for i, elem in enumerate(list):
@@ -1959,7 +1962,9 @@ def test_arrow_vectorizer_string_nullable_scalar_ops_tagged(
     fn = weave_internal.define_fn({"x": awl.object_type}, weave_func).val
     vec_fn = arrow.vectorize(fn)
 
+    print("VEC", vec_fn)
     called = weave_internal.call_fn(vec_fn, {"x": l})
+    print("CALLED TYPE", called.type)
     assert weave.use(called).to_pylist_notags() == expected_output
 
     item_node = arrow.ArrowWeaveList.__getitem__(called, 0)
@@ -2048,7 +2053,7 @@ def test_arrow_typeddict_nullable_merge(
     vec_fn = arrow.vectorize(fn)
     called = weave_internal.call_fn(vec_fn, {"x": l, "y": r})
     awl = weave.use(called)
-    assert awl.to_pylist() == expected_output
+    assert awl.to_pylist_raw() == expected_output
     assert called.type == arrow.ArrowWeaveListType(
         weave.type_of(expected_output).object_type
     )
@@ -2085,7 +2090,7 @@ def test_arrow_typeddict_pick_nullable(input_data, name, weave_func, expected_ou
     ).val
     vec_fn = arrow.vectorize(fn)
     called = weave_internal.call_fn(vec_fn, {"x": l})
-    assert weave.use(called).to_pylist() == expected_output
+    assert weave.use(called).to_pylist_raw() == expected_output
     assert called.type == arrow.ArrowWeaveListType(
         weave.type_of(expected_output).object_type
     )
@@ -2100,7 +2105,9 @@ def test_object_types_nullable():
     )
     assert weave.use(data_node[0]["point"].get_x()) == 256
 
-    assert weave.use(data_node.map(lambda row: row["point"].get_x())).to_pylist() == [
+    assert weave.use(
+        data_node.map(lambda row: row["point"].get_x())
+    ).to_pylist_raw() == [
         256,
         None,
     ]
@@ -2132,7 +2139,7 @@ def test_map_with_index():
     ref = create_arrow_data(100)
 
     node = weave.get(ref).map(lambda row, index: index)
-    assert weave.use(node).to_pylist() == list(range(100))
+    assert weave.use(node).to_pylist_raw() == list(range(100))
 
 
 def verify_pyarrow_array_type_is_valid_for_tag_array(pa_type: pa.DataType):
@@ -2254,7 +2261,7 @@ def test_arrow_concat_mixed(list_of_data, exp_res):
                     for ndx, data in enumerate(list_of_data)
                 }
             ).concat()
-        ).to_pylist()
+        ).to_pylist_raw()
         == exp_res
     )
 
@@ -2262,7 +2269,7 @@ def test_arrow_concat_mixed(list_of_data, exp_res):
 def test_abs():
     data = [-10, -2.2, 5, None, 3.3]
     arrow_node = weave.save(arrow.to_arrow(data))
-    assert weave.use(arrow_node.abs()).to_pylist() == [10, 2.2, 5, None, 3.3]
+    assert weave.use(arrow_node.abs()).to_pylist_raw() == [10, 2.2, 5, None, 3.3]
 
 
 def test_argmax():
@@ -2290,7 +2297,7 @@ def test_join_all_struct_val():
 
     tables = weave.save([t1, t2])
     joined = tables.joinAll(lambda row: row["a"], True)
-    res = weave.use(joined).to_pylist()
+    res = weave.use(joined).to_pylist_raw()
     # TODO: not correct, not because of join, because artifact saving is broken.
     assert res == [
         {"_tag": {"joinObj": 5}, "_value": {"a": [5, 5], "b": [{"c": 6}, {"c": 11}]}},
@@ -2317,16 +2324,16 @@ def test_dense_sparse_conversion():
 def test_to_arrow_union_list():
     val = [{"a": 5.0}, {"a": [1.0]}]
     arrow_val = arrow.to_arrow([{"a": 5.0}, {"a": [1.0]}])
-    assert arrow_val.to_pylist() == val
+    assert arrow_val.to_pylist_raw() == val
 
 
 def test_concat_empty_arrays():
     val = arrow.to_arrow([])
     val2 = arrow.to_arrow([{"a": 5}])
-    assert val.concatenate(val).to_pylist() == []
-    assert val.concatenate(val2).to_pylist() == val2.to_pylist()
-    assert val2.concatenate(val).to_pylist() == val2.to_pylist()
-    assert val2.concatenate(val2).to_pylist() == [{"a": 5}, {"a": 5}]
+    assert val.concatenate(val).to_pylist_raw() == []
+    assert val.concatenate(val2).to_pylist_raw() == val2.to_pylist_raw()
+    assert val2.concatenate(val).to_pylist_raw() == val2.to_pylist_raw()
+    assert val2.concatenate(val2).to_pylist_raw() == [{"a": 5}, {"a": 5}]
 
 
 _loading_builtins_token = context_state.set_loading_built_ins()
@@ -2379,29 +2386,29 @@ def test_automap_more_than_one():
 
     assert weave.use(
         arrow_data.map(lambda x: _test_arrow_do_op(x, x, [4]))
-    ).to_pylist() == [_test_arrow_do_body(x, x, [4]) for x in data]
+    ).to_pylist_raw() == [_test_arrow_do_body(x, x, [4]) for x in data]
 
     assert weave.use(
         arrow_data.map(lambda x: _test_arrow_do_op(x + 1, x, [4]))
-    ).to_pylist() == [_test_arrow_do_body(x + 1, x, [4]) for x in data]
+    ).to_pylist_raw() == [_test_arrow_do_body(x + 1, x, [4]) for x in data]
 
     assert weave.use(
         arrow_data.map(lambda x: _test_arrow_do_op(x + 1, x, ops.make_list(a=x * 2)))
-    ).to_pylist() == [_test_arrow_do_body(x + 1, x, [x * 2]) for x in data]
+    ).to_pylist_raw() == [_test_arrow_do_body(x + 1, x, [x * 2]) for x in data]
 
     assert weave.use(
         arrow_data.map(lambda x: _test_arrow_do_op(-1, x, ops.make_list(a=x * 2)))
-    ).to_pylist() == [_test_arrow_do_body(-1, x, [x * 2]) for x in data]
+    ).to_pylist_raw() == [_test_arrow_do_body(-1, x, [x * 2]) for x in data]
 
     assert weave.use(
         arrow_data.map(lambda x: _test_arrow_do_op(-1, -9, ops.make_list(a=x * 2)))
-    ).to_pylist() == [_test_arrow_do_body(-1, -9, [x * 2]) for x in data]
+    ).to_pylist_raw() == [_test_arrow_do_body(-1, -9, [x * 2]) for x in data]
 
 
 def test_serialization_of_boxed_nones():
     data = [{"a": 1, "b": box.box(None)}, {"a": 2, "b": box.box(None)}]
     arrow_data = weave.save(arrow.to_arrow(data))
-    assert weave.use(arrow_data).to_pylist() == data
+    assert weave.use(arrow_data).to_pylist_raw() == data
 
 
 def test_vectorize_inner_lambdas():
@@ -2461,7 +2468,7 @@ def test_join_tag_support():
     get_awl = ttu.make_get_tag("awl_tag")
 
     second_list = weave.use(raw_lists[1])
-    assert second_list.to_pylist() == [
+    assert second_list.to_pylist_raw() == [
         {
             "_tag": {"_ct_row_tag": "row_1_0"},
             "_value": {
@@ -2518,8 +2525,8 @@ def test_join_tag_support():
 def test_arrow_handling_of_empty_structs():
     data = [{"a": 5, "b": {}}, {"a": 6, "b": {}}, {"a": 7, "b": None}]
     arrow_data = weave.save(arrow.to_arrow(data))
-    assert weave.use(arrow_data.map(lambda x: x["b"])).to_pylist() == [{}, {}, None]
-    assert weave.use(arrow_data.map(lambda x: x["a"])).to_pylist() == [5, 6, 7]
+    assert weave.use(arrow_data.map(lambda x: x["b"])).to_pylist_raw() == [{}, {}, None]
+    assert weave.use(arrow_data.map(lambda x: x["a"])).to_pylist_raw() == [5, 6, 7]
 
 
 def test_unboxing_in_broadcasting():
@@ -2554,18 +2561,40 @@ def test_count_on_group():
     col = weave.save(arrow.to_arrow([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]))
     col = col.groupby(lambda x: x % 2)
     col = col.map(lambda x: x.count())
-    assert weave.use(col).to_pylist() == [5, 5]
+    assert weave.use(col).to_pylist_raw() == [5, 5]
 
 
 def test_limit_on_group():
     col = weave.save(arrow.to_arrow([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]))
     col = col.groupby(lambda x: x % 2)
     col = col.map(lambda x: x.limit(3))
-    assert weave.use(col).to_pylist() == [[1, 3, 5], [2, 4, 6]]
+    assert weave.use(col).to_pylist_raw() == [[1, 3, 5], [2, 4, 6]]
 
 
 def test_offset_on_group():
     col = weave.save(arrow.to_arrow([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]))
     col = col.groupby(lambda x: x % 2)
     col = col.map(lambda x: x.offset(2))
-    assert weave.use(col).to_pylist() == [[5, 7, 9], [6, 8, 10]]
+    assert weave.use(col).to_pylist_raw() == [[5, 7, 9], [6, 8, 10]]
+
+
+def test_map_column():
+    arr = arrow.to_arrow(
+        [{"a": {"c": 6, "d": 7}, "b": 9}, {"a": {"c": 14, "d": 7}, "b": 5}]
+    )
+
+    def _map(awl, path):
+        if isinstance(awl.object_type, types.TypedDict):
+            # Keep the first element of the dict
+            key0, type0 = next(iter(awl.object_type.property_types.items()))
+            return arrow.ArrowWeaveList(
+                awl._arrow_data.field(key0),
+                type0,
+                awl._artifact,
+            )
+
+    res = arr.map_column(_map)
+    # Since this is post-order traversal of the type tree, we should
+    # only see the innermost type
+    assert res.object_type == types.Int()
+    assert res.to_pylist_raw() == [6, 14]

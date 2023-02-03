@@ -142,6 +142,22 @@ def __add__(self, other):
     return _concatenate_strings(self, other)
 
 
+# Handle plain str on the left. We'll need to figure out how to do
+# this generally.
+# TODO: Do this generally!
+@op(
+    name="ArrowWeaveListString_right-add",
+)
+def right_add(
+    left: typing.Optional[str], right: ArrowWeaveList[typing.Optional[str]]
+) -> ArrowWeaveList[str]:
+    return ArrowWeaveList(
+        pc.binary_join_element_wise(left, right._arrow_data_asarray_no_tags(), ""),
+        types.String(),
+        right._artifact,
+    )
+
+
 # todo: remove this explicit name, it shouldn't be needed
 @arrow_op(
     name="ArrowWeaveListString-append",
@@ -177,7 +193,7 @@ def split(self, pattern):
     if isinstance(pattern, str):
         return ArrowWeaveList(
             pc.split_pattern(self._arrow_data, pattern),
-            types.List(types.String()),
+            types.optional(types.List(types.String())),
             self._artifact,
         )
     return ArrowWeaveList(
@@ -185,7 +201,7 @@ def split(self, pattern):
             self._arrow_data[i].as_py().split(pattern._arrow_data[i].as_py())
             for i in range(len(self._arrow_data))
         ),
-        types.List(types.String()),
+        types.optional(types.List(types.String())),
         self._artifact,
     )
 
@@ -210,7 +226,7 @@ def partition(self, sep):
 
     return ArrowWeaveList(
         pa.array(data_iterator()),
-        types.List(types.String()),
+        types.optional(types.List(types.String())),
         self._artifact,
     )
 

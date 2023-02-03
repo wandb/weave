@@ -62,7 +62,7 @@ def test_mapped_pick():
     ]
     arrow_arr = ops_arrow.to_arrow(data)
 
-    assert weave.use(ops_arrow.dict.pick(arrow_arr, "b")).to_pylist() == [9, 10]
+    assert weave.use(ops_arrow.dict.pick(arrow_arr, "b")).to_pylist_raw() == [9, 10]
 
 
 def test_constructor():

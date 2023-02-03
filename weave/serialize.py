@@ -104,7 +104,7 @@ def node_id(node: graph.Node):
             node.val, graph.VarNode
         ):
             # Ensure we don't share function nodes. That's invalid!
-            hashable["val"] = str(random.random())
+            hashable["val"] = json.dumps(node.to_json())
         else:
             hashable["val"] = storage.to_python(node.val)
     else:

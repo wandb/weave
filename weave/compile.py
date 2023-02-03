@@ -103,6 +103,30 @@ def _dispatch_map_fn_no_refine(node: graph.Node) -> typing.Optional[graph.Output
     return None
 
 
+def _simple_optimizations(node: graph.Node) -> typing.Optional[graph.OutputNode]:
+    # Put simple graph transforms here!
+    if not isinstance(node, graph.OutputNode):
+        return None
+    if node.from_op.friendly_name == "merge":
+        # Merging two dicts where one is empty returns the other. The frontend
+        # sends this pattern down a lot right now, and it causes us to break out
+        # of arrow vectorization.
+        lhs, rhs = node.from_op.inputs.values()
+        if (
+            isinstance(lhs, graph.OutputNode)
+            and lhs.from_op.friendly_name == "dict"
+            and not lhs.from_op.inputs
+        ):
+            return rhs
+        if (
+            isinstance(rhs, graph.OutputNode)
+            and rhs.from_op.friendly_name == "dict"
+            and not rhs.from_op.inputs
+        ):
+            return lhs
+    return None
+
+
 def _make_auto_op_map_fn(when_type: type[types.Type], call_op_fn):
     def fn(node: graph.Node) -> typing.Optional[graph.Node]:
         if isinstance(node, graph.OutputNode):
@@ -193,6 +217,12 @@ def compile_fix_calls(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]
     return graph.map_nodes_full(nodes, _dispatch_map_fn_no_refine)
 
 
+def compile_simple_optimizations(
+    nodes: typing.List[graph.Node],
+) -> typing.List[graph.Node]:
+    return graph.map_nodes_full(nodes, _simple_optimizations)
+
+
 def compile_await(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
     return graph.map_nodes_full(nodes, _await_run_outputs_map_fn)
 
@@ -216,6 +246,9 @@ def _compile(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
     # op output types, so after this, the types in the graph are not yet correct.
     with tracer.trace("compile:fix_calls"):
         n = compile_fix_calls(n)
+
+    with tracer.trace("compile:simple_optimizations"):
+        n = compile_simple_optimizations(n)
 
     # Now that we have the correct calls, we can do our forward-looking pushdown
     # optimizations. These do not depend on having correct types in the graph.

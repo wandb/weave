@@ -165,12 +165,6 @@ def recursively_unwrap_arrow(obj):
 
 
 def to_python(obj, wb_type=None):
-    # Arrow hacks for WeaveJS. We want to send the raw Python data
-    # to the frontend for these objects. But this will break querying them in Weave
-    # Python when not using InProcessServer.
-    # TODO: Remove!
-    obj = recursively_unwrap_arrow(obj)
-
     if wb_type is None:
         wb_type = types.TypeRegistry.type_of(obj)
     # Note, we use ArtifactMem here, which means the serialized object
@@ -188,3 +182,20 @@ def from_python(obj, wb_type=None):
     mapper = mappers_python.map_from_python(wb_type, None)
     res = mapper.apply(obj["_val"])
     return res
+
+
+def to_weavejs(obj):
+    from .ops_arrow import list_ as arrow_list
+
+    obj = box.unbox(obj)
+    if isinstance(obj, (str, int, float, bool, type(None))):
+        return obj
+    elif isinstance(obj, dict):
+        return {k: to_weavejs(v) for (k, v) in obj.items()}
+    elif isinstance(obj, list):
+        return [to_weavejs(item) for item in obj]
+    elif isinstance(obj, arrow_list.ArrowWeaveList):
+        return obj.to_pylist_notags()
+    wb_type = types.TypeRegistry.type_of(obj)
+    mapper = mappers_python.map_to_python(wb_type, artifact_mem.MemArtifact())
+    return mapper.apply(obj)

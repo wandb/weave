@@ -612,7 +612,7 @@ def rewrite_weavelist_refs(arrow_data, object_type, source_artifact, target_arti
         )
     elif _object_type_is_basic(object_type):
         return arrow_data
-    elif isinstance(object_type, types.List):
+    elif isinstance(object_type, (types.List, ArrowWeaveListType)):
         return pa.ListArray.from_arrays(
             arrow_data.offsets,
             rewrite_weavelist_refs(

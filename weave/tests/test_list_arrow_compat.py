@@ -81,7 +81,7 @@ def test_fn_equality(data, fn_name, fn_def, res, extra_args):
     arrow_node_mapped = arrow_node.__getattr__(fn_name)(fn_def, *extra_args)
 
     assert weave.use(list_node_mapped) == res
-    assert weave.use(arrow_node_mapped).to_pylist() == res
+    assert weave.use(arrow_node_mapped).to_pylist_raw() == res
 
 
 # TODO: In Weave0, we also have a `join2` op. This will be done in a followup

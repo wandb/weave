@@ -222,6 +222,26 @@ def to_fixed(self, digits):
     )
 
 
+@op(
+    name="ArrowWeaveListNumber-max",
+    input_type={"self": ArrowWeaveListType(types.optional(types.Number()))},
+    output_type=types.Number(),
+)
+def max(self):
+    array = self._arrow_data_asarray_no_tags()
+    return pc.max(array).as_py()
+
+
+@op(
+    name="ArrowWeaveListNumber-min",
+    input_type={"self": ArrowWeaveListType(types.optional(types.Number()))},
+    output_type=types.Number(),
+)
+def min(self):
+    array = self._arrow_data_asarray_no_tags()
+    return pc.min(array).as_py()
+
+
 # TODO: Do we need to vectorize these in 1 more dimension?
 @op(
     name="ArrowWeaveListNumbers-argmax",

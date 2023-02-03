@@ -266,5 +266,5 @@ def test_save_nested_custom_objs():
     t2 = arrow.to_arrow([{"a": 9}])
 
     tables = weave.save([t1, t2])
-    assert weave.use(tables[0]).to_pylist() == [{"a": 5}]
-    assert weave.use(tables[1]).to_pylist() == [{"a": 9}]
+    assert weave.use(tables[0]).to_pylist_raw() == [{"a": 5}]
+    assert weave.use(tables[1]).to_pylist_raw() == [{"a": 9}]

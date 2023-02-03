@@ -1,5 +1,5 @@
 from weave import graph_debug, serialize
-from weave.server import _handle_request
+from weave.server import handle_request
 
 
 def test_playback():
@@ -15,7 +15,7 @@ def test_playback():
                 ),
             )
         )
-        res = _handle_request(payload, True)
+        res = handle_request(payload, True)
         assert "err" not in res
 
 
