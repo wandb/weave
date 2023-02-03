@@ -18,7 +18,6 @@ from ..ops_primitives import list_, dict_
 from .. import weave_types as types
 
 from .. import ops_arrow as arrow
-from ..ops_domain.wbmedia import TableClientArtifactFileRef
 import cProfile
 from ..language_features.tagging.tagged_value_type import TaggedValueType
 from ..ops_domain import table

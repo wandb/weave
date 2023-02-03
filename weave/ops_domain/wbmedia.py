@@ -1,18 +1,12 @@
 # Implements backward compatibility for existing W&B Media types.
 
-import contextlib
-import typing
-
-from ..artifact_wandb import WandbRunFilesProxyArtifact, get_wandb_read_client_artifact
 from ..language_features.tagging.tag_store import isolated_tagging_context
 from .. import types
 from .. import errors
 from .. import api as weave
 from .. import artifact_fs
-from .. import file_util
 from ..ops_primitives import html
 from ..ops_primitives import markdown
-from . import table
 
 
 @weave.type(__override_name="image-file")  # type: ignore
@@ -53,159 +47,6 @@ class Object3DArtifactFileRef:
 class MoleculeArtifactFileRef:
     artifact: artifact_fs.FilesystemArtifact
     path: str
-
-
-table_client_artifact_scheme = "wandb-client-artifact://"
-table_artifact_scheme = "wandb-artifact://"
-
-
-def _parse_artifact_path(path: str) -> typing.Tuple[str, str]:
-    """Returns art_id, file_path. art_id might be client_id or seq:alias"""
-    if path.startswith(table_artifact_scheme):
-        path = path[len(table_artifact_scheme) :]
-    elif path.startswith(table_client_artifact_scheme):
-        path = path[len(table_client_artifact_scheme) :]
-    else:
-        raise ValueError('unknown artifact path scheme: "%s"' % path)
-    art_identifier, file_path = path.split("/", 1)
-    return art_identifier, file_path
-
-
-@weave.type(__override_name="table-file")  # type: ignore
-class TableClientArtifactFileRef:
-    artifact_path: str
-
-    def __init__(self, artifact_path):
-        self.artifact_path = artifact_path
-        self._artifact = None
-        self._art_id, self._file_path = _parse_artifact_path(artifact_path)
-
-    @property
-    def artifact(self):
-        if self._artifact == None:
-            self._artifact = get_wandb_read_client_artifact(self._art_id)
-        return self._artifact
-
-    @property
-    def path(self):
-        return self._file_path
-
-    # This is a temp hack until we have better support for _base_type inheritance
-    @weave.op(
-        name="tablefile-table",
-        output_type=table.TableType(),
-    )
-    def table(self):
-        path_info = self.artifact.path_info(self._file_path)
-        if path_info is None:
-            return None
-        return table.file_table.resolve_fn(path_info)
-
-
-@weave.type(__override_name="joinedtable-file")  # type: ignore
-class JoinedTableClientArtifactFileRef:
-    artifact_path: str
-
-    def __init__(self, artifact_path):
-        self.artifact_path = artifact_path
-        self._artifact = None
-        self._art_id, self._file_path = _parse_artifact_path(artifact_path)
-
-    @property
-    def artifact(self):
-        if self._artifact == None:
-            self._artifact = get_wandb_read_client_artifact(self._art_id)
-        return self._artifact
-
-    @property
-    def path(self):
-        return self._file_path
-
-    @weave.op(
-        name="joinedtablefile-joinedTable",
-        output_type=table.JoinedTableType(),
-    )
-    def joined_table(self):
-        path_info = self.artifact.path_info(self._file_path)
-        if path_info is None:
-            return None
-        return table.joined_table.resolve_fn(self)
-
-
-@weave.type(__override_name="runtable-file")  # type: ignore
-class TableRunFileRef:
-    entity_name: str
-    project_name: str
-    run_name: str
-    file_path: str
-
-    def __init__(self, entity_name, project_name, run_name, file_path):
-        self.entity_name = entity_name
-        self.project_name = project_name
-        self.run_name = run_name
-        self.file_path = file_path
-        self.artifact = WandbRunFilesProxyArtifact(
-            self.entity_name, self.project_name, self.run_name
-        )
-
-    # file_base.File interface
-    @contextlib.contextmanager
-    def open(self, mode: str = "r") -> typing.Generator[typing.IO, None, None]:
-        if "r" in mode:
-            with file_util.safe_open(self.artifact.path(self.file_path)) as f:
-                yield f
-        else:
-            raise NotImplementedError
-
-    @property
-    def path(self):
-        return self.file_path
-
-    # This is a temp hack until we have better support for _base_type inheritance
-    @weave.op(
-        name="runtablefile-table",
-        output_type=table.TableType(),
-    )
-    def table(self):
-        return table.file_table.resolve_fn(self)
-
-
-@weave.type(__override_name="runjoinedtable-file")  # type: ignore
-class JoinedTableRunFileRef:
-    entity_name: str
-    project_name: str
-    run_name: str
-    file_path: str
-
-    def __init__(self, entity_name, project_name, run_name, file_path):
-        self.entity_name = entity_name
-        self.project_name = project_name
-        self.run_name = run_name
-        self.file_path = file_path
-        self.artifact = WandbRunFilesProxyArtifact(
-            self.entity_name, self.project_name, self.run_name
-        )
-
-    # file_base.File interface
-    @contextlib.contextmanager
-    def open(self, mode: str = "r") -> typing.Generator[typing.IO, None, None]:
-        if "r" in mode:
-            with file_util.safe_open(self.artifact.path(self.file_path)) as f:
-                yield f
-        else:
-            raise NotImplementedError
-
-    @property
-    def path(self):
-        return self.file_path
-
-    # This is a temp hack until we have better support for _base_type inheritance
-    @weave.op(
-        name="runjoinedtablefile-joinedTable",
-        output_type=table.JoinedTableType(),
-    )
-    def joined_table(self):
-        return table.joined_table.resolve_fn(self)
 
 
 @weave.type(__override_name="html-file")  # type: ignore
@@ -258,8 +99,6 @@ ArtifactAssetType = types.union(
     VideoArtifactFileRef.WeaveType(),  # type: ignore
     Object3DArtifactFileRef.WeaveType(),  # type: ignore
     MoleculeArtifactFileRef.WeaveType(),  # type: ignore
-    TableClientArtifactFileRef.WeaveType(),  # type: ignore
-    JoinedTableClientArtifactFileRef.WeaveType(),  # type: ignore
     HtmlArtifactFileRef.WeaveType(),  # type: ignore
 )
 

@@ -33,21 +33,10 @@ def get_wandb_read_artifact(path: str):
     return wandb_client_api.wandb_public_api().artifact(path)
 
 
-@memo.memo
-def get_wandb_read_run(path):
-    return wandb_client_api.wandb_public_api().run(path)
-
-
 def wandb_artifact_dir():
     # Make this a subdir of local_artifact_dir, since the server
     # checks for local_artifact_dir to see if it should serve
     d = os.path.join(artifact_util.local_artifact_dir(), "_wandb_artifacts")
-    os.makedirs(d, exist_ok=True)
-    return d
-
-
-def wandb_run_dir():
-    d = os.path.join(artifact_util.local_artifact_dir(), "_wandb_runs")
     os.makedirs(d, exist_ok=True)
     return d
 
@@ -189,28 +178,6 @@ def get_wandb_read_client_artifact(art_id: str) -> "WandbArtifact":
     """art_id may be client_id, seq:alias, or server_id"""
     weave_art_uri, artifact_type_name = get_wandb_read_client_artifact_uri(art_id)
     return WandbArtifact(weave_art_uri.name, artifact_type_name, weave_art_uri)
-
-
-@contextlib.contextmanager
-def _isolated_download_and_atomic_mover(
-    end_path: str,
-) -> typing.Generator[typing.Tuple[str, typing.Callable[[str], None]], None, None]:
-    rand_part = "".join(random.choice("0123456789ABCDEF") for _ in range(16))
-    tmp_dir = os.path.join(artifact_util.local_artifact_dir(), f"tmp_{rand_part}")
-    os.makedirs(tmp_dir, exist_ok=True)
-
-    def mover(tmp_path: str):
-        # This uses the same technique as WB artifacts
-        pathlib.Path(end_path).parent.mkdir(parents=True, exist_ok=True)
-        try:
-            os.replace(tmp_path, end_path)
-        except AttributeError:
-            os.rename(tmp_path, end_path)
-
-    try:
-        yield tmp_dir, mover
-    finally:
-        shutil.rmtree(tmp_dir)
 
 
 class WandbArtifactType(artifact_fs.FilesystemArtifactType):
@@ -444,44 +411,6 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
 
 
 WandbArtifactType.instance_classes = WandbArtifact
-
-
-# TODO: Switch to new wandb api service
-class WandbRunFilesProxyArtifact(artifact_fs.FilesystemArtifact):
-    def __init__(self, entity_name: str, project_name: str, run_name: str):
-        self.name = f"{entity_name}/{project_name}/{run_name}"
-        self._local_path: dict[str, str] = {}
-        self._run = None
-
-    @property
-    def is_saved(self) -> bool:
-        return True
-
-    @property
-    def run(self):
-        if self._run is None:
-            self._run = get_wandb_read_run(self.name)
-        return self._run
-
-    def path(self, name):
-        # First, check if we already downloaded this file:
-        if name in self._local_path:
-            return self._local_path[name]
-
-        static_file_path = os.path.join(wandb_run_dir(), str(self.name), name)
-        # Next, check if another process has already downloaded this file:
-        if os.path.exists(static_file_path):
-            self._local_path[name] = static_file_path
-            return static_file_path
-
-        # Finally, download the file in an isolated directory:
-        with _isolated_download_and_atomic_mover(static_file_path) as (tmp_dir, mover):
-            with self.run.file(name).download(tmp_dir, replace=True) as fp:
-                downloaded_file_path = fp.name
-            mover(downloaded_file_path)
-
-        self._local_path[name] = static_file_path
-        return static_file_path
 
 
 class WandbArtifactRef(artifact_fs.FilesystemArtifactRef):
