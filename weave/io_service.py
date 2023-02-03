@@ -29,7 +29,7 @@ from . import artifact_wandb
 from . import errors
 from . import engine_trace
 from . import filesystem
-from . import http
+from . import weave_http
 from . import wandb_api
 from . import wandb_file_manager
 from . import util
@@ -139,7 +139,7 @@ class Server:
 
     async def main(self) -> None:
         fs = filesystem.get_filesystem_async()
-        net = http.HttpAsync(fs)
+        net = weave_http.HttpAsync(fs)
         self.wandb_file_manager = wandb_file_manager.WandbFileManagerAsync(
             fs, net, await wandb_api.get_wandb_api()
         )

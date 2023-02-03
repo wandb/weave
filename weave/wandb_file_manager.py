@@ -16,7 +16,7 @@ from . import artifact_wandb
 from . import errors
 from . import engine_trace
 from . import filesystem
-from . import http
+from . import weave_http
 from . import wandb_api
 from . import environment as weave_env
 from . import cache
@@ -29,7 +29,7 @@ class WandbFileManagerAsync:
     def __init__(
         self,
         filesystem: filesystem.FilesystemAsync,
-        http: http.HttpAsync,
+        http: weave_http.HttpAsync,
         wandb_api: wandb_api.WandbApiAsync,
     ) -> None:
         self.fs = filesystem

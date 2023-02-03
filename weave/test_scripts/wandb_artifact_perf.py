@@ -16,7 +16,7 @@ import cProfile
 from .. import engine_trace
 from .. import wandb_api
 from .. import filesystem
-from .. import http
+from .. import weave_http
 from .. import artifact_wandb
 from .. import wandb_file_manager
 from .. import io_service
@@ -28,7 +28,7 @@ tracer = engine_trace.tracer()  # type: ignore
 async def gql_test() -> None:
     api = await wandb_api.get_wandb_api()
     fs = filesystem.get_filesystem_async()
-    net = http.HttpAsync(fs)
+    net = weave_http.HttpAsync(fs)
     file_man = wandb_file_manager.WandbFileManagerAsync(fs, net, api)
     man = await file_man.manifest(
         artifact_wandb.WeaveWBArtifactURI(
