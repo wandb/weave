@@ -221,6 +221,10 @@ class Server:
         uri = artifact_wandb.WeaveWBArtifactURI.parse(artifact_uri)
         return await self.wandb_file_manager.ensure_file(uri)
 
+    async def handle_direct_url(self, artifact_uri: str) -> typing.Optional[str]:
+        uri = artifact_wandb.WeaveWBArtifactURI.parse(artifact_uri)
+        return await self.wandb_file_manager.direct_url(uri)
+
 
 SERVER = None
 SERVER_START_LOCK = threading.Lock()
@@ -355,6 +359,11 @@ class SyncClient:
         self, artifact_uri: artifact_wandb.WeaveWBArtifactURI
     ) -> typing.Optional[str]:
         return self.request("ensure_file", str(artifact_uri))
+
+    def direct_url(
+        self, artifact_uri: artifact_wandb.WeaveWBArtifactURI
+    ) -> typing.Optional[str]:
+        return self.request("direct_url", str(artifact_uri))
 
 
 def get_sync_client() -> SyncClient:

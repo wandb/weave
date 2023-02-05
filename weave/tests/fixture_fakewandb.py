@@ -198,6 +198,9 @@ class FakeIoServiceClient:
 
         return FakeFs()
 
+    def direct_url(self, artifact_uri):
+        return f"https://api.wandb.ai/{artifact_uri.entity_name}/{artifact_uri.project_name}/{artifact_uri.name}_{artifact_uri.version}/{artifact_uri.path}"
+
     def ensure_file(self, artifact_uri):
         return f"{artifact_uri.entity_name}/{artifact_uri.project_name}/{artifact_uri.name}_{artifact_uri.version}/{artifact_uri.path}"
 

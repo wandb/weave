@@ -194,7 +194,7 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
     ):
         from . import io_service
 
-        self.sync_client = io_service.get_sync_client()
+        self.io_service = io_service.get_sync_client()
         self.name = name
         self._read_artifact_uri_or_client_uri = None
         self._read_artifact = None
@@ -262,17 +262,25 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
     def get_other_version(self, version):
         raise NotImplementedError()
 
+    def direct_url(self, path: str) -> typing.Optional[str]:
+        if self._read_artifact_uri is None:
+            raise errors.WeaveInternalError(
+                'cannot get direct url for unsaved artifact"'
+            )
+        uri = self._read_artifact_uri.with_path(path)
+        return self.io_service.direct_url(uri)
+
     def path(self, name: str) -> str:
         if not self.is_saved or not self._read_artifact_uri:
             raise errors.WeaveInternalError("cannot download of an unsaved artifact")
 
         uri = self._read_artifact_uri.with_path(name)
-        fs_path = self.sync_client.ensure_file(uri)
+        fs_path = self.io_service.ensure_file(uri)
         if fs_path is None:
             # Important to raise FileNotFoundError here, FileSystemArtifactRef.type
             # relies on this.
             raise FileNotFoundError("Path not in artifact")
-        return self.sync_client.fs.path(fs_path)
+        return self.io_service.fs.path(fs_path)
 
     def size(self, path: str) -> int:
         if path in self._saved_artifact.manifest.entries:
@@ -353,7 +361,7 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
                 'cannot get path info for unsaved artifact"'
             )
         uri = self._read_artifact_uri.with_path(path)
-        manifest = self.sync_client.manifest(uri)
+        manifest = self.io_service.manifest(uri)
         if manifest is None:
             return None
         manifest_entry = manifest.get_entry_by_path(path)

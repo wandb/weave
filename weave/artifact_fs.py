@@ -80,6 +80,9 @@ class FilesystemArtifact(artifact_base.Artifact):
     def uri(self) -> str:
         return str(self.uri_obj)
 
+    def direct_url(self, path: str) -> typing.Optional[str]:
+        raise NotImplementedError
+
     def path(self, path: str) -> str:
         raise NotImplementedError
 

@@ -18,6 +18,7 @@ from . import artifact_fs
 from . import file_base
 from . import file_util
 from . import filesystem
+from . import environment
 
 
 def local_artifact_dir() -> str:
@@ -135,6 +136,11 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
         ):
             raise errors.WeaveAccessDeniedError()
         return full_path
+
+    def direct_url(self, name: str) -> str:
+        art_path = self.path(name)
+        local_path = os.path.abspath(art_path)
+        return f"{environment.weave_server_url()}/__weave/file{local_path}"
 
     def path(self, name: str) -> str:
         return str(self._get_read_path(name))
