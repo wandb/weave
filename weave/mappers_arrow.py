@@ -315,6 +315,17 @@ class DefaultFromArrow(mappers_python.DefaultFromPy):
         return super().apply(obj)
 
 
+class ArrowToArrowWeaveListOrPylist(mappers_python.ListToPyList):
+    def apply(self, obj):
+        from .ops_arrow import arrow
+
+        if isinstance(self.type, arrow.ArrowWeaveListType):
+            # we're already mapped - no need to go further
+            return obj
+
+        return super().apply(obj)
+
+
 def map_to_arrow_(type, mapper, artifact: artifact_base.Artifact, path=[]):
     from .ops_arrow import arrow
 
@@ -356,7 +367,7 @@ def map_from_arrow_(type, mapper, artifact, path=[]):
     if isinstance(type, types.TypedDict):
         return mappers_python.TypedDictToPyDict(type, mapper, artifact, path)
     elif isinstance(type, (types.List, arrow.ArrowWeaveListType)):
-        return mappers_python.ListToPyList(type, mapper, artifact, path)
+        return ArrowToArrowWeaveListOrPylist(type, mapper, artifact, path)
     elif isinstance(type, types.UnionType):
         return ArrowUnionToUnion(type, mapper, artifact, path)
     elif isinstance(type, types.ObjectType):

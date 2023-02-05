@@ -413,13 +413,15 @@ def set_path(
             return
         else:
             raise ValueError(f"Unexpected path element: {el}")
-    if isinstance(path[-1], str):
-        v[path[-1]] = value_fn(v[path[-1]], offset)
-    elif el == SpecialPathItem.PATH_TAGGED_TAG:
+
+    leaf = path[-1]
+    if isinstance(leaf, str):
+        v[leaf] = value_fn(v[leaf], offset)
+    elif leaf == SpecialPathItem.PATH_TAGGED_TAG:
         v["_tag"] = value_fn(v["_tag"], offset)
-    elif el == SpecialPathItem.PATH_TAGGED_VALUE:
+    elif leaf == SpecialPathItem.PATH_TAGGED_VALUE:
         v["_value"] = value_fn(v["_value"], offset)
-    elif el == SpecialPathItem.PATH_LIST_ITEMS:
+    elif leaf == SpecialPathItem.PATH_LIST_ITEMS:
         for j, vi in enumerate(v):
             v[j] = value_fn(vi, offset + j)
     else:
@@ -701,13 +703,14 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
 
     def __array__(self, dtype=None):
         # TODO: replace with to_pylist_tagged once refs are supported
-        return np.asarray(arrow.safe_array_to_pylist(arrow_as_array(self._arrow_data)))
+        pylist = self.to_pylist_raw()
+        return np.asarray(pylist)
 
     def __iter__(self):
         # TODO: replace with to_pylist_tagged once refs are supported, then we can
         # get rid of a bunch of older functions
-        for item in arrow.safe_array_to_pylist(arrow_as_array(self._arrow_data)):
-            yield self._mapper.apply(item)
+        for i in range(len(self)):
+            yield self._index(i)
 
     def __repr__(self):
         return f"<ArrowWeaveList: {self.object_type}>"
@@ -834,7 +837,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             return [col_mapper.apply(i.as_py()) for i in col]
         return col
 
-    def _index(self, index):
+    def _index(self, index: int):
         self._arrow_data = arrow_as_array(self._arrow_data)
         try:
             row = self._arrow_data.slice(index, 1)

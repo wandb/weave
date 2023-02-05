@@ -2601,7 +2601,43 @@ def test_map_column():
 
 def test_encode_decode_list_of_dictionary_encoded_strings():
     data = [["a", "b", "c"], ["b", "c"], ["a", "b", None], None, ["d"], []]
-    array = pa.array(data)
-    encoded = arrow.recursively_encode_pyarrow_strings_as_dictionaries(array)
-    result = arrow_type.safe_array_to_pylist(encoded)
+    awl = arrow.to_arrow(
+        data,
+        wb_type=types.List(
+            types.UnionType(
+                types.List(types.UnionType(types.String(), types.NoneType())),
+                types.NoneType(),
+            )
+        ),
+    )
+    awl._arrow_data = arrow.recursively_encode_pyarrow_strings_as_dictionaries(
+        awl._arrow_data
+    )
+    result = awl.to_pylist_raw()
     assert result == data
+
+
+def test_groupby_concat():
+    # query at issue
+    #   some-table().rows().concat()
+    #   .groupby(some_function)
+    #   .dropna().concat()'  <- note second concat here
+
+    data = [{"time": 1, "model_type": "a"}, {"time": 2, "model_type": "b"}]
+    awl_node = weave.save(arrow.to_arrow(data))
+
+    # concat
+    list_node = ops.make_list(**{str(i): awl_node for i in range(4)})
+    concatted = arrow.concat(list_node)
+
+    # groupby
+    grouped = concatted.groupby(lambda x: ops.dict_(**{"time": x["time"]}))
+
+    # dropna
+    dropped = grouped.dropna()
+
+    # now concat all the groups together
+    concatted_2 = arrow.concat(dropped)
+
+    result = weave.use(concatted_2).to_pylist_notags()
+    assert result == ([data[0]] * 4) + ([data[1]] * 4)
