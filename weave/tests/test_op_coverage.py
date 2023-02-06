@@ -78,7 +78,6 @@ js_op_exceptions = set(
         "date_round-hour",
         "date_round-minute",
         "date_round-quarter",
-        "date_round-week",
         "date_round-year",
         "date-sub",
         "dates-Equal",
