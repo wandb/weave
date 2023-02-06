@@ -708,7 +708,7 @@ def test_loading_artifact_browser_request_2(fake_wandb):
                     "artifactMembership_fe9cc269bee939ccb54ebba88c6087dd": {
                         **fwb.artifactMembership_payload
                     },
-                    "artifactMemberships": {
+                    "artifactMemberships_first_1": {
                         "edges": [
                             {
                                 "node": {

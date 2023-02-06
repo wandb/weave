@@ -259,6 +259,30 @@ class NodeExecutionReport(typing.TypedDict):
     already_executed: typing.Optional[bool]
 
 
+# This function is not called in prod - but helpful when debugging
+# to print out the entire stack of nodes that were executed.
+def _debug_node_stack(
+    fg: forward_graph.ForwardGraph, node: graph.Node, depth=0, prefix=""
+):
+    padding = " " * depth
+    if isinstance(node, graph.OutputNode):
+        input_nodes = node.from_op.inputs
+        result = ref_base.deref(fg.get_result(node))
+        res_str = str(result)[:100]
+        print(f"{padding}{prefix}{node.from_op.name} = {res_str}")
+        for input_name, input_node in input_nodes.items():
+            _debug_node_stack(fg, input_node, depth=depth + 1, prefix=f"{input_name}:")
+    elif isinstance(node, graph.ConstNode):
+        val_str = str(node.val)[:100]
+        print(f"{padding}{prefix}CONST = {val_str}")
+    elif isinstance(node, graph.VarNode):
+        print(f"{padding}{prefix}VAR({node.name})")
+    elif isinstance(node, graph.VoidNode):
+        print(f"{padding}{prefix}VOID")
+    else:
+        print(f"ERROR: {type(node)}")
+
+
 def execute_forward_node(
     fg: forward_graph.ForwardGraph,
     forward_node: forward_graph.ForwardNode,

@@ -133,3 +133,41 @@ def test_union_dicts():
     nodeC = list_.make_list(a=nodeA, b=nodeB)
     nodeD = nodeC["a"]
     assert weave.use(nodeD) == [1, None]
+
+
+def test_lambda_node_serialization():
+    # Case 1: Same array, same function - should have same deserialized mem address
+    arr_1 = ops.make_list(a=1, b=2)
+    arr_2 = ops.make_list(a=1, b=2)
+    mapped_1 = arr_1.map(lambda x: x + 1)
+    mapped_2 = arr_2.map(lambda x: x + 1)
+
+    [des_1, des_2] = serialize.deserialize(serialize.serialize([mapped_1, mapped_2]))
+    assert des_1 is des_2
+
+    # Case 2: different array, same function  - should have different deserialized mem address
+    arr_1 = ops.make_list(a=1, b=2)
+    arr_2 = ops.make_list(a=3, b=4)
+    mapped_1 = arr_1.map(lambda x: x + 1)
+    mapped_2 = arr_2.map(lambda x: x + 1)
+
+    [des_1, des_2] = serialize.deserialize(serialize.serialize([mapped_1, mapped_2]))
+    assert des_1 is not des_2
+
+    # Case 3: same array, different function  - should have different deserialized mem address
+    arr_1 = ops.make_list(a=1, b=2)
+    arr_2 = ops.make_list(a=1, b=2)
+    mapped_1 = arr_1.map(lambda x: x + 1)
+    mapped_2 = arr_2.map(lambda x: x + 2)
+
+    [des_1, des_2] = serialize.deserialize(serialize.serialize([mapped_1, mapped_2]))
+    assert des_1 is not des_2
+
+    # Case 4: different array, different function  - should have different deserialized mem address
+    arr_1 = ops.make_list(a=1, b=2)
+    arr_2 = ops.make_list(a=3, b=4)
+    mapped_1 = arr_1.map(lambda x: x + 1)
+    mapped_2 = arr_2.map(lambda x: x + 2)
+
+    [des_1, des_2] = serialize.deserialize(serialize.serialize([mapped_1, mapped_2]))
+    assert des_1 is not des_2

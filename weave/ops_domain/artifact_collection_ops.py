@@ -145,7 +145,7 @@ def is_portfolio(artifact: wdt.ArtifactCollection) -> bool:
     name="artifact-lastMembership",
     plugins=wb_gql_op_plugin(
         lambda inputs, inner: f"""
-            artifactMemberships(first: 1) {{
+            artifactMemberships_first_1: artifactMemberships(first: 1) {{
                 edges {{
                     node {{
                         {wdt.ArtifactCollectionMembership.REQUIRED_FRAGMENT}
@@ -159,7 +159,7 @@ def is_portfolio(artifact: wdt.ArtifactCollection) -> bool:
 def last_membership(
     artifact: wdt.ArtifactCollection,
 ) -> typing.Optional[wdt.ArtifactCollectionMembership]:
-    edges = artifact.gql["artifactMemberships"]["edges"]
+    edges = artifact.gql["artifactMemberships_first_1"]["edges"]
     if len(edges) == 0:
         return None
     return wdt.ArtifactCollectionMembership.from_gql(edges[0]["node"])

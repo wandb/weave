@@ -87,6 +87,12 @@ def serialize(graphs: typing.List[graph.Node]) -> SerializedReturnType:
     return {"nodes": nodes, "rootNodes": root_nodes}
 
 
+def _is_lambda(node: graph.Node):
+    return isinstance(node, graph.ConstNode) and (
+        isinstance(node.val, graph.OutputNode) or isinstance(node.val, graph.VarNode)
+    )
+
+
 @memo.memo
 def node_id(node: graph.Node):
     hashable = {"type": node.type.to_dict()}
@@ -94,6 +100,8 @@ def node_id(node: graph.Node):
         hashable["op_name"] = node.from_op.name
         hashable["inputs"] = {
             arg_name: node_id(arg_node)
+            if not _is_lambda(arg_node)
+            else json.dumps(arg_node.to_json())
             for arg_name, arg_node in node.from_op.inputs.items()
         }
     elif isinstance(node, graph.VarNode):
@@ -104,7 +112,7 @@ def node_id(node: graph.Node):
             node.val, graph.VarNode
         ):
             # Ensure we don't share function nodes. That's invalid!
-            hashable["val"] = json.dumps(node.to_json())
+            hashable["val"] = str(random.random())
         else:
             hashable["val"] = storage.to_python(node.val)
     else:
