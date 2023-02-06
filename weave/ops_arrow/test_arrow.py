@@ -16,6 +16,7 @@ from .. import box
 from .. import errors
 from .. import storage
 from ..ops_primitives import Number
+from ..ops_domain import wb_domain_types as wdt, project_ops
 from .. import api as weave
 from .. import ops
 from .. import weave_types as types
@@ -31,6 +32,7 @@ from . import list_ as arrow
 from . import dict as arrow_dict
 
 from ..tests import tag_test_util as ttu
+from ..tests import test_wb
 
 
 _loading_builtins_token = context_state.set_loading_built_ins()
@@ -2615,6 +2617,26 @@ def test_encode_decode_list_of_dictionary_encoded_strings():
     )
     result = awl.to_pylist_raw()
     assert result == data
+
+
+def test_pushdown_of_gql_tags_on_awls(fake_wandb):
+    fake_wandb.add_mock(lambda q, ndx: test_wb.workspace_response)
+    project_node = ops.project("stacey", "mendeleev")
+    project = weave.use(project_node)
+    data = box.box([1, 2, 3])
+    tag_store.add_tags(data, {"project": project})
+    awl = weave.save(arrow.to_arrow(data))
+
+    list_node = ops.arrow_list_(**{"a": awl, "b": awl})
+    concatted = arrow.concat(list_node)
+
+    for i in range(6):
+        cell = arrow.ArrowWeaveList.__getitem__(concatted, i)
+        ptag = project_ops.get_project_tag(cell)
+        assert weave.use(ptag) == project
+
+    count = concatted.count()
+    assert weave.use(count) == 6
 
 
 def test_groupby_concat():

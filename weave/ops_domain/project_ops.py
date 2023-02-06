@@ -13,7 +13,7 @@ from .. import weave_types as types
 from .. import errors
 
 # Section 1/6: Tag Getters
-make_tag_getter_op("project", wdt.ProjectType, op_name="tag-project")
+get_project_tag = make_tag_getter_op("project", wdt.ProjectType, op_name="tag-project")
 
 # Section 2/6: Root Ops
 # The output in this case is stored so it can be exported in __init__.py (can probably remove this

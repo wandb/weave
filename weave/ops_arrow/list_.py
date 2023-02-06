@@ -1439,13 +1439,7 @@ def _call_vectorized_fn_node_maybe_awl(
 def pushdown_list_tags(arr: ArrowWeaveList) -> ArrowWeaveList:
     if tag_store.is_tagged(arr):
         tag = tag_store.get_tags(arr)
-        tag_type = types.TypeRegistry.type_of(tag)
-        tag_no_dictionary = to_arrow([tag])._arrow_data
-        tag_maybe_dictionary_encoded = (
-            recursively_encode_pyarrow_strings_as_dictionaries(tag_no_dictionary)
-        )
-        tags = pa.repeat(tag_maybe_dictionary_encoded[0], len(arr))
-        return awl_add_arrow_tags(arr, tags, tag_type)
+        arr = tag_awl_list_elements_with_single_tag_dict(arr, tag)
     return arr
 
 
@@ -2380,6 +2374,27 @@ def direct_add_arrow_tags(
     return pa.StructArray.from_arrays([tag_array, new_value], ["_tag", "_value"])
 
 
+def tag_arrow_array_elements_with_single_tag_dict(
+    array: pa.Array, py_tags: dict
+) -> pa.StructArray:
+    tag_no_dictionary = to_arrow([py_tags])._arrow_data
+    tag_maybe_dictionary_encoded = recursively_encode_pyarrow_strings_as_dictionaries(
+        tag_no_dictionary
+    )
+    tags = pa.repeat(tag_maybe_dictionary_encoded[0], len(array))
+    return direct_add_arrow_tags(array, tags)
+
+
+def tag_awl_list_elements_with_single_tag_dict(
+    awl: ArrowWeaveList, py_tags: dict
+) -> ArrowWeaveList:
+    tag_type = types.TypeRegistry.type_of(py_tags)
+    tag_array = tag_arrow_array_elements_with_single_tag_dict(
+        awl._arrow_data, py_tags
+    ).field("_tag")
+    return awl_add_arrow_tags(awl, tag_array, tag_type)
+
+
 def awl_add_arrow_tags(
     l: ArrowWeaveList, arrow_tags: pa.StructArray, tag_type: types.Type
 ):
@@ -2451,11 +2466,8 @@ def vectorized_container_constructor_preprocessor(
                 awl_artifact = v._artifact
             if tag_store.is_tagged(v):
                 list_tags = tag_store.get_tags(v)
-                v = awl_add_arrow_tags(
-                    v,
-                    pa.array([list_tags] * len(v)),
-                    types.TypeRegistry.type_of(list_tags),
-                )
+                # convert tags to arrow
+                v = tag_awl_list_elements_with_single_tag_dict(v, list_tags)
             prop_types[k] = v.object_type
             v = v._arrow_data
             arrays.append(arrow_as_array(v))
@@ -2491,14 +2503,9 @@ def vectorized_container_constructor_preprocessor(
                 a = box.unbox(a)
             arrays[i] = pa.array([a] * max_len)
             if tags is not None:
-                tag_no_dictionary = pa.array([tags])
-                tag_maybe_dictionary_encoded = (
-                    recursively_encode_pyarrow_strings_as_dictionaries(
-                        tag_no_dictionary
-                    )
+                arrays[i] = tag_arrow_array_elements_with_single_tag_dict(
+                    arrays[i], tags
                 )
-                tag_array = pa.repeat(tag_maybe_dictionary_encoded[0], len(arrays[i]))
-                arrays[i] = direct_add_arrow_tags(arrays[i], tag_array)
 
     return VectorizedContainerConstructorResults(
         arrays, prop_types, max_len, awl_artifact
