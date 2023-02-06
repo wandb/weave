@@ -15,7 +15,7 @@ from ..tests import weavejs_ops
 from .. import box
 from .. import errors
 from .. import storage
-from ..ops_primitives import Number
+from ..ops_primitives import Number, Boolean
 from ..ops_domain import wb_domain_types as wdt, project_ops
 from .. import api as weave
 from .. import ops
@@ -2663,3 +2663,48 @@ def test_groupby_concat():
 
     result = weave.use(concatted_2).to_pylist_notags()
     assert result == ([data[0]] * 4) + ([data[1]] * 4)
+
+
+@pytest.mark.parametrize(
+    "name,weave_func,expected_output",
+    [
+        ("bool-and-scalar", lambda x: Boolean.bool_and(x, True), [False, None, True]),
+        ("bool-or-scalar", lambda x: Boolean.bool_or(x, True), [True, None, True]),
+        ("bool-not", lambda x: Boolean.bool_not(x), [True, None, False]),
+    ],
+)
+def test_vectorized_bool_ops(name, weave_func, expected_output):
+    expected_value_type = weave.type_of(expected_output).object_type
+
+    list = [False, None, True]
+    for i, elem in enumerate(list):
+        taggable = box.box(elem)
+        list[i] = tag_store.add_tags(taggable, {"mytag": f"test{i + 1}"})
+
+    tag_getter_op = make_tag_getter_op.make_tag_getter_op("mytag", types.String())
+
+    awl = arrow.to_arrow(list)
+    l = weave.save(awl)
+    fn = weave_internal.define_fn({"x": awl.object_type}, weave_func).val
+    vec_fn = arrow.vectorize(fn)
+
+    called = weave_internal.call_fn(vec_fn, {"x": l})
+    assert weave.use(called).to_pylist_notags() == expected_output
+
+    item_node = arrow.ArrowWeaveList.__getitem__(called, 0)
+
+    def make_exp_tag(t: types.Type):
+        return tagged_value_type.TaggedValueType(
+            types.TypedDict({"mytag": types.String()}),
+            t,
+        )
+
+    expected_type_obj_type = make_exp_tag(expected_value_type)
+    # check that tags are propagated
+    assert weave.use(tag_getter_op(item_node)) == "test1"
+
+    # NOTE: This optionality is needed because some arrow ops eagerly declare
+    # optional returns. See number.py and string.py for commentary on the subject.
+    assert arrow.ArrowWeaveListType(types.optional(expected_type_obj_type)).assign_type(
+        called.type
+    )

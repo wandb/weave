@@ -75,6 +75,4 @@ def bool_or(self, other):
     output_type=self_type_output_type_fn,
 )
 def bool_not(self):
-    if isinstance(other, ArrowWeaveList):
-        other = other._arrow_data
     return ArrowWeaveList(pc.invert(self._arrow_data), types.Boolean(), self._artifact)
