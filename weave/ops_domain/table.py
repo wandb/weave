@@ -1,6 +1,6 @@
 import dataclasses
 import json
-import logging
+import datetime
 import typing
 
 
@@ -291,8 +291,10 @@ def _in_place_join_in_linked_tables(
     return rows, object_type
 
 
-def _transform_rows_into_media_objects(
-    row_data: list[dict], file: artifact_fs.FilesystemArtifactFile
+def _table_data_to_weave1_objects(
+    row_data: list[dict],
+    file: artifact_fs.FilesystemArtifactFile,
+    row_type: types.TypedDict,
 ) -> list[dict]:
     def _create_media_type_for_cell(cell: dict) -> typing.Any:
         file_type = cell["_type"]
@@ -322,19 +324,37 @@ def _transform_rows_into_media_objects(
                 f"Unsupported media type {file_type}"
             )
 
-    def _process_cell_value(cell: typing.Any) -> typing.Any:
-        if isinstance(cell, list):
-            cell = [_process_cell_value(c) for c in cell]
+    def _process_cell_value(cell: typing.Any, cell_type: types.Type) -> typing.Any:
+        if isinstance(cell, list) and isinstance(cell_type, types.List):
+            cell = [_process_cell_value(c, cell_type.object_type) for c in cell]
         elif isinstance(cell, dict):
             if "_type" in cell and "path" in cell:
                 cell = _create_media_type_for_cell(cell)
-            else:
-                cell = {k: _process_cell_value(v) for k, v in cell.items()}
+            elif isinstance(cell_type, types.TypedDict):
+                cell = {
+                    k: _process_cell_value(v, cell_type.property_types[k])
+                    for k, v in cell.items()
+                }
+
+        # this is needed because tables store timestamps as unix epochs in ms, but the deserialized
+        # representation in weave1 is a datetime object. we do the conversion here to ensure deserialized
+        # timestamps all expose a common interface to weave1 callers.
+        elif types.UnionType(types.NoneType(), types.Timestamp()).assign_type(
+            cell_type
+        ):
+            if cell is not None:
+                cell = datetime.datetime.fromtimestamp(
+                    cell / 1000, tz=datetime.timezone.utc
+                )
+
         return cell
 
     rows: list[dict] = []
     for data_row in row_data:
-        new_row = {k: _process_cell_value(v) for k, v in data_row.items()}
+        new_row = {
+            k: _process_cell_value(v, row_type.property_types[k])
+            for k, v in data_row.items()
+        }
         rows.append(new_row)
 
     return rows
@@ -386,7 +406,7 @@ def _get_rows_and_object_type_from_weave_format(
     object_type = types.TypedDict(obj_prop_types)
 
     raw_rows = [dict(zip(data["columns"], row)) for row in row_data]
-    rows = _transform_rows_into_media_objects(raw_rows, file)
+    rows = _table_data_to_weave1_objects(raw_rows, file, object_type)
 
     rows, object_type = _in_place_join_in_linked_tables(
         rows, object_type, column_types, file
@@ -403,7 +423,7 @@ def _get_rows_and_object_type_from_legacy_format(
     raw_rows = [dict(zip(data["columns"], row)) for row in data["data"]]
     object_type = _infer_type_from_row_dicts(_sample_rows(raw_rows))
 
-    rows = _transform_rows_into_media_objects(raw_rows, file)
+    rows = _table_data_to_weave1_objects(raw_rows, file, object_type)
 
     return rows, object_type
 
