@@ -332,7 +332,7 @@ def _table_data_to_weave1_objects(
                 cell = _create_media_type_for_cell(cell)
             elif isinstance(cell_type, types.TypedDict):
                 cell = {
-                    k: _process_cell_value(v, cell_type.property_types[k])
+                    k: _process_cell_value(v, cell_type.property_types[str(k)])
                     for k, v in cell.items()
                 }
 
@@ -352,7 +352,7 @@ def _table_data_to_weave1_objects(
     rows: list[dict] = []
     for data_row in row_data:
         new_row = {
-            k: _process_cell_value(v, row_type.property_types[k])
+            k: _process_cell_value(v, row_type.property_types[str(k)])
             for k, v in data_row.items()
         }
         rows.append(new_row)
