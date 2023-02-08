@@ -101,3 +101,52 @@ def test_we_dont_over_execute(fake_wandb):
     # has changed in the engine that is causing us to over-execute nodes
     # and is an indication of a serious performance regression.
     assert stats["node_count"] == 17
+
+
+def table_mock_respecting_run_name(q, ndx):
+    # this is a more realistic gql responder that will only return run displayName
+    # if its selected.
+    if q["gql"].definitions[0].name.value == "WeavePythonCG":
+        # is project.runs.edges.node.displayName selected?
+        project_field = q["gql"].definitions[0].selection_set.selections[0]
+        assert project_field.name.value == "project"
+        runs_field = project_field.selection_set.selections[3]
+        assert runs_field.name.value == "runs"
+        runs_node = runs_field.selection_set.selections[0].selection_set.selections[0]
+        node_fields = runs_node.selection_set.selections
+        display_name_selected = any(f.name.value == "displayName" for f in node_fields)
+
+        if display_name_selected:
+            return test_wb.workspace_response
+        else:
+            return test_wb.workspace_response_no_run_displayname
+    else:
+        return test_wb.artifact_version_sdk_response
+
+
+def test_outer_tags_propagate_on_cache_hit(fake_wandb):
+    fake_wandb.add_mock(table_mock_respecting_run_name)
+    row = (
+        ops.project("stacey", "mendeleev")
+        .runs()
+        .limit(50)
+        .summary()
+        .pick("table")
+        .offset(0)
+        .limit(2)[0]
+        .table()
+        .rows()
+        .createIndexCheckpointTag()[0]
+    )
+    # The first query does not select run.displayName, but it caches
+    # results along the way.
+    weave.use(row)
+
+    # The cached results include tags that have gql results (which don't
+    # include displayName since it wasn't selected in the prior query).
+
+    # Now select displayName in a new query. This query will hit cache.
+    # But we should get the correct result because we propagate outer
+    # tags even on cache hits.
+    run_names_res = weave.use(row.run().name())
+    assert run_names_res == "amber-glade-100"

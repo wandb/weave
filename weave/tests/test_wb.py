@@ -103,6 +103,53 @@ workspace_response = {
     }
 }
 
+workspace_response_no_run_displayname = {
+    "project_518fa79465d8ffaeb91015dce87e092f": {
+        **fwb.project_payload,  # type: ignore
+        "runs_21303e3890a1b6580998e6aa8a345859": {
+            "edges": [
+                {
+                    "node": {
+                        **fwb.run_payload,  # type: ignore
+                        "summaryMetrics": json.dumps(
+                            {
+                                "table": {
+                                    "_type": "table-file",
+                                    "artifact_path": "wandb-client-artifact://1234567890/test_results.table.json",
+                                },
+                                "legacy_table": {
+                                    "_type": "table-file",
+                                    "path": "media/tables/legacy_table.table.json",
+                                },
+                            }
+                        ),
+                    },
+                },
+                {
+                    "node": {
+                        **fwb.run2_payload,  # type: ignore
+                        "summaryMetrics": json.dumps({}),
+                    },
+                },
+                {
+                    "node": {
+                        **fwb.run3_payload,  # type: ignore
+                        "summaryMetrics": json.dumps(
+                            {
+                                "table": {
+                                    "_type": "table-file",
+                                    "artifact_path": "wandb-client-artifact://1122334455/test_results.table.json",
+                                },
+                            }
+                        ),
+                    },
+                },
+            ]
+        },
+    }
+}
+
+
 empty_workspace_response = {
     "project_518fa79465d8ffaeb91015dce87e092f": {
         **fwb.project_payload,  # type: ignore

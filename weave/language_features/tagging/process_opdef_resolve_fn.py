@@ -86,6 +86,27 @@ def propagate_arrow_tags(
     return res
 
 
+def flow_tags(
+    first_input: typing.Any,
+    output: typing.Any,
+    give_precedence_to_existing_tags: bool = False,
+) -> typing.Any:
+    if tag_store.is_tagged(first_input):
+        tag_dict = tag_store.get_tags(first_input)
+        if isinstance(output, types.Type):
+            if len(tag_dict.keys()) == 0:
+                return output
+            tag_type = types.TypeRegistry.type_of(tag_dict)
+            assert isinstance(tag_type, types.TypedDict)
+            return TaggedValueType(tag_type, output)
+        return tag_store.add_tags(
+            output,
+            tag_dict,
+            give_precedence_to_existing_tags=give_precedence_to_existing_tags,
+        )
+    return output
+
+
 # This function is responcible for post-processing the results of a resolve_fn.
 # Specifically, it will take one of 3 actions:
 # 1. If `_should_tag_op_def_outputs` is true, then it will tag the output with the input.
@@ -120,15 +141,5 @@ def process_opdef_resolve_fn(
             return tag_store.add_tags(res, tag_dict)
     elif should_flow_tags(op_def):
         key, val = get_first_arg(op_def, args, kwargs)
-        if tag_store.is_tagged(val):
-            tag_dict = tag_store.get_tags(val)
-            if isinstance(res, types.Type):
-                if len(tag_dict.keys()) == 0:
-                    return res
-                tag_type = types.TypeRegistry.type_of(tag_dict)
-                assert isinstance(tag_type, types.TypedDict)
-                return TaggedValueType(tag_type, res)
-            return tag_store.add_tags(
-                res, tag_dict, give_precedence_to_existing_tags=True
-            )
+        return flow_tags(val, res, give_precedence_to_existing_tags=True)
     return res

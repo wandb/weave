@@ -28,6 +28,8 @@ from . import weave_types as types
 # Ops
 from . import registry_mem
 from . import op_def
+from .language_features.tagging import process_opdef_resolve_fn
+from .language_features.tagging import opdef_util
 
 # Trace / cache
 from . import trace_local
@@ -192,7 +194,10 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
 
                 logging.info(
                     "Exception during execution of: %s\n%s"
-                    % (str(forward_node.node), traceback.format_exc())
+                    % (
+                        graph_debug.node_expr_str_full(forward_node.node),
+                        traceback.format_exc(),
+                    )
                 )
                 raise
             finally:
@@ -344,18 +349,27 @@ def execute_forward_node(
                     return {"cache_used": True, "already_executed": False}
                 else:
                     if run.output is not None:
-                        # if isinstance(run._output, artifacts_local.LocalArtifact):
-                        #     print('OUTPUT REF TYPE OBJ TYPE', )
-                        # This `refs.deref(run.output)` a critical call, even though
-                        # the output is not used. This call ensures that the output
-                        # is loaded, which in turn materializes the tags at the
-                        # currect context scope. Without this call, the first child
-                        # of this node will perform the derefing, which will result
-                        # in the tags being added the the scope of the child. If
-                        # more than 1 direct child exists, the next children will
-                        # not have the tags in their scope.
-                        ref_base.deref(run.output)
-                        forward_node.set_result(run.output)
+                        output_ref = run.output
+                        # We must deref here to restore tags
+                        output = output_ref.get()
+
+                        # Flowed tags are not cacheable(!),
+                        # because they may contain graph dependent information,
+                        # as in the case of gql tags that contain results for downstream
+                        # nodes. So we fix that up here, by flowing tags and overriding
+                        # the cached tags.
+                        # Note, this only works for outer tags, not tags that are inside
+                        # values. For those, we don't have a solution yet.
+                        if opdef_util.should_flow_tags(op_def):
+                            arg0_ref = next(iter(input_refs.values()))
+                            arg0 = ref_base.deref(arg0_ref)
+
+                            output = output_ref.get()
+
+                            process_opdef_resolve_fn.flow_tags(arg0, output)
+
+                        forward_node.set_result(output_ref)
+
                         return {"cache_used": True, "already_executed": False}
                 # otherwise, the run's output was not saveable, so we need
                 # to recompute it.
