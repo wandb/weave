@@ -32,7 +32,7 @@ class NumpyArrayLoader:
 
 class NumpyArrayType(types.Type):
     instance_classes = np.ndarray
-    name = "ndarray"
+    name = "WeaveNDArray"
 
     def __init__(self, dtype="x", shape=(0,)):
         self.dtype = dtype

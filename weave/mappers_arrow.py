@@ -14,7 +14,7 @@ from . import errors
 from . import node_ref
 from . import artifact_base
 from .language_features.tagging import tagged_value_type, tag_store
-
+from .ops_domain import wbmedia
 import contextvars
 
 _in_tagging_context = contextvars.ContextVar("in_tagging_context", default=False)
@@ -278,7 +278,7 @@ class DefaultToArrow(mappers_python.DefaultToPy):
                 )
             )
         elif (
-            self.type.name == "ndarray"
+            self.type.name == "WeaveNDArray"
             or self.type.name == "pil_image"
             or self.type.name == "ArrowArray"
             or self.type.name == "ArrowTable"
@@ -292,6 +292,8 @@ class DefaultToArrow(mappers_python.DefaultToPy):
             return pa.timestamp("ms", tz="+00:00")
         elif self.type.name == "type":
             return pa.string()
+        elif self.type.name == "ndarray":
+            return pa.null()
 
         raise errors.WeaveInternalError(
             "Type not yet handled by mappers_arrow: %s" % self.type
@@ -416,6 +418,7 @@ def map_from_arrow_scalar(value: pa.Scalar, type_: types.Type, artifact):
             types.String,
             types.Timestamp,
             types.NoneType,
+            wbmedia.LegacyTableNDArrayType,
         ),
     ):
         return value.as_py()

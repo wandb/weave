@@ -85,11 +85,7 @@ def _convert_type(old_type: Weave0TypeJson) -> types.Type:
     elif old_type_name == "timestamp":
         return types.Timestamp()
     elif old_type_name == "ndarray":
-        # returning None here since the data is serialized as a none. The actual data is stored
-        # in the artifact at the path specified in `old_type._params["serialization_path"]`. In Weave0
-        # we never attempt to read this data and simply ignore it! For compatibility, we can doe the
-        # same here, but in the future we likely want to improve this behavior.
-        return types.NoneType()
+        return ops.LegacyTableNDArrayType()
         # return NumpyArrayType("f", shape=old_type._params.get("shape", (0,)))
     #
     # Media Types

@@ -55,6 +55,18 @@ class HtmlArtifactFileRef:
     path: str
 
 
+# When a WB table is written to disk, it accumulates all the NDArrays into a
+# single file so that these columns can be stored more efficiently. In the UI,
+# we completely ignore such columns. The underlying data is even Nulled out!
+#  With Weave1, we actually have the possibility of doing something with them if
+# we wanted to! There are additional properties which we could use to add value:
+# {"params": {"serialization_path": {"key": "output", "path":
+# "media/serialized_data/498587e8.npz"}, "shape": [10]} However, I suspect we
+# will just use the newer Weave1 NDArray type instead.
+class LegacyTableNDArrayType(types.Type):
+    name = "ndarray"
+
+
 # This shows a pattern for how to convert an in memory object (Html)
 # to a W&B media type style FileRef, so that the existing frontend
 # code can work with it.

@@ -90,7 +90,7 @@ def make_molecule():
         #
         (datetime.datetime.now(), types.Timestamp()),  # type: ignore
         # See comment in wandb_util.py - this may change in the future
-        (np.array([1, 2, 3]), types.NoneType()),
+        (np.array([1, 2, 3]), weave.ops.LegacyTableNDArrayType()),
         #
         # Media Types
         #

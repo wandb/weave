@@ -56,7 +56,7 @@ class DeriveOpHandler:
 disallow_mapping_type_name_list = [
     "type",
     "list",
-    "ndarray",
+    "WeaveNDArray",
     "ArrowArray",
     "ArrowTable",
     "ArrowWeaveList",
