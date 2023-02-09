@@ -213,17 +213,6 @@ def list_ops():
     return {"data": ret}
 
 
-def recursively_unwrap_unions(obj):
-    if isinstance(obj, list):
-        return [recursively_unwrap_unions(o) for o in obj]
-    if isinstance(obj, dict):
-        if "_union_id" in obj and "_val" in obj:
-            return recursively_unwrap_unions(obj["_val"])
-        else:
-            return {k: recursively_unwrap_unions(v) for k, v in obj.items()}
-    return obj
-
-
 @blueprint.route("/__weave/execute", methods=["POST"])
 def execute():
     """Execute endpoint used by WeaveJS."""

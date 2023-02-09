@@ -63,9 +63,9 @@ def _convert_type(old_type: Weave0TypeJson) -> types.Type:
         )
     elif old_type_name == "const":
         val = old_type["params"]["val"]
-        if old_type["params"]["is_set"]:
-            # TODO is_set is wrong... shoudl be enum probably
-            val = set(val)
+        # if old_type["params"]["is_set"]:
+        # TODO is_set is wrong... should be enum probably
+        # val = set(val)
         return types.Const(types.TypeRegistry.type_of(val), val)
     #
     # Container Types
@@ -95,7 +95,36 @@ def _convert_type(old_type: Weave0TypeJson) -> types.Type:
         or old_type_name == "wandb.Image"
         or (is_python_object_type and old_type["params"].get("class_name") == "Image")
     ):
-        return ops.ImageArtifactFileRef.WeaveType()  # type: ignore
+        if "params" not in old_type or "class_map" not in old_type["params"]:
+            # This is legacy and fixed in `_patch_legacy_image_file_types``
+            return ops.LegacyImageArtifactFileRefType()
+
+        boxLayersType = (
+            weave0_type_json_to_weave1_type(old_type["params"]["box_layers"]).val  # type: ignore
+            if "box_layers" in old_type["params"]
+            else None
+        )
+        boxScoreKeysType = (
+            weave0_type_json_to_weave1_type(old_type["params"]["box_score_keys"]).val  # type: ignore
+            if "box_score_keys" in old_type["params"]
+            else None
+        )
+        maskLayersType = (
+            weave0_type_json_to_weave1_type(old_type["params"]["mask_layers"]).val  # type: ignore
+            if "mask_layers" in old_type["params"]
+            else None
+        )
+        classMapType = (
+            weave0_type_json_to_weave1_type(old_type["params"]["class_map"]).val  # type: ignore
+            if "class_map" in old_type["params"]
+            else None
+        )
+        return ops.ImageArtifactFileRefType(
+            boxLayersType,
+            boxScoreKeysType,
+            maskLayersType,
+            classMapType,
+        )
     elif old_type_name == "audio-file" or (
         is_python_object_type and old_type["params"].get("class_name") == "Audio"
     ):

@@ -82,7 +82,7 @@ def test_execute_cache_mode_minimal_no_recursive_refinement(weave_cache_mode_min
 
 
 def test_we_dont_over_execute(fake_wandb):
-    fake_wandb.add_mock(test_wb.table_mock1)
+    fake_wandb.fake_api.add_mock(test_wb.table_mock1)
     cell_node = (
         ops.project("stacey", "mendeleev")
         .runs()

@@ -94,7 +94,7 @@ def cereal_csv():
 @pytest.fixture()
 def fake_wandb():
     setup_response = fixture_fakewandb.setup()
-    yield setup_response.fake_api
+    yield setup_response
     fixture_fakewandb.teardown(setup_response)
 
 

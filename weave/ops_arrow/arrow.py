@@ -41,6 +41,10 @@ def dense_union_to_sparse_union(array: pa.Array) -> pa.Array:
 def safe_replace_with_mask(
     array: pa.Array, mask: pa.Array, replacements: pa.Array
 ) -> pa.Array:
+    if array.type != replacements.type:
+        raise errors.WeaveInternalError(
+            f"Expected array and replacements to have the same type, got {array.type} and {replacements.type}"
+        )
 
     if pa.types.is_struct(array.type):
         arrays = []
@@ -54,20 +58,109 @@ def safe_replace_with_mask(
 
         return pa.StructArray.from_arrays(arrays, names)
     elif pa.types.is_list(array.type):
-        offsets = array.offsets
-        value_array = array.flatten()
-        replacement_array = replacements.flatten()
+        # Note: this is admittedly not efficient, but there does not seem to be
+        # a better alternative. Basically, `pc.replace_with_mask` does not work
+        # on list arrays. There are a number of problems:
+        # 1. Calling `flatten` on a list array drops the nulls.
+        # 2. In order to enter another level of recursion with
+        # `safe_replace_with_mask`, we would need to create a new mask, value,
+        # and replacement array. The value and mask arrays cannot be correctly
+        # created with pure pyarrow functions and require looping over every sub
+        # element in the lists. Unless that can be solved, then this single loop
+        # over the outer list is the best we can do.
+        final_arr = []
+        replacement_ndx = 0
+        for i in range(len(array)):
+            if mask[i].as_py():
+                final_arr.append(replacements[replacement_ndx].as_py())
+                replacement_ndx += 1
+            else:
+                final_arr.append(array[i].as_py())
+        return pa.array(final_arr, type=array.type)
 
-        flat_mask_pydata = []
-        for i in range(len(mask)):
-            if not pc.is_null(array[i]).as_py():
-                for _ in range(len(array[i])):
-                    flat_mask_pydata.append(mask[i])
+        # Note: Danny had commented that the above implementation would fail in
+        # the case that array.type is a dense union. This is true - see
+        # https://github.com/wandb/weave-internal/pull/542/files#r1100703368.
+        #
+        # A test commented out test case is provided in `test_safe_replace_with_mask`
+        # which stresses this.
+        #
+        # In particular, it would need to follow something like this logic
+        # (which is pretty challenging to implement and likely requires visiting
+        # every single value!):
+        #
+        #
+        # array: ListArray<T> - length L
+        # replacements - ListArray<T> - length R
+        # mask: BooleanArray - length L (R number of True values)
+        #
+        # flattened_array: (assuming [3,3])
+        # [0_0, 0_1, 0_2, 1_0, 1_1, 1_2, 2_0, 2_1, 2_2]
+        #  |-----L0-----| |-----L1-----| |-----L2-----|
+        #
+        # flattened_mask:
+        # [0_B, 0_B, 0_B, 1_B, 1_B, 1_B, 2_B, 2_B, 2_B]
+        #  |-----L0-----| |-----L1-----| |-----L2-----|
+        #
+        # flattened_replacements: (assuming (2,2))
+        # [0_0, 0_1, 1_0, 1_1]
+        #  |--R0--| |--R1---|
+        #
+        # Now, let's assume the mask is [True, False, True],
+        #
+        # Then we want to replace the first and third list in the original array,
+        # so the mask needs to be:
+        # [True, True, False, False, False, True, True]
+        #  |--M0--|    |-------M1-------|   |--M2--|
+        #
+        # Notice that the expanded values of the masks are not always the same length - they
+        # take the length of the original list if False, and the length of the replacement list
+        # if True. But since our masks and array need to be the same length, the true flattened
+        # array needs to be something like:
+        # [None, None, 1_0, 1_1, 1_2, None, None]
+        #  |--L0--|    |-----L1----|   |-L2---|
+        #
+        # Where the masked entries are turned into None values of length R#!
+        #
+        #
+        # Similarly, the offsets are also a bit odd:
+        #
+        # flattened_offsets:
+        # [0, 2, 5, 7]
+        #
+        #
+        # These offsets need to be derived from the mask, and offsets of both the original
+        # and replacement arrays.
+        #
+        #
+        # array_offsets:
+        # [0, 3, 6, 9]
+        #
+        # replacement_offsets:
+        # [0, 2, 4]
+        #
+        # So to calculate the offsets, we basically need to do a cumulative sum, shifting
+        # between the different offsets depending on the value of the mask. so:
+        #
+        # step 1: - each entry is the length of the inner list corresponding to that
+        #           index in either either the original or replacement array if the mask
+        #           is False or True respectively:
+        # [0, 2, 3, 2]
+        #
+        # step 2: cumulative sum:
+        # [0, 2, 5, 7]
+        #
+        #
+        # So, our final calculated vars are:
+        #
+        # flattened_modified_array = [None, None, 1_0, 1_1, 1_2, None, None]
+        # flattened_mask           = [True, True, False, False, False, True, True]
+        # flattened_offsets        = [0, 2, 5, 7]
+        # flattened_replacements   = [0_0, 0_1, 1_0, 1_1]
+        #
+        # new_replaced = safe_replace_with_mask(flattened_modified_array, flattened_mask, flattened_replacements)
+        # return pa.ListArray.from_arrays(flattened_offsets, new_replaced)
 
-        flat_mask = pa.array(flat_mask_pydata, type=pa.bool_())
-
-        result = safe_replace_with_mask(value_array, flat_mask, replacement_array)
-        return pa.ListArray.from_arrays(offsets, result)
     return pc.replace_with_mask(array, mask, replacements)
 
 
@@ -245,6 +338,22 @@ def adjust_table_after_parquet_deserialization(table: pa.Table) -> pa.Table:
                     )
             return column_name, pa.chunked_array(new_col)
 
+        elif pa.types.is_list(column.type):
+            new_col = []
+            for a in column.chunks:
+                (
+                    name,
+                    array,
+                ) = convert_struct_to_union_and_nullify_dummy_empty_structs(
+                    pa.chunked_array(a.flatten()), column_name
+                )
+                new_col.append(
+                    pa.ListArray.from_arrays(
+                        a.offsets, array.combine_chunks(), mask=pa.compute.is_null(a)
+                    )
+                )
+            return column_name, pa.chunked_array(new_col)
+
         else:
             # we have a regular field
             return column_name, column
@@ -329,6 +438,25 @@ def adjust_table_for_parquet_serialization(table: pa.Table) -> pa.Table:
                             arrays, names, mask=pa.compute.invert(a.is_valid())
                         )
                     )
+            column = pa.chunked_array(new_col)
+
+        if pa.types.is_list(column.type):
+            new_col = []
+            for a in column.chunks:
+                (
+                    new_name,
+                    chunked_array,
+                ) = recursively_convert_unions_to_structs_and_impute_empty_structs(
+                    pa.chunked_array(a.flatten()), column_name
+                )
+                new_col.append(
+                    pa.ListArray.from_arrays(
+                        a.offsets,
+                        chunked_array.combine_chunks(),
+                        mask=pa.compute.invert(a.is_valid()),
+                    )
+                )
+
             column = pa.chunked_array(new_col)
 
         return column_name, column

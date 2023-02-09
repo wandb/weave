@@ -31,7 +31,7 @@ def test_root_project_runs(fake_wandb):
     runs_1_iid = runs_node[1].internalId()
     runs_2_name = runs_node[2].name()
     concat_node = runs_0_id.add(runs_1_iid).add(runs_2_name)
-    fake_wandb.add_mock(
+    fake_wandb.fake_api.add_mock(
         lambda query, ndx: {
             "project_518fa79465d8ffaeb91015dce87e092f": {
                 "id": 1,
@@ -69,7 +69,7 @@ def test_root_project_runs(fake_wandb):
         }
     )
     assert weave.use(concat_node) == "2ed5xwpnid_1small-cat-7"
-    log = fake_wandb.execute_log()
+    log = fake_wandb.fake_api.execute_log()
     assert len(log) == 1
     assert_gql_str_equal(
         log[0]["gql"],
@@ -109,7 +109,7 @@ def test_root_project_runs(fake_wandb):
 def test_root_project_concat(fake_wandb):
     runs_node_1 = ops.project("stacey", "mendeleev").filteredRuns("{}", "-createdAt")
     runs_node_2 = ops.project("stacey", "mendeleev").filteredRuns("{}", "-createdAt")
-    fake_wandb.add_mock(
+    fake_wandb.fake_api.add_mock(
         lambda query, ndx: {
             "project_518fa79465d8ffaeb91015dce87e092f": {
                 **fwb.project_payload,
@@ -131,7 +131,7 @@ def test_root_project_concat(fake_wandb):
     )
 
     assert weave.use(summary) == [0.1, 0.1]
-    log = fake_wandb.execute_log()
+    log = fake_wandb.fake_api.execute_log()
     assert len(log) == 2
     assert_gql_str_equal(
         log[0]["gql"],
@@ -173,7 +173,7 @@ def test_root_project_concat(fake_wandb):
 
 def test_all_projects(fake_wandb):
     all_projects = ops.project_ops.root_all_projects().runs().flatten().name()
-    fake_wandb.add_mock(
+    fake_wandb.fake_api.add_mock(
         lambda query, ndx: {
             "instance": {
                 "projects_500": {
@@ -199,7 +199,7 @@ def test_all_projects(fake_wandb):
         }
     )
     assert weave.use(all_projects) == ["crazy-cat-5"]
-    log = fake_wandb.execute_log()
+    log = fake_wandb.fake_api.execute_log()
     assert len(log) == 1
     assert_gql_str_equal(
         log[0]["gql"],
@@ -244,7 +244,7 @@ def test_all_projects(fake_wandb):
 def test_rpt_op(fake_wandb):
     rpt_op = registry_mem.memory_registry.get_op("rpt_weekly_users_by_country_by_repo")
     data = rpt_op("stacey")["rows"]["user_fraction"]
-    fake_wandb.add_mock(
+    fake_wandb.fake_api.add_mock(
         lambda query, ndx: {
             "repoInsightsPlotData_541e3882f7cccacef0f697358bac12e3": {
                 "edges": [
@@ -264,7 +264,7 @@ def test_rpt_op(fake_wandb):
         }
     )
     assert weave.use(data) == [0.5, 0.75]
-    log = fake_wandb.execute_log()
+    log = fake_wandb.fake_api.execute_log()
     assert len(log) == 1
     assert_gql_str_equal(
         log[0]["gql"],
@@ -289,7 +289,7 @@ def test_rpt_op(fake_wandb):
 
 
 def test_mutli_root_merging(fake_wandb):
-    fake_wandb.add_mock(
+    fake_wandb.fake_api.add_mock(
         lambda query, ndx: {
             "project_8d1592567720841659de23c02c97d594": {
                 **fwb.project_payload,
@@ -352,7 +352,7 @@ def test_mutli_root_merging(fake_wandb):
         [1609459200, 1640995200],
     ]
 
-    log = fake_wandb.execute_log()
+    log = fake_wandb.fake_api.execute_log()
     assert len(log) == 1
     assert_gql_str_equal(
         log[0]["gql"],

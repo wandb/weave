@@ -307,6 +307,9 @@ def _table_data_to_weave1_objects(
                 height=cell["height"],
                 width=cell["width"],
                 sha256=cell.get("sha256", file_path),
+                boxes=cell.get("boxes", {}),  # type: ignore
+                masks=cell.get("masks", {}),  # type: ignore
+                classes=cell.get("classes"),  # type: ignore
             )
         elif file_type in [
             "audio-file",
@@ -360,6 +363,121 @@ def _table_data_to_weave1_objects(
     return rows
 
 
+def _patch_legacy_image_file_types(
+    rows: list[dict],
+    object_type: types.TypedDict,
+    file: artifact_fs.FilesystemArtifactFile,
+    assume_legacy: bool = False,
+):
+    """
+    This is a patch to make up for image files born before Oct 2021. Before then, we did not encode the
+    full box and mask type information in the type system and unfortunately requires looking at the data.
+    We will only look at the first 10 examples, however. This is a rewrite of the same patch function found here:
+    https://github.com/wandb/core/blob/30d6d9eeb125904c00066f023ac404c957bf6bf7/lib/js/cg/src/ops/domain/table.ts#LL51C29-L51C29
+
+    Note: this does not work for lists of images!
+    """
+    return_prop_types = {}
+    class_types = (
+        (wbmedia.LegacyImageArtifactFileRefType,)
+        if not assume_legacy
+        else (wbmedia.LegacyImageArtifactFileRefType, wbmedia.ImageArtifactFileRefType)
+    )
+    for col_name, col_type in object_type.property_types.items():
+        return_prop_types[col_name] = col_type
+        other_members = []
+
+        # If the type is a union, we need to check if the union contains a legacy image type
+        # If it does, we keep track of the peer types so we can re-create the union
+        if isinstance(col_type, types.UnionType):
+            found = False
+            for member in col_type.members:
+                if not isinstance(member, class_types):
+                    other_members.append(member)
+                else:
+                    found = True
+            if not found:
+                continue
+
+        # If the type is not a union, we need to check if it is a legacy image type
+        elif not isinstance(col_type, class_types):
+            continue
+
+        # We will look at the first 10 rows of the table to determine the type.
+        non_null_rows_evaluated = 0
+        mask_keys_set: set[str] = set()
+        box_keys_set: set[str] = set()
+        box_score_key_set: set[str] = set()
+        class_map: dict[int, str] = {}
+        for row in rows:
+            image_example = row[col_name]
+            if image_example is None:
+                continue
+            image_example = typing.cast(wbmedia.ImageArtifactFileRef, image_example)
+
+            # Add the mask keys to the running set
+            if image_example.masks is not None:
+                mask_keys_set = mask_keys_set.union(image_example.masks.keys())
+
+            # Add the box keys to the running set
+            if image_example.boxes is not None:
+                box_keys_set = box_keys_set.union(image_example.boxes.keys())
+
+                # Add the box score keys to the running set
+                for box_set in image_example.boxes.values():
+                    for box in box_set:
+                        if "scores" in box and box["scores"] is not None:
+                            box_score_key_set = box_score_key_set.union(
+                                box["scores"].keys()
+                            )
+
+            # Fetch the class data (requires a network call) and update the class map
+            if image_example.classes is not None and "path" in image_example.classes:
+                classes_path = image_example.classes["path"]
+                classes_file = file.artifact.path_info(classes_path)
+                if classes_file is None or isinstance(
+                    classes_file, artifact_fs.FilesystemArtifactDir
+                ):
+                    raise errors.WeaveInternalError(
+                        "classes_file is None or a directory"
+                    )
+                with classes_file.open() as f:
+                    tracer = engine_trace.tracer()
+                    with tracer.trace("classes_file:jsonload"):
+                        classes_data = json.load(f)
+                if (
+                    "class_set" in classes_data
+                    and classes_data["class_set"] is not None
+                ):
+                    for class_item in classes_data["class_set"]:
+                        if (
+                            "id" in class_item
+                            and "name" in class_item
+                            and class_map.get(class_item["id"]) is None
+                        ):
+                            class_map[class_item["id"]] = class_item["name"]
+
+            # Update the number of loaded rows
+            non_null_rows_evaluated += 1
+            if non_null_rows_evaluated >= 10:
+                break
+
+        # Finally, construct the needed objects
+        class_keys = list(class_map.keys())
+        box_layers = {box_key: class_keys for box_key in box_keys_set}
+        mask_layers = {box_key: class_keys for box_key in mask_keys_set}
+
+        new_image_type = wbmedia.ImageArtifactFileRefType(
+            boxLayers=box_layers,
+            boxScoreKeys=list(box_score_key_set),
+            maskLayers=mask_layers,
+            classMap=class_map,
+        )
+
+        return_prop_types[col_name] = types.union(*other_members, new_image_type)
+    return types.TypedDict(return_prop_types)
+
+
 def _get_rows_and_object_type_from_weave_format(
     data: typing.Any, file: artifact_fs.FilesystemArtifactFile
 ) -> tuple[list, types.TypedDict]:
@@ -407,6 +525,7 @@ def _get_rows_and_object_type_from_weave_format(
 
     raw_rows = [dict(zip(data["columns"], row)) for row in row_data]
     rows = _table_data_to_weave1_objects(raw_rows, file, object_type)
+    object_type = _patch_legacy_image_file_types(rows, object_type, file)
 
     rows, object_type = _in_place_join_in_linked_tables(
         rows, object_type, column_types, file
@@ -424,6 +543,7 @@ def _get_rows_and_object_type_from_legacy_format(
     object_type = _infer_type_from_row_dicts(_sample_rows(raw_rows))
 
     rows = _table_data_to_weave1_objects(raw_rows, file, object_type)
+    object_type = _patch_legacy_image_file_types(rows, object_type, file, True)
 
     return rows, object_type
 

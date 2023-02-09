@@ -3,14 +3,17 @@ from dataclasses import dataclass, field
 import json
 import os
 import random
+import tempfile
 import typing
 
 from weave import context_state
 from weave import wandb_api
 from weave import util
+from ..artifact_wandb import WandbArtifact, WeaveWBArtifactURI
 from .. import wandb_client_api
 from unittest import mock
 import shutil
+import weave
 
 # Note: We're mocking out the whole io_service right now. This is too
 # high level and doesn't test the actual io implementation. We should
@@ -182,11 +185,37 @@ class FakeApi:
         self.client.mock_handlers = []
 
 
+@dataclass
+class MockedArtifact:
+    artifact: typing.Any
+    local_path: tempfile.TemporaryDirectory
+
+
 class FakeIoServiceClient:
+    def __init__(self):
+        self.mocked_artifacts = {}
+
+    def add_artifact(self, artifact, artifact_uri):
+        d = tempfile.TemporaryDirectory()
+        for path, entry in artifact.manifest.entries.items():
+            target_file_path = os.path.join(d.name, path)
+            os.makedirs(os.path.dirname(target_file_path), exist_ok=True)
+            shutil.copy2(entry.local_path, target_file_path)
+        ma = MockedArtifact(artifact, d)
+
+        self.mocked_artifacts[str(artifact_uri)] = ma
+
     def manifest(self, artifact_uri):
+        uri_str = str(artifact_uri.with_path(""))
+        if uri_str in self.mocked_artifacts:
+            return FakeManifest(self.mocked_artifacts[uri_str].local_path.name)
         requested_path = f"{artifact_uri.entity_name}/{artifact_uri.project_name}/{artifact_uri.name}_{artifact_uri.version}"
         target = os.path.abspath(os.path.join(shared_artifact_dir, requested_path))
         return FakeManifest(target)
+
+    def cleanup(self):
+        for ma in self.mocked_artifacts.values():
+            ma.local_path.cleanup()
 
     @property
     def fs(self):
@@ -202,15 +231,36 @@ class FakeIoServiceClient:
         return f"https://api.wandb.ai/{artifact_uri.entity_name}/{artifact_uri.project_name}/{artifact_uri.name}_{artifact_uri.version}/{artifact_uri.path}"
 
     def ensure_file(self, artifact_uri):
+        uri_str = str(artifact_uri.with_path(""))
+        if uri_str in self.mocked_artifacts:
+            return os.path.join(
+                self.mocked_artifacts[uri_str].local_path.name, artifact_uri.path
+            )
         return f"{artifact_uri.entity_name}/{artifact_uri.project_name}/{artifact_uri.name}_{artifact_uri.version}/{artifact_uri.path}"
 
 
 @dataclass
 class SetupResponse:
     fake_api: FakeApi
+    fake_io: FakeIoServiceClient
     old_wandb_api_wandb_public_api: typing.Callable
     orig_io_service_client: FakeIoServiceClient
     token: Token
+
+    def mock_artifact_as_node(
+        self, artifact, entity_name="test_entity", project_name="test_project"
+    ):
+        artifact_uri = WeaveWBArtifactURI.parse(
+            f"wandb-artifact:///{entity_name}/{project_name}/{artifact.name}:v{len(self.fake_io.mocked_artifacts)}"
+        )
+        self.fake_io.add_artifact(artifact, artifact_uri)
+        return weave.make_node(
+            WandbArtifact(
+                "test_name",
+                None,
+                artifact_uri,
+            )
+        )
 
 
 def setup():
@@ -234,6 +284,7 @@ def setup():
 
     return SetupResponse(
         fake_api,
+        fake_io_service_client,
         old_wandb_api_wandb_public_api,
         orig_io_service_client,
         token,
@@ -244,6 +295,7 @@ def teardown(setup_response: SetupResponse):
     wandb_api.reset_wandb_api_context(setup_response.token)
     setup_response.fake_api.clear_execute_log()
     setup_response.fake_api.clear_mock_handlers()
+    setup_response.fake_io.cleanup()
     wandb_client_api.wandb_public_api = setup_response.old_wandb_api_wandb_public_api
     io_service.get_sync_client = setup_response.orig_io_service_client  # type: ignore
 

@@ -2255,11 +2255,32 @@ def recursively_build_pyarrow_array(
             pa.array(offsets, type=pa.int32()),
             arrays,
         )
+    elif pa.types.is_list(pyarrow_type):
+        assert isinstance(mapper, mappers_arrow.ListToArrowArr)
+        offsets = [0]
+        flattened_objs = []
+        mask = []
+        for obj in py_objs:
+            mask.append(obj == None)
+            if obj == None:
+                obj = []
+            offsets.append(offsets[-1] + len(obj))
+            flattened_objs += obj
+        new_objs = recursively_build_pyarrow_array(
+            flattened_objs,
+            pyarrow_type.value_type,
+            mapper._object_type,
+            py_objs_already_mapped,
+        )
+        return pa.ListArray.from_arrays(
+            offsets, new_objs, mask=pa.array(mask, type=pa.bool_())
+        )
+
     if py_objs_already_mapped:
         return pa.array(py_objs, pyarrow_type)
-    return pa.array(
-        [mapper.apply(o) if o is not None else None for o in py_objs], pyarrow_type
-    )
+
+    arrays = [mapper.apply(o) if o is not None else None for o in py_objs]
+    return pa.array(arrays, pyarrow_type)
 
 
 # This will be a faster version fo to_arrow (below). Its
@@ -2624,6 +2645,8 @@ def _map_nested_arrow_fields(
     if user_arr != None and user_arr != array:
         return user_arr
     if pa.types.is_struct(array.type):
+        if array.type.num_fields == 0:
+            return array
         sub_fields = [
             _map_nested_arrow_fields(array.field(field.name), fn, path + [field.name])
             for field in array.type

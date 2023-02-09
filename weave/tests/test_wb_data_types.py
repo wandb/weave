@@ -4,6 +4,10 @@ from wandb import data_types as wb_data_types
 import numpy as np
 from wandb.sdk.data_types._dtypes import TypeRegistry as SDKTypeRegistry
 
+from ..ops_domain.wbmedia import ImageArtifactFileRefType
+
+from ..artifact_wandb import WandbArtifact, WeaveWBArtifactURI
+
 from .fixture_fakewandb import FakeApi
 
 from ..wandb_util import weave0_type_json_to_weave1_type
@@ -166,3 +170,369 @@ def test_image(sdk_obj, expected_type, fake_wandb):
     art._logged_artifact = logged_artifact
 
     assert weave0_type_json_to_weave1_type(obj_json) == expected_type
+
+
+def make_table():
+    def peak(v, m):
+        return 1 - ((abs((2 * v) - m + 1) % m) / m)
+
+    def make_np_image(dim=128):
+        return np.array(
+            [
+                [(peak(col, dim) * peak(row, dim)) ** 0.5 for col in range(dim)]
+                for row in range(dim)
+            ]
+        )
+
+    def make_wb_image(use_middle=False, use_pixels=False):
+        if use_pixels:
+            position = (
+                {
+                    "middle": [50, 50],
+                    "height": 10,
+                    "width": 20,
+                }
+                if use_middle
+                else {
+                    "minX": 40,
+                    "maxX": 100,
+                    "minY": 30,
+                    "maxY": 50,
+                }
+            )
+            domain = "pixel"
+        else:
+            position = (
+                {
+                    "middle": [0.5, 0.5],
+                    "height": 0.5,
+                    "width": 0.25,
+                }
+                if use_middle
+                else {
+                    "minX": 0.4,
+                    "maxX": 0.6,
+                    "minY": 0.3,
+                    "maxY": 0.7,
+                }
+            )
+            domain = None
+        return wandb.Image(
+            make_np_image(),
+            boxes={
+                "box_set_1": {
+                    "box_data": [
+                        {
+                            "position": position,
+                            "domain": domain,
+                            "class_id": 0,
+                            "scores": {"loss": 0.3, "gain": 0.7},
+                            "box_caption": "a",
+                        },
+                    ],
+                },
+                "box_set_2": {
+                    "box_data": [
+                        {
+                            "position": position,
+                            "domain": domain,
+                            "class_id": 2,
+                            "scores": {"loss": 0.3, "gain": 0.7},
+                        },
+                    ],
+                },
+            },
+            masks={
+                "mask_set_1": {
+                    "mask_data": np.array(
+                        [[row % 4 for col in range(128)] for row in range(128)]
+                    )
+                }
+            },
+            classes=[
+                {"id": 0, "name": "c_zero"},
+                {"id": 1, "name": "c_one"},
+                {"id": 2, "name": "c_two"},
+                {"id": 3, "name": "c_three"},
+            ],
+        )
+
+    return wandb.Table(
+        columns=["label", "image"],
+        data=[
+            ["a", make_wb_image(False, False)],
+            ["b", make_wb_image(False, True)],
+            ["c", make_wb_image(True, False)],
+            ["d", make_wb_image(True, True)],
+        ],
+    )
+
+
+exp_raw_data = [
+    {
+        "label": "a",
+        "image": {
+            "artifact": "wandb-artifact:///test_entity/test_project/test_name:v0",
+            "path": "media/images/724389f96d933f4166db.png",
+            "format": "png",
+            "height": 128,
+            "width": 128,
+            "sha256": "82287185f849c094e7acf82835f0ceeb8a5d512329e8ce1da12e21df2e81e739",
+            "boxes": {
+                "box_set_1": [
+                    {
+                        "box_caption": "a",
+                        "class_id": 0,
+                        "domain": None,
+                        "position": {
+                            "maxX": 0.6,
+                            "maxY": 0.7,
+                            "minX": 0.4,
+                            "minY": 0.3,
+                        },
+                        "scores": {"loss": 0.3, "gain": 0.7},
+                    }
+                ],
+                "box_set_2": [
+                    {
+                        "box_caption": None,
+                        "class_id": 2,
+                        "domain": None,
+                        "position": {
+                            "maxX": 0.6,
+                            "maxY": 0.7,
+                            "minX": 0.4,
+                            "minY": 0.3,
+                        },
+                        "scores": {"loss": 0.3, "gain": 0.7},
+                    }
+                ],
+            },
+            "masks": {
+                "mask_set_1": {
+                    "_type": "mask",
+                    "path": "media/images/mask/b98a2fc054512bf6450c.mask.png",
+                    "sha256": "00c619b2faa45fdc9ce6de014e7aef7839c9de725bf78b528ef47d279039aacf",
+                }
+            },
+        },
+    },
+    {
+        "label": "b",
+        "image": {
+            "artifact": "wandb-artifact:///test_entity/test_project/test_name:v0",
+            "path": "media/images/724389f96d933f4166db.png",
+            "format": "png",
+            "height": 128,
+            "width": 128,
+            "sha256": "82287185f849c094e7acf82835f0ceeb8a5d512329e8ce1da12e21df2e81e739",
+            "boxes": {
+                "box_set_1": [
+                    {
+                        "box_caption": "a",
+                        "class_id": 0,
+                        "domain": "pixel",
+                        "position": {"maxX": 100, "maxY": 50, "minX": 40, "minY": 30},
+                        "scores": {"loss": 0.3, "gain": 0.7},
+                    }
+                ],
+                "box_set_2": [
+                    {
+                        "box_caption": None,
+                        "class_id": 2,
+                        "domain": "pixel",
+                        "position": {"maxX": 100, "maxY": 50, "minX": 40, "minY": 30},
+                        "scores": {"loss": 0.3, "gain": 0.7},
+                    }
+                ],
+            },
+            "masks": {
+                "mask_set_1": {
+                    "_type": "mask",
+                    "path": "media/images/mask/b98a2fc054512bf6450c.mask.png",
+                    "sha256": "00c619b2faa45fdc9ce6de014e7aef7839c9de725bf78b528ef47d279039aacf",
+                }
+            },
+        },
+    },
+    {
+        "label": "c",
+        "image": {
+            "artifact": "wandb-artifact:///test_entity/test_project/test_name:v0",
+            "path": "media/images/724389f96d933f4166db.png",
+            "format": "png",
+            "height": 128,
+            "width": 128,
+            "sha256": "82287185f849c094e7acf82835f0ceeb8a5d512329e8ce1da12e21df2e81e739",
+            "boxes": {
+                "box_set_1": [
+                    {
+                        "box_caption": "a",
+                        "class_id": 0,
+                        "domain": None,
+                        "position": {
+                            "height": 0.5,
+                            "middle": [0.5, 0.5],
+                            "width": 0.25,
+                        },
+                        "scores": {"loss": 0.3, "gain": 0.7},
+                    }
+                ],
+                "box_set_2": [
+                    {
+                        "box_caption": None,
+                        "class_id": 2,
+                        "domain": None,
+                        "position": {
+                            "height": 0.5,
+                            "middle": [0.5, 0.5],
+                            "width": 0.25,
+                        },
+                        "scores": {"loss": 0.3, "gain": 0.7},
+                    }
+                ],
+            },
+            "masks": {
+                "mask_set_1": {
+                    "_type": "mask",
+                    "path": "media/images/mask/b98a2fc054512bf6450c.mask.png",
+                    "sha256": "00c619b2faa45fdc9ce6de014e7aef7839c9de725bf78b528ef47d279039aacf",
+                }
+            },
+        },
+    },
+    {
+        "label": "d",
+        "image": {
+            "artifact": "wandb-artifact:///test_entity/test_project/test_name:v0",
+            "path": "media/images/724389f96d933f4166db.png",
+            "format": "png",
+            "height": 128,
+            "width": 128,
+            "sha256": "82287185f849c094e7acf82835f0ceeb8a5d512329e8ce1da12e21df2e81e739",
+            "boxes": {
+                "box_set_1": [
+                    {
+                        "box_caption": "a",
+                        "class_id": 0,
+                        "domain": "pixel",
+                        "position": {"height": 10, "middle": [50, 50], "width": 20},
+                        "scores": {"loss": 0.3, "gain": 0.7},
+                    }
+                ],
+                "box_set_2": [
+                    {
+                        "box_caption": None,
+                        "class_id": 2,
+                        "domain": "pixel",
+                        "position": {"height": 10, "middle": [50, 50], "width": 20},
+                        "scores": {"loss": 0.3, "gain": 0.7},
+                    }
+                ],
+            },
+            "masks": {
+                "mask_set_1": {
+                    "_type": "mask",
+                    "path": "media/images/mask/b98a2fc054512bf6450c.mask.png",
+                    "sha256": "00c619b2faa45fdc9ce6de014e7aef7839c9de725bf78b528ef47d279039aacf",
+                }
+            },
+        },
+    },
+]
+
+
+def test_annotated_images_in_tables(fake_wandb):
+    table = make_table()
+
+    art = wandb.Artifact("test_name", "test_type")
+    art.add(table, "table")
+    art_node = fake_wandb.mock_artifact_as_node(art)
+
+    file_node = art_node.file("table.table.json")
+    table_node = file_node.table()
+    table_rows = table_node.rows()
+    table_rows_type = table_node.rowsType()
+
+    raw_data = weave.use(table_rows).to_pylist_notags()
+    assert raw_data == exp_raw_data
+
+    ot = weave.use(table_rows_type).object_type
+    assert ot == weave.types.TypedDict(
+        {
+            "label": weave.types.UnionType(
+                weave.types.NoneType(), weave.types.String()
+            ),
+            "image": weave.types.UnionType(
+                ImageArtifactFileRefType(
+                    boxLayers={"box_set_1": [0], "box_set_2": [2]},
+                    boxScoreKeys=["loss", "gain"],
+                    maskLayers={"mask_set_1": [0, 1, 2, 3]},
+                    classMap={
+                        "0": "c_zero",
+                        "1": "c_one",
+                        "2": "c_two",
+                        "3": "c_three",
+                    },
+                ),
+                weave.types.NoneType(),
+            ),
+        }
+    )
+
+
+def test_annotated_legacy_images_in_tables(fake_wandb):
+    # Mocking this property makes the payload look like the legacy version.
+    from wandb.data_types import _ImageFileType
+    from wandb.sdk.data_types._dtypes import InvalidType
+
+    def dummy_params(self):
+        return {}
+
+    def dummy_assign_type(self, wb_type=None):
+        if isinstance(wb_type, _ImageFileType):
+            return self
+        return InvalidType()
+
+    _ImageFileType.params = property(dummy_params)
+    _ImageFileType.assign_type = dummy_assign_type
+
+    table = make_table()
+
+    art = wandb.Artifact("test_name", "test_type")
+    art.add(table, "table")
+    art_node = fake_wandb.mock_artifact_as_node(art)
+
+    file_node = art_node.file("table.table.json")
+    table_node = file_node.table()
+    table_rows = table_node.rows()
+    table_rows_type = table_node.rowsType()
+
+    raw_data = weave.use(table_rows).to_pylist_notags()
+    assert raw_data == exp_raw_data
+
+    ot = weave.use(table_rows_type).object_type
+    assert ot == weave.types.TypedDict(
+        {
+            "label": weave.types.UnionType(
+                weave.types.NoneType(), weave.types.String()
+            ),
+            "image": weave.types.UnionType(
+                ImageArtifactFileRefType(
+                    # Both box and mask layers have all the keys because
+                    # we can't possible look at all the elements, so we assume
+                    # they all may or may not have all the keys
+                    boxLayers={"box_set_1": [0, 1, 2, 3], "box_set_2": [0, 1, 2, 3]},
+                    boxScoreKeys=["loss", "gain"],
+                    maskLayers={"mask_set_1": [0, 1, 2, 3]},
+                    classMap={
+                        "0": "c_zero",
+                        "1": "c_one",
+                        "2": "c_two",
+                        "3": "c_three",
+                    },
+                ),
+                weave.types.NoneType(),
+            ),
+        }
+    )

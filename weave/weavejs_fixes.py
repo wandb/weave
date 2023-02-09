@@ -138,6 +138,18 @@ def fixup_node(node: graph.Node) -> graph.Node:
     return convert_specific_ops_to_generic_ops_node(node)
 
 
+def recursively_unwrap_unions(obj):
+    if isinstance(obj, list):
+        return [recursively_unwrap_unions(o) for o in obj]
+    if isinstance(obj, dict):
+        if "_union_id" in obj and "_val" in obj:
+            return recursively_unwrap_unions(obj["_val"])
+        else:
+            return {k: recursively_unwrap_unions(v) for k, v in obj.items()}
+    return obj
+
+
 def fixup_data(data):
+    data = recursively_unwrap_unions(data)
     data = remove_opcall_versions_data(data)
     return convert_specific_ops_to_generic_ops_data(data)

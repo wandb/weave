@@ -2620,7 +2620,7 @@ def test_encode_decode_list_of_dictionary_encoded_strings():
 
 
 def test_pushdown_of_gql_tags_on_awls(fake_wandb):
-    fake_wandb.add_mock(lambda q, ndx: test_wb.workspace_response)
+    fake_wandb.fake_api.add_mock(lambda q, ndx: test_wb.workspace_response)
     project_node = ops.project("stacey", "mendeleev")
     project = weave.use(project_node)
     data = box.box([1, 2, 3])
@@ -2708,3 +2708,74 @@ def test_vectorized_bool_ops(name, weave_func, expected_output):
     assert arrow.ArrowWeaveListType(types.optional(expected_type_obj_type)).assign_type(
         called.type
     )
+
+
+options = [
+    (
+        pa.array([1, 2, 3, 4, 5]),
+        pa.array([True, False, True, False, True]),
+        pa.array([10, 20, 30]),
+        pa.array([10, 2, 20, 4, 30]),
+    ),
+    (
+        pa.array([{"a": 1}, {"b": 2}, {"a": 3, "b": 4}]),
+        pa.array([True, False, True]),
+        pa.array([{"a": 10, "b": 20}, {"a": 40, "b": 50}]),
+        pa.array([{"a": 10, "b": 20}, {"b": 2}, {"a": 40, "b": 50}]),
+    ),
+    (
+        pa.array([[1, 2], [3, 4], [5, 6]]),
+        pa.array([False, True, False]),
+        pa.array([[10, 20, 30]]),
+        pa.array([[1, 2], [10, 20, 30], [5, 6]]),
+    ),
+    (
+        pa.array([[{"a": 1}], [{"b": 2}], [{"a": 3, "b": 4}]]),
+        pa.array([False, True, False]),
+        pa.array([[{"a": 10, "b": 20}]]),
+        pa.array([[{"a": 1}], [{"a": 10, "b": 20}], [{"a": 3, "b": 4}]]),
+    ),
+]
+
+# This is known to fail today.
+# la_1 = pa.ListArray.from_arrays(
+#     pa.array([0, 1, 2, 3, 4], type=pa.int32()),
+#     pa.UnionArray.from_dense(
+#         pa.array([0, 1, 1, 0, 0], type=pa.int8()),
+#         pa.array([0, 0, 1, 1, 2], type=pa.int32()),
+#         [pa.array([5, 6, 7]), pa.array([False, True])],
+#     ),
+# )
+# la_2 = pa.ListArray.from_arrays(
+#     pa.array([0, 1, 2, 3, 4], type=pa.int32()),
+#     pa.UnionArray.from_dense(
+#         pa.array([0, 1, 1, 0, 0], type=pa.int8()),
+#         pa.array([0, 0, 1, 1, 2], type=pa.int32()),
+#         [pa.array([50, 60, 70]), pa.array([True, False])],
+#     ),
+# )
+# la_res = pa.ListArray.from_arrays(
+#     pa.array([0, 1, 2, 3, 4], type=pa.int32()),
+#     pa.UnionArray.from_dense(
+#         pa.array([0, 1, 1, 0, 0], type=pa.int8()),
+#         pa.array([0, 0, 1, 1, 2], type=pa.int32()),
+#         [pa.array([5, 60, 70]), pa.array([True, True])],
+#     ),
+# )
+# options.append(
+#     (
+#         la_1,
+#         pa.array([False, True, False, True]),
+#         la_2,
+#         la_res,
+#     )
+# )
+
+
+@pytest.mark.parametrize(
+    "array, mask, replacements, expected",
+    options,
+)
+def test_safe_replace_with_mask(array, mask, replacements, expected):
+    res = arrow_type.safe_replace_with_mask(array, mask, replacements)
+    assert res.equals(expected)

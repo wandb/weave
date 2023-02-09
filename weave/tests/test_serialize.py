@@ -21,7 +21,7 @@ response = {
 
 
 def test_serialize(fake_wandb):
-    fake_wandb.add_mock(lambda q, ndx: response)
+    fake_wandb.fake_api.add_mock(lambda q, ndx: response)
     proj = ops.project("stacey", "mendeleev")
     av = proj.artifactVersion("test_res_1fwmcd3q", "v0")
     file = av.file("test_results.table.json")

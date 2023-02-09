@@ -7,7 +7,7 @@ import re
 
 import wandb
 
-from ..weave_server import recursively_unwrap_unions
+from ..weavejs_fixes import recursively_unwrap_unions
 
 from .. import api as weave
 from ..ops_arrow import list_ as arrow

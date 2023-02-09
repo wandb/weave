@@ -18,7 +18,7 @@ def use_static_artifact_node(
     collection_name="joined_table_artifact",
     version="latest",
 ) -> weave.graph.Node:
-    fake_wandb.add_mock(
+    fake_wandb.fake_api.add_mock(
         lambda ndx, q: {
             "project_5702147f0293fd7538d402af13069708": {
                 "id": "p1",

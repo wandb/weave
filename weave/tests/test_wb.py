@@ -240,7 +240,7 @@ artifact_version_sdk_response = {
     ],
 )
 def test_table_call(table_file_node, mock_response, fake_wandb):
-    fake_wandb.add_mock(lambda q, ndx: mock_response)
+    fake_wandb.fake_api.add_mock(lambda q, ndx: mock_response)
     table_image0_node = table_file_node.table().rows()[0]["image"]
     table_image0 = weave.use(table_image0_node)
     assert table_image0.height == 299
@@ -263,7 +263,7 @@ def test_table_call(table_file_node, mock_response, fake_wandb):
 
 
 def test_avfile_type(fake_wandb):
-    fake_wandb.add_mock(lambda q, ndx: file_path_response)
+    fake_wandb.fake_api.add_mock(lambda q, ndx: file_path_response)
     f = (
         ops.project("stacey", "mendeleev")
         .artifactType("test_results")
@@ -282,7 +282,7 @@ def test_avfile_type(fake_wandb):
 
 
 def test_table_col_order_and_unknown_types(fake_wandb):
-    fake_wandb.add_mock(lambda q, ndx: file_path_response)
+    fake_wandb.fake_api.add_mock(lambda q, ndx: file_path_response)
     node = (
         ops.project("stacey", "mendeleev")
         .artifactType("test_results")
@@ -295,7 +295,7 @@ def test_table_col_order_and_unknown_types(fake_wandb):
 
 
 def test_missing_file(fake_wandb):
-    fake_wandb.add_mock(lambda q, ndx: file_path_response)
+    fake_wandb.fake_api.add_mock(lambda q, ndx: file_path_response)
     node = (
         ops.project("stacey", "mendeleev")
         .artifactType("test_results")
@@ -326,7 +326,7 @@ def table_mock_empty_workspace(q, ndx):
 
 
 def test_map_gql_op(fake_wandb):
-    fake_wandb.add_mock(lambda q, ndx: project_run_artifact_response)
+    fake_wandb.fake_api.add_mock(lambda q, ndx: project_run_artifact_response)
     node = (
         ops.project("stacey", "mendeleev")
         .runs()
@@ -339,7 +339,7 @@ def test_map_gql_op(fake_wandb):
 
 
 def test_legacy_run_file_table_format(fake_wandb):
-    fake_wandb.add_mock(table_mock1)
+    fake_wandb.fake_api.add_mock(table_mock1)
     cell_node = (
         ops.project("stacey", "mendeleev")
         .runs()
@@ -358,7 +358,7 @@ def test_legacy_run_file_table_format(fake_wandb):
 
 
 def test_mapped_table_empty(fake_wandb):
-    fake_wandb.add_mock(table_mock_empty_workspace)
+    fake_wandb.fake_api.add_mock(table_mock_empty_workspace)
     cell_node = (
         ops.project("stacey", "mendeleev")
         .runs()
@@ -376,7 +376,7 @@ def test_mapped_table_empty(fake_wandb):
 
 
 def test_mapped_table_tags(fake_wandb):
-    fake_wandb.add_mock(table_mock1)
+    fake_wandb.fake_api.add_mock(table_mock1)
     cell_node = (
         ops.project("stacey", "mendeleev")
         .runs()
@@ -394,7 +394,7 @@ def test_mapped_table_tags(fake_wandb):
 
 
 def test_table_tags_row_first(fake_wandb):
-    fake_wandb.add_mock(table_mock1)
+    fake_wandb.fake_api.add_mock(table_mock1)
     cell_node = (
         ops.project("stacey", "mendeleev")
         .runs()
@@ -410,7 +410,7 @@ def test_table_tags_row_first(fake_wandb):
 
 
 def test_workspace_table_type(fake_wandb):
-    fake_wandb.add_mock(table_mock2)
+    fake_wandb.fake_api.add_mock(table_mock2)
     summary_node = ops.project("stacey", "mendeleev").runs().summary()
     cell_node = summary_node["table"].table()
     assert cell_node.type == TaggedValueType(
@@ -427,7 +427,7 @@ def test_workspace_table_type(fake_wandb):
 
 
 def test_workspace_table_rows_type(fake_wandb):
-    fake_wandb.add_mock(table_mock2)
+    fake_wandb.fake_api.add_mock(table_mock2)
     cell_node = (
         ops.project("stacey", "mendeleev").runs().summary()["table"].table().rows()
     )
@@ -466,7 +466,7 @@ def test_workspace_table_rows_type(fake_wandb):
 
 
 def test_table_tags_column_first(fake_wandb):
-    fake_wandb.add_mock(table_mock1)
+    fake_wandb.fake_api.add_mock(table_mock1)
     cell_node = (
         ops.project("stacey", "mendeleev")
         .runs()
@@ -482,7 +482,7 @@ def test_table_tags_column_first(fake_wandb):
 
 
 def test_table_images(fake_wandb):
-    fake_wandb.add_mock(table_mock2)
+    fake_wandb.fake_api.add_mock(table_mock2)
     # Query 1:
     project_node = ops.project("stacey", "mendeleev")
     project_runs_node = project_node.runs().limit(1)
@@ -504,7 +504,7 @@ def table_mock_filtered(q, ndx):
 
 
 def test_tag_run_color_lookup(fake_wandb):
-    fake_wandb.add_mock(table_mock_filtered)
+    fake_wandb.fake_api.add_mock(table_mock_filtered)
     colors_node = weave.save(
         {"1ht5692d": "rgb(218, 76, 76)", "2ed5xwpn": "rgb(83, 135, 221)"}
     )
@@ -526,7 +526,7 @@ def test_tag_run_color_lookup(fake_wandb):
 
 
 def test_domain_gql_fragments(fake_wandb):
-    fake_wandb.add_mock(
+    fake_wandb.fake_api.add_mock(
         lambda q, ndx: {
             "project_518fa79465d8ffaeb91015dce87e092f": {
                 **fwb.project_payload,
@@ -571,7 +571,7 @@ def test_domain_gql_fragments(fake_wandb):
 
 
 def test_domain_gql_through_dicts_with_fn_nodes(fake_wandb):
-    fake_wandb.add_mock(lambda q, ndx: workspace_response)
+    fake_wandb.fake_api.add_mock(lambda q, ndx: workspace_response)
     project_node = ops.project("stacey", "mendeleev")
     project_name_node = project_node.name()
     entity_node = project_node.entity()
@@ -604,7 +604,7 @@ def test_domain_gql_through_dicts_with_fn_nodes(fake_wandb):
 
 
 def test_domain_gql_around_fn_nodes(fake_wandb):
-    fake_wandb.add_mock(lambda q, ndx: workspace_response)
+    fake_wandb.fake_api.add_mock(lambda q, ndx: workspace_response)
     project_node = ops.project("stacey", "mendeleev")
     runs_node = project_node.runs()
     sorted_runs = runs_node.sort(lambda row: ops.make_list(a=row.createdAt()), ["asc"])
@@ -616,7 +616,7 @@ def test_domain_gql_around_fn_nodes(fake_wandb):
 
 
 def test_lambda_gql_stitch(fake_wandb):
-    fake_wandb.add_mock(
+    fake_wandb.fake_api.add_mock(
         lambda q, ndx: {"project_518fa79465d8ffaeb91015dce87e092f": fwb.project_payload}
     )
     weave.use(
@@ -627,7 +627,7 @@ def test_lambda_gql_stitch(fake_wandb):
 
 
 def test_arrow_groupby_nested_tag_stripping(fake_wandb):
-    fake_wandb.add_mock(lambda q, ndx: file_path_response)
+    fake_wandb.fake_api.add_mock(lambda q, ndx: file_path_response)
     groupby_node = (
         ops.project("stacey", "mendeleev")
         .artifactType("test_results")
@@ -644,7 +644,7 @@ def test_arrow_groupby_nested_tag_stripping(fake_wandb):
 
 
 def test_arrow_groupby_sort(fake_wandb):
-    fake_wandb.add_mock(lambda q, ndx: file_path_response)
+    fake_wandb.fake_api.add_mock(lambda q, ndx: file_path_response)
     groupby_node = (
         ops.project("stacey", "mendeleev")
         .artifactType("test_results")
@@ -663,7 +663,7 @@ def test_arrow_groupby_sort(fake_wandb):
 
 
 def test_arrow_tag_stripping(fake_wandb):
-    fake_wandb.add_mock(lambda q, ndx: file_path_response)
+    fake_wandb.fake_api.add_mock(lambda q, ndx: file_path_response)
     awl_node = (
         ops.project("stacey", "mendeleev")
         .artifactType("test_results")
@@ -680,7 +680,7 @@ def test_arrow_tag_stripping(fake_wandb):
 
 
 def test_arrow_tag_serialization_can_handle_runs_in_concat(fake_wandb):
-    fake_wandb.add_mock(table_mock_filtered)
+    fake_wandb.fake_api.add_mock(table_mock_filtered)
     rows_node = (
         ops.project("stacey", "mendeleev")
         .filteredRuns("{}", "-createdAt")
@@ -724,7 +724,7 @@ def test_shawn_groupby_profiling_correctness():
 
 def test_loading_artifact_browser_request_1(fake_wandb):
     # Leaf 1: Get's the current artifact collection
-    fake_wandb.add_mock(
+    fake_wandb.fake_api.add_mock(
         lambda q, ndx: {
             "project_518fa79465d8ffaeb91015dce87e092f": {
                 **fwb.project_payload,  # type: ignore
@@ -741,7 +741,7 @@ def test_loading_artifact_browser_request_1(fake_wandb):
 def test_loading_artifact_browser_request_2(fake_wandb):
     ac_node = ops.project("stacey", "mendeleev").artifact("test_res_1fwmcd3q")
     # Leaf 2: Get collection details
-    fake_wandb.add_mock(
+    fake_wandb.fake_api.add_mock(
         lambda q, ndx: {
             "project_518fa79465d8ffaeb91015dce87e092f": {
                 **fwb.project_payload,  # type: ignore
@@ -802,8 +802,8 @@ def test_loading_artifact_browser_request_2(fake_wandb):
     assert weave.use(ac_detail_node) != None
 
     # Leaf 3: Get the specific membership
-    fake_wandb.clear_mock_handlers()
-    fake_wandb.add_mock(
+    fake_wandb.fake_api.clear_mock_handlers()
+    fake_wandb.fake_api.add_mock(
         lambda q, ndx: {
             "project_518fa79465d8ffaeb91015dce87e092f": {
                 **fwb.project_payload,  # type: ignore
@@ -820,8 +820,8 @@ def test_loading_artifact_browser_request_2(fake_wandb):
     assert weave.use(mem_node) != None
 
     # Leaf 4: Get the specific membership details
-    fake_wandb.clear_mock_handlers()
-    fake_wandb.add_mock(
+    fake_wandb.fake_api.clear_mock_handlers()
+    fake_wandb.fake_api.add_mock(
         lambda q, ndx: {
             "project_518fa79465d8ffaeb91015dce87e092f": {
                 **fwb.project_payload,  # type: ignore
@@ -847,7 +847,7 @@ def test_loading_artifact_browser_request_3(fake_wandb):
     ac_node = ops.project("stacey", "mendeleev").artifact("test_res_1fwmcd3q")
     mem_node = ac_node.membershipForAlias("v0")
     # Leaf 5: Get the specific artifact version details
-    fake_wandb.add_mock(
+    fake_wandb.fake_api.add_mock(
         lambda q, ndx: {
             "project_518fa79465d8ffaeb91015dce87e092f": {
                 **fwb.project_payload,  # type: ignore
@@ -1018,8 +1018,8 @@ def test_loading_artifact_browser_request_3(fake_wandb):
     assert weave.use(av_details_node) != None
 
     # Leaf 6: Get Portfolios
-    fake_wandb.clear_mock_handlers()
-    fake_wandb.add_mock(
+    fake_wandb.fake_api.clear_mock_handlers()
+    fake_wandb.fake_api.add_mock(
         lambda q, ndx: {
             "project_518fa79465d8ffaeb91015dce87e092f": {
                 **fwb.project_payload,  # type: ignore
@@ -1054,8 +1054,8 @@ def test_loading_artifact_browser_request_3(fake_wandb):
     assert weave.use(portfolios_node) != None
 
     # Leaf 7: Is Weave
-    fake_wandb.clear_mock_handlers()
-    fake_wandb.add_mock(
+    fake_wandb.fake_api.clear_mock_handlers()
+    fake_wandb.fake_api.add_mock(
         lambda q, ndx: {
             "project_518fa79465d8ffaeb91015dce87e092f": {
                 **fwb.project_payload,  # type: ignore
@@ -1149,7 +1149,7 @@ def run_history_mocker(q, ndx):
 
 
 def test_run_history(fake_wandb):
-    fake_wandb.add_mock(run_history_mocker)
+    fake_wandb.fake_api.add_mock(run_history_mocker)
     node = ops.project("stacey", "mendeleev").runs()[0].history()
     assert isinstance(node.type, TaggedValueType)
     assert types.List(
@@ -1190,7 +1190,7 @@ def run_history_as_of_mocker(q, ndx):
 
 
 def test_run_history_as_of(fake_wandb):
-    fake_wandb.add_mock(run_history_as_of_mocker)
+    fake_wandb.fake_api.add_mock(run_history_as_of_mocker)
     node = ops.project("stacey", "mendeleev").runs()[0].historyAsOf(10)
     assert isinstance(node.type, TaggedValueType)
     assert types.TypedDict(
@@ -1207,7 +1207,7 @@ def test_run_history_as_of(fake_wandb):
 
 
 def test_artifact_membership_link(fake_wandb):
-    fake_wandb.add_mock(lambda q, ndx: artifact_browser_response)
+    fake_wandb.fake_api.add_mock(lambda q, ndx: artifact_browser_response)
     node = amo.artifact_membership_link(
         ops.project("stacey", "mendeleev")
         .artifact("test_res_1fwmcd3q")
@@ -1221,7 +1221,7 @@ def test_artifact_membership_link(fake_wandb):
 
 
 def test_run_colors(fake_wandb):
-    fake_wandb.add_mock(table_mock_filtered)
+    fake_wandb.fake_api.add_mock(table_mock_filtered)
     colors_node = ops.dict_(
         **{"1ht5692d": "rgb(218, 76, 76)", "2ed5xwpn": "rgb(83, 135, 221)"}
     )
@@ -1247,7 +1247,7 @@ def test_run_colors(fake_wandb):
 
 
 def test_arrow_groupby_external_tag(fake_wandb):
-    fake_wandb.add_mock(table_mock_filtered)
+    fake_wandb.fake_api.add_mock(table_mock_filtered)
     run_names = (
         ops.project("stacey", "mendeleev")
         .filteredRuns("{}", "-createdAt")
@@ -1269,7 +1269,7 @@ def test_arrow_groupby_external_tag(fake_wandb):
 
 
 def test_join_all_tables(fake_wandb):
-    fake_wandb.add_mock(table_mock_filtered)
+    fake_wandb.fake_api.add_mock(table_mock_filtered)
     joined_row = (
         ops.project("stacey", "mendeleev")
         .filteredRuns("{}", "-createdAt")
