@@ -71,6 +71,41 @@ def new_trace_context() -> typing.Optional[TraceContext]:
         return None
 
 
+class DummyStatsd:
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def increment(self, *args, **kwargs):
+        pass
+
+    def decrement(self, *args, **kwargs):
+        pass
+
+    def gauge(self, *args, **kwargs):
+        pass
+
+
+_STATSD = None
+
+
+def _initialize_statsd():
+    if os.getenv("DD_ENV"):
+        from datadog import initialize, statsd
+
+        initialize()
+        return statsd
+    else:
+        return DummyStatsd()
+
+
+def statsd():
+    global _STATSD
+    if _STATSD is None:
+        _STATSD = _initialize_statsd()
+
+    return _STATSD
+
+
 from ddtrace import tracer as ddtrace_tracer
 
 x = ddtrace_tracer.current_trace_context()

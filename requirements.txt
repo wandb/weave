@@ -1,4 +1,5 @@
 wandb @ git+https://github.com/wandb/client.git@ee6ef54da992a4bb250ab83921e2bb34cd8ea293
+datadog==0.44.0
 ddtrace
 python-json-logger
 numpy

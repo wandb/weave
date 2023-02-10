@@ -1,9 +1,12 @@
 import typing
 import datetime
 
+from . import engine_trace
 from . import wandb_api
 from . import environment
 from . import errors
+
+statsd = engine_trace.statsd()  # type: ignore
 
 
 def get_user_cache_key() -> typing.Optional[str]:
@@ -57,14 +60,17 @@ class LruTimeWindowCache(typing.Generic[CacheKeyType, CacheValueType]):
                 del self._cache[key]
             else:
                 break
+        statsd.gauge("weave.cache.size", len(self._cache))
 
     def get(self, key: CacheKeyType) -> typing.Union[NotFound, CacheValueType]:
         full_key = self._full_key(key)
         val = self._cache.get(full_key)
         if val is None:
+            statsd.increment("weave.cache.miss")
             return self.NOT_FOUND
         # Set the value again to move it to the end of the cache
         self.set(key, val[1])
+        statsd.increment("weave.cache.hit")
         return val[1]
 
     def set(self, key: CacheKeyType, value: CacheValueType) -> None:

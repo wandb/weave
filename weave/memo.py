@@ -1,7 +1,12 @@
 import typing
 
+
 import contextvars
 import contextlib
+
+from . import engine_trace
+
+statsd = engine_trace.statsd()  # type: ignore
 
 _memo_storage: contextvars.ContextVar[typing.Optional[dict]] = contextvars.ContextVar(
     "memo_storage", default=None
@@ -31,9 +36,12 @@ def memo(f: typing.Any) -> typing.Any:
             return f(*args, **kwargs)
         key = (f, args, tuple(kwargs.items()))
         try:
-            return storage[key]
+            val = storage[key]
+            statsd.increment("weave.memo.hit")
+            return val
         except KeyError:
             pass
+        statsd.increment("weave.memo.miss")
         result = f(*args, **kwargs)
         storage[key] = result
         return result

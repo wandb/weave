@@ -36,6 +36,7 @@ from . import util
 
 
 tracer = engine_trace.tracer()  # type: ignore
+statsd = engine_trace.statsd()  # type: ignore
 
 SOCKET_PATH = "/tmp/weave-io-service.sock"
 
@@ -129,6 +130,7 @@ class Server:
         self.ready_queue.get()
 
     def cleanup(self) -> None:
+        statsd.flush()
         try:
             os.remove(self.socket_path)
         except OSError:
