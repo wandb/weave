@@ -583,3 +583,105 @@ def test_grouping_on_images(fake_wandb):
         "1237db9e0c3d396728f7f4077f62b6283118c08fbfdced1e99e33205c270bd27",
         "e7bdc527afd649f51950b4524b0c15aecaf7f484448a6cdfcdc2ecd9bba0f5a7",
     ]
+
+
+exp_join_labels = [
+    ["0-0", "0-2"],
+    ["0-1", "0-2"],
+    ["0-2", "0-2"],
+    ["1-0", "1-2"],
+    ["1-1", "1-2"],
+    ["1-2", "1-2"],
+    ["0-0", "0-1"],
+    ["0-1", "0-1"],
+    ["0-2", "0-1"],
+    ["1-0", "1-1"],
+    ["1-1", "1-1"],
+    ["1-2", "1-1"],
+    ["0-0", "0-0"],
+    ["0-1", "0-0"],
+    ["0-2", "0-0"],
+    ["1-0", "1-0"],
+    ["1-1", "1-0"],
+    ["1-2", "1-0"],
+]
+
+exp_join_tag_shas = [
+    "1237db9e0c3d396728f7f4077f62b6283118c08fbfdced1e99e33205c270bd27",
+    "1237db9e0c3d396728f7f4077f62b6283118c08fbfdced1e99e33205c270bd27",
+    "1237db9e0c3d396728f7f4077f62b6283118c08fbfdced1e99e33205c270bd27",
+    "e7bdc527afd649f51950b4524b0c15aecaf7f484448a6cdfcdc2ecd9bba0f5a7",
+    "e7bdc527afd649f51950b4524b0c15aecaf7f484448a6cdfcdc2ecd9bba0f5a7",
+    "e7bdc527afd649f51950b4524b0c15aecaf7f484448a6cdfcdc2ecd9bba0f5a7",
+    "1237db9e0c3d396728f7f4077f62b6283118c08fbfdced1e99e33205c270bd27",
+    "1237db9e0c3d396728f7f4077f62b6283118c08fbfdced1e99e33205c270bd27",
+    "1237db9e0c3d396728f7f4077f62b6283118c08fbfdced1e99e33205c270bd27",
+    "e7bdc527afd649f51950b4524b0c15aecaf7f484448a6cdfcdc2ecd9bba0f5a7",
+    "e7bdc527afd649f51950b4524b0c15aecaf7f484448a6cdfcdc2ecd9bba0f5a7",
+    "e7bdc527afd649f51950b4524b0c15aecaf7f484448a6cdfcdc2ecd9bba0f5a7",
+    "1237db9e0c3d396728f7f4077f62b6283118c08fbfdced1e99e33205c270bd27",
+    "1237db9e0c3d396728f7f4077f62b6283118c08fbfdced1e99e33205c270bd27",
+    "1237db9e0c3d396728f7f4077f62b6283118c08fbfdced1e99e33205c270bd27",
+    "e7bdc527afd649f51950b4524b0c15aecaf7f484448a6cdfcdc2ecd9bba0f5a7",
+    "e7bdc527afd649f51950b4524b0c15aecaf7f484448a6cdfcdc2ecd9bba0f5a7",
+    "e7bdc527afd649f51950b4524b0c15aecaf7f484448a6cdfcdc2ecd9bba0f5a7",
+]
+
+exp_join_length = (3 * 3) * 2  # 3 copies of 2 unique images
+
+
+def make_join_table_row_nodes(fake_wandb):
+    table_1 = make_simple_image_table()
+    table_2 = make_simple_image_table()
+
+    art = wandb.Artifact("test_name", "test_type")
+    art.add(table_1, "table_1")
+    art.add(table_2, "table_2")
+    art_node = fake_wandb.mock_artifact_as_node(art)
+
+    file_1_node = art_node.file("table_1.table.json")
+    table_1_node = file_1_node.table()
+    table_1_rows = table_1_node.rows()
+
+    file_2_node = art_node.file("table_2.table.json")
+    table_2_node = file_2_node.table()
+    table_2_rows = table_2_node.rows()
+
+    return table_1_rows, table_2_rows
+
+
+def test_join_all_on_images(fake_wandb):
+    table_1_rows, table_2_rows = make_join_table_row_nodes(fake_wandb)
+
+    rows = weave.ops.make_list(a=table_1_rows, b=table_2_rows)
+
+    joined = rows.joinAll(lambda row: row["image"], True)
+
+    raw_data = weave.use(joined).to_pylist_notags()
+    assert len(raw_data) == exp_join_length
+    assert [row["label"] for row in raw_data] == exp_join_labels
+
+    group_keys = weave.use(joined.joinObj()).to_pylist_notags()
+    assert [key["sha256"] for key in group_keys] == exp_join_tag_shas
+
+
+def test_join_2_on_images(fake_wandb):
+    table_1_rows, table_2_rows = make_join_table_row_nodes(fake_wandb)
+
+    joined = table_1_rows.join(
+        table_2_rows,
+        lambda row: row["image"],
+        lambda row: row["image"],
+        "t1",
+        "t2",
+        True,
+        True,
+    )
+
+    raw_data = weave.use(joined).to_pylist_notags()
+    assert len(raw_data) == exp_join_length
+    assert [
+        [row["t1"]["label"], row["t2"]["label"]] for row in raw_data
+    ] == exp_join_labels
+    group_keys = weave.use(joined.joinObj()).to_pylist_notags()
+    assert [key["sha256"] for key in group_keys] == exp_join_tag_shas

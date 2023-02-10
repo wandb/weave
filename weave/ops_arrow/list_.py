@@ -2775,6 +2775,7 @@ def _multi_array_common_encoder(
     output_type=_join_all_output_type,
 )
 def join_all(arrs, joinFn, outer: bool):
+    safe_join_fn = _to_compare_safe_call(joinFn)
     # This is a pretty complicated op. See list.ts for the original implementation
     outer_tags = None
     if tag_store.is_tagged(arrs):
@@ -2799,10 +2800,22 @@ def join_all(arrs, joinFn, outer: bool):
     tagged_arrs_keys = []
     untagged_arrs_keys = []
     for arr in pushed_arrs:
-        arr_res, key_type = _custom_join_apply_fn_node(maybe_tag(arr), joinFn)
-        key_types.append(key_type)
-        tagged_arrs_keys.append(arrow_as_array(arr_res._arrow_data))
+        maybe_tagged_arr = maybe_tag(arr)
+        arr_res, key_type = _custom_join_apply_fn_node(maybe_tagged_arr, safe_join_fn)
         untagged_arrs_keys.append(arr_res._arrow_data_asarray_no_tags())
+
+        if safe_join_fn is joinFn:
+            full_keys = arrow_as_array(arr_res._arrow_data)
+            tagged_key_type = key_type
+        else:
+            unsafe_arr_res, unsafe_key_type = _custom_join_apply_fn_node(
+                maybe_tagged_arr, joinFn
+            )
+            tagged_key_type = unsafe_key_type
+            full_keys = arrow_as_array(unsafe_arr_res._arrow_data)
+
+        key_types.append(tagged_key_type)
+        tagged_arrs_keys.append(full_keys)
 
     arrs_keys = untagged_arrs_keys
 
@@ -2976,18 +2989,35 @@ def _join_2_output_type(input_types):
 )
 def join_2(arr1, arr2, joinFn1, joinFn2, alias1, alias2, leftOuter, rightOuter):
     # This is a pretty complicated op. See list.ts for the original implementation
+    safe_join_fn_1 = _to_compare_safe_call(joinFn1)
+    safe_join_fn_2 = _to_compare_safe_call(joinFn2)
 
     table1 = _awl_struct_array_to_table(arr1._arrow_data)
     table2 = _awl_struct_array_to_table(arr2._arrow_data)
 
     # Execute the joinFn on each of the arrays
-    table1_join_keys = arrow_as_array(
-        _apply_fn_node_with_tag_pushdown(arr1, joinFn1)._arrow_data
+    table1_safe_join_keys = arrow_as_array(
+        _apply_fn_node_with_tag_pushdown(arr1, safe_join_fn_1)._arrow_data
     )
-    table2_join_keys = arrow_as_array(
-        _apply_fn_node_with_tag_pushdown(arr2, joinFn2)._arrow_data
+    table2_safe_join_keys = arrow_as_array(
+        _apply_fn_node_with_tag_pushdown(arr2, safe_join_fn_2)._arrow_data
     )
-    join_obj_type = types.optional(types.union(joinFn1.type, joinFn2.type))
+
+    if safe_join_fn_1 is joinFn1:
+        table1_raw_join_keys = table1_safe_join_keys
+    else:
+        table1_raw_join_keys = arrow_as_array(
+            _apply_fn_node_with_tag_pushdown(arr1, joinFn1)._arrow_data
+        )
+
+    if safe_join_fn_2 is joinFn2:
+        table2_raw_join_keys = table2_safe_join_keys
+    else:
+        table2_raw_join_keys = arrow_as_array(
+            _apply_fn_node_with_tag_pushdown(arr2, joinFn2)._arrow_data
+        )
+
+    raw_join_obj_type = types.optional(types.union(joinFn1.type, joinFn2.type))
 
     table1_columns_names = arr1.object_type.property_types.keys()
     table2_columns_names = arr2.object_type.property_types.keys()
@@ -2998,21 +3028,39 @@ def join_2(arr1, arr2, joinFn1, joinFn2, alias1, alias2, leftOuter, rightOuter):
     table1_safe_alias = "a_1"
     table2_safe_alias = "a_2"
 
-    join_key_col_name = "__joinobj__"
+    safe_join_key_col_name = "__joinobj__"
+    raw_join_key_col_name = "__raw_joinobj__"
 
     with duckdb_con() as con:
 
-        def create_keyed_table(table_name, table, keys, safe_column_names):
+        def create_keyed_table(
+            table_name, table, safe_keys, raw_keys, safe_column_names
+        ):
             keyed_table = (
-                table.add_column(0, join_key_col_name, keys)
-                .filter(pc.invert(pc.is_null(pc.field(join_key_col_name))))
-                .rename_columns([join_key_col_name] + safe_column_names)
+                table.add_column(0, safe_join_key_col_name, safe_keys)
+                .add_column(1, raw_join_key_col_name, raw_keys)
+                .filter(pc.invert(pc.is_null(pc.field(safe_join_key_col_name))))
+                .rename_columns(
+                    [safe_join_key_col_name, raw_join_key_col_name] + safe_column_names
+                )
             )
             con.register(table_name, keyed_table)
             return keyed_table
 
-        create_keyed_table("t1", table1, table1_join_keys, table1_safe_column_names)
-        create_keyed_table("t2", table2, table2_join_keys, table2_safe_column_names)
+        create_keyed_table(
+            "t1",
+            table1,
+            table1_safe_join_keys,
+            table1_raw_join_keys,
+            table1_safe_column_names,
+        )
+        create_keyed_table(
+            "t2",
+            table2,
+            table2_safe_join_keys,
+            table2_raw_join_keys,
+            table2_safe_column_names,
+        )
 
         if leftOuter and rightOuter:
             join_type = "full outer"
@@ -3025,18 +3073,19 @@ def join_2(arr1, arr2, joinFn1, joinFn2, alias1, alias2, leftOuter, rightOuter):
 
         query = f"""
         SELECT 
-            COALESCE(t1.{join_key_col_name}, t2.{join_key_col_name}) as {join_key_col_name},
-            CASE WHEN t1.{join_key_col_name} IS NULL THEN NULL ELSE
+            COALESCE(t1.{safe_join_key_col_name}, t2.{safe_join_key_col_name}) as {safe_join_key_col_name},
+            COALESCE(t1.{raw_join_key_col_name}, t2.{raw_join_key_col_name}) as {raw_join_key_col_name},
+            CASE WHEN t1.{safe_join_key_col_name} IS NULL THEN NULL ELSE
                 struct_pack({
                     ", ".join(f'{col} := t1.{col}' for col in table1_safe_column_names)
                 })
             END as {table1_safe_alias},
-            CASE WHEN t2.{join_key_col_name} IS NULL THEN NULL ELSE
+            CASE WHEN t2.{safe_join_key_col_name} IS NULL THEN NULL ELSE
                 struct_pack({
                     ", ".join(f'{col} := t2.{col}' for col in table2_safe_column_names)
                 })
             END as {table2_safe_alias},
-        FROM t1 {join_type} JOIN t2 ON t1.{join_key_col_name} = t2.{join_key_col_name}
+        FROM t1 {join_type} JOIN t2 ON t1.{safe_join_key_col_name} = t2.{safe_join_key_col_name}
         """
 
         res = con.execute(query)
@@ -3049,8 +3098,8 @@ def join_2(arr1, arr2, joinFn1, joinFn2, alias1, alias2, leftOuter, rightOuter):
             duck_table = pa.Table.from_pandas(res.df())
         else:
             duck_table = res.arrow()
-    join_obj = duck_table.column(join_key_col_name).combine_chunks()
-    duck_table = duck_table.drop([join_key_col_name])
+    join_obj = duck_table.column(raw_join_key_col_name).combine_chunks()
+    duck_table = duck_table.drop([safe_join_key_col_name, raw_join_key_col_name])
     alias_1_res = duck_table.column(table1_safe_alias).combine_chunks()
     alias_1_renamed = pa.StructArray.from_arrays(
         [alias_1_res.field(col_name) for col_name in table1_safe_column_names],
@@ -3076,7 +3125,7 @@ def join_2(arr1, arr2, joinFn1, joinFn2, alias1, alias2, leftOuter, rightOuter):
     res = awl_add_arrow_tags(
         untagged_result,
         pa.StructArray.from_arrays([join_obj], names=["joinObj"]),
-        types.TypedDict({"joinObj": join_obj_type}),
+        types.TypedDict({"joinObj": raw_join_obj_type}),
     )
     return res
 
