@@ -25,7 +25,7 @@ MapNodeOrOpToSerialized = typing.Dict[NodeOrOp, typing.Tuple[SerializedNode, int
 
 class SerializedReturnType(typing.TypedDict):
     nodes: typing.List[SerializedNode]
-    rootNodes: typing.List[int]
+    targetNodes: typing.List[int]
 
 
 def _serialize_node(node: NodeOrOp, serialized_nodes: MapNodeOrOpToSerialized) -> int:
@@ -80,11 +80,11 @@ def _serialize_node(node: NodeOrOp, serialized_nodes: MapNodeOrOpToSerialized) -
 
 def serialize(graphs: typing.List[graph.Node]) -> SerializedReturnType:
     serialized: MapNodeOrOpToSerialized = {}
-    root_nodes = [_serialize_node(n, serialized) for n in graphs]
+    target_nodes = [_serialize_node(n, serialized) for n in graphs]
     nodes = list(range(len(serialized)))
     for node_json, node_id in serialized.values():
         nodes[node_id] = node_json
-    return {"nodes": nodes, "rootNodes": root_nodes}
+    return {"nodes": nodes, "targetNodes": target_nodes}
 
 
 def _is_lambda(node: graph.Node):
@@ -199,7 +199,14 @@ def deserialize(serialized: SerializedReturnType) -> "list[graph.Node]":
     # along the graph topology. If it were we could do an easy linear
     # implementation. But its not so we recurse for now.
     nodes = serialized["nodes"]
-    root_nodes = serialized["rootNodes"]
+    # TODO(np): Clean this up once we've updated the app to use targetNodes
+    if "targetNodes" in serialized:
+        target_nodes = serialized["targetNodes"]
+    elif "rootNodes" in serialized:
+        target_nodes = serialized["rootNodes"]  # type: ignore
+    else:
+        raise errors.WeaveInternalError("payload has no target nodes")
+
     parsed_nodes: dict[int, graph.Node] = {}
     # WeaveJS does not do a good job deduplicating nodes currently, so we do it here.
     # This ensures we don't execute the same node many times.
@@ -207,5 +214,6 @@ def deserialize(serialized: SerializedReturnType) -> "list[graph.Node]":
 
     with memo.memo_storage():
         return [
-            _deserialize_node(i, nodes, parsed_nodes, hashed_nodes) for i in root_nodes
+            _deserialize_node(i, nodes, parsed_nodes, hashed_nodes)
+            for i in target_nodes
         ]

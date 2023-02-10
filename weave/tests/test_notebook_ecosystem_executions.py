@@ -162,7 +162,7 @@ execute_payloads = [
                 },
                 {"name": "count", "inputs": {"arr": 6}},
             ],
-            "rootNodes": [0, 1, 2, 13, 18, 23, 28],
+            "targetNodes": [0, 1, 2, 13, 18, 23, 28],
         }
     }
 ]

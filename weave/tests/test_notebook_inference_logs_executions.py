@@ -126,7 +126,7 @@ execute_payloads = [
                     "varName": "model_node",
                 },
             ],
-            "rootNodes": [0],
+            "targetNodes": [0],
         }
     }
 ]
