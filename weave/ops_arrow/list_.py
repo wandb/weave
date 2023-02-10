@@ -356,6 +356,8 @@ def _sort_structs(array: pa.Array) -> pa.Array:
             [_sort_structs(chunk) for chunk in array.chunks], array.type
         )
     if pa.types.is_struct(array.type):
+        if array.type.num_fields == 0:
+            return array
         field_names = sorted([f.name for f in array.type])
         sub_fields = [_sort_structs(array.field(f)) for f in field_names]
         return pa.StructArray.from_arrays(sub_fields, field_names)

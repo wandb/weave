@@ -47,6 +47,8 @@ def safe_replace_with_mask(
         )
 
     if pa.types.is_struct(array.type):
+        if array.type.num_fields == 0:
+            return array
         arrays = []
         names = []
         for field_index, field in enumerate(array.type):
