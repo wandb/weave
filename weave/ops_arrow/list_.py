@@ -320,6 +320,8 @@ def awl_group_by_result_object_type(
 
 def recursively_encode_pyarrow_strings_as_dictionaries(array: pa.Array) -> pa.Array:
     if pa.types.is_struct(array.type):
+        if array.type.num_fields == 0:
+            return array
         return pa.StructArray.from_arrays(
             [
                 recursively_encode_pyarrow_strings_as_dictionaries(
@@ -629,6 +631,9 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             prop_types = self.object_type.property_types
             if callable(prop_types):
                 prop_types = prop_types()
+
+            if len(prop_types) == 0:
+                return arrow_data
 
             for field in arrow_data.type:
                 keys.append(field.name)
@@ -1245,26 +1250,30 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         ),
     )
     def groupby(self, group_by_fn):
-        group_table_awl = _apply_fn_node_with_tag_pushdown(self, group_by_fn)
+        safe_group_by_fn = _to_compare_safe_call(group_by_fn)
+        group_table_awl = _apply_fn_node_with_tag_pushdown(self, safe_group_by_fn)
+
+        if (
+            safe_group_by_fn is group_by_fn
+        ):  # we want to use `is` here since we want to check for identity
+            unsafe_group_table_awl = group_table_awl
+        else:
+            # This only can happen if `_to_compare_safe_call` modifies something - which
+            # in itself only happens if we are grouping by a media asset
+            unsafe_group_table_awl = _apply_fn_node_with_tag_pushdown(self, group_by_fn)
+
         table = self._arrow_data
 
         group_table = group_table_awl._arrow_data
         group_table_as_array = arrow.arrow_as_array(group_table)
 
         # strip tags recursively so we group on values only
-        # TODO: even though we are stripping tags for the grouping,
-        # the groupkey itself should retain its tags. For now this is not
-        # practically a problem, but we may want to revisit this in the future.
         group_table_as_array_awl = ArrowWeaveList(
             group_table_as_array, group_table_awl.object_type, self._artifact
         )
         group_table_as_array_awl_stripped = (
             group_table_as_array_awl._arrow_data_asarray_no_tags()
         )
-        stripped_type = types.TypeRegistry.type_of(
-            group_table_as_array_awl_stripped
-        ).object_type
-
         group_table_chunked = pa.chunked_array(
             pa.StructArray.from_arrays(
                 [
@@ -1294,11 +1303,6 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         awl_grouped_agg_struct = _unflatten_structs_in_flattened_table(awl_grouped_agg)
 
         combined = awl_grouped_agg_struct.column("_index_list").combine_chunks()
-        grouped_keys = awl_grouped_agg_struct.column("group_key").combine_chunks()
-        nested_group_keys = pa.StructArray.from_arrays(
-            [grouped_keys], names=["groupKey"]
-        )
-
         val_lengths = combined.value_lengths()
         flattened_indexes = combined.flatten()
         values = arrow.arrow_as_array(table).take(flattened_indexes)
@@ -1307,11 +1311,18 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         grouped_awl = ArrowWeaveList(
             grouped_results, ArrowWeaveListType(self.object_type), self._artifact
         )
+        effective_group_key_indexes = flattened_indexes.take(offsets.tolist()[:-1])
+        effective_group_keys = arrow.arrow_as_array(
+            unsafe_group_table_awl._arrow_data
+        ).take(effective_group_key_indexes)
+        nested_effective_group_keys = pa.StructArray.from_arrays(
+            [effective_group_keys], names=["groupKey"]
+        )
 
         return awl_add_arrow_tags(
             grouped_awl,
-            nested_group_keys,
-            types.TypedDict({"groupKey": stripped_type}),
+            nested_effective_group_keys,
+            types.TypedDict({"groupKey": unsafe_group_table_awl.object_type}),
         )
 
     @op(output_type=lambda input_types: input_types["self"])
@@ -1375,6 +1386,29 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             types.TypedDict(new_obj_prop_types),
             self._artifact,
         )
+
+
+# Reimplementation of Weave0 `toSafeCall` which
+# converts media to their digest
+def _to_compare_safe_call(node: graph.OutputNode) -> graph.OutputNode:
+    from ..ops_primitives.dict import dict_
+    from ..ops_domain.wbmedia import ArtifactAssetType
+
+    node_type = types.non_none(node.type)
+    if ArtifactAssetType.assign_type(node_type):
+        return node.file().digest()  # type: ignore
+    elif types.TypedDict({}).assign_type(node_type):
+        new_keys = {}
+        dirty = False
+        for key in node_type.property_types.keys():  # type: ignore
+            sub_key = node[key]  # type: ignore
+            new_val = _to_compare_safe_call(sub_key)
+            new_keys[key] = new_val
+            if new_val is not sub_key:
+                dirty = True
+        if dirty:
+            return dict_(**new_keys)
+    return node
 
 
 def _apply_fn_node_with_tag_pushdown(

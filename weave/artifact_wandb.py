@@ -25,6 +25,9 @@ from . import filesystem
 
 from urllib import parse
 
+if typing.TYPE_CHECKING:
+    from wandb.sdk.interface import artifacts
+
 
 # TODO: Get rid of this, we have the new wandb api service! But this
 # is still used in a couple places.
@@ -347,6 +350,21 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         uri = WeaveWBArtifactURI(a_name, a_version, run.entity, project)
         self._set_read_artifact_uri(uri)
 
+    def _manifest(self) -> typing.Optional["artifacts.ArtifactManifest"]:
+        if self._read_artifact_uri is None:
+            raise errors.WeaveInternalError(
+                'cannot get path info for unsaved artifact"'
+            )
+        return self.io_service.manifest(self._read_artifact_uri)
+
+    def digest(self, path: str) -> typing.Optional[str]:
+        manifest = self._manifest()
+        if manifest is not None:
+            manifest_entry = manifest.get_entry_by_path(path)
+            if manifest_entry is not None:
+                return manifest_entry.digest
+        return None
+
     def _path_info(
         self, path: str
     ) -> typing.Optional[
@@ -356,12 +374,7 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
             "artifact_fs.FilesystemArtifactRef",
         ]
     ]:
-        if self._read_artifact_uri is None:
-            raise errors.WeaveInternalError(
-                'cannot get path info for unsaved artifact"'
-            )
-        uri = self._read_artifact_uri.with_path(path)
-        manifest = self.io_service.manifest(uri)
+        manifest = self._manifest()
         if manifest is None:
             return None
         manifest_entry = manifest.get_entry_by_path(path)

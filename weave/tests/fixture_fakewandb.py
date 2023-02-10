@@ -34,6 +34,10 @@ class FakeEntry:
     def __init__(self, path):
         self.path = path
 
+    @property
+    def digest(self):
+        return self.path
+
 
 class FakeManifest:
     entries = {"fakeentry": FakeEntry("fakeentry")}

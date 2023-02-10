@@ -536,3 +536,50 @@ def test_annotated_legacy_images_in_tables(fake_wandb):
             ),
         }
     )
+
+
+def make_simple_image_table():
+    table = wandb.Table(columns=["label", "image"])
+    for group in range(2):
+        for item in range(3):
+            table.add_data(
+                f"{group}-{item}",
+                wandb.Image(
+                    np.ones((32, 32)) * group,
+                    masks={
+                        # Here, we add a mask set unique to each image to ensure that the mask is not considered in grouping
+                        f"mask_set-{group}-{item}": {
+                            "mask_data": np.array(
+                                [[row % 4 for col in range(128)] for row in range(128)]
+                            )
+                        }
+                    },
+                ),
+            )
+    return table
+
+
+def test_grouping_on_images(fake_wandb):
+    table = make_simple_image_table()
+
+    art = wandb.Artifact("test_name", "test_type")
+    art.add(table, "table")
+    art_node = fake_wandb.mock_artifact_as_node(art)
+
+    file_node = art_node.file("table.table.json")
+    table_node = file_node.table()
+    table_rows = table_node.rows()
+    grouped = table_rows.groupby(lambda row: weave.ops.dict_(g_image=row["image"]))
+
+    raw_data = weave.use(grouped).to_pylist_notags()
+    assert len(raw_data) == 2
+    assert [[row["label"] for row in group] for group in raw_data] == [
+        ["0-0", "0-1", "0-2"],
+        ["1-0", "1-1", "1-2"],
+    ]
+
+    group_keys = weave.use(grouped.groupkey()).to_pylist_notags()
+    assert [key["g_image"]["sha256"] for key in group_keys] == [
+        "1237db9e0c3d396728f7f4077f62b6283118c08fbfdced1e99e33205c270bd27",
+        "e7bdc527afd649f51950b4524b0c15aecaf7f484448a6cdfcdc2ecd9bba0f5a7",
+    ]

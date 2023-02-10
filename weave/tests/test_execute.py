@@ -125,7 +125,7 @@ def table_mock_respecting_run_name(q, ndx):
 
 
 def test_outer_tags_propagate_on_cache_hit(fake_wandb):
-    fake_wandb.add_mock(table_mock_respecting_run_name)
+    fake_wandb.fake_api.add_mock(table_mock_respecting_run_name)
     row = (
         ops.project("stacey", "mendeleev")
         .runs()

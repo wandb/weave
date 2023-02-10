@@ -73,6 +73,9 @@ class File:
     def open(self, mode: str = "r") -> typing.Generator[typing.IO, None, None]:
         raise NotImplementedError
 
+    def digest(self) -> typing.Optional[str]:
+        raise NotImplementedError
+
 
 FileBaseType.instance_classes = File
 

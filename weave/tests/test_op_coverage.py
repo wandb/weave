@@ -115,9 +115,6 @@ js_op_exceptions = set(
         "list-tSNE",
         "artifactVersion-historyStep",
         "root_number-binsfixed",
-        # Ops which can't be accessed and are not used
-        "asset-file",
-        "file-digest",
     ]
 )
 

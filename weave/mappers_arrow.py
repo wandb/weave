@@ -283,6 +283,7 @@ class DefaultToArrow(mappers_python.DefaultToPy):
             or self.type.name == "ArrowArray"
             or self.type.name == "ArrowTable"
             or self.type.name == "FilesystemArtifact"
+            or self.type.name == "file"
         ):
             # Ref type
             return pa.string()

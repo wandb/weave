@@ -61,6 +61,11 @@ def file_size(file: file_base.File) -> int:
     return file.size()
 
 
+@op(name="file-digest")
+def file_digest(file: file_base.File) -> typing.Optional[str]:
+    return file.digest()
+
+
 @op(name="file-media", output_type=lambda input_types: input_types["file"].wbObjectType)
 def file_media(file: FilesystemArtifactFile):
     if file is None or isinstance(file, FilesystemArtifactDir):

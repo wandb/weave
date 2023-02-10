@@ -241,6 +241,18 @@ class FilesystemArtifactFile(file_base.File):
     def size(self) -> int:
         return self.artifact.size(self.path)
 
+    def digest(self) -> typing.Optional[str]:
+        from weave.artifact_wandb import WandbArtifact
+
+        if isinstance(self.artifact, WandbArtifact):
+            # we can get the digest from the manifest (much faster)
+            return self.artifact.digest(self.path)
+        else:
+            # This matches how WandB calculates digests for files
+            from wandb.sdk.lib import hashutil
+
+            return hashutil.md5_file_b64(self.artifact.path(self.path))
+
 
 FilesystemArtifactFileType.instance_classes = FilesystemArtifactFile
 
