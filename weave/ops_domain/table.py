@@ -328,6 +328,7 @@ def _table_data_to_weave1_objects(
             )
 
     def _process_cell_value(cell: typing.Any, cell_type: types.Type) -> typing.Any:
+        cell_type = types.non_none(cell_type)
         if isinstance(cell, list) and isinstance(cell_type, types.List):
             cell = [_process_cell_value(c, cell_type.object_type) for c in cell]
         elif isinstance(cell, dict):
