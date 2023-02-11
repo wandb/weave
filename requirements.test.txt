@@ -7,3 +7,4 @@ nbmake>=0.5
 rich
 bokeh
 soundfile
+pytest-asyncio>=0.20.3

@@ -160,3 +160,10 @@ def http_server_test_client(app):
 @pytest.fixture()
 def weave_test_client(http_server_test_client):
     return client.Client(http_server_test_client)
+
+
+@pytest.fixture()
+def enable_touch_on_read():
+    os.environ["WEAVE_ENABLE_TOUCH_ON_READ"] = "1"
+    yield
+    del os.environ["WEAVE_ENABLE_TOUCH_ON_READ"]
