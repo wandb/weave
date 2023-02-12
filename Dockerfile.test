@@ -14,6 +14,8 @@ COPY integration_test/package.json /root/integration_test/package.json
 COPY integration_test/package-lock.json /root/integration_test/package-lock.json
 RUN cd integration_test && npm install
 
+RUN df -h
+
 # final stage
 FROM cypress/included:10.11.0
 
@@ -21,4 +23,7 @@ WORKDIR /root
 COPY --from=builder /root/venv venv
 COPY --from=builder /root/integration_test integration_test
 RUN rm /bin/sh && ln -s /bin/bash /bin/sh
+
+RUN df -h
+
 ENTRYPOINT "/bin/bash"
