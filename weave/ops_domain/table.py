@@ -291,6 +291,30 @@ def _in_place_join_in_linked_tables(
     return rows, object_type
 
 
+def _make_type_non_none(t: types.Type) -> types.Type:
+    non_none_type = types.non_none(t)
+    if isinstance(non_none_type, types.List):
+        return types.List(_make_type_non_none(non_none_type.object_type))
+    elif isinstance(non_none_type, types.TypedDict):
+        return types.TypedDict(
+            {k: _make_type_non_none(v) for k, v in non_none_type.property_types.items()}
+        )
+    return non_none_type
+
+
+possible_media_type_classes = (
+    wbmedia.LegacyImageArtifactFileRefType,
+    wbmedia.ImageArtifactFileRefType,
+    wbmedia.AudioArtifactFileRef.WeaveType,  # type: ignore
+    wbmedia.BokehArtifactFileRef.WeaveType,  # type: ignore
+    wbmedia.VideoArtifactFileRef.WeaveType,  # type: ignore
+    wbmedia.Object3DArtifactFileRef.WeaveType,  # type: ignore
+    wbmedia.MoleculeArtifactFileRef.WeaveType,  # type: ignore
+    wbmedia.HtmlArtifactFileRef.WeaveType,  # type: ignore
+    wbmedia.LegacyTableNDArrayType,
+)
+
+
 def _table_data_to_weave1_objects(
     row_data: list[dict],
     file: artifact_fs.FilesystemArtifactFile,
@@ -328,35 +352,35 @@ def _table_data_to_weave1_objects(
             )
 
     def _process_cell_value(cell: typing.Any, cell_type: types.Type) -> typing.Any:
-        cell_type = types.non_none(cell_type)
         if isinstance(cell, list) and isinstance(cell_type, types.List):
             cell = [_process_cell_value(c, cell_type.object_type) for c in cell]
-        elif isinstance(cell, dict):
-            if "_type" in cell and "path" in cell:
-                cell = _create_media_type_for_cell(cell)
-            elif isinstance(cell_type, types.TypedDict):
-                cell = {
-                    k: _process_cell_value(v, cell_type.property_types[str(k)])
-                    for k, v in cell.items()
-                }
-
+        elif isinstance(cell, dict) and isinstance(cell_type, types.TypedDict):
+            cell = {
+                k: _process_cell_value(v, cell_type.property_types[str(k)])
+                for k, v in cell.items()
+            }
         # this is needed because tables store timestamps as unix epochs in ms, but the deserialized
         # representation in weave1 is a datetime object. we do the conversion here to ensure deserialized
         # timestamps all expose a common interface to weave1 callers.
-        elif types.UnionType(types.NoneType(), types.Timestamp()).assign_type(
-            cell_type
-        ):
+        elif isinstance(cell_type, types.Timestamp):
             if cell is not None:
                 cell = datetime.datetime.fromtimestamp(
                     cell / 1000, tz=datetime.timezone.utc
                 )
+        elif isinstance(cell, dict) and isinstance(
+            cell_type, possible_media_type_classes
+        ):
+            cell = _create_media_type_for_cell(cell)
 
         return cell
+
+    non_null_prop_types = _make_type_non_none(row_type)
+    non_null_prop_types = typing.cast(types.TypedDict, non_null_prop_types)
 
     rows: list[dict] = []
     for data_row in row_data:
         new_row = {
-            k: _process_cell_value(v, row_type.property_types[str(k)])
+            k: _process_cell_value(v, non_null_prop_types.property_types[str(k)])
             for k, v in data_row.items()
         }
         rows.append(new_row)
