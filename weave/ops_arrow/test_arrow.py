@@ -16,7 +16,7 @@ from .. import box
 from .. import errors
 from .. import storage
 from ..ops_primitives import Number, Boolean
-from ..ops_domain import wb_domain_types as wdt, project_ops
+from ..ops_domain import project_ops
 from .. import api as weave
 from .. import ops
 from .. import weave_types as types
@@ -2779,3 +2779,14 @@ options = [
 def test_safe_replace_with_mask(array, mask, replacements, expected):
     res = arrow_type.safe_replace_with_mask(array, mask, replacements)
     assert res.equals(expected)
+
+
+def test_conversion_of_domain_types_to_awl_values(fake_wandb):
+    fake_wandb.fake_api.add_mock(lambda q, ndx: test_wb.workspace_response)
+    project_node = ops.project("stacey", "mendeleev")
+    project = weave.use(project_node)
+    data = box.box([project] * 3)
+    awl = weave.save(arrow.to_arrow(data))
+
+    list_node = ops.arrow_list_(**{"a": awl, "b": awl})
+    assert [[item for item in l] for l in weave.use(list_node)] == [[project] * 2] * 3

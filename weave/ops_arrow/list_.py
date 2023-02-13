@@ -2431,6 +2431,11 @@ def direct_add_arrow_tags(
     return pa.StructArray.from_arrays([tag_array, new_value], ["_tag", "_value"])
 
 
+def repeat(value: typing.Any, count: int) -> pa.Array:
+    value_single = to_arrow([value])._arrow_data
+    return pa.repeat(value_single[0], count)
+
+
 def tag_arrow_array_elements_with_single_tag_dict(
     array: pa.Array, py_tags: dict
 ) -> pa.StructArray:
@@ -2558,7 +2563,7 @@ def vectorized_container_constructor_preprocessor(
                 tags = tag_store.get_tags(a)
             if box.is_boxed(a):
                 a = box.unbox(a)
-            arrays[i] = pa.array([a] * max_len)
+            arrays[i] = repeat(a, max_len)
             if tags is not None:
                 arrays[i] = tag_arrow_array_elements_with_single_tag_dict(
                     arrays[i], tags
