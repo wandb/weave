@@ -60,6 +60,14 @@ class WeaveArtifactFileNotFound(WeaveBaseError):
     pass
 
 
+class WeaveArtifactCollectionNotFound(WeaveBaseError):
+    pass
+
+
+class WeaveArtifactVersionNotFound(WeaveBaseError):
+    pass
+
+
 class WeaveVectorizationError(WeaveBaseError):
     pass
 

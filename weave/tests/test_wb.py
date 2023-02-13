@@ -210,8 +210,9 @@ project_run_artifact_response = {
 artifact_version_sdk_response = {
     "artifact": {
         **fwb.artifactVersion_payload,  # type: ignore
+        "state": "COMMITTED",
         "artifactType": fwb.defaultArtifactType_payload,
-        "artifactSequence": {**fwb.artifactSequence_payload, "project": fwb.project_payload},  # type: ignore
+        "artifactSequence": {**fwb.artifactSequence_payload, "project": fwb.project_payload, "state": "READY"},  # type: ignore
     }
 }
 
@@ -419,7 +420,7 @@ def test_workspace_table_type(fake_wandb):
             object_type=types.optional(
                 TaggedValueType(
                     types.TypedDict(property_types={"run": wdt.RunType}),
-                    ops.TableType(),
+                    types.optional(ops.TableType()),
                 )
             )
         ),

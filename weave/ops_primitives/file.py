@@ -68,7 +68,7 @@ def file_digest(file: file_base.File) -> typing.Optional[str]:
 
 @op(name="file-media", output_type=lambda input_types: input_types["file"].wbObjectType)
 def file_media(file: FilesystemArtifactFile):
-    if file is None or isinstance(file, FilesystemArtifactDir):
+    if isinstance(file, FilesystemArtifactDir):
         raise errors.WeaveInternalError("File is None or a directory")
     tracer = engine_trace.tracer()
     with file.open() as f:

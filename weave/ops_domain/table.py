@@ -263,27 +263,35 @@ def _in_place_join_in_linked_tables(
             or col_wb_type in wandb_util.foreign_index_type_names
         ):
             peer_file = file.artifact.path_info(column_type["params"]["table"])
-            if peer_file is None or isinstance(
-                peer_file, artifact_fs.FilesystemArtifactDir
-            ):
-                raise errors.WeaveInternalError("Peer file is None or a directory")
-            with peer_file.open() as f:
-                tracer = engine_trace.tracer()
-                with tracer.trace("peer_table:jsonload"):
-                    peer_data = json.load(f)
-            peer_rows, peer_object_type = _get_rows_and_object_type_from_weave_format(
-                peer_data, peer_file
-            )
-            peer_reader = PeerTableReader(peer_rows, peer_object_type)
+            if peer_file is None:
+                # if is none, then the file doesn't exist, so we can't join.
+                # We will just set the column to an empty dict. This is preferred
+                # over failing.
+                peer_object_type = types.TypedDict({})
+                # Update the row values
+                for row in rows:
+                    row[column_name] = {}
+            elif isinstance(peer_file, artifact_fs.FilesystemArtifactDir):
+                raise errors.WeaveInternalError("Peer file is a directory")
+            else:
+                with peer_file.open() as f:
+                    tracer = engine_trace.tracer()
+                    with tracer.trace("peer_table:jsonload"):
+                        peer_data = json.load(f)
+                (
+                    peer_rows,
+                    peer_object_type,
+                ) = _get_rows_and_object_type_from_weave_format(peer_data, peer_file)
+                peer_reader = PeerTableReader(peer_rows, peer_object_type)
 
-            # Update the row values
-            for row in rows:
-                if col_wb_type in wandb_util.foreign_index_type_names:
-                    row[column_name] = peer_reader.row_at_index(row[column_name])
-                else:
-                    row[column_name] = peer_reader.row_at_key(
-                        column_type["params"]["col_name"], row[column_name]
-                    )
+                # Update the row values
+                for row in rows:
+                    if col_wb_type in wandb_util.foreign_index_type_names:
+                        row[column_name] = peer_reader.row_at_index(row[column_name])
+                    else:
+                        row[column_name] = peer_reader.row_at_key(
+                            column_type["params"]["col_name"], row[column_name]
+                        )
 
             # update the object type
             object_type.property_types[column_name] = peer_object_type
@@ -667,16 +675,41 @@ def _get_joined_table_awl_from_file(
 
 
 @op(name="file-table")
-def file_table(file: artifact_fs.FilesystemArtifactFile) -> Table:
-    return Table(_get_table_like_awl_from_file(file).awl)
+def file_table(file: artifact_fs.FilesystemArtifactFile) -> typing.Optional[Table]:
+    # We do a try/catch here because it is possible that the `file` does not
+    # exist. This can happen if the user has deleted the referenced artifact. In
+    # this case we will throw a `FileNotFoundError` when calling file.open().
+    # Technically we probably should do this try/catch in every case of
+    # `file.open` (for example in file-contents, file-media, etc...). However,
+    # in practice, the `file.open` should only fail if the File is constructed
+    # directly (as opposed to use the `artifact.path_info` method - since
+    # `path_info` will return None in this case). This only happens when pulling
+    # a file from run summary since it is constructed from a hard-coded artifact
+    # URL. This path is only used when fetching tables.
+    try:
+        return Table(_get_table_like_awl_from_file(file).awl)
+    except FileNotFoundError as e:
+        return None
 
 
 @op(name="file-partitionedTable")
-def partitioned_table(file: artifact_fs.FilesystemArtifactFile) -> PartitionedTable:
-    res = _get_table_like_awl_from_file(file)
+def partitioned_table(
+    file: artifact_fs.FilesystemArtifactFile,
+) -> typing.Optional[PartitionedTable]:
+    # Please see comment in `file_table` regarding try/catch
+    try:
+        res = _get_table_like_awl_from_file(file)
+    except FileNotFoundError as e:
+        return None
     return PartitionedTable(res.awl, file, res.data)
 
 
 @op(name="file-joinedTable")
-def joined_table(file: artifact_fs.FilesystemArtifactFile) -> JoinedTable:
-    return JoinedTable(_get_table_like_awl_from_file(file).awl, file)
+def joined_table(
+    file: artifact_fs.FilesystemArtifactFile,
+) -> typing.Optional[JoinedTable]:
+    # Please see comment in `file_table` regarding try/catch
+    try:
+        return JoinedTable(_get_table_like_awl_from_file(file).awl, file)
+    except FileNotFoundError as e:
+        return None
