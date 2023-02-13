@@ -183,7 +183,7 @@ def _map_each(self: "ArrowWeaveList", fn):
                 self.object_type.tag,
             )
         return reshaped_arrow_data
-    return _apply_fn_node(self, fn)
+    return _apply_fn_node_with_tag_pushdown(self, fn)
 
 
 def rewrite_groupby_refs(arrow_data, group_keys, object_type, artifact):
