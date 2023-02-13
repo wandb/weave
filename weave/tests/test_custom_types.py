@@ -4,7 +4,7 @@ from PIL import Image
 
 from .. import context_state as _context
 
-from weave.ecosystem.wandb import geom
+from . import geom
 
 from .. import api as weave
 from .. import ops_arrow

@@ -18,6 +18,11 @@ with open("requirements.txt") as requirements_file:
         for requirement in pkg_resources.parse_requirements(requirements_file)
     ]
 
+with open("requirements.ecosystem.txt") as requirements_file:
+    requirements_ecosystem = [
+        convert_git_requirement(str(requirement))
+        for requirement in pkg_resources.parse_requirements(requirements_file)
+    ]
 
 setup(
     name="weave",
@@ -36,4 +41,5 @@ setup(
         "Programming Language :: Python :: 3",
         "Operating System :: OS Independent",
     ],
+    extras_require={"ecosystem": requirements_ecosystem},
 )

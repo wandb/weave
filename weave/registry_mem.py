@@ -137,8 +137,19 @@ class Registry:
         self._ops_by_common_name[op.common_name].pop(name)
         self._ops_by_common_name.setdefault(op.common_name, {})[new_name] = op
 
+        old_version = op.version
+
+        # TODO(DG): find a better way to do this than to save the op again
+        # see comment here: https://github.com/wandb/weave-internal/pull/554#discussion_r1103875156
+        if op.location is not None:
+            ref = storage.save(op, name=new_name)
+            location = ref.artifact.uri_obj
+            version = ref.version
+            op.version = version
+            op.location = location
+
         if op.version is not None:
-            self._op_versions.pop((name, op.version))
+            self._op_versions.pop((name, old_version))
             self._op_versions[(new_name, op.version)] = op
 
     # def register_type(self, type: weave_types.Type):

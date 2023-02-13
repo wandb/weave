@@ -1,6 +1,5 @@
 import weave
-from weave.ops_domain import wb_domain_types
-from weave.ecosystem.wandb import runs2, make_runs2_tables
+from weave.ops_domain import wb_domain_types, runs2
 
 
 from .. import stitch
@@ -8,11 +7,11 @@ from .. import compile_table
 
 
 def test_runs2_plan():
-    make_runs2_tables(10, 10, 10, 1, 2)
+    runs2.make_runs2_tables(10, 10, 10, 1, 2)
     project = weave.save(
         wb_domain_types.Project.from_gql({"name": "weavetest-10-10-10-2"})
     )
-    runs = runs2(project)
+    runs = runs2.runs2(project)
     post_runs = runs.createIndexCheckpointTag()
     post_runs = runs.groupby(lambda run: weave.ops.dict_(k0=run["config"]["key0"]))
     window = post_runs

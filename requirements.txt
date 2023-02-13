@@ -1,45 +1,30 @@
 wandb @ git+https://github.com/wandb/client.git@ee6ef54da992a4bb250ab83921e2bb34cd8ea293
 datadog==0.44.0
-ddtrace
-python-json-logger
-numpy
-pandas
-h5py
-sqlalchemy
-ipython
+ddtrace>=1.7.3
+python-json-logger>=2.0.4
+numpy>=1.21
+pandas>=1.5.3
+ipython>=8.9
 flask>=2.1
-flask_cors
-notebook
-pymysql
+flask_cors>=3.0.10
+notebook>=6.5.2
 pyarrow==10.0.1
-ipynbname
-pillow
-openai
-analytics-python
-typing_extensions
-matplotlib!=3.5.3
-shap
-xgboost
-torch
-torchvision
-bertviz
-datasets
-transformers<4.21
-rich
-plotly
-replicate
-duckdb
-scikit-learn
-umap-learn
+ipynbname>=2021.3.2
+pillow>=9.4.0
+analytics-python>=1.2.9
+rich>=13.3.1
+replicate>=0.4.0
+duckdb>=0.6.1
+scikit-learn>=1.2.1
+umap-learn>=0.5.3
 aiofiles>=22.1.0
 gql>=3.4.0
-
-# spaCy Requirements:
-spacy>=3.0.0,<4.0.0
-en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.4.0/en_core_web_sm-3.4.0.tar.gz
+aiohttp>=3.8.3
+sqlalchemy>=2.0.1
+pymysql>=1.0.2
 
 # string-levenshtein op:
-levenshtein
+levenshtein>=0.20.9
 setuptools>=65.5.1 # not directly required, pinned by Snyk to avoid a vulnerability
 wheel>=0.38.0 # not directly required, pinned by Snyk to avoid a vulnerability
 

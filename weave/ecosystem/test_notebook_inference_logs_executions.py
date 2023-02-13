@@ -2,7 +2,7 @@ from weave.server import handle_request
 
 
 def test_playback():
-    from ..ecosystem import huggingface
+    from . import huggingface
 
     for payload in [execute_payloads[-1]]:
         res = handle_request(payload, True)

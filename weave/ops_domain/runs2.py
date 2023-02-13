@@ -17,9 +17,9 @@ import typing
 import weave
 from weave.ops_domain import wb_domain_types
 
-from ... import engine_trace
-from ...ops_arrow.arrow import arrow_schema_to_weave_type
-from ...ops_arrow.list_ import ArrowWeaveListType
+from .. import engine_trace
+from ..ops_arrow.arrow import arrow_schema_to_weave_type
+from ..ops_arrow.list_ import ArrowWeaveListType
 
 
 class EmptyTypedDict(typing.TypedDict):

@@ -233,6 +233,10 @@ def build_deps(
     latest_deps_full_name = qualified_image_name(image, "latest-deps")
     command += f" \ \n  --tag={latest_deps_full_name}"
 
+    for tag in WRITE_TAGS:
+        full_name = qualified_image_name(image, tag)
+        command += f" \ \n  --tag={full_name}"
+
     print(command)
     print("")
 

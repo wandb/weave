@@ -1,0 +1,15 @@
+h5py>=3.8.0
+openai>=0.26.4
+matplotlib!=3.5,>3
+shap>=0.41.0
+xgboost>=1.7.3
+torch>=1.13.1
+torchvision>=0.14.1
+bertviz>=1.4.0
+datasets>=2.9.0
+transformers<4.21
+plotly>=5.13.0
+
+# spaCy Requirements:
+spacy>=3.0.0,<4.0.0
+en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.4.0/en_core_web_sm-3.4.0.tar.gz

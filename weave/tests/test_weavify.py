@@ -5,7 +5,7 @@ from .. import weave_internal
 from .. import weave_types as types
 from .. import ops
 from .. import graph
-from ..ecosystem.wandb import geom
+from . import geom
 
 
 @pytest.mark.parametrize(

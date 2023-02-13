@@ -1,11 +1,9 @@
 -r requirements.txt
-types-requests
-types-setuptools
-pre-commit
-black
-rich
-pytest
-pytest-timeout
-types-aiofiles
+types-requests>=2.28.11.8
+types-setuptools>=65.7.0.3
+pre-commit>=3.0.2
+black>=23.1.0
+types-aiofiles>=22.1.0.6
+typing_extensions>=4.4.0
 
 setuptools>=65.5.1 # not directly required, pinned by Snyk to avoid a vulnerability

@@ -370,7 +370,14 @@ if os.getenv("WEAVE_SERVER_DEBUG"):
 @app.before_first_request
 def before_first_request():
     if not util.parse_boolean_env_var("WEAVE_SERVER_DISABLE_ECOSYSTEM"):
-        from weave.ecosystem import all
+        try:
+            from weave.ecosystem import all
+        except ImportError:
+            logging.warning(
+                'Failed to import "weave.ecosystem". Weave ecosystem features will be disabled. '
+                'To fix this, install ecosystem dependencies with "pip install weave[ecosystem]". '
+                "To disable this message, set WEAVE_SERVER_DISABLE_ECOSYSTEM=1."
+            )
 
 
 if __name__ == "__main__":
