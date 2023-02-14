@@ -168,6 +168,17 @@ def config(run: wdt.Run) -> dict[str, typing.Any]:
     )
 
 
+def _get_combined_summary_metrics(run_dict: dict) -> dict:
+    all_metrics: list[dict] = [
+        json.loads(v) for k, v in run_dict.items() if k.startswith("summaryMetrics_")
+    ]
+    # merge all metrics
+    merged_metrics = {}
+    for metrics in all_metrics:
+        merged_metrics.update(metrics)
+    return merged_metrics
+
+
 @op(
     render_info={"type": "function"},
     # When refine_summary_type is explicitly requested in the graph, we ask for
@@ -175,18 +186,15 @@ def config(run: wdt.Run) -> dict[str, typing.Any]:
     plugins=wb_gql_op_plugin(lambda inputs, inner: "summaryMetrics"),
 )
 def refine_summary_type(run: wdt.Run) -> types.Type:
-    summary_field_s = None
     try:
         # If summary was explicitly requested, this will be the case.
-        summary_field_s = run.gql["summaryMetrics"]
+        metrics = json.loads(run.gql["summaryMetrics"] or "{}")
     except KeyError:
         # Otherwise we'll be refining implicitly in compile, but we only need
         # to provide the summary requested by the rest of the graph.
-        summary_field_s = run.gql["summaryMetricsSubset"]
-    if not summary_field_s:
-        summary_field_s = "{}"
+        metrics = _get_combined_summary_metrics(run.gql.json_dict)
 
-    return wb_util.process_run_dict_type(json.loads(summary_field_s))
+    return wb_util.process_run_dict_type(metrics)
 
 
 def _make_run_summary_gql_field(inputs: InputAndStitchProvider, inner: str):
@@ -196,8 +204,10 @@ def _make_run_summary_gql_field(inputs: InputAndStitchProvider, inner: str):
     top_level_keys = list(key_tree.keys())
     if not top_level_keys:
         # If no keys, then we must select the whole object
-        return "summaryMetricsSubset: summaryMetrics"
-    return f"summaryMetricsSubset: summaryMetrics(keys: {json.dumps(top_level_keys)})"
+        return "summaryMetrics"
+    keys = json.dumps(top_level_keys)
+    alias = _make_alias(keys, prefix="summaryMetrics")
+    return f"{alias}: summaryMetrics(keys: {keys})"
 
 
 @op(
@@ -206,8 +216,9 @@ def _make_run_summary_gql_field(inputs: InputAndStitchProvider, inner: str):
     plugins=wb_gql_op_plugin(_make_run_summary_gql_field),
 )
 def summary(run: wdt.Run) -> dict[str, typing.Any]:
+    merged_metrics = _get_combined_summary_metrics(run.gql.json_dict)
     return wb_util.process_run_dict_obj(
-        json.loads(run.gql["summaryMetricsSubset"] or "{}"),
+        merged_metrics,
         wb_util.RunPath(
             run.gql["project"]["entity"]["name"],
             run.gql["project"]["name"],
