@@ -4,6 +4,8 @@ from .. import ops as ops
 import graphql
 from . import fixture_fakewandb as fwb
 from .. import registry_mem
+from ..language_features.tagging import tagged_value_type
+from ..ops_domain import wb_domain_types
 
 """
 Tests in this file whould be used to test the graphs that can be constructed
@@ -118,7 +120,7 @@ def test_root_project_concat(fake_wandb):
                         {
                             "node": {
                                 **fwb.run_payload,
-                                "summaryMetrics": '{"loss": 0.1}',
+                                "summaryMetricsSubset": '{"loss": 0.1}',
                             },
                         }
                     ]
@@ -129,10 +131,9 @@ def test_root_project_concat(fake_wandb):
     summary = (
         ops.make_list(a=runs_node_1, b=runs_node_2).concat().limit(50).summary()["loss"]
     )
-
-    assert weave.use(summary) == [0.1, 0.1]
     log = fake_wandb.fake_api.execute_log()
-    assert len(log) == 2
+    assert len(log) == 1
+    # The first request is to refineSummary, so we request summaryMetrics
     assert_gql_str_equal(
         log[0]["gql"],
         # Note: the inner project/entity query is because it is part of the required fragment for runs
@@ -163,6 +164,66 @@ def test_root_project_concat(fake_wandb):
                         }
                     }
                     summaryMetrics
+                    }
+                }
+                }
+            }
+            }""",
+    )
+    assert summary.type == tagged_value_type.TaggedValueType(
+        weave.types.TypedDict(property_types={"project": wb_domain_types.ProjectType}),
+        weave.types.List(
+            object_type=tagged_value_type.TaggedValueType(
+                weave.types.TypedDict(
+                    property_types={
+                        "run": tagged_value_type.TaggedValueType(
+                            weave.types.TypedDict(
+                                property_types={"project": wb_domain_types.ProjectType}
+                            ),
+                            wb_domain_types.RunType,
+                        )
+                    }
+                ),
+                weave.types.Float(),
+            )
+        ),
+    )
+
+    assert weave.use(summary) == [0.1, 0.1]
+    # The second request is the graph we constructed above. Projection
+    # pushdown should occur (we should request summaryMetrics with the keys
+    # arg)
+    assert len(log) == 2
+    assert_gql_str_equal(
+        log[1]["gql"],
+        # Note: the inner project/entity query is because it is part of the required fragment for runs
+        # this could in theory change in the future.
+        """query WeavePythonCG {
+            project_518fa79465d8ffaeb91015dce87e092f: project(name: "mendeleev", entityName: "stacey") {
+                id
+                name
+                entity {
+                id
+                name
+                }
+                runs_6e908597bd3152c2f0457f6283da76b9: runs(
+                first: 50
+                filters: "{}"
+                order: "-createdAt"
+                ) {
+                edges {
+                    node {
+                    id
+                    name
+                    project {
+                        id
+                        name
+                        entity {
+                        id
+                        name
+                        }
+                    }
+                    summaryMetricsSubset: summaryMetrics(keys: ["loss"])
                     }
                 }
                 }

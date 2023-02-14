@@ -15,7 +15,7 @@ if typing.TYPE_CHECKING:
 @dataclass
 class InputProvider:
     raw: dict[str, typing.Any]
-    _dumps_cache: dict[str, str] = field(default_factory=dict)
+    _dumps_cache: dict[str, str] = field(init=False, repr=False, default_factory=dict)
 
     def __getitem__(self, key: str) -> typing.Any:
         if key not in self.raw:
@@ -26,8 +26,13 @@ class InputProvider:
 
 
 @dataclass
+class InputAndStitchProvider(InputProvider):
+    stitched_obj: stitch.ObjectRecorder
+
+
+@dataclass
 class GqlOpPlugin:
-    query_fn: typing.Callable[[InputProvider, str], str]
+    query_fn: typing.Callable[[InputAndStitchProvider, str], str]
     is_root: bool = False
     root_resolver: typing.Optional["op_def.OpDef"] = None
 
@@ -41,7 +46,7 @@ class GqlOpPlugin:
 # see `project_ops.py::artifacts`), most ops use the higher level helpers
 # defined in `wb_domain_gql.py`
 def wb_gql_op_plugin(
-    query_fn: typing.Callable[[InputProvider, str], str],
+    query_fn: typing.Callable[[InputAndStitchProvider, str], str],
     is_root: bool = False,
     root_resolver: typing.Optional["op_def.OpDef"] = None,
 ) -> dict[str, GqlOpPlugin]:
@@ -171,31 +176,14 @@ def _get_fragment(node: graph.OutputNode, stitchedGraph: stitch.StitchedGraph) -
         for key, value in node.from_op.inputs.items()
         if isinstance(value, graph.ConstNode)
     }
-    ip = InputProvider(const_node_input_vals)
+    ip = InputAndStitchProvider(const_node_input_vals, forward_obj)
 
     fragment = wb_domain_gql.query_fn(
         ip,
         child_fragment,
     )
 
-    # This block adds any fragments required by the corresponding refinement op.
-    # Note: as of this writing, the only op which has a different gql fragment
-    # for refine is run-history. Since we only compile a graph once, we need to
-    # eagerly include both the data needed for refinement and execution when we
-    # compile. Notice that `compile.py` as a `if _is_compiling():` check to
-    # short circuit if it is currently compiling. Therefore, without this block,
-    # the refinement op will not have it's gql fragment included.
-    refine_fragment = ""
-    if op_def.refine_output_type is not None:
-        refine_wb_domain_gql = _get_gql_plugin(op_def.refine_output_type)
-        if refine_wb_domain_gql is not None:
-            refine_wb_domain_gql = typing.cast(GqlOpPlugin, refine_wb_domain_gql)
-            refine_fragment = refine_wb_domain_gql.query_fn(
-                ip,
-                child_fragment,
-            )
-
-    return fragment + "\n" + refine_fragment
+    return fragment
 
 
 def _field_selections_are_mergeable(

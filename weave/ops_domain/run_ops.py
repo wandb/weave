@@ -1,6 +1,44 @@
+# W&B API Weave Ops: Runs
+#
+# Run projection pushdown strategy
+# --------------------------------
+#
+# Its important for performance
+# that we only select the run user data (config/summary/history) columns that
+# we need. We can use the stitched graph to do that for the relevant ops, any
+# pick ops connected to config/summary are used to determine the keys argument
+# to the graphql field.
+#
+# But we also need to consider refinement. There are two different ways
+# refinment will happen: explicit where there is a request for a refinement
+# op like refine_summary_type in the graph, and implicit, which is all other cases.
+# In the explicit case we must fetch all columns so we can produce the full
+# type.
+#
+# The implicit case always happens, because compile refines all ops in the
+# graph to fix incoming Weave0 graphs for compatibility with Weave1. But this
+# refinement only needs to provide the subset of the type that will be used
+# for dispatch. Ie we can compute the type of only the summary fields needed
+# by the query.
+#
+# So the correct strategy is: if a refinement descendent is explicitly requested,
+# select all fields. Otherwise, select the fields described by pick descendents.
+#
+# We do not yet perform projection pushdown for history. Currently to fetch
+# specific history columns from the W&B API, you need to use the sampledHistory
+# graphql field. But it's incorrect to make a request for one "historySpec"
+# containing all the required keys, because the W&B backend will return
+# only rows that have all keys present. We can instead request one spec
+# for each history key, always also including the _step key, and then zip
+# the results back together ourselves. If we do so we'll have to do it unsampled.
+# It may be better to just move to the Runs2 strategy where Weave is directly
+# responsible for scanning the data instead of using the sampledHistory field.
+
 import json
+import typing
 import logging
-from ..compile_domain import wb_gql_op_plugin
+from .. import compile_table
+from ..compile_domain import wb_gql_op_plugin, InputAndStitchProvider
 from ..api import op
 from .. import weave_types as types
 from . import wb_domain_types as wdt
@@ -11,9 +49,8 @@ from .wandb_domain_gql import (
     gql_connection_op,
     _make_alias,
 )
-
-import typing
 from . import wb_util
+
 
 # Section 1/6: Tag Getters
 run_tag_getter_op = make_tag_getter_op("run", wdt.RunType, op_name="tag-run")
@@ -90,17 +127,39 @@ gql_prop_op(
     plugins=wb_gql_op_plugin(lambda inputs, inner: "config"),
 )
 def refine_config_type(run: wdt.Run) -> types.Type:
-    return wb_util.process_run_dict_type(json.loads(run.gql["config"] or "{}"))
+    config_field_s = None
+    try:
+        # If config was explicitly requested, this will be the case.
+        config_field_s = run.gql["config"]
+    except KeyError:
+        # Otherwise we'll be refining implicitly in compile, but we only need
+        # to provide the summary requested by the rest of the graph.
+        config_field_s = run.gql["configSubset"]
+    if not config_field_s:
+        config_field_s = "{}"
+
+    return wb_util.process_run_dict_type(json.loads(config_field_s))
+
+
+def _make_run_config_gql_field(inputs: InputAndStitchProvider, inner: str):
+    stitch_obj = inputs.stitched_obj
+    key_tree = compile_table.get_projection(stitch_obj)
+    # we only pushdown the top level keys for now.
+    top_level_keys = list(key_tree.keys())
+    if not top_level_keys:
+        # If no keys, then we must select the whole object
+        return "configSubset: config"
+    return f"configSubset: config(keys: {json.dumps(top_level_keys)})"
 
 
 @op(
     name="run-config",
     refine_output_type=refine_config_type,
-    plugins=wb_gql_op_plugin(lambda inputs, inner: "config"),
+    plugins=wb_gql_op_plugin(_make_run_config_gql_field),
 )
 def config(run: wdt.Run) -> dict[str, typing.Any]:
     return wb_util.process_run_dict_obj(
-        json.loads(run.gql["config"] or "{}"),
+        json.loads(run.gql["configSubset"] or "{}"),
         wb_util.RunPath(
             run.gql["project"]["entity"]["name"],
             run.gql["project"]["name"],
@@ -111,20 +170,44 @@ def config(run: wdt.Run) -> dict[str, typing.Any]:
 
 @op(
     render_info={"type": "function"},
+    # When refine_summary_type is explicitly requested in the graph, we ask for
+    # the entire summaryMetrics field.
     plugins=wb_gql_op_plugin(lambda inputs, inner: "summaryMetrics"),
 )
 def refine_summary_type(run: wdt.Run) -> types.Type:
-    return wb_util.process_run_dict_type(json.loads(run.gql["summaryMetrics"] or "{}"))
+    summary_field_s = None
+    try:
+        # If summary was explicitly requested, this will be the case.
+        summary_field_s = run.gql["summaryMetrics"]
+    except KeyError:
+        # Otherwise we'll be refining implicitly in compile, but we only need
+        # to provide the summary requested by the rest of the graph.
+        summary_field_s = run.gql["summaryMetricsSubset"]
+    if not summary_field_s:
+        summary_field_s = "{}"
+
+    return wb_util.process_run_dict_type(json.loads(summary_field_s))
+
+
+def _make_run_summary_gql_field(inputs: InputAndStitchProvider, inner: str):
+    stitch_obj = inputs.stitched_obj
+    key_tree = compile_table.get_projection(stitch_obj)
+    # we only pushdown the top level keys for now.
+    top_level_keys = list(key_tree.keys())
+    if not top_level_keys:
+        # If no keys, then we must select the whole object
+        return "summaryMetricsSubset: summaryMetrics"
+    return f"summaryMetricsSubset: summaryMetrics(keys: {json.dumps(top_level_keys)})"
 
 
 @op(
     name="run-summary",
     refine_output_type=refine_summary_type,
-    plugins=wb_gql_op_plugin(lambda inputs, inner: "summaryMetrics"),
+    plugins=wb_gql_op_plugin(_make_run_summary_gql_field),
 )
 def summary(run: wdt.Run) -> dict[str, typing.Any]:
     return wb_util.process_run_dict_obj(
-        json.loads(run.gql["summaryMetrics"] or "{}"),
+        json.loads(run.gql["summaryMetricsSubset"] or "{}"),
         wb_util.RunPath(
             run.gql["project"]["entity"]["name"],
             run.gql["project"]["name"],
@@ -136,7 +219,7 @@ def summary(run: wdt.Run) -> dict[str, typing.Any]:
 @op(
     render_info={"type": "function"},
     plugins=wb_gql_op_plugin(
-        lambda inputs, inner: "historyKeys, first_10_history_rows: history(minStep: 0, maxStep: 10)"
+        lambda inputs, inner: "historyKeys, history(samples: 1000)"
     ),
 )
 def _refine_history_type(run: wdt.Run) -> types.Type:
@@ -151,7 +234,7 @@ def _refine_history_type(run: wdt.Run) -> types.Type:
     # remove needing to read any history.
     prop_types: dict[str, types.Type] = {}
     historyKeys = run.gql["historyKeys"]["keys"]
-    example_history_rows = run.gql["first_10_history_rows"]
+    example_history_rows = run.gql["history"]
     keys_needing_type = set()
 
     for key, key_details in historyKeys.items():
@@ -189,7 +272,9 @@ def _refine_history_type(run: wdt.Run) -> types.Type:
 @op(
     name="run-history",
     refine_output_type=_refine_history_type,
-    plugins=wb_gql_op_plugin(lambda inputs, inner: "history"),
+    plugins=wb_gql_op_plugin(
+        lambda inputs, inner: "historyKeys, history(minStep: 0, maxStep: 10, samples: 1000)"
+    ),
 )
 def history(run: wdt.Run) -> list[dict[str, typing.Any]]:
     return [

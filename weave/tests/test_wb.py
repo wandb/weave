@@ -62,7 +62,7 @@ workspace_response = {
                 {
                     "node": {
                         **fwb.run_payload,  # type: ignore
-                        "summaryMetrics": json.dumps(
+                        "summaryMetricsSubset": json.dumps(
                             {
                                 "table": {
                                     "_type": "table-file",
@@ -80,14 +80,14 @@ workspace_response = {
                 {
                     "node": {
                         **fwb.run2_payload,  # type: ignore
-                        "summaryMetrics": json.dumps({}),
+                        "summaryMetricsSubset": json.dumps({}),
                         "displayName": "run2-display_name",
                     },
                 },
                 {
                     "node": {
                         **fwb.run3_payload,  # type: ignore
-                        "summaryMetrics": json.dumps(
+                        "summaryMetricsSubset": json.dumps(
                             {
                                 "table": {
                                     "_type": "table-file",
@@ -111,7 +111,7 @@ workspace_response_no_run_displayname = {
                 {
                     "node": {
                         **fwb.run_payload,  # type: ignore
-                        "summaryMetrics": json.dumps(
+                        "summaryMetricsSubset": json.dumps(
                             {
                                 "table": {
                                     "_type": "table-file",
@@ -128,13 +128,13 @@ workspace_response_no_run_displayname = {
                 {
                     "node": {
                         **fwb.run2_payload,  # type: ignore
-                        "summaryMetrics": json.dumps({}),
+                        "summaryMetricsSubset": json.dumps({}),
                     },
                 },
                 {
                     "node": {
                         **fwb.run3_payload,  # type: ignore
-                        "summaryMetrics": json.dumps(
+                        "summaryMetricsSubset": json.dumps(
                             {
                                 "table": {
                                     "_type": "table-file",
@@ -165,7 +165,7 @@ workspace_response_filtered = {
                 {
                     "node": {
                         **fwb.run_payload,  # type: ignore
-                        "summaryMetrics": json.dumps(
+                        "summaryMetricsSubset": json.dumps(
                             {
                                 "table": {
                                     "_type": "table-file",
@@ -1112,41 +1112,22 @@ example_history_keys = {
 
 
 def run_history_mocker(q, ndx):
-    if ndx == 0:
-        return {
-            "project_518fa79465d8ffaeb91015dce87e092f": {
-                **fwb.project_payload,  # type: ignore
-                "runs_21303e3890a1b6580998e6aa8a345859": {
-                    "edges": [
-                        {
-                            "node": {
-                                **fwb.run_payload,  # type: ignore
-                                "first_10_history_rows": example_history,
-                                "historyKeys": example_history_keys,
-                            }
+    return {
+        "project_518fa79465d8ffaeb91015dce87e092f": {
+            **fwb.project_payload,  # type: ignore
+            "runs_21303e3890a1b6580998e6aa8a345859": {
+                "edges": [
+                    {
+                        "node": {
+                            **fwb.run_payload,  # type: ignore
+                            "historyKeys": example_history_keys,
+                            "history": example_history,
                         }
-                    ]
-                },
-            }
+                    }
+                ]
+            },
         }
-    elif ndx == 1:
-        return {
-            "project_518fa79465d8ffaeb91015dce87e092f": {
-                **fwb.project_payload,  # type: ignore
-                "runs_21303e3890a1b6580998e6aa8a345859": {
-                    "edges": [
-                        {
-                            "node": {
-                                **fwb.run_payload,  # type: ignore
-                                "first_10_history_rows": example_history,
-                                "historyKeys": example_history_keys,
-                                "history": example_history,
-                            }
-                        }
-                    ]
-                },
-            }
-        }
+    }
 
 
 def test_run_history(fake_wandb):
