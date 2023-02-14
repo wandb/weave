@@ -33,8 +33,8 @@ def direct_url_as_of(file: file_base.File, asOf: int) -> str:
 
 @op(name="file-contents")
 def file_contents(file: file_base.File) -> str:
-    with file.open("rb") as f:
-        return f.read().decode("ISO-8859-1")
+    with file.open("r") as f:
+        return f.read()
 
 
 @op(name="file-dir")

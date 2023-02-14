@@ -4,9 +4,11 @@ from wandb import data_types as wb_data_types
 import numpy as np
 from wandb.sdk.data_types._dtypes import TypeRegistry as SDKTypeRegistry
 
+from ..ops_primitives import file
 from ..ops_domain.wbmedia import ImageArtifactFileRefType
 
 from ..artifact_wandb import WandbArtifact, WeaveWBArtifactURI
+from .. import artifact_fs
 
 from .fixture_fakewandb import FakeApi
 
@@ -32,8 +34,11 @@ def make_audio():
     return wandb.Audio(np.random.uniform(-1, 1, 44100), 44100)
 
 
+HTML_STRING = "<body><h1>Hello this is some HTML with symbols and emoji '$!$!@#&#$%^??%$# 🤠</h1></body>"
+
+
 def make_html():
-    return wandb.Html("<html><body><h1>Hello</h1></body></html>")
+    return wandb.Html(HTML_STRING)
 
 
 def make_bokeh():
@@ -685,3 +690,20 @@ def test_join_2_on_images(fake_wandb):
     ] == exp_join_labels
     group_keys = weave.use(joined.joinObj()).to_pylist_notags()
     assert [key["sha256"] for key in group_keys] == exp_join_tag_shas
+
+
+def test_html_encoding_decoding(fake_wandb):
+    # Familiar wandb sdk code:
+    html = make_html()
+
+    art = wandb.Artifact("test_name", "test_type")
+    art.add(html, "html")
+
+    # new helper:
+    art_node = fake_wandb.mock_artifact_as_node(art)
+
+    # Weave Query off table:
+    file_node = art_node.file("media/html/349dc3aced6290aac120.html")
+    contents = file.file_contents(file_node)
+    result = weave.use(contents)
+    assert HTML_STRING in result
