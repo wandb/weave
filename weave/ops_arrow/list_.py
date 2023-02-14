@@ -1450,6 +1450,9 @@ def _to_compare_safe_call(node: graph.OutputNode) -> graph.OutputNode:
                 dirty = True
         if dirty:
             return dict_(**new_keys)
+    elif types.List().assign_type(node_type):
+        # AWL does not like joining on lists.
+        return node.joinToStr(",")  # type: ignore
     return node
 
 
