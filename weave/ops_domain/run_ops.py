@@ -122,23 +122,34 @@ gql_prop_op(
 )
 
 
+def _get_combined_sub_dicts(run_dict: dict, prefix: str) -> dict:
+    all_metrics: list[dict] = [
+        json.loads(v) for k, v in run_dict.items() if k.startswith(prefix)
+    ]
+    # merge all metrics
+    merged_metrics = {}
+    for metrics in all_metrics:
+        merged_metrics.update(metrics)
+    return merged_metrics
+
+
+config_subset_prefix = "configKeySubset"
+
+
 @op(
     render_info={"type": "function"},
     plugins=wb_gql_op_plugin(lambda inputs, inner: "config"),
 )
 def refine_config_type(run: wdt.Run) -> types.Type:
-    config_field_s = None
     try:
         # If config was explicitly requested, this will be the case.
-        config_field_s = run.gql["config"]
+        metrics = json.loads(run.gql["config"] or "{}")
     except KeyError:
         # Otherwise we'll be refining implicitly in compile, but we only need
         # to provide the summary requested by the rest of the graph.
-        config_field_s = run.gql["configSubset"]
-    if not config_field_s:
-        config_field_s = "{}"
+        metrics = _get_combined_sub_dicts(run.gql.json_dict, f"{config_subset_prefix}_")
 
-    return wb_util.process_run_dict_type(json.loads(config_field_s))
+    return wb_util.process_run_dict_type(metrics)
 
 
 def _make_run_config_gql_field(inputs: InputAndStitchProvider, inner: str):
@@ -148,8 +159,10 @@ def _make_run_config_gql_field(inputs: InputAndStitchProvider, inner: str):
     top_level_keys = list(key_tree.keys())
     if not top_level_keys:
         # If no keys, then we must select the whole object
-        return "configSubset: config"
-    return f"configSubset: config(keys: {json.dumps(top_level_keys)})"
+        return "config"
+    keys = json.dumps(top_level_keys)
+    alias = _make_alias(keys, prefix="configKeySubset")
+    return f"{alias}: config(keys: {keys})"
 
 
 @op(
@@ -158,8 +171,11 @@ def _make_run_config_gql_field(inputs: InputAndStitchProvider, inner: str):
     plugins=wb_gql_op_plugin(_make_run_config_gql_field),
 )
 def config(run: wdt.Run) -> dict[str, typing.Any]:
+    merged_metrics = _get_combined_sub_dicts(
+        run.gql.json_dict, f"{config_subset_prefix}_"
+    )
     return wb_util.process_run_dict_obj(
-        json.loads(run.gql["configSubset"] or "{}"),
+        merged_metrics,
         wb_util.RunPath(
             run.gql["project"]["entity"]["name"],
             run.gql["project"]["name"],
@@ -168,15 +184,7 @@ def config(run: wdt.Run) -> dict[str, typing.Any]:
     )
 
 
-def _get_combined_summary_metrics(run_dict: dict) -> dict:
-    all_metrics: list[dict] = [
-        json.loads(v) for k, v in run_dict.items() if k.startswith("summaryMetrics_")
-    ]
-    # merge all metrics
-    merged_metrics = {}
-    for metrics in all_metrics:
-        merged_metrics.update(metrics)
-    return merged_metrics
+summary_metric_subset_prefix = "summeryMetricsKeySubset"
 
 
 @op(
@@ -192,7 +200,9 @@ def refine_summary_type(run: wdt.Run) -> types.Type:
     except KeyError:
         # Otherwise we'll be refining implicitly in compile, but we only need
         # to provide the summary requested by the rest of the graph.
-        metrics = _get_combined_summary_metrics(run.gql.json_dict)
+        metrics = _get_combined_sub_dicts(
+            run.gql.json_dict, f"{summary_metric_subset_prefix}_"
+        )
 
     return wb_util.process_run_dict_type(metrics)
 
@@ -206,7 +216,7 @@ def _make_run_summary_gql_field(inputs: InputAndStitchProvider, inner: str):
         # If no keys, then we must select the whole object
         return "summaryMetrics"
     keys = json.dumps(top_level_keys)
-    alias = _make_alias(keys, prefix="summaryMetrics")
+    alias = _make_alias(keys, prefix=summary_metric_subset_prefix)
     return f"{alias}: summaryMetrics(keys: {keys})"
 
 
@@ -216,7 +226,9 @@ def _make_run_summary_gql_field(inputs: InputAndStitchProvider, inner: str):
     plugins=wb_gql_op_plugin(_make_run_summary_gql_field),
 )
 def summary(run: wdt.Run) -> dict[str, typing.Any]:
-    merged_metrics = _get_combined_summary_metrics(run.gql.json_dict)
+    merged_metrics = _get_combined_sub_dicts(
+        run.gql.json_dict, f"{summary_metric_subset_prefix}_"
+    )
     return wb_util.process_run_dict_obj(
         merged_metrics,
         wb_util.RunPath(
@@ -230,7 +242,7 @@ def summary(run: wdt.Run) -> dict[str, typing.Any]:
 @op(
     render_info={"type": "function"},
     plugins=wb_gql_op_plugin(
-        lambda inputs, inner: "historyKeys, history(samples: 1000)"
+        lambda inputs, inner: "historyKeys, history_sampled_1000: history(samples: 1000)"
     ),
 )
 def _refine_history_type(run: wdt.Run) -> types.Type:
@@ -245,7 +257,7 @@ def _refine_history_type(run: wdt.Run) -> types.Type:
     # remove needing to read any history.
     prop_types: dict[str, types.Type] = {}
     historyKeys = run.gql["historyKeys"]["keys"]
-    example_history_rows = run.gql["history"]
+    example_history_rows = run.gql["history_sampled_1000"]
     keys_needing_type = set()
 
     for key, key_details in historyKeys.items():
@@ -284,7 +296,7 @@ def _refine_history_type(run: wdt.Run) -> types.Type:
     name="run-history",
     refine_output_type=_refine_history_type,
     plugins=wb_gql_op_plugin(
-        lambda inputs, inner: "historyKeys, history(minStep: 0, maxStep: 10, samples: 1000)"
+        lambda inputs, inner: "historyKeys, history_sampled_1000: history(samples: 1000)"
     ),
 )
 def history(run: wdt.Run) -> list[dict[str, typing.Any]]:
@@ -297,7 +309,7 @@ def history(run: wdt.Run) -> list[dict[str, typing.Any]]:
                 run.gql["name"],
             ),
         )
-        for row in run.gql["history"]
+        for row in run.gql["history_sampled_1000"]
     ]
 
 
