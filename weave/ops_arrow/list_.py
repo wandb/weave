@@ -1207,7 +1207,9 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                         desired_type,
                         self._artifact,
                     )
-
+        elif current_type == desired_type:
+            # Put this at the end to support custom types
+            result = self
         if result is None:
             raise ValueError(f"Cannot convert {current_type} to {desired_type}.")
 
