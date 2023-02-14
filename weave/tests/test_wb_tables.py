@@ -1,16 +1,9 @@
 import wandb
 import weave
-from weave.artifact_local import LocalArtifact, LocalArtifactType
+from weave.language_features.tagging.tagged_value_type import TaggedValueType
 from weave.ops_domain.wandb_domain_gql import _make_alias
 from weave.ops_domain import wbmedia
-from weave.ops_domain import table
-from ..weave_internal import make_const_node
-
-from ..artifact_wandb import WandbArtifact, WandbArtifactType, WeaveWBArtifactURI
-from .fixture_fakewandb import FakeApi
-
-from wandb.apis.public import Artifact as PublicArtifact
-import os
+import numpy as np
 
 
 def use_static_artifact_node(
@@ -105,4 +98,93 @@ def test_convert_optional_list_cell(fake_wandb):
                 }
             ]
         }
+    ]
+
+
+def _quick_image(val: int):
+    return wandb.Image(np.ones((32, 32)) * val)
+
+
+def test_join_table_with_images(fake_wandb):
+    table1 = wandb.Table(
+        columns=["name", "image"], data=[["a", _quick_image(1)], ["b", _quick_image(2)]]
+    )
+    table2 = wandb.Table(columns=["name", "score"], data=[["a", 1], ["b", 2]])
+    jt = wandb.JoinedTable(table1, table2, "name")
+
+    art = wandb.Artifact("test_name", "test_type")
+    art.add(jt, "table")
+    art_node = fake_wandb.mock_artifact_as_node(art)
+    file_node = art_node.file("table.joined-table.json")
+    table_node = file_node.table()
+    table_rows = table_node.rows()
+    awl = weave.use(table_rows)
+    assert awl.object_type == TaggedValueType(
+        weave.types.TypedDict(
+            {
+                "joinObj": weave.types.optional(weave.types.String()),
+            }
+        ),
+        weave.types.TypedDict(
+            {
+                "0": weave.types.optional(
+                    weave.types.TypedDict(
+                        {
+                            "name": weave.types.optional(weave.types.String()),
+                            "image": weave.types.optional(
+                                wbmedia.ImageArtifactFileRef.WeaveType()
+                            ),
+                        }
+                    )
+                ),
+                "1": weave.types.optional(
+                    weave.types.TypedDict(
+                        {
+                            "name": weave.types.optional(weave.types.String()),
+                            "score": weave.types.optional(weave.types.Float()),
+                        }
+                    )
+                ),
+            }
+        ),
+    )
+    assert awl.to_pylist_raw() == [
+        {
+            "_tag": {"joinObj": "a"},
+            "_value": {
+                "0": {
+                    "name": "a",
+                    "image": {
+                        "artifact": "wandb-artifact:///test_entity/test_project/test_name:v0",
+                        "path": "media/images/9d4f26b99a1d4d044b6c.png",
+                        "format": "png",
+                        "height": 32,
+                        "width": 32,
+                        "sha256": "e7bdc527afd649f51950b4524b0c15aecaf7f484448a6cdfcdc2ecd9bba0f5a7",
+                        "boxes": {},
+                        "masks": {},
+                    },
+                },
+                "1": {"name": "a", "score": 1.0},
+            },
+        },
+        {
+            "_tag": {"joinObj": "b"},
+            "_value": {
+                "0": {
+                    "name": "b",
+                    "image": {
+                        "artifact": "wandb-artifact:///test_entity/test_project/test_name:v0",
+                        "path": "media/images/7fd26b0af1228fa077bb.png",
+                        "format": "png",
+                        "height": 32,
+                        "width": 32,
+                        "sha256": "61cd2467cff9f0666c730c57d065cfe834765ba26514b46f91735c750676876a",
+                        "boxes": {},
+                        "masks": {},
+                    },
+                },
+                "1": {"name": "b", "score": 2.0},
+            },
+        },
     ]

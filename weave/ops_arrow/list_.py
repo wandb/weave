@@ -3166,9 +3166,23 @@ def join_2(arr1, arr2, joinFn1, joinFn2, alias1, alias2, leftOuter, rightOuter):
         [alias_1_renamed, alias_2_renamed],
         [alias1, alias2],
     )
+
+    final_type = base_list._join_2_output_row_type(
+        {
+            "arr1": ArrowWeaveListType(arr1.object_type),
+            "arr2": ArrowWeaveListType(arr2.object_type),
+            "joinFn1": types.Function({"row": arr1.object_type}, joinFn1.type),
+            "joinFn2": types.Function({"row": arr2.object_type}, joinFn2.type),
+            "alias1": types.Const(types.String(), alias1),
+            "alias2": types.Const(types.String(), alias2),
+            "leftOuter": types.Const(types.Boolean(), leftOuter),
+            "rightOuter": types.Const(types.Boolean(), rightOuter),
+        }
+    )
+
     untagged_result: ArrowWeaveList = ArrowWeaveList(
         final_table,
-        None,
+        final_type,
         arr1._artifact,
     )
 
