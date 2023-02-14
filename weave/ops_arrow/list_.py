@@ -268,7 +268,7 @@ def _arrow_sort_ranking_to_indicies(sort_ranking, col_dirs):
         else:
             columns.append(flattened)
     table = pa.Table.from_arrays(columns, names=col_names)
-    return pc.sort_indices(table, order)
+    return pc.sort_indices(table, order, null_placement="at_end")
 
 
 def _slow_arrow_or_list_ranking(
@@ -295,6 +295,7 @@ def _slow_arrow_or_list_ranking(
             (col_name, "ascending" if dir_name == "asc" else "descending")
             for col_name, dir_name in zip(py_columns.keys(), col_dirs)
         ],
+        null_placement="at_end",
     )
 
 
