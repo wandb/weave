@@ -23,10 +23,10 @@ def _get_umap():
 
 
 def perform_2D_projection(
-    np_array_of_embeddings: np.array,
+    np_array_of_embeddings: np.ndarray,
     projectionAlgorithm: str,
     algorithmOptions: dict,
-) -> np.array:
+) -> np.ndarray:
     if len(np_array_of_embeddings.shape) != 2:
         raise errors.WeaveInternalError(
             f"The input to the 2D projection must be a 2D array of embeddings, found {np_array_of_embeddings.shape}"
@@ -49,8 +49,8 @@ def perform_2D_projection(
 
 
 def limit_embedding_dimensions(
-    np_array_of_embeddings: np.array, max_dimensions: int = 50
-) -> np.array:
+    np_array_of_embeddings: np.ndarray, max_dimensions: int = 50
+) -> np.ndarray:
     max_dimensions = min(max_dimensions, len(np_array_of_embeddings))
     if np_array_of_embeddings.shape[1] > max_dimensions:
         return PCA(n_components=max_dimensions).fit_transform(np_array_of_embeddings)
@@ -58,12 +58,14 @@ def limit_embedding_dimensions(
 
 
 def perform_2D_projection_pca(
-    np_array_of_embeddings: np.array, options: dict
-) -> np.array:
+    np_array_of_embeddings: np.ndarray, options: dict
+) -> np.ndarray:
     return PCA(n_components=2).fit_transform(np_array_of_embeddings)
 
 
-def perform_2D_projection_tsne(np_array_of_embeddings: np.array, options) -> np.array:
+def perform_2D_projection_tsne(
+    np_array_of_embeddings: np.ndarray, options
+) -> np.ndarray:
     n_samples = len(np_array_of_embeddings)
     return TSNE(
         n_components=2,
@@ -81,8 +83,8 @@ umap_lock = threading.Lock()
 
 
 def perform_2D_projection_umap(
-    np_array_of_embeddings: np.array, options: dict
-) -> np.array:
+    np_array_of_embeddings: np.ndarray, options: dict
+) -> np.ndarray:
     n_samples = len(np_array_of_embeddings)
     with umap_lock:
         return (
