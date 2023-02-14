@@ -1269,3 +1269,65 @@ def test_join_all_tables(fake_wandb):
     assert run_names_res == "amber-glade-100"
     run_names_res = weave.use(joined_row.project().name())
     assert run_names_res == "mendeleev"
+
+
+def test_arrow_unnest_shallow_tags(fake_wandb):
+    fake_wandb.fake_api.add_mock(table_mock_filtered)
+    x_val = (
+        ops.project("stacey", "mendeleev")
+        .filteredRuns("{}", "-createdAt")
+        .limit(50)[0]
+        .summary()
+        .pick("table")
+        .table()
+        .rows()
+        .map(lambda row: ops.dict_(x=row["truth"], y=row["guess"]))
+        .unnest()[3]["x"]
+    )
+    run_name = x_val.run().name()
+
+
+def test_arrow_unnest_deep_tags(fake_wandb):
+    fake_wandb.fake_api.add_mock(table_mock_filtered)
+    x_val = (
+        ops.project("stacey", "mendeleev")
+        .filteredRuns("{}", "-createdAt")
+        .limit(50)
+        .summary()
+        .pick("table")
+        .table()
+        .rows()
+        .dropna()
+        .concat()
+        .createIndexCheckpointTag()
+        .map(lambda row: ops.dict_(x=row["truth"], y=row["guess"]))
+        .unnest()[3]["x"]
+    )
+    run_name = x_val.run().name()
+    assert weave.use(run_name) == "amber-glade-100"
+
+    checkpoint_tag = x_val.indexCheckpoint()
+    assert weave.use(checkpoint_tag) == 3
+
+    assert weave.use(run_name) == "amber-glade-100"
+
+
+def test_arrow_unnest_inner_tags(fake_wandb):
+    fake_wandb.fake_api.add_mock(table_mock_filtered)
+    run_name = (
+        (
+            ops.project("stacey", "mendeleev")
+            .filteredRuns("{}", "-createdAt")
+            .limit(50)
+            .summary()
+            .pick("table")
+            .table()
+            .rows()
+        )
+        .joinAll(lambda row: row["truth"], True)
+        .map(lambda row: ops.dict_(x=row["truth"], y=row["guess"]))
+        .unnest()[0]["x"]
+        .run()
+        .name()
+    )
+    assert weave.use(run_name) == "amber-glade-100"

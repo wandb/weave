@@ -1364,7 +1364,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         for k, v_type in self.object_type.property_types.items():
             if types.is_list_like(v_type):
                 list_cols.append(k)
-                new_obj_prop_types[k] = v_type.object_type
+                new_obj_prop_types[k] = op_def.normalize_type(v_type.object_type)
             else:
                 new_obj_prop_types[k] = v_type
         if not list_cols:
@@ -1378,13 +1378,47 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         else:
             arrow_obj = self._arrow_data
 
+        # Split out tagged list columns into separate columns
+        tag_col_name_map = {}
+        for col in list_cols:
+            col_data = arrow_obj.column(col).combine_chunks()
+            if isinstance(
+                self.object_type.property_types[col], tagged_value_type.TaggedValueType
+            ):
+                tag_col_name = f"{col}__tag__"
+                tag_col_name_map[col] = tag_col_name
+
+                col_tags = col_data.field("_tag")
+                col_values = col_data.field("_value")
+
+                arrow_obj = arrow_obj.remove_column(arrow_obj.column_names.index(col))
+                arrow_obj = arrow_obj.append_column(tag_col_name, col_tags)
+                arrow_obj = arrow_obj.append_column(col, col_values)
+
         # todo: make this more efficient. we shouldn't have to convert back and forth
         # from the arrow in-memory representation to pandas just to call the explode
         # function. but there is no native pyarrow implementation of this
+        exploded_table = pa.Table.from_pandas(
+            df=arrow_obj.to_pandas().explode(list_cols), preserve_index=False
+        )
+
+        # Reconstruct the tagged list columns
+        for col in exploded_table.column_names:
+            if col in tag_col_name_map:
+                tag_col_name = tag_col_name_map[col]
+                val_col = exploded_table.column(col).combine_chunks()
+                tag_col = exploded_table.column(tag_col_name).combine_chunks()
+                combined_col = direct_add_arrow_tags(val_col, tag_col)
+                exploded_table = exploded_table.remove_column(
+                    exploded_table.column_names.index(tag_col_name)
+                )
+                exploded_table = exploded_table.remove_column(
+                    exploded_table.column_names.index(col)
+                )
+                exploded_table = exploded_table.append_column(col, combined_col)
+
         return ArrowWeaveList(
-            pa.Table.from_pandas(
-                df=arrow_obj.to_pandas().explode(list_cols), preserve_index=False
-            ),
+            exploded_table,
             types.TypedDict(new_obj_prop_types),
             self._artifact,
         )
