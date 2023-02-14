@@ -977,7 +977,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         result: typing.Optional[ArrowWeaveList] = None
 
         current_type = self.object_type
-        if current_type == desired_type:
+        if self._arrow_data.type == desired_type_pyarrow_type:
             result = self
         elif isinstance(desired_type, tagged_value_type.TaggedValueType):
             if isinstance(current_type, tagged_value_type.TaggedValueType):
@@ -1186,11 +1186,16 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                             )
 
                     # Finally, combine the M arrays into a single union array.
+                    field_names = [
+                        desired_type_pyarrow_type.field(i).name
+                        for i in range(desired_type_pyarrow_type.num_fields)
+                    ]
                     result = ArrowWeaveList(
                         pa.UnionArray.from_dense(
                             type_code_array,
                             offsets,
                             data_arrays,
+                            field_names,
                         ),
                         desired_type,
                         self._artifact,

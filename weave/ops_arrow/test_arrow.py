@@ -24,6 +24,7 @@ from .. import weave_internal
 from .. import context_state
 from .. import graph
 from ..ops_primitives import dict_, list_
+from .. import mappers_arrow
 
 from ..language_features.tagging import tag_store, tagged_value_type, make_tag_getter_op
 
@@ -2790,3 +2791,31 @@ def test_conversion_of_domain_types_to_awl_values(fake_wandb):
 
     list_node = ops.arrow_list_(**{"a": awl, "b": awl})
     assert [[item for item in l] for l in weave.use(list_node)] == [[project] * 2] * 3
+
+
+@pytest.mark.parametrize(
+    "data, with_type",
+    [
+        (
+            [{"a": 1}, {"a": False}],
+            types.TypedDict(
+                {
+                    "a": types.union(types.Int(), types.Boolean()),
+                }
+            ),
+        ),
+        (
+            [{"a": 1}, {"b": "b"}, {"a": 2, "b": "c"}],
+            types.TypedDict(
+                {
+                    "a": types.optional(types.union(types.Int(), types.Boolean())),
+                    "b": types.optional(types.union(types.String(), types.Boolean())),
+                }
+            ),
+        ),
+    ],
+)
+def test_with_object_type(data, with_type):
+    awl = arrow.to_arrow(data).with_object_type(with_type)
+    mapper = mappers_arrow.map_to_arrow(with_type, awl._arrow_data)
+    assert awl.object_type == with_type == mapper.type
