@@ -100,7 +100,7 @@ def test_we_dont_over_execute(fake_wandb):
     # If this check fails, please be very careful! It means that something
     # has changed in the engine that is causing us to over-execute nodes
     # and is an indication of a serious performance regression.
-    assert stats["node_count"] == 17
+    assert stats["node_count"] == 16
 
 
 def table_mock_respecting_run_name(q, ndx):

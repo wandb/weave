@@ -100,7 +100,6 @@ js_op_exceptions = set(
         "report-description",
         "report-stargazers",
         "root-allEntities",
-        "root-artifactVersion",
         "root-featuredreports",
         "root-localArtifact",
         "root_number-range",

@@ -3,9 +3,11 @@ import json
 from ..file_base import wb_object_type_from_path
 from ..compile_domain import wb_gql_op_plugin
 from ..api import op
+from .. import errors
 from .. import weave_types as types
 from . import wb_domain_types as wdt
 from .wandb_domain_gql import (
+    _make_alias,
     gql_prop_op,
     gql_direct_edge_op,
     gql_connection_op,
@@ -21,7 +23,73 @@ from .. import artifact_wandb
 # None
 
 # Section 2/6: Root Ops
-# None
+@op(
+    name="root-artifactVersionGQLResolver",
+    input_type={
+        "gql_result": types.TypedDict({}),
+        "entityName": types.String(),
+        "projectName": types.String(),
+        "artifactTypeName": types.String(),
+        "artifactVersionName": types.String(),
+    },
+    output_type=wdt.ArtifactVersionType,
+)
+def root_artifact_version_gql_resolver(
+    gql_result, entityName, projectName, artifactTypeName, artifactVersionName
+):
+    project_alias = _make_alias(entityName, projectName, prefix="project")
+    artifact_type_alias = _make_alias(artifactTypeName, prefix="artifactType")
+    artifact_alias = _make_alias(artifactVersionName, prefix="artifact")
+
+    return wdt.ArtifactType.from_gql(
+        gql_result[project_alias][artifact_type_alias][artifact_alias]
+    )
+
+
+def _root_artifact_version_plugin(inputs, inner):
+    project_alias = _make_alias(
+        inputs.raw["entityName"], inputs.raw["projectName"], prefix="project"
+    )
+    artifact_type_alias = _make_alias(
+        inputs.raw["artifactTypeName"], prefix="artifactType"
+    )
+    artifact_alias = _make_alias(inputs.raw["artifactVersionName"], prefix="artifact")
+    return f"""
+        {project_alias}: project(entityName: {inputs['entityName']}, name:{inputs['projectName']}){{
+            id
+            {artifact_type_alias}: artifactType(name: {inputs['artifactTypeName']}){{
+                id
+                {artifact_alias}: artifact(name: {inputs['artifactVersionName']}){{
+                    {wdt.ArtifactVersion.REQUIRED_FRAGMENT}
+                    {inner}
+                }}
+            }}
+        }}
+    """
+
+
+@op(
+    name="root-artifactVersion",
+    input_type={
+        "entityName": types.String(),
+        "projectName": types.String(),
+        "artifactTypeName": types.String(),
+        "artifactVersionName": types.String(),
+    },
+    output_type=wdt.ArtifactVersionType,
+    plugins=wb_gql_op_plugin(
+        _root_artifact_version_plugin,
+        is_root=True,
+        root_resolver=root_artifact_version_gql_resolver,
+    ),
+)
+def root_artifact_version(
+    entityName, projectName, artifactTypeName, artifactVersionName
+):
+    raise errors.WeaveGQLCompileError(
+        "root-artifactVersion should not be executed directly. If you see this error, it is a bug in the Weave compiler."
+    )
+
 
 # Section 3/6: Attribute Getters
 gql_prop_op("artifactVersion-id", wdt.ArtifactVersionType, "id", types.String())

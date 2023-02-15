@@ -24,7 +24,7 @@ from .. import errors
 def root_all_artifacts_gql_resolver(gql_result):
     return [
         wdt.ArtifactCollection.from_gql(artifact_collection["node"])
-        for artifact_collection in gql_result["artifacts_500"]["edges"]
+        for artifact_collection in gql_result["instance"]["artifacts_500"]["edges"]
     ]
 
 

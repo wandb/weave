@@ -85,24 +85,17 @@ def apply_domain_op_gql_translation(leaf_nodes: list[graph.Node]) -> list[graph.
         fragments.append(inner_fragment)
         alias = _get_outermost_alias(inner_fragment)
         aliases.append(alias)
-        result_selection = graph.OutputNode(
-            types.TypedDict({}),
-            "typedDict-pick",
-            {
-                "obj": query_root_node,
-                "key": graph.ConstNode(types.String(), alias),
-            },
-        )
         custom_resolver = _custom_root_resolver(node)
         if custom_resolver is not None:
-            return custom_resolver(result_selection, **node.from_op.inputs)
+            return custom_resolver(query_root_node, **node.from_op.inputs)
         else:
             output_type = _get_plugin_output_type(node)
             return graph.OutputNode(
                 output_type,
                 "gqlroot-querytoobj",
                 {
-                    "result_dict": result_selection,
+                    "result_dict": query_root_node,
+                    "result_key": graph.ConstNode(types.String(), alias),
                     "output_type": graph.ConstNode(types.TypeType(), output_type),
                 },
             )
@@ -299,6 +292,8 @@ def _get_outermost_alias(query_str: str) -> str:
     if not isinstance(root_operation, graphql.language.ast.OperationDefinitionNode):
         raise errors.WeaveInternalError("Only operation definitions are supported.")
     if len(root_operation.selection_set.selections) != 1:
+        # NOTE: if we ever need a root op to have multiple root selections, we
+        # can easily loosen this restriction and just return a list of aliases
         raise errors.WeaveInternalError("Only one root selection is supported")
     inner_selection = root_operation.selection_set.selections[0]
     if not isinstance(inner_selection, graphql.language.ast.FieldNode):
