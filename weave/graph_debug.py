@@ -1,8 +1,9 @@
 import json
-import copy
+import itertools
 import typing
 
 from . import graph
+from . import forward_graph
 from . import weave_types as types
 
 
@@ -10,88 +11,12 @@ class _CombinedConstVal:
     """Special value to respresent the combination of multiple values in debug output."""
 
     def __init__(self, vals: typing.Sequence[typing.Any]):
-        self.vals = dict.fromkeys(vals)
-
-    def union(self, other: "_CombinedConstVal") -> "_CombinedConstVal":
-        vals = copy.copy(self.vals)
-        vals.update(other.vals)
-        return _CombinedConstVal(list(vals.keys()))
+        self.vals = vals
 
     def __str__(self) -> str:
-        return "EACH[%s]" % ", ".join(v.__repr__() for v in sorted(self.vals))
-
-
-def _combine_graphs_by_consts(
-    node1: graph.Node, node2: graph.Node
-) -> typing.Union[graph.Node, None]:
-    if node1.type != node2.type:
-        return None
-    if isinstance(node1, graph.ConstNode) and isinstance(node2, graph.ConstNode):
-        if isinstance(node1.type, types.Function) and isinstance(
-            node2.type, types.Function
-        ):
-            combined_fn = _combine_graphs_by_consts(node1.val, node2.val)
-            if combined_fn is None:
-                return None
-            return graph.ConstNode(node1.type, combined_fn)
-        if not isinstance(node1.type, types.BasicType):
-            return None
-        if node1.val == node2.val:
-            return node1
-        node1_vals = node1.val
-        if not isinstance(node1_vals, _CombinedConstVal):
-            node1_vals = _CombinedConstVal((node1_vals,))
-        node2_vals = node2.val
-        if not isinstance(node2_vals, _CombinedConstVal):
-            node2_vals = _CombinedConstVal((node2_vals,))
-        return graph.ConstNode(node1.type, node1_vals.union(node2_vals))
-    elif isinstance(node1, graph.OutputNode) and isinstance(node2, graph.OutputNode):
-        new_inputs = {}
-        if len(node1.from_op.inputs) != len(node2.from_op.inputs):
-            return None
-        for (k1, input1), (k2, input2) in zip(
-            node1.from_op.inputs.items(), node2.from_op.inputs.items()
-        ):
-            if k1 != k2:
-                return None
-            new_input = _combine_graphs_by_consts(input1, input2)
-            if new_input is None:
-                return None
-            new_inputs[k1] = new_input
-        return graph.OutputNode(node1.type, node1.from_op.name, new_inputs)
-    elif isinstance(node1, graph.VarNode) and isinstance(node2, graph.VarNode):
-        if node1.name == node2.name:
-            return node1
-        return None
-    elif isinstance(node1, graph.VoidNode) and isinstance(node2, graph.VoidNode):
-        return node1
-    return None
-
-
-ItemType = typing.TypeVar("ItemType")
-
-
-# TODO: move to general util
-def merge(
-    items: list[ItemType],
-    combine_fn: typing.Callable[[ItemType, ItemType], typing.Union[ItemType, None]],
-) -> list[ItemType]:
-    """
-    Merges items in a list by combining them with combine_fn. If combine_fn
-    returns None, then the items are not combined.
-
-    This is an inefficient implementation, its runtime is O(n^2).
-    """
-    new_items: list[ItemType] = []
-    for item in items:
-        for i, new_item in enumerate(new_items):
-            combined = combine_fn(item, new_item)
-            if combined is not None:
-                new_items[i] = combined
-                break
-        else:
-            new_items.append(item)
-    return new_items
+        s_vals = [v.__repr__() for v in self.vals]
+        s_vals_uniq = sorted(dict.fromkeys(s_vals).keys())
+        return "EACH[%s]" % ", ".join(s_vals_uniq)
 
 
 def combine_common_nodes(outputs: list[graph.Node]) -> list[graph.Node]:
@@ -101,8 +26,96 @@ def combine_common_nodes(outputs: list[graph.Node]) -> list[graph.Node]:
     replace values with _CombinedConstVal. So the results should
     only be used for debugging/printing.
     """
-    # if two graphs differ only by Consts, then combine them.
-    return merge(outputs, _combine_graphs_by_consts)
+    fg = forward_graph.ForwardGraph()
+    fg.add_nodes(outputs)
+    new_outputs: list[graph.Node] = []
+    next_items = list(fg.roots)
+    replacements: dict[graph.Node, graph.OutputNode] = {}
+    while next_items:
+        forward_node = next_items.pop()
+        if not forward_node.input_to:
+            # This is a leaf node, so we can't combine it
+            new_node = graph.OutputNode(
+                forward_node.node.type,
+                forward_node.node.from_op.name,
+                {
+                    k: replacements.get(v, v)
+                    for k, v in forward_node.node.from_op.inputs.items()
+                },
+            )
+            new_outputs.append(new_node)
+            continue
+        input_to = forward_node.input_to
+        combinable_forward_nodes: set[forward_graph.ForwardNode] = set()
+
+        # Find input forward nodes that are mergeable
+        for fn in input_to:
+            inputs = list(fn.node.from_op.inputs.values())
+            if all(
+                replacements.get(i, i) is forward_node.node
+                or (
+                    isinstance(i, graph.ConstNode)
+                    and not isinstance(i.val, graph.OutputNode)
+                )
+                for i in inputs
+            ):
+                combinable_forward_nodes.add(fn)
+            else:
+                if fn not in next_items:
+                    next_items.append(fn)
+
+        # Group by op and merge
+        name_key = (
+            lambda n: n.node.from_op.name
+            + "-"
+            + "".join(
+                "1" if isinstance(i, graph.ConstNode) else "0"
+                for i in n.node.from_op.inputs.values()
+            )
+        )
+        op_groups = itertools.groupby(
+            sorted(combinable_forward_nodes, key=name_key), key=name_key
+        )
+        for k, group_nodes_iter in op_groups:
+            group_nodes = list(group_nodes_iter)
+            node0 = group_nodes[0]
+            node0_inputs = list(node0.node.from_op.inputs.items())
+            node_inputs: dict[str, forward_graph.ExecutableNode]
+            if len(group_nodes) == 1:
+                node_inputs = node0.node.from_op.inputs
+            else:
+                node_inputs = {}
+                for input_name, input_node in node0_inputs:
+                    if replacements.get(input_node, input_node) is forward_node.node:
+                        node_inputs[input_name] = replacements.get(
+                            input_node, input_node
+                        )
+                    else:
+                        node_inputs[input_name] = graph.ConstNode(
+                            input_node.type,
+                            _CombinedConstVal(
+                                [
+                                    op.node.from_op.inputs[input_name].val
+                                    for op in group_nodes
+                                ]
+                            ),
+                        )
+            new_inner_input_to: dict[
+                forward_graph.ForwardNode, typing.Literal[True]
+            ] = {}
+            for o in group_nodes:
+                new_inner_input_to.update(o.input_to)
+            new_node = graph.OutputNode(
+                node0.node.type, node0.node.from_op.name, node_inputs
+            )
+            for o in group_nodes:
+                replacements[o.node] = new_node
+            new_forward_node = forward_graph.ForwardNode(new_node)
+            new_forward_node.input_to = new_inner_input_to
+            if new_forward_node not in next_items:
+                next_items.append(new_forward_node)
+
+    return new_outputs
 
 
 def node_expr_str_full(node: graph.Node) -> str:
@@ -151,3 +164,64 @@ def node_expr_str_full(node: graph.Node) -> str:
         return "<void>"
     else:
         return "**PARSE_ERROR**"
+
+
+def to_assignment_form(
+    outputs: list[graph.Node],
+) -> dict[graph.OutputNode, graph.VarNode]:
+    fg = forward_graph.ForwardGraph()
+    fg.add_nodes(outputs)
+    new_nodes: dict[graph.Node, graph.OutputNode] = {}
+    assignments: dict[graph.Node, graph.VarNode] = {}
+    next_assignment_roots = list(fg.roots)
+    var_id = 0
+    while next_assignment_roots:
+        forward_node = next_assignment_roots.pop()
+        node = forward_node.node
+        node_inputs: dict[str, graph.Node] = {}
+        for k, v in node.from_op.inputs.items():
+            if v in assignments:
+                node_inputs[k] = assignments[v]
+            else:
+                node_inputs[k] = v
+        new_node = graph.OutputNode(node.type, node.from_op.name, node_inputs)
+
+        # walk linear graph section, swapping nodes for variables pointing
+        # assignments we've already created
+        while len(forward_node.input_to) == 1:
+            next_forward_node = list(forward_node.input_to)[0]
+            next_node = next_forward_node.node
+            next_node_inputs: dict[str, graph.Node] = {}
+            for k, v in next_node.from_op.inputs.items():
+                if v is node:
+                    next_node_inputs[k] = new_node
+                elif v in assignments:
+                    next_node_inputs[k] = assignments[v]
+                else:
+                    next_node_inputs[k] = v
+            new_node = graph.OutputNode(
+                next_node.type, next_node.from_op.name, next_node_inputs
+            )
+            forward_node = next_forward_node
+            node = next_node
+
+        # store in assignment
+        new_nodes[node] = new_node
+        assignments[node] = graph.VarNode(node.type, f"var{var_id}")
+        var_id += 1
+
+        # if we have more than one input_to, then create those as roots
+        if len(forward_node.input_to) > 1:
+            for input_to in forward_node.input_to:
+                if input_to not in next_assignment_roots:
+                    next_assignment_roots.append(input_to)
+
+        # else we have zero, this is terminal
+    return {new_nodes[k]: v for k, v in assignments.items()}
+
+
+def assignments_string(assignments: dict[graph.OutputNode, graph.VarNode]) -> str:
+    return "\n".join(
+        f"{str(var_node)} = {node_expr_str_full(expression)}"
+        for expression, var_node in assignments.items()
+    )

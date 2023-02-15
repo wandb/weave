@@ -44,11 +44,11 @@ def get_node_result_store():
 
 class ForwardNode:
     node: graph.OutputNode[ExecutableNode]
-    input_to: typing.Set["ForwardNode"]
+    input_to: dict["ForwardNode", typing.Literal[True]]
 
-    def __init__(self, node):
+    def __init__(self, node: graph.OutputNode[ExecutableNode]) -> None:
         self.node = node
-        self.input_to = set()
+        self.input_to = {}
         self.cache_id = None
 
     def __str__(self):
@@ -76,11 +76,11 @@ class ForwardNode:
 # the nodes in it. But it will skip executing nodes if the result already
 # exist for that node in the top-level result store.
 class ForwardGraph:
-    roots: set[ForwardNode]
+    roots: dict[ForwardNode, typing.Literal[True]]
     _node_to_forward_node: typing.Dict[graph.Node, ForwardNode]
 
     def __init__(self, allow_var_nodes=False) -> None:
-        self.roots = set()
+        self.roots = {}
         self._node_to_forward_node = {}
         self._allow_var_nodes = allow_var_nodes
 
@@ -102,17 +102,17 @@ class ForwardGraph:
                 "Found var node when constructing ForwardGraph: %s" % node
             )
 
-        forward_node = ForwardNode(node)
+        forward_node = ForwardNode(node)  # type: ignore
         self._node_to_forward_node[node] = forward_node
         if isinstance(node, graph.OutputNode):
             is_root = True
             for param_node in node.from_op.inputs.values():
                 self.add_node(param_node)
                 if isinstance(param_node, graph.OutputNode):
-                    self._node_to_forward_node[param_node].input_to.add(forward_node)
+                    self._node_to_forward_node[param_node].input_to[forward_node] = True
                     is_root = False
             if is_root:
-                self.roots.add(forward_node)
+                self.roots[forward_node] = True
 
     def get_forward_node(self, node: typing.Union[graph.OutputNode, graph.VarNode]):
         return self._node_to_forward_node[node]

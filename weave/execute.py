@@ -124,16 +124,19 @@ def get_top_level_stats() -> typing.Optional[FullStats]:
 
 
 def execute_nodes(nodes, no_cache=False):
-    logging.info(
-        "Executing %s leaf nodes.\n%s"
-        % (
-            len(nodes),
-            "\n".join(
-                graph_debug.node_expr_str_full(n)
-                for n in graph_debug.combine_common_nodes(nodes)
-            ),
+    tracer = engine_trace.tracer()
+    with tracer.trace("execute-log-graph"):
+        logging.info(
+            "Executing %s leaf nodes.\n%s"
+            % (
+                len(nodes),
+                graph_debug.assignments_string(
+                    graph_debug.to_assignment_form(
+                        graph_debug.combine_common_nodes(nodes)
+                    )
+                ),
+            )
         )
-    )
     with wandb_api.from_environment():
         with memo.memo_storage():
             with tag_store.isolated_tagging_context():
@@ -166,13 +169,13 @@ def execute_nodes(nodes, no_cache=False):
 
 
 def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteStats:
-    to_run: set[forward_graph.ForwardNode] = fg.roots
+    to_run = fg.roots
 
     stats = ExecuteStats()
     tracer = engine_trace.tracer()
     while len(to_run):
-        running_now = to_run.copy()
-        to_run = set()
+        running_now = list(to_run)
+        to_run = {}
         for forward_node in running_now:
             start_time = time.time()
             span = None
@@ -216,7 +219,7 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
                     if not fg.has_result(param_node):
                         ready_to_run = False
                 if ready_to_run:
-                    to_run.add(downstream_forward_node)
+                    to_run[downstream_forward_node] = True
     return stats
 
 
