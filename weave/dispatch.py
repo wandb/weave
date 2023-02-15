@@ -340,9 +340,10 @@ class DispatchMixin:
     def _get_prop(self, attr: str) -> typing.Optional[graph.OutputNode]:
         node_self = typing.cast(graph.Node, self)
         self_type = node_self.type
-        if isinstance(self_type, types.ObjectType):
+        non_none_type = types.non_none(self_type)
+        if isinstance(non_none_type, types.ObjectType):
             # Definitely an ObjectType
-            if attr in self_type.property_types():
+            if attr in non_none_type.property_types():
                 obj_getattr = registry_mem.memory_registry.get_op("Object-__getattr__")
                 return obj_getattr(node_self, attr)
             else:

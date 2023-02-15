@@ -353,7 +353,9 @@ def _table_data_to_weave1_objects(
         ]:
             type_cls = types.type_name_to_type(file_type)
             if type_cls is not None and type_cls.instance_class is not None:
-                return type_cls.instance_class(file.artifact, file_path)
+                return type_cls.instance_class(
+                    file.artifact, file_path, cell.get("sha256", file_path)
+                )
         else:
             raise errors.WeaveTableDeserializationError(
                 f"Unsupported media type {file_type}"

@@ -2839,3 +2839,39 @@ def test_with_object_type(data, with_type):
     awl = arrow.to_arrow(data).with_object_type(with_type)
     mapper = mappers_arrow.map_to_arrow(with_type, awl._arrow_data)
     assert awl.object_type == with_type == mapper.type
+
+
+def test_vectorize_index_simple():
+    l = weave.save(arrow.to_arrow([[1, 2, 3], [4, 5, 6], [7, 8, 9]]))
+    fn = weave_internal.define_fn({"row": l.type.object_type}, lambda row: row[0]).val
+    vec_fn = arrow.vectorize(fn)
+    called = weave_internal.call_fn(vec_fn, {"row": l})
+    assert list(weave.use(called)) == [1, 4, 7]
+
+
+def test_vectorize_index_out_of_bounds():
+    l = weave.save(arrow.to_arrow([[1, 2, 3], [1, 2], [4, 5, 6], [], [7, 8, 9]]))
+    fn = weave_internal.define_fn({"row": l.type.object_type}, lambda row: row[2]).val
+    vec_fn = arrow.vectorize(fn)
+    called = weave_internal.call_fn(vec_fn, {"row": l})
+    assert list(weave.use(called)) == [3, None, 6, None, 9]
+
+
+def test_vectorize_index_nested():
+    l = weave.save(arrow.to_arrow([[[1, 2, 3]], [[4, 5, 6]], [[7, 8, 9]]]))
+    fn = weave_internal.define_fn(
+        {"row": l.type.object_type}, lambda row: row[0][0]
+    ).val
+    vec_fn = arrow.vectorize(fn)
+    called = weave_internal.call_fn(vec_fn, {"row": l})
+    assert list(weave.use(called)) == [1, 4, 7]
+
+
+def test_vectorize_index_dependent():
+    l = weave.save(arrow.to_arrow([[1, 1, 2, 3], [2, 4, 5, 6], [3, 7, 8, 9]]))
+    fn = weave_internal.define_fn(
+        {"row": l.type.object_type}, lambda row: row[row[0]]
+    ).val
+    vec_fn = arrow.vectorize(fn)
+    called = weave_internal.call_fn(vec_fn, {"row": l})
+    assert list(weave.use(called)) == [1, 5, 9]

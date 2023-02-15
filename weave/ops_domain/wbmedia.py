@@ -88,53 +88,55 @@ class ImageArtifactFileRefType(types.ObjectType):
             "sha256": types.String(),
             "boxes": types.TypedDict(
                 {
-                    box_key: types.List(
-                        types.TypedDict(
-                            {
-                                "box_caption": types.optional(types.String()),
-                                "class_id": types.Int(),
-                                "domain": types.optional(types.String()),
-                                "position": types.union(
-                                    types.TypedDict(
-                                        {
-                                            "maxX": types.Int(),
-                                            "maxY": types.Int(),
-                                            "minX": types.Int(),
-                                            "minY": types.Int(),
-                                        }
+                    box_key: types.optional(
+                        types.List(
+                            types.TypedDict(
+                                {
+                                    "box_caption": types.optional(types.String()),
+                                    "class_id": types.Int(),
+                                    "domain": types.optional(types.String()),
+                                    "position": types.union(
+                                        types.TypedDict(
+                                            {
+                                                "maxX": types.Int(),
+                                                "maxY": types.Int(),
+                                                "minX": types.Int(),
+                                                "minY": types.Int(),
+                                            }
+                                        ),
+                                        types.TypedDict(
+                                            {
+                                                "maxX": types.Float(),
+                                                "maxY": types.Float(),
+                                                "minX": types.Float(),
+                                                "minY": types.Float(),
+                                            }
+                                        ),
+                                        types.TypedDict(
+                                            {
+                                                "height": types.Float(),
+                                                "middle": types.List(types.Float()),
+                                                "width": types.Float(),
+                                            }
+                                        ),
+                                        types.TypedDict(
+                                            {
+                                                "height": types.Int(),
+                                                "middle": types.List(types.Int()),
+                                                "width": types.Int(),
+                                            }
+                                        ),
                                     ),
-                                    types.TypedDict(
-                                        {
-                                            "maxX": types.Float(),
-                                            "maxY": types.Float(),
-                                            "minX": types.Float(),
-                                            "minY": types.Float(),
-                                        }
+                                    "scores": types.optional(
+                                        types.TypedDict(
+                                            {
+                                                score_key: types.Float()
+                                                for score_key in self.boxScoreKeys
+                                            }
+                                        )
                                     ),
-                                    types.TypedDict(
-                                        {
-                                            "height": types.Float(),
-                                            "middle": types.List(types.Float()),
-                                            "width": types.Float(),
-                                        }
-                                    ),
-                                    types.TypedDict(
-                                        {
-                                            "height": types.Int(),
-                                            "middle": types.List(types.Int()),
-                                            "width": types.Int(),
-                                        }
-                                    ),
-                                ),
-                                "scores": types.optional(
-                                    types.TypedDict(
-                                        {
-                                            score_key: types.Float()
-                                            for score_key in self.boxScoreKeys
-                                        }
-                                    )
-                                ),
-                            }
+                                }
+                            )
                         )
                     )
                     for box_key in self.boxLayers.keys()
@@ -142,12 +144,14 @@ class ImageArtifactFileRefType(types.ObjectType):
             ),
             "masks": types.TypedDict(
                 {
-                    mask_key: types.TypedDict(
-                        {
-                            "_type": types.String(),
-                            "path": types.String(),
-                            "sha256": types.String(),
-                        }
+                    mask_key: types.optional(
+                        types.TypedDict(
+                            {
+                                "_type": types.String(),
+                                "path": types.String(),
+                                "sha256": types.String(),
+                            }
+                        )
                     )
                     for mask_key in self.maskLayers.keys()
                 }
@@ -250,36 +254,42 @@ ImageArtifactFileRefType.instance_classes = ImageArtifactFileRef
 class AudioArtifactFileRef:
     artifact: artifact_fs.FilesystemArtifact
     path: str
+    sha256: str
 
 
 @weave.type(__override_name="bokeh-file")  # type: ignore
 class BokehArtifactFileRef:
     artifact: artifact_fs.FilesystemArtifact
     path: str
+    sha256: str
 
 
 @weave.type(__override_name="video-file")  # type: ignore
 class VideoArtifactFileRef:
     artifact: artifact_fs.FilesystemArtifact
     path: str
+    sha256: str
 
 
 @weave.type(__override_name="object3D-file")  # type: ignore
 class Object3DArtifactFileRef:
     artifact: artifact_fs.FilesystemArtifact
     path: str
+    sha256: str
 
 
 @weave.type(__override_name="molecule-file")  # type: ignore
 class MoleculeArtifactFileRef:
     artifact: artifact_fs.FilesystemArtifact
     path: str
+    sha256: str
 
 
 @weave.type(__override_name="html-file")  # type: ignore
 class HtmlArtifactFileRef:
     artifact: artifact_fs.FilesystemArtifact
     path: str
+    sha256: str
 
 
 # When a WB table is written to disk, it accumulates all the NDArrays into a
@@ -308,7 +318,7 @@ def html_file(html: html.Html) -> HtmlArtifactFileRef:
     if path is None:
         raise errors.WeaveInternalError("storage save returned None path")
     file_path = path + ".html"
-    return HtmlArtifactFileRef(ref.artifact, file_path)
+    return HtmlArtifactFileRef(ref.artifact, file_path, file_path)
 
 
 # Yet another pattern for returning a file inside an artifact!

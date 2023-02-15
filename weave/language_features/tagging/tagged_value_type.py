@@ -278,7 +278,9 @@ class TaggedValueType(types.Type):
         return mapper.apply(result)
 
     def __repr__(self) -> str:
-        return f"TaggedValueType({self.tag}, {self.value})"
+        return (
+            f"TaggedValueType({{{list(self.tag.property_types.keys())}}}, {self.value})"
+        )
 
 
 class TaggedValueMapper(mappers.Mapper):

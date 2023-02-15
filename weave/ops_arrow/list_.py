@@ -1440,7 +1440,8 @@ def _to_compare_safe_call(node: graph.OutputNode) -> graph.OutputNode:
 
     node_type = types.non_none(node.type)
     if ArtifactAssetType.assign_type(node_type):
-        return node.file().digest()  # type: ignore
+        # Must add this to all assets before merging
+        return node.sha256  # type: ignore
     elif types.TypedDict({}).assign_type(node_type):
         new_keys = {}
         dirty = False
@@ -1846,15 +1847,15 @@ def _is_non_simd_node(node: graph.OutputNode, vectorized_keys: set[str]):
     # curated list from looking at Weave0. We probably need to refactor this entire vectorize to have a more
     # rigorous ruleset that can be applied, but in the interest of time, we are hand-crafting this for now
     non_vectorized_awl_op_names = [
-        "count",
         "limit",
         "offset",
         "unnest",
         "flatten",
         "2DProjection",
-        "count",
+        "count",  # we could easily vectorize `count` using the `value_counts` pyarrow attribute
         "joinToStr",
-        "index",
+        "index",  # We might be able to vectorize this by using some existing ListArray methods
+        "__getitem__",  # Same op as `index`
         "dropna",
         "unique",
         "numbers-sum",

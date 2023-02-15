@@ -95,6 +95,7 @@ def test_convert_optional_list_cell(fake_wandb):
                 {
                     "artifact": "wandb-artifact:///test_entity/test_project/test_name:v0",
                     "path": "media/html/03ac15e611be692f058e.html",
+                    "sha256": "d4935b7d4e8f30952d5869122ca6793114936be8bf156dd936b6794fb6715e02",
                 }
             ]
         }

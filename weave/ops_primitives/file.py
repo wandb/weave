@@ -84,7 +84,7 @@ def file_media(file: FilesystemArtifactFile):
             format=data["format"],
             height=data["height"],
             width=data["width"],
-            sha256=file_path,  # TODO: This is not correct, but i don't think it is used.
+            sha256=data.get("sha256", file_path),
         )
     elif any(
         file.path.endswith(path_suffix)
@@ -102,7 +102,9 @@ def file_media(file: FilesystemArtifactFile):
             raise errors.WeaveInternalError(
                 f"op file-media: Media Type has not bound instance_class: {file.path}: {type_cls}"
             )
-        res = type_cls.instance_class(file.artifact, file_path)
+        res = type_cls.instance_class(
+            file.artifact, file_path, data.get("sha256", file_path)
+        )
     else:
         raise errors.WeaveInternalError(
             f"op file-media: Unknown media file type: {file.path}"
