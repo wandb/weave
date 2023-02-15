@@ -26,7 +26,7 @@ def dense_union_to_sparse_union(array: pa.Array) -> pa.Array:
         # convert dense representation to sparse representation
         value_array = array.field(field_index)
         mask = pc.equal(type_codes, pa.scalar(field_index, type=pa.int8()))
-        offsets_for_type = pc.filter(array.offsets, mask)
+        offsets_for_type = pc.filter(offsets_starting_at_zero(array), mask)
         replacements = pc.take(value_array, offsets_for_type)
         empty_array = pa.nulls(len(array), type=field.type)
         result = safe_replace_with_mask(empty_array, mask, replacements)
@@ -351,7 +351,9 @@ def adjust_table_after_parquet_deserialization(table: pa.Table) -> pa.Table:
                 )
                 new_col.append(
                     pa.ListArray.from_arrays(
-                        a.offsets, array.combine_chunks(), mask=pa.compute.is_null(a)
+                        offsets_starting_at_zero(a),
+                        array.combine_chunks(),
+                        mask=pa.compute.is_null(a),
                     )
                 )
             return column_name, pa.chunked_array(new_col)
@@ -453,7 +455,7 @@ def adjust_table_for_parquet_serialization(table: pa.Table) -> pa.Table:
                 )
                 new_col.append(
                     pa.ListArray.from_arrays(
-                        a.offsets,
+                        offsets_starting_at_zero(a),
                         chunked_array.combine_chunks(),
                         mask=pa.compute.invert(a.is_valid()),
                     )
@@ -556,6 +558,29 @@ def arrow_as_array(obj) -> pa.Array:
     elif not isinstance(obj, pa.Array):
         raise TypeError("Expected pyarrow Array or Table, got %s" % type(obj))
     return obj
+
+
+def offsets_starting_at_zero(arr: pa.ListArray) -> pa.IntegerArray:
+    """
+    We often have code to operate on the elements of a list array. That code
+    will do something like:
+    ```
+        offsets = arr.offsets
+        elements = arr.flatten()
+        transformed = do_something(elements)
+        result = pa.ListArray.from_arrays(offsets, transformed)
+    ```
+    However, sometimes for performance reasons, the offsets do not start at 0.
+    For example, when the ListArray is actually a slice of a larger underlying
+    buffer. We should use this helper function anytime we are doing something
+    like the above example.
+    """
+    raw_offsets = arr.offsets
+    first_value = raw_offsets[0]
+    if first_value == 0:
+        return raw_offsets
+    else:
+        return pc.subtract(raw_offsets, first_value)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -693,7 +718,7 @@ def rewrite_weavelist_refs(arrow_data, object_type, source_artifact, target_arti
         if isinstance(arrow_data, pa.ChunkedArray):
             data = arrow_data.combine_chunks()
         return pa.ListArray.from_arrays(
-            data.offsets,
+            offsets_starting_at_zero(data),
             rewrite_weavelist_refs(
                 data.values,
                 object_type.object_type,

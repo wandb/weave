@@ -2,7 +2,7 @@ import typing
 import pyarrow as pa
 import numpy as np
 
-from .arrow import arrow_as_array
+from .arrow import arrow_as_array, offsets_starting_at_zero
 
 from ..api import op, OpVarArgs
 from ..decorator_arrow_op import arrow_op
@@ -68,7 +68,7 @@ def _awl_pick(array: pa.Array, path: list[str]) -> pa.Array:
         else:
             flattened_results = _awl_pick(inner_array.flatten(), next_path)
             rolled_results = pa.ListArray.from_arrays(
-                inner_array.offsets, flattened_results
+                offsets_starting_at_zero(inner_array), flattened_results
             )
             return tag_wrapper(rolled_results)
     elif isinstance(inner_array, pa.StructArray):

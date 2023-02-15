@@ -3,6 +3,8 @@ import typing
 import pyarrow as pa
 import pyarrow.compute as pc
 
+from .arrow import offsets_starting_at_zero
+
 from ..api import op
 from ..decorator_arrow_op import arrow_op
 from .. import weave_types as types
@@ -412,7 +414,8 @@ def join_to_str(arr, sep):
         sep = sep._arrow_data
     # match Weave0 - join nulls to empty string
     filled_arr = pa.ListArray.from_arrays(
-        arr._arrow_data.offsets, arr._arrow_data.flatten().fill_null("")
+        offsets_starting_at_zero(arr._arrow_data),
+        arr._arrow_data.flatten().fill_null(""),
     )
     return ArrowWeaveList(
         pc.binary_join(filled_arr, sep), types.String(), arr._artifact

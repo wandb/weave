@@ -5,6 +5,7 @@ import logging
 import typing
 
 from .language_features.tagging.is_tag_getter import is_tag_getter
+from .language_features.tagging.tagged_value_type import TaggedValueType
 
 from . import weave_types as types
 from . import op_def
@@ -339,11 +340,12 @@ class DispatchMixin:
 
     def _get_prop(self, attr: str) -> typing.Optional[graph.OutputNode]:
         node_self = typing.cast(graph.Node, self)
-        self_type = node_self.type
-        non_none_type = types.non_none(self_type)
-        if isinstance(non_none_type, types.ObjectType):
+        use_type = types.non_none(node_self.type)
+        if isinstance(use_type, TaggedValueType):
+            use_type = use_type.value
+        if isinstance(use_type, types.ObjectType):
             # Definitely an ObjectType
-            if attr in non_none_type.property_types():
+            if attr in use_type.property_types():
                 obj_getattr = registry_mem.memory_registry.get_op("Object-__getattr__")
                 return obj_getattr(node_self, attr)
             else:

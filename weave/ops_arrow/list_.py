@@ -34,7 +34,7 @@ from .. import arrow_util
 from ..language_features.tagging import tag_store
 from ..ops_primitives import list_ as base_list
 
-from .arrow import arrow_as_array, ArrowWeaveListType
+from .arrow import arrow_as_array, ArrowWeaveListType, offsets_starting_at_zero
 from .. import artifact_base
 
 FLATTEN_DELIMITER = "➡️"
@@ -154,7 +154,7 @@ def _map_each(self: "ArrowWeaveList", fn):
         if isinstance(self.object_type, tagged_value_type.TaggedValueType):
             as_array = as_array.field("_value")
 
-        offsets = as_array.offsets
+        offsets = offsets_starting_at_zero(as_array)
         flattened = as_array.flatten()
         if isinstance(self.object_type, tagged_value_type.TaggedValueType):
             new_object_type = typing.cast(
@@ -335,7 +335,7 @@ def recursively_encode_pyarrow_strings_as_dictionaries(array: pa.Array) -> pa.Ar
         )
     elif pa.types.is_list(array.type):
         return pa.ListArray.from_arrays(
-            array.offsets,
+            offsets_starting_at_zero(array),
             recursively_encode_pyarrow_strings_as_dictionaries(array.flatten()),
             mask=pa.compute.invert(array.is_valid()),
         )
@@ -364,7 +364,7 @@ def _sort_structs(array: pa.Array) -> pa.Array:
         return pa.StructArray.from_arrays(sub_fields, field_names)
     elif pa.types.is_list(array.type):
         return pa.ListArray.from_arrays(
-            array.offsets,
+            offsets_starting_at_zero(array),
             _sort_structs(array.flatten()),
         )
     return array
@@ -512,7 +512,9 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                 self._arrow_data.values, self.object_type.object_type, self._artifact
             )._map_column(fn, path + (SpecialPathItem.PATH_LIST_ITEMS,))
             with_mapped_children = ArrowWeaveList(
-                pa.ListArray.from_arrays(self._arrow_data.offsets, items._arrow_data),
+                pa.ListArray.from_arrays(
+                    offsets_starting_at_zero(self._arrow_data), items._arrow_data
+                ),
                 types.List(items.object_type),
                 self._artifact,
             )
@@ -651,7 +653,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
 
         elif isinstance(self.object_type, types.List):
 
-            offsets = arrow_data.offsets
+            offsets = offsets_starting_at_zero(arrow_data)
             # strip tags from each element
             flattened = ArrowWeaveList(
                 arrow_data.flatten(),
@@ -1067,7 +1069,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         elif isinstance(desired_type, types.List) and isinstance(
             current_type, types.List
         ):
-            offsets = self._arrow_data.offsets
+            offsets = offsets_starting_at_zero(self._arrow_data)
             flattened = self._arrow_data.flatten()
             flattened_converted = ArrowWeaveList(
                 flattened,
@@ -2743,7 +2745,9 @@ def _map_nested_arrow_fields(
         )
     elif pa.types.is_list(array.type):
         sub_arrays = _map_nested_arrow_fields(array.flatten(), fn, path)
-        return pa.ListArray.from_arrays(array.offsets, sub_arrays, mask=array.is_null())
+        return pa.ListArray.from_arrays(
+            offsets_starting_at_zero(array), sub_arrays, mask=array.is_null()
+        )
     elif pa.types.is_dictionary(array.type):
         sub_fields = _map_nested_arrow_fields(array.dictionary, fn, path)
         return pa.DictionaryArray.from_arrays(
@@ -3212,14 +3216,15 @@ def vectorized_arrow_pick_output_type(input_types):
     input_type={
         "self": types.TypedDict({}),
         "key": types.union(
-            ArrowWeaveListType(types.String()), types.List(types.String())
+            ArrowWeaveListType(types.optional(types.String())),
+            types.List(types.optional(types.String())),
         ),
     },
     output_type=vectorized_arrow_pick_output_type,
 )
 def vectorized_arrow_pick(self, key):
     if isinstance(key, list):
-        return [self.get(k, None) for k in key]
+        return [self.get(k, None) if k != None else None for k in key]
     de = arrow_as_array(key._arrow_data_asarray_no_tags()).dictionary_encode()
     new_dictionary = pa.array(
         [self.get(key, None) for key in de.dictionary.to_pylist()]
