@@ -142,6 +142,7 @@ def refine_config_type(run: wdt.Run) -> types.Type:
 
 
 def _make_run_config_gql_field(inputs: InputAndStitchProvider, inner: str):
+    # Must be kept in sync with compile_domain:_field_selections_hardcode_merge
     stitch_obj = inputs.stitched_obj
     key_tree = compile_table.get_projection(stitch_obj)
     # we only pushdown the top level keys for now.
@@ -190,6 +191,8 @@ def refine_summary_type(run: wdt.Run) -> types.Type:
 
 
 def _make_run_summary_gql_field(inputs: InputAndStitchProvider, inner: str):
+    # Must be kept in sync with compile_domain:_field_selections_hardcode_merge
+
     stitch_obj = inputs.stitched_obj
     key_tree = compile_table.get_projection(stitch_obj)
     # we only pushdown the top level keys for now.

@@ -179,6 +179,73 @@ def _get_fragment(node: graph.OutputNode, stitchedGraph: stitch.StitchedGraph) -
     return fragment
 
 
+def _get_configsummary_keys(
+    field: graphql.language.ast.FieldNode,
+) -> typing.Optional[typing.List[str]]:
+    if len(field.arguments) > 1:
+        raise errors.WeaveInternalError(
+            "Custom merge for config and summaryMetrics only supports one argument"
+        )
+    if not field.arguments:
+        return None
+    field_arg0 = field.arguments[0]
+    if field_arg0.name.value != "keys":
+        raise errors.WeaveInternalError(
+            "First argument for custom merge must be 'keys'"
+        )
+    if not isinstance(field_arg0.value, graphql.language.ast.ListValueNode):
+        raise errors.WeaveInternalError(
+            "First argument for custom merge must be a list"
+        )
+    keys: list[str] = []
+    for key in field_arg0.value.values:
+        if not isinstance(key, graphql.language.ast.StringValueNode):
+            raise errors.WeaveInternalError(
+                "First argument for custom merge must be a list of strings"
+            )
+        keys.append(key.value)
+    return keys
+
+
+def _field_selections_hardcoded_merge(
+    merge_from: graphql.language.ast.FieldNode,
+    merge_to: graphql.language.ast.FieldNode,
+) -> bool:
+    # Custom field merging for config and summaryMetrics keys.
+    # Must be kept in sync with run_ops config* and summary_metrics* ops.
+    if merge_from.name.value != merge_to.name.value:
+        return False
+    if merge_from.name.value != "config" and merge_from.name.value != "summaryMetrics":
+        return False
+    if (
+        merge_from.alias is None
+        or merge_to.alias is None
+        or merge_from.alias.value != merge_to.alias.value
+    ):
+        return False
+    if (
+        merge_from.alias.value != "configSubset"
+        and merge_from.alias.value != "summaryMetricsSubset"
+    ):
+        return False
+    merge_from_keys = _get_configsummary_keys(merge_from)
+    merge_to_keys = _get_configsummary_keys(merge_to)
+    if merge_to_keys is None:
+        # merge_to already selects all
+        pass
+    elif merge_from_keys is None:
+        # select all by removing arguments
+        merge_to.arguments = ()
+    else:
+        for k in merge_from_keys:
+            if k not in merge_to_keys:
+                merge_to_keys.append(k)
+        merge_to.arguments[0].value.values = tuple(
+            graphql.language.ast.StringValueNode(value=k) for k in merge_to_keys
+        )
+    return True
+
+
 def _field_selections_are_mergeable(
     selection1: graphql.language.ast.FieldNode,
     selection2: graphql.language.ast.FieldNode,
@@ -228,6 +295,14 @@ def _zip_selection_set(
             selection, graphql.language.ast.InlineFragmentNode
         ):
             for new_selection in new_selections:
+                did_custom_merge = (
+                    isinstance(selection, graphql.language.ast.FieldNode)
+                    and isinstance(new_selection, graphql.language.ast.FieldNode)
+                    and _field_selections_hardcoded_merge(selection, new_selection)
+                )
+                if did_custom_merge:
+                    break
+
                 should_merge = (
                     isinstance(selection, graphql.language.ast.FieldNode)
                     and isinstance(new_selection, graphql.language.ast.FieldNode)

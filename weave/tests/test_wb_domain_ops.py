@@ -349,7 +349,7 @@ def test_rpt_op(fake_wandb):
     )
 
 
-def test_mutli_root_merging(fake_wandb):
+def test_multi_root_merging(fake_wandb):
     fake_wandb.fake_api.add_mock(
         lambda query, ndx: {
             "project_8d1592567720841659de23c02c97d594": {
@@ -470,3 +470,61 @@ def test_mutli_root_merging(fake_wandb):
         }
         """,
     )
+
+
+def test_two_level_summary(fake_wandb):
+    def _mocked_query(query, ndx):
+        run_selections = (
+            query["gql"]
+            .definitions[0]
+            .selection_set.selections[0]
+            .selection_set.selections[3]
+            .selection_set.selections[0]
+            .selection_set.selections[0]
+            .selection_set.selections
+        )
+        assert (
+            len(
+                list(
+                    f
+                    for f in run_selections
+                    if f.name.value == "summaryMetrics"
+                    and f.alias
+                    and f.alias.value == "summaryMetricsSubset"
+                )
+            )
+            == 1
+        )
+        return {
+            "project_8d1592567720841659de23c02c97d594": {
+                **fwb.project_payload,
+                "name": "p_1",
+                "runs_21303e3890a1b6580998e6aa8a345859": {
+                    "edges": [
+                        {
+                            "node": {
+                                "name": "r_1",
+                                "project": {"name": "p_1", "entity": {"name": "e_1"}},
+                                "summaryMetricsSubset": json.dumps({"a": 1, "b": "x"}),
+                            }
+                        },
+                        {
+                            "node": {
+                                "name": "r_1",
+                                "project": {"name": "p_1", "entity": {"name": "e_1"}},
+                                "summaryMetricsSubset": json.dumps({"a": 2, "b": "y"}),
+                            }
+                        },
+                    ]
+                },
+            }
+        }
+
+    fake_wandb.fake_api.add_mock(_mocked_query)
+    n = (
+        ops.project("e_0", "p_0")
+        .runs()
+        .filter(lambda r: r.summary()["a"] == 1)
+        .summary()["b"]
+    )
+    assert weave.use(n) == ["x"]
