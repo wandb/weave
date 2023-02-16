@@ -541,8 +541,8 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                 m for m in self.object_type.members if not isinstance(m, types.NoneType)
             ]
             nullable = len(non_none_members) < len(self.object_type.members)
+            arr = arrow.arrow_as_array(self._arrow_data)
             if len(non_none_members) > 1:
-                arr = arrow.arrow_as_array(self._arrow_data)
                 members: list[ArrowWeaveList] = [
                     ArrowWeaveList(
                         arr.field(i), member_type, self._artifact
@@ -561,6 +561,10 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                     types.UnionType(*new_type_members),
                     self._artifact,
                 )
+            else:
+                with_mapped_children = ArrowWeaveList(
+                    arr, non_none_members[0], self._artifact
+                )._map_column(fn, path + (str(0),))
         mapped = fn(with_mapped_children, path)
         if mapped is None:
             mapped = with_mapped_children
