@@ -485,6 +485,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                 pa.StructArray.from_arrays(
                     [v._arrow_data for v in properties.values()],
                     list(properties.keys()),
+                    mask=pc.invert(arr.is_valid()),
                 ),
                 types.TypedDict({k: v.object_type for k, v in properties.items()}),
                 self._artifact,
@@ -501,6 +502,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                 pa.StructArray.from_arrays(
                     [v._arrow_data for v in attrs.values()],
                     list(attrs.keys()),
+                    mask=pc.invert(arr.is_valid()),
                 ),
                 self.object_type.__class__(
                     **{k: attrs[k].object_type for k in self.object_type.type_attrs()}
@@ -513,7 +515,9 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             )._map_column(fn, path + (SpecialPathItem.PATH_LIST_ITEMS,))
             with_mapped_children = ArrowWeaveList(
                 pa.ListArray.from_arrays(
-                    offsets_starting_at_zero(self._arrow_data), items._arrow_data
+                    offsets_starting_at_zero(self._arrow_data),
+                    items._arrow_data,
+                    mask=pc.invert(self._arrow_data.is_valid()),
                 ),
                 types.List(items.object_type),
                 self._artifact,
@@ -532,6 +536,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                 pa.StructArray.from_arrays(
                     [tag._arrow_data, value._arrow_data],
                     ["_tag", "_value"],
+                    mask=pc.invert(arr.is_valid()),
                 ),
                 tagged_value_type.TaggedValueType(tag.object_type, value.object_type),
                 self._artifact,
