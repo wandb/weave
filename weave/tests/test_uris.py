@@ -1,5 +1,6 @@
 import pytest
 from .. import uris
+from ..artifact_wandb import WeaveWBArtifactURI
 
 URIS = [
     "op-get",
@@ -21,3 +22,17 @@ URIS = [
 def test_parse_uri_str(uri_str: str):
     local_uri = uris.WeaveURI.parse(uri_str)
     assert uri_str == str(local_uri)
+
+
+def test_uri_with_slashes():
+    uri = WeaveWBArtifactURI(
+        "test-art-deleted-07/02/23-17898374309789951906",
+        "latest",
+        "test",
+        "test",
+        "",
+        "test.table.json",
+    )
+    uri_str = str(uri)
+    uri2 = uris.WeaveURI.parse(uri_str)
+    assert uri == uri2

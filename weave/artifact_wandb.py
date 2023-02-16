@@ -2,9 +2,7 @@ import binascii
 import contextlib
 import dataclasses
 import os
-import random
-import shutil
-import pathlib
+import functools
 import tempfile
 import typing
 
@@ -28,6 +26,7 @@ from urllib import parse
 if typing.TYPE_CHECKING:
     from wandb.sdk.interface import artifacts
 
+quote_slashes = functools.partial(parse.quote, safe="")
 
 # TODO: Get rid of this, we have the new wandb api service! But this
 # is still used in a couple places.
@@ -559,11 +558,13 @@ class WeaveWBArtifactURI(uris.WeaveURI):
         fragment: str,
     ):
         parts = path.strip("/").split("/")
+        parts = [parse.unquote(part) for part in parts]
         if len(parts) < 3:
             raise errors.WeaveInvalidURIError(f"Invalid WB Artifact URI: {uri}")
         entity_name = parts[0]
         project_name = parts[1]
         name, version = parts[2].split(":", 1)
+
         file_path: typing.Optional[str] = None
         if len(parts) > 3:
             file_path = "/".join(parts[3:])
@@ -578,11 +579,17 @@ class WeaveWBArtifactURI(uris.WeaveURI):
 
     def __str__(self) -> str:
         netloc = self.netloc or ""
-        uri = f"{self.SCHEME}://{netloc}/{self.entity_name}/{self.project_name}/{self.name}:{self.version}"
+        uri = (
+            f"{self.SCHEME}://"
+            f"{quote_slashes(netloc)}/"
+            f"{quote_slashes(self.entity_name)}/"
+            f"{quote_slashes(self.project_name)}/"
+            f"{quote_slashes(self.name)}:{quote_slashes(self.version) if self.version else ''}"
+        )
         if self.path:
-            uri += f"/{self.path}"
+            uri += f"/{quote_slashes(self.path)}"
         if self.extra:
-            uri += f"#{'/'.join(self.extra)}"
+            uri += f"#{'/'.join([quote_slashes(e) for e in self.extra])}"
         return uri
 
     def with_path(self, path: str) -> "WeaveWBArtifactURI":
