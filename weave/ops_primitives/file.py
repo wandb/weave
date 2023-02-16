@@ -82,8 +82,8 @@ def file_media(file: FilesystemArtifactFile):
             artifact=file.artifact,
             path=file_path,
             format=data["format"],
-            height=data["height"],
-            width=data["width"],
+            height=data.get("height", 0),
+            width=data.get("width", 0),
             sha256=data.get("sha256", file_path),
         )
     elif any(

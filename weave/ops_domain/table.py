@@ -336,8 +336,8 @@ def _table_data_to_weave1_objects(
                 artifact=file.artifact,
                 path=file_path,
                 format=cell["format"],
-                height=cell["height"],
-                width=cell["width"],
+                height=cell.get("height", 0),
+                width=cell.get("width", 0),
                 sha256=cell.get("sha256", file_path),
                 boxes=cell.get("boxes", {}),  # type: ignore
                 masks=cell.get("masks", {}),  # type: ignore
