@@ -149,7 +149,7 @@ class ImageArtifactFileRefType(types.ObjectType):
                             {
                                 "_type": types.String(),
                                 "path": types.String(),
-                                "sha256": types.String(),
+                                "sha256": types.optional(types.String()),
                             }
                         )
                     )
