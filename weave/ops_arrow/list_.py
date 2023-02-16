@@ -405,6 +405,8 @@ def set_path(
     # Path must be of length 1 or greater. Caller needs to handle the case
     # where we want to set v itself (path is of length 0).
     for i, el in enumerate(path[:-1]):
+        if v == None:  # Optional field:
+            return
         if isinstance(el, str):
             v = v[el]
         elif el == SpecialPathItem.PATH_TAGGED_TAG:
@@ -418,7 +420,8 @@ def set_path(
             return
         else:
             raise ValueError(f"Unexpected path element: {el}")
-
+    if v == None:  # Optional field:
+        return
     leaf = path[-1]
     if isinstance(leaf, str):
         v[leaf] = value_fn(v[leaf], offset)
@@ -474,41 +477,46 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                 self._arrow_data, self.object_type.val_type, self._artifact
             )._map_column(fn, path)
         elif isinstance(self.object_type, types.TypedDict):
-            arr = arrow.arrow_as_array(self._arrow_data)
-            properties: dict[str, ArrowWeaveList] = {
-                k: ArrowWeaveList(arr.field(k), v, self._artifact)._map_column(
-                    fn, path + (k,)
+            if len(self.object_type.property_types) > 0:
+                arr = arrow.arrow_as_array(self._arrow_data)
+                properties: dict[str, ArrowWeaveList] = {
+                    k: ArrowWeaveList(arr.field(k), v, self._artifact)._map_column(
+                        fn, path + (k,)
+                    )
+                    for k, v in self.object_type.property_types.items()
+                }
+                with_mapped_children = ArrowWeaveList(
+                    pa.StructArray.from_arrays(
+                        [v._arrow_data for v in properties.values()],
+                        list(properties.keys()),
+                        mask=pc.invert(arr.is_valid()),
+                    ),
+                    types.TypedDict({k: v.object_type for k, v in properties.items()}),
+                    self._artifact,
                 )
-                for k, v in self.object_type.property_types.items()
-            }
-            with_mapped_children = ArrowWeaveList(
-                pa.StructArray.from_arrays(
-                    [v._arrow_data for v in properties.values()],
-                    list(properties.keys()),
-                    mask=pc.invert(arr.is_valid()),
-                ),
-                types.TypedDict({k: v.object_type for k, v in properties.items()}),
-                self._artifact,
-            )
         elif isinstance(self.object_type, types.ObjectType):
-            arr = arrow.arrow_as_array(self._arrow_data)
-            attrs: dict[str, ArrowWeaveList] = {
-                k: ArrowWeaveList(arr.field(k), v, self._artifact)._map_column(
-                    fn, path + (k,)
+            if len(self.object_type.property_types()) > 0:
+                arr = arrow.arrow_as_array(self._arrow_data)
+                attrs: dict[str, ArrowWeaveList] = {
+                    k: ArrowWeaveList(arr.field(k), v, self._artifact)._map_column(
+                        fn, path + (k,)
+                    )
+                    for k, v in self.object_type.property_types().items()
+                }
+                with_mapped_children = ArrowWeaveList(
+                    pa.StructArray.from_arrays(
+                        [v._arrow_data for v in attrs.values()],
+                        list(attrs.keys()),
+                        mask=pc.invert(arr.is_valid()),
+                    ),
+                    self.object_type.__class__(
+                        **{
+                            k: attrs[k].object_type
+                            for k in self.object_type.type_attrs()
+                        }
+                    ),
+                    self._artifact,
                 )
-                for k, v in self.object_type.property_types().items()
-            }
-            with_mapped_children = ArrowWeaveList(
-                pa.StructArray.from_arrays(
-                    [v._arrow_data for v in attrs.values()],
-                    list(attrs.keys()),
-                    mask=pc.invert(arr.is_valid()),
-                ),
-                self.object_type.__class__(
-                    **{k: attrs[k].object_type for k in self.object_type.type_attrs()}
-                ),
-                self._artifact,
-            )
         elif isinstance(self.object_type, types.List):
             items: ArrowWeaveList = ArrowWeaveList(
                 self._arrow_data.flatten(), self.object_type.object_type, self._artifact
@@ -757,7 +765,8 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                     if not path:
                         value_py[i] = dict_col[row]
                     else:
-                        set_path(row, path, lambda v, j: dict_col[v])
+                        if dict_col:
+                            set_path(row, path, lambda v, j: dict_col[v])
 
         return value_py
 
