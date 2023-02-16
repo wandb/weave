@@ -248,6 +248,10 @@ def awl_2d_projection(
                 col for col in column_data if not isinstance(col, pa.NullArray)
             ]
             np_array_of_embeddings = np.array(column_data).T
+        # remove 0-only columns
+        np_array_of_embeddings = np_array_of_embeddings[
+            :, ~(np_array_of_embeddings.sum(axis=0) == 0)
+        ]
         # If the selected data is not a 2D array, or if it has less than 2 columns, then
         # we can't perform a 2D projection. In this case, we just return a 2D array of
         # zeros.
