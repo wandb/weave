@@ -20,59 +20,6 @@ from ..language_features.tagging import (
 import functools
 
 
-def _map_each_function_type(input_types: dict[str, types.Type]) -> types.Function:
-    if types.List().assign_type(input_types["arr"]):
-        return _map_each_function_type(
-            {"arr": typing.cast(types.List, input_types["arr"]).object_type}
-        )
-    return types.Function({"row": input_types["arr"]}, types.Any())
-
-
-def _map_each_output_type(input_types: dict[str, types.Type]):
-    # propagate tags in output type
-    map_each_function_type = input_types["mapFn"]
-    output_type = typing.cast(types.Function, map_each_function_type).output_type
-
-    def get_next_type(t: types.Type) -> types.Type:
-        if types.List().assign_type(t):
-            t_as_list = typing.cast(types.List, t)
-            if tagged_value_type_helpers.is_tagged_value_type(t):
-                t_as_tagged = typing.cast(tagged_value_type.TaggedValueType, t)
-                return tagged_value_type.TaggedValueType(
-                    t_as_tagged.tag,
-                    types.List(
-                        get_next_type(
-                            typing.cast(types.List, t_as_tagged.value).object_type
-                        )
-                    ),
-                )
-            return types.List(get_next_type(t_as_list.object_type))
-        elif tagged_value_type_helpers.is_tagged_value_type(t):
-            t_as_tagged = typing.cast(tagged_value_type.TaggedValueType, t)
-            return tagged_value_type.TaggedValueType(t_as_tagged.tag, output_type)
-        return output_type
-
-    return get_next_type(input_types["arr"])
-
-
-def _map_each(arr: list, fn):
-    existing_tags = [
-        tag_store.get_tags(item) if tag_store.is_tagged(item) else None for item in arr
-    ]
-
-    if isinstance(arr, list) and len(arr) > 0 and isinstance(arr[0], list):
-        result = [_map_each(item, fn) for item in arr]
-    else:
-        result = execute_fast.fast_map_fn(arr, fn)
-
-    for i, item in enumerate(result):
-        maybe_existing_tags = existing_tags[i]
-        if maybe_existing_tags is not None:
-            result[i] = tag_store.add_tags(box.box(item), maybe_existing_tags)
-
-    return result
-
-
 def getitem_output_type(input_types):
     self_type = input_types["arr"]
     if isinstance(self_type, types.UnionType):
@@ -194,17 +141,6 @@ class List:
         return execute_fast.fast_map_fn(arr, mapFn)
 
     @op(
-        name="mapEach",
-        input_type={
-            "arr": types.List(types.Any()),
-            "mapFn": _map_each_function_type,
-        },
-        output_type=_map_each_output_type,
-    )
-    def map_each(arr, mapFn):
-        return _map_each(arr, mapFn)
-
-    @op(
         name="groupby",
         input_type={
             "arr": types.List(types.Any()),
@@ -295,6 +231,77 @@ def group_result_index_output_type(input_types):
 
 
 ### TODO Move these ops onto List class and make part of the List interface
+
+
+def _map_each_function_type(input_types: dict[str, types.Type]) -> types.Function:
+    if types.List().assign_type(input_types["arr"]):
+        return _map_each_function_type(
+            {"arr": typing.cast(types.List, input_types["arr"]).object_type}
+        )
+    return types.Function({"row": input_types["arr"]}, types.Any())
+
+
+def _map_each_output_type(input_types: dict[str, types.Type]):
+    # propagate tags in output type
+    map_each_function_type = input_types["mapFn"]
+    output_type = typing.cast(types.Function, map_each_function_type).output_type
+
+    def get_next_type(t: types.Type) -> types.Type:
+        if types.List().assign_type(t):
+            t_as_list = typing.cast(types.List, t)
+            if tagged_value_type_helpers.is_tagged_value_type(t):
+                t_as_tagged = typing.cast(tagged_value_type.TaggedValueType, t)
+                return tagged_value_type.TaggedValueType(
+                    t_as_tagged.tag,
+                    types.List(
+                        get_next_type(
+                            typing.cast(types.List, t_as_tagged.value).object_type
+                        )
+                    ),
+                )
+            return types.List(get_next_type(t_as_list.object_type))
+        elif tagged_value_type_helpers.is_tagged_value_type(t):
+            t_as_tagged = typing.cast(tagged_value_type.TaggedValueType, t)
+            return tagged_value_type.TaggedValueType(t_as_tagged.tag, output_type)
+        return output_type
+
+    return get_next_type(input_types["arr"])
+
+
+def _map_each(arr: list, fn):
+    existing_tags = [
+        tag_store.get_tags(item) if tag_store.is_tagged(item) else None for item in arr
+    ]
+
+    if isinstance(arr, list) and len(arr) > 0 and isinstance(arr[0], list):
+        result = [_map_each(item, fn) for item in arr]
+    else:
+        result = execute_fast.fast_map_fn(arr, fn)
+
+    for i, item in enumerate(result):
+        maybe_existing_tags = existing_tags[i]
+        if maybe_existing_tags is not None:
+            result[i] = tag_store.add_tags(box.box(item), maybe_existing_tags)
+
+    return result
+
+
+@op(
+    name="mapEach",
+    input_type={
+        "arr": types.Any(),
+        "mapFn": _map_each_function_type,
+    },
+    output_type=_map_each_output_type,
+)
+def map_each(arr, mapFn):
+    arr_is_list = isinstance(arr, list)
+    if not arr_is_list:
+        arr = [arr]
+    res = _map_each(arr, mapFn)
+    if not arr_is_list:
+        res = res[0]
+    return res
 
 
 def index_checkpoint_setter(arr, new_arr):

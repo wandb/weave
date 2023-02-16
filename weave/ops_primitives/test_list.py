@@ -113,9 +113,17 @@ def test_nullable_concat():
 def test_mapeach():
     row_node = list_.make_list(a=1, b=2, c=3)
     two_d_list_node = list_.make_list(a=row_node, b=row_node, c=row_node)
-    result = list_.List.map_each(two_d_list_node, lambda row: row + 1)
+    result = list_.map_each(two_d_list_node, lambda row: row + 1)
     assert result.type == types.List(types.List(types.Number()))
     assert weave.use(result) == [[2, 3, 4], [2, 3, 4], [2, 3, 4]]
+
+
+def test_mapeach_single():
+    row_node = list_.make_list(a=1, b=2, c=3)
+    item = row_node[0]
+    result = list_.map_each(item, lambda row: row + 1)
+    assert result.type == types.Number()
+    assert weave.use(result) == 2
 
 
 def test_mapeach_tagged():
@@ -127,7 +135,7 @@ def test_mapeach_tagged():
     raw_data = tag_store.add_tags(box.box(raw_data), {"tag": "top"})
     two_d_list_node = weave.save(raw_data)
 
-    result = list_.List.map_each(two_d_list_node, lambda row: row + 1)
+    result = list_.map_each(two_d_list_node, lambda row: row + 1)
 
     expected_type = tagged_value_type.TaggedValueType(
         types.TypedDict({"tag": types.String()}),
