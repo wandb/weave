@@ -1331,3 +1331,18 @@ def test_arrow_unnest_inner_tags(fake_wandb):
         .name()
     )
     assert weave.use(run_name) == "amber-glade-100"
+
+
+def test_image_sha_from_table(fake_wandb):
+    fake_wandb.fake_api.add_mock(table_mock2)
+    img_node = (
+        ops.project("stacey", "mendeleev")
+        .runs()[0]
+        .summary()["table"]
+        .table()
+        .rows()[0]["image"]
+    )
+    assert (
+        weave.use(img_node.sha256)
+        == "50a7232cb6785ffae981038af58de306192e5739a0b9d9903fa436f9f508e7d5"
+    )

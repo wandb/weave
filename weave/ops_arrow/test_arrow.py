@@ -2875,3 +2875,34 @@ def test_vectorize_index_dependent():
     vec_fn = arrow.vectorize(fn)
     called = weave_internal.call_fn(vec_fn, {"row": l})
     assert list(weave.use(called)) == [1, 5, 9]
+
+
+def test_vectorize_special_pick():
+    l = weave.save(arrow.to_arrow(["a", None, "b", None, "c"]))
+    dict_node = weave_internal.make_const_node(
+        types.Dict(types.String(), types.String()),
+        {
+            "a": 1,
+            "b": 2,
+            "c": 3,
+            "d": 4,
+        },
+    )
+    fn = weave_internal.define_fn(
+        {"row": l.type.object_type}, lambda row: dict_node[row]
+    ).val
+    vec_fn = arrow.vectorize(fn)
+    called = weave_internal.call_fn(vec_fn, {"row": l})
+    assert list(weave.use(called)) == [1, None, 2, None, 3]
+
+
+def test_non_zero_offset():
+    non_zero_offset_array = pa.array([[0, 1], [2, 3], [4, 5]]).slice(1)
+    awl = arrow.ArrowWeaveList(non_zero_offset_array)
+
+    # First assertion validates that the test setup is correct:
+    assert awl._arrow_data.offsets[0] != 0
+
+    # We just want to validate that this function completes - no assertion
+    # needed
+    awl.map_column(lambda x, y: None)

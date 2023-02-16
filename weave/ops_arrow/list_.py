@@ -509,7 +509,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             )
         elif isinstance(self.object_type, types.List):
             items: ArrowWeaveList = ArrowWeaveList(
-                self._arrow_data.values, self.object_type.object_type, self._artifact
+                self._arrow_data.flatten(), self.object_type.object_type, self._artifact
             )._map_column(fn, path + (SpecialPathItem.PATH_LIST_ITEMS,))
             with_mapped_children = ArrowWeaveList(
                 pa.ListArray.from_arrays(

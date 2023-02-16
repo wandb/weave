@@ -720,7 +720,7 @@ def rewrite_weavelist_refs(arrow_data, object_type, source_artifact, target_arti
         return pa.ListArray.from_arrays(
             offsets_starting_at_zero(data),
             rewrite_weavelist_refs(
-                data.values,
+                data.flatten(),
                 object_type.object_type,
                 source_artifact,
                 target_artifact,
