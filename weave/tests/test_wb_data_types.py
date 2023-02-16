@@ -469,7 +469,7 @@ def test_annotated_images_in_tables(fake_wandb):
                 weave.types.NoneType(), weave.types.String()
             ),
             "image": weave.types.UnionType(
-                ImageArtifactFileRefType(
+                ImageArtifactFileRefType.init_from_sdk_attributes(
                     boxLayers={"box_set_1": [0], "box_set_2": [2]},
                     boxScoreKeys=["loss", "gain"],
                     maskLayers={"mask_set_1": [0, 1, 2, 3]},
@@ -523,7 +523,7 @@ def test_annotated_legacy_images_in_tables(fake_wandb):
                 weave.types.NoneType(), weave.types.String()
             ),
             "image": weave.types.UnionType(
-                ImageArtifactFileRefType(
+                ImageArtifactFileRefType.init_from_sdk_attributes(
                     # Both box and mask layers have all the keys because
                     # we can't possible look at all the elements, so we assume
                     # they all may or may not have all the keys

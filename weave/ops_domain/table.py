@@ -502,7 +502,7 @@ def _patch_legacy_image_file_types(
         box_layers = {box_key: class_keys for box_key in box_keys_set}
         mask_layers = {box_key: class_keys for box_key in mask_keys_set}
 
-        new_image_type = wbmedia.ImageArtifactFileRefType(
+        new_image_type = wbmedia.ImageArtifactFileRefType.init_from_sdk_attributes(
             boxLayers=box_layers,
             boxScoreKeys=list(box_score_key_set),
             maskLayers=mask_layers,

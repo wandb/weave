@@ -119,7 +119,7 @@ def _convert_type(old_type: Weave0TypeJson) -> types.Type:
             if "class_map" in old_type["params"]
             else None
         )
-        return ops.ImageArtifactFileRefType(
+        return ops.ImageArtifactFileRefType.init_from_sdk_attributes(
             boxLayersType,
             boxScoreKeysType,
             maskLayersType,
