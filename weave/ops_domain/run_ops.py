@@ -50,6 +50,7 @@ from .wandb_domain_gql import (
     _make_alias,
 )
 from . import wb_util
+from ..ops_primitives import _dict_utils
 
 
 # Section 1/6: Tag Getters
@@ -146,7 +147,7 @@ def _make_run_config_gql_field(inputs: InputAndStitchProvider, inner: str):
     stitch_obj = inputs.stitched_obj
     key_tree = compile_table.get_projection(stitch_obj)
     # we only pushdown the top level keys for now.
-    top_level_keys = list(key_tree.keys())
+    top_level_keys = [_dict_utils.unescape_dots(key) for key in list(key_tree.keys())]
     if not top_level_keys:
         # If no keys, then we must select the whole object
         return "configSubset: config"
@@ -196,7 +197,7 @@ def _make_run_summary_gql_field(inputs: InputAndStitchProvider, inner: str):
     stitch_obj = inputs.stitched_obj
     key_tree = compile_table.get_projection(stitch_obj)
     # we only pushdown the top level keys for now.
-    top_level_keys = list(key_tree.keys())
+    top_level_keys = [_dict_utils.unescape_dots(key) for key in list(key_tree.keys())]
     if not top_level_keys:
         # If no keys, then we must select the whole object
         return "summaryMetricsSubset: summaryMetrics"

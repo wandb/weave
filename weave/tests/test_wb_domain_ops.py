@@ -6,6 +6,7 @@ from . import fixture_fakewandb as fwb
 from .. import registry_mem
 from ..language_features.tagging import tagged_value_type
 from ..ops_domain import wb_domain_types
+from ..ops_primitives import _dict_utils
 
 """
 Tests in this file whould be used to test the graphs that can be constructed
@@ -528,3 +529,76 @@ def test_two_level_summary(fake_wandb):
         .summary()["b"]
     )
     assert weave.use(n) == ["x"]
+
+
+def test_escaped_gql_query(fake_wandb):
+
+    response = {
+        "project_8d1592567720841659de23c02c97d594": {
+            "id": "UHJvamVjdDp2MTpzYWdlbWFrZXItcGVvcGxlLXZlaGljbGUtY2xhc3Mtc3BsaXR0aW5nOmFjdHVhdGVhaQ==",
+            "name": "",
+            "entity": {"id": "RW50aXR5OjE0NzUxNw==", "name": "e_0"},
+            "runs_6e908597bd3152c2f0457f6283da76b9": {"edges": []},
+        }
+    }
+
+    fake_wandb.fake_api.add_mock(lambda q, ix: response)
+
+    key = "Tables/NMS_0\\.45_IOU_0\\.5"
+    node = (
+        ops.project("e_0", "p_0")
+        .filteredRuns("{}", "-createdAt")
+        .limit(1)
+        .summary()[key]
+        .table()
+        .rows()
+        .dropna()
+        .concat()
+        .createIndexCheckpointTag()
+        .index(6)["label"]
+    )
+
+    log = fake_wandb.fake_api.execute_log()
+    assert_gql_str_equal(
+        log[1]["gql"],
+        # Note: the inner project/entity query is because it is part of the required fragment for runs
+        # this could in theory change in the future.
+        """
+        query WeavePythonCG {
+        project_8d1592567720841659de23c02c97d594: project(
+            name: "p_0"
+            entityName: "e_0"
+        ) {
+            id
+            name
+            entity {
+            id
+            name
+            }
+            runs_6e908597bd3152c2f0457f6283da76b9: runs(
+            first: 50
+            filters: "{}"
+            order: "-createdAt"
+            ) {
+            edges {
+                node {
+                id
+                name
+                project {
+                    id
+                    name
+                    entity {
+                    id
+                    name
+                    }
+                }
+                summaryMetricsSubset: summaryMetrics(
+                    keys: ["Tables/NMS_0.45_IOU_0.5"]
+                )
+                }
+            }
+            }
+        }
+        }
+        """,
+    )
