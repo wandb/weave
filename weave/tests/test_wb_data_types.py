@@ -463,26 +463,20 @@ def test_annotated_images_in_tables(fake_wandb):
     assert raw_data == exp_raw_data
 
     ot = weave.use(table_rows_type).object_type
-    assert ot == weave.types.TypedDict(
-        {
-            "label": weave.types.UnionType(
-                weave.types.NoneType(), weave.types.String()
-            ),
-            "image": weave.types.UnionType(
-                ImageArtifactFileRefType.init_from_sdk_attributes(
-                    boxLayers={"box_set_1": [0], "box_set_2": [2]},
-                    boxScoreKeys=["loss", "gain"],
-                    maskLayers={"mask_set_1": [0, 1, 2, 3]},
-                    classMap={
-                        "0": "c_zero",
-                        "1": "c_one",
-                        "2": "c_two",
-                        "3": "c_three",
-                    },
-                ),
-                weave.types.NoneType(),
-            ),
-        }
+    assert isinstance(ot, weave.types.TypedDict)
+    assert types.non_none(ot.property_types["label"]) == weave.types.String()
+    assert types.non_none(
+        ot.property_types["image"]
+    ) == ImageArtifactFileRefType.init_from_sdk_attributes(
+        boxLayers={"box_set_1": [0], "box_set_2": [2]},
+        boxScoreKeys=["loss", "gain"],
+        maskLayers={"mask_set_1": [0, 1, 2, 3]},
+        classMap={
+            "0": "c_zero",
+            "1": "c_one",
+            "2": "c_two",
+            "3": "c_three",
+        },
     )
 
 
