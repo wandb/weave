@@ -708,6 +708,12 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                     self._arrow_data.offsets,
                     tag_stripped_members,
                 )
+            else:
+                return ArrowWeaveList(
+                    self._arrow_data,
+                    types.non_none(self.object_type),
+                    self._artifact,
+                )._arrow_data_asarray_no_tags()
 
         return arrow_data
 
