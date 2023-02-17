@@ -1,5 +1,5 @@
-import json
 import itertools
+import textwrap
 import typing
 
 from . import graph
@@ -139,19 +139,24 @@ def node_expr_str_full(node: graph.Node) -> str:
             )
         if not param_names:
             return "%s()" % graph.opuri_full_name(node.from_op.name)
-        return "%s.%s(%s)" % (
+        # This puts in newlines, but not very well. Fix me :)
+        return "%s\n  .%s(%s) %s" % (
             node_expr_str_full(node.from_op.inputs[param_names[0]]),
             graph.opuri_full_name(node.from_op.name),
             ", ".join(
                 node_expr_str_full(node.from_op.inputs[n]) for n in param_names[1:]
             ),
+            ""
+            # node.type.simple_str()[:100],
         )
     elif isinstance(node, graph.ConstNode):
         if isinstance(node.type, types.Function):
             res = node_expr_str_full(node.val)
+
+            res = textwrap.indent(res, "  ")
             return res
         try:
-            return json.dumps(node.val)
+            return "[" + str(node.val)[:30] + "...]"
         except TypeError:
             # WARNING: This behavior means that sometimes this function
             # produces expressionions that JS can't parse (it happens when

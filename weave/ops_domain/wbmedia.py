@@ -161,9 +161,13 @@ class ImageArtifactFileRefType(types.ObjectType):
 
     @classmethod
     def type_of_instance(cls, obj):
-        boxLayers = {
-            key: [row["class_id"] for row in value] for key, value in obj.boxes.items()
-        }
+        if obj.boxes:
+            boxLayers = {
+                key: [row["class_id"] for row in value]
+                for key, value in obj.boxes.items()
+            }
+        else:
+            boxLayers = {}
         boxScoreKeysSet = set()
         for boxLayer in boxLayers:
             for box in obj.boxes[boxLayer]:
@@ -171,16 +175,19 @@ class ImageArtifactFileRefType(types.ObjectType):
                     boxScoreKeysSet.update(list(box["scores"].keys()))
         boxScoreKeys = list(boxScoreKeysSet)
 
-        maskLayers = {
-            # Empty array here. We really should read in the mask data, then
-            # find all the unique values. but that is really costly and is not
-            # worth it. This is because `type_of_instance` is only called when
-            # we are trying to re-serialize for transmission back to the client.
-            # In these cases, having the correct classes in each key is not
-            # needed.
-            key: []
-            for key in obj.masks.keys()
-        }
+        if obj.masks:
+            maskLayers = {
+                # Empty array here. We really should read in the mask data, then
+                # find all the unique values. but that is really costly and is not
+                # worth it. This is because `type_of_instance` is only called when
+                # we are trying to re-serialize for transmission back to the client.
+                # In these cases, having the correct classes in each key is not
+                # needed.
+                key: []
+                for key in obj.masks.keys()
+            }
+        else:
+            maskLayers = {}
         return cls(
             boxLayers=boxLayers, boxScoreKeys=boxScoreKeys, maskLayers=maskLayers
         )
@@ -223,6 +230,8 @@ class ImageArtifactFileRef:
         # needed because the union branch of `recursively_build_pyarrow_array`
         # requires exact type matching!
 
+        if not self.boxes:
+            return
         for box_set_id in self.boxes:
             box_set = self.boxes[box_set_id]
             for box in box_set:

@@ -49,10 +49,16 @@ def test_to_assignment_form():
     print(graph_debug.assignments_string(result))
     assert (
         graph_debug.assignments_string(result)
-        == """var0 = op-_test_cn_op1().map(op-_test_cn_op2(row, 1))
-var1 = list-__getitem__(var0, 1).typedDict-pick("b")
-var2 = list-__getitem__(var0, 1).typedDict-pick("a")
-var3 = list-__getitem__(var0, 0).typedDict-pick("c")
-var4 = list-__getitem__(var0, 0).typedDict-pick("b")
-var5 = list-__getitem__(var0, 0).typedDict-pick("a")"""
+        == """var0 = op-_test_cn_op1()
+  .map(  op-_test_cn_op2(row, [1...])) 
+var1 = list-__getitem__(var0, [1...])
+  .typedDict-pick([b...]) 
+var2 = list-__getitem__(var0, [1...])
+  .typedDict-pick([a...]) 
+var3 = list-__getitem__(var0, [0...])
+  .typedDict-pick([c...]) 
+var4 = list-__getitem__(var0, [0...])
+  .typedDict-pick([b...]) 
+var5 = list-__getitem__(var0, [0...])
+  .typedDict-pick([a...]) """
     )

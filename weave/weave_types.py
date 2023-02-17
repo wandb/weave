@@ -208,6 +208,9 @@ class Type(metaclass=_TypeSubclassWatcher):
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}()"
 
+    def simple_str(self) -> str:
+        return str(self)
+
     @classmethod
     def _instance_classes(cls):
         """Helper to get instance_classes as iterable."""

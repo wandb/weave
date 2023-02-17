@@ -6,6 +6,7 @@ from ..decorator_arrow_op import arrow_op
 from .. import weave_types as types
 from ..ops_primitives import obj as primitives_obj
 
+from .arrow import arrow_as_array
 from .list_ import ArrowWeaveList, ArrowWeaveListType
 
 
@@ -23,14 +24,8 @@ from .list_ import ArrowWeaveList, ArrowWeaveListType
     all_args_nullable=False,
 )
 def arrow_getattr(self, name):
-    ref_array = self._arrow_data
-    # deserialize objects
-    objects: list[typing.Any] = []
-    for ref in ref_array:
-        if ref.as_py() is None:
-            objects.append(None)
-        else:
-            objects.append(getattr(self._mapper.apply(ref.as_py()), name))
-
-    object_type = type_of(objects[0])
-    return ArrowWeaveList(pa.array(objects), object_type, self._artifact)
+    data = arrow_as_array(self._arrow_data)
+    t = types.non_none(self.object_type).property_types()[name]
+    if types.optional(self.object_type):
+        t = types.optional(t)
+    return ArrowWeaveList(data.field(name), t, self._artifact)

@@ -194,6 +194,9 @@ class TaggedValueType(types.Type):
                 )
             self.__dict__["value"] = self.value.value
 
+    def simple_str(self) -> str:
+        return str(self.value)
+
     @functools.cached_property
     def _assignment_form(self) -> types.Type:
         if isinstance(self.value, types.UnionType):

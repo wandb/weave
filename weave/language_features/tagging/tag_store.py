@@ -93,8 +93,8 @@ def isolated_tagging_context() -> typing.Iterator[None]:
 # infinite recursion when determining the type of tagged objects.
 @contextmanager
 def with_visited_obj(obj: typing.Any) -> typing.Iterator[None]:
-    id_val = id(obj)
-    assert id_val == id(box.box(obj)), "Can only tag boxed objects"
+    id_val = get_id(obj)
+    assert id_val == get_id(box.box(obj)), "Can only tag boxed objects"
     visited_obj_ids = _VISITED_OBJ_IDS.get()
     visited_obj_ids.add(id_val)
     try:
@@ -115,6 +115,15 @@ def _remove_tags(mem_map: dict[int, typing.Any], id_val: int) -> None:
             del tag_map[id_val]
 
 
+def get_id(obj: typing.Any) -> int:
+    if box.cannot_have_weakref(obj):
+        if obj._id is not None:
+            return obj._id
+        obj._id = box.make_id()
+        return obj._id
+    return id(obj)
+
+
 # Adds a dictionary of tags to an object
 def add_tags(
     obj: typing.Any,
@@ -124,18 +133,11 @@ def add_tags(
     mem_map = _current_obj_tag_mem_map()
     if mem_map is None:
         raise errors.WeaveInternalError("No tag store context")
-    id_val = id(obj)
-    if id_val not in mem_map:
+    id_val = get_id(obj)
+    if not box.cannot_have_weakref(obj) and id_val not in mem_map:
         # Ensure we cleanup the tags when the object is garbage collected.
         # Python is happy to reuse IDs after they are freed!
-        try:
-            weakref.finalize(obj, _remove_tags, mem_map, id_val)
-        except TypeError:
-            # This happens for BoxedInt and probably other boxed types.
-            # You're not allow to use weakrefs on classes that inherit
-            # from basic python types.
-            # TODO: probably an issue.
-            pass
+        weakref.finalize(obj, _remove_tags, mem_map, id_val)
     assert box.is_boxed(obj), "Can only tag boxed objects"
     existing_tags = get_tags(obj) if is_tagged(obj) else {}
     if give_precedence_to_existing_tags:
@@ -150,7 +152,7 @@ def add_tags(
 # the given object
 def get_tags(obj: typing.Any) -> dict[str, typing.Any]:
 
-    id_val = id(obj)
+    id_val = get_id(obj)
     if id_val in _VISITED_OBJ_IDS.get():
         raise ValueError("Cannot get tags for an object that is being visited")
 
@@ -181,7 +183,7 @@ def find_tag(
 
 # Returns true if the given object has been tagged
 def is_tagged(obj: typing.Any) -> bool:
-    id_val = id(obj)
+    id_val = get_id(obj)
     if id_val in _VISITED_OBJ_IDS.get():
         return False
     mem_map = _current_obj_tag_mem_map()

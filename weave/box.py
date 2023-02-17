@@ -1,9 +1,18 @@
 import typing
+import random
+import datetime
 import numpy as np
+
+
+def make_id() -> int:
+    return random.randint(-(2**63), 2**63 - 1)
+
 
 # Watch out, can't do "is None" on this!
 # TODO: fix?
 class BoxedNone:
+    _id: typing.Optional[int] = None
+
     def __init__(self, val):
         self.val = val
 
@@ -15,6 +24,8 @@ class BoxedNone:
 
 
 class BoxedBool:
+    _id: typing.Optional[int] = None
+
     def __init__(self, val):
         self.val = val
 
@@ -26,23 +37,32 @@ class BoxedBool:
 
 
 class BoxedInt(int):
-    pass
+    _id: typing.Optional[int] = None
 
 
 class BoxedFloat(float):
-    pass
+    _id: typing.Optional[int] = None
 
 
 class BoxedStr(str):
-    pass
+    _id: typing.Optional[int] = None
 
 
 class BoxedDict(dict):
-    pass
+    _id: typing.Optional[int] = None
 
 
 class BoxedList(list):
     pass
+
+
+class BoxedDatetime(datetime.datetime):
+    def __eq__(self, other):
+        return self.timestamp() == other.timestamp()
+
+
+def cannot_have_weakref(obj: typing.Any):
+    return isinstance(obj, (BoxedInt, BoxedFloat, BoxedStr, BoxedBool, BoxedNone))
 
 
 # See https://numpy.org/doc/stable/user/basics.subclassing.html
@@ -71,6 +91,7 @@ def box(
     BoxedList,
     BoxedNDArray,
     BoxedNone,
+    BoxedDatetime,
 ]:
     if type(obj) == int:
         return BoxedInt(obj)
@@ -86,6 +107,8 @@ def box(
         return BoxedList(obj)
     elif type(obj) == np.ndarray:
         return BoxedNDArray(obj)
+    elif type(obj) == datetime.datetime:
+        return BoxedDatetime.fromtimestamp(obj.timestamp())
     elif obj is None:
         return BoxedNone(obj)
     return obj
@@ -93,7 +116,9 @@ def box(
 
 def unbox(
     obj: T,
-) -> typing.Union[T, int, float, str, bool, dict, list, np.ndarray, None]:
+) -> typing.Union[
+    T, int, float, str, bool, dict, list, np.ndarray, datetime.datetime, None
+]:
 
     if type(obj) == BoxedInt:
         return int(obj)
@@ -109,6 +134,8 @@ def unbox(
         return list(obj)
     elif type(obj) == BoxedNDArray:
         return np.array(obj)
+    elif type(obj) == BoxedDatetime:
+        return datetime.datetime.fromtimestamp(obj.timestamp())
     elif type(obj) == BoxedNone:
         return None
     return obj

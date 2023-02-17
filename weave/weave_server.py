@@ -243,17 +243,19 @@ def execute():
         # Profile the request and add a link to local snakeviz to the trace.
         profile = cProfile.Profile()
         start_time = time.time()
-        response = profile.runcall(server.handle_request, **execute_args)
-        elapsed = time.time() - start_time
-        profile_filename = f"/tmp/weave/profile/execute.{start_time*1000:.0f}.{elapsed*1000:.0f}ms.prof"
-        profile.dump_stats(profile_filename)
-        root_span = tracer.current_root_span()
-        if root_span:
-            root_span.set_tag(
-                "profile_url",
-                "http://localhost:8080/snakeviz/"
-                + urllib.parse.quote(profile_filename),
-            )
+        try:
+            response = profile.runcall(server.handle_request, **execute_args)
+        finally:
+            elapsed = time.time() - start_time
+            profile_filename = f"/tmp/weave/profile/execute.{start_time*1000:.0f}.{elapsed*1000:.0f}ms.prof"
+            profile.dump_stats(profile_filename)
+            root_span = tracer.current_root_span()
+            if root_span:
+                root_span.set_tag(
+                    "profile_url",
+                    "http://localhost:8080/snakeviz/"
+                    + urllib.parse.quote(profile_filename),
+                )
     fixed_response = [weavejs_fixes.fixup_data(r) for r in response]
 
     response = {"data": fixed_response}
