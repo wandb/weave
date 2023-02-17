@@ -2906,3 +2906,16 @@ def test_non_zero_offset():
     # We just want to validate that this function completes - no assertion
     # needed
     awl.map_column(lambda x, y: None)
+
+
+def test_vectorize_function_with_const_first_arg():
+    string = "hello"
+    data = ["hello", "world", "hello", "world", "hello", "world"]
+    awl_node = weave.save(arrow.to_arrow(data))
+    string_node = weave_internal.make_const_node(types.String(), string)
+    fn = weave_internal.define_fn(
+        {"row": types.String()}, lambda row: string_node == row
+    ).val
+    vec_fn = arrow.vectorize(fn)
+    called = weave_internal.call_fn(vec_fn, {"row": awl_node})
+    assert weave.use(called) == [True, False, True, False, True, False]

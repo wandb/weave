@@ -12,6 +12,22 @@ if typing.TYPE_CHECKING:
     from . import op_def
 
 
+def verify_weave_fn_is_valid(op: "op_def.OpDef", weavified: graph.Node) -> None:
+
+    constituent_ops = typing.cast(
+        list[graph.OutputNode],
+        graph.filter_nodes_top_level(
+            [weavified], lambda n: isinstance(n, graph.OutputNode)
+        ),
+    )
+    output_nodes_disjoint = all([n.from_op.name != op.name for n in constituent_ops])
+
+    if not output_nodes_disjoint:
+        raise errors.WeavifyError(
+            f"Weavified version of {op.name} contains a call to itself"
+        )
+
+
 def op_to_weave_fn(opdef: "op_def.OpDef") -> graph.Node:
 
     # TODO: remove this condition. we should be able to convert mutations to weave functions but
@@ -61,7 +77,10 @@ def op_to_weave_fn(opdef: "op_def.OpDef") -> graph.Node:
         result = opdef.resolve_fn(**kwargs)  # type: ignore
         return weavify_object(result)
 
-    return weave_internal.define_fn(original_input_types, weave_fn_body).val
+    fn = weave_internal.define_fn(original_input_types, weave_fn_body).val
+    verify_weave_fn_is_valid(opdef, fn)
+
+    return fn
 
 
 def weavify_object(obj: typing.Any) -> graph.Node:

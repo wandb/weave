@@ -1894,6 +1894,7 @@ def _safe_get_weavified_op(op: op_def.OpDef) -> typing.Optional[graph.Node]:
             errors.WeaveTypeError,
         ):
             pass
+
     return op.weave_fn
 
 
