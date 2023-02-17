@@ -131,10 +131,6 @@ def _get_fragment(node: graph.OutputNode, stitchedGraph: stitch.StitchedGraph) -
     if op_def.derived_from and op_def.derived_from.derived_ops["mapped"] == op_def:
         op_def = op_def.derived_from
 
-    wb_domain_gql = _get_gql_plugin(op_def)
-    if wb_domain_gql is None:
-        return ""
-
     forward_obj = stitchedGraph.get_result(node)
     calls = forward_obj.calls
     child_fragment = "\n".join(
@@ -144,6 +140,10 @@ def _get_fragment(node: graph.OutputNode, stitchedGraph: stitch.StitchedGraph) -
             if isinstance(call.node, graph.OutputNode)
         ]
     )
+
+    wb_domain_gql = _get_gql_plugin(op_def)
+    if wb_domain_gql is None:
+        return ""
 
     wb_domain_gql = typing.cast(GqlOpPlugin, wb_domain_gql)
 
