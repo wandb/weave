@@ -17,7 +17,7 @@ def test_zlib_playback():
     req_bytes = zlib.decompress(base64.b64decode(zlib_str.encode("ascii")))
     json_data = json.loads(req_bytes)
 
-    if filter_node is not None:
+    if filter_node != "":
         nodes = serialize.deserialize(json_data["graphs"])
         use_node = None
         for ndx, n in enumerate(nodes):

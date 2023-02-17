@@ -259,6 +259,23 @@ def stitch_node_inner(
     elif len(inputs) == 0:
         # op does not have any inputs, just track its downstream calls
         return ObjectRecorder(node)
+
+    is_passthrough = (
+        node.from_op.name.endswith("offset")
+        or node.from_op.name.endswith("limit")
+        or node.from_op.name.endswith("index")
+        or node.from_op.name.endswith("__getitem__")
+        or node.from_op.name.endswith("concat")
+        or node.from_op.name.endswith("contains")
+        or node.from_op.name.endswith("list")
+        or node.from_op.name.endswith("concat")
+        or node.from_op.name.endswith("flatten")
+        or node.from_op.name.endswith("dropna")
+        or node.from_op.name.endswith("createIndexCheckpointTag")
+    )
+    if is_passthrough:
+        return inputs[0]
+
     # Otherwise, not a special op, track its call.
     return inputs[0].call_node(node, input_dict)
 

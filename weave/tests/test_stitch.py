@@ -207,3 +207,15 @@ def test_shared_fn_node():
     assert_node_calls(list_of_list_node, ["concat"])
     assert_node_calls(concat_node, ["numbers-sum"])
     assert_node_calls(sum_node, [])
+
+
+def test_traverse_dict_constructor_in_map():
+    obj_node = weave.save(["a"])
+    mapped = obj_node.map(lambda row: weave.ops.dict_(thing=row))
+    final = mapped.createIndexCheckpointTag()[0]["thing"] + "b"
+
+    p = stitch.stitch([final])
+    obj_recorder = p.get_result(obj_node)
+
+    assert len(obj_recorder.calls) == 1
+    assert obj_recorder.calls[0].node.from_op.name == "string-add"
