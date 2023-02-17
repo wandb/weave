@@ -164,6 +164,23 @@ def get_tag_name_from_mapped_tag_getter_op(op: op_def.OpDef) -> str:
     return get_tag_name_from_tag_getter_op(op.derived_from)  # type: ignore
 
 
+def _list_recorder_for_node(
+    node: graph.OutputNode, input_dict: dict[str, ObjectRecorder]
+) -> LiteralListObjectRecorder:
+    # Merge element tags together and place them on the outer list.
+    # This is overly aggressive, but it means we don't need to provide
+    # special handling for concat and other structural list ops for
+    # now.
+    tags: dict[str, ObjectRecorder] = {}
+    for input in input_dict.values():
+        tags.update(input.tags)
+    res = LiteralListObjectRecorder(node, tags=tags, val=list(input_dict.values()))
+    op_call = OpCall(node, input_dict, res)
+    for input in input_dict.values():
+        input.calls.append(op_call)
+    return res
+
+
 def stitch_node_inner(
     node: graph.OutputNode, input_dict: dict[str, ObjectRecorder], sg: StitchedGraph
 ) -> ObjectRecorder:
@@ -192,23 +209,28 @@ def stitch_node_inner(
     elif node.from_op.name == "dict":
         return LiteralDictObjectRecorder(node, val=input_dict)
     elif node.from_op.name == "list":
-        # Merge element tags together and place them on the outer list.
-        # This is overly aggressive, but it means we don't need to provide
-        # special handling for concat and other structural list ops for
-        # now.
-        tags: dict[str, ObjectRecorder] = {}
-        for input in input_dict.values():
-            tags.update(input.tags)
-        res = LiteralListObjectRecorder(node, tags=tags, val=list(input_dict.values()))
-        op_call = OpCall(node, input_dict, res)
-        for input in input_dict.values():
-            input.calls.append(op_call)
-        return res
+        return _list_recorder_for_node(node, input_dict)
+    elif node.from_op.name.endswith("flatten") or node.from_op.name.endswith("concat"):
+        return _list_recorder_for_node(node, input_dict)
     elif node.from_op.name.endswith("pick"):
         if isinstance(node.from_op.inputs["key"], graph.ConstNode):
             key = _dict_utils.unescape_dots(node.from_op.inputs["key"].val)
             if isinstance(inputs[0], LiteralDictObjectRecorder):
                 return inputs[0].val[key]
+            elif isinstance(inputs[0], LiteralListObjectRecorder):
+                key_recorders = []
+                for list_input in inputs[0].val:
+                    if (
+                        isinstance(list_input, LiteralDictObjectRecorder)
+                        and key in list_input.val
+                    ):
+                        key_recorders.append(list_input.val[key])
+                if len(key_recorders) > 0:
+                    return _list_recorder_for_node(
+                        node, {str(ndx): rec for ndx, rec in enumerate(key_recorders)}
+                    )
+                else:
+                    pass
             else:
                 # This is the case that the picked key is not found in the
                 # dictionary. In this case, we just ignore the pick and don't
@@ -260,24 +282,28 @@ def stitch_node_inner(
         # op does not have any inputs, just track its downstream calls
         return ObjectRecorder(node)
 
+    if node.from_op.name.endswith("list") or node.from_op.name.endswith("list"):
+        # List constructor - we need each of the inputs to
+        # call this node since they all are subject to the
+        # downstream calls.
+        for i in inputs:
+            i.call_node(node, input_dict)
+    # Otherwise, not a special op, track its call.
+    node_obj_res = inputs[0].call_node(node, input_dict)
+
     is_passthrough = (
         node.from_op.name.endswith("offset")
         or node.from_op.name.endswith("limit")
         or node.from_op.name.endswith("index")
         or node.from_op.name.endswith("__getitem__")
-        or node.from_op.name.endswith("concat")
         or node.from_op.name.endswith("contains")
-        or node.from_op.name.endswith("list")
-        or node.from_op.name.endswith("concat")
-        or node.from_op.name.endswith("flatten")
         or node.from_op.name.endswith("dropna")
         or node.from_op.name.endswith("createIndexCheckpointTag")
     )
     if is_passthrough:
         return inputs[0]
-
-    # Otherwise, not a special op, track its call.
-    return inputs[0].call_node(node, input_dict)
+    else:
+        return node_obj_res
 
 
 def stitch_node(
