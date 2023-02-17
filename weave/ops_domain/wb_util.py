@@ -96,7 +96,7 @@ def _process_run_dict_item_type(val):
             return Histogram.WeaveType()
         if type == "joined-table":
             extension = types.Const(types.String(), "json")
-            return artifact_fs.FilesystemArtifactType(
+            return artifact_fs.FilesystemArtifactFileType(
                 extension, table.JoinedTableType()
             )
 
