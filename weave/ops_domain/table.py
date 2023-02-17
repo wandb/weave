@@ -523,29 +523,27 @@ def _get_rows_and_object_type_from_weave_format(
             "Weave table file format is only supported for wandb artifacts"
         )
     row_data = data["data"]
+    # Always convert the column names to string names
     column_types = data["column_types"]
+    column_names = [str(c) for c in data["columns"]]
     converted_object_type = wandb_util.weave0_type_json_to_weave1_type(column_types)
     if not isinstance(converted_object_type, types.TypedDict):
         raise errors.WeaveInternalError(
             "Weave table file format only supports typed dicts"
         )
+    converted_object_type = types.TypedDict(
+        {str(k): v for k, v in converted_object_type.property_types.items()}
+    )
     # Fix two things:
     # 1. incoming table column names may not match the order of column_types
     # 2. if we had an unknown (happens when old type is "PythonObjectType")
     #    we need to manually detect the type.
     obj_prop_types = {}
-    for i, key in enumerate(data["columns"]):
+    for i, key in enumerate(column_names):
         if key not in converted_object_type.property_types:
-            # Since when a WB table is saved with a numeric column name, it is
-            # stored as a number in `columns` but a string in the keys of
-            # `properties`. This patch is to handle that case. A similar case
-            # had to be handled in Weave0
-            if str(key) in converted_object_type.property_types:
-                key = str(key)
-            else:
-                raise errors.WeaveTableDeserializationError(
-                    f"Column name {key} not found in column_types"
-                )
+            raise errors.WeaveTableDeserializationError(
+                f"Column name {key} not found in column_types"
+            )
         col_type = converted_object_type.property_types[key]
         if col_type.assign_type(types.UnknownType()):
             # Sample some data to detect the type. Otherwise this
@@ -558,7 +556,7 @@ def _get_rows_and_object_type_from_weave_format(
             obj_prop_types[key] = col_type
     object_type = types.TypedDict(obj_prop_types)
 
-    raw_rows = [dict(zip(data["columns"], row)) for row in row_data]
+    raw_rows = [dict(zip(column_names, row)) for row in row_data]
     rows = _table_data_to_weave1_objects(raw_rows, file, object_type)
     object_type = _patch_legacy_image_file_types(rows, object_type, file)
 

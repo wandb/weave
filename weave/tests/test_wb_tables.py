@@ -189,3 +189,25 @@ def test_join_table_with_images(fake_wandb):
             },
         },
     ]
+
+
+def test_join_table_with_numeric_columns(fake_wandb):
+    table = wandb.Table(columns=[1, 2], data=[[1, 2]])
+    art = wandb.Artifact("test_name", "test_type")
+    art.add(table, "table")
+    art_node = fake_wandb.mock_artifact_as_node(art)
+    file_node = art_node.file("table.table.json")
+    table_node = file_node.table()
+    table_rows = table_node.rows()
+    awl = weave.use(table_rows)
+    # We want to convert these columns to strings - it is intentional that the
+    # input is numbers but the output is strings. This is because Typescript,
+    # JSON, and Python all handle numeric keys slightly diffently, so we settle
+    # on always using the string representation.
+    assert awl.object_type == weave.types.TypedDict(
+        {
+            "1": weave.types.optional(weave.types.Float()),
+            "2": weave.types.optional(weave.types.Float()),
+        }
+    )
+    assert awl.to_pylist_raw() == [{"1": 1, "2": 2}]
