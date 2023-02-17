@@ -72,6 +72,15 @@ workspace_response = {
                                     "_type": "table-file",
                                     "path": "media/tables/legacy_table.table.json",
                                 },
+                                "image": {
+                                    "height": 64,
+                                    "sha256": "440fab0d6f537b4557a106fa7853453332650631ef580fd328c620bd8aa5a025",
+                                    "path": "media/images/random_image_9_440fab0d6f537b4557a1.png",
+                                    "size": 4228,
+                                    "_type": "image-file",
+                                    "width": 64,
+                                    "format": "png",
+                                },
                             }
                         ),
                         "displayName": "amber-glade-100",
@@ -490,7 +499,7 @@ def test_table_images(fake_wandb):
     summary_node = project_runs_node.summary()
     # this use is important as it models the sequence of calls in UI
     # and invokes the issues with artifact paths
-    assert list(weave.use(summary_node)[0].keys()) == ["table", "legacy_table"]
+    assert list(weave.use(summary_node)[0].keys()) == ["table", "legacy_table", "image"]
 
     # Query 2:
     table_rows_node = summary_node.pick("table").table().rows()
@@ -1345,4 +1354,15 @@ def test_image_sha_from_table(fake_wandb):
     assert (
         weave.use(img_node.sha256)
         == "50a7232cb6785ffae981038af58de306192e5739a0b9d9903fa436f9f508e7d5"
+    )
+
+
+def test_nested_summary_key(fake_wandb):
+    fake_wandb.fake_api.add_mock(table_mock2)
+
+    img_node = ops.project("stacey", "mendeleev").runs()[0].summary()["image.sha256"]
+
+    assert (
+        weave.use(img_node)
+        == "440fab0d6f537b4557a106fa7853453332650631ef580fd328c620bd8aa5a025"
     )
