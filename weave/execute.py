@@ -40,6 +40,9 @@ from . import language_nullability
 
 TRACE_LOCAL = trace_local.TraceLocal()
 
+# Set this to true when debugging for costly, but detailed storyline of execution
+PRINT_DEBUG = False
+
 
 class OpExecuteStats(typing.TypedDict):
     avg_time: float
@@ -156,6 +159,9 @@ def execute_nodes(nodes, no_cache=False):
                         stats = execute_forward(fg, no_cache=no_cache)
                         summary = stats.summary()
                         logging.info("Execution summary\n%s" % pprint.pformat(summary))
+                        if PRINT_DEBUG:
+                            for node in nodes:
+                                _debug_node_stack(fg, node)
 
                         res = [fg.get_result(n) for n in nodes]
 

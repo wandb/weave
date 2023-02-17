@@ -1,23 +1,51 @@
-from weave import graph_debug, serialize
+from weave import serialize, storage
 from weave.server import handle_request
+import base64
+import zlib
+import json
 
 
-def test_playback():
+def test_graph_playback():
     for payload in execute_payloads:
-        nodes = serialize.deserialize(payload["graphs"])
-        print(
-            "Executing %s leaf nodes.\n%s"
-            % (
-                len(nodes),
-                "\n".join(
-                    graph_debug.node_expr_str_full(n)
-                    for n in graph_debug.combine_common_nodes(nodes)
-                ),
-            )
-        )
-        res = handle_request(payload, True)
+        res = handle_request(payload, True, storage.to_weavejs)
         assert "err" not in res
 
+
+def test_zlib_playback():
+    if zlib_str == "":
+        return
+    req_bytes = zlib.decompress(base64.b64decode(zlib_str.encode("ascii")))
+    json_data = json.loads(req_bytes)
+
+    if filter_node is not None:
+        nodes = serialize.deserialize(json_data["graphs"])
+        use_node = None
+        for ndx, n in enumerate(nodes):
+            if str(n) == filter_node:
+                use_node = ndx
+                break
+        if use_node is None:
+            raise Exception("Did not find filter node")
+        json_data["graphs"]["targetNodes"] = [
+            json_data["graphs"]["targetNodes"][use_node]
+        ]
+
+    execute_args = {
+        "request": json_data,
+        "deref": True,
+        "serialize_fn": storage.to_weavejs,
+    }
+
+    response = handle_request(**execute_args)
+    assert "err" not in response
+
+
+# (Only used in zlib test) - if you are testing a `WeaveNullishResponseException`, you can
+# paste the stringified error node here and we will only execute that node.
+filter_node = ""
+
+# Paste zlib below (from DD)
+zlib_str = ""
 
 # Paste graphs below (from DD or Network tab to test)
 execute_payloads: list[dict] = []
