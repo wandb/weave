@@ -52,6 +52,8 @@ from .wandb_domain_gql import (
 from . import wb_util
 from ..ops_primitives import _dict_utils
 
+# number of rows of example data to look at to determine history type
+ROW_LIMIT_FOR_TYPE_INTERROGATION = 10
 
 # Section 1/6: Tag Getters
 run_tag_getter_op = make_tag_getter_op("run", wdt.RunType, op_name="tag-run")
@@ -229,7 +231,7 @@ def summary(run: wdt.Run) -> dict[str, typing.Any]:
 def _refine_history_type(run: wdt.Run) -> types.Type:
     # The Weave0 implementation loads the entire history & the historyKeys. This
     # is very inefficient and actually incomplete. Here, for performance
-    # reasons, we will simply scan the first 10 rows and use that to determine
+    # reasons, we will simply sample the first 1000 rows and use that to determine
     # the type. This means that some columns will not be perfectly typed. Once
     # we have fully implemented a mapping from historyKeys to Weave types, we
     # can remove the history scan. Critically, Table types could be artifact
@@ -238,7 +240,7 @@ def _refine_history_type(run: wdt.Run) -> types.Type:
     # remove needing to read any history.
     prop_types: dict[str, types.Type] = {}
     historyKeys = run.gql["historyKeys"]["keys"]
-    example_history_rows = run.gql["history"]
+    example_history_rows = run.gql["history"][:ROW_LIMIT_FOR_TYPE_INTERROGATION]
     keys_needing_type = set()
 
     for key, key_details in historyKeys.items():
@@ -277,7 +279,7 @@ def _refine_history_type(run: wdt.Run) -> types.Type:
     name="run-history",
     refine_output_type=_refine_history_type,
     plugins=wb_gql_op_plugin(
-        lambda inputs, inner: "historyKeys, history(minStep: 0, maxStep: 10, samples: 1000)"
+        lambda inputs, inner: "historyKeys, history(samples: 1000)"
     ),
 )
 def history(run: wdt.Run) -> list[dict[str, typing.Any]]:
