@@ -52,6 +52,8 @@ from .wandb_domain_gql import (
 from . import wb_util
 from ..ops_primitives import _dict_utils
 
+from ..compile_table import KeyTree
+
 # number of rows of example data to look at to determine history type
 ROW_LIMIT_FOR_TYPE_INTERROGATION = 10
 
@@ -125,6 +127,19 @@ gql_prop_op(
 )
 
 
+def get_top_level_keys(key_tree: KeyTree) -> list[str]:
+    top_level_keys = list(
+        map(
+            _dict_utils.unescape_dots,
+            set(
+                next(iter(_dict_utils.split_escaped_string(key)))
+                for key in key_tree.keys()
+            ),
+        )
+    )
+    return top_level_keys
+
+
 @op(
     render_info={"type": "function"},
     plugins=wb_gql_op_plugin(lambda inputs, inner: "config"),
@@ -149,7 +164,8 @@ def _make_run_config_gql_field(inputs: InputAndStitchProvider, inner: str):
     stitch_obj = inputs.stitched_obj
     key_tree = compile_table.get_projection(stitch_obj)
     # we only pushdown the top level keys for now.
-    top_level_keys = [_dict_utils.unescape_dots(key) for key in list(key_tree.keys())]
+
+    top_level_keys = get_top_level_keys(key_tree)
     if not top_level_keys:
         # If no keys, then we must select the whole object
         return "configSubset: config"
@@ -198,8 +214,9 @@ def _make_run_summary_gql_field(inputs: InputAndStitchProvider, inner: str):
 
     stitch_obj = inputs.stitched_obj
     key_tree = compile_table.get_projection(stitch_obj)
+
     # we only pushdown the top level keys for now.
-    top_level_keys = [_dict_utils.unescape_dots(key) for key in list(key_tree.keys())]
+    top_level_keys = get_top_level_keys(key_tree)
     if not top_level_keys:
         # If no keys, then we must select the whole object
         return "summaryMetricsSubset: summaryMetrics"
