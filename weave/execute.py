@@ -278,31 +278,31 @@ class NodeExecutionReport(typing.TypedDict):
 def _debug_node_stack(
     fg: forward_graph.ForwardGraph, node: graph.Node, depth=0, prefix=""
 ) -> str:
-    result = ""
+    result_str = ""
     padding = " " * depth
     if isinstance(node, graph.OutputNode):
         input_nodes = node.from_op.inputs
         result = ref_base.deref(fg.get_result(node))
         res_str = str(result)
-        result += f"{padding}{prefix}{node.from_op.name} = {res_str}"
+        result_str += f"{padding}{prefix}{node.from_op.name} = {res_str}"
         for input_name, input_node in input_nodes.items():
-            result += "\n" + _debug_node_stack(
+            result_str += "\n" + _debug_node_stack(
                 fg, input_node, depth=depth + 1, prefix=f"{input_name}:"
             )
     elif isinstance(node, graph.ConstNode):
         val_str = str(node.val)
-        result += f"{padding}{prefix}CONST = {val_str}"
+        result_str += f"{padding}{prefix}CONST = {val_str}"
     elif isinstance(node, graph.VarNode):
-        result += f"{padding}{prefix}VAR({node.name})"
+        result_str += f"{padding}{prefix}VAR({node.name})"
     elif isinstance(node, graph.VoidNode):
-        result += f"{padding}{prefix}VOID"
+        result_str += f"{padding}{prefix}VOID"
     else:
-        result += f"ERROR: {type(node)}"
+        result_str += f"ERROR: {type(node)}"
 
     if depth == 0:
-        logging.debug(result)
+        logging.debug(result_str)
 
-    return result
+    return result_str
 
 
 def execute_forward_node(
