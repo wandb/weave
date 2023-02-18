@@ -277,24 +277,32 @@ class NodeExecutionReport(typing.TypedDict):
 # to print out the entire stack of nodes that were executed.
 def _debug_node_stack(
     fg: forward_graph.ForwardGraph, node: graph.Node, depth=0, prefix=""
-):
+) -> str:
+    result = ""
     padding = " " * depth
     if isinstance(node, graph.OutputNode):
         input_nodes = node.from_op.inputs
         result = ref_base.deref(fg.get_result(node))
-        res_str = str(result)[:1000]
-        logging.debug(f"{padding}{prefix}{node.from_op.name} = {res_str}")
+        res_str = str(result)
+        result += f"{padding}{prefix}{node.from_op.name} = {res_str}"
         for input_name, input_node in input_nodes.items():
-            _debug_node_stack(fg, input_node, depth=depth + 1, prefix=f"{input_name}:")
+            result += "\n" + _debug_node_stack(
+                fg, input_node, depth=depth + 1, prefix=f"{input_name}:"
+            )
     elif isinstance(node, graph.ConstNode):
-        val_str = str(node.val)[:1000]
-        logging.debug(f"{padding}{prefix}CONST = {val_str}")
+        val_str = str(node.val)
+        result += f"{padding}{prefix}CONST = {val_str}"
     elif isinstance(node, graph.VarNode):
-        logging.debug(f"{padding}{prefix}VAR({node.name})")
+        result += f"{padding}{prefix}VAR({node.name})"
     elif isinstance(node, graph.VoidNode):
-        logging.debug(f"{padding}{prefix}VOID")
+        result += f"{padding}{prefix}VOID"
     else:
-        logging.debug(f"ERROR: {type(node)}")
+        result += f"ERROR: {type(node)}"
+
+    if depth == 0:
+        logging.debug(result)
+
+    return result
 
 
 def execute_forward_node(
