@@ -642,7 +642,7 @@ def _get_partitioned_table_awl_from_file(
     if isinstance(part_dir, artifact_fs.FilesystemArtifactDir):
         for file in part_dir.files.values():
             all_aws.append(_get_table_like_awl_from_file(file).awl)
-    arrow_weave_list = ops_arrow.list_.concat.raw_resolve_fn(all_aws)
+    arrow_weave_list = ops_arrow.ops.concat.raw_resolve_fn(all_aws)
     return arrow_weave_list
 
 
@@ -668,7 +668,7 @@ def _get_joined_table_awl_from_file(
     # in practice it is always a full-outer join. If we want to parameterize that
     # then we need to filter out the unneeded rows in joinedTable-rows since we
     # eagerly construct the rows here.
-    arrow_weave_list = ops_arrow.list_.join_2.raw_resolve_fn(
+    arrow_weave_list = ops_arrow.list_join.join_2.raw_resolve_fn(
         awl_1, awl_2, join_fn_1.val, join_fn_2.val, "0", "1", True, True
     )
     return arrow_weave_list

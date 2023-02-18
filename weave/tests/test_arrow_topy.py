@@ -5,8 +5,8 @@ import typing
 import weave
 
 from .. import box
-from ..ops_arrow import list_
-from ..language_features.tagging import tag_store, tagged_value_type, make_tag_getter_op
+from .. import ops_arrow
+from ..language_features.tagging import tag_store
 
 
 @dataclasses.dataclass
@@ -79,8 +79,8 @@ def assert_equal(v1, v2):
         assert len(v1) == len(v2)
         for i in range(len(v1)):
             assert_equal(v1[i], v2[i])
-    elif isinstance(v1, list_.ArrowWeaveList):
-        assert isinstance(v2, list_.ArrowWeaveList)
+    elif isinstance(v1, ops_arrow.ArrowWeaveList):
+        assert isinstance(v2, ops_arrow.ArrowWeaveList)
         assert v1.object_type == v2.object_type
         assert v1._arrow_data == v2._arrow_data
     else:
@@ -98,8 +98,8 @@ def assert_equal(v1, v2):
         [{"a": 15, "b": 2}, {"a": 3, "b": 4}],
         [{"a": 15, "b": [8, 9, 10]}, {"a": 3, "b": [4, 5, 6]}],
         [
-            {"a": 15, "b": list_.to_arrow([8, 9, 10])},
-            {"a": 3, "b": list_.to_arrow([4, 5, 6])},
+            {"a": 15, "b": ops_arrow.to_arrow([8, 9, 10])},
+            {"a": 3, "b": ops_arrow.to_arrow([4, 5, 6])},
         ],
         [{"a": 15, "b": [{"c": 5}, {"c": -2}]}, {"a": 3, "b": [{"c": -2}, {"c": 4}]}],
         # basic tag array
@@ -208,7 +208,7 @@ def assert_equal(v1, v2):
 )
 def test_to_from_arrow(value):
     weave_py = concrete_to_tagstore(value)
-    a = list_.to_arrow(weave_py)
+    a = ops_arrow.to_arrow(weave_py)
 
     leaf_col_paths = []
 

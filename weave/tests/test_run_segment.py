@@ -1,6 +1,7 @@
 import pytest
 from itertools import chain
 
+import weave
 from ..ops_domain.run_segment import RunSegment
 from ..ops_arrow import ArrowWeaveList
 from .. import ops
@@ -213,8 +214,7 @@ def test_invalid_explicit_experiment_construction():
 
 def test_vectorized_unnest_list_for_panelplot():
     metrics = random_metrics(10)
-    root_segment = RunSegment("my-first-run", None, 0, metrics)
-    storage.save(root_segment)
+    root_segment = weave.save(RunSegment("my-first-run", None, 0, metrics))
 
     def map_fn(row):
         return ops.dict_(
@@ -242,8 +242,8 @@ def test_vectorized_unnest_list_for_panelplot():
         map_fn,
     )
 
-    res = root_segment.metrics.map(fn_node)
-    mapped = api.use(res).to_pylist_raw()
+    res = weave.use(root_segment.metrics.map(fn_node))
+    mapped = res.to_pylist_raw()
     metrics_arr = metrics._arrow_data.to_pylist()
     assert mapped == [
         {
@@ -311,12 +311,12 @@ def test_group_by_bins_arrow_vectorized():
     func_node = weave_internal.define_fn(
         {"row": api.type_of(segment.metrics).object_type}, groupby_func
     )
-    groupby_node = segment.metrics.groupby(func_node)
+    groupby_node = weave.weave(segment.metrics).groupby(func_node)
 
     result = api.use(groupby_node)
-    assert api.use(result.count()) == 9
+    assert api.use(weave.weave(result).count()) == 9
 
-    group_key_node = result[4].groupkey()
+    group_key_node = weave.weave(result)[4].groupkey()
     key = api.use(group_key_node)
     assert key == {"number_bin_col_name": {"start": 130.0, "stop": 135.0}}
 

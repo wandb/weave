@@ -12,14 +12,13 @@ from ..ops_primitives import projection_utils
 from ..language_features.tagging import (
     process_opdef_output_type,
 )
+from .arrow_tags import direct_add_arrow_tags
 
-from .list_ import (
-    ArrowWeaveList,
-    ArrowWeaveListType,
-    direct_add_arrow_tags,
+from .constructors import (
     vectorized_container_constructor_preprocessor,
     vectorized_input_types,
 )
+from .list_ import ArrowWeaveList, ArrowWeaveListType
 
 
 def typeddict_pick_output_type(input_types):

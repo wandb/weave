@@ -25,6 +25,7 @@ from .context import (
 from .server import capture_weave_server_logs
 from .val_const import const
 from .file_base import File, Dir
+from .dispatch import RuntimeConstNode
 
 from .weave_internal import define_fn
 
@@ -85,3 +86,7 @@ def expr(obj):
 
 def type_of(obj: typing.Any) -> types.Type:
     return types.TypeRegistry.type_of(obj)
+
+
+def weave(obj: typing.Any) -> RuntimeConstNode:
+    return _weave_internal.make_const_node(type_of(obj), obj)  # type: ignore
