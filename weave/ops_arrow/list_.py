@@ -1219,12 +1219,17 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         return col
 
     def _index(self, index: int):
-        if not hasattr(self, "pylist"):
-            self.pylist = self.to_pylist_tagged()
-        try:
-            return self.pylist[index]
-        except IndexError:
+        if len(self._arrow_data) <= index:
             return None
+        # Create a temp AWL so we can leverage the `to_pylist_tagged` helper,
+        # but it will only apply to a single element instead of wasting a bunch
+        # of cycles. Note: this was previously memoized on the object but that
+        # is not safe! You cannot save the results of `to_pylist_tagged` since
+        # it is only valid in the tagging context which it was first called!
+        temp_awl: ArrowWeaveList = ArrowWeaveList(
+            self._arrow_data.take([index]), self.object_type, self._artifact
+        )
+        return temp_awl.to_pylist_tagged()[0]
 
     @op(output_type=lambda input_types: input_types["self"].object_type)
     def __getitem__(self, index: int):

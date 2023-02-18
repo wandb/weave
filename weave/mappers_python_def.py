@@ -3,6 +3,7 @@ import datetime
 import inspect
 import math
 
+import pandas as pd
 
 from . import mappers
 from . import storage
@@ -153,6 +154,11 @@ class StringToPyString(mappers.Mapper):
 
 class TimestampToPyTimestamp(mappers.Mapper):
     def apply(self, obj: datetime.datetime):
+        # TODO: I have no idea why, but Eval.ipynb ends up with a pandas
+        # Timestamp here. This is clearly not the correct fix, but we need to
+        # get CI working again.
+        if isinstance(obj, pd.Timestamp):
+            obj = obj.to_pydatetime()
         return int(tz_aware_dt(obj).timestamp() * 1000)
 
 

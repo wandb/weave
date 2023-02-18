@@ -211,3 +211,31 @@ def test_join_table_with_numeric_columns(fake_wandb):
         }
     )
     assert awl.to_pylist_raw() == [{"1": 1, "2": 2}]
+
+
+def test_metric_table_join(fake_wandb):
+    table = wandb.Table(
+        columns=["id", "label", "score_1", "score_2", "score_3"],
+        data=[
+            [1, "cat", 1.1, 2.1, 3.1],
+            [2, "dog", 1.2, 2.2, 3.2],
+            [3, "cat", 1.3, 2.3, 3.3],
+            [4, "dog", 1.4, 2.4, 3.4],
+            [5, "mouse", 1.5, 2.5, 3.5],
+        ],
+    )
+    art = wandb.Artifact("test_name", "test_type")
+    art.add(table, "table")
+    art_node = fake_wandb.mock_artifact_as_node(art)
+    file_node = art_node.file("table.table.json")
+    table_node = file_node.table()
+    table_rows = table_node.rows().createIndexCheckpointTag()
+    grouped = table_rows.groupby(lambda row: weave.ops.dict_(label=row["label"]))
+    sorted = grouped.sort(
+        lambda row: weave.ops.make_list(a=row.groupkey()["label"]), ["asc"]
+    )
+    group_col_0 = sorted[0].groupkey()["label"]
+    group_col_1 = sorted[1].groupkey()["label"]
+    group_col_2 = sorted[2].groupkey()["label"]
+    res = weave.use([group_col_0, group_col_1, group_col_2])
+    assert res == ["cat", "dog", "mouse"]
