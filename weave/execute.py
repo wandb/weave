@@ -290,15 +290,15 @@ def _debug_node_stack(
         res_str = str(result)
 
         if isinstance(result, ArrowWeaveList):
-            res_str = f"  (rows {result._arrow_data.slice(0, 5)}...)"
+            res_str += f"  (rows {result._arrow_data.slice(0, 5)}...)"
         elif (
             isinstance(result, list)
             and len(result) > 0
             and isinstance(result[0], ArrowWeaveList)
         ):
-            res_str = f"  (rows {[r._arrow_data.slice(0, 5) for r in result[:5]]}...)"
+            res_str += f"  (rows {[r._arrow_data.slice(0, 5) for r in result[:5]]}...)"
         elif isinstance(result, Table):
-            res_str = f"  (rows {result._rows._arrow_data.slice(0, 5)}...)"
+            res_str += f"  (rows {result._rows._arrow_data.slice(0, 5)}...)"
 
         result_str += f"{padding}{prefix}{node.from_op.name} = {res_str}"
         for input_name, input_node in input_nodes.items():
