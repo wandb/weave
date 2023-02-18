@@ -283,18 +283,18 @@ def _debug_node_stack(
         input_nodes = node.from_op.inputs
         result = ref_base.deref(fg.get_result(node))
         res_str = str(result)[:100]
-        print(f"{padding}{prefix}{node.from_op.name} = {res_str}")
+        logging.debug(f"{padding}{prefix}{node.from_op.name} = {res_str}")
         for input_name, input_node in input_nodes.items():
             _debug_node_stack(fg, input_node, depth=depth + 1, prefix=f"{input_name}:")
     elif isinstance(node, graph.ConstNode):
         val_str = str(node.val)[:100]
-        print(f"{padding}{prefix}CONST = {val_str}")
+        logging.debug(f"{padding}{prefix}CONST = {val_str}")
     elif isinstance(node, graph.VarNode):
-        print(f"{padding}{prefix}VAR({node.name})")
+        logging.debug(f"{padding}{prefix}VAR({node.name})")
     elif isinstance(node, graph.VoidNode):
-        print(f"{padding}{prefix}VOID")
+        logging.debug(f"{padding}{prefix}VOID")
     else:
-        print(f"ERROR: {type(node)}")
+        logging.debug(f"ERROR: {type(node)}")
 
 
 def execute_forward_node(
