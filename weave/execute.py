@@ -41,7 +41,7 @@ from . import language_nullability
 TRACE_LOCAL = trace_local.TraceLocal()
 
 # Set this to true when debugging for costly, but detailed storyline of execution
-PRINT_DEBUG = False
+PRINT_DEBUG = True
 
 
 class OpExecuteStats(typing.TypedDict):
