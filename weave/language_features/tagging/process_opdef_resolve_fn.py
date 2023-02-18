@@ -32,7 +32,8 @@ def propagate_arrow_tags(
     args: list[typing.Any],
     kwargs: dict[str, typing.Any],
 ) -> typing.Any:
-    from ...ops_arrow import ArrowWeaveList, awl_add_arrow_tags
+    from ...ops_arrow.arrow_tags import awl_add_arrow_tags
+    from ...ops_arrow import ArrowWeaveList
 
     tag_type: typing.Optional[types.Type]
 

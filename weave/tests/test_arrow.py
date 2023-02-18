@@ -285,7 +285,7 @@ def test_custom_tagged_groupby1():
     grouped_node = data_node.groupby(lambda row: ops.dict_(a=row["a"]))
     group1_node = grouped_node[0]
 
-    assert grouped_node.type == arrow.awl_group_by_result_type(
+    assert grouped_node.type == arrow.ops.awl_group_by_result_type(
         types.TypedDict(
             {
                 "a": types.Int(),
@@ -298,7 +298,7 @@ def test_custom_tagged_groupby1():
         types.TypedDict({"a": types.Int()}),
     )
 
-    assert group1_node.type == arrow.awl_group_by_result_object_type(
+    assert group1_node.type == arrow.ops.awl_group_by_result_object_type(
         types.TypedDict(
             {
                 "a": types.Int(),
@@ -337,7 +337,7 @@ def test_custom_tagged_groupby2():
                 "list_tag": types.Int(),
             }
         ),
-        arrow.awl_group_by_result_type(
+        arrow.ops.awl_group_by_result_type(
             types.TypedDict(
                 {
                     "a": types.Int(),
@@ -470,7 +470,7 @@ def test_arrow_nested_with_refs():
 
     # Next, we get a derive node from the data_node, and assert that the path is
     # converted to an artifact reference when appropriate.
-    col_node = arrow.pick(weave.weave(data_node), "outer")
+    col_node = arrow.ops.pick(weave.weave(data_node), "outer")
     # Note: we don't need to save the `col_node` because
     # they are already converted to the node representation via dispatch
     raw_col_data = weave.use(col_node)
@@ -576,7 +576,7 @@ def test_tagging_concat():
         awls.append(weave.save(awl))
 
     list_nodes = weave._ops.make_list(l1=awls[0], l2=awls[1])
-    concatenated = arrow.concat(list_nodes)
+    concatenated = arrow.ops.concat(list_nodes)
 
     assert weave.use(concatenated.to_py()) == [{"a": 1, "b": 2}, {"a": 3, "b": 4}] * 2
     assert concatenated.type == arrow.ArrowWeaveListType(
@@ -772,7 +772,7 @@ def test_arrow_filter_nulls():
 
 def test_grouped_typed_dict_assign():
     assert types.List(types.TypedDict(property_types={})).assign_type(
-        arrow.awl_group_by_result_object_type(
+        arrow.ops.awl_group_by_result_object_type(
             object_type=types.TypedDict(
                 property_types={"a": types.Int(), "im": types.Int()}
             ),
@@ -802,7 +802,7 @@ def test_concat_multiple_table_types():
     )
 
     to_concat = ops.make_list(l=datal, r=datar)
-    result = arrow.concat(to_concat)
+    result = arrow.ops.concat(to_concat)
 
     assert result.type == arrow.ArrowWeaveListType(
         object_type=types.TypedDict(
@@ -840,7 +840,7 @@ def test_concat_multiple_table_types_tagged():
     datar = weave.save(arrow.to_arrow(tagged_datar))
 
     to_concat = ops.make_list(l=datal, r=datar)
-    result = arrow.concat(to_concat)
+    result = arrow.ops.concat(to_concat)
 
     expected = arrow.ArrowWeaveListType(
         object_type=tagged_value_type.TaggedValueType(
@@ -919,7 +919,7 @@ def test_arrow_concat_nested_union():
     datar = weave.save(arrow.to_arrow(raw_datar))
 
     to_concat = ops.make_list(l=datal, r=datar)
-    result = arrow.concat(to_concat)
+    result = arrow.ops.concat(to_concat)
 
     expected = arrow.ArrowWeaveListType(
         object_type=types.TypedDict(
@@ -947,7 +947,7 @@ def test_arrow_concat_nested_union_with_optional_type():
     datar = weave.save(arrow.to_arrow(raw_datar))
 
     to_concat = ops.make_list(l=datal, r=datar)
-    result = arrow.concat(to_concat)
+    result = arrow.ops.concat(to_concat)
 
     expected = arrow.ArrowWeaveListType(
         object_type=types.TypedDict(
@@ -976,7 +976,7 @@ def test_arrow_concat_nested_union_with_optional_type_and_custom_type():
     datar = weave.save(arrow.to_arrow(raw_datar))
 
     to_concat = ops.make_list(l=datal, r=datar)
-    result = arrow.concat(to_concat)
+    result = arrow.ops.concat(to_concat)
 
     expected = arrow.ArrowWeaveListType(
         object_type=types.TypedDict(
@@ -1006,7 +1006,7 @@ def test_arrow_concat_degenerate_types():
     datar = weave.save(arrow.to_arrow(raw_datar))
 
     to_concat = ops.make_list(l=datal, r=datar)
-    result = arrow.concat(to_concat)
+    result = arrow.ops.concat(to_concat)
 
     expected = arrow.ArrowWeaveListType(
         object_type=types.TypedDict(
@@ -1350,7 +1350,7 @@ def test_concat_nulls():
     )
 
     list_nodes = weave._ops.make_list(l1=datal, l2=datar)
-    concatenated = arrow.concat(list_nodes)
+    concatenated = arrow.ops.concat(list_nodes)
 
     assert weave.use(concatenated.to_py()) == [
         {"prompt": None},
@@ -1567,8 +1567,8 @@ def test_pushdown_of_gql_tags_on_awls(fake_wandb):
     tag_store.add_tags(data, {"project": project})
     awl = weave.save(arrow.to_arrow(data))
 
-    list_node = ops.arrow_list_(**{"a": awl, "b": awl})
-    concatted = arrow.concat(list_node)
+    list_node = arrow.ops.arrow_list_(**{"a": awl, "b": awl})
+    concatted = arrow.ops.concat(list_node)
 
     for i in range(6):
         cell = arrow.ops.index(concatted, i)
@@ -1590,7 +1590,7 @@ def test_groupby_concat():
 
     # concat
     list_node = ops.make_list(**{str(i): awl_node for i in range(4)})
-    concatted = arrow.concat(list_node)
+    concatted = arrow.ops.concat(list_node)
 
     # groupby
     grouped = concatted.groupby(lambda x: ops.dict_(**{"time": x["time"]}))
@@ -1599,7 +1599,7 @@ def test_groupby_concat():
     dropped = grouped.dropna()
 
     # now concat all the groups together
-    concatted_2 = arrow.concat(dropped)
+    concatted_2 = arrow.ops.concat(dropped)
 
     result = weave.use(concatted_2).to_pylist_notags()
     assert result == ([data[0]] * 4) + ([data[1]] * 4)
@@ -1683,7 +1683,7 @@ def test_conversion_of_domain_types_to_awl_values(fake_wandb):
     data = box.box([project] * 3)
     awl = weave.save(arrow.to_arrow(data))
 
-    list_node = ops.arrow_list_(**{"a": awl, "b": awl})
+    list_node = arrow.ops.arrow_list_(**{"a": awl, "b": awl})
     assert [[item for item in l] for l in weave.use(list_node)] == [[project] * 2] * 3
 
 

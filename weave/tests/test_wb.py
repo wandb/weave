@@ -702,7 +702,7 @@ def test_arrow_tag_serialization_can_handle_runs_in_concat(fake_wandb):
 
     const_list = ops.make_list(l=rows_node, r=rows_node)
     concatted_list = list_.List.concat(const_list)
-    concatted = arrow.concat(arr=concatted_list)
+    concatted = arrow.ops.concat(arr=concatted_list)
 
     # now get the run from the tags
     weave.use(ops.run_ops.run_tag_getter_op(concatted[0]))
