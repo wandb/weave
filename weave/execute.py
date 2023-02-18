@@ -278,12 +278,28 @@ class NodeExecutionReport(typing.TypedDict):
 def _debug_node_stack(
     fg: forward_graph.ForwardGraph, node: graph.Node, depth=0, prefix=""
 ) -> str:
+
+    from .ops_arrow import ArrowWeaveList
+    from .ops_domain import Table
+
     result_str = ""
     padding = " " * depth
     if isinstance(node, graph.OutputNode):
         input_nodes = node.from_op.inputs
         result = ref_base.deref(fg.get_result(node))
         res_str = str(result)
+
+        if isinstance(result, ArrowWeaveList):
+            res_str = f"  (rows {result._arrow_data.slice(0, 5)}...)"
+        elif (
+            isinstance(result, list)
+            and len(result) > 0
+            and isinstance(result[0], ArrowWeaveList)
+        ):
+            res_str = f"  (rows {[r._arrow_data.slice(0, 5) for r in result[:5]]}...)"
+        elif isinstance(result, Table):
+            res_str = f"  (rows {result._rows._arrow_data.slice(0, 5)}...)"
+
         result_str += f"{padding}{prefix}{node.from_op.name} = {res_str}"
         for input_name, input_node in input_nodes.items():
             result_str += "\n" + _debug_node_stack(
@@ -299,7 +315,7 @@ def _debug_node_stack(
     else:
         result_str += f"ERROR: {type(node)}"
 
-    if depth == 0:
+    if depth == 0 and "contact-estimation" in result_str:
         logging.debug(result_str)
 
     return result_str
