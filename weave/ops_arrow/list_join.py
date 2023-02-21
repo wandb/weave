@@ -5,7 +5,7 @@ import typing
 import pyarrow as pa
 import pyarrow.compute as pc
 
-from ..ops_primitives import list_ as base_list
+from ..ops_primitives import list_ as primitive_list
 from .. import weave_types as types
 from ..language_features.tagging import tagged_value_type, tag_store
 from ..api import op
@@ -400,7 +400,7 @@ def join_all(arrs, joinFn, outer: bool):
 
 
 def _join_2_output_type(input_types):
-    return ArrowWeaveListType(base_list._join_2_output_row_type(input_types))
+    return ArrowWeaveListType(primitive_list._join_2_output_row_type(input_types))
 
 
 @op(
@@ -551,7 +551,7 @@ def join_2(arr1, arr2, joinFn1, joinFn2, alias1, alias2, leftOuter, rightOuter):
         [alias1, alias2],
     )
 
-    final_type = base_list._join_2_output_row_type(
+    final_type = primitive_list._join_2_output_row_type(
         {
             "arr1": ArrowWeaveListType(arr1.object_type),
             "arr2": ArrowWeaveListType(arr2.object_type),

@@ -45,8 +45,9 @@ class String:
 
     @op(name="string-add")
     def __add__(lhs: str, rhs: typing.Optional[str]) -> str:  # type: ignore[misc]
-        rhs = rhs or ""
-        return lhs + rhs
+        if rhs == None:
+            return None  # type: ignore
+        return lhs + rhs  # type: ignore
 
     @op(name="string-len")
     def len(str: str) -> int:  # type: ignore[misc]

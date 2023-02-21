@@ -876,7 +876,10 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             return [col_mapper.apply(i.as_py()) for i in col]
         return col
 
-    def _index(self, index: int):
+    def _index(self, index: typing.Optional[int]):
+        if index == None:
+            return None
+        index = typing.cast(int, index)
         if len(self._arrow_data) <= index:
             return None
         # Create a temp AWL so we can leverage the `to_pylist_tagged` helper,

@@ -157,7 +157,7 @@ def configure_logger():
     log.setLevel(logging.ERROR)
 
     logger = logging.getLogger("root")
-    log.setLevel(logs.env_log_level())
+    logger.setLevel(logs.env_log_level())
 
     enable_datadog = os.getenv("DD_ENV")
     if not enable_datadog:

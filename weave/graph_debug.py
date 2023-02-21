@@ -156,7 +156,10 @@ def node_expr_str_full(node: graph.Node) -> str:
             res = textwrap.indent(res, "  ")
             return res
         try:
-            return "[" + str(node.val)[:30] + "...]"
+            str_val = str(node.val)
+            if len(str_val) > 50:
+                return f"~{str_val[:50]}...~"
+            return str_val
         except TypeError:
             # WARNING: This behavior means that sometimes this function
             # produces expressionions that JS can't parse (it happens when

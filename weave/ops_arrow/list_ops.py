@@ -11,7 +11,7 @@ from ..language_features.tagging import (
 )
 from collections import defaultdict
 from .. import op_args
-from ..ops_primitives import list_ as base_list
+from ..ops_primitives import list_ as primitive_list
 from .. import op_def
 
 from .arrow import ArrowWeaveListType, arrow_as_array, offsets_starting_at_zero
@@ -125,7 +125,9 @@ def map(self, map_fn):
 
 
 def _map_each_function_type(input_types: dict[str, types.Type]) -> types.Type:
-    base_op_fn_type = base_list._map_each_function_type({"arr": input_types["self"]})
+    base_op_fn_type = primitive_list._map_each_function_type(
+        {"arr": input_types["self"]}
+    )
     base_op_fn_type.input_types["self"] = ArrowWeaveListType(
         typing.cast(types.List, input_types["self"]).object_type
     )
@@ -133,7 +135,7 @@ def _map_each_function_type(input_types: dict[str, types.Type]) -> types.Type:
 
 
 def _map_each_output_type(input_types: dict[str, types.Type]):
-    base_output_type = base_list._map_each_output_type(
+    base_output_type = primitive_list._map_each_output_type(
         {"arr": input_types["self"], "mapFn": input_types["map_fn"]}
     )
     return ArrowWeaveListType(base_output_type.object_type)
@@ -430,9 +432,11 @@ def count(self: ArrowWeaveList) -> int:
 
 @op(
     name="ArrowWeaveList-__getitem__",
-    output_type=lambda input_types: input_types["self"].object_type,
+    output_type=lambda input_types: primitive_list.getitem_output_type(
+        {"arr": input_types["self"]}
+    ),
 )
-def index(self: ArrowWeaveList, index: int):
+def index(self: ArrowWeaveList, index: typing.Optional[int]):
     return self._index(index)
 
 

@@ -197,18 +197,20 @@ def get_op_for_inputs(name: str, kwargs: dict[str, types.Type]) -> op_def.OpDef:
     if not ops:
         logging.info('No ops found for "%s" with first arg "%s"', name, input_types[0])
         err = errors.WeaveDispatchError(
-            f'Cannot dispatch op "{name}"; no matching op found'
+            f'Cannot dispatch op "{name}"; no matching op found for first arg type: {input_types[0]}'
         )
         util.raise_exception_with_sentry_if_available(err, [name])
 
-    ops = _dispatch_remaining_args(ops, dict(zip(input_keys[1:], input_types[1:])))
-    if not ops:
+    final_ops = _dispatch_remaining_args(
+        ops, dict(zip(input_keys[1:], input_types[1:]))
+    )
+    if not final_ops:
         err = errors.WeaveDispatchError(
-            f'Cannot dispatch op "{name}"; no matching op found'
+            f'Cannot dispatch op "{name}"; ops {ops} matched first arg type, but no matching ops found for remaining arg types: {input_types[1:]}'
         )
         util.raise_exception_with_sentry_if_available(err, [name])
 
-    return _resolve_op_ambiguity(ops, input_types[0])
+    return _resolve_op_ambiguity(final_ops, input_types[0])
 
 
 def _type_of_input_param(v: typing.Any) -> types.Type:

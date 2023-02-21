@@ -15,6 +15,7 @@ from .. import weavify
 
 from .arrow import ArrowWeaveListType
 from .list_ import ArrowWeaveList
+from . import arraylist_ops
 from . import convert_ops, convert
 from .arrow_tags import pushdown_list_tags
 
@@ -244,10 +245,8 @@ def _is_non_simd_node(node: graph.OutputNode, vectorized_keys: set[str]):
         "unnest",
         "flatten",
         "2DProjection",
-        "count",  # we could easily vectorize `count` using the `value_counts` pyarrow attribute
+        "count",
         "joinToStr",
-        "index",  # We might be able to vectorize this by using some existing ListArray methods
-        "__getitem__",  # Same op as `index`
         "dropna",
         "unique",
         "numbers-sum",
@@ -423,6 +422,13 @@ def vectorize(
                         arg_names[1]: node_inputs[arg_names[1]],
                     }
                 )
+
+        if node_name.endswith("index") or node_name.endswith("__getitem__"):
+            inputs_as_awl = _vectorized_inputs_as_awl(node_inputs, vectorized_keys)
+            return arraylist_ops.listindex(*inputs_as_awl.values())
+        elif node_name.endswith("numbers-max"):
+            inputs_as_awl = _vectorized_inputs_as_awl(node_inputs, vectorized_keys)
+            return arraylist_ops.list_numbers_max(*inputs_as_awl.values())
 
         # 4. Non SIMD ops (List/AWL)
         if _is_non_simd_node(node, vectorized_keys):

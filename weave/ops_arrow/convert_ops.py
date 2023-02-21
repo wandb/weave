@@ -16,6 +16,11 @@ def list_to_arrow(arr):
     return convert.to_arrow(arr)
 
 
-@op(output_type=lambda input_types: types.List(input_types["self"].object_type))
+@op(
+    input_type={
+        "self": ArrowWeaveListType(),
+    },
+    output_type=lambda input_types: types.List(input_types["self"].object_type),
+)
 def to_py(self):
     return self.to_pylist_tagged()

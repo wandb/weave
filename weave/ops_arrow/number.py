@@ -1,3 +1,4 @@
+import typing
 import pyarrow.compute as pc
 import pyarrow as pa
 
@@ -5,6 +6,7 @@ from ..decorator_arrow_op import arrow_op
 from .. import weave_types as types
 from ..api import op
 from .list_ import ArrowWeaveList, ArrowWeaveListType
+from .arrow import arrow_as_array
 
 ARROW_WEAVE_LIST_NUMBER_TYPE = ArrowWeaveListType(types.Number())
 ARROW_WEAVE_LIST_BOOLEAN_TYPE = ArrowWeaveListType(types.Boolean())
@@ -35,7 +37,24 @@ def __add__(self, other):
     if isinstance(other, ArrowWeaveList):
         other = other._arrow_data
     return ArrowWeaveList(
-        pc.add(self._arrow_data, other), types.Number(), self._artifact
+        pc.add(self._arrow_data, other),
+        types.NoneType() if other == None else types.Number(),
+        self._artifact,
+    )
+
+
+@op(
+    name="ArrowWeaveListNumber_right-add",
+    output_type=lambda input_type: input_type["right"],
+)
+def number_right_add(
+    left: typing.Optional[typing.Union[int, float]],
+    right: ArrowWeaveList[typing.Optional[typing.Union[int, float]]],
+):
+    return ArrowWeaveList(
+        pc.add(left, right._arrow_data_asarray_no_tags()),
+        types.Number(),
+        right._artifact,
     )
 
 
@@ -74,7 +93,24 @@ def __sub__(self, other):
     if isinstance(other, ArrowWeaveList):
         other = other._arrow_data
     return ArrowWeaveList(
-        pc.subtract(self._arrow_data, other), types.Number(), self._artifact
+        pc.subtract(self._arrow_data, other),
+        types.NoneType() if other == None else types.Number(),
+        self._artifact,
+    )
+
+
+@op(
+    name="ArrowWeaveListNumber_right-sub",
+    output_type=lambda input_type: input_type["right"],
+)
+def number_right_sub(
+    left: typing.Optional[typing.Union[int, float]],
+    right: ArrowWeaveList[typing.Optional[typing.Union[int, float]]],
+):
+    return ArrowWeaveList(
+        pc.subtract(left, right._arrow_data_asarray_no_tags()),
+        types.Number(),
+        right._artifact,
     )
 
 
