@@ -711,8 +711,6 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         return np.asarray(pylist)
 
     def __iter__(self):
-        # TODO: replace with to_pylist_tagged once refs are supported, then we can
-        # get rid of a bunch of older functions
         pylist = self.to_pylist_tagged()
         for x in pylist:
             yield x

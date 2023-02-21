@@ -134,23 +134,9 @@ def fast_map_fn(input_list, map_fn):
     with tracer.trace("fast_map:compile2"):
         map_fn = compile.compile([map_fn])[0]
 
-    # These are hacks because sometimes __len__ and __getitem__
-    # are OpDefs, sometimes they are regular Python functions.
-    # TODO: Fix this (eager behavior)
-    if isinstance(input_list.__len__, op_def.OpDef):
-        list_len = input_list.__len__.resolve_fn()
-    else:
-        list_len = len(input_list)
-
-    if isinstance(input_list.__getitem__, op_def.OpDef):
-        getitem = input_list.__getitem__.resolve_fn
-    else:
-        getitem = lambda input_list, index: input_list.__getitem__(index)
-
     # now map the remaining weave_fn (after resolving static branches above)
     # over the input list
     with tracer.trace("fast_map:map"):
         return [
-            _fast_apply_map_fn(getitem(input_list, i), i, map_fn)
-            for i in range(list_len)
+            _fast_apply_map_fn(item, i, map_fn) for i, item in enumerate(input_list)
         ]
