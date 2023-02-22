@@ -3,6 +3,7 @@ from .. import weave_types as types
 from .. import errors
 from ..language_features.tagging import tag_store, tagged_value_type
 from .. import box
+import dataclasses
 
 
 def typeddict_pick_output_type(input_types):
@@ -10,7 +11,7 @@ def typeddict_pick_output_type(input_types):
     if not isinstance(input_types["key"], types.Const):
         return types.union(*property_types.values())
     key = input_types["key"].val
-    output_type = _tag_aware_dict_or_list_type_for_path(
+    output_type = _tag_aware_dict_list_or_object_type_for_path(
         input_types["self"], split_escaped_string(key)
     )
     return output_type
@@ -107,6 +108,8 @@ def _any_val_for_path(val: typing.Any, path: list[str]) -> typing.Any:
             return tag_wrapper([_any_val_for_path(item, next_path) for item in val])
     elif isinstance(val, dict):
         return _dict_val_for_path(val, path)
+    elif dataclasses.is_dataclass(val):
+        return _dict_val_for_path(dataclasses.asdict(val), path)
     else:
         return None
 
@@ -152,7 +155,7 @@ def _type_tag_wrapper(
     return wrapper, inner_type
 
 
-def _tag_aware_dict_or_list_type_for_path(
+def _tag_aware_dict_list_or_object_type_for_path(
     type: types.Type, path: list[str]
 ) -> types.Type:
     if isinstance(type, types.Const):
@@ -164,13 +167,15 @@ def _tag_aware_dict_or_list_type_for_path(
         return tag_wrapper(
             types.union(
                 *[
-                    _tag_aware_dict_or_list_type_for_path(mem_type, path)
+                    _tag_aware_dict_list_or_object_type_for_path(mem_type, path)
                     for mem_type in inner_type.members
                 ]
             )
         )
     if not (
-        isinstance(inner_type, types.List) or isinstance(inner_type, types.TypedDict)
+        isinstance(inner_type, types.List)
+        or isinstance(inner_type, types.TypedDict)
+        or isinstance(inner_type, types.ObjectType)
     ):
         return types.NoneType()
     key = path[0]
@@ -181,31 +186,36 @@ def _tag_aware_dict_or_list_type_for_path(
         else:
             return tag_wrapper(
                 types.List(
-                    _tag_aware_dict_or_list_type_for_path(
+                    _tag_aware_dict_list_or_object_type_for_path(
                         inner_type.object_type, next_path
                     )
                 )
             )
-    elif isinstance(inner_type, types.TypedDict):
-        return _dict_type_for_path(type, path)
+    elif isinstance(inner_type, (types.TypedDict, types.ObjectType)):
+        return _dict_or_object_type_for_path(type, path)
     else:
         return types.NoneType()
 
 
-def _dict_type_for_path(type: types.Type, path: list[str]) -> types.Type:
+def _dict_or_object_type_for_path(type: types.Type, path: list[str]) -> types.Type:
     tag_wrapper, inner_type = _type_tag_wrapper(type)
     if len(path) == 0:
         return types.NoneType()
-    if not isinstance(inner_type, types.TypedDict):
+    if not isinstance(inner_type, (types.TypedDict, types.ObjectType)):
         return types.NoneType()
-    prop_types = inner_type.property_types
+    if isinstance(inner_type, types.ObjectType):
+        prop_types = inner_type.property_types()
+    else:
+        prop_types = inner_type.property_types
     key = path[0]
     next_path = path[1:]
     if key == "*":
         return tag_wrapper(
             types.TypedDict(
                 {
-                    sub_key: _tag_aware_dict_or_list_type_for_path(sub_val, next_path)
+                    sub_key: _tag_aware_dict_list_or_object_type_for_path(
+                        sub_val, next_path
+                    )
                     for sub_key, sub_val in prop_types.items()
                 }
             )
@@ -216,6 +226,6 @@ def _dict_type_for_path(type: types.Type, path: list[str]) -> types.Type:
     if len(next_path) == 0:
         res = key_val
     else:
-        res = _tag_aware_dict_or_list_type_for_path(key_val, next_path)
+        res = _tag_aware_dict_list_or_object_type_for_path(key_val, next_path)
 
     return tag_wrapper(res)
