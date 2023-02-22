@@ -84,6 +84,9 @@ class DummyStatsd:
     def gauge(self, *args, **kwargs):
         pass
 
+    def flush(self, *args, **kwargs):
+        pass
+
 
 _STATSD = None
 

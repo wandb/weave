@@ -934,6 +934,17 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         current_type = self.object_type
         if self._arrow_data.type == desired_type_pyarrow_type:
             result = self
+        elif (
+            pa.types.is_list(self._arrow_data.type)
+            and self._arrow_data.type.value_type == pa.null()
+        ):
+            # In this case we have a AWL<list<null>>. In these cases we run into a bunch of issues because
+            # the current type is unknown. Instead, we basically just cast the AWL to the desired type.
+            return ArrowWeaveList(
+                self._arrow_data.cast(desired_type_pyarrow_type),
+                desired_type,
+                self._artifact,
+            )
         elif isinstance(desired_type, tagged_value_type.TaggedValueType):
             if isinstance(current_type, tagged_value_type.TaggedValueType):
 
@@ -1157,10 +1168,10 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                     )
                 else:
                     result = ArrowWeaveList(
-                        self.with_object_type(non_nullable_types[0])._arrow_data,
-                        desired_type,
+                        self._arrow_data,
+                        types.non_none(desired_type),
                         self._artifact,
-                    )
+                    ).with_object_type(non_nullable_types[0])
         elif current_type == desired_type:
             # Put this at the end to support custom types
             result = self
@@ -1193,7 +1204,9 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                 for a in (self, other)
             ]
 
-            new_object_type = types.merge_types(*new_object_types_with_pushed_down_tags)
+            new_object_type = types.unknown_coalesce(
+                types.merge_types(*new_object_types_with_pushed_down_tags)
+            )
 
             new_arrow_arrays = [
                 a.with_object_type(new_object_type)._arrow_data for a in (self, other)

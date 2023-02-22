@@ -1193,6 +1193,163 @@ def merge_types(a: Type, b: Type) -> Type:
     return UnionType(a, b)
 
 
+def unknown_coalesce(in_type: Type) -> Type:
+    """
+    Recursively removes unknowns from a type. Whenever a union is encountered,
+    we do 2 operations:
+    1) reduce the union members to only non-unknowns
+    2) for each container-type member, attempt to remove any unknowns that are
+        known by a peer member.
+
+    For example:
+
+    Union<
+        Unknown,
+        List<Union<Unknown, Int>>,
+        TypedDict<{'a': Unknown}>,
+        TypedDict<{'a': Int}>,
+    >
+
+    would reduce to
+
+    Union<
+        List<Int>,
+        TypedDict<{'a': Int}>,
+    >
+
+    This is particularly useful when a nested field in an AWL is empty - the
+    type will be Unknown. However, when merging for concatenation, we want to
+    remove such unknowns since we know the type from a another list.
+    """
+
+    # In this function, there are 3 cases:
+    # 1) in_type is a union type - in this case we delegate to _unknown_coalesce_on_union
+    # 2) Each of the container types calls this function recursively
+    # 3) the base case just returns the type
+    TaggedValueType = type_name_to_type("tagged")
+    if isinstance(in_type, UnionType):
+        return _unknown_coalesce_on_union(in_type)
+    elif isinstance(in_type, UnknownType):
+        return UnknownType()
+    elif isinstance(in_type, List):
+        return List(unknown_coalesce(in_type.object_type))
+    elif isinstance(in_type, Dict):
+        return Dict(in_type.key_type, unknown_coalesce(in_type.object_type))
+    elif isinstance(in_type, TypedDict):
+        return TypedDict(
+            {
+                key: unknown_coalesce(value_type)
+                for key, value_type in in_type.property_types.items()
+            }
+        )
+    elif isinstance(in_type, TaggedValueType):
+        return TaggedValueType(
+            unknown_coalesce(in_type.tag),  # type: ignore
+            unknown_coalesce(in_type.value),
+        )
+    elif isinstance(in_type, Const):
+        return Const(unknown_coalesce(in_type.val_type), in_type.value)
+    elif isinstance(in_type, ObjectType):
+        # TODO: This is hard due to image type being non-standard.
+        pass
+    return in_type
+
+
+def _filter_unknowns(types: list[Type]) -> list[Type]:
+    return [t for t in types if not isinstance(t, UnknownType)]
+
+
+def _unknown_coalesce_on_union(u_type: UnionType) -> Type:
+    # This helper function will remove all the unknowns from a a union's members,
+    # then apply the `unknown_coalesce` function to each known member. This ensures
+    # that each member is processed before comparing to it's peers.
+    known_members = [
+        unknown_coalesce(member) for member in _filter_unknowns(u_type.members)
+    ]
+
+    if len(known_members) == 0:
+        return UnknownType()
+
+    final_types: list[Type] = []
+    for ndx in range(len(known_members)):
+        final_types.append(
+            _merge_unknowns_of_type_with_types(
+                known_members[ndx], known_members[:ndx] + known_members[ndx + 1 :]
+            )
+        )
+
+    return union(*final_types)
+
+
+def _merge_unknowns_of_type_with_types(of_type: Type, with_types: list[Type]):
+    # At this stage, we have a starting type and a list of peer candidate types.
+    # These types have already been coalesced individually. This step is similar to
+    # the outer `unknown_coalesce` function, except that rather than operating on the
+    # single incoming type, we must select the correct type from the list of peers.
+    TaggedValueType = type_name_to_type("tagged")
+
+    # First, we filter out any unknowns from the list of peers.
+    with_types = _filter_unknowns(with_types)
+    if len(with_types) == 0:
+        return of_type
+
+    # If the current type itself is a union, then we need to recurse into it
+    if isinstance(of_type, UnionType):
+        return _unknown_coalesce_on_union(union(*(of_type.members + with_types)))  # type: ignore
+
+    # if the current type is unknown, then we just return the next peer type.
+    elif isinstance(of_type, UnknownType):
+        return with_types[0]
+
+    # Next, we filter down to peer types that have the same type class, and recurse
+    # into each container type.
+    with_types = [
+        member for member in with_types if member.__class__ == of_type.__class__
+    ]
+    if isinstance(of_type, List):
+        return List(
+            _merge_unknowns_of_type_with_types(
+                of_type.object_type, [t.object_type for t in with_types]  # type: ignore
+            )
+        )
+    elif isinstance(of_type, Dict):
+        return Dict(
+            of_type.key_type,
+            _merge_unknowns_of_type_with_types(
+                of_type.value_type, [t.value_type for t in with_types]  # type: ignore
+            ),
+        )
+    elif isinstance(of_type, TypedDict):
+        return TypedDict(
+            {
+                key: _merge_unknowns_of_type_with_types(
+                    value_type, [t.property_types[key] for t in with_types]  # type: ignore
+                )
+                for key, value_type in of_type.property_types.items()
+            }
+        )
+    elif isinstance(of_type, TaggedValueType):
+        return TaggedValueType(
+            _merge_unknowns_of_type_with_types(of_type.tag, [t.tag for t in with_types]),  # type: ignore
+            _merge_unknowns_of_type_with_types(
+                of_type.value, [t.value for t in with_types]  # type: ignore
+            ),
+        )
+    elif isinstance(of_type, Const):
+        return Const(
+            _merge_unknowns_of_type_with_types(
+                of_type.val_type, [t.val_type for t in with_types]  # type: ignore
+            ),
+            of_type.value,
+        )
+    elif isinstance(of_type, ObjectType):
+        # TODO: This is hard due to image type being non-standard.
+        pass
+
+    # Finally, return the type.
+    return of_type
+
+
 def union(*members: Type) -> Type:
     if not members:
         return UnknownType()

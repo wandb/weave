@@ -1169,6 +1169,11 @@ def test_verify_dictionary_encoding_of_strings():
                 {"a": {"c": 7, "d": 8}, "b": {"c": 6, "d": 5}},
             ],
         ),
+        # Empty Lists
+        (
+            [[{"a": [1]}], [{"a": []}], [{"a": None}]],
+            [{"a": [1]}, {"a": []}, {"a": None}],
+        ),
         # Mix of lists and dicts
         (
             [
@@ -1226,6 +1231,23 @@ def test_arrow_concat_mixed(list_of_data, exp_res):
         ).to_pylist_raw()
         == exp_res
     )
+
+
+def test_complex_concat_union():
+    l_0_0 = weave.save(arrow.to_arrow([{"a": [1]}]))
+    l_0_1 = weave.save(arrow.to_arrow([{"a": []}]))
+    l_0_2 = weave.save(arrow.to_arrow([{"a": None}]))
+    l_0 = ops.make_list(a=l_0_0, b=l_0_1, c=l_0_2).concat()["a"]
+
+    # This is intentionally empty!
+    l_1_0 = weave.save(arrow.to_arrow([{"a": []}]))
+    l_1_1 = weave.save(arrow.to_arrow([{"a": []}]))
+    l_1_2 = weave.save(arrow.to_arrow([{"a": None}]))
+    l_1 = ops.make_list(a=l_1_0, b=l_1_1, c=l_1_2).concat()["a"]
+
+    l = ops.make_list(a=l_0, b=l_1).concat()
+
+    assert weave.use(l).to_pylist_raw() == [[1], [], None, [], [], None]
 
 
 def test_abs():
