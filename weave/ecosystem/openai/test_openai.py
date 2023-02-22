@@ -51,7 +51,7 @@ def test_large_const_node(test_artifact_dir):
 
     print("test_large_const_node.actual", actual)
 
-    actual_SHOW_PARAMS_FINE_TUNE_WEAVE_NODE = {
+    ACTUAL_SHOW_PARAMS_FINE_TUNE_WEAVE_NODE = {
         "nodeType": "output",
         "type": {
             "type": "Run",
@@ -110,7 +110,7 @@ def test_large_const_node(test_artifact_dir):
             "name": "op-finetune_gpt3",
             "inputs": {
                 "training_dataset": {
-                    "nodeType": "output",
+                    "nodeType": "const",
                     "type": {
                         "type": "LocalArtifactRef",
                         "_base_type": {"type": "Ref"},
@@ -126,16 +126,7 @@ def test_large_const_node(test_artifact_dir):
                             },
                         },
                     },
-                    "fromOp": {
-                        "name": "get",
-                        "inputs": {
-                            "uri": {
-                                "nodeType": "const",
-                                "type": "string",
-                                "val": "local-artifact:///list:f909a3e7a090a0a57dbd03801ddebd51/obj",
-                            }
-                        },
-                    },
+                    "val": "local-artifact:///list:f909a3e7a090a0a57dbd03801ddebd51/obj",
                 },
                 "hyperparameters": {
                     "nodeType": "const",
@@ -145,7 +136,7 @@ def test_large_const_node(test_artifact_dir):
             },
         },
     }
-    assert actual == actual_SHOW_PARAMS_FINE_TUNE_WEAVE_NODE
+    assert actual == ACTUAL_SHOW_PARAMS_FINE_TUNE_WEAVE_NODE
 
     model = openai.Gpt3FineTune.model(fine_tune)
     panel = panels.Table(["1 + 9 =", "2 + 14 ="])
@@ -167,5 +158,5 @@ def test_large_const_node(test_artifact_dir):
     # Asserting that weavejs_fixes.remove_opcall_versions_data works
     assert (
         graph.node_expr_str(col_sel_fn2)
-        == 'get("local-artifact:///list:f909a3e7a090a0a57dbd03801ddebd51/obj").finetune_gpt3({"n_epochs": 2}).model().complete(row)["choices"][0]["text"]'
+        == 'finetune_gpt3(local-artifact:///list:f909a3e7a090a0a57dbd03801ddebd51/obj, {"n_epochs": 2}).model().complete(row)["choices"][0]["text"]'
     )
