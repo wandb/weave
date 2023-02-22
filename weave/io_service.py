@@ -20,10 +20,6 @@ import queue
 import atexit
 import os
 
-from . import wandb_client_api
-
-from wandb.sdk.interface import artifacts
-
 
 from . import artifact_wandb
 from . import errors
@@ -348,14 +344,15 @@ class SyncClient:
 
     def manifest(
         self, artifact_uri: artifact_wandb.WeaveWBArtifactURI
-    ) -> typing.Optional[artifacts.ArtifactManifest]:
+    ) -> typing.Optional[artifact_wandb.WandbArtifactManifest]:
         manifest_path: typing.Optional[str] = self.request(
             "ensure_manifest", str(artifact_uri)
         )
         if manifest_path is None:
             return None
         with self.fs.open_read(manifest_path) as f:
-            return artifacts.ArtifactManifest.from_manifest_json(None, json.load(f))
+            with tracer.trace("json"):
+                return artifact_wandb.WandbArtifactManifest(json.load(f))
 
     def ensure_file(
         self, artifact_uri: artifact_wandb.WeaveWBArtifactURI

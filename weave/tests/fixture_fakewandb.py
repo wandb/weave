@@ -34,9 +34,18 @@ class FakeEntry:
     def __init__(self, path):
         self.path = path
 
-    @property
-    def digest(self):
-        return self.path
+    def __getitem__(self, key):
+        if key == "ref":
+            return None
+        elif key == "digest":
+            return self.path
+        raise KeyError
+
+    def get(self, path):
+        try:
+            return self[path]
+        except KeyError:
+            return None
 
 
 class FakeManifest:
@@ -61,12 +70,12 @@ class FakeManifest:
         # Otherwise, file is missing, return None.
         return None
 
-    def get_entries_in_directory(self, cur_dir):
+    def get_paths_in_directory(self, cur_dir):
         if self.dir_to_use != None:
             target = os.path.join(self.dir_to_use, cur_dir)
             if os.path.exists(target) and os.path.isdir(target):
                 return [
-                    FakeEntry(os.path.join(cur_dir, sub_path))
+                    os.path.join(cur_dir, sub_path)
                     for sub_path in os.listdir(target)
                     if os.path.isfile(os.path.join(target, sub_path))
                 ]

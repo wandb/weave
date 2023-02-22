@@ -28,6 +28,46 @@ if typing.TYPE_CHECKING:
 
 quote_slashes = functools.partial(parse.quote, safe="")
 
+
+class WandbArtifactManifestEntry(typing.TypedDict):
+    digest: str
+    birthArtifactID: typing.Optional[str]
+    ref: typing.Optional[str]
+    size: typing.Optional[int]
+    extra: typing.Optional[dict[str, typing.Any]]
+    # wandb.sdk.wandb_artifacts.ArtifactManifestEntry also has "local_path"
+    # but that doesn't exist in saved manifests
+
+
+class WandbArtifactManifestV1(typing.TypedDict):
+    version: int
+    storagePolicy: str
+    storagePolicyConfig: typing.Optional[dict[str, typing.Any]]
+    contents: typing.Dict[str, WandbArtifactManifestEntry]
+
+
+# We used to use wandb.sdk.wandb_artifacts.ArtifactManifest directly, but it
+# is expensive to construct because it makes new objects for every entry and
+# causes a lot of memory/gc churn. This implementation leaves the manifest
+# as the raw json dict instead.
+@dataclasses.dataclass
+class WandbArtifactManifest:
+    _manifest_json: WandbArtifactManifestV1
+
+    def get_entry_by_path(
+        self, path: str
+    ) -> typing.Optional[WandbArtifactManifestEntry]:
+        return self._manifest_json["contents"].get(path)
+
+    def get_paths_in_directory(self, path: str) -> typing.List[str]:
+        if path == "":
+            return list(self._manifest_json["contents"].keys())
+        dir_path = path + "/"
+        return [
+            k for k in self._manifest_json["contents"].keys() if k.startswith(dir_path)
+        ]
+
+
 # TODO: Get rid of this, we have the new wandb api service! But this
 # is still used in a couple places.
 def get_wandb_read_artifact(path: str):
@@ -445,7 +485,7 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         uri = WeaveWBArtifactURI(a_name, a_version, run.entity, project)
         self._set_read_artifact_uri(uri)
 
-    def _manifest(self) -> typing.Optional["artifacts.ArtifactManifest"]:
+    def _manifest(self) -> typing.Optional[WandbArtifactManifest]:
         if self._read_artifact_uri is None:
             raise errors.WeaveInternalError(
                 'cannot get path info for unsaved artifact"'
@@ -457,7 +497,7 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         if manifest is not None:
             manifest_entry = manifest.get_entry_by_path(path)
             if manifest_entry is not None:
-                return manifest_entry.digest
+                return manifest_entry["digest"]
         return None
 
     def _path_info(
@@ -477,11 +517,10 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
             # This is not a WeaveURI! Its the artifact reference style used
             # by the W&B Artifacts/media layer.
             ref_prefix = "wandb-artifact://"
-            if manifest_entry.ref and manifest_entry.ref.startswith(ref_prefix):
+            ref = manifest_entry.get("ref")
+            if ref and ref.startswith(ref_prefix):
                 # This is a reference to another artifact
-                art_id, target_path = manifest_entry.ref[len(ref_prefix) :].split(
-                    "/", 1
-                )
+                art_id, target_path = ref[len(ref_prefix) :].split("/", 1)
                 art = get_wandb_read_client_artifact(art_id)
                 # this should be None when the requested artifact is deleted from the server.
                 # we want to return None in this case so that the caller can handle it.
@@ -492,17 +531,10 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
             return artifact_fs.FilesystemArtifactFile(self, path)
 
         # This is not a file, assume its a directory. If not, we'll return an empty result.
-        cur_dir = (
-            path  # give better name so the rest of this code block is more readable
-        )
-        if cur_dir == "":
-            dir_ents = manifest.entries.values()
-        else:
-            dir_ents = manifest.get_entries_in_directory(cur_dir)
+        dir_paths = manifest.get_paths_in_directory(path)
         sub_dirs: dict[str, file_base.SubDir] = {}
         files = {}
-        for entry in dir_ents:
-            entry_path = entry.path
+        for entry_path in dir_paths:
             rel_path = os.path.relpath(entry_path, path)
             rel_path_parts = rel_path.split("/")
             if len(rel_path_parts) == 1:

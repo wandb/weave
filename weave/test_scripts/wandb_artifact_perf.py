@@ -43,7 +43,7 @@ async def gql_test() -> None:
     result_paths = []
     start_time = time.time()
     with cProfile.Profile() as profile:
-        paths = list(man.entries.keys())[:1000]
+        paths = list(man.get_paths_in_directory(""))[:1000]
         uris = [
             artifact_wandb.WeaveWBArtifactURI(
                 "raw_data",
