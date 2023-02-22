@@ -576,6 +576,8 @@ def offsets_starting_at_zero(arr: pa.ListArray) -> pa.IntegerArray:
     like the above example.
     """
     raw_offsets = arr.offsets
+    if len(raw_offsets) == 0:
+        return raw_offsets
     first_value = raw_offsets[0]
     if first_value == 0:
         return raw_offsets
