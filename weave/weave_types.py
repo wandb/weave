@@ -651,12 +651,12 @@ class UnionType(Type):
             else:
                 if mem not in all_members:
                     all_members.append(mem)
-        # Remove UnknownType if there are other types
-        non_unknown_members = [
-            mem for mem in all_members if not isinstance(mem, UnknownType)
-        ]
-        if non_unknown_members:
-            all_members = non_unknown_members
+        # # Remove UnknownType if there are other types
+        # non_unknown_members = [
+        #     mem for mem in all_members if not isinstance(mem, UnknownType)
+        # ]
+        # if non_unknown_members:
+        #     all_members = non_unknown_members
         if not all_members:
             raise errors.WeaveInternalError("Attempted to construct empty union")
         object.__setattr__(self, "members", all_members)
