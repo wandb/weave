@@ -296,8 +296,6 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         if self.object_type is None:
             self.object_type = types.TypeRegistry.type_of(self._arrow_data).object_type
         self._artifact = artifact
-        self._mapper = mappers_arrow.map_from_arrow(self.object_type, self._artifact)
-        # TODO: construct mapper
 
     def map_column(
         self,
@@ -494,6 +492,20 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         res = self.map_column(_remove_dictionaries), dictionary_columns
         return res
 
+    def without_dictionaries(self) -> "ArrowWeaveList":
+        def _remove_dictionaries(
+            list: ArrowWeaveList, path: PathType
+        ) -> typing.Optional[ArrowWeaveList]:
+            if pa.types.is_dictionary(list._arrow_data.type):
+                return ArrowWeaveList(
+                    list._arrow_data.dictionary_decode(),
+                    list.object_type,
+                    list._artifact,
+                )
+            return None
+
+        return self.map_column(_remove_dictionaries)
+
     def separate_awls(
         self,
     ) -> typing.Tuple["ArrowWeaveList", dict[PathType, list["ArrowWeaveList"]]]:
@@ -609,101 +621,12 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         return self.map_column(_replace_union_with_struct)
 
     def _arrow_data_asarray_no_tags(self) -> pa.Array:
-        """Cast `self._arrow_data` as an array and recursively strip its tags."""
-
-        # arrow_as_array is idempotent so even though we will hit this on every recursive call,
-        # it will be a no-op after the first time.
-        arrow_data = arrow_as_array(self._arrow_data)
-
-        if isinstance(self.object_type, tagged_value_type.TaggedValueType):
-            return ArrowWeaveList(
-                arrow_data.field("_value"),
-                self.object_type.value,
-                self._artifact,
-            )._arrow_data_asarray_no_tags()
-
-        elif isinstance(self.object_type, (types.TypedDict, types.ObjectType)):
-            # strip tags from each field
-            arrays = []
-            keys = []
-
-            prop_types = self.object_type.property_types
-            if callable(prop_types):
-                prop_types = prop_types()
-
-            if len(prop_types) == 0:
-                return arrow_data
-
-            for field in arrow_data.type:
-                keys.append(field.name)
-                arrays.append(
-                    ArrowWeaveList(
-                        arrow_data.field(field.name),
-                        prop_types[field.name],
-                        self._artifact,
-                    )._arrow_data_asarray_no_tags()
-                )
-            return pa.StructArray.from_arrays(arrays, names=keys)
-
-        elif isinstance(self.object_type, types.List):
-
-            offsets = offsets_starting_at_zero(arrow_data)
-            # strip tags from each element
-            flattened = ArrowWeaveList(
-                arrow_data.flatten(),
-                self.object_type.object_type,
-                self._artifact,
-            )._arrow_data_asarray_no_tags()
-
-            # unflatten
-            return pa.ListArray.from_arrays(
-                offsets, flattened, mask=pa.compute.is_null(arrow_data)
-            )
-
-        elif isinstance(self.object_type, types.UnionType):
-            is_not_simple_nullable_union = (
-                len(
-                    [
-                        member_type
-                        for member_type in self.object_type.members
-                        if not types.NoneType().assign_type(member_type)
-                    ]
-                )
-                > 1
-            )
-
-            if is_not_simple_nullable_union:
-                # strip tags from each element
-                if not isinstance(self._arrow_data, pa.UnionArray):
-                    raise ValueError(
-                        "Expected UnionArray, but got: "
-                        f"{type(self._arrow_data).__name__}"
-                    )
-                if not isinstance(self._mapper, mappers_arrow.ArrowUnionToUnion):
-                    raise ValueError(
-                        "Expected ArrowUnionToUnion, but got: "
-                        f"{type(self._mapper).__name__}"
-                    )
-                tag_stripped_members: list[pa.Array] = []
-                for member_type in self.object_type.members:
-                    tag_stripped_member = ArrowWeaveList(
-                        self._arrow_data.field(
-                            # mypy doesn't recognize that this method is inherited from the
-                            # superclass of ArrowUnionToUnion
-                            self._mapper.type_code_of_type(member_type)  # type: ignore
-                        ),
-                        member_type,
-                        self._artifact,
-                    )._arrow_data_asarray_no_tags()
-                    tag_stripped_members.append(tag_stripped_member)
-
-                return pa.UnionArray.from_dense(
-                    self._arrow_data.type_codes,
-                    self._arrow_data.offsets,
-                    tag_stripped_members,
-                )
-
-        return arrow_data
+        # Remove both tags and dictionaries. You should typically leave
+        # dictionaries as late as possible! So only use this if you're sure
+        # you don't want them.
+        no_tags = self.without_tags()
+        no_dicts = no_tags.without_dictionaries()
+        return no_dicts._arrow_data
 
     def __array__(self, dtype=None):
         # TODO: replace with to_pylist_tagged once refs are supported
@@ -861,20 +784,6 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         return ArrowWeaveList(
             self._arrow_data.dictionary_encode(), self.object_type, self._artifact
         )
-
-    # TODO: this is only used in one test. If we get rid of it, we can get rid
-    # of some mapper stuff too.
-    def _get_col(self, name):
-        if isinstance(self._arrow_data, pa.Table):
-            col = self._arrow_data[name]
-        elif isinstance(self._arrow_data, pa.ChunkedArray):
-            raise NotImplementedError("TODO: implement this")
-        elif isinstance(self._arrow_data, pa.StructArray):
-            col = self._arrow_data.field(name)
-        col_mapper = self._mapper._property_serializers[name]
-        if isinstance(col_mapper, mappers_python_def.DefaultFromPy):
-            return [col_mapper.apply(i.as_py()) for i in col]
-        return col
 
     def _index(self, index: typing.Optional[int]):
         if index == None:
