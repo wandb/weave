@@ -9,7 +9,7 @@ import typing
 from weave import context_state
 from weave import wandb_api
 from weave import util
-from ..artifact_wandb import WandbArtifact, WeaveWBArtifactURI
+from ..artifact_wandb import WandbArtifact, WeaveWBArtifactURI, is_valid_version_index
 from .. import wandb_client_api
 from unittest import mock
 import shutil
@@ -91,13 +91,14 @@ shared_artifact_dir = os.path.abspath(
 )
 
 
+@dataclass
 class FakeVersion:
-    entity = "stacey"
-    project = "mendeleev"
-    _sequence_name = "test_res_1fwmcd3q"
-    version = "v0"
-    name = "test_res_1fwmcd3q:v0"
-    id = "1234567890"
+    entity: str = "stacey"
+    project: str = "mendeleev"
+    _sequence_name: str = "test_res_1fwmcd3q"
+    version: str = "v0"
+    name: str = "test_res_1fwmcd3q:v0"
+    id: str = "1234567890"
 
 
 class FakeVersions:
@@ -170,8 +171,15 @@ class FakeApi:
     client = FakeClient()
     run = mock.Mock(return_value=FakeRun())
 
-    def artifact(self, path):
-        return FakeVersion(path.replace(":", "_"))
+    def artifact(self, path: str) -> FakeVersion:
+        entity, project, name = path.split("/")
+        name, version = name.split(":")
+        return FakeVersion(
+            entity=entity,
+            project=project,
+            name=name,
+            version="v4" if not is_valid_version_index(version) else version,
+        )
 
     def add_mock(
         self,

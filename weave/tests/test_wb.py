@@ -1,4 +1,3 @@
-import graphql
 import pytest
 from weave import stitch
 
@@ -6,6 +5,8 @@ from weave.tests.test_wb_domain_ops import assert_gql_str_equal
 
 from .. import api as weave
 from .. import ops as ops
+from .. import uris
+from .. import artifact_wandb
 
 from . import weavejs_ops
 import json
@@ -1121,22 +1122,24 @@ example_history_keys = {
 
 
 def run_history_mocker(q, ndx):
-    return {
-        "project_518fa79465d8ffaeb91015dce87e092f": {
-            **fwb.project_payload,  # type: ignore
-            "runs_21303e3890a1b6580998e6aa8a345859": {
-                "edges": [
-                    {
-                        "node": {
-                            **fwb.run_payload,  # type: ignore
-                            "historyKeys": example_history_keys,
-                            "history": example_history,
+    if ndx < 2:
+        return {
+            "project_518fa79465d8ffaeb91015dce87e092f": {
+                **fwb.project_payload,  # type: ignore
+                "runs_21303e3890a1b6580998e6aa8a345859": {
+                    "edges": [
+                        {
+                            "node": {
+                                **fwb.run_payload,  # type: ignore
+                                "historyKeys": example_history_keys,
+                                "history": example_history,
+                            }
                         }
-                    }
-                ]
-            },
+                    ]
+                },
+            }
         }
-    }
+    return artifact_version_sdk_response
 
 
 def test_run_history(fake_wandb):
@@ -1366,3 +1369,76 @@ def test_nested_summary_key(fake_wandb):
         weave.use(img_node)
         == "440fab0d6f537b4557a106fa7853453332650631ef580fd328c620bd8aa5a025"
     )
+
+
+@pytest.mark.parametrize(
+    "input_uri, expected_uri",
+    [
+        (
+            "wandb-logged-artifact://long_server_id:latest/path",
+            "wandb-artifact:///random-entity/random-project/run-2isjqtcr-Validation_table:v4/path",
+        ),
+        (
+            "wandb-logged-artifact://long_server_id:v4/path",
+            "wandb-artifact:///random-entity/random-project/run-2isjqtcr-Validation_table:v4/path",
+        ),
+        (
+            "wandb-logged-artifact://1234567890/path",
+            "wandb-artifact:///stacey/mendeleev/test_res_1fwmcd3q:v0/path",
+        ),
+        (
+            "wandb-artifact:///input-entity/input-project/run-2isjqtcr-Validation_table:latest/path",
+            "wandb-artifact:///input-entity/input-project/run-2isjqtcr-Validation_table:v4/path",
+        ),
+        (
+            "wandb-artifact:///input-entity/input-project/run-2isjqtcr-Validation_table:v4/path",
+            "wandb-artifact:///input-entity/input-project/run-2isjqtcr-Validation_table:v4/path",
+        ),
+    ],
+)
+def test_wb_artifact_uri_resolution(fake_wandb, input_uri, expected_uri):
+    if input_uri == "wandb-logged-artifact://1234567890/path":
+        fake_wandb.fake_api.add_mock(lambda q, index: artifact_version_sdk_response)
+    else:
+        fake_wandb.fake_api.add_mock(
+            lambda q, index: {
+                "artifactCollection": {
+                    "id": "QXJ0aWZhY3RDb2xsZWN0aW9uOjUzNDYxMTc2",
+                    "name": "run-2isjqtcr-Validation_table",
+                    "state": "READY",
+                    "project": {
+                        "id": "UHJvamVjdDp2MTpNZXJnZWRfbGlndG5pbmc6Y29udGFjdC1lc3RpbWF0aW9u",
+                        "name": "random-project",
+                        "entity": {
+                            "id": "RW50aXR5OjUwODA2Mg==",
+                            "name": "random-entity",
+                        },
+                    },
+                    "artifactMembership": {
+                        "id": "QXJ0aWZhY3RDb2xsZWN0aW9uTWVtYmVyc2hpcDozNzAxNzE5NDE=",
+                        "versionIndex": 4,
+                    },
+                    "defaultArtifactType": {
+                        "id": "QXJ0aWZhY3RUeXBlOjM1OTgxNA==",
+                        "name": "run_table",
+                    },
+                }
+            }
+        )
+
+    uri = uris.WeaveURI.parse(input_uri)
+    ref = artifact_wandb.WandbArtifactRef.from_uri(uri=uri)
+    assert str(ref) == expected_uri
+
+
+def test_is_valid_version_string():
+    assert not artifact_wandb.is_valid_version_index("latest")
+
+    for v in ["v0", "v1", "v10", "v19"]:
+        assert artifact_wandb.is_valid_version_index(v)
+
+    for v in ["v0.0", "v1.0", "v10.0", "v19.0"]:
+        assert not artifact_wandb.is_valid_version_index(v)
+
+    for v in ["v01", "v0009"]:
+        assert not artifact_wandb.is_valid_version_index(v)
