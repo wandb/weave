@@ -4,7 +4,7 @@ from wandb import data_types as wb_data_types
 import numpy as np
 from wandb.sdk.data_types._dtypes import TypeRegistry as SDKTypeRegistry
 
-from ..ops_primitives import file
+from ..ops_primitives import file, dict_
 from ..ops_domain.wbmedia import ImageArtifactFileRefType
 
 from ..artifact_wandb import WandbArtifact, WeaveWBArtifactURI
@@ -20,6 +20,7 @@ from bokeh.plotting import figure
 import os
 
 from wandb.apis.public import Artifact as PublicArtifact
+from ..ops_domain import wb_util
 
 
 class RandomClass:
@@ -707,3 +708,12 @@ def test_html_encoding_decoding(fake_wandb):
     contents = file.file_contents(file_node)
     result = weave.use(contents)
     assert HTML_STRING in result
+
+
+def test_type_inference_on_nested_pick_from_object_in_dict():
+    bins = [1.0, 2.0, 3.0]
+    hist = wb_util.Histogram(bins, [1, 2])
+    dict_node = dict_(hist=hist)
+    bins_node = dict_node.pick("hist.bins")
+    assert weave.use(bins_node) == bins
+    assert bins_node.type.assign_type(types.List(types.Float()))
