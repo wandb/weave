@@ -1,9 +1,11 @@
 import dataclasses
+import datetime
 import typing
 
 import weave
 from weave import op_def
 from weave import ops_primitives
+from weave.timestamp import PY_DATETIME_MAX_MS, PY_DATETIME_MIN_MS
 
 
 @dataclasses.dataclass
@@ -143,4 +145,84 @@ index = OpSpec(
     ],
 )
 
-OP_TEST_SPECS = [number_add, number_sub, string_add, numbers_max, index]
+number_to_timestamp = OpSpec(
+    op=ops_primitives.Number.to_timestamp,
+    kind=OpKind(arity=1),
+    test_cases=[
+        # Current Time
+        OpSpecTestCase(
+            input=(1677098489000,),
+            expected=datetime.datetime.fromtimestamp(1677098489, datetime.timezone.utc),
+            expected_type=weave.types.Timestamp(),
+        ),
+        # Zero Time
+        OpSpecTestCase(
+            input=(0,),
+            expected=datetime.datetime.fromtimestamp(0, datetime.timezone.utc),
+            expected_type=weave.types.Timestamp(),
+        ),
+        # Negative Time
+        OpSpecTestCase(
+            input=(-1677098489000,),
+            expected=datetime.datetime.fromtimestamp(
+                -1677098489, datetime.timezone.utc
+            ),
+            expected_type=weave.types.Timestamp(),
+        ),
+        # Small Value
+        OpSpecTestCase(
+            input=(1000,),
+            expected=datetime.datetime.fromtimestamp(1, datetime.timezone.utc),
+            expected_type=weave.types.Timestamp(),
+        ),
+        # Large Value
+        OpSpecTestCase(
+            input=(PY_DATETIME_MAX_MS,),
+            expected=datetime.datetime.fromtimestamp(
+                PY_DATETIME_MAX_MS / 1000, datetime.timezone.utc
+            ),
+            expected_type=weave.types.Timestamp(),
+        ),
+        # Large Value (in nanoseconds)
+        OpSpecTestCase(
+            input=(PY_DATETIME_MAX_MS + 12345,),
+            expected=datetime.datetime.fromtimestamp(
+                ((PY_DATETIME_MAX_MS + 12345) // 1000) / 1000, datetime.timezone.utc
+            ),
+            expected_type=weave.types.Timestamp(),
+        ),
+        # Large Negative Value
+        OpSpecTestCase(
+            input=(PY_DATETIME_MIN_MS,),
+            expected=datetime.datetime.fromtimestamp(
+                PY_DATETIME_MIN_MS / 1000, datetime.timezone.utc
+            ),
+            expected_type=weave.types.Timestamp(),
+        ),
+        # Large Negative Value (in nano seconds)
+        OpSpecTestCase(
+            input=(PY_DATETIME_MIN_MS - 12345,),
+            expected=datetime.datetime.fromtimestamp(
+                ((PY_DATETIME_MIN_MS - 12345) // 1000) / 1000, datetime.timezone.utc
+            ),
+            expected_type=weave.types.Timestamp(),
+        ),
+        # Float Value (Drops Fractional Part)
+        OpSpecTestCase(
+            input=(1677098489215.025,),
+            expected=datetime.datetime.fromtimestamp(
+                1677098489.215, datetime.timezone.utc
+            ),
+            expected_type=weave.types.Timestamp(),
+        ),
+    ],
+)
+
+OP_TEST_SPECS = [
+    number_add,
+    number_sub,
+    string_add,
+    numbers_max,
+    number_to_timestamp,
+    index,
+]

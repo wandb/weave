@@ -1036,7 +1036,7 @@ def test_arrow_timestamp_conversion(li):
         datetime.datetime(2020, 1, 2, 3, 4, 5, tzinfo=datetime.timezone.utc),
     ]
     utc_dates = [d.astimezone(datetime.timezone.utc) for d in dates]
-    timestamps = [d.timestamp() for d in utc_dates]
+    timestamps = [d.timestamp() * 1000 for d in utc_dates]
 
     # Direct datetime type
     data = li.make_node(dates)

@@ -84,6 +84,16 @@ def _convert_type(old_type: Weave0TypeJson) -> types.Type:
     #
     elif old_type_name == "timestamp":
         return types.Timestamp()
+    elif (
+        old_type_name == "pythonObject"
+        and old_type.get("params", {}).get("class_name") == "datetime64"
+    ):
+        # This is a bit unfortunate. Weave0 interprets this as a number, then calls
+        # something like `number-toTimestamp` on it. In the future, this should return
+        # timestamp, but for now we'll just return number. Once we convert to Weave1,
+        # we can change this because the frontend will be using this type instead of
+        # figuring it out itself.
+        return types.Int()
     elif old_type_name == "ndarray":
         return ops.LegacyTableNDArrayType()
         # return NumpyArrayType("f", shape=old_type._params.get("shape", (0,)))

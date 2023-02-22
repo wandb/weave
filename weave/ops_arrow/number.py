@@ -7,6 +7,7 @@ from .. import weave_types as types
 from ..api import op
 from .list_ import ArrowWeaveList, ArrowWeaveListType
 from .arrow import arrow_as_array
+from .. import timestamp as weave_timestamp
 
 ARROW_WEAVE_LIST_NUMBER_TYPE = ArrowWeaveListType(types.Number())
 ARROW_WEAVE_LIST_BOOLEAN_TYPE = ArrowWeaveListType(types.Boolean())
@@ -312,18 +313,38 @@ def stddev(self):
 @arrow_op(
     name="ArrowWeaveListNumber-toTimestamp",
     input_type=unary_input_type,
-    output_type=ArrowWeaveListType(types.optional(types.Timestamp())),
+    output_type=ArrowWeaveListType(types.Timestamp()),
 )
 def to_timestamp(self):
-    # TODO: We may need to handle more conversion points similar to Weave0
-    timestamp_second_upper_bound = 60 * 60 * 24 * 365 * 1000
-    # first 1000 years
-    second_mask = pc.less(self._arrow_data, timestamp_second_upper_bound)
-    data = pc.replace_with_mask(
-        self._arrow_data, second_mask, pc.multiply(self._arrow_data, pa.scalar(1000.0))
+    data = self._arrow_data
+    try:
+        data = data.cast("float64")
+    except pa.ArrowInvalid:
+        # In the case that our data overflows the bounds of a float64,
+        # we just proceed with the original data. If this is the case,
+        # then the data is already a high enough precision timestamp
+        # and we will need to adjust it anyway.
+        pass
+
+    def adjustment_mask():
+        return pc.or_(
+            pc.less(data, weave_timestamp.PY_DATETIME_MIN_MS),
+            pc.greater(data, weave_timestamp.PY_DATETIME_MAX_MS),
+        )
+
+    mask = adjustment_mask()
+
+    # In practice this should only ever need to run once or twice.
+    while pc.sum(mask).as_py() > 0:
+        adjusted_data = pc.divide(data, 1000)
+        data = pc.if_else(mask, adjusted_data, data)
+        mask = adjustment_mask()
+
+    data_as_timestamp = (
+        pc.floor(data).cast("int64").cast(pa.timestamp("ms", tz="+00:00"))
     )
     return ArrowWeaveList(
-        data.cast("int64").cast(pa.timestamp("ms", tz="+00:00")),
+        data_as_timestamp,
         types.Timestamp(),
         self._artifact,
     )

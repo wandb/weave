@@ -9,7 +9,7 @@ from collections.abc import Iterable
 from . import box
 from . import errors
 from . import mappers_python
-from .timestamp import tz_aware_dt
+from . import timestamp as weave_timestamp
 
 
 if typing.TYPE_CHECKING:
@@ -602,13 +602,13 @@ class LegacyDate(Type):
                 "save_instance invalid when artifact is None for type: %s" % self
             )
         with artifact.new_file(f"{name}.object.json") as f:
-            v = int(tz_aware_dt(obj).timestamp() * 1000)
+            v = weave_timestamp.python_datetime_to_ms(obj)
             json.dump(v, f)
 
     def load_instance(self, artifact, name, extra=None):
         with artifact.open(f"{name}.object.json") as f:
             v = json.load(f)
-            return datetime.datetime.fromtimestamp(v / 1000, tz=datetime.timezone.utc)
+            return weave_timestamp.ms_to_python_datetime(v)
 
 
 class Timestamp(Type):
@@ -626,13 +626,13 @@ class Timestamp(Type):
                 "save_instance invalid when artifact is None for type: %s" % self
             )
         with artifact.new_file(f"{name}.object.json") as f:
-            v = int(tz_aware_dt(obj).timestamp() * 1000)
+            v = weave_timestamp.python_datetime_to_ms(obj)
             json.dump(v, f)
 
     def load_instance(self, artifact, name, extra=None):
         with artifact.open(f"{name}.object.json") as f:
             v = json.load(f)
-            return datetime.datetime.fromtimestamp(v / 1000, tz=datetime.timezone.utc)
+            return weave_timestamp.ms_to_python_datetime(v)
 
 
 @dataclasses.dataclass(frozen=True)

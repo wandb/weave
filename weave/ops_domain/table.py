@@ -14,6 +14,7 @@ from .. import wandb_util
 from .. import weave_internal
 from .. import engine_trace
 from . import wbmedia
+from .. import timestamp as weave_timestamp
 
 
 @dataclasses.dataclass(frozen=True)
@@ -374,8 +375,8 @@ def _table_data_to_weave1_objects(
         # timestamps all expose a common interface to weave1 callers.
         elif isinstance(cell_type, types.Timestamp):
             if cell is not None:
-                cell = datetime.datetime.fromtimestamp(
-                    cell / 1000, tz=datetime.timezone.utc
+                cell = weave_timestamp.ms_to_python_datetime(
+                    weave_timestamp.unitless_int_to_inferred_ms(cell)
                 )
         elif isinstance(cell, dict) and isinstance(
             cell_type, possible_media_type_classes

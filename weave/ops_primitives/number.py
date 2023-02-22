@@ -1,9 +1,11 @@
 import typing
 import datetime
 import math
+
 from ..api import op, weave_class
 from .. import weave_types as types
 import numpy as np
+from .. import timestamp as weave_timestamp
 
 binary_number_op_input_type = {
     "lhs": types.Number(),
@@ -200,12 +202,9 @@ class Number(object):
         output_type=types.Timestamp(),
     )
     def to_timestamp(val):
-        # TODO: We may need to handle more conversion points similar to Weave0
-        timestamp_second_upper_bound = 60 * 60 * 24 * 365 * 1000
-        # first 1000 years
-        if val > timestamp_second_upper_bound:
-            val = val / 1000
-        return datetime.datetime.fromtimestamp(val, tz=datetime.timezone.utc)
+        return weave_timestamp.ms_to_python_datetime(
+            weave_timestamp.unitless_int_to_inferred_ms(val)
+        )
 
     @op(
         name="number-toString",
