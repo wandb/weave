@@ -712,7 +712,7 @@ def join_all(arrs, joinFn, outer: bool):
 
 @op(name="range")
 def op_range(start: int, stop: int, step: int) -> list[int]:
-    return list(range(start, stop, step))
+    return list(range(int(start), int(stop), int(step)))
 
 
 @op(

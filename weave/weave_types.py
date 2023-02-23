@@ -964,7 +964,7 @@ class Function(Type):
         )
 
     def _is_assignable_to(self, other_type) -> typing.Optional[bool]:
-        if other_type.__class__ != Function:
+        if other_type.__class__ != Function and len(self.input_types) == 0:
             return other_type.assign_type(self.output_type)
         return None
 

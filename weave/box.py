@@ -58,7 +58,11 @@ class BoxedList(list):
 
 class BoxedDatetime(datetime.datetime):
     def __eq__(self, other):
-        return self.timestamp() == other.timestamp()
+
+        return (
+            isinstance(other, datetime.datetime)
+            and self.timestamp() == other.timestamp()
+        )
 
 
 def cannot_have_weakref(obj: typing.Any):
