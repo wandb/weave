@@ -199,10 +199,14 @@ class List:
     @op(
         name="dropna",
         input_type={"arr": types.List(types.Any())},
-        output_type=lambda input_types: input_types["arr"],
+        output_type=lambda input_types: types.List(
+            types.non_none(input_types["arr"].object_type)
+            if types.non_none(input_types["arr"].object_type) != types.Invalid()
+            else types.NoneType()
+        ),
     )
     def dropna(arr):
-        return [i for i in arr if i is not None]
+        return [i for i in arr if i != None]
 
     @op(
         name="concat",

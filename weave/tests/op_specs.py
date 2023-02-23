@@ -145,6 +145,29 @@ index = OpSpec(
     ],
 )
 
+
+dropna = OpSpec(
+    op=ops_primitives.List.dropna,
+    kind=OpKind(arity=1),
+    test_cases=[
+        OpSpecTestCase(
+            input=([1, 2, 3],),
+            expected=[1, 2, 3],
+            expected_type=weave.types.List(weave.types.Int()),
+        ),
+        OpSpecTestCase(
+            input=([1, None, 3],),
+            expected=[1, 3],
+            expected_type=weave.types.List(weave.types.Int()),
+        ),
+        OpSpecTestCase(
+            input=([None, None, None],),
+            expected=[],
+            expected_type=weave.types.List(weave.types.NoneType()),
+        ),
+    ],
+)
+
 number_to_timestamp = OpSpec(
     op=ops_primitives.Number.to_timestamp,
     kind=OpKind(arity=1),
@@ -218,6 +241,7 @@ number_to_timestamp = OpSpec(
     ],
 )
 
+
 OP_TEST_SPECS = [
     number_add,
     number_sub,
@@ -225,4 +249,5 @@ OP_TEST_SPECS = [
     numbers_max,
     number_to_timestamp,
     index,
+    dropna,
 ]

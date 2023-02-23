@@ -247,7 +247,6 @@ def _is_non_simd_node(node: graph.OutputNode, vectorized_keys: set[str]):
         "2DProjection",
         "count",
         "joinToStr",
-        "dropna",
         "unique",
         "numbers-sum",
         "numbers-avg",
@@ -429,6 +428,14 @@ def vectorize(
         elif node_name.endswith("numbers-max"):
             inputs_as_awl = _vectorized_inputs_as_awl(node_inputs, vectorized_keys)
             return arraylist_ops.list_numbers_max(*inputs_as_awl.values())
+        elif node_name == "dropna":
+            arg_names = list(node_inputs.keys())
+            if arg_names[0] in vectorized_keys:
+                op = registry_mem.memory_registry.get_op(
+                    "ArrowWeaveListList-vectorizedDropna"
+                )
+                inputs_as_awl = _vectorized_inputs_as_awl(node_inputs, vectorized_keys)
+                return op.lazy_call(*inputs_as_awl.values())
 
         # 4. Non SIMD ops (List/AWL)
         if _is_non_simd_node(node, vectorized_keys):

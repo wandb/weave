@@ -165,3 +165,18 @@ def test_mapeach_tagged():
         for j in range(3):
             assert weave.use(tag_getter_op_row(result[i][j])) == i
             assert weave.use(tag_getter_op_col(result[i][j])) == j
+
+
+def test_dropna_tagged():
+    raw_data = [1, None, 3]
+    for i, item in enumerate(raw_data):
+        raw_data[i] = tag_store.add_tags(box.box(item), {"row": i})
+    list_node = weave.save(raw_data)
+    dropnaed = list_node.dropna()
+
+    assert weave.use(dropnaed) == [1, 3]
+
+    tag_getter_op_row = make_tag_getter_op.make_tag_getter_op("row", types.Int())
+
+    for i, val in enumerate([0, 2]):
+        assert weave.use(tag_getter_op_row(dropnaed[i])) == val

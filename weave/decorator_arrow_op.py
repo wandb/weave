@@ -13,9 +13,9 @@ InputTypeDict = typing.Mapping[str, TypeOrCallable]
 
 def _nullify_vector_type(t: types.Type) -> types.Type:
     if isinstance(t, ArrowWeaveListType):
-        return ArrowWeaveListType(_nullify_vector_type(t.object_type))
+        return ArrowWeaveListType(types.optional(t.object_type))
     elif isinstance(t, types.List):
-        return types.List(_nullify_vector_type(t.object_type))
+        return types.List(types.optional(t.object_type))
     elif isinstance(t, tagged_value_type.TaggedValueType):
         return tagged_value_type.TaggedValueType(t.tag, _nullify_vector_type(t.value))
     elif isinstance(t, types.UnionType):
@@ -78,13 +78,20 @@ def _make_new_vector_output_type_callable(old_type_func: TypeCallable) -> TypeCa
         assert ArrowWeaveListType().assign_type(first_input_type)
         first_input_type = typing.cast(ArrowWeaveListType, first_input_type)
 
+        has_optional_vector_type = types.is_optional(first_input_type.object_type)
+        if has_optional_vector_type:
+            first_input_type = ArrowWeaveListType(
+                types.non_none(first_input_type.object_type)
+            )
+            non_callable_input_types[first_input_type_name] = first_input_type
+
         old_type = typing.cast(
             ArrowWeaveListType, old_type_func(non_callable_input_types)
         )
 
         tag_propagated_output_type = _handle_arrow_tags(old_type, first_input_type)
 
-        if types.is_optional(first_input_type.object_type):
+        if has_optional_vector_type:
             return _nullify_vector_type(tag_propagated_output_type)
         return tag_propagated_output_type
 
