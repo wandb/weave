@@ -7,6 +7,16 @@ import ipynbname
 import typing
 
 
+def init_sentry():
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.logging import LoggingIntegration
+    except ImportError:
+        return
+    # Disable logs going to Sentry. Its slow
+    sentry_sdk.init(integrations=[LoggingIntegration(level=None, event_level=None)])
+
+
 def raise_exception_with_sentry_if_available(
     err: Exception, fingerprint: typing.Any
 ) -> typing.NoReturn:
