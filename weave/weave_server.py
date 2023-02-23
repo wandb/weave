@@ -152,8 +152,6 @@ def enable_stream_logging(
 
 
 def configure_logger():
-    util.init_sentry()
-
     # Disable ddtrace logs, not sure why they're turned on.
     log = logging.getLogger("ddtrace")
     log.setLevel(logging.ERROR)

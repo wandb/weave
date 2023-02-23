@@ -6,8 +6,15 @@ import gc, inspect
 import ipynbname
 import typing
 
+sentry_inited = False
+
 
 def init_sentry():
+    global sentry_inited
+    if sentry_inited:
+        return
+    sentry_inited = True
+
     try:
         import sentry_sdk
         from sentry_sdk.integrations.logging import LoggingIntegration
@@ -20,6 +27,7 @@ def init_sentry():
 def raise_exception_with_sentry_if_available(
     err: Exception, fingerprint: typing.Any
 ) -> typing.NoReturn:
+    init_sentry()
     try:
         import sentry_sdk
     except ImportError:
@@ -37,6 +45,7 @@ def raise_exception_with_sentry_if_available(
 def capture_exception_with_sentry_if_available(
     err: Exception, fingerprint: typing.Any
 ) -> None:
+    init_sentry()
     try:
         import sentry_sdk
     except ImportError:
