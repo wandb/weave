@@ -152,6 +152,8 @@ def enable_stream_logging(
 
 
 def configure_logger():
+    util.init_sentry()
+
     # Disable ddtrace logs, not sure why they're turned on.
     log = logging.getLogger("ddtrace")
     log.setLevel(logging.ERROR)
@@ -216,7 +218,8 @@ def list_ops():
 @blueprint.route("/__weave/execute", methods=["POST"])
 def execute():
     """Execute endpoint used by WeaveJS."""
-    req_bytes = request.data
+    with tracer.trace("read_request"):
+        req_bytes = request.data
     req_compressed = zlib.compress(req_bytes)
     req_b64 = base64.b64encode(req_compressed).decode("ascii")
     logging.info(
