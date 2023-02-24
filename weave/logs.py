@@ -130,26 +130,47 @@ def configure_logger() -> None:
     logger = logging.getLogger("root")
     logger.setLevel(env_log_level())
 
-    enable_datadog = os.getenv("DD_ENV")
+    dd_env = os.getenv("DD_ENV")
+    enable_datadog = dd_env
     if not enable_datadog:
+        # This is the standard path for users.
         if os.getenv("WEAVE_SERVER_ENABLE_LOGGING"):
+            # WEAVE_SERVER_ENABLE_LOGGING forces the logs to go to the wsgi
+            # stream which will go to the console. We set this flag in our
+            # server start scripts, so that if you run the server in its own
+            # terminal, you get the logs.
             enable_stream_logging(
                 logger,
                 wsgi_stream_settings=LogSettings(LogFormat.PRETTY, "INFO"),
                 pid_logfile_settings=LogSettings(LogFormat.PRETTY, "INFO"),
             )
         else:
+            # This is the default case. Log to a file for this process, but
+            # do not write to standard out/error. This is important because
+            # when you run Weave in a notebook, it'll create a server, but
+            # we don't want the logs to show up in the notebook.
             enable_stream_logging(
                 logger,
                 pid_logfile_settings=LogSettings(LogFormat.PRETTY, "INFO"),
             )
     else:
-        if environment.wandb_production():
+        if dd_env == "ci":
+            # CI expects logs in the pid logfile
+            enable_stream_logging(
+                logger,
+                wsgi_stream_settings=LogSettings(LogFormat.PRETTY, "INFO"),
+                pid_logfile_settings=LogSettings(LogFormat.PRETTY, "INFO"),
+            )
+        elif environment.wandb_production():
+            # Only log in the datadog format to the wsgi stream
             enable_stream_logging(
                 logger,
                 wsgi_stream_settings=LogSettings(LogFormat.DATADOG, "DEBUG"),
             )
         else:
+            # Otherwise this is dev mode with datadog logging turned on.
+            # Log to standard out and a known filename that the datadog
+            # agent can watch.
             enable_stream_logging(
                 logger,
                 wsgi_stream_settings=LogSettings(LogFormat.PRETTY, "INFO"),
