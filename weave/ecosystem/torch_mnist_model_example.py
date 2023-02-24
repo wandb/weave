@@ -39,7 +39,10 @@ class Model:
     pred_fn: torch.nn.Sequential  # just the torch model above for now
 
     @weave.op(
-        input_type={"X": lambda input_type: input_type["self"].input_type},
+        input_type={
+            "self": ModelType(),
+            "X": lambda input_type: input_type["self"].input_type,
+        },
         # TODO
         # output_type=lambda input_type: weave.types.List(
         #     weave.types.TypedDict(
