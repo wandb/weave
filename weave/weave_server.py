@@ -253,6 +253,7 @@ if not environment.wandb_production() and DEBUG_MEM:
 app = make_app()
 
 if os.getenv("WEAVE_SERVER_DEBUG"):
+    logs.configure_logger()
 
     @app.errorhandler(HTTPException)
     def handle_exception(e):

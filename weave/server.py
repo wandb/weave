@@ -191,4 +191,5 @@ def capture_weave_server_logs(log_level: str = "INFO"):
     logs.enable_stream_logging(
         logger,
         wsgi_stream_settings=logs.LogSettings(logs.LogFormat.PRETTY, log_level),
+        pid_logfile_settings=logs.LogSettings(logs.LogFormat.PRETTY, log_level),
     )

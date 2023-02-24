@@ -6,6 +6,7 @@ import os
 import pathlib
 import logging
 import logging.config
+from logging.handlers import WatchedFileHandler
 from flask.logging import wsgi_errors_stream
 from pythonjsonlogger import jsonlogger
 import typing
@@ -31,7 +32,7 @@ default_log_format = "[%(asctime)s] %(levelname)s in %(module)s (Thread Name: %(
 def get_logdir() -> typing.Optional[str]:
     logdir = "/tmp/weave/log"
     try:
-        pathlib.Path(logdir).parent.mkdir(exist_ok=True, parents=True)
+        pathlib.Path(logdir).mkdir(exist_ok=True, parents=True)
     except OSError:
         warnings.warn(
             f"weave: Unable make log dir '{logdir}'. Filesystem logging will be disabled for "
@@ -48,7 +49,7 @@ def get_logfile_path(logfile_path: str) -> typing.Optional[str]:
         return None
     full_path = pathlib.Path(logdir) / logfile_path
     try:
-        full_path.parent.mkdir(exist_ok=True, parents=True)
+        full_path.touch()
     except OSError:
         warnings.warn(
             f"weave: Unable to touch logfile at '{full_path}'. Filesystem logging will be disabled for "
@@ -57,6 +58,11 @@ def get_logfile_path(logfile_path: str) -> typing.Optional[str]:
         )
         return None
     return str(full_path)
+
+
+def default_log_filename() -> typing.Optional[str]:
+    pid = os.getpid()
+    return get_logfile_path(f"{pid}.log")
 
 
 def env_log_level() -> typing.Any:
@@ -101,10 +107,10 @@ def enable_stream_logging(
         logger.addHandler(handler)
 
     if pid_logfile_settings is not None:
-        pid = os.getpid()
-        log_filename = get_logfile_path(f"{pid}.log")
+        log_filename = default_log_filename()
         if log_filename:
-            handler = logging.FileHandler(log_filename, mode="w")
+
+            handler = WatchedFileHandler(log_filename, mode="w")
             setup_handler(handler, pid_logfile_settings)
             logger.addHandler(handler)
 
@@ -126,10 +132,17 @@ def configure_logger() -> None:
 
     enable_datadog = os.getenv("DD_ENV")
     if not enable_datadog:
-        enable_stream_logging(
-            logger,
-            pid_logfile_settings=LogSettings(LogFormat.PRETTY, "INFO"),
-        )
+        if os.getenv("WEAVE_SERVER_ENABLE_LOGGING"):
+            enable_stream_logging(
+                logger,
+                wsgi_stream_settings=LogSettings(LogFormat.PRETTY, "INFO"),
+                pid_logfile_settings=LogSettings(LogFormat.PRETTY, "INFO"),
+            )
+        else:
+            enable_stream_logging(
+                logger,
+                pid_logfile_settings=LogSettings(LogFormat.PRETTY, "INFO"),
+            )
     else:
         if environment.wandb_production():
             enable_stream_logging(
