@@ -208,6 +208,9 @@ class Type(metaclass=_TypeSubclassWatcher):
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}()"
 
+    def __name__(self) -> str:
+        return self.__repr__()
+
     def simple_str(self) -> str:
         return str(self)
 

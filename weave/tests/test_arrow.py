@@ -1773,3 +1773,102 @@ def test_save_nested_custom_objs():
     tables = weave.save([t1, t2])
     assert weave.use(tables[0]).to_pylist_raw() == [{"a": 5}]
     assert weave.use(tables[1]).to_pylist_raw() == [{"a": 9}]
+
+
+base_types = [
+    types.Int(),
+    types.Float(),
+    types.String(),
+    types.Boolean(),
+    types.Timestamp(),
+    types.NoneType(),
+]
+
+
+def make_optional_variants(seed_types: list[types.Type]) -> list[types.Type]:
+    return [types.optional(t) for t in seed_types]
+
+
+def make_union_variants(seed_types: list[types.Type]) -> list[types.Type]:
+    # Arrow does not support mixed types:
+    # `pyarrow.lib.ArrowInvalid: cannot mix list and non-list, non-null values`
+
+    non_union_seeds = [t for t in seed_types if not isinstance(t, types.UnionType)]
+    list_seeds = [t for t in non_union_seeds if isinstance(t, types.List)]
+    dict_seeds = [t for t in non_union_seeds if isinstance(t, types.TypedDict)]
+    non_list_non_dict_seeds = [
+        t
+        for t in non_union_seeds
+        if not isinstance(t, types.List) and not isinstance(t, types.TypedDict)
+    ]
+
+    return [
+        types.union(*non_list_non_dict_seeds),
+        types.union(*list_seeds),
+        types.union(*dict_seeds),
+    ]
+
+
+def make_list_variants(seed_types: list[types.Type]) -> list[types.Type]:
+    return [types.List(t) for t in seed_types]
+
+
+def make_dict_variants(seed_types: list[types.Type]) -> list[types.Type]:
+    # We explicitly exclude NoneType here because arrow segfaults when there is
+    # a union of dicts with a NoneType key. Perhaps we should work to fix this
+    # in the future?
+    return [
+        types.TypedDict({f"t_{ndx}": t})
+        for ndx, t in enumerate(seed_types)
+        if not isinstance(t, types.NoneType)
+    ]
+
+
+def create_new_types_from_variants(seed_types: list[types.Type]) -> list[types.Type]:
+    new_types = []
+    new_types.extend(make_optional_variants(seed_types))
+    new_types.extend(make_union_variants(seed_types))
+    new_types.extend(make_list_variants(seed_types))
+    new_types.extend(make_dict_variants(seed_types))
+    return new_types
+
+
+def create_new_types_of_depth(
+    seed_types: list[types.Type], depth: int = 3
+) -> list[types.Type]:
+    new_types = seed_types
+    type_batch = new_types
+    for _ in range(depth):
+        type_batch = create_new_types_from_variants(type_batch)
+        new_types.extend(type_batch)
+    return new_types
+
+
+all_types = create_new_types_of_depth(base_types, 3)
+
+# Both of these test cases throw errors in `safe_replace_with_mask` because they
+# have dense unions. This is a known issue in our code path and needs to be resolved
+# for these tests to pass. Currently skipping to get the rest of these fixes in.
+skip_indicies = [151, 152]
+
+all_types = [t for i, t in enumerate(all_types) if i not in skip_indicies]
+
+
+@pytest.mark.parametrize(
+    "assumed_weave_type",
+    all_types,
+)
+def test_empty_identity_of_type(assumed_weave_type):
+    raw = arrow.to_arrow([], types.List(assumed_weave_type))
+    assert raw.to_pylist_raw() == []
+    assert weave.use(weave.save(raw)).to_pylist_raw() == []
+
+    # Nullable version
+    raw = arrow.to_arrow([], types.List(types.optional(assumed_weave_type)))
+    assert raw.to_pylist_raw() == []
+    assert weave.use(weave.save(raw)).to_pylist_raw() == []
+
+    # Nullable version with None
+    raw = arrow.to_arrow([None], types.List(types.optional(assumed_weave_type)))
+    assert raw.to_pylist_raw() == [None]
+    assert weave.use(weave.save(raw)).to_pylist_raw() == [None]

@@ -58,7 +58,15 @@ def safe_replace_with_mask(
             arrays.append(result)
             names.append(field.name)
 
-        return pa.StructArray.from_arrays(arrays, names)
+        return pa.StructArray.from_arrays(
+            arrays,
+            names,
+            mask=pc.replace_with_mask(
+                pa.compute.invert(array.is_valid()),
+                mask,
+                pa.compute.invert(replacements.is_valid()),
+            ),
+        )
     elif pa.types.is_list(array.type):
         # Note: this is admittedly not efficient, but there does not seem to be
         # a better alternative. Basically, `pc.replace_with_mask` does not work
@@ -291,6 +299,20 @@ def adjust_table_after_parquet_deserialization(table: pa.Table) -> pa.Table:
                 raise errors.WeaveTypeError(
                     "Expected struct array with type code field"
                 )
+            if len(type_code_array) == type_code_array.null_count:
+                # Nulls should only be in the type code array in the specific
+                # instance that this entire column is null. If any entry is not
+                # null, then the type code for the null elements will be the
+                # first null type code in the union. However, in the case that
+                # everything is null, then the entire block is nulled out. Here
+                # we can just use the first type code in the union as the type
+                # code for the entire column.  This is because our serialization
+                # side correctly applies the mask to this union column. When
+                # pyarrow can represent nulls using one of the type codes, then
+                # the mask will always be all true, even if there are nulls.
+                # However, if the entire thing is null, payarrow's mask is false
+                # for the whole column.
+                type_code_array = pc.fill_null(type_code_array, 0)
             sparse = pa.UnionArray.from_sparse(type_code_array, arrays)
             new_col = sparse_union_to_dense_union(sparse)
             column_name = column_name[len(ArrowArrayType.UNION_PREFIX) :]
@@ -347,13 +369,14 @@ def adjust_table_after_parquet_deserialization(table: pa.Table) -> pa.Table:
                     name,
                     array,
                 ) = convert_struct_to_union_and_nullify_dummy_empty_structs(
-                    pa.chunked_array(a.flatten()), column_name
+                    pa.chunked_array(a.flatten()), column.type.value_field.name
                 )
                 new_col.append(
                     pa.ListArray.from_arrays(
                         offsets_starting_at_zero(a),
                         array.combine_chunks(),
                         mask=pa.compute.is_null(a),
+                        type=pa.list_(pa.field(name, array.type)),
                     )
                 )
             return column_name, pa.chunked_array(new_col)
@@ -388,7 +411,6 @@ def adjust_table_for_parquet_serialization(table: pa.Table) -> pa.Table:
 
                     arrays = []
                     names = []
-
                     for i, field in enumerate(a.type):
                         arrays.append(a.field(i))
                         names.append(field.name)
@@ -451,13 +473,14 @@ def adjust_table_for_parquet_serialization(table: pa.Table) -> pa.Table:
                     new_name,
                     chunked_array,
                 ) = recursively_convert_unions_to_structs_and_impute_empty_structs(
-                    pa.chunked_array(a.flatten()), column_name
+                    pa.chunked_array(a.flatten()), column.type.value_field.name
                 )
                 new_col.append(
                     pa.ListArray.from_arrays(
                         offsets_starting_at_zero(a),
                         chunked_array.combine_chunks(),
                         mask=pa.compute.invert(a.is_valid()),
+                        type=pa.list_(pa.field(new_name, chunked_array.type)),
                     )
                 )
 
@@ -727,6 +750,7 @@ def rewrite_weavelist_refs(arrow_data, object_type, source_artifact, target_arti
                 source_artifact,
                 target_artifact,
             ),
+            mask=pa.compute.is_null(data),
         )
     else:
         # We have a column of refs

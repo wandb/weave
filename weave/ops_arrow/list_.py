@@ -313,6 +313,9 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         path: PathType,
     ) -> "ArrowWeaveList":
         with_mapped_children = self
+        if isinstance(self._arrow_data, pa.NullArray):
+            # If we are a null array, then there is nothing to map
+            return self
         if isinstance(self.object_type, types.Const):
             with_mapped_children = ArrowWeaveList(
                 self._arrow_data, self.object_type.val_type, self._artifact
