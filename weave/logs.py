@@ -176,6 +176,3 @@ def configure_logger() -> None:
                 wsgi_stream_settings=LogSettings(LogFormat.PRETTY, "INFO"),
                 server_logfile_settings=LogSettings(LogFormat.DATADOG, "DEBUG"),
             )
-
-
-configure_logger()

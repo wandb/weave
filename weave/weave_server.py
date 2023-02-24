@@ -89,6 +89,8 @@ blueprint = Blueprint("weave", "weave-server", static_folder=static_folder)
 
 
 def make_app():
+    logs.configure_logger()
+
     app = Flask(__name__)
     app.register_blueprint(blueprint)
 
@@ -253,7 +255,6 @@ if not environment.wandb_production() and DEBUG_MEM:
 app = make_app()
 
 if os.getenv("WEAVE_SERVER_DEBUG"):
-    logs.configure_logger()
 
     @app.errorhandler(HTTPException)
     def handle_exception(e):
