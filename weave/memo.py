@@ -37,11 +37,11 @@ def memo(f: typing.Any) -> typing.Any:
         key = (f, args, tuple(kwargs.items()))
         try:
             val = storage[key]
-            statsd.increment("weave.memo.hit")
+            # statsd.increment("weave.memo.hit")
             return val
         except KeyError:
             pass
-        statsd.increment("weave.memo.miss")
+        # statsd.increment("weave.memo.miss")
         result = f(*args, **kwargs)
         storage[key] = result
         return result
