@@ -6,6 +6,7 @@ from .. import ops
 from .. import context
 from .. import server
 from .. import weave_server
+from .. import logs
 
 import pytest
 
@@ -17,9 +18,11 @@ def test_logfile_created(fresh_server_logfile):
         assert api.use(ops.Number.__add__(3, 9)) == 12
 
         # check that the log file was created
-        assert os.path.exists(weave_server.default_log_filename)
+        log_filename = logs.default_log_filename()
+        assert log_filename
+        assert os.path.exists(log_filename)
 
-        with open(weave_server.default_log_filename, "r") as f:
+        with open(log_filename, "r") as f:
             content = f.read()
 
         # check that it has a record of executing one call
@@ -34,9 +37,11 @@ def test_logfile_captures_error(fresh_server_logfile):
             api.use(ops.Number.__add__(4, "a"))
 
         # check that the log file was created
-        assert os.path.exists(weave_server.default_log_filename)
+        log_filename = logs.default_log_filename()
+        assert log_filename
+        assert os.path.exists(log_filename)
 
-        with open(weave_server.default_log_filename, "r") as f:
+        with open(log_filename, "r") as f:
             content = f.read()
 
         # check that it has a record of executing one call
@@ -55,9 +60,11 @@ def test_log_2_app_instances_different_threads(fresh_server_logfile):
         assert api.use(ops.Number.__add__(3, 9)) == 12
 
     # check that the log file was created
-    assert os.path.exists(weave_server.default_log_filename)
+    log_filename = logs.default_log_filename()
+    assert log_filename
+    assert os.path.exists(log_filename)
 
-    with open(weave_server.default_log_filename, "r") as f:
+    with open(log_filename, "r") as f:
         content = f.read()
 
     # check that it has a record of executing one call
@@ -80,9 +87,11 @@ def test_capture_server_logs_captures_server_logs(fresh_server_logfile, capsys):
         assert api.use(ops.Number.__add__(3, 9)) == 12
 
         # check that the log file was created
-        assert os.path.exists(weave_server.default_log_filename)
+        log_filename = logs.default_log_filename()
+        assert log_filename
+        assert os.path.exists(log_filename)
 
-        with open(weave_server.default_log_filename, "r") as f:
+        with open(log_filename, "r") as f:
             content = f.read()
 
         # check that it has a record of executing one call
