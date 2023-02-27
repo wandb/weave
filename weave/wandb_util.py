@@ -130,10 +130,10 @@ def _convert_type(old_type: Weave0TypeJson) -> types.Type:
             else None
         )
         return ops.ImageArtifactFileRefType(
-            boxLayersType,
-            boxScoreKeysType,
-            maskLayersType,
-            classMapType,
+            boxLayers=boxLayersType,
+            boxScoreKeys=boxScoreKeysType,
+            maskLayers=maskLayersType,
+            classMap=classMapType,
         )
     elif old_type_name == "audio-file" or (
         is_python_object_type and old_type["params"].get("class_name") == "Audio"

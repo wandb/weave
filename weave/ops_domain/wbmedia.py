@@ -1,4 +1,8 @@
 # Implements backward compatibility for existing W&B Media types.
+#
+# There is serious type hacking going on here, to match the legacy types.
+# This file should not be used as an example of how to implement new stuff
+# in Weave!
 
 import dataclasses
 import typing
@@ -41,6 +45,15 @@ class LegacyImageArtifactFileRefType(types.ObjectType):
 @dataclasses.dataclass(frozen=True)
 class ImageArtifactFileRefType(types.ObjectType):
     name = "image-file"
+
+    # set base type correctly. This allows any ops that are available
+    # on the base type to be called on objects of this type, like
+    # direct_url, etc.
+    _base_type = artifact_fs.FilesystemArtifactFileType
+    # base attributes
+    extension: types.Type = types.String()
+    wbObjectType: types.Type = types.Any()
+
     boxLayers: dict[str, list] = dataclasses.field(default_factory=dict)
     boxScoreKeys: list = dataclasses.field(default_factory=list)
     maskLayers: dict[str, list] = dataclasses.field(default_factory=dict)
@@ -205,10 +218,10 @@ class ImageArtifactFileRefType(types.ObjectType):
     @classmethod
     def from_dict(cls, d):
         return cls(
-            d.get("boxLayers", {}),
-            d.get("boxScoreKeys", []),
-            d.get("maskLayers", {}),
-            d.get("classMap", {}),
+            boxLayers=d.get("boxLayers", {}),
+            boxScoreKeys=d.get("boxScoreKeys", []),
+            maskLayers=d.get("maskLayers", {}),
+            classMap=d.get("classMap", {}),
         )
 
 

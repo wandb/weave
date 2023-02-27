@@ -707,3 +707,41 @@ def test_html_encoding_decoding(fake_wandb):
     contents = file.file_contents(file_node)
     result = weave.use(contents)
     assert HTML_STRING in result
+
+
+MEDIA_TYPE_EXAMPLES = [
+    ImageArtifactFileRefType(
+        boxLayers={"box_set_1": [0], "box_set_2": [2]},
+        boxScoreKeys=["loss", "gain"],
+        maskLayers={"mask_set_1": [0, 1, 2, 3]},
+        classMap={
+            "0": "c_zero",
+            "1": "c_one",
+            "2": "c_two",
+            "3": "c_three",
+        },
+    )
+]
+
+
+@pytest.mark.parametrize("media_type", MEDIA_TYPE_EXAMPLES)
+def test_media_type_saveload(media_type):
+    media_type = ImageArtifactFileRefType(
+        boxLayers={"box_set_1": [0], "box_set_2": [2]},
+        boxScoreKeys=["loss", "gain"],
+        maskLayers={"mask_set_1": [0, 1, 2, 3]},
+        classMap={
+            "0": "c_zero",
+            "1": "c_one",
+            "2": "c_two",
+            "3": "c_three",
+        },
+    )
+    t2 = types.TypeRegistry.type_from_dict(media_type.to_dict())
+    assert media_type == t2
+
+
+@pytest.mark.parametrize("media_type", MEDIA_TYPE_EXAMPLES)
+def test_mediatype_assign(media_type):
+    # All media types should be assignable to the base type
+    assert artifact_fs.FilesystemArtifactFileType().assign_type(media_type)
