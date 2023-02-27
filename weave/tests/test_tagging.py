@@ -1,9 +1,11 @@
 import pytest
 import weave
 from weave.artifact_fs import FilesystemArtifactFileType
-from weave.ops_domain.wb_domain_types import ProjectType, RunType
+from weave.ops_domain.wb_domain_types import ProjectType, RunType, Run
+from weave.ops_primitives import dict as dict_ops
 from ..language_features.tagging import make_tag_getter_op, tagged_value_type, tag_store
 from .. import weave_types as types
+from .. import box
 
 
 def test_tagged_value():
@@ -241,5 +243,29 @@ def test_nested_deserialization_of_weave0_tags():
             {
                 "e": RunType,
             }
+        ),
+    )
+
+
+def test_keytypes_tagged():
+
+    object = box.box({"b": 1, "c": "a"})
+    tag_store.add_tags(object, {"run": Run()})
+    object_node = weave.save(object)
+
+    kt_node = dict_ops.object_keytypes(object_node)
+    assert weave.use(kt_node) == [
+        {"key": "b", "type": types.Int()},
+        {"key": "c", "type": types.String()},
+    ]
+    assert kt_node.type == tagged_value_type.TaggedValueType(
+        types.TypedDict({"run": RunType}),
+        types.List(
+            object_type=types.TypedDict(
+                property_types={
+                    "key": types.String(),
+                    "type": types.TypeType(attr_types={}),
+                }
+            )
         ),
     )

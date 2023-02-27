@@ -8,6 +8,8 @@ from ..language_features.tagging import make_tag_getter_op
 from .. import compile_table
 from weave import context_state as _context
 from .. import weave_internal
+from . import test_wb
+from ..ops_domain import run_ops
 
 _loading_builtins_token = _context.set_loading_built_ins()
 
@@ -207,3 +209,26 @@ def test_shared_fn_node():
     assert_node_calls(list_of_list_node, ["concat"])
     assert_node_calls(concat_node, ["numbers-sum"])
     assert_node_calls(sum_node, [])
+
+
+def test_stitch_keytypes_override_fetch_all_columns(fake_wandb):
+    fake_wandb.fake_api.add_mock(test_wb.table_mock_filtered)
+    keytypes_node = weave.ops.object_keytypes(
+        run_ops.run_tag_getter_op(
+            weave.ops.project("stacey", "mendeleev")
+            .filteredRuns("{}", "-createdAt")
+            .limit(50)
+            .summary()
+            .pick("table")
+            .table()
+            .rows()
+        ).summary()
+    )
+
+    p = stitch.stitch([keytypes_node])
+    object_recorder = p.get_result(keytypes_node)
+    key_tree = compile_table.get_projection(object_recorder)
+
+    # even though we have picked a specific key out of the table, we should still have an empty key tree
+    # because we must fetch all columns due to keytypes
+    assert key_tree == {}

@@ -3,6 +3,7 @@ from ._dict_utils import typeddict_pick_output_type
 from ..api import op, weave_class, mutation, OpVarArgs
 from .. import weave_types as types
 from ._dict_utils import tag_aware_dict_val_for_escaped_key
+from ..language_features.tagging import tagged_value_type
 
 # @op(
 #     name='pick',
@@ -131,6 +132,23 @@ def dict_(**d):
     return d
 
 
+def _keytypes_resovler(
+    weave_type: types.Type,
+) -> list[dict[str, typing.Union[str, types.Type]]]:
+    res: list[dict[str, typing.Union[str, types.Type]]] = []
+    if isinstance(weave_type, types.TypedDict):
+        for k, v in weave_type.property_types.items():
+            res.append(
+                {
+                    "key": k,
+                    "type": v,
+                }
+            )
+    elif isinstance(weave_type, tagged_value_type.TaggedValueType):
+        return _keytypes_resovler(weave_type.value)
+    return res
+
+
 @op(
     name="object-keytypes",
     input_type={
@@ -140,7 +158,7 @@ def dict_(**d):
         types.TypedDict(
             {
                 "key": types.String(),
-                "type": types.Type(),
+                "type": types.TypeType(),
             }
         )
     ),
@@ -149,13 +167,4 @@ def object_keytypes(obj):
     # Unlike Weave0, we don't have the type information of inputs, so
     # unfortunately we have to figure out the types using the data....
     weave_type = types.TypeRegistry.type_of(obj)
-    res = []
-    if isinstance(weave_type, types.TypedDict):
-        for k, v in weave_type.property_types.items():
-            res.append(
-                {
-                    "key": k,
-                    "type": v,
-                }
-            )
-    return res
+    return _keytypes_resovler(weave_type)
