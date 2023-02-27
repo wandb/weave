@@ -88,6 +88,11 @@ class ScatterData:
 
 @weave.op()
 def plotly_scatter(data: list[ScatterData]) -> plotly.graph_objs.Figure:
+    from ... import ops_arrow
+
+    # TODO: Should convert to dataframe instead of list!
+    if isinstance(data, ops_arrow.ArrowWeaveList):
+        data = data.to_pylist_tagged()
     fig = px.scatter(data, x="x", y="y", template="plotly_white")
     fig.update_layout(margin=dict(l=0, r=0, t=0, b=0))
     fig.update_layout(dragmode="select")

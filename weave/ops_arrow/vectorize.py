@@ -589,6 +589,11 @@ def _apply_fn_node_with_tag_pushdown(
 
 
 def _apply_fn_node(awl: ArrowWeaveList, fn: graph.OutputNode) -> ArrowWeaveList:
+    # Need to resolve static to get fetching functions out of Const
+    # nodes to work here. (just like in execute_fast)
+    from .. import execute_fast
+
+    fn = execute_fast._resolve_static_branches(fn)
     vecced = vectorize(fn)
     called = _call_vectorized_fn_node_maybe_awl(awl, vecced)
     return _call_and_ensure_awl(awl, called)
