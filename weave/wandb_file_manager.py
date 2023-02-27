@@ -39,6 +39,7 @@ class WandbFileManagerAsync:
         ] = cache.LruTimeWindowCache(datetime.timedelta(minutes=5))
 
     def manifest_path(self, uri: artifact_wandb.WeaveWBArtifactURI) -> str:
+        assert uri.version is not None
         return f"wandb_file_manager/{uri.entity_name}/{uri.project_name}/{uri.name}/manifest-{uri.version}.json"
 
     async def _manifest(
@@ -73,6 +74,7 @@ class WandbFileManagerAsync:
         self, art_uri: artifact_wandb.WeaveWBArtifactURI
     ) -> typing.Optional[artifact_wandb.WandbArtifactManifest]:
         with tracer.trace("wandb_file_manager.manifest") as span:
+            assert art_uri.version is not None
             manifest_path = self.manifest_path(art_uri)
             manifest = self._manifests.get(manifest_path)
             if not isinstance(manifest, cache.LruTimeWindowCache.NotFound):

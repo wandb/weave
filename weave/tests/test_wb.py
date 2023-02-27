@@ -221,6 +221,7 @@ artifact_version_sdk_response = {
     "artifact": {
         **fwb.artifactVersion_payload,  # type: ignore
         "state": "COMMITTED",
+        "commitHash": "303db33c9f9264768626",
         "artifactType": fwb.defaultArtifactType_payload,
         "artifactSequence": {**fwb.artifactSequence_payload, "project": fwb.project_payload, "state": "READY"},  # type: ignore
     }
@@ -869,7 +870,8 @@ def test_loading_artifact_browser_request_3(fake_wandb):
                         "artifact": {
                             **fwb.artifactVersion_payload,  # type: ignore
                             "description": "",
-                            "digest": "fd2948ad1c05b8d0084609a726a5da68",
+                            "digest": "51560154fe3bae863d18335d39129732",
+                            "commitHash": "303db33c9f9264768626",
                             "createdAt": "2021-07-10T19:27:32",
                             "usedBy_21303e3890a1b6580998e6aa8a345859": {
                                 "edges": [
@@ -1376,23 +1378,19 @@ def test_nested_summary_key(fake_wandb):
     [
         (
             "wandb-logged-artifact://long_server_id:latest/path",
-            "wandb-artifact:///random-entity/random-project/run-2isjqtcr-Validation_table:v4/path",
+            "wandb-artifact:///random-entity/random-project/run-2isjqtcr-Validation_table:303db33c9f9264768626/path",
         ),
         (
             "wandb-logged-artifact://long_server_id:v4/path",
-            "wandb-artifact:///random-entity/random-project/run-2isjqtcr-Validation_table:v4/path",
+            "wandb-artifact:///random-entity/random-project/run-2isjqtcr-Validation_table:303db33c9f9264768626/path",
         ),
         (
             "wandb-logged-artifact://1234567890/path",
-            "wandb-artifact:///stacey/mendeleev/test_res_1fwmcd3q:v0/path",
+            "wandb-artifact:///stacey/mendeleev/test_res_1fwmcd3q:303db33c9f9264768626/path",
         ),
         (
-            "wandb-artifact:///input-entity/input-project/run-2isjqtcr-Validation_table:latest/path",
-            "wandb-artifact:///input-entity/input-project/run-2isjqtcr-Validation_table:v4/path",
-        ),
-        (
-            "wandb-artifact:///input-entity/input-project/run-2isjqtcr-Validation_table:v4/path",
-            "wandb-artifact:///input-entity/input-project/run-2isjqtcr-Validation_table:v4/path",
+            "wandb-artifact:///input-entity/input-project/run-2isjqtcr-Validation_table/path",
+            "wandb-artifact:///input-entity/input-project/run-2isjqtcr-Validation_table:303db33c9f9264768626/path",
         ),
     ],
 )
@@ -1417,6 +1415,9 @@ def test_wb_artifact_uri_resolution(fake_wandb, input_uri, expected_uri):
                     "artifactMembership": {
                         "id": "QXJ0aWZhY3RDb2xsZWN0aW9uTWVtYmVyc2hpcDozNzAxNzE5NDE=",
                         "versionIndex": 4,
+                        "artifact": {
+                            "commitHash": "303db33c9f9264768626",
+                        },
                     },
                     "defaultArtifactType": {
                         "id": "QXJ0aWZhY3RUeXBlOjM1OTgxNA==",

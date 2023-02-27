@@ -203,6 +203,7 @@ class ArtifactVersion(GQLTypeMixin):
     REQUIRED_FRAGMENT = f"""
         id
         versionIndex
+        commitHash
         artifactSequence {{
             {ArtifactCollection.REQUIRED_FRAGMENT}
         }}

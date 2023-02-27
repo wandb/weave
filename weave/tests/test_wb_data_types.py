@@ -273,178 +273,189 @@ def make_table():
     )
 
 
-exp_raw_data = [
-    {
-        "label": "a",
-        "image": {
-            "artifact": "wandb-artifact:///test_entity/test_project/test_name:v0",
-            "path": "media/images/724389f96d933f4166db.png",
-            "format": "png",
-            "height": 128,
-            "width": 128,
-            "sha256": "82287185f849c094e7acf82835f0ceeb8a5d512329e8ce1da12e21df2e81e739",
-            "boxes": {
-                "box_set_1": [
-                    {
-                        "box_caption": "a",
-                        "class_id": 0,
-                        "domain": None,
-                        "position": {
-                            "maxX": 0.6,
-                            "maxY": 0.7,
-                            "minX": 0.4,
-                            "minY": 0.3,
-                        },
-                        "scores": {"loss": 0.3, "gain": 0.7},
+def exp_raw_data(commit_hash: str):
+    return [
+        {
+            "label": "a",
+            "image": {
+                "artifact": f"wandb-artifact:///test_entity/test_project/test_name:{commit_hash}",
+                "path": "media/images/724389f96d933f4166db.png",
+                "format": "png",
+                "height": 128,
+                "width": 128,
+                "sha256": "82287185f849c094e7acf82835f0ceeb8a5d512329e8ce1da12e21df2e81e739",
+                "boxes": {
+                    "box_set_1": [
+                        {
+                            "box_caption": "a",
+                            "class_id": 0,
+                            "domain": None,
+                            "position": {
+                                "maxX": 0.6,
+                                "maxY": 0.7,
+                                "minX": 0.4,
+                                "minY": 0.3,
+                            },
+                            "scores": {"loss": 0.3, "gain": 0.7},
+                        }
+                    ],
+                    "box_set_2": [
+                        {
+                            "box_caption": None,
+                            "class_id": 2,
+                            "domain": None,
+                            "position": {
+                                "maxX": 0.6,
+                                "maxY": 0.7,
+                                "minX": 0.4,
+                                "minY": 0.3,
+                            },
+                            "scores": {"loss": 0.3, "gain": 0.7},
+                        }
+                    ],
+                },
+                "masks": {
+                    "mask_set_1": {
+                        "_type": "mask",
+                        "path": "media/images/mask/b98a2fc054512bf6450c.mask.png",
+                        "sha256": "00c619b2faa45fdc9ce6de014e7aef7839c9de725bf78b528ef47d279039aacf",
                     }
-                ],
-                "box_set_2": [
-                    {
-                        "box_caption": None,
-                        "class_id": 2,
-                        "domain": None,
-                        "position": {
-                            "maxX": 0.6,
-                            "maxY": 0.7,
-                            "minX": 0.4,
-                            "minY": 0.3,
-                        },
-                        "scores": {"loss": 0.3, "gain": 0.7},
-                    }
-                ],
-            },
-            "masks": {
-                "mask_set_1": {
-                    "_type": "mask",
-                    "path": "media/images/mask/b98a2fc054512bf6450c.mask.png",
-                    "sha256": "00c619b2faa45fdc9ce6de014e7aef7839c9de725bf78b528ef47d279039aacf",
-                }
-            },
-        },
-    },
-    {
-        "label": "b",
-        "image": {
-            "artifact": "wandb-artifact:///test_entity/test_project/test_name:v0",
-            "path": "media/images/724389f96d933f4166db.png",
-            "format": "png",
-            "height": 128,
-            "width": 128,
-            "sha256": "82287185f849c094e7acf82835f0ceeb8a5d512329e8ce1da12e21df2e81e739",
-            "boxes": {
-                "box_set_1": [
-                    {
-                        "box_caption": "a",
-                        "class_id": 0,
-                        "domain": "pixel",
-                        "position": {"maxX": 100, "maxY": 50, "minX": 40, "minY": 30},
-                        "scores": {"loss": 0.3, "gain": 0.7},
-                    }
-                ],
-                "box_set_2": [
-                    {
-                        "box_caption": None,
-                        "class_id": 2,
-                        "domain": "pixel",
-                        "position": {"maxX": 100, "maxY": 50, "minX": 40, "minY": 30},
-                        "scores": {"loss": 0.3, "gain": 0.7},
-                    }
-                ],
-            },
-            "masks": {
-                "mask_set_1": {
-                    "_type": "mask",
-                    "path": "media/images/mask/b98a2fc054512bf6450c.mask.png",
-                    "sha256": "00c619b2faa45fdc9ce6de014e7aef7839c9de725bf78b528ef47d279039aacf",
-                }
+                },
             },
         },
-    },
-    {
-        "label": "c",
-        "image": {
-            "artifact": "wandb-artifact:///test_entity/test_project/test_name:v0",
-            "path": "media/images/724389f96d933f4166db.png",
-            "format": "png",
-            "height": 128,
-            "width": 128,
-            "sha256": "82287185f849c094e7acf82835f0ceeb8a5d512329e8ce1da12e21df2e81e739",
-            "boxes": {
-                "box_set_1": [
-                    {
-                        "box_caption": "a",
-                        "class_id": 0,
-                        "domain": None,
-                        "position": {
-                            "height": 0.5,
-                            "middle": [0.5, 0.5],
-                            "width": 0.25,
-                        },
-                        "scores": {"loss": 0.3, "gain": 0.7},
+        {
+            "label": "b",
+            "image": {
+                "artifact": f"wandb-artifact:///test_entity/test_project/test_name:{commit_hash}",
+                "path": "media/images/724389f96d933f4166db.png",
+                "format": "png",
+                "height": 128,
+                "width": 128,
+                "sha256": "82287185f849c094e7acf82835f0ceeb8a5d512329e8ce1da12e21df2e81e739",
+                "boxes": {
+                    "box_set_1": [
+                        {
+                            "box_caption": "a",
+                            "class_id": 0,
+                            "domain": "pixel",
+                            "position": {
+                                "maxX": 100,
+                                "maxY": 50,
+                                "minX": 40,
+                                "minY": 30,
+                            },
+                            "scores": {"loss": 0.3, "gain": 0.7},
+                        }
+                    ],
+                    "box_set_2": [
+                        {
+                            "box_caption": None,
+                            "class_id": 2,
+                            "domain": "pixel",
+                            "position": {
+                                "maxX": 100,
+                                "maxY": 50,
+                                "minX": 40,
+                                "minY": 30,
+                            },
+                            "scores": {"loss": 0.3, "gain": 0.7},
+                        }
+                    ],
+                },
+                "masks": {
+                    "mask_set_1": {
+                        "_type": "mask",
+                        "path": "media/images/mask/b98a2fc054512bf6450c.mask.png",
+                        "sha256": "00c619b2faa45fdc9ce6de014e7aef7839c9de725bf78b528ef47d279039aacf",
                     }
-                ],
-                "box_set_2": [
-                    {
-                        "box_caption": None,
-                        "class_id": 2,
-                        "domain": None,
-                        "position": {
-                            "height": 0.5,
-                            "middle": [0.5, 0.5],
-                            "width": 0.25,
-                        },
-                        "scores": {"loss": 0.3, "gain": 0.7},
-                    }
-                ],
-            },
-            "masks": {
-                "mask_set_1": {
-                    "_type": "mask",
-                    "path": "media/images/mask/b98a2fc054512bf6450c.mask.png",
-                    "sha256": "00c619b2faa45fdc9ce6de014e7aef7839c9de725bf78b528ef47d279039aacf",
-                }
-            },
-        },
-    },
-    {
-        "label": "d",
-        "image": {
-            "artifact": "wandb-artifact:///test_entity/test_project/test_name:v0",
-            "path": "media/images/724389f96d933f4166db.png",
-            "format": "png",
-            "height": 128,
-            "width": 128,
-            "sha256": "82287185f849c094e7acf82835f0ceeb8a5d512329e8ce1da12e21df2e81e739",
-            "boxes": {
-                "box_set_1": [
-                    {
-                        "box_caption": "a",
-                        "class_id": 0,
-                        "domain": "pixel",
-                        "position": {"height": 10, "middle": [50, 50], "width": 20},
-                        "scores": {"loss": 0.3, "gain": 0.7},
-                    }
-                ],
-                "box_set_2": [
-                    {
-                        "box_caption": None,
-                        "class_id": 2,
-                        "domain": "pixel",
-                        "position": {"height": 10, "middle": [50, 50], "width": 20},
-                        "scores": {"loss": 0.3, "gain": 0.7},
-                    }
-                ],
-            },
-            "masks": {
-                "mask_set_1": {
-                    "_type": "mask",
-                    "path": "media/images/mask/b98a2fc054512bf6450c.mask.png",
-                    "sha256": "00c619b2faa45fdc9ce6de014e7aef7839c9de725bf78b528ef47d279039aacf",
-                }
+                },
             },
         },
-    },
-]
+        {
+            "label": "c",
+            "image": {
+                "artifact": f"wandb-artifact:///test_entity/test_project/test_name:{commit_hash}",
+                "path": "media/images/724389f96d933f4166db.png",
+                "format": "png",
+                "height": 128,
+                "width": 128,
+                "sha256": "82287185f849c094e7acf82835f0ceeb8a5d512329e8ce1da12e21df2e81e739",
+                "boxes": {
+                    "box_set_1": [
+                        {
+                            "box_caption": "a",
+                            "class_id": 0,
+                            "domain": None,
+                            "position": {
+                                "height": 0.5,
+                                "middle": [0.5, 0.5],
+                                "width": 0.25,
+                            },
+                            "scores": {"loss": 0.3, "gain": 0.7},
+                        }
+                    ],
+                    "box_set_2": [
+                        {
+                            "box_caption": None,
+                            "class_id": 2,
+                            "domain": None,
+                            "position": {
+                                "height": 0.5,
+                                "middle": [0.5, 0.5],
+                                "width": 0.25,
+                            },
+                            "scores": {"loss": 0.3, "gain": 0.7},
+                        }
+                    ],
+                },
+                "masks": {
+                    "mask_set_1": {
+                        "_type": "mask",
+                        "path": "media/images/mask/b98a2fc054512bf6450c.mask.png",
+                        "sha256": "00c619b2faa45fdc9ce6de014e7aef7839c9de725bf78b528ef47d279039aacf",
+                    }
+                },
+            },
+        },
+        {
+            "label": "d",
+            "image": {
+                "artifact": f"wandb-artifact:///test_entity/test_project/test_name:{commit_hash}",
+                "path": "media/images/724389f96d933f4166db.png",
+                "format": "png",
+                "height": 128,
+                "width": 128,
+                "sha256": "82287185f849c094e7acf82835f0ceeb8a5d512329e8ce1da12e21df2e81e739",
+                "boxes": {
+                    "box_set_1": [
+                        {
+                            "box_caption": "a",
+                            "class_id": 0,
+                            "domain": "pixel",
+                            "position": {"height": 10, "middle": [50, 50], "width": 20},
+                            "scores": {"loss": 0.3, "gain": 0.7},
+                        }
+                    ],
+                    "box_set_2": [
+                        {
+                            "box_caption": None,
+                            "class_id": 2,
+                            "domain": "pixel",
+                            "position": {"height": 10, "middle": [50, 50], "width": 20},
+                            "scores": {"loss": 0.3, "gain": 0.7},
+                        }
+                    ],
+                },
+                "masks": {
+                    "mask_set_1": {
+                        "_type": "mask",
+                        "path": "media/images/mask/b98a2fc054512bf6450c.mask.png",
+                        "sha256": "00c619b2faa45fdc9ce6de014e7aef7839c9de725bf78b528ef47d279039aacf",
+                    }
+                },
+            },
+        },
+    ]
 
 
 def test_annotated_images_in_tables(fake_wandb):
@@ -460,7 +471,7 @@ def test_annotated_images_in_tables(fake_wandb):
     table_rows_type = table_node.rowsType()
 
     raw_data = weave.use(table_rows).to_pylist_notags()
-    assert raw_data == exp_raw_data
+    assert raw_data == exp_raw_data(art.commit_hash)
 
     ot = weave.use(table_rows_type).object_type
     assert ot == weave.types.TypedDict(
@@ -514,7 +525,7 @@ def test_annotated_legacy_images_in_tables(fake_wandb):
     table_rows_type = table_node.rowsType()
 
     raw_data = weave.use(table_rows).to_pylist_notags()
-    assert raw_data == exp_raw_data
+    assert raw_data == exp_raw_data(art.commit_hash)
 
     ot = weave.use(table_rows_type).object_type
     assert ot == weave.types.TypedDict(

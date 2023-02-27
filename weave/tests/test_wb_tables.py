@@ -14,7 +14,7 @@ def use_static_artifact_node(
     version="latest",
 ) -> weave.graph.Node:
     fake_wandb.fake_api.add_mock(
-        lambda ndx, q: {
+        lambda q, ndx: {
             "project_5702147f0293fd7538d402af13069708": {
                 "id": "p1",
                 "name": project_name,
@@ -24,6 +24,7 @@ def use_static_artifact_node(
                 ): {
                     "id": "a1",
                     "versionIndex": "0",
+                    "commitHash": "1478438ajsdfjj3kj1nn1nj",
                     "artifactSequence": {
                         "id": "c1",
                         "name": collection_name,
@@ -93,7 +94,7 @@ def test_convert_optional_list_cell(fake_wandb):
         {
             "a": [
                 {
-                    "artifact": "wandb-artifact:///test_entity/test_project/test_name:v0",
+                    "artifact": f"wandb-artifact:///test_entity/test_project/test_name:{art.commit_hash}",
                     "path": "media/html/03ac15e611be692f058e.html",
                     "sha256": "d4935b7d4e8f30952d5869122ca6793114936be8bf156dd936b6794fb6715e02",
                 }
@@ -156,7 +157,7 @@ def test_join_table_with_images(fake_wandb):
                 "0": {
                     "name": "a",
                     "image": {
-                        "artifact": "wandb-artifact:///test_entity/test_project/test_name:v0",
+                        "artifact": f"wandb-artifact:///test_entity/test_project/test_name:{art.commit_hash}",
                         "path": "media/images/9d4f26b99a1d4d044b6c.png",
                         "format": "png",
                         "height": 32,
@@ -175,7 +176,7 @@ def test_join_table_with_images(fake_wandb):
                 "0": {
                     "name": "b",
                     "image": {
-                        "artifact": "wandb-artifact:///test_entity/test_project/test_name:v0",
+                        "artifact": f"wandb-artifact:///test_entity/test_project/test_name:{art.commit_hash}",
                         "path": "media/images/7fd26b0af1228fa077bb.png",
                         "format": "png",
                         "height": 32,

@@ -320,12 +320,12 @@ def _artifact_version_to_wb_artifact(artifactVersion: wdt.ArtifactVersion):
     ]["name"]
     type_name = artifactVersion.gql["artifactSequence"]["defaultArtifactType"]["name"]
     home_sequence_name = artifactVersion.gql["artifactSequence"]["name"]
-    home_version_index = artifactVersion.gql["versionIndex"]
+    commit_hash = artifactVersion.gql["commitHash"]
     return artifact_wandb.WandbArtifact(
         name=home_sequence_name,
         type=type_name,
         uri=artifact_wandb.WeaveWBArtifactURI(
-            home_sequence_name, f"v{home_version_index}", entity_name, project_name
+            home_sequence_name, commit_hash, entity_name, project_name
         ),
     )
 
