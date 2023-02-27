@@ -26,7 +26,7 @@ tracer = engine_trace.tracer()  # type: ignore
 
 
 async def gql_test() -> None:
-    api = await wandb_api.get_wandb_api()
+    api = await wandb_api.get_async_wandb_api()
     fs = filesystem.get_filesystem_async()
     net = weave_http.HttpAsync(fs)
     file_man = wandb_file_manager.WandbFileManagerAsync(fs, net, api)

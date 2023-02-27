@@ -12,6 +12,7 @@ import contextvars
 import os
 
 from gql.transport.aiohttp import AIOHTTPTransport
+from gql.transport.requests import RequestsHTTPTransport
 
 
 from . import engine_trace
@@ -99,6 +100,41 @@ def from_environment() -> typing.Generator[None, None, None]:
     finally:
         if token:
             reset_wandb_api_context(token)
+
+
+class WandbApiSync:
+    @property
+    def user_agent(self) -> str:
+        return "Weave Client"
+
+    def __init__(self) -> None:
+        url_base = weave_env.wandb_base_url()
+        self.client = gql.Client(
+            transport=RequestsHTTPTransport(
+                use_json=True,
+                # this timeout won't apply when the DNS lookup fails. in that case, it will be 60s
+                # https://bugs.python.org/issue22889
+                timeout=30,
+                url="%s/graphql" % url_base,
+            )
+        )
+        self.session = self.client.connect_sync()
+
+    def query(self, query: graphql.DocumentNode, **kwargs: typing.Any) -> typing.Any:
+        wandb_context = get_wandb_api_context()
+        headers = {
+            "User-Agent": self.user_agent,
+            "Use-Admin-Privileges": "true",
+        }
+        cookies = {}
+        if wandb_context is not None:
+            headers.update(wandb_context.headers or {})
+            headers = wandb_context.headers
+            cookies = wandb_context.cookies
+
+        return self.session.execute(
+            query, kwargs, extra_args={"headers": headers, "cookies": cookies}
+        )
 
 
 class WandbApiAsync:
@@ -196,5 +232,15 @@ class WandbApiAsync:
         return file["directUrl"]
 
 
-async def get_wandb_api() -> WandbApiAsync:
+sync_api = None
+
+
+def get_sync_wandb_api() -> WandbApiSync:
+    global sync_api
+    if sync_api is None:
+        sync_api = WandbApiSync()
+    return sync_api
+
+
+async def get_async_wandb_api() -> WandbApiAsync:
     return WandbApiAsync()

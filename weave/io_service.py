@@ -139,7 +139,7 @@ class Server:
         fs = filesystem.get_filesystem_async()
         net = weave_http.HttpAsync(fs)
         self.wandb_file_manager = wandb_file_manager.WandbFileManagerAsync(
-            fs, net, await wandb_api.get_wandb_api()
+            fs, net, await wandb_api.get_async_wandb_api()
         )
         server = await asyncio.start_unix_server(
             self.handle_connection, path=self.socket_path

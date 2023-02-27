@@ -2,6 +2,7 @@ import hashlib
 import typing
 from typing import Mapping
 import json
+import datetime
 import random
 
 from . import storage
@@ -12,32 +13,42 @@ from . import errors
 
 
 def _value_id(val):
-    try:
-        hash_val = json.dumps(storage.to_hashable(val))
-    except errors.WeaveSerializeError:
-        # This is a lame fallback. We will fall back here if an object
-        # contains a reference to a custom type. When we generate a random
-        # ID, nothing downstream of us will be cacheable.
-        # It'd be better to not even try to serialize this object, and warn.
-        # TODO: Fix later.
-        hash_val = random.random()
+    # try:
+    hash_val = json.dumps(storage.to_hashable(val))
+    # except errors.WeaveSerializeError:
+    # This is a lame fallback. We will fall back here if an object
+    # contains a reference to a custom type. When we generate a random
+    # ID, nothing downstream of us will be cacheable.
+    # It'd be better to not even try to serialize this object, and warn.
+    # TODO: Fix later.
+    # hash_val = random.random()
     hash = hashlib.md5()
     hash.update(json.dumps(hash_val).encode())
     return hash.hexdigest()
 
 
+def floor_date(date: datetime.datetime, **kwargs):
+    secs = datetime.timedelta(**kwargs).total_seconds()
+    return datetime.datetime.fromtimestamp(date.timestamp() - date.timestamp() % secs)
+
+
 def make_run_id(op_def: op_def.OpDef, inputs_refs: Mapping[str, typing.Any]) -> str:
     hash_val: typing.Any
+    hashable_inputs = {}
+    for name, obj in inputs_refs.items():
+        ref = storage._get_ref(obj)
+        if ref is not None:
+            hashable_inputs[name] = str(ref)
+        else:
+            hashable_inputs[name] = _value_id(obj)
     if not op_def.pure:
-        hash_val = random.random()
+        round_date = str(floor_date(datetime.datetime.now(), seconds=15))
+        hash_val = {
+            "op_name": op_def.name,
+            "inputs": hashable_inputs,
+            "timestamp": round_date,
+        }
     else:
-        hashable_inputs = {}
-        for name, obj in inputs_refs.items():
-            ref = storage._get_ref(obj)
-            if ref is not None:
-                hashable_inputs[name] = str(ref)
-            else:
-                hashable_inputs[name] = _value_id(obj)
         hash_val = {
             "op_name": op_def.name,
             "op_version": op_def.version,

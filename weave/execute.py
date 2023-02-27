@@ -310,7 +310,8 @@ def execute_forward_node(
     if cache_mode == environment.CacheMode.MINIMAL:
         no_cache = True
         if not node.from_op.name.startswith("mapped") and (
-            node.from_op.name.endswith("file-table")
+            node.from_op.name == "gqlroot-wbgqlquery"
+            or node.from_op.name.endswith("file-table")
             or node.from_op.name.endswith("file-joinedTable")
             # or node.from_op.name.endswith("artifactVersion-file")
             # or node.from_op.name.endswith("FilesystemArtifact-file")
@@ -348,7 +349,7 @@ def execute_forward_node(
             # Compute the run ID, which is deterministic if the op is pure
             run_id = trace_local.make_run_id(op_def, input_refs)
 
-        if use_cache and op_def.pure:
+        if use_cache:
             run = TRACE_LOCAL.get_run(run_id)
             if run is not None:
                 logging.debug("Cache hit, returning")
