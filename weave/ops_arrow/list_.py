@@ -685,7 +685,16 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         function_type_paths = value.function_type_paths()
         obj_type_paths = value.obj_type_paths()
 
-        value_awl, dict_columns = value.separate_dictionaries()
+        # Special case single row, which happens when we're doing _index.
+        # TODO in branch: there is more index perf stuff to fix.
+        # Calling map_columns so many times is expensive (once per call above
+        # per row that we're indexing). Also add perf tests!
+        if len(self) == 1:
+            value_awl = value
+            dict_columns = {}
+        else:
+            value_awl, dict_columns = value.separate_dictionaries()
+
         value_py = value_awl._arrow_data.to_pylist()
 
         dict_columns = {p: c._arrow_data.to_pylist() for p, c in dict_columns.items()}
