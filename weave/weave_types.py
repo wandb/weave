@@ -1298,7 +1298,12 @@ def _merge_unknowns_of_type_with_types(of_type: Type, with_types: list[Type]):
 
     # If the current type itself is a union, then we need to recurse into it
     if isinstance(of_type, UnionType):
-        return _unknown_coalesce_on_union(union(*(of_type.members + with_types)))  # type: ignore
+        return union(
+            *[
+                _merge_unknowns_of_type_with_types(member, with_types)
+                for member in of_type.members
+            ]
+        )
 
     # if the current type is unknown, then we just return the next peer type.
     elif isinstance(of_type, UnknownType):
@@ -1326,7 +1331,7 @@ def _merge_unknowns_of_type_with_types(of_type: Type, with_types: list[Type]):
         return TypedDict(
             {
                 key: _merge_unknowns_of_type_with_types(
-                    value_type, [t.property_types[key] for t in with_types]  # type: ignore
+                    value_type, [t.property_types.get(key, NoneType()) for t in with_types]  # type: ignore
                 )
                 for key, value_type in of_type.property_types.items()
             }

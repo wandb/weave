@@ -63,6 +63,7 @@ def _sort_structs(array: pa.Array) -> pa.Array:
         return pa.ListArray.from_arrays(
             offsets_starting_at_zero(array),
             _sort_structs(array.flatten()),
+            mask=pa.compute.is_null(array),
         )
     return array
 
@@ -884,6 +885,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             final_array = pa.StructArray.from_arrays(
                 [tag_awl._arrow_data, value_awl._arrow_data],
                 names=["_tag", "_value"],
+                mask=pa.compute.is_null(self._arrow_data),
             )
 
             result = ArrowWeaveList(final_array, desired_type, self._artifact)
@@ -929,7 +931,11 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                 field_names, arrays = tuple(zip(*field_arrays.items()))
 
                 result = ArrowWeaveList(
-                    pa.StructArray.from_arrays(arrays=arrays, names=field_names),  # type: ignore
+                    pa.StructArray.from_arrays(
+                        arrays=arrays,
+                        names=field_names,
+                        mask=pa.compute.is_null(self._arrow_data),
+                    ),
                     desired_type,
                     self._artifact,
                 )
@@ -957,6 +963,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                     offsets,
                     flattened_converted._arrow_data,
                     type=desired_type_pyarrow_type,
+                    mask=pa.compute.is_null(self._arrow_data),
                 ),
                 desired_type,
                 self._artifact,
@@ -1040,6 +1047,12 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                         else [non_null_current_type]
                     )
                     for member in non_nullable_types:
+
+                        def member_mapper_type():
+                            return mappers_arrow.map_to_arrow(
+                                member, self._artifact
+                            ).result_type()
+
                         for curr_ndx, curr_member in enumerate(non_null_current_types):
                             if member.assign_type(
                                 curr_member
@@ -1051,16 +1064,15 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                                     selection = self._arrow_data.field(curr_ndx)
                                 else:
                                     selection = self._arrow_data
+                                if pa.types.is_null(selection.type):
+                                    selection = selection.cast(member_mapper_type())
                                 data_arrays.append(selection)
                                 break
                         else:
                             # Here we have not found the corresponding type in the current array.
                             # We will create an array of nulls.
-                            member_mapper = mappers_arrow.map_to_arrow(
-                                member, self._artifact
-                            )
                             data_arrays.append(
-                                pa.nulls(len(self), type=member_mapper.result_type())
+                                pa.nulls(len(self), type=member_mapper_type())
                             )
 
                     # Finally, combine the M arrays into a single union array.

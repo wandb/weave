@@ -13,6 +13,10 @@ from .. import errors
 from .. import artifact_fs
 
 
+def is_dense_union(array: pa.Array) -> bool:
+    return pa.types.is_union(array.type) and array.type.mode == "dense"
+
+
 def dense_union_to_sparse_union(array: pa.Array) -> pa.Array:
     if not pa.types.is_union(array.type):
         raise ValueError(f"Expected UnionArray, got {type(array)}")
@@ -170,6 +174,36 @@ def safe_replace_with_mask(
         #
         # new_replaced = safe_replace_with_mask(flattened_modified_array, flattened_mask, flattened_replacements)
         # return pa.ListArray.from_arrays(flattened_offsets, new_replaced)
+    elif pa.types.is_union(array.type):
+        if is_dense_union(array):
+            sparse_array = dense_union_to_sparse_union(array)
+        else:
+            sparse_array = array
+
+        if is_dense_union(replacements):
+            sparse_replacements = dense_union_to_sparse_union(replacements)
+        else:
+            sparse_replacements = replacements
+
+        new_arrays = []
+        for f_ndx in range(sparse_array.type.num_fields):
+            array_field = sparse_array.field(f_ndx)
+            replacement_field = sparse_replacements.field(f_ndx)
+            new_arrays.append(
+                safe_replace_with_mask(array_field, mask, replacement_field)
+            )
+        sparse_replaced = pa.UnionArray.from_sparse(sparse_array.type_codes, new_arrays)
+
+        if is_dense_union(array):
+            return sparse_union_to_dense_union(sparse_replaced)
+        else:
+            return sparse_replaced
+    elif pa.types.is_null(array.type) and pa.types.is_null(replacements.type):
+        return array
+    elif pa.types.is_null(array.type):
+        return pc.replace_with_mask(array.cast(replacements.type), mask, replacements)
+    elif pa.types.is_null(replacements.type):
+        return pc.replace_with_mask(array, mask, replacements.cast(array.type))
 
     return pc.replace_with_mask(array, mask, replacements)
 
@@ -706,6 +740,8 @@ def rewrite_weavelist_refs(arrow_data, object_type, source_artifact, target_arti
                 names=arrays.keys(),
                 mask=pa.compute.is_null(arrow_data),
             )
+        elif isinstance(arrow_data, pa.NullArray):
+            return arrow_data
         else:
             raise errors.WeaveTypeError('Unhandled type "%s"' % type(arrow_data))
     elif isinstance(object_type, types.UnionType):

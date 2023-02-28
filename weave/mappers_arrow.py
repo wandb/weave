@@ -112,7 +112,7 @@ class UnionToArrowUnion(mappers_weave.UnionMapper):
         if not nullable or len(non_null_mappers) > 1:
             fields = [
                 pa.field(
-                    f"{non_null_mappers[i].type.name}_{i}",
+                    str(i),
                     non_null_mappers[i].result_type(),
                     nullable,
                 )

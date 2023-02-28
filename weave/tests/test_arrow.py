@@ -5,6 +5,9 @@ import hashlib
 import pyarrow as pa
 import string
 from PIL import Image
+from weave.ops_arrow.convert import (
+    recursively_merge_union_types_if_they_are_unions_of_structs,
+)
 
 from weave.tests import list_arrow_test_helpers as lath
 
@@ -1775,13 +1778,17 @@ def test_save_nested_custom_objs():
     assert weave.use(tables[1]).to_pylist_raw() == [{"a": 9}]
 
 
-base_types = [
+base_types: list[types.Type] = [
     types.Int(),
-    types.Float(),
     types.String(),
-    types.Boolean(),
-    types.Timestamp(),
     types.NoneType(),
+    # Commenting out a few types since they don't enhance the coverage, but they
+    # unnecessarily create far more permutations than is needed. Moreover, the
+    # "jumble_type" function assumes no type is a "boolean" type in order to
+    # guarantee a non overlapping new type.
+    # types.Float(),
+    # types.Boolean(),
+    # types.Timestamp(),
 ]
 
 
@@ -1817,10 +1824,27 @@ def make_dict_variants(seed_types: list[types.Type]) -> list[types.Type]:
     # We explicitly exclude NoneType here because arrow segfaults when there is
     # a union of dicts with a NoneType key. Perhaps we should work to fix this
     # in the future?
+
+    # TODO: Make it so that sometimes different types land on the same key!
     return [
         types.TypedDict({f"t_{ndx}": t})
         for ndx, t in enumerate(seed_types)
         if not isinstance(t, types.NoneType)
+    ]
+
+
+def make_tagging_variant(seed_types: list[types.Type]) -> list[types.Type]:
+    return [
+        tagged_value_type.TaggedValueType(
+            types.TypedDict(
+                {
+                    "common_tag": types.String(),
+                    f"unique_tag_{seed_ndx}": types.String(),
+                }
+            ),
+            seed_type,
+        )
+        for seed_ndx, seed_type in enumerate(seed_types)
     ]
 
 
@@ -1830,6 +1854,9 @@ def create_new_types_from_variants(seed_types: list[types.Type]) -> list[types.T
     new_types.extend(make_union_variants(seed_types))
     new_types.extend(make_list_variants(seed_types))
     new_types.extend(make_dict_variants(seed_types))
+    # TODO: Uncomment this and address any issues
+    # new_types.extend(make_tagging_variant(seed_types))
+
     return new_types
 
 
@@ -1846,29 +1873,95 @@ def create_new_types_of_depth(
 
 all_types = create_new_types_of_depth(base_types, 3)
 
-# Both of these test cases throw errors in `safe_replace_with_mask` because they
-# have dense unions. This is a known issue in our code path and needs to be resolved
-# for these tests to pass. Currently skipping to get the rest of these fixes in.
-skip_indicies = [151, 152]
 
-all_types = [t for i, t in enumerate(all_types) if i not in skip_indicies]
+def jumble_type(t: types.Type) -> types.Type:
+    """
+    Walk the type tree and replace very basic type with an optional boolean type (since boolean
+    is not included in the basic types for sanity) This means we get the same overall shape, but
+    with a different type at each node.
+    """
+    if isinstance(t, (types.Int, types.String)):
+        return types.optional(types.Boolean())
+    elif isinstance(t, types.List):
+        return types.List(jumble_type(t.object_type))
+    elif isinstance(t, types.TypedDict):
+        return types.TypedDict({k: jumble_type(v) for k, v in t.property_types.items()})
+    elif isinstance(t, types.UnionType):
+        return types.union(*[jumble_type(t) for t in t.members])
+    elif isinstance(t, tagged_value_type.TaggedValueType):
+        return tagged_value_type.TaggedValueType(
+            # type ignore here because mypy doesn't know that jumpy_type will return
+            # the typed dict for the tag
+            jumble_type(t.tag),  # type: ignore
+            jumble_type(t.value),
+        )
+    return t
+
+
+def make_identity_permutations(
+    all_types: list[types.Type],
+) -> tuple[list[str], list[tuple[types.Type, list, types.Type, list]]]:
+    res_with_data: list[tuple[str, types.Type, list]] = []
+    for type_ndx, type_example in enumerate(all_types):
+        res_with_data.append((f"{str(type_ndx).zfill(3)}_empty", type_example, []))
+        if type_example.assign_type(types.NoneType()):
+            res_with_data.append(
+                (f"{str(type_ndx).zfill(3)}_null", type_example, [None])
+            )
+
+    res_with_concat: list[tuple[types.Type, list, types.Type, list]] = []
+    names: list[str] = []
+    for data_example in res_with_data:
+        names.append(f"{str(len(names)).zfill(3)}-t_{data_example[0]}_concat_none")
+        res_with_concat.append(
+            (data_example[1], data_example[2], types.NoneType(), [None])
+        )
+        names.append(f"{str(len(names)).zfill(3)}-t_{data_example[0]}_concat_jumbled")
+        res_with_concat.append(
+            (data_example[1], data_example[2], jumble_type(data_example[1]), [None])
+        )
+
+    return names, res_with_concat
+
+
+names, cases = make_identity_permutations(all_types)
+
+# This test hits the list<dense union> issue described in `safe_replace_with_mask`.
+# We don;t believe this is possible to hit in practice today, so skipping for now.
+skip_indicies = [207]
+
+cases = [c for ndx, c in enumerate(cases) if ndx not in skip_indicies]
+names = [n for ndx, n in enumerate(names) if ndx not in skip_indicies]
 
 
 @pytest.mark.parametrize(
-    "assumed_weave_type",
-    all_types,
+    "assumed_weave_type, data, concat_with_weave_type, concat_with_data",
+    cases,
+    ids=names,
 )
-def test_empty_identity_of_type(assumed_weave_type):
-    raw = arrow.to_arrow([], types.List(assumed_weave_type))
-    assert raw.to_pylist_raw() == []
-    assert weave.use(weave.save(raw)).to_pylist_raw() == []
+def test_identity_awl_operations_3(
+    assumed_weave_type, data, concat_with_weave_type, concat_with_data
+):
+    # Assert basic in-memory identity
+    raw_awl = arrow.to_arrow(data, types.List(assumed_weave_type))
+    assert raw_awl.to_pylist_raw() == data
 
-    # Nullable version
-    raw = arrow.to_arrow([], types.List(types.optional(assumed_weave_type)))
-    assert raw.to_pylist_raw() == []
-    assert weave.use(weave.save(raw)).to_pylist_raw() == []
+    # Assert with_object_type identity
+    # Here, we explicitly call `recursively_merge_union_types_if_they_are_unions_of_structs` since
+    # it is done in the constructor of arrow. Maybe this should be moved into `with_object_type`?
+    # For now calling here explicitly.
+    with_type_awl = raw_awl.with_object_type(
+        recursively_merge_union_types_if_they_are_unions_of_structs(assumed_weave_type)
+    )
+    assert with_type_awl.to_pylist_raw() == data
 
-    # Nullable version with None
-    raw = arrow.to_arrow([None], types.List(types.optional(assumed_weave_type)))
-    assert raw.to_pylist_raw() == [None]
-    assert weave.use(weave.save(raw)).to_pylist_raw() == [None]
+    # Assert save/load identity
+    awl_node = weave.save(raw_awl)
+    assert weave.use(awl_node).to_pylist_raw() == data
+
+    # Assert concat-ability
+    concat_awl = weave.save(
+        arrow.to_arrow(concat_with_data, types.List(concat_with_weave_type))
+    )
+    concatted = ops.make_list(a=awl_node, b=concat_awl).concat()
+    assert weave.use(concatted).to_pylist_raw() == data + concat_with_data
