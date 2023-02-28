@@ -538,29 +538,51 @@ def test_escaped_gql_query(fake_wandb):
             "id": "UHJvamVjdDp2MTpzYWdlbWFrZXItcGVvcGxlLXZlaGljbGUtY2xhc3Mtc3BsaXR0aW5nOmFjdHVhdGVhaQ==",
             "name": "",
             "entity": {"id": "RW50aXR5OjE0NzUxNw==", "name": "e_0"},
-            "runs_6e908597bd3152c2f0457f6283da76b9": {"edges": []},
+            "runs_6e908597bd3152c2f0457f6283da76b9": {
+                "edges": [
+                    {
+                        "node": {
+                            **fwb.run_payload,
+                            "displayName": "TEST_RUN_NAME",
+                            "summaryMetricsSubset": json.dumps(
+                                {
+                                    "Tables/NMS_0.45_IOU_0.5": {
+                                        "path": "table.table.json",
+                                        "size": 100,
+                                        "_type": "table-file",
+                                        "ncols": 2,
+                                        "nrows": 3,
+                                        "sha256": "37268073927574b67446db544c2ad7acd1aeca5ba57492865eaa4030a7927e6d",
+                                        "artifact_path": "wandb-artifact://41727469666163743a323937363839353737/table.table.json",
+                                    }
+                                }
+                            ),
+                        }
+                    }
+                ]
+            },
         }
     }
 
     fake_wandb.fake_api.add_mock(lambda q, ix: response)
 
     key = "Tables/NMS_0\\.45_IOU_0\\.5"
-    node = (
+    rr = (
         ops.project("e_0", "p_0")
         .filteredRuns("{}", "-createdAt")
         .limit(1)
         .summary()[key]
         .table()
-        .rows()
-        .dropna()
-        .concat()
-        .createIndexCheckpointTag()
-        .index(6)["label"]
     )
+    rows_node = rr.rows()
+    item_node = rows_node.dropna().concat().createIndexCheckpointTag().index(6)["label"]
 
+    run_node = item_node.run()
+    node = run_node.name()
+    weave.use(node)
     log = fake_wandb.fake_api.execute_log()
     assert_gql_str_equal(
-        log[1]["gql"],
+        log[2]["gql"],
         # Note: the inner project/entity query is because it is part of the required fragment for runs
         # this could in theory change in the future.
         """
@@ -584,6 +606,7 @@ def test_escaped_gql_query(fake_wandb):
                 node {
                 id
                 name
+                displayName
                 project {
                     id
                     name

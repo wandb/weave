@@ -3,6 +3,12 @@ import inspect
 import typing
 from concurrent.futures import ThreadPoolExecutor
 
+from .language_features.tagging.opdef_util import (
+    should_flow_tags,
+    should_tag_op_def_outputs,
+)
+from .language_features.tagging.tagged_value_type import TaggedValueType
+
 
 from . import weave_types as types
 from . import context
@@ -144,8 +150,8 @@ class MappedDeriveOpHandler(DeriveOpHandler):
             def new_output_type(input_type):
                 object_type = input_type[mapped_param_name].object_type
                 if types.is_optional(object_type):
-                    return types.List(types.optional(object_type))
-                return types.List(object_type)
+                    return types.List(types.optional(orig_op.output_type))
+                return types.List(orig_op.output_type)
 
             output_type = new_output_type
         else:
@@ -255,7 +261,13 @@ class MappedDeriveOpHandler(DeriveOpHandler):
 
             if isinstance(orig_op.concrete_output_type, types.TypeType):
                 if not list_:
-                    return types.List(types.NoneType())
+                    inner_type = types.NoneType()
+                    if should_tag_op_def_outputs(orig_op):
+                        inner_type = TaggedValueType(
+                            types.TypedDict({first_arg_name: first_arg.type}),
+                            inner_type,
+                        )
+                    return types.List(inner_type)
                 types_to_merge = [
                     orig_op.resolve_fn(**{mapped_param_name: x, **new_inputs})
                     if (not x == None or types.is_optional(first_arg.type))
