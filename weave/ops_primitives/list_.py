@@ -32,6 +32,20 @@ def general_picker(obj, key):
     return [row.get(key) for row in obj]
 
 
+def dropna_object_type(obj_type: types.Type) -> types.Type:
+    nn_type = types.non_none(obj_type)
+    if isinstance(nn_type, tagged_value_type.TaggedValueType):
+        inner_type = nn_type.value
+        fallback_type: types.Type = tagged_value_type.TaggedValueType(
+            nn_type.tag, types.NoneType()
+        )
+    else:
+        inner_type = nn_type
+        fallback_type = types.NoneType()
+
+    return nn_type if inner_type != types.Invalid() else fallback_type
+
+
 @weave_class(weave_type=types.List)
 class List:
     @op(name="count", input_type={"arr": types.List(types.Any())})
@@ -200,9 +214,7 @@ class List:
         name="dropna",
         input_type={"arr": types.List(types.Any())},
         output_type=lambda input_types: types.List(
-            types.non_none(input_types["arr"].object_type)
-            if types.non_none(input_types["arr"].object_type) != types.Invalid()
-            else types.NoneType()
+            dropna_object_type(input_types["arr"].object_type)
         ),
     )
     def dropna(arr):

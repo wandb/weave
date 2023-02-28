@@ -417,12 +417,14 @@ def groupby(self, group_by_fn):
     name="ArrowWeaveList-dropna",
     input_type={"self": ArrowWeaveListType()},
     output_type=lambda input_types: ArrowWeaveListType(
-        types.non_none(input_types["self"].object_type)
+        primitive_list.dropna_object_type(input_types["self"].object_type)
     ),
 )
 def dropna(self):
     res = pc.drop_null(self._arrow_data)
-    return ArrowWeaveList(res, types.non_none(self.object_type), self._artifact)
+    return ArrowWeaveList(
+        res, primitive_list.dropna_object_type(self.object_type), self._artifact
+    )
 
 
 @op(name="ArrowWeaveList-count")

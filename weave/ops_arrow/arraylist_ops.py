@@ -1,8 +1,10 @@
 import typing
 import pyarrow as pa
 
+
 from .. import weave_types as types
 from ..decorator_arrow_op import arrow_op
+from ..ops_primitives.list_ import dropna_object_type
 
 from .arrow import ArrowWeaveListType, arrow_as_array
 from .list_ import ArrowWeaveList
@@ -107,7 +109,7 @@ def _vectorized_dropna_object_type(
         typing.Union[types.List, ArrowWeaveListType], container_type
     ).object_type
 
-    ret_type = container_class(types.non_none(element_type))
+    ret_type = container_class(dropna_object_type(element_type))
     if outer_is_optional:
         ret_type = types.optional(ret_type)  # type: ignore
     return ret_type
