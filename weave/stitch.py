@@ -273,10 +273,6 @@ def stitch_node_inner(
     return inputs[0].call_node(node, input_dict)
 
 
-def shallow_copy(dict: dict) -> dict:
-    return {k: v for k, v in dict.items()}
-
-
 def stitch_node(
     node: graph.OutputNode, input_dict: dict[str, ObjectRecorder], sg: StitchedGraph
 ) -> ObjectRecorder:

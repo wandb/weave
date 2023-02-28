@@ -236,11 +236,10 @@ def _make_run_summary_gql_field(inputs: InputAndStitchProvider, inner: str):
 
 @op(
     name="run-summary",
-    output_type=types.TypedDict({}),
     refine_output_type=refine_summary_type,
     plugins=wb_gql_op_plugin(_make_run_summary_gql_field),
 )
-def summary(run: wdt.Run):
+def summary(run: wdt.Run) -> dict[str, typing.Any]:
     return wb_util.process_run_dict_obj(
         json.loads(run.gql["summaryMetricsSubset"] or "{}"),
         wb_util.RunPath(
