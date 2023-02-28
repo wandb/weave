@@ -2,6 +2,8 @@ import weave
 import typing
 import pytest
 
+from weave import serialize
+
 from .. import stitch
 
 from ..language_features.tagging import make_tag_getter_op
@@ -212,6 +214,73 @@ def test_shared_fn_node():
     assert_node_calls(sum_node, [])
 
 
+def test_shared_fn_node_with_tag_getter():
+    def quick_tagged(val):
+        return weave.save(
+            _TestPlanHasObject("a", _TestPlanObject("b", val))
+        )._test_hasobj_obj()
+
+    const_list_node = weave.ops.make_list(a=quick_tagged(1), b=quick_tagged(2))
+    indexed_node = const_list_node[0]
+    arr_1_node = weave.ops.make_list(
+        a=quick_tagged(1), b=quick_tagged(2), c=quick_tagged(3)
+    )
+    arr_2_node = weave.ops.make_list(
+        a=quick_tagged(10), b=quick_tagged(20), c=quick_tagged(30)
+    )
+
+    mapped_1_node = arr_1_node.map(
+        lambda row: weave.ops.dict_(
+            item=get_hasobject_self_tag(row), const=get_hasobject_self_tag(indexed_node)
+        )
+    )
+    mapped_2_node = arr_2_node.map(
+        lambda row: weave.ops.dict_(
+            item=get_hasobject_self_tag(row), const=get_hasobject_self_tag(indexed_node)
+        )
+    )
+
+    mapped_1_item_node = mapped_1_node["item"]  # .val
+    mapped_1_const_node = mapped_1_node["const"]  # .val
+    mapped_2_item_node = mapped_2_node["item"]  # .val
+    mapped_2_const_node = mapped_2_node["const"]  # .val
+
+    # mapped_2_item_add_node = mapped_2_item_node + 100
+    # mapped_2_const_add_node = mapped_2_const_node + 100
+
+    list_of_list_node = weave.ops.make_list(
+        a=mapped_1_item_node,
+        b=mapped_1_const_node,
+        c=mapped_2_item_node,
+        d=mapped_2_const_node,
+    )
+    concat_node = list_of_list_node.concat()
+    # sum_node = concat_node.sum()
+
+    p = stitch.stitch([concat_node])
+
+    def assert_node_calls(node, expected_call_names):
+        found_calls = set([c.node.from_op.name for c in p.get_result(node).calls])
+        expected_calls = set(expected_call_names)
+        assert found_calls == expected_calls
+
+    assert_node_calls(const_list_node, ["list-__getitem__"])
+    assert_node_calls(indexed_node, ["list", "mapped_number-add"])
+    assert_node_calls(arr_1_node, ["list"])
+    assert_node_calls(arr_2_node, ["mapped_number-add"])
+    assert_node_calls(mapped_1_node, [])
+    assert_node_calls(mapped_2_node, [])
+    assert_node_calls(mapped_1_item_node, ["list"])
+    assert_node_calls(mapped_1_const_node, ["list", "mapped_number-add"])
+    assert_node_calls(mapped_2_item_node, ["mapped_number-add"])
+    assert_node_calls(mapped_2_const_node, ["list", "mapped_number-add"])
+    assert_node_calls(mapped_2_item_add_node, ["list"])
+    assert_node_calls(mapped_2_const_add_node, ["list"])
+    assert_node_calls(list_of_list_node, ["concat"])
+    assert_node_calls(concat_node, ["numbers-sum"])
+    assert_node_calls(sum_node, [])
+
+
 def test_stitch_keytypes_override_fetch_all_columns(fake_wandb):
     fake_wandb.fake_api.add_mock(test_wb.table_mock_filtered)
     keytypes_node = weave.ops.object_keytypes(
@@ -286,13 +355,30 @@ def test_stitch_overlapping_tags_in_map(fake_wandb):
     filtered_runs_a_node = project_node.filteredRuns("{}", "-createdAt")
     summary_a_node = filtered_runs_a_node.summary()
     tagged_name_a = summary_a_node.map(lambda row: row.run().name())
-    # tagged_name_a = summary_a_node[.map(lambda row: row['a'].run().name())
     filtered_runs_b_node = project_node.filteredRuns("{}", "+createdAt")
     summary_b_node = filtered_runs_b_node.summary()
     tagged_id_b = summary_b_node.map(lambda row: row.run().id())
 
-    p = stitch.stitch([tagged_name_a, tagged_id_b])
+    [
+        s_tagged_name_a,
+        s_tagged_id_b,
+        s_project_node,
+        s_filtered_runs_a_node,
+        s_filtered_runs_b_node,
+    ] = serialize.deserialize(
+        serialize.serialize(
+            [
+                tagged_name_a,
+                tagged_id_b,
+                project_node,
+                filtered_runs_a_node,
+                filtered_runs_b_node,
+            ]
+        )
+    )
 
-    assert len(p.get_result(project_node).tags) == 0
-    assert len(p.get_result(filtered_runs_a_node).calls) == 2
-    assert len(p.get_result(filtered_runs_b_node).calls) == 2
+    p = stitch.stitch([s_tagged_name_a, s_tagged_id_b])
+
+    assert len(p.get_result(s_project_node).tags) == 0
+    assert len(p.get_result(s_filtered_runs_a_node).calls) == 2
+    assert len(p.get_result(s_filtered_runs_b_node).calls) == 2

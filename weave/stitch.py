@@ -102,10 +102,19 @@ def stitch(
         sg = stitched_graph
 
     def handle_node(node: graph.Node) -> graph.Node:
-        if sg.has_result(node):
-            return node
         if isinstance(node, graph.OutputNode):
             input_dict = {k: sg.get_result(v) for k, v in node.from_op.inputs.items()}
+            if sg.has_result(node):
+                res = sg.get_result(node)
+                if isinstance(res.node, graph.OutputNode):
+                    if all(
+                        new_in is curr_in
+                        for new_in, curr_in in zip(
+                            node.from_op.inputs.values(),
+                            res.node.from_op.inputs.values(),
+                        )
+                    ):
+                        return node
             sg.add_result(node, stitch_node(node, input_dict, sg))
         elif isinstance(node, graph.ConstNode):
             sg.add_result(node, ObjectRecorder(node, val=node.val))

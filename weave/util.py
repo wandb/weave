@@ -25,7 +25,7 @@ def init_sentry():
 
 
 def raise_exception_with_sentry_if_available(
-    err: Exception, fingerprint: typing.Any
+    err: Exception, fingerprint: list
 ) -> typing.NoReturn:
     init_sentry()
     try:
@@ -43,7 +43,7 @@ def raise_exception_with_sentry_if_available(
 
 
 def capture_exception_with_sentry_if_available(
-    err: Exception, fingerprint: typing.Any
+    err: Exception, fingerprint: list
 ) -> None:
     init_sentry()
     try:
