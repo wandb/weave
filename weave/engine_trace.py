@@ -84,6 +84,9 @@ class DummyStatsd:
     def gauge(self, *args, **kwargs):
         pass
 
+    def flush(self, *args, **kwargs):
+        pass
+
 
 _STATSD = None
 
@@ -92,7 +95,7 @@ def _initialize_statsd():
     if os.getenv("DD_ENV"):
         from datadog import initialize, statsd
 
-        initialize()
+        initialize(statsd_disable_buffering=False)
         return statsd
     else:
         return DummyStatsd()

@@ -140,6 +140,17 @@ def get_top_level_keys(key_tree: KeyTree) -> list[str]:
     return top_level_keys
 
 
+def config_to_values(config: dict) -> dict:
+    """
+    Unfortunately config values from wandb have their data located at the .value
+    property inside of the config object.
+    """
+    return {
+        key: value["value"] if isinstance(value, dict) and "value" in value else value
+        for key, value in config.items()
+    }
+
+
 @op(
     render_info={"type": "function"},
     plugins=wb_gql_op_plugin(lambda inputs, inner: "config"),
@@ -156,7 +167,7 @@ def refine_config_type(run: wdt.Run) -> types.Type:
     if not config_field_s:
         config_field_s = "{}"
 
-    return wb_util.process_run_dict_type(json.loads(config_field_s))
+    return wb_util.process_run_dict_type(config_to_values(json.loads(config_field_s)))
 
 
 def _make_run_config_gql_field(inputs: InputAndStitchProvider, inner: str):
@@ -179,7 +190,7 @@ def _make_run_config_gql_field(inputs: InputAndStitchProvider, inner: str):
 )
 def config(run: wdt.Run) -> dict[str, typing.Any]:
     return wb_util.process_run_dict_obj(
-        json.loads(run.gql["configSubset"] or "{}"),
+        config_to_values(json.loads(run.gql["configSubset"] or "{}")),
         wb_util.RunPath(
             run.gql["project"]["entity"]["name"],
             run.gql["project"]["name"],

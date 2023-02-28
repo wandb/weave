@@ -3,6 +3,7 @@ import datetime
 import inspect
 import math
 
+import pandas as pd
 
 from . import mappers
 from . import storage
@@ -13,7 +14,7 @@ from . import errors
 from . import box
 from . import mappers_python
 from . import val_const
-from .timestamp import tz_aware_dt
+from . import timestamp as weave_timestamp
 from .language_features.tagging import tagged_value_type
 
 
@@ -153,7 +154,12 @@ class StringToPyString(mappers.Mapper):
 
 class TimestampToPyTimestamp(mappers.Mapper):
     def apply(self, obj: datetime.datetime):
-        return int(tz_aware_dt(obj).timestamp() * 1000)
+        # TODO: I have no idea why, but Eval.ipynb ends up with a pandas
+        # Timestamp here. This is clearly not the correct fix, but we need to
+        # get CI working again.
+        if isinstance(obj, pd.Timestamp):
+            obj = obj.to_pydatetime()
+        return weave_timestamp.python_datetime_to_ms(obj)
 
 
 class PyTimestampToTimestamp(mappers.Mapper):
@@ -167,7 +173,7 @@ class PyTimestampToTimestamp(mappers.Mapper):
                 )
             return datetime.datetime.strptime(obj["val"], "%Y-%m-%dT%H:%M:%S.%fZ")
         else:
-            return datetime.datetime.fromtimestamp(obj / 1000, tz=datetime.timezone.utc)
+            return weave_timestamp.ms_to_python_datetime(obj)
 
 
 class NoneToPyNone(mappers.Mapper):

@@ -22,8 +22,9 @@ import functools
 
 def getitem_output_type(input_types):
     self_type = input_types["arr"]
-    if isinstance(self_type, types.UnionType):
-        return types.UnionType(*[t.object_type for t in self_type.members])
+    if self_type.object_type == types.UnknownType():
+        # This happens when we're indexing an empty list
+        return types.NoneType()
     return self_type.object_type
 
 
@@ -46,10 +47,15 @@ class List:
 
     @op(
         setter=__setitem__,
-        input_type={"arr": types.List(types.Any()), "index": types.Int()},
+        input_type={
+            "arr": types.List(types.Any()),
+            "index": types.optional(types.Int()),
+        },
         output_type=getitem_output_type,
     )
     def __getitem__(arr, index):
+        if index == None:
+            return None
         # This is a hack to resolve the fact that WeaveJS expects groupby to
         # return TaggedValue, while Weave Python currently still returns GroupResult
         # TODO: Remove when we switch Weave Python over to using TaggedValue for this
@@ -193,10 +199,14 @@ class List:
     @op(
         name="dropna",
         input_type={"arr": types.List(types.Any())},
-        output_type=lambda input_types: input_types["arr"],
+        output_type=lambda input_types: types.List(
+            types.non_none(input_types["arr"].object_type)
+            if types.non_none(input_types["arr"].object_type) != types.Invalid()
+            else types.NoneType()
+        ),
     )
     def dropna(arr):
-        return [i for i in arr if i is not None]
+        return [i for i in arr if i != None]
 
     @op(
         name="concat",

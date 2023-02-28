@@ -8,7 +8,6 @@ import typing
 import base64
 import urllib
 
-from wandb.sdk.interface import artifacts
 from wandb import util as wandb_util
 
 
@@ -36,15 +35,16 @@ class WandbFileManagerAsync:
         self.http = http
         self.wandb_api = wandb_api
         self._manifests: cache.LruTimeWindowCache[
-            str, typing.Optional[artifacts.ArtifactManifest]
+            str, typing.Optional[artifact_wandb.WandbArtifactManifest]
         ] = cache.LruTimeWindowCache(datetime.timedelta(minutes=5))
 
     def manifest_path(self, uri: artifact_wandb.WeaveWBArtifactURI) -> str:
+        assert uri.version is not None
         return f"wandb_file_manager/{uri.entity_name}/{uri.project_name}/{uri.name}/manifest-{uri.version}.json"
 
     async def _manifest(
         self, art_uri: artifact_wandb.WeaveWBArtifactURI, manifest_path: str
-    ) -> typing.Optional[artifacts.ArtifactManifest]:
+    ) -> typing.Optional[artifact_wandb.WandbArtifactManifest]:
         if art_uri.version is None:
             raise errors.WeaveInternalError(
                 'Artifact URI has no version: "%s"' % art_uri
@@ -52,9 +52,7 @@ class WandbFileManagerAsync:
         # Check if on disk
         try:
             async with self.fs.open_read(manifest_path) as f:
-                return artifacts.ArtifactManifest.from_manifest_json(
-                    None, json.loads(await f.read())
-                )
+                return artifact_wandb.WandbArtifactManifest(json.loads(await f.read()))
         except FileNotFoundError:
             pass
         # Download
@@ -70,14 +68,13 @@ class WandbFileManagerAsync:
             manifest_path,
         )
         async with self.fs.open_read(manifest_path) as f:
-            return artifacts.ArtifactManifest.from_manifest_json(
-                None, json.loads(await f.read())
-            )
+            return artifact_wandb.WandbArtifactManifest(json.loads(await f.read()))
 
     async def manifest(
         self, art_uri: artifact_wandb.WeaveWBArtifactURI
-    ) -> typing.Optional[artifacts.ArtifactManifest]:
+    ) -> typing.Optional[artifact_wandb.WandbArtifactManifest]:
         with tracer.trace("wandb_file_manager.manifest") as span:
+            assert art_uri.version is not None
             manifest_path = self.manifest_path(art_uri)
             manifest = self._manifests.get(manifest_path)
             if not isinstance(manifest, cache.LruTimeWindowCache.NotFound):
@@ -112,21 +109,23 @@ class WandbFileManagerAsync:
         manifest_entry = manifest.get_entry_by_path(path)
         if manifest_entry is None:
             return None
-        md5_hex = wandb_util.bytes_to_hex(base64.b64decode(manifest_entry.digest))
-        # TODO: storage_region
-        storage_region = "default"
+        md5_hex = wandb_util.bytes_to_hex(base64.b64decode(manifest_entry["digest"]))
         base_url = weave_env.wandb_base_url()
-        return self.file_path(art_uri, md5_hex), "{}/artifactsV2/{}/{}/{}/{}".format(
-            base_url,
-            storage_region,
-            art_uri.entity_name,
-            urllib.parse.quote(
-                manifest_entry.birth_artifact_id
-                if manifest_entry.birth_artifact_id is not None
-                else ""
-            ),
-            md5_hex,
-        )
+        file_path = self.file_path(art_uri, md5_hex)
+        if manifest.storage_layout == manifest.StorageLayout.V1:
+            return file_path, "{}/artifacts/{}/{}".format(
+                base_url, art_uri.entity_name, md5_hex
+            )
+        else:
+            # TODO: storage_region
+            storage_region = "default"
+            return file_path, "{}/artifactsV2/{}/{}/{}/{}".format(
+                base_url,
+                storage_region,
+                art_uri.entity_name,
+                urllib.parse.quote(manifest_entry.get("birthArtifactID", "")),  # type: ignore
+                md5_hex,
+            )
 
     async def ensure_file(
         self, art_uri: artifact_wandb.WeaveWBArtifactURI

@@ -1,12 +1,12 @@
 import pytest
 from itertools import chain
 
+import weave
 from ..ops_domain.run_segment import RunSegment
-from ..ops_arrow import ArrowWeaveList
+from ..ops_arrow import ArrowWeaveList, arrow_as_array
 from .. import ops
 from .. import storage
 from .. import api
-from .. import errors
 from .. import weave_types as types
 
 import pyarrow as pa
@@ -123,6 +123,11 @@ def num_runs():
     return 20
 
 
+def get_awl_col(awl: ArrowWeaveList, col_name: str):
+    arr = arrow_as_array(awl._arrow_data)
+    return arr.field(col_name)
+
+
 @pytest.mark.parametrize("branch_frac", [0.0, 0.8, 1.0])
 def test_experiment_branching(branch_frac, num_steps, num_runs):
     steps_per_run = num_steps // num_runs
@@ -140,9 +145,9 @@ def test_experiment_branching(branch_frac, num_steps, num_runs):
         )
 
         assert (
-            experiment._get_col("step").to_pylist()
+            get_awl_col(experiment, "step").to_pylist()
             == list(range(int(steps_per_run * branch_frac) * (num_runs - 1)))
-            + segment.metrics._get_col("step").to_pylist()
+            + get_awl_col(segment.metrics, "step").to_pylist()
         )
 
 
@@ -168,17 +173,17 @@ def test_explicit_experiment_construction(delta_step):
     storage.save(segment2)
     experiment = api.use(segment2.experiment())
 
-    assert experiment._get_col("step").to_pylist() == list(
+    assert get_awl_col(experiment, "step").to_pylist() == list(
         range(0, 15 * delta_step, delta_step)
     )
     assert (
-        experiment._get_col("string_col").to_pylist()
-        == root_segment.metrics._get_col("string_col").to_pylist()[:5]
-        + segment1.metrics._get_col("string_col").to_pylist()[:5]
-        + segment2.metrics._get_col("string_col").to_pylist()
+        get_awl_col(experiment, "string_col").to_pylist()
+        == get_awl_col(root_segment.metrics, "string_col").to_pylist()[:5]
+        + get_awl_col(segment1.metrics, "string_col").to_pylist()[:5]
+        + get_awl_col(segment2.metrics, "string_col").to_pylist()
     )
 
-    assert experiment._get_col("run_name").to_pylist() == list(
+    assert get_awl_col(experiment, "run_name").to_pylist() == list(
         chain(
             *[[name] * 5 for name in ["my-first-run", "my-second-run", "my-third-run"]]
         )
@@ -213,8 +218,7 @@ def test_invalid_explicit_experiment_construction():
 
 def test_vectorized_unnest_list_for_panelplot():
     metrics = random_metrics(10)
-    root_segment = RunSegment("my-first-run", None, 0, metrics)
-    storage.save(root_segment)
+    root_segment = weave.save(RunSegment("my-first-run", None, 0, metrics))
 
     def map_fn(row):
         return ops.dict_(
@@ -242,8 +246,8 @@ def test_vectorized_unnest_list_for_panelplot():
         map_fn,
     )
 
-    res = root_segment.metrics.map(fn_node)
-    mapped = api.use(res).to_pylist_raw()
+    res = weave.use(root_segment.metrics.map(fn_node))
+    mapped = res.to_pylist_raw()
     metrics_arr = metrics._arrow_data.to_pylist()
     assert mapped == [
         {
@@ -311,12 +315,12 @@ def test_group_by_bins_arrow_vectorized():
     func_node = weave_internal.define_fn(
         {"row": api.type_of(segment.metrics).object_type}, groupby_func
     )
-    groupby_node = segment.metrics.groupby(func_node)
+    groupby_node = weave.weave(segment.metrics).groupby(func_node)
 
     result = api.use(groupby_node)
-    assert api.use(result.count()) == 9
+    assert api.use(weave.weave(result).count()) == 9
 
-    group_key_node = result[4].groupkey()
+    group_key_node = weave.weave(result)[4].groupkey()
     key = api.use(group_key_node)
     assert key == {"number_bin_col_name": {"start": 130.0, "stop": 135.0}}
 

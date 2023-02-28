@@ -179,6 +179,29 @@ def test_dict_without_key_type():
     assert fully_typed.assign_type(partial_typed)
 
 
+# def test_union_unknown():
+#     assert (
+#         weave.weave_types.union(
+#             weave.weave_types.String(), weave.weave_types.UnknownType()
+#         )
+#         == weave.weave_types.String()
+#     )
+#     assert (
+#         weave.weave_types.union(
+#             weave.weave_types.UnknownType(), weave.weave_types.UnknownType()
+#         )
+#         == weave.weave_types.UnknownType()
+#     )
+#     assert (
+#         weave.weave_types.union(
+#             weave.weave_types.UnknownType(),
+#             weave.weave_types.UnknownType(),
+#             weave.types.String(),
+#         )
+#         == weave.weave_types.String()
+#     )
+
+
 def test_union_access():
     ### Type return
 

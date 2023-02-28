@@ -4,7 +4,7 @@ from .. import artifact_local
 from .. import artifact_fs
 from .. import storage
 
-from ..ops_arrow import list_ as arrow
+from .. import ops_arrow as arrow
 
 
 def test_artifact():

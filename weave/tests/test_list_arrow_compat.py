@@ -1,6 +1,6 @@
 import pytest
 from .. import api as weave
-from ..ops_arrow import list_ as arrow
+from .. import ops_arrow as arrow
 from ..ops_primitives import list_, dict_
 from . import list_arrow_test_helpers as lath
 import numpy as np

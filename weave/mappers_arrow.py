@@ -13,7 +13,7 @@ from . import ref_base
 from . import errors
 from . import node_ref
 from . import artifact_base
-from .language_features.tagging import tagged_value_type, tag_store
+from .language_features.tagging import tagged_value_type
 from .ops_domain import wbmedia
 import contextvars
 
@@ -112,7 +112,7 @@ class UnionToArrowUnion(mappers_weave.UnionMapper):
         if not nullable or len(non_null_mappers) > 1:
             fields = [
                 pa.field(
-                    f"{non_null_mappers[i].type.name}_{i}",
+                    str(i),
                     non_null_mappers[i].result_type(),
                     nullable,
                 )
@@ -399,88 +399,3 @@ def map_from_arrow_(type, mapper, artifact, path=[]):
 
 map_to_arrow = mappers.make_mapper(map_to_arrow_)
 map_from_arrow = mappers.make_mapper(map_from_arrow_)
-
-
-def map_from_arrow_scalar(value: pa.Scalar, type_: types.Type, artifact):
-    from .ops_arrow import arrow, list_
-
-    if isinstance(type_, arrow.ArrowWeaveListType):
-        return list_.ArrowWeaveList(value.values, type_.object_type, artifact)
-
-    if isinstance(type_, types.Const):
-        return map_from_arrow_scalar(value, type_.val, artifact)
-    if isinstance(
-        type_,
-        (
-            types.Number,
-            types.Int,
-            types.Float,
-            types.Boolean,
-            types.String,
-            types.Timestamp,
-            types.NoneType,
-            wbmedia.LegacyTableNDArrayType,
-        ),
-    ):
-        return value.as_py()
-    elif isinstance(type_, types.List):
-        return [map_from_arrow_scalar(v, type_.object_type, artifact) for v in value]
-    elif isinstance(type_, tagged_value_type.TaggedValueType):
-        # :( This can fail because we still sometimes have the wrong types
-        # from WeaveJS, because we don't refine lambdas in compile currently.
-        # So sometimes we think we have a tagged type here, but the value is
-        # actually a plain value.
-        # TODO: fix!
-        field_names = set([f.name for f in value.type])
-        if "_value" not in field_names or "_tag" not in field_names:
-            return value.as_py()
-
-        val = box.box(map_from_arrow_scalar(value["_value"], type_.value, artifact))
-        tag = map_from_arrow_scalar(value["_tag"], type_.tag, artifact)
-        return tag_store.add_tags(val, tag)
-    elif isinstance(type_, types.TypedDict):
-        return {
-            k: map_from_arrow_scalar(value[k], type_.property_types[k], artifact)
-            for k in type_.property_types
-        }
-    elif isinstance(type_, types.ObjectType):
-        return type_.instance_class(  # type: ignore
-            **map_from_arrow_scalar(
-                value, types.TypedDict(type_.property_types()), artifact
-            ),
-        )
-    elif isinstance(type_, types.UnionType):
-        if type_.is_simple_nullable():
-            if pa.compute.is_null(value).as_py():
-                return None
-            return map_from_arrow_scalar(value, types.non_none(type_), artifact)
-        else:
-            # we have a real union type
-            type_code = value.type_code
-            non_null_members = [
-                m for m in type_.members if not isinstance(m, types.NoneType)
-            ]
-            current_type = non_null_members[type_code]
-            return map_from_arrow_scalar(value.value, current_type, artifact)
-    elif isinstance(type_, types.Function):
-        obj: str = value.as_py()
-        ref = ref_base.Ref.from_str(obj)
-        return node_ref.ref_to_node(ref)
-    else:
-        # default
-        obj = value.as_py()
-        if isinstance(obj, dict):
-            return type_.instance_from_dict(obj)
-        # else its a ref string
-        # TODO: this does not use self.artifact, can we just drop it?
-        # Do we need the type so we can load here? No...
-        if ":" in obj:
-            ref = ref_base.Ref.from_str(obj)
-            # Note: we are forcing type here, because we already know it
-            # We don't save the types for every file in a remote artifact!
-            # But you can still reference them, because you have to get that
-            # file through an op, and therefore we know the type?
-            ref._type = type_
-            return ref.get()
-
-        return artifact.get(obj, type_)

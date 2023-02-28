@@ -12,6 +12,7 @@ from .tests import fixture_fakewandb
 from . import serialize
 from . import client
 from .language_features.tagging.tag_store import isolated_tagging_context
+from . import logs
 
 from flask.testing import FlaskClient
 
@@ -74,7 +75,7 @@ def pre_post_each_test(test_artifact_dir):
 def fresh_server_logfile():
     def _clearlog():
         try:
-            os.remove(weave_server.default_log_filename)
+            os.remove(logs.default_log_filename())
         except (OSError, FileNotFoundError) as e:
             pass
 

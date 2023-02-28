@@ -163,20 +163,6 @@ class VarNode(Node):
         return {"nodeType": "var", "type": self.type.to_dict(), "varName": self.name}
 
 
-def _inner_type_skips_output_node(type: weave_types.Type) -> bool:
-    return isinstance(
-        type, (weave_types.BasicType, weave_types.TypedDict, weave_types.TypeType)
-    )
-
-
-def _type_skips_output_node(type: weave_types.Type) -> bool:
-    return (
-        _inner_type_skips_output_node(type)
-        or isinstance(type, weave_types.Const)
-        and _inner_type_skips_output_node(type.val_type)
-    )
-
-
 class ConstNode(Node):
     val: typing.Any
 
@@ -193,29 +179,7 @@ class ConstNode(Node):
             val = storage.from_python({"_type": obj["type"], "_val": obj["val"]})  # type: ignore
         return cls(weave_types.TypeRegistry.type_from_dict(obj["type"]), val)
 
-    def equivalent_output_node(self) -> typing.Union[OutputNode, None]:
-        if isinstance(self.type, weave_types.Function):
-            return None
-
-        val = self.val
-        if _type_skips_output_node(self.type):
-            return None
-
-        ref = storage._get_ref(val)
-        if ref is None:
-            ref = storage.save(val)
-
-        return OutputNode(
-            self.type, "get", {"uri": ConstNode(weave_types.String(), str(ref))}
-        )
-
     def to_json(self) -> dict:
-        # This is used to convert to WeaveJS compatible JS. There are business logic
-        # decisions here, like for now if its a BasicType or TypedDict, we encode
-        # as json directly, otherwise we save the object and return a get() operation
-        equiv_output_node = self.equivalent_output_node()
-        if equiv_output_node is not None:
-            return equiv_output_node.to_json()
 
         val = storage.to_python(self.val)["_val"]  # type: ignore
         # mapper = mappers_python.map_to_python(self.type, None)

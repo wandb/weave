@@ -21,15 +21,15 @@ def test_mapped_method_on_custom_type():
     assert mid.x == 0.45
     assert mid.y == 0.6
 
-    segments = ops_arrow.to_arrow(
+    segments = ops_arrow.to_weave_arrow(
         [
             geom.LineSegment(0.0, 0.1, 0.9, 1.1),
             geom.LineSegment(0.0, 0.2, 0.4, 1.1),
         ]
     )
     lens = weave.use(segments.map(lambda seg: seg.length()))
-    assert weave.use(lens[0]) == 1.81
-    assert weave.use(lens[1]) == pytest.approx(0.97)
+    assert lens[0] == 1.81
+    assert lens[1] == pytest.approx(0.97)
 
     # mid = weave.use(segments.midpoint())
     # mid = weave.use(segments.map(lambda seg: seg.midpoint()))
@@ -40,7 +40,7 @@ def test_mapped_method_on_custom_type():
 
 
 def test_mapped_method_returning_custom_type():
-    segments = ops_arrow.to_arrow(
+    segments = ops_arrow.to_weave_arrow(
         [
             geom.LineSegment(0.0, 0.1, 0.9, 1.1),
             geom.LineSegment(0.0, 0.2, 0.4, 1.1),
@@ -49,10 +49,10 @@ def test_mapped_method_returning_custom_type():
 
     mid = weave.use(segments.map(lambda seg: seg.midpoint()))
 
-    assert weave.use(mid[0].x) == 0.45
-    assert weave.use(mid[0].y) == 0.6
-    assert weave.use(mid[1].x) == 0.2
-    assert weave.use(mid[1].y) == pytest.approx(0.65)
+    assert mid[0].x == 0.45
+    assert mid[0].y == 0.6
+    assert mid[1].x == 0.2
+    assert mid[1].y == pytest.approx(0.65)
 
 
 def test_mapped_pick():

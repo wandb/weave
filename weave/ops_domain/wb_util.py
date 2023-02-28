@@ -52,7 +52,11 @@ def filesystem_runfiles_from_run_path(run_path: RunPath, file_path: str):
 
 
 def process_run_dict_obj(run_dict, run_path: typing.Optional[RunPath] = None):
-    return {k: _process_run_dict_item(v, run_path) for k, v in run_dict.items()}
+    return {
+        k: _process_run_dict_item(v, run_path)
+        for k, v in run_dict.items()
+        if k != "_wandb"
+    }
 
 
 def _process_run_dict_item(val, run_path: typing.Optional[RunPath] = None):
@@ -85,7 +89,11 @@ def _process_run_dict_item(val, run_path: typing.Optional[RunPath] = None):
 
 def process_run_dict_type(run_dict):
     return types.TypedDict(
-        {k: _process_run_dict_item_type(v) for k, v in run_dict.items()}
+        {
+            k: _process_run_dict_item_type(v)
+            for k, v in run_dict.items()
+            if k != "_wandb"
+        }
     )
 
 
@@ -96,7 +104,7 @@ def _process_run_dict_item_type(val):
             return Histogram.WeaveType()
         if type == "joined-table":
             extension = types.Const(types.String(), "json")
-            return artifact_fs.FilesystemArtifactType(
+            return artifact_fs.FilesystemArtifactFileType(
                 extension, table.JoinedTableType()
             )
 

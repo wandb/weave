@@ -8,7 +8,7 @@ types = weave.types.get_type_classes()
 def test_const_assignment(type_name, type_cls):
     params = []
     # Quick list of types that don't work with this parametrization
-    if type_name in ["const", "invalid", "union", "function"]:
+    if type_name in ["const", "invalid", "union", "function", "unknown"]:
         return
 
     # Special types that need extra params

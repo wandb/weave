@@ -39,14 +39,6 @@ class OpArgs:
     def nonfirst_params_valid(self, param_types: list[types.Type]) -> bool:
         raise NotImplementedError
 
-    def params_are_valid(
-        self, param_types: dict[str, types.Type], skip_first=False
-    ) -> bool:
-        types = list(param_types.values())
-        return self.first_param_valid(types[0]) and self.nonfirst_params_valid(
-            types[1:]
-        )
-
     def why_are_params_invalid(
         self, param_dict: dict[str, types.Type]
     ) -> typing.Optional[str]:

@@ -11,7 +11,7 @@ import time
 import requests
 import traceback
 import time
-import cProfile
+
 
 from weave.language_features.tagging.tag_store import isolated_tagging_context
 
@@ -20,9 +20,8 @@ from . import serialize
 from . import storage
 from . import context
 from . import weave_types
-from . import util
 from . import engine_trace
-from . import graph_debug
+from . import logs
 
 
 # A function to monkeypatch the request post method
@@ -188,13 +187,9 @@ class HttpServer(threading.Thread):
         return url
 
 
-def capture_weave_server_logs(log_level: str = "DEBUG"):
-    from . import weave_server
-
-    logger = logging.getLogger("root")
-    weave_server.enable_stream_logging(
+def capture_weave_server_logs(log_level: str = "INFO"):
+    logs.enable_stream_logging(
         logger,
-        wsgi_stream_settings=weave_server.LogSettings(
-            weave_server.LogFormat.PRETTY, log_level
-        ),
+        wsgi_stream_settings=logs.LogSettings(logs.LogFormat.PRETTY, log_level),
+        pid_logfile_settings=logs.LogSettings(logs.LogFormat.PRETTY, log_level),
     )

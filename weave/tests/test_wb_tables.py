@@ -14,7 +14,7 @@ def use_static_artifact_node(
     version="latest",
 ) -> weave.graph.Node:
     fake_wandb.fake_api.add_mock(
-        lambda ndx, q: {
+        lambda q, ndx: {
             "project_5702147f0293fd7538d402af13069708": {
                 "id": "p1",
                 "name": project_name,
@@ -24,6 +24,7 @@ def use_static_artifact_node(
                 ): {
                     "id": "a1",
                     "versionIndex": "0",
+                    "commitHash": "1478438ajsdfjj3kj1nn1nj",
                     "artifactSequence": {
                         "id": "c1",
                         "name": collection_name,
@@ -93,7 +94,7 @@ def test_convert_optional_list_cell(fake_wandb):
         {
             "a": [
                 {
-                    "artifact": "wandb-artifact:///test_entity/test_project/test_name:v0",
+                    "artifact": f"wandb-artifact:///test_entity/test_project/test_name:{art.commit_hash}",
                     "path": "media/html/03ac15e611be692f058e.html",
                     "sha256": "d4935b7d4e8f30952d5869122ca6793114936be8bf156dd936b6794fb6715e02",
                 }
@@ -156,7 +157,7 @@ def test_join_table_with_images(fake_wandb):
                 "0": {
                     "name": "a",
                     "image": {
-                        "artifact": "wandb-artifact:///test_entity/test_project/test_name:v0",
+                        "artifact": f"wandb-artifact:///test_entity/test_project/test_name:{art.commit_hash}",
                         "path": "media/images/9d4f26b99a1d4d044b6c.png",
                         "format": "png",
                         "height": 32,
@@ -175,7 +176,7 @@ def test_join_table_with_images(fake_wandb):
                 "0": {
                     "name": "b",
                     "image": {
-                        "artifact": "wandb-artifact:///test_entity/test_project/test_name:v0",
+                        "artifact": f"wandb-artifact:///test_entity/test_project/test_name:{art.commit_hash}",
                         "path": "media/images/7fd26b0af1228fa077bb.png",
                         "format": "png",
                         "height": 32,
@@ -211,3 +212,31 @@ def test_join_table_with_numeric_columns(fake_wandb):
         }
     )
     assert awl.to_pylist_raw() == [{"1": 1, "2": 2}]
+
+
+def test_metric_table_join(fake_wandb):
+    table = wandb.Table(
+        columns=["id", "label", "score_1", "score_2", "score_3"],
+        data=[
+            [1, "cat", 1.1, 2.1, 3.1],
+            [2, "dog", 1.2, 2.2, 3.2],
+            [3, "cat", 1.3, 2.3, 3.3],
+            [4, "dog", 1.4, 2.4, 3.4],
+            [5, "mouse", 1.5, 2.5, 3.5],
+        ],
+    )
+    art = wandb.Artifact("test_name", "test_type")
+    art.add(table, "table")
+    art_node = fake_wandb.mock_artifact_as_node(art)
+    file_node = art_node.file("table.table.json")
+    table_node = file_node.table()
+    table_rows = table_node.rows().createIndexCheckpointTag()
+    grouped = table_rows.groupby(lambda row: weave.ops.dict_(label=row["label"]))
+    sorted = grouped.sort(
+        lambda row: weave.ops.make_list(a=row.groupkey()["label"]), ["asc"]
+    )
+    group_col_0 = sorted[0].groupkey()["label"]
+    group_col_1 = sorted[1].groupkey()["label"]
+    group_col_2 = sorted[2].groupkey()["label"]
+    res = weave.use([group_col_0, group_col_1, group_col_2])
+    assert res == ["cat", "dog", "mouse"]

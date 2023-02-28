@@ -10,6 +10,7 @@ from ..decorator_arrow_op import arrow_op
 from .. import weave_types as types
 
 from .list_ import ArrowWeaveList, ArrowWeaveListType
+from .arrow import ArrowWeaveListType, arrow_as_array
 
 
 ARROW_WEAVE_LIST_STRING_TYPE = ArrowWeaveListType(types.String())
@@ -33,6 +34,13 @@ self_type_output_type_fn = lambda input_types: input_types["self"]
 def _concatenate_strings(
     left: ArrowWeaveList[str], right: typing.Union[str, ArrowWeaveList[str]]
 ) -> ArrowWeaveList[str]:
+    a = arrow_as_array(left._arrow_data)
+    if right == None:
+        return ArrowWeaveList(
+            pa.nulls(len(a), type=a.type),
+            types.NoneType(),
+            left._artifact,
+        )
     if isinstance(right, ArrowWeaveList):
         right = right._arrow_data
     return ArrowWeaveList(
@@ -140,7 +148,7 @@ def arrowweavelist_len(self):
     input_type=binary_input_type,
     output_type=self_type_output_type_fn,
 )
-def __add__(self, other):
+def string_add(self, other):
     return _concatenate_strings(self, other)
 
 
@@ -149,10 +157,11 @@ def __add__(self, other):
 # TODO: Do this generally!
 @op(
     name="ArrowWeaveListString_right-add",
+    output_type=lambda input_type: input_type["right"],
 )
-def right_add(
+def string_right_add(
     left: typing.Optional[str], right: ArrowWeaveList[typing.Optional[str]]
-) -> ArrowWeaveList[str]:
+):
     return ArrowWeaveList(
         pc.binary_join_element_wise(left, right._arrow_data_asarray_no_tags(), ""),
         types.String(),
