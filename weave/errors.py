@@ -119,3 +119,7 @@ class WeaveHttpError(WeaveBaseError):
 
 class WeaveArtifactMediaFileLookupError(WeaveBaseError):
     pass
+
+
+class WeaveClientRequestError(WeaveBaseError):
+    pass

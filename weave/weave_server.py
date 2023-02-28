@@ -129,8 +129,11 @@ def execute():
         req_b64,
     )
 
-    if not request.json or "graphs" not in request.json:
-        abort(400)
+    if not request.json:
+        abort(400, "Request body must be JSON.")
+    if "graphs" not in request.json:
+        abort(400, "Request body must contain a 'graphs' key.")
+
     # Simulate browser/server latency
     # import time
     # time.sleep(0.1)
