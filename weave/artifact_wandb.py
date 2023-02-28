@@ -731,7 +731,7 @@ class WeaveWBLoggedArtifactURI(uris.WeaveURI):
         query: dict[str, list[str]],
         fragment: str,
     ):
-        path = path.strip("/")
+        path = parse.unquote(path.strip("/"))
         spl_netloc = netloc.split(":")
         if len(spl_netloc) == 1:
             name = spl_netloc[0]

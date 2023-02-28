@@ -1,4 +1,5 @@
 import typing
+from urllib import parse
 from .. import weave_types as types
 from .. import decorator_type
 
@@ -59,6 +60,22 @@ def process_run_dict_obj(run_dict, run_path: typing.Optional[RunPath] = None):
     }
 
 
+def escape_artifact_path(artifact_path: str) -> str:
+    prefix = "wandb-client-artifact://"
+    if artifact_path.startswith(prefix):
+        artifact_path = artifact_path[len(prefix) :]
+        if ":" in artifact_path:
+            name, version_path = artifact_path.split(":", 1)
+            version, path = version_path.split("/", 1)
+        else:
+            version = None
+            name, path = artifact_path.split("/", 1)
+        path = parse.quote(path, safe="")
+        version_string = f":{version}" if version is not None else ""
+        artifact_path = f"{prefix}{name}{version_string}/{path}"
+    return artifact_path
+
+
 def _process_run_dict_item(val, run_path: typing.Optional[RunPath] = None):
     if isinstance(val, dict) and "_type" in val:
         if val["_type"] == "histogram":
@@ -77,7 +94,8 @@ def _process_run_dict_item(val, run_path: typing.Optional[RunPath] = None):
             )
         if val["_type"] == "table-file":
             if "artifact_path" in val:
-                return filesystem_artifact_file_from_artifact_path(val["artifact_path"])
+                artifact_path = escape_artifact_path(val["artifact_path"])
+                return filesystem_artifact_file_from_artifact_path(artifact_path)
             elif "path" in val and run_path is not None:
                 return filesystem_runfiles_from_run_path(run_path, val["path"])
 

@@ -22,6 +22,7 @@ from .. import ops_arrow as arrow
 import cProfile
 from ..language_features.tagging.tagged_value_type import TaggedValueType
 from ..ops_domain import table
+from ..ops_domain import wb_util
 
 file_path_response = {
     "project_518fa79465d8ffaeb91015dce87e092f": {
@@ -1443,3 +1444,14 @@ def test_is_valid_version_string():
 
     for v in ["v01", "v0009"]:
         assert not artifact_wandb.is_valid_version_index(v)
+
+
+def test_artifact_path_character_escaping():
+    name = 12347187287418787843872388177814
+    path = "table #3.table.json"
+    result = wb_util.escape_artifact_path(
+        f"wandb-client-artifact://{name}:latest/{path}"
+    )
+    uri = artifact_wandb.WeaveWBLoggedArtifactURI.parse(result)
+
+    assert uri.path == path
