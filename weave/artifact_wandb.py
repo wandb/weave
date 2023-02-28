@@ -51,7 +51,21 @@ class WandbArtifactManifestV1(typing.TypedDict):
 # as the raw json dict instead.
 @dataclasses.dataclass
 class WandbArtifactManifest:
+    class StorageLayout:
+        V1 = "V1"
+        V2 = "V2"
+
     _manifest_json: WandbArtifactManifestV1
+
+    @property
+    def _storage_policy_config(self):
+        return self._manifest_json.get("storagePolicyConfig", {})
+
+    @property
+    def storage_layout(self):
+        return self._storage_policy_config.get(
+            "storageLayout", WandbArtifactManifest.StorageLayout.V1
+        )
 
     def get_entry_by_path(
         self, path: str

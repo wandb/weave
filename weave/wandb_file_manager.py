@@ -110,16 +110,22 @@ class WandbFileManagerAsync:
         if manifest_entry is None:
             return None
         md5_hex = wandb_util.bytes_to_hex(base64.b64decode(manifest_entry["digest"]))
-        # TODO: storage_region
-        storage_region = "default"
         base_url = weave_env.wandb_base_url()
-        return self.file_path(art_uri, md5_hex), "{}/artifactsV2/{}/{}/{}/{}".format(
-            base_url,
-            storage_region,
-            art_uri.entity_name,
-            urllib.parse.quote(manifest_entry.get("birthArtifactID", "")),  # type: ignore
-            md5_hex,
-        )
+        file_path = self.file_path(art_uri, md5_hex)
+        if manifest.storage_layout == manifest.StorageLayout.V1:
+            return file_path, "{}/artifacts/{}/{}".format(
+                base_url, art_uri.entity_name, md5_hex
+            )
+        else:
+            # TODO: storage_region
+            storage_region = "default"
+            return file_path, "{}/artifactsV2/{}/{}/{}/{}".format(
+                base_url,
+                storage_region,
+                art_uri.entity_name,
+                urllib.parse.quote(manifest_entry.get("birthArtifactID", "")),  # type: ignore
+                md5_hex,
+            )
 
     async def ensure_file(
         self, art_uri: artifact_wandb.WeaveWBArtifactURI
