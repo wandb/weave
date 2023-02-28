@@ -1965,3 +1965,20 @@ def test_identity_awl_operations_3(
     )
     concatted = ops.make_list(a=awl_node, b=concat_awl).concat()
     assert weave.use(concatted).to_pylist_raw() == data + concat_with_data
+
+
+def test_dropna_empty_list():
+    data_node = weave._weave_internal.make_const_node(
+        types.List(types.NoneType()), [None]
+    )
+    dropped = data_node.dropna()
+    res_node = dropped + "Hello"
+    res = weave.use(res_node)
+    assert res == []
+
+    data_node = weave.save(arrow.to_arrow([None], types.List(types.NoneType())))
+    dropped = arrow.ops.dropna(data_node)
+    res_node = dropped + "Hello"
+    res = weave.use(res_node)
+    # Note: since dropped is AWL<None>, we fallback to list when doing the add.
+    assert res == []

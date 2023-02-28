@@ -124,7 +124,7 @@ def _vectorized_dropna_object_type(
         _vectorized_dropna_object_type(input_types["self"].object_type)
     ),
 )
-def dropna(self):
+def vectorized_dropna(self):
     a = arrow_as_array(self._arrow_data)
 
     # NOTE: does not work for unions right now because of pyarrow bugs for null union values
