@@ -4,6 +4,7 @@ from weave.language_features.tagging.tagged_value_type import TaggedValueType
 from weave.ops_domain.wandb_domain_gql import _make_alias
 from weave.ops_domain import wbmedia
 import numpy as np
+from weave.ops_arrow.list_ops import filter
 
 
 def use_static_artifact_node(
@@ -240,3 +241,23 @@ def test_metric_table_join(fake_wandb):
     group_col_2 = sorted[2].groupkey()["label"]
     res = weave.use([group_col_0, group_col_1, group_col_2])
     assert res == ["cat", "dog", "mouse"]
+
+
+def test_empty_table(fake_wandb):
+    table = wandb.Table(
+        columns=["id", "label", "score_1", "score_2", "score_3"],
+        data=[],
+    )
+    art = wandb.Artifact("test_name", "test_type")
+    art.add(table, "table")
+    art_node = fake_wandb.mock_artifact_as_node(art)
+    file_node = art_node.file("table.table.json")
+    table_node = file_node.table()
+    table_rows = table_node.rows().createIndexCheckpointTag()
+    filtered = filter(table_rows, lambda row: row["label"] == "cat")
+    grouped = filtered.groupby(lambda row: weave.ops.dict_(label=row["label"]))
+    sorted = grouped.sort(
+        lambda row: weave.ops.make_list(a=row.groupkey()["label"]), ["asc"]
+    )
+    res = weave.use(sorted)
+    assert res.to_pylist_raw() == []

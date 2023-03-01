@@ -298,6 +298,7 @@ def sort(self, comp_fn, col_dirs):
 def filter(self, filter_fn):
     mask = _apply_fn_node_with_tag_pushdown(self, filter_fn)
     arrow_mask = mask._arrow_data_asarray_no_tags()
+    arrow_mask = pc.fill_null(arrow_mask.cast(pa.bool_()), False)
     return ArrowWeaveList(
         arrow_as_array(self._arrow_data).filter(arrow_mask),
         self.object_type,
@@ -398,7 +399,9 @@ def groupby(self, group_by_fn):
     grouped_awl = ArrowWeaveList(
         grouped_results, ArrowWeaveListType(self.object_type), self._artifact
     )
-    effective_group_key_indexes = flattened_indexes.take(offsets.tolist()[:-1])
+    effective_group_key_indexes = flattened_indexes.take(
+        pa.array(offsets.tolist()[:-1]).cast(pa.int64())
+    )
     effective_group_keys = arrow_as_array(unsafe_group_table_awl._arrow_data).take(
         effective_group_key_indexes
     )

@@ -178,6 +178,8 @@ def _infer_type_from_row_dict(row: dict) -> types.Type:
 
 
 def _infer_type_from_col_list(row: list) -> types.Type:
+    if len(row) == 0:
+        return types.NoneType()
     running_type: types.Type = types.UnknownType()
     for cell in row:
         running_type = types.merge_types(running_type, _infer_type_from_cell(cell))
