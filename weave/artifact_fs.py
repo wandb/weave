@@ -73,6 +73,17 @@ class FilesystemArtifact(artifact_base.Artifact):
         raise NotImplementedError
 
     @property
+    def initial_uri_obj(self) -> uris.WeaveURI:
+        # uri_obj must be a stable identifier (no aliases) for this artifact.
+        # initial_uri_obj is the uri used to construct the artifact, which may include
+        # aliases. artifact_wandb is the only case where we need to override this
+        # to provide different behaviors for each, because it does not resolve aliases
+        # upon construction. storage.to_weavejs is the only place that makes use
+        # of initial_uri_obj. It doesn't want to incur the cost of resolving potentially
+        # many uris (as in a run summary object), and the calling code doesn't care.
+        return self.uri_obj
+
+    @property
     def uri_obj(self) -> uris.WeaveURI:
         raise NotImplementedError
 
@@ -158,6 +169,13 @@ class FilesystemArtifactRef(artifact_base.ArtifactRef):
     @property
     def is_saved(self) -> bool:
         return self.artifact.is_saved
+
+    @property
+    def initial_uri(self) -> str:
+        uri = typing.cast("FilesystemArtifactURI", self.artifact.initial_uri_obj)
+        uri.path = self.path
+        uri.extra = self.extra
+        return str(uri)
 
     @property
     def uri(self) -> str:

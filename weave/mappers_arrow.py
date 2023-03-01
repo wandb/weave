@@ -329,7 +329,9 @@ class ArrowToArrowWeaveListOrPylist(mappers_python.ListToPyList):
         return super().apply(obj)
 
 
-def map_to_arrow_(type, mapper, artifact: artifact_base.Artifact, path=[]):
+def map_to_arrow_(
+    type, mapper, artifact: artifact_base.Artifact, path=[], mapper_options=None
+):
     from .ops_arrow import arrow
 
     if isinstance(type, types.Const):
@@ -364,7 +366,7 @@ def map_to_arrow_(type, mapper, artifact: artifact_base.Artifact, path=[]):
         return DefaultToArrow(type, mapper, artifact, path)
 
 
-def map_from_arrow_(type, mapper, artifact, path=[]):
+def map_from_arrow_(type, mapper, artifact, path=[], mapper_options=None):
     from .ops_arrow import arrow
 
     if isinstance(type, types.TypedDict):

@@ -447,6 +447,14 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         return super().size(path)
 
     @property
+    def initial_uri_obj(
+        self,
+    ) -> typing.Union["WeaveWBArtifactURI", "WeaveWBLoggedArtifactURI"]:
+        if not self.is_saved or not self._unresolved_read_artifact_or_client_uri:
+            raise errors.WeaveInternalError("cannot get uri of an unsaved artifact")
+        return self._unresolved_read_artifact_or_client_uri
+
+    @property
     def uri_obj(self) -> "WeaveWBArtifactURI":
         if not self.is_saved or not self._read_artifact_uri:
             raise errors.WeaveInternalError("cannot get uri of an unsaved artifact")
@@ -610,6 +618,15 @@ types.WandbArtifactRefType.instance_classes = WandbArtifactRef
 
 WandbArtifact.RefClass = WandbArtifactRef
 
+
+def is_hex_string(s: str) -> bool:
+    try:
+        int(s, 16)
+        return True
+    except ValueError:
+        return False
+
+
 # Used to refer to objects stored in WB Artifacts. This URI must not change and
 # matches the existing artifact schemes
 @dataclasses.dataclass
@@ -697,8 +714,12 @@ class WeaveWBArtifactURI(uris.WeaveURI):
 
     @property
     def resolved_artifact_uri(self) -> "WeaveWBArtifactURI":
-        if self.version:
+        # This is the heuristic we use everywhere to tell if a version is an alias or not
+        # if self.version:
+        if self.version and is_hex_string(self.version) and len(self.version) == 20:
             return self
+        # if self.version and is_hex_string(self.version) and len(self.version) == 20:
+        #     return self
         if self._resolved_artifact_uri is None:
             path = f"{self.entity_name}/{self.project_name}/{self.name}"
             if self.version:

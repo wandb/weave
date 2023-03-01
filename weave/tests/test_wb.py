@@ -271,7 +271,7 @@ def test_table_call(table_file_node, mock_response, fake_wandb):
     )
     image0_url = weave.use(image0_url_node)
     assert image0_url.endswith(
-        "test_res_1fwmcd3q_v0/media/images/8f65e54dc684f7675aec.png"
+        "test_res_1fwmcd3q_303db33c9f9264768626/media/images/8f65e54dc684f7675aec.png"
     )
 
 

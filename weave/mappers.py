@@ -17,7 +17,7 @@ class Mapper:
 
 
 def make_mapper(map_fn):
-    def mapper(type_, artifact, path=[]):
-        return map_fn(type_, mapper, artifact, path)
+    def mapper(type_, artifact, path=[], mapper_options=None):
+        return map_fn(type_, mapper, artifact, path, mapper_options=mapper_options)
 
     return mapper

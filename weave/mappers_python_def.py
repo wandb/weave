@@ -189,9 +189,18 @@ class UnknownToPyUnknown(mappers.Mapper):
 
 
 class RefToPyRef(mappers_weave.RefMapper):
-    def apply(self, obj):
+    def __init__(
+        self, type_: types.Type, mapper, artifact, path=[], use_stable_refs=True
+    ):
+        super().__init__(type_, mapper, artifact, path)
+        self._use_stable_refs = use_stable_refs
+
+    def apply(self, obj: ref_base.Ref):
         try:
-            return obj.uri
+            if self._use_stable_refs:
+                return obj.uri
+            else:
+                return obj.initial_uri
         except NotImplementedError:
             raise errors.WeaveSerializeError('Cannot serialize ref "%s"' % obj)
 
@@ -220,11 +229,14 @@ class ConstToPyConst(mappers_weave.ConstMapper):
 
 
 class DefaultToPy(mappers.Mapper):
-    def __init__(self, type_: types.Type, mapper, artifact, path=[]):
+    def __init__(
+        self, type_: types.Type, mapper, artifact, path=[], use_stable_refs=True
+    ):
         self.type = type_
         self._artifact = artifact
         self._path = path
         self._row_id = 0
+        self._use_stable_refs = use_stable_refs
 
     def apply(self, obj):
         try:
@@ -236,8 +248,11 @@ class DefaultToPy(mappers.Mapper):
         existing_ref = storage._get_ref(obj)
         if existing_ref:
             if existing_ref.is_saved:
-                return str(existing_ref)
-
+                if self._use_stable_refs:
+                    uri = existing_ref.uri
+                else:
+                    uri = existing_ref.initial_uri
+                return str(uri)
         # This defines the artifact layout!
         name = "/".join(self._path + [str(self._row_id)])
         self._row_id += 1
@@ -293,7 +308,9 @@ def add_mapper(
     _additional_mappers.append(RegisteredMapper(type_class, to_mapper, from_mapper))
 
 
-def map_to_python_(type, mapper, artifact, path=[]):
+def map_to_python_(type, mapper, artifact, path=[], mapper_options=None):
+    mapper_options = mapper_options or {}
+    use_stable_refs = mapper_options.get("use_stable_refs", True)
     if isinstance(type, types.TypeType):
         # If we're actually serializing a type itself
         return TypeToPyType(type, mapper, artifact, path)
@@ -328,15 +345,17 @@ def map_to_python_(type, mapper, artifact, path=[]):
     elif isinstance(type, types.UnknownType):
         return UnknownToPyUnknown(type, mapper, artifact, path)
     elif isinstance(type, types.RefType):
-        return RefToPyRef(type, mapper, artifact, path)
+        return RefToPyRef(type, mapper, artifact, path, use_stable_refs=use_stable_refs)
     else:
         for m in _additional_mappers:
             if isinstance(type, m.type_class):
                 return m.to_mapper(type, mapper, artifact, path)
-        return DefaultToPy(type, mapper, artifact, path)
+        return DefaultToPy(
+            type, mapper, artifact, path, use_stable_refs=use_stable_refs
+        )
 
 
-def map_from_python_(type: types.Type, mapper, artifact, path=[]):
+def map_from_python_(type: types.Type, mapper, artifact, path=[], mapper_options=None):
     if isinstance(type, types.TypeType):
         # If we're actually serializing a type itself
         return PyTypeToType(type, mapper, artifact, path)
