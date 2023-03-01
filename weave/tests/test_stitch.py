@@ -10,6 +10,7 @@ from weave import context_state as _context
 from .. import weave_internal
 from . import test_wb
 from ..ops_domain import run_ops
+from . import fixture_fakewandb as fwb
 
 _loading_builtins_token = _context.set_loading_built_ins()
 
@@ -232,3 +233,34 @@ def test_stitch_keytypes_override_fetch_all_columns(fake_wandb):
     # even though we have picked a specific key out of the table, we should still have an empty key tree
     # because we must fetch all columns due to keytypes
     assert key_tree == {}
+
+
+def test_stitch_overlapping_tags(fake_wandb):
+    fake_wandb.fake_api.add_mock(
+        lambda a, b: {
+            "project_518fa79465d8ffaeb91015dce87e092f": {
+                **fwb.project_payload,
+                "runs_6e908597bd3152c2f0457f6283da76b9": {
+                    "edges": [{"node": {**fwb.run_payload, "summaryMetrics": "{}"}}]
+                },
+                "runs_76cc8d511150f7f1320d5d5494445c8e": {
+                    "edges": [
+                        {"node": {**fwb.run_payload, "summaryMetrics": '{"a": 1}'}}
+                    ]
+                },
+            }
+        }
+    )
+    project_node = weave.ops.project("stacey", "mendeleev")
+    filtered_runs_a_node = project_node.filteredRuns("{}", "-createdAt")[0]
+    summary_a_node = filtered_runs_a_node.summary()
+    tagged_name_a = weave.ops.run_ops.run_tag_getter_op(summary_a_node["a"]).name()
+    filtered_runs_b_node = project_node.filteredRuns("{}", "+createdAt")[0]
+    summary_b_node = filtered_runs_b_node.summary()
+    tagged_id_b = weave.ops.run_ops.run_tag_getter_op(summary_b_node).id()
+
+    p = stitch.stitch([tagged_name_a, tagged_id_b])
+
+    assert len(p.get_result(project_node).tags) == 0
+    assert len(p.get_result(filtered_runs_a_node).calls) == 2
+    assert len(p.get_result(filtered_runs_b_node).calls) == 2
