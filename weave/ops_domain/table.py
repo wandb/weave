@@ -1,6 +1,7 @@
 import dataclasses
 import json
 import datetime
+import logging
 import typing
 
 
@@ -516,6 +517,19 @@ def _patch_legacy_image_file_types(
     return types.TypedDict(return_prop_types)
 
 
+def should_infer_type_from_data(col_type: types.Type) -> bool:
+    status = {"found_unknown": False}
+
+    def is_unknown_type_mapper(t: types.Type) -> None:
+        status["found_unknown"] = status["found_unknown"] or isinstance(
+            t, types.UnknownType
+        )
+
+    types.map_leaf_types(col_type, is_unknown_type_mapper)
+
+    return status["found_unknown"]
+
+
 def _get_rows_and_object_type_from_weave_format(
     data: typing.Any, file: artifact_fs.FilesystemArtifactFile
 ) -> tuple[list, types.TypedDict]:
@@ -548,13 +562,16 @@ def _get_rows_and_object_type_from_weave_format(
                 f"Column name {key} not found in column_types"
             )
         col_type = converted_object_type.property_types[key]
-        if col_type.assign_type(types.UnknownType()):
+        if should_infer_type_from_data(col_type):
             # Sample some data to detect the type. Otherwise this
             # can be very expensive. This could cause down-stream crashes,
             # for example if we don't realize that a column is union of string
             # and int, saving to arrow will crash.
             unknown_col_example_data = [row[i] for row in _sample_rows(row_data)]
             obj_prop_types[key] = _infer_type_from_col_list(unknown_col_example_data)
+            logging.warning(
+                f"Column {key} had type {col_type} requiring data-inferred type. Inferred type as {obj_prop_types[key]}. This may be incorrect due to data sampling"
+            )
         else:
             obj_prop_types[key] = col_type
     object_type = types.TypedDict(obj_prop_types)

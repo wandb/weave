@@ -1400,3 +1400,41 @@ def type_is_variable(t: Type) -> bool:
 
 
 NumberBinType = TypedDict({"start": Float(), "stop": Float()})
+
+
+def map_leaf_types(t: Type, fn: typing.Callable[[Type], typing.Optional[Type]]) -> Type:
+    """
+    This function will recursively apply `fn` to all leaf types in `t`. A leaf type is
+    a basic type, object type, or const. If `fn` returns None, then the original type
+    will be used.
+    """
+
+    def null_safe_fn(t: Type) -> Type:
+        fn_res = fn(t)
+        return t if fn_res is None else fn_res
+
+    return _map_leaf_types_null_safe(t, null_safe_fn)
+
+
+def _map_leaf_types_null_safe(t: Type, fn: typing.Callable[[Type], Type]) -> Type:
+    TaggedValueType = type_name_to_type("tagged")
+    if isinstance(t, List):
+        return List(_map_leaf_types_null_safe(t.object_type, fn))
+    elif isinstance(t, TypedDict):
+        return TypedDict(
+            {k: _map_leaf_types_null_safe(v, fn) for k, v in t.property_types.items()}
+        )
+    elif isinstance(t, Dict):
+        return Dict(t.key_type, _map_leaf_types_null_safe(t.object_type, fn))
+    elif isinstance(t, ObjectType):
+        pass
+    elif isinstance(t, UnionType):
+        return union(*[_map_leaf_types_null_safe(t, fn) for t in t.members])
+    elif isinstance(t, Const):
+        pass
+    elif isinstance(t, TaggedValueType):
+        return TaggedValueType(
+            _map_leaf_types_null_safe(t.tag, fn),  # type: ignore
+            _map_leaf_types_null_safe(t.value, fn),
+        )
+    return fn(t)

@@ -86,6 +86,11 @@ def _convert_type(old_type: Weave0TypeJson) -> types.Type:
         return types.Timestamp()
     elif (
         old_type_name == "pythonObject"
+        and old_type.get("params", {}).get("class_name") == "Timestamp"
+    ):
+        return types.Timestamp()
+    elif (
+        old_type_name == "pythonObject"
         and old_type.get("params", {}).get("class_name") == "datetime64"
     ):
         # This is a bit unfortunate. Weave0 interprets this as a number, then calls
