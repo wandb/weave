@@ -166,10 +166,8 @@ def _collection_and_alias_id_mapping_to_uri(
             artifactMembership(aliasName: $aliasName) {	
                 id	
                 versionIndex	
-                artifact {
-                    commitHash
-                }
-            }	
+                commitHash
+            }
             defaultArtifactType {	
                 id	
                 name	
@@ -201,8 +199,13 @@ def _collection_and_alias_id_mapping_to_uri(
     artifact_membership = res["artifactCollection"]["artifactMembership"]
     if artifact_membership is None:
         is_deleted = True
-
-    commit_hash = artifact_membership["artifact"]["commitHash"]
+        # If the membership is deleted, then we will not be able to get the commit hash.
+        # Here, we can simply use the alias name as the commit hash. If the collection
+        # is ever un-deleted or the alias is re-assigned, then the next call will result
+        # in a "true" commit hash, ensuring we don't hit a stale cache.
+        commit_hash = alias_name
+    else:
+        commit_hash = artifact_membership["commitHash"]
     entity_name = collection["project"]["entity"]["name"]
     project_name = collection["project"]["name"]
     artifact_name = collection["name"]

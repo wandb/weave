@@ -1416,9 +1416,7 @@ def test_wb_artifact_uri_resolution(fake_wandb, input_uri, expected_uri):
                     "artifactMembership": {
                         "id": "QXJ0aWZhY3RDb2xsZWN0aW9uTWVtYmVyc2hpcDozNzAxNzE5NDE=",
                         "versionIndex": 4,
-                        "artifact": {
-                            "commitHash": "303db33c9f9264768626",
-                        },
+                        "commitHash": "303db33c9f9264768626",
                     },
                     "defaultArtifactType": {
                         "id": "QXJ0aWZhY3RUeXBlOjM1OTgxNA==",
