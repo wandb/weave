@@ -1189,10 +1189,10 @@ def merge_types(a: Type, b: Type) -> Type:
         return TypedDict(next_prop_types)
     if isinstance(a, List) and isinstance(b, List):
         return List(merge_types(a.object_type, b.object_type))
-    if isinstance(a, UnknownType):
-        return b
-    if isinstance(b, UnknownType):
-        return a
+    # if isinstance(a, UnknownType):
+    #     return b
+    # if isinstance(b, UnknownType):
+    #     return a
     return UnionType(a, b)
 
 
@@ -1281,6 +1281,8 @@ def _unknown_coalesce_on_union(u_type: UnionType) -> Type:
             )
         )
 
+    if len(known_members) < len(u_type.members):
+        final_types.append(NoneType())
     return union(*final_types)
 
 

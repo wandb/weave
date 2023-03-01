@@ -1965,3 +1965,17 @@ def test_identity_awl_operations_3(
     )
     concatted = ops.make_list(a=awl_node, b=concat_awl).concat()
     assert weave.use(concatted).to_pylist_raw() == data + concat_with_data
+
+
+def test_concat_dense_union_list_of_null():
+    node_1 = weave.save(arrow.to_arrow([["a"], [1]]))
+    node_2 = weave.save(arrow.to_arrow([[None]]))
+    list_of_nodes = ops.make_list(a=node_1, b=node_2).concat()
+    assert weave.use(list_of_nodes).to_pylist_raw() == [["a"], [1], [None]]
+
+
+def test_concat_dense_union_empty_list():
+    node_1 = weave.save(arrow.to_arrow([["a"], [1]]))
+    node_2 = weave.save(arrow.to_arrow([[]]))
+    list_of_nodes = ops.make_list(a=node_1, b=node_2).concat()
+    assert weave.use(list_of_nodes).to_pylist_raw() == [["a"], [1], []]

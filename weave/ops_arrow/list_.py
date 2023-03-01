@@ -850,10 +850,15 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         elif (
             pa.types.is_list(self._arrow_data.type)
             and self._arrow_data.type.value_type == pa.null()
+            # and not pa.types.is_union(desired_type_pyarrow_type)
+            and not (
+                pa.types.is_list(desired_type_pyarrow_type)
+                and pa.types.is_union(desired_type_pyarrow_type.value_type)
+            )
         ):
             # In this case we have a AWL<list<null>>. In these cases we run into a bunch of issues because
             # the current type is unknown. Instead, we basically just cast the AWL to the desired type.
-            if pa.types.is_union(desired_type_pyarrow_type):
+            if False and pa.types.is_union(desired_type_pyarrow_type):
                 if desired_type_pyarrow_type.mode == "dense":
                     new_arrow_data = pa.UnionArray.from_dense(
                         pa.repeat(0, len(self._arrow_data)).cast(pa.int8()),
