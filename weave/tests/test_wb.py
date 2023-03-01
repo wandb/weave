@@ -935,7 +935,7 @@ def test_loading_artifact_browser_request_3(fake_wandb):
                                 **fwb.project_payload,  # type: ignore
                                 "entity": {
                                     **fwb.entity_payload,  # type: ignore
-                                    "artifactCollections_9dd867443b22f4b22c2b85e7719e3d46": {
+                                    "artifactCollections_c96697489c051b1be46673088f743964": {
                                         "edges": [
                                             {
                                                 "node": {
