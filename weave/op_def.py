@@ -312,6 +312,7 @@ class OpDef:
         typing.Callable[[typing.Dict[str, types.Type]], types.Type],
     ]:
         if self.name in [
+            "save_to_ref",
             "op_get_tag_type",
             "op_make_type_tagged",
             "op_make_type_key_tag",

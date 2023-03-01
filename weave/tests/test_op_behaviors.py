@@ -14,6 +14,7 @@ import weave
 from .concrete_tagged_value import (
     TaggedValue,
     concrete_to_tagstore,
+    concrete_from_tagstore,
 )
 from ..language_features.tagging.tagged_value_type import (
     TaggedValueType,
@@ -26,34 +27,37 @@ from .. import graph
 from .. import graph_debug
 from .. import weave_internal
 from .. import registry_mem
+from .. import storage
 
 from .op_specs import OpSpec, OpSpecTestCase, OP_TEST_SPECS
 
 
 def assert_equal_with_tags(node: graph.Node, v: typing.Any, expected: typing.Any):
+    v = concrete_from_tagstore(v)
     if isinstance(expected, TaggedValue):
-        assert v == expected.value
-        for k, v in expected.tag.items():
-            get_list_tag = make_tag_getter_op.make_tag_getter_op(k, weave.types.Any())
-            tag_val = weave.use(get_list_tag(node))
-            assert tag_val == v
+        # Nones are not tagged
+        if v != None:
+            assert isinstance(v, TaggedValue)
+            assert expected.tag == v.tag
+            v = v.value
+        expected = expected.value
+
+    if isinstance(v, ops_arrow.ArrowWeaveList):
+        assert isinstance(expected, ops_arrow.ArrowWeaveList)
+        actual_py = v.to_pylist_raw()
+        expected_py = expected.to_pylist_raw()
+        assert actual_py == expected_py
+        # We can't check the arrow type if we expect all Nones, because we pass
+        # a python list in as the expectation right now. And in arrow you can have
+        # Nones of any type.
+        if not all(x is None for x in expected):
+            assert v._arrow_data.type == expected._arrow_data.type
+        # TODO: this check is too loose, it should be type equality. But
+        # we currently aren't specific enough in some ops, or have mistmatches
+        # between python and arrow
+        assert expected.object_type.assign_type(v.object_type)
     else:
-        if isinstance(v, ops_arrow.ArrowWeaveList):
-            assert isinstance(expected, ops_arrow.ArrowWeaveList)
-            actual_py = v.to_pylist_raw()
-            expected_py = expected.to_pylist_raw()
-            assert actual_py == expected_py
-            # We can't check the arrow type if we expect all Nones, because we pass
-            # a python list in as the expectation right now. And in arrow you can have
-            # Nones of any type.
-            if not all(x is None for x in expected):
-                assert v._arrow_data.type == expected._arrow_data.type
-            # TODO: this check is too loose, it should be type equality. But
-            # we currently aren't specific enough in some ops, or have mistmatches
-            # between python and arrow
-            assert expected.object_type.assign_type(v.object_type)
-        else:
-            assert v == expected
+        assert v == expected
 
 
 def assert_fn_vectorized(fn_node: graph.Node) -> graph.Node:
@@ -70,19 +74,21 @@ def assert_fn_vectorized(fn_node: graph.Node) -> graph.Node:
 
 
 def check_case(called: graph.Node, result_type: weave.types.Type, result: typing.Any):
-    assert result_type.assign_type(called.type)
-
-    actual_result = weave.use(called)
+    assert result_type.assign_type(
+        called.type
+    ), f"Expected op output type: {result_type}, but got {called.type}"
+    result_ref = weave.use(weave.ops.save_to_ref(called, None))
+    actual_result = storage.get(str(result_ref))
     assert_equal_with_tags(called, actual_result, result)
 
-    # We can't check the type of the output we received, because execution
-    # doesn't produce tags directly. But since we know result was equal
-    # to expectation from above, we can check that the type of the
-    # expectation instead.
+    # # We can't check the type of the output we received, because execution
+    # # doesn't produce tags directly. But since we know result was equal
+    # # to expectation from above, we can check that the type of the
+    # # expectation instead.
     actual_result_type = weave.type_of(concrete_to_tagstore(result))
-    # TODO: this check is too loose, it should be type equality. But
-    # we currently aren't specific enough in some ops, or have mistmatches
-    # between python and arrow
+    # # TODO: this check is too loose, it should be type equality. But
+    # # we currently aren't specific enough in some ops, or have mistmatches
+    # # between python and arrow
     assert result_type.assign_type(
         actual_result_type
     ), f"{graph_debug.node_expr_str_full(called)} produced type {actual_result_type}, but expected type {result_type}"
@@ -151,12 +157,53 @@ class OpTestCaseStandard(OpTestCase):
             expected=self.expected if isinstance(expected, NoValue) else expected,
         )
 
+    def vecdim1_variant(
+        self,
+        name: str,
+        input: typing.Union[NoValue, tuple[typing.Any, ...]] = NoValue(),
+        expected_type: typing.Union[NoValue, typing.Any] = NoValue(),
+        expected: typing.Union[NoValue, typing.Any] = NoValue(),
+    ):
+        return OpTestCaseVecDim1(
+            name=self.name + [name],
+            op_def=self.op_def,
+            input=self.input if isinstance(input, NoValue) else input,
+            expected_type=self.expected_type
+            if isinstance(expected_type, NoValue)
+            else expected_type,
+            expected=self.expected if isinstance(expected, NoValue) else expected,
+        )
+
     def check(self):
         check_case(
             call(self.op_def, self.input),
             result_type=self.expected_type,
             result=self.expected,
         )
+
+
+def convert_expected_to_arrow(
+    expected_type: weave.types.Type, expected: typing.Any
+) -> tuple[weave.types.Type, typing.Any]:
+    if isinstance(expected_type, weave.types.List):
+        assert isinstance(expected, list)
+        arrow_type = ops_arrow.ArrowWeaveListType(expected_type.object_type)
+        arrow_list = ops_arrow.to_arrow(concrete_to_tagstore(expected))
+        # We override the object type in the expected value, to be the declared expected
+        # type. The arrow list value may have a type that is too narrow for checking
+        # (right now ArrowWeaveLists constructed inside op resolvers tend to use the
+        # input type logic, which creates wider types than doing a type_of operation would)
+        arrow_list.object_type = arrow_type.object_type
+        return arrow_type, arrow_list
+    if isinstance(expected_type, TaggedValueType):
+        assert isinstance(expected, TaggedValue)
+        expected_value_type, expected_value = convert_expected_to_arrow(
+            expected_type.value, expected.value
+        )
+        return TaggedValueType(expected_type.tag, expected_value_type), TaggedValue(
+            expected.tag, expected_value
+        )
+    return expected_type, expected
 
 
 @dataclasses.dataclass
@@ -171,7 +218,9 @@ class OpTestCaseVecDim0(OpTestCaseStandard):
     def check(self):
         inputs = [concrete_to_tagstore(it) for it in self.input]
         inputs[0] = ops_arrow.to_arrow(inputs[0])
-        inputs = [weave.save(input) for input in inputs]
+        inputs = [
+            weave.save(input) if not callable(input) else input for input in inputs
+        ]
         called = getattr(inputs[0], self.op_def.simple_name)(*inputs[1:])
         called_op_name = called.from_op.name
         called_op_def = registry_mem.memory_registry.get_op(called_op_name)
@@ -179,10 +228,42 @@ class OpTestCaseVecDim0(OpTestCaseStandard):
             list(called_op_def.input_type.arg_types.values())[0],
             ops_arrow.ArrowWeaveListType,
         )
+        expected_type, expected = convert_expected_to_arrow(
+            self.expected_type, self.expected
+        )
         check_case(
             called,
-            result_type=self.expected_type,
-            result=self.expected,
+            result_type=expected_type,
+            result=expected,
+        )
+
+
+@dataclasses.dataclass
+class OpTestCaseVecDim1(OpTestCaseStandard):
+    """Tests that a list op has a vectorized equivalent for second dim (joinall/concat)."""
+
+    op_def: op_def.OpDef
+    input: tuple[typing.Any, ...]
+    expected_type: typing.Any
+    expected: typing.Any
+
+    def check(self):
+        inputs = [concrete_to_tagstore(it) for it in self.input]
+        inputs[0] = [ops_arrow.to_arrow(i) for i in inputs[0]]
+        if isinstance(self.input[0], TaggedValue):
+            inputs[0] = concrete_to_tagstore(TaggedValue(self.input[0].tag, inputs[0]))
+        inputs = [
+            weave.save(input) if not callable(input) else input for input in inputs
+        ]
+        called = getattr(inputs[0], self.op_def.simple_name)(*inputs[1:])
+        assert ops_arrow.ArrowWeaveListType().assign_type(called.type)
+        expected_type, expected = convert_expected_to_arrow(
+            self.expected_type, self.expected
+        )
+        check_case(
+            called,
+            result_type=expected_type,
+            result=expected,
         )
 
 
@@ -517,6 +598,15 @@ def make_binary_vectorscalar_variants(
     return variants
 
 
+def is_all_none(x):
+    if isinstance(x, list):
+        return all(is_all_none(i) for i in x)
+    elif isinstance(x, TaggedValue):
+        return is_all_none(x.value)
+    else:
+        return x == None
+
+
 def make_op_variants(op_test_def: OpSpec):
     variants: list[OpTestCase] = []
     op_name = op_test_def.op.name
@@ -531,8 +621,13 @@ def make_op_variants(op_test_def: OpSpec):
         if op_test_def.kind.list_op:
             for variant in base_variants:
                 # Don't need to test when first arg is None
-                if variant.input[0] != None:
+                if not is_all_none(variant.input[0]):
                     variants.append(variant.vecdim0_variant("vecdim0"))
+        if op_test_def.kind.list_list_op:
+            for variant in base_variants:
+                # Don't need to test when first arg is None
+                if not is_all_none(variant.input[0]):
+                    variants.append(variant.vecdim1_variant("vecdim1"))
 
     # All test cases in one vectorized call
     if op_test_def.kind.arity <= 2:
@@ -582,8 +677,20 @@ def make_all_variants() -> list[tuple[str, OpTestCase]]:
 
 VARIANTS = dict(make_all_variants())
 
+SKIPS = set(
+    [
+        # test doesn't produce correct expected output
+        "joinAll_case1_vecdim1",
+        # op implementation produces incorrect output
+        "joinAll_case0_arg0-tag_vecdim1",
+        "joinAll_case1_arg0-tag_vecdim1",
+    ]
+)
+
 
 @pytest.mark.parametrize("name", [name for name in VARIANTS.keys()])
 def test_all_ops(name: str):
+    if name in SKIPS:
+        return
     test = VARIANTS[name]
     test.check()

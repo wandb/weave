@@ -601,7 +601,7 @@ def test_grouping_on_images(fake_wandb):
     ]
 
 
-exp_join_labels = [
+exp_join2_labels = [
     ["0-0", "0-2"],
     ["0-1", "0-2"],
     ["0-2", "0-2"],
@@ -622,7 +622,7 @@ exp_join_labels = [
     ["1-2", "1-0"],
 ]
 
-exp_join_tag_shas = [
+exp_join2_tag_shas = [
     "1237db9e0c3d396728f7f4077f62b6283118c08fbfdced1e99e33205c270bd27",
     "1237db9e0c3d396728f7f4077f62b6283118c08fbfdced1e99e33205c270bd27",
     "1237db9e0c3d396728f7f4077f62b6283118c08fbfdced1e99e33205c270bd27",
@@ -638,6 +638,48 @@ exp_join_tag_shas = [
     "1237db9e0c3d396728f7f4077f62b6283118c08fbfdced1e99e33205c270bd27",
     "1237db9e0c3d396728f7f4077f62b6283118c08fbfdced1e99e33205c270bd27",
     "1237db9e0c3d396728f7f4077f62b6283118c08fbfdced1e99e33205c270bd27",
+    "e7bdc527afd649f51950b4524b0c15aecaf7f484448a6cdfcdc2ecd9bba0f5a7",
+    "e7bdc527afd649f51950b4524b0c15aecaf7f484448a6cdfcdc2ecd9bba0f5a7",
+    "e7bdc527afd649f51950b4524b0c15aecaf7f484448a6cdfcdc2ecd9bba0f5a7",
+]
+
+exp_joinall_labels = [
+    ["0-0", "0-2"],
+    ["0-0", "0-1"],
+    ["0-0", "0-0"],
+    ["0-1", "0-2"],
+    ["0-1", "0-1"],
+    ["0-1", "0-0"],
+    ["0-2", "0-2"],
+    ["0-2", "0-1"],
+    ["0-2", "0-0"],
+    ["1-0", "1-2"],
+    ["1-0", "1-1"],
+    ["1-0", "1-0"],
+    ["1-1", "1-2"],
+    ["1-1", "1-1"],
+    ["1-1", "1-0"],
+    ["1-2", "1-2"],
+    ["1-2", "1-1"],
+    ["1-2", "1-0"],
+]
+
+exp_joinall_tag_shas = [
+    "1237db9e0c3d396728f7f4077f62b6283118c08fbfdced1e99e33205c270bd27",
+    "1237db9e0c3d396728f7f4077f62b6283118c08fbfdced1e99e33205c270bd27",
+    "1237db9e0c3d396728f7f4077f62b6283118c08fbfdced1e99e33205c270bd27",
+    "1237db9e0c3d396728f7f4077f62b6283118c08fbfdced1e99e33205c270bd27",
+    "1237db9e0c3d396728f7f4077f62b6283118c08fbfdced1e99e33205c270bd27",
+    "1237db9e0c3d396728f7f4077f62b6283118c08fbfdced1e99e33205c270bd27",
+    "1237db9e0c3d396728f7f4077f62b6283118c08fbfdced1e99e33205c270bd27",
+    "1237db9e0c3d396728f7f4077f62b6283118c08fbfdced1e99e33205c270bd27",
+    "1237db9e0c3d396728f7f4077f62b6283118c08fbfdced1e99e33205c270bd27",
+    "e7bdc527afd649f51950b4524b0c15aecaf7f484448a6cdfcdc2ecd9bba0f5a7",
+    "e7bdc527afd649f51950b4524b0c15aecaf7f484448a6cdfcdc2ecd9bba0f5a7",
+    "e7bdc527afd649f51950b4524b0c15aecaf7f484448a6cdfcdc2ecd9bba0f5a7",
+    "e7bdc527afd649f51950b4524b0c15aecaf7f484448a6cdfcdc2ecd9bba0f5a7",
+    "e7bdc527afd649f51950b4524b0c15aecaf7f484448a6cdfcdc2ecd9bba0f5a7",
+    "e7bdc527afd649f51950b4524b0c15aecaf7f484448a6cdfcdc2ecd9bba0f5a7",
     "e7bdc527afd649f51950b4524b0c15aecaf7f484448a6cdfcdc2ecd9bba0f5a7",
     "e7bdc527afd649f51950b4524b0c15aecaf7f484448a6cdfcdc2ecd9bba0f5a7",
     "e7bdc527afd649f51950b4524b0c15aecaf7f484448a6cdfcdc2ecd9bba0f5a7",
@@ -675,10 +717,10 @@ def test_join_all_on_images(fake_wandb):
 
     raw_data = weave.use(joined).to_pylist_notags()
     assert len(raw_data) == exp_join_length
-    assert [row["label"] for row in raw_data] == exp_join_labels
+    assert [row["label"] for row in raw_data] == exp_joinall_labels
 
     group_keys = weave.use(joined.joinObj()).to_pylist_notags()
-    assert [key["sha256"] for key in group_keys] == exp_join_tag_shas
+    assert [key["sha256"] for key in group_keys] == exp_joinall_tag_shas
 
 
 def test_join_2_on_images(fake_wandb):
@@ -698,9 +740,9 @@ def test_join_2_on_images(fake_wandb):
     assert len(raw_data) == exp_join_length
     assert [
         [row["t1"]["label"], row["t2"]["label"]] for row in raw_data
-    ] == exp_join_labels
+    ] == exp_join2_labels
     group_keys = weave.use(joined.joinObj()).to_pylist_notags()
-    assert [key["sha256"] for key in group_keys] == exp_join_tag_shas
+    assert [key["sha256"] for key in group_keys] == exp_join2_tag_shas
 
 
 def test_html_encoding_decoding(fake_wandb):
