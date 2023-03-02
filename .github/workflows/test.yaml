@@ -65,7 +65,7 @@ jobs:
         run: WEAVE_SERVER_DISABLE_ECOSYSTEM=1 source /root/venv/bin/activate && cd weave && pytest ./tests ./ops_arrow --ddtrace
 
   test-no-cache:
-    name: Python unit tests
+    name: Python unit tests (No Cache)
     needs:
       - build-container
     runs-on: [self-hosted, runner]
