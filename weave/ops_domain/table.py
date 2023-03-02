@@ -524,7 +524,7 @@ def should_infer_type_from_data(col_type: types.Type) -> bool:
 
     def is_unknown_type_mapper(t: types.Type) -> None:
         status["found_unknown"] = status["found_unknown"] or isinstance(
-            t, types.UnknownType
+            t, (types.UnknownType, types.Any)
         )
 
     types.map_leaf_types(col_type, is_unknown_type_mapper)
