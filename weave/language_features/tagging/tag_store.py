@@ -88,6 +88,15 @@ def isolated_tagging_context() -> typing.Iterator[None]:
             _OBJ_TAGS_MEM_MAP.reset(token)
 
 
+@contextmanager
+def new_tagging_context() -> typing.Iterator[None]:
+    token = _OBJ_TAGS_MEM_MAP.set(defaultdict(dict))
+    try:
+        yield None
+    finally:
+        _OBJ_TAGS_MEM_MAP.reset(token)
+
+
 # Callers can indicate that an object is being visited by using this context manager
 # This is primarily used by the TaggedValueType::type_of_instance method to prevent
 # infinite recursion when determining the type of tagged objects.

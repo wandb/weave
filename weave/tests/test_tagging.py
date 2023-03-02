@@ -2,7 +2,8 @@ import pytest
 import weave
 from weave.artifact_fs import FilesystemArtifactFileType
 from weave.ops_domain.wb_domain_types import ProjectType, RunType, Run
-from weave.ops_primitives import dict as dict_ops
+from weave.ops_domain.run_ops import run_tag_getter_op
+from weave.ops_primitives import dict as dict_ops, list_ as list_ops
 from ..language_features.tagging import make_tag_getter_op, tagged_value_type, tag_store
 from .. import weave_types as types
 from .. import box
@@ -269,3 +270,28 @@ def test_keytypes_tagged():
             )
         ),
     )
+
+
+@pytest.mark.parametrize(
+    "list_data",
+    [
+        lambda: box.box([1, 2, 3]),
+        lambda: box.box(
+            [
+                tag_store.add_tags(box.box(elem), {"int": i})
+                for i, elem in enumerate([1, 2, 3])
+            ]
+        ),
+    ],
+)
+def test_list_tags_accessible_to_map_elements(list_data):
+    run = Run()
+    tag_type = types.TypedDict({"run": RunType})
+    tagged = tag_store.add_tags(list_data(), {"run": run})
+    saved_node = weave.save(tagged)
+    map_fn = lambda row: run_tag_getter_op(row)
+    fn = weave.define_fn(
+        {"row": tagged_value_type.TaggedValueType(tag_type, types.Int())}, map_fn
+    )
+    mapped = list_ops.List.map(saved_node, fn)
+    assert weave.use(mapped) == [run, run, run]

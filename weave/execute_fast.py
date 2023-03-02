@@ -5,10 +5,11 @@ from . import registry_mem
 from . import weave_internal
 from . import weave_types as types
 from . import errors
-from . import op_def
+from . import box
 from . import compile
 from . import engine_trace
 from . import language_nullability
+from .language_features.tagging import tag_store
 
 
 def _fast_apply_map_fn(item, index, map_fn):
@@ -137,6 +138,23 @@ def fast_map_fn(input_list, map_fn):
     # now map the remaining weave_fn (after resolving static branches above)
     # over the input list
     with tracer.trace("fast_map:map"):
-        return [
-            _fast_apply_map_fn(item, i, map_fn) for i, item in enumerate(input_list)
-        ]
+        # push down tags from outer list to item
+        list_tags = (
+            None
+            if not tag_store.is_tagged(input_list)
+            else tag_store.get_tags(input_list)
+        )
+        result = []
+        for i, item in enumerate(input_list):
+            item_tags = tag_store.get_tags(item) if tag_store.is_tagged(item) else None
+            item = box.box(item)
+            with tag_store.new_tagging_context():
+                if item_tags is not None:
+                    tag_store.add_tags(item, item_tags)
+                if list_tags is not None:
+                    tag_store.add_tags(
+                        item, list_tags, give_precedence_to_existing_tags=True
+                    )
+                result.append(_fast_apply_map_fn(item, i, map_fn))
+
+        return result

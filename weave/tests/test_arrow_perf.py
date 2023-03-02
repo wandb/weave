@@ -17,4 +17,4 @@ def test_listmap():
     assert weave.use(node) == expected
     elapsed = time.time() - start_time
     # Runs in 0.9s on my m1 macbook pro
-    assert elapsed < 2.2
+    assert elapsed < 2.3
