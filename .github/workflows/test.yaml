@@ -64,6 +64,23 @@ jobs:
           DD_ENV: ci
         run: WEAVE_SERVER_DISABLE_ECOSYSTEM=1 source /root/venv/bin/activate && cd weave && pytest ./tests ./ops_arrow --ddtrace
 
+  test-no-cache:
+    name: Python unit tests
+    needs:
+      - build-container
+    runs-on: [self-hosted, runner]
+    container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:${{ github.sha }}
+    steps:
+      # - uses: datadog/agent-github-action@v1.3
+      #   with:
+      #     api_key: ${{ secrets.DD_API_KEY }}
+      - uses: actions/checkout@v2
+      - name: Run tests
+        env:
+          DD_SERVICE: weave-python
+          DD_ENV: ci
+        run: WEAVE_NO_CACHE=true WEAVE_SERVER_DISABLE_ECOSYSTEM=1 source /root/venv/bin/activate && cd weave && pytest ./tests ./ops_arrow --ddtrace
+
   ecosystem-tests:
     name: Python ecosystem unit tests
     needs:
