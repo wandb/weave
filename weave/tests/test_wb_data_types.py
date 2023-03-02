@@ -4,6 +4,8 @@ from wandb import data_types as wb_data_types
 import numpy as np
 from wandb.sdk.data_types._dtypes import TypeRegistry as SDKTypeRegistry
 
+from weave.language_features.tagging.tagged_value_type import TaggedValueType
+
 from ..ops_primitives import file
 from ..ops_domain.wbmedia import ImageArtifactFileRefType
 
@@ -474,26 +476,31 @@ def test_annotated_images_in_tables(fake_wandb):
     assert raw_data == exp_raw_data(art.commit_hash)
 
     ot = weave.use(table_rows_type).object_type
-    assert ot == weave.types.TypedDict(
-        {
-            "label": weave.types.UnionType(
-                weave.types.NoneType(), weave.types.String()
-            ),
-            "image": weave.types.UnionType(
-                ImageArtifactFileRefType(
-                    boxLayers={"box_set_1": [0], "box_set_2": [2]},
-                    boxScoreKeys=["loss", "gain"],
-                    maskLayers={"mask_set_1": [0, 1, 2, 3]},
-                    classMap={
-                        "0": "c_zero",
-                        "1": "c_one",
-                        "2": "c_two",
-                        "3": "c_three",
-                    },
+    assert ot == TaggedValueType(
+        types.TypedDict(
+            {"_ct_fake_run": types.String(), "_ct_fake_project": types.String()}
+        ),
+        weave.types.TypedDict(
+            {
+                "label": weave.types.UnionType(
+                    weave.types.NoneType(), weave.types.String()
                 ),
-                weave.types.NoneType(),
-            ),
-        }
+                "image": weave.types.UnionType(
+                    ImageArtifactFileRefType(
+                        boxLayers={"box_set_1": [0], "box_set_2": [2]},
+                        boxScoreKeys=["loss", "gain"],
+                        maskLayers={"mask_set_1": [0, 1, 2, 3]},
+                        classMap={
+                            "0": "c_zero",
+                            "1": "c_one",
+                            "2": "c_two",
+                            "3": "c_three",
+                        },
+                    ),
+                    weave.types.NoneType(),
+                ),
+            }
+        ),
     )
 
 
@@ -528,29 +535,37 @@ def test_annotated_legacy_images_in_tables(fake_wandb):
     assert raw_data == exp_raw_data(art.commit_hash)
 
     ot = weave.use(table_rows_type).object_type
-    assert ot == weave.types.TypedDict(
-        {
-            "label": weave.types.UnionType(
-                weave.types.NoneType(), weave.types.String()
-            ),
-            "image": weave.types.UnionType(
-                ImageArtifactFileRefType(
-                    # Both box and mask layers have all the keys because
-                    # we can't possible look at all the elements, so we assume
-                    # they all may or may not have all the keys
-                    boxLayers={"box_set_1": [0, 1, 2, 3], "box_set_2": [0, 1, 2, 3]},
-                    boxScoreKeys=["loss", "gain"],
-                    maskLayers={"mask_set_1": [0, 1, 2, 3]},
-                    classMap={
-                        "0": "c_zero",
-                        "1": "c_one",
-                        "2": "c_two",
-                        "3": "c_three",
-                    },
+    assert ot == TaggedValueType(
+        types.TypedDict(
+            {"_ct_fake_run": types.String(), "_ct_fake_project": types.String()}
+        ),
+        weave.types.TypedDict(
+            {
+                "label": weave.types.UnionType(
+                    weave.types.NoneType(), weave.types.String()
                 ),
-                weave.types.NoneType(),
-            ),
-        }
+                "image": weave.types.UnionType(
+                    ImageArtifactFileRefType(
+                        # Both box and mask layers have all the keys because
+                        # we can't possible look at all the elements, so we assume
+                        # they all may or may not have all the keys
+                        boxLayers={
+                            "box_set_1": [0, 1, 2, 3],
+                            "box_set_2": [0, 1, 2, 3],
+                        },
+                        boxScoreKeys=["loss", "gain"],
+                        maskLayers={"mask_set_1": [0, 1, 2, 3]},
+                        classMap={
+                            "0": "c_zero",
+                            "1": "c_one",
+                            "2": "c_two",
+                            "3": "c_three",
+                        },
+                    ),
+                    weave.types.NoneType(),
+                ),
+            }
+        ),
     )
 
 
@@ -692,16 +707,20 @@ def make_join_table_row_nodes(fake_wandb):
     table_1 = make_simple_image_table()
     table_2 = make_simple_image_table()
 
-    art = wandb.Artifact("test_name", "test_type")
-    art.add(table_1, "table_1")
-    art.add(table_2, "table_2")
-    art_node = fake_wandb.mock_artifact_as_node(art)
+    art_1 = wandb.Artifact("test_name_1", "test_type_1")
+    art_1.add(table_1, "table_1")
 
-    file_1_node = art_node.file("table_1.table.json")
+    art_2 = wandb.Artifact("test_name_2", "test_type_2")
+    art_2.add(table_2, "table_2")
+
+    art_1_node = fake_wandb.mock_artifact_as_node(art_1)
+    art_2_node = fake_wandb.mock_artifact_as_node(art_2)
+
+    file_1_node = art_1_node.file("table_1.table.json")
     table_1_node = file_1_node.table()
     table_1_rows = table_1_node.rows()
 
-    file_2_node = art_node.file("table_2.table.json")
+    file_2_node = art_2_node.file("table_2.table.json")
     table_2_node = file_2_node.table()
     table_2_rows = table_2_node.rows()
 

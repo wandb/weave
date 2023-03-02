@@ -261,3 +261,46 @@ def test_empty_table(fake_wandb):
     )
     res = weave.use(sorted)
     assert res.to_pylist_raw() == []
+
+
+def test_join_group_combo(fake_wandb):
+    table_1 = wandb.Table(
+        columns=["id", "label", "score"],
+        data=[
+            [1, "A", 1],
+            [2, "A", 2],
+            [3, "B", 3],
+            [4, "B", 4],
+            [5, "C", 5],
+            [6, "C", 6],
+        ],
+    )
+    art_1 = wandb.Artifact("test_name_1", "test_type_1")
+    art_1.add(table_1, "table_1")
+
+    table_2 = wandb.Table(
+        columns=["id", "label", "score"],
+        data=[
+            [1, "A", 10],
+            [2, "B", 20],
+            [3, "B", 30],
+            [4, "C", 40],
+            [5, "C", 50],
+            [6, "A", 60],
+        ],
+    )
+    art_2 = wandb.Artifact("test_name_2", "test_type_2")
+    art_2.add(table_2, "table_2")
+
+    art_1_node = fake_wandb.mock_artifact_as_node(art_1)
+    art_2_node = fake_wandb.mock_artifact_as_node(art_2)
+    table_1_rows = art_1_node.file("table_1.table.json").table().rows()
+    table_2_rows = art_2_node.file("table_2.table.json").table().rows()
+    list_of_tables = weave.ops.make_list(a=table_1_rows, b=table_2_rows).dropna()
+    joined_tables = list_of_tables.joinAll(
+        lambda row: weave.ops.make_list(a=row["id"]), False
+    )
+    indexed = joined_tables.createIndexCheckpointTag()
+    grouped = indexed.groupby(lambda row: weave.ops.dict_(label=row["label"][0]))
+    assert weave.use(grouped.count()) == 3
+    assert weave.use(grouped[2].groupkey()["label"]) == "C"

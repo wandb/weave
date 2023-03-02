@@ -8,6 +8,7 @@ import typing
 
 from weave import wandb_api
 from weave import util
+from .tag_test_util import op_add_tag
 from ..artifact_wandb import WandbArtifact, WeaveWBArtifactURI
 from .. import wandb_client_api
 from unittest import mock
@@ -280,6 +281,11 @@ class SetupResponse:
         artifact,
         entity_name="test_entity",
         project_name="test_project",
+        tag_payload={
+            # In the future, we should make these actual run and project objects so we can chain ops
+            "fake_run": "test_run",
+            "fake_project": "test_project",
+        },
     ):
 
         artifact_uri = WeaveWBArtifactURI.parse(
@@ -287,13 +293,16 @@ class SetupResponse:
         )
 
         self.fake_io.add_artifact(artifact, artifact_uri)
-        return weave.make_node(
+        res = weave.make_node(
             WandbArtifact(
                 "test_name",
                 None,
                 artifact_uri,
             )
         )
+        if tag_payload:
+            res = op_add_tag(res, tag_payload)
+        return res
 
 
 class PatchedSDKArtifact(wandb.Artifact):
