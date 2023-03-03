@@ -40,7 +40,7 @@ class RetryingWandbPublicApiProxy:
         self, name: typing.Any, type: typing.Optional[typing.Any] = None
     ) -> public.Artifact:
         return self._with_timeout_protection(
-            lambda api: api.artifact(name, type), "artifact"
+            lambda api: api.artifact(name=name, type=type), "artifact"
         )
 
     def run(self, path: str = "") -> public.Run:
