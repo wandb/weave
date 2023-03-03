@@ -320,7 +320,7 @@ def setup():
     fake_api = FakeApi()
     fake_io_service_client = FakeIoServiceClient()
 
-    def wandb_public_api():
+    def wandb_public_api(timeout: int = 30):
         return fake_api
 
     old_wandb_api_wandb_public_api = wandb_client_api.wandb_public_api
