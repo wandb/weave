@@ -1,5 +1,6 @@
 import wandb
 import weave
+from weave.language_features.tagging import make_tag_getter_op
 from weave.language_features.tagging.tagged_value_type import TaggedValueType
 from weave.ops_domain.wandb_domain_gql import _make_alias
 from weave.ops_domain import wbmedia
@@ -302,5 +303,25 @@ def test_join_group_combo(fake_wandb):
     )
     indexed = joined_tables.createIndexCheckpointTag()
     grouped = indexed.groupby(lambda row: weave.ops.dict_(label=row["label"][0]))
-    assert weave.use(grouped.count()) == 3
-    assert weave.use(grouped[2].groupkey()["label"]) == "C"
+    sorted = grouped.sort(
+        lambda row: weave.ops.make_list(label=row.groupkey()["label"]), ["asc"]
+    )
+    assert weave.use(sorted.count()) == 3
+    assert weave.use(sorted[2].groupkey()["label"]) == "C"
+    assert weave.use(sorted[1]["score"]).to_pylist_notags() == [
+        [3.0, 30.0],
+        [4.0, 40.0],
+    ]
+
+    join_obj = sorted[0].joinObj()[0]
+    assert weave.use(join_obj) == [1.0]
+
+    tag_getter_op = make_tag_getter_op.make_tag_getter_op(
+        "_ct_fake_run", weave.types.String()
+    )
+    run_names = sorted[0]["score"].mapEach(lambda row: tag_getter_op(row))
+    use_run_names = weave.use(run_names)
+    assert use_run_names.to_pylist_notags() == [
+        ["test_run", "test_run"],
+        ["test_run", "test_run"],
+    ]

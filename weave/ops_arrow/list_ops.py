@@ -165,7 +165,7 @@ def _map_each(self: ArrowWeaveList, fn):
         mapped = _map_each(new_awl, fn)
         reshaped_arrow_data: ArrowWeaveList = ArrowWeaveList(
             pa.ListArray.from_arrays(offsets, mapped._arrow_data),
-            self.object_type,
+            types.List(fn.type),
             self._artifact,
         )
 
