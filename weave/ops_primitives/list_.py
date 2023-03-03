@@ -101,11 +101,11 @@ class List:
             b_comp_res = b[0]
             for a_res, b_res, c_dir in zip(a_comp_res, b_comp_res, columnDirs):
                 dir_adjust = -1 if c_dir == "desc" else 1
-                if a_res is None and b_res is None:
+                if a_res == None and b_res == None:
                     continue
-                elif a_res is None:
+                elif a_res == None:
                     return -1 * dir_adjust
-                elif b_res is None:
+                elif b_res == None:
                     return 1 * dir_adjust
 
                 if a_res < b_res:
