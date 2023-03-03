@@ -196,13 +196,7 @@ def deserialize(serialized: SerializedReturnType) -> "list[graph.Node]":
     # along the graph topology. If it were we could do an easy linear
     # implementation. But its not so we recurse for now.
     nodes = serialized["nodes"]
-    # TODO(np): Clean this up once we've updated the app to use targetNodes
-    if "targetNodes" in serialized:
-        target_nodes = serialized["targetNodes"]
-    elif "rootNodes" in serialized:
-        target_nodes = serialized["rootNodes"]  # type: ignore
-    else:
-        raise errors.WeaveInternalError("payload has no target nodes")
+    target_nodes = serialized["targetNodes"]
 
     parsed_nodes: dict[int, graph.Node] = {}
     # WeaveJS does not do a good job deduplicating nodes currently, so we do it here.
