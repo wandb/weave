@@ -84,7 +84,7 @@ class WandbArtifactManifest:
 # TODO: Get rid of this, we have the new wandb api service! But this
 # is still used in a couple places.
 def get_wandb_read_artifact(path: str):
-    return wandb_client_api.wandb_public_api().artifact(path)
+    return wandb_client_api.RetryingWandbPublicApiProxy().artifact(path)
 
 
 def is_valid_version_index(version_index: str) -> bool:
@@ -132,7 +132,7 @@ def _convert_client_id_to_server_id(art_id: str) -> str:
         }
     """
     )
-    res = wandb_client_api.wandb_public_api().client.execute(
+    res = wandb_client_api.RetryingWandbPublicApiProxy().execute(
         query,
         variable_values={
             "clientID": art_id,
@@ -176,7 +176,7 @@ def _collection_and_alias_id_mapping_to_uri(
     }	
     """
     )
-    res = wandb_client_api.wandb_public_api().client.execute(
+    res = wandb_client_api.RetryingWandbPublicApiProxy().execute(
         query,
         variable_values={
             "id": client_collection_id,
@@ -253,7 +253,7 @@ def _version_server_id_to_uri(server_id: str) -> ReadClientArtifactURIResult:
     }	
     """
     )
-    res = wandb_client_api.wandb_public_api().client.execute(
+    res = wandb_client_api.RetryingWandbPublicApiProxy().execute(
         query,
         variable_values={"id": hex_to_b64_id(server_id)},
     )

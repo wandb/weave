@@ -22,7 +22,7 @@ if typing.TYPE_CHECKING:
 
 @memo.memo
 def get_wandb_read_run(path: str) -> "WBRun":
-    return wandb_client_api.wandb_public_api().run(path)
+    return wandb_client_api.RetryingWandbPublicApiProxy().run(path)
 
 
 def wandb_run_dir() -> str:
