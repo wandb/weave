@@ -16,6 +16,7 @@ from .. import engine_trace
 from .arrow import arrow_as_array, ArrowWeaveListType, offsets_starting_at_zero
 from .util import _to_compare_safe_call
 from .vectorize import (
+    _ensure_variadic_fn,
     vectorize,
     _call_vectorized_fn_node_maybe_awl,
     _call_and_ensure_awl,
@@ -95,7 +96,10 @@ def _joined_all_output_type_tag_type(
 def _custom_join_apply_fn_node(
     awl: ArrowWeaveList, fn: graph.OutputNode
 ) -> typing.Tuple[ArrowWeaveList, types.Type]:
-    called = _call_vectorized_fn_node_maybe_awl(awl, vectorize(fn))
+    # Need to add here as well since it is a custom one
+    called = _call_vectorized_fn_node_maybe_awl(
+        awl, vectorize(_ensure_variadic_fn(fn, awl.object_type))
+    )
     object_type = typing.cast(types.List, called.type).object_type
     return _call_and_ensure_awl(awl, called), object_type
 

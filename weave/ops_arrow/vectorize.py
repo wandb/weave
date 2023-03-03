@@ -3,6 +3,7 @@ import typing
 import pyarrow as pa
 import numpy as np
 
+
 from ..api import op, use
 from .. import weave_types as types
 from .. import graph
@@ -18,6 +19,7 @@ from .list_ import ArrowWeaveList
 from . import arraylist_ops
 from . import convert_ops, convert
 from .arrow_tags import pushdown_list_tags
+from ..ops_primitives.dict import dict_
 
 
 class VectorizeError(errors.WeaveBaseError):
@@ -588,7 +590,20 @@ def _apply_fn_node_with_tag_pushdown(
     return _apply_fn_node(tagged_awl, fn)
 
 
+def _ensure_variadic_fn(
+    fn: graph.OutputNode, dummy_var_type: types.Type, dummy_var_name: str = "row"
+) -> graph.OutputNode:
+    # Check if fn contains variables.
+    contains_vars = len(graph.expr_vars(fn)) > 0
+    # if it does, return early.
+    if contains_vars:
+        return fn
+    # else, create a new graph which contains a row
+    # variable. We will use a dict followed by a pick.
+    return dict_(a=fn, b=graph.VarNode(dummy_var_type, dummy_var_name))["a"]
+
+
 def _apply_fn_node(awl: ArrowWeaveList, fn: graph.OutputNode) -> ArrowWeaveList:
-    vecced = vectorize(fn)
+    vecced = vectorize(_ensure_variadic_fn(fn, awl.object_type))
     called = _call_vectorized_fn_node_maybe_awl(awl, vecced)
     return _call_and_ensure_awl(awl, called)

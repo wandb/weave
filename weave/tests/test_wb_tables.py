@@ -6,6 +6,7 @@ from weave.ops_domain.wandb_domain_gql import _make_alias
 from weave.ops_domain import wbmedia
 import numpy as np
 from weave.ops_arrow.list_ops import filter
+from weave.weave_internal import make_const_node
 
 
 def use_static_artifact_node(
@@ -324,4 +325,30 @@ def test_join_group_combo(fake_wandb):
     assert use_run_names.to_pylist_notags() == [
         ["test_run", "test_run"],
         ["test_run", "test_run"],
+    ]
+
+
+def test_group_by_const(fake_wandb):
+    columns = ["id", "label", "score"]
+    data = [
+        [1, "A", 1],
+        [2, "A", 2],
+        [3, "B", 3],
+        [4, "B", 4],
+        [5, "C", 5],
+        [6, "C", 6],
+    ]
+    table_1 = wandb.Table(
+        columns=columns,
+        data=data,
+    )
+    art_1 = wandb.Artifact("test_name_1", "test_type_1")
+    art_1.add(table_1, "table_1")
+    art_1_node = fake_wandb.mock_artifact_as_node(art_1)
+    table_1_rows = art_1_node.file("table_1.table.json").table().rows()
+    grouped = table_1_rows.groupby(
+        lambda row: weave.ops.dict_(a=make_const_node(weave.types.Boolean(), True))
+    )
+    assert weave.use(grouped).to_pylist_notags() == [
+        [dict(zip(columns, row)) for row in data]
     ]
