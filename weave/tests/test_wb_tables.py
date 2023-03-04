@@ -1,3 +1,4 @@
+import pytest
 import wandb
 import weave
 from weave.language_features.tagging import make_tag_getter_op
@@ -352,3 +353,112 @@ def test_group_by_const(fake_wandb):
     assert weave.use(grouped).to_pylist_notags() == [
         [dict(zip(columns, row)) for row in data]
     ]
+
+
+def _make_empty_table_rows(fake_wandb):
+    table = wandb.Table(
+        columns=["id", "label", "score"],
+        data=[],
+    )
+    art = wandb.Artifact("test_name", "test_type")
+    art.add(table, "table")
+    art_node = fake_wandb.mock_artifact_as_node(art)
+    return art_node.file("table.table.json").table().rows()
+
+
+def _make_simple_table_rows(fake_wandb):
+    table = wandb.Table(
+        columns=["id", "label", "score"],
+        data=[
+            [1, "A", 1],
+            [2, "A", 2],
+            [3, "B", 3],
+            [4, "B", 4],
+            [5, "C", 5],
+            [6, "C", 6],
+        ],
+    )
+    art = wandb.Artifact("test_name", "test_type")
+    art.add(table, "table")
+    art_node = fake_wandb.mock_artifact_as_node(art)
+    return art_node.file("table.table.json").table().rows()
+
+
+def test_join_all_one_empty(fake_wandb):
+    rows_1 = _make_empty_table_rows(fake_wandb)
+    rows_2 = _make_simple_table_rows(fake_wandb)
+    list_of_tables = weave.ops.make_list(a=rows_1, b=rows_2).dropna()
+    joined_tables = list_of_tables.joinAll(
+        lambda row: weave.ops.make_list(a=row["id"]), False
+    )
+    assert weave.use(joined_tables) == []
+
+
+def test_join_all_all_empty(fake_wandb):
+    rows_1 = _make_empty_table_rows(fake_wandb)
+    rows_2 = _make_empty_table_rows(fake_wandb)
+    list_of_tables = weave.ops.make_list(a=rows_1, b=rows_2).dropna()
+    joined_tables = list_of_tables.joinAll(
+        lambda row: weave.ops.make_list(a=row["id"]), False
+    )
+    assert weave.use(joined_tables) == []
+
+
+@pytest.mark.parametrize(
+    "leftOuter, rightOuter, expected",
+    [
+        (True, True, []),
+        (True, False, []),
+        (False, True, []),
+        (False, False, []),
+    ],
+)
+def test_join_2_one_empty(leftOuter, rightOuter, expected, fake_wandb):
+    rows_1 = _make_empty_table_rows(fake_wandb)
+    rows_2 = _make_simple_table_rows(fake_wandb)
+    joined_tables = rows_1.join(
+        rows_2,
+        lambda row: weave.ops.make_list(a=row["id"]),
+        lambda row: weave.ops.make_list(a=row["id"]),
+        "alias1",
+        "alias2",
+        leftOuter,
+        rightOuter,
+    )
+    assert weave.use(joined_tables) == expected
+
+
+@pytest.mark.parametrize(
+    "leftOuter, rightOuter, expected",
+    [
+        (True, True, []),
+        (True, False, []),
+        (False, True, []),
+        (False, False, []),
+    ],
+)
+def test_join_2_both_empty(leftOuter, rightOuter, expected, fake_wandb):
+    rows_1 = _make_empty_table_rows(fake_wandb)
+    rows_2 = _make_empty_table_rows(fake_wandb)
+    joined_tables = rows_1.join(
+        rows_2,
+        lambda row: weave.ops.make_list(a=row["id"]),
+        lambda row: weave.ops.make_list(a=row["id"]),
+        "alias1",
+        "alias2",
+        leftOuter,
+        rightOuter,
+    )
+    assert weave.use(joined_tables) == expected
+
+
+def test_sort_empty(fake_wandb):
+    rows = _make_empty_table_rows(fake_wandb)
+    sorted = rows.sort(lambda row: weave.ops.make_list(a=row["label"]), ["asc"])
+    assert weave.use(sorted) == []
+
+
+def test_group_empty(fake_wandb):
+    rows = _make_empty_table_rows(fake_wandb)
+    grouped = rows.groupby(lambda row: weave.ops.dict_(label=row["label"]))
+    assert weave.use(grouped) == []

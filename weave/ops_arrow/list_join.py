@@ -261,13 +261,33 @@ def _joinall_arrow(
 ) -> pa.Table:
     # join
     table0 = tables[0]
+
+    # # In the event that we have any empty tables, then the join column will be null
+    # # and in such cases we need to cast null column to the correct type for the join
+    # # to work. So, we find the first non empty join column and use that
+    # non_empty_join_column_type = None
+    # non_empty_join_tag_column_type = None
+    # for t in tables:
+    #     col_type = t[join_key_col_name].type
+    #     if not pa.types.is_null(col_type) and non_empty_join_column_type is None:
+    #         non_empty_join_column_type = col_type
+    #     tag_type = t[join_tag_key_col_name].type
+    #     if not pa.types.is_null(tag_type)  and non_empty_join_tag_column_type is None:
+    #         non_empty_join_tag_column_type = tag_type
+    #     if non_empty_join_column_type is not None and non_empty_join_tag_column_type is not None:
+    #         break
+
     joined = pa.Table.from_arrays(
         [table0[join_key_col_name], np.arange(len(table0), dtype="int64")],
         names=["join", "index_t0"],
     )
     for i, t in enumerate(tables[1:]):
+        # skip empty tables
+        raw_join_col = t[join_key_col_name]
+        # if pa.types.is_null(raw_join_col.type):
+        #     raw_join_col = raw_join_col.cast(non_empty_join_column_type)
         other = pa.Table.from_arrays(
-            [t[join_key_col_name], np.arange(len(t), dtype="int64")],
+            [raw_join_col, np.arange(len(t), dtype="int64")],
             names=["join", f"index_t{i+1}"],
         )
         joined = joined.join(
@@ -282,7 +302,10 @@ def _joinall_arrow(
     for t, table in enumerate(tables):
         if join_tag_key_col_name in table.schema.names:
             t_indexes = joined[f"index_t{t}"]
-            join_tag_cols.append(table[join_tag_key_col_name].take(t_indexes))
+            tag_col = table[join_tag_key_col_name]
+            # if pa.types.is_null(tag_col.type):
+            #     tag_col = tag_col.cast(non_empty_join_tag_column_type)
+            join_tag_cols.append(tag_col.take(t_indexes))
     join_tag_col = pa.compute.coalesce(*join_tag_cols)
 
     # zip

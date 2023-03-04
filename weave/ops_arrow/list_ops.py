@@ -270,6 +270,8 @@ def _arrow_sort_ranking_to_indicies(sort_ranking, col_dirs):
     output_type=lambda input_types: input_types["self"],
 )
 def sort(self, comp_fn, col_dirs):
+    # if len(self._arrow_data) == 0:
+    #     return self
     ranking = _apply_fn_node_with_tag_pushdown(self, comp_fn)
     if not types.optional(types.union(types.String(), types.Number())).assign_type(
         comp_fn.type.object_type
