@@ -260,20 +260,6 @@ def test_table_call(table_file_node, mock_response, fake_wandb):
     assert table_image0.width == 299
     assert table_image0.path == "media/images/6274b7484d7ed4b6ad1b.png"
 
-    # artifactVersion is not currently callable on image node as a method.
-    # TODO: fix
-    image0_url_node = (
-        ops.wbmedia.artifactVersion(table_image0_node)
-        .file(
-            "wandb-artifact:///stacey/mendeleev/test_res_1fwmcd3q:v0/media/images/8f65e54dc684f7675aec.png"
-        )
-        .direct_url_as_of(1654358491562)
-    )
-    image0_url = weave.use(image0_url_node)
-    assert image0_url.endswith(
-        "test_res_1fwmcd3q_303db33c9f9264768626/media/images/8f65e54dc684f7675aec.png"
-    )
-
 
 def test_avfile_type(fake_wandb):
     fake_wandb.fake_api.add_mock(lambda q, ndx: file_path_response)

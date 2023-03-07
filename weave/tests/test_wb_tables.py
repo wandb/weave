@@ -352,3 +352,29 @@ def test_group_by_const(fake_wandb):
     assert weave.use(grouped).to_pylist_notags() == [
         [dict(zip(columns, row)) for row in data]
     ]
+
+
+def test_symbols_in_name(fake_wandb):
+    columns = ["id", "label", "score"]
+    data = [
+        [1, "A", 1],
+        [2, "A", 2],
+        [3, "B", 3],
+        [4, "B", 4],
+        [5, "C", 5],
+        [6, "C", 6],
+    ]
+    table_1 = wandb.Table(
+        columns=columns,
+        data=data,
+    )
+    art_1 = wandb.Artifact("test_name_1", "test_type_1")
+    name_with_all_symbols_and_spaces = "table_1!@#$%^&*( )_+`~[]{}|;':\",./<>?"
+    art_1.add(table_1, name_with_all_symbols_and_spaces)
+    art_1_node = fake_wandb.mock_artifact_as_node(art_1)
+    table_1_rows = (
+        art_1_node.file(f"{name_with_all_symbols_and_spaces}.table.json").table().rows()
+    )
+    assert weave.use(table_1_rows).to_pylist_notags() == [
+        dict(zip(columns, row)) for row in data
+    ]
