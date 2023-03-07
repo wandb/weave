@@ -132,9 +132,10 @@ def stitch(
 def subgraph_stitch(
     function_node: graph.Node, args: dict[str, ObjectRecorder], sg: StitchedGraph
 ) -> ObjectRecorder:
-    result_graph = stitch([function_node], args)
-    for node in result_graph._node_map:
-        sg.add_result(node, result_graph._node_map[node])
+    result_graph = stitch([function_node], args, stitched_graph=sg)
+    # result_graph = stitch([function_node], args)
+    # for node in result_graph._node_map:
+    #     sg.add_result(node, result_graph._node_map[node])
     return result_graph.get_result(function_node)
 
 
