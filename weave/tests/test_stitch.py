@@ -292,3 +292,31 @@ def test_double_tag(fake_wandb):
     object_recorder = p.get_result(limit_node)
 
     assert len(object_recorder.calls) == 3
+
+
+def test_stitch_shared_fn_simple():
+    proj_node_1 = weave_internal.make_const_node(weave.types.String(), "a,b,c")
+    proj_node_2 = weave_internal.make_const_node(weave.types.String(), "d,e,f")
+    runs_node_1 = proj_node_1.split(",")
+    runs_node_2 = proj_node_2.split(",")
+
+    mapped_node_1 = runs_node_1.map(lambda row: weave.ops.dict_(a=row + "_inner_"))
+
+    # Here we use this notation to ensure that it is the same function in memory
+    # as that is the way it will come over from JS
+    mapped_node_2 = runs_node_2.map(mapped_node_1.from_op.inputs["mapFn"])
+
+    version_1 = mapped_node_1
+    version_2 = mapped_node_2
+
+    assert weave.use([version_1, version_2]) == [
+        [{"a": "a_inner_"}, {"a": "b_inner_"}, {"a": "c_inner_"}],
+        [{"a": "d_inner_"}, {"a": "e_inner_"}, {"a": "f_inner_"}],
+    ]
+
+    p = stitch.stitch([version_1, version_2])
+    res_1 = p.get_result(runs_node_1)
+    res_2 = p.get_result(runs_node_2)
+    print("R1", [c.node.from_op.name for c in res_1.calls])
+    print("R2", [c.node.from_op.name for c in res_2.calls])
+    assert len(res_1.calls) == len(res_2.calls) == 1
