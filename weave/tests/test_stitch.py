@@ -292,6 +292,3 @@ def test_double_tag(fake_wandb):
     object_recorder = p.get_result(limit_node)
 
     assert len(object_recorder.calls) == 3
-
-
-# 'project("dsu", "overbooking").filteredRuns("{\\"name\\":{\\"$ne\\":null}}", "-createdAt").limit(50).summary()["table"].table().run().summary()["table"].dropna().table().rows().offset(0).limit(1)[0].createIndexCheckpointTag()[0].run().name()'
