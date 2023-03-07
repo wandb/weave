@@ -155,6 +155,14 @@ def fast_map_fn(input_list, map_fn):
                     tag_store.add_tags(
                         item, list_tags, give_precedence_to_existing_tags=True
                     )
-                result.append(_fast_apply_map_fn(item, i, map_fn))
+                item_result = _fast_apply_map_fn(item, i, map_fn)
+                item_result_tags = (
+                    tag_store.get_tags(item_result)
+                    if tag_store.is_tagged(item_result)
+                    else None
+                )
 
+            if item_result_tags is not None:
+                tag_store.add_tags(item_result, item_result_tags)
+            result.append(item_result)
         return result

@@ -180,3 +180,15 @@ def test_dropna_tagged():
 
     for i, val in enumerate([0, 2]):
         assert weave.use(tag_getter_op_row(dropnaed[i])) == val
+
+
+def test_preserve_tags_on_mapped_elements():
+
+    data = [1]
+    for i, item in enumerate(data):
+        data[i] = tag_store.add_tags(box.box(item), {"row": i})
+    list_node = weave.save(data)
+    mapped = list_node.map(lambda n: n + 2)
+    indexed = mapped[0]
+    tag_getter_op = make_tag_getter_op.make_tag_getter_op("row", types.Int())
+    assert weave.use(tag_getter_op(indexed)) == 0
