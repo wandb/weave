@@ -146,13 +146,14 @@ def process_opdef_resolve_fn(
     return res
 
 
+def dummy_fn(*args: typing.Any, **kwargs: typing.Any) -> None:
+    return None
+
+
 # Helper function to use when we want nullability to flow
 def process_opdef_nullable_resolve_fn(
     op_def: "OpDef.OpDef",
     args: list[typing.Any],
     kwargs: dict[str, typing.Any],
 ) -> typing.Any:
-    def dummy_fn(*args: typing.Any, **kwargs: typing.Any) -> None:
-        return None
-
     return process_opdef_resolve_fn(op_def, dummy_fn, args, kwargs)
