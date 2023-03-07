@@ -45,24 +45,73 @@ class OpCall:
 @dataclasses.dataclass()
 class ObjectRecorder:
     node: graph.Node
-    tags: dict[str, "ObjectRecorder"] = dataclasses.field(default_factory=dict)
-    val: typing.Optional[typing.Any] = None
-    calls: list[OpCall] = dataclasses.field(default_factory=list)
+    _tags: dict[str, "ObjectRecorder"] = dataclasses.field(default_factory=dict)
+    _calls: list[OpCall] = dataclasses.field(default_factory=list)
+
+    @property
+    def tags(self) -> dict[str, "ObjectRecorder"]:
+        return self._tags
+
+    @property
+    def calls(self) -> list[OpCall]:
+        return self._calls
 
     def call_node(
-        self, node: graph.OutputNode, input_dict: dict[str, "ObjectRecorder"]
-    ) -> "ObjectRecorder":
-        output = ObjectRecorder(node)
-        self.calls.append(OpCall(node, input_dict, output))
-        return output
+        self,
+        node: graph.OutputNode,
+        input_dict: dict[str, ObjectRecorder],
+        node_recorder: typing.Optional[ObjectRecorder],
+    ) -> None:
+        self.calls.append(OpCall(node, input_dict, node_recorder))
+
+    def object_recorder_for_key(
+        self, node: graph.OutputNode, key: str
+    ) -> typing.Optional["ObjectRecorder"]:
+        # The base case is that we have no information about the key.
+        return None
 
 
+@dataclasses.dataclass()
+class ConstObjectRecorder(ObjectRecorder):
+    val: typing.Optional[typing.Any] = None
+
+
+@dataclasses.dataclass()
+class MultiRecorder(ObjectRecorder):
+    recorders: list[ObjectRecorder] = dataclasses.field(default_factory=list)
+
+    def call_node(
+        self,
+        node: graph.OutputNode,
+        input_dict: dict[str, ObjectRecorder],
+        node_recorder: typing.Optional[ObjectRecorder],
+    ) -> None:
+        for r in self.recorders:
+            r.call_node(node, input_dict, node_recorder)
+
+    def object_recorder_for_key(
+        self, node: graph.OutputNode, key: str
+    ) -> typing.Optional["ObjectRecorder"]:
+        inner_recorders = [r.object_recorder_for_key(key) for r in self.recorders]
+        non_null_recorders = [r for r in inner_recorders if r is not None]
+        if len(non_null_recorders) == 0:
+            return None
+        elif len(non_null_recorders) == 1:
+            return non_null_recorders[0]
+        else:
+            return MultiRecorder(node, recorders=non_null_recorders)
+
+
+@dataclasses.dataclass()
 class LiteralDictObjectRecorder(ObjectRecorder):
-    val: dict[str, ObjectRecorder]
+    property_object_recorders: dict[str, ObjectRecorder] = dataclasses.field(
+        default_factory=dict
+    )
 
-
-class LiteralListObjectRecorder(ObjectRecorder):
-    val: list[ObjectRecorder]
+    def object_recorder_for_key(
+        self, node: graph.OutputNode, key: str
+    ) -> typing.Optional["ObjectRecorder"]:
+        return self.property_object_recorders.get(key, None)
 
 
 @dataclasses.dataclass

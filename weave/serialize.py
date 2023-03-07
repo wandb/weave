@@ -196,7 +196,7 @@ def deserialize(serialized: SerializedReturnType) -> "list[graph.Node]":
     # along the graph topology. If it were we could do an easy linear
     # implementation. But its not so we recurse for now.
     nodes = serialized["nodes"]
-    target_nodes = serialized["targetNodes"]
+    target_nodes = serialized.get("targetNodes", serialized.get("rootNodes", []))
 
     parsed_nodes: dict[int, graph.Node] = {}
     # WeaveJS does not do a good job deduplicating nodes currently, so we do it here.
