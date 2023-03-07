@@ -56,6 +56,12 @@ class ObjectRecorder:
         self.calls.append(OpCall(node, input_dict, output))
         return output
 
+    def print_call_tree(self, indent: int = 0) -> None:
+        if isinstance(self.node, graph.OutputNode):
+            print("  " * indent, self.node.from_op.name)
+            for call in self.calls:
+                call.output.print_call_tree(indent + 1)
+
 
 class LiteralDictObjectRecorder(ObjectRecorder):
     val: dict[str, ObjectRecorder]

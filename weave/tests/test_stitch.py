@@ -264,3 +264,34 @@ def test_stitch_overlapping_tags(fake_wandb):
     assert len(p.get_result(project_node).tags) == 0
     assert len(p.get_result(filtered_runs_a_node).calls) == 2
     assert len(p.get_result(filtered_runs_b_node).calls) == 2
+
+
+def test_double_tag(fake_wandb):
+    fake_wandb.fake_api.add_mock(test_wb.table_mock_filtered)
+    limit_node = (
+        weave.ops.project("stacey", "mendeleev")
+        .filteredRuns("{}", "-createdAt")
+        .limit(50)
+    )
+    table_node = limit_node.summary().pick("table").table()
+    run_node_1 = run_ops.run_tag_getter_op(table_node)
+    first_table_first_row_node = (
+        run_node_1.summary()
+        .pick("table")
+        .dropna()
+        .table()
+        .rows()
+        .offset(0)
+        .limit(1)[0]
+        .createIndexCheckpointTag()[0]
+    )
+    run_node_2 = run_ops.run_tag_getter_op(first_table_first_row_node)
+    name_node = run_node_2.name()
+
+    p = stitch.stitch([name_node])
+    object_recorder = p.get_result(limit_node)
+
+    assert len(object_recorder.calls) == 3
+
+
+# 'project("dsu", "overbooking").filteredRuns("{\\"name\\":{\\"$ne\\":null}}", "-createdAt").limit(50).summary()["table"].table().run().summary()["table"].dropna().table().rows().offset(0).limit(1)[0].createIndexCheckpointTag()[0].run().name()'
