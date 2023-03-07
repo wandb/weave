@@ -385,7 +385,7 @@ def test_mapped_table_empty(fake_wandb):
     )
     assert weave.use(cell_node.indexCheckpoint()) == None
     assert weave.use(cell_node.run().name()) == None
-    assert weave.use(cell_node.project().name()) == None
+    assert weave.use(cell_node.project().name()) == "mendeleev"
 
 
 def test_mapped_table_tags(fake_wandb):

@@ -1,5 +1,6 @@
 import logging
 
+
 from . import graph
 from . import registry_mem
 from . import weave_internal
@@ -9,7 +10,7 @@ from . import box
 from . import compile
 from . import engine_trace
 from . import language_nullability
-from .language_features.tagging import tag_store
+from .language_features.tagging import tag_store, process_opdef_resolve_fn
 
 
 def _fast_apply_map_fn(item, index, map_fn):
@@ -20,7 +21,9 @@ def _fast_apply_map_fn(item, index, map_fn):
         }
         op_def = registry_mem.memory_registry.get_op(map_fn.from_op.name)
         if language_nullability.should_force_none_result(inputs, op_def):
-            return None
+            return process_opdef_resolve_fn.process_opdef_nullable_resolve_fn(
+                op_def, [], inputs
+            )
         return op_def.resolve_fn(**inputs)
     elif isinstance(map_fn, graph.ConstNode):
         return map_fn.val

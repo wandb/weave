@@ -108,7 +108,7 @@ def flow_tags(
     return output
 
 
-# This function is responcible for post-processing the results of a resolve_fn.
+# This function is responsible for post-processing the results of a resolve_fn.
 # Specifically, it will take one of 3 actions:
 # 1. If `_should_tag_op_def_outputs` is true, then it will tag the output with the input.
 # 2. Else If `_should_flow_tags`, then it will flow the tags from the input to the output.
@@ -144,3 +144,15 @@ def process_opdef_resolve_fn(
         key, val = get_first_arg(op_def, args, kwargs)
         return flow_tags(val, res, give_precedence_to_existing_tags=True)
     return res
+
+
+# Helper function to use when we want nullability to flow
+def process_opdef_nullable_resolve_fn(
+    op_def: "OpDef.OpDef",
+    args: list[typing.Any],
+    kwargs: dict[str, typing.Any],
+) -> typing.Any:
+    def dummy_fn(*args: typing.Any, **kwargs: typing.Any) -> None:
+        return None
+
+    return process_opdef_resolve_fn(op_def, dummy_fn, args, kwargs)

@@ -404,7 +404,9 @@ def execute_forward_node(
     else:
         with tracer.trace("execute-sync"):
             if language_nullability.should_force_none_result(inputs, op_def):
-                result = None
+                result = process_opdef_resolve_fn.process_opdef_nullable_resolve_fn(
+                    op_def, [], inputs
+                )
             else:
                 result = execute_sync_op(op_def, inputs)
 
