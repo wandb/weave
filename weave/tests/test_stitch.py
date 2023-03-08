@@ -6,6 +6,7 @@ from .. import stitch
 
 from ..language_features.tagging import make_tag_getter_op
 from .. import compile_table
+from .. import compile_domain
 from weave import context_state as _context
 from .. import weave_internal
 from . import test_wb
@@ -98,8 +99,8 @@ def test_lambda_using_externally_defined_node():
     assert len(calls) == 3
     assert calls[0].node.from_op.name == "mapped_typedDict-pick"
     assert calls[0].inputs[1].val == "b"
-    assert calls[1].node.from_op.name == "list-__getitem__"
-    assert calls[1].inputs[1].val == 0
+    assert calls[1].node.from_op.name == "typedDict-pick"
+    assert calls[1].inputs[1].val == "b"
     assert calls[2].node.from_op.name == "typedDict-pick"
     assert calls[2].inputs[1].val == "a"
 
@@ -195,7 +196,7 @@ def test_shared_fn_node():
         expected_calls = set(expected_call_names)
         assert found_calls == expected_calls
 
-    assert_node_calls(const_list_node, ["list-__getitem__"])
+    assert_node_calls(const_list_node, ["list", "mapped_number-add"])
     assert_node_calls(indexed_node, ["list", "mapped_number-add"])
     assert_node_calls(arr_1_node, ["list"])
     assert_node_calls(arr_2_node, ["mapped_number-add"])
@@ -264,3 +265,15 @@ def test_stitch_overlapping_tags(fake_wandb):
     assert len(p.get_result(project_node).tags) == 0
     assert len(p.get_result(filtered_runs_a_node).calls) == 2
     assert len(p.get_result(filtered_runs_b_node).calls) == 2
+
+
+def test_refine_history_type_included_in_gql():
+    project_node = weave.ops.project("stacey", "mendeleev")
+    runs_node = project_node.runs()
+    map_node = runs_node.map(lambda row: weave.ops.dict_(variant=row))
+    checkpoint_node = map_node.createIndexCheckpointTag()
+    index_node = checkpoint_node[0]
+    pick_node = index_node["variant"]
+    refine_history_node = pick_node.refine_history_type()
+    sg = stitch.stitch([refine_history_node])
+    assert "historyKeys" in compile_domain._get_fragment(project_node, sg)

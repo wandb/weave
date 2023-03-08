@@ -189,8 +189,11 @@ def stitch_node_inner(
         return inputs[0].tags[tag_name]
     elif node.from_op.name.endswith("createIndexCheckpointTag"):
         inputs[0].tags["indexCheckpoint"] = ObjectRecorder(node)
+        return inputs[0]
     elif node.from_op.name == "dict":
         return LiteralDictObjectRecorder(node, val=input_dict)
+    elif node.from_op.name.endswith("__getitem__"):
+        return inputs[0]
     elif node.from_op.name == "list":
         # Merge element tags together and place them on the outer list.
         # This is overly aggressive, but it means we don't need to provide
