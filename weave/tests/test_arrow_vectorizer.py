@@ -1187,3 +1187,20 @@ def test_vectorize_function_with_const_first_arg():
     vec_fn = arrow.vectorize(fn)
     called = weave_internal.call_fn(vec_fn, {"row": awl_node})
     assert weave.use(called) == [True, False, True, False, True, False]
+
+
+def test_isnone():
+    a = [1, None, False, 0, "", "a"]
+    awl = arrow.to_arrow(a)
+    l = weave.save(awl)
+    fn = weave_internal.define_fn({"x": awl.object_type}, lambda x: x.isNone()).val
+    vec_fn = arrow.vectorize(fn)
+    called = weave_internal.call_fn(vec_fn, {"x": l})
+    assert weave.use(called).to_pylist_notags() == [
+        False,
+        True,
+        False,
+        False,
+        False,
+        False,
+    ]

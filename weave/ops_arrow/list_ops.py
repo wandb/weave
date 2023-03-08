@@ -4,6 +4,7 @@ import numpy as np
 import typing
 
 from ..api import op
+from ..decorator_arrow_op import arrow_op
 from .. import weave_types as types
 from ..language_features.tagging import (
     tagged_value_type,
@@ -723,4 +724,27 @@ def vectorized_arrow_pick(self, key):
     result = new_array.dictionary_decode()
     return ArrowWeaveList(
         result,
+    )
+
+
+@arrow_op(
+    name="ArrowWeaveList-vectorizedIsNone",
+    input_type={"self": ArrowWeaveListType(types.optional(types.Any()))},
+    output_type=ArrowWeaveListType(types.Boolean()),
+)
+def vectorized_is_none(self):
+    # Need to break out to python due to this issue we reported
+    # https://github.com/apache/arrow/issues/34315
+    # TODO: Remove this once the issue is fixed
+    # Open PR here: https://github.com/apache/arrow/pull/34408
+    if isinstance(self._arrow_data, pa.UnionArray):
+        return ArrowWeaveList(
+            pa.array([x == None for x in self._arrow_data.to_pylist()]),
+            types.Boolean(),
+            self._artifact,
+        )
+    return ArrowWeaveList(
+        self._arrow_data.is_null(),
+        types.Boolean(),
+        self._artifact,
     )
