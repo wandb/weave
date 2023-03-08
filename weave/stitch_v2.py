@@ -52,9 +52,10 @@ class DependencyGraph:
 
                     # Assume that each var depends on all inputs (this is a more liberal assumption than we need)
                     for var in vars:
-                        # Here, we only add the input nodes that come before the current fn param!
-                        for input_node_2 in node_inputs[:input_node_ndx]:
-                            self._add_edge(input_node_2, var)
+                        for var_input_to in self.input_to_output[var]:
+                            # Here, we only add the input nodes that come before the current fn param!
+                            for input_node_2 in node_inputs[:input_node_ndx]:
+                                self._add_edge(input_node_2, var_input_to)
 
     def _add_edge(self, input_node: graph.Node, output_node: graph.Node) -> None:
         self.input_to_output[input_node].add(output_node)
@@ -164,6 +165,30 @@ class OpCall:
         return ObjectRecorder(self.node, self._sg2)
 
 
+def is_call_passthrough(node: graph.Node) -> bool:
+    if isinstance(node, graph.OutputNode):
+        op = registry_mem.memory_registry.get_op(node.from_op.name)
+        return (
+            op.name.endswith("offset")
+            or op.name.endswith("limit")
+            or op.name.endswith("index")
+            or op.name.endswith("__getitem__")
+            or op.name.endswith("pick")
+            or op.name.endswith("concat")
+            or op.name.endswith("contains")
+            or op.name.endswith("list")
+            or op.name.endswith("dict")
+            or op.name.endswith("flatten")
+            or op.name.endswith("dropna")
+            or op.name.endswith("filter")
+            or op.name.endswith("join")
+            or op.name.endswith("joinAll")
+            or op.name.endswith("groupby")
+            or op.name.endswith("createIndexCheckpointTag")
+        )
+    return False
+
+
 @dataclasses.dataclass
 class StitchedGraph:
     _subscription_manager: TagSubscriptionManager
@@ -175,7 +200,14 @@ class StitchedGraph:
             self._subscription_manager.node_provides_tag_for_downstream_nodes[node]
         )
 
-        return direct_outputs.union(tag_subscriptions)
+        child_outputs = direct_outputs.union(tag_subscriptions)
+        final_outputs = set()
+        for child in child_outputs:
+            final_outputs.add(child)
+            if is_call_passthrough(child):
+                final_outputs = final_outputs.union(self.get_combined_outputs(child))
+
+        return final_outputs
 
     # Just for compatibility with the old stitcher
     def get_result(self, node: graph.Node) -> ObjectRecorder:
@@ -281,7 +313,7 @@ def node_provides_tag(node: graph.Node) -> typing.Optional[TagProviderResult]:
             and opdef_util.should_tag_op_def_outputs(op.derived_from)
         ) or opdef_util.should_tag_op_def_outputs(op):
             first_input_key, first_input_node = list(node.from_op.inputs.items())[0]
-            return TagProviderResult(first_input_key, first_input_node)
+            return TagProviderResult(first_input_key, [first_input_node])
         elif node.from_op.name.endswith("groupby"):
             return TagProviderResult("groupKey", [get_group_fn_from_mapper_node(node)])
         elif node.from_op.name.endswith("joinAll"):

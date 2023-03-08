@@ -29,8 +29,9 @@ def get_projection(obj: stitch.ObjectRecorder) -> KeyTree:
         ):
             key = call.inputs[1].val
             if key is None:
-                raise errors.WeaveInternalError("non-const not yet supported")
-            tree_merge(cols.setdefault(key, {}), get_projection(call.output))
+                all_keys = True
+            else:
+                tree_merge(cols.setdefault(key, {}), get_projection(call.output))
         elif call.node.from_op.name.endswith("keytypes"):
             all_keys = True
         else:
