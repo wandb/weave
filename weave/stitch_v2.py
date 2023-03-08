@@ -121,9 +121,10 @@ class TagSubscriptionManager:
             ] = set()
             for provider in provider_result.tag_providers:
                 for sub_node in subscriptions_to_provided_tag:
-                    self.node_provides_tag_for_downstream_nodes[provider].add(sub_node)
-                    self.rollup_tags(provider, dg.output_to_input[sub_node], dg)
-                    # self._direct_merge_subscriptions_into_node_from_downstream_node(provided_by, sub_node)
+                    self.node_provides_tag_for_downstream_nodes[provider].update(
+                        dg.input_to_output[sub_node]
+                    )
+                    self.rollup_tags(provider, dg.input_to_output[sub_node], dg)
 
 
 # Just for compatibility with the old stitcher
