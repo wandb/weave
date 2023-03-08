@@ -2,7 +2,7 @@ import json
 import typing
 from . import graph
 from . import weave_types as types
-from . import stitch
+from . import stitch_v2 as stitch
 from . import registry_mem
 from . import errors
 from dataclasses import dataclass, field

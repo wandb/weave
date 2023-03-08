@@ -13,7 +13,7 @@ from . import graph
 from . import registry_mem
 from . import dispatch
 from . import graph_debug
-from . import stitch
+from . import stitch_v2 as stitch
 from . import compile_table
 from . import weave_internal
 from . import engine_trace

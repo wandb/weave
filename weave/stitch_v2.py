@@ -125,8 +125,47 @@ class TagSubscriptionManager:
                     # self._direct_merge_subscriptions_into_node_from_downstream_node(provided_by, sub_node)
 
 
+# Just for compatibility with the old stitcher
 @dataclasses.dataclass
-class StitchGraph2:
+class ObjectRecorder:
+    node: graph.Node
+    _sg2: "StitchedGraph"
+
+    @property
+    def calls(self) -> list["OpCall"]:
+        return [
+            OpCall(node, self._sg2)
+            for node in self._sg2.get_combined_outputs(self.node)
+            if isinstance(node, graph.OutputNode)
+        ]
+
+    @property
+    def val(self) -> typing.Any:
+        if isinstance(self.node, graph.ConstNode):
+            return self.node.val
+        return None
+
+
+# Just for compatibility with the old stitcher
+@dataclasses.dataclass
+class OpCall:
+    node: graph.OutputNode
+    _sg2: "StitchedGraph"
+
+    @property
+    def inputs(self) -> list["ObjectRecorder"]:
+        return [
+            self._sg2.get_result(input_node)
+            for input_node in self.node.from_op.inputs.values()
+        ]
+
+    @property
+    def output(self) -> "ObjectRecorder":
+        return ObjectRecorder(self.node, self._sg2)
+
+
+@dataclasses.dataclass
+class StitchedGraph:
     _subscription_manager: TagSubscriptionManager
     _dependency_graph: DependencyGraph
 
@@ -138,8 +177,12 @@ class StitchGraph2:
 
         return direct_outputs.union(tag_subscriptions)
 
+    # Just for compatibility with the old stitcher
+    def get_result(self, node: graph.Node) -> ObjectRecorder:
+        return ObjectRecorder(node, self)
 
-def stitch_2(nodes: list[graph.Node]) -> StitchGraph2:
+
+def stitch(nodes: list[graph.Node]) -> StitchedGraph:
     """
     Stitch2 is a new version of the stitcher that uses a bottom-up traversal, similar
     to Weave0. Here, we start at the leaf nodes, and collect "tag getters" along the way.
@@ -187,7 +230,7 @@ def stitch_2(nodes: list[graph.Node]) -> StitchGraph2:
             curr_node, dependency_graph.input_to_output[curr_node], dependency_graph
         )
 
-    return StitchGraph2(tag_subscription_manager, dependency_graph)
+    return StitchedGraph(tag_subscription_manager, dependency_graph)
 
 
 def node_gets_tag_by_name(node: graph.Node) -> typing.Optional[str]:

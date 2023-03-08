@@ -3,7 +3,7 @@
 import typing
 
 from . import errors
-from . import stitch
+from . import stitch_v2 as stitch
 
 
 KeyTree = typing.Dict[str, "KeyTree"]  # type:ignore
