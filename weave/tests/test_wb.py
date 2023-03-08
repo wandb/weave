@@ -29,12 +29,12 @@ file_path_response = {
         **fwb.project_payload,  # type: ignore
         "artifactType_46d22fef09db004187bb8da4b5e98c58": {
             **fwb.defaultArtifactType_payload,  # type: ignore
-            "artifactCollections_21303e3890a1b6580998e6aa8a345859": {
+            "artifactCollections_c1233b7003317090ab5e2a75db4ad965": {
                 "edges": [
                     {
                         "node": {
                             **fwb.artifactSequence_payload,  # type: ignore
-                            "artifacts_21303e3890a1b6580998e6aa8a345859": {
+                            "artifacts_c1233b7003317090ab5e2a75db4ad965": {
                                 "edges": [{"node": fwb.artifactVersion_payload}]
                             },
                         }
@@ -59,7 +59,7 @@ artifact_browser_response = {
 workspace_response = {
     "project_518fa79465d8ffaeb91015dce87e092f": {
         **fwb.project_payload,  # type: ignore
-        "runs_21303e3890a1b6580998e6aa8a345859": {
+        "runs_c1233b7003317090ab5e2a75db4ad965": {
             "edges": [
                 {
                     "node": {
@@ -117,7 +117,7 @@ workspace_response = {
 workspace_response_no_run_displayname = {
     "project_518fa79465d8ffaeb91015dce87e092f": {
         **fwb.project_payload,  # type: ignore
-        "runs_21303e3890a1b6580998e6aa8a345859": {
+        "runs_c1233b7003317090ab5e2a75db4ad965": {
             "edges": [
                 {
                     "node": {
@@ -164,14 +164,14 @@ workspace_response_no_run_displayname = {
 empty_workspace_response = {
     "project_518fa79465d8ffaeb91015dce87e092f": {
         **fwb.project_payload,  # type: ignore
-        "runs_21303e3890a1b6580998e6aa8a345859": {"edges": []},
+        "runs_c1233b7003317090ab5e2a75db4ad965": {"edges": []},
     }
 }
 
 workspace_response_filtered = {
     "project_518fa79465d8ffaeb91015dce87e092f": {
         **fwb.project_payload,  # type: ignore
-        "runs_6e908597bd3152c2f0457f6283da76b9": {
+        "runs_261949318143369aa6c158af92afee03": {
             "edges": [
                 {
                     "node": {
@@ -195,12 +195,12 @@ workspace_response_filtered = {
 project_run_artifact_response = {
     "project_518fa79465d8ffaeb91015dce87e092f": {
         **fwb.project_payload,  # type: ignore
-        "runs_21303e3890a1b6580998e6aa8a345859": {
+        "runs_c1233b7003317090ab5e2a75db4ad965": {
             "edges": [
                 {
                     "node": {
                         **fwb.run_payload,  # type: ignore
-                        "outputArtifacts_21303e3890a1b6580998e6aa8a345859": {
+                        "outputArtifacts_c1233b7003317090ab5e2a75db4ad965": {
                             "edges": [
                                 {
                                     "node": {
@@ -531,12 +531,12 @@ def test_domain_gql_fragments(fake_wandb):
                 **fwb.project_payload,
                 "artifactType_46d22fef09db004187bb8da4b5e98c58": {
                     **fwb.defaultArtifactType_payload,
-                    "artifactCollections_21303e3890a1b6580998e6aa8a345859": {
+                    "artifactCollections_c1233b7003317090ab5e2a75db4ad965": {
                         "edges": [
                             {
                                 "node": {
                                     **fwb.artifactSequence_payload,
-                                    "artifacts_21303e3890a1b6580998e6aa8a345859": {
+                                    "artifacts_c1233b7003317090ab5e2a75db4ad965": {
                                         "edges": [
                                             {
                                                 "node": {
@@ -748,7 +748,7 @@ def test_loading_artifact_browser_request_2(fake_wandb):
                     **fwb.artifactSequence_payload,  # type: ignore
                     "__typename": "ArtifactSequence",
                     "project": fwb.project_payload,
-                    "artifacts_21303e3890a1b6580998e6aa8a345859": {
+                    "artifacts_c1233b7003317090ab5e2a75db4ad965": {
                         "edges": [{"node": {**fwb.artifactVersion_payload}}]
                     },
                     "artifactMembership_fe9cc269bee939ccb54ebba88c6087dd": {
@@ -764,7 +764,7 @@ def test_loading_artifact_browser_request_2(fake_wandb):
                             }
                         ]
                     },
-                    "artifactMemberships_21303e3890a1b6580998e6aa8a345859": {
+                    "artifactMemberships_c1233b7003317090ab5e2a75db4ad965": {
                         "edges": [
                             {
                                 "node": {
@@ -860,7 +860,7 @@ def test_loading_artifact_browser_request_3(fake_wandb):
                             "digest": "51560154fe3bae863d18335d39129732",
                             "commitHash": "303db33c9f9264768626",
                             "createdAt": "2021-07-10T19:27:32",
-                            "usedBy_21303e3890a1b6580998e6aa8a345859": {
+                            "usedBy_c1233b7003317090ab5e2a75db4ad965": {
                                 "edges": [
                                     {
                                         "node": {
@@ -886,7 +886,7 @@ def test_loading_artifact_browser_request_3(fake_wandb):
                             "createdBy": {
                                 "__typename": "Run",
                                 **fwb.run_payload,  # type: ignore
-                                "inputArtifacts_21303e3890a1b6580998e6aa8a345859": {
+                                "inputArtifacts_c1233b7003317090ab5e2a75db4ad965": {
                                     "edges": [
                                         {
                                             "node": {
@@ -908,7 +908,7 @@ def test_loading_artifact_browser_request_3(fake_wandb):
                         },
                         "artifactCollection": {
                             **fwb.artifactSequence_payload,  # type: ignore
-                            "aliases_21303e3890a1b6580998e6aa8a345859": {
+                            "aliases_c1233b7003317090ab5e2a75db4ad965": {
                                 "edges": [
                                     {
                                         "node": {
@@ -933,7 +933,7 @@ def test_loading_artifact_browser_request_3(fake_wandb):
                                 },
                             },
                             "__typename": "ArtifactSequence",
-                            "artifactMemberships_21303e3890a1b6580998e6aa8a345859": {
+                            "artifactMemberships_c1233b7003317090ab5e2a75db4ad965": {
                                 "edges": [
                                     {
                                         "node": {
@@ -1115,7 +1115,7 @@ def run_history_mocker(q, ndx):
         return {
             "project_518fa79465d8ffaeb91015dce87e092f": {
                 **fwb.project_payload,  # type: ignore
-                "runs_21303e3890a1b6580998e6aa8a345859": {
+                "runs_c1233b7003317090ab5e2a75db4ad965": {
                     "edges": [
                         {
                             "node": {
@@ -1156,7 +1156,7 @@ def run_history_as_of_mocker(q, ndx):
     return {
         "project_518fa79465d8ffaeb91015dce87e092f": {
             **fwb.project_payload,  # type: ignore
-            "runs_21303e3890a1b6580998e6aa8a345859": {
+            "runs_c1233b7003317090ab5e2a75db4ad965": {
                 "edges": [
                     {
                         "node": {

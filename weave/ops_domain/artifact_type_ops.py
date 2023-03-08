@@ -35,23 +35,23 @@ gql_connection_op(
     "artifactCollections",
     wdt.ArtifactCollectionType,
     {},
-    lambda inputs: f"first: 50",
+    lambda inputs: f"first: 100",
 )
 
 # Section 6/6: Non Standard Business Logic Ops
 # This is a horrible op due to the double limits - we should remove this.
-first_50_collections_alias = _make_alias("first: 50", prefix="artifactCollections")
-first_50_artifacts_alias = _make_alias("first: 50", prefix="artifacts")
+first_100_collections_alias = _make_alias("first: 100", prefix="artifactCollections")
+first_100_artifacts_alias = _make_alias("first: 100", prefix="artifacts")
 
 
 @op(
     name="artifactType-artifactVersions",
     plugins=wb_gql_op_plugin(
         lambda inputs, inner: f"""
-    {first_50_collections_alias}: artifactCollections(first: 50) {{
+    {first_100_collections_alias}: artifactCollections(first: 100) {{
         edges {{
             node {{
-                {first_50_artifacts_alias}: artifacts(first: 50) {{
+                {first_100_artifacts_alias}: artifacts(first: 100) {{
                     edges {{
                         node {{
                             {wdt.ArtifactVersion.REQUIRED_FRAGMENT}
@@ -68,8 +68,10 @@ def artifact_versions(
     artifactType: wdt.ArtifactType,
 ) -> list[wdt.ArtifactVersion]:
     res = []
-    for artifactCollectionEdge in artifactType.gql[first_50_collections_alias]["edges"]:
-        for artifactEdge in artifactCollectionEdge["node"][first_50_artifacts_alias][
+    for artifactCollectionEdge in artifactType.gql[first_100_collections_alias][
+        "edges"
+    ]:
+        for artifactEdge in artifactCollectionEdge["node"][first_100_artifacts_alias][
             "edges"
         ]:
             res.append(wdt.ArtifactVersion(artifactEdge["node"]))

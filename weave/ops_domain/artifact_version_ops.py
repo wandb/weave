@@ -230,7 +230,7 @@ gql_connection_op(
     "usedBy",
     wdt.RunType,
     {},
-    lambda inputs: "first: 50",
+    lambda inputs: "first: 100",
 )
 
 

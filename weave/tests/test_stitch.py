@@ -241,10 +241,10 @@ def test_stitch_overlapping_tags(fake_wandb):
         lambda a, b: {
             "project_518fa79465d8ffaeb91015dce87e092f": {
                 **fwb.project_payload,
-                "runs_6e908597bd3152c2f0457f6283da76b9": {
+                "runs_261949318143369aa6c158af92afee03": {
                     "edges": [{"node": {**fwb.run_payload, "summaryMetrics": "{}"}}]
                 },
-                "runs_76cc8d511150f7f1320d5d5494445c8e": {
+                "runs_30ea80144a38a5c57c80d9d7f0485166": {
                     "edges": [
                         {"node": {**fwb.run_payload, "summaryMetrics": '{"a": 1}'}}
                     ]

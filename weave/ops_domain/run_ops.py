@@ -376,7 +376,7 @@ gql_connection_op(
     "inputArtifacts",
     wdt.ArtifactVersionType,
     {},
-    lambda inputs: "first: 50",
+    lambda inputs: "first: 100",
 )
 
 gql_connection_op(
@@ -385,7 +385,7 @@ gql_connection_op(
     "outputArtifacts",
     wdt.ArtifactVersionType,
     {},
-    lambda inputs: "first: 50",
+    lambda inputs: "first: 100",
 )
 
 
