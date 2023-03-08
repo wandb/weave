@@ -2,7 +2,7 @@ import weave
 import typing
 import pytest
 
-from .. import stitch
+from .. import stitch_v2 as stitch
 
 from ..language_features.tagging import make_tag_getter_op
 from .. import compile_table

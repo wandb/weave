@@ -2,7 +2,7 @@ import weave
 from weave.ops_domain import wb_domain_types, runs2
 
 
-from .. import stitch
+from .. import stitch_v2 as stitch
 from .. import compile_table
 
 
@@ -23,4 +23,4 @@ def test_runs2_plan():
     p = stitch.stitch(nodes)
     run_cols = compile_table.get_projection(p.get_result(runs))
     assert list(run_cols.keys()) == ["config"]
-    assert list(run_cols["config"].keys()) == [f"key{i}" for i in range(15)]
+    assert set(run_cols["config"].keys()) == set([f"key{i}" for i in range(15)])

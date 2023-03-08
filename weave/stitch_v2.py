@@ -200,15 +200,15 @@ class StitchedGraph:
         tag_subscriptions = (
             self._subscription_manager.node_provides_tag_for_downstream_nodes[node]
         )
+        return direct_outputs.union(tag_subscriptions)
+        # child_outputs = direct_outputs.union(tag_subscriptions)
+        # final_outputs = set()
+        # for child in child_outputs:
+        #     final_outputs.add(child)
+        #     if is_call_passthrough(child):
+        #         final_outputs = final_outputs.union(self.get_combined_outputs(child))
 
-        child_outputs = direct_outputs.union(tag_subscriptions)
-        final_outputs = set()
-        for child in child_outputs:
-            final_outputs.add(child)
-            if is_call_passthrough(child):
-                final_outputs = final_outputs.union(self.get_combined_outputs(child))
-
-        return final_outputs
+        # return final_outputs
 
     # Just for compatibility with the old stitcher
     def get_result(self, node: graph.Node) -> ObjectRecorder:
