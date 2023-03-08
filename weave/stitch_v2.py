@@ -21,41 +21,42 @@ class DependencyGraph:
     )
 
     def add_node(self: "DependencyGraph", node_to_add: graph.Node) -> None:
-        if isinstance(node_to_add, graph.OutputNode):
-            output_node = node_to_add
-            node_inputs = list(output_node.from_op.inputs.values())
-            # Add each input node to the graph and mark the output dependents
-            for input_node_ndx, input_node in enumerate(node_inputs):
-                if node_is_mapper(input_node):
-                    # Special case for mappers - if the input is a mapper (opMap or opMapEach), then we
-                    # need to connect the fn_node to the output node directly (since the tag getter can
-                    # apply to either inside the map fn or to the map fn itself). We don't do this
-                    # for for all lambdas (like opSort), since the lambda terminates with the execution
-                    # of that op.
-                    self._add_edge(get_map_fn_from_mapper_node(input_node), output_node)
-                self._add_edge(input_node, output_node)
-                self.add_node(input_node)
+        if not isinstance(node_to_add, graph.OutputNode):
+            return
+        output_node = node_to_add
+        node_inputs = list(output_node.from_op.inputs.values())
+        # Add each input node to the graph and mark the output dependents
+        for input_node_ndx, input_node in enumerate(node_inputs):
+            if node_is_mapper(input_node):
+                # Special case for mappers - if the input is a mapper (opMap or opMapEach), then we
+                # need to connect the fn_node to the output node directly (since the tag getter can
+                # apply to either inside the map fn or to the map fn itself). We don't do this
+                # for for all lambdas (like opSort), since the lambda terminates with the execution
+                # of that op.
+                self._add_edge(get_map_fn_from_mapper_node(input_node), output_node)
+            self._add_edge(input_node, output_node)
+            self.add_node(input_node)
 
-                # Special case for lambdas. Example:
-                # ouput_node = opMap
-                # fn_node = the lambda
-                if isinstance(input_node, graph.ConstNode) and isinstance(
-                    input_node.val, graph.Node
-                ):
-                    fn_node = input_node.val
+            # Special case for lambdas. Example:
+            # ouput_node = opMap
+            # fn_node = the lambda
+            if is_fn_node(input_node):
+                fn_node = input_node.val
 
-                    # Add the node to the graph
-                    self.add_node(fn_node)
+                # Add the node to the graph
+                self.add_node(fn_node)
 
-                    # Get a reference to the vars:
-                    vars = graph.expr_vars(fn_node)
+                # Get a reference to the vars:
+                vars = graph.expr_vars(fn_node)
 
-                    # Assume that each var depends on all inputs (this is a more liberal assumption than we need)
-                    for var in vars:
-                        for var_input_to in self.input_to_output[var]:
-                            # Here, we only add the input nodes that come before the current fn param!
-                            for input_node_2 in node_inputs[:input_node_ndx]:
-                                self._add_edge(input_node_2, var_input_to)
+                # Assume that each var depends on all inputs (this is a more liberal assumption than we need)
+                # If we wanted to optimize further, we could have branching rules for each lambda function,
+                # but this helps it be more general.
+                for var in vars:
+                    for var_input_to in self.input_to_output[var]:
+                        # Here, we only add the input nodes that come before the current fn param!
+                        for input_node_2 in node_inputs[:input_node_ndx]:
+                            self._add_edge(input_node_2, var_input_to)
 
     def _add_edge(self, input_node: graph.Node, output_node: graph.Node) -> None:
         self.input_to_output[input_node].add(output_node)
@@ -166,28 +167,28 @@ class OpCall:
         return ObjectRecorder(self.node, self._sg2)
 
 
-def is_call_passthrough(node: graph.Node) -> bool:
-    if isinstance(node, graph.OutputNode):
-        op = registry_mem.memory_registry.get_op(node.from_op.name)
-        return (
-            op.name.endswith("offset")
-            or op.name.endswith("limit")
-            or op.name.endswith("index")
-            or op.name.endswith("__getitem__")
-            or op.name.endswith("pick")
-            or op.name.endswith("concat")
-            or op.name.endswith("contains")
-            or op.name.endswith("list")
-            or op.name.endswith("dict")
-            or op.name.endswith("flatten")
-            or op.name.endswith("dropna")
-            or op.name.endswith("filter")
-            or op.name.endswith("join")
-            or op.name.endswith("joinAll")
-            or op.name.endswith("groupby")
-            or op.name.endswith("createIndexCheckpointTag")
-        )
-    return False
+# def is_call_passthrough(node: graph.Node) -> bool:
+#     if isinstance(node, graph.OutputNode):
+#         op = registry_mem.memory_registry.get_op(node.from_op.name)
+#         return (
+#             op.name.endswith("offset")
+#             or op.name.endswith("limit")
+#             or op.name.endswith("index")
+#             or op.name.endswith("__getitem__")
+#             or op.name.endswith("pick")
+#             or op.name.endswith("concat")
+#             or op.name.endswith("contains")
+#             or op.name.endswith("list")
+#             or op.name.endswith("dict")
+#             or op.name.endswith("flatten")
+#             or op.name.endswith("dropna")
+#             or op.name.endswith("filter")
+#             or op.name.endswith("join")
+#             or op.name.endswith("joinAll")
+#             or op.name.endswith("groupby")
+#             or op.name.endswith("createIndexCheckpointTag")
+#         )
+#     return False
 
 
 @dataclasses.dataclass
@@ -248,10 +249,8 @@ def stitch(nodes: list[graph.Node]) -> StitchedGraph:
                 frontier.append(input_node)
 
         ## Special case for lambdas
-        if isinstance(curr_node, graph.ConstNode) and isinstance(
-            curr_node.val, graph.Node
-        ):
-            fn_node = curr_node.val
+        if is_fn_node(curr_node):
+            fn_node = typing.cast(graph.ConstNode, curr_node).val
             if all(
                 output_of_input in visited
                 for output_of_input in dependency_graph.input_to_output[fn_node]
@@ -264,6 +263,10 @@ def stitch(nodes: list[graph.Node]) -> StitchedGraph:
         )
 
     return StitchedGraph(tag_subscription_manager, dependency_graph)
+
+
+def is_fn_node(node: graph.Node) -> bool:
+    return isinstance(node, graph.ConstNode) and isinstance(node.val, graph.Node)
 
 
 def node_gets_tag_by_name(node: graph.Node) -> typing.Optional[str]:
@@ -286,17 +289,10 @@ def get_map_fn_from_mapper_node(node: graph.OutputNode) -> graph.Node:
     return list(node.from_op.inputs.values())[1].val
 
 
-def get_group_fn_from_mapper_node(node: graph.OutputNode) -> graph.Node:
-    return list(node.from_op.inputs.values())[1].val
-
-
-def get_joinall_fn_from_mapper_node(node: graph.OutputNode) -> graph.Node:
-    return list(node.from_op.inputs.values())[1].val
-
-
-def get_join_2_fn_from_mapper_node(node: graph.OutputNode) -> list[graph.Node]:
-    inputs = list(node.from_op.inputs.values())
-    return [inputs[2].val, inputs[3].val]
+def get_input_fn_vals(node: graph.OutputNode) -> list[graph.Node]:
+    return [
+        n.val for n in node.from_op.inputs.values() if isinstance(n.val, graph.Node)
+    ]
 
 
 @dataclasses.dataclass
@@ -316,11 +312,11 @@ def node_provides_tag(node: graph.Node) -> typing.Optional[TagProviderResult]:
             first_input_key, first_input_node = list(node.from_op.inputs.items())[0]
             return TagProviderResult(first_input_key, [first_input_node])
         elif node.from_op.name.endswith("groupby"):
-            return TagProviderResult("groupKey", [get_group_fn_from_mapper_node(node)])
+            return TagProviderResult("groupKey", get_input_fn_vals(node))
         elif node.from_op.name.endswith("joinAll"):
-            return TagProviderResult("joinKey", [get_joinall_fn_from_mapper_node(node)])
+            return TagProviderResult("joinKey", get_input_fn_vals(node))
         elif node.from_op.name.endswith("join"):
-            return TagProviderResult("joinKey", get_join_2_fn_from_mapper_node(node))
+            return TagProviderResult("joinKey", get_input_fn_vals(node))
     return None
 
 
