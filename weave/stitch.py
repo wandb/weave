@@ -42,28 +42,43 @@ class OpCall:
         return list(self.input_dict.values())
 
 
-@dataclasses.dataclass()
+@dataclasses.dataclass
 class ObjectRecorder:
     node: graph.Node
-    tags: dict[str, "ObjectRecorder"] = dataclasses.field(default_factory=dict)
-    val: typing.Optional[typing.Any] = None
-    calls: list[OpCall] = dataclasses.field(default_factory=list)
+    superpositions: list["ObjectRecorderSuperposition"] = dataclasses.field(default_factory=list)
 
     def call_node(
         self, node: graph.OutputNode, input_dict: dict[str, "ObjectRecorder"]
     ) -> "ObjectRecorder":
         output = ObjectRecorder(node)
-        self.calls.append(OpCall(node, input_dict, output))
+        for superposition in self.superpositions:
+            superposition.calls.append(OpCall(node, input_dict, output))
         return output
 
 
-class LiteralDictObjectRecorder(ObjectRecorder):
+@dataclasses.dataclass
+class ObjectRecorderSuperposition:
+    tags: dict[str, "ObjectRecorder"] = dataclasses.field(default_factory=dict)
+    val: typing.Optional[typing.Any] = None
+    calls: list[OpCall] = dataclasses.field(default_factory=list)
+
+
+class LiteralDictObjectRecorder(ObjectRecorderSuperposition):
     val: dict[str, ObjectRecorder]
 
 
-class LiteralListObjectRecorder(ObjectRecorder):
+class LiteralListObjectRecorder(ObjectRecorderSuperposition):
     val: list[ObjectRecorder]
 
+# def node_shortname(node: graph.Node) -> str:
+#     if isinstance(node, graph.OutputNode):
+#         return node.from_op.name
+#     elif isinstance(node, graph.ConstNode):
+#         return f"C[{str(node.val)[:10]}]"
+#     elif isinstance(node, graph.VarNode):
+#         return f"V[{node.name}]"
+#     else:
+#         raise errors.WeaveInternalError(f"Unknown node type {type(node)}")
 
 @dataclasses.dataclass
 class StitchedGraph:
@@ -77,6 +92,33 @@ class StitchedGraph:
 
     def add_result(self, node: graph.Node, result: ObjectRecorder) -> None:
         self._node_map[node] = result
+
+    def add_superpositions(self, node: graph.Node, superpositions: list[ObjectRecorderSuperposition]) -> None:
+        if node not in self._node_map:
+            self._node_map[node] = ObjectRecorder(node)
+        self._node_map[node].superpositions.extend(superpositions)
+
+    # def print_debug_summary(self) -> None:
+    #     res = ""
+    #     node_names = {orig_node: f"<{i}-{node_shortname(orig_node)}>" for i, (orig_node, recorder) in enumerate(self._node_map.items())}
+    #     res += '\n' + "StitchedGraph Summary:"
+    #     res += '\n' + "  Nodes:"
+    #     for curr_node, curr_node_name in node_names.items():
+    #         if isinstance(curr_node, graph.OutputNode):
+    #             res += '\n' + f"  * {curr_node_name}({','.join([node_names[input_node] for input_node in  curr_node.from_op.inputs.values()])})"
+    #         else:
+    #             res += '\n' + f"  * {curr_node_name}"
+    #         recorder = self._node_map[curr_node]
+    #         if recorder.calls:
+    #             res += '\n' + f"    calls: {','.join([node_names[call.node] for call in recorder.calls])}"
+    #         if recorder.tags:
+    #             res += '\n' + f"    tags: {','.join([str((tag_name, node_names[tag_recorder.node])) for tag_name, tag_recorder in recorder.tags.items()])}"
+    #     print(res)
+                
+    #                 node: graph.Node
+    # tags: dict[str, "ObjectRecorder"] = dataclasses.field(default_factory=dict)
+    # val: typing.Optional[typing.Any] = None
+    # calls: list[OpCall] = dataclasses.field(default_factory=list)
 
 
 def stitch(
@@ -92,28 +134,16 @@ def stitch(
         sg = stitched_graph
 
     def handle_node(node: graph.Node) -> graph.Node:
-        if sg.has_result(node):
-            return node
         if isinstance(node, graph.OutputNode):
             input_dict = {k: sg.get_result(v) for k, v in node.from_op.inputs.items()}
-            sg.add_result(node, stitch_node(node, input_dict, sg))
+            sg.add_superpositions(node, stitch_node(node, input_dict, sg))
         elif isinstance(node, graph.ConstNode):
-            sg.add_result(node, ObjectRecorder(node, val=node.val))
+            sg.add_superpositions([ObjectRecorderSuperposition(val=node.val)])
         elif isinstance(node, graph.VarNode):
             if var_values and node.name in var_values:
                 sg.add_result(node, var_values[node.name])
             else:
-                # Originally, we would raise an error here, but we now allow
-                # unbound vars to be in the graph. This makes sense to me (Tim)
-                # since we could be stitching the compilation step of a
-                # subgraph, but Shawn has pointed out that this case could be
-                # removed if we stitched the entire graph in 1 pass. For now, we
-                # assign an empty recorder, but this might be able to be
-                # optimized out in the future.
                 sg.add_result(node, ObjectRecorder(node))
-                # raise errors.WeaveInternalError(
-                #     "Encountered var %s but var_values not provided" % node.name
-                # )
         else:
             raise errors.WeaveInternalError("Unexpected node type")
         return node
@@ -126,7 +156,17 @@ def stitch(
 def subgraph_stitch(
     function_node: graph.Node, args: dict[str, ObjectRecorder], sg: StitchedGraph
 ) -> ObjectRecorder:
-    result_graph = stitch([function_node], args, stitched_graph=sg)
+    result_graph = stitch([function_node], args, sg)
+
+    # # Sorry, but we gotta merge...
+    # for node, recorder in result_graph._node_map.items():
+    #     if node in sg._node_map:
+
+    #         sg._node_map[node].tags.update(recorder.tags)
+    #         sg._node_map[node].calls.extend(recorder.calls)
+    #     else:
+    #         sg._node_map[node] = recorder
+
     return result_graph.get_result(function_node)
 
 
@@ -299,7 +339,7 @@ def _apply_tag_rules_to_stitch_result(
 
 def stitch_node(
     node: graph.OutputNode, input_dict: dict[str, ObjectRecorder], sg: StitchedGraph
-) -> ObjectRecorder:
+) -> list[ObjectRecorderSuperposition]:
     op = registry_mem.memory_registry.get_op(node.from_op.name)
     input_names = list(input_dict.keys())
     inputs = list(input_dict.values())

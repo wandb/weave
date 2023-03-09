@@ -1,4 +1,6 @@
 import logging
+
+from ..compile_domain import pretty_print
 from .. import weave_types as types
 from ..api import op
 from . import wb_domain_types as wdt
@@ -27,7 +29,7 @@ def _wbgqlquery_output_type(input_types: dict[str, types.Type]) -> types.Type:
 def wbgqlquery(query_str, alias_list):
     tracer = engine_trace.tracer()
     with tracer.trace("wbgqlquery:public_api"):
-        logging.info("Executing GQL query: %s", query_str)
+        logging.info("Executing GQL query: %s", pretty_print(query_str))
         gql_payload = wandb_gql_query(query_str)
     for alias in alias_list:
         if alias not in gql_payload:

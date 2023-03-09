@@ -63,6 +63,7 @@ def apply_domain_op_gql_translation(leaf_nodes: list[graph.Node]) -> list[graph.
     if not graph.filter_nodes_full(leaf_nodes, _is_root_node):
         return leaf_nodes
     p = stitch.stitch(leaf_nodes)
+    p.print_debug_summary()
 
     query_str_const_node = graph.ConstNode(types.String(), "")
     alias_list_const_node = graph.ConstNode(types.List(types.String()), [])
@@ -147,8 +148,8 @@ def _get_fragment(node: graph.OutputNode, stitchedGraph: stitch.StitchedGraph) -
     )
 
     wb_domain_gql = _get_gql_plugin(op_def)
-    if wb_domain_gql is None and not is_passthrough:
-        return ""
+    # if wb_domain_gql is None and not is_passthrough:
+    #     return ""
 
     forward_obj = stitchedGraph.get_result(node)
     calls = forward_obj.calls
@@ -160,8 +161,9 @@ def _get_fragment(node: graph.OutputNode, stitchedGraph: stitch.StitchedGraph) -
         ]
     )
 
-    if is_passthrough:
+    if wb_domain_gql is None:
         return child_fragment
+
     wb_domain_gql = typing.cast(GqlOpPlugin, wb_domain_gql)
 
     const_node_input_vals = {
@@ -359,6 +361,9 @@ def _normalize_query_str(query_str: str) -> str:
     return graphql.utilities.strip_ignored_characters(
         graphql.language.print_ast(gql_doc)
     )
+
+def pretty_print(query_str: str) -> str:
+    return graphql.language.print_ast(graphql.language.parse(query_str))
 
 
 def _get_outermost_alias(query_str: str) -> str:
