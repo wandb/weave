@@ -6,7 +6,6 @@ from ..decorator_arrow_op import arrow_op
 from .. import weave_types as types
 from ..api import op
 from .list_ import ArrowWeaveList, ArrowWeaveListType
-from .arrow import arrow_as_array
 from .. import timestamp as weave_timestamp
 from . import util
 
@@ -82,7 +81,24 @@ def __mul__(self, other):
     if isinstance(other, ArrowWeaveList):
         other = other._arrow_data
     return ArrowWeaveList(
-        pc.multiply(self._arrow_data, other), types.Number(), self._artifact
+        pc.multiply(self._arrow_data, other),
+        types.NoneType() if other == None else types.Number(),
+        self._artifact,
+    )
+
+
+@op(
+    name="ArrowWeaveListNumber_right-mult",
+    output_type=lambda input_type: input_type["right"],
+)
+def number_right_mult(
+    left: typing.Optional[typing.Union[int, float]],
+    right: ArrowWeaveList[typing.Optional[typing.Union[int, float]]],
+):
+    return ArrowWeaveList(
+        pc.multiply(left, right._arrow_data_asarray_no_tags()),
+        types.Number(),
+        right._artifact,
     )
 
 

@@ -88,20 +88,20 @@ def make_molecule():
         #
         (None, types.none_type),
         (True, types.Boolean()),
-        (42, types.Float()),
+        (42, types.Number()),
         ("hello", types.String()),
         #
         # Container Types
         #
         ({"hello": "world"}, types.TypedDict({"hello": types.String()})),
-        ([1, 2, 3], types.List(types.Float())),
+        ([1, 2, 3], types.List(types.Number())),
         ([{"hello": "world"}], types.List(types.TypedDict({"hello": types.String()}))),
         #
         # Domain Types
         #
         (datetime.datetime.now(), types.Timestamp()),  # type: ignore
         # See comment in wandb_util.py - this may change in the future
-        (np.array([1, 2, 3]), weave.ops.LegacyTableNDArrayType()),
+        (np.array([1, 2, 3]), types.NoneType()),
         #
         # Media Types
         #
@@ -297,6 +297,9 @@ def exp_raw_data(commit_hash: str):
                                 "maxY": 0.7,
                                 "minX": 0.4,
                                 "minY": 0.3,
+                                "height": None,
+                                "middle": None,
+                                "width": None,
                             },
                             "scores": {"loss": 0.3, "gain": 0.7},
                         }
@@ -311,6 +314,9 @@ def exp_raw_data(commit_hash: str):
                                 "maxY": 0.7,
                                 "minX": 0.4,
                                 "minY": 0.3,
+                                "height": None,
+                                "middle": None,
+                                "width": None,
                             },
                             "scores": {"loss": 0.3, "gain": 0.7},
                         }
@@ -341,10 +347,13 @@ def exp_raw_data(commit_hash: str):
                             "class_id": 0,
                             "domain": "pixel",
                             "position": {
-                                "maxX": 100,
-                                "maxY": 50,
-                                "minX": 40,
-                                "minY": 30,
+                                "maxX": 100.0,
+                                "maxY": 50.0,
+                                "minX": 40.0,
+                                "minY": 30.0,
+                                "height": None,
+                                "middle": None,
+                                "width": None,
                             },
                             "scores": {"loss": 0.3, "gain": 0.7},
                         }
@@ -355,10 +364,13 @@ def exp_raw_data(commit_hash: str):
                             "class_id": 2,
                             "domain": "pixel",
                             "position": {
-                                "maxX": 100,
-                                "maxY": 50,
-                                "minX": 40,
-                                "minY": 30,
+                                "maxX": 100.0,
+                                "maxY": 50.0,
+                                "minX": 40.0,
+                                "minY": 30.0,
+                                "height": None,
+                                "middle": None,
+                                "width": None,
                             },
                             "scores": {"loss": 0.3, "gain": 0.7},
                         }
@@ -389,6 +401,10 @@ def exp_raw_data(commit_hash: str):
                             "class_id": 0,
                             "domain": None,
                             "position": {
+                                "maxX": None,
+                                "maxY": None,
+                                "minX": None,
+                                "minY": None,
                                 "height": 0.5,
                                 "middle": [0.5, 0.5],
                                 "width": 0.25,
@@ -402,6 +418,10 @@ def exp_raw_data(commit_hash: str):
                             "class_id": 2,
                             "domain": None,
                             "position": {
+                                "maxX": None,
+                                "maxY": None,
+                                "minX": None,
+                                "minY": None,
                                 "height": 0.5,
                                 "middle": [0.5, 0.5],
                                 "width": 0.25,
@@ -434,7 +454,15 @@ def exp_raw_data(commit_hash: str):
                             "box_caption": "a",
                             "class_id": 0,
                             "domain": "pixel",
-                            "position": {"height": 10, "middle": [50, 50], "width": 20},
+                            "position": {
+                                "maxX": None,
+                                "maxY": None,
+                                "minX": None,
+                                "minY": None,
+                                "height": 10.0,
+                                "middle": [50.0, 50.0],
+                                "width": 20.0,
+                            },
                             "scores": {"loss": 0.3, "gain": 0.7},
                         }
                     ],
@@ -443,7 +471,15 @@ def exp_raw_data(commit_hash: str):
                             "box_caption": None,
                             "class_id": 2,
                             "domain": "pixel",
-                            "position": {"height": 10, "middle": [50, 50], "width": 20},
+                            "position": {
+                                "maxX": None,
+                                "maxY": None,
+                                "minX": None,
+                                "minY": None,
+                                "height": 10.0,
+                                "middle": [50.0, 50.0],
+                                "width": 20.0,
+                            },
                             "scores": {"loss": 0.3, "gain": 0.7},
                         }
                     ],
@@ -557,8 +593,8 @@ def test_annotated_legacy_images_in_tables(fake_wandb):
                         maskLayers={"mask_set_1": [0, 1, 2, 3]},
                         classMap={
                             "0": "c_zero",
-                            "1": "c_one",
                             "2": "c_two",
+                            "1": "c_one",
                             "3": "c_three",
                         },
                     ),

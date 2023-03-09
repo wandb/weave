@@ -446,9 +446,9 @@ def _patch_legacy_image_file_types(
 
         # We will look at the first 10 rows of the table to determine the type.
         non_null_rows_evaluated = 0
-        mask_keys_set: set[str] = set()
-        box_keys_set: set[str] = set()
-        box_score_key_set: set[str] = set()
+        mask_keys_set: dict[str, bool] = {}
+        box_keys_set: dict[str, bool] = {}
+        box_score_key_set: dict[str, bool] = {}
         class_map: dict[int, str] = {}
         for row in rows:
             image_example = row[col_name]
@@ -458,18 +458,18 @@ def _patch_legacy_image_file_types(
 
             # Add the mask keys to the running set
             if image_example.masks is not None:
-                mask_keys_set = mask_keys_set.union(image_example.masks.keys())
+                mask_keys_set.update(dict.fromkeys(image_example.masks.keys()))
 
             # Add the box keys to the running set
             if image_example.boxes is not None:
-                box_keys_set = box_keys_set.union(image_example.boxes.keys())
+                box_keys_set.update(dict.fromkeys(image_example.boxes.keys()))
 
                 # Add the box score keys to the running set
                 for box_set in image_example.boxes.values():
                     for box in box_set:
                         if "scores" in box and box["scores"] is not None:
-                            box_score_key_set = box_score_key_set.union(
-                                box["scores"].keys()
+                            box_score_key_set.update(
+                                dict.fromkeys(box["scores"].keys())
                             )
 
             # Fetch the class data (requires a network call) and update the class map

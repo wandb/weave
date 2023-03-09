@@ -25,10 +25,16 @@ class _TestMyObj:
 
 def assert_equal(v1, v2):
     if isinstance(v1, dict):
+        # Allow missing key to be None
         assert isinstance(v2, dict)
-        assert set(v1.keys()) == set(v2.keys())
-        for k in v1:
-            assert_equal(v1[k], v2[k])
+        all_keys = set(v1.keys()) | set(v2.keys())
+        for k in all_keys:
+            if k not in v1:
+                assert v2[k] == None
+            elif k not in v2:
+                assert v1[k] == None
+            else:
+                assert_equal(v1[k], v2[k])
     elif isinstance(v1, list):
         assert isinstance(v2, list)
         assert len(v1) == len(v2)
@@ -38,6 +44,10 @@ def assert_equal(v1, v2):
         assert isinstance(v2, ops_arrow.ArrowWeaveList)
         assert v1.object_type == v2.object_type
         assert v1._arrow_data == v2._arrow_data
+    elif isinstance(v1, TaggedValue):
+        assert isinstance(v2, TaggedValue)
+        assert_equal(v1.value, v2.value)
+        assert_equal(v1.tag, v2.tag)
     else:
         assert v1 == v2
 
@@ -168,9 +178,7 @@ def test_to_from_arrow(value):
     leaf_col_paths = []
 
     def save_leaf(awl, path):
-        if isinstance(
-            awl.object_type, (weave.types.Int, weave.types.String, weave.types.Float)
-        ):
+        if isinstance(awl.object_type, weave.types.String):
             leaf_col_paths.append(path)
 
     a.map_column(save_leaf)
@@ -188,6 +196,8 @@ def test_to_from_arrow(value):
                 dict_cols.append(path)
                 a = a.replace_column(path, lambda v: v.dictionary_encode())
         print("TEST ", test_id, "dict_col_mask:", bits, "dict_col_paths:", dict_cols)
+        print("A", a)
+        print("A._arrow_data", a._arrow_data.type)
         weave_py2 = a.to_pylist_tagged()
         value2 = concrete_from_tagstore(weave_py2)
         print("  VALUE 1", value)

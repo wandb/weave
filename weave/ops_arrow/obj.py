@@ -1,12 +1,7 @@
-import typing
-import pyarrow as pa
-
-from ..api import type_of
 from ..decorator_arrow_op import arrow_op
 from .. import weave_types as types
 from ..ops_primitives import obj as primitives_obj
 
-from .arrow import arrow_as_array
 from .list_ import ArrowWeaveList, ArrowWeaveListType
 
 
@@ -24,7 +19,7 @@ from .list_ import ArrowWeaveList, ArrowWeaveListType
     all_args_nullable=False,
 )
 def arrow_getattr(self, name):
-    data = arrow_as_array(self._arrow_data)
+    data = self._arrow_data
     t = types.non_none(self.object_type).property_types()[name]
     if types.optional(self.object_type):
         t = types.optional(t)

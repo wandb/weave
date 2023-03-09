@@ -79,6 +79,23 @@ number_add = OpSpec(
     ],
 )
 
+number_mul = OpSpec(
+    op=ops_primitives.Number.__mul__,
+    kind=OpKind(arity=2, commutative=True),
+    test_cases=[
+        OpSpecTestCase(
+            input=(1, 2),
+            expected=2,
+            expected_type=weave.types.Number(),
+        ),
+        OpSpecTestCase(
+            input=(-1, 2),
+            expected=-2,
+            expected_type=weave.types.Number(),
+        ),
+    ],
+)
+
 number_sub = OpSpec(
     op=ops_primitives.Number.__sub__,
     kind=OpKind(arity=2, commutative=False),
@@ -417,6 +434,7 @@ boolean_equal = OpSpec(
 OP_TEST_SPECS = [
     number_add,
     number_sub,
+    number_mul,
     string_add,
     numbers_max,
     number_to_timestamp,

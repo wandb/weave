@@ -48,7 +48,7 @@ def _convert_type(old_type: Weave0TypeJson) -> types.Type:
         return types.Boolean()
     elif old_type_name == "number":
         # TODO: should we try to figure out if its an Int?
-        return types.Float()
+        return types.Number()
     elif old_type_name == "string":
         return types.String()
     #
@@ -100,7 +100,9 @@ def _convert_type(old_type: Weave0TypeJson) -> types.Type:
         # figuring it out itself.
         return types.Int()
     elif old_type_name == "ndarray":
-        return ops.LegacyTableNDArrayType()
+        # return ops.LegacyTableNDArrayType()
+        # Just return NoneType. The data is None.
+        return types.NoneType()
         # return NumpyArrayType("f", shape=old_type._params.get("shape", (0,)))
     #
     # Media Types

@@ -10,7 +10,7 @@ from ..decorator_arrow_op import arrow_op
 from .. import weave_types as types
 
 from .list_ import ArrowWeaveList, ArrowWeaveListType
-from .arrow import ArrowWeaveListType, arrow_as_array
+from .arrow import ArrowWeaveListType
 from . import util
 
 
@@ -48,7 +48,7 @@ self_type_output_type_fn = lambda input_types: input_types["self"]
 def _concatenate_strings(
     left: ArrowWeaveList[str], right: typing.Union[str, ArrowWeaveList[str]]
 ) -> ArrowWeaveList[str]:
-    a = arrow_as_array(left._arrow_data)
+    a = left._arrow_data
     if right == None:
         return ArrowWeaveList(
             pa.nulls(len(a), type=a.type),

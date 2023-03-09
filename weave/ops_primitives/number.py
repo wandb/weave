@@ -41,7 +41,8 @@ class Number(object):
         output_type=types.Number(),
     )
     def __mul__(lhs, rhs):
-        rhs = rhs or 0
+        if rhs == None or lhs == None:
+            return None
         return lhs * rhs
 
     @op(

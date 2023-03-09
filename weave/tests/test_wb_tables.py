@@ -146,7 +146,7 @@ def test_join_table_with_images(fake_wandb):
                     weave.types.TypedDict(
                         {
                             "name": weave.types.optional(weave.types.String()),
-                            "score": weave.types.optional(weave.types.Float()),
+                            "score": weave.types.optional(weave.types.Number()),
                         }
                     )
                 ),
@@ -210,8 +210,8 @@ def test_join_table_with_numeric_columns(fake_wandb):
     # on always using the string representation.
     assert awl.object_type == weave.types.TypedDict(
         {
-            "1": weave.types.optional(weave.types.Float()),
-            "2": weave.types.optional(weave.types.Float()),
+            "1": weave.types.optional(weave.types.Number()),
+            "2": weave.types.optional(weave.types.Number()),
         }
     )
     assert awl.to_pylist_raw() == [{"1": 1, "2": 2}]
