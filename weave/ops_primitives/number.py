@@ -87,20 +87,24 @@ class Number(object):
 
     @op(
         name="number-equal",
-        input_type=binary_number_op_input_type,
+        input_type={
+            **binary_number_op_input_type,
+            "lhs": types.optional(types.Number()),
+        },
         output_type=types.Boolean(),
     )
     def __eq__(lhs, rhs):
-        rhs = rhs or 0
         return lhs == rhs
 
     @op(
         name="number-notEqual",
-        input_type=binary_number_op_input_type,
+        input_type={
+            **binary_number_op_input_type,
+            "lhs": types.optional(types.Number()),
+        },
         output_type=types.Boolean(),
     )
     def __ne__(lhs, rhs):
-        rhs = rhs or 0
         return lhs != rhs
 
     @op(

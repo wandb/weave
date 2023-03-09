@@ -20,6 +20,7 @@ from ..language_features.tagging.tagged_value_type import (
     TaggedValueType,
 )
 from ..language_features.tagging import make_tag_getter_op
+from .. import language_nullability
 from .. import op_def
 from .. import ops_arrow
 from .. import ops_primitives
@@ -424,25 +425,31 @@ def make_standard_variants(
         base_variants.append(base.variant("commutative", input=test_case.input[::-1]))
 
     # the op should handle None in any position, returning None.
-    inputs = list(test_case.input)
-    inputs[0] = None
-    base_variants.append(
-        base.variant(
-            "arg0-none",
-            input=tuple(inputs),
-            expected_type=weave.types.optional(test_case.expected_type),
-            expected=None,
-        )
+    is_null_consuming = not language_nullability.should_force_none_result(
+        {"first_arg": None}, op_test_def.op
     )
-    if op_test_def.kind.arity == 2:
+
+    if not is_null_consuming:
+        inputs = list(test_case.input)
+        inputs[0] = None
+
         base_variants.append(
             base.variant(
-                "arg1-none",
-                input=(test_case.input[0], None),
+                "arg0-none",
+                input=tuple(inputs),
                 expected_type=weave.types.optional(test_case.expected_type),
                 expected=None,
             )
         )
+        if op_test_def.kind.arity == 2:
+            base_variants.append(
+                base.variant(
+                    "arg1-none",
+                    input=(test_case.input[0], None),
+                    expected_type=weave.types.optional(test_case.expected_type),
+                    expected=None,
+                )
+            )
 
     # Tags in first position are flowed to output.
     inputs = list(test_case.input)
@@ -497,31 +504,39 @@ def make_standard_vector_variants(
     input_vecs_with_arg0_nones.append(input_vecs[0] + [None] * len(input_vecs[0]))
     if op_test_def.kind.arity == 2:
         input_vecs_with_arg0_nones.append(input_vecs[1] * 2)
-    variants.append(
-        base_variant.variant(
-            "arg0-none",
-            input_vecs=tuple(input_vecs_with_arg0_nones),
-            expected_object_type=weave.types.optional(
-                base_variant.expected_object_type
-            ),
-            expected=base_variant.expected + [None] * len(input_vecs[0]),
-        )
+
+    is_null_consuming = not language_nullability.should_force_none_result(
+        {"first_arg": None}, op_test_def.op
     )
 
-    if op_test_def.kind.arity == 2:
-        input_vecs_with_arg1_nones = []
-        input_vecs_with_arg1_nones.append(input_vecs[0] * 2)
-        input_vecs_with_arg1_nones.append(input_vecs[1] + [None] * len(input_vecs[1]))
+    if not is_null_consuming:
         variants.append(
             base_variant.variant(
-                "arg1-none",
-                input_vecs=tuple(input_vecs_with_arg1_nones),
+                "arg0-none",
+                input_vecs=tuple(input_vecs_with_arg0_nones),
                 expected_object_type=weave.types.optional(
                     base_variant.expected_object_type
                 ),
-                expected=base_variant.expected + [None] * len(input_vecs[1]),
+                expected=base_variant.expected + [None] * len(input_vecs[0]),
             )
         )
+
+        if op_test_def.kind.arity == 2:
+            input_vecs_with_arg1_nones = []
+            input_vecs_with_arg1_nones.append(input_vecs[0] * 2)
+            input_vecs_with_arg1_nones.append(
+                input_vecs[1] + [None] * len(input_vecs[1])
+            )
+            variants.append(
+                base_variant.variant(
+                    "arg1-none",
+                    input_vecs=tuple(input_vecs_with_arg1_nones),
+                    expected_object_type=weave.types.optional(
+                        base_variant.expected_object_type
+                    ),
+                    expected=base_variant.expected + [None] * len(input_vecs[1]),
+                )
+            )
 
     return variants
 
@@ -540,7 +555,7 @@ def make_binary_vectorscalar_variants(
 
     variants: list[OpTestCaseBinaryVectorScalar] = []
 
-    key_fn = lambda x: x.input[scalar_index]
+    key_fn = lambda x: str(x.input[scalar_index])
     scalar_grouped = itertools.groupby(
         sorted(op_test_def.test_cases, key=key_fn), key=key_fn
     )
@@ -570,28 +585,34 @@ def make_binary_vectorscalar_variants(
         )
         vecgroup_variants.append(base_vec)
 
-        vecgroup_variants.append(
-            base_vec.variant(
-                "vec-with-none",
-                vec=vec + [None],
-                expected_object_type=weave.types.optional(expected_object_type),
-                expected=result + [None],
-            )
+        is_null_consuming = not language_nullability.should_force_none_result(
+            {"first_arg": None}, op_test_def.op
         )
 
-        if vector_position == "lhs":
-            # We can't use the variant when vector_position is rhs, because
-            # nullability means we'll just return None for the None scalar, not
-            # using our vectorized op.
-            # TODO: fix! We should return a vector of None in this case.
+        if not is_null_consuming:
+
             vecgroup_variants.append(
                 base_vec.variant(
-                    "scalar-none",
-                    scalar=None,
+                    "vec-with-none",
+                    vec=vec + [None],
                     expected_object_type=weave.types.optional(expected_object_type),
-                    expected=[None] * len(vec),
+                    expected=result + [None],
                 )
             )
+
+            if vector_position == "lhs":
+                # We can't use the variant when vector_position is rhs, because
+                # nullability means we'll just return None for the None scalar, not
+                # using our vectorized op.
+                # TODO: fix! We should return a vector of None in this case.
+                vecgroup_variants.append(
+                    base_vec.variant(
+                        "scalar-none",
+                        scalar=None,
+                        expected_object_type=weave.types.optional(expected_object_type),
+                        expected=[None] * len(vec),
+                    )
+                )
 
         variants.extend(vecgroup_variants)
 

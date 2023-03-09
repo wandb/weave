@@ -8,6 +8,7 @@ from ..api import op
 from .list_ import ArrowWeaveList, ArrowWeaveListType
 from .arrow import arrow_as_array
 from .. import timestamp as weave_timestamp
+from . import util
 
 ARROW_WEAVE_LIST_NUMBER_TYPE = ArrowWeaveListType(types.Number())
 ARROW_WEAVE_LIST_BOOLEAN_TYPE = ArrowWeaveListType(types.Boolean())
@@ -19,6 +20,19 @@ unary_input_type = {
 binary_input_type = {
     "self": ARROW_WEAVE_LIST_NUMBER_TYPE,
     "other": types.UnionType(types.Number(), ARROW_WEAVE_LIST_NUMBER_TYPE),
+}
+
+null_consuming_binary_input_type = {
+    "self": ArrowWeaveListType(types.optional(types.Number())),
+    "other": types.UnionType(
+        types.optional(types.Number()),
+        ArrowWeaveListType(types.optional(types.Number())),
+    ),
+}
+
+null_consuming_binary_input_type_right = {
+    "self": types.optional(types.Number()),
+    "other": ArrowWeaveListType(types.optional(types.Number())),
 }
 
 
@@ -130,28 +144,46 @@ def __pow__(self, other):
 
 @arrow_op(
     name="ArrowWeaveListNumber-notEqual",
-    input_type=binary_input_type,
+    input_type=null_consuming_binary_input_type,
     output_type=ARROW_WEAVE_LIST_BOOLEAN_TYPE,
 )
 def __ne__(self, other):
     if isinstance(other, ArrowWeaveList):
         other = other._arrow_data
-    return ArrowWeaveList(
-        pc.not_equal(self._arrow_data, other), types.Boolean(), self._artifact
-    )
+    result = util.not_equal(self._arrow_data, other)
+    return ArrowWeaveList(result, types.Boolean(), self._artifact)
+
+
+@op(
+    name="ArrowWeaveListNumber_right-notEqual",
+    input_type=null_consuming_binary_input_type_right,
+    output_type=ARROW_WEAVE_LIST_BOOLEAN_TYPE,
+)
+def __ne_right__(self, other):
+    result = util.not_equal(other._arrow_data, self)
+    return ArrowWeaveList(result, types.Boolean(), other._artifact)
+
+
+@op(
+    name="ArrowWeaveListNumber_right-equal",
+    input_type=null_consuming_binary_input_type_right,
+    output_type=ARROW_WEAVE_LIST_BOOLEAN_TYPE,
+)
+def __eq_right__(self, other):
+    result = util.equal(other._arrow_data, self)
+    return ArrowWeaveList(result, types.Boolean(), other._artifact)
 
 
 @arrow_op(
     name="ArrowWeaveListNumber-equal",
-    input_type=binary_input_type,
+    input_type=null_consuming_binary_input_type,
     output_type=ARROW_WEAVE_LIST_BOOLEAN_TYPE,
 )
 def __eq__(self, other):
     if isinstance(other, ArrowWeaveList):
         other = other._arrow_data
-    return ArrowWeaveList(
-        pc.equal(self._arrow_data, other), types.Boolean(), self._artifact
-    )
+    result = util.equal(self._arrow_data, other)
+    return ArrowWeaveList(result, types.Boolean(), self._artifact)
 
 
 @arrow_op(
