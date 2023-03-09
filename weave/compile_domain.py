@@ -2,7 +2,9 @@ import json
 import typing
 from . import graph
 from . import weave_types as types
-from . import stitch_v2 as stitch
+
+# from . import stitch_v2 as stitch
+from . import stitch
 from . import registry_mem
 from . import errors
 from dataclasses import dataclass, field
@@ -132,27 +134,27 @@ def _get_fragment(node: graph.OutputNode, stitchedGraph: stitch.StitchedGraph) -
         op_def = op_def.derived_from
 
     # These are all passthrough ops - should this be in stitch?
-    is_passthrough = (
-        op_def.name.endswith("offset")
-        or op_def.name.endswith("limit")
-        or op_def.name.endswith("index")
-        or op_def.name.endswith("__getitem__")
-        or op_def.name.endswith("pick")
-        or op_def.name.endswith("concat")
-        or op_def.name.endswith("contains")
-        or op_def.name.endswith("list")
-        or op_def.name.endswith("dict")
-        or op_def.name.endswith("flatten")
-        or op_def.name.endswith("dropna")
-        or op_def.name.endswith("filter")
-        or op_def.name.endswith("join")
-        or op_def.name.endswith("joinAll")
-        or op_def.name.endswith("groupby")
-        or op_def.name.endswith("createIndexCheckpointTag")
-    )
+    # is_passthrough = (
+    #     op_def.name.endswith("offset")
+    #     or op_def.name.endswith("limit")
+    #     or op_def.name.endswith("index")
+    #     or op_def.name.endswith("__getitem__")
+    #     or op_def.name.endswith("pick")
+    #     or op_def.name.endswith("concat")
+    #     or op_def.name.endswith("contains")
+    #     or op_def.name.endswith("list")
+    #     or op_def.name.endswith("dict")
+    #     or op_def.name.endswith("flatten")
+    #     or op_def.name.endswith("dropna")
+    #     or op_def.name.endswith("filter")
+    #     or op_def.name.endswith("join")
+    #     or op_def.name.endswith("joinAll")
+    #     or op_def.name.endswith("groupby")
+    #     or op_def.name.endswith("createIndexCheckpointTag")
+    # )
 
     wb_domain_gql = _get_gql_plugin(op_def)
-    if wb_domain_gql is None and not is_passthrough:
+    if wb_domain_gql is None:  # and not is_passthrough:
         return ""
 
     forward_obj = stitchedGraph.get_result(node)
@@ -165,8 +167,8 @@ def _get_fragment(node: graph.OutputNode, stitchedGraph: stitch.StitchedGraph) -
         ]
     )
 
-    if is_passthrough:
-        return child_fragment
+    # if is_passthrough:
+    #     return child_fragment
 
     wb_domain_gql = typing.cast(GqlOpPlugin, wb_domain_gql)
 

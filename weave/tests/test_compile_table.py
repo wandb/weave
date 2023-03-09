@@ -2,7 +2,8 @@ import weave
 from weave.ops_domain import wb_domain_types, runs2
 
 
-from .. import stitch_v2 as stitch
+# from .. import stitch_v2 as stitch
+from .. import stitch
 from .. import compile_table
 
 

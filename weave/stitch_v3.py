@@ -50,6 +50,7 @@ In order to avoid this multi-pass complexity, we make the following simplifying 
 """
 
 
+
 from collections import defaultdict
 import dataclasses
 import typing
@@ -57,62 +58,188 @@ import typing
 from . import graph
 from . import registry_mem
 from . import op_def
+from . import types
 from .language_features.tagging import opdef_util
 
+@dataclasses.dataclass
+class DAGNode:
+    original_node: graph.Node
+    stitched_inputs: set["DAGNode"] = dataclasses.field(default_factory=set)
+    stitched_outputs: set["DAGNode"] = dataclasses.field(default_factory=set)
 
 @dataclasses.dataclass
-class DependencyGraph:
-    # Map of inputs to outputs
-    input_to_output: defaultdict[graph.Node, set[graph.Node]] = dataclasses.field(
-        default_factory=lambda: defaultdict(set)
-    )
+class EdgeDAG:
+    """
+    A EdgeDAG maintains a DAG (with O(1) access to node inputs, and the nodes which consume them). This is in 
+    contrast to the normal graph which only maintains inputs. When initializing a EdgeDAG, we build the DAG from
+    the normal graph. At initialization, each original node has a 1-1 mapping with a node in the EdgeDAG - with
+    the edges being a perfect mapping of the original edges. However, the EdgeDAG supports a number of mutations 
+    which will modify the edges to support different compellation goals. It is entirely possible that by the end
+    of such mutations, an original node has different edges coming in, going out, or both - even completely
+    disconnected from the graph!
+    """
+    _original_node_to_dag_node: dict[graph.Node, "DAGNode"] = dataclasses.field(default_factory=dict)
+    _locked: bool = False
 
-    # Map from outputs to inputs
-    output_to_input: defaultdict[graph.Node, set[graph.Node]] = dataclasses.field(
-        default_factory=lambda: defaultdict(set)
-    )
+    def lock_graph(self) -> None:
+        self._locked = True
 
-    def add_node(self: "DependencyGraph", node_to_add: graph.Node) -> None:
+    def add_node(self: "EdgeDAG", node_to_add: graph.Node) -> None:
         if not isinstance(node_to_add, graph.OutputNode):
             return
         output_node = node_to_add
-        node_inputs = list(output_node.from_op.inputs.values())
-        # Add each input node to the graph and mark the output dependents
-        for input_node_ndx, input_node in enumerate(node_inputs):
-            if node_is_mapper(input_node):
-                # Special case for mappers - if the input is a mapper (opMap or opMapEach), then we
-                # need to connect the fn_node to the output node directly (since the tag getter can
-                # apply to either inside the map fn or to the map fn itself). We don't do this
-                # for for all lambdas (like opSort), since the lambda terminates with the execution
-                # of that op.
-                self._add_edge(get_map_fn_from_mapper_node(input_node), output_node)
-            self._add_edge(input_node, output_node)
+        for input_node in output_node.from_op.inputs.values():
+            self._add_raw_edge(input_node, output_node)
             self.add_node(input_node)
 
-            # Special case for lambdas. Example:
-            # ouput_node = opMap
-            # fn_node = the lambda
+            # Explode any lambda params
             if is_fn_node(input_node):
                 fn_node = input_node.val
-
-                # Add the node to the graph
                 self.add_node(fn_node)
 
-                # Get a reference to the vars:
-                vars = graph.expr_vars(fn_node)
+    def _ensure_node(self, node: graph.Node) -> DAGNode:
+        if self._locked:
+            raise RuntimeError("Cannot add nodes to a locked graph")
+        
+        if node not in self._original_node_to_dag_node:
+            self._original_node_to_dag_node[node] = DAGNode(node)
+        return self._original_node_to_dag_node[node]
+    
+    def _add_raw_edge(self, input_node: graph.Node, output_node: graph.Node) -> None:
+        self._add_dag_edge(self._ensure_node(input_node), self._ensure_node(output_node))
 
-                # Assume that each var depends on all inputs (this is a more liberal assumption than we need)
-                # If we wanted to optimize further, we could have branching rules for each lambda function,
-                # but this helps it be more general.
-                for var in vars:
-                    for var_input_to in self.input_to_output[var]:
-                        # Here, we only add the input nodes that come before the current fn param!
-                        for input_node_2 in node_inputs[:input_node_ndx]:
-                            self._add_edge(input_node_2, var_input_to)
+    def _add_dag_edge(self, input_node: DAGNode, output_node: DAGNode) -> None:
+        input_node.stitched_outputs.add(output_node)
+        output_node.stitched_inputs.add(input_node)
 
-    def _add_edge(self, input_node: graph.Node, output_node: graph.Node) -> None:
-        self.input_to_output[input_node].add(output_node)
-        self.output_to_input[output_node].add(input_node)
+    def _remove_dag_edge(self, input_node: DAGNode, output_node: DAGNode) -> None:
+        input_node.stitched_outputs.remove(output_node)
+        output_node.stitched_inputs.remove(input_node)
+
+    def _get_leaf_nodes(self) -> list[DAGNode]:
+        return [node for node in self._original_node_to_dag_node.values() if not node.stitched_outputs and isinstance(node.original_node, graph.OutputNode)]
+    
+    def _apply_bottoms_up_bfs(self, fn: typing.Callable[[DAGNode], None]) -> None:
+        """
+        Apply a function to each node in the graph, in a bottoms up BFS order. This means that the function will be
+        applied to all nodes which have no outputs first, then all nodes which have outputs which have no outputs, etc.
+        """
+        self.lock_graph()
+        leaf_nodes = self._get_leaf_nodes()
+        visited = set()
+        while leaf_nodes:
+            node = leaf_nodes.pop()
+            if node in visited:
+                continue
+            visited.add(node)
+            fn(node)
+            leaf_nodes.extend(node.stitched_inputs)
+    
+    def apply_lambda_stitch(self) -> None:
+        """
+        """
+
+        def lambda_stitch(node: DAGNode) -> None:
+            if isinstance(node.original_node, graph.OutputNode):
+                op_name = node.original_node.from_op.name
+                if op_name.endswith("map") or op_name.endswith("mapEach"):
+                    orig_inputs = list(node.original_node.from_op.inputs.values())
+                    orig_fn_node = orig_inputs[1]
+                    orig_var_nodes = graph.expr_vars(orig_fn_node)
+                    orig_var_nodes = [var_node for var_node in orig_var_nodes if var_node.name == 'row']
+
+                    dag_arr_node = self._ensure_node(orig_inputs[0])
+                    dag_fn_node = self._ensure_node(orig_fn_node)
+                    dag_var_nodes = [self._ensure_node(var_node) for var_node in orig_var_nodes]
+
+                    # For each output of the map node, delete it and add a link from the fn node
+                    for output_node in node.stitched_outputs:
+                        self._remove_dag_edge(node, output_node)
+                        self._add_dag_edge(dag_fn_node, output_node)
+                    
+                    if len(dag_var_nodes) > 0:
+                        # In this case, we want to unlink the varNode from each of it's outputs, and for each
+                        # output, add a new link to the original array node.
+                        for dag_var_node in dag_var_nodes:
+                            for output_node in dag_var_node.stitched_outputs:
+                                self._remove_dag_edge(dag_var_node, output_node)
+                                self._add_dag_edge(dag_arr_node, output_node)
+                    else:
+                        # This is sort of a weird situation, but we need to allow tag lineage to flow through. We can
+                        # do this by Lambda bridge! - This dummy dag node will prevent non-tag stitch operations from
+                        # flowing through, but will allow tags later on.
+                        lambda_tag_bridge = DAGNode(graph.ConstNode(types.NoneType(), None))
+                        for output_node in node.stitched_outputs:
+                            self._add_dag_edge(lambda_tag_bridge, output_node)
+                            self._add_dag_edge(dag_arr_node, lambda_tag_bridge)
+                # elif op_name.endswith("groupby"):
+                    
+
+
+        self._apply_bottoms_up_bfs(lambda_stitch)
+
+
+# def _lambda_node
+
+
+
+
+
+
+
+# @dataclasses.dataclass
+# class DependencyGraph:
+#     # Map of inputs to outputs
+#     input_to_output: defaultdict[graph.Node, set[graph.Node]] = dataclasses.field(
+#         default_factory=lambda: defaultdict(set)
+#     )
+
+#     # Map from outputs to inputs
+#     output_to_input: defaultdict[graph.Node, set[graph.Node]] = dataclasses.field(
+#         default_factory=lambda: defaultdict(set)
+#     )
+
+#     def add_node(self: "DependencyGraph", node_to_add: graph.Node) -> None:
+#         if not isinstance(node_to_add, graph.OutputNode):
+#             return
+#         output_node = node_to_add
+#         node_inputs = list(output_node.from_op.inputs.values())
+#         # Add each input node to the graph and mark the output dependents
+#         for input_node_ndx, input_node in enumerate(node_inputs):
+#             if node_is_mapper(input_node):
+#                 # Special case for mappers - if the input is a mapper (opMap or opMapEach), then we
+#                 # need to connect the fn_node to the output node directly (since the tag getter can
+#                 # apply to either inside the map fn or to the map fn itself). We don't do this
+#                 # for for all lambdas (like opSort), since the lambda terminates with the execution
+#                 # of that op.
+#                 self._add_edge(get_map_fn_from_mapper_node(input_node), output_node)
+#             self._add_edge(input_node, output_node)
+#             self.add_node(input_node)
+
+#             # Special case for lambdas. Example:
+#             # ouput_node = opMap
+#             # fn_node = the lambda
+#             if is_fn_node(input_node):
+#                 fn_node = input_node.val
+
+#                 # Add the node to the graph
+#                 self.add_node(fn_node)
+
+#                 # Get a reference to the vars:
+#                 vars = graph.expr_vars(fn_node)
+
+#                 # Assume that each var depends on all inputs (this is a more liberal assumption than we need)
+#                 # If we wanted to optimize further, we could have branching rules for each lambda function,
+#                 # but this helps it be more general.
+#                 for var in vars:
+#                     for var_input_to in self.input_to_output[var]:
+#                         # Here, we only add the input nodes that come before the current fn param!
+#                         for input_node_2 in node_inputs[:input_node_ndx]:
+#                             self._add_edge(input_node_2, var_input_to)
+
+#     def _add_edge(self, input_node: graph.Node, output_node: graph.Node) -> None:
+#         self.input_to_output[input_node].add(output_node)
+#         self.output_to_input[output_node].add(input_node)
 
 
 @dataclasses.dataclass

@@ -2,7 +2,8 @@ import weave
 import typing
 import pytest
 
-from .. import stitch_v2 as stitch
+# from .. import stitch_v2 as stitch
+from .. import stitch
 
 from ..language_features.tagging import make_tag_getter_op
 from .. import compile_table
@@ -54,10 +55,11 @@ def test_traverse_tags():
     obj_from_tag_val_node = get_object_self_tag(obj_node.name() + "hello").val
     p = stitch.stitch([obj_from_tag_val_node])
     obj_recorder = p.get_result(obj_node)
-    assert len(obj_recorder.calls) == 2
-    assert obj_recorder.calls[0].node.from_op.name == "_TestPlanObject-name"
-    assert obj_recorder.calls[1].node.from_op.name == "Object-__getattr__"
-    assert obj_recorder.calls[1].inputs[1].val == "val"
+    calls = sorted(obj_recorder.calls, key=lambda call: call.node.from_op.name)
+    assert len(calls) == 2
+    assert calls[0].node.from_op.name == "Object-__getattr__"
+    assert calls[0].inputs[1].val == "val"
+    assert calls[1].node.from_op.name == "_TestPlanObject-name"
 
 
 def test_traverse_tags_2level():
@@ -68,22 +70,24 @@ def test_traverse_tags_2level():
     ).name
     p = stitch.stitch([obj_from_tag_val_node])
     obj_recorder = p.get_result(obj_node)
-    assert len(obj_recorder.calls) == 2
-    assert obj_recorder.calls[0].node.from_op.name == "op-_test_hasobj_obj"
-    assert obj_recorder.calls[1].node.from_op.name == "Object-__getattr__"
-    assert obj_recorder.calls[1].inputs[1].val == "name"
+    calls = sorted(obj_recorder.calls, key=lambda call: call.node.from_op.name)
+    assert len(calls) == 2
+    assert calls[0].node.from_op.name == "Object-__getattr__"
+    assert calls[0].inputs[1].val == "name"
+    assert calls[1].node.from_op.name == "op-_test_hasobj_obj"
 
 
 def test_enter_filter():
     objs_node = weave.save([{"a": 5, "b": 6, "c": 10}, {"a": 7, "b": 8, "c": 11}])
     p = stitch.stitch([objs_node["b"], objs_node.filter(lambda obj: obj["a"] > 6)])
     obj_recorder = p.get_result(objs_node)
-    calls = obj_recorder.calls
-    assert len(calls) == 2
-    assert calls[0].node.from_op.name == "mapped_typedDict-pick"
-    assert calls[0].inputs[1].val == "b"
-    assert calls[1].node.from_op.name == "typedDict-pick"
-    assert calls[1].inputs[1].val == "a"
+    calls = sorted(obj_recorder.calls, key=lambda call: call.node.from_op.name)
+    assert len(calls) == 3
+    assert calls[0].node.from_op.name == "filter"
+    assert calls[1].node.from_op.name == "mapped_typedDict-pick"
+    assert calls[1].inputs[1].val == "b"
+    assert calls[2].node.from_op.name == "typedDict-pick"
+    assert calls[2].inputs[1].val == "a"
 
 
 def test_lambda_using_externally_defined_node():
@@ -94,14 +98,15 @@ def test_lambda_using_externally_defined_node():
         [objs_node["b"], objs_node.filter(lambda obj: obj["a"] > objs_node[0]["b"])]
     )
     obj_recorder = p.get_result(objs_node)
-    calls = obj_recorder.calls
-    assert len(calls) == 3
-    assert calls[0].node.from_op.name == "mapped_typedDict-pick"
-    assert calls[0].inputs[1].val == "b"
+    calls = sorted(obj_recorder.calls, key=lambda call: call.node.from_op.name)
+    assert len(calls) == 4
+    assert calls[0].node.from_op.name == "filter"
     assert calls[1].node.from_op.name == "list-__getitem__"
     assert calls[1].inputs[1].val == 0
-    assert calls[2].node.from_op.name == "typedDict-pick"
-    assert calls[2].inputs[1].val == "a"
+    assert calls[2].node.from_op.name == "mapped_typedDict-pick"
+    assert calls[2].inputs[1].val == "b"
+    assert calls[3].node.from_op.name == "typedDict-pick"
+    assert calls[3].inputs[1].val == "a"
 
 
 def test_tag_access_in_filter_expr():
@@ -109,11 +114,11 @@ def test_tag_access_in_filter_expr():
     leaf = objs_node.name().filter(lambda obj: get_object_self_tag(obj).val > 2)
     p = stitch.stitch([leaf])
     obj_recorder = p.get_result(objs_node)
-    calls = obj_recorder.calls
+    calls = sorted(obj_recorder.calls, key=lambda call: call.node.from_op.name)
     assert len(calls) == 2
-    assert calls[0].node.from_op.name == "mapped__TestPlanObject-name"
-    assert calls[1].node.from_op.name == "Object-__getattr__"
-    assert calls[1].inputs[1].val == "val"
+    assert calls[0].node.from_op.name == "Object-__getattr__"
+    assert calls[0].inputs[1].val == "val"
+    assert calls[1].node.from_op.name == "mapped__TestPlanObject-name"
 
 
 def test_travese_dict():
@@ -153,9 +158,10 @@ def test_zero_arg_ops():
 
     p = stitch.stitch([node.filter(lambda x: x._get_op("name")() != ""), node.name()])
     obj_recorder = p.get_result(node)
-    assert len(obj_recorder.calls) == 2
-    assert obj_recorder.calls[0].node.from_op.name == "_TestPlanObject-name"
-    assert obj_recorder.calls[1].node.from_op.name == "mapped__TestPlanObject-name"
+    calls = sorted(obj_recorder.calls, key=lambda call: call.node.from_op.name)
+    assert len(calls) == 2
+    assert calls[0].node.from_op.name == "_TestPlanObject-name"
+    assert calls[1].node.from_op.name == "mapped__TestPlanObject-name"
 
 
 def test_shared_fn_node():

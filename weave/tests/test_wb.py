@@ -1,5 +1,7 @@
 import pytest
-from weave import stitch_v2 as stitch
+
+# from weave import stitch_v2 as stitch
+from weave import stitch
 
 from weave.tests.test_wb_domain_ops import assert_gql_str_equal
 
