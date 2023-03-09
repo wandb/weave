@@ -50,7 +50,6 @@ In order to avoid this multi-pass complexity, we make the following simplifying 
 """
 
 
-
 from collections import defaultdict
 import dataclasses
 import typing
@@ -61,24 +60,29 @@ from . import op_def
 from . import types
 from .language_features.tagging import opdef_util
 
+
 @dataclasses.dataclass
 class DAGNode:
     original_node: graph.Node
     stitched_inputs: set["DAGNode"] = dataclasses.field(default_factory=set)
     stitched_outputs: set["DAGNode"] = dataclasses.field(default_factory=set)
 
+
 @dataclasses.dataclass
 class EdgeDAG:
     """
-    A EdgeDAG maintains a DAG (with O(1) access to node inputs, and the nodes which consume them). This is in 
+    A EdgeDAG maintains a DAG (with O(1) access to node inputs, and the nodes which consume them). This is in
     contrast to the normal graph which only maintains inputs. When initializing a EdgeDAG, we build the DAG from
     the normal graph. At initialization, each original node has a 1-1 mapping with a node in the EdgeDAG - with
-    the edges being a perfect mapping of the original edges. However, the EdgeDAG supports a number of mutations 
+    the edges being a perfect mapping of the original edges. However, the EdgeDAG supports a number of mutations
     which will modify the edges to support different compellation goals. It is entirely possible that by the end
     of such mutations, an original node has different edges coming in, going out, or both - even completely
     disconnected from the graph!
     """
-    _original_node_to_dag_node: dict[graph.Node, "DAGNode"] = dataclasses.field(default_factory=dict)
+
+    _original_node_to_dag_node: dict[graph.Node, "DAGNode"] = dataclasses.field(
+        default_factory=dict
+    )
     _locked: bool = False
 
     def lock_graph(self) -> None:
@@ -100,13 +104,15 @@ class EdgeDAG:
     def _ensure_node(self, node: graph.Node) -> DAGNode:
         if self._locked:
             raise RuntimeError("Cannot add nodes to a locked graph")
-        
+
         if node not in self._original_node_to_dag_node:
             self._original_node_to_dag_node[node] = DAGNode(node)
         return self._original_node_to_dag_node[node]
-    
+
     def _add_raw_edge(self, input_node: graph.Node, output_node: graph.Node) -> None:
-        self._add_dag_edge(self._ensure_node(input_node), self._ensure_node(output_node))
+        self._add_dag_edge(
+            self._ensure_node(input_node), self._ensure_node(output_node)
+        )
 
     def _add_dag_edge(self, input_node: DAGNode, output_node: DAGNode) -> None:
         input_node.stitched_outputs.add(output_node)
@@ -117,8 +123,13 @@ class EdgeDAG:
         output_node.stitched_inputs.remove(input_node)
 
     def _get_leaf_nodes(self) -> list[DAGNode]:
-        return [node for node in self._original_node_to_dag_node.values() if not node.stitched_outputs and isinstance(node.original_node, graph.OutputNode)]
-    
+        return [
+            node
+            for node in self._original_node_to_dag_node.values()
+            if not node.stitched_outputs
+            and isinstance(node.original_node, graph.OutputNode)
+        ]
+
     def _apply_bottoms_up_bfs(self, fn: typing.Callable[[DAGNode], None]) -> None:
         """
         Apply a function to each node in the graph, in a bottoms up BFS order. This means that the function will be
@@ -134,10 +145,9 @@ class EdgeDAG:
             visited.add(node)
             fn(node)
             leaf_nodes.extend(node.stitched_inputs)
-    
+
     def apply_lambda_stitch(self) -> None:
-        """
-        """
+        """ """
 
         def lambda_stitch(node: DAGNode) -> None:
             if isinstance(node.original_node, graph.OutputNode):
@@ -146,17 +156,23 @@ class EdgeDAG:
                     orig_inputs = list(node.original_node.from_op.inputs.values())
                     orig_fn_node = orig_inputs[1]
                     orig_var_nodes = graph.expr_vars(orig_fn_node)
-                    orig_var_nodes = [var_node for var_node in orig_var_nodes if var_node.name == 'row']
+                    orig_var_nodes = [
+                        var_node
+                        for var_node in orig_var_nodes
+                        if var_node.name == "row"
+                    ]
 
                     dag_arr_node = self._ensure_node(orig_inputs[0])
                     dag_fn_node = self._ensure_node(orig_fn_node)
-                    dag_var_nodes = [self._ensure_node(var_node) for var_node in orig_var_nodes]
+                    dag_var_nodes = [
+                        self._ensure_node(var_node) for var_node in orig_var_nodes
+                    ]
 
                     # For each output of the map node, delete it and add a link from the fn node
                     for output_node in node.stitched_outputs:
                         self._remove_dag_edge(node, output_node)
                         self._add_dag_edge(dag_fn_node, output_node)
-                    
+
                     if len(dag_var_nodes) > 0:
                         # In this case, we want to unlink the varNode from each of it's outputs, and for each
                         # output, add a new link to the original array node.
@@ -168,23 +184,18 @@ class EdgeDAG:
                         # This is sort of a weird situation, but we need to allow tag lineage to flow through. We can
                         # do this by Lambda bridge! - This dummy dag node will prevent non-tag stitch operations from
                         # flowing through, but will allow tags later on.
-                        lambda_tag_bridge = DAGNode(graph.ConstNode(types.NoneType(), None))
+                        lambda_tag_bridge = DAGNode(
+                            graph.ConstNode(types.NoneType(), None)
+                        )
                         for output_node in node.stitched_outputs:
                             self._add_dag_edge(lambda_tag_bridge, output_node)
                             self._add_dag_edge(dag_arr_node, lambda_tag_bridge)
                 # elif op_name.endswith("groupby"):
-                    
-
 
         self._apply_bottoms_up_bfs(lambda_stitch)
 
 
 # def _lambda_node
-
-
-
-
-
 
 
 # @dataclasses.dataclass
