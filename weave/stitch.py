@@ -65,6 +65,17 @@ class LiteralListObjectRecorder(ObjectRecorder):
     val: list[ObjectRecorder]
 
 
+def node_shortname(node: graph.Node) -> str:
+    if isinstance(node, graph.OutputNode):
+        return node.from_op.name
+    elif isinstance(node, graph.ConstNode):
+        return f"C[{str(node.val)[:10]}]"
+    elif isinstance(node, graph.VarNode):
+        return f"V[{node.name}]"
+    else:
+        raise errors.WeaveInternalError(f"Unknown node type {type(node)}")
+
+
 @dataclasses.dataclass
 class StitchedGraph:
     _node_map: typing.Dict[graph.Node, ObjectRecorder]
@@ -77,6 +88,35 @@ class StitchedGraph:
 
     def add_result(self, node: graph.Node, result: ObjectRecorder) -> None:
         self._node_map[node] = result
+
+    def print_debug_summary(self) -> None:
+        res = ""
+        node_names = {
+            orig_node: f"<{i}-{node_shortname(orig_node)}>"
+            for i, (orig_node, recorder) in enumerate(self._node_map.items())
+        }
+        res += "\n" + "StitchedGraph Summary:"
+        res += "\n" + "  Nodes:"
+        for curr_node, curr_node_name in node_names.items():
+            if isinstance(curr_node, graph.OutputNode):
+                res += (
+                    "\n"
+                    + f"  * {curr_node_name}({','.join([node_names[input_node] for input_node in  curr_node.from_op.inputs.values()])})"
+                )
+            else:
+                res += "\n" + f"  * {curr_node_name}"
+            recorder = self._node_map[curr_node]
+            if recorder.calls:
+                res += (
+                    "\n"
+                    + f"    calls: {','.join([node_names[call.node] for call in recorder.calls])}"
+                )
+            if recorder.tags:
+                res += (
+                    "\n"
+                    + f"    tags: {','.join([str((tag_name, node_names[tag_recorder.node])) for tag_name, tag_recorder in recorder.tags.items()])}"
+                )
+        print(res)
 
 
 def stitch(
