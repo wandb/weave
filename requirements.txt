@@ -1,4 +1,4 @@
-wandb @ git+https://github.com/wandb/client.git@ee6ef54da992a4bb250ab83921e2bb34cd8ea293
+wandb @ git+https://github.com/wandb/client.git@fc4e34525c69c1c6eebd4dee2ef64c501b338720
 datadog==0.44.0
 ddtrace>=1.7.3
 python-json-logger>=2.0.4
