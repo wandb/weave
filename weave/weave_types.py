@@ -1121,7 +1121,7 @@ def non_none(type_: Type) -> Type:
         elif len(new_members) == 1:
             return new_members[0]
         else:
-            return UnionType(*new_members)
+            return union(*new_members)
     return type_
 
 
@@ -1255,7 +1255,7 @@ def merge_types(a: Type, b: Type) -> Type:
         #             final_members.append(merged_m)
         #         else:
         #             final_members.append(new_union.members[i])
-        return UnionType(*final_members)
+        return union(*final_members)
     return union(a, b)
 
 
