@@ -296,9 +296,6 @@ def _compile(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
     with tracer.trace("compile:simple_optimizations"):
         n = compile_simple_optimizations(n)
 
-    with tracer.trace("compile:simple_optimizations"):
-        n = compile_simple_optimizations(n)
-
     with tracer.trace("compile:lambda_uniqueness"):
         n = compile_lambda_uniqueness(n)
 
