@@ -860,7 +860,7 @@ def test_loading_artifact_browser_request_3(fake_wandb):
                             "digest": "51560154fe3bae863d18335d39129732",
                             "commitHash": "303db33c9f9264768626",
                             "createdAt": "2021-07-10T19:27:32",
-                            "usedBy_c1233b7003317090ab5e2a75db4ad965": {
+                            "usedBy": {
                                 "edges": [
                                     {
                                         "node": {
