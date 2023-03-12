@@ -1,26 +1,29 @@
 import typing
+import contextvars
+import contextlib
+import typing_extensions
 import dataclasses
 import numpy as np
 import pyarrow as pa
+import textwrap
 
-from ..ops_domain import wbmedia
 from .. import ref_base
 from .. import weave_types as types
 from .. import box
 from .. import errors
-from .. import mappers_arrow
-from .. import mappers_python_def
 from ..language_features.tagging import (
     tagged_value_type,
-    tagged_value_type_helpers,
 )
-from .. import arrow_util
 from .. import artifact_base
 from .. import node_ref
 from ..language_features.tagging import tag_store
 
-from .arrow import arrow_as_array, ArrowWeaveListType, offsets_starting_at_zero
-from . import arrow
+from .arrow import (
+    ArrowWeaveListType,
+    offsets_starting_at_zero,
+    pretty_print_arrow_type,
+)
+from .. import debug_types
 
 
 def reverse_dict(d: dict) -> dict:
@@ -45,41 +48,38 @@ def concrete_to_tagstore(val: typing.Any) -> typing.Any:
     return val
 
 
-ArrowWeaveListObjectTypeVar = typing.TypeVar("ArrowWeaveListObjectTypeVar")
+def diff_arrow_type(t1, t2):
+    if t1 == t2:
+        return None
+    if (
+        isinstance(t1, pa.StructType)
+        and isinstance(t2, pa.StructType)
+        or isinstance(t1, pa.UnionType)
+        and isinstance(t2, pa.UnionType)
+    ):
+        if isinstance(t1, pa.StructType):
+            error_prefix = "structs"
+        else:
+            error_prefix = "unions"
+        if t1.num_fields != t2.num_fields:
+            return f"{error_prefix} different number of fields"
+        for f1, f2 in zip(t1, t2):
+            if f1.name != f2.name:
+                return f"{error_prefix} different field names: {f1.name} != {f2.name}"
+            diff = diff_arrow_type(f1.type, f2.type)
+            if diff is not None:
+                return f"{error_prefix} field {f1.name}: {diff}"
+        return None
+    if isinstance(t1, pa.ListType) and isinstance(t2, pa.ListType):
+        return diff_arrow_type(t1.value_type, t2.value_type)
+    return f"{t1}\n!=\n{t2}"
 
 
-def _sort_structs(array: pa.Array) -> pa.Array:
-    if isinstance(array, pa.ChunkedArray):
-        return pa.chunked_array(
-            [_sort_structs(chunk) for chunk in array.chunks], array.type
-        )
-    if pa.types.is_struct(array.type):
-        if array.type.num_fields == 0:
-            return array
-        field_names = sorted([f.name for f in array.type])
-        sub_fields = [_sort_structs(array.field(f)) for f in field_names]
-        return pa.StructArray.from_arrays(sub_fields, field_names)
-    elif pa.types.is_list(array.type):
-        return pa.ListArray.from_arrays(
-            offsets_starting_at_zero(array),
-            _sort_structs(array.flatten()),
-        )
-    return array
-
-
-# When concatenating arrays, the structs need to have the same key order. This
-# method attempts reshape StructArrays to have the same nested key order in
-# order to safely concat them. If this is not done, arrow will throw an error
-# like: `arrays to be concatenated must be identically typed, but ...`
-def safe_pa_concat_arrays(arrays):
-    if len(arrays) < 2:
-        return pa.concat_arrays(arrays)
-    t = arrays[0].type
-    if all(a.type == t for a in arrays):
-        return pa.concat_arrays(arrays)
-    if isinstance(t, pa.StructType):
-        return pa.concat_arrays([_sort_structs(array) for array in arrays])
-    return pa.concat_arrays(arrays)
+def first_non_none(v):
+    for i in v:
+        if i is not None:
+            return i
+    return None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -139,7 +139,6 @@ def set_path(
     offset: int = 0,
     arrow_offset: int = 0,
 ):
-    arrow_data = arrow.arrow_as_array(arrow_data)
     last_settable_index = len(path) - 1
     final_union_path_el: typing.Optional[PathItemUnionEntry] = None
     if isinstance(path[last_settable_index], PathItemUnionEntry):
@@ -249,7 +248,7 @@ def set_path(
         try:
             v["_value"] = value_fn(v["_value"], offset)
         except (KeyError, TypeError):
-            print("V", v)
+            # print("V", v)
             v.value = value_fn(v.value, offset)
     elif leaf == PathItemList():
         if final_union_path_el:
@@ -280,38 +279,312 @@ def set_path(
         raise ValueError(f"Unexpected path element: {leaf}")
 
 
+def weave_arrow_type_check(
+    wt: types.Type, arr: pa.Array, optional: bool = False
+) -> typing.Optional[str]:
+    reasons: list[str] = []
+    at: pa.DataType = arr.type
+    if wt == types.Any():
+        reasons.append("Any not allowed")
+    elif isinstance(wt, types.UnionType):
+        for i in range(len(wt.members)):
+            for j in range(i + 1, len(wt.members)):
+                if not isinstance(
+                    types.merge_types(wt.members[i], wt.members[j]), types.UnionType
+                ):
+                    reasons.append(f"Union members {i} and {j} are mergable")
+        non_none_members = [m for m in wt.members if m != types.NoneType()]
+        none_member_count = len(wt.members) - len(non_none_members)
+        if none_member_count > 1:
+            reasons.append("Multiple None members in Union")
+        elif none_member_count == 1:
+            # Nullable case
+            # TODO: Actually must check nullable!
+            if len(non_none_members) == 0:
+                reasons.append("NoneType not allowed in Union with no other members")
+            elif len(non_none_members) == 1:
+                reason = weave_arrow_type_check(non_none_members[0], arr, optional=True)
+            else:
+                reason = weave_arrow_type_check(
+                    types.UnionType(*non_none_members), arr, optional=True
+                )
+            if reason is not None:
+                reasons.append(f"Nullable member: {reason}")
+        else:
+            if not pa.types.is_union(at):
+                reasons.append(f"Expected UnionType, got {at}")
+            else:
+                if len(wt.members) != len(at):
+                    reasons.append(
+                        f"Union length mismatch: {len(wt.members)} != {len(at)}"
+                    )
+                else:
+                    for i, w in enumerate(wt.members):
+                        reason = weave_arrow_type_check(
+                            w, arr.field(i), optional=optional
+                        )
+                        if reason is not None:
+                            reasons.append(f"Union member {i}: {reason}")
+    elif optional and pa.types.is_null(at):
+        pass
+    else:
+        # Nullable check. This surfaces a ton of failures...
+        # if wt != types.NoneType() and not optional and arr.null_count > 0:
+        #     reasons.append("Non-nullable but array has nulls")
+
+        if isinstance(wt, tagged_value_type.TaggedValueType):
+            tag_reason = weave_arrow_type_check(
+                wt.tag, arr.field("_tag"), optional=optional
+            )
+            if tag_reason is not None:
+                reasons.append(f"TaggedValue tag: {tag_reason}")
+            value_reason = weave_arrow_type_check(
+                wt.value, arr.field("_value"), optional=optional
+            )
+            if value_reason is not None:
+                reasons.append(f"TaggedValue value: {value_reason}")
+
+        elif isinstance(wt, types.Const):
+            reasons.append("Const not allowed")
+
+        elif isinstance(wt, types.Function):
+            if not pa.types.is_string(at):
+                reasons.append(f"Expected StringType, got {at}")
+
+        elif isinstance(wt, types.TypedDict):
+            if not pa.types.is_struct(at):
+                reasons.append(f"Expected StructType, got {at}")
+            else:
+                at_fields_by_name = {f.name: f for f in at}
+                for k, v in wt.property_types.items():
+                    if k not in at_fields_by_name:
+                        reasons.append(f"Missing field {k}")
+                    else:
+                        reason = weave_arrow_type_check(
+                            v, arr.field(k), optional=optional
+                        )
+                        if reason is not None:
+                            reasons.append(f"Field {k}: {reason}")
+
+        elif isinstance(wt, (types.List, ArrowWeaveListType)):
+            if not pa.types.is_list(at):
+                reasons.append(f"Expected ListType, got {at}")
+            else:
+                reason = weave_arrow_type_check(
+                    wt.object_type, arr.flatten(), optional=optional
+                )
+                if reason is not None:
+                    reasons.append(f"List element: {reason}")
+
+        elif isinstance(wt, types.ObjectType):
+            if not pa.types.is_struct(at):
+                reasons.append(f"Expected StructType, got {at}")
+            else:
+                at_fields_by_name = {f.name: f for f in at}
+                for k, v in wt.property_types().items():
+                    if k not in at_fields_by_name:
+                        reasons.append(f"Missing field {k}")
+                    else:
+                        reason = weave_arrow_type_check(
+                            v, arr.field(k), optional=optional
+                        )
+                        if reason is not None:
+                            reasons.append(f"Field {k}: {reason}")
+        elif isinstance(wt, types.String):
+            if pa.types.is_dictionary(at):
+                if not pa.types.is_string(at.value_type):
+                    reasons.append(
+                        f"Expected StringType as dictionary type, got {at.value_type}"
+                    )
+            elif not pa.types.is_string(at):
+                reasons.append(f"Expected StringType, got {at}")
+        elif isinstance(wt, types.UnknownType):
+            if len(arr) != 0:
+                reasons.append(f"Non-zero length array with UnknownType")
+        elif isinstance(wt, types.Int):
+            # We allow float32/64 because of a bug in our unnest implementation
+            # which relies on pandas. TODO: Remove this when we fix unnest.
+            if (
+                not pa.types.is_float64(at)
+                and not pa.types.is_int64(at)
+                and not pa.types.is_float32(at)
+                and not pa.types.is_int32(at)
+            ):
+                reasons.append(
+                    f"Expected int64 or int32 (float32/64 allowed because of unnest bug), got {at}"
+                )
+        elif isinstance(wt, types.Float):
+            if not pa.types.is_float64(at) and not pa.types.is_float32(at):
+                reasons.append(f"Expected float64 or float32, got {at}")
+        elif isinstance(wt, types.Number):
+            if (
+                not pa.types.is_float64(at)
+                and not pa.types.is_int64(at)
+                and not pa.types.is_float32(at)
+                and not pa.types.is_int32(at)
+            ):
+                reasons.append(
+                    f"Expected float64 or float32 or int64 or int32, got {at}"
+                )
+        elif isinstance(wt, types.Boolean):
+            if not pa.types.is_boolean(at):
+                reasons.append(f"Expected boolean, got {at}")
+        elif isinstance(wt, types.NoneType):
+            # We don't check for pa.types.is_null(at) because we can have for
+            # example at == int32 with all nulls.
+            if not arr.null_count == len(arr):
+                reasons.append(f"Expected all nulls, got {arr.null_count}")
+        elif isinstance(wt, types.Timestamp):
+            if not pa.types.is_timestamp(at):
+                reasons.append(f"Expected TimestampType, got {at}")
+        elif types.is_custom_type(wt):
+            if pa.types.is_dictionary(at):
+                if not pa.types.is_string(at.value_type):
+                    reasons.append(
+                        f"Expected StringType as dictionary type, got {at.value_type}"
+                    )
+            elif not pa.types.is_string(at):
+                reasons.append(f"Expected StringType, got {at}")
+        else:
+            reasons.append(f"Unhandled case: {wt}, {at}")
+
+    if reasons:
+        indented_reasons = textwrap.indent("\n".join(reasons), "  ")
+        print("TYPE", type(wt))
+        return f"{debug_types.short_type(wt)}, {str(at)[:50]}\n{indented_reasons}"
+
+    return None
+
+
+_awl_invalid_reason: contextvars.ContextVar[
+    typing.Optional[str]
+] = contextvars.ContextVar("_awl_invalid_reason", default=None)
+
+
+@contextlib.contextmanager
+def unsafe_awl_construction(reason: str):
+    token = None
+    if _awl_invalid_reason.get() is None:
+        token = _awl_invalid_reason.set(reason)
+    try:
+        yield
+    finally:
+        if token is not None:
+            _awl_invalid_reason.reset(token)
+
+
+ArrowWeaveListObjectTypeVar = typing.TypeVar("ArrowWeaveListObjectTypeVar")
+
+
 class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
-    _arrow_data: typing.Union[pa.Table, pa.ChunkedArray, pa.Array]
+    _arrow_data: pa.Array
     object_type: types.Type
 
     # TODO: Refactor to disable None artifact? (Only used in tests)
     def __init__(
         self,
-        _arrow_data,
+        arrow_data: typing.Union[pa.Table, pa.ChunkedArray, pa.Array],
         object_type=None,
         artifact: typing.Optional[artifact_base.Artifact] = None,
+        invalid_reason=None,
     ) -> None:
-        self._arrow_data = _arrow_data
+        # Do not dictionary decode this array! That will break performance.
+        # Note we combine chunks here, to make the internal interface easy
+        # to use. In the future we could refactor to retain chunked form.
+        if isinstance(arrow_data, pa.Array):
+            self._arrow_data = arrow_data
+        elif isinstance(arrow_data, pa.Table):
+            self._arrow_data = pa.StructArray.from_arrays(
+                # TODO: we shouldn't need to combine chunks, we can produce this in the
+                # original chunked form for zero copy
+                [c.combine_chunks() for c in arrow_data.columns],
+                names=arrow_data.column_names,
+            )
+        elif isinstance(arrow_data, pa.ChunkedArray):
+            self._arrow_data = arrow_data.combine_chunks()
+        else:
+            raise TypeError(
+                "Expected pyarrow Array, ChunkdArray or Table, got %s"
+                % type(arrow_data)
+            )
+
         self.object_type = object_type
         if self.object_type is None:
             self.object_type = types.TypeRegistry.type_of(self._arrow_data).object_type
         self._artifact = artifact
+        if invalid_reason is None:
+            invalid_reason = _awl_invalid_reason.get()
+        self._invalid_reason = invalid_reason
+
+        self._validate()
+
+    def _validate(self) -> None:
+        if self._invalid_reason is None:
+            self._validate_weave_type()
+        self._validate_arrow_data()
+
+    def _validate_weave_type(self) -> None:
+        return
+
+        # Validation disabled
+        arr = self._arrow_data
+        type_match_summary = weave_arrow_type_check(self.object_type, arr)
+        if type_match_summary != None:
+            from rich import print
+
+            print()
+            print("ArrowWeaveList VALIDATION ERROR")
+            print()
+            print("ArrowWeaveList.object_type", self.object_type)
+            print()
+            print(
+                "ArrowWeaveList._arrow_data.type\n",
+                pretty_print_arrow_type(self._arrow_data.type),
+            )
+            print()
+            print(type_match_summary)
+            raise ValueError(f"ArrowWeaveList validation err: {type_match_summary}")
+
+    def _validate_arrow_data(self) -> None:
+        try:
+            self._arrow_data.validate(full=True)
+        except pa.ArrowInvalid:
+            raise
+
+    def validate(self) -> None:
+        self._validate_weave_type()
+        self._validate_arrow_data()
+        self._invalid_reason = None
 
     def map_column(
         self,
         fn: typing.Callable[
             ["ArrowWeaveList", PathType], typing.Optional["ArrowWeaveList"]
         ],
+        pre_fn: typing.Optional[
+            typing.Callable[
+                ["ArrowWeaveList", PathType], typing.Optional["ArrowWeaveList"]
+            ]
+        ] = None,
     ) -> "ArrowWeaveList":
-        return self._map_column(fn, ())
+        return self._map_column(fn, pre_fn, ())
 
     def _map_column(
         self,
         fn: typing.Callable[
             ["ArrowWeaveList", PathType], typing.Optional["ArrowWeaveList"]
         ],
+        pre_fn: typing.Optional[
+            typing.Callable[
+                ["ArrowWeaveList", PathType], typing.Optional["ArrowWeaveList"]
+            ]
+        ],
         path: PathType,
     ) -> "ArrowWeaveList":
+        if pre_fn is not None:
+            pre_mapped = pre_fn(self, path)
+            if pre_mapped is not None:
+                self = pre_mapped
         with_mapped_children = self
         if isinstance(self._arrow_data, pa.NullArray):
             # If we are a null array, then there is nothing to map
@@ -319,12 +592,12 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         if isinstance(self.object_type, types.Const):
             with_mapped_children = ArrowWeaveList(
                 self._arrow_data, self.object_type.val_type, self._artifact
-            )._map_column(fn, path)
+            )._map_column(fn, pre_fn, path)
         elif isinstance(self.object_type, types.TypedDict):
-            arr = arrow.arrow_as_array(self._arrow_data)
+            arr = self._arrow_data
             properties: dict[str, ArrowWeaveList] = {
                 k: ArrowWeaveList(arr.field(k), v, self._artifact)._map_column(
-                    fn, path + (PathItemStructField(k),)
+                    fn, pre_fn, path + (PathItemStructField(k),)
                 )
                 for k, v in self.object_type.property_types.items()
             }
@@ -337,19 +610,31 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                     mask=pa.compute.is_null(arr),
                 )
 
+            # set invalid_reason to the first non-None invalid reason found in
+            # properties
+            invalid_reason = first_non_none(
+                v._invalid_reason for v in properties.values()
+            )
+
             with_mapped_children = ArrowWeaveList(
                 result_arr,
                 types.TypedDict({k: v.object_type for k, v in properties.items()}),
                 self._artifact,
+                invalid_reason=invalid_reason,
             )
         elif isinstance(self.object_type, types.ObjectType):
-            arr = arrow.arrow_as_array(self._arrow_data)
+            arr = self._arrow_data
             attrs: dict[str, ArrowWeaveList] = {
                 k: ArrowWeaveList(arr.field(k), v, self._artifact)._map_column(
-                    fn, path + (PathItemObjectField(k),)
+                    fn, pre_fn, path + (PathItemObjectField(k),)
                 )
                 for k, v in self.object_type.property_types().items()
             }
+
+            # Types of some of the attrs may have changed. But some property types on object
+            # types are no variable, and it is invalid to change them from our type system's
+            # perspective. So the result here is invalid ArrowWeaveList. The results should
+            # only be used in cirumstances where this is acceptable.
             with_mapped_children = ArrowWeaveList(
                 pa.StructArray.from_arrays(
                     [v._arrow_data for v in attrs.values()],
@@ -357,36 +642,36 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                     mask=pa.compute.is_null(arr),
                 ),
                 self.object_type,
-                # Can't do this because The W&B Image types are non-standard :(
-                # self.object_type.__class__(
-                #     **{k: attrs[k].object_type for k in self.object_type.type_attrs()}
-                # ),
                 self._artifact,
+                invalid_reason="mapped_column on ObjectType can produce invalid ArrowWeaveList",
             )
-        elif isinstance(self.object_type, types.List):
-            arr = arrow.arrow_as_array(self._arrow_data)
+        elif isinstance(self.object_type, (types.List, ArrowWeaveListType)):
+            arr = self._arrow_data
             items: ArrowWeaveList = ArrowWeaveList(
                 arr.flatten(), self.object_type.object_type, self._artifact
-            )._map_column(fn, path + (PathItemList(),))
+            )._map_column(fn, pre_fn, path + (PathItemList(),))
+            # print("SELF OBJECT TYPE", self.object_type)
+            # print("SELF ARROW DATA TYPE", self._arrow_data.type)
             with_mapped_children = ArrowWeaveList(
                 pa.ListArray.from_arrays(
                     offsets_starting_at_zero(self._arrow_data),
                     items._arrow_data,
                     mask=pa.compute.is_null(arr),
                 ),
-                types.List(items.object_type),
+                self.object_type.__class__(items.object_type),
                 self._artifact,
+                invalid_reason=items._invalid_reason,
             )
         elif isinstance(self.object_type, tagged_value_type.TaggedValueType):
-            arr = arrow.arrow_as_array(self._arrow_data)
+            arr = self._arrow_data
             tag: ArrowWeaveList = ArrowWeaveList(
                 self._arrow_data.field("_tag"), self.object_type.tag, self._artifact
-            )._map_column(fn, path + (PathItemTaggedValueTag(),))
+            )._map_column(fn, pre_fn, path + (PathItemTaggedValueTag(),))
             if not isinstance(tag.object_type, types.TypedDict):
                 raise errors.WeaveInternalError("Tag must be a TypedDict")
             value: ArrowWeaveList = ArrowWeaveList(
                 self._arrow_data.field("_value"), self.object_type.value, self._artifact
-            )._map_column(fn, path + (PathItemTaggedValueValue(),))
+            )._map_column(fn, pre_fn, path + (PathItemTaggedValueValue(),))
             with_mapped_children = ArrowWeaveList(
                 pa.StructArray.from_arrays(
                     [tag._arrow_data, value._arrow_data],
@@ -395,6 +680,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                 ),
                 tagged_value_type.TaggedValueType(tag.object_type, value.object_type),
                 self._artifact,
+                invalid_reason=tag._invalid_reason or value._invalid_reason,
             )
         elif isinstance(self.object_type, types.UnionType):
             non_none_members = [
@@ -402,28 +688,35 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             ]
             nullable = len(non_none_members) < len(self.object_type.members)
             if len(non_none_members) == 1:
-                # simple nullable case
                 non_none_member = ArrowWeaveList(
                     self._arrow_data,
                     non_none_members[0],
                     self._artifact,
-                )._map_column(fn, path)
+                )._map_column(fn, pre_fn, path)
                 with_mapped_children = ArrowWeaveList(
                     non_none_member._arrow_data,
                     types.optional(non_none_member.object_type),
                     self._artifact,
+                    invalid_reason=non_none_member._invalid_reason,
                 )
             elif len(non_none_members) > 1:
-                arr = arrow.arrow_as_array(self._arrow_data)
+                arr = self._arrow_data
                 members: list[ArrowWeaveList] = [
                     ArrowWeaveList(
-                        arr.field(i), member_type, self._artifact
-                    )._map_column(fn, path + (PathItemUnionEntry(i),))
+                        arr.field(i),
+                        types.optional(member_type) if nullable else member_type,
+                        self._artifact,
+                    )._map_column(fn, pre_fn, path + (PathItemUnionEntry(i),))
                     for i, member_type in enumerate(non_none_members)
                 ]
                 new_type_members = [m.object_type for m in members]
                 if nullable:
                     new_type_members.append(types.NoneType())
+
+                # set invalid_reason to the first non-None invalid reason found in
+                # properties
+                invalid_reason = first_non_none(m._invalid_reason for m in members)
+                # breakpoint()
                 with_mapped_children = ArrowWeaveList(
                     pa.UnionArray.from_dense(
                         self._arrow_data.type_codes,
@@ -432,6 +725,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                     ),
                     types.UnionType(*new_type_members),
                     self._artifact,
+                    invalid_reason=invalid_reason,
                 )
             else:
                 raise errors.WeaveInternalError(
@@ -487,8 +781,11 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                 )
                 return ArrowWeaveList(
                     list._arrow_data.indices,
-                    types.Int(),
+                    # Don't change the object type to Int. Instead, we mark the ArrowWeaveList
+                    # as invalid (the arrow type no longer matches object_type)
+                    list.object_type,
                     list._artifact,
+                    invalid_reason="Dictionary removed",
                 )
             return None
 
@@ -504,6 +801,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                     list._arrow_data.dictionary_decode(),
                     list.object_type,
                     list._artifact,
+                    invalid_reason="Dictionary removed",
                 )
             return None
 
@@ -529,8 +827,8 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                 )
             return None
 
-        res = self.map_column(_remove_awls), awl_columns
-        return res
+        # Use pre-order traversal. We only want the top most awls.
+        return self.map_column(lambda x, y: None, _remove_awls), awl_columns
 
     def function_type_paths(
         self,
@@ -580,7 +878,6 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                     types.String,
                     types.Timestamp,
                     types.NoneType,
-                    wbmedia.LegacyTableNDArrayType,
                     tagged_value_type.TaggedValueType,
                     types.TypedDict,
                     types.ObjectType,
@@ -593,35 +890,6 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
 
         self.map_column(_save_custom_type_path)
         return custom_type_paths
-
-    def with_unions_as_structs(self) -> "ArrowWeaveList":
-        def _replace_union_with_struct(
-            col: ArrowWeaveList, path: PathType
-        ) -> typing.Optional[ArrowWeaveList]:
-            if isinstance(col.object_type, types.UnionType):
-                non_none_members = [
-                    m
-                    for m in col.object_type.members
-                    if not isinstance(m, types.NoneType)
-                ]
-                if len(non_none_members) == 1:
-                    # Don't need to convert simple nullable
-                    return None
-                nullable = len(non_none_members) < len(col.object_type.members)
-                arrs = [col._arrow_data.field(i) for i in range(len(non_none_members))]
-                names = [f"_union_{i}" for i in range(len(non_none_members))]
-                property_types = {n: t for n, t in zip(names, non_none_members)}
-                new_type: types.Type = types.TypedDict(property_types)
-                if nullable:
-                    new_type = types.optional(new_type)
-                return ArrowWeaveList(
-                    pa.StructArray.from_arrays(arrs, names=names),
-                    new_type,
-                    self._artifact,
-                )
-            return None
-
-        return self.map_column(_replace_union_with_struct)
 
     def _arrow_data_asarray_no_tags(self) -> pa.Array:
         # Remove both tags and dictionaries. You should typically leave
@@ -679,6 +947,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
 
     def to_pylist_tagged(self):
         """Convert the ArrowWeaveList to a python list, tagging objects correctly"""
+        # breakpoint()
         value, awl_columns = self.separate_awls()
 
         custom_type_paths = value.custom_type_paths()
@@ -691,6 +960,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         dict_columns = {p: c._arrow_data.to_pylist() for p, c in dict_columns.items()}
 
         for path, obj_type in obj_type_paths.items():
+            # print("OBJ TYPE PATH", path)
             set_path(
                 value_py,
                 value_awl._arrow_data,
@@ -820,7 +1090,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                     self._arrow_data.field(field.name)
                 )
             arrow_obj = pa.table(chunked_arrays)
-            new_data = arrow_as_array(arrow_obj.append_column(name, [data]))
+            new_data = arrow_obj.append_column(name, [data])
         else:
             raise ValueError(
                 f"Cannot append column to {type(self._arrow_data)} object."
@@ -828,309 +1098,69 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
 
         return ArrowWeaveList(new_data, None, self._artifact)
 
-    def with_object_type(self, desired_type: types.Type) -> "ArrowWeaveList":
-        """Converts this ArrowWeaveList into a new one with the specified object type.
-        Updates the backing arrow data to also match the new type.
-
-        If conversion is not possible, raises a ValueError.
-        """
-        self._arrow_data = arrow_as_array(self._arrow_data)
-        mapper = mappers_arrow.map_to_arrow(desired_type, self._arrow_data)
-        if isinstance(mapper.result_type(), arrow_util.ArrowTypeWithFieldInfo):
-            desired_type_pyarrow_type = mapper.result_type().type
+    def column(self, name: str) -> "ArrowWeaveList":
+        if isinstance(self.object_type, types.TypedDict):
+            property_types = self.object_type.property_types
+        elif isinstance(self.object_type, types.ObjectType):
+            property_types = self.object_type.property_types()
         else:
-            desired_type_pyarrow_type = mapper.result_type()
-
-        result: typing.Optional[ArrowWeaveList] = None
-
-        current_type = self.object_type
-        if self._arrow_data.type == desired_type_pyarrow_type:
-            result = self
-        elif (
-            pa.types.is_list(self._arrow_data.type)
-            and self._arrow_data.type.value_type == pa.null()
-        ):
-            # In this case we have a AWL<list<null>>. In these cases we run into a bunch of issues because
-            # the current type is unknown. Instead, we basically just cast the AWL to the desired type.
-            return ArrowWeaveList(
-                self._arrow_data.cast(desired_type_pyarrow_type),
-                desired_type,
-                self._artifact,
-            )
-        elif isinstance(desired_type, tagged_value_type.TaggedValueType):
-            if isinstance(current_type, tagged_value_type.TaggedValueType):
-
-                tag_awl = ArrowWeaveList(
-                    self._arrow_data.field("_tag"),
-                    current_type.tag,
-                    self._artifact,
-                ).with_object_type(desired_type.tag)
-
-                value_awl = ArrowWeaveList(
-                    self._arrow_data.field("_value"),
-                    current_type.value,
-                    self._artifact,
-                ).with_object_type(desired_type.value)
-
-            else:
-                value_awl = self.with_object_type(desired_type.value)
-                tag_array_type = desired_type_pyarrow_type.field("_tag")
-                tag_awl = ArrowWeaveList(
-                    pa.nulls(len(value_awl), type=tag_array_type),
-                    desired_type.tag,
-                    self._artifact,
-                )
-
-            final_array = pa.StructArray.from_arrays(
-                [tag_awl._arrow_data, value_awl._arrow_data],
-                names=["_tag", "_value"],
+            raise ValueError(
+                f"Cannot get column {name} from non-TypedDict or ObjectType."
             )
 
-            result = ArrowWeaveList(final_array, desired_type, self._artifact)
+        return ArrowWeaveList(
+            self._arrow_data.field(name),
+            property_types[name],
+            self._artifact,
+            invalid_reason=self._invalid_reason,
+        )
 
-        elif isinstance(
-            current_type, tagged_value_type.TaggedValueType
-        ) and not isinstance(desired_type, tagged_value_type.TaggedValueType):
-            result = ArrowWeaveList(
-                self._arrow_data.field("_value"), current_type.value, self._artifact
-            ).with_object_type(desired_type)
+    def tagged_value_tag(self) -> "ArrowWeaveList":
+        if not isinstance(self.object_type, tagged_value_type.TaggedValueType):
+            raise ValueError(f"Cannot get tagged_value_tag from non-TaggedValueType")
 
-        elif isinstance(desired_type, types.TypedDict):
-            if isinstance(current_type, types.TypedDict):
+        return ArrowWeaveList(
+            self._arrow_data.field("_tag"), self.object_type.tag, self._artifact
+        )
 
-                self_keys = set(current_type.property_types.keys())
-                other_keys = set(desired_type.property_types.keys())
-                common_keys = self_keys.intersection(other_keys)
+    def tagged_value_value(self) -> "ArrowWeaveList":
+        if not isinstance(self.object_type, tagged_value_type.TaggedValueType):
+            raise ValueError(f"Cannot get tagged_value_tag from non-TaggedValueType")
 
-                field_arrays: dict[str, pa.Array] = {}
+        return ArrowWeaveList(
+            self._arrow_data.field("_value"), self.object_type.value, self._artifact
+        )
 
-                for key in desired_type.property_types.keys():
-                    if key in common_keys:
-                        field_arrays[key] = (
-                            ArrowWeaveList(
-                                self._arrow_data.field(key),
-                                current_type.property_types[key],
-                                self._artifact,
-                            )
-                            .with_object_type(desired_type.property_types[key])
-                            ._arrow_data
-                        )
+    def concat(self, other: "ArrowWeaveList") -> "ArrowWeaveList":
+        from . import concat
 
-                    elif key in other_keys:
-                        if key not in common_keys:
-                            field_arrays[key] = ArrowWeaveList(
-                                pa.nulls(
-                                    len(self), type=desired_type_pyarrow_type[key].type
-                                ),
-                                desired_type.property_types[key],
-                                self._artifact,
-                            )._arrow_data
-
-                field_names, arrays = tuple(zip(*field_arrays.items()))
-
-                result = ArrowWeaveList(
-                    pa.StructArray.from_arrays(arrays=arrays, names=field_names),  # type: ignore
-                    desired_type,
-                    self._artifact,
-                )
-
-        elif isinstance(desired_type, types.BasicType):
-            result = ArrowWeaveList(
-                self._arrow_data.cast(desired_type_pyarrow_type),
-                desired_type,
-                self._artifact,
-            )
-
-        elif isinstance(desired_type, types.List) and isinstance(
-            current_type, types.List
-        ):
-            offsets = offsets_starting_at_zero(self._arrow_data)
-            flattened = self._arrow_data.flatten()
-            flattened_converted = ArrowWeaveList(
-                flattened,
-                current_type.object_type,
-                self._artifact,
-            ).with_object_type(desired_type.object_type)
-
-            result = ArrowWeaveList(
-                pa.ListArray.from_arrays(
-                    offsets,
-                    flattened_converted._arrow_data,
-                    type=desired_type_pyarrow_type,
-                ),
-                desired_type,
-                self._artifact,
-            )
-
-        elif isinstance(desired_type, types.UnionType) and desired_type.assign_type(
-            current_type
-        ):
-
-            if isinstance(current_type, types.NoneType):
-                # If the current type is None, then we can just return a new
-                # array with the desired type - based on the above we already
-                # know they are assignable.
-
-                result = ArrowWeaveList(
-                    pa.nulls(len(self), type=desired_type_pyarrow_type),
-                    desired_type,
-                    self._artifact,
-                )
-            else:
-
-                non_none_desired = types.non_none(desired_type)
-                if isinstance(non_none_desired, types.UnionType):
-                    non_nullable_types = non_none_desired.members
-                else:
-                    non_nullable_types = [non_none_desired]
-
-                non_null_current_type = types.non_none(current_type)
-
-                if len(non_nullable_types) > 1:
-                    # At this point, the objective is to build M arrays, where M is
-                    # the number of members in the desired union type. Each array
-                    # corresponds to the nth member of the desired union type, and
-                    # will contains all nulls, except values for the index in which
-                    # the current array is the corresponding type. This will then be
-                    # combined in the end via `UnionArray.from_sparse`.
-                    #
-                    # The logic is only slightly different when the current type is a union,
-                    # so we handle both cases in the same code block.
-
-                    # First, we need to create an array which indicates the type code (type index)
-                    # for each value in the current array. In the case that the current array is not
-                    # a union, then we can just use the type code of the current type. Else, we need
-                    # to map the type codes of the current array to the type codes of the desired array.
-                    if not isinstance(non_null_current_type, types.UnionType):
-                        # In this case we have single type:
-                        type_code = mapper.type_code_of_type(non_null_current_type)
-                        type_code_array = pa.repeat(type_code, len(self)).cast(
-                            pa.int8()
-                        )
-                        offsets = pa.array(range(len(self)), type=pa.int32())
-                    else:
-                        curr_type_code_to_desired_type_code = [
-                            mapper.type_code_of_type(t)
-                            for t in non_null_current_type.members
-                        ]
-                        current_type_code_list = self._arrow_data.type.type_codes
-                        type_encoding = dict(
-                            zip(
-                                current_type_code_list,
-                                curr_type_code_to_desired_type_code,
-                            )
-                        )
-
-                        def new_type_code_gen():
-                            for code in self._arrow_data.type_codes:
-                                yield type_encoding[code.as_py()]
-
-                        type_code_array = pa.array(new_type_code_gen(), type=pa.int8())
-                        offsets = self._arrow_data.offsets
-
-                    # Next, we are going to build the M arrays. We will do this by iterating
-                    # over the desired types. For each type, we will find the corresponding
-                    # type in the current type, and then select the corresponding values from
-                    # the current array. If there is no corresponding type, then we will create
-                    # an array of nulls.
-                    data_arrays: list[pa.Array] = []
-                    non_null_current_types = (
-                        non_null_current_type.members
-                        if isinstance(non_null_current_type, types.UnionType)
-                        else [non_null_current_type]
-                    )
-                    for member in non_nullable_types:
-                        for curr_ndx, curr_member in enumerate(non_null_current_types):
-                            if member.assign_type(
-                                curr_member
-                            ) and curr_member.assign_type(member):
-                                # Here we have found the corresponding type in the current array.
-                                # If the current array is a union, then we need to select the
-                                # corresponding field. Else, we can just use the current array.
-                                if isinstance(non_null_current_type, types.UnionType):
-                                    selection = self._arrow_data.field(curr_ndx)
-                                else:
-                                    selection = self._arrow_data
-                                data_arrays.append(selection)
-                                break
-                        else:
-                            # Here we have not found the corresponding type in the current array.
-                            # We will create an array of nulls.
-                            member_mapper = mappers_arrow.map_to_arrow(
-                                member, self._artifact
-                            )
-                            data_arrays.append(
-                                pa.nulls(len(self), type=member_mapper.result_type())
-                            )
-
-                    # Finally, combine the M arrays into a single union array.
-                    field_names = [
-                        desired_type_pyarrow_type.field(i).name
-                        for i in range(desired_type_pyarrow_type.num_fields)
-                    ]
-                    result = ArrowWeaveList(
-                        pa.UnionArray.from_dense(
-                            type_code_array,
-                            offsets,
-                            data_arrays,
-                            field_names,
-                        ),
-                        desired_type,
-                        self._artifact,
-                    )
-                else:
-                    result = ArrowWeaveList(
-                        self._arrow_data,
-                        types.non_none(desired_type),
-                        self._artifact,
-                    ).with_object_type(non_nullable_types[0])
-        elif current_type == desired_type:
-            # Put this at the end to support custom types
-            result = self
-        if result is None:
-            raise ValueError(f"Cannot convert {current_type} to {desired_type}.")
-
-        if tag_store.is_tagged(self):
-            tag_store.add_tags(result, tag_store.get_tags(self))
-
-        return result
-
-    def concatenate(self, other: "ArrowWeaveList") -> "ArrowWeaveList":
-        if len(self) == 0:
-            return other
-        if len(other) == 0:
-            return self
-        arrow_data = [arrow_as_array(awl._arrow_data) for awl in (self, other)]
-        if arrow_data[0].type == arrow_data[1].type:
-            return ArrowWeaveList(
-                safe_pa_concat_arrays(arrow_data), self.object_type, self._artifact
-            )
-        else:
-            new_object_types_with_pushed_down_tags = [
-                typing.cast(
-                    ArrowWeaveListType,
-                    tagged_value_type_helpers.push_down_tags_from_container_type_to_element_type(
-                        types.TypeRegistry.type_of(a)
-                    ),
-                ).object_type
-                for a in (self, other)
-            ]
-
-            new_object_type = types.unknown_coalesce(
-                types.merge_types(*new_object_types_with_pushed_down_tags)
-            )
-
-            new_arrow_arrays = [
-                a.with_object_type(new_object_type)._arrow_data for a in (self, other)
-            ]
-            return ArrowWeaveList(
-                safe_pa_concat_arrays(new_arrow_arrays), new_object_type, self._artifact
-            )
+        return concat.concatenate(self, other)
 
     def _limit(self, limit: int):
         return ArrowWeaveList(
             self._arrow_data.slice(0, limit), self.object_type, self._artifact
         )
+
+    def _with_object_type(self, object_type: types.Type, invalid_reason=None):
+        return ArrowWeaveList(
+            self._arrow_data, object_type, self._artifact, invalid_reason=invalid_reason
+        )
+
+    def _clear_invalid_reason(self):
+        return ArrowWeaveList(
+            self._arrow_data, self.object_type, self._artifact, invalid_reason=None
+        )
+
+
+ArrowWeaveListGenericType = typing.TypeVar(
+    "ArrowWeaveListGenericType", bound=types.Type
+)
+
+
+class ArrowWeaveListGeneric(
+    ArrowWeaveList[typing.Any], typing.Generic[ArrowWeaveListGenericType]
+):
+    object_type: ArrowWeaveListGenericType
 
 
 ArrowWeaveListType.instance_classes = ArrowWeaveList
@@ -1138,6 +1168,32 @@ ArrowWeaveListType.instance_classes = ArrowWeaveList
 
 ArrowWeaveListType.instance_classes = ArrowWeaveList
 ArrowWeaveListType.instance_class = ArrowWeaveList
+
+
+def is_typedict_arrowweavelist(
+    val: ArrowWeaveList,
+) -> typing_extensions.TypeGuard[ArrowWeaveListGeneric[types.TypedDict]]:
+    return isinstance(val.object_type, types.TypedDict)
+
+
+def is_object_arrowweavelist(
+    val: ArrowWeaveList,
+) -> typing_extensions.TypeGuard[ArrowWeaveListGeneric[types.ObjectType]]:
+    return isinstance(val.object_type, types.ObjectType)
+
+
+def is_taggedvalue_arrowweavelist(
+    val: ArrowWeaveList,
+) -> typing_extensions.TypeGuard[
+    ArrowWeaveListGeneric[tagged_value_type.TaggedValueType]
+]:
+    return isinstance(val.object_type, tagged_value_type.TaggedValueType)
+
+
+def is_list_arrowweavelist(
+    val: ArrowWeaveList,
+) -> typing_extensions.TypeGuard[ArrowWeaveListGeneric[types.List]]:
+    return isinstance(val.object_type, types.List)
 
 
 def dataframe_to_arrow(df):

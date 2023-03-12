@@ -53,7 +53,7 @@ gql_connection_op(
     "artifactCollections",
     wdt.ArtifactCollectionType,
     {},
-    lambda inputs: f"first: 50 collectionTypes: [PORTFOLIO]",
+    lambda inputs: f"collectionTypes: [PORTFOLIO]",
 )
 
 gql_connection_op(
@@ -62,7 +62,7 @@ gql_connection_op(
     "projects",
     wdt.ProjectType,
     {},
-    lambda inputs: f"first: 50",
+    lambda inputs: f"first: 100",
 )
 
 # Section 6/6: Non Standard Business Logic Ops

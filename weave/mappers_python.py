@@ -12,6 +12,7 @@ def map_to_python(
     type_: "weave_types.Type",
     artifact: "artifact_base.Artifact",
     path: list[str] = [],
+    mapper_options: typing.Any = None,
 ) -> "mappers.Mapper":
     pass
 
@@ -20,5 +21,6 @@ def map_from_python(
     type_: "weave_types.Type",
     artifact: "artifact_base.Artifact",
     path: list[str] = [],
+    mapper_options: typing.Any = None,
 ) -> "mappers.Mapper":
     pass

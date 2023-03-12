@@ -1,6 +1,7 @@
 import dataclasses
 import datetime
 import typing
+import inspect
 import functools
 import json
 from collections.abc import Iterable
@@ -227,7 +228,10 @@ class Type(metaclass=_TypeSubclassWatcher):
     def type_attrs(cls):
         type_attrs = []
         for field in dataclasses.fields(cls):
-            if issubclass(field.type, Type):
+            if (inspect.isclass(field.type) and issubclass(field.type, Type)) or (
+                field.type.__origin__ == typing.Union
+                and any(issubclass(a, Type) for a in field.type.__args__)
+            ):
                 type_attrs.append(field.name)
         return type_attrs
 
@@ -494,7 +498,12 @@ class Const(Type):
             )
 
     def _hashable(self):
-        return (hash(self.val_type), id(self.val))
+        val_id = id(self.val)
+        try:
+            val_id = hash(self.val)
+        except TypeError:
+            pass
+        return (hash(self.val_type), val_id)
 
     def __getattr__(self, attr):
         return getattr(self.val_type, attr)
@@ -662,14 +671,20 @@ class UnionType(Type):
         #     all_members = non_unknown_members
         if not all_members:
             raise errors.WeaveInternalError("Attempted to construct empty union")
+        if len(all_members) == 1:
+            raise errors.WeaveInternalError(
+                "Attempted to construct union with only one member, did you mean to use union()?"
+            )
         object.__setattr__(self, "members", all_members)
 
-    def __repr__(self):
-        return "UnionType(%s)" % ", ".join(repr(mem) for mem in self.members)
+    # def __repr__(self):
+    #     return "UnionType(%s)" % ", ".join(repr(mem) for mem in self.members)
 
     def __eq__(self, other):
         if not isinstance(other, UnionType):
             return False
+        # Order matters, it affects layout.
+        # return self.members == other.members
         return set(self.members) == set(other.members)
 
     def _hashable(self):
@@ -687,7 +702,7 @@ class UnionType(Type):
     #     raise Exception('invalid')
     @classmethod
     def from_dict(cls, d):
-        return cls(*[TypeRegistry.type_from_dict(mem) for mem in d["members"]])
+        return union(*[TypeRegistry.type_from_dict(mem) for mem in d["members"]])
 
     def _to_dict(self):
         return {"members": [mem.to_dict() for mem in self.members]}
@@ -1072,6 +1087,13 @@ def is_optional(type_: Type) -> bool:
     )
 
 
+def simple_non_none(type_: Type) -> Type:
+    if not isinstance(type_, UnionType):
+        return type_
+    new_members = [m for m in type_.members if m != NoneType()]
+    return union(*new_members)
+
+
 def non_none(type_: Type) -> Type:
     TaggedValueType = type_name_to_type("tagged")
 
@@ -1099,7 +1121,7 @@ def non_none(type_: Type) -> Type:
         elif len(new_members) == 1:
             return new_members[0]
         else:
-            return UnionType(*new_members)
+            return union(*new_members)
     return type_
 
 
@@ -1151,23 +1173,35 @@ def merge_many_types(types: list[Type]) -> Type:
 
 
 def merge_types(a: Type, b: Type) -> Type:
-    """Given two types return a new type that both are assignable to
+    """Compute the next list object type.
 
-    There are design decisions we can make here. We could choose to produce
-    a less specific type when merging TypedDicts for example, to keep
-    the type size smaller.
+    list[a].append(b) -> merge_types(a, b)
+
+    This is used at run-time, to figure out the type of existing objects!
+    So we can do things like drop UnknownType (UnknownType doesn't make
+    sense at run time)
+
+    Note: we don't guarantee that the resulting type can be assigned to
+    by either of the inputs! Consider TypedDict[{"a": int}].merge_types(TypedDict[{"b": int}])
+    The result is TypedDict[{"a": optional[int], "b": optional[int]}],
+    but neither of the inputs can be assigned to it.
+
+    Our decisions about how to merge types here are made to reduce overall
+    type size for lists.
+
+    This implementation must match list.concat implementations (which is the only
+    way to extend a list in Weave). Ie list.concat(list[a], [b]) -> list[merge_types(a, b)]
     """
     from .language_features.tagging import tagged_value_type
 
     if a == b:
         return a
-    if (
-        isinstance(a, Float)
-        and isinstance(b, Int)
-        or isinstance(a, Int)
-        and isinstance(b, Float)
-    ):
-        return Float()
+    if isinstance(a, Number) and isinstance(b, Number):
+        if a.__class__ == Number or b.__class__ == Number:
+            return Number()
+        if a.__class__ == Float or b.__class__ == Float:
+            return Float()
+        return Int()
     if isinstance(a, tagged_value_type.TaggedValueType) and isinstance(
         b, tagged_value_type.TaggedValueType
     ):
@@ -1187,13 +1221,42 @@ def merge_types(a: Type, b: Type) -> Type:
             other_prop_type = b.property_types.get(key, none_type)
             next_prop_types[key] = merge_types(self_prop_type, other_prop_type)
         return TypedDict(next_prop_types)
+    if isinstance(a, ObjectType) and isinstance(b, ObjectType):
+        if a.name == b.name:
+            next_type_attrs = {}
+            for key in a.type_attrs():
+                next_type_attrs[key] = merge_types(getattr(a, key), getattr(b, key))
+            return type(a)(**next_type_attrs)
+
     if isinstance(a, List) and isinstance(b, List):
         return List(merge_types(a.object_type, b.object_type))
+
     if isinstance(a, UnknownType):
         return b
     if isinstance(b, UnknownType):
         return a
-    return UnionType(a, b)
+
+    if isinstance(a, UnionType) or isinstance(b, UnionType):
+        new_union = UnionType(a, b)
+        final_members = [new_union.members[0]]
+        for mem in new_union.members[1:]:
+            for i, final_mem in enumerate(final_members):
+                merged_m = merge_types(final_mem, mem)
+                if not isinstance(merged_m, UnionType):
+                    final_members[i] = merged_m
+                    break
+            else:
+                final_members.append(mem)
+
+        # for i in range(len(new_union.members)):
+        #     for j in range(i + 1, len(new_union.members)):
+        #         merged_m = merge_types(new_union.members[i], new_union.members[j])
+        #         if not isinstance(merged_m, UnionType):
+        #             final_members.append(merged_m)
+        #         else:
+        #             final_members.append(new_union.members[i])
+        return union(*final_members)
+    return union(a, b)
 
 
 def unknown_coalesce(in_type: Type) -> Type:
@@ -1298,7 +1361,12 @@ def _merge_unknowns_of_type_with_types(of_type: Type, with_types: list[Type]):
 
     # If the current type itself is a union, then we need to recurse into it
     if isinstance(of_type, UnionType):
-        return _unknown_coalesce_on_union(union(*(of_type.members + with_types)))  # type: ignore
+        return union(
+            *[
+                _merge_unknowns_of_type_with_types(member, with_types)
+                for member in of_type.members
+            ]
+        )
 
     # if the current type is unknown, then we just return the next peer type.
     elif isinstance(of_type, UnknownType):
@@ -1326,7 +1394,7 @@ def _merge_unknowns_of_type_with_types(of_type: Type, with_types: list[Type]):
         return TypedDict(
             {
                 key: _merge_unknowns_of_type_with_types(
-                    value_type, [t.property_types[key] for t in with_types]  # type: ignore
+                    value_type, [t.property_types.get(key, NoneType()) for t in with_types]  # type: ignore
                 )
                 for key, value_type in of_type.property_types.items()
             }
@@ -1356,10 +1424,20 @@ def _merge_unknowns_of_type_with_types(of_type: Type, with_types: list[Type]):
 def union(*members: Type) -> Type:
     if not members:
         return UnknownType()
-    t = UnionType(*members)
-    if len(t.members) == 1:
-        return t.members[0]
-    return t
+    final_members = []
+    for member in members:
+        if isinstance(member, UnionType):
+            for sub_member in member.members:
+                if sub_member not in final_members:
+                    final_members.append(sub_member)
+        elif member not in final_members:
+            final_members.append(member)
+    # Unknown "takes over" in a union.
+    if any(isinstance(m, UnknownType) for m in final_members):
+        return UnknownType()
+    if len(final_members) == 1:
+        return final_members[0]
+    return UnionType(*final_members)
 
 
 def is_list_like(t: Type) -> bool:
@@ -1373,6 +1451,8 @@ def is_custom_type(t: Type) -> bool:
         or isinstance(t, TypedDict)
         or isinstance(t, List)
         or isinstance(t, UnionType)
+        or isinstance(t, Timestamp)
+        or t.name == "tagged"
     )
 
 
@@ -1395,3 +1475,92 @@ def type_is_variable(t: Type) -> bool:
 
 
 NumberBinType = TypedDict({"start": Float(), "stop": Float()})
+
+
+def map_leaf_types(t: Type, fn: typing.Callable[[Type], typing.Optional[Type]]) -> Type:
+    """
+    This function will recursively apply `fn` to all leaf types in `t`. A leaf type is
+    a basic type, object type, or const. If `fn` returns None, then the original type
+    will be used.
+    """
+
+    def null_safe_fn(t: Type) -> Type:
+        fn_res = fn(t)
+        return t if fn_res is None else fn_res
+
+    return _map_leaf_types_null_safe(t, null_safe_fn)
+
+
+def _map_leaf_types_null_safe(t: Type, fn: typing.Callable[[Type], Type]) -> Type:
+    TaggedValueType = type_name_to_type("tagged")
+    if isinstance(t, List):
+        return List(_map_leaf_types_null_safe(t.object_type, fn))
+    elif isinstance(t, TypedDict):
+        return TypedDict(
+            {k: _map_leaf_types_null_safe(v, fn) for k, v in t.property_types.items()}
+        )
+    elif isinstance(t, Dict):
+        return Dict(t.key_type, _map_leaf_types_null_safe(t.object_type, fn))
+    elif isinstance(t, ObjectType):
+        pass
+    elif isinstance(t, UnionType):
+        return union(*[_map_leaf_types_null_safe(t, fn) for t in t.members])
+    elif isinstance(t, Const):
+        pass
+    elif isinstance(t, TaggedValueType):
+        return TaggedValueType(
+            _map_leaf_types_null_safe(t.tag, fn),  # type: ignore
+            _map_leaf_types_null_safe(t.value, fn),
+        )
+    return fn(t)
+
+
+# parse_const_type and const_type_to_json are a new concept used only
+# by the weave0 ImageArtifactRefFileType. That stores for example
+# boxScores as {box1: [2, 3, 5], box2: [0]} where the lists are
+# class ids. This is a way to convert those literal representations
+# to types, making assignability work. The above becomes
+# TypedDict<box1: List<Union<Const<2>, Const<3>, Const<5>>>, box2: List<Const<0>>>.
+# We can update the names and standardize this more if we find it useful
+# outside of weave0 support.
+
+
+def parse_constliteral_type(val: typing.Any) -> Type:
+    if isinstance(val, Type):
+        return val
+    elif isinstance(val, dict):
+        return TypedDict({k: parse_constliteral_type(v) for k, v in val.items()})
+    elif isinstance(val, list):
+        return List(union(*[parse_constliteral_type(v) for v in val]))
+    else:
+        return Const(TypeRegistry.type_of(val), val)
+
+
+def constliteral_type_to_json(t: Type) -> typing.Any:
+    t = simple_non_none(t)
+    if isinstance(t, Const):
+        return t.val
+    elif isinstance(t, TypedDict):
+        return {k: constliteral_type_to_json(v) for k, v in t.property_types.items()}
+    elif isinstance(t, Dict):
+        return {}
+    elif isinstance(t, List):
+        object_type = t.object_type
+        members = [object_type]
+        if isinstance(object_type, UnionType):
+            members = object_type.members
+        members = [m for m in members if isinstance(m, Const)]
+        return [constliteral_type_to_json(mem) for mem in members]
+    raise ValueError(f"Cannot convert {t} to a JSON value")
+
+
+def split_none(t: Type) -> tuple[bool, Type]:
+    """Returns (is_optional, non_none_type)"""
+    if t == NoneType():
+        return True, UnknownType()
+    if not isinstance(t, UnionType):
+        return False, t
+    non_none_members = [m for m in t.members if not isinstance(m, NoneType)]
+    if len(non_none_members) < len(t.members):
+        return True, union(*non_none_members)
+    return False, t

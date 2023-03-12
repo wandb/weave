@@ -159,7 +159,6 @@ class WandbApiAsync:
                     currentManifest {
                         id
                         file {
-                            id
                             directUrl
                         }
                     }

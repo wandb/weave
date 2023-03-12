@@ -1,10 +1,14 @@
 import pytest
+
+from weave import weave_internal
 from .. import api as weave
 from .. import ops_arrow as arrow
 from ..ops_primitives import list_, dict_
 from . import list_arrow_test_helpers as lath
 import numpy as np
 import pytest
+from ..tests import tag_test_util as ttu
+from .. import ops
 
 
 def filter_fn(row) -> bool:
@@ -296,7 +300,7 @@ def test_join_all(li):
     if li == lath.ListNode:
         tag_order = [1, 1, 1, 1, 2, 2, 3, 3, 5]
     elif li == lath.ArrowNode:
-        tag_order = [1, 1, 3, 1, 1, 3, 2, 2, 5]
+        tag_order = [1, 1, 1, 1, 3, 3, 2, 2, 5]
     assert li.use_node(joined_outer_node.joinObj()) == tag_order
 
 
@@ -479,3 +483,88 @@ def test_join_to_str():
 
     assert lath.ListNode.use_node(list_joined) == res
     assert lath.ArrowNode.use_node(arrow_joined) == [res, res]
+
+
+@pytest.mark.parametrize(
+    "use_arrow",
+    [
+        # TODO: Implement Arrow Support
+        # True,
+        False
+    ],
+)
+def test_flatten_and_tags(use_arrow):
+    # tagged<list<tagged<awl<tagged<dict<id: tagged<number>, col: tagged<string>>>>>>>
+    cst = weave_internal.const
+    tag = ttu.op_add_tag
+    item_tag_getter = ttu.make_get_tag("item_tag")
+    list_tag_getter = ttu.make_get_tag("list_tag")
+
+    def cst_list(data):
+        return ops.make_list(**{str(i): l for i, l in enumerate(data)})
+
+    def cst_arrow(data):
+        return arrow.ops.list_to_arrow(cst_list(data))
+
+    if use_arrow:
+        inner_list_fn = cst_arrow
+    else:
+        inner_list_fn = cst_list
+
+    list_of_lists = cst_list(
+        [
+            tag(
+                inner_list_fn(
+                    [
+                        tag(cst("item_1_1"), {"item_tag": "1_1"}),
+                        tag(cst("item_1_2"), {"item_tag": "1_2"}),
+                        tag(cst("item_1_3"), {"item_tag": "1_3"}),
+                    ]
+                ),
+                {"list_tag": "1"},
+            ),
+            tag(
+                inner_list_fn(
+                    [
+                        tag(cst("item_2_1"), {"item_tag": "2_1"}),
+                        tag(cst("item_2_2"), {"item_tag": "2_2"}),
+                        tag(cst("item_2_3"), {"item_tag": "2_3"}),
+                    ]
+                ),
+                {"list_tag": "2"},
+            ),
+            tag(
+                inner_list_fn(
+                    [
+                        tag(cst("item_3_1"), {"item_tag": "3_1"}),
+                        tag(cst("item_3_2"), {"item_tag": "3_2"}),
+                        tag(cst("item_3_3"), {"item_tag": "3_3"}),
+                    ]
+                ),
+                {"list_tag": "3"},
+            ),
+        ]
+    )
+
+    flattened = list_of_lists.flatten()
+
+    data_res = weave.use(flattened)
+    item_tag_res = weave.use(item_tag_getter(flattened[0]))
+    list_tag_res = weave.use(list_tag_getter(flattened[0]))
+
+    # if use_arrow:
+    #     data_res = data_res
+
+    assert data_res == [
+        "item_1_1",
+        "item_1_2",
+        "item_1_3",
+        "item_2_1",
+        "item_2_2",
+        "item_2_3",
+        "item_3_1",
+        "item_3_2",
+        "item_3_3",
+    ]
+    assert item_tag_res == "1_1"
+    assert list_tag_res == "1"

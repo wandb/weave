@@ -13,7 +13,6 @@ from wandb.util import hex_to_b64_id, b64_to_hex_id
 from . import uris
 from . import errors
 from . import wandb_client_api
-from . import memo
 from . import file_base
 from . import file_util
 
@@ -52,7 +51,21 @@ class WandbArtifactManifestV1(typing.TypedDict):
 # as the raw json dict instead.
 @dataclasses.dataclass
 class WandbArtifactManifest:
+    class StorageLayout:
+        V1 = "V1"
+        V2 = "V2"
+
     _manifest_json: WandbArtifactManifestV1
+
+    @property
+    def _storage_policy_config(self):
+        return self._manifest_json.get("storagePolicyConfig", {})
+
+    @property
+    def storage_layout(self):
+        return self._storage_policy_config.get(
+            "storageLayout", WandbArtifactManifest.StorageLayout.V1
+        )
 
     def get_entry_by_path(
         self, path: str
@@ -80,7 +93,12 @@ def is_valid_version_index(version_index: str) -> bool:
 
 def get_wandb_read_artifact_uri(path: str):
     art = get_wandb_read_artifact(path)
-    return WeaveWBArtifactURI(art.name, art.version, art.entity, art.project, None)
+    return WeaveWBArtifactURI(
+        art.name.split(":", 1)[0],
+        art.commit_hash,
+        art.entity,
+        art.project,
+    )
 
 
 def wandb_artifact_dir():
@@ -148,11 +166,12 @@ def _collection_and_alias_id_mapping_to_uri(
             artifactMembership(aliasName: $aliasName) {	
                 id	
                 versionIndex	
-            }	
+                commitHash
+            }
             defaultArtifactType {	
                 id	
                 name	
-            }	
+            }
         }	
     }	
     """
@@ -180,18 +199,20 @@ def _collection_and_alias_id_mapping_to_uri(
     artifact_membership = res["artifactCollection"]["artifactMembership"]
     if artifact_membership is None:
         is_deleted = True
-        version = alias_name
+        # If the membership is deleted, then we will not be able to get the commit hash.
+        # Here, we can simply use the alias name as the commit hash. If the collection
+        # is ever un-deleted or the alias is re-assigned, then the next call will result
+        # in a "true" commit hash, ensuring we don't hit a stale cache.
+        commit_hash = alias_name
     else:
-        version_index = artifact_membership["versionIndex"]
-        version = f"v{version_index}"
-
+        commit_hash = artifact_membership["commitHash"]
     entity_name = collection["project"]["entity"]["name"]
     project_name = collection["project"]["name"]
     artifact_name = collection["name"]
 
     weave_art_uri = WeaveWBArtifactURI(
         artifact_name,
-        version,
+        commit_hash,
         entity_name,
         project_name,
     )
@@ -209,6 +230,7 @@ def _version_server_id_to_uri(server_id: str) -> ReadClientArtifactURIResult:
         artifact(id: $id) {	
             id
             state
+            commitHash
             versionIndex
             artifactType {	
                 id	
@@ -262,16 +284,15 @@ def _version_server_id_to_uri(server_id: str) -> ReadClientArtifactURIResult:
         is_deleted = True
 
     artifact_type_name = artifact["artifactType"]["name"]
-    version_index = artifact["versionIndex"]
+    commit_hash = artifact["commitHash"]
 
     entity_name = collection["project"]["entity"]["name"]
     project_name = collection["project"]["name"]
     artifact_name = collection["name"]
-    version = f"v{version_index}"
 
     weave_art_uri = WeaveWBArtifactURI(
         artifact_name,
-        version,
+        commit_hash,
         entity_name,
         project_name,
     )
@@ -424,6 +445,14 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         if path in self._saved_artifact.manifest.entries:
             return self._saved_artifact.manifest.entries[path].size
         return super().size(path)
+
+    @property
+    def initial_uri_obj(
+        self,
+    ) -> typing.Union["WeaveWBArtifactURI", "WeaveWBLoggedArtifactURI"]:
+        if not self.is_saved or not self._unresolved_read_artifact_or_client_uri:
+            raise errors.WeaveInternalError("cannot get uri of an unsaved artifact")
+        return self._unresolved_read_artifact_or_client_uri
 
     @property
     def uri_obj(self) -> "WeaveWBArtifactURI":
@@ -589,6 +618,15 @@ types.WandbArtifactRefType.instance_classes = WandbArtifactRef
 
 WandbArtifact.RefClass = WandbArtifactRef
 
+
+def is_hex_string(s: str) -> bool:
+    try:
+        int(s, 16)
+        return True
+    except ValueError:
+        return False
+
+
 # Used to refer to objects stored in WB Artifacts. This URI must not change and
 # matches the existing artifact schemes
 @dataclasses.dataclass
@@ -620,14 +658,29 @@ class WeaveWBArtifactURI(uris.WeaveURI):
             raise errors.WeaveInvalidURIError(f"Invalid WB Artifact URI: {uri}")
         entity_name = parts[0]
         project_name = parts[1]
-        name, version = parts[2].split(":", 1)
+
+        if ":" in parts[2]:
+            name, version = parts[2].split(":", 1)
+        else:
+            name = parts[2]
+            version = None
+
         file_path: typing.Optional[str] = None
         if len(parts) > 3:
             file_path = "/".join(parts[3:])
+
         extra: typing.Optional[list[str]] = None
         if fragment:
             extra = fragment.split("/")
-        return cls(name, version, entity_name, project_name, netloc, file_path, extra)
+        return cls(
+            name,
+            version,
+            entity_name,
+            project_name,
+            netloc,
+            file_path,
+            extra,
+        )
 
     @classmethod
     def parse(cls: typing.Type["WeaveWBArtifactURI"], uri: str) -> "WeaveWBArtifactURI":
@@ -640,7 +693,7 @@ class WeaveWBArtifactURI(uris.WeaveURI):
             f"{quote_slashes(netloc)}/"
             f"{quote_slashes(self.entity_name)}/"
             f"{quote_slashes(self.project_name)}/"
-            f"{quote_slashes(self.name)}:{quote_slashes(self.version) if self.version else ''}"
+            f"{quote_slashes(self.name)}:{self.version if self.version else ''}"
         )
         if self.path:
             uri += f"/{quote_slashes(self.path)}"
@@ -661,13 +714,18 @@ class WeaveWBArtifactURI(uris.WeaveURI):
 
     @property
     def resolved_artifact_uri(self) -> "WeaveWBArtifactURI":
-        if self.version and is_valid_version_index(self.version):
+        # This is the heuristic we use everywhere to tell if a version is an alias or not
+        # if self.version:
+        if self.version and is_hex_string(self.version) and len(self.version) == 20:
             return self
+        # if self.version and is_hex_string(self.version) and len(self.version) == 20:
+        #     return self
         if self._resolved_artifact_uri is None:
             path = f"{self.entity_name}/{self.project_name}/{self.name}"
             if self.version:
                 path += f":{self.version}"
-            self._resolved_artifact_uri = get_wandb_read_artifact_uri(path)
+            resolved_artifact_uri = get_wandb_read_artifact_uri(path)
+            self._resolved_artifact_uri = resolved_artifact_uri
         return self._resolved_artifact_uri
 
     def to_ref(self) -> WandbArtifactRef:
@@ -697,7 +755,7 @@ class WeaveWBLoggedArtifactURI(uris.WeaveURI):
         query: dict[str, list[str]],
         fragment: str,
     ):
-        path = path.strip("/")
+        path = parse.unquote(path.strip("/"))
         spl_netloc = netloc.split(":")
         if len(spl_netloc) == 1:
             name = spl_netloc[0]
@@ -707,7 +765,11 @@ class WeaveWBLoggedArtifactURI(uris.WeaveURI):
         else:
             raise errors.WeaveInvalidURIError(f"Invalid WB Client Artifact URI: {uri}")
 
-        return WeaveWBLoggedArtifactURI(name=name, version=version, path=path)
+        return WeaveWBLoggedArtifactURI(
+            name=name,
+            version=version,
+            path=path,
+        )
 
     def __str__(self) -> str:
         netloc = self.name
@@ -723,6 +785,7 @@ class WeaveWBLoggedArtifactURI(uris.WeaveURI):
         if self._resolved_artifact_uri is None:
             art_id = self.name
             if self.version:
+                # version is the alias or version index string
                 art_id += f":{self.version}"
             res = get_wandb_read_client_artifact_uri(art_id)
             self._resolved_artifact_uri = res.weave_art_uri

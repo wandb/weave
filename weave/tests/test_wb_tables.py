@@ -1,9 +1,12 @@
 import wandb
 import weave
+from weave.language_features.tagging import make_tag_getter_op
 from weave.language_features.tagging.tagged_value_type import TaggedValueType
 from weave.ops_domain.wandb_domain_gql import _make_alias
 from weave.ops_domain import wbmedia
 import numpy as np
+from weave.ops_arrow.list_ops import filter
+from weave.weave_internal import make_const_node
 
 
 def use_static_artifact_node(
@@ -14,7 +17,7 @@ def use_static_artifact_node(
     version="latest",
 ) -> weave.graph.Node:
     fake_wandb.fake_api.add_mock(
-        lambda ndx, q: {
+        lambda q, ndx: {
             "project_5702147f0293fd7538d402af13069708": {
                 "id": "p1",
                 "name": project_name,
@@ -24,6 +27,7 @@ def use_static_artifact_node(
                 ): {
                     "id": "a1",
                     "versionIndex": "0",
+                    "commitHash": "1478438ajsdfjj3kj1nn1nj",
                     "artifactSequence": {
                         "id": "c1",
                         "name": collection_name,
@@ -93,7 +97,7 @@ def test_convert_optional_list_cell(fake_wandb):
         {
             "a": [
                 {
-                    "artifact": "wandb-artifact:///test_entity/test_project/test_name:v0",
+                    "artifact": f"wandb-artifact:///test_entity/test_project/test_name:{art.commit_hash}",
                     "path": "media/html/03ac15e611be692f058e.html",
                     "sha256": "d4935b7d4e8f30952d5869122ca6793114936be8bf156dd936b6794fb6715e02",
                 }
@@ -142,7 +146,7 @@ def test_join_table_with_images(fake_wandb):
                     weave.types.TypedDict(
                         {
                             "name": weave.types.optional(weave.types.String()),
-                            "score": weave.types.optional(weave.types.Float()),
+                            "score": weave.types.optional(weave.types.Number()),
                         }
                     )
                 ),
@@ -156,7 +160,7 @@ def test_join_table_with_images(fake_wandb):
                 "0": {
                     "name": "a",
                     "image": {
-                        "artifact": "wandb-artifact:///test_entity/test_project/test_name:v0",
+                        "artifact": f"wandb-artifact:///test_entity/test_project/test_name:{art.commit_hash}",
                         "path": "media/images/9d4f26b99a1d4d044b6c.png",
                         "format": "png",
                         "height": 32,
@@ -175,7 +179,7 @@ def test_join_table_with_images(fake_wandb):
                 "0": {
                     "name": "b",
                     "image": {
-                        "artifact": "wandb-artifact:///test_entity/test_project/test_name:v0",
+                        "artifact": f"wandb-artifact:///test_entity/test_project/test_name:{art.commit_hash}",
                         "path": "media/images/7fd26b0af1228fa077bb.png",
                         "format": "png",
                         "height": 32,
@@ -206,8 +210,8 @@ def test_join_table_with_numeric_columns(fake_wandb):
     # on always using the string representation.
     assert awl.object_type == weave.types.TypedDict(
         {
-            "1": weave.types.optional(weave.types.Float()),
-            "2": weave.types.optional(weave.types.Float()),
+            "1": weave.types.optional(weave.types.Number()),
+            "2": weave.types.optional(weave.types.Number()),
         }
     )
     assert awl.to_pylist_raw() == [{"1": 1, "2": 2}]
@@ -239,3 +243,138 @@ def test_metric_table_join(fake_wandb):
     group_col_2 = sorted[2].groupkey()["label"]
     res = weave.use([group_col_0, group_col_1, group_col_2])
     assert res == ["cat", "dog", "mouse"]
+
+
+def test_empty_table(fake_wandb):
+    table = wandb.Table(
+        columns=["id", "label", "score_1", "score_2", "score_3"],
+        data=[],
+    )
+    art = wandb.Artifact("test_name", "test_type")
+    art.add(table, "table")
+    art_node = fake_wandb.mock_artifact_as_node(art)
+    file_node = art_node.file("table.table.json")
+    table_node = file_node.table()
+    table_rows = table_node.rows().createIndexCheckpointTag()
+    filtered = filter(table_rows, lambda row: row["label"] == "cat")
+    grouped = filtered.groupby(lambda row: weave.ops.dict_(label=row["label"]))
+    sorted = grouped.sort(
+        lambda row: weave.ops.make_list(a=row.groupkey()["label"]), ["asc"]
+    )
+    res = weave.use(sorted)
+    assert res.to_pylist_raw() == []
+
+
+def test_join_group_combo(fake_wandb):
+    table_1 = wandb.Table(
+        columns=["id", "label", "score"],
+        data=[
+            [1, "A", 1],
+            [2, "A", 2],
+            [3, "B", 3],
+            [4, "B", 4],
+            [5, "C", 5],
+            [6, "C", 6],
+        ],
+    )
+    art_1 = wandb.Artifact("test_name_1", "test_type_1")
+    art_1.add(table_1, "table_1")
+
+    table_2 = wandb.Table(
+        columns=["id", "label", "score"],
+        data=[
+            [1, "A", 10],
+            [2, "B", 20],
+            [3, "B", 30],
+            [4, "C", 40],
+            [5, "C", 50],
+            [6, "A", 60],
+        ],
+    )
+    art_2 = wandb.Artifact("test_name_2", "test_type_2")
+    art_2.add(table_2, "table_2")
+
+    art_1_node = fake_wandb.mock_artifact_as_node(art_1)
+    art_2_node = fake_wandb.mock_artifact_as_node(art_2)
+    table_1_rows = art_1_node.file("table_1.table.json").table().rows()
+    table_2_rows = art_2_node.file("table_2.table.json").table().rows()
+    list_of_tables = weave.ops.make_list(a=table_1_rows, b=table_2_rows).dropna()
+    joined_tables = list_of_tables.joinAll(
+        lambda row: weave.ops.make_list(a=row["id"]), False
+    )
+    indexed = joined_tables.createIndexCheckpointTag()
+    grouped = indexed.groupby(lambda row: weave.ops.dict_(label=row["label"][0]))
+    sorted = grouped.sort(
+        lambda row: weave.ops.make_list(label=row.groupkey()["label"]), ["asc"]
+    )
+    assert weave.use(sorted.count()) == 3
+    assert weave.use(sorted[2].groupkey()["label"]) == "C"
+    assert weave.use(sorted[1]["score"]).to_pylist_notags() == [
+        [3.0, 30.0],
+        [4.0, 40.0],
+    ]
+
+    join_obj = sorted[0].joinObj()[0]
+    assert weave.use(join_obj) == [1.0]
+
+    tag_getter_op = make_tag_getter_op.make_tag_getter_op(
+        "_ct_fake_run", weave.types.String()
+    )
+    run_names = sorted[0]["score"].mapEach(lambda row: tag_getter_op(row))
+    use_run_names = weave.use(run_names)
+    assert use_run_names.to_pylist_notags() == [
+        ["test_run", "test_run"],
+        ["test_run", "test_run"],
+    ]
+
+
+def test_group_by_const(fake_wandb):
+    columns = ["id", "label", "score"]
+    data = [
+        [1, "A", 1],
+        [2, "A", 2],
+        [3, "B", 3],
+        [4, "B", 4],
+        [5, "C", 5],
+        [6, "C", 6],
+    ]
+    table_1 = wandb.Table(
+        columns=columns,
+        data=data,
+    )
+    art_1 = wandb.Artifact("test_name_1", "test_type_1")
+    art_1.add(table_1, "table_1")
+    art_1_node = fake_wandb.mock_artifact_as_node(art_1)
+    table_1_rows = art_1_node.file("table_1.table.json").table().rows()
+    grouped = table_1_rows.groupby(
+        lambda row: weave.ops.dict_(a=make_const_node(weave.types.Boolean(), True))
+    )
+    assert weave.use(grouped).to_pylist_notags() == [
+        [dict(zip(columns, row)) for row in data]
+    ]
+
+
+def test_symbols_in_name(fake_wandb):
+    columns = ["id", "label", "score"]
+    data = [
+        [1, "A", 1],
+        [2, "A", 2],
+        [3, "B", 3],
+        [4, "B", 4],
+        [5, "C", 5],
+        [6, "C", 6],
+    ]
+    table_1 = wandb.Table(
+        columns=columns,
+        data=data,
+    )
+    art_1 = wandb.Artifact("test_name_1", "test_type_1")
+    name_with_all_symbols_and_spaces = "table_1!@#$%^&*( )_+`~[]{}|;':\",./<>?"
+    art_1.add(table_1, name_with_all_symbols_and_spaces)
+    art_1_node = fake_wandb.mock_artifact_as_node(art_1)
+    table_1_rows = (
+        art_1_node.file(f"{name_with_all_symbols_and_spaces}.table.json").table().rows()
+    )
+    assert weave.use(table_1_rows).to_pylist_notags() == [
+        dict(zip(columns, row)) for row in data
+    ]

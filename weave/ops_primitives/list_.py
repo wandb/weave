@@ -101,11 +101,11 @@ class List:
             b_comp_res = b[0]
             for a_res, b_res, c_dir in zip(a_comp_res, b_comp_res, columnDirs):
                 dir_adjust = -1 if c_dir == "desc" else 1
-                if a_res is None and b_res is None:
+                if a_res == None and b_res == None:
                     continue
-                elif a_res is None:
+                elif a_res == None:
                     return -1 * dir_adjust
-                elif b_res is None:
+                elif b_res == None:
                     return 1 * dir_adjust
 
                 if a_res < b_res:
@@ -361,7 +361,16 @@ def flatten_return_type(input_types):
 
 def _flatten(l):
     if isinstance(l, list):
-        return sum((_flatten(o) for o in l), [])
+        tags = None
+        if tag_store.is_tagged(l):
+            tags = tag_store.get_tags(l)
+
+        def tag_wrapper(item):
+            if tags is not None:
+                return tag_store.add_tags(box.box(item), tags)
+            return item
+
+        return sum((_flatten(tag_wrapper(o)) for o in l), [])
     else:
         return [l]
 

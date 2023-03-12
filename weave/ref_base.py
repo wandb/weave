@@ -50,6 +50,10 @@ class Ref:
         return uris.WeaveURI.parse(s).to_ref()
 
     @property
+    def initial_uri(self) -> str:
+        raise NotImplementedError
+
+    @property
     def uri(self) -> str:
         raise NotImplementedError
 

@@ -194,6 +194,68 @@ class TaggedValueType(types.Type):
                 )
             self.__dict__["value"] = self.value.value
 
+        # This post processing step is to handle the case where the value is a
+        # union of None and a TaggedValueType. This is a common pattern in
+        # Weave. In this step, we hoist the tags in the inner TaggedValueType up
+        # to the outer TaggedValueType and make them optional, leaving the union
+        # to be a union of None and the TaggedValueType's inner value type.
+        # While this seems highly specific, the motivation is to solve a bug in
+        # Arrow.
+        #
+        # Firstly, let's justify why this is allowed in the first place. Take
+        # the following type: Tagged<{TO},Maybe<Tagged<TI, TV>>. The
+        # transformation ends up being: Tagged<{TO, Maybe<TI>},Maybe<TV>>. Now,
+        # from a Weave0 compatibility perspective, this is fine because anything
+        # the original type is assignable to, the new type is also assignable
+        # to. Therefore we are making a slightly broader type here.
+        #
+        # In fact, I think we can generalize this even farther to always merge
+        # out inner unions of TaggedValues.
+        #
+        # From an op perspective, this fits our model since any tag get
+        # operation on the original type will result in an optional value if the
+        # tag is on the inner TaggedValue. So, this is perfectly compatible.
+        #
+        # Now, why do this? The main motivation is AWL. When adding tags to AWL,
+        # we use a helper function `direct_add_arrow_tags` which will merge tags
+        # in an attempt to conform to the post processing rule above. However,
+        # there is one edge case which is incorrect: when the inner value is
+        # this optional tagged value case. The reason is because the arrow's
+        # `nullable` property on fields is not the same as the Weave union None
+        # type. So we have no way of knowing if there is an intermediate "None"
+        # and therefore will always merge the tags. This creates a bug when
+        # doing type traversal because the Weave type does not match the
+        # underlying data shape anymore. This post processing step ensures the
+        # types are always aligned.
+        #
+        # As a bonus, this actually makes the types more accurate with respect
+        # to how they are stored in the op_store as well. In the op_store, we
+        # merge types in a similar manner, but since we don't need to do any
+        # column mapping on the op_store data we never ran into this problem.
+        if isinstance(self.value, types.UnionType):
+            if len(self.value.members) == 2:
+                maybe_none_type = None
+                maybe_tagged_value_type = None
+                for member in self.value.members:
+                    if isinstance(member, types.NoneType):
+                        maybe_none_type = member
+                    elif isinstance(member, TaggedValueType):
+                        maybe_tagged_value_type = member
+                if maybe_none_type and maybe_tagged_value_type:
+                    new_tag = types.TypedDict(
+                        {
+                            **self.tag.property_types,
+                            **{
+                                k: types.optional(v)
+                                for k, v in maybe_tagged_value_type.tag.property_types.items()
+                            },
+                        }
+                    )
+                    new_value = maybe_tagged_value_type.value
+
+                    self.__dict__["tag"] = new_tag
+                    self.__dict__["value"] = new_value
+
     def simple_str(self) -> str:
         return str(self.value)
 

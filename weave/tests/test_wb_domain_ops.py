@@ -43,7 +43,7 @@ def test_root_project_runs(fake_wandb):
                     "id": 1,
                     "name": "stacey",
                 },
-                "runs_21303e3890a1b6580998e6aa8a345859": {
+                "runs_c1233b7003317090ab5e2a75db4ad965": {
                     "edges": [
                         {
                             "node": {
@@ -87,7 +87,7 @@ def test_root_project_runs(fake_wandb):
                     id 
                     name
                 } 
-                runs_21303e3890a1b6580998e6aa8a345859: runs(first: 50) {
+                runs_c1233b7003317090ab5e2a75db4ad965: runs(first: 100) {
                     edges {
                         node {
                             id
@@ -116,7 +116,7 @@ def test_root_project_concat(fake_wandb):
         lambda query, ndx: {
             "project_518fa79465d8ffaeb91015dce87e092f": {
                 **fwb.project_payload,
-                "runs_6e908597bd3152c2f0457f6283da76b9": {
+                "runs_261949318143369aa6c158af92afee03": {
                     "edges": [
                         {
                             "node": {
@@ -147,8 +147,8 @@ def test_root_project_concat(fake_wandb):
                 id
                 name
                 }
-                runs_6e908597bd3152c2f0457f6283da76b9: runs(
-                first: 50
+                runs_261949318143369aa6c158af92afee03: runs(
+                first: 100
                 filters: "{}"
                 order: "-createdAt"
                 ) {
@@ -207,8 +207,8 @@ def test_root_project_concat(fake_wandb):
                 id
                 name
                 }
-                runs_6e908597bd3152c2f0457f6283da76b9: runs(
-                first: 50
+                runs_261949318143369aa6c158af92afee03: runs(
+                first: 100
                 filters: "{}"
                 order: "-createdAt"
                 ) {
@@ -243,7 +243,7 @@ def test_all_projects(fake_wandb):
                         {
                             "node": {
                                 **fwb.project_payload,
-                                "runs_21303e3890a1b6580998e6aa8a345859": {
+                                "runs_c1233b7003317090ab5e2a75db4ad965": {
                                     "edges": [
                                         {
                                             "node": {
@@ -278,7 +278,7 @@ def test_all_projects(fake_wandb):
                                 id
                                 name
                             }
-                            runs_21303e3890a1b6580998e6aa8a345859: runs(first: 50) {
+                            runs_c1233b7003317090ab5e2a75db4ad965: runs(first: 100) {
                                 edges {
                                     node {
                                         id
@@ -361,7 +361,7 @@ def test_multi_root_merging(fake_wandb):
             "project_3c237e5b25fed9a705b21513dd7921c6": {
                 **fwb.project_payload,
                 "name": "p_1",
-                "runs_21303e3890a1b6580998e6aa8a345859": {
+                "runs_c1233b7003317090ab5e2a75db4ad965": {
                     "edges": [
                         {
                             "node": {
@@ -436,7 +436,7 @@ def test_multi_root_merging(fake_wandb):
                     id 
                     name
                 }
-                runs_21303e3890a1b6580998e6aa8a345859:runs(first:50){
+                runs_c1233b7003317090ab5e2a75db4ad965:runs(first:100){
                     edges{
                         node{
                             id 
@@ -500,7 +500,7 @@ def test_two_level_summary(fake_wandb):
             "project_8d1592567720841659de23c02c97d594": {
                 **fwb.project_payload,
                 "name": "p_1",
-                "runs_21303e3890a1b6580998e6aa8a345859": {
+                "runs_c1233b7003317090ab5e2a75db4ad965": {
                     "edges": [
                         {
                             "node": {
@@ -538,7 +538,7 @@ def test_escaped_gql_query(fake_wandb):
             "id": "UHJvamVjdDp2MTpzYWdlbWFrZXItcGVvcGxlLXZlaGljbGUtY2xhc3Mtc3BsaXR0aW5nOmFjdHVhdGVhaQ==",
             "name": "",
             "entity": {"id": "RW50aXR5OjE0NzUxNw==", "name": "e_0"},
-            "runs_6e908597bd3152c2f0457f6283da76b9": {"edges": []},
+            "runs_261949318143369aa6c158af92afee03": {"edges": []},
         }
     }
 
@@ -575,8 +575,8 @@ def test_escaped_gql_query(fake_wandb):
             id
             name
             }
-            runs_6e908597bd3152c2f0457f6283da76b9: runs(
-            first: 50
+            runs_261949318143369aa6c158af92afee03: runs(
+            first: 100
             filters: "{}"
             order: "-createdAt"
             ) {

@@ -90,7 +90,9 @@ class HttpAsync:
         if ENABLE_REQUEST_TRACING:
             trace_configs.append(logging_trace_config())
         self.session = aiohttp.ClientSession(
-            trace_configs=trace_configs, connector=conn
+            trace_configs=trace_configs,
+            connector=conn,
+            cookie_jar=aiohttp.DummyCookieJar(),
         )
 
     async def download_file(

@@ -2,6 +2,7 @@ import contextlib
 import dataclasses
 import duckdb
 import typing
+import numpy as np
 import pyarrow as pa
 import pyarrow.compute as pc
 
@@ -10,17 +11,21 @@ from .. import weave_types as types
 from ..language_features.tagging import tagged_value_type, tag_store
 from ..api import op
 from .. import graph
+from .. import engine_trace
 
 from .arrow import arrow_as_array, ArrowWeaveListType, offsets_starting_at_zero
 from .util import _to_compare_safe_call
 from .vectorize import (
+    _ensure_variadic_fn,
     vectorize,
     _call_vectorized_fn_node_maybe_awl,
     _call_and_ensure_awl,
     _apply_fn_node_with_tag_pushdown,
 )
 from .arrow_tags import pushdown_list_tags, awl_add_arrow_tags
-from .list_ import ArrowWeaveList
+from .list_ import ArrowWeaveList, unsafe_awl_construction
+
+tracer = engine_trace.tracer()  # type: ignore
 
 
 @contextlib.contextmanager
@@ -34,6 +39,18 @@ def duckdb_con() -> typing.Generator[duckdb.DuckDBPyConnection, None, None]:
 
 def _filter_none(arrs: list[typing.Any]) -> list[typing.Any]:
     return [a for a in arrs if a != None]
+
+
+def _arrow_zip(*arrs: pa.Array) -> pa.Array:
+    n_arrs = len(arrs)
+    output_len = min(len(a) for a in arrs)
+    array_indexes = np.tile(np.arange(n_arrs, dtype="int64"), output_len)
+    item_indexes = np.floor(np.arange(0, output_len, 1.0 / n_arrs)).astype("int64")
+    indexes = item_indexes + array_indexes * output_len
+    concatted = pa.concat_arrays(arrs)
+    interleaved = concatted.take(indexes)
+    offsets = np.arange(0, len(interleaved) + len(arrs), len(arrs), dtype="int64")
+    return pa.ListArray.from_arrays(offsets, interleaved)
 
 
 def _awl_struct_array_to_table(arr: pa.StructArray) -> pa.Table:
@@ -79,7 +96,10 @@ def _joined_all_output_type_tag_type(
 def _custom_join_apply_fn_node(
     awl: ArrowWeaveList, fn: graph.OutputNode
 ) -> typing.Tuple[ArrowWeaveList, types.Type]:
-    called = _call_vectorized_fn_node_maybe_awl(awl, vectorize(fn))
+    # Need to add here as well since it is a custom one
+    called = _call_vectorized_fn_node_maybe_awl(
+        awl, vectorize(_ensure_variadic_fn(fn, awl.object_type))
+    )
     object_type = typing.cast(types.List, called.type).object_type
     return _call_and_ensure_awl(awl, called), object_type
 
@@ -198,6 +218,90 @@ def _multi_array_common_encoder(
     )
 
 
+join_key_col_name = "__joinobj__"
+join_tag_key_col_name = "__joinobj_tag__"
+
+
+# This is the old duckdb implementation. It is 40x slower than the arrow one below.
+# Leaving for the moment in case we need to fall back for correctness
+def _joinall_duck(
+    tables: list[pa.Table], join_type: str, select_cols: list[str]
+) -> pa.Table:
+    n_tables = len(tables)
+    query = "SELECT COALESCE(%s) as %s" % (
+        ", ".join(f"t{i}.{join_key_col_name}" for i in range(n_tables)),
+        join_key_col_name,
+    )
+    query += ", COALESCE(%s) as %s" % (
+        ", ".join(f"t{i}.{join_tag_key_col_name}" for i in range(n_tables)),
+        join_tag_key_col_name,
+    )
+    for k in select_cols:
+        query += ", list_value(%s) as %s" % (
+            ", ".join(
+                f"t{i}.{k}" for i in range(n_tables) if k in tables[i].schema.names
+            ),
+            k,
+        )
+
+    query += "\nFROM t0"
+    for t_ndx in range(1, n_tables):
+        query += f" {join_type} join t{t_ndx} ON t0.{join_key_col_name} = t{t_ndx}.{join_key_col_name}"
+
+    with duckdb_con() as con:
+        for i, keyed_table in enumerate(tables):
+            con.register(f"t{i}", keyed_table)
+        with tracer.trace("ddbexecute"):
+            res = con.execute(query)
+            return res.arrow()
+
+
+def _joinall_arrow(
+    tables: list[pa.Table], join_type: str, select_cols: list[str]
+) -> pa.Table:
+    # join
+    table0 = tables[0]
+    joined = pa.Table.from_arrays(
+        [table0[join_key_col_name], np.arange(len(table0), dtype="int64")],
+        names=["join", "index_t0"],
+    )
+    for i, t in enumerate(tables[1:]):
+        other = pa.Table.from_arrays(
+            [t[join_key_col_name], np.arange(len(t), dtype="int64")],
+            names=["join", f"index_t{i+1}"],
+        )
+        joined = joined.join(
+            other,
+            ["join"],
+            join_type=join_type,
+            use_threads=False,
+            coalesce_keys=True,
+        )
+
+    join_tag_cols = []
+    for t, table in enumerate(tables):
+        if join_tag_key_col_name in table.schema.names:
+            t_indexes = joined[f"index_t{t}"]
+            join_tag_cols.append(table[join_tag_key_col_name].take(t_indexes))
+    join_tag_col = pa.compute.coalesce(*join_tag_cols)
+
+    # zip
+    zipped_cols = []
+    for c in select_cols:
+        col_cols = []
+        for t, table in enumerate(tables):
+            t_indexes = joined[f"index_t{t}"]
+            if c in table.schema.names:
+                col_cols.append(table[c].take(t_indexes).combine_chunks())
+        zipped_cols.append(_arrow_zip(*col_cols))
+
+    result = pa.Table.from_arrays(
+        [joined["join"], join_tag_col] + zipped_cols,
+        names=[join_key_col_name, join_tag_key_col_name] + select_cols,
+    )
+    return result
+
+
 @op(
     name="ArrowWeaveList-joinAll",
     input_type={
@@ -263,8 +367,6 @@ def join_all(arrs, joinFn, outer: bool):
     raw_key_to_safe_key = {key: f"c_{ndx}" for ndx, key in enumerate(all_element_keys)}
     safe_key_to_raw_key = {v: k for k, v in raw_key_to_safe_key.items()}
     safe_element_keys = list(raw_key_to_safe_key.values())
-    join_key_col_name = "__joinobj__"
-    join_tag_key_col_name = "__joinobj_tag__"
 
     duck_ready_tables = []
     for i, (arr, arrs_keys) in enumerate(zip(pushed_arrs, arrs_keys)):
@@ -336,40 +438,15 @@ def join_all(arrs, joinFn, outer: bool):
         )
         duck_ready_tables.append(filtered_table)
 
-    join_type = "full outer" if outer else "inner"
-
-    query = "SELECT COALESCE(%s) as %s" % (
-        ", ".join(f"t{i}.{join_key_col_name}" for i in range(len(duck_ready_tables))),
-        join_key_col_name,
-    )
-    query += ", COALESCE(%s) as %s" % (
-        ", ".join(
-            f"t{i}.{join_tag_key_col_name}" for i in range(len(duck_ready_tables))
-        ),
-        join_tag_key_col_name,
-    )
-    for k in safe_element_keys:
-        raw_key = safe_key_to_raw_key[k]
-        query += ", list_value(%s) as %s" % (
-            ", ".join(
-                f"t{i}.{k}"
-                for i in range(len(duck_ready_tables))
-                if raw_key in arr_keys[i]
-            ),
-            k,
-        )
-
-    query += "\nFROM t0"
-    for t_ndx in range(1, len(duck_ready_tables)):
-        query += f" {join_type} join t{t_ndx} ON t0.{join_key_col_name} = t{t_ndx}.{join_key_col_name}"
-
     encoder_result = _multi_array_common_encoder(duck_ready_tables)
     encoded_db_tables = encoder_result.encoded_arrays
-    with duckdb_con() as con:
-        for i, keyed_table in enumerate(encoded_db_tables):
-            con.register(f"t{i}", keyed_table)
-        res = con.execute(query)
-        duck_res_table = res.arrow()
+
+    join_type = "full outer" if outer else "inner"
+
+    duck_res_table = _joinall_arrow(
+        encoded_db_tables, join_type, list(safe_key_to_raw_key)
+    )
+
     recorded_table = encoder_result.code_array_to_encoded_array(duck_res_table)
     join_obj_tagged = recorded_table.column(join_tag_key_col_name).combine_chunks()
 
@@ -564,15 +641,16 @@ def join_2(arr1, arr2, joinFn1, joinFn2, alias1, alias2, leftOuter, rightOuter):
         }
     )
 
-    untagged_result: ArrowWeaveList = ArrowWeaveList(
-        final_table,
-        final_type,
-        arr1._artifact,
-    )
-
-    res = awl_add_arrow_tags(
-        untagged_result,
-        pa.StructArray.from_arrays([join_obj], names=["joinObj"]),
-        types.TypedDict({"joinObj": raw_join_obj_type}),
-    )
+    with unsafe_awl_construction("missing tags"):
+        untagged_result: ArrowWeaveList = ArrowWeaveList(
+            final_table,
+            final_type,
+            arr1._artifact,
+        )
+        res = awl_add_arrow_tags(
+            untagged_result,
+            pa.StructArray.from_arrays([join_obj], names=["joinObj"]),
+            types.TypedDict({"joinObj": raw_join_obj_type}),
+        )
+    res.validate()
     return res

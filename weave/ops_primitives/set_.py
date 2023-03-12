@@ -44,7 +44,7 @@ def difference_output_type(input_type):
     if vals1 and vals2:
         union_vals = set(vals1).difference(vals2)
         return types.List(
-            types.UnionType(*(types.Const(types.String(), v) for v in union_vals))
+            types.union(*(types.Const(types.String(), v) for v in union_vals))
         )
     return types.List(types.String())
 

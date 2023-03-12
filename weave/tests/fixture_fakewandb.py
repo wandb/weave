@@ -2,18 +2,21 @@ from contextvars import Token
 from dataclasses import dataclass, field
 import json
 import os
-import random
+import uuid
 import tempfile
 import typing
 
-from weave import context_state
 from weave import wandb_api
 from weave import util
-from ..artifact_wandb import WandbArtifact, WeaveWBArtifactURI, is_valid_version_index
+from .tag_test_util import op_add_tag
+from ..artifact_wandb import WandbArtifact, WeaveWBArtifactURI
 from .. import wandb_client_api
 from unittest import mock
 import shutil
 import weave
+import wandb
+
+from wandb.sdk.wandb_artifacts import Artifact
 
 # Note: We're mocking out the whole io_service right now. This is too
 # high level and doesn't test the actual io implementation. We should
@@ -108,6 +111,7 @@ class FakeVersion:
     version: str = "v0"
     name: str = "test_res_1fwmcd3q:v0"
     id: str = "1234567890"
+    commit_hash: str = "303db33c9f9264768626"
 
 
 class FakeVersions:
@@ -182,12 +186,16 @@ class FakeApi:
 
     def artifact(self, path: str) -> FakeVersion:
         entity, project, name = path.split("/")
-        name, version = name.split(":")
+        if ":" in name:
+            name, version = name.split(":")
+        else:
+            version = "latest"
+
         return FakeVersion(
             entity=entity,
             project=project,
             name=name,
-            version="v4" if not is_valid_version_index(version) else version,
+            version=version,  # currently a commit_hash or "latest"
         )
 
     def add_mock(
@@ -269,19 +277,40 @@ class SetupResponse:
     token: Token
 
     def mock_artifact_as_node(
-        self, artifact, entity_name="test_entity", project_name="test_project"
+        self,
+        artifact,
+        entity_name="test_entity",
+        project_name="test_project",
+        tag_payload={
+            # In the future, we should make these actual run and project objects so we can chain ops
+            "fake_run": "test_run",
+            "fake_project": "test_project",
+        },
     ):
+
         artifact_uri = WeaveWBArtifactURI.parse(
-            f"wandb-artifact:///{entity_name}/{project_name}/{artifact.name}:v{len(self.fake_io.mocked_artifacts)}"
+            f"wandb-artifact:///{entity_name}/{project_name}/{artifact.name}:{artifact.commit_hash}"
         )
+
         self.fake_io.add_artifact(artifact, artifact_uri)
-        return weave.make_node(
+        res = weave.make_node(
             WandbArtifact(
                 "test_name",
                 None,
                 artifact_uri,
             )
         )
+        if tag_payload:
+            res = op_add_tag(res, tag_payload)
+        return res
+
+
+class PatchedSDKArtifact(wandb.Artifact):
+    @property
+    def commit_hash(self) -> str:
+        if not hasattr(self, "_commit_hash"):
+            self._commit_hash = uuid.uuid4().hex[:20]
+        return self._commit_hash
 
 
 def setup():
@@ -303,6 +332,9 @@ def setup():
     orig_io_service_client = io_service.get_sync_client
     io_service.get_sync_client = get_sync_client
 
+    # patch wandb artifact to allow us to generate a commit hash before we log the artifact
+    wandb.Artifact = PatchedSDKArtifact
+
     return SetupResponse(
         fake_api,
         fake_io_service_client,
@@ -319,6 +351,7 @@ def teardown(setup_response: SetupResponse):
     setup_response.fake_io.cleanup()
     wandb_client_api.wandb_public_api = setup_response.old_wandb_api_wandb_public_api
     io_service.get_sync_client = setup_response.orig_io_service_client  # type: ignore
+    wandb.Artifact = Artifact
 
 
 entity_payload = {
@@ -358,6 +391,7 @@ artifactSequence_payload = {
 artifactVersion_payload = {
     "id": "QXJ0aWZhY3Q6MTQxODgyNDA=",
     "versionIndex": 0,
+    "commitHash": "303db33c9f9264768626",
     "artifactSequence": artifactSequence_payload,
 }
 artifactMembership_payload = {

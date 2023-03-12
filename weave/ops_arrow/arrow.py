@@ -4,6 +4,7 @@ import pyarrow as pa
 from pyarrow import compute as pc
 import pyarrow.parquet as pq
 import typing
+import textwrap
 
 py_type = type
 
@@ -11,229 +12,6 @@ from .. import mappers_python
 from .. import weave_types as types
 from .. import errors
 from .. import artifact_fs
-
-
-def dense_union_to_sparse_union(array: pa.Array) -> pa.Array:
-    if not pa.types.is_union(array.type):
-        raise ValueError(f"Expected UnionArray, got {type(array)}")
-    if array.type.mode != "dense":
-        raise ValueError(f"Expected dense UnionArray, got {array.type.mode}")
-
-    type_codes = array.type_codes
-    arrays = []
-
-    for field_index, field in enumerate(array.type):
-        # convert dense representation to sparse representation
-        value_array = array.field(field_index)
-        mask = pc.equal(type_codes, pa.scalar(field_index, type=pa.int8()))
-        offsets_for_type = pc.filter(offsets_starting_at_zero(array), mask)
-        replacements = pc.take(value_array, offsets_for_type)
-        empty_array = pa.nulls(len(array), type=field.type)
-        result = safe_replace_with_mask(empty_array, mask, replacements)
-        arrays.append(result)
-
-    return pa.UnionArray.from_sparse(
-        type_codes,
-        arrays,
-    )
-
-
-def safe_replace_with_mask(
-    array: pa.Array, mask: pa.Array, replacements: pa.Array
-) -> pa.Array:
-    if array.type != replacements.type:
-        raise errors.WeaveInternalError(
-            f"Expected array and replacements to have the same type, got {array.type} and {replacements.type}"
-        )
-
-    if pa.types.is_struct(array.type):
-        if array.type.num_fields == 0:
-            return array
-        arrays = []
-        names = []
-        for field_index, field in enumerate(array.type):
-            value_array = array.field(field_index)
-            replacement_array = replacements.field(field_index)
-            result = safe_replace_with_mask(value_array, mask, replacement_array)
-            arrays.append(result)
-            names.append(field.name)
-
-        return pa.StructArray.from_arrays(
-            arrays,
-            names,
-            mask=pc.replace_with_mask(
-                pa.compute.invert(array.is_valid()),
-                mask,
-                pa.compute.invert(replacements.is_valid()),
-            ),
-        )
-    elif pa.types.is_list(array.type):
-        # Note: this is admittedly not efficient, but there does not seem to be
-        # a better alternative. Basically, `pc.replace_with_mask` does not work
-        # on list arrays. There are a number of problems:
-        # 1. Calling `flatten` on a list array drops the nulls.
-        # 2. In order to enter another level of recursion with
-        # `safe_replace_with_mask`, we would need to create a new mask, value,
-        # and replacement array. The value and mask arrays cannot be correctly
-        # created with pure pyarrow functions and require looping over every sub
-        # element in the lists. Unless that can be solved, then this single loop
-        # over the outer list is the best we can do.
-        final_arr = []
-        replacement_ndx = 0
-        for i in range(len(array)):
-            if mask[i].as_py():
-                final_arr.append(replacements[replacement_ndx].as_py())
-                replacement_ndx += 1
-            else:
-                final_arr.append(array[i].as_py())
-        return pa.array(final_arr, type=array.type)
-
-        # Note: Danny had commented that the above implementation would fail in
-        # the case that array.type is a dense union. This is true - see
-        # https://github.com/wandb/weave-internal/pull/542/files#r1100703368.
-        #
-        # A test commented out test case is provided in `test_safe_replace_with_mask`
-        # which stresses this.
-        #
-        # In particular, it would need to follow something like this logic
-        # (which is pretty challenging to implement and likely requires visiting
-        # every single value!):
-        #
-        #
-        # array: ListArray<T> - length L
-        # replacements - ListArray<T> - length R
-        # mask: BooleanArray - length L (R number of True values)
-        #
-        # flattened_array: (assuming [3,3])
-        # [0_0, 0_1, 0_2, 1_0, 1_1, 1_2, 2_0, 2_1, 2_2]
-        #  |-----L0-----| |-----L1-----| |-----L2-----|
-        #
-        # flattened_mask:
-        # [0_B, 0_B, 0_B, 1_B, 1_B, 1_B, 2_B, 2_B, 2_B]
-        #  |-----L0-----| |-----L1-----| |-----L2-----|
-        #
-        # flattened_replacements: (assuming (2,2))
-        # [0_0, 0_1, 1_0, 1_1]
-        #  |--R0--| |--R1---|
-        #
-        # Now, let's assume the mask is [True, False, True],
-        #
-        # Then we want to replace the first and third list in the original array,
-        # so the mask needs to be:
-        # [True, True, False, False, False, True, True]
-        #  |--M0--|    |-------M1-------|   |--M2--|
-        #
-        # Notice that the expanded values of the masks are not always the same length - they
-        # take the length of the original list if False, and the length of the replacement list
-        # if True. But since our masks and array need to be the same length, the true flattened
-        # array needs to be something like:
-        # [None, None, 1_0, 1_1, 1_2, None, None]
-        #  |--L0--|    |-----L1----|   |-L2---|
-        #
-        # Where the masked entries are turned into None values of length R#!
-        #
-        #
-        # Similarly, the offsets are also a bit odd:
-        #
-        # flattened_offsets:
-        # [0, 2, 5, 7]
-        #
-        #
-        # These offsets need to be derived from the mask, and offsets of both the original
-        # and replacement arrays.
-        #
-        #
-        # array_offsets:
-        # [0, 3, 6, 9]
-        #
-        # replacement_offsets:
-        # [0, 2, 4]
-        #
-        # So to calculate the offsets, we basically need to do a cumulative sum, shifting
-        # between the different offsets depending on the value of the mask. so:
-        #
-        # step 1: - each entry is the length of the inner list corresponding to that
-        #           index in either either the original or replacement array if the mask
-        #           is False or True respectively:
-        # [0, 2, 3, 2]
-        #
-        # step 2: cumulative sum:
-        # [0, 2, 5, 7]
-        #
-        #
-        # So, our final calculated vars are:
-        #
-        # flattened_modified_array = [None, None, 1_0, 1_1, 1_2, None, None]
-        # flattened_mask           = [True, True, False, False, False, True, True]
-        # flattened_offsets        = [0, 2, 5, 7]
-        # flattened_replacements   = [0_0, 0_1, 1_0, 1_1]
-        #
-        # new_replaced = safe_replace_with_mask(flattened_modified_array, flattened_mask, flattened_replacements)
-        # return pa.ListArray.from_arrays(flattened_offsets, new_replaced)
-
-    return pc.replace_with_mask(array, mask, replacements)
-
-
-def fallback_dictionary_encode(array: pa.Array) -> pa.DictionaryArray:
-    """Dictionary encoding not implemented for this type, need to break out to python."""
-    pydata = array.to_pylist()
-
-    # we need to json encode because dicts and lists are not hashable, but we need them to be
-    json_encoded = [json.dumps(v) for v in pydata]
-    unique_values_json = list(set(json_encoded))
-    unique_values = [json.loads(v) for v in unique_values_json]
-
-    indices = [unique_values_json.index(v) for v in json_encoded]
-    indices_array = pa.array(indices, type=pa.int32())
-    unique_values_array = pa.array(unique_values)
-    return pa.DictionaryArray.from_arrays(indices_array, unique_values_array)
-
-
-def sparse_union_to_dense_union(array: pa.Array) -> pa.Array:
-    if not pa.types.is_union(array.type):
-        raise ValueError(f"Expected UnionArray, got {type(array)}")
-    if array.type.mode != "sparse":
-        raise ValueError(f"Expected sparse UnionArray, got {array.type.mode}")
-
-    type_codes = array.type_codes
-    arrays: list[pa.Array] = []
-    offsets_for_each_type: list[pa.Array] = []
-    mask_for_each_type: list[pa.Array] = []
-
-    for field_index, _ in enumerate(array.type):
-        # convert sparse representation to dense representation
-
-        # looks like [None, 1, None, 3, 4, None]
-        value_array = array.field(field_index)
-
-        mask_for_type = pc.equal(type_codes, pa.scalar(field_index, type=pa.int8()))
-
-        # dictionary encode it to get offsets and values array
-        try:
-            value_array_encoded = value_array.dictionary_encode(null_encoding="encode")
-        except pa.ArrowNotImplementedError:
-            # dictionary encoding not implemented for this type, need to break out to python.
-            value_array_encoded = fallback_dictionary_encode(value_array)
-
-        offsets_for_type = pc.filter(value_array_encoded.indices, mask_for_type)
-        unique_values_for_type = value_array_encoded.dictionary
-
-        arrays.append(unique_values_for_type)
-        offsets_for_each_type.append(offsets_for_type)
-        mask_for_each_type.append(mask_for_type)
-
-    # merge offsets for each type together into a single offsets array
-    combined_offsets_array = pa.nulls(len(array), type=pa.int32())
-    for offset, mask in zip(offsets_for_each_type, mask_for_each_type):
-        combined_offsets_array = safe_replace_with_mask(
-            combined_offsets_array, mask, offset
-        )
-
-    return pa.UnionArray.from_dense(
-        type_codes,
-        combined_offsets_array,
-        arrays,
-    )
 
 
 def arrow_type_to_weave_type(pa_type: pa.DataType) -> types.Type:
@@ -273,236 +51,6 @@ def arrow_schema_to_weave_type(schema) -> types.Type:
     return types.TypedDict({f.name: arrow_field_to_weave_type(f) for f in schema})
 
 
-def adjust_table_after_parquet_deserialization(table: pa.Table) -> pa.Table:
-    def convert_struct_to_union_and_nullify_dummy_empty_structs(
-        column: pa.ChunkedArray, column_name: str
-    ) -> tuple[str, pa.ChunkedArray]:
-
-        if column_name.startswith(ArrowArrayType.UNION_PREFIX):
-            # we have a union field
-            # As of pyarrow 10.0.1 there seems to be a bug with constructing a Union array
-            # from a sub-chunk of a chunked array. from_sparse fails with a size mismatch
-            # error. That function thinks the last chunk size is the size of the whole
-            # chunked array. So we combine chunks here.
-            a = column.combine_chunks()
-            arrays = []
-            type_code_array: typing.Optional[pa.Array] = None
-
-            for field in a.type:
-                if field.name == ArrowArrayType.UNION_TO_STRUCT_TYPE_CODE_COLNAME:
-                    type_code_array = a.field(
-                        ArrowArrayType.UNION_TO_STRUCT_TYPE_CODE_COLNAME
-                    )
-                else:
-                    arrays.append(a.field(field.name))
-            if type_code_array is None:
-                raise errors.WeaveTypeError(
-                    "Expected struct array with type code field"
-                )
-            if len(type_code_array) == type_code_array.null_count:
-                # Nulls should only be in the type code array in the specific
-                # instance that this entire column is null. If any entry is not
-                # null, then the type code for the null elements will be the
-                # first null type code in the union. However, in the case that
-                # everything is null, then the entire block is nulled out. Here
-                # we can just use the first type code in the union as the type
-                # code for the entire column.  This is because our serialization
-                # side correctly applies the mask to this union column. When
-                # pyarrow can represent nulls using one of the type codes, then
-                # the mask will always be all true, even if there are nulls.
-                # However, if the entire thing is null, payarrow's mask is false
-                # for the whole column.
-                type_code_array = pc.fill_null(type_code_array, 0)
-            sparse = pa.UnionArray.from_sparse(type_code_array, arrays)
-            new_col = sparse_union_to_dense_union(sparse)
-            column_name = column_name[len(ArrowArrayType.UNION_PREFIX) :]
-            return column_name, pa.chunked_array([new_col])
-
-        elif pa.types.is_struct(column.type):
-            new_col = []
-
-            if (
-                len(column.type) == 1
-                and column.type[0].name == ArrowArrayType.EMPTY_STRUCT_DUMMY_FIELD_NAME
-            ):
-                # serialized representation of empty struct,
-                for a in column.chunks:
-
-                    def empty_struct_generator():
-                        for _ in range(len(a)):
-                            yield {}
-
-                    new_col.append(
-                        pa.array(
-                            empty_struct_generator(),
-                            mask=pa.compute.invert(a.is_valid()),
-                        )
-                    )
-            else:
-
-                # we have a struct field - recurse it and convert all subfields to unions where applicable
-
-                for a in column.chunks:
-                    arrays = []
-                    names = []
-                    for field in a.type:
-                        (
-                            name,
-                            array,
-                        ) = convert_struct_to_union_and_nullify_dummy_empty_structs(
-                            pa.chunked_array(a.field(field.name)), field.name
-                        )
-
-                        arrays.append(array.combine_chunks())
-                        names.append(name)
-                    new_col.append(
-                        pa.StructArray.from_arrays(
-                            arrays, names, mask=pa.compute.is_null(a)
-                        )
-                    )
-            return column_name, pa.chunked_array(new_col)
-
-        elif pa.types.is_list(column.type):
-            new_col = []
-            for a in column.chunks:
-                (
-                    name,
-                    array,
-                ) = convert_struct_to_union_and_nullify_dummy_empty_structs(
-                    pa.chunked_array(a.flatten()), column.type.value_field.name
-                )
-                new_col.append(
-                    pa.ListArray.from_arrays(
-                        offsets_starting_at_zero(a),
-                        array.combine_chunks(),
-                        mask=pa.compute.is_null(a),
-                        type=pa.list_(pa.field(name, array.type)),
-                    )
-                )
-            return column_name, pa.chunked_array(new_col)
-
-        else:
-            # we have a regular field
-            return column_name, column
-
-    for i, column_name in enumerate(table.column_names):
-        current_column = table[column_name]
-        new_name, new_column = convert_struct_to_union_and_nullify_dummy_empty_structs(
-            current_column, column_name
-        )
-        if new_column is not current_column:
-            table = table.remove_column(i)
-            table = table.add_column(i, new_name, new_column)
-
-    return table
-
-
-def adjust_table_for_parquet_serialization(table: pa.Table) -> pa.Table:
-    def recursively_convert_unions_to_structs_and_impute_empty_structs(
-        column: pa.ChunkedArray, column_name: str
-    ) -> tuple[str, pa.ChunkedArray]:
-
-        if pa.types.is_union(column.type):
-            new_col = []
-            for a in column.chunks:
-                if isinstance(a, pa.UnionArray):
-                    # a is a dense union, we need sparse here
-                    a = dense_union_to_sparse_union(a)
-
-                    arrays = []
-                    names = []
-                    for i, field in enumerate(a.type):
-                        arrays.append(a.field(i))
-                        names.append(field.name)
-
-                    arrays.append(a.type_codes)
-                    names.append(ArrowArrayType.UNION_TO_STRUCT_TYPE_CODE_COLNAME)
-
-                    new_col.append(pa.StructArray.from_arrays(arrays, names))
-
-            column = pa.chunked_array(new_col)
-            column_name = ArrowArrayType.UNION_PREFIX + column_name
-
-        if pa.types.is_struct(column.type):
-            new_col = []
-
-            if len(column.type) == 0:
-                # empty struct, add dummy field so we can serialize to parquet
-                # (parquet does not support empty structs)
-                for a in column.chunks:
-                    dummy_values = [""]
-                    indices = []
-                    for i in range(len(a)):
-                        indices.append(0)
-                    dummy_array = pa.DictionaryArray.from_arrays(
-                        pa.array(indices, pa.int32()), pa.array(dummy_values)
-                    )
-                    new_col.append(
-                        pa.StructArray.from_arrays(
-                            [dummy_array],
-                            [ArrowArrayType.EMPTY_STRUCT_DUMMY_FIELD_NAME],
-                            mask=pa.compute.invert(a.is_valid()),
-                        )
-                    )
-
-            else:
-                for a in column.chunks:
-                    names = []
-                    arrays = []
-                    for field in a.type:
-                        (
-                            new_name,
-                            chunked_array,
-                        ) = recursively_convert_unions_to_structs_and_impute_empty_structs(
-                            pa.chunked_array(a.field(field.name)), field.name
-                        )
-                        names.append(new_name)
-                        arrays.append(chunked_array.combine_chunks())
-
-                    new_col.append(
-                        pa.StructArray.from_arrays(
-                            arrays, names, mask=pa.compute.invert(a.is_valid())
-                        )
-                    )
-            column = pa.chunked_array(new_col)
-
-        if pa.types.is_list(column.type):
-            new_col = []
-            for a in column.chunks:
-                (
-                    new_name,
-                    chunked_array,
-                ) = recursively_convert_unions_to_structs_and_impute_empty_structs(
-                    pa.chunked_array(a.flatten()), column.type.value_field.name
-                )
-                new_col.append(
-                    pa.ListArray.from_arrays(
-                        offsets_starting_at_zero(a),
-                        chunked_array.combine_chunks(),
-                        mask=pa.compute.invert(a.is_valid()),
-                        type=pa.list_(pa.field(new_name, chunked_array.type)),
-                    )
-                )
-
-            column = pa.chunked_array(new_col)
-
-        return column_name, column
-
-    for i, column_name in enumerate(table.column_names):
-        current_column = table[column_name]
-        (
-            new_name,
-            new_column,
-        ) = recursively_convert_unions_to_structs_and_impute_empty_structs(
-            current_column, column_name
-        )
-        if new_column is not current_column:
-            table = table.remove_column(i)
-            table = table.add_column(i, new_name, new_column)
-
-    return table
-
-
 @dataclasses.dataclass(frozen=True)
 class ArrowArrayType(types.Type):
     instance_classes = [pa.ChunkedArray, pa.ExtensionArray, pa.Array]
@@ -518,17 +66,7 @@ class ArrowArrayType(types.Type):
         return cls(arrow_type_to_weave_type(obj.type))
 
     def save_instance(self, obj, artifact, name):
-        # Could use the arrow format instead. I think it supports memory
-        # mapped random access, but is probably larger.
-        # See here: https://arrow.apache.org/cookbook/py/io.html#saving-arrow-arrays-to-disk
-        # TODO: what do we want?
-
         table = pa.table({"arr": obj})
-        # convert unions to structs. parquet does not know how to serialize arrow unions, so
-        # we store them in a struct format that we convert back to a union on deserialization
-
-        table = adjust_table_for_parquet_serialization(table)
-
         with artifact.new_file(f"{name}.parquet", binary=True) as f:
             pq.write_table(table, f)
 
@@ -536,12 +74,7 @@ class ArrowArrayType(types.Type):
 
         with artifact.open(f"{name}.parquet", binary=True) as f:
             deserialized = pq.read_table(f)
-
-            # convert struct to union. parquet does not know how to serialize arrow unions, so
-            # we store them in a struct format
-            deserialized = adjust_table_after_parquet_deserialization(deserialized)
             deserialized = deserialized["arr"].combine_chunks()
-
             return deserialized
 
 
@@ -565,6 +98,8 @@ class ArrowTableType(types.Type):
             return pq.read_table(f)
 
 
+# This function is evil and breaks performance because of the dictionary_decode
+# call. Don't use it. TODO: remove all calls
 def arrow_as_array(obj) -> pa.Array:
     # assumes obj is table or array
     if isinstance(obj, pa.Table):
@@ -620,51 +155,56 @@ class ArrowWeaveListType(types.Type):
         return cls(obj.object_type)
 
     def save_instance(self, obj, artifact, name):
+        # rewriting refs is disabled after a refactor. We need this to work
+        # for media and caching with local artifacts to work. But we don't need
+        # it for W&B production for weave0 use cases.
+        # TODO: fix this
+
         # If we are saving to the same artifact as we were written to,
         # then we don't need to rewrite any references.
-        if obj._artifact == artifact:
-            arrow_data = obj._arrow_data
-        else:
-            # super().save_instance(obj, artifact, name)
-            # return
-            arrow_data = rewrite_weavelist_refs(
+
+        # if obj._artifact == artifact:
+        #     arrow_data = obj._arrow_data
+        # else:
+        #     # super().save_instance(obj, artifact, name)
+        #     # return
+        #     arrow_data = rewrite_weavelist_refs(
+        #         obj._arrow_data, obj.object_type, obj._artifact, artifact
+        #     )
+        if not obj._artifact == artifact:
+            # somehow we still need this block of code to get the test passing,
+            # even though we don't use its result.
+            rewrite_weavelist_refs(
                 obj._arrow_data, obj.object_type, obj._artifact, artifact
             )
 
-        d = {"_arrow_data": arrow_data, "object_type": obj.object_type}
-        type_of_d = types.TypedDict(
-            {
-                "_arrow_data": types.union(ArrowTableType(), ArrowArrayType()),
-                "object_type": types.TypeType(),
-            }
-        )
-        if hasattr(self, "_key"):
-            d["_key"] = obj._key
-            type_of_d.property_types["_key"] = self._key
+        from . import convert
 
-        serializer = mappers_python.map_to_python(type_of_d, artifact, path=[name])
-        result_d = serializer.apply(d)
-
-        with artifact.new_file(f"{name}.ArrowWeaveList.json") as f:
-            json.dump(result_d, f)
+        parquet_friendly = convert.to_parquet_friendly(obj)
+        table = pa.table({"arr": parquet_friendly._arrow_data})
+        with artifact.new_file(f"{name}.ArrowWeaveList.parquet", binary=True) as f:
+            pq.write_table(table, f)
+        with artifact.new_file(f"{name}.ArrowWeaveList.type.json") as f:
+            json.dump(obj.object_type.to_dict(), f)
 
     def load_instance(
         self, artifact: artifact_fs.FilesystemArtifact, name: str, extra=None
     ):
-        with artifact.open(f"{name}.ArrowWeaveList.json") as f:
-            result = json.load(f)
-        type_of_d = types.TypedDict(
-            {
-                "_arrow_data": types.union(ArrowTableType(), ArrowArrayType()),
-                "object_type": types.TypeType(),
-            }
-        )
-        if hasattr(self, "_key"):
-            type_of_d.property_types["_key"] = self._key  # type: ignore
+        with artifact.open(f"{name}.ArrowWeaveList.parquet", binary=True) as f:
+            table = pq.read_table(f)
+        arr = table["arr"].combine_chunks()
+        with artifact.open(f"{name}.ArrowWeaveList.type.json") as f:
+            object_type = json.load(f)
+            object_type = types.TypeRegistry.type_from_dict(object_type)
+        from . import list_
 
-        mapper = mappers_python.map_from_python(type_of_d, artifact)
-        res = mapper.apply(result)
-        return self.instance_class(artifact=artifact, **res)  # type: ignore
+        with list_.unsafe_awl_construction("load_from_parquet"):
+            l = self.instance_class(arr, object_type=object_type, artifact=artifact)  # type: ignore
+            from . import convert
+
+            res = convert.from_parquet_friendly(l)
+        res.validate()
+        return res
 
 
 def rewrite_weavelist_refs(arrow_data, object_type, source_artifact, target_artifact):
@@ -706,6 +246,8 @@ def rewrite_weavelist_refs(arrow_data, object_type, source_artifact, target_arti
                 names=arrays.keys(),
                 mask=pa.compute.is_null(arrow_data),
             )
+        elif isinstance(arrow_data, pa.NullArray):
+            return arrow_data
         else:
             raise errors.WeaveTypeError('Unhandled type "%s"' % type(arrow_data))
     elif isinstance(object_type, types.UnionType):
@@ -815,3 +357,27 @@ def _rewrite_ref_for_save(entry: str, object_type, source_artifact, target_artif
     return target_artifact.set(
         entry, object_type, source_artifact.get(entry, object_type)
     ).local_ref_str()
+
+
+def pretty_print_arrow_type(t: typing.Union[pa.Schema, pa.DataType, pa.Field]) -> str:
+    if isinstance(t, pa.Schema):
+        return "Schema:\n" + textwrap.indent(
+            "\n".join(pretty_print_arrow_type(f) for f in t), "  "
+        )
+    elif isinstance(t, pa.Field):
+        return f"{t.name}: {'nullable' if t.nullable else 'non-null'} {pretty_print_arrow_type(t.type)}"
+
+    if isinstance(t, pa.StructType):
+        return "Struct:\n" + textwrap.indent(
+            "\n".join(pretty_print_arrow_type(f) for f in t), "  "
+        )
+
+    elif isinstance(t, pa.ListType):
+        return f"List\n" + textwrap.indent(pretty_print_arrow_type(t.value_type), "  ")
+
+    elif isinstance(t, pa.UnionType):
+        return "Union:\n" + textwrap.indent(
+            "\n".join(pretty_print_arrow_type(f) for f in t), "  "
+        )
+
+    return str(t)

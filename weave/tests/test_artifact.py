@@ -32,34 +32,41 @@ def test_artifact():
 
     art_dir_files = art_dir.files
     exp_art_file1_type = artifact_fs.FilesystemArtifactFileType(
-        extension=weave.types.Const(weave.types.String(), "json"),
-        wbObjectType=arrow.ArrowWeaveListType(),
+        extension=weave.types.Const(weave.types.String(), "parquet"),
+        wbObjectType=weave.types.NoneType(),
     )
     assert weave.type_of(art_dir_files) == weave.types.TypedDict(
         {
-            "obj.ArrowWeaveList.json": exp_art_file1_type,
+            "obj.ArrowWeaveList.parquet": artifact_fs.FilesystemArtifactFileType(
+                extension=weave.types.Const(weave.types.String(), "parquet"),
+                wbObjectType=weave.types.NoneType(),
+            ),
+            "obj.ArrowWeaveList.type.json": artifact_fs.FilesystemArtifactFileType(
+                extension=weave.types.Const(weave.types.String(), "json"),
+                wbObjectType=weave.types.TypeType(attr_types={}),
+            ),
             "obj.type.json": artifact_fs.FilesystemArtifactFileType(
                 extension=weave.types.Const(weave.types.String(), "json"),
-                wbObjectType=weave.types.TypeType(),
+                wbObjectType=weave.types.TypeType(attr_types={}),
             ),
         }
     )
-    assert len(art_dir.files) == 2
+    assert len(art_dir.files) == 3
 
-    art_file1 = art_dir_files["obj.ArrowWeaveList.json"]
+    art_file1 = art_dir_files["obj.ArrowWeaveList.parquet"]
     assert art_file1 == artifact_fs.FilesystemArtifactFile(
-        art, "obj.ArrowWeaveList.json"
+        art, "obj.ArrowWeaveList.parquet"
     )
 
     # Here we don't create a new object
     art_file1_ref = storage.save(art_file1)
     assert (
         art_file1_ref.artifact == art
-        and art_file1_ref.path == "obj.ArrowWeaveList.json"
+        and art_file1_ref.path == "obj.ArrowWeaveList.parquet"
     )
     assert art_file1_ref.type == exp_art_file1_type
 
-    assert len(art_dir.dirs) == 1
+    assert len(art_dir.dirs) == 0
 
 
 def test_local_artifact_name():

@@ -13,6 +13,9 @@ from .. import api as weave
 from ..ops_arrow import list_ as arrow
 from .. import weave_types as types
 from .. import storage
+from .. import artifact_wandb
+from .. import artifact_mem
+from .. import mappers_python
 from ..weave_internal import make_const_node
 
 
@@ -259,3 +262,69 @@ def test_ref_to_node():
 )
 def test_to_python_object(obj, wb_type, expected):
     assert recursively_unwrap_unions(storage.to_python(obj, wb_type)) == expected
+
+
+class MockStats:
+    call_count = 0
+
+
+@pytest.fixture
+def mock_get_wandb_read_artifact_uri():
+    orig = artifact_wandb.get_wandb_read_artifact_uri
+
+    stats = MockStats()
+
+    def _mock_get_wandb_read_artifact_uri(path: str):
+        stats.call_count += 1
+        return artifact_wandb.WeaveWBArtifactURI(
+            "my-uri", "a_specific_version", "entity", "project", None, "path"
+        )
+
+    artifact_wandb.get_wandb_read_artifact_uri = _mock_get_wandb_read_artifact_uri
+    yield stats
+    artifact_wandb.get_wandb_read_artifact_uri = orig
+
+
+def test_to_conversion_uri_resolution(
+    mock_get_wandb_read_artifact_uri: MockStats,
+):
+    def make_art():
+        return artifact_wandb.WandbArtifact(
+            "my-art",
+            "my-type",
+            artifact_wandb.WeaveWBArtifactURI(
+                "my-uri", "latest", "entity", "project", None, "path"
+            ),
+        )
+
+    wb_type = types.TypeRegistry.type_of(make_art())
+
+    # Construct the mapper manually. Default should be to resolve
+    mapper = mappers_python.map_to_python(wb_type, artifact_mem.MemArtifact())
+    res = mapper.apply(make_art())
+    assert mock_get_wandb_read_artifact_uri.call_count == 1
+    assert res == "wandb-artifact:///entity/project/my-uri:a_specific_version"
+
+    # to_python uses the resolve behavior
+    res = storage.to_python(make_art())
+    assert mock_get_wandb_read_artifact_uri.call_count == 2
+    assert res == {
+        "_type": {
+            "_base_type": {"type": "FilesystemArtifact"},
+            "type": "WandbArtifact",
+        },
+        "_val": "wandb-artifact:///entity/project/my-uri:a_specific_version",
+    }
+
+    # Tell the mapper not to resolve
+    mapper = mappers_python.map_to_python(
+        wb_type, artifact_mem.MemArtifact(), mapper_options={"use_stable_refs": False}
+    )
+    assert mock_get_wandb_read_artifact_uri.call_count == 2
+    res = mapper.apply(make_art())
+    assert res == "wandb-artifact:///entity/project/my-uri:latest"
+
+    # to_weavejs doesn't resolve
+    assert mock_get_wandb_read_artifact_uri.call_count == 2
+    res = storage.to_weavejs(make_art())
+    assert res == "wandb-artifact:///entity/project/my-uri:latest"

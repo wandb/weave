@@ -22,18 +22,19 @@ from .. import ops_arrow as arrow
 import cProfile
 from ..language_features.tagging.tagged_value_type import TaggedValueType
 from ..ops_domain import table
+from ..ops_domain import wb_util
 
 file_path_response = {
     "project_518fa79465d8ffaeb91015dce87e092f": {
         **fwb.project_payload,  # type: ignore
         "artifactType_46d22fef09db004187bb8da4b5e98c58": {
             **fwb.defaultArtifactType_payload,  # type: ignore
-            "artifactCollections_21303e3890a1b6580998e6aa8a345859": {
+            "artifactCollections_c1233b7003317090ab5e2a75db4ad965": {
                 "edges": [
                     {
                         "node": {
                             **fwb.artifactSequence_payload,  # type: ignore
-                            "artifacts_21303e3890a1b6580998e6aa8a345859": {
+                            "artifacts_c1233b7003317090ab5e2a75db4ad965": {
                                 "edges": [{"node": fwb.artifactVersion_payload}]
                             },
                         }
@@ -58,7 +59,7 @@ artifact_browser_response = {
 workspace_response = {
     "project_518fa79465d8ffaeb91015dce87e092f": {
         **fwb.project_payload,  # type: ignore
-        "runs_21303e3890a1b6580998e6aa8a345859": {
+        "runs_c1233b7003317090ab5e2a75db4ad965": {
             "edges": [
                 {
                     "node": {
@@ -116,7 +117,7 @@ workspace_response = {
 workspace_response_no_run_displayname = {
     "project_518fa79465d8ffaeb91015dce87e092f": {
         **fwb.project_payload,  # type: ignore
-        "runs_21303e3890a1b6580998e6aa8a345859": {
+        "runs_c1233b7003317090ab5e2a75db4ad965": {
             "edges": [
                 {
                     "node": {
@@ -163,14 +164,14 @@ workspace_response_no_run_displayname = {
 empty_workspace_response = {
     "project_518fa79465d8ffaeb91015dce87e092f": {
         **fwb.project_payload,  # type: ignore
-        "runs_21303e3890a1b6580998e6aa8a345859": {"edges": []},
+        "runs_c1233b7003317090ab5e2a75db4ad965": {"edges": []},
     }
 }
 
 workspace_response_filtered = {
     "project_518fa79465d8ffaeb91015dce87e092f": {
         **fwb.project_payload,  # type: ignore
-        "runs_6e908597bd3152c2f0457f6283da76b9": {
+        "runs_261949318143369aa6c158af92afee03": {
             "edges": [
                 {
                     "node": {
@@ -194,12 +195,12 @@ workspace_response_filtered = {
 project_run_artifact_response = {
     "project_518fa79465d8ffaeb91015dce87e092f": {
         **fwb.project_payload,  # type: ignore
-        "runs_21303e3890a1b6580998e6aa8a345859": {
+        "runs_c1233b7003317090ab5e2a75db4ad965": {
             "edges": [
                 {
                     "node": {
                         **fwb.run_payload,  # type: ignore
-                        "outputArtifacts_21303e3890a1b6580998e6aa8a345859": {
+                        "outputArtifacts_c1233b7003317090ab5e2a75db4ad965": {
                             "edges": [
                                 {
                                     "node": {
@@ -221,6 +222,7 @@ artifact_version_sdk_response = {
     "artifact": {
         **fwb.artifactVersion_payload,  # type: ignore
         "state": "COMMITTED",
+        "commitHash": "303db33c9f9264768626",
         "artifactType": fwb.defaultArtifactType_payload,
         "artifactSequence": {**fwb.artifactSequence_payload, "project": fwb.project_payload, "state": "READY"},  # type: ignore
     }
@@ -257,20 +259,6 @@ def test_table_call(table_file_node, mock_response, fake_wandb):
     assert table_image0.height == 299
     assert table_image0.width == 299
     assert table_image0.path == "media/images/6274b7484d7ed4b6ad1b.png"
-
-    # artifactVersion is not currently callable on image node as a method.
-    # TODO: fix
-    image0_url_node = (
-        ops.wbmedia.artifactVersion(table_image0_node)
-        .file(
-            "wandb-artifact:///stacey/mendeleev/test_res_1fwmcd3q:v0/media/images/8f65e54dc684f7675aec.png"
-        )
-        .direct_url_as_of(1654358491562)
-    )
-    image0_url = weave.use(image0_url_node)
-    assert image0_url.endswith(
-        "test_res_1fwmcd3q_v0/media/images/8f65e54dc684f7675aec.png"
-    )
 
 
 def test_avfile_type(fake_wandb):
@@ -383,7 +371,7 @@ def test_mapped_table_empty(fake_wandb):
     )
     assert weave.use(cell_node.indexCheckpoint()) == None
     assert weave.use(cell_node.run().name()) == None
-    assert weave.use(cell_node.project().name()) == None
+    assert weave.use(cell_node.project().name()) == "mendeleev"
 
 
 def test_mapped_table_tags(fake_wandb):
@@ -457,16 +445,16 @@ def test_workspace_table_rows_type(fake_wandb):
                                 ),
                                 "guess": types.optional(types.String()),
                                 "truth": types.optional(types.String()),
-                                "score_Animalia": types.optional(types.Float()),
-                                "score_Amphibia": types.optional(types.Float()),
-                                "score_Arachnida": types.optional(types.Float()),
-                                "score_Aves": types.optional(types.Float()),
-                                "score_Fungi": types.optional(types.Float()),
-                                "score_Insecta": types.optional(types.Float()),
-                                "score_Mammalia": types.optional(types.Float()),
-                                "score_Mollusca": types.optional(types.Float()),
-                                "score_Plantae": types.optional(types.Float()),
-                                "score_Reptilia": types.optional(types.Float()),
+                                "score_Animalia": types.optional(types.Number()),
+                                "score_Amphibia": types.optional(types.Number()),
+                                "score_Arachnida": types.optional(types.Number()),
+                                "score_Aves": types.optional(types.Number()),
+                                "score_Fungi": types.optional(types.Number()),
+                                "score_Insecta": types.optional(types.Number()),
+                                "score_Mammalia": types.optional(types.Number()),
+                                "score_Mollusca": types.optional(types.Number()),
+                                "score_Plantae": types.optional(types.Number()),
+                                "score_Reptilia": types.optional(types.Number()),
                             }
                         )
                     ),
@@ -543,12 +531,12 @@ def test_domain_gql_fragments(fake_wandb):
                 **fwb.project_payload,
                 "artifactType_46d22fef09db004187bb8da4b5e98c58": {
                     **fwb.defaultArtifactType_payload,
-                    "artifactCollections_21303e3890a1b6580998e6aa8a345859": {
+                    "artifactCollections_c1233b7003317090ab5e2a75db4ad965": {
                         "edges": [
                             {
                                 "node": {
                                     **fwb.artifactSequence_payload,
-                                    "artifacts_21303e3890a1b6580998e6aa8a345859": {
+                                    "artifacts_c1233b7003317090ab5e2a75db4ad965": {
                                         "edges": [
                                             {
                                                 "node": {
@@ -760,7 +748,7 @@ def test_loading_artifact_browser_request_2(fake_wandb):
                     **fwb.artifactSequence_payload,  # type: ignore
                     "__typename": "ArtifactSequence",
                     "project": fwb.project_payload,
-                    "artifacts_21303e3890a1b6580998e6aa8a345859": {
+                    "artifacts_c1233b7003317090ab5e2a75db4ad965": {
                         "edges": [{"node": {**fwb.artifactVersion_payload}}]
                     },
                     "artifactMembership_fe9cc269bee939ccb54ebba88c6087dd": {
@@ -776,7 +764,7 @@ def test_loading_artifact_browser_request_2(fake_wandb):
                             }
                         ]
                     },
-                    "artifactMemberships_21303e3890a1b6580998e6aa8a345859": {
+                    "artifactMemberships_c1233b7003317090ab5e2a75db4ad965": {
                         "edges": [
                             {
                                 "node": {
@@ -869,9 +857,10 @@ def test_loading_artifact_browser_request_3(fake_wandb):
                         "artifact": {
                             **fwb.artifactVersion_payload,  # type: ignore
                             "description": "",
-                            "digest": "fd2948ad1c05b8d0084609a726a5da68",
+                            "digest": "51560154fe3bae863d18335d39129732",
+                            "commitHash": "303db33c9f9264768626",
                             "createdAt": "2021-07-10T19:27:32",
-                            "usedBy_21303e3890a1b6580998e6aa8a345859": {
+                            "usedBy": {
                                 "edges": [
                                     {
                                         "node": {
@@ -897,7 +886,7 @@ def test_loading_artifact_browser_request_3(fake_wandb):
                             "createdBy": {
                                 "__typename": "Run",
                                 **fwb.run_payload,  # type: ignore
-                                "inputArtifacts_21303e3890a1b6580998e6aa8a345859": {
+                                "inputArtifacts_c1233b7003317090ab5e2a75db4ad965": {
                                     "edges": [
                                         {
                                             "node": {
@@ -919,7 +908,7 @@ def test_loading_artifact_browser_request_3(fake_wandb):
                         },
                         "artifactCollection": {
                             **fwb.artifactSequence_payload,  # type: ignore
-                            "aliases_21303e3890a1b6580998e6aa8a345859": {
+                            "aliases_c1233b7003317090ab5e2a75db4ad965": {
                                 "edges": [
                                     {
                                         "node": {
@@ -932,7 +921,7 @@ def test_loading_artifact_browser_request_3(fake_wandb):
                                 **fwb.project_payload,  # type: ignore
                                 "entity": {
                                     **fwb.entity_payload,  # type: ignore
-                                    "artifactCollections_9dd867443b22f4b22c2b85e7719e3d46": {
+                                    "artifactCollections_c96697489c051b1be46673088f743964": {
                                         "edges": [
                                             {
                                                 "node": {
@@ -944,7 +933,7 @@ def test_loading_artifact_browser_request_3(fake_wandb):
                                 },
                             },
                             "__typename": "ArtifactSequence",
-                            "artifactMemberships_21303e3890a1b6580998e6aa8a345859": {
+                            "artifactMemberships_c1233b7003317090ab5e2a75db4ad965": {
                                 "edges": [
                                     {
                                         "node": {
@@ -1126,7 +1115,7 @@ def run_history_mocker(q, ndx):
         return {
             "project_518fa79465d8ffaeb91015dce87e092f": {
                 **fwb.project_payload,  # type: ignore
-                "runs_21303e3890a1b6580998e6aa8a345859": {
+                "runs_c1233b7003317090ab5e2a75db4ad965": {
                     "edges": [
                         {
                             "node": {
@@ -1167,7 +1156,7 @@ def run_history_as_of_mocker(q, ndx):
     return {
         "project_518fa79465d8ffaeb91015dce87e092f": {
             **fwb.project_payload,  # type: ignore
-            "runs_21303e3890a1b6580998e6aa8a345859": {
+            "runs_c1233b7003317090ab5e2a75db4ad965": {
                 "edges": [
                     {
                         "node": {
@@ -1376,23 +1365,19 @@ def test_nested_summary_key(fake_wandb):
     [
         (
             "wandb-logged-artifact://long_server_id:latest/path",
-            "wandb-artifact:///random-entity/random-project/run-2isjqtcr-Validation_table:v4/path",
+            "wandb-artifact:///random-entity/random-project/run-2isjqtcr-Validation_table:303db33c9f9264768626/path",
         ),
         (
             "wandb-logged-artifact://long_server_id:v4/path",
-            "wandb-artifact:///random-entity/random-project/run-2isjqtcr-Validation_table:v4/path",
+            "wandb-artifact:///random-entity/random-project/run-2isjqtcr-Validation_table:303db33c9f9264768626/path",
         ),
         (
             "wandb-logged-artifact://1234567890/path",
-            "wandb-artifact:///stacey/mendeleev/test_res_1fwmcd3q:v0/path",
+            "wandb-artifact:///stacey/mendeleev/test_res_1fwmcd3q:303db33c9f9264768626/path",
         ),
         (
-            "wandb-artifact:///input-entity/input-project/run-2isjqtcr-Validation_table:latest/path",
-            "wandb-artifact:///input-entity/input-project/run-2isjqtcr-Validation_table:v4/path",
-        ),
-        (
-            "wandb-artifact:///input-entity/input-project/run-2isjqtcr-Validation_table:v4/path",
-            "wandb-artifact:///input-entity/input-project/run-2isjqtcr-Validation_table:v4/path",
+            "wandb-artifact:///input-entity/input-project/run-2isjqtcr-Validation_table/path",
+            "wandb-artifact:///input-entity/input-project/run-2isjqtcr-Validation_table:303db33c9f9264768626/path",
         ),
     ],
 )
@@ -1417,6 +1402,7 @@ def test_wb_artifact_uri_resolution(fake_wandb, input_uri, expected_uri):
                     "artifactMembership": {
                         "id": "QXJ0aWZhY3RDb2xsZWN0aW9uTWVtYmVyc2hpcDozNzAxNzE5NDE=",
                         "versionIndex": 4,
+                        "commitHash": "303db33c9f9264768626",
                     },
                     "defaultArtifactType": {
                         "id": "QXJ0aWZhY3RUeXBlOjM1OTgxNA==",
@@ -1442,3 +1428,14 @@ def test_is_valid_version_string():
 
     for v in ["v01", "v0009"]:
         assert not artifact_wandb.is_valid_version_index(v)
+
+
+def test_artifact_path_character_escaping():
+    name = 12347187287418787843872388177814
+    path = "table #3.table.json"
+    result = wb_util.escape_artifact_path(
+        f"wandb-client-artifact://{name}:latest/{path}"
+    )
+    uri = artifact_wandb.WeaveWBLoggedArtifactURI.parse(result)
+
+    assert uri.path == path

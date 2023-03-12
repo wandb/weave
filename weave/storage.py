@@ -209,5 +209,7 @@ def to_weavejs(obj):
     elif isinstance(obj, arrow_list.ArrowWeaveList):
         return obj.to_pylist_notags()
     wb_type = types.TypeRegistry.type_of(obj)
-    mapper = mappers_python.map_to_python(wb_type, artifact_mem.MemArtifact())
+    mapper = mappers_python.map_to_python(
+        wb_type, artifact_mem.MemArtifact(), mapper_options={"use_stable_refs": False}
+    )
     return mapper.apply(obj)

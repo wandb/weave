@@ -235,6 +235,52 @@ def compile_refine(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
     return graph.map_nodes_full(nodes, _dispatch_map_fn_refining)
 
 
+# This compile pass using the `top_level` mapper since we recurse manually. We can't use
+# the full mapper, because we need to traverse when encountering the lambda op itself,
+# rather than the const node since we need uniqueness based on the lambda op.
+def compile_lambda_uniqueness(
+    nodes: typing.List[graph.Node],
+) -> typing.List[graph.Node]:
+    return graph.map_nodes_top_level(nodes, _compile_lambda_uniqueness)
+
+
+def _compile_lambda_uniqueness(node: graph.Node) -> typing.Optional[graph.Node]:
+    # In the case that the node has a lambda op, then we recurse into any
+    # lambda parameter. If the result is a new output var, then we update the
+    # current node, ensuring that every lambda parameter is unique to the op.
+    #
+    # There is another benefit of this approach: parts of the lambda graph which are
+    # shared between lambdas AND don't have a var ancestor will be shared in memory.
+    # This means that if a lambda has a shared "non-dependent" parameter, then it will
+    # only be executed once, and will be treated as the same logical op in stitch operations.
+    # This is the desired behavior.
+    if isinstance(node, graph.OutputNode):
+        new_inputs = {}
+        for input_key, input_node in node.from_op.inputs.items():
+            if isinstance(input_node, graph.ConstNode) and isinstance(
+                input_node.val, graph.Node
+            ):
+                uniq_lambda = compile_lambda_uniqueness([input_node.val])[0]
+                if uniq_lambda is not input_node.val:
+                    new_inputs[input_key] = graph.ConstNode(
+                        input_node.type, uniq_lambda
+                    )
+        if len(new_inputs) > 0:
+            use_inputs: dict[str, graph.Node] = {
+                k: new_inputs.get(k, v) for k, v in node.from_op.inputs.items()
+            }
+            return weave_internal.make_output_node(
+                node.type, node.from_op.name, use_inputs
+            )
+
+    # This is where the magic happens. We need to ensure that var nodes
+    # are unique in memory
+    elif isinstance(node, graph.VarNode):
+        return weave_internal.make_var_node(node.type, node.name)
+
+    return node
+
+
 def _compile(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
     tracer = engine_trace.tracer()
     # logging.info("Starting compilation of graph with %s leaf nodes" % len(nodes))
@@ -249,6 +295,9 @@ def _compile(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
 
     with tracer.trace("compile:simple_optimizations"):
         n = compile_simple_optimizations(n)
+
+    with tracer.trace("compile:lambda_uniqueness"):
+        n = compile_lambda_uniqueness(n)
 
     # Now that we have the correct calls, we can do our forward-looking pushdown
     # optimizations. These do not depend on having correct types in the graph.

@@ -65,6 +65,17 @@ class LiteralListObjectRecorder(ObjectRecorder):
     val: list[ObjectRecorder]
 
 
+def node_shortname(node: graph.Node) -> str:
+    if isinstance(node, graph.OutputNode):
+        return node.from_op.name
+    elif isinstance(node, graph.ConstNode):
+        return f"C[{str(node.val)[:10]}]"
+    elif isinstance(node, graph.VarNode):
+        return f"V[{node.name}]"
+    else:
+        raise errors.WeaveInternalError(f"Unknown node type {type(node)}")
+
+
 @dataclasses.dataclass
 class StitchedGraph:
     _node_map: typing.Dict[graph.Node, ObjectRecorder]
@@ -77,6 +88,35 @@ class StitchedGraph:
 
     def add_result(self, node: graph.Node, result: ObjectRecorder) -> None:
         self._node_map[node] = result
+
+    def print_debug_summary(self) -> None:
+        res = ""
+        node_names = {
+            orig_node: f"<{i}-{node_shortname(orig_node)}>"
+            for i, (orig_node, recorder) in enumerate(self._node_map.items())
+        }
+        res += "\n" + "StitchedGraph Summary:"
+        res += "\n" + "  Nodes:"
+        for curr_node, curr_node_name in node_names.items():
+            if isinstance(curr_node, graph.OutputNode):
+                res += (
+                    "\n"
+                    + f"  * {curr_node_name}({','.join([node_names[input_node] for input_node in  curr_node.from_op.inputs.values()])})"
+                )
+            else:
+                res += "\n" + f"  * {curr_node_name}"
+            recorder = self._node_map[curr_node]
+            if recorder.calls:
+                res += (
+                    "\n"
+                    + f"    calls: {','.join([node_names[call.node] for call in recorder.calls])}"
+                )
+            if recorder.tags:
+                res += (
+                    "\n"
+                    + f"    tags: {','.join([str((tag_name, node_names[tag_recorder.node])) for tag_name, tag_recorder in recorder.tags.items()])}"
+                )
+        print(res)
 
 
 def stitch(
@@ -189,8 +229,11 @@ def stitch_node_inner(
         return inputs[0].tags[tag_name]
     elif node.from_op.name.endswith("createIndexCheckpointTag"):
         inputs[0].tags["indexCheckpoint"] = ObjectRecorder(node)
+        return inputs[0]
     elif node.from_op.name == "dict":
         return LiteralDictObjectRecorder(node, val=input_dict)
+    elif node.from_op.name.endswith("__getitem__"):
+        return inputs[0]
     elif node.from_op.name == "list":
         # Merge element tags together and place them on the outer list.
         # This is overly aggressive, but it means we don't need to provide
@@ -263,6 +306,37 @@ def stitch_node_inner(
     return inputs[0].call_node(node, input_dict)
 
 
+def _apply_tag_rules_to_stitch_result(
+    result: ObjectRecorder,
+    op: op_def.OpDef,
+    inputs: list[ObjectRecorder],
+    input_names: list[str],
+) -> None:
+    # Tag logic
+    # If the op is a mapped, derived op, then we need the tags to flow
+    # internally. We know we need to do this because there is special tag
+    # handling logic in the mapped ops which does a parallel job. Note: This is
+    # probably something that needs to be done for arrow as well.
+    should_tag_with_inputs = False
+    should_flow_tags = False
+    if op.derived_from and op.derived_from.derived_ops.get("mapped"):
+        if opdef_util.should_tag_op_def_outputs(op.derived_from):
+            should_tag_with_inputs = True
+        elif opdef_util.should_flow_tags(op.derived_from):
+            should_flow_tags = True
+    # Always do this, even for mapped
+    if opdef_util.should_tag_op_def_outputs(op):
+        should_tag_with_inputs = True
+    elif opdef_util.should_flow_tags(op):
+        should_flow_tags = True
+
+    if should_tag_with_inputs:
+        result.tags.update(inputs[0].tags)
+        result.tags[input_names[0]] = inputs[0]
+    elif should_flow_tags:
+        result.tags.update(inputs[0].tags)
+
+
 def stitch_node(
     node: graph.OutputNode, input_dict: dict[str, ObjectRecorder], sg: StitchedGraph
 ) -> ObjectRecorder:
@@ -271,23 +345,6 @@ def stitch_node(
     inputs = list(input_dict.values())
 
     result = stitch_node_inner(node, input_dict, sg)
-
-    # Tag logic
-    # If the op is a mapped, derived op, then we need the tags to flow
-    # internally. We know we need to do this because there is special tag
-    # handling logic in the mapped ops which does a parallel job. Note: This is
-    # probably somehting that needs to be done for arrow as well.
-    if op.derived_from and op.derived_from.derived_ops.get("mapped"):
-        if opdef_util.should_tag_op_def_outputs(op.derived_from):
-            result.tags = inputs[0].tags
-            result.tags[input_names[0]] = inputs[0]
-        elif opdef_util.should_flow_tags(op.derived_from):
-            result.tags = inputs[0].tags
-    # Always do this, even for mapped
-    if opdef_util.should_tag_op_def_outputs(op):
-        result.tags = inputs[0].tags
-        result.tags[input_names[0]] = inputs[0]
-    elif opdef_util.should_flow_tags(op):
-        result.tags = inputs[0].tags
+    _apply_tag_rules_to_stitch_result(result, op, inputs, input_names)
 
     return result

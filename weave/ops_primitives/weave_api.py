@@ -34,6 +34,18 @@ def save(obj: typing.Any, name: typing.Optional[str]):
     return ref.obj
 
 
+# TODO: This should not be a separate op.
+# save above should return a ref. But some tests depend on it returning an object,
+# which I didn't bother fixing yet.
+@op(
+    name="save_to_ref",
+    output_type=types.RefType(),
+)
+def save_to_ref(obj: typing.Any, name: typing.Optional[str]):
+    ref = storage.save(obj, name=name)
+    return ref
+
+
 def usedby_output_type(op_name: str) -> types.Type:
     op_def = registry_mem.memory_registry.get_op(op_name)
 

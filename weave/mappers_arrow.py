@@ -112,7 +112,7 @@ class UnionToArrowUnion(mappers_weave.UnionMapper):
         if not nullable or len(non_null_mappers) > 1:
             fields = [
                 pa.field(
-                    f"{non_null_mappers[i].type.name}_{i}",
+                    str(i),
                     non_null_mappers[i].result_type(),
                     nullable,
                 )
@@ -133,6 +133,11 @@ class UnionToArrowUnion(mappers_weave.UnionMapper):
             try:
                 return self._type_codes[type]
             except KeyError:
+                for member_type, member_type_code in self._type_codes.items():
+                    if not isinstance(
+                        types.merge_types(member_type, type), types.UnionType
+                    ):
+                        return member_type_code
                 raise errors.WeaveTypeError(f"Could not find type code for {type}")
 
     def type_code_of_obj(self, obj) -> int:
@@ -329,7 +334,9 @@ class ArrowToArrowWeaveListOrPylist(mappers_python.ListToPyList):
         return super().apply(obj)
 
 
-def map_to_arrow_(type, mapper, artifact: artifact_base.Artifact, path=[]):
+def map_to_arrow_(
+    type, mapper, artifact: artifact_base.Artifact, path=[], mapper_options=None
+):
     from .ops_arrow import arrow
 
     if isinstance(type, types.Const):
@@ -364,7 +371,7 @@ def map_to_arrow_(type, mapper, artifact: artifact_base.Artifact, path=[]):
         return DefaultToArrow(type, mapper, artifact, path)
 
 
-def map_from_arrow_(type, mapper, artifact, path=[]):
+def map_from_arrow_(type, mapper, artifact, path=[], mapper_options=None):
     from .ops_arrow import arrow
 
     if isinstance(type, types.TypedDict):

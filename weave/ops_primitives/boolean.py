@@ -15,12 +15,12 @@ class Boolean:
         return val
 
     @op(name="boolean-equal")
-    def bool_equals(lhs: bool, rhs: typing.Optional[bool]) -> bool:  # type: ignore
-        return lhs == bool(rhs)
+    def bool_equals(lhs: typing.Optional[bool], rhs: typing.Optional[bool]) -> bool:  # type: ignore
+        return lhs == rhs
 
     @op(name="boolean-notEqual")
-    def bool_notEquals(lhs: bool, rhs: typing.Optional[bool]) -> bool:  # type: ignore
-        return lhs != bool(rhs)
+    def bool_notEquals(lhs: typing.Optional[bool], rhs: typing.Optional[bool]) -> bool:  # type: ignore
+        return lhs != rhs
 
     @op(name="and")
     def bool_and(lhs: bool, rhs: typing.Optional[bool]) -> bool:  # type: ignore

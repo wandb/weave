@@ -8,6 +8,16 @@ from .arrow import ArrowWeaveListType, arrow_as_array
 from .list_ import ArrowWeaveList
 
 
+def _arrowweavelistlist_listindex_output_type(input_types):
+    self = input_types["self"]
+    new_type = types.optional(self.object_type.object_type)
+    if new_type == types.UnknownType():
+        # if our object type was Unknown, it means it was an empty list.
+        # indexing into that will always produce None
+        new_type = types.NoneType()
+    return new_type
+
+
 @arrow_op(
     name="ArrowWeaveListList-listindex",
     input_type={
@@ -23,7 +33,7 @@ from .list_ import ArrowWeaveList
         ),
     },
     output_type=lambda input_types: ArrowWeaveListType(
-        types.optional(input_types["self"].object_type.object_type)
+        _arrowweavelistlist_listindex_output_type(input_types)
     ),
 )
 def listindex(self, index):
@@ -31,7 +41,7 @@ def listindex(self, index):
     # Not handling negative indexes at the moment
     if index == None:
         return ArrowWeaveList(
-            pa.nulls(len(a), type=a.type.value_type),
+            pa.nulls(len(a)),
             types.NoneType(),
             self._artifact,
         )
@@ -49,7 +59,7 @@ def listindex(self, index):
     result = a.flatten().take(take_indexes)
     return ArrowWeaveList(
         result,
-        types.optional(self.object_type.object_type),
+        _arrowweavelistlist_listindex_output_type({"self": self}),
         self._artifact,
     )
 

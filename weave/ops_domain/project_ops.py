@@ -146,7 +146,7 @@ gql_connection_op(
     "artifactTypes",
     wdt.ArtifactTypeType,
     {},
-    lambda inputs: "first: 50",
+    lambda inputs: "first: 10",
 )
 
 gql_connection_op(
@@ -155,7 +155,7 @@ gql_connection_op(
     "runs",
     wdt.RunType,
     {},
-    lambda inputs: "first: 50",
+    lambda inputs: "first: 100",
 )
 
 
@@ -168,7 +168,7 @@ gql_connection_op(
         "filter": types.String(),
         "order": types.String(),
     },
-    lambda inputs: f'first: 50, filters: {inputs["filter"]}, order: {inputs["order"]}',
+    lambda inputs: f'first: 100, filters: {inputs["filter"]}, order: {inputs["order"]}',
 )
 
 
@@ -186,11 +186,11 @@ def link(project: wdt.Project) -> wdt.Link:
     name="project-artifacts",
     plugins=wb_gql_op_plugin(
         lambda inputs, inner: f"""
-            artifactTypes(first: 50) {{
+            artifactTypes(first: 100) {{
                 edges {{
                     node {{
                         id
-                        artifactCollections(first: 50) {{
+                        artifactCollections(first: 100) {{
                             edges {{
                                 node {{
                                     {wdt.ArtifactCollection.REQUIRED_FRAGMENT}

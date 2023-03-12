@@ -45,6 +45,13 @@ def op_to_weave_fn(opdef: "op_def.OpDef") -> graph.Node:
             "Refusing to convert op that is already defined on Arrow object to weave_fn"
         )
 
+    if opdef._gets_tag_by_name != None:
+        # This happens in test_wb_tables.py::test_join_group_combo. We fail to find the
+        # vectorized version because the op is generated in the test and is not a built-in
+        raise errors.WeavifyError(
+            "Not weavifying tag op. We should already have a vectorized version!"
+        )
+
     if opdef.name.startswith("objectConstructor"):
         raise errors.WeavifyError(
             "Can't convert objectConstructor to weave_fn: %s" % opdef

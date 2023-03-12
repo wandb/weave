@@ -8,6 +8,8 @@ from .. import storage
 from .. import context
 from .. import weave_internal
 from .. import graph
+from .. import box
+from ..ops_domain import table as table_ops
 
 from . import weavejs_ops
 
@@ -235,3 +237,11 @@ def test_groupby_pick():
     items = weave.save([{"a": 5, "b": 6}, {"a": 5, "b": 8}])
     picked = items.groupby(lambda row: row["a"])[0].pick("b")
     assert weave.use(picked.sum() == 14)
+
+
+def test_rows_type_null():
+    type_node = table_ops.Table.rows_type(None)
+    assert weave.use(type_node) == types.NoneType()
+
+    type_node = table_ops.Table.rows_type(box.box(None))
+    assert weave.use(type_node) == types.NoneType()

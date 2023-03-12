@@ -1,6 +1,7 @@
 import dataclasses
 import json
 import datetime
+import logging
 import typing
 
 
@@ -34,10 +35,12 @@ class Table:
 
     @op(
         name="table-rowsType",
-        input_type={"table": TableType()},
+        input_type={"table": types.optional(TableType())},
         output_type=types.TypeType(),
     )
     def rows_type(table):
+        if table == None:
+            return types.NoneType()
         ttype = types.TypeRegistry.type_of(table._rows)
         return ttype
 
@@ -175,6 +178,8 @@ def _infer_type_from_row_dict(row: dict) -> types.Type:
 
 
 def _infer_type_from_col_list(row: list) -> types.Type:
+    if len(row) == 0:
+        return types.NoneType()
     running_type: types.Type = types.UnknownType()
     for cell in row:
         running_type = types.merge_types(running_type, _infer_type_from_cell(cell))
@@ -441,9 +446,9 @@ def _patch_legacy_image_file_types(
 
         # We will look at the first 10 rows of the table to determine the type.
         non_null_rows_evaluated = 0
-        mask_keys_set: set[str] = set()
-        box_keys_set: set[str] = set()
-        box_score_key_set: set[str] = set()
+        mask_keys_set: dict[str, bool] = {}
+        box_keys_set: dict[str, bool] = {}
+        box_score_key_set: dict[str, bool] = {}
         class_map: dict[int, str] = {}
         for row in rows:
             image_example = row[col_name]
@@ -453,18 +458,18 @@ def _patch_legacy_image_file_types(
 
             # Add the mask keys to the running set
             if image_example.masks is not None:
-                mask_keys_set = mask_keys_set.union(image_example.masks.keys())
+                mask_keys_set.update(dict.fromkeys(image_example.masks.keys()))
 
             # Add the box keys to the running set
             if image_example.boxes is not None:
-                box_keys_set = box_keys_set.union(image_example.boxes.keys())
+                box_keys_set.update(dict.fromkeys(image_example.boxes.keys()))
 
                 # Add the box score keys to the running set
                 for box_set in image_example.boxes.values():
                     for box in box_set:
                         if "scores" in box and box["scores"] is not None:
-                            box_score_key_set = box_score_key_set.union(
-                                box["scores"].keys()
+                            box_score_key_set.update(
+                                dict.fromkeys(box["scores"].keys())
                             )
 
             # Fetch the class data (requires a network call) and update the class map
@@ -514,6 +519,19 @@ def _patch_legacy_image_file_types(
     return types.TypedDict(return_prop_types)
 
 
+def should_infer_type_from_data(col_type: types.Type) -> bool:
+    status = {"found_unknown": False}
+
+    def is_unknown_type_mapper(t: types.Type) -> None:
+        status["found_unknown"] = status["found_unknown"] or isinstance(
+            t, (types.UnknownType, types.Any)
+        )
+
+    types.map_leaf_types(col_type, is_unknown_type_mapper)
+
+    return status["found_unknown"]
+
+
 def _get_rows_and_object_type_from_weave_format(
     data: typing.Any, file: artifact_fs.FilesystemArtifactFile
 ) -> tuple[list, types.TypedDict]:
@@ -546,13 +564,16 @@ def _get_rows_and_object_type_from_weave_format(
                 f"Column name {key} not found in column_types"
             )
         col_type = converted_object_type.property_types[key]
-        if col_type.assign_type(types.UnknownType()):
+        if should_infer_type_from_data(col_type):
             # Sample some data to detect the type. Otherwise this
             # can be very expensive. This could cause down-stream crashes,
             # for example if we don't realize that a column is union of string
             # and int, saving to arrow will crash.
             unknown_col_example_data = [row[i] for row in _sample_rows(row_data)]
             obj_prop_types[key] = _infer_type_from_col_list(unknown_col_example_data)
+            logging.warning(
+                f"Column {key} had type {col_type} requiring data-inferred type. Inferred type as {obj_prop_types[key]}. This may be incorrect due to data sampling"
+            )
         else:
             obj_prop_types[key] = col_type
     object_type = types.TypedDict(obj_prop_types)

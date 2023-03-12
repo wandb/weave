@@ -56,7 +56,7 @@ class RunSegment:
                 f"Attempted to branch off of an empty run: run {prior_run} has no metrics."
             )
 
-        return prior_experiment.concatenate(limited)
+        return prior_experiment.concat(limited)
 
     @weave.op(render_info={"type": "function"})
     def refine_experiment_type(self) -> types.Type:

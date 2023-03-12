@@ -388,8 +388,8 @@ nullable_number_ops_test_cases = [
     ("multiply", lambda x: x * 2, [2.0, None, 6.0]),
     ("divide", lambda x: x / 2, [0.5, None, 1.5]),
     ("pow", lambda x: x**2, [1.0, None, 9.0]),
-    ("ne", lambda x: x != 2, [True, None, True]),
-    ("eq", lambda x: x == 2, [False, None, False]),
+    ("ne", lambda x: x != 2, [True, True, True]),
+    ("eq", lambda x: x == 2, [False, False, False]),
     ("gt", lambda x: x > 2, [False, None, True]),
     ("lt", lambda x: x < 2, [True, None, False]),
     ("ge", lambda x: x >= 2, [False, None, True]),
@@ -418,8 +418,8 @@ def test_arrow_vectorizer_nullable_number_ops(name, weave_func, expected_output)
 
 
 string_ops_nullable_test_cases = [
-    ("eq-scalar", lambda x: x == "bc", [True, None, False]),
-    ("ne-scalar", lambda x: x != "bc", [False, None, True]),
+    ("eq-scalar", lambda x: x == "bc", [True, False, False]),
+    ("ne-scalar", lambda x: x != "bc", [False, True, True]),
     ("contains-scalar", lambda x: x.__contains__("b"), [True, None, False]),
     ("in-scalar", lambda x: x.in_("bcd"), [True, None, False]),
     ("len-scalar", lambda x: x.len(), [2, None, 2]),
@@ -1186,4 +1186,21 @@ def test_vectorize_function_with_const_first_arg():
     ).val
     vec_fn = arrow.vectorize(fn)
     called = weave_internal.call_fn(vec_fn, {"row": awl_node})
-    assert weave.use(called) == [True, False, True, False, True, False]
+    assert weave.use(called).to_pylist_raw() == [True, False, True, False, True, False]
+
+
+def test_isnone():
+    a = [1, None, False, 0, "", "a"]
+    awl = arrow.to_arrow(a)
+    l = weave.save(awl)
+    fn = weave_internal.define_fn({"x": awl.object_type}, lambda x: x.isNone()).val
+    vec_fn = arrow.vectorize(fn)
+    called = weave_internal.call_fn(vec_fn, {"x": l})
+    assert weave.use(called).to_pylist_notags() == [
+        False,
+        True,
+        False,
+        False,
+        False,
+        False,
+    ]

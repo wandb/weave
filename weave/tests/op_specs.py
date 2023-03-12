@@ -5,7 +5,11 @@ import typing
 import weave
 from weave import op_def
 from weave import ops_primitives
+from weave.language_features.tagging import tagged_value_type
 from weave.timestamp import PY_DATETIME_MAX_MS, PY_DATETIME_MIN_MS
+from .concrete_tagged_value import (
+    TaggedValue,
+)
 
 
 @dataclasses.dataclass
@@ -21,6 +25,7 @@ class OpKind:
     uniform_input_types: bool = True
     commutative: bool = False
     list_op: bool = False
+    list_list_op: bool = False
 
 
 @dataclasses.dataclass
@@ -69,6 +74,23 @@ number_add = OpSpec(
         OpSpecTestCase(
             input=(-1, 2),
             expected=1,
+            expected_type=weave.types.Number(),
+        ),
+    ],
+)
+
+number_mul = OpSpec(
+    op=ops_primitives.Number.__mul__,
+    kind=OpKind(arity=2, commutative=True),
+    test_cases=[
+        OpSpecTestCase(
+            input=(1, 2),
+            expected=2,
+            expected_type=weave.types.Number(),
+        ),
+        OpSpecTestCase(
+            input=(-1, 2),
+            expected=-2,
             expected_type=weave.types.Number(),
         ),
     ],
@@ -145,10 +167,79 @@ index = OpSpec(
     ],
 )
 
+join_all = OpSpec(
+    op=ops_primitives.join_all,
+    kind=OpKind(arity=3, list_list_op=True, uniform_input_types=False),
+    test_cases=[
+        OpSpecTestCase(
+            input=(
+                [[{"a": 5, "b": 6}, {"a": 7, "b": 9}], [{"a": 5, "b": 8}]],
+                lambda x: x["a"],
+                False,
+            ),
+            expected=[TaggedValue({"joinObj": 5}, {"a": [5, 5], "b": [6, 8]})],
+            expected_type=weave.types.List(
+                tagged_value_type.TaggedValueType(
+                    weave.types.TypedDict({"joinObj": weave.types.Int()}),
+                    weave.types.TypedDict(
+                        {
+                            "a": weave.types.List(
+                                weave.types.optional(weave.types.Int())
+                            ),
+                            "b": weave.types.List(
+                                weave.types.optional(weave.types.Int())
+                            ),
+                        }
+                    ),
+                )
+            ),
+        ),
+        # 'b' will end up a union of TypedDict and Int
+        OpSpecTestCase(
+            input=(
+                [
+                    [{"a": 5, "b": 6}, {"a": 7, "b": 9}],
+                    [{"a": 5, "b": {"j": 12, "k": 13}}],
+                ],
+                lambda x: x["a"],
+                False,
+            ),
+            expected=[
+                TaggedValue({"joinObj": 5}, {"a": [5, 5], "b": [6, {"j": 12, "k": 13}]})
+            ],
+            expected_type=weave.types.List(
+                tagged_value_type.TaggedValueType(
+                    weave.types.TypedDict({"joinObj": weave.types.Int()}),
+                    weave.types.TypedDict(
+                        {
+                            "a": weave.types.List(
+                                weave.types.optional(weave.types.Int())
+                            ),
+                            "b": weave.types.List(
+                                weave.types.optional(
+                                    weave.types.UnionType(
+                                        weave.types.Int(),
+                                        weave.types.TypedDict(
+                                            {
+                                                "j": weave.types.Int(),
+                                                "k": weave.types.Int(),
+                                            }
+                                        ),
+                                    )
+                                )
+                            ),
+                        }
+                    ),
+                )
+            ),
+        ),
+    ],
+)
+
 
 dropna = OpSpec(
     op=ops_primitives.List.dropna,
-    kind=OpKind(arity=1),
+    kind=OpKind(arity=1, list_op=True),
     test_cases=[
         OpSpecTestCase(
             input=([1, 2, 3],),
@@ -241,13 +332,116 @@ number_to_timestamp = OpSpec(
     ],
 )
 
+number_equal = OpSpec(
+    op=ops_primitives.Number.__eq__,
+    kind=OpKind(arity=2, commutative=True),
+    test_cases=[
+        OpSpecTestCase(
+            input=(1, 1),
+            expected=True,
+            expected_type=weave.types.Boolean(),
+        ),
+        OpSpecTestCase(
+            input=(1, 2),
+            expected=False,
+            expected_type=weave.types.Boolean(),
+        ),
+        OpSpecTestCase(
+            input=(1, None),
+            expected=False,
+            expected_type=weave.types.Boolean(),
+        ),
+        OpSpecTestCase(
+            input=(None, None),
+            expected=True,
+            expected_type=weave.types.Boolean(),
+        ),
+        OpSpecTestCase(
+            input=(None, 1),
+            expected=False,
+            expected_type=weave.types.Boolean(),
+        ),
+    ],
+)
+
+
+string_equal = OpSpec(
+    op=ops_primitives.String.__eq__,
+    kind=OpKind(arity=2, commutative=True),
+    test_cases=[
+        OpSpecTestCase(
+            input=("a", "a"),
+            expected=True,
+            expected_type=weave.types.Boolean(),
+        ),
+        OpSpecTestCase(
+            input=("a", "b"),
+            expected=False,
+            expected_type=weave.types.Boolean(),
+        ),
+        OpSpecTestCase(
+            input=("a", None),
+            expected=False,
+            expected_type=weave.types.Boolean(),
+        ),
+        OpSpecTestCase(
+            input=(None, None),
+            expected=True,
+            expected_type=weave.types.Boolean(),
+        ),
+        OpSpecTestCase(
+            input=(None, "a"),
+            expected=False,
+            expected_type=weave.types.Boolean(),
+        ),
+    ],
+)
+
+
+boolean_equal = OpSpec(
+    op=ops_primitives.Boolean.bool_equals,
+    kind=OpKind(arity=2, commutative=True),
+    test_cases=[
+        OpSpecTestCase(
+            input=(True, True),
+            expected=True,
+            expected_type=weave.types.Boolean(),
+        ),
+        OpSpecTestCase(
+            input=(True, False),
+            expected=False,
+            expected_type=weave.types.Boolean(),
+        ),
+        OpSpecTestCase(
+            input=(True, None),
+            expected=False,
+            expected_type=weave.types.Boolean(),
+        ),
+        OpSpecTestCase(
+            input=(None, None),
+            expected=True,
+            expected_type=weave.types.Boolean(),
+        ),
+        OpSpecTestCase(
+            input=(None, True),
+            expected=False,
+            expected_type=weave.types.Boolean(),
+        ),
+    ],
+)
+
 
 OP_TEST_SPECS = [
     number_add,
     number_sub,
+    number_mul,
     string_add,
     numbers_max,
     number_to_timestamp,
     index,
+    join_all,
     dropna,
+    number_equal,
+    string_equal,
+    boolean_equal,
 ]
