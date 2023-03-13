@@ -185,10 +185,52 @@ def _concatenate_lists(
     )
 
 
-# See comment in `_concatenate_non_unions` for explanation of these.
-def _is_concatenate_non_unions_special_case(
+def _weave_assignable_but_not_arrow_castable(
     self: ArrowWeaveList, other: ArrowWeaveList
 ) -> bool:
+    # We have some special handling for Number! - This helper function
+    # is just for `_concatenate_non_unions`.
+    #
+    # First, consider the following Weave type truth table:
+    #
+    # Weave Assignment Truth Table:
+    # from_type | to_type | to_type.assign_type(from_type)
+    # ----------+---------+--------------------------
+    # Number    | Number  | True
+    # Number    | Int     | True
+    # Number    | Float   | True
+    # Int       | Number  | True
+    # Int       | Int     | True
+    # Int       | Float   | True
+    # Float     | Number  | True
+    # Float     | Int     | False
+    # Float     | Float   | True
+    #
+    # Notice that iff a Weave Type is Number, then the underlying Arrow type could
+    # be either int-like or float-like. So, we have the following possibilities:
+    #
+    # Weave Assignment Truth Table:
+    # self_type | other_type | self_arrow_type | other_arrow_type | other._arrow_data.cast(self._arrow_data.type)
+    # ----------+------------+-----------------+------------------+----------------------------------------------
+    # Number    | Number     | int             | int              | Safe
+    # Number    | Number     | int             | float            | Not Safe
+    # Number    | Number     | float           | int              | Safe
+    # Number    | Number     | float           | float            | Safe
+    # Number    | Int        | int             | int              | Safe
+    # Number    | Int        | float           | int              | Safe
+    # Number    | Float      | int             | float            | Not Safe
+    # Number    | Float      | float           | float            | Safe
+    # Int       | Number     | int             | int              | Safe
+    # Int       | Number     | int             | float            | Not Safe
+    # Float     | Number     | float           | int              | Safe
+    # Float     | Number     | float           | float            | Safe
+    #
+    # As you can see from this table, there are 3 unsafe cases:
+    # 1. self: Number(int); other: Number(float)
+    # 2. self: Number(int); other: Float
+    # 3. self: Int;         other: Number(float)
+    #
+    # So, we need to special case these situations.
     return (
         # 1. self: Number(int); other: Number(float)
         (
@@ -233,60 +275,12 @@ def _concatenate_non_unions(
 
     # TODO: Note about why can't the types equal case go at the top?
 
-    # Note: we have some special handling for Number, and the following comment
-    # justifies why we need such special handling in a generic part of the code.
-    #
-    # If either of the types are Number, then the first case will handle it.
-    # The first case being `if self.object_type.assign_type(other.object_type):`
-    # See the truth table above for why this is the case.
-    #
-    # Weave Assignment Truth Table:
-    # from_type | to_type | to_type.assign_type(from_type)
-    # ----------+---------+--------------------------
-    # Number    | Number  | True
-    # Number    | Int     | True
-    # Number    | Float   | True
-    # Int       | Number  | True
-    # Int       | Int     | True
-    # Int       | Float   | True
-    # Float     | Number  | True
-    # Float     | Int     | False
-    # Float     | Float   | True
-    #
-    # However, if a Weave Type is Number, then the underlying Arrow type could
-    # be either int or float. So, we have the following possibilities:
-    #
-    # Weave Assignment Truth Table:
-    # self_type | other_type | self_arrow_type | other_arrow_type | other._arrow_data.cast(self._arrow_data.type)
-    # ----------+------------+-----------------+------------------+----------------------------------------------
-    # Number    | Number     | int             | int              | Safe
-    # Number    | Number     | int             | float            | Not Safe
-    # Number    | Number     | float           | int              | Safe
-    # Number    | Number     | float           | float            | Safe
-    # Number    | Int        | int             | int              | Safe
-    # Number    | Int        | float           | int              | Safe
-    # Number    | Float      | int             | float            | Not Safe
-    # Number    | Float      | float           | float            | Safe
-    # Int       | Number     | int             | int              | Safe
-    # Int       | Number     | int             | float            | Not Safe
-    # Float     | Number     | float           | int              | Safe
-    # Float     | Number     | float           | float            | Safe
-    #
-    # As you can see from this table, there are 3 unsafe cases:
-    # 1. self: Number(int); other: Number(float)
-    # 2. self: Number(int); other: Float
-    # 3. self: Int;         other: Number(float)
-    #
-    # So, we need to special case these situations.
-
     indent_print(depth, "Extend case non-union types")
-    if self.object_type.assign_type(other.object_type):
-        if _is_concatenate_non_unions_special_case(self, other):
-            self_data = self._arrow_data.cast(other._arrow_data.type)
-            other_data = other._arrow_data
-        else:
-            self_data = self._arrow_data
-            other_data = other._arrow_data.cast(self._arrow_data.type)
+    if self.object_type.assign_type(
+        other.object_type
+    ) and not _weave_assignable_but_not_arrow_castable(self, other):
+        self_data = self._arrow_data
+        other_data = other._arrow_data.cast(self._arrow_data.type)
         if len(self) == 0:
             data = other_data
         elif len(other) == 0:
@@ -296,7 +290,9 @@ def _concatenate_non_unions(
         return ArrowWeaveList(
             data, self.object_type, self._artifact, invalid_reason="Possibly nullable"
         )
-    elif other.object_type.assign_type(self.object_type):
+    elif other.object_type.assign_type(
+        self.object_type
+    ) and not _weave_assignable_but_not_arrow_castable(other, self):
         self_data = self._arrow_data.cast(other._arrow_data.type)
         other_data = other._arrow_data
         if len(self) == 0:
