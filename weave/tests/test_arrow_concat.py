@@ -6,6 +6,7 @@ from ..ops_domain import wbmedia
 from .. import artifact_local
 from .. import storage
 
+import weave
 
 CONCAT_TEST_CASES = [
     ([1, 2, 3], [4, 5, 6]),
@@ -233,6 +234,31 @@ CONCAT_TEST_CASES = [
             },
         ],
     ),
+    # Number/Int/Floats
+    # Int / Int Data, Permutations of Weave Types
+    ([1, 2, 3], [4, 5, 6], weave.types.Number(), weave.types.Number()),
+    ([1, 2, 3], [4, 5, 6], weave.types.Number(), weave.types.Int()),
+    ([1, 2, 3], [4, 5, 6], weave.types.Int(), weave.types.Number()),
+    ([1, 2, 3], [4, 5, 6], weave.types.Int(), weave.types.Int()),
+    # Int / Float Data, Permutations of Weave Types
+    ([1, 2, 3], [4.5, 5.5, 6.5], weave.types.Number(), weave.types.Number()),
+    ([1, 2, 3], [4.5, 5.5, 6.5], weave.types.Number(), weave.types.Float()),
+    ([1, 2, 3], [4.5, 5.5, 6.5], weave.types.Int(), weave.types.Number()),
+    ([1, 2, 3], [4.5, 5.5, 6.5], weave.types.Int(), weave.types.Float()),
+    # Float / Int Data, Permutations of Weave Types
+    ([1.5, 2.5, 3.5], [4, 5, 6], weave.types.Number(), weave.types.Number()),
+    ([1.5, 2.5, 3.5], [4, 5, 6], weave.types.Number(), weave.types.Int()),
+    ([1.5, 2.5, 3.5], [4, 5, 6], weave.types.Float(), weave.types.Number()),
+    ([1.5, 2.5, 3.5], [4, 5, 6], weave.types.Float(), weave.types.Int()),
+    # Float / Float Data, Permutations of Weave Types
+    ([1.5, 2.5, 3.5], [4.5, 5.5, 6.5], weave.types.Number(), weave.types.Number()),
+    ([1.5, 2.5, 3.5], [4.5, 5.5, 6.5], weave.types.Number(), weave.types.Float()),
+    ([1.5, 2.5, 3.5], [4.5, 5.5, 6.5], weave.types.Float(), weave.types.Number()),
+    ([1.5, 2.5, 3.5], [4.5, 5.5, 6.5], weave.types.Float(), weave.types.Float()),
+]
+
+CONCAT_TEST_CASES = [
+    case if len(case) == 4 else (*case, None, None) for case in CONCAT_TEST_CASES
 ]
 
 
@@ -251,23 +277,29 @@ def fix_for_compare(x1):
 
 
 @pytest.mark.parametrize(
-    "l1, l2",
+    "l1, l2, l1_wb_type, l2_wb_type",
     CONCAT_TEST_CASES,  # ids=lambda arg: str(weave.type_of(arg).object_type)
 )
-def test_extend(l1, l2):
+def test_extend(l1, l2, l1_wb_type, l2_wb_type):
     from rich import print
 
     print()
     print("L1", l1)
     print("L2", l2)
-    a1 = to_arrow(l1)
+
+    if l1_wb_type:
+        l1_wb_type = weave.types.List(l1_wb_type)
+    if l2_wb_type:
+        l2_wb_type = weave.types.List(l2_wb_type)
+
+    a1 = to_arrow(l1, l1_wb_type)
     a1_ref = storage.save(a1)
     a1_again = storage.get(str(a1_ref))
     assert a1.object_type == a1_again.object_type
     assert a1._arrow_data == a1_again._arrow_data
     a1 = a1_again
 
-    a2 = to_arrow(l2)
+    a2 = to_arrow(l2, l2_wb_type)
     a2_ref = storage.save(a2)
     a2_again = storage.get(str(a2_ref))
     assert a2.object_type == a2_again.object_type
