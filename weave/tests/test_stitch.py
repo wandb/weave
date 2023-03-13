@@ -277,3 +277,17 @@ def test_refine_history_type_included_in_gql():
     refine_history_node = pick_node.refine_history_type()
     sg = stitch.stitch([refine_history_node])
     assert "historyKeys" in compile_domain._get_fragment(project_node, sg)
+
+
+def test_stitch_missing_key():
+    a_node = weave_internal.make_const_node(weave.types.String(), "a")
+    dict_node = weave.ops.dict_(a=a_node)
+    picked_valid = dict_node["a"] + "-suffix"
+    picked_missing = dict_node["b"] + "-suffix"
+
+    assert weave.use(picked_valid) == "a-suffix"
+    assert weave.use(picked_missing) == None
+
+    sg = stitch.stitch([picked_valid, picked_missing])
+
+    assert len(sg.get_result(a_node).calls) == 1

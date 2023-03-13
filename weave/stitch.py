@@ -250,7 +250,10 @@ def stitch_node_inner(
     elif node.from_op.name.endswith("pick"):
         if isinstance(node.from_op.inputs["key"], graph.ConstNode):
             key = _dict_utils.unescape_dots(node.from_op.inputs["key"].val)
-            if isinstance(inputs[0], LiteralDictObjectRecorder):
+            if (
+                isinstance(inputs[0], LiteralDictObjectRecorder)
+                and key in inputs[0].val
+            ):
                 return inputs[0].val[key]
             else:
                 # This is the case that the picked key is not found in the
