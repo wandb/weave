@@ -88,26 +88,6 @@ def __ne__(self, other):
     return ArrowWeaveList(result, types.Boolean(), self._artifact)
 
 
-@op(
-    name="ArrowWeaveListString_right-notEqual",
-    input_type=null_consuming_binary_input_type_right,
-    output_type=ARROW_WEAVE_LIST_BOOLEAN_TYPE,
-)
-def __ne_right__(self, other):
-    result = util.not_equal(other._arrow_data, self)
-    return ArrowWeaveList(result, types.Boolean(), other._artifact)
-
-
-@op(
-    name="ArrowWeaveListString_right-equal",
-    input_type=null_consuming_binary_input_type_right,
-    output_type=ARROW_WEAVE_LIST_BOOLEAN_TYPE,
-)
-def __eq_right__(self, other):
-    result = util.equal(other._arrow_data, self)
-    return ArrowWeaveList(result, types.Boolean(), other._artifact)
-
-
 @arrow_op(
     name="ArrowWeaveListString-contains",
     input_type=binary_input_type,

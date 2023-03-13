@@ -1204,3 +1204,23 @@ def test_isnone():
         False,
         False,
     ]
+
+
+@pytest.mark.parametrize(
+    "weave_func, expected",
+    [
+        (lambda x: Number.__eq__(5, x), [False, False, False, False, True]),
+        (lambda x: Number.__ne__(5, x), [True, True, True, True, False]),
+    ],
+)
+def test_right_equals_not_equals_elements_tagged(weave_func, expected):
+    # make an arrow weave list with tagged elements
+    data = [1, 2, 3, 4, 5]
+    for i in range(len(data)):
+        data[i] = tag_store.add_tags(box.box(data[i]), {"mytag": "test" + str(i)})
+    awl = arrow.to_arrow(data)
+    l = weave.save(awl)
+    fn = weave_internal.define_fn({"x": awl.object_type}, weave_func).val
+    vec_fn = arrow.vectorize(fn)
+    called = weave_internal.call_fn(vec_fn, {"x": l})
+    assert weave.use(called).to_pylist_notags() == expected
