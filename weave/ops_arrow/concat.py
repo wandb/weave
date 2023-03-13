@@ -185,6 +185,35 @@ def _concatenate_lists(
     )
 
 
+# See comment in `_concatenate_non_unions` for explanation of these.
+def _is_concatenate_non_unions_special_case(
+    self: ArrowWeaveList, other: ArrowWeaveList
+) -> bool:
+    return (
+        # 1. self: Number(int); other: Number(float)
+        (
+            type(self.object_type) == types.Number
+            and pa.types.is_integer(self._arrow_data.type)
+            and type(other.object_type) == types.Number
+            and pa.types.is_floating(other._arrow_data.type)
+        )
+        or
+        # 2. self: Number(int); other: Float
+        (
+            type(self.object_type) == types.Number
+            and pa.types.is_integer(self._arrow_data.type)
+            and type(other.object_type) == types.Float
+        )
+        or
+        # 3. self: Int;         other: Number(float)
+        (
+            type(self.object_type) == types.Int
+            and type(other.object_type) == types.Number
+            and pa.types.is_floating(other._arrow_data.type)
+        )
+    )
+
+
 def _concatenate_non_unions(
     self: ArrowWeaveList, other: ArrowWeaveList, depth: int = 0
 ) -> typing.Optional[ArrowWeaveList]:
@@ -204,10 +233,60 @@ def _concatenate_non_unions(
 
     # TODO: Note about why can't the types equal case go at the top?
 
+    # Note: we have some special handling for Number, and the following comment
+    # justifies why we need such special handling in a generic part of the code.
+    #
+    # If either of the types are Number, then the first case will handle it.
+    # The first case being `if self.object_type.assign_type(other.object_type):`
+    # See the truth table above for why this is the case.
+    #
+    # Weave Assignment Truth Table:
+    # from_type | to_type | to_type.assign_type(from_type)
+    # ----------+---------+--------------------------
+    # Number    | Number  | True
+    # Number    | Int     | True
+    # Number    | Float   | True
+    # Int       | Number  | True
+    # Int       | Int     | True
+    # Int       | Float   | True
+    # Float     | Number  | True
+    # Float     | Int     | False
+    # Float     | Float   | True
+    #
+    # However, if a Weave Type is Number, then the underlying Arrow type could
+    # be either int or float. So, we have the following possibilities:
+    #
+    # Weave Assignment Truth Table:
+    # self_type | other_type | self_arrow_type | other_arrow_type | other._arrow_data.cast(self._arrow_data.type)
+    # ----------+------------+-----------------+------------------+----------------------------------------------
+    # Number    | Number     | int             | int              | Safe
+    # Number    | Number     | int             | float            | Not Safe
+    # Number    | Number     | float           | int              | Safe
+    # Number    | Number     | float           | float            | Safe
+    # Number    | Int        | int             | int              | Safe
+    # Number    | Int        | float           | int              | Safe
+    # Number    | Float      | int             | float            | Not Safe
+    # Number    | Float      | float           | float            | Safe
+    # Int       | Number     | int             | int              | Safe
+    # Int       | Number     | int             | float            | Not Safe
+    # Float     | Number     | float           | int              | Safe
+    # Float     | Number     | float           | float            | Safe
+    #
+    # As you can see from this table, there are 3 unsafe cases:
+    # 1. self: Number(int); other: Number(float)
+    # 2. self: Number(int); other: Float
+    # 3. self: Int;         other: Number(float)
+    #
+    # So, we need to special case these situations.
+
     indent_print(depth, "Extend case non-union types")
     if self.object_type.assign_type(other.object_type):
-        self_data = self._arrow_data
-        other_data = other._arrow_data.cast(self._arrow_data.type)
+        if _is_concatenate_non_unions_special_case(self, other):
+            self_data = self._arrow_data.cast(other._arrow_data.type)
+            other_data = other._arrow_data
+        else:
+            self_data = self._arrow_data
+            other_data = other._arrow_data.cast(self._arrow_data.type)
         if len(self) == 0:
             data = other_data
         elif len(other) == 0:
