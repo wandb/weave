@@ -130,9 +130,13 @@ class WandbApiAsync:
         # which is 10 seconds by default. See issue: https://github.com/graphql-python/gql/issues/381
         # Closing the session just closes the connector, which we don't want anyway, so we don't
         # bother.
+        # Using the perminent session pattern as described here:
+        # https://gql.readthedocs.io/en/latest/advanced/async_permanent_session.html#async-permanent-session
         client = gql.Client(transport=transport, fetch_schema_from_transport=False)
         session = await client.connect_async(reconnecting=False)  # type: ignore
-        return await session.execute(query, kwargs)
+        res = await session.execute(query, kwargs)
+        await client.close_async()  # type: ignore
+        return res
 
     SERVER_INFO_QUERY = gql.gql(
         """
