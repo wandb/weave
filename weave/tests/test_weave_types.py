@@ -463,6 +463,13 @@ def test_typeddict_to_dict():
             types.union(types.NoneType(), types.Number(), types.String()),
             types.union(types.Number(), types.String()),
         ),
+        # Union with multiple none-like members
+        (
+            types.union(
+                types.NoneType(), TaggedValueType(types.TypedDict({}), types.NoneType())
+            ),
+            types.Invalid(),
+        ),
     ],
 )
 def test_non_none(in_type, out_type):

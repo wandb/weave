@@ -1114,10 +1114,9 @@ def non_none(type_: Type) -> Type:
         new_members = [
             non_none(m) for m in type_.members if not none_type.assign_type(m)
         ]
-        # TODO: could put this logic in UnionType.from_members ?
+        # Can happen if there are Nones and Tagged Nones
         if len(new_members) == 0:
-            # Should never have a length one union to start with
-            raise Exception("programming error")
+            return Invalid()
         elif len(new_members) == 1:
             return new_members[0]
         else:
