@@ -74,5 +74,5 @@ def artifact_versions(
         for artifactEdge in artifactCollectionEdge["node"][first_100_artifacts_alias][
             "edges"
         ]:
-            res.append(wdt.ArtifactVersion(artifactEdge["node"]))
+            res.append(wdt.ArtifactVersion.from_gql(artifactEdge["node"]))
     return res
