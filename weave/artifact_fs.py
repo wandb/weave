@@ -105,12 +105,6 @@ class FilesystemArtifact(artifact_base.Artifact):
     ) -> typing.Optional[
         typing.Union["FilesystemArtifactFile", "FilesystemArtifactDir"]
     ]:
-        if ":" in path:
-            # This is a full URI, not a local path.
-            ref = uris.WeaveURI.parse(path).to_ref()
-            if not isinstance(ref, FilesystemArtifactRef) or ref.path is None:
-                raise errors.WeaveInternalError(f"Cannot get path info for {path}")
-            return ref.artifact.path_info(ref.path)
         res = self._path_info(path)
         if isinstance(res, FilesystemArtifactRef):
             if res.path is None:

@@ -229,8 +229,6 @@ gql_connection_op(
     wdt.ArtifactVersionType,
     "usedBy",
     wdt.RunType,
-    {},
-    lambda inputs: "first: 50",
 )
 
 

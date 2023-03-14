@@ -3,6 +3,7 @@ import typing
 import pytest
 
 import weave
+from weave.weave_internal import define_fn, make_const_node
 from ..api import use
 from .. import graph
 from .. import weave_types as types
@@ -162,3 +163,38 @@ def test_optimize_merge_empty_dict():
         compile.compile_simple_optimizations([non_simplified_merge])[0].to_json()
         == non_simplified_merge.to_json()
     )
+
+
+def count_nodes(node: graph.Node) -> int:
+    counter = 0
+
+    def inc(n: graph.Node):
+        nonlocal counter
+        counter += 1
+
+    weave.graph.map_nodes_full([node], inc)
+    return counter
+
+
+def test_compile_lambda_uniqueness():
+    list_node_1 = weave.ops.make_list(a=make_const_node(weave.types.Number(), 1))
+    list_node_2 = weave.ops.make_list(a=make_const_node(weave.types.Number(), 2))
+    fn_node = define_fn({"row": weave.types.Number()}, lambda row: row + 1)
+    mapped_1 = list_node_1.map(fn_node)
+    mapped_2 = list_node_2.map(fn_node)
+    combined = weave.ops.make_list(a=mapped_1, b=mapped_2)
+    concatted = combined.concat()
+
+    # list node contains 2 nodes (const, list), x 2 = 4
+    # fn node contains 3 nodes (row, add, const) + the fn node itself, x1 = 4
+    # map node contains 1 node, x2 = 2
+    # combined node contains 1 node, x1 = 1
+    # concat node contains 1 node, x1 = 1
+    # total = 12
+    assert count_nodes(concatted) == 12
+
+    # However, after lambda compilation, we should get
+    # 3 more nodes (new row, add, and fn), creating
+    # a total of 15 nodes
+    compiled = compile.compile([concatted])[0]
+    assert count_nodes(compiled) == 15

@@ -85,7 +85,6 @@ def _process_run_dict_item(val, run_path: typing.Optional[RunPath] = None):
                 for i in range(val["packedBins"]["count"]):
                     bins.append(bin_min)
                     bin_min += val["packedBins"]["size"]
-                bins = val["packedBins"]
             else:
                 bins = val["bins"]
             return Histogram(

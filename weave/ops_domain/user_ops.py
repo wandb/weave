@@ -55,7 +55,7 @@ gql_connection_op(
     "teams",
     wdt.EntityType,
     {},
-    lambda inputs: f"first: 50",
+    lambda inputs: f"first: 100",
 )
 
 # Section 6/6: Non Standard Business Logic Ops

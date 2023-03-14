@@ -438,6 +438,28 @@ def vectorize(
                 )
                 inputs_as_awl = _vectorized_inputs_as_awl(node_inputs, vectorized_keys)
                 return op.lazy_call(*inputs_as_awl.values())
+        elif node_name.endswith("isNone"):
+            arg_names = list(node_inputs.keys())
+            if arg_names[0] in vectorized_keys:
+                op = registry_mem.memory_registry.get_op(
+                    "ArrowWeaveList-vectorizedIsNone"
+                )
+                inputs_as_awl = _vectorized_inputs_as_awl(node_inputs, vectorized_keys)
+                return op.lazy_call(*inputs_as_awl.values())
+        elif node_name.endswith("-equal") or node_name.endswith("-notEqual"):
+            # if the first arg is not in the vectorized path, but is a constant, and the second is in the vectorized path,
+            # then we swap the order of the inputs so that we can use existing ops we have written where the AWL is first
+            # in order for tag flow to proceed as expected
+            arg_names = list(node_inputs.keys())
+            if arg_names[1] in vectorized_keys and arg_names[0] not in vectorized_keys:
+                inputs_as_awl = _vectorized_inputs_as_awl(node_inputs, vectorized_keys)
+                inputs_as_awl = {
+                    arg_names[0]: inputs_as_awl[arg_names[1]],
+                    arg_names[1]: inputs_as_awl[arg_names[0]],
+                }
+                maybe_op = _safe_get_op_for_inputs(node_name, inputs_as_awl)
+                if maybe_op is not None:
+                    return maybe_op.lazy_call(*inputs_as_awl.values())
 
         # 4. Non SIMD ops (List/AWL)
         if _is_non_simd_node(node, vectorized_keys):

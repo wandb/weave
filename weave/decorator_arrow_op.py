@@ -68,7 +68,9 @@ def _handle_arrow_tags(
     return old_output_type
 
 
-def _make_new_vector_output_type_callable(old_type_func: TypeCallable) -> TypeCallable:
+def _make_new_vector_output_type_callable(
+    old_type_func: TypeCallable, is_null_consuming=False
+) -> TypeCallable:
     def new_callable_nullable_awl_type(
         non_callable_input_types: dict[str, types.Type]
     ) -> types.Type:
@@ -79,7 +81,7 @@ def _make_new_vector_output_type_callable(old_type_func: TypeCallable) -> TypeCa
         first_input_type = typing.cast(ArrowWeaveListType, first_input_type)
 
         has_optional_vector_type = types.is_optional(first_input_type.object_type)
-        if has_optional_vector_type:
+        if has_optional_vector_type and not is_null_consuming:
             first_input_type = ArrowWeaveListType(
                 types.non_none(first_input_type.object_type)
             )
@@ -91,7 +93,7 @@ def _make_new_vector_output_type_callable(old_type_func: TypeCallable) -> TypeCa
 
         tag_propagated_output_type = _handle_arrow_tags(old_type, first_input_type)
 
-        if has_optional_vector_type:
+        if has_optional_vector_type and not is_null_consuming:
             return _nullify_vector_type(tag_propagated_output_type)
         return tag_propagated_output_type
 
@@ -100,12 +102,25 @@ def _make_new_vector_output_type_callable(old_type_func: TypeCallable) -> TypeCa
 
 def adjust_output_type_for_tags_and_nullability(
     output_type: TypeOrCallable,
+    is_null_consuming=False,
 ) -> TypeOrCallable:
     if not callable(output_type):
         new_output_type = typing.cast(TypeCallable, lambda _: output_type)
     else:
         new_output_type = typing.cast(TypeCallable, output_type)
-    return _make_new_vector_output_type_callable(new_output_type)
+    return _make_new_vector_output_type_callable(
+        new_output_type, is_null_consuming=is_null_consuming
+    )
+
+
+def is_null_consuming_arrow_op(input_types: InputTypeDict) -> bool:
+    first_input_type_name = next(k for k in input_types)
+    first_input_type = input_types[first_input_type_name]
+    assert not callable(first_input_type)
+    assert ArrowWeaveListType().assign_type(first_input_type)
+    return types.is_optional(
+        typing.cast(ArrowWeaveListType, first_input_type).object_type
+    )
 
 
 def arrow_op(
@@ -127,14 +142,17 @@ def arrow_op(
     In these cases, element tags from (1) are automatically propagated to each element of (2).
     """
 
-    # arrow ops should automatically have nullability at the object level
-    # TODO: update input types to handle nullable object types
-    # TODO: update output types to handle nullable object types
-
     # TODO(DG): handle reading input and output types from function signature
-
-    new_input_type = adjust_input_types_for_nullability(input_type, all_args_nullable)
-    new_output_type = adjust_output_type_for_tags_and_nullability(output_type)
+    is_null_consuming = is_null_consuming_arrow_op(input_type)
+    if not is_null_consuming:
+        new_input_type = adjust_input_types_for_nullability(
+            input_type, all_args_nullable
+        )
+    else:
+        new_input_type = input_type
+    new_output_type = adjust_output_type_for_tags_and_nullability(
+        output_type, is_null_consuming=is_null_consuming
+    )
 
     return op(
         input_type=new_input_type,

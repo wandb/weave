@@ -23,7 +23,7 @@ from .vectorize import (
     _apply_fn_node_with_tag_pushdown,
 )
 from .arrow_tags import pushdown_list_tags, awl_add_arrow_tags
-from .list_ import ArrowWeaveList
+from .list_ import ArrowWeaveList, unsafe_awl_construction
 
 tracer = engine_trace.tracer()  # type: ignore
 
@@ -664,15 +664,16 @@ def join_2(arr1, arr2, joinFn1, joinFn2, alias1, alias2, leftOuter, rightOuter):
         }
     )
 
-    untagged_result: ArrowWeaveList = ArrowWeaveList(
-        final_table,
-        final_type,
-        arr1._artifact,
-    )
-
-    res = awl_add_arrow_tags(
-        untagged_result,
-        pa.StructArray.from_arrays([join_obj], names=["joinObj"]),
-        types.TypedDict({"joinObj": raw_join_obj_type}),
-    )
+    with unsafe_awl_construction("missing tags"):
+        untagged_result: ArrowWeaveList = ArrowWeaveList(
+            final_table,
+            final_type,
+            arr1._artifact,
+        )
+        res = awl_add_arrow_tags(
+            untagged_result,
+            pa.StructArray.from_arrays([join_obj], names=["joinObj"]),
+            types.TypedDict({"joinObj": raw_join_obj_type}),
+        )
+    res.validate()
     return res

@@ -41,44 +41,42 @@ class LegacyImageArtifactFileRefType(types.ObjectType):
 @dataclasses.dataclass(frozen=True)
 class ImageArtifactFileRefType(types.ObjectType):
     name = "image-file"
-    boxLayers: dict[str, list] = dataclasses.field(default_factory=dict)
-    boxScoreKeys: list = dataclasses.field(default_factory=list)
-    maskLayers: dict[str, list] = dataclasses.field(default_factory=dict)
-    classMap: dict[int, str] = dataclasses.field(default_factory=dict)
+    boxLayers: typing.Union[types.Type, dict] = types.TypedDict({})
+    boxScoreKeys: typing.Union[types.Type, list] = types.List(types.UnknownType())
+    maskLayers: typing.Union[types.Type, dict] = types.TypedDict({})
+    classMap: typing.Union[types.Type, dict] = types.TypedDict({})
 
-    def __eq__(self, other):
-        # this custom __eq__ is needed because we need to allow
-        # the lists to be in any order. This is only implemented
-        # for the purpose of testing.
+    # TODO: This should probably be standard for Type!
+    def __post_init__(self):
+        for type_attr in self.type_attrs():
+            self.__dict__[type_attr] = types.parse_constliteral_type(
+                self.__dict__[type_attr]
+            )
 
-        if not isinstance(other, ImageArtifactFileRefType):
-            return False
-        boxLayerKeys = set(self.boxLayers.keys())
-        otherBoxLayerKeys = set(other.boxLayers.keys())
-        if boxLayerKeys != otherBoxLayerKeys:
-            return False
+    def _to_dict(self) -> dict:
+        d: dict = {"_is_object": True}
+        d = self.class_to_dict()
+        d["_is_object"] = True
+        d["boxLayers"] = types.constliteral_type_to_json(self.boxLayers)  # type: ignore
+        d["boxScoreKeys"] = types.constliteral_type_to_json(self.boxScoreKeys)  # type: ignore
+        d["maskLayers"] = types.constliteral_type_to_json(self.maskLayers)  # type: ignore
+        d["classMap"] = types.constliteral_type_to_json(self.classMap)  # type: ignore
+        return d
 
-        maskLayerKeys = set(self.maskLayers.keys())
-        otherMaskLayerKeys = set(other.maskLayers.keys())
-        if maskLayerKeys != otherMaskLayerKeys:
-            return False
-
-        boxScoreKeysSet = set(self.boxScoreKeys)
-        otherBoxScoreKeysSet = set(other.boxScoreKeys)
-        if boxScoreKeysSet != otherBoxScoreKeysSet:
-            return False
-
-        for key in boxLayerKeys:
-            if set(self.boxLayers[key]) != set(other.boxLayers[key]):
-                return False
-
-        for key in maskLayerKeys:
-            if set(self.maskLayers[key]) != set(other.maskLayers[key]):
-                return False
-
-        return self.classMap == other.classMap
+    # TODO: This should probably be standard for Type!
+    @classmethod
+    def from_dict(cls, d):
+        return cls(
+            d.get("boxLayers", {}),
+            d.get("boxScoreKeys", []),
+            d.get("maskLayers", {}),
+            d.get("classMap", {}),
+        )
 
     def property_types(self) -> dict[str, types.Type]:
+        boxLayers = types.constliteral_type_to_json(self.boxLayers)  # type: ignore
+        boxScoreKeys = types.constliteral_type_to_json(self.boxScoreKeys)  # type: ignore
+        maskLayers = types.constliteral_type_to_json(self.maskLayers)  #   type: ignore
         res = {
             "artifact": artifact_fs.FilesystemArtifactType(),
             "path": types.String(),
@@ -86,75 +84,66 @@ class ImageArtifactFileRefType(types.ObjectType):
             "height": types.Int(),
             "width": types.Int(),
             "sha256": types.String(),
-            "boxes": types.TypedDict(
-                {
-                    box_key: types.optional(
-                        types.List(
+            "boxes": types.optional(
+                types.TypedDict(
+                    {
+                        box_key: types.optional(
+                            types.List(
+                                types.TypedDict(
+                                    {
+                                        "box_caption": types.optional(types.String()),
+                                        "class_id": types.Int(),
+                                        "domain": types.optional(types.String()),
+                                        # The framework should do this merge types for us. But for
+                                        # now we have to do it manually.
+                                        "position": types.merge_types(
+                                            types.TypedDict(
+                                                {
+                                                    "maxX": types.Float(),
+                                                    "maxY": types.Float(),
+                                                    "minX": types.Float(),
+                                                    "minY": types.Float(),
+                                                }
+                                            ),
+                                            types.TypedDict(
+                                                {
+                                                    "height": types.Float(),
+                                                    "middle": types.List(types.Float()),
+                                                    "width": types.Float(),
+                                                }
+                                            ),
+                                        ),
+                                        "scores": types.optional(
+                                            types.TypedDict(
+                                                {
+                                                    score_key: types.Float()
+                                                    for score_key in boxScoreKeys
+                                                }
+                                            )
+                                        ),
+                                    }
+                                )
+                            )
+                        )
+                        for box_key in boxLayers.keys()
+                    }
+                )
+            ),
+            "masks": types.optional(
+                types.TypedDict(
+                    {
+                        mask_key: types.optional(
                             types.TypedDict(
                                 {
-                                    "box_caption": types.optional(types.String()),
-                                    "class_id": types.Int(),
-                                    "domain": types.optional(types.String()),
-                                    "position": types.union(
-                                        types.TypedDict(
-                                            {
-                                                "maxX": types.Int(),
-                                                "maxY": types.Int(),
-                                                "minX": types.Int(),
-                                                "minY": types.Int(),
-                                            }
-                                        ),
-                                        types.TypedDict(
-                                            {
-                                                "maxX": types.Float(),
-                                                "maxY": types.Float(),
-                                                "minX": types.Float(),
-                                                "minY": types.Float(),
-                                            }
-                                        ),
-                                        types.TypedDict(
-                                            {
-                                                "height": types.Float(),
-                                                "middle": types.List(types.Float()),
-                                                "width": types.Float(),
-                                            }
-                                        ),
-                                        types.TypedDict(
-                                            {
-                                                "height": types.Int(),
-                                                "middle": types.List(types.Int()),
-                                                "width": types.Int(),
-                                            }
-                                        ),
-                                    ),
-                                    "scores": types.optional(
-                                        types.TypedDict(
-                                            {
-                                                score_key: types.Float()
-                                                for score_key in self.boxScoreKeys
-                                            }
-                                        )
-                                    ),
+                                    "_type": types.String(),
+                                    "path": types.String(),
+                                    "sha256": types.optional(types.String()),
                                 }
                             )
                         )
-                    )
-                    for box_key in self.boxLayers.keys()
-                }
-            ),
-            "masks": types.TypedDict(
-                {
-                    mask_key: types.optional(
-                        types.TypedDict(
-                            {
-                                "_type": types.String(),
-                                "path": types.String(),
-                                "sha256": types.optional(types.String()),
-                            }
-                        )
-                    )
-                    for mask_key in self.maskLayers.keys()
-                }
+                        for mask_key in maskLayers.keys()
+                    }
+                )
             ),
         }
         return res
@@ -168,11 +157,11 @@ class ImageArtifactFileRefType(types.ObjectType):
             }
         else:
             boxLayers = {}
-        boxScoreKeysSet = set()
+        boxScoreKeysSet = {}
         for boxLayer in boxLayers:
             for box in obj.boxes[boxLayer]:
                 if box["scores"] is not None:
-                    boxScoreKeysSet.update(list(box["scores"].keys()))
+                    boxScoreKeysSet.update(dict.fromkeys(box["scores"].keys()))
         boxScoreKeys = list(boxScoreKeysSet)
 
         if obj.masks:
@@ -189,26 +178,10 @@ class ImageArtifactFileRefType(types.ObjectType):
         else:
             maskLayers = {}
         return cls(
-            boxLayers=boxLayers, boxScoreKeys=boxScoreKeys, maskLayers=maskLayers
-        )
-
-    def _to_dict(self) -> dict:
-        d: dict = {"_is_object": True}
-        d = self.class_to_dict()
-        d["_is_object"] = True
-        d["boxLayers"] = self.boxLayers
-        d["boxScoreKeys"] = self.boxScoreKeys
-        d["maskLayers"] = self.maskLayers
-        d["classMap"] = self.classMap
-        return d
-
-    @classmethod
-    def from_dict(cls, d):
-        return cls(
-            d.get("boxLayers", {}),
-            d.get("boxScoreKeys", []),
-            d.get("maskLayers", {}),
-            d.get("classMap", {}),
+            boxLayers=boxLayers,
+            boxScoreKeys=boxScoreKeys,
+            maskLayers=maskLayers,
+            classMap={},
         )
 
 
@@ -221,37 +194,13 @@ class ImageArtifactFileRef:
     height: int
     width: int
     sha256: str
-    boxes: dict[str, list[dict]] = dataclasses.field(default_factory=dict)
-    masks: dict[str, dict[str, str]] = dataclasses.field(default_factory=dict)
-    classes: typing.Optional[dict] = None
-
-    def __post_init__(self):
-        # Here, we ensure the correct types for the boxes and masks this is
-        # needed because the union branch of `recursively_build_pyarrow_array`
-        # requires exact type matching!
-
-        if not self.boxes:
-            return
-        for box_set_id in self.boxes:
-            box_set = self.boxes[box_set_id]
-            for box in box_set:
-                if "scores" in box:
-                    if box["scores"] is not None:
-                        # Scores are always floats
-                        box["scores"] = {k: float(v) for k, v in box["scores"].items()}
-                if "domain" in box and box["domain"] == "pixel":
-                    py_number_type = int
-                else:
-                    py_number_type = float
-
-                # Position values are either float or int based on the domain
-                # spec
-                box["position"] = {
-                    k: py_number_type(v)
-                    if k != "middle"
-                    else [py_number_type(v[0]), py_number_type(v[1])]
-                    for k, v in box["position"].items()
-                }
+    boxes: typing.Optional[dict[str, list[dict]]] = dataclasses.field(
+        default_factory=dict
+    )  # type: ignore
+    masks: typing.Optional[dict[str, dict[str, str]]] = dataclasses.field(
+        default_factory=dict
+    )  # type: ignore
+    classes: typing.Optional[typing.Optional[dict]] = None
 
 
 ImageArtifactFileRef.WeaveType = ImageArtifactFileRefType  # type: ignore
@@ -309,6 +258,9 @@ class HtmlArtifactFileRef:
 # {"params": {"serialization_path": {"key": "output", "path":
 # "media/serialized_data/498587e8.npz"}, "shape": [10]} However, I suspect we
 # will just use the newer Weave1 NDArray type instead.
+
+# 3/22/23: However as of this comment, we just return NoneType() instead of this
+# type when we encounter legacy ndarray, since the table data is None
 class LegacyTableNDArrayType(types.Type):
     name = "ndarray"
 

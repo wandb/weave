@@ -10,7 +10,8 @@ from ..decorator_arrow_op import arrow_op
 from .. import weave_types as types
 
 from .list_ import ArrowWeaveList, ArrowWeaveListType
-from .arrow import ArrowWeaveListType, arrow_as_array
+from .arrow import ArrowWeaveListType
+from . import util
 
 
 ARROW_WEAVE_LIST_STRING_TYPE = ArrowWeaveListType(types.String())
@@ -28,13 +29,26 @@ binary_input_type = {
     ),
 }
 
+null_consuming_binary_input_type = {
+    "self": ArrowWeaveListType(types.optional(types.String())),
+    "other": types.UnionType(
+        types.optional(types.String()),
+        ArrowWeaveListType(types.optional(types.String())),
+    ),
+}
+
+null_consuming_binary_input_type_right = {
+    "self": types.optional(types.String()),
+    "other": ArrowWeaveListType(types.optional(types.String())),
+}
+
 self_type_output_type_fn = lambda input_types: input_types["self"]
 
 
 def _concatenate_strings(
     left: ArrowWeaveList[str], right: typing.Union[str, ArrowWeaveList[str]]
 ) -> ArrowWeaveList[str]:
-    a = arrow_as_array(left._arrow_data)
+    a = left._arrow_data
     if right == None:
         return ArrowWeaveList(
             pa.nulls(len(a), type=a.type),
@@ -52,28 +66,26 @@ def _concatenate_strings(
 
 @arrow_op(
     name="ArrowWeaveListString-equal",
-    input_type=binary_input_type,
+    input_type=null_consuming_binary_input_type,
     output_type=ARROW_WEAVE_LIST_BOOLEAN_TYPE,
 )
 def __eq__(self, other):
     if isinstance(other, ArrowWeaveList):
         other = other._arrow_data
-    return ArrowWeaveList(
-        pc.equal(self._arrow_data, other), types.Boolean(), self._artifact
-    )
+    result = util.equal(self._arrow_data, other)
+    return ArrowWeaveList(result, types.Boolean(), self._artifact)
 
 
 @arrow_op(
     name="ArrowWeaveListString-notEqual",
-    input_type=binary_input_type,
+    input_type=null_consuming_binary_input_type,
     output_type=ARROW_WEAVE_LIST_BOOLEAN_TYPE,
 )
 def __ne__(self, other):
     if isinstance(other, ArrowWeaveList):
         other = other._arrow_data
-    return ArrowWeaveList(
-        pc.not_equal(self._arrow_data, other), types.Boolean(), self._artifact
-    )
+    result = util.not_equal(self._arrow_data, other)
+    return ArrowWeaveList(result, types.Boolean(), self._artifact)
 
 
 @arrow_op(

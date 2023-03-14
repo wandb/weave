@@ -20,6 +20,8 @@ import queue
 import atexit
 import os
 
+from requests import HTTPError
+
 
 from . import artifact_wandb
 from . import errors
@@ -98,13 +100,21 @@ class ServerResponse:
     id: int
     value: typing.Any
     error: bool = False
+    http_error_code: typing.Optional[int] = None
+    http_error_message: typing.Optional[str] = None
 
     @classmethod
     def from_json(cls, json: typing.Any) -> "ServerResponse":
         return cls(**json)
 
     def to_json(self) -> typing.Any:
-        return {"id": self.id, "value": self.value, "error": self.error}
+        return {
+            "id": self.id,
+            "value": self.value,
+            "error": self.error,
+            "http_error_code": self.http_error_code,
+            "http_error_message": self.http_error_message,
+        }
 
 
 class Server:
@@ -191,7 +201,26 @@ class Server:
                 "WBArtifactManager request error: %s\n", traceback.format_exc()
             )
             print("WBArtifactManager request error: %s\n", traceback.format_exc())
-            error_response = ServerResponse(server_req.id, str(e), error=True)
+            http_error_code = None
+            http_error_message = None
+
+            # In the specific instance that the response is either an
+            # HTTP error (from requests) or a WeaveHttpError (from Weave),
+            # we want to extract the HTTP code and message from the error
+            # and send it back to the client.
+            if isinstance(e, HTTPError) and e.response is not None:
+                http_error_code = e.response.status_code
+                http_error_message = e.response.reason
+            elif isinstance(e, errors.WeaveHttpError) and len(e.args) > 1:
+                http_error_message = e.args[0]
+                http_error_code = e.args[1]
+            error_response = ServerResponse(
+                server_req.id,
+                str(e),
+                error=True,
+                http_error_code=http_error_code,
+                http_error_message=http_error_message,
+            )
             writer.write((json.dumps(error_response.to_json()) + "\n").encode())
             await writer.drain()
             return
@@ -337,6 +366,10 @@ class SyncClient:
         json_resp = json.loads(decoded)
         server_resp = ServerResponse.from_json(json_resp)
         if server_resp.error:
+            if server_resp.http_error_code != None:
+                raise errors.WeaveHttpError(
+                    server_resp.http_error_message, server_resp.http_error_code
+                )
             raise errors.WeaveWandbArtifactManagerError(
                 "Request error: " + server_resp.value
             )

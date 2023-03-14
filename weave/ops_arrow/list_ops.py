@@ -4,6 +4,7 @@ import numpy as np
 import typing
 
 from ..api import op
+from ..decorator_arrow_op import arrow_op
 from .. import weave_types as types
 from ..language_features.tagging import (
     tagged_value_type,
@@ -15,10 +16,7 @@ from ..ops_primitives import list_ as primitive_list
 from .. import op_def
 
 from .arrow import ArrowWeaveListType, arrow_as_array, offsets_starting_at_zero
-from .list_ import (
-    ArrowWeaveList,
-    safe_pa_concat_arrays,
-)
+from .list_ import ArrowWeaveList
 from . import arrow_tags
 from .vectorize import _apply_fn_node_with_tag_pushdown
 from . import convert
@@ -514,6 +512,12 @@ def unnest(self):
     # todo: make this more efficient. we shouldn't have to convert back and forth
     # from the arrow in-memory representation to pandas just to call the explode
     # function. but there is no native pyarrow implementation of this
+
+    # This can replace int64 with float64! I believe it happens when we have nullable
+    # int. pandas represents nullability using nan.
+    # This requires us a hack in our AWL.validate function to allow float64 when
+    # the weave type is int.
+    # TODO: write an arrow based implementation, and remove the hack in validate.
     exploded_table = pa.Table.from_pandas(
         df=arrow_obj.to_pandas().explode(list_cols), preserve_index=False
     )
@@ -606,7 +610,7 @@ def concat(arr):
 
     for i in range(1, len(arr)):
         tagged = arrow_tags.pushdown_list_tags(arr[i])
-        res = res.concatenate(tagged)
+        res = res.concat(tagged)
     return res
 
 
@@ -671,9 +675,21 @@ def vectorized_list_output_type(input_types):
     render_info={"type": "function"},
 )
 def arrow_list_(**e):
+    if len(e) == 0:
+        return ArrowWeaveList(pa.nones(0), types.UnknownType(), None)
     res = vectorized_container_constructor_preprocessor(e)
-    element_types = res.prop_types.values()
-    concatted = safe_pa_concat_arrays(res.arrays)
+
+    # Use our ArrowWeaveList concat implementation. Its guaranteed to
+    # work for all possible AWL types.
+    awls = [
+        ArrowWeaveList(arr, object_type, None)
+        for arr, object_type in zip(res.arrays, res.prop_types.values())
+    ]
+    result_values = awls[0]
+    for next_awl in awls[1:]:
+        result_values = result_values.concat(next_awl)
+
+    concatted = result_values._arrow_data
 
     if len(concatted) == 0:
         values = concatted
@@ -687,7 +703,7 @@ def arrow_list_(**e):
     )
     return ArrowWeaveList(
         pa.ListArray.from_arrays(offsets, values),
-        types.List(types.union(*element_types)),
+        types.List(result_values.object_type),
         res.artifact,
     )
 
@@ -725,4 +741,27 @@ def vectorized_arrow_pick(self, key):
     result = new_array.dictionary_decode()
     return ArrowWeaveList(
         result,
+    )
+
+
+@arrow_op(
+    name="ArrowWeaveList-vectorizedIsNone",
+    input_type={"self": ArrowWeaveListType(types.optional(types.Any()))},
+    output_type=ArrowWeaveListType(types.Boolean()),
+)
+def vectorized_is_none(self):
+    # Need to break out to python due to this issue we reported
+    # https://github.com/apache/arrow/issues/34315
+    # TODO: Remove this once the issue is fixed
+    # Open PR here: https://github.com/apache/arrow/pull/34408
+    if isinstance(self._arrow_data, pa.UnionArray):
+        return ArrowWeaveList(
+            pa.array([x == None for x in self._arrow_data.to_pylist()]),
+            types.Boolean(),
+            self._artifact,
+        )
+    return ArrowWeaveList(
+        self._arrow_data.is_null(),
+        types.Boolean(),
+        self._artifact,
     )

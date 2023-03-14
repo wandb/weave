@@ -9,6 +9,8 @@ from .. import runs
 from ..ops_primitives import _dict_utils
 from rich import print
 
+from ..ops_domain import wbmedia
+
 
 def test_typeof_string():
     t = types.TypeRegistry.type_of("x")
@@ -133,18 +135,13 @@ def test_typeof_list_runs():
     print("test_typeof_list_runs.actual", actual)
 
     assert actual == types.List(
-        types.UnionType(
-            types.RunType(
-                inputs=types.TypedDict({"a": types.String()}),
-                history=types.List(types.UnknownType()),
-                output=types.Float(),
+        types.RunType(
+            inputs=types.TypedDict(
+                {"a": types.String(), "b": types.optional(types.Int())}
             ),
-            types.RunType(
-                inputs=types.TypedDict({"a": types.String(), "b": types.Int()}),
-                history=types.List(types.UnknownType()),
-                output=types.Float(),
-            ),
-        )
+            history=types.List(types.UnknownType()),
+            output=types.Float(),
+        ),
     )
 
 
@@ -466,6 +463,13 @@ def test_typeddict_to_dict():
             types.union(types.NoneType(), types.Number(), types.String()),
             types.union(types.Number(), types.String()),
         ),
+        # Union with multiple none-like members
+        (
+            types.union(
+                types.NoneType(), TaggedValueType(types.TypedDict({}), types.NoneType())
+            ),
+            types.Invalid(),
+        ),
     ],
 )
 def test_non_none(in_type, out_type):
@@ -578,3 +582,122 @@ def test_tagged_value_flow():
         TaggedValueType(list_tag_type_2, types.String()),
     )
     assert pts["c"] == types.optional(TaggedValueType(list_tag_type_2, types.Int()))
+
+
+MERGE_CONSTS_TEST_CASES = [
+    (
+        types.TypedDict(
+            {
+                "a": types.Const(types.Int(), 1),
+            },
+        ),
+        types.TypedDict(
+            {
+                "a": types.Const(types.Int(), 2),
+            },
+        ),
+        types.TypedDict(
+            {
+                "a": types.UnionType(
+                    types.Const(types.Int(), 1), types.Const(types.Int(), 2)
+                )
+            },
+        ),
+    ),
+    (
+        types.TypedDict(
+            {
+                "a": types.List(
+                    types.UnionType(
+                        types.Const(types.Int(), 1), types.Const(types.Int(), 2)
+                    )
+                ),
+            },
+        ),
+        types.TypedDict(
+            {
+                "a": types.List(
+                    types.UnionType(
+                        types.Const(types.Int(), 1), types.Const(types.Int(), 3)
+                    )
+                ),
+            },
+        ),
+        types.TypedDict(
+            {
+                "a": types.List(
+                    types.UnionType(
+                        types.Const(types.Int(), 1),
+                        types.Const(types.Int(), 2),
+                        types.Const(types.Int(), 3),
+                    )
+                )
+            },
+        ),
+    ),
+    (
+        types.TypedDict(
+            {"a": wbmedia.ImageArtifactFileRefType({"boxLayer1": [1, 2, 3]})},
+        ),
+        types.TypedDict(
+            {"a": wbmedia.ImageArtifactFileRefType({"boxLayer1": [1, 3, 9]})},
+        ),
+        types.TypedDict(
+            {"a": wbmedia.ImageArtifactFileRefType({"boxLayer1": [1, 2, 3, 9]})},
+        ),
+    ),
+]
+
+
+@pytest.mark.parametrize("t1, t2, expected", MERGE_CONSTS_TEST_CASES)
+def test_merge_consts(t1, t2, expected):
+    assert types.merge_types(t1, t2) == expected
+
+
+def test_parse_const_type():
+    assert types.parse_constliteral_type({"a": [1, 2, 3]}) == types.TypedDict(
+        {
+            "a": types.List(
+                types.union(
+                    types.Const(types.Int(), 1),
+                    types.Const(types.Int(), 2),
+                    types.Const(types.Int(), 3),
+                )
+            )
+        }
+    )
+
+
+def test_init_image():
+
+    image_ref_type = wbmedia.ImageArtifactFileRefType({"a": [1, 2, 3]})
+    assert image_ref_type.boxLayers == types.TypedDict(
+        {
+            "a": types.List(
+                types.union(
+                    types.Const(types.Int(), 1),
+                    types.Const(types.Int(), 2),
+                    types.Const(types.Int(), 3),
+                )
+            )
+        }
+    )
+
+    d = image_ref_type.to_dict()
+    assert d == {
+        "_base_type": {"type": "Object"},
+        "_is_object": True,
+        "boxLayers": {"a": [1, 2, 3]},
+        "boxScoreKeys": [],
+        "classMap": {},
+        "maskLayers": {},
+        "type": "image-file",
+    }
+
+
+def test_deserializes_single_member_union():
+    # weave0 may produce these
+    assert (
+        types.TypeRegistry.type_from_dict({"members": ["int"], "type": "union"})
+        == types.Int()
+    )

@@ -133,6 +133,11 @@ class UnionToArrowUnion(mappers_weave.UnionMapper):
             try:
                 return self._type_codes[type]
             except KeyError:
+                for member_type, member_type_code in self._type_codes.items():
+                    if not isinstance(
+                        types.merge_types(member_type, type), types.UnionType
+                    ):
+                        return member_type_code
                 raise errors.WeaveTypeError(f"Could not find type code for {type}")
 
     def type_code_of_obj(self, obj) -> int:

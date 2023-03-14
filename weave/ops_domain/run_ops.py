@@ -256,7 +256,7 @@ def summary(run: wdt.Run) -> dict[str, typing.Any]:
         lambda inputs, inner: "historyKeys, history(samples: 1000)"
     ),
 )
-def _refine_history_type(run: wdt.Run) -> types.Type:
+def refine_history_type(run: wdt.Run) -> types.Type:
     # The Weave0 implementation loads the entire history & the historyKeys. This
     # is very inefficient and actually incomplete. Here, for performance
     # reasons, we will simply sample the first 1000 rows and use that to determine
@@ -305,7 +305,7 @@ def _refine_history_type(run: wdt.Run) -> types.Type:
 
 @op(
     name="run-history",
-    refine_output_type=_refine_history_type,
+    refine_output_type=refine_history_type,
     plugins=wb_gql_op_plugin(
         lambda inputs, inner: "historyKeys, history(samples: 1000)"
     ),
@@ -376,7 +376,7 @@ gql_connection_op(
     "inputArtifacts",
     wdt.ArtifactVersionType,
     {},
-    lambda inputs: "first: 50",
+    lambda inputs: "first: 100",
 )
 
 gql_connection_op(
@@ -385,7 +385,7 @@ gql_connection_op(
     "outputArtifacts",
     wdt.ArtifactVersionType,
     {},
-    lambda inputs: "first: 50",
+    lambda inputs: "first: 100",
 )
 
 
