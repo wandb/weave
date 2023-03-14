@@ -19,6 +19,7 @@ import threading
 import queue
 import atexit
 import os
+import gql
 
 from requests import HTTPError
 
@@ -211,6 +212,12 @@ class Server:
             if isinstance(e, HTTPError) and e.response is not None:
                 http_error_code = e.response.status_code
                 http_error_message = e.response.reason
+            elif (
+                isinstance(e, gql.transport.exceptions.TransportServerError)
+                and e.code is None
+            ):
+                http_error_code = e.code
+                http_error_message = e.message
             elif isinstance(e, errors.WeaveHttpError) and len(e.args) > 1:
                 http_error_message = e.args[0]
                 http_error_code = e.args[1]

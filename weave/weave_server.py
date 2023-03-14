@@ -12,6 +12,7 @@ import base64
 import zlib
 import urllib.parse
 from flask import json
+import gql
 from requests import HTTPError
 from werkzeug.exceptions import HTTPException
 from werkzeug.middleware.profiler import ProfilerMiddleware
@@ -158,7 +159,7 @@ def execute():
         try:
             response = profile.runcall(server.handle_request, **execute_args)
 
-        # The first exception block catches HTTPErrors, which are raised by
+        # The exception block catches HTTPErrors, which are raised by
         # the requests module. These can be thrown by the wandb sdk when using
         # the public API (for gql, runs, artifacts, etc...). Flask does not
         # interpret these as HTTPExceptions, so we need to catch them here.
@@ -176,7 +177,18 @@ def execute():
             else:
                 raise
 
-        # This second exception block catches WeaveHttpErrors, which are raised
+        # Catches TransportServerErrors, which are raised by the gql module
+        # For example, 502.
+        except gql.transport.exceptions.TransportServerError as e:
+            if e.code in http_codes_to_pass_to_client:
+                abort_code = e.code
+                logging.warning(
+                    f"Encountered WeaveHttpError: {str(abort_code)} {e.message}"
+                )
+            else:
+                raise
+
+        # This exception block catches WeaveHttpErrors, which are raised
         # by Weave code when it encounters an HTTP error (as of this writing, can
         # occur in the I/O service call paths). Similar logic applies to the
         # first exception block, but we need to catch these separately because
