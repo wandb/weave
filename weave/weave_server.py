@@ -173,6 +173,8 @@ def execute():
                 logging.warning(
                     f"Encountered HTTPError: {str(abort_code)} {response.reason}"
                 )
+            else:
+                raise
 
         # This second exception block catches WeaveHttpErrors, which are raised
         # by Weave code when it encounters an HTTP error (as of this writing, can
@@ -185,6 +187,8 @@ def execute():
                 logging.warning(
                     f"Encountered WeaveHttpError: {str(abort_code)} {e.args[0]}"
                 )
+            else:
+                raise
 
         finally:
             elapsed = time.time() - start_time
