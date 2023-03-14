@@ -31,6 +31,7 @@ from . import weave_http
 from . import wandb_api
 from . import wandb_file_manager
 from . import util
+from . import server_error_handling
 
 
 tracer = engine_trace.tracer()  # type: ignore
@@ -113,7 +114,6 @@ class ServerResponse:
             "value": self.value,
             "error": self.error,
             "http_error_code": self.http_error_code,
-            "http_error_message": self.http_error_message,
         }
 
 
@@ -201,25 +201,13 @@ class Server:
                 "WBArtifactManager request error: %s\n", traceback.format_exc()
             )
             print("WBArtifactManager request error: %s\n", traceback.format_exc())
-            http_error_code = None
-            http_error_message = None
-
-            # In the specific instance that the response is either an
-            # HTTP error (from requests) or a WeaveHttpError (from Weave),
-            # we want to extract the HTTP code and message from the error
-            # and send it back to the client.
-            if isinstance(e, HTTPError) and e.response is not None:
-                http_error_code = e.response.status_code
-                http_error_message = e.response.reason
-            elif isinstance(e, errors.WeaveHttpError) and len(e.args) > 1:
-                http_error_message = e.args[0]
-                http_error_code = e.args[1]
             error_response = ServerResponse(
                 server_req.id,
                 str(e),
                 error=True,
-                http_error_code=http_error_code,
-                http_error_message=http_error_message,
+                http_error_code=server_error_handling.maybe_extract_code_from_exception(
+                    e
+                ),
             )
             writer.write((json.dumps(error_response.to_json()) + "\n").encode())
             await writer.drain()
@@ -367,8 +355,8 @@ class SyncClient:
         server_resp = ServerResponse.from_json(json_resp)
         if server_resp.error:
             if server_resp.http_error_code != None:
-                raise errors.WeaveHttpError(
-                    server_resp.http_error_message, server_resp.http_error_code
+                raise server_error_handling.WeaveInternalHttpException.from_code(
+                    server_resp.http_error_code
                 )
             raise errors.WeaveWandbArtifactManagerError(
                 "Request error: " + server_resp.value

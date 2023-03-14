@@ -13,7 +13,7 @@ import logging
 
 from . import engine_trace
 from . import filesystem
-from . import errors
+from . import server_error_handling
 
 logging.getLogger("aiohttp.access").setLevel(logging.WARNING)
 logging.getLogger("aiohttp.client").setLevel(logging.WARNING)
@@ -117,4 +117,6 @@ class HttpAsync:
                         async for data in r.content.iter_chunked(16 * 1024):
                             await f.write(data)
                 else:
-                    raise errors.WeaveHttpError("Download failed", r.status)
+                    raise server_error_handling.WeaveInternalHttpException.from_code(
+                        r.status, "Download failed"
+                    )

@@ -1,7 +1,4 @@
 import cProfile
-import dataclasses
-import enum
-import typing
 import os
 import logging
 import pathlib
@@ -12,15 +9,13 @@ import base64
 import zlib
 import urllib.parse
 from flask import json
-from requests import HTTPError
 from werkzeug.exceptions import HTTPException
-from werkzeug.middleware.profiler import ProfilerMiddleware
 
 from flask import Flask, Blueprint
 from flask import request
 from flask import abort
-from flask_cors import CORS, cross_origin
-from flask import send_from_directory, send_file, jsonify
+from flask_cors import CORS
+from flask import send_from_directory
 
 from weave import server
 from weave import storage
@@ -32,6 +27,7 @@ from weave import engine_trace
 from weave import environment
 from weave import logs
 from weave import filesystem
+from weave.server_error_handling import client_safe_http_exceptions_as_werkzeug
 
 PROFILE_DIR = "/tmp/weave/profile"
 # PROFILE_DIR = None
@@ -40,8 +36,6 @@ if PROFILE_DIR is not None:
 
 
 tracer = engine_trace.tracer()
-
-http_codes_to_pass_to_client = [502, 503, 504, 429]
 
 
 def custom_dd_patch():
@@ -154,42 +148,9 @@ def execute():
         # Profile the request and add a link to local snakeviz to the trace.
         profile = cProfile.Profile()
         start_time = time.time()
-        abort_code = None
         try:
-            response = profile.runcall(server.handle_request, **execute_args)
-
-        # The first exception block catches HTTPErrors, which are raised by
-        # the requests module. These can be thrown by the wandb sdk when using
-        # the public API (for gql, runs, artifacts, etc...). Flask does not
-        # interpret these as HTTPExceptions, so we need to catch them here.
-        # This will allow us to run the code in the `finally` block, then
-        # correctly abort with the correct status code.
-        except HTTPError as e:
-            if (
-                e.response is not None
-                and e.response.status_code in http_codes_to_pass_to_client
-            ):
-                abort_code = e.response.status_code
-                logging.warning(
-                    f"Encountered HTTPError: {str(abort_code)} {response.reason}"
-                )
-            else:
-                raise
-
-        # This second exception block catches WeaveHttpErrors, which are raised
-        # by Weave code when it encounters an HTTP error (as of this writing, can
-        # occur in the I/O service call paths). Similar logic applies to the
-        # first exception block, but we need to catch these separately because
-        # they are raised by Weave code, not the requests module.
-        except errors.WeaveHttpError as e:
-            if len(e.args) > 1 and e.args[1] in http_codes_to_pass_to_client:
-                abort_code = e.args[1]
-                logging.warning(
-                    f"Encountered WeaveHttpError: {str(abort_code)} {e.args[0]}"
-                )
-            else:
-                raise
-
+            with client_safe_http_exceptions_as_werkzeug():
+                response = profile.runcall(server.handle_request, **execute_args)
         finally:
             elapsed = time.time() - start_time
             profile_filename = f"/tmp/weave/profile/execute.{start_time*1000:.0f}.{elapsed*1000:.0f}ms.prof"
@@ -201,8 +162,6 @@ def execute():
                     "http://localhost:8080/snakeviz/"
                     + urllib.parse.quote(profile_filename),
                 )
-            if abort_code:
-                abort(abort_code)
     fixed_response = [weavejs_fixes.fixup_data(r) for r in response]
 
     response = {"data": fixed_response}

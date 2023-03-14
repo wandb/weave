@@ -113,10 +113,6 @@ class WeaveWandbArtifactManagerError(WeaveBaseError):
     pass
 
 
-class WeaveHttpError(WeaveBaseError):
-    pass
-
-
 class WeaveArtifactMediaFileLookupError(WeaveBaseError):
     pass
 
