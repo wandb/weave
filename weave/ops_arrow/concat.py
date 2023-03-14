@@ -1,4 +1,9 @@
-# TODO: Handle dictionaries!
+# Concat implementation for ArrowWeaveList. Should work in all cases!
+#
+# Any places where we extend lists need to follow our merge_types implementation.
+# Fortunately, concat is the only place that extends lists! Everything else should
+# make use of concat to do so.
+
 
 import typing
 import dataclasses
@@ -199,37 +204,62 @@ def _concatenate_non_unions(
         # Lists with different object types
         return _concatenate_lists(self, other, depth=depth)
 
-    # This covers number cases (where we merge int/float to float) as well
-    # as the common case where types are equal.
+    if isinstance(self.object_type, types.Number) and isinstance(
+        other.object_type, types.Number
+    ):
+        # Numeric special case
+        indent_print(
+            depth, "Extend case number types", self.object_type, other.object_type
+        )
 
-    # TODO: Note about why can't the types equal case go at the top?
+        # Weave numeric types are odd for legacy reasons. We have three numeric types
+        # Number, Float, Int. Unfortunately Number is a Union of Float and Int, but
+        # also assignable to Int.
 
-    indent_print(depth, "Extend case non-union types")
-    if self.object_type.assign_type(other.object_type):
-        self_data = self._arrow_data
-        other_data = other._arrow_data.cast(self._arrow_data.type)
-        if len(self) == 0:
-            data = other_data
-        elif len(other) == 0:
-            data = self_data
+        # We should fix that. But for now we rely on the arrow type for this special
+        # case.
+
+        if self._arrow_data.type == other._arrow_data.type:
+            new_arrow_type = self._arrow_data.type
         else:
-            data = pa_concat_arrays([self_data, other_data])
+            # If types aren't equal, just cast to float64. This is not entirely
+            # correct! Very large integers will be truncated.
+            new_arrow_type = pa.float64()
+
+        new_weave_type: types.Type
+        if pa.types.is_integer(new_arrow_type):
+            new_weave_type = types.Int()
+        elif pa.types.is_floating(new_arrow_type):
+            new_weave_type = types.Float()
+        else:
+            raise errors.WeaveInternalError('Unexpected type for "Number" type.')
+
+        if len(self) == 0:
+            data = other._arrow_data
+        elif len(other) == 0:
+            data = self._arrow_data
+        else:
+            data = pa_concat_arrays(
+                [
+                    self._arrow_data.cast(new_arrow_type),
+                    other._arrow_data.cast(new_arrow_type),
+                ]
+            )
+        return ArrowWeaveList(
+            data, new_weave_type, self._artifact, invalid_reason="Possibly nullable"
+        )
+    elif self.object_type == other.object_type:
+        # Types exactly equal case
+        indent_print(depth, "Extend case equal", self.object_type, other.object_type)
+        if len(self) == 0:
+            data = other._arrow_data
+        elif len(other) == 0:
+            data = self._arrow_data
+        else:
+            data = pa_concat_arrays([self._arrow_data, other._arrow_data])
         return ArrowWeaveList(
             data, self.object_type, self._artifact, invalid_reason="Possibly nullable"
         )
-    elif other.object_type.assign_type(self.object_type):
-        self_data = self._arrow_data.cast(other._arrow_data.type)
-        other_data = other._arrow_data
-        if len(self) == 0:
-            data = other_data
-        elif len(other) == 0:
-            data = self_data
-        else:
-            data = pa_concat_arrays([self_data, other_data])
-        return ArrowWeaveList(
-            data, other.object_type, other._artifact, invalid_reason="Possibly nullable"
-        )
-
     return None
 
 
