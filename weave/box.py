@@ -32,6 +32,14 @@ class BoxedBool:
     def __bool__(self):
         return self.val
 
+    def __lt__(self, other):
+        if isinstance(other, bool):
+            return self.val < other
+        elif isinstance(other, BoxedBool):
+            return self.val < other.val
+        else:
+            raise TypeError(f"Cannot compare {type(self)} to {type(other)}")
+
     def __eq__(self, other):
         return self.val == other
 
