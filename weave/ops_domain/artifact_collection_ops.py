@@ -167,6 +167,22 @@ def last_membership(
 
 @op(
     name="artifact-link",
+    plugins=wb_gql_op_plugin(
+        lambda inputs, inner: """
+            defaultArtifactType {
+                id
+                name
+                project {
+                    id
+                    name
+                    entity {
+                        id
+                        name
+                    }
+                }
+            }
+        """,
+    ),
 )
 def link(
     artifact: wdt.ArtifactCollection,

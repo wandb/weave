@@ -1,6 +1,7 @@
 from ..api import op
 from .. import weave_types as types
 from . import wb_domain_types as wdt
+from ..compile_domain import wb_gql_op_plugin
 from .wandb_domain_gql import (
     gql_prop_op,
     gql_direct_edge_op,
@@ -16,13 +17,12 @@ import urllib
 # None
 
 # Section 3/6: Attribute Getters
-# artifact_membership_version_index is written in the plain style
-# because the attribute is part of the required fragment
-@op(name="artifactMembership-versionIndex")
-def artifact_membership_version_index(
-    artifactMembership: wdt.ArtifactCollectionMembership,
-) -> int:
-    return artifactMembership.gql["versionIndex"]
+gql_prop_op(
+    "artifactMembership-versionIndex",
+    wdt.ArtifactCollectionMembershipType,
+    "versionIndex",
+    types.Int(),
+)
 
 
 gql_prop_op(
@@ -62,7 +62,30 @@ gql_direct_edge_op(
 # None
 
 
-@op(name="artifactMembership-link")
+@op(
+    name="artifactMembership-link",
+    plugins=wb_gql_op_plugin(
+        lambda inputs, inner: """
+            versionIndex
+            artifactCollection {
+                id 
+                name 
+                defaultArtifactType {
+                    id 
+                    name 
+                    project {
+                        id 
+                        name 
+                        entity {
+                            id 
+                            name
+                        }
+                    }
+                }
+            }
+        """,
+    ),
+)
 def artifact_membership_link(
     artifactMembership: wdt.ArtifactCollectionMembership,
 ) -> wdt.Link:

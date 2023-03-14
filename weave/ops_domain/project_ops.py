@@ -175,7 +175,17 @@ gql_connection_op(
 # Section 6/6: Non Standard Business Logic Ops
 # Note: with project-link, the gql variables are already part fo the required fragment
 # so there is nothing more to do here.
-@op(name="project-link")
+@op(
+    name="project-link",
+    plugins=wb_gql_op_plugin(
+        lambda inputs, inner: """
+            entity {
+                id
+                name
+            }
+        """
+    ),
+)
 def link(project: wdt.Project) -> wdt.Link:
     return wdt.Link(
         project.gql["name"], f"{project.gql['entity']['name']}/{project.gql['name']}"
@@ -186,11 +196,11 @@ def link(project: wdt.Project) -> wdt.Link:
     name="project-artifacts",
     plugins=wb_gql_op_plugin(
         lambda inputs, inner: f"""
-            artifactTypes(first: 100) {{
+            artifactTypes_100: artifactTypes(first: 100) {{
                 edges {{
                     node {{
                         id
-                        artifactCollections(first: 100) {{
+                        artifactCollections_100: artifactCollections(first: 100) {{
                             edges {{
                                 node {{
                                     {wdt.ArtifactCollection.REQUIRED_FRAGMENT}
@@ -209,6 +219,6 @@ def artifacts(
 ) -> list[wdt.ArtifactCollection]:
     return [
         wdt.ArtifactCollection.from_gql(edge["node"])
-        for typeEdge in project.gql["artifactTypes"]["edges"]
-        for edge in typeEdge["node"]["artifactCollections"]["edges"]
+        for typeEdge in project.gql["artifactTypes_100"]["edges"]
+        for edge in typeEdge["node"]["artifactCollections_100"]["edges"]
     ]

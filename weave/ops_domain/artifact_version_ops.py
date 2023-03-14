@@ -251,7 +251,30 @@ def op_artifact_version_name(
     return f'{artifact.gql["artifactSequence"]["name"]}:v{artifact.gql["versionIndex"]}'
 
 
-@op(name="artifactVersion-link")
+@op(
+    name="artifactVersion-link",
+    plugins=wb_gql_op_plugin(
+        lambda inputs, inner: """
+            versionIndex
+            artifactSequence {
+                id
+                name
+                defaultArtifactType {
+                    id
+                    name
+                    project {
+                        id
+                        name
+                        entity {
+                            id
+                            name
+                        }
+                    }
+                }
+            }
+        """,
+    ),
+)
 def artifact_version_link(
     artifactVersion: wdt.ArtifactVersion,
 ) -> wdt.Link:
@@ -339,7 +362,31 @@ def _file_output_type(input_types):
 
 
 # Warning: see comment on ops_primitives/artifacts:artifact_file
-@op(name="artifactVersion-file", output_type=_file_output_type)
+@op(
+    name="artifactVersion-file",
+    output_type=_file_output_type,
+    plugins=wb_gql_op_plugin(
+        lambda inputs, inner: """
+            commitHash
+            artifactSequence {
+                id
+                name
+                defaultArtifactType {
+                    id
+                    name
+                    project {
+                        id
+                        name
+                        entity {
+                            id
+                            name
+                        }
+                    }
+                }
+            }
+        """
+    ),
+)
 def file_(artifactVersion: wdt.ArtifactVersion, path: str):
     art_local = _artifact_version_to_wb_artifact(artifactVersion)
     return art_local.path_info(path)  # type: ignore

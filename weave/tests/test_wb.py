@@ -1121,7 +1121,7 @@ def run_history_mocker(q, ndx):
                             "node": {
                                 **fwb.run_payload,  # type: ignore
                                 "historyKeys": example_history_keys,
-                                "history": example_history,
+                                "history_1000": example_history,
                             }
                         }
                     ]

@@ -143,9 +143,6 @@ class Project(GQLTypeMixin):
     REQUIRED_FRAGMENT = f"""
         id
         name
-        entity {{
-            {Entity.REQUIRED_FRAGMENT}
-        }}
     """
 
 
@@ -158,9 +155,6 @@ class Run(GQLTypeMixin):
     REQUIRED_FRAGMENT = f"""
         id
         name
-        project {{
-            {Project.REQUIRED_FRAGMENT}
-        }}
     """
 
 
@@ -173,9 +167,6 @@ class ArtifactType(GQLTypeMixin):
     REQUIRED_FRAGMENT = f"""
         id
         name
-        project {{
-            {Project.REQUIRED_FRAGMENT}
-        }}
     """
 
 
@@ -188,9 +179,6 @@ class ArtifactCollection(GQLTypeMixin):
     REQUIRED_FRAGMENT = f"""
         id
         name
-        defaultArtifactType {{
-            {ArtifactType.REQUIRED_FRAGMENT}
-        }}
     """
 
 
@@ -202,11 +190,6 @@ ArtifactCollectionType = typing.cast(types.Type, ArtifactCollectionType)
 class ArtifactVersion(GQLTypeMixin):
     REQUIRED_FRAGMENT = f"""
         id
-        versionIndex
-        commitHash
-        artifactSequence {{
-            {ArtifactCollection.REQUIRED_FRAGMENT}
-        }}
     """
 
 
@@ -220,13 +203,6 @@ ArtifactVersionType = typing.cast(types.Type, ArtifactVersionType)
 class ArtifactCollectionMembership(GQLTypeMixin):
     REQUIRED_FRAGMENT = f"""
         id
-        versionIndex
-        artifact {{
-            {ArtifactVersion.REQUIRED_FRAGMENT}
-        }}
-        artifactCollection {{
-            {ArtifactCollection.REQUIRED_FRAGMENT}
-        }}
     """
 
 
@@ -240,13 +216,6 @@ ArtifactCollectionMembershipType = typing.cast(
 class ArtifactAlias(GQLTypeMixin):
     REQUIRED_FRAGMENT = f"""
         id
-        alias
-        artifact {{
-            {ArtifactVersion.REQUIRED_FRAGMENT}
-        }}
-        artifactCollection {{
-            {ArtifactCollection.REQUIRED_FRAGMENT}
-        }}
     """
 
 

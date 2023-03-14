@@ -183,10 +183,27 @@ def _make_run_config_gql_field(inputs: InputAndStitchProvider, inner: str):
     return f"configSubset: config(keys: {json.dumps(top_level_keys)})"
 
 
+run_path_fragment = """
+    project {
+        id
+        name
+        entity {
+            id
+            name
+        }
+    }
+    """
+
+
+def _run_config_plugin(inputs: InputAndStitchProvider, inner: str):
+    config_field = _make_run_config_gql_field(inputs, inner)
+    return config_field + " " + run_path_fragment
+
+
 @op(
     name="run-config",
     refine_output_type=refine_config_type,
-    plugins=wb_gql_op_plugin(_make_run_config_gql_field),
+    plugins=wb_gql_op_plugin(_run_config_plugin),
 )
 def config(run: wdt.Run) -> dict[str, typing.Any]:
     return wb_util.process_run_dict_obj(
@@ -234,10 +251,15 @@ def _make_run_summary_gql_field(inputs: InputAndStitchProvider, inner: str):
     return f"summaryMetricsSubset: summaryMetrics(keys: {json.dumps(top_level_keys)})"
 
 
+def _run_summary_plugin(inputs: InputAndStitchProvider, inner: str):
+    summary_field = _make_run_summary_gql_field(inputs, inner)
+    return summary_field + " " + run_path_fragment
+
+
 @op(
     name="run-summary",
     refine_output_type=refine_summary_type,
-    plugins=wb_gql_op_plugin(_make_run_summary_gql_field),
+    plugins=wb_gql_op_plugin(_run_summary_plugin),
 )
 def summary(run: wdt.Run) -> dict[str, typing.Any]:
     return wb_util.process_run_dict_obj(
@@ -253,7 +275,7 @@ def summary(run: wdt.Run) -> dict[str, typing.Any]:
 @op(
     render_info={"type": "function"},
     plugins=wb_gql_op_plugin(
-        lambda inputs, inner: "historyKeys, history(samples: 1000)"
+        lambda inputs, inner: "historyKeys, history_1000: history(samples: 1000)"
     ),
 )
 def refine_history_type(run: wdt.Run) -> types.Type:
@@ -268,7 +290,7 @@ def refine_history_type(run: wdt.Run) -> types.Type:
     # remove needing to read any history.
     prop_types: dict[str, types.Type] = {}
     historyKeys = run.gql["historyKeys"]["keys"]
-    example_history_rows = run.gql["history"][:ROW_LIMIT_FOR_TYPE_INTERROGATION]
+    example_history_rows = run.gql["history_1000"][:ROW_LIMIT_FOR_TYPE_INTERROGATION]
     keys_needing_type = set()
 
     for key, key_details in historyKeys.items():
@@ -307,7 +329,7 @@ def refine_history_type(run: wdt.Run) -> types.Type:
     name="run-history",
     refine_output_type=refine_history_type,
     plugins=wb_gql_op_plugin(
-        lambda inputs, inner: "historyKeys, history(samples: 1000)"
+        lambda inputs, inner: f"historyKeys, history_1000: history(samples: 1000), {run_path_fragment}"
     ),
 )
 def history(run: wdt.Run) -> list[dict[str, typing.Any]]:
@@ -320,7 +342,7 @@ def history(run: wdt.Run) -> list[dict[str, typing.Any]]:
                 run.gql["name"],
             ),
         )
-        for row in run.gql["history"]
+        for row in run.gql["history_1000"]
     ]
 
 
@@ -390,7 +412,22 @@ gql_connection_op(
 
 
 # Section 6/6: Non Standard Business Logic Ops
-@op(name="run-link", plugins=wb_gql_op_plugin(lambda inputs, inner: "displayName"))
+@op(
+    name="run-link",
+    plugins=wb_gql_op_plugin(
+        lambda inputs, inner: """"
+    displayName
+    project {
+        id
+        name
+        entity {
+            id
+            name
+        }
+    }
+"""
+    ),
+)
 def link(run: wdt.Run) -> wdt.Link:
     return wdt.Link(
         run.gql["displayName"],

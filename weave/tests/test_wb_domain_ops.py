@@ -83,23 +83,11 @@ def test_root_project_runs(fake_wandb):
             project_518fa79465d8ffaeb91015dce87e092f: project(name: "mendeleev", entityName: "stacey") {
                 id
                 name
-                entity {
-                    id 
-                    name
-                } 
                 runs_c1233b7003317090ab5e2a75db4ad965: runs(first: 100) {
                     edges {
                         node {
                             id
                             name
-                            project {
-                                id
-                                name
-                                entity {
-                                    id
-                                    name
-                                }
-                            }
                             displayName
                         }
                     }
@@ -143,10 +131,6 @@ def test_root_project_concat(fake_wandb):
             project_518fa79465d8ffaeb91015dce87e092f: project(name: "mendeleev", entityName: "stacey") {
                 id
                 name
-                entity {
-                id
-                name
-                }
                 runs_261949318143369aa6c158af92afee03: runs(
                 first: 100
                 filters: "{}"
@@ -156,14 +140,6 @@ def test_root_project_concat(fake_wandb):
                     node {
                     id
                     name
-                    project {
-                        id
-                        name
-                        entity {
-                        id
-                        name
-                        }
-                    }
                     summaryMetrics
                     }
                 }
@@ -203,10 +179,6 @@ def test_root_project_concat(fake_wandb):
             project_518fa79465d8ffaeb91015dce87e092f: project(name: "mendeleev", entityName: "stacey") {
                 id
                 name
-                entity {
-                id
-                name
-                }
                 runs_261949318143369aa6c158af92afee03: runs(
                 first: 100
                 filters: "{}"
@@ -216,6 +188,7 @@ def test_root_project_concat(fake_wandb):
                     node {
                     id
                     name
+                    summaryMetricsSubset: summaryMetrics(keys: ["loss"])
                     project {
                         id
                         name
@@ -224,7 +197,6 @@ def test_root_project_concat(fake_wandb):
                         name
                         }
                     }
-                    summaryMetricsSubset: summaryMetrics(keys: ["loss"])
                     }
                 }
                 }
@@ -274,23 +246,11 @@ def test_all_projects(fake_wandb):
                         node {
                             id
                             name
-                            entity {
-                                id
-                                name
-                            }
                             runs_c1233b7003317090ab5e2a75db4ad965: runs(first: 100) {
                                 edges {
                                     node {
                                         id
                                         name
-                                        project {
-                                            id
-                                            name
-                                            entity {
-                                                id
-                                                name
-                                            }
-                                        }
                                         displayName
                                     }
                                 }
@@ -422,33 +382,17 @@ def test_multi_root_merging(fake_wandb):
         query WeavePythonCG{
             project_8d1592567720841659de23c02c97d594:project(name:"p_0" entityName:"e_0"){
                 id 
-                name 
-                entity{
-                    id 
-                    name
-                }
+                name
                 createdAt
             }
             project_3c237e5b25fed9a705b21513dd7921c6:project(name:"p_1" entityName:"e_1"){
                 id 
-                name 
-                entity{
-                    id 
-                    name
-                }
+                name
                 runs_c1233b7003317090ab5e2a75db4ad965:runs(first:100){
                     edges{
                         node{
                             id 
                             name 
-                            project{
-                                id 
-                                name 
-                                entity{
-                                    id 
-                                    name
-                                }
-                            }
                         }
                     }
                 }
@@ -458,11 +402,7 @@ def test_multi_root_merging(fake_wandb):
                     edges{
                         node{
                             id 
-                            name 
-                            entity{
-                                id 
-                                name
-                            }
+                            name
                             createdAt
                         }
                     }
@@ -479,7 +419,7 @@ def test_two_level_summary(fake_wandb):
             query["gql"]
             .definitions[0]
             .selection_set.selections[0]
-            .selection_set.selections[3]
+            .selection_set.selections[2]
             .selection_set.selections[0]
             .selection_set.selections[0]
             .selection_set.selections
@@ -571,10 +511,6 @@ def test_escaped_gql_query(fake_wandb):
         ) {
             id
             name
-            entity {
-            id
-            name
-            }
             runs_261949318143369aa6c158af92afee03: runs(
             first: 100
             filters: "{}"
@@ -584,6 +520,9 @@ def test_escaped_gql_query(fake_wandb):
                 node {
                 id
                 name
+                summaryMetricsSubset: summaryMetrics(
+                    keys: ["Tables/NMS_0.45_IOU_0.5"]
+                )
                 project {
                     id
                     name
@@ -592,9 +531,6 @@ def test_escaped_gql_query(fake_wandb):
                     name
                     }
                 }
-                summaryMetricsSubset: summaryMetrics(
-                    keys: ["Tables/NMS_0.45_IOU_0.5"]
-                )
                 }
             }
             }

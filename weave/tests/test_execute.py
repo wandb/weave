@@ -110,7 +110,7 @@ def table_mock_respecting_run_name(q, ndx):
         # is project.runs.edges.node.displayName selected?
         project_field = q["gql"].definitions[0].selection_set.selections[0]
         assert project_field.name.value == "project"
-        runs_field = project_field.selection_set.selections[3]
+        runs_field = project_field.selection_set.selections[2]
         assert runs_field.name.value == "runs"
         runs_node = runs_field.selection_set.selections[0].selection_set.selections[0]
         node_fields = runs_node.selection_set.selections
