@@ -415,7 +415,7 @@ gql_connection_op(
 @op(
     name="run-link",
     plugins=wb_gql_op_plugin(
-        lambda inputs, inner: """"
+        lambda inputs, inner: """
     displayName
     project {
         id
