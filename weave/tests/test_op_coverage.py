@@ -93,7 +93,6 @@ js_op_exceptions = set(
         "op-non_none",
         "org-members",
         "org-teams",
-        "project-internalId",
         "project-reports",
         "project-run",  # This is used in the demo compute graph... surprised nowhere else
         "report-name",

@@ -78,6 +78,13 @@ gql_prop_op(
     types.Timestamp(),
 )
 
+gql_prop_op(
+    "project-internalId",
+    wdt.ProjectType,
+    "id",
+    types.String(),
+)
+
 # Section 4/6: Direct Relationship Ops
 gql_direct_edge_op(
     "project-run",
