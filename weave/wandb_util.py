@@ -84,11 +84,14 @@ def _convert_type(old_type: Weave0TypeJson) -> types.Type:
     #
     elif old_type_name == "timestamp":
         return types.Timestamp()
-    elif (
-        old_type_name == "pythonObject"
-        and old_type.get("params", {}).get("class_name") == "Timestamp"
-    ):
-        return types.Timestamp()
+    # Once Weave1 is fully launched and we don't have shadow mode, we can
+    # uncomment the following block. Unfortunately, Weave0 views this as
+    # unknown, and in shadow mode we don't use Weave1's type system.
+    # elif (
+    #     old_type_name == "pythonObject"
+    #     and old_type.get("params", {}).get("class_name") == "Timestamp"
+    # ):
+    #     return types.Timestamp()
     elif (
         old_type_name == "pythonObject"
         and old_type.get("params", {}).get("class_name") == "datetime64"
