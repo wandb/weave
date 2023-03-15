@@ -12,14 +12,13 @@ def artifact_file_refine_type(
     return types.TypeRegistry.type_of(artifact.path_info(path))
 
 
-# Warning: the return type of this is incorrect! Weave0 treats
-# type 'file' (FilesystemArtifactFile) as both dir and file.
-# We could return the union here and add a refiner, but there is a problem
-# with compile/vectorization getting stuck in an infinite loop if we do
-# so.
-# TODO: fix
-@op(name="FilesystemArtifact-file")
+@op(
+    name="FilesystemArtifact-file",
+    refine_output_type=artifact_file_refine_type,
+)
 def artifact_file(
     artifact: artifact_fs.FilesystemArtifact, path: str
-) -> typing.Optional[artifact_fs.FilesystemArtifactFile]:
+) -> typing.Union[
+    None, artifact_fs.FilesystemArtifactFile, artifact_fs.FilesystemArtifactDir
+]:
     return artifact.path_info(path)  # type:ignore

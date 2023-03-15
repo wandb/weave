@@ -82,7 +82,11 @@ def test_out_of_bounds_tag_access():
     node = weave.save([1, 2])
     tagged = node._test_op_tag_input(1)
     assert weave.use(get_a_tag(tagged[0])) == 1
-    assert weave.use(get_a_tag(tagged[2])) == None
+    assert weave.use(tagged[0]) == 1
+    assert weave.use(get_a_tag(tagged[1])) == 1
+    assert weave.use(tagged[1]) == 2
+    assert weave.use(get_a_tag(tagged[2])) == 1
+    assert weave.use(tagged[2]) == None
 
 
 def test_refine_nullability():

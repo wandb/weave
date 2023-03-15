@@ -24,6 +24,7 @@ from . import graph
 from . import graph_debug
 from .language_features.tagging import tag_store
 from . import weave_types as types
+from . import box
 
 # Ops
 from . import registry_mem
@@ -297,6 +298,13 @@ def _debug_node_stack(
         print(f"ERROR: {type(node)}")
 
 
+def _tag_safe_deref(ref):
+    res = ref_base.deref(ref)
+    if tag_store.is_tagged(ref):
+        return tag_store.add_tags(box.box(res), tag_store.get_tags(ref))
+    return res
+
+
 def execute_forward_node(
     fg: forward_graph.ForwardGraph,
     forward_node: forward_graph.ForwardNode,
@@ -383,7 +391,7 @@ def execute_forward_node(
                 # otherwise, the run's output was not saveable, so we need
                 # to recompute it.
         inputs = {
-            input_name: ref_base.deref(input)
+            input_name: _tag_safe_deref(input)
             for input_name, input in input_refs.items()
         }
 
@@ -410,12 +418,17 @@ def execute_forward_node(
 
         with tracer.trace("execute-write-cache"):
             ref = ref_base.get_ref(result)
+
             if ref is not None:
                 logging.debug("Op resulted in ref")
                 # If the op produced an object which has a ref (as in the case of get())
                 # the result is the ref. This enables memoization after impure ops. E.g.
                 # if get('x:latest') produces version x:1, we use x:1 for our make_run_id
                 # calculation
+
+                # Add tags from the result to the ref
+                if tag_store.is_tagged(result):
+                    tag_store.add_tags(ref, tag_store.get_tags(result))
                 result = ref
             else:
                 if use_cache:

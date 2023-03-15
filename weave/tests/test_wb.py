@@ -23,6 +23,7 @@ import cProfile
 from ..language_features.tagging.tagged_value_type import TaggedValueType
 from ..ops_domain import table
 from ..ops_domain import wb_util
+import wandb
 
 file_path_response = {
     "project_518fa79465d8ffaeb91015dce87e092f": {
@@ -230,30 +231,35 @@ artifact_version_sdk_response = {
 
 
 @pytest.mark.parametrize(
-    "table_file_node, mock_response",
+    "table_file_node_fn, mock_response",
     [
         # Path used in weave demos
         (
-            ops.project("stacey", "mendeleev")
-            .artifactType("test_results")
-            .artifacts()[0]
-            .versions()[0]
-            .file("test_results.table.json"),
+            (
+                lambda: ops.project("stacey", "mendeleev")
+                .artifactType("test_results")
+                .artifacts()[0]
+                .versions()[0]
+                .file("test_results.table.json")
+            ),
             file_path_response,
         ),
         # Path used in artifact browser
         (
-            ops.project("stacey", "mendeleev")
-            .artifact("test_res_1fwmcd3q")
-            .membershipForAlias("v0")
-            .artifactVersion()
-            .file("test_results.table.json"),
+            (
+                lambda: ops.project("stacey", "mendeleev")
+                .artifact("test_res_1fwmcd3q")
+                .membershipForAlias("v0")
+                .artifactVersion()
+                .file("test_results.table.json")
+            ),
             artifact_browser_response,
         ),
     ],
 )
-def test_table_call(table_file_node, mock_response, fake_wandb):
+def test_table_call(table_file_node_fn, mock_response, fake_wandb):
     fake_wandb.fake_api.add_mock(lambda q, ndx: mock_response)
+    table_file_node = table_file_node_fn()
     table_image0_node = table_file_node.table().rows()[0]["image"]
     table_image0 = weave.use(table_image0_node)
     assert table_image0.height == 299
@@ -1439,3 +1445,39 @@ def test_artifact_path_character_escaping():
     uri = artifact_wandb.WeaveWBLoggedArtifactURI.parse(result)
 
     assert uri.path == path
+
+
+def _do_test_gql_artifact_dir_path(node):
+    dir_node = node.file("")
+    dir_type_node = dir_node.pathReturnType("")
+    dir_file_type_node = dir_node.pathReturnType("test_results.table.json")
+
+    file_node = dir_node.path("test_results.table.json")
+    file_type_node = file_node._get_op("type")()
+
+    assert artifact_fs.FilesystemArtifactDirType().assign_type(weave.use(dir_type_node))
+    assert artifact_fs.FilesystemArtifactFileType(
+        weave.types.Const(weave.types.String(), "json"), wbObjectType=ops.TableType()
+    ).assign_type(weave.use(dir_file_type_node))
+    assert artifact_fs.FilesystemArtifactFileType(
+        weave.types.Const(weave.types.String(), "json"), wbObjectType=ops.TableType()
+    ).assign_type(weave.use(file_type_node))
+
+
+def test_gql_artifact_dir_path(fake_wandb):
+    fake_wandb.fake_api.add_mock(lambda q, ndx: artifact_browser_response)
+    version_node = (
+        ops.project("stacey", "mendeleev")
+        .artifact("test_res_1fwmcd3q")
+        .membershipForAlias("v0")
+        .artifactVersion()
+    )
+    _do_test_gql_artifact_dir_path(version_node)
+
+
+def test_filesystem_artifact_dir_path(fake_wandb):
+    table = wandb.Table(data=[[1]], columns=["a"])
+    art = wandb.Artifact("test_name", "test_type")
+    art.add(table, "test_results")
+    art_node = fake_wandb.mock_artifact_as_node(art)
+    _do_test_gql_artifact_dir_path(art_node)

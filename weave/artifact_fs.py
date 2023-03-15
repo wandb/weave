@@ -295,5 +295,15 @@ class FilesystemArtifactDir(file_base.Dir):
     dirs: dict[str, file_base.SubDir]
     files: dict[str, FilesystemArtifactFile]
 
+    def path_info(
+        self, path: str
+    ) -> typing.Union[FilesystemArtifactFile, "FilesystemArtifactDir", None]:
+        target_path = self.fullPath
+        if target_path != "" and path != "":
+            target_path += "/"
+        target_path += path
+
+        return self.artifact.path_info(target_path)
+
 
 FilesystemArtifactDirType.instance_classes = FilesystemArtifactDir

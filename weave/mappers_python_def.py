@@ -75,7 +75,7 @@ class ObjectDictToObject(mappers_weave.ObjectMapper):
             if isinstance(prop_type, types.Const):
                 result[prop_name] = prop_type.val
 
-        if "artifact" in constructor_sig.parameters:
+        if "artifact" in constructor_sig.parameters and "artifact" not in result:
             result["artifact"] = self._artifact
         return instance_class(**result)
 
