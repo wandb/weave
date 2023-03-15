@@ -61,8 +61,8 @@ def maybe_extract_code_from_exception(e: Exception) -> typing.Optional[int]:
     """
     if isinstance(e, werkzeug_exceptions.HTTPException):
         return _extract_code_from_werkzeug_http_exception(e)
-    elif isinstance(e, requests.HTTPError):
-        return _extract_code_from_request_lib_http_error(e)
+    elif isinstance(e, requests.exceptions.RequestException):
+        return _extract_code_from_request_lib_request_exception(e)
     elif isinstance(e, gql.transport.exceptions.TransportServerError):
         return _extract_code_from_gql_lib_error(e)
     return None
@@ -76,11 +76,15 @@ def _extract_code_from_werkzeug_http_exception(
     return None
 
 
-def _extract_code_from_request_lib_http_error(
-    e: requests.HTTPError,
+def _extract_code_from_request_lib_request_exception(
+    e: requests.exceptions.RequestException,
 ) -> typing.Optional[int]:
-    if e.response is not None and isinstance(e.response.status_code, int):
-        return e.response.status_code
+    if isinstance(e, requests.HTTPError):
+        if e.response is not None and isinstance(e.response.status_code, int):
+            return e.response.status_code
+    elif isinstance(e, requests.exceptions.ReadTimeout):
+        # Convert internal read timeout to 502 (Bad Gateway)
+        return 502
     return None
 
 
