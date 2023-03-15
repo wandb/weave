@@ -1,6 +1,4 @@
-import contextlib
 import dataclasses
-import duckdb
 import typing
 import numpy as np
 import pyarrow as pa
@@ -20,21 +18,15 @@ from .vectorize import (
     vectorize,
     _call_vectorized_fn_node_maybe_awl,
     _call_and_ensure_awl,
-    _apply_fn_node_with_tag_pushdown,
 )
 from .arrow_tags import pushdown_list_tags, awl_add_arrow_tags
-from .list_ import ArrowWeaveList, unsafe_awl_construction
+from .list_ import (
+    ArrowWeaveList,
+    make_vec_dict,
+    make_vec_taggedvalue,
+)
 
 tracer = engine_trace.tracer()  # type: ignore
-
-
-@contextlib.contextmanager
-def duckdb_con() -> typing.Generator[duckdb.DuckDBPyConnection, None, None]:
-    con = duckdb.connect()
-    try:
-        yield con
-    finally:
-        con.close()
 
 
 def _filter_none(arrs: list[typing.Any]) -> list[typing.Any]:
@@ -220,40 +212,6 @@ def _multi_array_common_encoder(
 
 join_key_col_name = "__joinobj__"
 join_tag_key_col_name = "__joinobj_tag__"
-
-
-# This is the old duckdb implementation. It is 40x slower than the arrow one below.
-# Leaving for the moment in case we need to fall back for correctness
-def _joinall_duck(
-    tables: list[pa.Table], join_type: str, select_cols: list[str]
-) -> pa.Table:
-    n_tables = len(tables)
-    query = "SELECT COALESCE(%s) as %s" % (
-        ", ".join(f"t{i}.{join_key_col_name}" for i in range(n_tables)),
-        join_key_col_name,
-    )
-    query += ", COALESCE(%s) as %s" % (
-        ", ".join(f"t{i}.{join_tag_key_col_name}" for i in range(n_tables)),
-        join_tag_key_col_name,
-    )
-    for k in select_cols:
-        query += ", list_value(%s) as %s" % (
-            ", ".join(
-                f"t{i}.{k}" for i in range(n_tables) if k in tables[i].schema.names
-            ),
-            k,
-        )
-
-    query += "\nFROM t0"
-    for t_ndx in range(1, n_tables):
-        query += f" {join_type} join t{t_ndx} ON t0.{join_key_col_name} = t{t_ndx}.{join_key_col_name}"
-
-    with duckdb_con() as con:
-        for i, keyed_table in enumerate(tables):
-            con.register(f"t{i}", keyed_table)
-        with tracer.trace("ddbexecute"):
-            res = con.execute(query)
-            return res.arrow()
 
 
 def _joinall_arrow(
@@ -476,6 +434,101 @@ def join_all(arrs, joinFn, outer: bool):
     )
 
 
+def join2_impl(
+    arr1: ArrowWeaveList,
+    arr2: ArrowWeaveList,
+    joinFn1: graph.OutputNode,
+    joinFn2: graph.OutputNode,
+    alias1: typing.Optional[str] = None,
+    alias2: typing.Optional[str] = None,
+    leftOuter: bool = False,
+    rightOuter: bool = False,
+):
+    # TODO: This function does not try to assert join types are the same
+
+    if alias1 == None:
+        alias1 = "a1"
+    if alias2 == None:
+        alias2 = "a2"
+
+    safe_join_fn_1: graph.OutputNode = _to_compare_safe_call(joinFn1)
+    arr1_safe_join_col = arr1.apply(safe_join_fn_1).untagged()
+    if safe_join_fn_1 is joinFn1:
+        arr1_raw_join_col = arr1_safe_join_col
+    else:
+        arr1_raw_join_col = arr1.apply(joinFn1).untagged()
+
+    safe_join_fn_2: graph.OutputNode = _to_compare_safe_call(joinFn2)
+    arr2_safe_join_col = arr2.apply(safe_join_fn_2).untagged()
+    if safe_join_fn_2 is joinFn2:
+        arr2_raw_join_col = arr2_safe_join_col
+    else:
+        arr2_raw_join_col = arr2.apply(joinFn2).untagged()
+
+    t0 = pa.Table.from_arrays(
+        [
+            arr1_safe_join_col._arrow_data,
+            np.arange(len(arr1), dtype="int64"),
+        ],
+        names=["join", "index_t0"],
+    ).filter(pc.invert(pc.is_null(arr1_safe_join_col._arrow_data)))
+    t1 = pa.Table.from_arrays(
+        [
+            arr2_safe_join_col._arrow_data,
+            np.arange(len(arr2), dtype="int64"),
+        ],
+        names=["join", "index_t1"],
+    ).filter(pc.invert(pc.is_null(arr2_safe_join_col._arrow_data)))
+
+    if leftOuter and rightOuter:
+        join_type = "full outer"
+    elif leftOuter:
+        join_type = "left outer"
+    elif rightOuter:
+        join_type = "right outer"
+    else:
+        join_type = "inner"
+
+    joined = t0.join(
+        t1,
+        ["join"],
+        join_type=join_type,
+        use_threads=False,
+        coalesce_keys=True,
+    )
+
+    index0 = joined.column("index_t0")
+    index1 = joined.column("index_t1")
+    raw_join_col: ArrowWeaveList = ArrowWeaveList(
+        pa.compute.coalesce(
+            arr1_raw_join_col._arrow_data.take(index0),
+            arr2_raw_join_col._arrow_data.take(index1),
+        ),
+        arr1_raw_join_col.object_type,
+        None,
+    )
+    all_keys: dict[str, typing.Any] = {}
+    if isinstance(arr1.object_type, types.TypedDict):
+        for k in arr1.object_type.property_types.keys():
+            all_keys[k] = True
+
+    new_arr1: ArrowWeaveList = ArrowWeaveList(
+        arr1._arrow_data.take(index0).combine_chunks(),
+        types.optional(arr1.object_type),
+        arr1._artifact,
+    )
+    new_arr2: ArrowWeaveList = ArrowWeaveList(
+        arr2._arrow_data.take(index1).combine_chunks(),
+        types.optional(arr2.object_type),
+        arr2._artifact,
+    )
+
+    return make_vec_taggedvalue(
+        make_vec_dict(joinObj=raw_join_col),
+        make_vec_dict(**{alias1: new_arr1, alias2: new_arr2}),  # type: ignore
+    )
+
+
 def _join_2_output_type(input_types):
     return ArrowWeaveListType(primitive_list._join_2_output_row_type(input_types))
 
@@ -499,158 +552,6 @@ def _join_2_output_type(input_types):
     output_type=_join_2_output_type,
 )
 def join_2(arr1, arr2, joinFn1, joinFn2, alias1, alias2, leftOuter, rightOuter):
-    # This is a pretty complicated op. See list.ts for the original implementation
-    safe_join_fn_1 = _to_compare_safe_call(joinFn1)
-    safe_join_fn_2 = _to_compare_safe_call(joinFn2)
-
-    table1 = _awl_struct_array_to_table(arr1._arrow_data)
-    table2 = _awl_struct_array_to_table(arr2._arrow_data)
-
-    # Execute the joinFn on each of the arrays
-    table1_safe_join_keys = arrow_as_array(
-        _apply_fn_node_with_tag_pushdown(arr1, safe_join_fn_1)._arrow_data
+    return join2_impl(
+        arr1, arr2, joinFn1, joinFn2, alias1, alias2, leftOuter, rightOuter
     )
-    table2_safe_join_keys = arrow_as_array(
-        _apply_fn_node_with_tag_pushdown(arr2, safe_join_fn_2)._arrow_data
-    )
-
-    if safe_join_fn_1 is joinFn1:
-        table1_raw_join_keys = table1_safe_join_keys
-    else:
-        table1_raw_join_keys = arrow_as_array(
-            _apply_fn_node_with_tag_pushdown(arr1, joinFn1)._arrow_data
-        )
-
-    if safe_join_fn_2 is joinFn2:
-        table2_raw_join_keys = table2_safe_join_keys
-    else:
-        table2_raw_join_keys = arrow_as_array(
-            _apply_fn_node_with_tag_pushdown(arr2, joinFn2)._arrow_data
-        )
-
-    raw_join_obj_type = types.optional(types.union(joinFn1.type, joinFn2.type))
-
-    table1_columns_names = arr1.object_type.property_types.keys()
-    table2_columns_names = arr2.object_type.property_types.keys()
-
-    table1_safe_column_names = [f"c_{ndx}" for ndx in range(len(table1_columns_names))]
-    table2_safe_column_names = [f"c_{ndx}" for ndx in range(len(table2_columns_names))]
-
-    table1_safe_alias = "a_1"
-    table2_safe_alias = "a_2"
-
-    safe_join_key_col_name = "__joinobj__"
-    raw_join_key_col_name = "__raw_joinobj__"
-
-    with duckdb_con() as con:
-
-        def create_keyed_table(
-            table_name, table, safe_keys, raw_keys, safe_column_names
-        ):
-            keyed_table = (
-                table.add_column(0, safe_join_key_col_name, safe_keys)
-                .add_column(1, raw_join_key_col_name, raw_keys)
-                .filter(pc.invert(pc.is_null(pc.field(safe_join_key_col_name))))
-                .rename_columns(
-                    [safe_join_key_col_name, raw_join_key_col_name] + safe_column_names
-                )
-            )
-            con.register(table_name, keyed_table)
-            return keyed_table
-
-        create_keyed_table(
-            "t1",
-            table1,
-            table1_safe_join_keys,
-            table1_raw_join_keys,
-            table1_safe_column_names,
-        )
-        create_keyed_table(
-            "t2",
-            table2,
-            table2_safe_join_keys,
-            table2_raw_join_keys,
-            table2_safe_column_names,
-        )
-
-        if leftOuter and rightOuter:
-            join_type = "full outer"
-        elif leftOuter:
-            join_type = "left outer"
-        elif rightOuter:
-            join_type = "right outer"
-        else:
-            join_type = "inner"
-
-        query = f"""
-        SELECT 
-            COALESCE(t1.{safe_join_key_col_name}, t2.{safe_join_key_col_name}) as {safe_join_key_col_name},
-            COALESCE(t1.{raw_join_key_col_name}, t2.{raw_join_key_col_name}) as {raw_join_key_col_name},
-            CASE WHEN t1.{safe_join_key_col_name} IS NULL THEN NULL ELSE
-                struct_pack({
-                    ", ".join(f'{col} := t1.{col}' for col in table1_safe_column_names)
-                })
-            END as {table1_safe_alias},
-            CASE WHEN t2.{safe_join_key_col_name} IS NULL THEN NULL ELSE
-                struct_pack({
-                    ", ".join(f'{col} := t2.{col}' for col in table2_safe_column_names)
-                })
-            END as {table2_safe_alias},
-        FROM t1 {join_type} JOIN t2 ON t1.{safe_join_key_col_name} = t2.{safe_join_key_col_name}
-        """
-
-        res = con.execute(query)
-
-        # If we have any array columns goto pandas first then back to arrow otherwise
-        # we segfault: https://github.com/duckdb/duckdb/issues/6004
-        if any(pa.types.is_list(c.type) for c in table1.columns) or any(
-            pa.types.is_list(c.type) for c in table2.columns
-        ):
-            duck_table = pa.Table.from_pandas(res.df())
-        else:
-            duck_table = res.arrow()
-    join_obj = duck_table.column(raw_join_key_col_name).combine_chunks()
-    duck_table = duck_table.drop([safe_join_key_col_name, raw_join_key_col_name])
-    alias_1_res = duck_table.column(table1_safe_alias).combine_chunks()
-    alias_1_renamed = pa.StructArray.from_arrays(
-        [alias_1_res.field(col_name) for col_name in table1_safe_column_names],
-        table1_columns_names,
-        mask=alias_1_res.is_null(),
-    )
-    alias_2_res = duck_table.column(table2_safe_alias).combine_chunks()
-    alias_2_renamed = pa.StructArray.from_arrays(
-        [alias_2_res.field(col_name) for col_name in table2_safe_column_names],
-        table2_columns_names,
-        mask=alias_2_res.is_null(),
-    )
-    final_table = pa.StructArray.from_arrays(
-        [alias_1_renamed, alias_2_renamed],
-        [alias1, alias2],
-    )
-
-    final_type = primitive_list._join_2_output_row_type(
-        {
-            "arr1": ArrowWeaveListType(arr1.object_type),
-            "arr2": ArrowWeaveListType(arr2.object_type),
-            "joinFn1": types.Function({"row": arr1.object_type}, joinFn1.type),
-            "joinFn2": types.Function({"row": arr2.object_type}, joinFn2.type),
-            "alias1": types.Const(types.String(), alias1),
-            "alias2": types.Const(types.String(), alias2),
-            "leftOuter": types.Const(types.Boolean(), leftOuter),
-            "rightOuter": types.Const(types.Boolean(), rightOuter),
-        }
-    )
-
-    with unsafe_awl_construction("missing tags"):
-        untagged_result: ArrowWeaveList = ArrowWeaveList(
-            final_table,
-            final_type,
-            arr1._artifact,
-        )
-        res = awl_add_arrow_tags(
-            untagged_result,
-            pa.StructArray.from_arrays([join_obj], names=["joinObj"]),
-            types.TypedDict({"joinObj": raw_join_obj_type}),
-        )
-    res.validate()
-    return res

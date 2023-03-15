@@ -124,6 +124,16 @@ def node_expr_str_full(node: graph.Node) -> str:
     This function is a copy/modification of of node_expr_str.
     """
     if isinstance(node, graph.OutputNode):
+        if node.from_op.name == "dict":
+            return "dict(%s)" % ", ".join(
+                "%s= %s" % (k, node_expr_str_full(v))
+                for k, v in node.from_op.inputs.items()
+            )
+        elif node.from_op.name == "ArrowWeaveList-vectorizedDict":
+            return "ArrowWeaveList-vectorizedDict(%s)" % ", ".join(
+                "%s= %s" % (k, node_expr_str_full(v))
+                for k, v in node.from_op.inputs.items()
+            )
         if node.from_op.name == "gqlroot-wbgqlquery":
             query_hash = "_query_"  # TODO: make a hash from the query for idenity
             return f"{node.from_op.friendly_name}({query_hash})"

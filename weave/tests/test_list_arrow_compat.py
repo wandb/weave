@@ -436,7 +436,7 @@ def test_join_2(li):
     if li == lath.ListNode:
         tag_order = [1, 1, 1, 1, 2, 2, 3, 3, 5]
     elif li == lath.ArrowNode:
-        tag_order = [1, 1, 3, 1, 1, 3, 2, 2, 5]
+        tag_order = [1, 1, 1, 1, 3, 3, 2, 2, 5]
     assert li.use_node(joined_full_outer_node.joinObj()) == tag_order
 
 

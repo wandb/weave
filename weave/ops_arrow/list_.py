@@ -1,6 +1,7 @@
 import typing
 import contextvars
 import contextlib
+import inspect
 import typing_extensions
 import dataclasses
 import numpy as np
@@ -10,7 +11,9 @@ import textwrap
 from .. import ref_base
 from .. import weave_types as types
 from .. import box
+from .. import weave_internal
 from .. import errors
+from .. import graph
 from ..language_features.tagging import (
     tagged_value_type,
 )
@@ -1099,7 +1102,17 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         return ArrowWeaveList(new_data, None, self._artifact)
 
     def column(self, name: str) -> "ArrowWeaveList":
-        if isinstance(self.object_type, types.TypedDict):
+        if isinstance(self.object_type, tagged_value_type.TaggedValueType):
+            value = self.tagged_value_value().column(name)
+            tag = self.tagged_value_tag()
+            return ArrowWeaveList(
+                pa.StructArray.from_arrays(
+                    [tag._arrow_data, value._arrow_data], ["_tag", "_value"]
+                ),
+                tagged_value_type.TaggedValueType(tag.object_type, value.object_type),  # type: ignore
+                self._artifact,
+            )
+        elif isinstance(self.object_type, types.TypedDict):
             property_types = self.object_type.property_types
         elif isinstance(self.object_type, types.ObjectType):
             property_types = self.object_type.property_types()
@@ -1131,10 +1144,58 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             self._arrow_data.field("_value"), self.object_type.value, self._artifact
         )
 
+    def untagged(self) -> "ArrowWeaveList":
+        if isinstance(self.object_type, tagged_value_type.TaggedValueType):
+            return self.tagged_value_value()
+        return self
+
+    def _make_lambda_node(
+        self, fn: typing.Union[typing.Callable[[typing.Any], typing.Any], graph.Node]
+    ):
+        if isinstance(fn, graph.Node):
+            return fn
+
+        sig = inspect.signature(fn)
+        if len(sig.parameters) == 1:
+            vars = {"row": self.object_type}
+        elif len(sig.parameters) == 2:
+            vars = {"row": self.object_type, "index": types.Int()}
+        else:
+            raise ValueError(
+                "Functions passed to ArrowWeaveList.apply must have 1 or 2 parameters (row, [index])"
+            )
+        return weave_internal.define_fn(vars, fn).val
+
+    def apply(
+        self, fn: typing.Union[typing.Callable[[typing.Any], typing.Any], graph.Node]
+    ):
+        fn = self._make_lambda_node(fn)
+        from .vectorize import _apply_fn_node_with_tag_pushdown
+
+        return _apply_fn_node_with_tag_pushdown(self, fn)  # type: ignore
+
     def concat(self, other: "ArrowWeaveList") -> "ArrowWeaveList":
         from . import concat
 
         return concat.concatenate(self, other)
+
+    def join2(
+        self: "ArrowWeaveList",
+        other: "ArrowWeaveList",
+        joinFn1: graph.OutputNode,
+        joinFn2: graph.OutputNode,
+        alias1: typing.Optional[str] = None,
+        alias2: typing.Optional[str] = None,
+        leftOuter: bool = False,
+        rightOuter: bool = False,
+    ):
+        joinFn1 = self._make_lambda_node(joinFn1)
+        joinFn2 = self._make_lambda_node(joinFn2)
+        from . import list_join
+
+        return list_join.join2_impl(
+            self, other, joinFn1, joinFn2, alias1, alias2, leftOuter, rightOuter
+        )
 
     def _limit(self, limit: int):
         return ArrowWeaveList(
@@ -1198,3 +1259,20 @@ def is_list_arrowweavelist(
 
 def dataframe_to_arrow(df):
     return ArrowWeaveList(pa.Table.from_pandas(df))
+
+
+def make_vec_dict(**kwargs: ArrowWeaveList):
+    arr = pa.StructArray.from_arrays(
+        [v._arrow_data for v in kwargs.values()], [k for k in kwargs.keys()]
+    )
+    property_types = {k: v.object_type for k, v in kwargs.items()}
+    return ArrowWeaveList(arr, types.TypedDict(property_types), None)
+
+
+def make_vec_taggedvalue(tag: ArrowWeaveList, value: ArrowWeaveList):
+    arr = pa.StructArray.from_arrays(
+        [tag._arrow_data, value._arrow_data], ["_tag", "_value"]
+    )
+    return ArrowWeaveList(
+        arr, tagged_value_type.TaggedValueType(tag.object_type, value.object_type), None  # type: ignore
+    )
