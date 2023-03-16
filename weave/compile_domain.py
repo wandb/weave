@@ -179,7 +179,7 @@ def _get_fragment(node: graph.OutputNode, stitchedGraph: stitch.StitchedGraph) -
     return fragment
 
 
-def _get_configsummaryhistory_keys(
+def _get_configsummaryhistory_keys_or_specs(
     field: graphql.language.ast.FieldNode,
 ) -> typing.Optional[typing.List[str]]:
     if len(field.arguments) > 1:
@@ -189,9 +189,9 @@ def _get_configsummaryhistory_keys(
     if not field.arguments:
         return None
     field_arg0 = field.arguments[0]
-    if field_arg0.name.value != "keys":
+    if field_arg0.name.value not in ["keys", "specs"]:
         raise errors.WeaveInternalError(
-            "First argument for custom merge must be 'keys'"
+            "First argument for custom merge must be 'keys' or 'specs'"
         )
     if not isinstance(field_arg0.value, graphql.language.ast.ListValueNode):
         raise errors.WeaveInternalError(
@@ -229,8 +229,8 @@ def _field_selections_hardcoded_merge(
         and merge_from.alias.value != "sampledHistorySubset"
     ):
         return False
-    merge_from_keys = _get_configsummaryhistory_keys(merge_from)
-    merge_to_keys = _get_configsummaryhistory_keys(merge_to)
+    merge_from_keys = _get_configsummaryhistory_keys_or_specs(merge_from)
+    merge_to_keys = _get_configsummaryhistory_keys_or_specs(merge_to)
     if merge_to_keys is None:
         # merge_to already selects all
         pass
