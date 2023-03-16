@@ -179,12 +179,12 @@ def _get_fragment(node: graph.OutputNode, stitchedGraph: stitch.StitchedGraph) -
     return fragment
 
 
-def _get_configsummary_keys(
+def _get_configsummaryhistory_keys(
     field: graphql.language.ast.FieldNode,
 ) -> typing.Optional[typing.List[str]]:
     if len(field.arguments) > 1:
         raise errors.WeaveInternalError(
-            "Custom merge for config and summaryMetrics only supports one argument"
+            "Custom merge for config, summaryMetrics, and sampledHistory only supports one argument"
         )
     if not field.arguments:
         return None
@@ -211,11 +211,11 @@ def _field_selections_hardcoded_merge(
     merge_from: graphql.language.ast.FieldNode,
     merge_to: graphql.language.ast.FieldNode,
 ) -> bool:
-    # Custom field merging for config and summaryMetrics keys.
+    # Custom field merging for config, summaryMetrics, and history keys.
     # Must be kept in sync with run_ops config* and summary_metrics* ops.
     if merge_from.name.value != merge_to.name.value:
         return False
-    if merge_from.name.value != "config" and merge_from.name.value != "summaryMetrics":
+    if merge_from.name.value not in ["config", "summaryMetrics", "sampledHistory"]:
         return False
     if (
         merge_from.alias is None
@@ -226,10 +226,11 @@ def _field_selections_hardcoded_merge(
     if (
         merge_from.alias.value != "configSubset"
         and merge_from.alias.value != "summaryMetricsSubset"
+        and merge_from.alias.value != "sampledHistorySubset"
     ):
         return False
-    merge_from_keys = _get_configsummary_keys(merge_from)
-    merge_to_keys = _get_configsummary_keys(merge_to)
+    merge_from_keys = _get_configsummaryhistory_keys(merge_from)
+    merge_to_keys = _get_configsummaryhistory_keys(merge_to)
     if merge_to_keys is None:
         # merge_to already selects all
         pass

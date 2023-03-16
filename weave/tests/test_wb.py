@@ -1,4 +1,5 @@
 import pytest
+import re
 from weave import stitch
 
 from weave.tests.test_wb_domain_ops import assert_gql_str_equal
@@ -24,6 +25,7 @@ from ..language_features.tagging.tagged_value_type import TaggedValueType
 from ..ops_domain import table
 from ..ops_domain import wb_util
 import wandb
+
 
 file_path_response = {
     "project_518fa79465d8ffaeb91015dce87e092f": {
@@ -1096,6 +1098,11 @@ example_history = [
 example_history_keys = {
     "sets": [],
     "keys": {
+        "_step": {
+            "typeCounts": [{"type": "number", "count": 10}],
+            "monotonic": True,
+            "previousValue": 9,
+        },
         "system/gpu.0.powerWatts": {
             "typeCounts": [{"type": "number", "count": 51}],
             "monotonic": False,
@@ -1117,24 +1124,46 @@ example_history_keys = {
 
 
 def run_history_mocker(q, ndx):
-    if ndx < 2:
-        return {
-            "project_518fa79465d8ffaeb91015dce87e092f": {
-                **fwb.project_payload,  # type: ignore
-                "runs_c1233b7003317090ab5e2a75db4ad965": {
-                    "edges": [
-                        {
-                            "node": {
-                                **fwb.run_payload,  # type: ignore
-                                "historyKeys": example_history_keys,
-                                "history_1000": example_history,
-                            }
-                        }
-                    ]
-                },
-            }
+    query_str = q["gql"].loc.source.body
+    if "artifact" in query_str:
+        return artifact_version_sdk_response
+
+    history = []
+    if "sampledHistorySubset" in query_str:
+        specs = json.loads(
+            query_str.split("specs:")[1].split(")")[0].replace('" "', '","')
+        )
+        histories = []
+        for spec in specs:
+            keys = json.loads(spec)["keys"]
+
+            history: list[str] = []
+            # a _step only query returns an empty list. in order to get back step, you need to include another key
+            if keys != ["_step"]:
+                for h in example_history:
+                    loaded = json.loads(h)
+                    if all(k in loaded for k in keys):
+                        history.append({key: loaded[key] for key in keys})
+
+            histories.append(history)
+        history = histories
+
+    node = {
+        **fwb.run_payload,  # type: ignore
+    }
+
+    if "sampledHistorySubset" in query_str:
+        node["sampledHistorySubset"] = history
+
+    if "historyKeys" in query_str:
+        node["historyKeys"] = example_history_keys
+
+    return {
+        "project_518fa79465d8ffaeb91015dce87e092f": {
+            **fwb.project_payload,  # type: ignore
+            "runs_c1233b7003317090ab5e2a75db4ad965": {"edges": [{"node": node}]},
         }
-    return artifact_version_sdk_response
+    }
 
 
 def test_run_history(fake_wandb):
@@ -1144,10 +1173,11 @@ def test_run_history(fake_wandb):
     assert types.List(
         types.TypedDict(
             {
-                "system/gpu.0.powerWatts": types.Number(),
-                "epoch": types.Number(),
-                "predictions_10K": types.union(
-                    types.NoneType(),
+                "_step": types.Number(),
+                # we no longer send back system metrics
+                # "system/gpu.0.powerWatts": types.optional(types.Number()),
+                "epoch": types.optional(types.Number()),
+                "predictions_10K": types.optional(
                     artifact_fs.FilesystemArtifactFileType(
                         types.Const(types.String(), "json"), table.TableType()
                     ),
@@ -1155,7 +1185,39 @@ def test_run_history(fake_wandb):
             }
         )
     ).assign_type(node.type.value)
-    assert len(weave.use(node)) == len(example_history)
+
+    # this should just return dummy history
+    assert weave.use(node) == [{"_step": i} for i in range(10)]
+
+    # now we'll fetch a just one of the columns
+    new_node = node["epoch"]
+    assert types.List(
+        types.optional(types.Number()),
+    ).assign_type(new_node.type.value)
+    assert len(weave.use(new_node)) == 5
+
+    # now we'll create a graph that fetches two columns and execute it
+    epoch_node = node["epoch"]
+    pred_node = node["predictions_10K"]
+    assert types.List(
+        types.optional(
+            artifact_fs.FilesystemArtifactFileType(
+                types.Const(types.String(), "json"), table.TableType()
+            ),
+        )
+    ).assign_type(pred_node.type.value)
+
+    # simulates what a table call would do, selecting multiple columns
+    result = weave.use([epoch_node, pred_node])
+    assert len(result) == 2
+
+    # check the types, result lengths
+    assert all(len(r) == 10 for r in result)
+    assert all(r == None or isinstance(r, int) for r in result[0])
+    assert all(
+        r == None or isinstance(r, artifact_fs.FilesystemArtifactFile)
+        for r in result[1]
+    )
 
 
 def run_history_as_of_mocker(q, ndx):

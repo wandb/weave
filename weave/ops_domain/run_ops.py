@@ -50,6 +50,7 @@ from .wandb_domain_gql import (
     _make_alias,
 )
 from . import wb_util
+from . import history as history_util
 from ..ops_primitives import _dict_utils
 
 from ..compile_table import KeyTree
@@ -274,75 +275,152 @@ def summary(run: wdt.Run) -> dict[str, typing.Any]:
 
 @op(
     render_info={"type": "function"},
-    plugins=wb_gql_op_plugin(
-        lambda inputs, inner: "historyKeys, history_1000: history(samples: 1000)"
-    ),
+    plugins=wb_gql_op_plugin(lambda inputs, inner: "historyKeys"),
 )
 def refine_history_type(run: wdt.Run) -> types.Type:
-    # The Weave0 implementation loads the entire history & the historyKeys. This
-    # is very inefficient and actually incomplete. Here, for performance
-    # reasons, we will simply sample the first 1000 rows and use that to determine
-    # the type. This means that some columns will not be perfectly typed. Once
-    # we have fully implemented a mapping from historyKeys to Weave types, we
-    # can remove the history scan. Critically, Table types could be artifact
-    # tables or run tables. In Weave0 we need to figure this out eagerly.
-    # However, i think we can defer this and that will be the last thing to
-    # remove needing to read any history.
     prop_types: dict[str, types.Type] = {}
     historyKeys = run.gql["historyKeys"]["keys"]
-    example_history_rows = run.gql["history_1000"][:ROW_LIMIT_FOR_TYPE_INTERROGATION]
-    keys_needing_type = set()
 
     for key, key_details in historyKeys.items():
-        key_types = [tc["type"] for tc in key_details["typeCounts"]]
-        if len(key_types) == 1:
-            if key_types[0] == "number":
-                prop_types[key] = types.Number()
-                continue
-            elif key_types[0] == "string":
-                prop_types[key] = types.String()
-                continue
-        # TODO: We need to finish the historyKeys -> Weave type mapping
-        logging.warning(
-            f"Unable to determine history key type for key {key} with types {key_types}"
+        if key.startswith("system/"):
+            # skip system metrics for now
+            continue
+        type_counts: list[history_util.TypeCount] = key_details["typeCounts"]
+        wt = types.union(
+            *[
+                history_util.history_key_type_count_to_weave_type(tc)
+                for tc in type_counts
+            ]
         )
-        keys_needing_type.add(key)
+        if wt == types.UnknownType():
+            raise ValueError(
+                f"Unable to determine history key type for key {key} with types {type_counts}"
+            )
 
-    if len(keys_needing_type) > 0:
-        example_row_types = [
-            wb_util.process_run_dict_type(json.loads(row or "{}")).property_types
-            for row in example_history_rows
-        ]
-        for key in keys_needing_type:
-            cell_types = []
-            for row_type in example_row_types:
-                if key in row_type:
-                    cell_types.append(row_type[key])
-                else:
-                    cell_types.append(types.NoneType())
-            prop_types[key] = types.union(*cell_types)
+        # _step is a special key that is always guaranteed to be a nonnull number.
+        # other keys may be undefined at particular steps so we make them optional.
+        if key == "_step":
+            prop_types[key] = wt
+        else:
+            prop_types[key] = types.optional(wt)
 
     return types.List(types.TypedDict(prop_types))
+
+
+class SampledHistorySpec(typing.TypedDict):
+    keys: list[str]
+    samples: int
+
+
+def _history_key_to_sampled_history_spec(key: str) -> SampledHistorySpec:
+    return {
+        # select both desired key and step so we know how to merge downstream
+        "keys": [key] if key == "_step" else [key, "_step"],
+        "samples": 2**63 - 1,  # max int64
+    }
+
+
+def _make_run_history_gql_field(inputs: InputAndStitchProvider, inner: str):
+    # Must be kept in sync with compile_domain:_field_selections_hardcode_merge
+
+    stitch_obj = inputs.stitched_obj
+    key_tree = compile_table.get_projection(stitch_obj)
+
+    # we only pushdown the top level keys for now.
+    top_level_keys = get_top_level_keys(key_tree)
+
+    if not top_level_keys:
+        # If no keys, then we cowardly refuse to blindly fetch entire history table
+        return "historyKeys"
+
+    specs = [
+        json.dumps(_history_key_to_sampled_history_spec(key)) for key in top_level_keys
+    ]
+    project_fragment = """
+        project {
+        id
+        name
+        entity {
+            id
+            name
+        }
+    }
+    """
+
+    return f"historyKeys, sampledHistorySubset: sampledHistory(specs: {json.dumps(specs)}), {project_fragment}"
 
 
 @op(
     name="run-history",
     refine_output_type=refine_history_type,
-    plugins=wb_gql_op_plugin(
-        lambda inputs, inner: f"historyKeys, history_1000: history(samples: 1000), {run_path_fragment}"
-    ),
+    plugins=wb_gql_op_plugin(_make_run_history_gql_field),
 )
 def history(run: wdt.Run) -> list[dict[str, typing.Any]]:
+
+    # first check and see if we have actually fetched any history rows. if we have not,
+    # we are in the case where we have blindly requested the entire history object.
+    # we refuse to fetch that, so instead we will just inspect the historyKeys and return
+    # a dummy history object that can be used as a proxy for downstream ops (e.g., count).
+
+    if "sampledHistorySubset" not in run.gql:
+        last_step = run.gql["historyKeys"]["lastStep"]
+        history_keys = run.gql["historyKeys"]["keys"]
+        for key, key_details in history_keys.items():
+            if key == "_step":
+                type_counts: list[history_util.TypeCount] = key_details["typeCounts"]
+                count = type_counts[0]["count"]
+                break
+        else:
+            return []
+
+        # generate fake steps
+        steps = [{"_step": i} for i in range(count)]
+        steps[-1]["_step"] = last_step
+        assert len(steps) == count
+        return steps
+
+    # we have fetched some specific rows.
+
+    # get all the unique steps and sort them
+    step_set: set[int] = set()
+
+    # also get all the keys in the data
+    keys: set[str] = set()
+    for spec_history in run.gql["sampledHistorySubset"]:
+        for row in spec_history:
+            step_set.add(row["_step"])
+            for key in row.keys():
+                keys.add(key)
+    unique_steps = sorted(step_set)
+
+    # initialize the history to be empty
+    history: dict[int, dict[str, typing.Any]] = {}
+    for step in unique_steps:
+        row = {key: None for key in keys}
+        row["_step"] = step
+        history[step] = row
+
+    # update the history with the data from each spec
+    for spec in run.gql["sampledHistorySubset"]:
+        for row in spec:
+            step = row["_step"]
+            history_row = history[step]
+            for key in row.keys():
+                history_row[key] = row[key]
+
+    # convert the history to a list of rows
+    history_list = [history[step] for step in unique_steps]
+
     return [
         wb_util.process_run_dict_obj(
-            json.loads(row),
+            row,
             wb_util.RunPath(
                 run.gql["project"]["entity"]["name"],
                 run.gql["project"]["name"],
                 run.gql["name"],
             ),
         )
-        for row in run.gql["history_1000"]
+        for row in history_list
     ]
 
 
