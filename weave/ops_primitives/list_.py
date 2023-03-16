@@ -568,8 +568,8 @@ def _join_2_output_type(input_types):
 @op(
     name="join",
     input_type={
-        "arr1": types.List(types.TypedDict({})),
-        "arr2": types.List(types.TypedDict({})),
+        "arr1": types.List(),
+        "arr2": types.List(),
         "joinFn1": lambda input_types: types.Function(
             {"row": input_types["arr1"].object_type}, types.Any()
         ),
@@ -587,16 +587,18 @@ def join_2(arr1, arr2, joinFn1, joinFn2, alias1, alias2, leftOuter, rightOuter):
     table1_join_keys = execute_fast.fast_map_fn(arr1, joinFn1)
     table2_join_keys = execute_fast.fast_map_fn(arr2, joinFn2)
 
-    jk_to_idx: dict[str, typing.Tuple[list[int], list[int]]] = {}
+    jk_to_idx: dict[str, typing.Tuple[list[int], list[int], typing.Any]] = {}
     for i, jk in enumerate(table1_join_keys):
         if jk != None:
-            jk_to_idx.setdefault(jk, ([], []))[0].append(i)
+            safe_jk = json.dumps(box.unbox(jk))
+            jk_to_idx.setdefault(safe_jk, ([], [], jk))[0].append(i)
     for i, jk in enumerate(table2_join_keys):
         if jk != None:
-            jk_to_idx.setdefault(jk, ([], []))[1].append(i)
+            safe_jk = json.dumps(box.unbox(jk))
+            jk_to_idx.setdefault(safe_jk, ([], [], jk))[1].append(i)
 
     rows = []
-    for jk, (idx1, idx2) in jk_to_idx.items():
+    for idx1, idx2, jk in jk_to_idx.values():
         tag = {"joinObj": jk}
         if len(idx1) == 0 and rightOuter:
             idx1 = [None]

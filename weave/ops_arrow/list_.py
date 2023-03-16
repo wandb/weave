@@ -163,7 +163,6 @@ def set_path(
             v = getattr(v, el.attr)
             arrow_data = arrow_data.field(el.attr)
         elif el == PathItemTaggedValueTag():
-            # breakpoint()
             try:
                 v = v["_tag"]
             except (TypeError, KeyError):
@@ -589,8 +588,8 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             if pre_mapped is not None:
                 self = pre_mapped
         with_mapped_children = self
-        if isinstance(self._arrow_data, pa.NullArray):
-            # If we are a null array, then there is nothing to map
+        if isinstance(self.object_type, types.UnknownType):
+            # Only occurs in empty list. Don't map into this.
             return self
         if isinstance(self.object_type, types.Const):
             with_mapped_children = ArrowWeaveList(
@@ -716,17 +715,34 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                 if nullable:
                     new_type_members.append(types.NoneType())
 
+                # I believe there is a bug here. We should merge the new members,
+                # because they may have been re-written with new types, becoming
+                # mergable. We don't seem to be hitting this problem in fuzz-testing
+                # areas that make use of this function, I think because they either
+                #   1. don't rewrite the types in a way that make them mergeable
+                #      (e.g. to_pylists_tagged)
+                #   2. do type rewriting but then don't rely on the weave types
+                #      (e.g. to_compare_safe)
+                #
+                # However, I bet this will bite us!
+                #
+                # TODO: fix, by:
+                # We'll need a "merge union" function that cleans up unions that
+                # can be merged. The strategy is to try to merge pairs of types
+                # using merge_types first. And in cases where that doesn't produce
+                # a union, concat underlying member arrays together (using concat.py).
+
                 # set invalid_reason to the first non-None invalid reason found in
                 # properties
                 invalid_reason = first_non_none(m._invalid_reason for m in members)
-                # breakpoint()
                 with_mapped_children = ArrowWeaveList(
                     pa.UnionArray.from_dense(
                         self._arrow_data.type_codes,
                         self._arrow_data.offsets,
                         [m._arrow_data for m in members],
                     ),
-                    types.UnionType(*new_type_members),
+                    # types.UnionType(*new_type_members),
+                    types.union(*new_type_members),
                     self._artifact,
                     invalid_reason=invalid_reason,
                 )
@@ -950,7 +966,6 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
 
     def to_pylist_tagged(self):
         """Convert the ArrowWeaveList to a python list, tagging objects correctly"""
-        # breakpoint()
         value, awl_columns = self.separate_awls()
 
         custom_type_paths = value.custom_type_paths()
@@ -1080,6 +1095,15 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
     def __getitem__(self, index: int):
         return self._index(index)
 
+    def _slice(self, start: int, stop: int):
+        # We don't slice, we take to get a copy. Arrow slicing is confusing.
+        # I was seeing that type_codes in sliced unions were offset somehow...
+        return ArrowWeaveList(
+            self._arrow_data.take(np.arange(start, stop)),
+            self.object_type,
+            self._artifact,
+        )
+
     def _append_column(self, name: str, data) -> "ArrowWeaveList":
         if not data:
             raise ValueError(f'Data for new column "{name}" must be nonnull.')
@@ -1190,7 +1214,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         rightOuter: bool = False,
     ):
         joinFn1 = self._make_lambda_node(joinFn1)
-        joinFn2 = self._make_lambda_node(joinFn2)
+        joinFn2 = other._make_lambda_node(joinFn2)
         from . import list_join
 
         return list_join.join2_impl(

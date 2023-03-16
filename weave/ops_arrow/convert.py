@@ -428,3 +428,122 @@ def from_parquet_friendly(l: ArrowWeaveList) -> ArrowWeaveList:
         return None
 
     return l.map_column(_ident, _convert_col_from_parquet_friendly)
+
+
+def simple_to_string(arr: pa.Array):
+    return pa.compute.binary_join_element_wise(
+        "__t_%s" % arr.type.id,
+        arr.cast(pa.string()),
+        "-",
+    )
+
+
+def to_compare_safe(awl: ArrowWeaveList) -> ArrowWeaveList:
+    """Converts any ArrowWeaveList to simple type that pa.compute.equal can compare."""
+    from ..ops_domain.wbmedia import ArtifactAssetType
+
+    # Returns a number of string arrow weave list, possibly with Nones
+    def _to_compare_safe(
+        col: ArrowWeaveList, path: PathType
+    ) -> typing.Optional[ArrowWeaveList]:
+        if pa.types.is_null(col._arrow_data.type):
+            return ArrowWeaveList(
+                pa.nulls(len(col), type=pa.string()),
+                types.String(),
+                None,
+            )
+        elif pa.types.is_string(col._arrow_data.type):
+            return ArrowWeaveList(col._arrow_data, types.String(), None)
+        elif pa.types.is_floating(col._arrow_data.type) or pa.types.is_integer(
+            col._arrow_data.type
+        ):
+            return ArrowWeaveList(col._arrow_data, types.Number(), None)
+        elif pa.types.is_boolean(col._arrow_data.type):
+            return ArrowWeaveList(col._arrow_data, types.Boolean(), None)
+        elif ArtifactAssetType.assign_type(col.object_type):
+            # Special logic as implemented in Weave0 for media types that contain sha256
+            # checksums.
+            # This idea is generalized already in Weave1. Any persistent ref to an artifact
+            # is a uniquely comparable string for that object.
+            return ArrowWeaveList(col._arrow_data.field("sha256"), types.String(), None)
+        elif pa.types.is_struct(col._arrow_data.type):
+            value_string_arrs = []
+            field_names = sorted(field.name for field in col._arrow_data.type)
+            for field_name in field_names:
+                value_string_arrs.append(
+                    pa.compute.binary_join_element_wise(
+                        "__sk_%s" % (field_name),
+                        simple_to_string(col._arrow_data.field(field_name)).fill_null(
+                            "__none_"
+                        ),
+                        "_",
+                    )
+                )
+            if not value_string_arrs:
+                return ArrowWeaveList(
+                    pa.nulls(len(col), type=pa.string()),
+                    types.String(),
+                    None,
+                )
+            struct_strings = pa.compute.binary_join_element_wise(
+                *value_string_arrs, "-"
+            )
+            return ArrowWeaveList(
+                pa.compute.replace_with_mask(
+                    struct_strings,
+                    pa.compute.invert(col._arrow_data.is_valid()),
+                    pa.nulls(len(col._arrow_data), pa.string()),
+                ),
+                types.String(),
+                None,
+            )
+        elif pa.types.is_list(col._arrow_data.type):
+            stringed_list = pa.ListArray.from_arrays(
+                col._arrow_data.offsets,
+                simple_to_string(col._arrow_data.values).fill_null("__none_"),
+            )
+            list_strings = pa.compute.binary_join_element_wise(
+                "__list_",
+                pa.compute.binary_join(stringed_list, "-"),
+                "-",
+            )
+            res: ArrowWeaveList = ArrowWeaveList(
+                pa.compute.replace_with_mask(
+                    list_strings,
+                    pa.compute.invert(col._arrow_data.is_valid()),
+                    pa.nulls(len(col._arrow_data), pa.string()),
+                ),
+                types.String(),
+                None,
+            )
+            return res
+        elif pa.types.is_union(col._arrow_data.type):
+            merged = pa.nulls(len(col), pa.string())
+            for type_code in range(len(col._arrow_data.type)):
+                field = col._arrow_data.field(type_code)
+                if len(field) == 0:
+                    continue
+                string_field = simple_to_string(field)
+                mask = pa.compute.equal(col._arrow_data.type_codes, type_code)
+                indexes = pa.compute.multiply(
+                    mask.cast(pa.int8()), col._arrow_data.offsets
+                )
+                values = string_field.take(indexes)
+                merged = pa.compute.if_else(mask, values, merged)
+
+            return ArrowWeaveList(
+                merged,
+                types.String(),
+                None,
+            )
+        else:
+            raise errors.WeaveInternalError(
+                'Unhandled type in "to_compare_safe" %s' % col._arrow_data.type
+            )
+
+    return awl.map_column(_to_compare_safe)
+
+
+def unify_types(a1: ArrowWeaveList, a2: ArrowWeaveList):
+    concatted = a1.concat(a2)
+    return concatted._slice(0, len(a1)), concatted._slice(len(a1), len(concatted))

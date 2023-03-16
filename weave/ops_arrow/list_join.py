@@ -11,7 +11,13 @@ from ..api import op
 from .. import graph
 from .. import engine_trace
 
-from .arrow import arrow_as_array, ArrowWeaveListType, offsets_starting_at_zero
+from . import convert
+from .arrow import (
+    arrow_as_array,
+    ArrowWeaveListType,
+    offsets_starting_at_zero,
+    safe_coalesce,
+)
 from .util import _to_compare_safe_call
 from .vectorize import (
     _ensure_variadic_fn,
@@ -434,6 +440,10 @@ def join_all(arrs, joinFn, outer: bool):
     )
 
 
+Obj1Type = typing.TypeVar("Obj1Type")
+Obj2Type = typing.TypeVar("Obj2Type")
+
+
 def join2_impl(
     arr1: ArrowWeaveList,
     arr2: ArrowWeaveList,
@@ -444,26 +454,20 @@ def join2_impl(
     leftOuter: bool = False,
     rightOuter: bool = False,
 ):
-    # TODO: This function does not try to assert join types are the same
-
     if alias1 == None:
         alias1 = "a1"
     if alias2 == None:
         alias2 = "a2"
 
-    safe_join_fn_1: graph.OutputNode = _to_compare_safe_call(joinFn1)
-    arr1_safe_join_col = arr1.apply(safe_join_fn_1).untagged()
-    if safe_join_fn_1 is joinFn1:
-        arr1_raw_join_col = arr1_safe_join_col
-    else:
-        arr1_raw_join_col = arr1.apply(joinFn1).untagged()
+    arr1_raw_join_col = arr1.apply(joinFn1).untagged()
+    arr2_raw_join_col = arr2.apply(joinFn2).untagged()
 
-    safe_join_fn_2: graph.OutputNode = _to_compare_safe_call(joinFn2)
-    arr2_safe_join_col = arr2.apply(safe_join_fn_2).untagged()
-    if safe_join_fn_2 is joinFn2:
-        arr2_raw_join_col = arr2_safe_join_col
-    else:
-        arr2_raw_join_col = arr2.apply(joinFn2).untagged()
+    arr1_raw_join_col, arr2_raw_join_col = convert.unify_types(
+        arr1_raw_join_col, arr2_raw_join_col
+    )
+
+    arr1_safe_join_col = convert.to_compare_safe(arr1_raw_join_col)
+    arr2_safe_join_col = convert.to_compare_safe(arr2_raw_join_col)
 
     t0 = pa.Table.from_arrays(
         [
@@ -489,21 +493,27 @@ def join2_impl(
     else:
         join_type = "inner"
 
-    joined = t0.join(
-        t1,
-        ["join"],
-        join_type=join_type,
-        use_threads=False,
-        coalesce_keys=True,
-    )
+    if len(t0) == 0 and len(t1) == 0:
+        joined = pa.nulls(0)
+        index0 = np.array([], dtype="int64")
+        index1 = np.array([], dtype="int64")
+    else:
+        joined = t0.join(
+            t1,
+            ["join"],
+            join_type=join_type,
+            use_threads=False,
+            coalesce_keys=True,
+        )
+        index0 = joined.column("index_t0").combine_chunks()
+        index1 = joined.column("index_t1").combine_chunks()
 
-    index0 = joined.column("index_t0")
-    index1 = joined.column("index_t1")
+    coalesced_join_col = safe_coalesce(
+        arr1_raw_join_col._arrow_data.take(index0),
+        arr2_raw_join_col._arrow_data.take(index1),
+    )
     raw_join_col: ArrowWeaveList = ArrowWeaveList(
-        pa.compute.coalesce(
-            arr1_raw_join_col._arrow_data.take(index0),
-            arr2_raw_join_col._arrow_data.take(index1),
-        ),
+        coalesced_join_col,
         arr1_raw_join_col.object_type,
         None,
     )
@@ -513,12 +523,12 @@ def join2_impl(
             all_keys[k] = True
 
     new_arr1: ArrowWeaveList = ArrowWeaveList(
-        arr1._arrow_data.take(index0).combine_chunks(),
+        arr1._arrow_data.take(index0),
         types.optional(arr1.object_type),
         arr1._artifact,
     )
     new_arr2: ArrowWeaveList = ArrowWeaveList(
-        arr2._arrow_data.take(index1).combine_chunks(),
+        arr2._arrow_data.take(index1),
         types.optional(arr2.object_type),
         arr2._artifact,
     )

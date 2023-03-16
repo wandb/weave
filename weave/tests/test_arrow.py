@@ -1870,3 +1870,10 @@ def test_identity_awl_operations_3(
     )
     concatted = ops.make_list(a=awl_node, b=concat_awl).concat()
     assert weave.use(concatted).to_pylist_raw() == data + concat_with_data
+
+
+def test_to_compare_safe():
+    l = [[], "a", 5]
+    a = arrow.to_arrow(l)
+    safe = arrow.to_compare_safe(a)
+    assert safe.to_pylist_notags() == ["__t_13-__list_-", "__t_13-a", "__t_9-5"]

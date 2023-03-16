@@ -25,6 +25,8 @@ from .list_ import (
     offsets_starting_at_zero,
 )
 
+DEBUG = False
+
 
 @dataclasses.dataclass
 class UnionMember:
@@ -36,7 +38,8 @@ class UnionMember:
 def indent_print(indent: int = 0, *args) -> None:
     # from rich import print
 
-    print("    " * indent + " ".join([str(a) for a in args]))
+    if DEBUG:
+        print("    " * indent + " ".join([str(a) for a in args]))
 
 
 def make_none_awl(length: int) -> ArrowWeaveList:

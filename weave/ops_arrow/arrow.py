@@ -381,3 +381,34 @@ def pretty_print_arrow_type(t: typing.Union[pa.Schema, pa.DataType, pa.Field]) -
         )
 
     return str(t)
+
+
+def union_is_null(arr: pa.Array):
+    # pyarrow doesn't support is_null on unions. We do it ourselves
+    # by checking each child entry for whether its null. This code
+    # is vectorized so still fast.
+    merged = pa.nulls(len(arr), pa.bool_())
+    for type_code in range(len(arr.type)):
+        field = pa.compute.is_null(arr.field(type_code))
+        if len(field) == 0:
+            continue
+        mask = pa.compute.equal(arr.type_codes, type_code)
+        indexes = pa.compute.multiply(mask.cast(pa.int8()), arr.offsets)
+        values = field.take(indexes)
+        merged = pa.compute.if_else(mask, values, merged)
+    return merged
+
+
+def safe_is_null(arr: pa.Array):
+    # is_null that also handles unions correctly since pyarrow doesn't.
+    if isinstance(arr.type, pa.UnionType):
+        return union_is_null(arr)
+    else:
+        return pa.compute.is_null(arr)
+
+
+def safe_coalesce(arr1: pa.Array, arr2: pa.Array):
+    # pyarrows coalesce doesn't handle unions. This does!
+    if len(arr1) == 0:
+        return arr1
+    return pa.compute.if_else(safe_is_null(arr1), arr2, arr1)

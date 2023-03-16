@@ -32,6 +32,9 @@ class BoxedBool:
     def __bool__(self):
         return self.val
 
+    def __hash__(self):
+        return hash(self.val)
+
     def __eq__(self, other):
         return self.val == other
 
