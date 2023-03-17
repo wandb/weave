@@ -116,7 +116,9 @@ class ImageArtifactFileRefType(types.ObjectType):
                                         "scores": types.optional(
                                             types.TypedDict(
                                                 {
-                                                    score_key: types.Float()
+                                                    score_key: types.optional(
+                                                        types.Float()
+                                                    )
                                                     for score_key in boxScoreKeys
                                                 }
                                             )
