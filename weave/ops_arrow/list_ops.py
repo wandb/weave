@@ -214,19 +214,18 @@ def _impute_nones_for_sort(awl: ArrowWeaveList) -> ArrowWeaveList:
                 )
 
             if pa.types.is_string(arrow_list._arrow_data.type):
-                max = pa.compute.max(arrow_list._arrow_data).as_py()
-                replacement = pa.repeat(max + "a", num_null)
+                replacement = pa.repeat("", num_null)
                 new_data = pa.compute.replace_with_mask(
                     arrow_list._arrow_data, mask, replacement
                 )
             elif pa.types.is_floating(arrow_list._arrow_data.type):
-                max = pa.compute.max(arrow_list._arrow_data).as_py()
+                min = pa.compute.min(arrow_list._arrow_data).as_py()
                 replacement = pa.repeat(
-                    max + 1.0, num_null
+                    min - 1.0, num_null
                 )  # greater than all other elements
             elif pa.types.is_integer(arrow_list._arrow_data.type):
-                max = pa.compute.max(arrow_list._arrow_data).as_py()
-                replacement = pa.repeat(max + 1, num_null)
+                min = pa.compute.min(arrow_list._arrow_data).as_py()
+                replacement = pa.repeat(min - 1, num_null)
             else:
                 raise NotImplementedError(
                     f"Imputing nulls for type {arrow_list._arrow_data.type} is not implemented"

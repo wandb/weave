@@ -104,9 +104,9 @@ class List:
                 if a_res == None and b_res == None:
                     continue
                 elif a_res == None:
-                    return 1 * dir_adjust
-                elif b_res == None:
                     return -1 * dir_adjust
+                elif b_res == None:
+                    return 1 * dir_adjust
 
                 try:
                     lt = a_res < b_res

@@ -82,7 +82,7 @@ def inv_filter_fn(row) -> bool:
                 a=row * 0 if row is not None else None,
                 b=row * -2 if row is not None else None,
             ),
-            [1, 2, 3, 4, None],
+            [None, 1, 2, 3, 4],
             [["asc", "desc"]],
         ),
         (
@@ -92,7 +92,7 @@ def inv_filter_fn(row) -> bool:
                 a=row * 0 if row is not None else None,
                 b=row * -2 if row is not None else None,
             ),
-            [4, 3, 2, 1, None],
+            [None, 4, 3, 2, 1],
             [["asc", "asc"]],
         ),
         (
@@ -102,21 +102,21 @@ def inv_filter_fn(row) -> bool:
                 a=row * 0 if row is not None else None,
                 b=row * -2 if row is not None else None,
             ),
-            [None, 4, 3, 2, 1],
+            [4, 3, 2, 1, None],
             [["desc", "asc"]],
         ),
         (
             [1, 2, 3, 4, None],
             "sort",
             lambda row: list_.make_list(a="a", b=row),
-            [1, 2, 3, 4, None],
+            [None, 1, 2, 3, 4],
             [["asc", "asc"]],
         ),
         (
             [1, "a", None, 2.0, {"a": 1}],
             "sort",
             lambda row: list_.make_list(a=row),
-            [1, 2.0, "a", {"a": 1}, None],
+            [None, 1, 2.0, "a", {"a": 1}],
             [["asc"]],
         ),
         (
@@ -126,10 +126,10 @@ def inv_filter_fn(row) -> bool:
             list(
                 reversed(
                     [
+                        {"a": None},
                         {"a": 1},
                         {"a": 2},
                         {"a": 3},
-                        {"a": None},
                     ]
                 )
             ),
@@ -152,10 +152,10 @@ def test_list_arrow_compatibility(data, fn_name, fn_def, res, extra_args):
             lambda row: list_.make_list(a=row),
             [{"a": 1}, {"a": 2}, {"a": 3}, {"a": None}],
             [
+                {"a": None},
                 {"a": 1},
                 {"a": 2},
                 {"a": 3},
-                {"a": None},
             ],
             [["asc"]],
         )
