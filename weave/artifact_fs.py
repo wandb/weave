@@ -211,18 +211,13 @@ class FilesystemArtifactFileType(file_base.FileBaseType):
     # Note the name! When Weave0 uses "file" it means FilesystemArtifactFile.
     name = "file"
 
-    def instance_to_dict(self, obj: typing.Any) -> dict:
-        ref = FilesystemArtifactRef(obj.artifact, obj.path)
-
-        return {
-            "birthArtifactID": "TODO",
-            "digest": "TODO",
-            "fullPath": obj.path,
-            "size": obj.artifact.size(obj.path),
-            "type": "file",
-            "url": obj.artifact.direct_url(obj.path),
-            "_ref_uri": ref.uri,
-        }
+    def save_instance(
+        self,
+        obj: "FilesystemArtifactFile",
+        artifact: FilesystemArtifact,
+        name: str,
+    ) -> FilesystemArtifactRef:
+        return FilesystemArtifactRef(obj.artifact, obj.path)
 
     def load_instance(
         self,
@@ -230,8 +225,32 @@ class FilesystemArtifactFileType(file_base.FileBaseType):
         name: str,
         extra: typing.Optional[list[str]] = None,
     ) -> "FilesystemArtifactFile":
-        raise NotImplementedError
-        # return FilesystemArtifactFile(artifact, name)
+        return FilesystemArtifactFile(artifact, name)
+
+    # def instance_to_dict(self, obj: typing.Any) -> dict:
+    #     ref = FilesystemArtifactRef(obj.artifact, obj.path)
+
+    #     return {
+    #         "birthArtifactID": "TODO",
+    #         "digest": "TODO",
+    #         "fullPath": obj.path,
+    #         "size": obj.artifact.size(obj.path),
+    #         "type": "file",
+    #         "url": obj.artifact.direct_url(obj.path),
+    #         "_ref_uri": ref.uri,
+    #     }
+
+    # # def instance_from_dict(self, d: dict) -> "FilesystemArtifactFile":
+    # #     pass
+
+    # # def load_instance(
+    # #     self,
+    # #     artifact: FilesystemArtifact,
+    # #     name: str,
+    # #     extra: typing.Optional[list[str]] = None,
+    # # ) -> "FilesystemArtifactFile":
+    # #     raise NotImplementedError
+    # #     # return FilesystemArtifactFile(artifact, name)
 
 
 @dataclasses.dataclass

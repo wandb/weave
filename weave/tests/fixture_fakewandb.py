@@ -42,6 +42,8 @@ class FakeEntry:
             return None
         elif key == "digest":
             return self.path
+        elif key == "size":
+            return 1234
         raise KeyError
 
     def get(self, path):

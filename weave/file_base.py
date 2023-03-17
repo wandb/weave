@@ -86,7 +86,8 @@ class BaseDirType(types.ObjectType):
             "fullPath": types.String(),
             "size": types.Int(),
             "dirs": types.Dict(types.String(), SubDirType()),
-            "files": types.Dict(types.String(), FileBaseType()),
+            # "files": types.Dict(types.String(), FileBaseType()),
+            "files": types.Dict(types.String(), SubFileType()),
         }
 
 
@@ -139,6 +140,42 @@ class SubDir:
         self.size = size
         self.dirs = dirs
         self.files = files
+
+
+@dataclasses.dataclass(frozen=True)
+class SubFileType(types.ObjectType):
+    # TODO doesn't match frontend
+    name = "subfile"
+
+    # # A type argument, can be subfile of LocalFile or of FilesystemArtifactFile
+    file_type: types.Type = FileBaseType()
+
+    def property_types(self) -> dict[str, types.Type]:
+        return {
+            "birthArtifactID": types.String(),
+            "digest": types.String(),
+            "fullPath": types.String(),
+            "size": types.Int(),
+            "type": types.String(),
+            "url": types.String(),
+            "_w1_file": self.file_type,
+        }
+
+
+class SubFile:
+    def __init__(
+        self,
+        birthArtifactID: str,
+        digest: str,
+        fullPath: str,
+        size: int,
+        url: str,
+    ):
+        self.birthArtifactID = birthArtifactID
+        self.digest = digest
+        self.fullPath = fullPath
+        self.size = size
+        self.url = url
 
 
 SubDirType.instance_classes = SubDir
