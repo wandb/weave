@@ -29,8 +29,6 @@ _OP_ALIASES: list[list[str]] = [
     ["set_output", "setoutput"],
     ["print_", "print"],
     ["await_final_output", "await"],
-    # used in file.py
-    ["direct_url_as_of", "directUrlAsOf"],
 ]
 
 _OP_ALIASES_LOOKUP: dict[str, list[str]] = {}

@@ -13,7 +13,7 @@ def direct_url(file: file_local.LocalFile) -> str:
     return f"{environment.weave_server_url()}/__weave/file{local_path}"
 
 
-@op(name="LocalFile-direct_url_as_of")
+@op(name="LocalFile-directUrlAsOf")
 def direct_url_as_of(file: file_local.LocalFile, asOf: int) -> str:
     local_path = os.path.abspath(file.get_local_path())
     return f"{environment.weave_server_url()}/__weave/file{local_path}"

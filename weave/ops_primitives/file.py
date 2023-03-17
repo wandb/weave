@@ -25,7 +25,7 @@ def open(
     return dir.path_info(path)
 
 
-@op(name="file-direct_url_as_of")
+@op(name="file-directUrlAsOf")
 def direct_url_as_of(file: file_base.File, asOf: int) -> str:
     # This should only be used in the first dispatch phase
     raise NotImplementedError

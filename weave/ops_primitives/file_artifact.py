@@ -8,7 +8,7 @@ def direct_url(file: artifact_fs.FilesystemArtifactFile) -> typing.Optional[str]
     return file.artifact.direct_url(file.path)
 
 
-@op(name="FilesystemArtifactFile-direct_url_as_of")
+@op(name="FilesystemArtifactFile-directUrlAsOf")
 def direct_url_as_of(
     file: artifact_fs.FilesystemArtifactFile, asOf: int
 ) -> typing.Optional[str]:
