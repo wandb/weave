@@ -669,6 +669,25 @@ def test_arrow_groupby_sort(fake_wandb):
     assert grouped == "Reptilia"
 
 
+def test_arrow_groupby_mapped_run_tag(fake_wandb):
+    fake_wandb.fake_api.add_mock(lambda q, ndx: file_path_response)
+    node = (
+        ops.project("stacey", "mendeleev")
+        .artifactType("test_results")
+        .artifacts()[0]
+        .versions()[0]
+        .file("test_results.table.json")
+        .table()
+        .rows()
+        .createIndexCheckpointTag()
+        .groupby(lambda row: ops.dict_(x=row["truth"]))[0]["truth"]
+        .run()
+        .name()
+    )
+    result = weave.use(node)
+    assert result == None
+
+
 def test_arrow_tag_stripping(fake_wandb):
     fake_wandb.fake_api.add_mock(lambda q, ndx: file_path_response)
     awl_node = (

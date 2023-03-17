@@ -70,7 +70,7 @@ def env_log_level() -> typing.Any:
     level = os.environ.get("WEAVE_LOG_LEVEL", "ERROR")
     if os.environ.get("WEAVE_SERVER_ENABLE_LOGGING"):
         level = "INFO"
-    return logging.getLevelName(level)
+    return logging.getLevelName(level.upper())
 
 
 def silence_mpl() -> None:
