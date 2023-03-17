@@ -1,4 +1,3 @@
-import dataclasses
 import typing
 import numpy as np
 import pyarrow as pa
@@ -6,56 +5,173 @@ import pyarrow.compute as pc
 
 from ..ops_primitives import list_ as primitive_list
 from .. import weave_types as types
-from ..language_features.tagging import tagged_value_type, tag_store
+from ..language_features.tagging import tagged_value_type
 from ..api import op
 from .. import graph
 from .. import engine_trace
 
 from . import convert
 from .arrow import (
-    arrow_as_array,
     ArrowWeaveListType,
-    offsets_starting_at_zero,
     safe_coalesce,
 )
-from .util import _to_compare_safe_call
-from .vectorize import (
-    _ensure_variadic_fn,
-    vectorize,
-    _call_vectorized_fn_node_maybe_awl,
-    _call_and_ensure_awl,
-)
-from .arrow_tags import pushdown_list_tags, awl_add_arrow_tags
-from .list_ import (
-    ArrowWeaveList,
-    make_vec_dict,
-    make_vec_taggedvalue,
-)
+from .arrow_tags import pushdown_list_tags
+from .list_ import ArrowWeaveList, make_vec_dict, make_vec_taggedvalue, awl_zip
 
 tracer = engine_trace.tracer()  # type: ignore
 
 
-def _filter_none(arrs: list[typing.Any]) -> list[typing.Any]:
-    return [a for a in arrs if a != None]
+def join_all_zip_impl_lambda(
+    arrs: list[ArrowWeaveList], joinFn: graph.OutputNode, outer: bool
+):
+    # Filter Nones and pushdown tags
+    arrs = [pushdown_list_tags(a) for a in arrs if a != None]
+
+    # Get the join key for each list
+    join_key_cols = [a.apply(joinFn).untagged() for a in arrs]
+
+    return join_all_zip_impl_vec(arrs, join_key_cols, outer)
 
 
-def _arrow_zip(*arrs: pa.Array) -> pa.Array:
-    n_arrs = len(arrs)
-    output_len = min(len(a) for a in arrs)
-    array_indexes = np.tile(np.arange(n_arrs, dtype="int64"), output_len)
-    item_indexes = np.floor(np.arange(0, output_len, 1.0 / n_arrs)).astype("int64")
-    indexes = item_indexes + array_indexes * output_len
-    concatted = pa.concat_arrays(arrs)
-    interleaved = concatted.take(indexes)
-    offsets = np.arange(0, len(interleaved) + len(arrs), len(arrs), dtype="int64")
-    return pa.ListArray.from_arrays(offsets, interleaved)
+def join_all_zip_impl_vec(
+    arrs: list[ArrowWeaveList], join_key_cols: list[ArrowWeaveList], outer: bool
+):
+    # Empty case
+    if len(arrs) == 0:
+        # TODO: I don't think the arrow type is correct here. Should turn validate on.
+        return ArrowWeaveList(pa.array([]), types.TypedDict())
+
+    # Do the join
+    if outer:
+        join_type = "full outer"
+    else:
+        join_type = "inner"
+    aliases = [f"a{i}" for i in range(len(arrs))]
+    join_key_col, join_result = join_all_impl(arrs, join_key_cols, aliases, join_type)
+
+    all_keys = {}
+    for a in arrs:
+        all_keys.update(dict.fromkeys(a.keys()))
+
+    zipped_cols = []
+    for k in all_keys:
+        key_cols = [new_arr.column(k) for new_arr in join_result]
+        zipped_col = awl_zip(*key_cols)
+        zipped_cols.append(zipped_col)
+
+    return make_vec_taggedvalue(
+        make_vec_dict(joinObj=join_key_col),
+        make_vec_dict(**{k: v for k, v in zip(all_keys, zipped_cols)}),
+    )
 
 
-def _awl_struct_array_to_table(arr: pa.StructArray) -> pa.Table:
-    assert pa.types.is_struct(arr.type)
-    columns = [f.name for f in arr.type]
-    arrays = [arr.field(k) for k in columns]
-    return pa.Table.from_arrays(arrays, columns)
+def join_all_impl(
+    arrs: list[ArrowWeaveList],
+    join_key_cols: list[ArrowWeaveList],
+    aliases: list[str],
+    join_type: str,
+) -> tuple[ArrowWeaveList, list[ArrowWeaveList]]:
+    # Ensure each join key col has the same type
+    unified_join_key_cols = convert.unify_types(*join_key_cols)
+
+    join_key_cols = unified_join_key_cols
+
+    # Get the safe join keys
+    safe_join_key_cols = [convert.to_compare_safe(a) for a in join_key_cols]
+
+    tables: list[pa.Table] = []
+    for i, (arr, safe_join_key_col) in enumerate(zip(arrs, safe_join_key_cols)):
+        if pa.types.is_null(safe_join_key_col._arrow_data.type):
+            # Special case the type of a null column. Arrow's won't join on it.
+            # But nulls can be represented in any type, so we cast to int64. The
+            # safe join column is not included in the final output, so we don't
+            # need to worry about fixing the type later.
+            safe_join_key_col._arrow_data = safe_join_key_col._arrow_data.cast("int64")
+        tables.append(
+            pa.Table.from_arrays(
+                [safe_join_key_col._arrow_data, np.arange(len(arr), dtype="int64")],
+                names=["join", f"index_t{i}"],
+            ).filter(pc.invert(pc.is_null(safe_join_key_col._arrow_data)))
+        )
+
+    joined = tables[0]
+    for other in tables[1:]:
+        joined = joined.join(
+            other,
+            ["join"],
+            join_type=join_type,
+            use_threads=False,
+            coalesce_keys=True,
+        )
+
+    index_cols = [joined[f"index_t{i}"].combine_chunks() for i in range(len(arrs))]
+
+    final_join_key_col: ArrowWeaveList = ArrowWeaveList(
+        safe_coalesce(
+            *[
+                a._arrow_data.take(index_col)
+                for index_col, a in zip(index_cols, join_key_cols)
+            ]
+        ),
+        join_key_cols[0].object_type,
+        None,
+    )
+
+    new_arrs: list[ArrowWeaveList] = []
+    for index_col, arr in zip(index_cols, arrs):
+        new_arrs.append(
+            ArrowWeaveList(
+                arr._arrow_data.take(index_col),
+                types.optional(arr.object_type),
+                arr._artifact,
+            )
+        )
+
+    return final_join_key_col, new_arrs
+
+
+Obj1Type = typing.TypeVar("Obj1Type")
+Obj2Type = typing.TypeVar("Obj2Type")
+
+
+def join2_impl(
+    arr1: ArrowWeaveList,
+    arr2: ArrowWeaveList,
+    joinFn1: graph.OutputNode,
+    joinFn2: graph.OutputNode,
+    alias1: typing.Optional[str] = None,
+    alias2: typing.Optional[str] = None,
+    leftOuter: bool = False,
+    rightOuter: bool = False,
+):
+    if alias1 == None:
+        alias1 = "a1"
+    if alias2 == None:
+        alias2 = "a2"
+
+    arr1_raw_join_col = arr1.apply(joinFn1).untagged()
+    arr2_raw_join_col = arr2.apply(joinFn2).untagged()
+
+    if leftOuter and rightOuter:
+        join_type = "full outer"
+    elif leftOuter:
+        join_type = "left outer"
+    elif rightOuter:
+        join_type = "right outer"
+    else:
+        join_type = "inner"
+
+    join_key_col, [new_arr1, new_arr2] = join_all_impl(
+        [arr1, arr2],
+        [arr1_raw_join_col, arr2_raw_join_col],
+        [alias1, alias2],  # type: ignore
+        join_type,
+    )
+
+    return make_vec_taggedvalue(
+        make_vec_dict(joinObj=join_key_col),
+        make_vec_dict(**{alias1: new_arr1, alias2: new_arr2}),  # type: ignore
+    )
 
 
 def _join_all_output_type(input_types):
@@ -91,181 +207,6 @@ def _joined_all_output_type_tag_type(
     return types.TypedDict({"joinObj": join_fn_output_type})
 
 
-def _custom_join_apply_fn_node(
-    awl: ArrowWeaveList, fn: graph.OutputNode
-) -> typing.Tuple[ArrowWeaveList, types.Type]:
-    # Need to add here as well since it is a custom one
-    called = _call_vectorized_fn_node_maybe_awl(
-        awl, vectorize(_ensure_variadic_fn(fn, awl.object_type))
-    )
-    object_type = typing.cast(types.List, called.type).object_type
-    return _call_and_ensure_awl(awl, called), object_type
-
-
-def _map_nested_arrow_fields(
-    array: typing.Union[pa.Array, pa.Table, pa.ChunkedArray],
-    fn: typing.Callable[[pa.Array, list[str]], typing.Optional[pa.Array]],
-    path: list[str] = [],
-) -> pa.Array:
-    """
-    This function can be used to recursively map over all the fields of an arrow
-    array. It will traverse through structs, lists, and dictionaries - providing the
-    caller with a chance to return a new array at any level. Once a new array is returned
-    the traversal will stop at that level. If the caller returns None, the traversal will
-    continue. This is useful for performing inplace transformations.
-    """
-
-    # We handle ChunkedArrays and Tables by recursing over their chunks first
-    if isinstance(array, pa.ChunkedArray):
-        if len(array.chunks) == 0:
-            return array
-        chunks = [_map_nested_arrow_fields(chunk, fn, path) for chunk in array.chunks]
-        return pa.chunked_array(chunks)
-    if isinstance(array, pa.Table):
-        new_arrays = []
-        for field in array.schema:
-            new_arrays.append(
-                _map_nested_arrow_fields(
-                    array.column(field.name), fn, path + [field.name]
-                )
-            )
-        return pa.Table.from_arrays(new_arrays, array.schema.names)
-
-    # get results from user
-    user_arr = fn(array, path)
-
-    if user_arr != None and user_arr != array:
-        return user_arr
-    if pa.types.is_struct(array.type):
-        if array.type.num_fields == 0:
-            return array
-        sub_fields = [
-            _map_nested_arrow_fields(array.field(field.name), fn, path + [field.name])
-            for field in array.type
-        ]
-        return pa.StructArray.from_arrays(
-            sub_fields, [f.name for f in array.type], mask=array.is_null()
-        )
-    elif pa.types.is_list(array.type):
-        sub_arrays = _map_nested_arrow_fields(array.flatten(), fn, path)
-        return pa.ListArray.from_arrays(
-            offsets_starting_at_zero(array), sub_arrays, mask=array.is_null()
-        )
-    elif pa.types.is_dictionary(array.type):
-        sub_fields = _map_nested_arrow_fields(array.dictionary, fn, path)
-        return pa.DictionaryArray.from_arrays(
-            array.indices, sub_fields, mask=array.is_null()
-        )
-    return array
-
-
-@dataclasses.dataclass
-class MultiArrayCommonEncoderResult:
-    encoded_arrays: list[pa.Array]
-    code_array_to_encoded_array: typing.Callable[[pa.Array], pa.Array]
-
-
-def _multi_array_common_encoder(
-    arrs_keys: list[pa.Array],
-) -> MultiArrayCommonEncoderResult:
-    """
-    Returns a MultiArrayCommonEncoderResult for a list of arrays. Given a list
-    of arrays, recursively traverse all the sub fields and replace dictionaries
-    with pure integer arrays (the indices) while keeping track of the dictionary
-    values. This is useful since duckdb does not handle dictionary encoded
-    arrays. Moreover, a function is returned that can be used to convert the
-    indices back to dictionary encoded arrays. This is purpose build for Joins,
-    but is generally useful for any operation that requires a common encoding of
-    multiple arrays.
-    """
-
-    # path, new_encoding - note, we could duplicate entries, but that is better
-    # than having to perform object equality checks
-    all_dictionaries: dict[str, pa.Array] = {}
-
-    def collect_and_recode_dictionaries(array: pa.Array) -> pa.Array:
-        def _collect(array: pa.Array, path: list[str]) -> typing.Optional[pa.Array]:
-            if pa.types.is_dictionary(array.type):
-                path_str = ".".join(path)
-                if path_str not in all_dictionaries:
-                    offset = 0
-                    all_dictionaries[path_str] = array.dictionary
-                else:
-                    offset = len(all_dictionaries[path_str])
-                    all_dictionaries[path_str] = pa.concat_arrays(
-                        [all_dictionaries[path_str], array.dictionary]
-                    )
-                return pc.add(array.indices, offset)
-            return None
-
-        return _map_nested_arrow_fields(array, _collect)
-
-    def recode_dictionaries(array: pa.Array) -> typing.Optional[pa.Array]:
-        def _record(array: pa.Array, path: list[str]) -> typing.Optional[pa.Array]:
-            path_str = ".".join(path)
-            if path_str in all_dictionaries:
-                return pa.DictionaryArray.from_arrays(array, all_dictionaries[path_str])
-            return None
-
-        return _map_nested_arrow_fields(array, _record)
-
-    new_arrs = [collect_and_recode_dictionaries(arr) for arr in arrs_keys]
-    return MultiArrayCommonEncoderResult(
-        new_arrs,
-        recode_dictionaries,
-    )
-
-
-join_key_col_name = "__joinobj__"
-join_tag_key_col_name = "__joinobj_tag__"
-
-
-def _joinall_arrow(
-    tables: list[pa.Table], join_type: str, select_cols: list[str]
-) -> pa.Table:
-    # join
-    table0 = tables[0]
-    joined = pa.Table.from_arrays(
-        [table0[join_key_col_name], np.arange(len(table0), dtype="int64")],
-        names=["join", "index_t0"],
-    )
-    for i, t in enumerate(tables[1:]):
-        other = pa.Table.from_arrays(
-            [t[join_key_col_name], np.arange(len(t), dtype="int64")],
-            names=["join", f"index_t{i+1}"],
-        )
-        joined = joined.join(
-            other,
-            ["join"],
-            join_type=join_type,
-            use_threads=False,
-            coalesce_keys=True,
-        )
-
-    join_tag_cols = []
-    for t, table in enumerate(tables):
-        if join_tag_key_col_name in table.schema.names:
-            t_indexes = joined[f"index_t{t}"]
-            join_tag_cols.append(table[join_tag_key_col_name].take(t_indexes))
-    join_tag_col = pa.compute.coalesce(*join_tag_cols)
-
-    # zip
-    zipped_cols = []
-    for c in select_cols:
-        col_cols = []
-        for t, table in enumerate(tables):
-            t_indexes = joined[f"index_t{t}"]
-            if c in table.schema.names:
-                col_cols.append(table[c].take(t_indexes).combine_chunks())
-        zipped_cols.append(_arrow_zip(*col_cols))
-
-    result = pa.Table.from_arrays(
-        [joined["join"], join_tag_col] + zipped_cols,
-        names=[join_key_col_name, join_tag_key_col_name] + select_cols,
-    )
-    return result
-
-
 @op(
     name="ArrowWeaveList-joinAll",
     input_type={
@@ -277,266 +218,7 @@ def _joinall_arrow(
     output_type=_join_all_output_type,
 )
 def join_all(arrs, joinFn, outer: bool):
-    safe_join_fn = _to_compare_safe_call(joinFn)
-    # This is a pretty complicated op. See list.ts for the original implementation
-    outer_tags = None
-    if tag_store.is_tagged(arrs):
-        outer_tags = tag_store.get_tags(arrs)
-
-    def maybe_tag(arr):
-        if outer_tags is not None:
-            return pushdown_list_tags(tag_store.add_tags(arr, outer_tags))
-        else:
-            return arr
-
-    # First, filter out Nones
-    arrs = _filter_none(arrs)
-
-    # If nothing remains, simply return.
-    if len(arrs) == 0:
-        return ArrowWeaveList(pa.array([]), types.TypedDict({}))
-
-    pushed_arrs = [pushdown_list_tags(arr) for arr in arrs]
-
-    key_types = []
-    tagged_arrs_keys = []
-    untagged_arrs_keys = []
-    for arr in pushed_arrs:
-        maybe_tagged_arr = maybe_tag(arr)
-        arr_res, key_type = _custom_join_apply_fn_node(maybe_tagged_arr, safe_join_fn)
-        untagged_arrs_keys.append(arr_res._arrow_data_asarray_no_tags())
-
-        if safe_join_fn is joinFn:
-            full_keys = arrow_as_array(arr_res._arrow_data)
-            tagged_key_type = key_type
-        else:
-            unsafe_arr_res, unsafe_key_type = _custom_join_apply_fn_node(
-                maybe_tagged_arr, joinFn
-            )
-            tagged_key_type = unsafe_key_type
-            full_keys = arrow_as_array(unsafe_arr_res._arrow_data)
-
-        key_types.append(tagged_key_type)
-        tagged_arrs_keys.append(full_keys)
-
-    arrs_keys = untagged_arrs_keys
-
-    # Get the union of all the keys of all the elements
-    arr_keys = []
-    all_element_keys: set[str] = set([])
-    for arr in pushed_arrs:
-        keys = set(typing.cast(types.TypedDict, arr.object_type).property_types.keys())
-        arr_keys.append(keys)
-        all_element_keys = all_element_keys.union(keys)
-    raw_key_to_safe_key = {key: f"c_{ndx}" for ndx, key in enumerate(all_element_keys)}
-    safe_key_to_raw_key = {v: k for k, v in raw_key_to_safe_key.items()}
-    safe_element_keys = list(raw_key_to_safe_key.values())
-
-    duck_ready_tables = []
-    for i, (arr, arrs_keys) in enumerate(zip(pushed_arrs, arrs_keys)):
-        if isinstance(arr.object_type, tagged_value_type.TaggedValueType):
-            # here, we need to add the row tag to each element.
-            tag_arr = arr._arrow_data.field("_tag")
-            val_arr = arr._arrow_data.field("_value")
-            new_fields = []
-            field_names = []
-            for field in val_arr.type:
-                field_names.append(field.name)
-                curr_field = val_arr.field(field.name)
-                if isinstance(
-                    typing.cast(types.TypedDict, arr.object_type.value).property_types[
-                        field.name
-                    ],
-                    tagged_value_type.TaggedValueType,
-                ):
-
-                    curr_field_tag = curr_field.field("_tag")
-                    curr_field_val = curr_field.field("_value")
-                    combined_field_names = []
-                    combined_fields = []
-                    for sub_field in tag_arr.type:
-                        combined_field_names.append(sub_field.name)
-                        combined_fields.append(tag_arr.field(sub_field.name))
-                    for sub_field in curr_field_tag.type:
-                        if sub_field.name not in combined_field_names:
-                            combined_field_names.append(sub_field.name)
-                            combined_fields.append(curr_field_tag.field(sub_field.name))
-                    tag_field = pa.StructArray.from_arrays(
-                        combined_fields, names=combined_field_names
-                    )
-                    inner_curr_field = curr_field_val
-                else:
-                    tag_field = tag_arr
-                    inner_curr_field = curr_field
-
-                new_fields.append(
-                    pa.StructArray.from_arrays(
-                        [inner_curr_field, tag_field], names=["_value", "_tag"]
-                    )
-                )
-            array_with_untagged_rows = pa.StructArray.from_arrays(
-                new_fields, names=field_names
-            )
-        else:
-            array_with_untagged_rows = arr._arrow_data
-
-        table = _awl_struct_array_to_table(array_with_untagged_rows)
-        safe_named_table = table.rename_columns(
-            [raw_key_to_safe_key[lookup_name] for lookup_name in table.column_names]
-        )
-        raw_keyed_table = safe_named_table.add_column(0, join_key_col_name, arrs_keys)
-        tagged_table = raw_keyed_table
-
-        tagged_arr_key = tagged_arrs_keys[i]
-        if tagged_arr_key != None:
-            tagged_table = tagged_table.add_column(
-                1, join_tag_key_col_name, tagged_arr_key
-            )
-        else:
-            tagged_table = tagged_table.add_column(
-                1, join_tag_key_col_name, pc.scalar(None)
-            )
-
-        filtered_table = tagged_table.filter(
-            pc.invert(pc.is_null(pc.field(join_key_col_name)))
-        )
-        duck_ready_tables.append(filtered_table)
-
-    encoder_result = _multi_array_common_encoder(duck_ready_tables)
-    encoded_db_tables = encoder_result.encoded_arrays
-
-    join_type = "full outer" if outer else "inner"
-
-    duck_res_table = _joinall_arrow(
-        encoded_db_tables, join_type, list(safe_key_to_raw_key)
-    )
-
-    recorded_table = encoder_result.code_array_to_encoded_array(duck_res_table)
-    join_obj_tagged = recorded_table.column(join_tag_key_col_name).combine_chunks()
-
-    final_table = recorded_table.drop(
-        [join_key_col_name, join_tag_key_col_name]
-    ).rename_columns(all_element_keys)
-
-    merged_obj_types = types.merge_many_types([arr.object_type for arr in pushed_arrs])
-    if not types.TypedDict({}).assign_type(merged_obj_types):
-        raise ValueError("Can only join ArrowWeaveLists of TypedDicts")
-    inner_type = _joined_all_output_type_inner_type(
-        typing.cast(types.TypedDict, merged_obj_types),
-    )
-    tag_type = _joined_all_output_type_tag_type(types.union(*key_types))
-
-    untagged_result: ArrowWeaveList = ArrowWeaveList(
-        final_table,
-        inner_type,
-        arrs[0]._artifact,
-    )
-    result_tags = pa.StructArray.from_arrays([join_obj_tagged], names=["joinObj"])
-
-    return awl_add_arrow_tags(
-        untagged_result,
-        result_tags,
-        tag_type,
-    )
-
-
-Obj1Type = typing.TypeVar("Obj1Type")
-Obj2Type = typing.TypeVar("Obj2Type")
-
-
-def join2_impl(
-    arr1: ArrowWeaveList,
-    arr2: ArrowWeaveList,
-    joinFn1: graph.OutputNode,
-    joinFn2: graph.OutputNode,
-    alias1: typing.Optional[str] = None,
-    alias2: typing.Optional[str] = None,
-    leftOuter: bool = False,
-    rightOuter: bool = False,
-):
-    if alias1 == None:
-        alias1 = "a1"
-    if alias2 == None:
-        alias2 = "a2"
-
-    arr1_raw_join_col = arr1.apply(joinFn1).untagged()
-    arr2_raw_join_col = arr2.apply(joinFn2).untagged()
-
-    arr1_raw_join_col, arr2_raw_join_col = convert.unify_types(
-        arr1_raw_join_col, arr2_raw_join_col
-    )
-
-    arr1_safe_join_col = convert.to_compare_safe(arr1_raw_join_col)
-    arr2_safe_join_col = convert.to_compare_safe(arr2_raw_join_col)
-
-    t0 = pa.Table.from_arrays(
-        [
-            arr1_safe_join_col._arrow_data,
-            np.arange(len(arr1), dtype="int64"),
-        ],
-        names=["join", "index_t0"],
-    ).filter(pc.invert(pc.is_null(arr1_safe_join_col._arrow_data)))
-    t1 = pa.Table.from_arrays(
-        [
-            arr2_safe_join_col._arrow_data,
-            np.arange(len(arr2), dtype="int64"),
-        ],
-        names=["join", "index_t1"],
-    ).filter(pc.invert(pc.is_null(arr2_safe_join_col._arrow_data)))
-
-    if leftOuter and rightOuter:
-        join_type = "full outer"
-    elif leftOuter:
-        join_type = "left outer"
-    elif rightOuter:
-        join_type = "right outer"
-    else:
-        join_type = "inner"
-
-    if len(t0) == 0 and len(t1) == 0:
-        joined = pa.nulls(0)
-        index0 = np.array([], dtype="int64")
-        index1 = np.array([], dtype="int64")
-    else:
-        joined = t0.join(
-            t1,
-            ["join"],
-            join_type=join_type,
-            use_threads=False,
-            coalesce_keys=True,
-        )
-        index0 = joined.column("index_t0").combine_chunks()
-        index1 = joined.column("index_t1").combine_chunks()
-
-    coalesced_join_col = safe_coalesce(
-        arr1_raw_join_col._arrow_data.take(index0),
-        arr2_raw_join_col._arrow_data.take(index1),
-    )
-    raw_join_col: ArrowWeaveList = ArrowWeaveList(
-        coalesced_join_col,
-        arr1_raw_join_col.object_type,
-        None,
-    )
-    all_keys: dict[str, typing.Any] = {}
-    if isinstance(arr1.object_type, types.TypedDict):
-        for k in arr1.object_type.property_types.keys():
-            all_keys[k] = True
-
-    new_arr1: ArrowWeaveList = ArrowWeaveList(
-        arr1._arrow_data.take(index0),
-        types.optional(arr1.object_type),
-        arr1._artifact,
-    )
-    new_arr2: ArrowWeaveList = ArrowWeaveList(
-        arr2._arrow_data.take(index1),
-        types.optional(arr2.object_type),
-        arr2._artifact,
-    )
-
-    return make_vec_taggedvalue(
-        make_vec_dict(joinObj=raw_join_col),
-        make_vec_dict(**{alias1: new_arr1, alias2: new_arr2}),  # type: ignore
-    )
+    return join_all_zip_impl_lambda(arrs, joinFn, outer)
 
 
 def _join_2_output_type(input_types):

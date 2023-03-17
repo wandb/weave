@@ -454,6 +454,12 @@ def to_compare_safe(awl: ArrowWeaveList) -> ArrowWeaveList:
             )
         elif pa.types.is_string(col._arrow_data.type):
             return ArrowWeaveList(col._arrow_data, types.String(), None)
+        elif pa.types.is_dictionary(col._arrow_data.type):
+            if not isinstance(col.object_type, types.String):
+                raise errors.WeaveInternalError(
+                    "Unexpected dictionary type for non-string type"
+                )
+            return ArrowWeaveList(col._arrow_data, types.String(), None)
         elif pa.types.is_floating(col._arrow_data.type) or pa.types.is_integer(
             col._arrow_data.type
         ):
@@ -544,6 +550,17 @@ def to_compare_safe(awl: ArrowWeaveList) -> ArrowWeaveList:
     return awl.map_column(_to_compare_safe)
 
 
-def unify_types(a1: ArrowWeaveList, a2: ArrowWeaveList):
-    concatted = a1.concat(a2)
-    return concatted._slice(0, len(a1)), concatted._slice(len(a1), len(concatted))
+def unify_types(*arrs: ArrowWeaveList):
+    """Ensures each arr has the same type using merge_types/concat."""
+    # We make use of concat, which converts its inputs to the same type.
+    if not arrs:
+        return ()
+    concatted = arrs[0]
+    for a in arrs[1:]:
+        concatted = concatted.concat(a)
+    result = []
+    arr_start_index = 0
+    for a in arrs:
+        result.append(concatted._slice(arr_start_index, arr_start_index + len(a)))
+        arr_start_index += len(a)
+    return result

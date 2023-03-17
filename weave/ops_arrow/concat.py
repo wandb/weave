@@ -23,6 +23,7 @@ from .list_ import (
     is_list_arrowweavelist,
     unsafe_awl_construction,
     offsets_starting_at_zero,
+    make_vec_none,
 )
 
 DEBUG = False
@@ -40,10 +41,6 @@ def indent_print(indent: int = 0, *args) -> None:
 
     if DEBUG:
         print("    " * indent + " ".join([str(a) for a in args]))
-
-
-def make_none_awl(length: int) -> ArrowWeaveList:
-    return ArrowWeaveList(pa.nulls(length), types.NoneType(), None)
 
 
 def pa_concat_arrays(arrays: list[typing.Union[pa.Array, pa.ChunkedArray]]) -> pa.Array:
@@ -70,11 +67,11 @@ def _concatenate_typeddicts(
         indent_print(depth, "TypedDict key", key)
         if key not in l1.object_type.property_types:
             properties[key] = _concatenate(
-                make_none_awl(len(l1._arrow_data)), l2.column(key), depth=depth + 1
+                make_vec_none(len(l1._arrow_data)), l2.column(key), depth=depth + 1
             )
         elif key not in l2.object_type.property_types:
             properties[key] = _concatenate(
-                l1.column(key), make_none_awl(len(l2)), depth=depth + 1
+                l1.column(key), make_vec_none(len(l2)), depth=depth + 1
             )
         else:
             properties[key] = _concatenate(
@@ -300,7 +297,7 @@ def _concatenate(
     if isinstance(self.object_type, types.NoneType) and isinstance(
         other.object_type, types.NoneType
     ):
-        return make_none_awl(len(self) + len(other))
+        return make_vec_none(len(self) + len(other))
     elif isinstance(self.object_type, types.NoneType):
         indent_print(depth, "Extend case self None")
         if len(self) == 0:

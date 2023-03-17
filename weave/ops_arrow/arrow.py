@@ -1,6 +1,7 @@
 import dataclasses
 import json
 import pyarrow as pa
+import numpy as np
 from pyarrow import compute as pc
 import pyarrow.parquet as pq
 import typing
@@ -407,8 +408,25 @@ def safe_is_null(arr: pa.Array):
         return pa.compute.is_null(arr)
 
 
-def safe_coalesce(arr1: pa.Array, arr2: pa.Array):
+def safe_coalesce(*arrs: pa.Array):
+    if not arrs:
+        raise ValueError("coalesce requires at least one argument")
     # pyarrows coalesce doesn't handle unions. This does!
-    if len(arr1) == 0:
-        return arr1
-    return pa.compute.if_else(safe_is_null(arr1), arr2, arr1)
+    if len(arrs[0]) == 0:
+        return arrs[0]
+    result = arrs[0]
+    for arr in arrs[1:]:
+        result = pa.compute.if_else(safe_is_null(result), arr, result)
+    return result
+
+
+def arrow_zip(*arrs: pa.Array) -> pa.Array:
+    n_arrs = len(arrs)
+    output_len = min(len(a) for a in arrs)
+    array_indexes = np.tile(np.arange(n_arrs, dtype="int64"), output_len)
+    item_indexes = np.floor(np.arange(0, output_len, 1.0 / n_arrs)).astype("int64")
+    indexes = item_indexes + array_indexes * output_len
+    concatted = pa.concat_arrays(arrs)
+    interleaved = concatted.take(indexes)
+    offsets = np.arange(0, len(interleaved) + len(arrs), len(arrs), dtype="int64")
+    return pa.ListArray.from_arrays(offsets, interleaved)

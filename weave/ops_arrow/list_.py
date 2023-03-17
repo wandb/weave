@@ -22,9 +22,11 @@ from .. import node_ref
 from ..language_features.tagging import tag_store
 
 from .arrow import (
+    safe_is_null,
     ArrowWeaveListType,
     offsets_starting_at_zero,
     pretty_print_arrow_type,
+    arrow_zip,
 )
 from .. import debug_types
 
@@ -669,8 +671,6 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             tag: ArrowWeaveList = ArrowWeaveList(
                 self._arrow_data.field("_tag"), self.object_type.tag, self._artifact
             )._map_column(fn, pre_fn, path + (PathItemTaggedValueTag(),))
-            if not isinstance(tag.object_type, types.TypedDict):
-                raise errors.WeaveInternalError("Tag must be a TypedDict")
             value: ArrowWeaveList = ArrowWeaveList(
                 self._arrow_data.field("_value"), self.object_type.value, self._artifact
             )._map_column(fn, pre_fn, path + (PathItemTaggedValueValue(),))
@@ -680,7 +680,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                     ["_tag", "_value"],
                     mask=pa.compute.is_null(arr),
                 ),
-                tagged_value_type.TaggedValueType(tag.object_type, value.object_type),
+                tagged_value_type.TaggedValueType(tag.object_type, value.object_type),  # type: ignore
                 self._artifact,
                 invalid_reason=tag._invalid_reason or value._invalid_reason,
             )
@@ -1125,16 +1125,53 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
 
         return ArrowWeaveList(new_data, None, self._artifact)
 
+    def keys(self) -> list[str]:
+        if isinstance(self.object_type, tagged_value_type.TaggedValueType):
+            value_type = self.object_type.value
+            if isinstance(value_type, types.TypedDict):
+                return list(value_type.property_types.keys())
+        elif isinstance(self.object_type, types.TypedDict):
+            return list(self.object_type.property_types.keys())
+        raise ValueError("Cannot get keys from non-TypedDict.")
+
+    def _split_none(self) -> typing.Tuple[bool, "ArrowWeaveList"]:
+        if isinstance(self.object_type, types.UnionType):
+            optional, non_none_type = types.split_none(self.object_type)
+            return optional, ArrowWeaveList(
+                self._arrow_data,
+                non_none_type,
+                self._artifact,
+                invalid_reason="maybe optional",
+            )
+        return False, self
+
+    def _as_optional(self) -> "ArrowWeaveList":
+        invalid_reason = self._invalid_reason
+        if self._invalid_reason == "maybe optional":
+            invalid_reason = None
+        return ArrowWeaveList(
+            self._arrow_data,
+            types.optional(self.object_type),
+            self._artifact,
+            invalid_reason=invalid_reason,
+        )
+
+    def _null_mask(self) -> pa.Array:
+        return safe_is_null(self._arrow_data)
+
     def column(self, name: str) -> "ArrowWeaveList":
         if isinstance(self.object_type, tagged_value_type.TaggedValueType):
-            value = self.tagged_value_value().column(name)
-            tag = self.tagged_value_tag()
-            return ArrowWeaveList(
-                pa.StructArray.from_arrays(
-                    [tag._arrow_data, value._arrow_data], ["_tag", "_value"]
-                ),
-                tagged_value_type.TaggedValueType(tag.object_type, value.object_type),  # type: ignore
-                self._artifact,
+            return make_vec_taggedvalue(
+                self.tagged_value_tag(),
+                self.tagged_value_value().column(name),
+                is_null_mask=self._null_mask(),
+            )
+        elif isinstance(self.object_type, types.UnionType):
+            optional, non_none = self._split_none()
+            if optional and not isinstance(non_none.object_type, types.UnionType):
+                return non_none.column(name)._as_optional()
+            raise ValueError(
+                f"Cannot get column {name} from non-TypedDict or ObjectType."
             )
         elif isinstance(self.object_type, types.TypedDict):
             property_types = self.object_type.property_types
@@ -1145,6 +1182,9 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                 f"Cannot get column {name} from non-TypedDict or ObjectType."
             )
 
+        if name not in property_types:
+            return make_vec_none(len(self))
+
         return ArrowWeaveList(
             self._arrow_data.field(name),
             property_types[name],
@@ -1152,11 +1192,11 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             invalid_reason=self._invalid_reason,
         )
 
-    def tagged_value_tag(self) -> "ArrowWeaveList":
+    def tagged_value_tag(self) -> "ArrowWeaveListGeneric[types.TypedDict]":
         if not isinstance(self.object_type, tagged_value_type.TaggedValueType):
             raise ValueError(f"Cannot get tagged_value_tag from non-TaggedValueType")
 
-        return ArrowWeaveList(
+        return ArrowWeaveListGeneric[types.TypedDict](
             self._arrow_data.field("_tag"), self.object_type.tag, self._artifact
         )
 
@@ -1285,6 +1325,10 @@ def dataframe_to_arrow(df):
     return ArrowWeaveList(pa.Table.from_pandas(df))
 
 
+def make_vec_none(length: int) -> ArrowWeaveList:
+    return ArrowWeaveList(pa.nulls(length), types.NoneType(), None)
+
+
 def make_vec_dict(**kwargs: ArrowWeaveList):
     arr = pa.StructArray.from_arrays(
         [v._arrow_data for v in kwargs.values()], [k for k in kwargs.keys()]
@@ -1293,10 +1337,48 @@ def make_vec_dict(**kwargs: ArrowWeaveList):
     return ArrowWeaveList(arr, types.TypedDict(property_types), None)
 
 
-def make_vec_taggedvalue(tag: ArrowWeaveList, value: ArrowWeaveList):
+def make_vec_taggedvalue(
+    tag: ArrowWeaveListGeneric[types.TypedDict],
+    value: ArrowWeaveList,
+    is_null_mask: typing.Optional[pa.Array] = None,
+):
+    tag_types = tag.object_type.property_types
+    value_type = value.object_type
+    tag_data = tag._arrow_data
+    value_data = value._arrow_data
+    if isinstance(value_type, tagged_value_type.TaggedValueType):
+        # If value is a tagged value, we flatten by merging the tags and
+        # pulling the value up.
+        value_type_types = value_type.tag.property_types
+        new_tag_types = {**tag_types, **value_type_types}
+        if len(new_tag_types) != len(tag_types) + len(value_type_types):
+            raise ValueError("Tagged value types must be disjoint")
+        tag_types = new_tag_types
+        value_type = value_type.value
+
+        value_tag_data = value_data.field("_tag")
+        tag_data = pa.StructArray.from_arrays(
+            [tag_data.field(f.name) for f in tag_data.type]
+            + [value_tag_data.field(f.name) for f in value_tag_data.type],
+            names=[f.name for f in tag_data.type]
+            + [f.name for f in value_tag_data.type],
+        )
+        value_data = value_data.field("_value")
     arr = pa.StructArray.from_arrays(
-        [tag._arrow_data, value._arrow_data], ["_tag", "_value"]
+        [tag_data, value_data],
+        ["_tag", "_value"],
+        mask=is_null_mask,
     )
     return ArrowWeaveList(
-        arr, tagged_value_type.TaggedValueType(tag.object_type, value.object_type), None  # type: ignore
+        arr, tagged_value_type.TaggedValueType(types.TypedDict(tag_types), value_type), None  # type: ignore
     )
+
+
+def awl_zip(*arrs: ArrowWeaveList) -> ArrowWeaveList:
+    if not arrs:
+        raise ValueError("Cannot zip empty list")
+    from . import convert
+
+    arrs = convert.unify_types(*arrs)
+    zipped = arrow_zip(*[a._arrow_data for a in arrs])
+    return ArrowWeaveList(zipped, types.List(arrs[0].object_type), None)

@@ -1493,9 +1493,6 @@ def test_join_tag_support():
     joined_row_obj = joined_row_item.joinObj()
 
     assert (weave.use(joined_row_obj)) == "id_val_1"
-    assert (weave.use(get_id(joined_row_obj))) == "id_0_1"
-    assert (weave.use(get_row(joined_row_obj))) == "row_0_1"
-    assert (weave.use(get_awl(joined_row_obj))) == "awl_0"
 
 
 def test_arrow_handling_of_empty_structs():

@@ -1332,11 +1332,10 @@ def test_join_all_tables(fake_wandb):
         .dropna()
         .joinAll(lambda row: row["truth"], True)
         .createIndexCheckpointTag()[0]
-        .joinObj()
     )
-    run_names_res = weave.use(joined_row.run().name())
+    run_names_res = weave.use(joined_row["score_Fungi"][0].run().name())
     assert run_names_res == "amber-glade-100"
-    run_names_res = weave.use(joined_row.project().name())
+    run_names_res = weave.use(joined_row["score_Fungi"][0].project().name())
     assert run_names_res == "mendeleev"
 
 
