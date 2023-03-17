@@ -442,6 +442,13 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         return self.io_service.fs.path(fs_path)
 
     def size(self, path: str) -> int:
+        manifest = self._manifest()
+        if manifest is not None:
+            manifest_entry = manifest.get_entry_by_path(path)
+            if manifest_entry:
+                size = manifest_entry["size"]
+                if size is not None:
+                    return size
         if path in self._saved_artifact.manifest.entries:
             return self._saved_artifact.manifest.entries[path].size
         return super().size(path)
