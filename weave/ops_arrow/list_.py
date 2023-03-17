@@ -550,6 +550,10 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             raise ValueError(f"ArrowWeaveList validation err: {type_match_summary}")
 
     def _validate_arrow_data(self) -> None:
+        return
+
+        # Validation disabled: this seems to usually be fast, but can take
+        # many seconds for certain arrays.
         try:
             self._arrow_data.validate(full=True)
         except pa.ArrowInvalid:
