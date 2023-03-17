@@ -2,6 +2,10 @@ class WeaveBaseError(Exception):
     pass
 
 
+class WeaveBaseWarning(Warning):
+    pass
+
+
 # Only use this if you actually want to return an Http 400
 # to the client. This should only happen in cases where the
 # client is wrong.
@@ -28,6 +32,10 @@ class WeaveApiError(WeaveBaseError):
 
 
 class WeaveTypeError(WeaveBaseError):
+    pass
+
+
+class WeaveTypeWarning(WeaveBaseWarning):
     pass
 
 

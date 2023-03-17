@@ -52,6 +52,8 @@ from .wandb_domain_gql import (
 from . import wb_util
 from . import history as history_util
 from ..ops_primitives import _dict_utils
+from .. import util
+from .. import errors
 
 from ..compile_table import KeyTree
 
@@ -293,9 +295,13 @@ def refine_history_type(run: wdt.Run) -> types.Type:
             ]
         )
         if wt == types.UnknownType():
-            raise ValueError(
-                f"Unable to determine history key type for key {key} with types {type_counts}"
+            util.capture_exception_with_sentry_if_available(
+                errors.WeaveTypeWarning(
+                    f"Unable to determine history key type for key {key} with types {type_counts}"
+                ),
+                (str([tc["type"] for tc in type_counts]),),
             )
+            wt = types.NoneType()
 
         # _step is a special key that is always guaranteed to be a nonnull number.
         # other keys may be undefined at particular steps so we make them optional.
