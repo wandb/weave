@@ -1339,6 +1339,27 @@ def test_join_all_tables(fake_wandb):
     assert run_names_res == "mendeleev"
 
 
+def test_arrow_join_all_filter_notequal(fake_wandb):
+    fake_wandb.fake_api.add_mock(table_mock_filtered)
+    joined_row = (
+        ops.project("stacey", "mendeleev")
+        .filteredRuns("{}", "-createdAt")
+        .limit(50)
+        .summary()
+        .pick("table")
+        .table()
+        .rows()
+        .dropna()
+        .joinAll(lambda row: row["image"], True)
+        # Note: this doesn't dispatch because we always detect output type
+        # as UnknownType in dispatch path, but filter expects boolean.
+        # You can change filter to expect Any and it will get past this point.
+        .filter(lambda row: row["truth"] != row["guess"])
+        .createIndexCheckpointTag()[0]
+    )
+    # TODO: write test conditions!
+
+
 def test_arrow_unnest_shallow_tags(fake_wandb):
     fake_wandb.fake_api.add_mock(table_mock_filtered)
     x_val = (

@@ -269,7 +269,7 @@ def get_op_for_inputs(name: str, kwargs: dict[str, types.Type]) -> op_def.OpDef:
     )
     if not final_ops:
         err = errors.WeaveDispatchError(
-            f'Cannot dispatch op "{name}"; ops {ops} matched first arg type, but no matching ops found for remaining arg types: {input_types[1:]}'
+            f'Cannot dispatch op "{name}"; ops {ops} matched first arg type {input_types[0]}, but no matching ops found for remaining arg types: {input_types[1:]}'
         )
         util.raise_exception_with_sentry_if_available(err, [name])
 
@@ -284,7 +284,10 @@ def _type_of_input_param(v: typing.Any) -> types.Type:
         return v.type
     elif callable(v):
         input_type = pyfunc_type_util.determine_input_type(v, None, True)
-        output_type = pyfunc_type_util.determine_output_type(v, None, True)
+        # This always detects unknown which is not assignable to anything
+        # Force to Any instead
+        # output_type = pyfunc_type_util.determine_output_type(v, None, True)
+        output_type = types.Any()
         if not isinstance(input_type, op_args.OpNamedArgs):
             raise errors.WeaveInternalError("Function conversion requires named args")
         if callable(output_type):
@@ -322,7 +325,7 @@ class BoundPotentialOpDefs:
         )
         if not ops:
             err = errors.WeaveDispatchError(
-                f'Cannot dispatch choose op from "{self.potential_ops}"; no matching op found'
+                f'Cannot dispatch op from "{self.potential_ops} for remaining arg types {input_types[1:]}"; no matching op found'
             )
             util.raise_exception_with_sentry_if_available(
                 err, [str(self.potential_ops)]
