@@ -53,9 +53,9 @@ def _op_args_is_subtype(lhs: op_args.OpArgs, rhs: op_args.OpArgs) -> bool:
         raise errors.WeaveInternalError("unknown op_args types: %s, %s" % (lhs, rhs))
 
 
-def _resolve_op_ambiguity(
+def _nullability_ambiguity_resolution_rule(
     candidates: list[op_def.OpDef], first_arg_type: types.Type
-) -> op_def.OpDef:
+) -> list[op_def.OpDef]:
     # nullability, if the first argument is None or List[None], then any
     # of the candidates can handle it. Choose the first one (choosing the
     # first ensures we choose a tag getter if there is one).
@@ -63,52 +63,115 @@ def _resolve_op_ambiguity(
         types.NoneType().assign_type(first_arg_type)
         or types.List(types.NoneType()).assign_type(first_arg_type)
     ):
-        return candidates[0]
+        return [candidates[0]]
+    return candidates
 
-    # Currently we deprioritize all tag getter ops below standard ops
-    tag_getter_candidates = []
-    non_tag_getter_candidates = []
-    for candidate in candidates:
-        if is_tag_getter(candidate):
-            tag_getter_candidates.append(candidate)
-        else:
-            non_tag_getter_candidates.append(candidate)
 
-    def cmp(a: op_def.OpDef, b: op_def.OpDef) -> int:
-        # TODO: make this less hacky
-        # If we're mapping contains, don't do substring matching
-        ambiguous_contains = ["mapped_string-contains", "contains"]
-        if a.name in ambiguous_contains and b.name in ambiguous_contains:
-            if a.name == "contains":
-                return -1
-            else:
-                return 1
-        b_is_subtype = _op_args_is_subtype(a.input_type, b.input_type)
-        a_is_subtype = _op_args_is_subtype(b.input_type, a.input_type)
-        if a_is_subtype and b_is_subtype:
-            raise errors.WeaveDispatchError(
-                "Ambiguous ops %s, %s. Ops' input types are equivalent"
-                % (a.name, b.name)
-            )
-        if a_is_subtype:
+def _is_mapped_op(op: op_def.OpDef) -> bool:
+    return op.derived_from is not None and op.derived_from.derived_ops["mapped"] == op
+    # Leaving this here, we may want to include this condition in the future
+    # or isinstance(op, op_def.AutoTagHandlingArrowOpDef)
+
+
+def _mapped_ambiguity_resolution_rule(
+    candidates: list[op_def.OpDef], first_arg_type: types.Type
+) -> list[op_def.OpDef]:
+    non_mapped_candidates = [
+        candidate for candidate in candidates if not _is_mapped_op(candidate)
+    ]
+    if len(non_mapped_candidates) > 0:
+        return non_mapped_candidates
+    return candidates
+
+
+def _tagged_ambiguity_resolution_rule(
+    candidates: list[op_def.OpDef], first_arg_type: types.Type
+) -> list[op_def.OpDef]:
+    non_tagged_candidates = [
+        candidate for candidate in candidates if not is_tag_getter(candidate)
+    ]
+    if len(non_tagged_candidates) > 0:
+        return non_tagged_candidates
+    return candidates
+
+
+def _subtype_sorting_ambiguity_resolution_rule_cmp(
+    a: op_def.OpDef, b: op_def.OpDef
+) -> int:
+    # TODO: make this less hacky
+    # If we're mapping contains, don't do substring matching
+    ambiguous_contains = ["mapped_string-contains", "contains"]
+    if a.name in ambiguous_contains and b.name in ambiguous_contains:
+        if a.name == "contains":
             return -1
-        if b_is_subtype:
+        else:
             return 1
+    b_is_subtype = _op_args_is_subtype(a.input_type, b.input_type)
+    a_is_subtype = _op_args_is_subtype(b.input_type, a.input_type)
+    if a_is_subtype and b_is_subtype:
         raise errors.WeaveDispatchError(
-            "Ambiguous ops %s, %s. Ops' input types first arguments must be subset in one direction or the other."
-            % (a.name, b.name)
+            "Ambiguous ops %s, %s. Ops' input types are equivalent" % (a.name, b.name)
         )
+    if a_is_subtype:
+        return -1
+    if b_is_subtype:
+        return 1
+    raise errors.WeaveDispatchError(
+        "Ambiguous ops %s, %s. Ops' input types first arguments must be subset in one direction or the other."
+        % (a.name, b.name)
+    )
 
-    if len(non_tag_getter_candidates) > 0:
-        if len(tag_getter_candidates) > 0:
+
+def _subtype_sorting_ambiguity_resolution_rule(
+    candidates: list[op_def.OpDef], first_arg_type: types.Type
+) -> list[op_def.OpDef]:
+    return sorted(
+        candidates,
+        key=functools.cmp_to_key(_subtype_sorting_ambiguity_resolution_rule_cmp),
+    )
+
+
+def _apply_ambiguity_rules(
+    candidates: list[op_def.OpDef],
+    first_arg_type: types.Type,
+    rules: list[
+        typing.Tuple[
+            str, typing.Callable[[list[op_def.OpDef], types.Type], list[op_def.OpDef]]
+        ]
+    ],
+) -> list[op_def.OpDef]:
+    for rule_name, rule in rules:
+        reduced_candidates = rule(candidates, first_arg_type)
+        if len(reduced_candidates) < len(candidates):
             logging.warning(
-                f"Op dispatch candidates contained {len(non_tag_getter_candidates)} non tag-getters and {len(tag_getter_candidates)} tag getters. Ignoring tag getters to avoid ambigious dispatch."
+                f"Dispatch Ambiguity Resolution - {rule_name} Rule reduced set from {len(candidates)} to {len(reduced_candidates)}"
             )
-        ordered = sorted(non_tag_getter_candidates, key=functools.cmp_to_key(cmp))
-    else:
-        ordered = sorted(tag_getter_candidates, key=functools.cmp_to_key(cmp))
+        candidates = reduced_candidates
+        if len(candidates) == 1:
+            return candidates
+    return candidates
 
-    return ordered[0]
+
+def _resolve_op_ambiguity(
+    candidates: list[op_def.OpDef], first_arg_type: types.Type
+) -> op_def.OpDef:
+    if len(candidates) == 1:
+        return candidates[0]
+    final_candidates = _apply_ambiguity_rules(
+        candidates,
+        first_arg_type,
+        [
+            ("If Null Input, Choose First", _nullability_ambiguity_resolution_rule),
+            ("Prefer Non-Mapped", _mapped_ambiguity_resolution_rule),
+            ("Prefer Non-Tagged", _tagged_ambiguity_resolution_rule),
+            (
+                "Prefer Sub Type of Super Type",
+                _subtype_sorting_ambiguity_resolution_rule,
+            ),
+        ],
+    )
+
+    return final_candidates[0]
 
 
 def _get_ops_by_name(fq_op_name: str) -> list[op_def.OpDef]:

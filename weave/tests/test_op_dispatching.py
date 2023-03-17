@@ -1,4 +1,9 @@
+import pytest
 import weave
+
+from ..language_features.tagging.tagged_value_type import TaggedValueType
+from ..ops_domain import wb_domain_types
+from ..dispatch import _dispatch_first_arg, _resolve_op_ambiguity
 from .. import context_state as _context
 from .. import weave_internal
 from .. import graph
@@ -171,3 +176,27 @@ def test_dispatch_of_ambiguous_ops():
     # tag-project
     project_node = artifacts_node[0].project()
     projects_node = artifacts_node.project()
+
+
+@pytest.mark.parametrize(
+    "name, first_arg_type, exp_op_name",
+    [
+        ("contains", weave.types.String(), "string-contains"),
+        ("contains", weave.types.List(weave.types.String()), "contains"),
+        (
+            "project",
+            TaggedValueType(
+                weave.types.TypedDict({"project": wb_domain_types.ProjectType}),
+                wb_domain_types.RunType,
+            ),
+            "run-project",
+        ),
+    ],
+)
+def test_get_op_for_inputs(name, first_arg_type, exp_op_name):
+    assert (
+        _resolve_op_ambiguity(
+            _dispatch_first_arg(name, first_arg_type), first_arg_type
+        ).name
+        == exp_op_name
+    )
