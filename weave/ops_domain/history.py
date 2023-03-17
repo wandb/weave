@@ -15,6 +15,8 @@ class TypeCount(typing.TypedDict):
 
 
 def history_key_type_count_to_weave_type(tc: TypeCount) -> types.Type:
+    from .wbmedia import ImageArtifactFileRefType
+
     tc_type = tc["type"]
     if tc_type == "string":
         return types.String()
@@ -42,10 +44,11 @@ def history_key_type_count_to_weave_type(tc: TypeCount) -> types.Type:
     elif tc_type == "table-file":
         extension = types.Const(types.String(), "json")
         return artifact_fs.FilesystemArtifactFileType(extension, table.TableType())
-    elif type == "joined-table":
+    elif tc_type == "joined-table":
         extension = types.Const(types.String(), "json")
         return artifact_fs.FilesystemArtifactFileType(
             extension, table.JoinedTableType()
         )
-
+    elif tc_type == "image-file":
+        return ImageArtifactFileRefType()
     return types.UnknownType()

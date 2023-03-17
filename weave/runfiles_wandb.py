@@ -12,6 +12,7 @@ from . import wandb_client_api
 from . import memo
 
 from . import file_util
+from . import environment as weave_env
 from . import weave_types as types
 from . import artifact_fs
 from . import filesystem
@@ -77,6 +78,11 @@ class WandbRunFiles(artifact_fs.FilesystemArtifact):
     @property
     def uri_obj(self) -> "WeaveWBRunFilesURI":
         return self._run_files_uri
+
+    def direct_url(self, path: str) -> typing.Optional[str]:
+        base_url = weave_env.wandb_base_url()
+        uri = self.uri_obj
+        return f"{base_url}/files/{uri.entity_name}/{uri.project_name}/{uri.run_name}/{path}"
 
     def path(self, path: str) -> str:
         # TODO: Move this logic to `io_service`. We can get rid of the
@@ -182,8 +188,13 @@ class WeaveWBRunFilesURI(uris.WeaveURI):
     ) -> "WeaveWBRunFilesURI":
         path = path.strip("/")
         entity_name = netloc
-        project_name, run_name, path = path.split("/", 2)
-        return cls(netloc, None, entity_name, project_name, run_name, path)
+        has_file_path = path.count("/") > 1
+        if has_file_path:
+            project_name, run_name, path = path.split("/", 2)
+        else:
+            project_name, run_name = path.split("/", 1)
+            path = ""
+        return cls(netloc, None, entity_name, project_name, run_name, path or None)
 
     def to_ref(self) -> WandbRunFilesRef:
         return WandbRunFilesRef.from_uri(self)

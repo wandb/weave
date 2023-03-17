@@ -1416,13 +1416,13 @@ def test_image_sha_from_table(fake_wandb):
     )
 
 
-def test_nested_summary_key(fake_wandb):
+def test_image_in_summary(fake_wandb):
     fake_wandb.fake_api.add_mock(table_mock2)
 
-    img_node = ops.project("stacey", "mendeleev").runs()[0].summary()["image.sha256"]
+    img_node = ops.project("stacey", "mendeleev").runs()[0].summary()["image"]
 
     assert (
-        weave.use(img_node)
+        weave.use(img_node).sha256
         == "440fab0d6f537b4557a106fa7853453332650631ef580fd328c620bd8aa5a025"
     )
 
