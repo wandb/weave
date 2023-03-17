@@ -26,6 +26,14 @@ from . import errors
 DEBUG_COMPILE = False
 
 
+def _dispatch_error_is_client_error(op_name: str) -> bool:
+    if op_name == "tag-run":
+        # All the cases we've seen of this lately are clearly client errors, so
+        # we'll send back a 400!
+        return True
+    return False
+
+
 def _call_run_await(run_node: graph.Node) -> graph.OutputNode:
     run_node_type = typing.cast(types.RunType, run_node.type)
     return graph.OutputNode(run_node_type.output, "run-await", {"self": run_node})
@@ -59,7 +67,13 @@ def _dispatch_map_fn_refining(node: graph.Node) -> typing.Optional[graph.OutputN
                 from_op.input_types,
                 re.sub(r'[\\]+"', '"', graph_debug.node_expr_str_full(node)),
             )
-            raise
+            if _dispatch_error_is_client_error(from_op.name):
+                raise errors.WeaveBadRequest(
+                    "Error while dispatching: %s. This is most likely a client error"
+                    % from_op.name
+                )
+            else:
+                raise
     return None
 
 
@@ -86,7 +100,17 @@ def _dispatch_map_fn_no_refine(node: graph.Node) -> typing.Optional[graph.Output
             # TODO: does this work for mapped case?
             return node
         from_op = node.from_op
-        op = dispatch.get_op_for_inputs(node.from_op.name, from_op.input_types)
+        try:
+            op = dispatch.get_op_for_inputs(node.from_op.name, from_op.input_types)
+        except errors.WeaveDispatchError as e:
+            if _dispatch_error_is_client_error(from_op.name):
+                raise errors.WeaveBadRequest(
+                    "Error while dispatching: %s. This is most likely a client error"
+                    % from_op.name
+                )
+            else:
+                raise
+
         params = from_op.inputs
         if isinstance(op.input_type, op_args.OpNamedArgs):
             params = {

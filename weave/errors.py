@@ -126,3 +126,7 @@ class WeaveArtifactMediaFileLookupError(WeaveBaseError):
 
 class WeaveClientRequestError(WeaveBaseError):
     pass
+
+
+class WeaveMissingVariableError(WeaveBaseError):
+    pass

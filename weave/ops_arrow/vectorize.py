@@ -593,15 +593,18 @@ def _call_vectorized_fn_node_maybe_awl(
 ) -> graph.OutputNode:
     index_awl: ArrowWeaveList[int] = ArrowWeaveList(pa.array(np.arange(len(awl))))
     row_type = ArrowWeaveListType(awl.object_type)
-    fn_res_node = weave_internal.call_fn(
-        vectorized_fn,
-        {
-            "row": weave_internal.make_const_node(row_type, awl),
-            "index": weave_internal.make_const_node(
-                ArrowWeaveListType(types.Int()), index_awl
-            ),
-        },
-    )
+    try:
+        fn_res_node = weave_internal.call_fn(
+            vectorized_fn,
+            {
+                "row": weave_internal.make_const_node(row_type, awl),
+                "index": weave_internal.make_const_node(
+                    ArrowWeaveListType(types.Int()), index_awl
+                ),
+            },
+        )
+    except errors.WeaveMissingVariableError as e:
+        raise errors.WeaveBadRequest('Invalid variable "%s" in function' % e.args[0])
     return typing.cast(graph.OutputNode, weave_internal.refine_graph(fn_res_node))
 
 
