@@ -26,7 +26,7 @@ def combine_common_nodes(outputs: list[graph.Node]) -> list[graph.Node]:
     replace values with _CombinedConstVal. So the results should
     only be used for debugging/printing.
     """
-    fg = forward_graph.ForwardGraph()
+    fg = forward_graph.ForwardGraph(allow_var_nodes=True)
     fg.add_nodes(outputs)
     new_outputs: list[graph.Node] = []
     next_items = list(fg.roots)
@@ -187,7 +187,7 @@ def node_expr_str_full(node: graph.Node) -> str:
 def to_assignment_form(
     outputs: list[graph.Node],
 ) -> dict[graph.OutputNode, graph.VarNode]:
-    fg = forward_graph.ForwardGraph()
+    fg = forward_graph.ForwardGraph(allow_var_nodes=True)
     fg.add_nodes(outputs)
     new_nodes: dict[graph.Node, graph.OutputNode] = {}
     assignments: dict[graph.Node, graph.VarNode] = {}

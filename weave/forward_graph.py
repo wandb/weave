@@ -90,7 +90,7 @@ class ForwardGraph:
 
     def add_node(self, node: graph.Node):
         if isinstance(node, graph.VoidNode):
-            raise errors.WeaveInternalError(
+            raise errors.WeaveBadRequest(
                 "Found void node when constructing ForwardGraph: %s" % node
             )
         elif isinstance(node, graph.ConstNode):
@@ -98,7 +98,7 @@ class ForwardGraph:
         if node in self._node_to_forward_node:
             return
         if isinstance(node, graph.VarNode) and not self._allow_var_nodes:
-            raise errors.WeaveInternalError(
+            raise errors.WeaveBadRequest(
                 "Found var node when constructing ForwardGraph: %s" % node
             )
 

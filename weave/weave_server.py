@@ -149,8 +149,12 @@ def execute():
         profile = cProfile.Profile()
         start_time = time.time()
         try:
-            with client_safe_http_exceptions_as_werkzeug():
-                response = profile.runcall(server.handle_request, **execute_args)
+            try:
+                with client_safe_http_exceptions_as_werkzeug():
+                    response = profile.runcall(server.handle_request, **execute_args)
+            except errors.WeaveBadRequest as e:
+                traceback.print_exc()
+                abort(400, e.args[0])
         finally:
             elapsed = time.time() - start_time
             profile_filename = f"/tmp/weave/profile/execute.{start_time*1000:.0f}.{elapsed*1000:.0f}ms.prof"
