@@ -145,7 +145,11 @@ def recursively_unwrap_unions(obj):
         if "_union_id" in obj and "_val" in obj:
             return recursively_unwrap_unions(obj["_val"])
         else:
-            return {k: recursively_unwrap_unions(v) for k, v in obj.items()}
+            return {
+                k: recursively_unwrap_unions(v)
+                for k, v in obj.items()
+                if k != "_union_id"
+            }
     return obj
 
 
