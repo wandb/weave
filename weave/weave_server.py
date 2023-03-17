@@ -29,8 +29,8 @@ from weave import logs
 from weave import filesystem
 from weave.server_error_handling import client_safe_http_exceptions_as_werkzeug
 
-PROFILE_DIR = "/tmp/weave/profile"
-# PROFILE_DIR = None
+# PROFILE_DIR = "/tmp/weave/profile"
+PROFILE_DIR = None
 if PROFILE_DIR is not None:
     pathlib.Path(PROFILE_DIR).mkdir(parents=True, exist_ok=True)
 
