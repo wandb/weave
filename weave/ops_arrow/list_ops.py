@@ -3,7 +3,7 @@ import pyarrow.compute as pc
 import numpy as np
 import typing
 
-from ..api import op
+from ..api import op, type_of
 from ..decorator_arrow_op import arrow_op
 from .. import weave_types as types
 from ..language_features.tagging import (
@@ -16,7 +16,7 @@ from ..ops_primitives import list_ as primitive_list
 from .. import op_def
 
 from .arrow import ArrowWeaveListType, arrow_as_array, offsets_starting_at_zero
-from .list_ import ArrowWeaveList
+from .list_ import ArrowWeaveList, PathType
 from . import arrow_tags
 from .vectorize import _apply_fn_node_with_tag_pushdown
 from . import convert
@@ -189,47 +189,74 @@ def map_each(self, map_fn):
     return _map_each(self, map_fn)
 
 
-def _slow_arrow_or_list_ranking(
-    awl_or_list: typing.Union["ArrowWeaveList", list], col_dirs
-):
-    # This function is used to handle cases where the sort function will not play nicely with AWL
-    if isinstance(awl_or_list, ArrowWeaveList):
-        awl_or_list = awl_or_list.to_pylist_notags()
-    py_columns: dict[str, list] = {}
-    for row in awl_or_list:
-        for col_ndx, cell in enumerate(row):
-            col_name = f"c_{col_ndx}"
-            if col_name not in py_columns:
-                py_columns[col_name] = []
-            if not isinstance(cell, (str, int, float)):
-                # This is the crazy line - we need to convert it to something sane
-                # Maybe there is a generic way to do this w/.o str conversion?
-                cell = str(cell)
-            py_columns[col_name].append(cell)
-    table = pa.table(py_columns)
-    return pc.sort_indices(
-        table,
-        sort_keys=[
-            (col_name, "ascending" if dir_name == "asc" else "descending")
-            for col_name, dir_name in zip(py_columns.keys(), col_dirs)
-        ],
-        null_placement="at_end",
-    )
+def _impute_nones_for_sort(awl: ArrowWeaveList) -> ArrowWeaveList:
+    """Impute missing values in a table so that it can be sorted. This is a workaround for
+    the fact that arrow does not handle missing values in a table when sorting, it just
+    moves them all to the end of the list."""
+
+    def impute_nones(
+        arrow_list: ArrowWeaveList, path: PathType
+    ) -> typing.Optional[ArrowWeaveList]:
+        # this does not work for unions in arrow < 12
+        if not types.is_optional(arrow_list.object_type):
+            return None
+
+        mask = pa.compute.is_null(arrow_list._arrow_data)
+        any_null = pa.compute.any(mask).as_py()
+        num_null = pa.compute.sum(mask).as_py()
+
+        if any_null:
+            if pa.types.is_struct(arrow_list._arrow_data.type) or pa.types.is_list(
+                arrow_list._arrow_data.type
+            ):
+                raise NotImplementedError(
+                    "Imputing nulls for a struct or a list is not implemented"
+                )
+
+            if pa.types.is_string(arrow_list._arrow_data.type):
+                max = pa.compute.max(arrow_list._arrow_data).as_py()
+                replacement = pa.repeat(max + "a", num_null)
+                new_data = pa.compute.replace_with_mask(
+                    arrow_list._arrow_data, mask, replacement
+                )
+            elif pa.types.is_floating(arrow_list._arrow_data.type):
+                max = pa.compute.max(arrow_list._arrow_data).as_py()
+                replacement = pa.repeat(
+                    max + 1.0, num_null
+                )  # greater than all other elements
+            elif pa.types.is_integer(arrow_list._arrow_data.type):
+                max = pa.compute.max(arrow_list._arrow_data).as_py()
+                replacement = pa.repeat(max + 1, num_null)
+            else:
+                raise NotImplementedError(
+                    f"Imputing nulls for type {arrow_list._arrow_data.type} is not implemented"
+                )
+
+            new_data = pa.compute.replace_with_mask(
+                arrow_list._arrow_data, mask, replacement
+            )
+            return ArrowWeaveList(
+                new_data,
+                types.non_none(arrow_list.object_type),
+                awl._artifact,
+            )
+
+        return None
+
+    return awl.map_column(impute_nones)
 
 
-def _arrow_sort_ranking_to_indicies(sort_ranking, col_dirs):
-    flattened = sort_ranking._arrow_data_asarray_no_tags().flatten()
+def _sort_values_list_array_to_table(
+    sort_values: ArrowWeaveList, col_dirs: list[str]
+) -> pa.Table:
+    flattened = sort_values._arrow_data_asarray_no_tags().flatten()
 
     columns = (
         []
     )  # this is intended to be a pylist and will be small since it is number of sort fields
-    col_len = len(sort_ranking._arrow_data)
+    col_len = len(sort_values._arrow_data)
     dir_len = len(col_dirs)
     col_names = [str(i) for i in range(dir_len)]
-    order = [
-        (col_name, "ascending" if dir_name == "asc" else "descending")
-        for col_name, dir_name in zip(col_names, col_dirs)
-    ]
     # arrow data: (col_len x dir_len)
     # [
     #    [d00, d01]
@@ -251,8 +278,21 @@ def _arrow_sort_ranking_to_indicies(sort_ranking, col_dirs):
             columns.append(pc.take(flattened, pa.array(take_array)))
         else:
             columns.append(flattened)
-    table = pa.Table.from_arrays(columns, names=col_names)
-    return pc.sort_indices(table, order, null_placement="at_end")
+
+    return pa.Table.from_arrays(columns, names=col_names)
+
+
+def _arrow_sort_values_to_indices(
+    sort_values: pa.Table, col_dirs: list[str]
+) -> pa.Array:
+    col_names = sort_values.column_names
+
+    order = [
+        (col_name, "ascending" if dir_name == "asc" else "descending")
+        for col_name, dir_name in zip(col_names, col_dirs)
+    ]
+
+    return pc.sort_indices(sort_values, order, null_placement="at_end")
 
 
 @op(
@@ -268,17 +308,41 @@ def _arrow_sort_ranking_to_indicies(sort_ranking, col_dirs):
     output_type=lambda input_types: input_types["self"],
 )
 def sort(self, comp_fn, col_dirs):
-    ranking = _apply_fn_node_with_tag_pushdown(self, comp_fn)
-    if not types.optional(types.union(types.String(), types.Number())).assign_type(
-        comp_fn.type.object_type
-    ):
-        # Protection! Arrow cannot handle executing a sort on non-primitives.
-        # We will defer to a slower python implementation in these cases.
-        indicies = _slow_arrow_or_list_ranking(ranking, col_dirs)
-    else:
-        indicies = _arrow_sort_ranking_to_indicies(ranking, col_dirs)
+    sort_values = _apply_fn_node_with_tag_pushdown(self, comp_fn)
+    sort_values = _sort_values_list_array_to_table(sort_values, col_dirs)
+
+    # modify to_compare_safe to preserve numbers
+    for i, column_name in enumerate(sort_values.column_names):
+        column = sort_values[column_name]
+        column = column.combine_chunks()
+
+        # handle unions.
+
+        if pa.types.is_union(column.type):
+            if pa.compute.all(
+                pa.compute.equal(column.type_codes, column.type_codes[0])
+            ).as_py():
+                column = column.field(column.type_codes[0].as_py())
+            else:
+                # have to break out here. we need to convert to a string but
+                # pyarrow doesn't support string casting for multi-type unions.
+                column = [str(x) if x is not None else x for x in column.to_pylist()]
+                column = pa.array(column)
+
+        # quickly refine column type
+        column_type = types.TypeRegistry.type_of(column).object_type
+        has_nulls = pa.compute.any(pc.is_null(column)).as_py()
+        if has_nulls:
+            column_type = types.optional(column_type)
+
+        column = ArrowWeaveList(column, column_type, self._artifact)
+        column = _impute_nones_for_sort(column)
+        column = convert.to_compare_safe(column)
+        sort_values = sort_values.set_column(i, column_name, column._arrow_data)
+
+    indices = _arrow_sort_values_to_indices(sort_values, col_dirs)
     return ArrowWeaveList(
-        pc.take(self._arrow_data, indicies), self.object_type, self._artifact
+        pc.take(self._arrow_data, indices), self.object_type, self._artifact
     )
 
 

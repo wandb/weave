@@ -19,60 +19,6 @@ def inv_filter_fn(row) -> bool:
     return row < -3
 
 
-# This tests some inconsistencies between the list and arrow implementations
-# of sort. The list implementation is more correct - it treats nulls as being "less"
-# than all other values they are compared against. The arrow implementation
-# automatically places any row with a null value at the end of the list, regardless
-# of any specified sort directions (ascending/descending).
-@pytest.mark.parametrize(
-    "data, fn_name, fn_def, list_res, arrow_res, extra_args",
-    [
-        (
-            [1, 2, 3, 4, None],
-            "sort",
-            lambda row: list_.make_list(
-                a=row * 0 if row is not None else None,
-                b=row * -2 if row is not None else None,
-            ),
-            [None, 1, 2, 3, 4],
-            [1, 2, 3, 4, None],
-            [["asc", "desc"]],
-        ),
-        (
-            [1, 2, 3, 4, None],
-            "sort",
-            lambda row: list_.make_list(
-                a=row * 0 if row is not None else None,
-                b=row * -2 if row is not None else None,
-            ),
-            [None, 4, 3, 2, 1],
-            [4, 3, 2, 1, None],
-            [["asc", "asc"]],
-        ),
-        (
-            [1, 2, 3, 4, None],
-            "sort",
-            lambda row: list_.make_list(
-                a=row * 0 if row is not None else None,
-                b=row * -2 if row is not None else None,
-            ),
-            [4, 3, 2, 1, None],
-            [4, 3, 2, 1, None],
-            [["desc", "asc"]],
-        ),
-    ],
-)
-def test_fn_equality(data, fn_name, fn_def, list_res, arrow_res, extra_args):
-    list_node = list_.make_list(**{f"{i}": v for i, v in enumerate(data)})
-    arrow_node = weave.save(arrow.to_arrow(data))
-
-    list_node_mapped = list_node.__getattr__(fn_name)(fn_def, *extra_args)
-    arrow_node_mapped = arrow_node.__getattr__(fn_name)(fn_def, *extra_args)
-
-    assert weave.use(list_node_mapped) == list_res
-    assert weave.use(arrow_node_mapped).to_pylist_raw() == arrow_res
-
-
 # TODO: Test Tag managmenet
 @pytest.mark.parametrize(
     "data, fn_name, fn_def, res, extra_args",
@@ -129,10 +75,103 @@ def test_fn_equality(data, fn_name, fn_def, list_res, arrow_res, extra_args):
             [["asc", "desc"]],
         ),
         # ([1,2,3,4], "map", lambda row: row + 1, [2,3,4,5]),
+        (
+            [1, 2, 3, 4, None],
+            "sort",
+            lambda row: list_.make_list(
+                a=row * 0 if row is not None else None,
+                b=row * -2 if row is not None else None,
+            ),
+            [1, 2, 3, 4, None],
+            [["asc", "desc"]],
+        ),
+        (
+            [1, 2, 3, 4, None],
+            "sort",
+            lambda row: list_.make_list(
+                a=row * 0 if row is not None else None,
+                b=row * -2 if row is not None else None,
+            ),
+            [4, 3, 2, 1, None],
+            [["asc", "asc"]],
+        ),
+        (
+            [1, 2, 3, 4, None],
+            "sort",
+            lambda row: list_.make_list(
+                a=row * 0 if row is not None else None,
+                b=row * -2 if row is not None else None,
+            ),
+            [None, 4, 3, 2, 1],
+            [["desc", "asc"]],
+        ),
+        (
+            [1, 2, 3, 4, None],
+            "sort",
+            lambda row: list_.make_list(a="a", b=row),
+            [1, 2, 3, 4, None],
+            [["asc", "asc"]],
+        ),
+        (
+            [1, "a", None, 2.0, {"a": 1}],
+            "sort",
+            lambda row: list_.make_list(a=row),
+            [1, 2.0, "a", {"a": 1}, None],
+            [["asc"]],
+        ),
+        (
+            [{"a": 1}, {"a": 2}, {"a": 3}, {"a": None}],
+            "sort",
+            lambda row: list_.make_list(a=row["a"]),
+            list(
+                reversed(
+                    [
+                        {"a": 1},
+                        {"a": 2},
+                        {"a": 3},
+                        {"a": None},
+                    ]
+                )
+            ),
+            [["desc"]],
+        ),
     ],
 )
 def test_list_arrow_compatibility(data, fn_name, fn_def, res, extra_args):
-    test_fn_equality(data, fn_name, fn_def, res, res, extra_args)
+    test_list_arrow_fn_results_maybe_incompatible(
+        data, fn_name, fn_def, res, res, extra_args
+    )
+
+
+@pytest.mark.parametrize(
+    "data, fn_name, fn_def, list_res, arrow_res, extra_args",
+    [
+        (
+            [{"a": 1}, {"a": 2}, {"a": 3}, {"a": None}],
+            "sort",
+            lambda row: list_.make_list(a=row),
+            [{"a": 1}, {"a": 2}, {"a": 3}, {"a": None}],
+            [
+                {"a": 1},
+                {"a": 2},
+                {"a": 3},
+                {"a": None},
+            ],
+            [["asc"]],
+        )
+    ],
+)
+def test_list_arrow_fn_results_maybe_incompatible(
+    data, fn_name, fn_def, list_res, arrow_res, extra_args
+):
+    list_node = list_.make_list(**{f"{i}": v for i, v in enumerate(data)})
+    arrow_node = weave.save(arrow.to_arrow(data))
+
+    list_node_mapped = list_node.__getattr__(fn_name)(fn_def, *extra_args)
+    arrow_node_mapped = arrow_node.__getattr__(fn_name)(fn_def, *extra_args)
+
+    assert weave.use(list_node_mapped) == list_res
+    assert weave.use(arrow_node_mapped).to_pylist_raw() == arrow_res
 
 
 # TODO: In Weave0, we also have a `join2` op. This will be done in a followup

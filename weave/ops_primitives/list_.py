@@ -104,11 +104,18 @@ class List:
                 if a_res == None and b_res == None:
                     continue
                 elif a_res == None:
-                    return -1 * dir_adjust
-                elif b_res == None:
                     return 1 * dir_adjust
+                elif b_res == None:
+                    return -1 * dir_adjust
 
-                if a_res < b_res:
+                try:
+                    lt = a_res < b_res
+                except TypeError:
+                    a_res = str(a_res)
+                    b_res = str(b_res)
+                    lt = a_res < b_res
+
+                if lt:
                     return -1 * dir_adjust
                 elif a_res > b_res:
                     return 1 * dir_adjust
