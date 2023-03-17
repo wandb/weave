@@ -26,10 +26,33 @@ from . import errors
 DEBUG_COMPILE = False
 
 
-def _dispatch_error_is_client_error(op_name: str) -> bool:
-    if op_name == "tag-run":
+def _dispatch_error_is_client_error(
+    op_name: str, input_types: dict[str, types.Type]
+) -> bool:
+    from .ops_domain import wbmedia
+
+    if op_name in set(
+        (
+            "tag-run",
+            "count",
+            "file-table",
+            "offset",
+            "typedDict-pick",
+            "list-createIndexCheckpointTag",
+            "entity-name",
+            "concat",
+            "string-isNumeric",
+            "project-artifacts",
+            "panel-table",
+        )
+    ):
         # All the cases we've seen of this lately are clearly client errors, so
         # we'll send back a 400!
+        return True
+    elif op_name == "file-path" and types.optional(
+        wbmedia.ImageArtifactFileRefType()
+    ).assign_type(input_types["file"]):
+        # You shouldn't be able to call file-path on ImageArtifactFileRef.
         return True
     return False
 
@@ -67,7 +90,7 @@ def _dispatch_map_fn_refining(node: graph.Node) -> typing.Optional[graph.OutputN
                 from_op.input_types,
                 re.sub(r'[\\]+"', '"', graph_debug.node_expr_str_full(node)),
             )
-            if _dispatch_error_is_client_error(from_op.name):
+            if _dispatch_error_is_client_error(from_op.name, from_op.input_types):
                 raise errors.WeaveBadRequest(
                     "Error while dispatching: %s. This is most likely a client error"
                     % from_op.name
@@ -103,7 +126,7 @@ def _dispatch_map_fn_no_refine(node: graph.Node) -> typing.Optional[graph.Output
         try:
             op = dispatch.get_op_for_inputs(node.from_op.name, from_op.input_types)
         except errors.WeaveDispatchError as e:
-            if _dispatch_error_is_client_error(from_op.name):
+            if _dispatch_error_is_client_error(from_op.name, from_op.input_types):
                 raise errors.WeaveBadRequest(
                     "Error while dispatching: %s. This is most likely a client error"
                     % from_op.name
