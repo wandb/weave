@@ -204,7 +204,6 @@ class ArrowWeaveListType(types.Type):
             from . import convert
 
             res = convert.from_parquet_friendly(l)
-        res.validate()
         return res
 
 

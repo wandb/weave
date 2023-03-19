@@ -1224,3 +1224,51 @@ def test_right_equals_not_equals_elements_tagged(weave_func, expected):
     vec_fn = arrow.vectorize(fn)
     called = weave_internal.call_fn(vec_fn, {"x": l})
     assert weave.use(called).to_pylist_notags() == expected
+
+
+def test_map_each():
+    d = [[{"a": 5, "b": 6}, {"a": 7, "b": 8}], [{"a": 9, "b": 10}, {"a": 11, "b": 12}]]
+    awl = arrow.to_weave_arrow(d)
+    called_map = awl.map(lambda x: x["a"])
+    vec_fn = arrow.vectorize(called_map.from_op.inputs["map_fn"].val)
+    # Should vectorize as AWL-mapEach
+    assert vec_fn.from_op.name == "ArrowWeaveList-mapEach"
+    result = weave.use(called_map)
+    assert result.to_pylist_tagged() == [[5, 7], [9, 11]]
+
+
+def test_map_each2():
+    d = [[1, 2], [3, 4]]
+    awl = arrow.to_weave_arrow(d)
+    called_map = awl.map(lambda x: x + 2)
+    vec_fn = arrow.vectorize(called_map.from_op.inputs["map_fn"].val)
+    # Should vectorize as AWL-mapEach
+    assert vec_fn.from_op.name == "ArrowWeaveList-mapEach"
+    result = weave.use(called_map)
+    assert result.to_pylist_tagged() == [[3, 4], [5, 6]]
+
+
+# def test_map_each3():
+#     d = [[1, 2], [3, 4]]
+#     awl = arrow.to_weave_arrow(d)
+#     # Not allowed to be called by type system... interesting
+#     called_map = awl.map(lambda x: x + x)
+#     vec_fn = arrow.vectorize(called_map.from_op.inputs["map_fn"].val)
+#     # Should vectorize as AWL-mapEach
+#     assert vec_fn.from_op.name == "ArrowWeaveList-mapEach"
+#     result = weave.use(called_map)
+#     assert result.to_pylist_tagged() == [[3, 4], [5, 6]]
+
+
+# def test_map_each4():
+#     d = [
+#         [{"a": 5, "b": "a"}, {"a": 7, "b": "a"}],
+#         [{"a": 9, "b": "a"}, {"a": 11, "b": "a"}],
+#     ]
+#     awl = arrow.to_weave_arrow(d)
+#     called_map = awl.map(lambda x: x[x["b"]])
+#     vec_fn = arrow.vectorize(called_map.from_op.inputs["map_fn"].val)
+#     # Should vectorize as AWL-mapEach
+#     assert vec_fn.from_op.name == "ArrowWeaveList-mapEach"
+#     result = weave.use(called_map)
+#     assert result.to_pylist_tagged() == [[5, 7], [9, 11]]

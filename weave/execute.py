@@ -337,10 +337,10 @@ def execute_forward_node(
         return {"cache_used": False}
 
     # This is expensive!
-    # logging.info(
-    #     "Executing op: %s expr: %s"
-    #     % (node.from_op.name, graph_debug.node_expr_str_full(node))
-    # )
+    logging.info(
+        "Executing op: %s expr: %s"
+        % (node.from_op.name, graph_debug.node_expr_str_full(node))
+    )
 
     tracer = engine_trace.tracer()
 

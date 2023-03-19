@@ -557,5 +557,4 @@ def concatenate(
 ) -> "ArrowWeaveList":
     with unsafe_awl_construction("Possibly nullable"):
         result = _concatenate(self, other, depth)
-    result.validate()
     return result

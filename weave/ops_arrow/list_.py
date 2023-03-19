@@ -520,7 +520,9 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             invalid_reason = _awl_invalid_reason.get()
         self._invalid_reason = invalid_reason
 
-        self._validate()
+        # Validation disabled: this seems to usually be fast, but can take
+        # many seconds for certain arrays.
+        # self._validate()
 
     def _validate(self) -> None:
         if self._invalid_reason is None:
@@ -528,9 +530,6 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         self._validate_arrow_data()
 
     def _validate_weave_type(self) -> None:
-        return
-
-        # Validation disabled
         arr = self._arrow_data
         type_match_summary = weave_arrow_type_check(self.object_type, arr)
         if type_match_summary != None:
@@ -550,10 +549,6 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             raise ValueError(f"ArrowWeaveList validation err: {type_match_summary}")
 
     def _validate_arrow_data(self) -> None:
-        return
-
-        # Validation disabled: this seems to usually be fast, but can take
-        # many seconds for certain arrays.
         try:
             self._arrow_data.validate(full=True)
         except pa.ArrowInvalid:
