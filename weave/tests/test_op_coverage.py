@@ -391,6 +391,7 @@ hidden_js_ops = set(
         "tablerow-table",
         "dir-pathReturnType",
         "dir-path",
+        "dir-_as_w0_dict_",
         "localpathReturnType",
         "localpath",
         "root-localArtifact",

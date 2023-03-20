@@ -442,6 +442,14 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         return self.io_service.fs.path(fs_path)
 
     def size(self, path: str) -> int:
+        manifest = self._manifest()
+        if manifest is not None:
+            manifest_entry = manifest.get_entry_by_path(path)
+            if manifest_entry:
+                size = manifest_entry["size"]
+                if size is not None:
+                    return size
+
         if path in self._saved_artifact.manifest.entries:
             return self._saved_artifact.manifest.entries[path].size
         return super().size(path)
@@ -563,7 +571,14 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         dir_paths = manifest.get_paths_in_directory(path)
         sub_dirs: dict[str, file_base.SubDir] = {}
         files = {}
+        total_size = 0
+        sub_dir_sizes = {}
         for entry_path in dir_paths:
+            entry = manifest.get_entry_by_path(entry_path)
+            path_size = (
+                entry["size"] if entry is not None and entry["size"] is not None else 0
+            )
+            total_size += path_size
             rel_path = os.path.relpath(entry_path, path)
             rel_path_parts = rel_path.split("/")
             if len(rel_path_parts) == 1:
@@ -574,8 +589,10 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
             else:
                 dir_name = rel_path_parts[0]
                 if dir_name not in sub_dirs:
-                    dir_ = file_base.SubDir(entry_path, 1111, {}, {})
+                    dir_ = file_base.SubDir(entry_path, 0, {}, {})
+                    sub_dir_sizes[dir_name] = 0
                     sub_dirs[dir_name] = dir_
+                sub_dir_sizes[dir_name] += path_size
                 dir_ = sub_dirs[dir_name]
                 if len(rel_path_parts) == 2:
                     dir_files = typing.cast(dict, dir_.files)
@@ -587,7 +604,11 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
                     dir_.dirs[rel_path_parts[1]] = 1
         if not sub_dirs and not files:
             return None
-        return artifact_fs.FilesystemArtifactDir(self, path, 1591, sub_dirs, files)
+        for dir_name, dir_ in sub_dirs.items():
+            dir_.size = sub_dir_sizes[dir_name]
+        return artifact_fs.FilesystemArtifactDir(
+            self, path, total_size, sub_dirs, files
+        )
 
 
 WandbArtifactType.instance_classes = WandbArtifact

@@ -25,6 +25,38 @@ def open(
     return dir.path_info(path)
 
 
+@op(
+    name="dir-_as_w0_dict_",
+)
+def _as_w0_dict_(dir: file_base.Dir) -> dict:
+    if not isinstance(dir, FilesystemArtifactDir):
+        raise errors.WeaveInternalError("Dir must be FilesystemArtifactDir")
+    return {
+        "fullPath": dir.fullPath,
+        "size": dir.size,
+        "dirs": {
+            k: {
+                "fullPath": v.fullPath,
+                "size": v.size,
+                "dirs": v.dirs,
+                "files": v.files,
+            }
+            for k, v in dir.dirs.items()
+        },
+        "files": {
+            k: {
+                "birthArtifactID": "TODO",
+                "digest": v.digest(),
+                "fullPath": v.path,
+                "size": v.artifact.size(v.path),
+                "type": "file",
+                "url": v.artifact.direct_url(v.path),
+            }
+            for k, v in dir.files.items()
+        },
+    }
+
+
 @op(name="file-directUrlAsOf")
 def direct_url_as_of(file: file_base.File, asOf: int) -> str:
     # This should only be used in the first dispatch phase
