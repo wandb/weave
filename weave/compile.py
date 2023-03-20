@@ -114,12 +114,9 @@ def _dispatch_map_fn_no_refine(node: graph.Node) -> typing.Optional[graph.Output
             # this op). Maybe a WeaveJS bug?
             # TODO
             return node
-        if node.from_op.name.startswith("file-"):
+        if node.from_op.name == "file-type":
             # since we didn't refine, the input to file-type is not correct yet.
             # if its in the graph, just trust that's what we want
-            # This is because things that result in a file might
-            # (.path) return a union<file, dir> in W1, but in W0,
-            # just `file`.
             # TODO: does this work for mapped case?
             return node
         from_op = node.from_op

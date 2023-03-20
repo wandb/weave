@@ -542,4 +542,4 @@ def run_logged_artifact_version(
     run: wdt.Run, artifactVersionName: str
 ) -> wdt.ArtifactVersion:
     alias = _make_alias(artifactVersionName, prefix="artifact")
-    return wdt.ArtifactVersion(run.gql["project"][alias])
+    return wdt.ArtifactVersion.from_gql(run.gql["project"][alias])

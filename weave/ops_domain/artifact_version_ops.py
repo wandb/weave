@@ -382,6 +382,11 @@ def _file_refine_output_type(artifactVersion: wdt.ArtifactVersion, path: str):
     return types.TypeRegistry.type_of(art_local.path_info(path))
 
 
+# Warning: the return type of this is incorrect! Weave0 treats
+# type 'file' (FilesystemArtifactFile) as both dir and file.
+# We have a refiner to do the correct thing, but the return
+# type is set to `File` so that the first non-refine compile
+# path will still work.
 @op(
     name="artifactVersion-file",
     refine_output_type=_file_refine_output_type,
@@ -390,7 +395,7 @@ def _file_refine_output_type(artifactVersion: wdt.ArtifactVersion, path: str):
 def file_(
     artifactVersion: wdt.ArtifactVersion, path: str
 ) -> typing.Union[
-    None, artifact_fs.FilesystemArtifactFile, artifact_fs.FilesystemArtifactDir
+    None, artifact_fs.FilesystemArtifactFile  # , artifact_fs.FilesystemArtifactDir
 ]:
     art_local = _artifact_version_to_wb_artifact(artifactVersion)
     return art_local.path_info(path)  # type: ignore
