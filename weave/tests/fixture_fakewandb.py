@@ -3,7 +3,6 @@ from dataclasses import dataclass, field
 import json
 import os
 import uuid
-import tempfile
 import typing
 
 from weave import wandb_api
@@ -53,7 +52,31 @@ class FakeEntry:
             return None
 
 
-class FakeManifest:
+class FakeArtifactManifestEntry:
+    def __init__(self, entry):
+        self.entry = entry
+
+    def __getitem__(self, key):
+        if key == "birth_artifact_id":
+            return self.entry.birth_artifact_id
+        if key == "digest":
+            return self.entry.digest
+        if key == "path":
+            return self.entry.path
+        if key == "ref":
+            return self.entry.ref
+        if key == "size":
+            return self.entry.size
+        raise KeyError
+
+    def get(self, path):
+        try:
+            return self[path]
+        except KeyError:
+            return None
+
+
+class FakeFilesystemManifest:
     entries = {"fakeentry": FakeEntry("fakeentry")}
 
     def __init__(self, dir_to_use=None):
@@ -85,6 +108,22 @@ class FakeManifest:
                     if os.path.isfile(os.path.join(target, sub_path))
                 ]
         return []
+
+
+class FakeArtifactManifest:
+    def __init__(self, artifact):
+        self.artifact = artifact
+
+    def get_entry_by_path(self, path):
+        entry = self.artifact.manifest.get_entry_by_path(path)
+        if entry is None:
+            return None
+        return FakeArtifactManifestEntry(entry)
+
+    def get_paths_in_directory(self, cur_dir):
+        for entry in self.artifact.manifest.entries.values():
+            if entry.path.startswith(cur_dir):
+                yield entry.path
 
 
 class FakePath:
@@ -219,7 +258,7 @@ class FakeApi:
 @dataclass
 class MockedArtifact:
     artifact: typing.Any
-    local_path: tempfile.TemporaryDirectory
+    # local_path: tempfile.TemporaryDirectory
 
 
 class FakeIoServiceClient:
@@ -227,26 +266,21 @@ class FakeIoServiceClient:
         self.mocked_artifacts = {}
 
     def add_artifact(self, artifact, artifact_uri):
-        d = tempfile.TemporaryDirectory()
-        for path, entry in artifact.manifest.entries.items():
-            target_file_path = os.path.join(d.name, path)
-            os.makedirs(os.path.dirname(target_file_path), exist_ok=True)
-            shutil.copy2(entry.local_path, target_file_path)
-        ma = MockedArtifact(artifact, d)
+        ma = MockedArtifact(artifact)
 
         self.mocked_artifacts[str(artifact_uri)] = ma
 
     def manifest(self, artifact_uri):
         uri_str = str(artifact_uri.with_path(""))
         if uri_str in self.mocked_artifacts:
-            return FakeManifest(self.mocked_artifacts[uri_str].local_path.name)
+            return FakeArtifactManifest(self.mocked_artifacts[uri_str].artifact)
+            # return FakeFilesystemManifest(self.mocked_artifacts[uri_str].local_path.name)
         requested_path = f"{artifact_uri.entity_name}/{artifact_uri.project_name}/{artifact_uri.name}_{artifact_uri.version}"
         target = os.path.abspath(os.path.join(shared_artifact_dir, requested_path))
-        return FakeManifest(target)
+        return FakeFilesystemManifest(target)
 
     def cleanup(self):
-        for ma in self.mocked_artifacts.values():
-            ma.local_path.cleanup()
+        pass
 
     @property
     def fs(self):
@@ -264,9 +298,12 @@ class FakeIoServiceClient:
     def ensure_file(self, artifact_uri):
         uri_str = str(artifact_uri.with_path(""))
         if uri_str in self.mocked_artifacts:
-            return os.path.join(
-                self.mocked_artifacts[uri_str].local_path.name, artifact_uri.path
+            entry = self.mocked_artifacts[uri_str].artifact.manifest.entries.get(
+                artifact_uri.path
             )
+            if entry is None:
+                return None
+            return entry.local_path
         return f"{artifact_uri.entity_name}/{artifact_uri.project_name}/{artifact_uri.name}_{artifact_uri.version}/{artifact_uri.path}"
 
 

@@ -447,8 +447,9 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
             manifest_entry = manifest.get_entry_by_path(path)
             if manifest_entry:
                 size = manifest_entry["size"]
-                if size is not None:
-                    return size
+                if size is None:
+                    return 0
+                return size
 
         if path in self._saved_artifact.manifest.entries:
             return self._saved_artifact.manifest.entries[path].size
@@ -530,11 +531,17 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         return self.io_service.manifest(self._read_artifact_uri)
 
     def digest(self, path: str) -> typing.Optional[str]:
+        manifest_entry = self._manifest_entry(path)
+        if manifest_entry is not None:
+            return manifest_entry["digest"]
+        return None
+
+    def _manifest_entry(self, path: str) -> typing.Optional[WandbArtifactManifestEntry]:
         manifest = self._manifest()
         if manifest is not None:
             manifest_entry = manifest.get_entry_by_path(path)
             if manifest_entry is not None:
-                return manifest_entry["digest"]
+                return manifest_entry
         return None
 
     def _path_info(

@@ -1,6 +1,7 @@
 import pytest
 import re
 from weave import stitch
+import numpy as np
 
 from weave.tests.test_wb_domain_ops import assert_gql_str_equal
 
@@ -18,6 +19,7 @@ from ..ops_domain import wb_domain_types as wdt
 from ..ops_domain import artifact_membership_ops as amo
 from ..ops_primitives import list_, dict_
 from .. import weave_types as types
+from ..ops_primitives.file import _as_w0_dict_
 
 from .. import ops_arrow as arrow
 import cProfile
@@ -1542,3 +1544,44 @@ def test_filesystem_artifact_dir_path(fake_wandb):
     art.add(table, "test_results")
     art_node = fake_wandb.mock_artifact_as_node(art)
     _do_test_gql_artifact_dir_path(art_node)
+
+
+def test_filesystem_artifact_dir_dict(fake_wandb):
+    table = wandb.Table(
+        data=[[1, wandb.Image(np.zeros((32, 32)))]], columns=["a", "image"]
+    )
+    art = wandb.Artifact("test_name", "test_type")
+    art.add(table, "test_results")
+    art.add_reference("https://www.google.com", "google_link")
+    art_node = fake_wandb.mock_artifact_as_node(art)
+    assert weave.use(_as_w0_dict_(art_node.file(""))) == {
+        "fullPath": "",
+        "size": 954,
+        "dirs": {
+            "media": {
+                "fullPath": "media/images/842c574e85966d3269f6.png",
+                "size": 75,
+                "dirs": {"images": 1},
+                "files": {},
+            }
+        },
+        "files": {
+            "test_results.table.json": {
+                "birthArtifactID": "TODO",
+                "digest": "I/aUoc5M4r1UgTNwJUECMA==",
+                "fullPath": "test_results.table.json",
+                "size": 879,
+                "type": "file",
+                "url": f"https://api.wandb.ai/test_entity/test_project/test_name_{art.commit_hash}/test_results.table.json",
+            },
+            "google_link": {
+                "birthArtifactID": "TODO",
+                "digest": "https://www.google.com",
+                "fullPath": "google_link",
+                "size": 0,
+                "type": "file",
+                "ref": "https://www.google.com",
+                "url": "https://www.google.com",
+            },
+        },
+    }

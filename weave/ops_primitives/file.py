@@ -2,6 +2,7 @@ import json
 import typing
 
 from ..artifact_fs import FilesystemArtifactDir, FilesystemArtifactFile
+from ..artifact_wandb import WandbArtifact
 from ..ops_domain.wbmedia import ImageArtifactFileRef
 from ..api import op
 from .. import weave_types as types
@@ -25,6 +26,31 @@ def open(
     return dir.path_info(path)
 
 
+def _file_dict(file: FilesystemArtifactFile) -> dict:
+    base_dict = {
+        "birthArtifactID": "TODO",
+        "digest": file.digest(),
+        "fullPath": file.path,
+        "size": file.artifact.size(file.path),
+        "type": "file",
+    }
+
+    # We need to extract the ref if it exists.
+    art = file.artifact
+    if isinstance(art, WandbArtifact):
+        entry = art._manifest_entry(file.path)
+        if entry is not None and isinstance(entry.get("ref"), str):
+            base_dict["ref"] = entry["ref"]
+
+    # if the ref exists then use that for the URL
+    if "ref" in base_dict:
+        base_dict["url"] = base_dict["ref"]
+    else:
+        base_dict["url"] = file.artifact.direct_url(file.path)
+
+    return base_dict
+
+
 @op(
     name="dir-_as_w0_dict_",
 )
@@ -43,17 +69,7 @@ def _as_w0_dict_(dir: file_base.Dir) -> dict:
             }
             for k, v in dir.dirs.items()
         },
-        "files": {
-            k: {
-                "birthArtifactID": "TODO",
-                "digest": v.digest(),
-                "fullPath": v.path,
-                "size": v.artifact.size(v.path),
-                "type": "file",
-                "url": v.artifact.direct_url(v.path),
-            }
-            for k, v in dir.files.items()
-        },
+        "files": {k: _file_dict(v) for k, v in dir.files.items()},
     }
 
 
