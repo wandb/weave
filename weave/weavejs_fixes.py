@@ -47,6 +47,7 @@ def convert_specific_opname_to_generic_opname(
 ) -> tuple[str, dict[str, typing.Any]]:
     if name.startswith("mapped_"):
         unmapped_name = name[7:]
+        return unmapped_name, inputs
         res = _convert_specific_opname_to_generic_opname(unmapped_name, inputs)
         if res[0] == unmapped_name:
             raise errors.WeaveInternalError("Unable to fix up op: " + name)

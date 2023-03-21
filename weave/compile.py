@@ -150,10 +150,24 @@ def _dispatch_map_fn_no_refine(node: graph.Node) -> typing.Optional[graph.Output
     return None
 
 
-def _simple_optimizations(node: graph.Node) -> typing.Optional[graph.OutputNode]:
+def _simple_optimizations(node: graph.Node) -> typing.Optional[graph.Node]:
     # Put simple graph transforms here!
     if not isinstance(node, graph.OutputNode):
         return None
+
+    if node.from_op.friendly_name in set(
+        # Doh, execute...
+        # TODO!
+        ("__getattr__", "index", "__getitem__", "pick", "execute")
+    ):
+        inputs = list(node.from_op.inputs.values())
+        if all(isinstance(i, graph.ConstNode) for i in inputs):
+            op_def = registry_mem.memory_registry.get_op(node.from_op.name)
+            return graph.ConstNode(
+                node.type,
+                op_def.resolve_fn(*[i.val for i in inputs]),
+            )
+
     if node.from_op.friendly_name == "merge":
         # Merging two dicts where one is empty returns the other. The frontend
         # sends this pattern down a lot right now, and it causes us to break out
@@ -342,6 +356,15 @@ def _compile(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
 
     with tracer.trace("compile:simple_optimizations"):
         n = compile_simple_optimizations(n)
+    logging.info(
+        "Simpled optimized (%s).\n%s"
+        % (
+            len(n),
+            graph_debug.assignments_string(
+                graph_debug.to_assignment_form(graph_debug.combine_common_nodes(n))
+            ),
+        )
+    )
 
     with tracer.trace("compile:lambda_uniqueness"):
         n = compile_lambda_uniqueness(n)
@@ -358,8 +381,8 @@ def _compile(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
     # TODO: is it ok to have this before final refine?
     with tracer.trace("compile:await"):
         n = compile_await(n)
-    with tracer.trace("compile:execute"):
-        n = compile_execute(n)
+    # with tracer.trace("compile:execute"):
+    #     n = compile_execute(n)
 
     # Final refine, to ensure the graph types are exactly what Weave python
     # produces. This phase can execute parts of the graph. It's very important

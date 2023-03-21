@@ -7,5 +7,6 @@ from .weave_plotly import *
 from .panel_scatter import *
 from .panel_geo import *
 from ...ops_domain.runs2 import *
+from . import wandb_objs
 
 _context.clear_loading_built_ins(_loading_builtins_token)

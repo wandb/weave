@@ -51,4 +51,4 @@ class ObjectPicker(panel.Panel):
         # if something is executable. Because here we have Const nodes that contain
         # VarNodes in expressions in their values.
         if isinstance(self.config.choice, graph.VoidNode):
-            self.config.choice = self.input_node[0]
+            self.config.choice = graph.ConstNode(weave.types.String(), "z7coqj28")

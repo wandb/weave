@@ -21,7 +21,11 @@ class InputProvider:
         if key not in self.raw:
             raise KeyError(f"Input {key} not found")
         if key not in self._dumps_cache:
-            self._dumps_cache[key] = json.dumps(self.raw[key])
+            bla = self.raw[key]
+            # MAJOR HACK... we have a ConstNode here for some reason.
+            if isinstance(bla, graph.ConstNode):
+                bla = bla.val
+            self._dumps_cache[key] = json.dumps(bla)
         return self._dumps_cache[key]
 
 
