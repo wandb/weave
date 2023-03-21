@@ -19,11 +19,16 @@ This module provides utilities for handling errors in the Weave server. It provi
 
 
 from contextlib import contextmanager
+import logging
 import typing
 import gql
 import requests
 
 from werkzeug import Response, exceptions as werkzeug_exceptions, http as werkzeug_http
+
+
+from . import errors
+from . import util
 
 
 class WeaveInternalHttpException(werkzeug_exceptions.HTTPException):
@@ -65,6 +70,8 @@ def maybe_extract_code_from_exception(e: Exception) -> typing.Optional[int]:
         return _extract_code_from_request_lib_request_exception(e)
     elif isinstance(e, gql.transport.exceptions.TransportServerError):
         return _extract_code_from_gql_lib_error(e)
+    elif isinstance(e, errors.WeaveBadRequest):
+        return _extract_code_from_weave_bad_request_error(e)
     return None
 
 
@@ -84,6 +91,10 @@ def _extract_code_from_request_lib_request_exception(
             return e.response.status_code
     elif isinstance(e, requests.exceptions.ReadTimeout):
         # Convert internal read timeout to 502 (Bad Gateway)
+        util.capture_exception_with_sentry_if_available(
+            e, ("requests.exceptions.ReadTimeout",)
+        )
+        logging.warning(f"Converting requests.exceptions.ReadTimeout to 502")
         return 502
     return None
 
@@ -94,6 +105,15 @@ def _extract_code_from_gql_lib_error(
     if isinstance(e.code, int):
         return e.code
     return None
+
+
+def _extract_code_from_weave_bad_request_error(
+    e: errors.WeaveBadRequest,
+) -> typing.Optional[int]:
+    message = str(e.args[0]) if len(e.args) > 0 else ""
+    util.capture_exception_with_sentry_if_available(e, (message,))
+    logging.warning(f"Converting WeaveBadRequest to 400: {message}")
+    return 400
 
 
 _client_safe_code_allowlist = {
