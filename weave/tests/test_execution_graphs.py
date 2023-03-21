@@ -7,7 +7,7 @@ import json
 
 def test_graph_playback():
     for payload in execute_payloads:
-        res = handle_request(payload, True, storage.to_weavejs)
+        res = handle_request(payload, True, storage.make_js_serializer())
         assert "err" not in res
 
 
@@ -33,7 +33,7 @@ def test_zlib_playback():
     execute_args = {
         "request": json_data,
         "deref": True,
-        "serialize_fn": storage.to_weavejs,
+        "serialize_fn": storage.make_js_serializer(),
     }
 
     response = handle_request(**execute_args)

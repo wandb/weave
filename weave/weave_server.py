@@ -135,10 +135,13 @@ def execute():
     # import time
     # time.sleep(0.1)
 
+    # use a single memartifact to serialize the entire response.
+    # fixes https://weights-biases.sentry.io/issues/4022569419
+
     execute_args = {
         "request": request.json,
         "deref": True,
-        "serialize_fn": storage.to_weavejs,
+        "serialize_fn": storage.make_js_serializer(),
     }
     if not PROFILE_DIR:
         start_time = time.time()

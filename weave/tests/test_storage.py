@@ -326,5 +326,6 @@ def test_to_conversion_uri_resolution(
 
     # to_weavejs doesn't resolve
     assert mock_get_wandb_read_artifact_uri.call_count == 2
-    res = storage.to_weavejs(make_art())
+    js_serializer = storage.make_js_serializer()
+    res = js_serializer(make_art())
     assert res == "wandb-artifact:///entity/project/my-uri:latest"

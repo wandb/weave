@@ -1,9 +1,11 @@
 import os
 import typing
 import pathlib
+import functools
 
 from . import errors
 from . import ref_base
+from . import artifact_base
 from . import artifact_mem
 from . import artifact_local
 from . import artifact_wandb
@@ -196,20 +198,29 @@ def from_python(obj, wb_type=None):
     return res
 
 
-def to_weavejs(obj):
+def make_js_serializer():
+    artifact = artifact_mem.MemArtifact()
+    return functools.partial(to_weavejs, artifact=artifact)
+
+
+def to_weavejs(obj, artifact: typing.Optional[artifact_base.Artifact] = None):
     from .ops_arrow import list_ as arrow_list
 
     obj = box.unbox(obj)
     if isinstance(obj, (str, int, float, bool, type(None))):
         return obj
     elif isinstance(obj, dict):
-        return {k: to_weavejs(v) for (k, v) in obj.items()}
+        return {k: to_weavejs(v, artifact=artifact) for (k, v) in obj.items()}
     elif isinstance(obj, list):
-        return [to_weavejs(item) for item in obj]
+        return [to_weavejs(item, artifact=artifact) for item in obj]
     elif isinstance(obj, arrow_list.ArrowWeaveList):
         return obj.to_pylist_notags()
     wb_type = types.TypeRegistry.type_of(obj)
+
+    if artifact is None:
+        artifact = artifact_mem.MemArtifact()
+
     mapper = mappers_python.map_to_python(
-        wb_type, artifact_mem.MemArtifact(), mapper_options={"use_stable_refs": False}
+        wb_type, artifact, mapper_options={"use_stable_refs": False}
     )
     return mapper.apply(obj)
