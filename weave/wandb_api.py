@@ -86,14 +86,18 @@ def get_wandb_api_context() -> typing.Optional[WandbApiContext]:
     return _wandb_api_context.get()
 
 
-@contextlib.contextmanager
-def from_environment() -> typing.Generator[None, None, None]:
+def init() -> typing.Optional[contextvars.Token[typing.Optional[WandbApiContext]]]:
     cookie = weave_env.weave_wandb_cookie()
-    token = None
     if cookie:
         cookies = {"wandb": cookie}
         headers = {"use-admin-privileges": "true", "x-origin": "https://app.wandb.test"}
-        token = set_wandb_api_context("admin", "<not_used>", headers, cookies)
+        return set_wandb_api_context("admin", "<not_used>", headers, cookies)
+    return None
+
+
+@contextlib.contextmanager
+def from_environment() -> typing.Generator[None, None, None]:
+    token = init()
     try:
         yield
     finally:

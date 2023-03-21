@@ -12,6 +12,7 @@ from . import weave_types as types
 from . import uris
 from . import errors
 from . import file_base
+from .language_features.tagging import tag_store
 
 
 class FilesystemArtifactType(types.Type):
@@ -184,7 +185,14 @@ class FilesystemArtifactRef(artifact_base.ArtifactRef):
     def _get(self) -> typing.Any:
         if self.path is None:
             return self.artifact
-        return self.type.load_instance(self.artifact, self.path, extra=self.extra)
+        # If we not in the execution path, we don't have a tagging context.
+        # But we need a tagging context to load objects that were tagged.
+        # This call will only create one if we don't already have one.
+        # TODO: caching tagged values is already problematic in other ways
+        # since they break idempotency. When we figure that out, we may
+        # be able to remove this.
+        with tag_store.isolated_tagging_context():
+            return self.type.load_instance(self.artifact, self.path, extra=self.extra)
 
     def local_ref_str(self) -> str:
         if self.path is None:

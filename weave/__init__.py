@@ -20,6 +20,10 @@ from .errors import *
 # TODO: Don't expose
 from .panel_util import make_node
 
+from . import wandb_api as _wandb_api
+
+_wandb_api.init()
+
 _context.clear_loading_built_ins(_loading_builtins_token)
 
 # Wow, this works! you can do just "weave" in a notebook and render
