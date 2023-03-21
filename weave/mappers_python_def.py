@@ -16,6 +16,7 @@ from . import mappers_python
 from . import val_const
 from . import timestamp as weave_timestamp
 from .language_features.tagging import tagged_value_type
+from . import artifact_mem
 
 
 class TypedDictToPyDict(mappers_weave.TypedDictMapper):
@@ -260,6 +261,8 @@ class DefaultToPy(mappers.Mapper):
                 else:
                     uri = existing_ref.initial_uri
                 return str(uri)
+            elif isinstance(existing_ref, artifact_mem.MemArtifactRef):
+                return existing_ref.local_ref_str()
         # This defines the artifact layout!
         name = "/".join(self._path + [str(self._row_id)])
         self._row_id += 1
