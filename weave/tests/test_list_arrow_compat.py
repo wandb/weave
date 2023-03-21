@@ -113,6 +113,13 @@ def inv_filter_fn(row) -> bool:
             [["asc", "asc"]],
         ),
         (
+            [[None, 1], [None, 2], [None, 3]],
+            "sort",
+            lambda row: list_.make_list(a=row[0], b=row[1]),
+            [[None, 1], [None, 2], [None, 3]],
+            [["asc", "asc"]],
+        ),
+        (
             [1, "a", None, 2.0, {"a": 1}],
             "sort",
             lambda row: list_.make_list(a=row),

@@ -206,6 +206,13 @@ def _impute_nones_for_sort(awl: ArrowWeaveList) -> ArrowWeaveList:
         num_null = pa.compute.sum(mask).as_py()
 
         if any_null:
+            all_null = num_null == len(arrow_list._arrow_data)
+            if all_null:
+                return ArrowWeaveList(
+                    pa.repeat(0, num_null),
+                    types.Int(),
+                    awl._artifact,
+                )
             if pa.types.is_struct(arrow_list._arrow_data.type) or pa.types.is_list(
                 arrow_list._arrow_data.type
             ):
