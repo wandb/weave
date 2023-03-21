@@ -156,6 +156,7 @@ class ImageArtifactFileRefType(types.ObjectType):
             boxLayers = {
                 key: [row["class_id"] for row in value]
                 for key, value in obj.boxes.items()
+                if value is not None
             }
         else:
             boxLayers = {}
