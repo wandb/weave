@@ -22,6 +22,15 @@ from .. import artifact_wandb
 # Section 1/6: Tag Getters
 # None
 
+
+def _safe_nested_pick(obj: typing.Optional[dict], path: list[str]) -> typing.Any:
+    if len(path) == 0:
+        return obj
+    if not isinstance(obj, dict):
+        return None
+    return _safe_nested_pick(obj.get(path[0]), path[1:])
+
+
 # Section 2/6: Root Ops
 @op(
     name="root-artifactVersionGQLResolver",
@@ -32,7 +41,7 @@ from .. import artifact_wandb
         "artifactTypeName": types.String(),
         "artifactVersionName": types.String(),
     },
-    output_type=wdt.ArtifactVersionType,
+    output_type=types.optional(wdt.ArtifactVersionType),
 )
 def root_artifact_version_gql_resolver(
     gql_result, entityName, projectName, artifactTypeName, artifactVersionName
@@ -41,9 +50,16 @@ def root_artifact_version_gql_resolver(
     artifact_type_alias = _make_alias(artifactTypeName, prefix="artifactType")
     artifact_alias = _make_alias(artifactVersionName, prefix="artifact")
 
-    return wdt.ArtifactType.from_gql(
-        gql_result[project_alias][artifact_type_alias][artifact_alias]
+    # This nested property access is required because if an particular
+    # GQL does not exist, then it returns None for that key. So, if
+    # the user requests something that does not exist, then we want
+    # to safely return None in such a case
+    artifact_alias_data = _safe_nested_pick(
+        gql_result, [project_alias, artifact_type_alias, artifact_alias]
     )
+    if artifact_alias_data is not None:
+        return wdt.ArtifactType.from_gql(artifact_alias_data)
+    return None
 
 
 def _root_artifact_version_plugin(inputs, inner):
