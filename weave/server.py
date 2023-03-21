@@ -22,6 +22,7 @@ from . import context
 from . import weave_types
 from . import engine_trace
 from . import logs
+from . import wandb_api
 
 
 # A function to monkeypatch the request post method
@@ -71,7 +72,8 @@ def handle_request(request, deref=False, serialize_fn=storage.to_python):
     # Forces output to be untagged
     with tracer.trace("serialize_response"):
         with isolated_tagging_context():
-            result = [serialize_fn(r) for r in result]
+            with wandb_api.from_environment():
+                result = [serialize_fn(r) for r in result]
 
     logger.info("Server request done in: %ss" % (time.time() - start_time))
     return result

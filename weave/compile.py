@@ -150,7 +150,7 @@ def _dispatch_map_fn_no_refine(node: graph.Node) -> typing.Optional[graph.Output
     return None
 
 
-def _simple_optimizations(node: graph.Node) -> typing.Optional[graph.OutputNode]:
+def _simple_optimizations(node: graph.Node) -> typing.Optional[graph.Node]:
     # Put simple graph transforms here!
     if not isinstance(node, graph.OutputNode):
         return None
@@ -172,6 +172,33 @@ def _simple_optimizations(node: graph.Node) -> typing.Optional[graph.OutputNode]
         ):
             return lhs
     return None
+
+
+def _required_const_input_names(node: graph.OutputNode) -> typing.Optional[list[str]]:
+    res = compile_domain.required_const_input_names(node)
+    if res is not None:
+        return res
+    return None
+
+
+def _resolve_required_consts(node: graph.Node) -> typing.Optional[graph.Node]:
+    # Put simple graph transforms here!
+    if not isinstance(node, graph.OutputNode):
+        return None
+    required_const_input_names = _required_const_input_names(node)
+    if required_const_input_names is None:
+        return None
+    new_inputs = dict(node.from_op.inputs)
+    for input_name, input_node in node.from_op.inputs.items():
+        if input_name in required_const_input_names:
+            if not isinstance(input_node, graph.ConstNode):
+                result = weave_internal.use(input_node)
+                new_inputs[input_name] = graph.ConstNode(input_node.type, result)
+    return graph.OutputNode(
+        node.type,
+        node.from_op.name,
+        new_inputs,
+    )
 
 
 def _make_auto_op_map_fn(when_type: type[types.Type], call_op_fn):
@@ -270,6 +297,12 @@ def compile_simple_optimizations(
     return graph.map_nodes_full(nodes, _simple_optimizations)
 
 
+def compile_resolve_required_consts(
+    nodes: typing.List[graph.Node],
+) -> typing.List[graph.Node]:
+    return graph.map_nodes_full(nodes, _resolve_required_consts)
+
+
 def compile_await(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
     return graph.map_nodes_full(nodes, _await_run_outputs_map_fn)
 
@@ -346,13 +379,6 @@ def _compile(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
     with tracer.trace("compile:lambda_uniqueness"):
         n = compile_lambda_uniqueness(n)
 
-    # Now that we have the correct calls, we can do our forward-looking pushdown
-    # optimizations. These do not depend on having correct types in the graph.
-    with tracer.trace("compile:gql"):
-        n = compile_domain.apply_domain_op_gql_translation(n)
-    with tracer.trace("compile:column_pushdown"):
-        n = compile_apply_column_pushdown(n)
-
     # Auto-transforms, where we insert operations to convert between types
     # as needed.
     # TODO: is it ok to have this before final refine?
@@ -360,6 +386,19 @@ def _compile(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
         n = compile_await(n)
     with tracer.trace("compile:execute"):
         n = compile_execute(n)
+
+    # Some ops require const input nodes. This pass executes any branches necessary
+    # to ensure that requirement holds.
+    # Only gql ops require this for now.
+    with tracer.trace("compile:resolve_required_consts"):
+        n = compile_resolve_required_consts(n)
+
+    # Now that we have the correct calls, we can do our forward-looking pushdown
+    # optimizations. These do not depend on having correct types in the graph.
+    with tracer.trace("compile:gql"):
+        n = compile_domain.apply_domain_op_gql_translation(n)
+    with tracer.trace("compile:column_pushdown"):
+        n = compile_apply_column_pushdown(n)
 
     # Final refine, to ensure the graph types are exactly what Weave python
     # produces. This phase can execute parts of the graph. It's very important
@@ -382,22 +421,31 @@ def _compile(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
     return n
 
 
-_currently_compiling: contextvars.ContextVar[bool] = contextvars.ContextVar(
-    "_current_compiling", default=False
+_compile_disabled: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    "_compile_disabled", default=False
 )
 
 
 def _is_compiling() -> bool:
-    return _currently_compiling.get()
+    return _compile_disabled.get()
 
 
 @contextlib.contextmanager
 def _compiling():
-    token = _currently_compiling.set(True)
+    token = _compile_disabled.set(True)
     try:
         yield
     finally:
-        _currently_compiling.reset(token)
+        _compile_disabled.reset(token)
+
+
+@contextlib.contextmanager
+def enable_compile():
+    token = _compile_disabled.set(False)
+    try:
+        yield
+    finally:
+        _compile_disabled.reset(token)
 
 
 def compile(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:

@@ -205,7 +205,12 @@ def execute_setter(node, value, action=None):
     output_type=lambda input_type: input_type["node"].output_type,
 )
 def execute(node):
-    return weave_internal.use(node)
+    # Reenable compile, in case we're already compiling. This happens when a Node
+    # is stored in an object (as in the way that the Panel architecture passes
+    # information down to the server). Compile doesn't walk into objects. So we need
+    # to compile here when we are about to use them.
+    with compile.enable_compile():
+        return weave_internal.use(node)
 
 
 @op(

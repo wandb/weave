@@ -92,9 +92,9 @@ gql_direct_edge_op(
     "run",
     wdt.RunType,
     {
-        "name": types.String(),
+        "runName": types.String(),
     },
-    lambda inputs: f'name: {inputs["name"]}',
+    lambda inputs: f'name: {inputs["runName"]}',
 )
 
 gql_direct_edge_op(

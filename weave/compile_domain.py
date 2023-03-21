@@ -5,6 +5,7 @@ from . import weave_types as types
 from . import stitch
 from . import registry_mem
 from . import errors
+from . import op_args
 from dataclasses import dataclass, field
 import graphql
 
@@ -397,3 +398,21 @@ def _custom_root_resolver(node: graph.Node) -> typing.Optional["op_def.OpDef"]:
     if wb_domain_gql is not None:
         return wb_domain_gql.root_resolver
     return None
+
+
+def required_const_input_names(node: graph.Node) -> typing.Optional[list[str]]:
+    if not isinstance(node, graph.OutputNode):
+        return None
+
+    op_def = registry_mem.memory_registry.get_op(node.from_op.name)
+    wb_domain_gql = _get_gql_plugin(op_def)
+    if wb_domain_gql is None:
+        return None
+    if not isinstance(op_def.input_type, op_args.OpNamedArgs):
+        raise errors.WeaveInternalError(
+            'Only named args are supported for "gql" domain'
+        )
+    input_names = list(op_def.input_type.arg_types.keys())
+    if wb_domain_gql.is_root:
+        return input_names
+    return input_names[1:]

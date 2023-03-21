@@ -15,7 +15,12 @@ from . import errors
 def _convert_specific_opname_to_generic_opname(
     name: str, inputs: dict[str, typing.Any]
 ) -> tuple[str, dict[str, typing.Any]]:
-    if name == "typedDict-pick" or name == "dict-pick" or name == "list-pick":
+    if (
+        name == "typedDict-pick"
+        or name == "dict-pick"
+        or name == "list-pick"
+        or name == "ArrowWeaveListTypedDict-pick"
+    ):
         return "pick", {"obj": inputs["self"], "key": inputs["key"]}
     elif name == "groupresult-map":
         return "map", {"arr": inputs["self"], "mapFn": inputs["map_fn"]}
@@ -37,6 +42,7 @@ def _convert_specific_opname_to_generic_opname(
         name == "groupresult-__getitem__"
         or name == "artifacts-__getitem__"
         or name == "projectArtifactVersions-__getitem__"
+        or name == "ArrowWeaveList-__getitem__"
     ):
         return "index", {"arr": inputs["self"], "index": inputs["index"]}
     return name, inputs
@@ -47,10 +53,7 @@ def convert_specific_opname_to_generic_opname(
 ) -> tuple[str, dict[str, typing.Any]]:
     if name.startswith("mapped_"):
         unmapped_name = name[7:]
-        res = _convert_specific_opname_to_generic_opname(unmapped_name, inputs)
-        if res[0] == unmapped_name:
-            raise errors.WeaveInternalError("Unable to fix up op: " + name)
-        return res
+        return _convert_specific_opname_to_generic_opname(unmapped_name, inputs)
     return _convert_specific_opname_to_generic_opname(name, inputs)
 
 

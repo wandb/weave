@@ -1585,3 +1585,25 @@ def test_filesystem_artifact_dir_dict(fake_wandb):
             },
         },
     }
+
+
+def test_non_const_input_node(fake_wandb):
+    fake_wandb.fake_api.add_mock(table_mock1)
+    data_obj = weave.save({"project_name": "mendeleev"})
+    cell_node = (
+        # projectName arg is an OutputNode. Compile should execute
+        # the branch to convert it to a ConstNode, so the gql compile
+        # pass can see the value.
+        ops.project("stacey", data_obj["project_name"])
+        .runs()
+        .limit(1)
+        .summary()["table"]
+        .table()
+        .rows()
+        .dropna()
+        .concat()
+        .createIndexCheckpointTag()[5]["score_Amphibia"]
+    )
+    assert weave.use(cell_node.indexCheckpoint()) == 5
+    assert weave.use(cell_node.run().name()) == "amber-glade-100"
+    assert weave.use(cell_node.project().name()) == "mendeleev"
