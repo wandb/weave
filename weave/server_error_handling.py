@@ -53,7 +53,11 @@ def client_safe_http_exceptions_as_werkzeug() -> typing.Generator[None, None, No
         code = maybe_extract_code_from_exception(e)
         if code is None:
             raise
-        if code in _client_safe_code_allowlist:
+        # If the exception is a errors.WeaveBadRequest, then send up the 400
+        # code. This is the one case we want to pass along 400s
+        if code in _client_safe_code_allowlist or (
+            isinstance(e, errors.WeaveBadRequest) and code == 400
+        ):
             werkzeug_exceptions.abort(code)
         else:
             # Here, we mask the original exception with a generic 500 error.
