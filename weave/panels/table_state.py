@@ -20,6 +20,11 @@ class PanelDef:
     panelConfig: typing.Any
 
 
+class SortDef(typing.TypedDict):
+    dir: str
+    columnId: str
+
+
 @decorator_type.type()
 class TableState:
     input_node: graph.Node
@@ -34,7 +39,7 @@ class TableState:
     )
     order: list[str] = dataclasses.field(default_factory=list)
     groupBy: list[str] = dataclasses.field(default_factory=list)
-    sort: list[str] = dataclasses.field(default_factory=list)  # TODO: WRONG
+    sort: list[SortDef] = dataclasses.field(default_factory=list)
     pageSize: int = dataclasses.field(default=10)
     page: int = dataclasses.field(default=0)
 
@@ -59,6 +64,27 @@ class TableState:
             random.choice(string.ascii_uppercase + string.digits) for _ in range(14)
         )
 
+    def _expr_to_fn_node(self, fn, post_group_dimensionality=False):
+        if isinstance(fn, graph.Node):
+            return fn
+        object_type = self.input_node.type.object_type
+
+        # TODO: we are not deriving this type correctly
+        if post_group_dimensionality:
+            object_type = tagged_value_type.TaggedValueType(
+                weave_types.TypedDict({}), weave_types.List(object_type)
+            )
+
+        sig = inspect.signature(fn)
+        kwargs = {}
+        if "domain" in sig.parameters:
+            kwargs = {
+                "domain": weave_internal.make_var_node(
+                    weave_types.List(object_type), "domain"
+                )
+            }
+        return fn(weave_internal.make_var_node(object_type, "row"), **kwargs)
+
     def add_column(self, select_expr, name=""):
         col_id = self._new_col_id()
         self.columns[col_id] = PanelDef("", None)
@@ -78,24 +104,19 @@ class TableState:
         if col_id in self.groupBy:
             self.groupBy.remove(col_id)
 
-    def update_col(self, col_id, select_expr):
-        object_type = self.input_node.type.object_type
-        # TODO: we are not deriving this type correctly
-        if self.groupBy and col_id not in self.groupBy:
-            object_type = tagged_value_type.TaggedValueType(
-                weave_types.TypedDict({}), weave_types.List(object_type)
-            )
+    def set_filter_fn(self, filter_exp):
+        self.preFilterFunction = self._expr_to_fn_node(filter_exp)
 
-        sig = inspect.signature(select_expr)
-        kwargs = {}
-        if "domain" in sig.parameters:
-            kwargs = {
-                "domain": weave_internal.make_var_node(
-                    weave_types.List(object_type), "domain"
-                )
-            }
-        selected = select_expr(
-            weave_internal.make_var_node(object_type, "row"), **kwargs
+    def enable_sort(self, col_id, dir="asc"):
+        for sort_def in self.sort:
+            if sort_def["columnId"] == col_id:
+                sort_def["dir"] = dir
+                return
+        self.sort.append(SortDef(dir=dir, columnId=col_id))
+
+    def update_col(self, col_id, select_expr):
+        selected = self._expr_to_fn_node(
+            select_expr, self.groupBy and col_id not in self.groupBy
         )
 
         if isinstance(selected, panel.Panel):
