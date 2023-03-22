@@ -33,6 +33,7 @@ setup(
     url="https://github.com/wandb/end-to-end",
     package_dir={"weave": "weave"},
     include_package_data=True,
+    package_data={"weave": ["frontend/**"]},
     install_requires=requirements,
     license="MIT license",
     zip_safe=False,
