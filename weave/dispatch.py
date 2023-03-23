@@ -247,6 +247,13 @@ def get_op_for_inputs(name: str, kwargs: dict[str, types.Type]) -> op_def.OpDef:
             util.raise_exception_with_sentry_if_available(err, [name])
         return ops[0]
 
+    if name.startswith("panel_table"):
+        # The types don't work for TableState for some reason. This is hacked elsewhere..
+        # Hack it some more :(
+        # TODO: remove.
+        ops = _get_ops_by_name(name)
+        return ops[0]
+
     input_keys = list(kwargs.keys())
     input_types = list(kwargs.values())
 
