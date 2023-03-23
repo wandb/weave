@@ -308,7 +308,19 @@ def compile_await(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
 
 
 def compile_execute(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
-    return graph.map_nodes_full(nodes, _execute_nodes_map_fn)
+    with_execute_ops = graph.map_nodes_full(nodes, _execute_nodes_map_fn)
+
+    def _replace_execute(node: graph.Node) -> typing.Optional[graph.Node]:
+        if isinstance(node, graph.OutputNode) and node.from_op.name == "execute":
+            res = weave_internal.use(node.from_op.inputs["node"])
+            if not isinstance(res, graph.Node):
+                raise ValueError(
+                    f"Expected node to be a Node, got {res} of type {type(res)}"
+                )
+            return compile_fix_calls([res])[0]
+        return None
+
+    return graph.map_nodes_full(with_execute_ops, _replace_execute)
 
 
 def compile_refine(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:

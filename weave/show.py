@@ -2,6 +2,7 @@ import json
 import random
 import string
 import urllib
+import typing
 
 from IPython.display import display
 from IPython.display import IFrame
@@ -18,8 +19,45 @@ from . import usage_analytics
 from . import ref_base
 
 
+def make_container(obj: typing.Union[panel.Panel, graph.Node]) -> panel.Panel:
+    from weave.panels import Group2
+
+    return Group2(preferHorizontal=True, items={"main": obj})
+
+
+def make_show_obj(obj: typing.Any):
+    node: graph.Node
+    if obj is None:
+        return make_container(graph.VoidNode())
+    elif isinstance(obj, panel.Panel) or isinstance(obj, graph.Node):
+        return make_container(obj)
+
+    if types.TypeRegistry.has_type(obj):
+        print("HAVE TYPE")
+        from weave import ops
+
+        names = util.find_names(obj)
+
+        ref = storage.save(obj, name=names[-1])
+        node = ops.get(ref.uri)
+        return make_container(node)
+
+    raise errors.WeaveTypeError(
+        "%s not yet supported. Create a weave.Type to add support." % type(obj)
+    )
+
+
 # Broken out into to separate function for testing
 def _show_params(obj):
+    obj_in_container = make_show_obj(obj)
+    ref = storage.save(obj_in_container)
+    show_node = graph.OutputNode(
+        types.UnknownType(),
+        "get",
+        {"uri": graph.ConstNode(types.String(), str(ref))},
+    )
+    return {"weave_node": weavejs_fixes.fixup_node(show_node)}
+
     if obj is None:
         return {"weave_node": graph.VoidNode()}
     if isinstance(obj, graph.Node):
