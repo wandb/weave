@@ -623,6 +623,26 @@ class LegacyDate(Type):
             return weave_timestamp.ms_to_python_datetime(v)
 
 
+class TimeDelta(Type):
+    name = "timedelta"
+    instance_classes = datetime.timedelta
+
+    def save_instance(self, obj: datetime.timedelta, artifact, name):
+        if artifact is None:
+            raise errors.WeaveSerializeError(
+                "save_instance invalid when artifact is None for type: %s" % self
+            )
+        with artifact.new_file(f"{name}.object.json") as f:
+            # Uses internal python representation of timedelta for serialization
+            v = [obj.days, obj.seconds, obj.microseconds]
+            json.dump(v, f)
+
+    def load_instance(self, artifact, name, extra=None):
+        with artifact.open(f"{name}.object.json") as f:
+            [days, seconds, microseconds] = json.load(f)
+            return datetime.timedelta(days, seconds, microseconds)
+
+
 class Timestamp(Type):
     name = "timestamp"
     instance_classes = datetime.datetime
@@ -1474,6 +1494,7 @@ def type_is_variable(t: Type) -> bool:
 
 
 NumberBinType = TypedDict({"start": Float(), "stop": Float()})
+TimeBinType = TypedDict({"start": Timestamp(), "stop": Timestamp()})
 
 
 def map_leaf_types(t: Type, fn: typing.Callable[[Type], typing.Optional[Type]]) -> Type:

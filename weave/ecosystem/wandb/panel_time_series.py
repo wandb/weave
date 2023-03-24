@@ -1,0 +1,376 @@
+import dataclasses
+import typing
+
+import weave
+from weave import weave_internal
+
+from . import weave_plotly
+from ...ops_primitives import date
+from ...ops_primitives import dict as dict_ops
+
+TIME_SERIES_BIN_SIZES_SEC = [
+    1e-9,  # ns
+    1e-6,  # microsec
+    1e-3,  # ms
+    1,
+    30,
+    60,  # 1min
+    300,  # 5min
+    600,  # 10min
+    1200,  # 20min
+    1800,  # 30 min
+    *(3600 * i for i in range(1, 25)),  # 1 - 24 hr, increments of 1hr
+    *(86400 * i for i in range(2, 31)),  # 2 - 30 days, increments of 1 day
+    *(
+        86400 * 30 * i for i in range(2, 13)
+    ),  # 2 - 12 months (assuming 1 month = 30days) increments of 1 month
+    *(
+        365 * 86400 * i for i in range(1, 11)
+    ),  # 1 - 10 years (assuming 1 year = 365 days) increments of 1 year
+]
+
+TIME_SERIES_BIN_SIZES_SEC_NODE = weave_internal.make_const_node(
+    weave.types.List(weave.types.Number()), TIME_SERIES_BIN_SIZES_SEC
+)
+
+N_BINS = 50  # number of bins to show in plot
+
+mark_py_type = typing.Union[
+    typing.Literal["line"], typing.Literal["bar"], typing.Literal["point"]
+]
+
+mark_weave_type = weave.types.UnionType(
+    weave.types.Const(weave.types.String(), "line"),
+    weave.types.Const(weave.types.String(), "bar"),
+    weave.types.Const(weave.types.String(), "point"),
+)
+
+
+@weave.type()
+class TimeSeriesConfig:
+    x: weave.Node[typing.Any] = dataclasses.field(
+        default_factory=lambda: weave.graph.VoidNode()
+    )
+    agg: weave.Node[typing.Any] = dataclasses.field(
+        default_factory=lambda: weave.graph.VoidNode()
+    )
+    min_x: weave.Node[typing.Any] = dataclasses.field(
+        default_factory=lambda: weave.graph.VoidNode()
+    )
+    max_x: weave.Node[typing.Any] = dataclasses.field(
+        default_factory=lambda: weave.graph.VoidNode()
+    )
+    label: weave.Node[typing.Union[str, weave.types.InvalidPy]] = dataclasses.field(
+        default_factory=lambda: weave.graph.VoidNode()
+    )
+    mark: weave.Node[str] = dataclasses.field(
+        default_factory=lambda: weave.graph.ConstNode(weave.types.String(), "bar")
+    )
+    axis_labels: weave.Node[dict[str, str]] = dataclasses.field(
+        default_factory=lambda: weave.graph.ConstNode(
+            weave.types.Dict(weave.types.String(), weave.types.String()),
+            {},
+        )
+    )
+
+
+# This is boilerplate that I'd like to get rid of.
+def _multi_distribution_set_default_config(config, input_node, new_config):
+    return new_config
+
+
+def _multi_distribution_default_config_output_type(input_type):
+    # We have to do shenaningans to pass the input type through
+    # because it might be a subtype since the input type has unions
+    # TOOD: Fix
+    config_type = input_type["config"]
+    if config_type == None:
+        return TimeSeriesConfig.WeaveType()
+    if isinstance(config_type, weave.types.Const):
+        return config_type.val_type
+    return config_type
+
+
+def extract_column_with_type(
+    data_or_node: typing.Union[weave.graph.Node, list[typing.Any]],
+    desired_type: weave.types.Type,
+) -> typing.Tuple[typing.Optional[str], weave.graph.ConstNode]:
+    if isinstance(data_or_node, weave.graph.Node):
+        node_type = data_or_node.type
+    else:
+        node_type = weave.type_of(data_or_node)
+    if weave.types.List().assign_type(node_type):
+        node_type = typing.cast(weave.types.List, node_type)
+        object_type = node_type.object_type
+        if desired_type.assign_type(object_type):
+            return None, weave.define_fn({"item": object_type}, lambda item: item)
+        elif weave.types.TypedDict().assign_type(object_type):
+            object_type = typing.cast(weave.types.TypedDict, object_type)
+            for key in object_type.property_types:
+                value_type = object_type.property_types[key]
+                if desired_type.assign_type(value_type):
+                    return key, weave.define_fn(
+                        {"item": object_type}, lambda item: item[key]
+                    )
+        return None, weave.define_fn(
+            {"item": object_type}, lambda _: weave.graph.VoidNode()
+        )
+    raise ValueError(
+        f"Can't extract column with type {desired_type} from node of type {node_type}"
+    )
+
+
+# TODO: really annoying that I need the setter here.
+# TODO make this actually work
+@weave.op(
+    setter=_multi_distribution_set_default_config,
+    output_type=_multi_distribution_default_config_output_type,
+)
+def time_series_default_config(
+    config: typing.Optional[TimeSeriesConfig],
+    unnested_table: list[typing.Any],
+):
+    if config is None:
+        key, x_fn = extract_column_with_type(
+            unnested_table, weave.types.optional(weave.types.Timestamp())
+        )
+
+        if key is not None:
+            column = [item[key] for item in unnested_table]
+        elif not isinstance(x_fn.val, weave.graph.VoidNode):
+            column = unnested_table
+        else:
+            column = None
+
+        config = TimeSeriesConfig(
+            x=x_fn,
+            label=extract_column_with_type(
+                unnested_table,
+                weave.types.optional(
+                    weave.types.union(
+                        weave.types.String(),
+                        weave.types.Boolean(),
+                    )
+                ),
+            )[1],
+            agg=weave_internal.define_fn(
+                {"group": unnested_table.type},  # type: ignore
+                lambda group: group.count(),
+            ),
+        )
+
+        if column is not None:
+            config.min_x = (
+                weave.ops.numbers_min(column)
+                if column is not None
+                else weave.graph.VoidNode()
+            )
+            config.max_x = (
+                weave.ops.numbers_max(column)
+                if column is not None
+                else weave.graph.VoidNode()
+            )
+
+    return config
+
+
+@weave.op(
+    input_type={
+        "fn": weave.types.Function(
+            {
+                "item": weave.types.Any(),
+            },
+            weave.types.Any(),
+        )
+    }
+)
+def function_to_string(fn) -> str:
+    ret = str(fn)
+    if fn.val.from_op.name.endswith("pick"):
+        ret = str(fn.val.from_op.inputs["key"])
+    elif fn.val.from_op.name.endswith("__getattr__"):
+        ret = str(fn.val.from_op.inputs["attr"])
+    ret = ret.strip('"')
+    return ret
+
+
+# The render op. This renders the panel.
+@weave.op()
+def time_series(
+    input_node: weave.Node[list[typing.Any]], config: TimeSeriesConfig
+) -> weave_plotly.PanelPlotly:
+    # NOTE: everything inside this function is operating on nodes. There are no concrete values in here.
+    # We are just constructing a graph here. It will be executed later on.
+    # I can't edit the frontend right now and I want to get this test passing.
+    # So doing a little bit of type: ignore here.
+    # TODO: Fix
+
+    unnested = weave.ops.unnest(input_node)
+    # config = time_series_default_config(config, unnested)
+
+    min_x = weave.ops.execute(config.min_x)
+    max_x = weave.ops.execute(config.max_x)
+
+    if min_x is None or max_x is None:
+        return weave.panels.PanelHtml(weave.ops.Html("No data"))  # type: ignore
+
+    exact_bin_size = ((max_x - min_x) / N_BINS).totalSeconds()  # type: ignore
+    bin_size_index = TIME_SERIES_BIN_SIZES_SEC_NODE.map(  # type: ignore
+        lambda x: (x / exact_bin_size - 1).abs()
+    ).argmin()
+
+    bin_size = TIME_SERIES_BIN_SIZES_SEC_NODE[bin_size_index]  # type: ignore
+
+    def bin_fn(item):
+        label_fn_output_type = config.label.type.output_type
+        group_items = {}
+
+        # convert timestamp to seconds
+        timestamp = config.x(item)
+        seconds = timestamp.toNumber()  # type: ignore
+        delta_seconds = seconds - min_x.toNumber()  # type: ignore
+
+        bin_start_sec = min_x.toNumber() + round(delta_seconds / bin_size) * bin_size
+        bin_end_sec = bin_start_sec + bin_size
+
+        bin_center_sec = (bin_start_sec + bin_end_sec) * 0.5
+        bin_center = date.from_number(bin_center_sec)
+        bin_start = date.from_number(bin_start_sec)
+        bin_end = date.from_number(bin_end_sec)
+
+        group_items["bin"] = weave.ops.dict_(
+            start=bin_start, center=bin_center, stop=bin_end
+        )
+
+        if label_fn_output_type == weave.types.Invalid():
+            group_items["label"] = "no_label"
+        else:
+            group_items["label"] = config.label(item)
+
+        return weave.ops.dict_(**group_items)
+
+    binned = (
+        unnested.filter(
+            lambda item: weave.ops.Boolean.bool_and(
+                config.x(item) <= max_x, config.x(item) >= min_x  # type: ignore
+            )
+        )
+        .groupby(lambda item: bin_fn(item))
+        .map(
+            lambda group: weave.ops.dict_(
+                x=group.groupkey()["bin"],
+                label=group.groupkey()["label"],
+                y=config.agg(group),  # type: ignore
+            )
+        )
+        # this is needed because otherwise the lines look like a scrambled mess
+        .sort(lambda item: weave.ops.make_list(a=item["x"]["center"]), ["asc"])
+    )
+
+    default_labels = weave.ops.dict_(
+        x=function_to_string(config.x),
+        y=function_to_string(config.agg),
+        label=function_to_string(config.label),
+    )
+
+    fig = weave_plotly.plotly_time_series(
+        binned, config.mark, default_labels, config.axis_labels
+    )
+    return weave_plotly.PanelPlotly(fig)
+
+
+# The config render op. This renders the config editor.
+@weave.op()
+def time_series_config(
+    input_node: weave.Node[list[typing.Any]], config: TimeSeriesConfig
+) -> weave.panels.Group2:
+    unnested = weave.ops.unnest(input_node)
+    config = time_series_default_config(config, unnested)
+    return weave.panels.Group2(
+        items={
+            "x": weave.panels.LabeledItem(
+                label="x",
+                item=weave.panels.ExpressionEditor(
+                    config=weave.panels.ExpressionEditorConfig(config.x)
+                ),
+            ),
+            "label": weave.panels.LabeledItem(
+                label="label",
+                item=weave.panels.ExpressionEditor(
+                    config=weave.panels.ExpressionEditorConfig(config.label)
+                ),
+            ),
+            "min_x": weave.panels.LabeledItem(
+                label="min_x",
+                item=weave.panels.ExpressionEditor(
+                    config=weave.panels.ExpressionEditorConfig(config.min_x)
+                ),
+            ),
+            "max_x": weave.panels.LabeledItem(
+                label="max_x",
+                item=weave.panels.ExpressionEditor(
+                    config=weave.panels.ExpressionEditorConfig(config.max_x)
+                ),
+            ),
+            "agg": weave.panels.LabeledItem(
+                label="agg",
+                item=weave.panels.ExpressionEditor(
+                    config=weave.panels.ExpressionEditorConfig(config.agg)
+                ),
+            ),
+            "mark": weave.panels.LabeledItem(
+                label="mark",
+                item=weave.panels.ObjectPicker(
+                    weave_internal.make_const_node(
+                        weave.types.List(weave.types.String()),
+                        [
+                            "bar",
+                            "line",
+                            "point",
+                        ],
+                    ),
+                    config=weave.panels.ObjectPickerConfig(
+                        choice=weave.ops.execute(config.mark)
+                    ),
+                ),
+            ),
+        }
+    )
+
+
+# The interface for constructing this Panel from Python
+@weave.type()
+class TimeSeries(weave.Panel):
+    id = "op-time_series"
+    config: typing.Optional[TimeSeriesConfig] = None
+
+    def __init__(self, input_node, vars=None, config=None, **options):
+        super().__init__(input_node=input_node, vars=vars)
+        self.config = config
+
+        unnested = weave.ops.unnest(input_node)
+
+        # TODO: add the ability to configure options here
+        if self.config is None:
+            self.config = TimeSeriesConfig()
+            for attr in ["x", "min_x", "max_x", "label", "mark", "agg", "axis_labels"]:
+                if attr in options:
+                    value = options[attr]
+                    if not isinstance(value, weave.graph.Node):
+                        if attr in ["min_x", "max_x", "mark", "axis_labels"]:
+                            value = weave.make_node(value)
+                        elif attr in ["x", "label"]:
+                            value = weave.define_fn(
+                                {"item": unnested.type.object_type}, value
+                            )
+                        elif attr in ["agg"]:
+                            value = weave.define_fn(
+                                {"group": weave.types.List(unnested.type.object_type)},
+                                value,
+                            )
+                else:
+                    value = weave.define_fn(
+                        {"item": unnested.type.object_type},
+                        lambda item: weave.graph.VoidNode(),
+                    )
+                setattr(self.config, attr, value)
