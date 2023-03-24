@@ -1,3 +1,5 @@
+import datetime
+
 import dataclasses
 import io
 import plotly
@@ -84,6 +86,84 @@ def plotly_barplot(bar_data: list[BarData]) -> plotly.graph_objs.Figure:
 class ScatterData:
     x: float
     y: float
+
+
+class TimeBin(typing.TypedDict):
+    start: datetime.datetime
+    center: datetime.datetime
+    stop: datetime.datetime
+
+
+class TimeSeriesData(typing.TypedDict):
+    x: TimeBin
+    y: float
+    label: str
+
+
+@weave.op(
+    input_type={
+        "data": weave.types.List(
+            weave.types.TypedDict(
+                {
+                    "x": weave.types.TypedDict(
+                        {
+                            key: weave.types.Timestamp()
+                            for key in ["start", "center", "stop"]
+                        }
+                    ),
+                    "y": weave.types.Float(),
+                    "label": weave.types.String(),
+                }
+            )
+        ),
+        "mark": weave.types.String(),
+        "labels": weave.types.TypedDict(
+            {
+                "x": weave.types.String(),
+                "y": weave.types.String(),
+                "label": weave.types.String(),
+            }
+        ),
+        "label_overrides": weave.types.Dict(weave.types.String(), weave.types.String()),
+    }
+)
+def plotly_time_series(data, mark, labels, label_overrides) -> plotly.graph_objs.Figure:
+    labels = {**labels, **label_overrides}
+    if mark == "point":
+        data = [{**d, "x": d["x"]["center"]} for d in data]  # type: ignore
+        fig = px.scatter(data, x="x", y="y", template="plotly_white", labels=labels)
+        fig.update_layout(margin=dict(l=0, r=0, t=0, b=0))
+        fig.update_layout(dragmode="select")
+        return fig
+    elif mark == "bar":
+        pruned = [{**d, "x": d["x"]["start"]} for d in data]  # type: ignore
+
+        # plotly expects timedeltas in ms.
+        # source https://community.plotly.com/t/bar-width-using-plotly-express/47580/5
+        bin_size = (data[0]["x"]["stop"] - data[0]["x"]["start"]).total_seconds() * 1000
+        fig = px.bar(
+            pruned,
+            x="x",
+            y="y",
+            color="label",
+            barmode="stack",
+            template="plotly_white",
+            labels=labels,
+        )
+        fig.update_traces(width=bin_size)
+        fig.update_layout(margin=dict(l=0, r=0, t=0, b=0))
+        fig.update_layout(dragmode="select")
+        return fig
+    elif mark == "line":
+        data = [{**d, "x": d["x"]["center"]} for d in data]  # type: ignore
+        fig = px.line(
+            data, x="x", y="y", color="label", template="plotly_white", labels=labels
+        )
+        fig.update_layout(margin=dict(l=0, r=0, t=0, b=0))
+        fig.update_layout(dragmode="select")
+        return fig
+    else:
+        raise ValueError(f"Unknown mark {mark}")
 
 
 @weave.op()

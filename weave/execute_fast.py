@@ -11,6 +11,8 @@ from . import engine_trace
 from . import language_nullability
 from .language_features.tagging import tag_store
 
+from . import ref_base
+
 
 def _fast_apply_map_fn(item, index, map_fn):
     if isinstance(map_fn, graph.OutputNode):
@@ -21,6 +23,9 @@ def _fast_apply_map_fn(item, index, map_fn):
         op_def = registry_mem.memory_registry.get_op(map_fn.from_op.name)
         if language_nullability.should_force_none_result(inputs, op_def):
             return None
+        for key in inputs:
+            if isinstance(inputs[key], ref_base.Ref):
+                inputs[key] = inputs[key].get()
         return op_def.resolve_fn(**inputs)
     elif isinstance(map_fn, graph.ConstNode):
         return map_fn.val
@@ -93,11 +98,23 @@ def _resolve_static_branches(map_fn):
         raise errors.WeaveInternalError("Invalid Node: %s" % map_fn)
 
 
+def op_can_be_async(op_name: str) -> bool:
+    try:
+        op = registry_mem.memory_registry.get_op(op_name)
+    except errors.WeaveInternalError:
+        return any(
+            [
+                o.is_async
+                for o in registry_mem.memory_registry.find_ops_by_common_name(op_name)
+            ]
+        )
+    return op.is_async
+
+
 def _can_fast_map(map_fn):
     async_op_nodes = graph.filter_nodes_full(
         [map_fn],
-        lambda n: isinstance(n, graph.OutputNode)
-        and registry_mem.memory_registry.get_op(n.from_op.name).is_async,
+        lambda n: isinstance(n, graph.OutputNode) and op_can_be_async(n.from_op.name),
     )
     return len(async_op_nodes) == 0
 
