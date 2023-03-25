@@ -131,7 +131,9 @@ def plotly_time_series(data, mark, labels, label_overrides) -> plotly.graph_objs
     labels = {**labels, **label_overrides}
     if mark == "point":
         data = [{**d, "x": d["x"]["center"]} for d in data]  # type: ignore
-        fig = px.scatter(data, x="x", y="y", template="plotly_white", labels=labels)
+        fig = px.scatter(
+            data, x="x", y="y", color="label", template="plotly_white", labels=labels
+        )
         fig.update_layout(margin=dict(l=0, r=0, t=0, b=0))
         fig.update_layout(dragmode="select")
         return fig
