@@ -82,10 +82,12 @@ def _dispatch_map_fn_refining(node: graph.Node) -> typing.Optional[graph.OutputN
                     k: n
                     for k, n in zip(op.input_type.arg_types, from_op.inputs.values())
                 }
-            return op(**params)
+            res = op(**params)
+            logging.info("Dispatched (refine): %s -> %s", node, res.type)
+            return res
         except errors.WeaveDispatchError:
             logging.error(
-                "Error while dispatching\n!=!=!=!=!\nName: %s\nInput Types: %s\nExpression: %s",
+                "Error while dispatching (refine phase)\n!=!=!=!=!\nName: %s\nInput Types: %s\nExpression: %s",
                 from_op.name,
                 from_op.input_types,
                 re.sub(r'[\\]+"', '"', graph_debug.node_expr_str_full(node)),
@@ -125,7 +127,7 @@ def _dispatch_map_fn_no_refine(node: graph.Node) -> typing.Optional[graph.Output
         except errors.WeaveDispatchError as e:
             if _dispatch_error_is_client_error(from_op.name, from_op.input_types):
                 raise errors.WeaveBadRequest(
-                    "Error while dispatching: %s. This is most likely a client error"
+                    "Error while dispatching (no refine phase): %s. This is most likely a client error"
                     % from_op.name
                 )
             else:
@@ -146,7 +148,9 @@ def _dispatch_map_fn_no_refine(node: graph.Node) -> typing.Optional[graph.Output
         ):
             output_type = op.unrefined_output_type_for_params(params)
 
-        return graph.OutputNode(_remove_optional(output_type), op.uri, params)
+        res = graph.OutputNode(_remove_optional(output_type), op.uri, params)
+        logging.info("Dispatched (no refine): %s -> %s", node, res.type)
+        return res
     return None
 
 

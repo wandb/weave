@@ -11,10 +11,10 @@ from . import weave_plotly
 
 @weave.type()
 class ScatterConfig:
-    x_fn: weave.Node[typing.Optional[float]] = dataclasses.field(
+    x_fn: weave.Node[typing.Optional[typing.Any]] = dataclasses.field(
         default_factory=lambda: weave.graph.VoidNode()
     )
-    y_fn: weave.Node[typing.Optional[float]] = dataclasses.field(
+    y_fn: weave.Node[typing.Optional[typing.Any]] = dataclasses.field(
         default_factory=lambda: weave.graph.VoidNode()
     )
 

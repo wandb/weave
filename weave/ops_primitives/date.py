@@ -7,11 +7,13 @@ import datetime
     name="datetime-sub",
     input_type={
         "lhs": types.Timestamp(),
-        "rhs": types.Timestamp(),
+        "rhs": types.optional(types.Timestamp()),
     },
-    output_type=types.TimeDelta(),
+    output_type=types.optional(types.TimeDelta()),
 )
 def datetime_sub(lhs, rhs):
+    if rhs == None:
+        return None
     return lhs - rhs
 
 
@@ -19,13 +21,17 @@ def datetime_sub(lhs, rhs):
     name="datetime-add",
     input_type={
         "lhs": types.UnionType(types.Timestamp(), types.TimeDelta()),
-        "rhs": lambda input_types: types.Timestamp()
-        if types.TimeDelta().assign_type(input_types["lhs"])
-        else types.TimeDelta(),
+        "rhs": lambda input_types: types.optional(
+            types.Timestamp()
+            if types.TimeDelta().assign_type(input_types["lhs"])
+            else types.TimeDelta()
+        ),
     },
-    output_type=types.Timestamp(),
+    output_type=types.optional(types.Timestamp()),
 )
 def datetime_add(lhs, rhs):
+    if rhs == None:
+        return None
     return lhs + rhs
 
 
@@ -33,25 +39,28 @@ def datetime_add(lhs, rhs):
     name="timedelta-mult",
     input_type={
         "lhs": types.UnionType(types.Number(), types.TimeDelta()),
-        "rhs": lambda input_types: types.TimeDelta()
-        if types.Number().assign_type(input_types["lhs"])
-        else types.Number(),
+        "rhs": lambda input_types: types.optional(
+            types.TimeDelta()
+            if types.Number().assign_type(input_types["lhs"])
+            else types.Number()
+        ),
     },
-    output_type=types.TimeDelta(),
+    output_type=types.optional(types.TimeDelta()),
 )
 def timedelta_mult(lhs, rhs):
+    if rhs == None:
+        return None
     return lhs * rhs
 
 
 @op(
     name="timedelta-div",
-    input_type={
-        "lhs": types.TimeDelta(),
-        "rhs": types.Number(),
-    },
-    output_type=types.TimeDelta(),
+    input_type={"lhs": types.TimeDelta(), "rhs": types.optional(types.Number())},
+    output_type=types.optional(types.TimeDelta()),
 )
 def timedelta_div(lhs, rhs):
+    if rhs == None:
+        return None
     return lhs / rhs
 
 
@@ -166,3 +175,23 @@ def round_week(date):
 )
 def dates_equal(lhs, rhs):
     return lhs == rhs
+
+
+@op(
+    name="timestamp-min",
+    input_type={"values": types.List(types.optional(types.Timestamp()))},
+    output_type=types.optional(types.Timestamp()),
+)
+def timestamp_min(values):
+    values = [v for v in values if v != None]
+    return min(values) if len(values) > 0 else None
+
+
+@op(
+    name="timestamp-max",
+    input_type={"values": types.List(types.optional(types.Timestamp()))},
+    output_type=types.optional(types.Timestamp()),
+)
+def timestamp_max(values):
+    values = [v for v in values if v != None]
+    return max(values) if len(values) > 0 else None

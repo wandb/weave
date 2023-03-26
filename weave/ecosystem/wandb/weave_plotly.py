@@ -107,7 +107,7 @@ class TimeSeriesData(typing.TypedDict):
                 {
                     "x": weave.types.TypedDict(
                         {
-                            key: weave.types.Timestamp()
+                            key: weave.types.optional(weave.types.Timestamp())
                             for key in ["start", "center", "stop"]
                         }
                     ),

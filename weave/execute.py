@@ -134,11 +134,12 @@ def execute_nodes(nodes, no_cache=False):
             "Executing %s leaf nodes.\n%s"
             % (
                 len(nodes),
-                graph_debug.assignments_string(
-                    graph_debug.to_assignment_form(
-                        graph_debug.combine_common_nodes(nodes)
-                    )
-                ),
+                "\n".join([graph_debug.node_expr_str_full(n) for n in nodes])
+                # graph_debug.assignments_string(
+                #     graph_debug.to_assignment_form(
+                #         graph_debug.combine_common_nodes(nodes)
+                #     )
+                # ),
             )
         )
     with wandb_api.from_environment():
@@ -337,10 +338,10 @@ def execute_forward_node(
         return {"cache_used": False}
 
     # This is expensive!
-    # logging.info(
-    #     "Executing op: %s expr: %s"
-    #     % (node.from_op.name, graph_debug.node_expr_str_full(node))
-    # )
+    logging.info(
+        "Executing op: %s expr: %s"
+        % (node.from_op.name, graph_debug.node_expr_str_full(node))
+    )
 
     tracer = engine_trace.tracer()
 

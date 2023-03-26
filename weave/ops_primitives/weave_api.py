@@ -223,7 +223,7 @@ def set(self, val: typing.Any) -> typing.Any:
     # Node. You can call it like this:
     # weave.use(ops.set(weave_internal.const(csv[-1]["type"]), "YY"))
 
-    self = compile.compile([self])[0]
+    self = compile.compile_fix_calls([self])[0]
     nodes = graph.linearize(self)
     if nodes is None:
         raise errors.WeaveInternalError("Set error")
@@ -238,7 +238,7 @@ def set(self, val: typing.Any) -> typing.Any:
         inputs[arg0_name] = arg0
         for name, input_node in list(node.from_op.inputs.items())[1:]:
             if not isinstance(input_node, graph.ConstNode):
-                inputs[name] = weave_internal.use(input_node)
+                inputs[name] = storage.deref(weave_internal.use(input_node))
                 # TODO: I was raising here, but the way I'm handling
                 # default config in multi_distribution makes it necessary
                 # to handle this case. This solution is more general,
