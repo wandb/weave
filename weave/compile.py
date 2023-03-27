@@ -83,7 +83,7 @@ def _dispatch_map_fn_refining(node: graph.Node) -> typing.Optional[graph.OutputN
                     for k, n in zip(op.input_type.arg_types, from_op.inputs.values())
                 }
             res = op(**params)
-            logging.info("Dispatched (refine): %s -> %s", node, res.type)
+            # logging.info("Dispatched (refine): %s -> %s", node, res.type)
             return res
         except errors.WeaveDispatchError:
             logging.error(
@@ -149,7 +149,7 @@ def _dispatch_map_fn_no_refine(node: graph.Node) -> typing.Optional[graph.Output
             output_type = op.unrefined_output_type_for_params(params)
 
         res = graph.OutputNode(_remove_optional(output_type), op.uri, params)
-        logging.info("Dispatched (no refine): %s -> %s", node, res.type)
+        # logging.info("Dispatched (no refine): %s -> %s", node, res.type)
         return res
     return None
 

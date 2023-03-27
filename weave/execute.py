@@ -154,6 +154,15 @@ def execute_nodes(nodes, no_cache=False):
                 # assumption is violated.
                 with forward_graph.node_result_store():
                     nodes = compile.compile(nodes)
+                    logging.info(
+                        "Compiled %s leaf nodes.\n%s"
+                        % (
+                            len(nodes),
+                            "\n".join(
+                                [graph_debug.node_expr_str_full(n) for n in nodes]
+                            ),
+                        )
+                    )
                     fg = forward_graph.ForwardGraph()
                     fg.add_nodes(nodes)
 
@@ -338,10 +347,16 @@ def execute_forward_node(
         return {"cache_used": False}
 
     # This is expensive!
+    print()
+    print()
+    print()
     logging.info(
-        "Executing op: %s expr: %s"
-        % (node.from_op.name, graph_debug.node_expr_str_full(node))
+        "Executing op: %s"  # expr: %s"
+        % (node.from_op.name)  # , graph_debug.node_expr_str_full(node))
     )
+    print()
+    print()
+    print()
 
     tracer = engine_trace.tracer()
 

@@ -73,6 +73,8 @@ def timedelta_div(lhs, rhs):
     output_type=types.Boolean(),
 )
 def datetime_le(lhs, rhs):
+    if rhs == None:
+        return None
     return lhs <= rhs
 
 
@@ -85,6 +87,8 @@ def datetime_le(lhs, rhs):
     output_type=types.Boolean(),
 )
 def datetime_lt(lhs, rhs):
+    if rhs == None:
+        return None
     return lhs < rhs
 
 
@@ -97,6 +101,8 @@ def datetime_lt(lhs, rhs):
     output_type=types.Boolean(),
 )
 def datetime_ge(lhs, rhs):
+    if rhs == None:
+        return None
     return lhs >= rhs
 
 
@@ -109,6 +115,8 @@ def datetime_ge(lhs, rhs):
     output_type=types.Boolean(),
 )
 def datetime_gt(lhs, rhs):
+    if rhs == None:
+        return None
     return lhs > rhs
 
 

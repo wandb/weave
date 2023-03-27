@@ -22,6 +22,8 @@ def _convert_specific_opname_to_generic_opname(
         or name == "ArrowWeaveListTypedDict-pick"
     ):
         return "pick", {"obj": inputs["self"], "key": inputs["key"]}
+    elif name == "ArrowWeaveList-concat":
+        return "concat", {"arr": inputs["arr"]}
     elif name == "groupresult-map":
         return "map", {"arr": inputs["self"], "mapFn": inputs["map_fn"]}
     elif name == "groupresult-groupby":

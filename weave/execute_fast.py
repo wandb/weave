@@ -74,7 +74,10 @@ def _resolve_static_branches(map_fn):
             # TODO: if map_fn.type is UnionType we should do something about it here
             # before we blow up in the Const(Type) constructor
             with tracer.trace("resolve_static:op.%s" % op_def.name):
-                res = op_def.resolve_fn(**call_inputs)
+                if language_nullability.should_force_none_result(call_inputs, op_def):
+                    res = None
+                else:
+                    res = op_def.resolve_fn(**call_inputs)
                 use_type = map_fn.type
                 #
                 # Note from Tim: It is completely possible and logically sound
