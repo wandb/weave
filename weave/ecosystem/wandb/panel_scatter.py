@@ -5,6 +5,7 @@ import typing
 import weave
 
 from ... import weave_internal
+from ... import graph
 
 from . import weave_plotly
 
@@ -15,6 +16,9 @@ class ScatterConfig:
         default_factory=lambda: weave.graph.VoidNode()
     )
     y_fn: weave.Node[typing.Optional[typing.Any]] = dataclasses.field(
+        default_factory=lambda: weave.graph.VoidNode()
+    )
+    label_fn: weave.Node[typing.Any] = dataclasses.field(
         default_factory=lambda: weave.graph.VoidNode()
     )
 
@@ -43,13 +47,19 @@ def _scatter_default_config_output_type(input_type):
 )
 def scatter_default_config(
     config: typing.Optional[ScatterConfig],
-    unnested_node: list[typing.Any],
+    input_node_type: weave.types.Type,
 ):
-    input_type_item_type = weave.type_of(unnested_node).object_type  # type: ignore
     if config == None:
         return ScatterConfig(
-            x_fn=weave.define_fn({"item": input_type_item_type}, lambda item: item),
-            y_fn=weave.define_fn({"item": input_type_item_type}, lambda item: item),
+            x_fn=weave.define_fn(
+                {"item": input_node_type.object_type}, lambda item: item  # type: ignore
+            ),
+            y_fn=weave.define_fn(
+                {"item": input_node_type.object_type}, lambda item: item  # type: ignore
+            ),
+            label_fn=weave.define_fn(
+                {"item": input_node_type.object_type}, lambda item: graph.VoidNode()  # type: ignore
+            ),
         )
     return config
 
@@ -60,10 +70,15 @@ def scatter(
     input_node: weave.Node[list[typing.Any]], config: ScatterConfig
 ) -> weave_plotly.PanelPlotly:
     unnested = weave.ops.unnest(input_node)
-    config = scatter_default_config(config, unnested)
-    plot_data = unnested.map(
-        lambda item: weave.ops.dict_(x=config.x_fn(item), y=config.y_fn(item))  # type: ignore
-    )
+    config = scatter_default_config(config, weave_internal.const(unnested.type))
+    if config.label_fn.type == weave.types.Invalid():
+        plot_data = unnested.map(
+            lambda item: weave.ops.dict_(x=config.x_fn(item), y=config.y_fn(item))  # type: ignore
+        )
+    else:
+        plot_data = unnested.map(
+            lambda item: weave.ops.dict_(x=config.x_fn(item), y=config.y_fn(item), label=config.label_fn(item))  # type: ignore
+        )
     fig = weave_plotly.plotly_scatter(plot_data)
     return weave_plotly.PanelPlotly(fig)
 
@@ -74,7 +89,7 @@ def scatter_config(
     input_node: weave.Node[list[typing.Any]], config: ScatterConfig
 ) -> weave.panels.Group2:
     unnested = weave.ops.unnest(input_node)
-    config = scatter_default_config(config, unnested)
+    config = scatter_default_config(config, weave_internal.const(unnested.type))
     return weave.panels.Group2(
         items={
             "x_fn": weave.panels.LabeledItem(
@@ -87,6 +102,12 @@ def scatter_config(
                 label="y",
                 item=weave.panels.ExpressionEditor(
                     config=weave.panels.ExpressionEditorConfig(config.y_fn)
+                ),
+            ),
+            "label_fn": weave.panels.LabeledItem(
+                label="label",
+                item=weave.panels.ExpressionEditor(
+                    config=weave.panels.ExpressionEditorConfig(config.label_fn)
                 ),
             ),
         }
@@ -141,7 +162,9 @@ class Scatter(weave.Panel):
     @weave.op(output_type=lambda input_type: input_type["self"].input_node.output_type)
     def selected(self):
         unnested = weave.ops.unnest(self.input_node)
-        config = scatter_default_config(self.config, unnested)
+        config = scatter_default_config(
+            self.config, weave_internal.const(unnested.type)
+        )
         filtered = unnested.filter(
             lambda item: weave.ops.Boolean.bool_and(
                 weave.ops.Boolean.bool_and(
