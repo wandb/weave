@@ -282,6 +282,12 @@ class Type(metaclass=_TypeSubclassWatcher):
         if next_type.name == "tagged":
             next_type = next_type._assignment_form  # type: ignore
 
+        # Blargh, demo hack because I had to enable Const Union
+        if isinstance(next_type, Const):
+            is_assignable_to = next_type._is_assignable_to(self)
+            if is_assignable_to is not None:
+                return is_assignable_to
+
         # Check class attribute directly instead of isinstance for performance
         if next_type.__class__ == UnionType:
             return all(self.assign_type(t) for t in next_type.members)  # type: ignore
@@ -489,13 +495,15 @@ class Const(Type):
     val_type: Type
     val: typing.Any
 
-    def __post_init__(self):
-        if isinstance(self.val_type, UnionType):
-            # Const Unions are invalid. If something is Const, that means we know what its value
-            # is, which means it is definitely not a Union.
-            raise errors.WeaveInternalError(
-                "Attempted to initialize Const Union, which is invalid"
-            )
+    # DEMO HACK: Enable Const Union
+    # TODO: Remove me
+    # def __post_init__(self):
+    #     if isinstance(self.val_type, UnionType):
+    #         # Const Unions are invalid. If something is Const, that means we know what its value
+    #         # is, which means it is definitely not a Union.
+    #         raise errors.WeaveInternalError(
+    #             "Attempted to initialize Const Union, which is invalid"
+    #         )
 
     def _hashable(self):
         val_id = id(self.val)
