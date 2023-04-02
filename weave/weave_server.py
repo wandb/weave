@@ -293,4 +293,4 @@ def before_first_request():
 
 
 if __name__ == "__main__":
-    app.run(ssl_context="adhoc", port=9994)
+    app.run(port=9994)

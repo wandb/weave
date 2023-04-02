@@ -13,11 +13,13 @@ ItemsType = typing.TypeVar("ItemsType")
 
 @weave.type()
 class Group2Config(typing.Generic[ItemsType]):
+    showExpressions: bool = dataclasses.field(default_factory=lambda: False)
     layered: bool = dataclasses.field(default_factory=lambda: False)
     preferHorizontal: bool = dataclasses.field(default_factory=lambda: False)
     equalSize: bool = dataclasses.field(default_factory=lambda: False)
     style: str = dataclasses.field(default_factory=lambda: "")
     items: ItemsType = dataclasses.field(default_factory=dict)  # type: ignore
+    grid: bool = dataclasses.field(default_factory=lambda: False)
 
 
 Group2ConfigType = typing.TypeVar("Group2ConfigType")
@@ -40,6 +42,8 @@ class Group2(panel.Panel, typing.Generic[Group2ConfigType]):
             self.config = Group2Config()
         if "items" in options:
             self.config.items = options["items"]
+        if "showExpressions" in options:
+            self.config.showExpressions = options["showExpressions"]
         if "layered" in options:
             self.config.layered = options["layered"]
         if "preferHorizontal" in options:

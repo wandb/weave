@@ -40,6 +40,7 @@ def save(obj: typing.Any, name: typing.Optional[str]):
 @op(
     name="save_to_ref",
     output_type=types.RefType(),
+    hidden=True,
 )
 def save_to_ref(obj: typing.Any, name: typing.Optional[str]):
     ref = storage.save(obj, name=name)
@@ -154,6 +155,7 @@ def op_get_return_type_from_inputs(inputs):
     output_type=types.TypeType(),
 )
 def get_returntype(uri):
+    print("URI", uri)
     return op_get_return_type(uri)
 
 

@@ -128,6 +128,7 @@ def get_top_level_stats() -> typing.Optional[FullStats]:
 
 
 def execute_nodes(nodes, no_cache=False):
+    print("EXEC")
     tracer = engine_trace.tracer()
     with tracer.trace("execute-log-graph"):
         logging.info(

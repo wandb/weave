@@ -24,6 +24,9 @@ Click the links in the sidebar to get started.
 """
 )
 
+from .. import registry_mem
+
+op_org_name = registry_mem.memory_registry.get_op("user-name")
 
 # TODO: using TypedDict here so we get automatic Object rendering
 # But it'd be nice to use @weave.type() style so we have '.' attribute access instead
@@ -59,7 +62,7 @@ class Ecosystem:
 # TODO: This should be entirely lazy, so that we don't actually need to
 # load anything to construct it. We can load when the user browsers to specific
 # objects.
-@weave.op(render_info={"type": "function"})
+@weave.op(name="weave", render_info={"type": "function"})
 def ecosystem() -> Ecosystem:
     from .. import registry_mem
 
@@ -81,7 +84,7 @@ def ecosystem_render(
     ecosystem: weave.Node[Ecosystem],
 ) -> panels.Card:
     return panels.Card(
-        title="Weave ecosystem",
+        title="Weave",
         subtitle="",
         content=[
             panels.CardTab(
@@ -90,7 +93,25 @@ def ecosystem_render(
             ),
             panels.CardTab(
                 name="Organizations",
-                content=panels.Table(ecosystem.orgs()),  # type: ignore
+                content=panels.Table(
+                    weave.save(
+                        [
+                            "wandb",
+                            "huggingface",
+                            "deepmind",
+                            "blueriver",
+                            "google",
+                            "openai",
+                            "microsoft",
+                        ],
+                        name="org_list",
+                    ),
+                    columns=[
+                        lambda org_name: panels.WeaveLink(
+                            org_name, lambda org_name: ops.entity(org_name)
+                        )
+                    ],
+                ),  # type: ignore
             ),
             panels.CardTab(
                 name="Packages",

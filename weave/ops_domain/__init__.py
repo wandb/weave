@@ -25,5 +25,7 @@ from .table import *
 
 
 # make root ops top level
+viewer = user_ops.root_viewer
 project = project_ops.project
 entity = entity_ops.entity
+org = org_ops.org

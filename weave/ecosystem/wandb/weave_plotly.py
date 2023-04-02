@@ -84,8 +84,8 @@ def plotly_barplot(bar_data: list[BarData]) -> plotly.graph_objs.Figure:
 
 
 class ScatterData(typing.TypedDict):
-    x: float
-    y: float
+    x: typing.Optional[float]
+    y: typing.Optional[float]
     label: typing.Optional[str]
 
 
@@ -151,6 +151,7 @@ def plotly_time_series(data, mark, labels, label_overrides) -> plotly.graph_objs
             template="plotly_white",
             labels=labels,
         )
+        fig.update_layout(showlegend=False)
         fig.update_traces(width=bin_size)
         fig.update_layout(margin=dict(l=0, r=0, t=0, b=0))
         fig.update_layout(dragmode="select")

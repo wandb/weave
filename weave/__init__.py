@@ -12,6 +12,8 @@ from .graph import Node  # used as a type in op definitions
 from .show import show, show_url
 from .api import *
 
+use_frontend_devmode()
+
 from . import panels
 from .panel import Panel
 
@@ -28,5 +30,8 @@ _context.clear_loading_built_ins(_loading_builtins_token)
 
 # Wow, this works! you can do just "weave" in a notebook and render
 # something. Maybe render ecosystem panel?
-# def _ipython_display_():
-#     return show(ecosystem())
+from .ecosystem import ecosystem
+
+
+def _ipython_display_():
+    return show(ecosystem())

@@ -54,13 +54,8 @@ def models_render(
 
 @weave.op(pure=False)
 def model_render(
-    model_node: weave.Node[hfmodel.HFModel],
+    model: hfmodel.HFModel,
 ) -> weave.panels.Card:
-    # All methods callable on X are callable on weave.Node[X], but
-    # the types arent' setup properly, so cast to tell the type-checker
-    # TODO: Fix!
-    model = typing.cast(hfmodel.HFModel, model_node)
-
     return weave.panels.Card(
         title=model.id(),
         subtitle="HuggingFace Hub Model",
@@ -86,10 +81,6 @@ def model_render(
                     weave.ops.used_by(model, model.call.name),
                     columns=[
                         lambda run: run.output.model_input,
-                        # TODO: not general yet. Just hacking to make the default UI
-                        #     a little nicer for the moment.
-                        # Should be:
-                        # lambda run: run.output().model_output(),
                         lambda run: run.output.model_output[0]["generated_text"],
                     ],
                 ),

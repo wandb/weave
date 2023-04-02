@@ -19,18 +19,28 @@ from . import usage_analytics
 from . import ref_base
 
 
-def make_container(obj: typing.Union[panel.Panel, graph.Node]) -> panel.Panel:
+def make_varname_for_type(t: types.Type):
+    if isinstance(t, types.List) and isinstance(t.object_type, types.TypedDict):
+        return "table"
+    return t.name
+
+
+def make_container(
+    obj: typing.Union[panel.Panel, graph.Node], name: str
+) -> panel.Panel:
     from weave.panels import Group2
 
-    return Group2(preferHorizontal=True, items={"main": obj})
+    return Group2(preferHorizontal=True, showExpressions=True, items={name: obj})
 
 
 def make_show_obj(obj: typing.Any):
     node: graph.Node
     if obj is None:
-        return make_container(graph.VoidNode())
-    elif isinstance(obj, panel.Panel) or isinstance(obj, graph.Node):
-        return make_container(obj)
+        return make_container(graph.VoidNode(), "panel0")
+    elif isinstance(obj, panel.Panel):
+        return make_container(obj, obj.id + "0")
+    elif isinstance(obj, graph.Node):
+        return make_container(obj, make_varname_for_type(obj.type) + "0")
 
     if types.TypeRegistry.has_type(obj):
         print("HAVE TYPE")
@@ -40,7 +50,7 @@ def make_show_obj(obj: typing.Any):
 
         ref = storage.save(obj, name=names[-1])
         node = ops.get(ref.uri)
-        return make_container(node)
+        return make_container(node, make_varname_for_type(ref.type))
 
     raise errors.WeaveTypeError(
         "%s not yet supported. Create a weave.Type to add support." % type(obj)
@@ -50,7 +60,8 @@ def make_show_obj(obj: typing.Any):
 # Broken out into to separate function for testing
 def _show_params(obj):
     obj_in_container = make_show_obj(obj)
-    ref = storage.save(obj_in_container)
+    ref = storage.save(obj_in_container, name="panel")
+    ref.artifact._version = "latest"
     show_node = graph.OutputNode(
         types.UnknownType(),
         "get",

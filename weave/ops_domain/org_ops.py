@@ -10,7 +10,7 @@ from .. import weave_types as types
 #
 
 # Section 2/6: Root Ops
-gql_root_op(
+org = gql_root_op(
     "root-org",
     "organization",
     wdt.OrgType,

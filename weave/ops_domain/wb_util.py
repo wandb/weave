@@ -26,10 +26,10 @@ class RunPath:
     run_name: str
 
 
-@decorator_type.type("histogram")
-class Histogram:
-    bins: list[float]
-    values: list[int]
+# @decorator_type.type("histogram")
+# class Histogram:
+#     bins: list[float]
+#     values: list[int]
 
 
 def filesystem_artifact_file_from_artifact_path(artifact_path: str):

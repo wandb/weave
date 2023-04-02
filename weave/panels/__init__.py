@@ -1,4 +1,5 @@
 from ..panel import Panel
+from .panel_noop import *
 from .panel_table import Table
 from .panel_query import Query
 from .panel_plot import Plot
@@ -17,3 +18,6 @@ from .panel_markdown import PanelMarkdown
 from .panel_weavelink import WeaveLink
 from .panel_sized_string import SizedString
 from .panel_container import *
+
+# Incomplete
+from .panel_histogram import *
