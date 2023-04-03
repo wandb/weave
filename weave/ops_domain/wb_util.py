@@ -99,7 +99,7 @@ def _process_run_dict_item(val, run_path: typing.Optional[RunPath] = None):
             elif "path" in val and run_path is not None:
                 return filesystem_runfiles_from_run_path(run_path, val["path"])
 
-        if val["_type"] == "joined-table":
+        if val["_type"] in ["joined-table", "partitioned-table"]:
             return filesystem_artifact_file_from_artifact_path(val["artifact_path"])
 
         if val["_type"] == "image-file" and run_path is not None:

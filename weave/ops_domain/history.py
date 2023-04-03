@@ -49,6 +49,11 @@ def history_key_type_count_to_weave_type(tc: TypeCount) -> types.Type:
         return artifact_fs.FilesystemArtifactFileType(
             extension, table.JoinedTableType()
         )
+    elif tc_type == "partitioned-table":
+        extension = types.Const(types.String(), "json")
+        return artifact_fs.FilesystemArtifactFileType(
+            extension, table.PartitionedTableType()
+        )
     elif tc_type == "image-file":
         return ImageArtifactFileRefType()
     return types.UnknownType()
