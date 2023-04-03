@@ -774,7 +774,7 @@ def test_loading_artifact_browser_request_2(fake_wandb):
                             }
                         ]
                     },
-                    "artifactMemberships_c1233b7003317090ab5e2a75db4ad965": {
+                    "artifactMemberships": {
                         "edges": [
                             {
                                 "node": {
@@ -918,7 +918,7 @@ def test_loading_artifact_browser_request_3(fake_wandb):
                         },
                         "artifactCollection": {
                             **fwb.artifactSequence_payload,  # type: ignore
-                            "aliases_c1233b7003317090ab5e2a75db4ad965": {
+                            "aliases": {
                                 "edges": [
                                     {
                                         "node": {
@@ -943,7 +943,7 @@ def test_loading_artifact_browser_request_3(fake_wandb):
                                 },
                             },
                             "__typename": "ArtifactSequence",
-                            "artifactMemberships_c1233b7003317090ab5e2a75db4ad965": {
+                            "artifactMemberships": {
                                 "edges": [
                                     {
                                         "node": {
