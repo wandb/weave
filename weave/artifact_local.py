@@ -70,6 +70,7 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
             raise ValueError('Artifact name cannot contain "/" or "\\" or ".." or ":"')
         self.name = name
         self._version = version
+        self._branch = None
         self._root = os.path.join(local_artifact_dir(), name)
         self._path_handlers: dict[str, typing.Any] = {}
         self._setup_dirs()
@@ -101,6 +102,14 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
     def created_at(self):
         return self.read_metadata()["created_at"]
 
+    @property
+    def branch(self):
+        return self._branch
+
+    @property
+    def branch_point(self):
+        return self.read_metadata().get("branch_point")
+
     def get_other_version(self, version: str) -> typing.Optional["LocalArtifact"]:
         if not local_artifact_exists(self.name, version):
             return None
@@ -112,12 +121,21 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
         )
         self._read_dirname = None
         if self._version:
-            self._read_dirname = os.path.join(self._root, self._version)
-
-            # if this is a branch, set to the actual specific version it points to
-            if os.path.islink(self._read_dirname):
-                self._version = os.path.basename(os.path.realpath(self._read_dirname))
+            read_dirname = os.path.join(self._root, self._version)
+            if not os.path.exists(read_dirname):
+                # If it doesn't exist, assume the user has passed in a branch name
+                # for version.
+                self._branch = self._version
+            else:
                 self._read_dirname = os.path.join(self._root, self._version)
+
+                # if this is a branch, set to the actual specific version it points to
+                if os.path.islink(self._read_dirname):
+                    self._branch = self._version
+                    self._version = os.path.basename(
+                        os.path.realpath(self._read_dirname)
+                    )
+                    self._read_dirname = os.path.join(self._root, self._version)
 
     def _get_read_path(self, path: str) -> pathlib.Path:
         read_dirname = pathlib.Path(self._read_dirname)
@@ -198,6 +216,8 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
         return handler
 
     def read_metadata(self):
+        if not self._read_dirname:
+            return {}
         with file_util.safe_open(
             os.path.join(self._read_dirname, ".artifact-version.json")
         ) as f:
@@ -205,13 +225,13 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
             obj["created_at"] = datetime.fromisoformat(obj["created_at"])
             return obj
 
-    def write_metadata(self, dirname):
+    def write_metadata(self, dirname, metadata):
         with file_util.safe_open(
             os.path.join(dirname, ".artifact-version.json"), "w"
         ) as f:
-            json.dump({"created_at": datetime.now().isoformat()}, f)
+            json.dump({"created_at": datetime.now().isoformat(), **metadata}, f)
 
-    def save(self, branch="latest"):
+    def save(self, branch=None):
         for handler in self._path_handlers.values():
             handler.close()
         self._path_handlers = {}
@@ -219,15 +239,18 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
         if self._read_dirname:
             for dirpath, dnames, fnames in os.walk(self._read_dirname):
                 for f in fnames:
-                    full_path = os.path.join(dirpath, f)
-                    manifest[f] = md5_hash_file(full_path)
+                    if f != ".artifact-version.json":
+                        full_path = os.path.join(dirpath, f)
+                        manifest[f] = md5_hash_file(full_path)
         for dirpath, dnames, fnames in os.walk(self._write_dirname):
             for f in fnames:
-                full_path = os.path.join(dirpath, f)
-                manifest[f] = md5_hash_file(full_path)
+                if f != ".artifact-version.json":
+                    full_path = os.path.join(dirpath, f)
+                    manifest[f] = md5_hash_file(full_path)
         commit_hash = md5_string(json.dumps(manifest, sort_keys=True, indent=2))
-        self._version = commit_hash
+
         new_dirname = os.path.join(self._root, commit_hash)
+
         if not self._read_dirname:
             # we're not read-modify-writing an existing version, so
             # just rename the write dir
@@ -243,7 +266,6 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
             # using a working directory so we can atomic rename at end
             tmpdir = os.path.join(self._root, "tmpwritedir-%s" % util.rand_string_n(12))
             os.makedirs(tmpdir, exist_ok=True)
-            self.write_metadata(tmpdir)
             if self._read_dirname:
                 for path in os.listdir(self._read_dirname):
                     src_path = os.path.join(self._read_dirname, path)
@@ -265,7 +287,17 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
                 shutil.rmtree(tmpdir)
             shutil.rmtree(self._write_dirname)
 
-        self.write_metadata(new_dirname)
+        if branch is None:
+            branch = self._branch
+
+        metadata = {}
+        if branch != self._branch:
+            metadata["branch_point"] = {"branch": self._branch, "commit": self._version}
+        else:
+            metadata["branch_point"] = self.branch_point
+        self.write_metadata(new_dirname, metadata)
+
+        self._version = commit_hash
         self._setup_dirs()
 
         # Example of one of many races here
@@ -273,11 +305,15 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
         tmpdir_root = pathlib.Path(os.path.join(local_artifact_dir(), "tmp"))
         tmpdir_root.mkdir(exist_ok=True)
 
-        link_name = os.path.join(self._root, branch)
-        with tempfile.TemporaryDirectory(dir=tmpdir_root) as d:
-            temp_path = os.path.join(d, "tmplink")
-            os.symlink(self._version, temp_path)
-            os.rename(temp_path, link_name)
+        if branch is not None:
+            link_name = os.path.join(self._root, branch)
+            with tempfile.TemporaryDirectory(dir=tmpdir_root) as d:
+                temp_path = os.path.join(d, "tmplink")
+                os.symlink(commit_hash, temp_path)
+                os.rename(temp_path, link_name)
+
+        if branch is not None:
+            self._branch = branch
 
     def _path_info(
         self, path: str

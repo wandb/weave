@@ -329,3 +329,49 @@ def test_to_conversion_uri_resolution(
     js_serializer = storage.make_js_serializer()
     res = js_serializer(make_art())
     assert res == "wandb-artifact:///entity/project/my-uri:latest"
+
+
+def test_save_to_branch():
+    data = [{"a": 5}, {"a": 6}]
+    ref = storage.save(data, "data:main")
+    assert ref.branch == "main"
+    data2 = storage.get("local-artifact:///data:main/obj")
+    assert data == data2
+
+
+def test_branch_tracking():
+    data = [{"a": 5}, {"a": 6}]
+    ref = storage.save(data, "data:main")
+    assert ref.branch == "main"
+    data2 = storage.get("local-artifact:///data:main/obj")
+    data2[0]["a"] = 7
+    # Since data2 came from branch main, saving should update main
+    ref = storage.save(data2)
+    assert ref.branch == "main"
+
+
+def test_branch_point():
+    data = [{"a": 5}, {"a": 6}]
+    ref = storage.save(data, "data:main")
+    assert ref.branch == "main"
+    data2 = storage.get("local-artifact:///data:main/obj")
+    data2[0]["a"] = 7
+    ref2 = storage.save(data2, "data:other")
+    assert ref2.branch == "other"
+    assert ref2.branch_point["branch"] == "main"
+    assert ref2.branch_point["commit"] == ref.version
+
+    data3 = storage.get("local-artifact:///data:other/obj")
+    data3[0]["a"] = 8
+    ref3 = storage.save(data3, "data:other")
+    assert ref3.branch == "other"
+    # Still points to main branch point since we didn't fork
+    assert ref3.branch_point["branch"] == "main"
+    assert ref3.branch_point["commit"] == ref.version
+
+    data4 = storage.get("local-artifact:///data:other/obj")
+    data4[0]["a"] = 8
+    ref4 = storage.save(data4, "data:other2")
+    assert ref4.branch == "other2"
+    assert ref4.branch_point["branch"] == "other"
+    assert ref4.branch_point["commit"] == ref3.version

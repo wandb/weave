@@ -166,7 +166,7 @@ def _save(name, obj, action=None):
     # Clear the ref, otherwise save will immediately return
     # the result instead of saving the mutated result
     storage.clear_ref(obj)
-    storage.save(obj, name=obj_uri.name)
+    return str(storage.save(obj, name=obj_uri.name))
 
 
 @op(

@@ -74,6 +74,14 @@ class FilesystemArtifact(artifact_base.Artifact):
         raise NotImplementedError
 
     @property
+    def branch(self) -> typing.Optional[str]:
+        raise NotImplementedError
+
+    @property
+    def branch_point(self) -> typing.Optional[str]:
+        raise NotImplementedError
+
+    @property
     def initial_uri_obj(self) -> uris.WeaveURI:
         # uri_obj must be a stable identifier (no aliases) for this artifact.
         # initial_uri_obj is the uri used to construct the artifact, which may include
@@ -160,6 +168,14 @@ class FilesystemArtifactRef(artifact_base.ArtifactRef):
     @property
     def version(self) -> str:
         return self.artifact.version
+
+    @property
+    def branch(self) -> typing.Optional[str]:
+        return self.artifact.branch
+
+    @property
+    def branch_point(self) -> typing.Optional[str]:
+        return self.artifact.branch_point
 
     @property
     def is_saved(self) -> bool:
