@@ -533,11 +533,7 @@ def test_join_to_str():
 
 @pytest.mark.parametrize(
     "use_arrow",
-    [
-        # TODO: Implement Arrow Support
-        # True,
-        False
-    ],
+    [True, False],
 )
 def test_flatten_and_tags(use_arrow):
     # tagged<list<tagged<awl<tagged<dict<id: tagged<number>, col: tagged<string>>>>>>>

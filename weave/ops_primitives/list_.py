@@ -367,6 +367,9 @@ def flatten_return_type(input_types):
 
 
 def _flatten(l):
+    from ..ops_arrow import ArrowWeaveList
+    from ..ops_arrow.arrow_tags import pushdown_list_tags
+
     if isinstance(l, list):
         tags = None
         if tag_store.is_tagged(l):
@@ -378,6 +381,8 @@ def _flatten(l):
             return item
 
         return sum((_flatten(tag_wrapper(o)) for o in l), [])
+    elif isinstance(l, ArrowWeaveList):
+        return pushdown_list_tags(l).to_pylist_tagged()
     else:
         return [l]
 
