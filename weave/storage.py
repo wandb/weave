@@ -37,23 +37,25 @@ def _get_name(wb_type: types.Type, obj: typing.Any) -> str:
     # return f"{wb_type.name}-{obj_names[-1]}"
 
 
-def _save_or_publish(obj, name=None, type=None, publish: bool = False, artifact=None):
+def _save_or_publish(
+    obj, name=None, type=None, publish: bool = False, artifact=None, branch=None
+):
     # HAX for W&B publishing.
     project = None
     if name is not None and "/" in name:
         project, name = name.split("/")
-    target_branch = None
-    if name is not None and ":" in name:
-        name, target_branch = name.split(":", 1)
-
     source_branch = None
-    # If we have an existing ref and its a filesystem artifact
-    # track its branch
-    existing_ref = _get_ref(obj)
-    if isinstance(existing_ref, artifact_fs.FilesystemArtifactRef):
-        # We don't branch across artifacts for now (name change)... But we could!
-        if name is None or existing_ref.name == name:
-            source_branch = existing_ref.branch
+    if name is not None and ":" in name:
+        name, source_branch = name.split(":", 1)
+
+    # source_branch = None
+    # # If we have an existing ref and its a filesystem artifact
+    # # track its branch
+    # existing_ref = _get_ref(obj)
+    # if isinstance(existing_ref, artifact_fs.FilesystemArtifactRef):
+    #     # We don't branch across artifacts for now (name change)... But we could!
+    #     if name is None or existing_ref.name == name:
+    #         source_branch = existing_ref.branch
 
     # TODO: get rid of this? Always type check?
     wb_type = type
@@ -83,7 +85,7 @@ def _save_or_publish(obj, name=None, type=None, publish: bool = False, artifact=
         if project is not None:
             artifact.save(project)
         else:
-            artifact.save(branch=target_branch)
+            artifact.save(branch=branch)
 
     return ref
 
@@ -93,13 +95,15 @@ def publish(obj, name=None, type=None):
     return _save_or_publish(obj, name, type, True)
 
 
-def save(obj, name=None, type=None, artifact=None) -> artifact_local.LocalArtifactRef:
+def save(
+    obj, name=None, type=None, artifact=None, branch=None
+) -> artifact_local.LocalArtifactRef:
     # print("STORAGE SAVE", name, obj, type, artifact)
     # ref = _get_ref(obj)
     # if ref is not None:
     #     if name is None or ref.artifact._name == name:
     #         return ref
-    return _save_or_publish(obj, name, type, False, artifact=artifact)
+    return _save_or_publish(obj, name, type, False, artifact=artifact, branch=branch)
 
 
 def get(uri_s: typing.Union[str, ref_base.Ref]) -> typing.Any:

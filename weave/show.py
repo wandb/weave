@@ -60,7 +60,7 @@ def make_show_obj(obj: typing.Any):
 # Broken out into to separate function for testing
 def _show_params(obj):
     obj_in_container = make_show_obj(obj)
-    ref = storage.save(obj_in_container, name="panel")
+    ref = storage.save(obj_in_container, name="panel:latest")
     ref.artifact._version = "latest"
     show_node = graph.OutputNode(
         types.UnknownType(),

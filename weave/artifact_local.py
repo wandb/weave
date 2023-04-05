@@ -292,9 +292,17 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
 
         metadata = {}
         if branch != self._branch:
-            metadata["branch_point"] = {"branch": self._branch, "commit": self._version}
+            # new branch
+            metadata["branch_point"] = {
+                "branch": self._branch,
+                "commit": self._version,
+                "n_commits": 1,
+            }
         else:
-            metadata["branch_point"] = self.branch_point
+            # same branch, same branch point
+            if self.branch_point:
+                metadata["branch_point"] = self.branch_point
+                metadata["branch_point"]["n_commits"] += 1
         self.write_metadata(new_dirname, metadata)
 
         self._version = commit_hash

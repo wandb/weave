@@ -195,6 +195,15 @@ class FilesystemArtifactRef(artifact_base.ArtifactRef):
         uri.extra = self.extra
         return str(uri)
 
+    @property
+    def branch_uri(self) -> str:
+        uri = typing.cast("FilesystemArtifactURI", self.artifact.uri_obj)
+        uri.path = self.path
+        uri.extra = self.extra
+        if self.branch is not None:
+            uri.version = self.branch
+        return str(uri)
+
     def versions(self) -> list["FilesystemArtifactRef"]:
         raise NotImplementedError
 

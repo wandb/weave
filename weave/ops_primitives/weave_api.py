@@ -159,14 +159,13 @@ def get_returntype(uri):
     return op_get_return_type(uri)
 
 
-def _save(name, obj, action=None):
+def _save(name, obj, setter_options, action=None):
 
     obj_uri = uris.WeaveURI.parse(name)
 
-    # Clear the ref, otherwise save will immediately return
-    # the result instead of saving the mutated result
-    storage.clear_ref(obj)
-    return str(storage.save(obj, name=obj_uri.name))
+    branch = setter_options.get("branch")
+    ref = storage.save(obj, name=obj_uri.name + ":" + obj_uri.version, branch=branch)
+    return ref.branch_uri
 
 
 @op(
@@ -179,6 +178,34 @@ def _save(name, obj, action=None):
 )
 def get(uri):
     return storage.get(uri)
+
+
+@op(
+    pure=False,
+    name="ref",
+    render_info={"type": "function"},
+    input_type={"uri": types.String()},
+    output_type=types.RefType(),
+)
+def ref(uri):
+    return ref_base.Ref.from_str(uri)
+
+
+class BranchPointType(typing.TypedDict):
+    branch: str
+    commit: str
+    n_commits: int
+
+
+@op(
+    pure=False,
+    name="Ref-branch_point",
+    input_type={"ref": types.RefType()},
+)
+def ref_branch_point(ref) -> typing.Optional[BranchPointType]:
+    # TODO: execute automatically derefs. Need to not do that if input type is Ref!
+    real_ref = storage._get_ref(ref)
+    return real_ref.branch_point
 
 
 def execute_setter(node, value, action=None):
@@ -220,7 +247,7 @@ def execute(node):
     name="set",
     input_type={"self": types.Function({}, types.Any())},
 )
-def set(self, val: typing.Any) -> typing.Any:
+def set(self, val: typing.Any, root_args: typing.Any) -> typing.Any:
     # This implements mutations. Note that its argument must be a
     # Node. You can call it like this:
     # weave.use(ops.set(weave_internal.const(csv[-1]["type"]), "YY"))
@@ -256,7 +283,9 @@ def set(self, val: typing.Any) -> typing.Any:
 
     # Make the updates backwards
     res = val
-    for node, inputs, result in reversed(list(zip(nodes, op_inputs, results))):
+    for i, (node, inputs, result) in reversed(
+        list(enumerate(zip(nodes, op_inputs, results)))
+    ):
         op_def = registry_mem.memory_registry.get_op(node.from_op.name)
         if not op_def.setter:
             return res
@@ -267,6 +296,8 @@ def set(self, val: typing.Any) -> typing.Any:
             # )
         args = list(inputs.values())
         args.append(res)
+        if i == 0:
+            args.append(root_args)
         try:
             res = op_def.setter.func(*args)  # type: ignore
         except AttributeError:
