@@ -4,12 +4,16 @@ import typing
 
 from . import weave_types as types
 
+TRACE_EXT = "trace.json"
+
 
 def wb_object_type_from_path(path: str) -> typing.Tuple[types.Type, str]:
     parts = path.split(".")
     ext = ""
     wbObjectType: types.Type = types.NoneType()
-    if len(parts) != 1:
+    if path.endswith(TRACE_EXT):
+        ext = TRACE_EXT
+    elif len(parts) != 1:
         ext = parts[-1]
     if len(parts) > 2 and ext == "json":
         pathext_wbobjecttype = types.type_name_to_type(parts[-2])
