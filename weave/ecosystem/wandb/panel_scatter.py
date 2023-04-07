@@ -58,7 +58,7 @@ def scatter_default_config(
                 {"item": input_node_type.object_type}, lambda item: item  # type: ignore
             ),
             label_fn=weave.define_fn(
-                {"item": input_node_type.object_type}, lambda item: graph.VoidNode()  # type: ignore
+                {"item": input_node_type.object_type}, lambda item: item  # type: ignore
             ),
         )
     return config
@@ -93,22 +93,13 @@ def scatter_config(
     return weave.panels.Group2(
         items={
             "x_fn": weave.panels.LabeledItem(
-                label="x",
-                item=weave.panels.ExpressionEditor(
-                    config=weave.panels.ExpressionEditorConfig(config.x_fn)
-                ),
+                label="x", item=weave.panels.ExpressionEditor(config.x_fn)
             ),
             "y_fn": weave.panels.LabeledItem(
-                label="y",
-                item=weave.panels.ExpressionEditor(
-                    config=weave.panels.ExpressionEditorConfig(config.y_fn)
-                ),
+                label="y", item=weave.panels.ExpressionEditor(config.y_fn)
             ),
             "label_fn": weave.panels.LabeledItem(
-                label="label",
-                item=weave.panels.ExpressionEditor(
-                    config=weave.panels.ExpressionEditorConfig(config.label_fn)
-                ),
+                label="label", item=weave.panels.ExpressionEditor(config.label_fn)
             ),
         }
     )
@@ -154,6 +145,16 @@ class Scatter(weave.Panel):
                 )
             else:
                 self.config.y_fn = weave.define_fn(
+                    {"item": unnested.type.object_type}, lambda item: item
+                )
+            if "label_fn" in options:
+                sig = inspect.signature(options["label_fn"])
+                param_name = list(sig.parameters.values())[0].name
+                self.config.label_fn = weave.define_fn(
+                    {param_name: unnested.type.object_type}, options["label_fn"]
+                )
+            else:
+                self.config.label_fn = weave.define_fn(
                     {"item": unnested.type.object_type}, lambda item: item
                 )
 

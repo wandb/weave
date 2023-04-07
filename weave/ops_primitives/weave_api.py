@@ -251,6 +251,8 @@ def set(self, val: typing.Any, root_args: typing.Any) -> typing.Any:
     # This implements mutations. Note that its argument must be a
     # Node. You can call it like this:
     # weave.use(ops.set(weave_internal.const(csv[-1]["type"]), "YY"))
+    if isinstance(self, graph.ConstNode):
+        return val
 
     self = compile.compile_fix_calls([self])[0]
     nodes = graph.linearize(self)
@@ -296,7 +298,8 @@ def set(self, val: typing.Any, root_args: typing.Any) -> typing.Any:
             # )
         args = list(inputs.values())
         args.append(res)
-        if i == 0:
+        if i == 0 and node.from_op.name == "get":
+            # TODO hardcoded get to take root_args. Should just check if available on setter.
             args.append(root_args)
         try:
             res = op_def.setter.func(*args)  # type: ignore

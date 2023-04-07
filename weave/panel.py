@@ -6,7 +6,6 @@ from . import api as weave
 from . import graph
 from . import storage
 from . import weave_types as types
-from . import weavejs_fixes
 from . import weave_internal
 from . import panel_util
 from . import errors
@@ -117,8 +116,7 @@ class Panel(typing.Generic[InputNodeType, VarsType]):
         self.input_node = run_variable_lambdas(self.input_node, self.vars)
 
         if not isinstance(self.input_node, graph.Node):
-            ref = storage.save(self.input_node)
-            self.input_node = op_get(ref.uri)
+            self.input_node = storage.to_safe_const(self.input_node)
 
     def _normalize(self, frame=None):
         pass

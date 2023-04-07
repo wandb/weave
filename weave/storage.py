@@ -195,6 +195,13 @@ def to_python(obj, wb_type=None):
     return {"_type": wb_type.to_dict(), "_val": val}
 
 
+def to_safe_const(obj):
+    wb_type = types.TypeRegistry.type_of(obj)
+    mapper = mappers_python.map_to_python(wb_type, artifact_mem.MemArtifact())
+    val = mapper.apply(obj)
+    return graph.ConstNode(wb_type, val)
+
+
 def to_hashable(obj):
     wb_type = types.TypeRegistry.type_of(obj)
     art = artifact_mem.MemArtifact()
