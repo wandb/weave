@@ -321,7 +321,12 @@ class SampledHistorySpec(typing.TypedDict):
 def _history_key_to_sampled_history_spec(key: str) -> SampledHistorySpec:
     return {
         # select both desired key and step so we know how to merge downstream
-        "keys": [key] if key == "_step" else [key, "_step"],
+        # we need to select _timestamp (which is always included, along with step),
+        # because sampledHistory does not support selecting just _step
+        # (it will return nothing in that case).
+        # see (https://weightsandbiases.slack.com/archives/CR1B10HFW/p1680743091778719)
+        # for discussion.
+        "keys": [key, "_timestamp"] if key == "_step" else [key, "_step"],
         "samples": 2**63 - 1,  # max int64
     }
 
