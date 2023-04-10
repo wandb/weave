@@ -10,6 +10,40 @@ from .. import panel_util
 
 ItemsType = typing.TypeVar("ItemsType")
 
+# I pulled in all the type information from PanelBank, but we're not
+# using it all yet.
+
+
+class LayoutParameters(typing.TypedDict):
+    x: int
+    y: int
+    w: int
+    h: int
+
+
+class LayedOutPanel(typing.TypedDict):
+    id: str
+    layout: LayoutParameters
+
+
+class PanelBankFlowSectionConfig(typing.TypedDict):
+    snapToColumns: bool
+    columnsPerPage: int
+    rowsPerPage: int
+    gutterWidth: int
+    boxWidth: int
+    boxHeight: int
+
+
+class PanelBankSectionConfig(typing.TypedDict):
+    id: str
+    name: str
+    panels: typing.List[LayedOutPanel]
+    isOpen: bool
+    flowConfig: PanelBankFlowSectionConfig
+    type: str  # this 'grid' | 'flow' in ts
+    sorted: int  # This is an enum in js
+
 
 @weave.type()
 class Group2Config(typing.Generic[ItemsType]):
@@ -20,6 +54,21 @@ class Group2Config(typing.Generic[ItemsType]):
     style: str = dataclasses.field(default_factory=lambda: "")
     items: ItemsType = dataclasses.field(default_factory=dict)  # type: ignore
     grid: bool = dataclasses.field(default_factory=lambda: False)
+    gridConfig: typing.Optional[PanelBankSectionConfig] = dataclasses.field(
+        default_factory=lambda: None
+    )
+    liftChildVars: typing.Optional[bool] = dataclasses.field(
+        default_factory=lambda: None
+    )
+    allowedPanels: typing.Optional[list[str]] = dataclasses.field(
+        default_factory=lambda: None
+    )
+    enableAddPanel: typing.Optional[bool] = dataclasses.field(
+        default_factory=lambda: None
+    )
+    childNameBase: typing.Optional[str] = dataclasses.field(
+        default_factory=lambda: None
+    )
 
 
 Group2ConfigType = typing.TypeVar("Group2ConfigType")
