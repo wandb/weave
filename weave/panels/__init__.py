@@ -14,7 +14,6 @@ from .panel_color import Color
 from .panel_html import PanelHtml
 from .panel_markdown import PanelMarkdown
 from .panel_weavelink import WeaveLink
-from .panel_container import *
 
 
 # editors
