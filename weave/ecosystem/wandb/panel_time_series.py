@@ -305,10 +305,10 @@ def time_series(
 @weave.op()
 def time_series_config(
     input_node: weave.Node[list[typing.Any]], config: TimeSeriesConfig
-) -> weave.panels.Group2:
+) -> weave.panels.Group:
     unnested = weave.ops.unnest(input_node)
     config = time_series_default_config(config, weave_internal.const(unnested.type))
-    return weave.panels.Group2(
+    return weave.panels.Group(
         items={
             "x": weave.panels.LabeledItem(
                 label="x",

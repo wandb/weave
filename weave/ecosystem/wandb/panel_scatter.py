@@ -87,10 +87,10 @@ def scatter(
 @weave.op(name="Scatter_config")
 def scatter_config(
     input_node: weave.Node[list[typing.Any]], config: ScatterConfig
-) -> weave.panels.Group2:
+) -> weave.panels.Group:
     unnested = weave.ops.unnest(input_node)
     config = scatter_default_config(config, weave_internal.const(unnested.type))
-    return weave.panels.Group2(
+    return weave.panels.Group(
         items={
             "x_fn": weave.panels.LabeledItem(
                 label="x", item=weave.panels.ExpressionEditor(config.x_fn)

@@ -66,7 +66,7 @@ def model_render(
             ),
             weave.panels.CardTab(
                 name="Metadata",
-                content=weave.panels.Group2(
+                content=weave.panels.Group(
                     items={
                         "id": weave.panels.LabeledItem(item=model.id(), label="ID"),
                         "pipeline_tag": weave.panels.LabeledItem(

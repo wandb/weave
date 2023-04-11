@@ -149,10 +149,10 @@ def multi_distribution_panel_plot(
 @weave.op()
 def multi_distribution_config(
     input_node: weave.Node[list[typing.Any]], config: DistributionConfig
-) -> weave.panels.Group2:
+) -> weave.panels.Group:
     unnested = weave.ops.unnest(input_node)
     config = multi_distribution_default_config(config, unnested)
-    return weave.panels.Group2(
+    return weave.panels.Group(
         items={
             "value_fn": weave.panels.LabeledItem(
                 label="value",

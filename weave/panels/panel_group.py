@@ -46,7 +46,7 @@ class PanelBankSectionConfig(typing.TypedDict):
 
 
 @weave.type()
-class Group2Config(typing.Generic[ItemsType]):
+class GroupConfig(typing.Generic[ItemsType]):
     showExpressions: bool = dataclasses.field(default_factory=lambda: False)
     layered: bool = dataclasses.field(default_factory=lambda: False)
     preferHorizontal: bool = dataclasses.field(default_factory=lambda: False)
@@ -71,13 +71,13 @@ class Group2Config(typing.Generic[ItemsType]):
     )
 
 
-Group2ConfigType = typing.TypeVar("Group2ConfigType")
+GroupConfigType = typing.TypeVar("GroupConfigType")
 
 
 @weave.type()
-class Group2(panel.Panel, typing.Generic[Group2ConfigType]):
-    id = "Group2"
-    config: typing.Optional[Group2ConfigType] = dataclasses.field(
+class Group(panel.Panel, typing.Generic[GroupConfigType]):
+    id = "Group"
+    config: typing.Optional[GroupConfigType] = dataclasses.field(
         default_factory=lambda: None
     )
     # items: typing.TypeVar("items") = dataclasses.field(default_factory=dict)
@@ -88,7 +88,7 @@ class Group2(panel.Panel, typing.Generic[Group2ConfigType]):
         super().__init__(input_node=input_node, vars=vars)
         self.config = config
         if self.config is None:
-            self.config = Group2Config()
+            self.config = GroupConfig()
         if "items" in options:
             self.config.items = options["items"]
         if "showExpressions" in options:

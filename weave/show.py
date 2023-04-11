@@ -28,9 +28,9 @@ def make_varname_for_type(t: types.Type):
 def make_container(
     obj: typing.Union[panel.Panel, graph.Node], name: str
 ) -> panel.Panel:
-    from weave.panels import Group2
+    from weave.panels import Group
 
-    return Group2(preferHorizontal=True, showExpressions=True, items={name: obj})
+    return Group(preferHorizontal=True, showExpressions=True, items={name: obj})
 
 
 def make_show_obj(obj: typing.Any):

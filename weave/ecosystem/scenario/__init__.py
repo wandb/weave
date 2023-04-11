@@ -38,7 +38,7 @@ def metrics_bank(input_node: weave.Node[MetricsBankInput]) -> weave.panels.Each:
 
     return weave.panels.Each(
         metrics,
-        render=lambda metric_name: weave.panels.Group2(
+        render=lambda metric_name: weave.panels.Group(
             items={
                 "title": metric_name,
                 "plot": weave.panels.Plot(

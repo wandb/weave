@@ -71,7 +71,7 @@ def torch_vision_dataset_card(dataset) -> panels.Card:
         content=[
             panels.CardTab(
                 name="Overview",
-                content=panels.Group2(
+                content=panels.Group(
                     items={
                         "description": panels.LabeledItem(
                             item=dataset["description"], label="Description"
