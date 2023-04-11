@@ -1,5 +1,5 @@
 from ..panel import Panel
-from .panel_noop import *
+from .panel_expression import *
 from .panel_auto import *
 from .panel_table import Table
 from .panel_query import Query
