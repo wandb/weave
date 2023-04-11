@@ -10,16 +10,20 @@ from .panel_each import Each
 from .panel_card import Card, CardTab
 from .panel_group import Group
 from .panel_group2 import Group2
-from .panel_slider import Slider, SliderConfig
-from .panel_string_editor import StringEditor
 from .panel_color import Color
-from .panel_object_picker import ObjectPicker, ObjectPickerConfig
-from .panel_function_editor import FunctionEditor, FunctionEditorConfig
 from .panel_html import PanelHtml
 from .panel_markdown import PanelMarkdown
 from .panel_weavelink import WeaveLink
-from .panel_sized_string import SizedString
 from .panel_container import *
+
+
+# editors
+from .panel_slider import Slider, SliderConfig
+from .panel_string_editor import StringEditor
+from .panel_function_editor import FunctionEditor, FunctionEditorConfig
+
+# Non-standard editor (todo: update)
+from .panel_object_picker import ObjectPicker, ObjectPickerConfig
 
 # Incomplete
 from .panel_histogram import *
