@@ -32,12 +32,10 @@ class Query(panel.Panel):
 
     @weave.op()
     def selected_refine(self) -> weave.types.Type:
-        return weave.types.Function(output_type=self.input_node.type)
+        return self.input_node.type
 
     @weave.op(
-        output_type=weave.types.Function(
-            output_type=weave.types.List(weave.types.TypedDict({}))
-        ),
+        output_type=weave.types.List(weave.types.TypedDict({})),
         refine_output_type=selected_refine,
     )
     def selected(self):
@@ -56,5 +54,4 @@ class Query(panel.Panel):
                     self.config.tableState.preFilterFunction, {"row": row}
                 ),
             )
-        return table_node
         return weave_internal.use(table_node)

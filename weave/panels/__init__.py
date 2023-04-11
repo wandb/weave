@@ -11,6 +11,7 @@ from .panel_card import Card, CardTab
 from .panel_group import Group
 from .panel_group2 import Group2
 from .panel_slider2 import Slider2, Slider2Config
+from .panel_string_editor import StringEditor
 from .panel_color import Color
 from .panel_object_picker import ObjectPicker, ObjectPickerConfig
 from .panel_expression_editor import ExpressionEditor, ExpressionEditorConfig
