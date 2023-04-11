@@ -81,6 +81,10 @@ def listindex(self, index):
     ),
 )
 def list_numbers_max(self):
+    # strip tags on list element values - @arrow_op handles this on
+    # the lists themselves, but not the elements
+
+    self = self.without_tags()
     a = arrow_as_array(self._arrow_data)
     start_indexes = a.offsets[:-1]
     end_indexes = a.offsets[1:]

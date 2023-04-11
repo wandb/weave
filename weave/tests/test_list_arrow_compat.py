@@ -10,6 +10,10 @@ import pytest
 from ..tests import tag_test_util as ttu
 from .. import ops
 
+from weave import weave_types as types
+from ..language_features.tagging import tag_store, make_tag_getter_op, tagged_value_type
+from .. import box
+
 
 def filter_fn(row) -> bool:
     return row < 3
@@ -610,3 +614,68 @@ def test_flatten_and_tags(use_arrow):
     ]
     assert item_tag_res == "1_1"
     assert list_tag_res == "1"
+
+
+@pytest.mark.parametrize(
+    "use_arrow",
+    [True, False],
+)
+def test_tag_pushdown_on_list_of_lists(use_arrow):
+    data = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
+    for i, row in enumerate(data):
+        for j, item in enumerate(row):
+            data[i][j] = tag_store.add_tags(box.box(item), {"row": i, "col": j})
+        data[i] = tag_store.add_tags(box.box(data[i]), {"list_tag": i})
+    data = tag_store.add_tags(box.box(data), {"top_tag": 2})
+    list_node = weave.save(data)
+
+    if use_arrow:
+        list_node = arrow.ops.list_to_arrow(list_node)
+
+    row_tag_getter = make_tag_getter_op.make_tag_getter_op("row", types.Int())
+    col_tag_getter = make_tag_getter_op.make_tag_getter_op("col", types.Int())
+    list_tag_getter = make_tag_getter_op.make_tag_getter_op("list_tag", types.Int())
+    top_tag_getter = make_tag_getter_op.make_tag_getter_op("top_tag", types.Int())
+
+    inner_func = (
+        lambda n: n
+        + row_tag_getter(n)
+        + col_tag_getter(n)
+        + list_tag_getter(n)
+        - top_tag_getter(n)
+        + 3
+    )
+
+    outer_func = lambda row: row.map(inner_func)
+    mapped = list_node.map(outer_func)
+
+    assert mapped.type == tagged_value_type.TaggedValueType(
+        types.TypedDict({"top_tag": types.Int()}),
+        (types.List if not use_arrow else arrow.ArrowWeaveListType)(
+            tagged_value_type.TaggedValueType(
+                types.TypedDict({"list_tag": types.Int(), "top_tag": types.Int()}),
+                types.List(
+                    tagged_value_type.TaggedValueType(
+                        types.TypedDict(
+                            {
+                                "row": types.Int(),
+                                "col": types.Int(),
+                                "top_tag": types.Int(),
+                                "list_tag": types.Int(),
+                            }
+                        ),
+                        types.Number(),
+                    )
+                ),
+            )
+        ),
+    )
+
+    output = weave.use(mapped)
+
+    if use_arrow:
+        output = output.to_pylist_tagged()
+
+    assert output == [
+        [data[i][j] + 3 + i + j - 2 + i for j in range(3)] for i in range(3)
+    ]

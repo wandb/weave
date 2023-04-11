@@ -158,7 +158,6 @@ def fast_map_fn(input_list, map_fn):
     # now map the remaining weave_fn (after resolving static branches above)
     # over the input list
     with tracer.trace("fast_map:map"):
-        # push down tags from outer list to item
         list_tags = (
             None
             if not tag_store.is_tagged(input_list)
@@ -166,23 +165,13 @@ def fast_map_fn(input_list, map_fn):
         )
         result = []
         for i, item in enumerate(input_list):
-            item_tags = tag_store.get_tags(item) if tag_store.is_tagged(item) else None
             item = box.box(item)
-            with tag_store.new_tagging_context():
-                if item_tags is not None:
-                    tag_store.add_tags(item, item_tags)
-                if list_tags is not None:
-                    tag_store.add_tags(
-                        item, list_tags, give_precedence_to_existing_tags=True
-                    )
-                item_result = _fast_apply_map_fn(item, i, map_fn)
-                item_result_tags = (
-                    tag_store.get_tags(item_result)
-                    if tag_store.is_tagged(item_result)
-                    else None
+            if list_tags is not None:
+                # push down list tags to elements, mirroring arrow map (apply_fn_node_with_tag_pushdown)
+                tag_store.add_tags(
+                    item, list_tags, give_precedence_to_existing_tags=True
                 )
 
-            if item_result_tags is not None:
-                tag_store.add_tags(item_result, item_result_tags)
+            item_result = _fast_apply_map_fn(item, i, map_fn)
             result.append(item_result)
         return result
