@@ -1,8 +1,8 @@
 import typing
 from ..api import op, mutation, weave_class
 from .. import weave_types as types
-import Levenshtein
 import re
+import numpy as np
 
 
 @op(name="root-string")
@@ -171,4 +171,31 @@ types.String.instance_class = String
 
 @op(name="string-levenshtein", render_info={"type": "function"})
 def levenshtein(str1: typing.Union[str, None], str2: typing.Union[str, None]) -> int:
-    return Levenshtein.distance(str1 or "", str2 or "")
+    return _levenshtein(str1 or "", str2 or "")
+
+
+def _levenshtein(str1: str, str2: str) -> int:
+    """calculate the number of single-character edits between str1 and str2"""
+    if len(str1) < len(str2):
+        return _levenshtein(str2, str1)
+
+    if len(str2) == 0:
+        return len(str1)
+
+    arr1 = np.array(tuple(str1))
+    arr2 = np.array(tuple(str2))
+
+    previous_row = np.arange(arr2.size + 1)
+    for s in arr1:
+        current_row = previous_row + 1
+        current_row[1:] = np.minimum(
+            current_row[1:],
+            np.add(previous_row[:-1], arr2 != s),
+        )
+        current_row[1:] = np.minimum(
+            current_row[1:],
+            current_row[0:-1] + 1,
+        )
+        previous_row = current_row
+
+    return previous_row[-1]
