@@ -217,20 +217,21 @@ class Server:
         await writer.drain()
 
     async def handle(self, req: ServerRequest) -> ServerResponse:
-        with tracer.trace("WBArtifactManager.handle.%s" % req.name, service="weave-am"):
+        with tracer.trace(
+            "WBArtifactManager.handle.%s" % req.name, service="weave-am"
+        ) as span:
+            span.set_tag("args", req.args)
             handler = getattr(self, f"handle_{req.name}", None)
             if handler is None:
                 raise errors.WeaveInternalError("No handler")
             resp = await handler(*req.args)
             return ServerResponse(req.id, resp)
 
-    async def handle_ensure_manifest(self, artifact_uri: str) -> typing.Optional[str]:
+    async def handle_ensure_manifest(
+        self, artifact_uri: str
+    ) -> typing.Optional[artifact_wandb.WandbArtifactManifest]:
         uri = artifact_wandb.WeaveWBArtifactURI.parse(artifact_uri)
-        manifest_path = self.wandb_file_manager.manifest_path(uri)
-        manifest = await self.wandb_file_manager.manifest(uri)
-        if manifest is None:
-            return None
-        return manifest_path
+        return await self.wandb_file_manager.manifest(uri)
 
     async def handle_ensure_file(self, artifact_uri: str) -> typing.Optional[str]:
         uri = artifact_wandb.WeaveWBArtifactURI.parse(artifact_uri)
@@ -366,14 +367,7 @@ class SyncClient:
     def manifest(
         self, artifact_uri: artifact_wandb.WeaveWBArtifactURI
     ) -> typing.Optional[artifact_wandb.WandbArtifactManifest]:
-        manifest_path: typing.Optional[str] = self.request(
-            "ensure_manifest", str(artifact_uri)
-        )
-        if manifest_path is None:
-            return None
-        with self.fs.open_read(manifest_path) as f:
-            with tracer.trace("json"):
-                return artifact_wandb.WandbArtifactManifest(json.load(f))
+        return self.request("ensure_manifest", str(artifact_uri))
 
     def ensure_file(
         self, artifact_uri: artifact_wandb.WeaveWBArtifactURI
