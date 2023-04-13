@@ -11,6 +11,7 @@ from wandb.apis import public as wb_public
 from wandb.util import hex_to_b64_id, b64_to_hex_id
 
 from . import uris
+from . import util
 from . import errors
 from . import wandb_client_api
 from . import file_base
@@ -580,13 +581,19 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         files = {}
         total_size = 0
         sub_dir_sizes = {}
+        cwd = os.getcwd()
         for entry_path in dir_paths:
             entry = manifest.get_entry_by_path(entry_path)
             path_size = (
                 entry["size"] if entry is not None and entry["size"] is not None else 0
             )
             total_size += path_size
-            rel_path = os.path.relpath(entry_path, path)
+
+            # this used to be os.path.relpath but that called os.getcwd() every time
+            # that turned out to be a bottleneck in production for artifacts with many
+            # dir paths, so we use our own implementation that takes the cwd as input
+            # and doesn't need to ever call os.getcwd()
+            rel_path = util.relpath_no_syscalls(entry_path, path, cwd)
             rel_path_parts = rel_path.split("/")
             if len(rel_path_parts) == 1:
                 files[rel_path_parts[0]] = artifact_fs.FilesystemArtifactFile(
