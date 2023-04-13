@@ -16,6 +16,7 @@ class TypeCount(typing.TypedDict):
 
 def history_key_type_count_to_weave_type(tc: TypeCount) -> types.Type:
     from .wbmedia import ImageArtifactFileRefType
+    from .trace_tree import WBTraceTree
 
     tc_type = tc["type"]
     if tc_type == "string":
@@ -56,4 +57,6 @@ def history_key_type_count_to_weave_type(tc: TypeCount) -> types.Type:
         )
     elif tc_type == "image-file":
         return ImageArtifactFileRefType()
+    elif tc_type == "wb_trace_tree":
+        return WBTraceTree.WeaveType()  # type: ignore
     return types.UnknownType()

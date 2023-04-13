@@ -18,6 +18,7 @@ from . import repo_insight_ops
 # TODO: Investigate these
 from .wbmedia import *
 from .table import *
+from .trace_tree import *
 
 # from . import wbartifact
 # from . import file_wbartifact
