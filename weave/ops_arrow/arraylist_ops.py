@@ -1,5 +1,6 @@
 import typing
 import pyarrow as pa
+from pyarrow import compute as pc
 
 from .. import weave_types as types
 from ..decorator_arrow_op import arrow_op
@@ -101,6 +102,92 @@ def list_numbers_max(self):
     return ArrowWeaveList(
         result,
         self.object_type.object_type,
+        self._artifact,
+    )
+
+
+# This iterates over the outer list in python but keeps the inner comparisons vectorized
+# in arrow.
+def compare_sublists(array1: pa.ListArray, array2: pa.ListArray) -> pa.Array:
+    if len(array1) != len(array2):
+        raise ValueError("The input arrays have different lengths")
+
+    result = []
+    flattened1 = array1.flatten()
+    flattened2 = array2.flatten()
+    offsets1 = array1.offsets.to_pylist()
+    offsets2 = array2.offsets.to_pylist()
+
+    for i in range(len(array1)):
+        start1, end1 = offsets1[i], offsets1[i + 1]
+        start2, end2 = offsets2[i], offsets2[i + 1]
+        sublist1 = flattened1.slice(start1, end1 - start1)
+        sublist2 = flattened2.slice(start2, end2 - start2)
+        result.append(sublist1.equals(sublist2))
+
+    return result
+
+
+@arrow_op(
+    name="ArrowWeaveListListNumber-equal",
+    input_type={
+        "self": ArrowWeaveListType(
+            types.optional(
+                types.UnionType(
+                    types.List(types.optional(types.Number())),
+                    ArrowWeaveListType(types.optional(types.Number())),
+                )
+            )
+        ),
+        "other": ArrowWeaveListType(
+            types.optional(
+                types.UnionType(
+                    types.List(types.optional(types.Number())),
+                    ArrowWeaveListType(types.optional(types.Number())),
+                )
+            )
+        ),
+    },
+    output_type=lambda input_types: ArrowWeaveListType(types.Boolean()),
+)
+def list_equal(self, other):
+    return ArrowWeaveList(
+        pa.array(
+            compare_sublists(
+                self.without_tags()._arrow_data, other.without_tags()._arrow_data
+            )
+        ),
+        types.Boolean(),
+        self._artifact,
+    )
+
+
+@arrow_op(
+    name="ArrowWeaveListListNumber-notEqual",
+    input_type={
+        "self": ArrowWeaveListType(
+            types.optional(
+                types.UnionType(
+                    types.List(types.optional(types.Number())),
+                    ArrowWeaveListType(types.optional(types.Number())),
+                )
+            )
+        ),
+        "other": ArrowWeaveListType(
+            types.optional(
+                types.UnionType(
+                    types.List(types.optional(types.Number())),
+                    ArrowWeaveListType(types.optional(types.Number())),
+                )
+            )
+        ),
+    },
+    output_type=lambda input_types: ArrowWeaveListType(types.Boolean()),
+)
+def list_not_equal(self, other):
+    return ArrowWeaveList(
+        pc.invert(list_equal.resolve_fn(self, other)._arrow_data),
+        types.Boolean(),
         self._artifact,
     )
 

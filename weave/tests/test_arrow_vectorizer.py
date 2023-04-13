@@ -1254,3 +1254,28 @@ def test_listnumbersmax_with_tagged_inner_elements():
     )
 
     assert weave.use(res_node).to_pylist_tagged() == [3, 4, 6]
+
+
+def test_list_numbers_equal_notequal():
+    list_array1 = arrow.to_arrow([[1, 2, 3], [4, 5, 6], [7, 8, 9]])
+    list_array2 = arrow.to_arrow([[1, 2, 3], [4, 5, 6], [7, 8, 9]])
+    list_array3 = arrow.to_arrow([[1, 2], [4, 5, 6], [7, 8, 9]])
+    list_array4 = arrow.to_arrow([[1, 2, 3], None, [7, 8, 9]])
+    list_array5 = arrow.to_arrow([[1, 2], None, [7, 8, 9]])
+    list_array6 = arrow.to_arrow([[1, 2, 3], [None, 5, 6], [7, 8, 9]])
+    list_array7 = arrow.to_arrow([[1, 2], [None, 5, 6], [7, 8, 9]])
+
+    l1 = weave.save(list_array1)
+    l2 = weave.save(list_array2)
+    l3 = weave.save(list_array3)
+    l4 = weave.save(list_array4)
+    l5 = weave.save(list_array5)
+    l6 = weave.save(list_array6)
+    l7 = weave.save(list_array7)
+
+    assert weave.use(l1 == l2).to_pylist_notags() == [True, True, True]
+    assert weave.use(l1 == l3).to_pylist_notags() == [False, True, True]
+    assert weave.use(l4 == l2).to_pylist_notags() == [True, False, True]
+    assert weave.use(l4 == l5).to_pylist_notags() == [False, True, True]
+    assert weave.use(l6 == l2).to_pylist_notags() == [True, False, True]
+    assert weave.use(l6 == l7).to_pylist_notags() == [False, True, True]
