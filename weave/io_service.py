@@ -6,7 +6,6 @@
 # traces in local development.
 # TODO: Fix
 
-import aioprocessing
 import uuid
 import asyncio
 import dataclasses
@@ -26,8 +25,8 @@ from . import wandb_api
 from . import wandb_file_manager
 from . import server_error_handling
 
-
-from typing import Any, Callable, Dict, TypeVar, Generic
+from .async_queue import BaseAsyncQueue, AsyncThreadQueue, AsyncProcessQueue
+from typing import Any, Callable, Dict, TypeVar
 
 
 tracer = engine_trace.tracer()  # type: ignore
@@ -35,56 +34,6 @@ statsd = engine_trace.statsd()  # type: ignore
 
 
 QueueItemType = TypeVar("QueueItemType")
-
-
-class BaseAsyncQueue(Generic[QueueItemType]):
-    async def put(self, item: QueueItemType) -> None:
-        raise NotImplementedError
-
-    async def get(self) -> QueueItemType:
-        raise NotImplementedError
-
-    async def task_done(self) -> None:
-        raise NotImplementedError
-
-    async def join(self) -> None:
-        raise NotImplementedError
-
-
-class AsyncThreadQueue(BaseAsyncQueue, Generic[QueueItemType]):
-    def __init__(self, maxsize: int = 0):
-        self._queue: asyncio.Queue = asyncio.Queue(maxsize=maxsize)
-
-    async def put(self, item: QueueItemType) -> None:
-        await self._queue.put(item)
-
-    async def get(self) -> QueueItemType:
-        item = await self._queue.get()
-        return item
-
-    async def task_done(self) -> None:
-        self._queue.task_done()
-
-    async def join(self) -> None:
-        await self._queue.join()
-
-
-class AsyncProcessQueue(BaseAsyncQueue, Generic[QueueItemType]):
-    def __init__(self, maxsize: int = 0):
-        self._queue: aioprocessing.AioQueue = aioprocessing.AioQueue(maxsize=maxsize)
-
-    async def put(self, item: QueueItemType) -> None:
-        await self._queue.coro_put(item)
-
-    async def get(self) -> QueueItemType:
-        item = await self._queue.coro_get()
-        return item
-
-    async def task_done(self) -> None:
-        await self._queue.coro_task_done()
-
-    async def join(self) -> None:
-        await self._queue.coro_join()
 
 
 class ArtifactMetadata(typing.TypedDict):
