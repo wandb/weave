@@ -198,4 +198,4 @@ def _levenshtein(str1: str, str2: str) -> int:
         )
         previous_row = current_row
 
-    return previous_row[-1]
+    return previous_row[-1].item()
