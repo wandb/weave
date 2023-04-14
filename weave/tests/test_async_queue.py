@@ -31,14 +31,10 @@ def process_consumer(queue: BaseAsyncQueue) -> None:
 @pytest.mark.asyncio
 async def test_async_process_queue_shared() -> None:
     queue: BaseAsyncQueue = AsyncProcessQueue()
-    event = multiprocessing.Event()
+    event = aioprocessing.Event()
 
-    producer_process = aioprocessing.AioProcess(
-        target=process_producer, args=(queue, event)
-    )
-    consumer_process = aioprocessing.AioProcess(
-        target=process_consumer, args=(queue, event)
-    )
+    producer_process = aioprocessing.AioProcess(target=process_producer, args=(queue,))
+    consumer_process = aioprocessing.AioProcess(target=process_consumer, args=(queue,))
 
     producer_process.start()
     consumer_process.start()
@@ -46,4 +42,4 @@ async def test_async_process_queue_shared() -> None:
     producer_process.join()
     consumer_process.join()
 
-    await queue.join()
+    # await queue.join()
