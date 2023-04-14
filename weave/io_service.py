@@ -6,21 +6,15 @@
 # traces in local development.
 # TODO: Fix
 
+import aioprocessing
+import uuid
 import asyncio
-import json
-import socket
 import dataclasses
 import typing
 import contextlib
 import multiprocessing
-import logging
 import traceback
 import threading
-import queue
-import atexit
-import os
-
-from requests import HTTPError
 
 
 from . import artifact_wandb
@@ -30,14 +24,67 @@ from . import filesystem
 from . import weave_http
 from . import wandb_api
 from . import wandb_file_manager
-from . import util
 from . import server_error_handling
+
+
+from typing import Any, Callable, Dict, TypeVar, Generic
 
 
 tracer = engine_trace.tracer()  # type: ignore
 statsd = engine_trace.statsd()  # type: ignore
 
-SOCKET_PATH = "/tmp/weave-io-service.sock"
+
+QueueItemType = TypeVar("QueueItemType")
+
+
+class BaseAsyncQueue(Generic[QueueItemType]):
+    async def put(self, item: QueueItemType) -> None:
+        raise NotImplementedError
+
+    async def get(self) -> QueueItemType:
+        raise NotImplementedError
+
+    async def task_done(self) -> None:
+        raise NotImplementedError
+
+    async def join(self) -> None:
+        raise NotImplementedError
+
+
+class AsyncThreadQueue(BaseAsyncQueue, Generic[QueueItemType]):
+    def __init__(self, maxsize: int = 0):
+        self._queue: asyncio.Queue = asyncio.Queue(maxsize=maxsize)
+
+    async def put(self, item: QueueItemType) -> None:
+        await self._queue.put(item)
+
+    async def get(self) -> QueueItemType:
+        item = await self._queue.get()
+        return item
+
+    async def task_done(self) -> None:
+        self._queue.task_done()
+
+    async def join(self) -> None:
+        await self._queue.join()
+
+
+class AsyncProcessQueue(BaseAsyncQueue, Generic[QueueItemType]):
+    def __init__(self, maxsize: int = 0):
+        self._queue: aioprocessing.AioQueue = aioprocessing.AioQueue(maxsize=maxsize)
+
+    async def put(self, item: QueueItemType) -> None:
+        await self._queue.coro_put(item)
+
+    async def get(self) -> QueueItemType:
+        item = await self._queue.coro_get()
+        return item
+
+    async def task_done(self) -> None:
+        await self._queue.coro_task_done()
+
+    async def join(self) -> None:
+        await self._queue.coro_join()
 
 
 class ArtifactMetadata(typing.TypedDict):
@@ -77,6 +124,7 @@ class ServerRequestContext:
 
 @dataclasses.dataclass
 class ServerRequest:
+    client_id: str
     name: str
     args: typing.Tuple
     context: ServerRequestContext
@@ -95,9 +143,31 @@ class ServerRequest:
             "id": self.id,
         }
 
+    def error_response(
+        self, http_error_code: int, error: Exception
+    ) -> "ServerResponse":
+        return ServerResponse(
+            http_error_code=http_error_code,
+            client_id=self.client_id,
+            id=self.id,
+            # TODO(DG): this is a hack, we should be able to serialize the exception
+            value=str(error),
+            error=True,
+        )
+
+    def success_response(self, value: typing.Any) -> "ServerResponse":
+        return ServerResponse(
+            http_error_code=200,
+            error=False,
+            client_id=self.client_id,
+            id=self.id,
+            value=value,
+        )
+
 
 @dataclasses.dataclass
 class ServerResponse:
+    client_id: str
     id: int
     value: typing.Any
     error: bool = False
@@ -117,120 +187,84 @@ class ServerResponse:
         }
 
 
+HandlerFunction = Callable[..., Any]
+
+
 class Server:
-    def __init__(self, socket_path: str = SOCKET_PATH, process: bool = False) -> None:
-        self.socket_path = socket_path + "-" + util.rand_string_n(10)
-        self.ready_queue: typing.Union[queue.Queue, multiprocessing.Queue]
+    def __init__(
+        self,
+        process: bool = False,
+    ) -> None:
+        self.handlers: Dict[str, HandlerFunction] = {}
+
+        self.ready_queue: BaseAsyncQueue[bool]
         self.process: typing.Union[threading.Thread, multiprocessing.Process]
+        self.request_queue: BaseAsyncQueue[ServerRequest]
+        self.response_queues: Dict[str, BaseAsyncQueue[ServerResponse]] = {}
+        self.response_queue_factory: Callable[[], BaseAsyncQueue[ServerResponse]]
+
         if process:
-            self.ready_queue = multiprocessing.Queue()
+            self.request_queue = AsyncProcessQueue()
+            self.response_queue_factory = AsyncProcessQueue
+            self.ready_queue = AsyncProcessQueue()
             self.process = multiprocessing.Process(
                 target=self.server_process, daemon=True
             )
         else:
-            self.ready_queue = queue.Queue()
+            self.request_queue = AsyncThreadQueue()
+            self.response_queue_factory = AsyncThreadQueue
+            self.ready_queue = AsyncThreadQueue()
             self.process = threading.Thread(target=self.server_process, daemon=True)
-
-    def start(self) -> None:
-        self.process.start()
-        self.ready_queue.get()
-
-    def cleanup(self) -> None:
-        statsd.flush()
-        try:
-            os.remove(self.socket_path)
-        except OSError:
-            pass
 
     def server_process(self) -> None:
         asyncio.run(self.main(), debug=True)
 
+    async def start(self) -> None:
+        self.process.start()
+        await self.ready_queue.get()
+
+    def cleanup(self) -> None:
+        statsd.flush()
+
     async def main(self) -> None:
         fs = filesystem.get_filesystem_async()
         net = weave_http.HttpAsync(fs)
+
         self.wandb_file_manager = wandb_file_manager.WandbFileManagerAsync(
             fs, net, await wandb_api.get_wandb_api()
         )
-        server = await asyncio.start_unix_server(
-            self.handle_connection, path=self.socket_path
-        )
-        atexit.register(self.cleanup)
-        async with server:
-            self.ready_queue.put(True)
-            await server.serve_forever()
-
-    async def handle_connection(
-        self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
-    ) -> None:
-        running_tasks = set()
-
-        def _task_done(task: asyncio.Task) -> None:
-            running_tasks.discard(task)
-            e = task.exception()
-            if e is not None:
-                logging.error(
-                    "WBArtifactManager crash: %s",
-                    traceback.format_exception(e.__class__, e, e.__traceback__),
-                )
 
         while True:
-            req = await reader.readline()
-            if not req:
-                break
-            task = asyncio.create_task(self.handle_raw(req, writer))
-            running_tasks.add(task)
-            task.add_done_callback(_task_done)
+            req = await self.request_queue.get()
+            if req.name not in self.handlers:
+                resp = req.error_response(
+                    404, errors.WeaveBadRequest(f"No handler named {req.name!r}")
+                )
+            else:
+                try:
+                    resp = req.success_response(
+                        await self.handlers[req.name](*req.args)
+                    )
+                except Exception as e:
+                    resp = req.error_response(500, e)
+            await self.response_queues[req.client_id].put(resp)
 
-    async def handle_raw(
-        self, req: typing.Optional[bytes], writer: asyncio.StreamWriter
-    ) -> None:
-        if not req:
-            return
-        decoded = req.decode()
-        if not "\n" in decoded:
-            # new newline means we got EOF
-            return
-        json_req = json.loads(decoded)
-        server_req = ServerRequest.from_json(json_req)
-        try:
-            tracer.context_provider.activate(server_req.context.trace_context)
-            with wandb_api.wandb_api_context(server_req.context.wandb_api_context):
-                resp = await self.handle(server_req)
-        except Exception as e:
-            logging.error(
-                "WBArtifactManager request error: %s\n", traceback.format_exc()
-            )
-            print("WBArtifactManager request error: %s\n", traceback.format_exc())
-            error_response = ServerResponse(
-                server_req.id,
-                str(e),
-                error=True,
-                http_error_code=server_error_handling.maybe_extract_code_from_exception(
-                    e
-                ),
-            )
-            writer.write((json.dumps(error_response.to_json()) + "\n").encode())
-            await writer.drain()
-            return
+    def register_handler(self, name: str, handler: HandlerFunction) -> None:
+        self.handlers[name] = handler
 
-        writer.write((json.dumps(resp.to_json()) + "\n").encode())
-        await writer.drain()
+    def register_client(self, client_id: str) -> None:
+        if client_id not in self.response_queues:
+            self.response_queues[client_id] = self.response_queue_factory()
 
-    async def handle(self, req: ServerRequest) -> ServerResponse:
-        with tracer.trace("WBArtifactManager.handle.%s" % req.name, service="weave-am"):
-            handler = getattr(self, f"handle_{req.name}", None)
-            if handler is None:
-                raise errors.WeaveInternalError("No handler")
-            resp = await handler(*req.args)
-            return ServerResponse(req.id, resp)
+    def unregister_client(self, client_id: str) -> None:
+        if client_id in self.response_queues:
+            del self.response_queues[client_id]
 
-    async def handle_ensure_manifest(self, artifact_uri: str) -> typing.Optional[str]:
+    async def handle_ensure_manifest(
+        self, artifact_uri: str
+    ) -> typing.Optional[artifact_wandb.WandbArtifactManifest]:
         uri = artifact_wandb.WeaveWBArtifactURI.parse(artifact_uri)
-        manifest_path = self.wandb_file_manager.manifest_path(uri)
-        manifest = await self.wandb_file_manager.manifest(uri)
-        if manifest is None:
-            return None
-        return manifest_path
+        return await self.wandb_file_manager.manifest(uri)
 
     async def handle_ensure_file(self, artifact_uri: str) -> typing.Optional[str]:
         uri = artifact_wandb.WeaveWBArtifactURI.parse(artifact_uri)
@@ -250,18 +284,20 @@ def get_server() -> Server:
     with SERVER_START_LOCK:
         if SERVER is None:
             SERVER = Server(process=False)
-            SERVER.start()
+            asyncio.run(SERVER.start())
         return SERVER
 
 
 class AsyncConnection:
     def __init__(
-        self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+        self,
+        request_queue: BaseAsyncQueue[ServerRequest],
+        response_queue: BaseAsyncQueue[ServerResponse],
     ) -> None:
-        self.reader = reader
-        self.writer = writer
         self.request_id = 0
         self.requests: typing.Dict[int, asyncio.Future] = {}
+        self.request_queue: BaseAsyncQueue[ServerRequest] = request_queue
+        self.response_queue: BaseAsyncQueue[ServerResponse] = response_queue
         self.response_task = asyncio.create_task(self.handle_responses())
         self.response_task.add_done_callback(self.response_task_ended)
 
@@ -273,23 +309,14 @@ class AsyncConnection:
             raise exc
 
     async def close(self) -> None:
-        self.writer.close()
-        await self.writer.wait_closed()
-        self.response_task.cancel()
+        pass
 
     async def handle_responses(self) -> None:
         while True:
-            resp = await self.reader.readline()
+            resp = await self.response_queue.get()
             if not resp:
                 return
-            decoded = resp.decode()
-            if not "\n" in decoded:
-                raise errors.WeaveWandbArtifactManagerError(
-                    "Connection to ArtifactManager lost"
-                )
-            json_resp = json.loads(decoded)
-            server_resp = ServerResponse.from_json(json_resp)
-            self.requests[server_resp.id].set_result(server_resp)
+            self.requests[resp.id].set_result(resp)
 
     async def request(self, req: ServerRequest) -> ServerResponse:
         # Caller must check ServerResponse.error!
@@ -297,62 +324,54 @@ class AsyncConnection:
         self.request_id += 1
         response_future: asyncio.Future[ServerResponse] = asyncio.Future()
         self.requests[req.id] = response_future
-        self.writer.write((json.dumps(req.to_json()) + "\n").encode())
-        await self.writer.drain()
+        await self.request_queue.put(req)
         return await response_future
 
 
 class AsyncClient:
     def __init__(self, server: Server) -> None:
+        self.client_id = str(uuid.uuid4())
         self.server = server
 
     @contextlib.asynccontextmanager
     async def connect(self) -> typing.AsyncGenerator[AsyncConnection, None]:
-        self.reader, self.writer = await asyncio.open_unix_connection(
-            self.server.socket_path
+        self.server.register_client(self.client_id)
+        conn = AsyncConnection(
+            self.server.request_queue, self.server.response_queues[self.client_id]
         )
-        conn = AsyncConnection(self.reader, self.writer)
         try:
             yield conn
         finally:
+            self.server.unregister_client(self.client_id)
             await conn.close()
 
 
 class SyncClient:
     def __init__(self, server: Server, fs: filesystem.Filesystem) -> None:
+        self.client_id = str(uuid.uuid4())
         self.fs = fs
         self.server = server
+        self._current_request_id = 0
 
     def request(self, name: str, *args: typing.Any) -> typing.Any:
         wb_ctx = wandb_api.get_wandb_api_context()
         cur_trace_context = tracer.current_trace_context()
+        self._current_request_id += 1
+
         request = ServerRequest(
+            self.client_id,
             name,
             args,
             ServerRequestContext(cur_trace_context, wb_ctx),
+            id=self._current_request_id,
         )
-        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
-            sock.connect(self.server.socket_path)
-            msg = (json.dumps(request.to_json()) + "\n").encode()
-            sock.sendall(msg)
-            resp_msgs = []
-            # server uses writeline, so we read until \n
-            while True:
-                data = sock.recv(4096)
-                if not data:
-                    break
-                resp_msgs.append(data)
-                if ord("\n") in data:
-                    break
-        resp = b"".join(resp_msgs)
 
-        decoded = resp.decode()
-        if not "\n" in decoded:
-            raise errors.WeaveWandbArtifactManagerError(
-                "Connection to ArtifactManager lost"
-            )
-        json_resp = json.loads(decoded)
-        server_resp = ServerResponse.from_json(json_resp)
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(self.server.request_queue.put(request))
+        server_resp = loop.run_until_complete(
+            self.server.response_queues[self.client_id].get()
+        )
+
         if server_resp.error:
             if server_resp.http_error_code != None:
                 raise server_error_handling.WeaveInternalHttpException.from_code(
@@ -366,14 +385,10 @@ class SyncClient:
     def manifest(
         self, artifact_uri: artifact_wandb.WeaveWBArtifactURI
     ) -> typing.Optional[artifact_wandb.WandbArtifactManifest]:
-        manifest_path: typing.Optional[str] = self.request(
+        manifest: typing.Optional[artifact_wandb.WandbArtifactManifest] = self.request(
             "ensure_manifest", str(artifact_uri)
         )
-        if manifest_path is None:
-            return None
-        with self.fs.open_read(manifest_path) as f:
-            with tracer.trace("json"):
-                return artifact_wandb.WandbArtifactManifest(json.load(f))
+        return manifest
 
     def ensure_file(
         self, artifact_uri: artifact_wandb.WeaveWBArtifactURI
