@@ -75,4 +75,4 @@ class TraceLocal:
     def save_object(
         self, obj: typing.Any, name: typing.Optional[str] = None
     ) -> ref_base.Ref:
-        return storage.save(obj, name=name)
+        return storage.save(obj, name=name, branch="latest")
