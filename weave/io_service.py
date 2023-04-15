@@ -28,7 +28,7 @@ from . import wandb_file_manager
 from . import server_error_handling
 
 from .async_queue import BaseAsyncQueue, AsyncThreadQueue, AsyncProcessQueue
-from typing import Any, Coroutine, Callable, Dict, TypeVar
+from typing import Any, Callable, Dict, TypeVar
 
 
 tracer = engine_trace.tracer()  # type: ignore
