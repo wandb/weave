@@ -6,6 +6,8 @@
 # traces in local development.
 # TODO: Fix
 
+import queue
+import atexit
 import uuid
 import asyncio
 import dataclasses
@@ -136,7 +138,7 @@ class ServerResponse:
         }
 
 
-HandlerFunction = Callable[..., Any]
+HandlerFunction = Callable[[], Any]
 
 
 class Server:
@@ -145,12 +147,12 @@ class Server:
         process: bool = False,
     ) -> None:
         self.handlers: Dict[str, HandlerFunction] = {}
-
         self.ready_queue: multiprocessing.Queue = multiprocessing.Queue()
         self.process: typing.Union[threading.Thread, multiprocessing.Process]
         self.request_queue: BaseAsyncQueue[ServerRequest]
         self.response_queues: Dict[str, BaseAsyncQueue[ServerResponse]] = {}
         self.response_queue_factory: Callable[[], BaseAsyncQueue[ServerResponse]]
+        self.running = True
 
         if process:
             self.request_queue = AsyncProcessQueue()
@@ -182,8 +184,12 @@ class Server:
         )
 
         self.ready_queue.put(True)
-        while True:
-            req = await self.request_queue.get()
+        while self.running:
+            try:
+                req = await self.request_queue.get(block=False)
+            except queue.Empty:
+                await asyncio.sleep(1e-6)  # wait 1 microsecond
+                continue
             if req.name not in self.handlers:
                 resp = req.error_response(
                     404, errors.WeaveBadRequest(f"No handler named {req.name!r}")
@@ -195,6 +201,7 @@ class Server:
                     )
                 except Exception as e:
                     resp = req.error_response(500, e)
+            self.request_queue.task_done()
             await self.response_queues[req.client_id].put(resp)
 
     def register_handler(self, name: str, handler: HandlerFunction) -> None:
@@ -203,6 +210,10 @@ class Server:
     def register_client(self, client_id: str) -> None:
         if client_id not in self.response_queues:
             self.response_queues[client_id] = self.response_queue_factory()
+
+    def shutdown(self) -> None:
+        self.running = False
+        self.process.join()
 
     def unregister_client(self, client_id: str) -> None:
         if client_id in self.response_queues:
@@ -232,6 +243,7 @@ def get_server() -> Server:
     with SERVER_START_LOCK:
         if SERVER is None:
             SERVER = Server(process=False)
+            atexit.register(SERVER.shutdown)
             SERVER.start()
         return SERVER
 
@@ -314,11 +326,12 @@ class SyncClient:
             id=self._current_request_id,
         )
 
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(self.server.request_queue.put(request))
-        server_resp = loop.run_until_complete(
-            self.server.response_queues[self.client_id].get()
-        )
+        response_queue = self.server.response_queues[self.client_id]
+
+        # loop = asyncio.get_event_loop()
+        asyncio.run(self.server.request_queue.put(request))
+        server_resp = asyncio.run(response_queue.get())
+        response_queue.task_done()
 
         if server_resp.error:
             if server_resp.http_error_code != None:

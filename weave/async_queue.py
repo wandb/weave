@@ -1,6 +1,5 @@
-import asyncio
 import aioprocessing
-from typing import Any, Generic, TypeVar
+from typing import Optional, Generic, TypeVar
 
 QueueItemType = TypeVar("QueueItemType")
 
@@ -9,7 +8,9 @@ class BaseAsyncQueue(Generic[QueueItemType]):
     async def put(self, item: QueueItemType) -> None:
         raise NotImplementedError
 
-    async def get(self) -> QueueItemType:
+    async def get(
+        self, block: bool = True, timeout: Optional[int] = None
+    ) -> QueueItemType:
         raise NotImplementedError
 
     async def join(self) -> None:
@@ -28,8 +29,10 @@ class AsyncProcessQueue(BaseAsyncQueue, Generic[QueueItemType]):
     async def put(self, item: QueueItemType) -> None:
         await self._queue.coro_put(item)
 
-    async def get(self) -> QueueItemType:
-        return await self._queue.coro_get()
+    async def get(
+        self, block: bool = True, timeout: Optional[int] = None
+    ) -> QueueItemType:
+        return await self._queue.coro_get(block=block, timeout=timeout)
 
     async def join(self) -> None:
         await self._queue.coro_join()
