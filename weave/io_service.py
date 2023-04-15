@@ -42,6 +42,7 @@ class ArtifactMetadata(typing.TypedDict):
     created_at: str
 
 
+# ServerRequestContext holds the context for server requests
 @dataclasses.dataclass
 class ServerRequestContext:
     trace_context: typing.Optional[engine_trace.TraceContext]
@@ -73,6 +74,7 @@ class ServerRequestContext:
         }
 
 
+# ServerRequest represents a request object sent to the server
 @dataclasses.dataclass
 class ServerRequest:
     client_id: str
@@ -116,6 +118,7 @@ class ServerRequest:
         )
 
 
+# ServerResponse represents a response object returned by the server
 @dataclasses.dataclass
 class ServerResponse:
     client_id: str
@@ -141,6 +144,7 @@ class ServerResponse:
 HandlerFunction = Callable[[], Any]
 
 
+# Server class is responsible for managing server lifecycle and handling requests
 class Server:
     def __init__(
         self,
@@ -165,16 +169,27 @@ class Server:
             self.response_queue_factory = AsyncThreadQueue
             self.process = threading.Thread(target=self.server_process, daemon=True)
 
+    # server_process runs the server's main coroutine
     def server_process(self) -> None:
         asyncio.run(self.main(), debug=True)
 
+    # start starts the server thread or process
     def start(self) -> None:
         self.process.start()
         self.ready_queue.get()
 
+    # cleanup performs cleanup actions, such as flushing stats
     def cleanup(self) -> None:
         statsd.flush()
 
+    # shutdown stops the server and joins the thread/process
+    def shutdown(self) -> None:
+        self.running = False
+        if self.process.is_alive():
+            self.process.join()
+        self.cleanup()
+
+    # main is the server's main coroutine, handling incoming requests
     async def main(self) -> None:
         fs = filesystem.get_filesystem_async()
         net = weave_http.HttpAsync(fs)
@@ -211,10 +226,6 @@ class Server:
     def register_client(self, client_id: str) -> None:
         if client_id not in self.response_queues:
             self.response_queues[client_id] = self.response_queue_factory()
-
-    def shutdown(self) -> None:
-        self.running = False
-        self.process.join()
 
     def unregister_client(self, client_id: str) -> None:
         if client_id in self.response_queues:
@@ -260,6 +271,7 @@ class AsyncConnection:
         self.response_queue: BaseAsyncQueue[ServerResponse] = response_queue
         self.response_task = asyncio.create_task(self.handle_responses())
         self.response_task.add_done_callback(self.response_task_ended)
+        self.connected = True
 
     def response_task_ended(self, task: asyncio.Task) -> None:
         exc = task.exception()
@@ -269,13 +281,15 @@ class AsyncConnection:
             raise exc
 
     async def close(self) -> None:
-        pass
+        self.connected = False
 
     async def handle_responses(self) -> None:
-        while True:
-            resp = await self.response_queue.get()
-            if not resp:
-                return
+        while self.connected:
+            try:
+                resp = await self.response_queue.get(block=False)
+            except queue.Empty:
+                await asyncio.sleep(1e-6)
+                continue
             self.requests[resp.id].set_result(resp)
 
     async def request(self, req: ServerRequest) -> ServerResponse:
