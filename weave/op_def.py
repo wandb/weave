@@ -283,6 +283,10 @@ class OpDef:
             if final_output_type == None:
                 # This can happen due to nullability. In that case, accept the output type is null
                 final_output_type = types.NoneType()
+            # Have to deref if in case a ref came back...
+            from . import storage
+
+            final_output_type = storage.deref(final_output_type)
 
             final_output_type = (
                 process_opdef_output_type.process_opdef_refined_output_type(
