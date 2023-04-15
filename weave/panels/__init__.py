@@ -16,6 +16,7 @@ from .panel_table import Table
 from .panel_plot import Plot
 from .panel_facet import Facet
 from .panel_each import Each
+from .panel_each_column import EachColumn
 from .panel_color import Color
 from .panel_html import PanelHtml
 from .panel_markdown import PanelMarkdown
