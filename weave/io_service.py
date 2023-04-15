@@ -146,7 +146,7 @@ class Server:
     ) -> None:
         self.handlers: Dict[str, HandlerFunction] = {}
 
-        self.ready_queue: BaseAsyncQueue[bool]
+        self.ready_queue: multiprocessing.Queue = multiprocessing.Queue()
         self.process: typing.Union[threading.Thread, multiprocessing.Process]
         self.request_queue: BaseAsyncQueue[ServerRequest]
         self.response_queues: Dict[str, BaseAsyncQueue[ServerResponse]] = {}
@@ -155,22 +155,20 @@ class Server:
         if process:
             self.request_queue = AsyncProcessQueue()
             self.response_queue_factory = AsyncProcessQueue
-            self.ready_queue = AsyncProcessQueue()
             self.process = multiprocessing.Process(
                 target=self.server_process, daemon=True
             )
         else:
             self.request_queue = AsyncThreadQueue()
             self.response_queue_factory = AsyncThreadQueue
-            self.ready_queue = AsyncThreadQueue()
             self.process = threading.Thread(target=self.server_process, daemon=True)
 
     def server_process(self) -> None:
         asyncio.run(self.main(), debug=True)
 
-    async def start(self) -> None:
+    def start(self) -> None:
         self.process.start()
-        await self.ready_queue.get()
+        self.ready_queue.get()
 
     def cleanup(self) -> None:
         statsd.flush()
@@ -183,6 +181,7 @@ class Server:
             fs, net, await wandb_api.get_wandb_api()
         )
 
+        self.ready_queue.put(True)
         while True:
             req = await self.request_queue.get()
             if req.name not in self.handlers:
@@ -233,7 +232,7 @@ def get_server() -> Server:
     with SERVER_START_LOCK:
         if SERVER is None:
             SERVER = Server(process=False)
-            asyncio.run(SERVER.start())
+            SERVER.start()
         return SERVER
 
 
