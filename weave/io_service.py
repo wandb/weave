@@ -186,6 +186,7 @@ class Server:
         self.ready_queue.put(True)
         while self.running:
             try:
+                # dont block so that we dont hang shutdown
                 req = await self.request_queue.get(block=False)
             except queue.Empty:
                 await asyncio.sleep(1e-6)  # wait 1 microsecond
