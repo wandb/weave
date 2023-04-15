@@ -19,24 +19,6 @@ class BaseAsyncQueue(Generic[QueueItemType]):
         raise NotImplementedError
 
 
-class AsyncThreadQueue(BaseAsyncQueue, Generic[QueueItemType]):
-    def __init__(self, maxsize: int = 0):
-        self._queue: asyncio.Queue = asyncio.Queue(maxsize=maxsize)
-
-    async def put(self, item: QueueItemType) -> None:
-        await self._queue.put(item)
-
-    async def get(self) -> QueueItemType:
-        item = await self._queue.get()
-        return item
-
-    async def join(self) -> None:
-        await self._queue.join()
-
-    def task_done(self) -> None:
-        self._queue.task_done()
-
-
 class AsyncProcessQueue(BaseAsyncQueue, Generic[QueueItemType]):
     def __init__(self, maxsize: int = 0):
         self._queue: aioprocessing.Queue = aioprocessing.AioJoinableQueue(
@@ -54,3 +36,6 @@ class AsyncProcessQueue(BaseAsyncQueue, Generic[QueueItemType]):
 
     def task_done(self) -> None:
         self._queue.task_done()
+
+
+AsyncThreadQueue = AsyncProcessQueue
