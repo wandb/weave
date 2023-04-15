@@ -182,7 +182,7 @@ class Server:
         self.wandb_file_manager = wandb_file_manager.WandbFileManagerAsync(
             fs, net, await wandb_api.get_wandb_api()
         )
-
+        atexit.register(self.shutdown)
         self.ready_queue.put(True)
         while self.running:
             try:
@@ -243,7 +243,6 @@ def get_server() -> Server:
     with SERVER_START_LOCK:
         if SERVER is None:
             SERVER = Server(process=False)
-            atexit.register(SERVER.shutdown)
             SERVER.start()
         return SERVER
 
