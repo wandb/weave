@@ -28,7 +28,7 @@ from . import wandb_file_manager
 from . import server_error_handling
 
 from .async_queue import BaseAsyncQueue, AsyncThreadQueue, AsyncProcessQueue
-from typing import Any, Callable, Dict, TypeVar
+from typing import Any, Coroutine, Callable, Dict, TypeVar
 
 
 tracer = engine_trace.tracer()  # type: ignore
@@ -141,7 +141,7 @@ class ServerResponse:
         }
 
 
-HandlerFunction = Callable[[], Any]
+HandlerFunction = Callable[..., Any]
 
 
 # Server class is responsible for managing server lifecycle and handling requests
@@ -160,6 +160,11 @@ class Server:
         self._shutdown_lock = threading.Lock()
         self._fs = filesystem.FilesystemAsync()
         self._net = weave_http.HttpAsync(self._fs)
+
+        # Register handlers
+        self.register_handler("ensure_manifest", self.handle_ensure_manifest)
+        self.register_handler("ensure_file", self.handle_ensure_file)
+        self.register_handler("direct_url", self.handle_direct_url)
 
         if process:
             self.request_queue = AsyncProcessQueue()
@@ -192,37 +197,36 @@ class Server:
             if self.process.is_alive():
                 self.process.join()
             self.cleanup()
-            asyncio.run(self._net.session.close())
 
     # main is the server's main coroutine, handling incoming requests
     async def main(self) -> None:
-
-        self.wandb_file_manager = wandb_file_manager.WandbFileManagerAsync(
-            self._fs, self._net, await wandb_api.get_wandb_api()
-        )
-        atexit.register(self.shutdown)
-        self.ready_queue.put(True)
-        while self.running:
-            try:
-                with self._shutdown_lock:
-                    # dont block so that we dont hang shutdown
-                    req = await self.request_queue.get(block=False)
-            except (queue.Empty, RuntimeError):
-                await asyncio.sleep(1e-6)  # wait 1 microsecond
-                continue
-            if req.name not in self.handlers:
-                resp = req.error_response(
-                    404, errors.WeaveBadRequest(f"No handler named {req.name!r}")
-                )
-            else:
+        async with self._net:
+            self.wandb_file_manager = wandb_file_manager.WandbFileManagerAsync(
+                self._fs, self._net, await wandb_api.get_wandb_api()
+            )
+            atexit.register(self.shutdown)
+            self.ready_queue.put(True)
+            while self.running:
                 try:
-                    resp = req.success_response(
-                        await self.handlers[req.name](*req.args)
+                    with self._shutdown_lock:
+                        # dont block so that we dont hang shutdown
+                        req = await self.request_queue.get(block=False)
+                except (queue.Empty, RuntimeError):
+                    await asyncio.sleep(1e-6)  # wait 1 microsecond
+                    continue
+                if req.name not in self.handlers:
+                    resp = req.error_response(
+                        404, errors.WeaveBadRequest(f"No handler named {req.name!r}")
                     )
-                except Exception as e:
-                    resp = req.error_response(500, e)
-            self.request_queue.task_done()
-            await self.response_queues[req.client_id].put(resp)
+                else:
+                    try:
+                        resp = req.success_response(
+                            await self.handlers[req.name](*req.args)
+                        )
+                    except Exception as e:
+                        resp = req.error_response(500, e)
+                self.request_queue.task_done()
+                await self.response_queues[req.client_id].put(resp)
 
     def register_handler(self, name: str, handler: HandlerFunction) -> None:
         self.handlers[name] = handler
