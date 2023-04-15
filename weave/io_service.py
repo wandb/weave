@@ -157,6 +157,9 @@ class Server:
         self.response_queues: Dict[str, BaseAsyncQueue[ServerResponse]] = {}
         self.response_queue_factory: Callable[[], BaseAsyncQueue[ServerResponse]]
         self.running = True
+        self._shutdown_lock = threading.Lock()
+        self._fs = filesystem.FilesystemAsync()
+        self._net = weave_http.HttpAsync(self._fs)
 
         if process:
             self.request_queue = AsyncProcessQueue()
@@ -184,26 +187,27 @@ class Server:
 
     # shutdown stops the server and joins the thread/process
     def shutdown(self) -> None:
-        self.running = False
-        if self.process.is_alive():
-            self.process.join()
-        self.cleanup()
+        with self._shutdown_lock:
+            self.running = False
+            if self.process.is_alive():
+                self.process.join()
+            self.cleanup()
+            asyncio.run(self._net.session.close())
 
     # main is the server's main coroutine, handling incoming requests
     async def main(self) -> None:
-        fs = filesystem.get_filesystem_async()
-        net = weave_http.HttpAsync(fs)
 
         self.wandb_file_manager = wandb_file_manager.WandbFileManagerAsync(
-            fs, net, await wandb_api.get_wandb_api()
+            self._fs, self._net, await wandb_api.get_wandb_api()
         )
         atexit.register(self.shutdown)
         self.ready_queue.put(True)
         while self.running:
             try:
-                # dont block so that we dont hang shutdown
-                req = await self.request_queue.get(block=False)
-            except queue.Empty:
+                with self._shutdown_lock:
+                    # dont block so that we dont hang shutdown
+                    req = await self.request_queue.get(block=False)
+            except (queue.Empty, RuntimeError):
                 await asyncio.sleep(1e-6)  # wait 1 microsecond
                 continue
             if req.name not in self.handlers:
