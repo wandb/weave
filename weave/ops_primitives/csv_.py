@@ -21,7 +21,6 @@ def load_csv(csvfile):
     reader = csv.DictReader(csvfile, dialect=dialect)
     rows = []
     for row in reader:
-        print("ROW", row)
         # DictReader puts items that don't have a header into a list under
         # the None key. This happens for mal-formed csvs. Ignore the None
         # key.
