@@ -192,6 +192,7 @@ class Server:
 
     # shutdown stops the server and joins the thread/process
     def shutdown(self) -> None:
+        # TODO: is this with needed?
         with self._shutdown_lock:
             self.running = False
             if self.process.is_alive():
@@ -200,6 +201,7 @@ class Server:
 
     # main is the server's main coroutine, handling incoming requests
     async def main(self) -> None:
+        # TODO: should this be moved to shutdown?
         async with self._net:
             self.wandb_file_manager = wandb_file_manager.WandbFileManagerAsync(
                 self._fs, self._net, await wandb_api.get_wandb_api()
@@ -211,6 +213,7 @@ class Server:
                     with self._shutdown_lock:
                         # dont block so that we dont hang shutdown
                         req = await self.request_queue.get(block=False)
+                # TODO: do we need to catch this runtime error?
                 except (queue.Empty, RuntimeError):
                     await asyncio.sleep(1e-6)  # wait 1 microsecond
                     continue
