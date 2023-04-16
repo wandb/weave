@@ -14,6 +14,7 @@ import dataclasses
 import typing
 import contextlib
 import multiprocessing
+import logging
 import traceback
 import threading
 
@@ -27,8 +28,8 @@ from . import wandb_api
 from . import wandb_file_manager
 from . import server_error_handling
 
-from .async_queue import BaseAsyncQueue, AsyncThreadQueue, AsyncProcessQueue
-from typing import Any, Callable, Dict, TypeVar, Iterator
+from .async_queue import Queue, ThreadQueue, ProcessQueue
+from typing import Any, Callable, Dict, TypeVar, Iterator, Optional
 
 
 tracer = engine_trace.tracer()  # type: ignore
@@ -151,13 +152,16 @@ class Server:
         process: bool = False,
     ) -> None:
         self.handlers: Dict[str, HandlerFunction] = {}
-        self.ready_queue: multiprocessing.Queue = multiprocessing.Queue()
+        self.response_queue_factory: Callable[[], Queue[ServerResponse]]
         self.process: typing.Union[threading.Thread, multiprocessing.Process]
-        self.request_queue: BaseAsyncQueue[ServerRequest]
-        self.response_queues: Dict[str, BaseAsyncQueue[ServerResponse]] = {}
-        self.response_queue_factory: Callable[[], BaseAsyncQueue[ServerResponse]]
+
+        self.ready_queue: Queue
+        self.request_queue: Optional[Queue[ServerRequest]]
+        self.response_queues: Dict[str, Queue[ServerResponse]] = {}
+
         self.running = True
-        self._shutdown_lock = threading.Lock()
+        self.ready = multiprocessing.Event()
+        self._shutdown_lock = multiprocessing.Lock()
 
         # Register handlers
         self.register_handler("ensure_manifest", self.handle_ensure_manifest)
@@ -165,15 +169,15 @@ class Server:
         self.register_handler("direct_url", self.handle_direct_url)
 
         if process:
-            self.request_queue = AsyncProcessQueue()
-            self.response_queue_factory = AsyncProcessQueue
+            self.response_queue_factory = ProcessQueue
             self.process = multiprocessing.Process(
                 target=self.server_process, daemon=True
             )
         else:
-            self.request_queue = AsyncThreadQueue()
-            self.response_queue_factory = AsyncThreadQueue
+            self.response_queue_factory = ThreadQueue
             self.process = threading.Thread(target=self.server_process, daemon=True)
+
+        self.request_queue = self.response_queue_factory()
 
     # server_process runs the server's main coroutine
     def server_process(self) -> None:
@@ -182,7 +186,7 @@ class Server:
     # start starts the server thread or process
     def start(self) -> None:
         self.process.start()
-        self.ready_queue.get()
+        self.ready.wait()
 
     # cleanup performs cleanup actions, such as flushing stats
     def cleanup(self) -> None:
@@ -209,14 +213,14 @@ class Server:
                 fs, net, await wandb_api.get_wandb_api()
             )
             atexit.register(self.shutdown)
-            self.ready_queue.put(True)
+            self.ready.set()
             while self.running:
                 try:
                     with self._shutdown_lock:
                         # dont block so that we dont hang shutdown
-                        req = await self.request_queue.get(block=False)
+                        req = await self.request_queue.async_get(block=False)
                 # TODO: do we need to catch this runtime error?
-                except (queue.Empty, RuntimeError):
+                except (queue.Empty, asyncio.queues.QueueEmpty, RuntimeError):
                     await asyncio.sleep(1e-6)  # wait 1 microsecond
                     continue
                 if req.name not in self.handlers:
@@ -225,13 +229,27 @@ class Server:
                     )
                 else:
                     try:
-                        resp = req.success_response(
-                            await self.handlers[req.name](*req.args)
-                        )
+                        tracer.context_provider.activate(req.context.trace_context)
+                        with wandb_api.wandb_api_context(req.context.wandb_api_context):
+                            resp = req.success_response(
+                                await self.handlers[req.name](*req.args)
+                            )
                     except Exception as e:
-                        resp = req.error_response(500, e)
+                        logging.error(
+                            "WBArtifactManager request error: %s\n",
+                            traceback.format_exc(),
+                        )
+                        print(
+                            "WBArtifactManager request error: %s\n",
+                            traceback.format_exc(),
+                        )
+
+                        resp = req.error_response(
+                            server_error_handling.maybe_extract_code_from_exception(e),
+                            e,
+                        )
                 self.request_queue.task_done()
-                await self.response_queues[req.client_id].put(resp)
+                await self.response_queues[req.client_id].async_put(resp)
 
     def register_handler(self, name: str, handler: HandlerFunction) -> None:
         self.handlers[name] = handler
@@ -285,13 +303,13 @@ def get_server() -> Server:
 class AsyncConnection:
     def __init__(
         self,
-        request_queue: BaseAsyncQueue[ServerRequest],
-        response_queue: BaseAsyncQueue[ServerResponse],
+        request_queue: Queue[ServerRequest],
+        response_queue: Queue[ServerResponse],
     ) -> None:
         self.request_id = 0
         self.requests: typing.Dict[int, asyncio.Future] = {}
-        self.request_queue: BaseAsyncQueue[ServerRequest] = request_queue
-        self.response_queue: BaseAsyncQueue[ServerResponse] = response_queue
+        self.request_queue: Queue[ServerRequest] = request_queue
+        self.response_queue: Queue[ServerResponse] = response_queue
         self.response_task = asyncio.create_task(self.handle_responses())
         self.response_task.add_done_callback(self.response_task_ended)
         self.connected = True
@@ -309,7 +327,7 @@ class AsyncConnection:
     async def handle_responses(self) -> None:
         while self.connected:
             try:
-                resp = await self.response_queue.get(block=False)
+                resp = await self.response_queue.async_get(block=False)
             except queue.Empty:
                 await asyncio.sleep(1e-6)
                 continue
@@ -321,7 +339,7 @@ class AsyncConnection:
         self.request_id += 1
         response_future: asyncio.Future[ServerResponse] = asyncio.Future()
         self.requests[req.id] = response_future
-        await self.request_queue.put(req)
+        await self.request_queue.async_put(req)
         return await response_future
 
 
@@ -365,13 +383,19 @@ class SyncClient:
             )
 
             response_queue = self.server.response_queues[self.client_id]
+            self.server.request_queue.put(request)
+            server_resp = response_queue.get()
+
+            """
 
             async def _send_request() -> ServerResponse:
-                await self.server.request_queue.put(request)
-                return await response_queue.get()
+                await self.server.request_queue.async_put(request)
+                result = await response_queue.async_get()
+                response_queue.task_done()  # TODO: do we really need a joinable queue?
+                return result
 
             server_resp = asyncio.run(_send_request())
-            response_queue.task_done()  # TODO: do we really need a joinable queue?
+            """
 
         if server_resp.error:
             if server_resp.http_error_code != None:
