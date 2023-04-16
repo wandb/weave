@@ -28,7 +28,7 @@ from . import wandb_file_manager
 from . import server_error_handling
 
 from .async_queue import BaseAsyncQueue, AsyncThreadQueue, AsyncProcessQueue
-from typing import Any, Callable, Dict, TypeVar
+from typing import Any, Callable, Dict, TypeVar, Iterator
 
 
 tracer = engine_trace.tracer()  # type: ignore
@@ -158,8 +158,6 @@ class Server:
         self.response_queue_factory: Callable[[], BaseAsyncQueue[ServerResponse]]
         self.running = True
         self._shutdown_lock = threading.Lock()
-        self._fs = filesystem.FilesystemAsync()
-        self._net = weave_http.HttpAsync(self._fs)
 
         # Register handlers
         self.register_handler("ensure_manifest", self.handle_ensure_manifest)
@@ -201,10 +199,14 @@ class Server:
 
     # main is the server's main coroutine, handling incoming requests
     async def main(self) -> None:
+
+        fs = filesystem.FilesystemAsync()
+        net = weave_http.HttpAsync(fs)
+
         # TODO: should this be moved to shutdown?
-        async with self._net:
+        async with net:
             self.wandb_file_manager = wandb_file_manager.WandbFileManagerAsync(
-                self._fs, self._net, await wandb_api.get_wandb_api()
+                fs, net, await wandb_api.get_wandb_api()
             )
             atexit.register(self.shutdown)
             self.ready_queue.put(True)
@@ -233,6 +235,16 @@ class Server:
 
     def register_handler(self, name: str, handler: HandlerFunction) -> None:
         self.handlers[name] = handler
+
+    @contextlib.contextmanager
+    def registered_client(
+        self, client: typing.Union["AsyncClient", "SyncClient"]
+    ) -> Iterator[None]:
+        self.register_client(client.client_id)
+        try:
+            yield
+        finally:
+            self.unregister_client(client.client_id)
 
     def register_client(self, client_id: str) -> None:
         if client_id not in self.response_queues:
@@ -343,20 +355,23 @@ class SyncClient:
         cur_trace_context = tracer.current_trace_context()
         self._current_request_id += 1
 
-        request = ServerRequest(
-            self.client_id,
-            name,
-            args,
-            ServerRequestContext(cur_trace_context, wb_ctx),
-            id=self._current_request_id,
-        )
+        with self.server.registered_client(self):
+            request = ServerRequest(
+                self.client_id,
+                name,
+                args,
+                ServerRequestContext(cur_trace_context, wb_ctx),
+                id=self._current_request_id,
+            )
 
-        response_queue = self.server.response_queues[self.client_id]
+            response_queue = self.server.response_queues[self.client_id]
 
-        # loop = asyncio.get_event_loop()
-        asyncio.run(self.server.request_queue.put(request))
-        server_resp = asyncio.run(response_queue.get())
-        response_queue.task_done()
+            async def _send_request() -> ServerResponse:
+                await self.server.request_queue.put(request)
+                return await response_queue.get()
+
+            server_resp = asyncio.run(_send_request())
+            response_queue.task_done()  # TODO: do we really need a joinable queue?
 
         if server_resp.error:
             if server_resp.http_error_code != None:
