@@ -221,7 +221,7 @@ class Server:
                         try:
                             req = await self.request_queue.async_get(block=False)
                         except NotImplementedError:
-                            req = self.request_queue.get()
+                            req = self.request_queue.get(block=False)
                 # TODO: do we need to catch this runtime error?
                 except (queue.Empty, asyncio.queues.QueueEmpty, RuntimeError):
                     await asyncio.sleep(1e-6)  # wait 1 microsecond
