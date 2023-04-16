@@ -156,7 +156,7 @@ class Server:
         self.process: typing.Union[threading.Thread, multiprocessing.Process]
 
         self.ready_queue: Queue
-        self.request_queue: Optional[Queue[ServerRequest]]
+        self.request_queue: Queue[ServerRequest]
         self.response_queues: Dict[str, Queue[ServerResponse]] = {}
 
         self.running = True
@@ -177,7 +177,7 @@ class Server:
             self.response_queue_factory = ThreadQueue
             self.process = threading.Thread(target=self.server_process, daemon=True)
 
-        self.request_queue = self.response_queue_factory()
+        self.request_queue = self.response_queue_factory()  # type: ignore
 
     # server_process runs the server's main coroutine
     def server_process(self) -> None:
@@ -218,7 +218,10 @@ class Server:
                 try:
                     with self._shutdown_lock:
                         # dont block so that we dont hang shutdown
-                        req = await self.request_queue.async_get(block=False)
+                        try:
+                            req = await self.request_queue.async_get(block=False)
+                        except NotImplementedError:
+                            req = self.request_queue.get()
                 # TODO: do we need to catch this runtime error?
                 except (queue.Empty, asyncio.queues.QueueEmpty, RuntimeError):
                     await asyncio.sleep(1e-6)  # wait 1 microsecond
@@ -245,11 +248,15 @@ class Server:
                         )
 
                         resp = req.error_response(
-                            server_error_handling.maybe_extract_code_from_exception(e),
+                            server_error_handling.maybe_extract_code_from_exception(e)
+                            or 500,
                             e,
                         )
                 self.request_queue.task_done()
-                await self.response_queues[req.client_id].async_put(resp)
+                try:
+                    await self.response_queues[req.client_id].async_put(resp)
+                except NotImplementedError:
+                    self.response_queues[req.client_id].put(resp)
 
     def register_handler(self, name: str, handler: HandlerFunction) -> None:
         self.handlers[name] = handler
@@ -385,17 +392,6 @@ class SyncClient:
             response_queue = self.server.response_queues[self.client_id]
             self.server.request_queue.put(request)
             server_resp = response_queue.get()
-
-            """
-
-            async def _send_request() -> ServerResponse:
-                await self.server.request_queue.async_put(request)
-                result = await response_queue.async_get()
-                response_queue.task_done()  # TODO: do we really need a joinable queue?
-                return result
-
-            server_resp = asyncio.run(_send_request())
-            """
 
         if server_resp.error:
             if server_resp.http_error_code != None:

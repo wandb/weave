@@ -1,5 +1,5 @@
+import queue
 import aioprocessing
-import janus
 from typing import Optional, Generic, TypeVar
 
 QueueItemType = TypeVar("QueueItemType")
@@ -61,41 +61,28 @@ class ProcessQueue(Queue, Generic[QueueItemType]):
 
 
 class ThreadQueue(Queue, Generic[QueueItemType]):
-    @property
-    def queue(self):
-        if self._queue is None:
-            self._queue: janus.AsyncQueue[QueueItemType] = janus.Queue(
-                maxsize=self.maxsize
-            )
-        return self._queue
-
     def __init__(self, maxsize: int = 0):
-        self._queue = None
-        self.maxsize = maxsize
+        self._queue: queue.Queue = queue.Queue(maxsize=maxsize)
 
     async def async_put(self, item: QueueItemType) -> None:
-        await self.queue.async_q.put(item)
+        raise NotImplementedError
 
     async def async_get(
         self, block: bool = True, timeout: Optional[int] = None
     ) -> QueueItemType:
-        if timeout is not None:
-            raise NotImplementedError
-        if block:
-            return await self.queue.async_q.get()
-        return self.queue.async_q.get_nowait()
+        raise NotImplementedError
 
     async def async_join(self) -> None:
-        await self.queue.async_q.join()
+        raise NotImplementedError
 
     def put(self, item: QueueItemType) -> None:
-        self.queue.sync_q.put(item)
+        self._queue.put(item)
 
     def get(self, block: bool = True, timeout: Optional[int] = None) -> QueueItemType:
-        return self.queue.sync_q.get(block=block, timeout=timeout)
+        return self._queue.get(block=block, timeout=timeout)
 
     def join(self) -> None:
-        self.queue.sync_q.join()
+        self._queue.join()
 
     def task_done(self) -> None:
-        self.queue.sync_q.task_done()
+        self._queue.task_done()
