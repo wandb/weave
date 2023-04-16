@@ -30,7 +30,8 @@ async def test_async_process_queue_shared() -> None:
     consumer_process.start()
 
     await process_producer(queue)
-    await queue.async_join()
+
+    queue.join()
     consumer_process.join()
 
 

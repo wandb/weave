@@ -13,6 +13,7 @@ import asyncio
 import dataclasses
 import typing
 import contextlib
+import aioprocessing
 import multiprocessing
 import logging
 import traceback
@@ -145,6 +146,14 @@ class ServerResponse:
 HandlerFunction = Callable[..., Any]
 
 
+class HandlerNotFoundException(Exception):
+    pass
+
+
+async def make_404() -> typing.NoReturn:
+    raise HandlerNotFoundException()
+
+
 # Server class is responsible for managing server lifecycle and handling requests
 class Server:
     def __init__(
@@ -167,10 +176,11 @@ class Server:
         self.register_handler("ensure_manifest", self.handle_ensure_manifest)
         self.register_handler("ensure_file", self.handle_ensure_file)
         self.register_handler("direct_url", self.handle_direct_url)
+        self.register_handler("sleep", self.handle_sleep)
 
         if process:
             self.response_queue_factory = ProcessQueue
-            self.process = multiprocessing.Process(
+            self.process = aioprocessing.AioProcess(
                 target=self.server_process, daemon=True
             )
         else:
@@ -204,8 +214,11 @@ class Server:
     # main is the server's main coroutine, handling incoming requests
     async def main(self) -> None:
 
+        # NOTHING SHOULD BLOCK IN THIS LOOP
         fs = filesystem.FilesystemAsync()
         net = weave_http.HttpAsync(fs)
+        loop = asyncio.get_running_loop()
+        active_tasks: set[asyncio.Task[typing.Any]] = set()
 
         # TODO: should this be moved to shutdown?
         async with net:
@@ -221,36 +234,56 @@ class Server:
                         req = await self.request_queue.async_get(block=False)
                 # TODO: do we need to catch this runtime error?
                 except (queue.Empty, asyncio.queues.QueueEmpty, RuntimeError):
-                    await asyncio.sleep(1e-6)  # wait 1 microsecond
+                    await asyncio.sleep(1e-3)
                     continue
-                if req.name not in self.handlers:
-                    resp = req.error_response(
-                        404, errors.WeaveBadRequest(f"No handler named {req.name!r}")
-                    )
-                else:
-                    try:
-                        tracer.context_provider.activate(req.context.trace_context)
-                        with wandb_api.wandb_api_context(req.context.wandb_api_context):
-                            resp = req.success_response(
-                                await self.handlers[req.name](*req.args)
-                            )
-                    except Exception as e:
-                        logging.error(
-                            "WBArtifactManager request error: %s\n",
-                            traceback.format_exc(),
-                        )
-                        print(
-                            "WBArtifactManager request error: %s\n",
-                            traceback.format_exc(),
-                        )
 
-                        resp = req.error_response(
-                            server_error_handling.maybe_extract_code_from_exception(e)
-                            or 500,
-                            e,
+                def make_task_done_callback(req: ServerRequest) -> Callable:
+                    def task_done_callback(task: asyncio.Task) -> None:
+                        exception = task.exception()
+                        if exception:
+                            if isinstance(exception, HandlerNotFoundException):
+                                resp = req.error_response(404, exception)
+                            else:
+                                logging.error(
+                                    "WBArtifactManager request error: %s\n",
+                                    traceback.format_exc(),
+                                )
+                                print(
+                                    "WBArtifactManager request error: %s\n",
+                                    traceback.format_exc(),
+                                )
+
+                                resp = req.error_response(
+                                    server_error_handling.maybe_extract_code_from_exception(
+                                        exception  # type: ignore
+                                    )
+                                    or 500,
+                                    exception,  # type: ignore
+                                )
+                        else:
+                            resp = req.success_response(task.result())
+
+                        active_tasks.discard(task)
+
+                        new_task = loop.create_task(
+                            self.response_queues[req.client_id].async_put(resp)
                         )
+                        active_tasks.add(new_task)
+                        new_task.add_done_callback(active_tasks.discard)
+
+                    return task_done_callback
+
+                tracer.context_provider.activate(req.context.trace_context)
+                with wandb_api.wandb_api_context(req.context.wandb_api_context):
+                    if req.name not in self.handlers:
+                        task = loop.create_task(make_404())
+                    else:
+                        # launch a task to handle the request
+                        task = loop.create_task(self.handlers[req.name](*req.args))
+                    active_tasks.add(task)
+                    task_done_callback = make_task_done_callback(req)
+                    task.add_done_callback(task_done_callback)
                 self.request_queue.task_done()
-                await self.response_queues[req.client_id].async_put(resp)
 
     def register_handler(self, name: str, handler: HandlerFunction) -> None:
         self.handlers[name] = handler
@@ -287,6 +320,10 @@ class Server:
         uri = artifact_wandb.WeaveWBArtifactURI.parse(artifact_uri)
         return await self.wandb_file_manager.direct_url(uri)
 
+    async def handle_sleep(self, seconds: float) -> float:
+        await asyncio.sleep(seconds)
+        return seconds
+
 
 SERVER = None
 SERVER_START_LOCK = threading.Lock()
@@ -304,9 +341,15 @@ def get_server() -> Server:
 class AsyncConnection:
     def __init__(
         self,
-        request_queue: Queue[ServerRequest],
-        response_queue: Queue[ServerResponse],
+        client_id: str,
+        server: Server,
     ) -> None:
+
+        self.client_id = client_id
+        self.server = server
+        response_queue = server.response_queues[client_id]
+        request_queue = server.request_queue
+
         self.request_id = 0
         self.requests: typing.Dict[int, asyncio.Future] = {}
         self.request_queue: Queue[ServerRequest] = request_queue
@@ -332,16 +375,41 @@ class AsyncConnection:
             except queue.Empty:
                 await asyncio.sleep(1e-6)
                 continue
+            self.response_queue.task_done()
             self.requests[resp.id].set_result(resp)
 
-    async def request(self, req: ServerRequest) -> ServerResponse:
+    async def request(self, name: str, *args: typing.Any) -> typing.Any:
         # Caller must check ServerResponse.error!
-        req.id = self.request_id
+        wb_ctx = wandb_api.get_wandb_api_context()
+        cur_trace_context = tracer.current_trace_context()
+
+        req = ServerRequest(
+            self.client_id,
+            name,
+            args,
+            ServerRequestContext(cur_trace_context, wb_ctx),
+            self.request_id,
+        )
+
         self.request_id += 1
         response_future: asyncio.Future[ServerResponse] = asyncio.Future()
         self.requests[req.id] = response_future
         await self.request_queue.async_put(req)
-        return await response_future
+        server_resp = await response_future
+
+        if server_resp.error:
+            if server_resp.http_error_code != None:
+                raise server_error_handling.WeaveInternalHttpException.from_code(
+                    server_resp.http_error_code
+                )
+            raise errors.WeaveWandbArtifactManagerError(
+                "Request error: " + server_resp.value
+            )
+
+        return server_resp.value
+
+    async def sleep(self, seconds: float) -> float:
+        return await self.request("sleep", seconds)
 
 
 class AsyncClient:
@@ -351,15 +419,12 @@ class AsyncClient:
 
     @contextlib.asynccontextmanager
     async def connect(self) -> typing.AsyncGenerator[AsyncConnection, None]:
-        self.server.register_client(self.client_id)
-        conn = AsyncConnection(
-            self.server.request_queue, self.server.response_queues[self.client_id]
-        )
-        try:
-            yield conn
-        finally:
-            self.server.unregister_client(self.client_id)
-            await conn.close()
+        with self.server.registered_client(self):
+            conn = AsyncConnection(self.client_id, self.server)
+            try:
+                yield conn
+            finally:
+                await conn.close()
 
 
 class SyncClient:
@@ -414,6 +479,9 @@ class SyncClient:
         self, artifact_uri: artifact_wandb.WeaveWBArtifactURI
     ) -> typing.Optional[str]:
         return self.request("direct_url", str(artifact_uri))
+
+    def sleep(self, seconds: float) -> None:
+        self.request("sleep", seconds)
 
 
 def get_sync_client() -> SyncClient:
