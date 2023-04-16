@@ -5,6 +5,7 @@ TODO: this file is not complete. We should try to put all compability fixes here
 """
 import typing
 import copy
+import math
 
 from . import weave_types
 from . import graph
@@ -158,7 +159,22 @@ def recursively_unwrap_unions(obj):
     return obj
 
 
+def remove_nan_and_inf(obj):
+    if isinstance(obj, list):
+        return [remove_nan_and_inf(o) for o in obj]
+    if isinstance(obj, dict):
+        return {k: remove_nan_and_inf(v) for k, v in obj.items()}
+    if isinstance(obj, float):
+        if math.isnan(obj) or math.isinf(obj):
+            return 0
+    return obj
+
+
 def fixup_data(data):
     data = recursively_unwrap_unions(data)
     data = remove_opcall_versions_data(data)
+    # No good! We have to do this because remoteHttp doesn't handle NaN/inf in
+    # response right now.
+    # TODO: fix. Encode as string and then interpret in js side.
+    data = remove_nan_and_inf(data)
     return convert_specific_ops_to_generic_ops_data(data)

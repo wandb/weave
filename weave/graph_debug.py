@@ -168,8 +168,8 @@ def node_expr_str_full(node: graph.Node) -> str:
             return res
         try:
             str_val = str(node.val)
-            if len(str_val) > 5000:
-                return f"~{str_val[:5000]}...~"
+            if len(str_val) > 50:
+                return f"~{str_val[:50]}...~"
             return str_val
         except TypeError:
             # WARNING: This behavior means that sometimes this function

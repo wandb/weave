@@ -163,7 +163,7 @@ def _map_each(self: ArrowWeaveList, fn):
         mapped = _map_each(new_awl, fn)
         reshaped_arrow_data: ArrowWeaveList = ArrowWeaveList(
             pa.ListArray.from_arrays(offsets, mapped._arrow_data),
-            types.List(fn.type),
+            types.List(mapped.object_type),
             self._artifact,
         )
 
@@ -174,7 +174,8 @@ def _map_each(self: ArrowWeaveList, fn):
                 self.object_type.tag,
             )
         return reshaped_arrow_data
-    return _apply_fn_node_with_tag_pushdown(self, fn)
+    res = _apply_fn_node_with_tag_pushdown(self, fn)
+    return res
 
 
 @op(
