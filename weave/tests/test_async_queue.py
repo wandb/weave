@@ -8,14 +8,20 @@ import aioprocessing
 async def process_producer(queue: Queue) -> None:
     for i in range(3):
         print(f"Producer: {i}", flush=True)
-        await queue.async_put(i)
+        try:
+            await queue.async_put(i)
+        except NotImplementedError:
+            queue.put(i)
         await asyncio.sleep(0.1)
 
 
 def process_consumer(queue: Queue) -> None:
     async def _consume():
         for _ in range(3):
-            item = await queue.async_get()
+            try:
+                item = await queue.async_get()
+            except NotImplementedError:
+                item = queue.get()
             print(f"Consumer: {item}", flush=True)
             queue.task_done()
 
@@ -41,5 +47,5 @@ async def test_async_thread_queue_shared() -> None:
     consumer_thread.start()
 
     await process_producer(queue)
-    await queue.async_join()
+    queue.join()
     consumer_thread.join()
