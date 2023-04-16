@@ -8,20 +8,14 @@ import aioprocessing
 async def process_producer(queue: Queue) -> None:
     for i in range(3):
         print(f"Producer: {i}", flush=True)
-        try:
-            await queue.async_put(i)
-        except NotImplementedError:
-            queue.put(i)
+        await queue.async_put(i)
         await asyncio.sleep(0.1)
 
 
 def process_consumer(queue: Queue) -> None:
     async def _consume():
         for _ in range(3):
-            try:
-                item = await queue.async_get()
-            except NotImplementedError:
-                item = queue.get()
+            item = await queue.async_get()
             print(f"Consumer: {item}", flush=True)
             queue.task_done()
 

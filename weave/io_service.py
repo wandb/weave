@@ -218,10 +218,7 @@ class Server:
                 try:
                     with self._shutdown_lock:
                         # dont block so that we dont hang shutdown
-                        try:
-                            req = await self.request_queue.async_get(block=False)
-                        except NotImplementedError:
-                            req = self.request_queue.get(block=False)
+                        req = await self.request_queue.async_get(block=False)
                 # TODO: do we need to catch this runtime error?
                 except (queue.Empty, asyncio.queues.QueueEmpty, RuntimeError):
                     await asyncio.sleep(1e-6)  # wait 1 microsecond
@@ -253,10 +250,7 @@ class Server:
                             e,
                         )
                 self.request_queue.task_done()
-                try:
-                    await self.response_queues[req.client_id].async_put(resp)
-                except NotImplementedError:
-                    self.response_queues[req.client_id].put(resp)
+                await self.response_queues[req.client_id].async_put(resp)
 
     def register_handler(self, name: str, handler: HandlerFunction) -> None:
         self.handlers[name] = handler

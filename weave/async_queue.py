@@ -65,15 +65,15 @@ class ThreadQueue(Queue, Generic[QueueItemType]):
         self._queue: queue.Queue = queue.Queue(maxsize=maxsize)
 
     async def async_put(self, item: QueueItemType) -> None:
-        raise NotImplementedError
+        self.put(item)
 
     async def async_get(
         self, block: bool = True, timeout: Optional[int] = None
     ) -> QueueItemType:
-        raise NotImplementedError
+        return self.get(block=block, timeout=timeout)
 
     async def async_join(self) -> None:
-        raise NotImplementedError
+        self.join()
 
     def put(self, item: QueueItemType) -> None:
         self._queue.put(item)
