@@ -8,7 +8,7 @@ import time
 @pytest.mark.parametrize("process", [True, False])
 async def test_io_service_async_client_ensure_manifest(io_server_factory, process):
 
-    server = io_server_factory(process)
+    server: io_service.Server = io_server_factory(process)
     client = io_service.AsyncClient(
         server=server,
     )
@@ -38,3 +38,6 @@ async def test_io_service_async_client_ensure_manifest(io_server_factory, proces
     assert 0.1 < end - start < 0.2
     for result in results:
         assert result == 0.1
+
+    assert not conn.connected
+    assert len(server.response_queues) == 0
