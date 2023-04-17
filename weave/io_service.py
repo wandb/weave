@@ -176,8 +176,6 @@ class Server:
 
         self._server_process_ready = multiprocessing.Event()
         self._response_queue_feeder_thread_ready = threading.Event()
-
-        self._shutdown_lock = multiprocessing.Lock()
         self._shutting_down = multiprocessing.Event()
 
         # Register handlers
@@ -215,6 +213,7 @@ class Server:
         self.response_queue_feeder_thread.start()
         self._server_process_ready.wait()
         self._response_queue_feeder_thread_ready.wait()
+        atexit.register(self.shutdown)
 
     # cleanup performs cleanup actions, such as flushing stats
     def cleanup(self) -> None:
@@ -222,8 +221,7 @@ class Server:
 
     # shutdown stops the server and joins the thread/process
     def shutdown(self) -> None:
-        with self._shutdown_lock:
-            self._shutting_down.set()
+        self._shutting_down.set()
 
         if self.response_queue_feeder_thread.is_alive():
             self.response_queue_feeder_thread.join()
@@ -239,11 +237,11 @@ class Server:
     async def _response_queue_feeder_main(self) -> None:
         self._response_queue_feeder_thread_ready.set()
         while True:
+            if self._shutting_down.is_set():
+                break
             try:
-                with self._shutdown_lock:
-                    if self._shutting_down.is_set():
-                        break
-                    resp = await self._internal_response_queue.async_get(block=False)
+                # TODO: investigate whether this would be better as a task
+                resp = await self._internal_response_queue.async_get(block=False)
             except (queue.Empty, asyncio.queues.QueueEmpty, RuntimeError):
                 await asyncio.sleep(1e-6)
                 continue
@@ -260,21 +258,17 @@ class Server:
         net = weave_http.HttpAsync(fs)
         loop = asyncio.get_running_loop()
         active_tasks: set[asyncio.Task[typing.Any]] = set()
-
-        # TODO: should this be moved to shutdown?
         async with net:
             self.wandb_file_manager = wandb_file_manager.WandbFileManagerAsync(
                 fs, net, await wandb_api.get_wandb_api()
             )
-            atexit.register(self.shutdown)
             self._server_process_ready.set()
             while True:
+                if self._shutting_down.is_set():
+                    break
                 try:
-                    with self._shutdown_lock:
-                        if self._shutting_down.is_set():
-                            break
-                        # dont block so that we dont hang shutdown
-                        req = await self.request_queue.async_get(block=False)
+                    # dont block so that we dont hang shutdown
+                    req = await self.request_queue.async_get(block=False)
                 # TODO: do we need to catch this runtime error?
                 except (queue.Empty, asyncio.queues.QueueEmpty, RuntimeError):
                     await asyncio.sleep(1e-6)
@@ -363,6 +357,7 @@ class Server:
         return await self.wandb_file_manager.direct_url(uri)
 
     async def handle_sleep(self, seconds: float) -> float:
+        # used for testing to simulate long running processes
         await asyncio.sleep(seconds)
         return seconds
 
