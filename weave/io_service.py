@@ -6,7 +6,6 @@
 # traces in local development.
 # TODO: Fix
 
-import queue
 import atexit
 import uuid
 import asyncio
@@ -144,7 +143,8 @@ class ServerResponse:
 
 
 class ShutDown:
-    pass
+    def __eq__(self, other: Any) -> bool:
+        return isinstance(other, ShutDown)
 
 
 shutdown_request = ServerRequest("", "shutdown", (), ServerRequestContext(None, None))
@@ -257,6 +257,7 @@ class Server:
         while True:
             resp = await self._internal_response_queue.async_get()
             if resp.value == ShutDown():
+                self._internal_response_queue.task_done()
                 break
             client_response_queue = self.client_response_queues[resp.client_id]
             # this is non-blocking b/c resp is already in memory
@@ -306,6 +307,7 @@ class Server:
             while True:
                 req = await self.request_queue.async_get()
                 if req.name == "shutdown":
+                    self.request_queue.task_done()
                     break
                 tracer.context_provider.activate(req.context.trace_context)
                 with wandb_api.wandb_api_context(req.context.wandb_api_context):
