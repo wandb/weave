@@ -143,15 +143,18 @@ class ServerResponse:
         }
 
 
+class ShutDown:
+    pass
+
+
+shutdown_request = ServerRequest("", "shutdown", (), ServerRequestContext(None, None))
+shutdown_response = ServerResponse("", 0, ShutDown())
+
 HandlerFunction = Callable[..., Any]
 
 
 class HandlerNotFoundException(Exception):
     pass
-
-
-async def make_404() -> typing.NoReturn:
-    raise HandlerNotFoundException()
 
 
 # Server class is responsible for managing server lifecycle and handling requests
@@ -174,9 +177,14 @@ class Server:
         # that are both in the user process.
         self.client_response_queues: Dict[str, ThreadQueue[ServerResponse]] = {}
 
-        self._server_process_ready = multiprocessing.Event()
-        self._response_queue_feeder_thread_ready = threading.Event()
         self._shutting_down = multiprocessing.Event()
+        self._shutdown_lock = multiprocessing.Lock()
+
+        self._server_process_ready = multiprocessing.Event()
+        self._server_process_ready_to_shut_down = multiprocessing.Event()
+
+        self._response_queue_feeder_thread_ready = threading.Event()
+        self._response_queue_feeder_thread_ready_to_shut_down = threading.Event()
 
         # Register handlers
         self.register_handler("ensure_manifest", self.handle_ensure_manifest)
@@ -221,14 +229,24 @@ class Server:
 
     # shutdown stops the server and joins the thread/process
     def shutdown(self) -> None:
-        self._shutting_down.set()
 
-        if self.response_queue_feeder_thread.is_alive():
-            self.response_queue_feeder_thread.join()
+        with self._shutdown_lock:
+            self._shutting_down.set()
 
-        if self.handler_process.is_alive():
-            self.handler_process.join()
+            # tell the two auxiliary processes to shutdown
+            # (the server process and the response queue feeder thread)
 
+            self.request_queue.put(shutdown_request)
+            self._internal_response_queue.put(shutdown_response)
+
+        self._response_queue_feeder_thread_ready_to_shut_down.wait()
+        self._server_process_ready_to_shut_down.wait()
+
+        self.request_queue.join()
+        self._internal_response_queue.join()
+
+        self.response_queue_feeder_thread.join()
+        self.handler_process.join()
         self.cleanup()
 
     def response_queue_feeder_process(self) -> None:
@@ -237,23 +255,45 @@ class Server:
     async def _response_queue_feeder_main(self) -> None:
         self._response_queue_feeder_thread_ready.set()
         while True:
-            if self._shutting_down.is_set():
+            resp = await self._internal_response_queue.async_get()
+            if resp.value == ShutDown():
                 break
-            try:
-                # TODO: investigate whether this would be better as a task
-                resp = await self._internal_response_queue.async_get(block=False)
-            except (queue.Empty, asyncio.queues.QueueEmpty, RuntimeError):
-                await asyncio.sleep(1e-6)
-                continue
             client_response_queue = self.client_response_queues[resp.client_id]
             # this is non-blocking b/c resp is already in memory
             client_response_queue.put(resp)
+            self._internal_response_queue.task_done()
+        self._response_queue_feeder_thread_ready_to_shut_down.set()
+
+    async def _handle(self, req: ServerRequest) -> None:
+        with tracer.trace("WBArtifactManager.handle.%s" % req.name, service="weave-am"):
+            try:
+                handler = self.handlers[req.name]
+            except KeyError as e:
+                resp = req.error_response(404, e)
+            else:
+                try:
+                    val = await handler(*req.args)
+                except Exception as e:
+                    logging.error(
+                        "WBArtifactManager request error: %s\n",
+                        traceback.format_exc(),
+                    )
+                    print(
+                        "WBArtifactManager request error: %s\n",
+                        traceback.format_exc(),
+                    )
+                    resp = req.error_response(
+                        server_error_handling.maybe_extract_code_from_exception(e)
+                        or 500,
+                        e,
+                    )
+                else:
+                    resp = req.success_response(val)
+            await self._internal_response_queue.async_put(resp)
 
     # main is the server's main coroutine, handling incoming requests
     async def _server_main(self) -> None:
-
-        # NOTHING SHOULD BLOCK IN THIS LOOP.
-        # This loop runs in the non-user process.
+        # This loop should never block.
         fs = filesystem.FilesystemAsync()
         net = weave_http.HttpAsync(fs)
         loop = asyncio.get_running_loop()
@@ -264,62 +304,17 @@ class Server:
             )
             self._server_process_ready.set()
             while True:
-                if self._shutting_down.is_set():
+                req = await self.request_queue.async_get()
+                if req.name == "shutdown":
                     break
-                try:
-                    # dont block so that we dont hang shutdown
-                    req = await self.request_queue.async_get(block=False)
-                # TODO: do we need to catch this runtime error?
-                except (queue.Empty, asyncio.queues.QueueEmpty, RuntimeError):
-                    await asyncio.sleep(1e-6)
-                    continue
-
-                def make_task_done_callback(req: ServerRequest) -> Callable:
-                    def task_done_callback(task: asyncio.Task) -> None:
-                        exception = task.exception()
-                        if exception:
-                            if isinstance(exception, HandlerNotFoundException):
-                                resp = req.error_response(404, exception)
-                            else:
-                                logging.error(
-                                    "WBArtifactManager request error: %s\n",
-                                    traceback.format_exc(),
-                                )
-                                print(
-                                    "WBArtifactManager request error: %s\n",
-                                    traceback.format_exc(),
-                                )
-
-                                resp = req.error_response(
-                                    server_error_handling.maybe_extract_code_from_exception(
-                                        exception  # type: ignore
-                                    )
-                                    or 500,
-                                    exception,  # type: ignore
-                                )
-                        else:
-                            resp = req.success_response(task.result())
-
-                        active_tasks.discard(task)
-                        new_task = loop.create_task(
-                            self._internal_response_queue.async_put(resp)
-                        )
-                        active_tasks.add(new_task)
-                        new_task.add_done_callback(active_tasks.discard)
-
-                    return task_done_callback
-
                 tracer.context_provider.activate(req.context.trace_context)
                 with wandb_api.wandb_api_context(req.context.wandb_api_context):
-                    if req.name not in self.handlers:
-                        task = loop.create_task(make_404())
-                    else:
-                        # launch a task to handle the request
-                        task = loop.create_task(self.handlers[req.name](*req.args))
+                    # launch a task to handle the request
+                    task = loop.create_task(self._handle(req))
                     active_tasks.add(task)
-                    task_done_callback = make_task_done_callback(req)
-                    task.add_done_callback(task_done_callback)
+                    task.add_done_callback(active_tasks.discard)
                 self.request_queue.task_done()
+        self._server_process_ready_to_shut_down.set()
 
     def register_handler(self, name: str, handler: HandlerFunction) -> None:
         self.handlers[name] = handler
@@ -390,7 +385,7 @@ class AsyncConnection:
         self.request_id = 0
         self.requests: typing.Dict[int, asyncio.Future] = {}
         self.request_queue: Queue[ServerRequest] = request_queue
-        self.response_queue: Queue[ServerResponse] = response_queue
+        self.response_queue: ThreadQueue[ServerResponse] = response_queue
         self.response_task = asyncio.create_task(self.handle_responses())
         self.response_task.add_done_callback(self.response_task_ended)
         self.connected = True
@@ -407,16 +402,13 @@ class AsyncConnection:
 
     async def handle_responses(self) -> None:
         while self.connected:
-            try:
-                resp = await self.response_queue.async_get(block=False)
-            except queue.Empty:
-                await asyncio.sleep(1e-6)
-                continue
+            resp = await self.response_queue.async_get()
             self.response_queue.task_done()
             self.requests[resp.id].set_result(resp)
 
     async def request(self, name: str, *args: typing.Any) -> typing.Any:
         # Caller must check ServerResponse.error!
+
         wb_ctx = wandb_api.get_wandb_api_context()
         cur_trace_context = tracer.current_trace_context()
 
@@ -431,6 +423,16 @@ class AsyncConnection:
         self.request_id += 1
         response_future: asyncio.Future[ServerResponse] = asyncio.Future()
         self.requests[req.id] = response_future
+
+        with self.server._shutdown_lock:
+            is_shutting_down = self.server._shutting_down.is_set()
+
+        if is_shutting_down:
+            self.response_task.cancel()
+            raise errors.WeaveWandbArtifactManagerError(
+                "Server is shutting down, cannot make request"
+            )
+
         await self.request_queue.async_put(req)
         server_resp = await response_future
 
@@ -486,6 +488,15 @@ class SyncClient:
             )
 
             response_queue = self.server.client_response_queues[self.client_id]
+
+            with self.server._shutdown_lock:
+                is_shutting_down = self.server._shutting_down.is_set()
+
+            if is_shutting_down:
+                raise errors.WeaveWandbArtifactManagerError(
+                    "Server is shutting down, cannot make request"
+                )
+
             self.server.request_queue.put(request)
             server_resp = response_queue.get()
 

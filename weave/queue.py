@@ -1,8 +1,12 @@
+import time
+import asyncio
 import queue
 import aioprocessing
 from typing import Optional, Generic, TypeVar
 
 QueueItemType = TypeVar("QueueItemType")
+
+POLL_INTERVAL = 1e-6  # sec
 
 
 class Queue(Generic[QueueItemType]):
@@ -70,7 +74,19 @@ class ThreadQueue(Queue, Generic[QueueItemType]):
     async def async_get(
         self, block: bool = True, timeout: Optional[int] = None
     ) -> QueueItemType:
-        return self.get(block=block, timeout=timeout)
+        # approximate async with polling every microsec
+        start = time.time()
+        while True:
+            try:
+                item = self.get(block=False)
+            except (asyncio.queues.QueueEmpty, queue.Empty):
+                if not block:
+                    raise
+                await asyncio.sleep(POLL_INTERVAL)
+                if timeout is not None and time.time() - start > timeout:
+                    raise TimeoutError
+                continue
+            return item
 
     async def async_join(self) -> None:
         self.join()
