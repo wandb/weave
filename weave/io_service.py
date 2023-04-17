@@ -161,12 +161,13 @@ class Server:
         process: bool = False,
     ) -> None:
         self.handlers: Dict[str, HandlerFunction] = {}
-        self.response_queue_factory: Callable[[], Queue[ServerResponse]]
-        self.process: typing.Union[threading.Thread, multiprocessing.Process]
 
-        self.ready_queue: Queue
+        self.handler_process: typing.Union[threading.Thread, multiprocessing.Process]
         self.request_queue: Queue[ServerRequest]
-        self.response_queues: Dict[str, Queue[ServerResponse]] = {}
+        self.response_queue: Queue[ServerResponse]
+
+        # just using a ThreadQueue here since this runs in a thread in the user process
+        self.client_response_queues: Dict[str, ThreadQueue[ServerResponse]] = {}
 
         self.running = True
         self.ready = multiprocessing.Event()
@@ -179,15 +180,21 @@ class Server:
         self.register_handler("sleep", self.handle_sleep)
 
         if process:
-            self.response_queue_factory = ProcessQueue
-            self.process = aioprocessing.AioProcess(
+            self.handler_process = aioprocessing.AioProcess(
                 target=self.server_process, daemon=True
             )
+            self.request_queue = ProcessQueue()  # type: ignore
         else:
-            self.response_queue_factory = ThreadQueue
-            self.process = threading.Thread(target=self.server_process, daemon=True)
+            self.handler_process = threading.Thread(
+                target=self.server_process, daemon=True
+            )
+            self.request_queue = ThreadQueue()  # type: ignore
 
-        self.request_queue = self.response_queue_factory()  # type: ignore
+        # runs in the user process and puts responses from the server into the appropriate
+        # client-consumed response queues.
+        self.response_queue_feeder_thread = threading.Thread(
+            target=self.response_reader_process, daemon=True
+        )
 
     # server_process runs the server's main coroutine
     def server_process(self) -> None:
@@ -195,7 +202,7 @@ class Server:
 
     # start starts the server thread or process
     def start(self) -> None:
-        self.process.start()
+        self.handler_process.start()
         self.ready.wait()
 
     # cleanup performs cleanup actions, such as flushing stats
@@ -207,14 +214,45 @@ class Server:
         # TODO: is this with needed?
         with self._shutdown_lock:
             self.running = False
-            if self.process.is_alive():
-                self.process.join()
+            if self.handler_process.is_alive():
+                self.handler_process.join()
             self.cleanup()
+
+    def response_reader_process(self) -> None:
+        asyncio.run(self.response_reader_main(), debug=True)
+
+    async def response_reader_main(self) -> None:
+        loop = asyncio.get_running_loop()
+        active_tasks: set[asyncio.Task[ServerResponse]] = set()
+        while True:
+            with self._shutdown_lock:
+                if not self.running:
+                    break
+                # dont block so that we dont hang shutdown
+                task = loop.create_task(self.response_queue.async_get(block=False))
+                active_tasks.add(task)
+
+                def task_done_callback(task: asyncio.Task[ServerResponse]) -> None:
+                    exception = task.exception()
+                    if exception:
+                        if not isinstance(
+                            exception,
+                            (queue.Empty, asyncio.queues.QueueEmpty, RuntimeError),
+                        ):
+                            raise exception
+                    resp = task.result()
+                    client_response_queue = self.client_response_queues[resp.client_id]
+                    # this is non-blocking b/c resp is already in memory
+                    client_response_queue.put(resp.value)
+                    active_tasks.discard(task)
+
+                task.add_done_callback(task_done_callback)
 
     # main is the server's main coroutine, handling incoming requests
     async def main(self) -> None:
 
-        # NOTHING SHOULD BLOCK IN THIS LOOP
+        # NOTHING SHOULD BLOCK IN THIS LOOP.
+        # This loop runs in the non-user process.
         fs = filesystem.FilesystemAsync()
         net = weave_http.HttpAsync(fs)
         loop = asyncio.get_running_loop()
@@ -227,14 +265,16 @@ class Server:
             )
             atexit.register(self.shutdown)
             self.ready.set()
-            while self.running:
+            while True:
                 try:
                     with self._shutdown_lock:
+                        if not self.running:
+                            break
                         # dont block so that we dont hang shutdown
                         req = await self.request_queue.async_get(block=False)
                 # TODO: do we need to catch this runtime error?
                 except (queue.Empty, asyncio.queues.QueueEmpty, RuntimeError):
-                    await asyncio.sleep(1e-3)
+                    await asyncio.sleep(1e-6)
                     continue
 
                 def make_task_done_callback(req: ServerRequest) -> Callable:
@@ -264,10 +304,7 @@ class Server:
                             resp = req.success_response(task.result())
 
                         active_tasks.discard(task)
-
-                        new_task = loop.create_task(
-                            self.response_queues[req.client_id].async_put(resp)
-                        )
+                        new_task = loop.create_task(self.response_queue.async_put(resp))
                         active_tasks.add(new_task)
                         new_task.add_done_callback(active_tasks.discard)
 
@@ -299,12 +336,12 @@ class Server:
             self.unregister_client(client.client_id)
 
     def register_client(self, client_id: str) -> None:
-        if client_id not in self.response_queues:
-            self.response_queues[client_id] = self.response_queue_factory()
+        if client_id not in self.client_response_queues:
+            self.client_response_queues[client_id] = ThreadQueue()
 
     def unregister_client(self, client_id: str) -> None:
-        if client_id in self.response_queues:
-            del self.response_queues[client_id]
+        if client_id in self.client_response_queues:
+            del self.client_response_queues[client_id]
 
     async def handle_ensure_manifest(
         self, artifact_uri: str
@@ -347,7 +384,7 @@ class AsyncConnection:
 
         self.client_id = client_id
         self.server = server
-        response_queue = server.response_queues[client_id]
+        response_queue = server.client_response_queues[client_id]
         request_queue = server.request_queue
 
         self.request_id = 0
@@ -448,7 +485,7 @@ class SyncClient:
                 id=self._current_request_id,
             )
 
-            response_queue = self.server.response_queues[self.client_id]
+            response_queue = self.server.client_response_queues[self.client_id]
             self.server.request_queue.put(request)
             server_resp = response_queue.get()
 
