@@ -6,10 +6,13 @@ import aioprocessing
 
 
 async def process_producer(queue: Queue) -> None:
+    tasks = set()
+    loop = asyncio.get_running_loop()
     for i in range(3):
         print(f"Producer: {i}", flush=True)
-        await queue.async_put(i)
-        await asyncio.sleep(0.1)
+        task = loop.create_task(queue.async_put(i))
+        tasks.add(task)
+    await asyncio.wait(tasks)
 
 
 def process_consumer(queue: Queue) -> None:
