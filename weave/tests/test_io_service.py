@@ -40,4 +40,4 @@ async def test_io_service_async_client_ensure_manifest(io_server_factory, proces
         assert result == 0.1
 
     assert not conn.connected
-    assert len(server.response_queues) == 0
+    assert len(server.client_response_queues) == 0
