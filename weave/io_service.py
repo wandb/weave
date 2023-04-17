@@ -174,10 +174,11 @@ class Server:
         # that are both in the user process.
         self.client_response_queues: Dict[str, ThreadQueue[ServerResponse]] = {}
 
-        self.running = True
         self._server_process_ready = multiprocessing.Event()
         self._response_queue_feeder_thread_ready = threading.Event()
+
         self._shutdown_lock = multiprocessing.Lock()
+        self._shutting_down = multiprocessing.Event()
 
         # Register handlers
         self.register_handler("ensure_manifest", self.handle_ensure_manifest)
@@ -187,19 +188,21 @@ class Server:
 
         if process:
             self.handler_process = aioprocessing.AioProcess(
-                target=self.server_process, daemon=True
+                target=self.server_process, daemon=True, name="IO Server"
             )
-            self.request_queue = ProcessQueue()  # type: ignore
+            self.request_queue = ProcessQueue()
+            self._internal_response_queue = ProcessQueue()
         else:
             self.handler_process = threading.Thread(
-                target=self.server_process, daemon=True
+                target=self.server_process, daemon=True, name="IO Server"
             )
-            self.request_queue = ThreadQueue()  # type: ignore
+            self.request_queue = ThreadQueue()
+            self._internal_response_queue = ThreadQueue()
 
         # runs in the user process and puts responses from the server into the appropriate
         # client-consumed response queues.
         self.response_queue_feeder_thread = threading.Thread(
-            target=self._response_queue_feeder_main, daemon=True
+            target=self.response_queue_feeder_process, daemon=True
         )
 
     # server_process runs the server's main coroutine
@@ -220,12 +223,13 @@ class Server:
     # shutdown stops the server and joins the thread/process
     def shutdown(self) -> None:
         with self._shutdown_lock:
-            self.running = False
+            self._shutting_down.set()
+
+        if self.response_queue_feeder_thread.is_alive():
+            self.response_queue_feeder_thread.join()
 
         if self.handler_process.is_alive():
             self.handler_process.join()
-        if self.response_queue_feeder_thread.is_alive():
-            self.response_queue_feeder_thread.join()
 
         self.cleanup()
 
@@ -233,34 +237,19 @@ class Server:
         asyncio.run(self._response_queue_feeder_main(), debug=True)
 
     async def _response_queue_feeder_main(self) -> None:
-        loop = asyncio.get_running_loop()
-        active_tasks: set[asyncio.Task[ServerResponse]] = set()
         self._response_queue_feeder_thread_ready.set()
         while True:
-            with self._shutdown_lock:
-                if not self.running:
-                    break
-                # dont block so that we dont hang shutdown
-                task = loop.create_task(
-                    self._internal_response_queue.async_get(block=False)
-                )
-                active_tasks.add(task)
-
-                def task_done_callback(task: asyncio.Task[ServerResponse]) -> None:
-                    exception = task.exception()
-                    if exception:
-                        if not isinstance(
-                            exception,
-                            (queue.Empty, asyncio.queues.QueueEmpty, RuntimeError),
-                        ):
-                            raise exception
-                    resp = task.result()
-                    client_response_queue = self.client_response_queues[resp.client_id]
-                    # this is non-blocking b/c resp is already in memory
-                    client_response_queue.put(resp.value)
-                    active_tasks.discard(task)
-
-                task.add_done_callback(task_done_callback)
+            try:
+                with self._shutdown_lock:
+                    if self._shutting_down.is_set():
+                        break
+                    resp = await self._internal_response_queue.async_get(block=False)
+            except (queue.Empty, asyncio.queues.QueueEmpty, RuntimeError):
+                await asyncio.sleep(1e-6)
+                continue
+            client_response_queue = self.client_response_queues[resp.client_id]
+            # this is non-blocking b/c resp is already in memory
+            client_response_queue.put(resp)
 
     # main is the server's main coroutine, handling incoming requests
     async def _server_main(self) -> None:
@@ -282,7 +271,7 @@ class Server:
             while True:
                 try:
                     with self._shutdown_lock:
-                        if not self.running:
+                        if self._shutting_down.is_set():
                             break
                         # dont block so that we dont hang shutdown
                         req = await self.request_queue.async_get(block=False)
