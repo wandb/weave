@@ -34,7 +34,7 @@ async def test_io_service_async_client_ensure_manifest(io_server_factory, proces
     assert len(results) == 10
 
     # if serial, this should be greater than 1 second (10 * 0.1)
-    # if executed concurrently, this should be between 0.1 and 0.2 (10 * 0.1 + overhead)
+    # if executed concurrently, this should be between 0.1 and 0.2 (0.1 + overhead)
     assert 0.1 < end - start < 0.2
     for result in results:
         assert result == 0.1
