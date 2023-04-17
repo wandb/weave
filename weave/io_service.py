@@ -30,7 +30,7 @@ from . import wandb_file_manager
 from . import server_error_handling
 
 from .queue import Queue, ThreadQueue, ProcessQueue
-from typing import Any, Callable, Dict, TypeVar, Iterator, Optional
+from typing import Any, Callable, Dict, TypeVar, Iterator
 
 
 tracer = engine_trace.tracer()  # type: ignore
@@ -164,13 +164,19 @@ class Server:
 
         self.handler_process: typing.Union[threading.Thread, multiprocessing.Process]
         self.request_queue: Queue[ServerRequest]
-        self.response_queue: Queue[ServerResponse]
 
-        # just using a ThreadQueue here since this runs in a thread in the user process
+        # The internal response queue is used to communicate results back between the server
+        # process and the user process. The server process puts responses into this queue,
+        # and then the Queue feeder thread puts them into the appropriate client response queue.
+        self._internal_response_queue: Queue[ServerResponse]
+
+        # just using a ThreadQueue here since this is for communication between two threads
+        # that are both in the user process.
         self.client_response_queues: Dict[str, ThreadQueue[ServerResponse]] = {}
 
         self.running = True
-        self.ready = multiprocessing.Event()
+        self._server_process_ready = multiprocessing.Event()
+        self._response_queue_feeder_thread_ready = threading.Event()
         self._shutdown_lock = multiprocessing.Lock()
 
         # Register handlers
@@ -193,17 +199,19 @@ class Server:
         # runs in the user process and puts responses from the server into the appropriate
         # client-consumed response queues.
         self.response_queue_feeder_thread = threading.Thread(
-            target=self.response_reader_process, daemon=True
+            target=self._response_queue_feeder_main, daemon=True
         )
 
     # server_process runs the server's main coroutine
     def server_process(self) -> None:
-        asyncio.run(self.main(), debug=True)
+        asyncio.run(self._server_main(), debug=True)
 
     # start starts the server thread or process
     def start(self) -> None:
         self.handler_process.start()
-        self.ready.wait()
+        self.response_queue_feeder_thread.start()
+        self._server_process_ready.wait()
+        self._response_queue_feeder_thread_ready.wait()
 
     # cleanup performs cleanup actions, such as flushing stats
     def cleanup(self) -> None:
@@ -211,25 +219,31 @@ class Server:
 
     # shutdown stops the server and joins the thread/process
     def shutdown(self) -> None:
-        # TODO: is this with needed?
         with self._shutdown_lock:
             self.running = False
-            if self.handler_process.is_alive():
-                self.handler_process.join()
-            self.cleanup()
 
-    def response_reader_process(self) -> None:
-        asyncio.run(self.response_reader_main(), debug=True)
+        if self.handler_process.is_alive():
+            self.handler_process.join()
+        if self.response_queue_feeder_thread.is_alive():
+            self.response_queue_feeder_thread.join()
 
-    async def response_reader_main(self) -> None:
+        self.cleanup()
+
+    def response_queue_feeder_process(self) -> None:
+        asyncio.run(self._response_queue_feeder_main(), debug=True)
+
+    async def _response_queue_feeder_main(self) -> None:
         loop = asyncio.get_running_loop()
         active_tasks: set[asyncio.Task[ServerResponse]] = set()
+        self._response_queue_feeder_thread_ready.set()
         while True:
             with self._shutdown_lock:
                 if not self.running:
                     break
                 # dont block so that we dont hang shutdown
-                task = loop.create_task(self.response_queue.async_get(block=False))
+                task = loop.create_task(
+                    self._internal_response_queue.async_get(block=False)
+                )
                 active_tasks.add(task)
 
                 def task_done_callback(task: asyncio.Task[ServerResponse]) -> None:
@@ -249,7 +263,7 @@ class Server:
                 task.add_done_callback(task_done_callback)
 
     # main is the server's main coroutine, handling incoming requests
-    async def main(self) -> None:
+    async def _server_main(self) -> None:
 
         # NOTHING SHOULD BLOCK IN THIS LOOP.
         # This loop runs in the non-user process.
@@ -264,7 +278,7 @@ class Server:
                 fs, net, await wandb_api.get_wandb_api()
             )
             atexit.register(self.shutdown)
-            self.ready.set()
+            self._server_process_ready.set()
             while True:
                 try:
                     with self._shutdown_lock:
@@ -304,7 +318,9 @@ class Server:
                             resp = req.success_response(task.result())
 
                         active_tasks.discard(task)
-                        new_task = loop.create_task(self.response_queue.async_put(resp))
+                        new_task = loop.create_task(
+                            self._internal_response_queue.async_put(resp)
+                        )
                         active_tasks.add(new_task)
                         new_task.add_done_callback(active_tasks.discard)
 
