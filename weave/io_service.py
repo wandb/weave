@@ -518,7 +518,7 @@ class SyncClient:
         return self.request("direct_url", str(artifact_uri))
 
     def sleep(self, seconds: float) -> None:
-        self.request("sleep", seconds)
+        return self.request("sleep", seconds)
 
 
 def get_sync_client() -> SyncClient:
