@@ -18,7 +18,10 @@ async def process_producer(queue: Queue) -> None:
 def process_consumer(queue: Queue) -> None:
     async def _consume():
         for _ in range(3):
-            item = await queue.async_get()
+            if isinstance(queue, ThreadQueue):
+                item = queue.get()
+            else:
+                item = await queue.async_get()
             print(f"Consumer: {item}", flush=True)
             queue.task_done()
 
