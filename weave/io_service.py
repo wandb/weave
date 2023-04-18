@@ -239,15 +239,12 @@ class Server:
             self.request_queue.put(shutdown_request)
             self._internal_response_queue.put(shutdown_response)
 
-        self._response_queue_feeder_thread_ready_to_shut_down.wait()
-        self._server_process_ready_to_shut_down.wait()
+            self._response_queue_feeder_thread_ready_to_shut_down.wait()
+            self._server_process_ready_to_shut_down.wait()
 
-        self.request_queue.join()
-        self._internal_response_queue.join()
-
-        self.response_queue_feeder_thread.join()
-        self.handler_process.join()
-        self.cleanup()
+            self.response_queue_feeder_thread.join()
+            self.handler_process.join()
+            self.cleanup()
 
     def response_queue_feeder_process(self) -> None:
         asyncio.run(self._response_queue_feeder_main(), debug=True)
@@ -258,11 +255,13 @@ class Server:
             resp = await self._internal_response_queue.async_get()
             if resp.value == ShutDown():
                 self._internal_response_queue.task_done()
+                self._internal_response_queue.join()
                 break
             client_response_queue = self.client_response_queues[resp.client_id]
             # this is non-blocking b/c resp is already in memory
             client_response_queue.put(resp)
             self._internal_response_queue.task_done()
+        # drain queue
         self._response_queue_feeder_thread_ready_to_shut_down.set()
 
     async def _handle(self, req: ServerRequest) -> None:
@@ -308,6 +307,7 @@ class Server:
                 req = await self.request_queue.async_get()
                 if req.name == "shutdown":
                     self.request_queue.task_done()
+                    self.request_queue.join()
                     break
                 tracer.context_provider.activate(req.context.trace_context)
                 with wandb_api.wandb_api_context(req.context.wandb_api_context):
@@ -501,6 +501,7 @@ class SyncClient:
 
             self.server.request_queue.put(request)
             server_resp = response_queue.get()
+            response_queue.task_done()
 
         if server_resp.error:
             if server_resp.http_error_code != None:
