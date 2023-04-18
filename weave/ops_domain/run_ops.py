@@ -446,13 +446,26 @@ def _history_as_of_plugin(inputs, inner):
     return f"{alias}: history(minStep: {min_step}, maxStep: {max_step})"
 
 
+def _get_history_as_of_step(run: wdt.Run, asOfStep: int):
+    alias = _make_alias(str(asOfStep), prefix="history")
+
+    data = run.gql[alias]
+    if isinstance(data, list):
+        if len(data) > 0:
+            data = data[0]
+        else:
+            data = None
+    if data is None:
+        return {}
+    return json.loads(data)
+
+
 @op(
     render_info={"type": "function"},
     plugins=wb_gql_op_plugin(_history_as_of_plugin),
 )
 def _refine_history_as_of_type(run: wdt.Run, asOfStep: int) -> types.Type:
-    alias = _make_alias(str(asOfStep), prefix="history")
-    return wb_util.process_run_dict_type(json.loads(run.gql[alias] or "{}"))
+    return wb_util.process_run_dict_type(_get_history_as_of_step(run, asOfStep))
 
 
 @op(
@@ -461,8 +474,7 @@ def _refine_history_as_of_type(run: wdt.Run, asOfStep: int) -> types.Type:
     plugins=wb_gql_op_plugin(_history_as_of_plugin),
 )
 def history_as_of(run: wdt.Run, asOfStep: int) -> dict[str, typing.Any]:
-    alias = _make_alias(str(asOfStep), prefix="history")
-    return json.loads(run.gql[alias] or "{}")
+    return _get_history_as_of_step(run, asOfStep)
 
 
 # Section 4/6: Direct Relationship Ops
