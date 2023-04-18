@@ -6,7 +6,7 @@ from typing import Optional, Generic, TypeVar
 
 QueueItemType = TypeVar("QueueItemType")
 
-POLL_INTERVAL = 1e-6  # sec
+POLL_INTERVAL = 1e-3  # sec
 
 
 class Queue(Generic[QueueItemType]):
