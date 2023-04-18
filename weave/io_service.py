@@ -255,7 +255,12 @@ class Server:
                 self.cleanup()
 
     def response_queue_feeder_process(self) -> None:
-        asyncio.run(self._response_queue_feeder_main(), debug=True)
+        try:
+            asyncio.run(self._response_queue_feeder_main(), debug=True)
+        except Exception as e:
+            logging.error("Response queue feeder process caught exception: %s", e)
+            traceback.print_exc()
+            raise
 
     async def _response_queue_feeder_main(self) -> None:
         if isinstance(self._internal_response_queue, ThreadQueue):
