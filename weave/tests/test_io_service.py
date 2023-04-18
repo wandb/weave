@@ -2,9 +2,9 @@ import asyncio
 import pytest
 from .. import io_service
 from .. import filesystem
-import time
 
 
+@pytest.mark.timeout(10)
 @pytest.mark.asyncio
 @pytest.mark.parametrize("process", [True, False])
 async def test_io_service_async_client(io_server_factory, process):
@@ -38,6 +38,7 @@ async def test_io_service_async_client(io_server_factory, process):
     assert len(server.client_response_queues) == 0
 
 
+@pytest.mark.timeout(10)
 @pytest.mark.asyncio
 @pytest.mark.parametrize("process", [True, False])
 async def test_io_service_sync_client(io_server_factory, process):

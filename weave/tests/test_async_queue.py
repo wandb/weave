@@ -25,6 +25,7 @@ def process_consumer(queue: Queue) -> None:
     asyncio.run(_consume())
 
 
+@pytest.mark.timeout(10)
 @pytest.mark.asyncio
 async def test_async_process_queue_shared() -> None:
     queue: Queue = ProcessQueue()
@@ -38,6 +39,7 @@ async def test_async_process_queue_shared() -> None:
     consumer_process.join()
 
 
+@pytest.mark.timeout(10)
 @pytest.mark.asyncio
 async def test_async_thread_queue_shared() -> None:
     queue: Queue = ThreadQueue()
