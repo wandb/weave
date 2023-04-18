@@ -12,6 +12,7 @@ from .panel_group import Group
 from .panel_layout_flow import LayoutFlow
 from .panel_layout_bank import LayoutBank
 from .panel_facet_tabs import FacetTabs
+from .panel_sections import Sections
 
 # navigation
 from .panel_weavelink import WeaveLink
