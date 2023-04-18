@@ -582,7 +582,7 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         total_size = 0
         sub_dir_sizes = {}
         cwd = os.getcwd()
-        for entry_path in dir_paths:
+        for entry_path in dir_paths[:1000]:
             entry = manifest.get_entry_by_path(entry_path)
             path_size = (
                 entry["size"] if entry is not None and entry["size"] is not None else 0

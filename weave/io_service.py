@@ -6,6 +6,7 @@
 # traces in local development.
 # TODO: Fix
 
+import queue
 import atexit
 import uuid
 import asyncio
@@ -175,7 +176,9 @@ class Server:
 
         # just using a ThreadQueue here since this is for communication between two threads
         # that are both in the user process.
-        self.client_response_queues: Dict[str, ThreadQueue[ServerResponse]] = {}
+        self.client_response_queues: Dict[
+            str, typing.Union[queue.Queue[ServerResponse], ThreadQueue[ServerResponse]]
+        ] = {}
 
         self._shutting_down = multiprocessing.Event()
         self._shutdown_lock = multiprocessing.Lock()
@@ -250,6 +253,10 @@ class Server:
         asyncio.run(self._response_queue_feeder_main(), debug=True)
 
     async def _response_queue_feeder_main(self) -> None:
+        if isinstance(self._internal_response_queue, ThreadQueue):
+            # initialize the thread queue
+            self._internal_response_queue.init()
+
         self._response_queue_feeder_thread_ready.set()
         while True:
             resp = await self._internal_response_queue.async_get()
@@ -289,7 +296,12 @@ class Server:
                     )
                 else:
                     resp = req.success_response(val)
-            await self._internal_response_queue.async_put(resp)
+            if isinstance(self._internal_response_queue, ThreadQueue):
+                # this is fast
+                self._internal_response_queue.put(resp)
+            else:
+                # this needs to perform IPC
+                await self._internal_response_queue.async_put(resp)
 
     # main is the server's main coroutine, handling incoming requests
     async def _server_main(self) -> None:
@@ -302,6 +314,10 @@ class Server:
             self.wandb_file_manager = wandb_file_manager.WandbFileManagerAsync(
                 fs, net, await wandb_api.get_wandb_api()
             )
+            if isinstance(self.request_queue, ThreadQueue):
+                # initialize the thread queue
+                self.request_queue.init()
+
             self._server_process_ready.set()
             while True:
                 req = await self.request_queue.async_get()
@@ -325,19 +341,26 @@ class Server:
     def registered_client(
         self, client: typing.Union["AsyncClient", "SyncClient"]
     ) -> Iterator[None]:
-        self.register_client(client.client_id)
+        self.register_client(client)
         try:
             yield
         finally:
-            self.unregister_client(client.client_id)
+            self.unregister_client(client)
 
-    def register_client(self, client_id: str) -> None:
-        if client_id not in self.client_response_queues:
-            self.client_response_queues[client_id] = ThreadQueue()
+    def register_client(
+        self, client: typing.Union["SyncClient", "AsyncClient"]
+    ) -> None:
+        if client.client_id not in self.client_response_queues:
+            if isinstance(client, SyncClient):
+                self.client_response_queues[client.client_id] = queue.Queue()
+            else:
+                self.client_response_queues[client.client_id] = ThreadQueue()
 
-    def unregister_client(self, client_id: str) -> None:
-        if client_id in self.client_response_queues:
-            del self.client_response_queues[client_id]
+    def unregister_client(
+        self, client: typing.Union["SyncClient", "AsyncClient"]
+    ) -> None:
+        if client.client_id in self.client_response_queues:
+            del self.client_response_queues[client.client_id]
 
     async def handle_ensure_manifest(
         self, artifact_uri: str
@@ -387,7 +410,9 @@ class AsyncConnection:
         self.request_id = 0
         self.requests: typing.Dict[int, asyncio.Future] = {}
         self.request_queue: Queue[ServerRequest] = request_queue
-        self.response_queue: ThreadQueue[ServerResponse] = response_queue
+        self.response_queue: ThreadQueue[ServerResponse] = typing.cast(
+            ThreadQueue[ServerResponse], response_queue
+        )
         self.response_task = asyncio.create_task(self.handle_responses())
         self.response_task.add_done_callback(self.response_task_ended)
         self.connected = True
@@ -435,7 +460,11 @@ class AsyncConnection:
                 "Server is shutting down, cannot make request"
             )
 
-        await self.request_queue.async_put(req)
+        if isinstance(self.request_queue, ThreadQueue):
+            # this is fast
+            self.request_queue.put(req)
+        else:
+            await self.request_queue.async_put(req)
         server_resp = await response_future
 
         if server_resp.error:
