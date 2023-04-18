@@ -216,7 +216,12 @@ class Server:
 
     # server_process runs the server's main coroutine
     def server_process(self) -> None:
-        asyncio.run(self._server_main(), debug=True)
+        try:
+            asyncio.run(self._server_main(), debug=True)
+        except Exception as e:
+            logging.error("Server process caught exception: %s", e)
+            traceback.print_exc()
+            raise
 
     # start starts the server thread or process
     def start(self) -> None:
@@ -232,22 +237,22 @@ class Server:
 
     # shutdown stops the server and joins the thread/process
     def shutdown(self) -> None:
+        if not self._shutting_down.is_set():
+            with self._shutdown_lock:
+                self._shutting_down.set()
 
-        with self._shutdown_lock:
-            self._shutting_down.set()
+                # tell the two auxiliary processes to shutdown
+                # (the server process and the response queue feeder thread)
 
-            # tell the two auxiliary processes to shutdown
-            # (the server process and the response queue feeder thread)
+                self.request_queue.put(shutdown_request)
+                self._internal_response_queue.put(shutdown_response)
 
-            self.request_queue.put(shutdown_request)
-            self._internal_response_queue.put(shutdown_response)
+                self._response_queue_feeder_thread_ready_to_shut_down.wait()
+                self._server_process_ready_to_shut_down.wait()
 
-            self._response_queue_feeder_thread_ready_to_shut_down.wait()
-            self._server_process_ready_to_shut_down.wait()
-
-            self.response_queue_feeder_thread.join()
-            self.handler_process.join()
-            self.cleanup()
+                self.response_queue_feeder_thread.join()
+                self.handler_process.join()
+                self.cleanup()
 
     def response_queue_feeder_process(self) -> None:
         asyncio.run(self._response_queue_feeder_main(), debug=True)

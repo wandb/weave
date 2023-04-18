@@ -173,7 +173,7 @@ def enable_touch_on_read():
 
 @pytest.fixture()
 def io_server_factory():
-    current_server = io_service.SERVER
+    original_server = io_service.SERVER
 
     def factory(process=False):
         server = io_service.Server(process=process)
@@ -183,7 +183,7 @@ def io_server_factory():
 
     yield factory
 
-    if io_service.SERVER and io_service.SERVER is not current_server:
+    if io_service.SERVER and io_service.SERVER is not original_server:
         io_service.SERVER.shutdown()
 
-    io_service.SERVER = current_server
+    io_service.SERVER = original_server
