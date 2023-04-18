@@ -28,7 +28,7 @@ from . import wandb_api
 from . import wandb_file_manager
 from . import server_error_handling
 
-from .queue import Queue, ThreadQueue, ProcessQueue
+from .async_queue import Queue, ThreadQueue, ProcessQueue
 from typing import Any, Callable, Dict, TypeVar, Iterator
 
 

@@ -1,6 +1,6 @@
 import pytest
 import asyncio
-from ..queue import Queue, ProcessQueue, ThreadQueue
+from ..async_queue import Queue, ProcessQueue, ThreadQueue
 import threading
 import aioprocessing
 
