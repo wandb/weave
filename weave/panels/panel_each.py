@@ -12,11 +12,14 @@ RenderType = typing.TypeVar("RenderType")
 
 @weave.type()
 class EachConfig(typing.Generic[RenderType]):
-    layoutMode: str
-    pbLayoutConfig: typing.Optional[PanelBankSectionConfig] = dataclasses.field(
-        default_factory=lambda: None
+    section: weave.Node[typing.Optional[typing.Any]] = dataclasses.field(
+        default_factory=lambda: weave.graph.VoidNode()
     )
-    render: RenderType = dataclasses.field(default_factory=lambda: graph.VoidNode())
+    panel: weave.Node[typing.Optional[typing.Any]] = dataclasses.field(
+        default_factory=lambda: weave.graph.VoidNode()
+    )
+    select: RenderType = dataclasses.field(default_factory=lambda: graph.VoidNode())
+    layout: RenderType = dataclasses.field(default_factory=lambda: graph.VoidNode())
 
 
 @weave.type()

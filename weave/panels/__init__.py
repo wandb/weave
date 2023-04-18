@@ -9,6 +9,10 @@ from .panel_labeled_item import LabeledItem
 from .panel_card import Card, CardTab
 from .panel_group import Group
 
+from .panel_layout_flow import LayoutFlow
+from .panel_layout_bank import LayoutBank
+from .panel_facet_tabs import FacetTabs
+
 # navigation
 from .panel_weavelink import WeaveLink
 
