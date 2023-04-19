@@ -8,7 +8,7 @@ import typing
 from weave import wandb_api
 from weave import util
 from .tag_test_util import op_add_tag
-from ..artifact_wandb import WandbArtifact, WeaveWBArtifactURI
+from ..artifact_wandb import WandbArtifact, WeaveWBArtifactURI, WandbArtifactManifest
 from .. import wandb_client_api
 from unittest import mock
 import shutil
@@ -113,6 +113,7 @@ class FakeFilesystemManifest:
 class FakeArtifactManifest:
     def __init__(self, artifact):
         self.artifact = artifact
+        self.storage_layout = WandbArtifactManifest.StorageLayout.V1
 
     def get_entry_by_path(self, path):
         entry = self.artifact.manifest.get_entry_by_path(path)

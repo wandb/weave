@@ -1572,7 +1572,7 @@ def test_filesystem_artifact_dir_dict(fake_wandb):
                 "fullPath": "test_results.table.json",
                 "size": 879,
                 "type": "file",
-                "url": f"https://api.wandb.ai/test_entity/test_project/test_name_{art.commit_hash}/test_results.table.json",
+                "url": "https://api.wandb.ai/artifacts/test_entity/23f694a1ce4ce2bd5481337025410230/test_results.table.json",
             },
             "google_link": {
                 "birthArtifactID": "TODO",
