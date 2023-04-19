@@ -112,6 +112,7 @@ def get(uri_s: typing.Union[str, ref_base.Ref]) -> typing.Any:
     return ref_base.Ref.from_str(uri_s).get()
 
 
+get_local_version_ref = artifact_local.get_local_version_ref
 get_local_version = artifact_local.get_local_version
 
 

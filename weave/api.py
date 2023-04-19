@@ -36,8 +36,7 @@ def save(node_or_obj, name=None):
     if isinstance(node_or_obj, _graph.Node):
         return _ops.save(node_or_obj, name=name)
     else:
-        ref = _storage.save(node_or_obj, name=name)
-        return _ops.get(str(ref))
+        return _storage.save(node_or_obj, name=name)
 
 
 def publish(node_or_obj, name=None):
