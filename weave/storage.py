@@ -109,7 +109,7 @@ def save(
 def get(uri_s: typing.Union[str, ref_base.Ref]) -> typing.Any:
     if isinstance(uri_s, ref_base.Ref):
         return uri_s.get()
-    return ref_base.Ref.from_str(uri_s).get()
+    return ref_base.Ref.from_str(uri_s)
 
 
 get_local_version_ref = artifact_local.get_local_version_ref
