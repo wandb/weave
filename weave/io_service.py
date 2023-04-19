@@ -393,7 +393,7 @@ def get_server() -> Server:
     global SERVER
     with SERVER_START_LOCK:
         if SERVER is None:
-            SERVER = Server(process=False)
+            SERVER = Server(process=True)
             SERVER.start()
         return SERVER
 
