@@ -155,7 +155,6 @@ def op_get_return_type_from_inputs(inputs):
     output_type=types.TypeType(),
 )
 def get_returntype(uri):
-    print("URI", uri)
     return op_get_return_type(uri)
 
 
