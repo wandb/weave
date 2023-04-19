@@ -338,7 +338,22 @@ class Server:
                     # launch a task to handle the request
                     task = loop.create_task(self._handle(req))
                     active_tasks.add(task)
-                    task.add_done_callback(active_tasks.discard)
+
+                    def task_callback(task: asyncio.Task[typing.Any]) -> None:
+                        active_tasks.remove(task)
+                        exc = task.exception()
+                        if exc:
+                            logging.error(
+                                "WBArtifactManager request error: %s\n",
+                                traceback.format_exc(),
+                            )
+                            print(
+                                "WBArtifactManager request error: %s\n",
+                                traceback.format_exc(),
+                            )
+                            raise exc
+
+                    task.add_done_callback(task_callback)
                 self.request_queue.task_done()
         self._request_handler_ready_to_shut_down_event.set()
 
