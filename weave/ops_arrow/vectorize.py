@@ -650,9 +650,7 @@ def _ensure_variadic_fn(
 
 
 def _apply_fn_node(awl: ArrowWeaveList, fn: graph.OutputNode) -> ArrowWeaveList:
-    print("VECTORIZING ", fn)
     vecced = vectorize(_ensure_variadic_fn(fn, awl.object_type))
-    print("VECTORIZED ", vecced)
     called = _call_vectorized_fn_node_maybe_awl(awl, vecced)
     # print("CALLED ", called)
     return _call_and_ensure_awl(awl, called)
