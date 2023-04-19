@@ -13,6 +13,7 @@ from . import serialize
 from . import client
 from .language_features.tagging.tag_store import isolated_tagging_context
 from . import logs
+from . import io_service
 
 from flask.testing import FlaskClient
 
@@ -168,3 +169,21 @@ def enable_touch_on_read():
     os.environ["WEAVE_ENABLE_TOUCH_ON_READ"] = "1"
     yield
     del os.environ["WEAVE_ENABLE_TOUCH_ON_READ"]
+
+
+@pytest.fixture()
+def io_server_factory():
+    original_server = io_service.SERVER
+
+    def factory(process=False):
+        server = io_service.Server(process=process)
+        server.start()
+        io_service.SERVER = server
+        return server
+
+    yield factory
+
+    if io_service.SERVER and io_service.SERVER is not original_server:
+        io_service.SERVER.shutdown()
+
+    io_service.SERVER = original_server

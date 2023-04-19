@@ -95,6 +95,12 @@ class HttpAsync:
             cookie_jar=aiohttp.DummyCookieJar(),
         )
 
+    async def __aenter__(self) -> "HttpAsync":
+        return self
+
+    async def __aexit__(self, *args: typing.Any) -> None:
+        await self.session.close()
+
     async def download_file(
         self,
         url: str,
