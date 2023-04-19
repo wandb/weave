@@ -29,10 +29,12 @@ def determine_input_type(
         sig = get_signature(pyfunc)
         sig_params = sig.parameters
         arg_names = sig_params.keys()
-        is_var_args = any(
-            param.kind == param.VAR_POSITIONAL or param.kind == param.VAR_KEYWORD
+        var_arg_params = [
+            param
             for param in sig_params.values()
-        )
+            if param.kind == param.VAR_POSITIONAL or param.kind == param.VAR_KEYWORD
+        ]
+        is_var_args = len(var_arg_params) > 0
 
         # validate there aren't extra declared Weave types
         if not is_var_args:
@@ -77,6 +79,12 @@ def determine_input_type(
                 arg_types[input_name] = existing_weave_type
             else:
                 arg_types[input_name] = types.UnknownType()
+
+        if is_var_args:
+            # Add any remaining weave types if we have var args
+            for key, t in weave_input_type.arg_types.items():
+                if key not in arg_names:
+                    arg_types[key] = t
 
         # validate there aren't missing Weave types
         unknown_type_args = set(
