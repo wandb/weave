@@ -12,8 +12,6 @@ from .graph import Node  # used as a type in op definitions
 from .show import show, show_url
 from .api import *
 
-use_frontend_devmode()
-
 from . import panels
 from .panel import Panel
 
