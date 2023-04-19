@@ -213,6 +213,12 @@ def frontend(path):
         return send_from_directory(blueprint.static_folder, "index.html")
 
 
+@blueprint.route("/", defaults={"path": None})
+@blueprint.route("/<path:path>")
+def root_frontend(path):
+    return send_from_directory(blueprint.static_folder, "index.html")
+
+
 @blueprint.route("/__weave/hello")
 def hello():
     return "hello"
