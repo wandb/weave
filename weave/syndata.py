@@ -12,6 +12,7 @@ def random_metrics(n: int = 100000, n_metrics: int = 100) -> ArrowWeaveList:
     steps = np.arange(0, n, 1)
     data = {
         "step": steps,
+        "string_col": np.random.choice(list("ABCDEFGHIJKLMNOPQRSTUVWXYZ"), n),
     }
     fns: list[typing.Any] = [
         lambda steps: steps**2,
