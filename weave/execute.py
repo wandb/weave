@@ -128,7 +128,6 @@ def get_top_level_stats() -> typing.Optional[FullStats]:
 
 
 def execute_nodes(nodes, no_cache=False):
-    print("EXEC")
     tracer = engine_trace.tracer()
     with tracer.trace("execute-log-graph"):
         logging.info(
@@ -348,16 +347,10 @@ def execute_forward_node(
         return {"cache_used": False}
 
     # This is expensive!
-    print()
-    print()
-    print()
     logging.info(
         "Executing op: %s"  # expr: %s"
         % (node.from_op.name)  # , graph_debug.node_expr_str_full(node))
     )
-    print()
-    print()
-    print()
 
     tracer = engine_trace.tracer()
 

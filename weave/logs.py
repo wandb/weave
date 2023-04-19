@@ -130,6 +130,11 @@ def configure_logger() -> None:
     logger = logging.getLogger("root")
     logger.setLevel(env_log_level())
 
+    # Remove StreamHandler from the root logger to avoid stdout logging
+    for handler in logger.handlers:
+        if isinstance(handler, logging.StreamHandler):
+            logger.removeHandler(handler)
+
     dd_env = os.getenv("DD_ENV")
     enable_datadog = dd_env
     if not enable_datadog:
