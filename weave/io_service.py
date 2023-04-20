@@ -221,6 +221,22 @@ class Server:
 
     # server_process runs the server's main coroutine
     def _request_handler_fn(self) -> None:
+
+        try:
+            current_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            pass
+        else:
+            if current_loop.is_running():
+                logging.warning("Event loop is already running: %s", current_loop)
+                for (
+                    filename,
+                    lineno,
+                    function,
+                    code_context,
+                ) in traceback.extract_stack():
+                    logging.warning("  %s:%d: %s", filename, lineno, function)
+
         logging.info("Starting request handler thread (pid: %s)", os.getpid())
         try:
             asyncio.run(self._request_handler_fn_main(), debug=True)
