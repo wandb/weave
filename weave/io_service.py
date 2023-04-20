@@ -419,8 +419,10 @@ def get_server() -> Server:
     global SERVER
     with SERVER_START_LOCK:
         if SERVER is None:
+            logging.info("Starting WBArtifactManager server")
             SERVER = Server(process=False)
             SERVER.start()
+            logging.info("Starting WBArtifactManager server")
         return SERVER
 
 
