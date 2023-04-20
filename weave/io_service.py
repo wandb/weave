@@ -220,7 +220,11 @@ class Server:
 
     # server_process runs the server's main coroutine
     def _request_handler_fn(self) -> None:
-        asyncio.run(self._request_handler_fn_main(), debug=True)
+        try:
+            asyncio.run(self._request_handler_fn_main(), debug=True)
+        except (Exception, BaseException) as e:
+            logger.exception(f"Server process failed: {e}")
+            raise e
 
     # start starts the server thread or process
     def start(self) -> None:
@@ -258,7 +262,11 @@ class Server:
         logger.info("Shut down successful")
 
     def _response_queue_router_fn(self) -> None:
-        asyncio.run(self._response_queue_router_fn_main(), debug=True)
+        try:
+            asyncio.run(self._response_queue_router_fn_main(), debug=True)
+        except (Exception, BaseException) as e:
+            logger.exception(f"Exception in response queue router: {e}")
+            raise e
 
     async def _response_queue_router_fn_main(self) -> None:
         self._response_queue_feeder_ready_event.set()
