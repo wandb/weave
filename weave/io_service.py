@@ -15,6 +15,7 @@ import dataclasses
 import typing
 import contextlib
 import aioprocessing
+import nest_asyncio
 import multiprocessing
 import logging
 import traceback
@@ -238,15 +239,12 @@ class Server:
                     logging.warning("  %s:%d: %s", filename, lineno, function)
 
         logging.info("Starting request handler thread (pid: %s)", os.getpid())
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
         try:
-            loop.run_until_complete(self._request_handler_fn_main())
+            nest_asyncio.apply()
+            asyncio.run(self._request_handler_fn_main())
         except (Exception, BaseException) as e:
             logger.exception(f"Server process failed: {e}")
             raise e
-        finally:
-            loop.close()
 
     # start starts the server thread or process
     def start(self) -> None:
@@ -301,15 +299,12 @@ class Server:
                 ) in traceback.extract_stack():
                     logging.warning("  %s:%d: %s", filename, lineno, function)
 
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
         try:
-            loop.run_until_complete(self._response_queue_router_fn_main())
+            nest_asyncio.apply()
+            asyncio.run(self._response_queue_router_fn_main())
         except (Exception, BaseException) as e:
             logger.exception(f"Server process failed: {e}")
             raise e
-        finally:
-            loop.close()
 
     async def _response_queue_router_fn_main(self) -> None:
         logging.info("Inside response queue router fn main")
