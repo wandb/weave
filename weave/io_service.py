@@ -240,7 +240,7 @@ class Server:
 
         logging.info("Starting request handler thread (pid: %s)", os.getpid())
         try:
-            nest_asyncio.apply()
+            # nest_asyncio.apply()
             asyncio.run(self._request_handler_fn_main())
         except (Exception, BaseException) as e:
             logger.exception(f"Server process failed: {e}")
