@@ -285,6 +285,22 @@ class Server:
 
     def _response_queue_router_fn(self) -> None:
         logging.info("Starting response queue router thread (pid: %s)", os.getpid())
+
+        try:
+            current_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            pass
+        else:
+            if current_loop.is_running():
+                logging.warning("Event loop is already running: %s", current_loop)
+                for (
+                    filename,
+                    lineno,
+                    function,
+                    code_context,
+                ) in traceback.extract_stack():
+                    logging.warning("  %s:%d: %s", filename, lineno, function)
+
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
