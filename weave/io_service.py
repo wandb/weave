@@ -317,17 +317,25 @@ class Server:
     # main is the server's main coroutine, handling incoming requests
     async def _request_handler_fn_main(self) -> None:
         # This loop should never block.
+        logging.info("Starting request handler coroutine")
         fs = filesystem.FilesystemAsync()
+        logging.info("Created filesystem")
         net = weave_http.HttpAsync(fs)
+        logging.info("Created http")
         loop = asyncio.get_running_loop()
+        logging.info("Got running loop")
         active_tasks: set[asyncio.Task[typing.Any]] = set()
+        logging.info("Created active tasks set")
         async with net:
+            logging.info("Entered net context")
             self.wandb_file_manager = wandb_file_manager.WandbFileManagerAsync(
                 fs, net, await wandb_api.get_wandb_api()
             )
-
+            logging.info("Created wandb file manager")
             self._request_handler_ready_event.set()
+            logging.info("Set request handler ready event")
             while True:
+                logging.info("Waiting for request (active tasks: %s)", active_tasks)
                 try:
                     req = await self.request_queue.async_get()
                 except RuntimeError:
