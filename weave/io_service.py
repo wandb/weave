@@ -300,7 +300,7 @@ class Server:
                     logging.warning("  %s:%d: %s", filename, lineno, function)
 
         try:
-            nest_asyncio.apply()
+            # nest_asyncio.apply()
             asyncio.run(self._response_queue_router_fn_main())
         except (Exception, BaseException) as e:
             logger.exception(f"Server process failed: {e}")
