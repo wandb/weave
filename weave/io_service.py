@@ -35,6 +35,8 @@ from typing import Any, Callable, Dict, TypeVar, Iterator
 tracer = engine_trace.tracer()  # type: ignore
 statsd = engine_trace.statsd()  # type: ignore
 
+logger = logging.getLogger("root")
+
 
 QueueItemType = TypeVar("QueueItemType")
 
@@ -234,7 +236,7 @@ class Server:
 
     # shutdown stops the server and joins the thread/process
     def shutdown(self) -> None:
-        logging.info("Shutting down server")
+        logger.info("Shutting down server")
         with self._shutdown_lock:
             self._shutting_down.set()
 
@@ -249,7 +251,7 @@ class Server:
             self.response_queue_router.join()
             self.request_handler.join()
             self.cleanup()
-        logging.info("Shut down successful")
+        logger.info("Shut down successful")
 
     def _response_queue_router_fn(self) -> None:
         asyncio.run(self._response_queue_router_fn_main(), debug=True)
@@ -263,7 +265,7 @@ class Server:
                 # this happens when the interpreter is shutting down
                 break
             else:
-                logging.info("queue feeder thread Got response: %s", resp)
+                logger.info("queue feeder thread Got response: %s", resp)
             if resp.value == ShutDown():
                 self._internal_response_queue.task_done()
                 self._internal_response_queue.join()
@@ -285,7 +287,7 @@ class Server:
                 try:
                     val = await handler(*req.args)
                 except Exception as e:
-                    logging.error(
+                    logger.error(
                         "WBArtifactManager request error: %s\n",
                         traceback.format_exc(),
                     )
@@ -300,7 +302,7 @@ class Server:
                     )
                 else:
                     resp = req.success_response(val)
-            logging.info("WBArtifactManager response: %s", resp)
+            logger.info("WBArtifactManager response: %s", resp)
             if isinstance(self._internal_response_queue, async_queue.ThreadQueue):
                 # this is fast
                 self._internal_response_queue.put(resp)
@@ -328,7 +330,7 @@ class Server:
                     # this happens when the loop is shutting down
                     break
                 else:
-                    logging.info("Request handler Got request: %s", req)
+                    logger.info("Request handler Got request: %s", req)
                 if req.name == "shutdown":
                     self.request_queue.task_done()
                     self.request_queue.join()
@@ -343,7 +345,7 @@ class Server:
                         active_tasks.remove(task)
                         exc = task.exception()
                         if exc:
-                            logging.error(
+                            logger.error(
                                 "WBArtifactManager request error: %s\n",
                                 traceback.format_exc(),
                             )
@@ -365,11 +367,11 @@ class Server:
         self, client: typing.Union["AsyncClient", "SyncClient"]
     ) -> Iterator[None]:
         self.register_client(client)
-        logging.info("Registered client: %s", client.client_id)
+        logger.info("Registered client: %s", client.client_id)
         try:
             yield
         finally:
-            logging.info("Unregistered client: %s", client.client_id)
+            logger.info("Unregistered client: %s", client.client_id)
             self.unregister_client(client)
 
     def register_client(
@@ -555,10 +557,10 @@ class SyncClient:
                     "Server is shutting down, cannot make request"
                 )
 
-            logging.info("SyncClient: request: %s", request)
+            logger.info("SyncClient: request: %s", request)
             self.server.request_queue.put(request)
             server_resp = response_queue.get()
-            logging.info("SyncClient: response: %s", server_resp)
+            logger.info("SyncClient: response: %s", server_resp)
             response_queue.task_done()
 
         if server_resp.error:
