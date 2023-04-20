@@ -6,6 +6,7 @@
 # traces in local development.
 # TODO: Fix
 
+import os
 import atexit
 import queue
 import uuid
@@ -220,6 +221,7 @@ class Server:
 
     # server_process runs the server's main coroutine
     def _request_handler_fn(self) -> None:
+        logging.info("Starting request handler thread (pid: %s)", os.getpid())
         try:
             asyncio.run(self._request_handler_fn_main(), debug=True)
         except (Exception, BaseException) as e:
@@ -262,6 +264,7 @@ class Server:
         logger.info("Shut down successful")
 
     def _response_queue_router_fn(self) -> None:
+        logging.info("Starting response queue router thread (pid: %s)", os.getpid())
         try:
             asyncio.run(self._response_queue_router_fn_main(), debug=True)
         except (Exception, BaseException) as e:
@@ -269,6 +272,7 @@ class Server:
             raise e
 
     async def _response_queue_router_fn_main(self) -> None:
+        logging.info("Inside response queue router fn main")
         self._response_queue_feeder_ready_event.set()
         while True:
             try:
