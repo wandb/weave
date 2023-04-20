@@ -225,9 +225,13 @@ class Server:
     # start starts the server thread or process
     def start(self) -> None:
         self.request_handler.start()
+        logging.info("Started request handler thread")
         self.response_queue_router.start()
+        logging.info("Started response queue router thread")
         self._request_handler_ready_event.wait()
+        logging.info("Request handler ready event set")
         self._response_queue_feeder_ready_event.wait()
+        logging.info("Queue feeder ready event set")
         atexit.register(self.shutdown)
 
     # cleanup performs cleanup actions, such as flushing stats
