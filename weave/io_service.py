@@ -218,7 +218,11 @@ class Server:
 
     # server_process runs the server's main coroutine
     def _request_handler_fn(self) -> None:
-        asyncio.run(self._request_handler_fn_main(), debug=True)
+        try:
+            asyncio.run(self._request_handler_fn_main(), debug=True)
+        except Exception as e:
+            logging.exception(f"Error in request handler process: {e}")
+            raise e
 
     # start starts the server thread or process
     def start(self) -> None:
@@ -250,7 +254,11 @@ class Server:
             self.cleanup()
 
     def _response_queue_router_fn(self) -> None:
-        asyncio.run(self._response_queue_router_fn_main(), debug=True)
+        try:
+            asyncio.run(self._response_queue_router_fn_main(), debug=True)
+        except Exception as e:
+            logging.exception(f"Error in response queue router: {e}")
+            raise e
 
     async def _response_queue_router_fn_main(self) -> None:
         self._response_queue_feeder_ready_event.set()
