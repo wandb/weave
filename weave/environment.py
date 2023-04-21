@@ -22,8 +22,13 @@ class CacheMode(enum.Enum):
 def cache_mode() -> CacheMode:
     if util.parse_boolean_env_var("WEAVE_NO_CACHE"):
         return CacheMode.MINIMAL
-    else:
-        return CacheMode.FULL
+    env_mode = os.getenv("WEAVE_CACHE_MODE", CacheMode.MINIMAL.value)
+    for mode in CacheMode:
+        if mode.value == env_mode:
+            return mode
+    raise errors.WeaveConfigurationError(
+        f"WEAVE_CACHE_MODE must be one of {list(CacheMode)}"
+    )
 
 
 def wandb_production() -> bool:

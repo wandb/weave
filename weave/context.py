@@ -55,7 +55,11 @@ def _make_default_client():
     if util.is_notebook():
         serv = context_state.get_server()
         if serv is None:
-            serv = server.HttpServer()
+            # Hard-code to port 3000 for the moment. Need this to get media urls
+            # from W&B working.
+            # This means you can't have more than one weave server running
+            # TODO: Remove this constraint!
+            serv = server.HttpServer(port=3000)
             serv.start()
             context_state.set_server(serv)
         # Falling through here means the notebook kernel uses
