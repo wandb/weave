@@ -99,7 +99,7 @@ def _process_run_dict_item(val, run_path: typing.Optional[RunPath] = None):
             elif "path" in val and run_path is not None:
                 return filesystem_runfiles_from_run_path(run_path, val["path"])
 
-        if val["_type"] == "joined-table":
+        if val["_type"] == "joined-table" or val["_type"] == "partitioned-table":
             return filesystem_artifact_file_from_artifact_path(val["artifact_path"])
 
         if val["_type"] == "image-file" and run_path is not None:
@@ -132,6 +132,7 @@ def _process_run_dict_item_type(val):
     if isinstance(val, dict):
         type_count = {"type": val.get("_type", None)}
         type = history.history_key_type_count_to_weave_type(type_count)
+        print("VAL", val, type)
         if type != types.UnknownType():
             return type
     return types.TypeRegistry.type_of(val)

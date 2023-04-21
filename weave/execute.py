@@ -422,7 +422,10 @@ def execute_forward_node(
     else:
         with tracer.trace("execute-sync"):
             if language_nullability.should_force_none_result(inputs, op_def):
-                result = None
+                if isinstance(op_def.concrete_output_type, types.TypeType):
+                    result = types.NoneType()
+                else:
+                    result = None
             else:
                 result = execute_sync_op(op_def, inputs)
 
