@@ -1,6 +1,5 @@
 import json
 
-from ..file_base import wb_object_type_from_path
 from ..compile_domain import wb_gql_op_plugin
 from ..api import op
 from .. import errors
@@ -329,20 +328,111 @@ def files(
     return []
 
 
+def _get_history_metrics(
+    artifactVersion: wdt.ArtifactVersion,
+) -> dict[str, typing.Any]:
+    from ..compile import enable_compile
+    from weave.graph import OutputNode, ConstNode
+    from . import wb_domain_types
+    from .. import weave_internal
+
+    created_by = artifactVersion.gql["createdBy"]
+    if created_by["__typename"] != "Run":
+        return {}
+
+    run_name = created_by["name"]
+    project_name = created_by["project"]["name"]
+    entity_name = created_by["project"]["entity"]["name"]
+    history_step = artifactVersion.gql["historyStep"]
+
+    node = OutputNode(
+        types.TypedDict({}),
+        "run-historyAsOf",
+        {
+            "run": OutputNode(
+                wb_domain_types.RunType,
+                "project-run",
+                {
+                    "project": OutputNode(
+                        wb_domain_types.ProjectType,
+                        "root-project",
+                        {
+                            "entity_name": ConstNode(types.String(), entity_name),
+                            "project_name": ConstNode(types.String(), project_name),
+                        },
+                    ),
+                    "run_name": ConstNode(types.String(), run_name),
+                },
+            ),
+            "asOfStep": ConstNode(types.Int(), history_step),
+        },
+    )
+
+    with enable_compile():
+        res = weave_internal.use(node)
+    if isinstance(res, list):
+        res = res[0]
+
+    return res
+
+
 # This op contains a bunch of custom logic, punting for now
-@op()
+@op(
+    plugins=wb_gql_op_plugin(
+        lambda inputs, inner: """
+            historyStep
+            createdBy {
+                __typename
+                ... on Run {
+                    id
+                    name
+                    project {
+                        id
+                        name 
+                        entity {
+                            id
+                            name
+                        }
+                    }
+                }
+            }
+        """,
+    ),
+)
 def refine_history_metrics(
     artifactVersion: wdt.ArtifactVersion,
 ) -> types.Type:
-    return wb_util.process_run_dict_type({})
+    return wb_util.process_run_dict_type(_get_history_metrics(artifactVersion))
 
 
-@op(name="artifactVersion-historyMetrics", refine_output_type=refine_history_metrics)
+@op(
+    name="artifactVersion-historyMetrics",
+    plugins=wb_gql_op_plugin(
+        lambda inputs, inner: """
+            historyStep
+            createdBy {
+                __typename
+                ... on Run {
+                    id
+                    name
+                    project {
+                        id
+                        name 
+                        entity {
+                            id
+                            name
+                        }
+                    }
+                }
+            }
+        """,
+    ),
+    refine_output_type=refine_history_metrics,
+)
 def history_metrics(
     artifactVersion: wdt.ArtifactVersion,
 ) -> dict[str, typing.Any]:
-    # TODO: We should probably create a backend endpoint for this... in weave0 we make a bunch on custom calls.
-    return {}
+    return _get_history_metrics(artifactVersion)
 
 
 # Special bridge functions to lower level local artifacts
