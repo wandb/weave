@@ -67,9 +67,10 @@ def default_log_filename() -> typing.Optional[str]:
 
 def env_log_level() -> typing.Any:
     # Default to only showing ERROR logs, unless otherwise specified
-    level = os.environ.get("WEAVE_LOG_LEVEL", "ERROR")
+    default_level = "ERROR"
     if os.environ.get("WEAVE_SERVER_ENABLE_LOGGING"):
-        level = "INFO"
+        default_level = "INFO"
+    level = os.environ.get("WEAVE_LOG_LEVEL", default_level)
     return logging.getLevelName(level)
 
 
@@ -212,6 +213,6 @@ def configure_logger() -> None:
             # agent can watch.
             enable_stream_logging(
                 logger,
-                wsgi_stream_settings=LogSettings(LogFormat.PRETTY, "INFO"),
+                wsgi_stream_settings=LogSettings(LogFormat.PRETTY, "DEBUG"),
                 server_logfile_settings=LogSettings(LogFormat.DATADOG, "DEBUG"),
             )
