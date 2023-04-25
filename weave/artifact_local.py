@@ -291,9 +291,7 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
             branch = self._branch
 
         metadata = {}
-        print("BRANCH", branch, self._branch)
         if branch != self._branch:
-            print("NEW BRANCH")
             # new branch
             metadata["branch_point"] = {
                 "branch": self._branch,

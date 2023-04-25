@@ -26,10 +26,11 @@ class RunPath:
     run_name: str
 
 
-# @decorator_type.type("histogram")
-# class Histogram:
-#     bins: list[float]
-#     values: list[int]
+# Avoiding name collision with PanelHistogram ('histogram') for now.
+@decorator_type.type()
+class WbHistogram:
+    bins: list[float]
+    values: list[int]
 
 
 def filesystem_artifact_file_from_artifact_path(artifact_path: str):
@@ -88,7 +89,7 @@ def _process_run_dict_item(val, run_path: typing.Optional[RunPath] = None):
                     bin_min += val["packedBins"]["size"]
             else:
                 bins = val["bins"]
-            return Histogram(
+            return WbHistogram(
                 bins=bins,
                 values=val["values"],
             )
