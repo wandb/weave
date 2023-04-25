@@ -15,49 +15,73 @@ def test_show_simple_call(cereal_csv):
     assert actual == {
         "nodeType": "output",
         "type": {
-            "type": "list",
-            "objectType": {
-                "type": "typedDict",
-                "propertyTypes": {
-                    "name": "string",
-                    "mfr": "string",
-                    "type": "string",
-                    "calories": "int",
-                    "protein": "int",
-                    "fat": "int",
-                    "sodium": "int",
-                    "fiber": "float",
-                    "carbo": "float",
-                    "sugars": "int",
-                    "potass": "int",
-                    "vitamins": "int",
-                    "shelf": "int",
-                    "weight": "float",
-                    "cups": "float",
-                    "rating": "float",
-                },
+            "type": "Group",
+            "_base_type": {"type": "Panel", "_base_type": {"type": "Object"}},
+            "_is_object": True,
+            "input_node": {
+                "type": "function",
+                "inputTypes": {},
+                "outputType": "invalid",
             },
+            "vars": {"type": "typedDict", "propertyTypes": {}},
+            "config": {
+                "type": "GroupConfig",
+                "_base_type": {"type": "Object"},
+                "_is_object": True,
+                "items": {
+                    "type": "typedDict",
+                    "propertyTypes": {
+                        "table": {
+                            "type": "function",
+                            "inputTypes": {},
+                            "outputType": {
+                                "type": "list",
+                                "objectType": {
+                                    "type": "typedDict",
+                                    "propertyTypes": {
+                                        "name": "string",
+                                        "mfr": "string",
+                                        "type": "string",
+                                        "calories": "int",
+                                        "protein": "int",
+                                        "fat": "int",
+                                        "sodium": "int",
+                                        "fiber": "float",
+                                        "carbo": "float",
+                                        "sugars": "int",
+                                        "potass": "int",
+                                        "vitamins": "int",
+                                        "shelf": "int",
+                                        "weight": "float",
+                                        "cups": "float",
+                                        "rating": "float",
+                                    },
+                                },
+                            },
+                        }
+                    },
+                },
+                "gridConfig": "none",
+                "liftChildVars": "none",
+                "allowedPanels": "none",
+                "enableAddPanel": "none",
+                "childNameBase": "none",
+                "showExpressions": "boolean",
+                "layered": "boolean",
+                "preferHorizontal": "boolean",
+                "equalSize": "boolean",
+                "style": "string",
+                "grid": "boolean",
+            },
+            "id": "string",
         },
         "fromOp": {
-            "name": "file-readcsv",
+            "name": "get",
             "inputs": {
-                "self": {
-                    "nodeType": "output",
-                    "type": {
-                        "type": "local_file",
-                        "_base_type": {"type": "FileBase"},
-                        "extension": "csv",
-                    },
-                    "fromOp": {
-                        "name": "localpath",
-                        "inputs": {
-                            "path": {
-                                "nodeType": "const",
-                                "type": "string",
-                                "val": test_helpers.RegexMatcher(".*cereal.csv"),
-                            }
-                        },
-                    },
+                "uri": {
+                    "nodeType": "const",
+                    "type": "string",
+                    "val": "local-artifact:///dashboard-table:latest/obj",
                 }
             },
         },
