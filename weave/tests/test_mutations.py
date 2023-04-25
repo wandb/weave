@@ -42,9 +42,9 @@ def test_mutate_with_use(cereal_csv):
 
 
 def test_mutate_artifact():
-    storage.save({"a": 5, "b": 6}, "my-dict")
+    storage.save({"a": 5, "b": 6}, "my-dict:latest")
     dict_obj = ops.get(f"local-artifact:///my-dict:latest/obj")
-    weave.use(ops.set(weave_internal.const(dict_obj["a"]), 17))
+    weave.use(ops.set(weave_internal.const(dict_obj["a"]), 17, {}))
     assert weave.use(dict_obj["a"]) == 17
 
 

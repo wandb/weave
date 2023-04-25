@@ -339,24 +339,13 @@ def test_save_to_branch():
     assert data == data2
 
 
-def test_branch_tracking():
-    data = [{"a": 5}, {"a": 6}]
-    ref = storage.save(data, "data:main")
-    assert ref.branch == "main"
-    data2 = storage.get("local-artifact:///data:main/obj")
-    data2[0]["a"] = 7
-    # Since data2 came from branch main, saving should update main
-    ref = storage.save(data2)
-    assert ref.branch == "main"
-
-
 def test_branch_point():
     data = [{"a": 5}, {"a": 6}]
     ref = storage.save(data, "data:main")
     assert ref.branch == "main"
     data2 = storage.get("local-artifact:///data:main/obj")
     data2[0]["a"] = 7
-    ref2 = storage.save(data2, "data:other")
+    ref2 = storage.save(data2, "data:main", branch="other")
     assert ref2.branch == "other"
     assert ref2.branch_point["branch"] == "main"
     assert ref2.branch_point["commit"] == ref.version
@@ -371,7 +360,7 @@ def test_branch_point():
 
     data4 = storage.get("local-artifact:///data:other/obj")
     data4[0]["a"] = 8
-    ref4 = storage.save(data4, "data:other2")
+    ref4 = storage.save(data4, "data:other", branch="other2")
     assert ref4.branch == "other2"
     assert ref4.branch_point["branch"] == "other"
     assert ref4.branch_point["commit"] == ref3.version

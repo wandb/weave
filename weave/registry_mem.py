@@ -40,7 +40,7 @@ class Registry:
         should_save = not is_loading and not op.is_builtin
         if should_save:
             # if we're not loading an existing op, save it.
-            ref = storage.save(op, name=op.name)
+            ref = storage.save(op, name=op.name + ":latest")
             version = ref.version
             location = ref.artifact.uri_obj
         version = location.version if location is not None else None
