@@ -92,7 +92,7 @@ def make_rpt_op(plot_name, output_row_type):
 
     @op(
         name=f"rpt_{plot_name}GQLResolver",
-        input_type={"gql_result": types.Invalid(), "repoName": types.String()},
+        input_type={"gql_result": types.TypedDict({}), "repoName": types.String()},
         output_type=output_type,
     )
     def root_all_projects_gql_resolver(gql_result, repoName):
