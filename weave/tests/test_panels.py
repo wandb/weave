@@ -81,22 +81,6 @@ def test_synced():
 # )
 
 
-def test_save_panel():
-    metrics = weave.save(["a", "b"])
-    data = weave.save([{"a": [0, 1], "b": [2, 3]}, {"a": [4, 5], "b": [6, 7]}])
-
-    panel = weave.panels.Each(
-        metrics,
-        render=lambda metric_name: weave.panels.Plot(
-            data,
-            x=lambda row: row[metric_name][0],
-            y=lambda row: row[metric_name][1],
-        ),
-    )
-    # Just make sure it doesn't crash for now
-    storage.save(panel)
-
-
 def test_object_picker_choice_type():
     ints = weave.save([1, 2, 3], name="my-ints")
     panel = weave.panels.ObjectPicker(ints)

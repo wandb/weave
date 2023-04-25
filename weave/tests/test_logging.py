@@ -13,6 +13,7 @@ import pytest
 
 def test_logfile_created(fresh_server_logfile):
 
+    server.capture_weave_server_logs()
     with context.local_http_client():
         # run this to kick off a server
         assert api.use(ops.Number.__add__(3, 9)) == 12
@@ -31,6 +32,7 @@ def test_logfile_created(fresh_server_logfile):
 
 def test_logfile_captures_error(fresh_server_logfile):
     # run this to kick off a server
+    server.capture_weave_server_logs()
 
     with context.local_http_client():
         with pytest.raises(requests.exceptions.HTTPError):
@@ -50,6 +52,7 @@ def test_logfile_captures_error(fresh_server_logfile):
 
 def test_log_2_app_instances_different_threads(fresh_server_logfile):
     # kick off two http servers
+    server.capture_weave_server_logs()
     with context.local_http_client():
         with context.local_http_client():
             with pytest.raises(requests.exceptions.HTTPError):
