@@ -50,7 +50,7 @@ _context.clear_loading_built_ins(_loading_builtins_token)
     },
     output_type=LinearModelType(),
 )
-def train(X, y):
+def coreml_train(X, y):
     return Model(weave.type_of(X), weave.type_of(y), np.polyfit(X, y, 1))
 
 
@@ -62,7 +62,7 @@ def test_flow():
         ]
     )
 
-    model = train(train_data.pick("X"), train_data.pick("y"))
+    model = coreml_train(train_data.pick("X"), train_data.pick("y"))
 
     test_data = weave.save(
         [
