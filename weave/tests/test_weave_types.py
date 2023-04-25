@@ -707,7 +707,6 @@ def test_deserializes_single_member_union():
 def test_wbrun_not_assignable_to_weave_run():
     from ..ops_domain import wb_domain_types
 
-    breakpoint()
     assert not weave.types.optional(wb_domain_types.Run().WeaveType()).assign_type(
         weave.types.RunType(
             inputs=weave.types.TypedDict(property_types={}),

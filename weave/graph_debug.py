@@ -141,24 +141,24 @@ def node_expr_str_full(node: graph.Node) -> str:
         if all(
             [not isinstance(n, graph.OutputNode) for n in node.from_op.inputs.values()]
         ):
-            return "%s(%s) %s" % (
+            return "%s(%s)" % (
                 graph.opuri_full_name(node.from_op.name),
                 ", ".join(
                     node_expr_str_full(node.from_op.inputs[n]) for n in param_names
                 ),
-                node.type.simple_str()[:100],
+                # node.type.simple_str()[:100],
             )
         if not param_names:
             return "%s()" % graph.opuri_full_name(node.from_op.name)
         # This puts in newlines, but not very well. Fix me :)
-        return "%s\n  .%s(%s) %s" % (
+        return "%s\n  .%s(%s) " % (
             node_expr_str_full(node.from_op.inputs[param_names[0]]),
             graph.opuri_full_name(node.from_op.name),
             ", ".join(
                 node_expr_str_full(node.from_op.inputs[n]) for n in param_names[1:]
             ),
             # ""
-            node.type.simple_str()[:100],
+            # node.type.simple_str()[:100],
         )
     elif isinstance(node, graph.ConstNode):
         if isinstance(node.type, types.Function):
