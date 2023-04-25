@@ -249,7 +249,6 @@ class Gpt3FineTune:
         self.fine_tuned_model = fine_tuned_model
         self.result_file = result_file
 
-    @weave.mutation
     def update(self):
         fine_tune = openai.FineTune.retrieve(id=self.id)
         # print("FINE_TUNE", fine_tune)

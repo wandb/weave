@@ -27,7 +27,6 @@ class AdderConfig:
     )
 
 
-@weave.mutation
 def adder_set_default_config(config, new_config):
     return new_config
 

@@ -82,10 +82,12 @@ def _show_params(obj):
     # Name the panel artifact after the object's variable name for now,
     # and only create a new one if the name is not take yet.
     # If the name exists, we'll render whatever is already stored there!
+
+    # Actually, disabled this... always create a new panel for now.
+
     panel_name = "dashboard-" + var_name
-    panel_ref = storage.get_local_version_ref(panel_name, "latest")
-    if panel_ref is None:
-        panel_ref = storage.save(ui_root, name=f"{panel_name}:latest")
+    # panel_ref = storage.get_local_version_ref(panel_name, "latest")
+    panel_ref = storage.save(ui_root, name=f"{panel_name}:latest")
 
     # convert panel_ref to a a get expression.
     show_node = ops.get(panel_ref.branch_uri)

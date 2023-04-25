@@ -392,10 +392,6 @@ class OpDef:
         return uris.WeaveURI.parse(self.name).name
 
     @property
-    def is_mutation(self):
-        return getattr(self.raw_resolve_fn, "is_mutation", False)
-
-    @property
     def is_async(self):
         return (
             not callable(self.raw_output_type)

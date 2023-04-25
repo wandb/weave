@@ -9,18 +9,17 @@ from .. import runs
 def test_run_basic():
     run_id = "TESTRUN"
     run = runs.Run(id=run_id, op_name="test-run")
-    run_name = "run-%s" % run_id
+    run_name = "run-%s:latest" % run_id
     storage.save(run, name=run_name)
 
-    run_node = ops.get(f"local-artifact:///{run_name}:latest/obj")
-    # run = api.use(run_node)
+    run_node = ops.get(f"local-artifact:///{run_name}/obj")
     assert api.use(run_node.state) == "pending"
-    api.use(run_node.set_state("running"))
+    ops.run_set_state(run_node, "running")
     assert api.use(run_node.state) == "running"
-    api.use(run_node.print_("Hello"))
-    api.use(run_node.print_("Hello again"))
-    api.use(run_node.log({"x": 49.0}))
-    api.use(run_node.set_output("some-output"))
+    ops.run_print(run_node, "Hello")
+    ops.run_print(run_node, "Hello again")
+    ops.run_log(run_node, {"x": 49.0})
+    ops.run_set_output(run_node, "some-output")
 
     saved_prints = api.use(run_node.prints)
     assert saved_prints == ["Hello", "Hello again"]

@@ -30,13 +30,6 @@ def verify_weave_fn_is_valid(op: "op_def.OpDef", weavified: graph.Node) -> None:
 
 def op_to_weave_fn(opdef: "op_def.OpDef") -> graph.Node:
 
-    # TODO: remove this condition. we should be able to convert mutations to weave functions but
-    # we need to figure out how to do it
-    if opdef.is_mutation:
-        raise errors.WeavifyError(
-            f"Cannot derive weave function from mutation op {opdef.name}"
-        )
-
     if opdef.name.startswith("mapped"):
         raise errors.WeavifyError("Cannot convert mapped op to weave_fn here")
 

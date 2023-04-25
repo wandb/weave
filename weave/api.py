@@ -12,7 +12,7 @@ from . import context as _context
 from . import weave_types as types
 from . import types_numpy as _types_numpy
 from . import errors
-from .decorators import weave_class, op, mutation, type
+from .decorators import weave_class, op, type
 from .op_args import OpVarArgs
 from .op_def import OpDef
 from . import usage_analytics

@@ -17,8 +17,14 @@ def test_print_save_val():
     )
 
     # show should use the same expression
+    show_params = _show_params(ref)
     assert (
-        str(_show_params(ref)["weave_node"])
+        str(show_params["weave_node"])
+        == 'get("local-artifact:///dashboard-my-data:latest/obj")'
+    )
+    panel = weave.use(show_params["weave_node"])
+    assert (
+        str(panel.config.items["my-data"])
         == 'get("local-artifact:///my-data:0ede263a967353f0ddb20f3be13bcd56/obj")'
     )
 
@@ -37,8 +43,14 @@ def test_print_save_val():
         str(ref)
         == 'get("local-artifact:///my-data:e29ccef26ed48b2b59caf0bf28974e38/obj")'
     )
+    show_params = _show_params(ref)
     assert (
-        str(_show_params(ref)["weave_node"])
+        str(show_params["weave_node"])
+        == 'get("local-artifact:///dashboard-my-data:latest/obj")'
+    )
+    panel = weave.use(show_params["weave_node"])
+    assert (
+        str(panel.config.items["my-data"])
         == 'get("local-artifact:///my-data:e29ccef26ed48b2b59caf0bf28974e38/obj")'
     )
 

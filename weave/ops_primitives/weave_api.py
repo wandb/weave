@@ -2,7 +2,7 @@ import typing
 import time
 
 from weave.graph import Node
-from ..api import op, mutation, weave_class
+from ..api import op, weave_class
 from .. import weave_types as types
 from .. import errors
 from .. import storage
@@ -241,17 +241,14 @@ def execute(node):
         return weave_internal.use(node)
 
 
-@op(
-    pure=False,
-    name="set",
-    input_type={"self": types.Function({}, types.Any())},
-)
-def set(self, val: typing.Any, root_args: typing.Any) -> typing.Any:
+def mutate_op_body(
+    self,
+    root_args: typing.Any,
+    make_new_value: typing.Callable[[typing.Any], typing.Any] = None,
+):
     # This implements mutations. Note that its argument must be a
     # Node. You can call it like this:
     # weave.use(ops.set(weave_internal.const(csv[-1]["type"]), "YY"))
-    if isinstance(self, graph.ConstNode):
-        return val
 
     self = compile.compile_fix_calls([self])[0]
     nodes = graph.linearize(self)
@@ -283,7 +280,8 @@ def set(self, val: typing.Any, root_args: typing.Any) -> typing.Any:
         results.append(arg0)
 
     # Make the updates backwards
-    res = val
+    res = make_new_value(arg0)
+
     for i, (node, inputs, result) in reversed(
         list(enumerate(zip(nodes, op_inputs, results)))
     ):
@@ -308,6 +306,30 @@ def set(self, val: typing.Any, root_args: typing.Any) -> typing.Any:
     return res
 
 
+@op(
+    pure=False,
+    name="set",
+    input_type={"self": types.Function({}, types.Any())},
+)
+def set(self, val: typing.Any, root_args: typing.Any) -> typing.Any:
+    # This implements mutations. Note that its argument must be a
+    # Node. You can call it like this:
+    # weave.use(ops.set(weave_internal.const(csv[-1]["type"]), "YY"))
+    if isinstance(self, graph.ConstNode):
+        return val
+
+    return mutate_op_body(self, root_args, lambda _: val)
+
+
+@op(
+    pure=False,
+    name="append",
+    input_type={"self": types.Function({}, types.Any())},
+)
+def append(self, val: typing.Any, root_args: typing.Any) -> typing.Any:
+    return mutate_op_body(self, root_args, lambda v: v + [val])
+
+
 @weave_class(weave_type=types.Function)
 class FunctionOps:
     @op(
@@ -321,63 +343,39 @@ class FunctionOps:
         return weave_internal.use(called)
 
 
+# Run mutations. These should be dot-chainable from Run Node, but
+# we'll need to bring back the mutation decorator to make that work
+# (to tell execute that these should be eager and receive the Node
+# as first argument instead of resolve value).
+def run_set_state(self: graph.Node["Run"], state):
+    weave_internal.use(set(weave_internal.const(self.state), state, {}))
+
+
+def run_print(self: graph.Node["Run"], s: str):
+    weave_internal.use(append(weave_internal.const(self.prints), s, {}))
+
+
+def run_log(self: graph.Node["Run"], v: typing.Any):
+    weave_internal.use(append(weave_internal.const(self.history), v, {}))
+
+
+def run_set_inputs(self: graph.Node["Run"], v: typing.Any):
+    weave_internal.use(set(weave_internal.const(self.inputs), v, {}))
+
+
+def run_set_output(self: graph.Node["Run"], v: typing.Any):
+    # Prior mutation code had this
+    # # Force the output to be a ref.
+    # # TODO: this is probably not the right place to do this.
+    # if not isinstance(v, storage.Ref):
+    #     v = storage.save(v)
+    # self.output = v
+    # return self
+    weave_internal.use(set(weave_internal.const(self.output), v, {}))
+
+
 @weave_class(weave_type=types.RunType)
 class Run:
-    # NOTE: the mutations here are unused, only used by test currently.
-    # shows how we can implement the run API entirely on top of Weave objects,
-    # but we're not using this internally so probably best to remove.
-    @op(
-        name="run-setstate",
-        input_type={
-            "state": types.RUN_STATE_TYPE,
-        },
-        # can't return run because then we'll think this is an async op!
-        output_type=types.Invalid(),
-    )
-    @mutation
-    def set_state(self, state):
-        self.state = state
-        return self
-
-    @op(
-        name="run-print",
-        # can't return run because then we'll think this is an async op!
-        output_type=types.Invalid(),
-    )
-    @mutation
-    def print_(self, s: str):
-        # print("PRINT s", s)
-        self.prints.append(s)  # type: ignore
-        return self
-
-    @op(
-        name="run-log",
-        # can't return run because then we'll think this is an async op!
-        output_type=types.Invalid(),
-    )
-    @mutation
-    def log(self, v: typing.Any):
-        self.history.append(v)  # type: ignore
-        return self
-
-    @mutation
-    def set_inputs(self, v: typing.Any):
-        self.inputs = v
-        return self
-
-    @op(
-        name="run-setoutput",
-        output_type=types.Invalid(),
-    )
-    @mutation
-    def set_output(self, v: typing.Any):
-        # Force the output to be a ref.
-        # TODO: this is probably not the right place to do this.
-        if not isinstance(v, storage.Ref):
-            v = storage.save(v)
-        self.output = v
-        return self
-
     @op(
         name="run-await",
         output_type=lambda input_types: input_types["self"].output,

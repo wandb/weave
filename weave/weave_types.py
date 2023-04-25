@@ -1175,6 +1175,10 @@ class RunType(ObjectType):
     def _is_assignable_to(self, other_type) -> typing.Optional[bool]:
         # Use issubclass, we have RunLocalType defined as a subclass of RunType
         if not issubclass(other_type.__class__, RunType):
+            if self.output == NoneType():
+                # If output is None, we don't want to be assignable to basically
+                # all ops (since ops are nullable)
+                return None
             return other_type.assign_type(self.output)
         return None
 

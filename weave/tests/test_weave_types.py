@@ -702,3 +702,16 @@ def test_deserializes_single_member_union():
         types.TypeRegistry.type_from_dict({"members": ["int"], "type": "union"})
         == types.Int()
     )
+
+
+def test_wbrun_not_assignable_to_weave_run():
+    from ..ops_domain import wb_domain_types
+
+    breakpoint()
+    assert not weave.types.optional(wb_domain_types.Run().WeaveType()).assign_type(
+        weave.types.RunType(
+            inputs=weave.types.TypedDict(property_types={}),
+            history=weave.types.List(object_type=weave.types.UnknownType()),
+            output=weave.types.NoneType(),
+        )
+    )
