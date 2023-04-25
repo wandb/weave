@@ -106,12 +106,10 @@ def weavify_object(obj: typing.Any) -> graph.Node:
 
     try:
         return obj.__class__.constructor(
-            dict_(
-                **{
-                    field.name: weavify_object(getattr(obj, field.name))
-                    for field in dataclasses.fields(obj)
-                }
-            )
+            **{
+                field.name: weavify_object(getattr(obj, field.name))
+                for field in dataclasses.fields(obj)
+            }
         )
     except AttributeError:
         pass

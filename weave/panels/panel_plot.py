@@ -276,42 +276,6 @@ class Plot(panel.Panel):
         super().__init__(input_node=input_node, vars=vars)
         self.config = config
 
-        # A hack for the moment. We want to leave plot in an uninitialized state
-        # in the case where the user has just created one in the UI and its JS
-        # config is undefined, which causes the JS PanelPlot to use its own default
-        # config. If we auto-initialize here when we deserialize that object, we
-        # don't create exactly the same state that the UI would. For example we
-        # don't automatically pick select functions here.
-        #
-        # This means a Python user can't initialize an empty plot and then add
-        # series to it at the moment.
-        #
-        # TODO: Fix this. Solution is that panel defaults need to be constructed
-        # by Weave JS upon construction, not derived during rendering.
-        #
-        # no_axes and no_legend not included in this list, since they are not
-        # nullable (booleans)
-        if all(
-            [
-                setting == None
-                for setting in [
-                    config,
-                    constants,
-                    mark,
-                    x,
-                    y,
-                    color,
-                    label,
-                    tooltip,
-                    pointShape,
-                    lineStyle,
-                    y2,
-                    series,
-                ]
-            ]
-        ):
-            return
-
         if self.config is None:
             if mark is not None:
                 constants = PlotConstants(

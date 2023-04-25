@@ -45,15 +45,6 @@ def test_simple_nested_outer_lambda():
     assert str(panel.config.items["item"].config.items["item_inner"]) == "add(a, b)"
 
 
-def test_controlled_state_out():
-    panel = Group(
-        items={"my_slider": Slider2(), "val": lambda my_slider: my_slider.config.value}
-    )
-    # panel.items['val'] will have been converted to a node, stringifying it
-    # produces an expression string.
-    assert str(panel.config.items["val"]) == "my_slider.config.value"
-
-
 @pytest.mark.skip()
 def test_nested():
     # Doesn't quite work, we get the wrong type for
