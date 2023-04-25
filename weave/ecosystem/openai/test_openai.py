@@ -54,85 +54,122 @@ def test_large_const_node(test_artifact_dir):
     ACTUAL_SHOW_PARAMS_FINE_TUNE_WEAVE_NODE = {
         "nodeType": "output",
         "type": {
-            "type": "Run",
-            "_base_type": {"type": "Object"},
+            "type": "Group",
+            "_base_type": {"type": "Panel", "_base_type": {"type": "Object"}},
             "_is_object": True,
-            "id": "string",
-            "op_name": "string",
-            "state": {
-                "type": "union",
-                "members": [
-                    {"type": "const", "valType": "string", "val": "pending"},
-                    {"type": "const", "valType": "string", "val": "running"},
-                    {"type": "const", "valType": "string", "val": "finished"},
-                    {"type": "const", "valType": "string", "val": "failed"},
-                ],
+            "input_node": {
+                "type": "function",
+                "inputTypes": {},
+                "outputType": "invalid",
             },
-            "prints": {"type": "list", "objectType": "string"},
-            "inputs": {"type": "typedDict", "propertyTypes": {}},
-            "history": {"type": "list", "objectType": "any"},
-            "output": {
-                "type": "gpt3_fine_tune_type",
+            "vars": {"type": "typedDict", "propertyTypes": {}},
+            "config": {
+                "type": "GroupConfig",
                 "_base_type": {"type": "Object"},
                 "_is_object": True,
-                "id": "string",
-                "status": "string",
-                "fine_tuned_model": {"type": "union", "members": ["none", "string"]},
-                "result_file": {
-                    "type": "union",
-                    "members": [
-                        "none",
-                        {
-                            "type": "gpt3_fine_tune_results_type",
-                            "_base_type": {
-                                "type": "openai_stored_file",
+                "items": {
+                    "type": "typedDict",
+                    "propertyTypes": {
+                        "Run": {
+                            "type": "function",
+                            "inputTypes": {},
+                            "outputType": {
+                                "type": "Run",
                                 "_base_type": {"type": "Object"},
-                            },
-                            "_is_object": True,
-                            "bytes": "int",
-                            "created_at": "int",
-                            "filename": "string",
-                            "id": "string",
-                            "object": "string",
-                            "purpose": {
-                                "type": "const",
-                                "valType": "string",
-                                "val": "fine-tune-results",
-                            },
-                            "status": "string",
-                            "status_details": "none",
-                        },
-                    ],
-                },
-            },
-        },
-        "fromOp": {
-            "name": "op-finetune_gpt3",
-            "inputs": {
-                "training_dataset": {
-                    "nodeType": "const",
-                    "type": {
-                        "type": "LocalArtifactRef",
-                        "_base_type": {"type": "Ref"},
-                        "objectType": {
-                            "type": "list",
-                            "objectType": {
-                                "type": "typedDict",
-                                "propertyTypes": {
-                                    "id": "int",
-                                    "prompt": "string",
-                                    "completion": "string",
+                                "_is_object": True,
+                                "id": "string",
+                                "op_name": "string",
+                                "state": {
+                                    "type": "union",
+                                    "members": [
+                                        {
+                                            "type": "const",
+                                            "valType": "string",
+                                            "val": "pending",
+                                        },
+                                        {
+                                            "type": "const",
+                                            "valType": "string",
+                                            "val": "running",
+                                        },
+                                        {
+                                            "type": "const",
+                                            "valType": "string",
+                                            "val": "finished",
+                                        },
+                                        {
+                                            "type": "const",
+                                            "valType": "string",
+                                            "val": "failed",
+                                        },
+                                    ],
+                                },
+                                "prints": {"type": "list", "objectType": "string"},
+                                "inputs": {"type": "typedDict", "propertyTypes": {}},
+                                "history": {"type": "list", "objectType": "any"},
+                                "output": {
+                                    "type": "gpt3_fine_tune_type",
+                                    "_base_type": {"type": "Object"},
+                                    "_is_object": True,
+                                    "id": "string",
+                                    "status": "string",
+                                    "fine_tuned_model": {
+                                        "type": "union",
+                                        "members": ["none", "string"],
+                                    },
+                                    "result_file": {
+                                        "type": "union",
+                                        "members": [
+                                            "none",
+                                            {
+                                                "type": "gpt3_fine_tune_results_type",
+                                                "_base_type": {
+                                                    "type": "openai_stored_file",
+                                                    "_base_type": {"type": "Object"},
+                                                },
+                                                "_is_object": True,
+                                                "bytes": "int",
+                                                "created_at": "int",
+                                                "filename": "string",
+                                                "id": "string",
+                                                "object": "string",
+                                                "purpose": {
+                                                    "type": "const",
+                                                    "valType": "string",
+                                                    "val": "fine-tune-results",
+                                                },
+                                                "status": "string",
+                                                "status_details": "none",
+                                            },
+                                        ],
+                                    },
                                 },
                             },
-                        },
+                        }
                     },
-                    "val": "local-artifact:///list:f909a3e7a090a0a57dbd03801ddebd51/obj",
                 },
-                "hyperparameters": {
+                "gridConfig": "none",
+                "liftChildVars": "none",
+                "allowedPanels": "none",
+                "enableAddPanel": "none",
+                "childNameBase": "none",
+                "showExpressions": "boolean",
+                "layered": "boolean",
+                "preferHorizontal": "boolean",
+                "equalSize": "boolean",
+                "style": "string",
+                "grid": "boolean",
+            },
+            "id": "string",
+        },
+        "fromOp": {
+            "name": "get",
+            "inputs": {
+                "uri": {
                     "nodeType": "const",
-                    "type": {"type": "typedDict", "propertyTypes": {"n_epochs": "int"}},
-                    "val": {"n_epochs": 2},
-                },
+                    "type": "string",
+                    "val": "local-artifact:///dashboard-Run:latest/obj",
+                }
             },
         },
     }
@@ -147,9 +184,12 @@ def test_large_const_node(test_artifact_dir):
     show_panel_params = _show_params(panel)
     panel_params = weave.use(show_panel_params["weave_node"])
 
+    # Top-level is a Group panel (root)
+    panel_group_config = panel_params.config
     # Ensure that we sent the dataset as a get(<ref>) rather than as a const list
     # (this behavior is currently implemented in graph.py:ConstNode)
-    panel_config = panel_params.config
+    panel_config = panel_group_config.items["table0"].config
+
     table_state = panel_config.tableState
     col_select_fns = table_state.columnSelectFunctions
     col_sel_fn2 = list(col_select_fns.values())[1]

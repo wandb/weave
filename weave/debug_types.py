@@ -88,7 +88,7 @@ def why_not_assignable(to_type: Type, from_type: Type) -> typing.Optional[str]:
         )
     elif not reasons and not is_assignable:
         print(
-            "why_not_assignable programming error. reasons but assignable",
+            "why_not_assignable programming error. no reasons but not assignable",
             to_type,
             from_type,
             reasons,

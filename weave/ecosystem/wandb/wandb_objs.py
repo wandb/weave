@@ -12,15 +12,15 @@ user_name_op = registry_mem.memory_registry.get_op("user-name")
 
 
 @weave.type()
-class Model:
+class FakeWandbModel:
     name: str
 
 
 @weave.op(
     render_info={"type": "function"},
 )
-def org_model(entity_name: str, model_name: str) -> Model:
-    return Model(model_name)
+def org_model(entity_name: str, model_name: str) -> FakeWandbModel:
+    return FakeWandbModel(model_name)
 
 
 GHOSTWRITE_MD = weave.ops.Markdown(
@@ -33,8 +33,8 @@ Ghostwrite is a tool for writing. Our mission is to increase human creativity.
 
 
 @weave.op()
-def model_render(
-    model: weave.Node[Model],
+def fakewandbmodel_render(
+    model: weave.Node[FakeWandbModel],
 ) -> weave.panels.Card:
     return weave.panels.Card(
         title=model.name,

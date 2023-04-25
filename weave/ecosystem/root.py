@@ -62,7 +62,7 @@ class Ecosystem:
 # TODO: This should be entirely lazy, so that we don't actually need to
 # load anything to construct it. We can load when the user browsers to specific
 # objects.
-@weave.op(name="weave", render_info={"type": "function"})
+@weave.op(name="op-ecosystem", render_info={"type": "function"})
 def ecosystem() -> Ecosystem:
     from .. import registry_mem
 

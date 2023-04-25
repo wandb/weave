@@ -10,6 +10,7 @@ from IPython.display import IFrame
 from . import context
 from . import graph
 from . import panel
+from . import node_ref
 from . import weave_types as types
 from . import weavejs_fixes
 from . import storage
@@ -42,7 +43,13 @@ def make_show_obj(obj: typing.Any) -> tuple[graph.Node, str]:
     elif isinstance(obj, panel.Panel):
         return obj, obj.id + "0"
     elif isinstance(obj, graph.Node):
-        return obj, make_varname_for_type(obj.type)
+        ref = node_ref.node_to_ref(obj)
+        if ref is not None and isinstance(ref, artifact_fs.FilesystemArtifactRef):
+            name = ref.name
+        else:
+            name = make_varname_for_type(obj.type)
+
+        return obj, name
     elif isinstance(obj, ref_base.Ref):
         if isinstance(obj, artifact_fs.FilesystemArtifactRef):
             name = obj.name
