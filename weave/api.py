@@ -33,19 +33,13 @@ Node = _graph.Node
 
 
 def save(node_or_obj, name=None):
-    if isinstance(node_or_obj, _graph.Node):
-        return _ops.save(node_or_obj, name=name)
-    else:
-        ref = _storage.save(node_or_obj, name=name)
-        return _ops.get(str(ref))
+    ref = _storage.save(node_or_obj, name=name)
+    return _ops.get(str(ref))
 
 
 def publish(node_or_obj, name=None):
-    if isinstance(node_or_obj, _graph.Node):
-        node_or_obj = use(node_or_obj)
-
-    ref = _storage.publish(node_or_obj, name)
-    return _weave_internal.make_const_node(ref.type, ref.obj)
+    ref = _storage.publish(node_or_obj, name=name)
+    return _ops.get(str(ref))
 
 
 def get(ref_str):

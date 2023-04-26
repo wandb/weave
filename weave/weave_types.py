@@ -109,6 +109,11 @@ class TypeRegistry:
 
     @staticmethod
     def type_of(obj: typing.Any) -> "Type":
+        from .ref_base import get_ref
+
+        ref = get_ref(obj)
+        if ref:
+            return RefType.type_of_instance(ref)
 
         obj_type = type_name_to_type("tagged").type_of(obj)
         if obj_type is not None:
