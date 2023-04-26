@@ -134,7 +134,7 @@ def module_render(
     module: weave.Node[types.ModuleType],
 ) -> weave.panels.Card:
     return weave.panels.Card(
-        title=module.module_name(),
+        title=module.module_name(),  # type: ignore
         subtitle="python module",
         content=[
             weave.panels.CardTab(
@@ -144,11 +144,11 @@ def module_render(
             weave.panels.CardTab(
                 name="Classes",
                 content=weave.panels.Table(
-                    module.module_classes(),
+                    module.module_classes(),  # type: ignore
                     columns=[
                         lambda c: weave.panels.WeaveLink(
                             c.class_name(),
-                            to=lambda inp: module.module_class(inp),
+                            to=lambda inp: module.module_class(inp),  # type: ignore
                         )
                     ],
                 ),
@@ -156,11 +156,11 @@ def module_render(
             weave.panels.CardTab(
                 name="Functions",
                 content=weave.panels.Table(
-                    module.module_functions(),
+                    module.module_functions(),  # type: ignore
                     columns=[
                         lambda c: weave.panels.WeaveLink(
                             c.function_name(),
-                            to=lambda inp: module.module_function(inp),
+                            to=lambda inp: module.module_function(inp),  # type: ignore
                         )
                     ],
                 ),
@@ -174,7 +174,7 @@ def class_render(
     cls: weave.Node[type],
 ) -> weave.panels.Card:
     return weave.panels.Card(
-        title=cls.class_name(),
+        title=cls.class_name(),  # type: ignore
         subtitle="python class",
         content=[
             weave.panels.CardTab(
@@ -184,11 +184,11 @@ def class_render(
             weave.panels.CardTab(
                 name="Methods",
                 content=weave.panels.Table(
-                    cls.class_methods(),
+                    cls.class_methods(),  # type: ignore
                     columns=[
                         lambda m: weave.panels.WeaveLink(
                             m.function_name(),
-                            to=lambda inp: cls.class_method(inp),
+                            to=lambda inp: cls.class_method(inp),  # type: ignore
                         )
                     ],
                 ),
@@ -202,7 +202,7 @@ def function_render(
     func: weave.Node[types.FunctionType],
 ) -> weave.panels.Card:
     return weave.panels.Card(
-        title=func.function_name(),
+        title=func.function_name(),  # type: ignore
         subtitle="python function",
         content=[
             weave.panels.CardTab(

@@ -93,13 +93,13 @@ def scatter_config(
     return weave.panels.Group(
         items={
             "x_fn": weave.panels.LabeledItem(
-                label="x", item=weave.panels.ExpressionEditor(config.x_fn)
+                label="x", item=weave.panels.FunctionEditor(config.x_fn)
             ),
             "y_fn": weave.panels.LabeledItem(
-                label="y", item=weave.panels.ExpressionEditor(config.y_fn)
+                label="y", item=weave.panels.FunctionEditor(config.y_fn)
             ),
             "label_fn": weave.panels.LabeledItem(
-                label="label", item=weave.panels.ExpressionEditor(config.label_fn)
+                label="label", item=weave.panels.FunctionEditor(config.label_fn)
             ),
         }
     )

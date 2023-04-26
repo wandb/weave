@@ -156,20 +156,20 @@ def multi_distribution_config(
         items={
             "value_fn": weave.panels.LabeledItem(
                 label="value",
-                item=weave.panels.ExpressionEditor(
-                    config=weave.panels.ExpressionEditorConfig(config.value_fn)
+                item=weave.panels.FunctionEditor(
+                    config=weave.panels.FunctionEditorConfig(config.value_fn)
                 ),
             ),
             "label_fn": weave.panels.LabeledItem(
                 label="label",
-                item=weave.panels.ExpressionEditor(
-                    config=weave.panels.ExpressionEditorConfig(config.label_fn)
+                item=weave.panels.FunctionEditor(
+                    config=weave.panels.FunctionEditorConfig(config.label_fn)
                 ),
             ),
             "bin_size": weave.panels.LabeledItem(
                 label="bin_size",
-                item=weave.panels.Slider2(
-                    config=weave.panels.Slider2Config(
+                item=weave.panels.Slider(
+                    config=weave.panels.SliderConfig(
                         # Need execute here because....
                         # TODO: I don't quite know. Figure this out.
                         weave.ops.execute(config.bin_size)

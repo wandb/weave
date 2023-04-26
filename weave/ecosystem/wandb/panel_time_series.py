@@ -312,32 +312,32 @@ def time_series_config(
         items={
             "x": weave.panels.LabeledItem(
                 label="x",
-                item=weave.panels.ExpressionEditor(
-                    config=weave.panels.ExpressionEditorConfig(config.x)
+                item=weave.panels.FunctionEditor(
+                    config=weave.panels.FunctionEditorConfig(config.x)
                 ),
             ),
             "label": weave.panels.LabeledItem(
                 label="label",
-                item=weave.panels.ExpressionEditor(
-                    config=weave.panels.ExpressionEditorConfig(config.label)
+                item=weave.panels.FunctionEditor(
+                    config=weave.panels.FunctionEditorConfig(config.label)
                 ),
             ),
             "min_x": weave.panels.LabeledItem(
                 label="min_x",
-                item=weave.panels.ExpressionEditor(
-                    config=weave.panels.ExpressionEditorConfig(config.min_x)
+                item=weave.panels.FunctionEditor(
+                    config=weave.panels.FunctionEditorConfig(config.min_x)
                 ),
             ),
             "max_x": weave.panels.LabeledItem(
                 label="max_x",
-                item=weave.panels.ExpressionEditor(
-                    config=weave.panels.ExpressionEditorConfig(config.max_x)
+                item=weave.panels.FunctionEditor(
+                    config=weave.panels.FunctionEditorConfig(config.max_x)
                 ),
             ),
             "agg": weave.panels.LabeledItem(
                 label="agg",
-                item=weave.panels.ExpressionEditor(
-                    config=weave.panels.ExpressionEditorConfig(config.agg)
+                item=weave.panels.FunctionEditor(
+                    config=weave.panels.FunctionEditorConfig(config.agg)
                 ),
             ),
             "mark": weave.panels.LabeledItem(
