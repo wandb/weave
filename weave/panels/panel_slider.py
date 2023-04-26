@@ -28,6 +28,11 @@ class Slider(panel.Panel):
         default_factory=SliderConfig
     )
 
+    def __post_init__(self, *args):
+        super().__post_init__(*args)
+        if isinstance(self.input_node, weave.graph.VoidNode):
+            self.__dict__["input_node"] = weave_internal.const(0)
+
     @weave.op()
     def value(self) -> float:
         return weave.use(self.input_node)
