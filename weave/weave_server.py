@@ -114,8 +114,9 @@ def make_app():
 
 @blueprint.route("/__weave/ops", methods=["GET"])
 def list_ops():
-    # if not environment.wandb_production():
-    #     registry_mem.memory_registry.load_saved_ops()
+    # TODO: this is super slow.
+    if not environment.wandb_production():
+        registry_mem.memory_registry.load_saved_ops()
     ops = registry_mem.memory_registry.list_ops()
     ret = []
     for op in ops:
