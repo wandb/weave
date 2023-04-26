@@ -133,7 +133,6 @@ def _process_run_dict_item_type(val):
     if isinstance(val, dict):
         type_count = {"type": val.get("_type", None)}
         type = history.history_key_type_count_to_weave_type(type_count)
-        print("VAL", val, type)
         if type != types.UnknownType():
             return type
     return types.TypeRegistry.type_of(val)

@@ -298,6 +298,16 @@ def avg(self):
 
 
 @op(
+    name="ArrowWeaveListNumber-sum",
+    input_type={"self": ArrowWeaveListType(types.optional(types.Number()))},
+    output_type=types.Number(),
+)
+def sum(self):
+    array = self._arrow_data_asarray_no_tags()
+    return pc.sum(array).as_py()
+
+
+@op(
     name="ArrowWeaveListNumber-max",
     input_type={"self": ArrowWeaveListType(types.optional(types.Number()))},
     output_type=types.Number(),
