@@ -38,5 +38,8 @@ from .panel_function_editor import FunctionEditor, FunctionEditorConfig
 # Non-standard editor (todo: update)
 from .panel_object_picker import ObjectPicker, ObjectPickerConfig
 
+# basic
+from .panel_basic import *
+
 # Incomplete
 from .panel_histogram import *

@@ -80,7 +80,9 @@ def convert_specific_ops_to_generic_ops_node(node: graph.Node) -> graph.Node:
     return graph.map_nodes_full([node], convert_specific_op_to_generic_op)[0]
 
 
-def _dict_is_node_like(data: dict):
+def _obj_is_node_like(data: typing.Any):
+    if not isinstance(data, dict):
+        return False
     return data.get("nodeType") in ["const", "output", "var", "void"]
 
 
@@ -92,7 +94,7 @@ def _dict_is_op_like(data: dict):
         if isinstance(data["name"], str) and isinstance(data["inputs"], dict):
             # And the inputs will be dicts that are node-like
             return all(
-                _dict_is_node_like(in_node) for in_node in data["inputs"].values()
+                _obj_is_node_like(in_node) for in_node in data["inputs"].values()
             )
     return False
 
