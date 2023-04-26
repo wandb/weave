@@ -312,6 +312,13 @@ def compile_await(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
 
 
 def compile_execute(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
+    # Actually does the execution here in compile phase.
+    # I made this change to handle cases where we need to pass mutations through
+    # execute calls, which happens when we have Nodes stored in Const nodes (panels)
+    # that we are mutating.
+    # However I think I later solved this with client-side execution and it can maybe
+    # be removed.
+    # I'm leaving this for now as it doesn't affect W&B prod (which never calls execute).
     with_execute_ops = graph.map_nodes_full(nodes, _execute_nodes_map_fn)
 
     def _replace_execute(node: graph.Node) -> typing.Optional[graph.Node]:

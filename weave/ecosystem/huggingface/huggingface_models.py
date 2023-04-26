@@ -54,8 +54,9 @@ def models_render(
 
 @weave.op(pure=False)
 def model_render(
-    model: hfmodel.HFModel,
+    model_node: weave.Node[hfmodel.HFModel],
 ) -> weave.panels.Card:
+    model = typing.cast(hfmodel.HFModel, model_node)
     return weave.panels.Card(
         title=model.id(),
         subtitle="HuggingFace Hub Model",
