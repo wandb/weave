@@ -15,7 +15,9 @@ class SectionsConfig(typing.Generic[RenderType]):
     section: weave.Node[typing.Optional[typing.Any]] = dataclasses.field(
         default_factory=lambda: weave.graph.VoidNode()
     )
-    panel: RenderType = dataclasses.field(default_factory=lambda: graph.VoidNode())
+    panel: RenderType = dataclasses.field(
+        default_factory=lambda: graph.VoidNode()
+    )  # type: ignore
 
 
 @weave.type()

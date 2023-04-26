@@ -238,7 +238,7 @@ class ConfigOptionsExpanded:
     mark: bool = False
 
 
-@weave.type(__override_name="plotConfig")
+@weave.type("plotConfig")
 class PlotConfig:
     series: typing.List[Series]
     axisSettings: typing.Optional[AxisSettings]
@@ -247,7 +247,7 @@ class PlotConfig:
     configVersion: int = 7
 
 
-@weave.type(__override_name="plot")
+@weave.type("plot")
 class Plot(panel.Panel):
     id = "plot"
     config: typing.Optional[PlotConfig] = None
