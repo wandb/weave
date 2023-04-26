@@ -14,6 +14,7 @@
 // ***********************************************************
 
 // Import commands.js using ES2015 syntax:
+import '@deploysentinel/cypress-debugger/support'; // ❗ Must be imported top of file
 import './commands'
 
 // Alternatively you can use CommonJS syntax:
