@@ -134,7 +134,17 @@ def box(
 def unbox(
     obj: T,
 ) -> typing.Union[
-    T, int, float, str, bool, dict, list, np.ndarray, datetime.datetime, None
+    T,
+    int,
+    float,
+    str,
+    bool,
+    dict,
+    list,
+    np.ndarray,
+    datetime.datetime,
+    datetime.timedelta,
+    None,
 ]:
 
     if type(obj) == BoxedInt:
