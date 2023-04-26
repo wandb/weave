@@ -18,8 +18,8 @@ class EachConfig(typing.Generic[RenderType]):
     panel: weave.Node[typing.Optional[typing.Any]] = dataclasses.field(
         default_factory=lambda: weave.graph.VoidNode()
     )
-    select: RenderType = dataclasses.field(default_factory=lambda: graph.VoidNode())
-    layout: RenderType = dataclasses.field(default_factory=lambda: graph.VoidNode())
+    select: RenderType = dataclasses.field(default_factory=lambda: graph.VoidNode())  # type: ignore
+    layout: RenderType = dataclasses.field(default_factory=lambda: graph.VoidNode())  # type: ignore
 
 
 @weave.type()

@@ -5,6 +5,6 @@ from .. import panel
 # should automatically have Panel in the name but they don't at the moment.
 
 
-@weave.type(__override_name="histogram")
+@weave.type("histogram")
 class Histogram(panel.Panel):
     id = "histogram"

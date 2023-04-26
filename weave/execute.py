@@ -421,6 +421,7 @@ def execute_forward_node(
             execute_async_op(op_def, input_refs, run_id)
             forward_node.set_result(run)
     else:
+        result: typing.Any
         with tracer.trace("execute-sync"):
             if language_nullability.should_force_none_result(inputs, op_def):
                 if isinstance(op_def.concrete_output_type, types.TypeType):

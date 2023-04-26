@@ -16,7 +16,7 @@ class EachColumnConfig(typing.Generic[RenderType]):
     pbLayoutConfig: typing.Optional[PanelBankSectionConfig] = dataclasses.field(
         default_factory=lambda: None
     )
-    render: RenderType = dataclasses.field(default_factory=lambda: graph.VoidNode())
+    render: RenderType = dataclasses.field(default_factory=lambda: graph.VoidNode())  # type: ignore
 
 
 @weave.type()

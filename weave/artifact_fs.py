@@ -22,6 +22,12 @@ class FilesystemArtifactType(types.Type):
         return FilesystemArtifactRef(obj, None)
 
 
+class BranchPointType(typing.TypedDict):
+    branch: str
+    commit: str
+    n_commits: int
+
+
 class FilesystemArtifact(artifact_base.Artifact):
     RefClass: typing.ClassVar[typing.Type["FilesystemArtifactRef"]]
     name: str
@@ -78,7 +84,7 @@ class FilesystemArtifact(artifact_base.Artifact):
         raise NotImplementedError
 
     @property
-    def branch_point(self) -> typing.Optional[str]:
+    def branch_point(self) -> typing.Optional[BranchPointType]:
         raise NotImplementedError
 
     @property
@@ -174,7 +180,7 @@ class FilesystemArtifactRef(artifact_base.ArtifactRef):
         return self.artifact.branch
 
     @property
-    def branch_point(self) -> typing.Optional[str]:
+    def branch_point(self) -> typing.Optional[BranchPointType]:
         return self.artifact.branch_point
 
     @property

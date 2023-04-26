@@ -15,6 +15,7 @@ from .. import graph
 from .. import artifact_local
 from .. import compile
 from .. import runs
+from .. import artifact_fs
 
 
 @weave_class(weave_type=types.RefType)
@@ -191,20 +192,18 @@ def ref(uri):
     return ref_base.Ref.from_str(uri)
 
 
-class BranchPointType(typing.TypedDict):
-    branch: str
-    commit: str
-    n_commits: int
-
-
 @op(
     pure=False,
     name="Ref-branch_point",
-    input_type={"ref": types.RefType()},
+    input_type={"ref": types.FilesystemArtifactRefType()},
 )
-def ref_branch_point(ref) -> typing.Optional[BranchPointType]:
+def ref_branch_point(ref) -> typing.Optional[artifact_fs.BranchPointType]:
     # TODO: execute automatically derefs. Need to not do that if input type is Ref!
     real_ref = storage._get_ref(ref)
+    if not isinstance(real_ref, artifact_fs.FilesystemArtifactRef):
+        raise errors.WeaveInternalError(
+            "ref_branch_point only works on filesystem artifact refs"
+        )
     return real_ref.branch_point
 
 

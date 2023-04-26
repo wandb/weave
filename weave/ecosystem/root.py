@@ -108,8 +108,8 @@ def ecosystem_render(
                     ),
                     columns=[
                         lambda org_name: panels.WeaveLink(
-                            org_name, lambda org_name: ops.entity(org_name)
-                        )
+                            org_name, lambda org_name: ops.entity(org_name)  # type: ignore
+                        )  # type: ignore
                     ],
                 ),  # type: ignore
             ),

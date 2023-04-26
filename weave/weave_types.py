@@ -1060,12 +1060,17 @@ class RefType(Type):
 
 
 @dataclasses.dataclass(frozen=True)
-class LocalArtifactRefType(RefType):
+class FilesystemArtifactRefType(RefType):
     pass
 
 
 @dataclasses.dataclass(frozen=True)
-class WandbArtifactRefType(RefType):
+class LocalArtifactRefType(FilesystemArtifactRefType):
+    pass
+
+
+@dataclasses.dataclass(frozen=True)
+class WandbArtifactRefType(FilesystemArtifactRefType):
     pass
 
 

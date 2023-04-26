@@ -36,7 +36,7 @@ def make_container(
     return Group(preferHorizontal=True, showExpressions=True, items={name: obj})
 
 
-def make_show_obj(obj: typing.Any) -> tuple[graph.Node, str]:
+def make_show_obj(obj: typing.Any) -> tuple[typing.Union[panel.Panel, graph.Node], str]:
     node: graph.Node
     if obj is None:
         return graph.VoidNode(), "panel0"

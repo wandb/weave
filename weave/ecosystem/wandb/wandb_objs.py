@@ -1,3 +1,4 @@
+import typing
 import weave
 
 from ...ops_domain import wb_domain_types
@@ -34,8 +35,9 @@ Ghostwrite is a tool for writing. Our mission is to increase human creativity.
 
 @weave.op()
 def fakewandbmodel_render(
-    model: weave.Node[FakeWandbModel],
+    model_node: weave.Node[FakeWandbModel],
 ) -> weave.panels.Card:
+    model = typing.cast(FakeWandbModel, model_node)
     return weave.panels.Card(
         title=model.name,
         subtitle="",
@@ -60,8 +62,9 @@ def fakewandbmodel_render(
 
 @weave.op()
 def entity_render(
-    entity: weave.Node[wb_domain_types.Entity],
+    entity_node: weave.Node[wb_domain_types.Entity],
 ) -> weave.panels.Card:
+    entity = typing.cast(wb_domain_types.Entity, entity_node)
     return weave.panels.Card(
         title=entity_name_op(entity),
         subtitle="",
@@ -69,7 +72,7 @@ def entity_render(
             weave.panels.CardTab(
                 name="Projects",
                 content=weave.panels.Table(
-                    entity.projects(),
+                    entity.projects(),  # type: ignore
                     columns=[
                         lambda project: weave.panels.WeaveLink(
                             project_name_op(project),
