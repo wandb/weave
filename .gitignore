@@ -18,3 +18,4 @@ gha-creds-*.json
 .mypy_cache
 .hypothesis
 wandb
+.env

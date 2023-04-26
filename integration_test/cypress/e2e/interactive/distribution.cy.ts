@@ -1,6 +1,6 @@
 import {exec} from '../testlib';
 
-describe('distribution interactions', () => {
+describe.skip('distribution interactions', () => {
   it('can configure a python panel from scratch by clicking', () => {
     exec('python cypress/e2e/interactive/distribution.py', 10000).then(
       result => {

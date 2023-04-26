@@ -331,6 +331,8 @@ def execute_forward_node(
             node.from_op.name.endswith("file-table")
             or node.from_op.name.endswith("file-joinedTable")
             or node.from_op.name.endswith("readcsv")
+            or node.from_op.name.endswith("table-2DProjection")
+            or node.from_op.name.endswith("ArrowWeaveList-2DProjection")
             # or node.from_op.name.endswith("artifactVersion-file")
             # or node.from_op.name.endswith("FilesystemArtifact-file")
         ):

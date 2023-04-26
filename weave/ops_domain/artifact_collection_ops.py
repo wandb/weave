@@ -121,7 +121,6 @@ gql_connection_op(
     "artifactMemberships",
     wdt.ArtifactCollectionMembershipType,
     {},
-    lambda inputs: "first: 100",
 )
 gql_connection_op(
     "artifact-aliases",
@@ -129,7 +128,6 @@ gql_connection_op(
     "aliases",
     wdt.ArtifactAliasType,
     {},
-    lambda inputs: "first: 100",
 )
 
 # Section 6/6: Non Standard Business Logic Ops

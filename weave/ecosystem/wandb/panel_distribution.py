@@ -9,7 +9,7 @@ from ... import panel_util
 from . import weave_plotly
 
 
-@weave.type()
+@weave.type("op-multi_distributionConfig")
 class DistributionConfig:
     value_fn: weave.Node[typing.Any] = dataclasses.field(
         default_factory=lambda: weave.graph.VoidNode()
@@ -181,7 +181,7 @@ def multi_distribution_config(
 
 
 # The interface for constructing this Panel from Python
-@weave.type()
+@weave.type("op-multi_distribution")
 class MultiDistribution(weave.Panel):
     id = "op-multi_distribution"
     config: typing.Optional[DistributionConfig] = None

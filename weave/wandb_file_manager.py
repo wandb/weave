@@ -24,6 +24,50 @@ from . import cache
 tracer = engine_trace.tracer()  # type: ignore
 
 
+def _file_path(uri: artifact_wandb.WeaveWBArtifactURI, md5_hex: str) -> str:
+    if uri.path is None:
+        raise errors.WeaveInternalError("Artifact URI has no path in call to file_path")
+    path_parts = uri.path.split(".", 1)
+    if len(path_parts) == 2:
+        extension = "." + path_parts[1]
+    else:
+        extension = ""
+    return f"wandb_file_manager/{uri.entity_name}/{uri.project_name}/{uri.name}/{md5_hex}{extension}"
+
+
+def _local_path_and_download_url(
+    art_uri: artifact_wandb.WeaveWBArtifactURI,
+    manifest: artifact_wandb.WandbArtifactManifest,
+) -> typing.Optional[typing.Tuple[str, str]]:
+    path = art_uri.path
+    if path is None:
+        raise errors.WeaveInternalError(
+            "Artifact URI has no path in call to _local_path_and_download_url"
+        )
+    file_name = path.split("/")[-1]
+    manifest_entry = manifest.get_entry_by_path(path)
+    if manifest_entry is None:
+        return None
+    md5_hex = wandb_util.bytes_to_hex(base64.b64decode(manifest_entry["digest"]))
+    base_url = weave_env.wandb_base_url()
+    file_path = _file_path(art_uri, md5_hex)
+    if manifest.storage_layout == artifact_wandb.WandbArtifactManifest.StorageLayout.V1:
+        return file_path, "{}/artifacts/{}/{}/{}".format(
+            base_url, art_uri.entity_name, md5_hex, urllib.parse.quote(file_name)
+        )
+    else:
+        # TODO: storage_region
+        storage_region = "default"
+        return file_path, "{}/artifactsV2/{}/{}/{}/{}/{}".format(
+            base_url,
+            storage_region,
+            art_uri.entity_name,
+            urllib.parse.quote(manifest_entry.get("birthArtifactID", "")),  # type: ignore
+            md5_hex,
+            urllib.parse.quote(file_name),
+        )
+
+
 class WandbFileManagerAsync:
     def __init__(
         self,
@@ -83,49 +127,18 @@ class WandbFileManagerAsync:
             self._manifests.set(manifest_path, manifest)
             return manifest
 
-    def file_path(self, uri: artifact_wandb.WeaveWBArtifactURI, md5_hex: str) -> str:
-        if uri.path is None:
-            raise errors.WeaveInternalError(
-                "Artifact URI has no path in call to file_path"
-            )
-        path_parts = uri.path.split(".", 1)
-        if len(path_parts) == 2:
-            extension = "." + path_parts[1]
-        else:
-            extension = ""
-        return f"wandb_file_manager/{uri.entity_name}/{uri.project_name}/{uri.name}/{md5_hex}{extension}"
-
     async def local_path_and_download_url(
         self, art_uri: artifact_wandb.WeaveWBArtifactURI
     ) -> typing.Optional[typing.Tuple[str, str]]:
         path = art_uri.path
         if path is None:
             raise errors.WeaveInternalError(
-                "Artifact URI has no path in call to ensure_file"
+                "Artifact URI has no path in call to local_path_and_download_url"
             )
         manifest = await self.manifest(art_uri)
         if manifest is None:
             return None
-        manifest_entry = manifest.get_entry_by_path(path)
-        if manifest_entry is None:
-            return None
-        md5_hex = wandb_util.bytes_to_hex(base64.b64decode(manifest_entry["digest"]))
-        base_url = weave_env.wandb_base_url()
-        file_path = self.file_path(art_uri, md5_hex)
-        if manifest.storage_layout == manifest.StorageLayout.V1:
-            return file_path, "{}/artifacts/{}/{}".format(
-                base_url, art_uri.entity_name, md5_hex
-            )
-        else:
-            # TODO: storage_region
-            storage_region = "default"
-            return file_path, "{}/artifactsV2/{}/{}/{}/{}".format(
-                base_url,
-                storage_region,
-                art_uri.entity_name,
-                urllib.parse.quote(manifest_entry.get("birthArtifactID", "")),  # type: ignore
-                md5_hex,
-            )
+        return _local_path_and_download_url(art_uri, manifest)
 
     async def ensure_file(
         self, art_uri: artifact_wandb.WeaveWBArtifactURI

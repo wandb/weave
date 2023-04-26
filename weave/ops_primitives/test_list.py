@@ -192,3 +192,37 @@ def test_preserve_tags_on_mapped_elements():
     indexed = mapped[0]
     tag_getter_op = make_tag_getter_op.make_tag_getter_op("row", types.Int())
     assert weave.use(tag_getter_op(indexed)) == 0
+
+
+def test_group_over_tagged():
+    l = [
+        tag_store.add_tags(box.box({"a": 0, "b": 0, "y": "x"}), {"row": 0}),
+        tag_store.add_tags(box.box({"a": 0, "b": 1, "y": "x"}), {"row": 1}),
+        tag_store.add_tags(box.box({"a": 0, "b": 0, "y": "x"}), {"row": 2}),
+        tag_store.add_tags(box.box({"a": 1, "b": 1, "y": "x"}), {"row": 3}),
+        tag_store.add_tags(box.box({"a": 1, "b": 0, "y": "x"}), {"row": 4}),
+        tag_store.add_tags(box.box({"a": 1, "b": 1, "y": "x"}), {"row": 5}),
+    ]
+    saved = weave.save(l)
+
+    groupby1_fn = weave.define_fn(
+        {"row": types.TypeRegistry.type_of(l).object_type},
+        lambda row: dict.dict_(
+            **{
+                "a": row["a"],
+            }
+        ),
+    )
+    res = weavejs_ops.groupby(saved, groupby1_fn)
+    assert weave.use(res) == [
+        [
+            {"a": 0, "b": 0, "y": "x"},
+            {"a": 0, "b": 1, "y": "x"},
+            {"a": 0, "b": 0, "y": "x"},
+        ],
+        [
+            {"a": 1, "b": 1, "y": "x"},
+            {"a": 1, "b": 0, "y": "x"},
+            {"a": 1, "b": 1, "y": "x"},
+        ],
+    ]
