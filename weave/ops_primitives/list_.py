@@ -1,3 +1,4 @@
+import logging
 import numpy as np
 import pandas as pd
 import json
@@ -175,11 +176,15 @@ class List:
     def groupby(arr, groupByFn):
         call_results = execute_fast.fast_map_fn(arr, groupByFn)
         result = {}
-        for row, group_key_items in zip(arr, call_results):
-            group_key_s = json.dumps(storage.to_python(group_key_items))
-            if group_key_s not in result:
-                result[group_key_s] = (group_key_items, [])
-            result[group_key_s][1].append(row)
+        # Start a new tagging context since we don't want the tags messing
+        # with the groupby keys
+        with tag_store.new_tagging_context():
+            for row, group_key_items in zip(arr, call_results):
+                group_key_s = json.dumps(storage.to_python(group_key_items))
+                # logging.error("groupby group_key_s: %s", group_key_s)
+                if group_key_s not in result:
+                    result[group_key_s] = (group_key_items, [])
+                result[group_key_s][1].append(row)
         grs = []
         for group_result in result.values():
             item = box.box(group_result[1])
@@ -367,6 +372,9 @@ def flatten_return_type(input_types):
 
 
 def _flatten(l):
+    from ..ops_arrow import ArrowWeaveList
+    from ..ops_arrow.arrow_tags import pushdown_list_tags
+
     if isinstance(l, list):
         tags = None
         if tag_store.is_tagged(l):
@@ -378,6 +386,8 @@ def _flatten(l):
             return item
 
         return sum((_flatten(tag_wrapper(o)) for o in l), [])
+    elif isinstance(l, ArrowWeaveList):
+        return pushdown_list_tags(l).to_pylist_tagged()
     else:
         return [l]
 

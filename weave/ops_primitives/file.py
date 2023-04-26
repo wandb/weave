@@ -2,13 +2,14 @@ import json
 import typing
 
 from ..artifact_fs import FilesystemArtifactDir, FilesystemArtifactFile
-from ..artifact_wandb import WandbArtifact
+from ..artifact_wandb import WandbArtifact, WandbArtifactManifest
 from ..ops_domain.wbmedia import ImageArtifactFileRef
 from ..api import op
 from .. import weave_types as types
 from .. import file_base
 from .. import engine_trace
 from .. import errors
+from .. import wandb_file_manager
 
 
 @op(name="dir-pathReturnType")
@@ -26,35 +27,75 @@ def open(
     return dir.path_info(path)
 
 
-def _file_dict(file: FilesystemArtifactFile) -> dict:
+def _file_dict_from_manifest(
+    file: FilesystemArtifactFile, manifest: WandbArtifactManifest
+) -> dict:
+
+    art = file.artifact
+    if not isinstance(art, WandbArtifact):
+        return _file_dict(file)
+
+    entry = manifest.get_entry_by_path(file.path)
+    if entry is None:
+        return _file_dict(file)
+
+    digest = entry.get("digest")
+    size = entry.get("size") or 0
+
     base_dict = {
         "birthArtifactID": "TODO",
-        "digest": file.digest(),
+        "digest": digest,
         "fullPath": file.path,
-        "size": file.artifact.size(file.path),
+        "size": size,
         "type": "file",
     }
 
-    # We need to extract the ref if it exists.
-    art = file.artifact
-    if isinstance(art, WandbArtifact):
-        entry = art._manifest_entry(file.path)
-        if entry is not None and isinstance(entry.get("ref"), str):
-            base_dict["ref"] = entry["ref"]
+    ref = entry.get("ref")
+    if ref is not None:
+        base_dict["ref"] = ref
 
     # if the ref exists then use that for the URL
     if "ref" in base_dict:
         base_dict["url"] = base_dict["ref"]
     else:
-        base_dict["url"] = file.artifact.direct_url(file.path)
+        res = wandb_file_manager._local_path_and_download_url(
+            art.uri_obj.with_path(file.path),
+            manifest,
+        )
+        if res:
+            base_dict["url"] = res[1]
+        else:
+            base_dict["url"] = None
 
     return base_dict
+
+
+def _file_dict(file: FilesystemArtifactFile) -> dict:
+    if isinstance(file.artifact, WandbArtifact):
+        raise ValueError(
+            "WandbArtifact passed to _file_dict. This is not supported. Use _file_dict_from_manifest instead."
+        )
+
+    return {
+        "birthArtifactID": "TODO",
+        "digest": file.digest(),
+        "fullPath": file.path,
+        "size": file.artifact.size(file.path),
+        "type": "file",
+        "url": file.artifact.direct_url(file.path),
+    }
 
 
 @op(
     name="dir-_as_w0_dict_",
 )
 def _as_w0_dict_(dir: file_base.Dir) -> dict:
+    if isinstance(dir, FilesystemArtifactDir) and isinstance(
+        dir.artifact, WandbArtifact
+    ):
+        manifest = dir.artifact._manifest()
+    else:
+        manifest = None
     if not isinstance(dir, FilesystemArtifactDir):
         raise errors.WeaveInternalError("Dir must be FilesystemArtifactDir")
     return {
@@ -69,7 +110,12 @@ def _as_w0_dict_(dir: file_base.Dir) -> dict:
             }
             for k, v in dir.dirs.items()
         },
-        "files": {k: _file_dict(v) for k, v in dir.files.items()},
+        "files": {
+            k: _file_dict_from_manifest(v, manifest)
+            if manifest is not None
+            else _file_dict(v)
+            for k, v in dir.files.items()
+        },
     }
 
 

@@ -100,7 +100,7 @@ def _process_run_dict_item(val, run_path: typing.Optional[RunPath] = None):
             elif "path" in val and run_path is not None:
                 return filesystem_runfiles_from_run_path(run_path, val["path"])
 
-        if val["_type"] == "joined-table" or val["_type"] == "partitioned-table":
+        if val["_type"] in ["joined-table", "partitioned-table"]:
             return filesystem_artifact_file_from_artifact_path(val["artifact_path"])
 
         if val["_type"] == "image-file" and run_path is not None:
@@ -114,6 +114,14 @@ def _process_run_dict_item(val, run_path: typing.Optional[RunPath] = None):
                 width=val["width"],
                 height=val["height"],
                 sha256=val["sha256"],
+            )
+        if val["_type"] == "wb_trace_tree":
+            from .trace_tree import WBTraceTree
+
+            return WBTraceTree(
+                root_span_dumps=val.get("root_span_dumps"),  # type: ignore
+                model_dict_dumps=val.get("model_dict_dumps"),
+                model_hash=val.get("model_hash"),
             )
 
     return val

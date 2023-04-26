@@ -110,3 +110,38 @@ def is_notebook():
             # if "VSCODE_PID" in os.environ:
             #     return False
     return True
+
+
+def _resolve_path(path: str, current_working_directory: str) -> list[str]:
+    if not os.path.isabs(path):
+        path = os.path.join(current_working_directory, path)
+    path_parts: list[str] = []
+    for part in path.split(os.path.sep):
+        if part == "..":
+            if path_parts:
+                path_parts.pop()
+        elif part != "." and part:
+            path_parts.append(part)
+    return path_parts
+
+
+def relpath_no_syscalls(
+    target_path: str, start_path: str, current_working_directory: str
+) -> str:
+
+    target_parts = _resolve_path(target_path, current_working_directory)
+    start_parts = _resolve_path(start_path, current_working_directory)
+
+    if target_parts == start_parts:
+        return "."
+
+    common_length = 0
+    for target_part, start_part in zip(target_parts, start_parts):
+        if target_part != start_part:
+            break
+        common_length += 1
+
+    relative_parts = [".."] * (len(start_parts) - common_length) + target_parts[
+        common_length:
+    ]
+    return os.path.sep.join(relative_parts)

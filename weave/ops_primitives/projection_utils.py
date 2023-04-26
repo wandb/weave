@@ -37,7 +37,7 @@ def perform_2D_projection(
         )
     elif projectionAlgorithm == "tsne":
         projection = perform_2D_projection_tsne(
-            np_array_of_embeddings, algorithmOptions.get("tnse", {})
+            np_array_of_embeddings, algorithmOptions.get("tsne", {})
         )
     elif projectionAlgorithm == "umap":
         projection = perform_2D_projection_umap(
@@ -71,7 +71,7 @@ def perform_2D_projection_tsne(
     return TSNE(
         n_components=2,
         perplexity=min(n_samples - 1, options.get("perplexity", 30)),
-        n_iter=min(250, options.get("iterations", 250)),
+        n_iter=min(1000, max(500, options.get("iterations", 1000))),
         learning_rate=options.get("learningRate", "auto"),
         init="random",
     ).fit_transform(limit_embedding_dimensions(np_array_of_embeddings))
