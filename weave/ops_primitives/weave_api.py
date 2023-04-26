@@ -14,6 +14,7 @@ from .. import uris
 from .. import graph
 from .. import artifact_local
 from .. import compile
+from .. import runs
 
 
 @weave_class(weave_type=types.RefType)
@@ -244,7 +245,7 @@ def execute(node):
 def mutate_op_body(
     self,
     root_args: typing.Any,
-    make_new_value: typing.Callable[[typing.Any], typing.Any] = None,
+    make_new_value: typing.Callable[[typing.Any], typing.Any],
 ):
     # This implements mutations. Note that its argument must be a
     # Node. You can call it like this:
@@ -348,22 +349,27 @@ class FunctionOps:
 # (to tell execute that these should be eager and receive the Node
 # as first argument instead of resolve value).
 def run_set_state(self: graph.Node["Run"], state):
-    weave_internal.use(set(weave_internal.const(self.state), state, {}))
+    r = typing.cast(runs.Run, self)
+    weave_internal.use(set(weave_internal.const(r.state), state, {}))
 
 
 def run_print(self: graph.Node["Run"], s: str):
-    weave_internal.use(append(weave_internal.const(self.prints), s, {}))
+    r = typing.cast(runs.Run, self)
+    weave_internal.use(append(weave_internal.const(r.prints), s, {}))
 
 
 def run_log(self: graph.Node["Run"], v: typing.Any):
-    weave_internal.use(append(weave_internal.const(self.history), v, {}))
+    r = typing.cast(runs.Run, self)
+    weave_internal.use(append(weave_internal.const(r.history), v, {}))
 
 
 def run_set_inputs(self: graph.Node["Run"], v: typing.Any):
-    weave_internal.use(set(weave_internal.const(self.inputs), v, {}))
+    r = typing.cast(runs.Run, self)
+    weave_internal.use(set(weave_internal.const(r.inputs), v, {}))
 
 
 def run_set_output(self: graph.Node["Run"], v: typing.Any):
+    r = typing.cast(runs.Run, self)
     # Prior mutation code had this
     # # Force the output to be a ref.
     # # TODO: this is probably not the right place to do this.
@@ -371,7 +377,7 @@ def run_set_output(self: graph.Node["Run"], v: typing.Any):
     #     v = storage.save(v)
     # self.output = v
     # return self
-    weave_internal.use(set(weave_internal.const(self.output), v, {}))
+    weave_internal.use(set(weave_internal.const(r.output), v, {}))
 
 
 @weave_class(weave_type=types.RunType)
