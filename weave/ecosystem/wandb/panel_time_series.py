@@ -7,12 +7,18 @@ from weave import weave_internal
 from . import weave_plotly
 from ...ops_primitives import date
 from ...ops_primitives import dict as dict_ops
+from ...language_features.tagging import tagged_value_type
 
 TIME_SERIES_BIN_SIZES_SEC = [
+    # TODO: will need more steps along here for smooth zooming.
     1e-9,  # ns
     1e-6,  # microsec
     1e-3,  # ms
     1,
+    2.5,
+    5,
+    10,
+    15,
     30,
     60,  # 1min
     300,  # 5min
@@ -60,9 +66,9 @@ class TimeSeriesConfig:
     max_x: weave.Node[typing.Any] = dataclasses.field(
         default_factory=lambda: weave.graph.VoidNode()
     )
-    label: weave.Node[typing.Union[str, weave.types.InvalidPy]] = dataclasses.field(
-        default_factory=lambda: weave.graph.VoidNode()
-    )
+    label: weave.Node[
+        typing.Optional[typing.Union[str, weave.types.InvalidPy]]
+    ] = dataclasses.field(default_factory=lambda: weave.graph.VoidNode())
     mark: weave.Node[str] = dataclasses.field(
         default_factory=lambda: weave.graph.ConstNode(weave.types.String(), "bar")
     )
@@ -91,30 +97,45 @@ def _multi_distribution_default_config_output_type(input_type):
     return config_type
 
 
-def extract_column_with_type(
-    data_or_node: typing.Union[weave.graph.Node, list[typing.Any]],
+def first_column_of_type(
+    node_type: weave.types.Type,
     desired_type: weave.types.Type,
-) -> typing.Tuple[typing.Optional[str], weave.graph.ConstNode]:
-    if isinstance(data_or_node, weave.graph.Node):
-        node_type = data_or_node.type
-    else:
-        node_type = weave.type_of(data_or_node)
+) -> typing.Tuple[weave.graph.ConstNode, weave.graph.ConstNode]:
+    if isinstance(node_type, tagged_value_type.TaggedValueType):
+        node_type = node_type.value
     if weave.types.List().assign_type(node_type):
         node_type = typing.cast(weave.types.List, node_type)
         object_type = node_type.object_type
         if desired_type.assign_type(object_type):
-            return None, weave.define_fn({"item": object_type}, lambda item: item)
+            return weave.define_fn(
+                {"input_node": node_type}, lambda item: item
+            ), weave.define_fn({"item": object_type}, lambda item: item)
         elif weave.types.TypedDict().assign_type(object_type):
             object_type = typing.cast(weave.types.TypedDict, object_type)
+            _, non_none_desired = weave.types.split_none(desired_type)
+            if (
+                isinstance(non_none_desired, weave.types.Timestamp)
+                and "_timestamp" in object_type.property_types
+            ):
+                return (
+                    weave.define_fn(
+                        {"input_node": node_type},
+                        lambda item: (item["_timestamp"] * 1000).toTimestamp(),
+                    ),
+                    weave.define_fn(
+                        {"item": object_type},
+                        lambda item: (item["_timestamp"] * 1000).toTimestamp(),
+                    ),
+                )
             for key in object_type.property_types:
                 value_type = object_type.property_types[key]
                 if desired_type.assign_type(value_type):
-                    return key, weave.define_fn(
-                        {"item": object_type}, lambda item: item[key]
-                    )
-        return None, weave.define_fn(
-            {"item": object_type}, lambda _: weave.graph.VoidNode()
-        )
+                    return weave.define_fn(
+                        {"input_node": node_type}, lambda item: item[key]
+                    ), weave.define_fn({"item": object_type}, lambda item: item[key])
+        # return weave.define_fn(
+        #     {"input_node": node_type}, weave.graph.VoidNode()
+        # ), weave.define_fn({"item": object_type}, lambda _: weave.graph.VoidNode())
     raise ValueError(
         f"Can't extract column with type {desired_type} from node of type {node_type}"
     )
@@ -128,24 +149,33 @@ def extract_column_with_type(
 )
 def time_series_default_config(
     config: typing.Optional[TimeSeriesConfig],
-    unnested_table: list[typing.Any],
+    input_node_type: weave.types.Type,
 ):
-    if config is None:
-        key, x_fn = extract_column_with_type(
-            unnested_table, weave.types.optional(weave.types.Timestamp())
+    # TODO: unnested_table should be Node, that way we don't evaluate it just
+    # to figure it outs type here.
+    # TODO: we need input variables (frame) available here. For now we have
+    # manually construct them :(
+    if config == None:
+        col_fn, item_fn = first_column_of_type(
+            input_node_type, weave.types.optional(weave.types.Timestamp())
         )
 
-        if key is not None:
-            column = [item[key] for item in unnested_table]
-        elif not isinstance(x_fn.val, weave.graph.VoidNode):
-            column = unnested_table
-        else:
-            column = None
+        min_x_called = col_fn.val.min()
+        min_x = weave_internal.const(
+            min_x_called,
+            weave.types.Function(col_fn.type.input_types, min_x_called.type),  # type: ignore
+        )
+
+        max_x_called = col_fn.val.max()
+        max_x = weave_internal.const(
+            max_x_called,
+            weave.types.Function(col_fn.type.input_types, max_x_called.type),  # type: ignore
+        )
 
         config = TimeSeriesConfig(
-            x=x_fn,
-            label=extract_column_with_type(
-                unnested_table,
+            x=item_fn,
+            label=first_column_of_type(
+                input_node_type,
                 weave.types.optional(
                     weave.types.union(
                         weave.types.String(),
@@ -154,22 +184,12 @@ def time_series_default_config(
                 ),
             )[1],
             agg=weave_internal.define_fn(
-                {"group": unnested_table.type},  # type: ignore
+                {"group": input_node_type},  # type: ignore
                 lambda group: group.count(),
             ),
+            min_x=min_x,
+            max_x=max_x,
         )
-
-        if column is not None:
-            config.min_x = (
-                weave.ops.numbers_min(column)
-                if column is not None
-                else weave.graph.VoidNode()
-            )
-            config.max_x = (
-                weave.ops.numbers_max(column)
-                if column is not None
-                else weave.graph.VoidNode()
-            )
 
     return config
 
@@ -206,12 +226,14 @@ def time_series(
     # TODO: Fix
 
     unnested = weave.ops.unnest(input_node)
-    # config = time_series_default_config(config, unnested)
+    config = time_series_default_config(config, weave_internal.const(unnested.type))
 
-    min_x = weave.ops.execute(config.min_x)
-    max_x = weave.ops.execute(config.max_x)
+    min_x = config.min_x(input_node)  # type: ignore
+    max_x = config.max_x(input_node)  # type: ignore
 
-    if min_x is None or max_x is None:
+    if not weave.types.optional(weave.types.Timestamp()).assign_type(
+        min_x.type
+    ) or not weave.types.optional(weave.types.Timestamp()).assign_type(max_x.type):
         return weave.panels.PanelHtml(weave.ops.Html("No data"))  # type: ignore
 
     exact_bin_size = ((max_x - min_x) / N_BINS).totalSeconds()  # type: ignore
@@ -283,39 +305,39 @@ def time_series(
 @weave.op()
 def time_series_config(
     input_node: weave.Node[list[typing.Any]], config: TimeSeriesConfig
-) -> weave.panels.Group2:
+) -> weave.panels.Group:
     unnested = weave.ops.unnest(input_node)
-    config = time_series_default_config(config, unnested)
-    return weave.panels.Group2(
+    config = time_series_default_config(config, weave_internal.const(unnested.type))
+    return weave.panels.Group(
         items={
             "x": weave.panels.LabeledItem(
                 label="x",
-                item=weave.panels.ExpressionEditor(
-                    config=weave.panels.ExpressionEditorConfig(config.x)
+                item=weave.panels.FunctionEditor(
+                    config=weave.panels.FunctionEditorConfig(config.x)
                 ),
             ),
             "label": weave.panels.LabeledItem(
                 label="label",
-                item=weave.panels.ExpressionEditor(
-                    config=weave.panels.ExpressionEditorConfig(config.label)
+                item=weave.panels.FunctionEditor(
+                    config=weave.panels.FunctionEditorConfig(config.label)
                 ),
             ),
             "min_x": weave.panels.LabeledItem(
                 label="min_x",
-                item=weave.panels.ExpressionEditor(
-                    config=weave.panels.ExpressionEditorConfig(config.min_x)
+                item=weave.panels.FunctionEditor(
+                    config=weave.panels.FunctionEditorConfig(config.min_x)
                 ),
             ),
             "max_x": weave.panels.LabeledItem(
                 label="max_x",
-                item=weave.panels.ExpressionEditor(
-                    config=weave.panels.ExpressionEditorConfig(config.max_x)
+                item=weave.panels.FunctionEditor(
+                    config=weave.panels.FunctionEditorConfig(config.max_x)
                 ),
             ),
             "agg": weave.panels.LabeledItem(
                 label="agg",
-                item=weave.panels.ExpressionEditor(
-                    config=weave.panels.ExpressionEditorConfig(config.agg)
+                item=weave.panels.FunctionEditor(
+                    config=weave.panels.FunctionEditorConfig(config.agg)
                 ),
             ),
             "mark": weave.panels.LabeledItem(
@@ -329,9 +351,7 @@ def time_series_config(
                             "point",
                         ],
                     ),
-                    config=weave.panels.ObjectPickerConfig(
-                        choice=weave.ops.execute(config.mark)
-                    ),
+                    config=weave.panels.ObjectPickerConfig(choice=config.mark),
                 ),
             ),
         }

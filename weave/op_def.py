@@ -174,6 +174,7 @@ class OpDef:
     weave_fn: typing.Optional[graph.Node]
     _decl_locals: typing.Dict[str, typing.Any]
     instance: typing.Union[None, graph.Node]
+    hidden: bool
     pure: bool
     raw_resolve_fn: typing.Callable
     _output_type: typing.Optional[
@@ -207,6 +208,7 @@ class OpDef:
         resolve_fn: typing.Callable,
         refine_output_type: typing.Optional["OpDef"] = None,
         setter=None,
+        hidden=False,
         render_info=None,
         pure=True,
         is_builtin: typing.Optional[bool] = None,
@@ -222,6 +224,7 @@ class OpDef:
         self.raw_resolve_fn = resolve_fn  # type: ignore
         self.setter = setter
         self.render_info = render_info
+        self.hidden = hidden
         self.pure = pure
         self.is_builtin = (
             is_builtin
@@ -280,6 +283,10 @@ class OpDef:
             if final_output_type == None:
                 # This can happen due to nullability. In that case, accept the output type is null
                 final_output_type = types.NoneType()
+            # Have to deref if in case a ref came back...
+            from . import storage
+
+            final_output_type = storage.deref(final_output_type)
 
             final_output_type = (
                 process_opdef_output_type.process_opdef_refined_output_type(
@@ -385,10 +392,6 @@ class OpDef:
         return uris.WeaveURI.parse(self.name).name
 
     @property
-    def is_mutation(self):
-        return getattr(self.raw_resolve_fn, "is_mutation", False)
-
-    @property
     def is_async(self):
         return (
             not callable(self.raw_output_type)
@@ -432,6 +435,8 @@ class OpDef:
             "input_types": input_types,
             "output_type": output_type,
         }
+        if self.hidden:
+            serialized["hidden"] = True
         if self.render_info is not None:
             serialized["render_info"] = self.render_info
         if self.refine_output_type is not None:

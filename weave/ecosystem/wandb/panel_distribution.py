@@ -9,7 +9,7 @@ from ... import panel_util
 from . import weave_plotly
 
 
-@weave.type()
+@weave.type("op-multi_distributionConfig")
 class DistributionConfig:
     value_fn: weave.Node[typing.Any] = dataclasses.field(
         default_factory=lambda: weave.graph.VoidNode()
@@ -149,27 +149,27 @@ def multi_distribution_panel_plot(
 @weave.op()
 def multi_distribution_config(
     input_node: weave.Node[list[typing.Any]], config: DistributionConfig
-) -> weave.panels.Group2:
+) -> weave.panels.Group:
     unnested = weave.ops.unnest(input_node)
     config = multi_distribution_default_config(config, unnested)
-    return weave.panels.Group2(
+    return weave.panels.Group(
         items={
             "value_fn": weave.panels.LabeledItem(
                 label="value",
-                item=weave.panels.ExpressionEditor(
-                    config=weave.panels.ExpressionEditorConfig(config.value_fn)
+                item=weave.panels.FunctionEditor(
+                    config=weave.panels.FunctionEditorConfig(config.value_fn)
                 ),
             ),
             "label_fn": weave.panels.LabeledItem(
                 label="label",
-                item=weave.panels.ExpressionEditor(
-                    config=weave.panels.ExpressionEditorConfig(config.label_fn)
+                item=weave.panels.FunctionEditor(
+                    config=weave.panels.FunctionEditorConfig(config.label_fn)
                 ),
             ),
             "bin_size": weave.panels.LabeledItem(
                 label="bin_size",
-                item=weave.panels.Slider2(
-                    config=weave.panels.Slider2Config(
+                item=weave.panels.Slider(
+                    config=weave.panels.SliderConfig(
                         # Need execute here because....
                         # TODO: I don't quite know. Figure this out.
                         weave.ops.execute(config.bin_size)
@@ -181,7 +181,7 @@ def multi_distribution_config(
 
 
 # The interface for constructing this Panel from Python
-@weave.type()
+@weave.type("op-multi_distribution")
 class MultiDistribution(weave.Panel):
     id = "op-multi_distribution"
     config: typing.Optional[DistributionConfig] = None

@@ -1,5 +1,5 @@
 import typing
-from ..api import op, mutation, weave_class
+from ..api import op, weave_class
 from .. import weave_types as types
 import re
 import numpy as np
@@ -22,7 +22,6 @@ class String:
         input_type={"self": types.String(), "val": types.String()},
         output_type=types.String(),
     )
-    @mutation
     def set(self, val):
         return val
 

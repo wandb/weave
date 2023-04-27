@@ -7,7 +7,7 @@ from . import ops
 
 
 def make_node(v: typing.Any) -> graph.Node:
-    """Convert v to a node that is guaranteed to be json serializable"""
+    """Business logic for how values passed to panels are converted to json."""
     if isinstance(v, graph.Node):
         return v
 

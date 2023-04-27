@@ -219,8 +219,10 @@ class MappedDeriveOpHandler(DeriveOpHandler):
 
             # Just do file-table in parallel for now. We'll do parallelization
             # more generally in the future.
-            if orig_op.name.endswith("file-table") or orig_op.name.endswith(
-                "file-joinedTable"
+            if (
+                orig_op.name.endswith("file-table")
+                or orig_op.name.endswith("file-joinedTable")
+                or orig_op.name.endswith("file-partitionedTable")
             ):
                 wandb_api_ctx = wandb_api.get_wandb_api_context()
                 memo_ctx = memo._memo_storage.get()

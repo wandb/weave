@@ -1,5 +1,6 @@
 .python-version
 .ipynb_checkpoints
+dist/
 /wandb/
 .wandb_core/
 __pycache__

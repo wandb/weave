@@ -3,38 +3,29 @@ from .. import api as weave
 from .. import file_base
 
 
+def convert_type(val):
+    if val is None:
+        return val
+    try:
+        return int(val)
+    except ValueError:
+        try:
+            return float(val)
+        except ValueError:
+            return val
+
+
 def load_csv(csvfile):
     dialect = csv.Sniffer().sniff(csvfile.read(10240), delimiters=";,")
     csvfile.seek(0)
-    reader = csv.reader(csvfile, dialect)
-    header = next(reader)
-    col_types = {}
-    for key in header:
-        col_types[key] = int
-
-    # shitty type guessing
+    reader = csv.DictReader(csvfile, dialect=dialect)
     rows = []
-    for raw_row in reader:
-        rows.append(raw_row)
-        for key, val in zip(header, raw_row):
-            cur_col_type = col_types[key]
-            try:
-                val = int(val)
-            except ValueError:
-                try:
-                    val = float(val)
-                    if cur_col_type == int:
-                        col_types[key] = float
-                except ValueError:
-                    if cur_col_type != str:
-                        col_types[key] = str
-    final_rows = []
-    for raw_row in rows:
-        row = {}
-        for key, val in zip(header, raw_row):
-            row[key] = col_types[key](val)
-        final_rows.append(row)
-    return final_rows
+    for row in reader:
+        # DictReader puts items that don't have a header into a list under
+        # the None key. This happens for mal-formed csvs. Ignore the None
+        # key.
+        rows.append({k: convert_type(v) for k, v in row.items() if k is not None})
+    return rows
 
 
 def save_csv(csvfile, csv_data):

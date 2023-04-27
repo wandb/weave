@@ -131,14 +131,15 @@ def execute_nodes(nodes, no_cache=False):
     tracer = engine_trace.tracer()
     with tracer.trace("execute-log-graph"):
         logging.info(
-            "Executing %s leaf nodes.\n%s"
+            "Executing %s leaf nodes. (showing first 10)\n%s"
             % (
                 len(nodes),
-                graph_debug.assignments_string(
-                    graph_debug.to_assignment_form(
-                        graph_debug.combine_common_nodes(nodes)
-                    )
-                ),
+                "\n".join([graph_debug.node_expr_str_full(n) for n in nodes[:10]])
+                # graph_debug.assignments_string(
+                #     graph_debug.to_assignment_form(
+                #         graph_debug.combine_common_nodes(nodes)
+                #     )
+                # ),
             )
         )
     with wandb_api.from_environment():
@@ -153,6 +154,15 @@ def execute_nodes(nodes, no_cache=False):
                 # assumption is violated.
                 with forward_graph.node_result_store():
                     nodes = compile.compile(nodes)
+                    # logging.info(
+                    #     "Compiled %s leaf nodes.\n%s"
+                    #     % (
+                    #         len(nodes),
+                    #         "\n".join(
+                    #             [graph_debug.node_expr_str_full(n) for n in nodes]
+                    #         ),
+                    #     )
+                    # )
                     fg = forward_graph.ForwardGraph()
                     fg.add_nodes(nodes)
 
@@ -320,6 +330,7 @@ def execute_forward_node(
         if not node.from_op.name.startswith("mapped") and (
             node.from_op.name.endswith("file-table")
             or node.from_op.name.endswith("file-joinedTable")
+            or node.from_op.name.endswith("readcsv")
             or node.from_op.name.endswith("table-2DProjection")
             or node.from_op.name.endswith("ArrowWeaveList-2DProjection")
             # or node.from_op.name.endswith("artifactVersion-file")
@@ -339,10 +350,10 @@ def execute_forward_node(
         return {"cache_used": False}
 
     # This is expensive!
-    # logging.info(
-    #     "Executing op: %s expr: %s"
-    #     % (node.from_op.name, graph_debug.node_expr_str_full(node))
-    # )
+    logging.info(
+        "Executing op: %s"  # expr: %s"
+        % (node.from_op.name)  # , graph_debug.node_expr_str_full(node))
+    )
 
     tracer = engine_trace.tracer()
 
@@ -412,9 +423,13 @@ def execute_forward_node(
             execute_async_op(op_def, input_refs, run_id)
             forward_node.set_result(run)
     else:
+        result: typing.Any
         with tracer.trace("execute-sync"):
             if language_nullability.should_force_none_result(inputs, op_def):
-                result = None
+                if isinstance(op_def.concrete_output_type, types.TypeType):
+                    result = types.NoneType()
+                else:
+                    result = None
             else:
                 result = execute_sync_op(op_def, inputs)
 

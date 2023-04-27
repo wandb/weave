@@ -36,9 +36,10 @@ def metrics_bank(input_node: weave.Node[MetricsBankInput]) -> weave.panels.Each:
     # The output type of difference is List["metric1" | "metric2" | "metric3"]
     metrics = weave.ops.difference(joined_keys, [weave.const("scenario_id")])
 
+    # TODO: broken
     return weave.panels.Each(
         metrics,
-        render=lambda metric_name: weave.panels.Group2(
+        render=lambda metric_name: weave.panels.Group(
             items={
                 "title": metric_name,
                 "plot": weave.panels.Plot(
@@ -56,4 +57,4 @@ def metrics_bank(input_node: weave.Node[MetricsBankInput]) -> weave.panels.Each:
                 ),
             },
         ),
-    )
+    )  # type: ignore

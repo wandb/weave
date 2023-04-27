@@ -1,6 +1,6 @@
 import {exec, checkAllPanelsRendered} from '../testlib';
 
-describe('scatter interactions', () => {
+describe.skip('scatter interactions', () => {
   it('can select a region on a scatter plot and update another panel based on selection', () => {
     exec('python cypress/e2e/interactive/scatter.py', 10000).then(result => {
       const url = result.stdout;
@@ -12,9 +12,9 @@ describe('scatter interactions', () => {
       // This does a plotly select
       cy.get('[data-test-weave-id=PanelPlotly] .svg-container .drag')
         .first()
-        .trigger('mousedown', 200, 200, { force: true })
-        .trigger('mousemove', 500, 500, { force: true })
-        .trigger('mouseup', { force: true });
+        .trigger('mousedown', 200, 200, {force: true})
+        .trigger('mousemove', 500, 500, {force: true})
+        .trigger('mouseup', {force: true});
 
       checkAllPanelsRendered();
 

@@ -2,7 +2,7 @@ import typing
 import time
 
 from weave.graph import Node
-from ..api import op, mutation, weave_class
+from ..api import op, weave_class
 from .. import weave_types as types
 from .. import errors
 from .. import storage
@@ -14,6 +14,8 @@ from .. import uris
 from .. import graph
 from .. import artifact_local
 from .. import compile
+from .. import runs
+from .. import artifact_fs
 
 
 @weave_class(weave_type=types.RefType)
@@ -40,6 +42,7 @@ def save(obj: typing.Any, name: typing.Optional[str]):
 @op(
     name="save_to_ref",
     output_type=types.RefType(),
+    hidden=True,
 )
 def save_to_ref(obj: typing.Any, name: typing.Optional[str]):
     ref = storage.save(obj, name=name)
@@ -157,14 +160,13 @@ def get_returntype(uri):
     return op_get_return_type(uri)
 
 
-def _save(name, obj, action=None):
+def _save(name, obj, setter_options, action=None):
 
     obj_uri = uris.WeaveURI.parse(name)
 
-    # Clear the ref, otherwise save will immediately return
-    # the result instead of saving the mutated result
-    storage.clear_ref(obj)
-    storage.save(obj, name=obj_uri.name)
+    branch = setter_options.get("branch")
+    ref = storage.save(obj, name=obj_uri.name + ":" + obj_uri.version, branch=branch)
+    return ref.branch_uri
 
 
 @op(
@@ -177,6 +179,32 @@ def _save(name, obj, action=None):
 )
 def get(uri):
     return storage.get(uri)
+
+
+@op(
+    pure=False,
+    name="ref",
+    render_info={"type": "function"},
+    input_type={"uri": types.String()},
+    output_type=types.RefType(),
+)
+def ref(uri):
+    return ref_base.Ref.from_str(uri)
+
+
+@op(
+    pure=False,
+    name="Ref-branch_point",
+    input_type={"ref": types.FilesystemArtifactRefType()},
+)
+def ref_branch_point(ref) -> typing.Optional[artifact_fs.BranchPointType]:
+    # TODO: execute automatically derefs. Need to not do that if input type is Ref!
+    real_ref = storage._get_ref(ref)
+    if not isinstance(real_ref, artifact_fs.FilesystemArtifactRef):
+        raise errors.WeaveInternalError(
+            "ref_branch_point only works on filesystem artifact refs"
+        )
+    return real_ref.branch_point
 
 
 def execute_setter(node, value, action=None):
@@ -213,17 +241,16 @@ def execute(node):
         return weave_internal.use(node)
 
 
-@op(
-    pure=False,
-    name="set",
-    input_type={"self": types.Function({}, types.Any())},
-)
-def set(self, val: typing.Any) -> typing.Any:
+def mutate_op_body(
+    self,
+    root_args: typing.Any,
+    make_new_value: typing.Callable[[typing.Any], typing.Any],
+):
     # This implements mutations. Note that its argument must be a
     # Node. You can call it like this:
     # weave.use(ops.set(weave_internal.const(csv[-1]["type"]), "YY"))
 
-    self = compile.compile([self])[0]
+    self = compile.compile_fix_calls([self])[0]
     nodes = graph.linearize(self)
     if nodes is None:
         raise errors.WeaveInternalError("Set error")
@@ -238,7 +265,7 @@ def set(self, val: typing.Any) -> typing.Any:
         inputs[arg0_name] = arg0
         for name, input_node in list(node.from_op.inputs.items())[1:]:
             if not isinstance(input_node, graph.ConstNode):
-                inputs[name] = weave_internal.use(input_node)
+                inputs[name] = storage.deref(weave_internal.use(input_node))
                 # TODO: I was raising here, but the way I'm handling
                 # default config in multi_distribution makes it necessary
                 # to handle this case. This solution is more general,
@@ -253,8 +280,11 @@ def set(self, val: typing.Any) -> typing.Any:
         results.append(arg0)
 
     # Make the updates backwards
-    res = val
-    for node, inputs, result in reversed(list(zip(nodes, op_inputs, results))):
+    res = make_new_value(arg0)
+
+    for i, (node, inputs, result) in reversed(
+        list(enumerate(zip(nodes, op_inputs, results)))
+    ):
         op_def = registry_mem.memory_registry.get_op(node.from_op.name)
         if not op_def.setter:
             return res
@@ -265,12 +295,39 @@ def set(self, val: typing.Any) -> typing.Any:
             # )
         args = list(inputs.values())
         args.append(res)
+        if i == 0 and node.from_op.name == "get":
+            # TODO hardcoded get to take root_args. Should just check if available on setter.
+            args.append(root_args)
         try:
             res = op_def.setter.func(*args)  # type: ignore
         except AttributeError:
             res = op_def.setter(*args)
 
     return res
+
+
+@op(
+    pure=False,
+    name="set",
+    input_type={"self": types.Function({}, types.Any())},
+)
+def set(self, val: typing.Any, root_args: typing.Any) -> typing.Any:
+    # This implements mutations. Note that its argument must be a
+    # Node. You can call it like this:
+    # weave.use(ops.set(weave_internal.const(csv[-1]["type"]), "YY"))
+    if isinstance(self, graph.ConstNode):
+        return val
+
+    return mutate_op_body(self, root_args, lambda _: val)
+
+
+@op(
+    pure=False,
+    name="append",
+    input_type={"self": types.Function({}, types.Any())},
+)
+def append(self, val: typing.Any, root_args: typing.Any) -> typing.Any:
+    return mutate_op_body(self, root_args, lambda v: v + [val])
 
 
 @weave_class(weave_type=types.Function)
@@ -286,63 +343,44 @@ class FunctionOps:
         return weave_internal.use(called)
 
 
+# Run mutations. These should be dot-chainable from Run Node, but
+# we'll need to bring back the mutation decorator to make that work
+# (to tell execute that these should be eager and receive the Node
+# as first argument instead of resolve value).
+def run_set_state(self: graph.Node["Run"], state):
+    r = typing.cast(runs.Run, self)
+    weave_internal.use(set(weave_internal.const(r.state), state, {}))
+
+
+def run_print(self: graph.Node["Run"], s: str):
+    r = typing.cast(runs.Run, self)
+    weave_internal.use(append(weave_internal.const(r.prints), s, {}))
+
+
+def run_log(self: graph.Node["Run"], v: typing.Any):
+    r = typing.cast(runs.Run, self)
+    weave_internal.use(append(weave_internal.const(r.history), v, {}))
+
+
+def run_set_inputs(self: graph.Node["Run"], v: typing.Any):
+    r = typing.cast(runs.Run, self)
+    weave_internal.use(set(weave_internal.const(r.inputs), v, {}))
+
+
+def run_set_output(self: graph.Node["Run"], v: typing.Any):
+    r = typing.cast(runs.Run, self)
+    # Prior mutation code had this
+    # # Force the output to be a ref.
+    # # TODO: this is probably not the right place to do this.
+    # if not isinstance(v, storage.Ref):
+    #     v = storage.save(v)
+    # self.output = v
+    # return self
+    weave_internal.use(set(weave_internal.const(r.output), v, {}))
+
+
 @weave_class(weave_type=types.RunType)
 class Run:
-    # NOTE: the mutations here are unused, only used by test currently.
-    # shows how we can implement the run API entirely on top of Weave objects,
-    # but we're not using this internally so probably best to remove.
-    @op(
-        name="run-setstate",
-        input_type={
-            "state": types.RUN_STATE_TYPE,
-        },
-        # can't return run because then we'll think this is an async op!
-        output_type=types.Invalid(),
-    )
-    @mutation
-    def set_state(self, state):
-        self.state = state
-        return self
-
-    @op(
-        name="run-print",
-        # can't return run because then we'll think this is an async op!
-        output_type=types.Invalid(),
-    )
-    @mutation
-    def print_(self, s: str):
-        # print("PRINT s", s)
-        self.prints.append(s)  # type: ignore
-        return self
-
-    @op(
-        name="run-log",
-        # can't return run because then we'll think this is an async op!
-        output_type=types.Invalid(),
-    )
-    @mutation
-    def log(self, v: typing.Any):
-        self.history.append(v)  # type: ignore
-        return self
-
-    @mutation
-    def set_inputs(self, v: typing.Any):
-        self.inputs = v
-        return self
-
-    @op(
-        name="run-setoutput",
-        output_type=types.Invalid(),
-    )
-    @mutation
-    def set_output(self, v: typing.Any):
-        # Force the output to be a ref.
-        # TODO: this is probably not the right place to do this.
-        if not isinstance(v, storage.Ref):
-            v = storage.save(v)
-        self.output = v
-        return self
-
     @op(
         name="run-await",
         output_type=lambda input_types: input_types["self"].output,

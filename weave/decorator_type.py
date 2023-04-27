@@ -94,19 +94,17 @@ def type(__override_name: str = None, __is_simple: bool = False):
         @decorator_op.op(
             name=f"objectConstructor-_new_{target_name.replace('-', '_')}",
             input_type={
-                "attributes": types.TypedDict(
-                    {
-                        field.name: static_property_types.get(field.name, None)
-                        or type_vars[field.name]
-                        for field in fields
-                    }
-                )
+                field.name: static_property_types.get(field.name, None)
+                or type_vars[field.name]
+                for field in fields
             },
             output_type=TargetType(),
             render_info={"type": "function"},
         )
-        def constructor(attributes):
-            return dc(**{field.name: attributes[field.name] for field in fields})
+        def constructor(**attributes):
+            return dc(
+                **{field.name: attributes[field.name] for field in fields if field.init}
+            )
 
         dc.constructor = constructor
 

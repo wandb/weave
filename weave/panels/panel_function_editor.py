@@ -10,13 +10,13 @@ ExpressionType = typing.TypeVar("ExpressionType")
 
 
 @weave.type()
-class ExpressionEditorConfig(typing.Generic[ExpressionType]):
+class FunctionEditorConfig(typing.Generic[ExpressionType]):
     expr: graph.Node[ExpressionType] = dataclasses.field(default_factory=graph.VoidNode)
 
 
 @weave.type()
-class ExpressionEditor(panel.Panel):
-    id = "ExpressionEditor"
-    config: ExpressionEditorConfig = dataclasses.field(
-        default_factory=ExpressionEditorConfig
+class FunctionEditor(panel.Panel):
+    id = "FunctionEditor"
+    config: FunctionEditorConfig = dataclasses.field(
+        default_factory=FunctionEditorConfig
     )

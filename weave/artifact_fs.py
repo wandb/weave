@@ -22,6 +22,12 @@ class FilesystemArtifactType(types.Type):
         return FilesystemArtifactRef(obj, None)
 
 
+class BranchPointType(typing.TypedDict):
+    branch: str
+    commit: str
+    n_commits: int
+
+
 class FilesystemArtifact(artifact_base.Artifact):
     RefClass: typing.ClassVar[typing.Type["FilesystemArtifactRef"]]
     name: str
@@ -71,6 +77,14 @@ class FilesystemArtifact(artifact_base.Artifact):
 
     @property
     def version(self) -> str:
+        raise NotImplementedError
+
+    @property
+    def branch(self) -> typing.Optional[str]:
+        raise NotImplementedError
+
+    @property
+    def branch_point(self) -> typing.Optional[BranchPointType]:
         raise NotImplementedError
 
     @property
@@ -162,6 +176,14 @@ class FilesystemArtifactRef(artifact_base.ArtifactRef):
         return self.artifact.version
 
     @property
+    def branch(self) -> typing.Optional[str]:
+        return self.artifact.branch
+
+    @property
+    def branch_point(self) -> typing.Optional[BranchPointType]:
+        return self.artifact.branch_point
+
+    @property
     def is_saved(self) -> bool:
         return self.artifact.is_saved
 
@@ -177,6 +199,15 @@ class FilesystemArtifactRef(artifact_base.ArtifactRef):
         uri = typing.cast("FilesystemArtifactURI", self.artifact.uri_obj)
         uri.path = self.path
         uri.extra = self.extra
+        return str(uri)
+
+    @property
+    def branch_uri(self) -> str:
+        uri = typing.cast("FilesystemArtifactURI", self.artifact.uri_obj)
+        uri.path = self.path
+        uri.extra = self.extra
+        if self.branch is not None:
+            uri.version = self.branch
         return str(uri)
 
     def versions(self) -> list["FilesystemArtifactRef"]:

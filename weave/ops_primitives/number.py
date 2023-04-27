@@ -13,10 +13,16 @@ binary_number_op_input_type = {
 }
 
 
+def _set_add(lhs, rhs, v, action=None):
+    return v - rhs
+
+
 @weave_class(weave_type=types.Number)
 class Number(object):
     @op(
         name="number-add",
+        # Just to show that mutations can work in interesting ways.
+        setter=_set_add,
         input_type=binary_number_op_input_type,
         output_type=types.Number(),
     )

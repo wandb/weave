@@ -7,6 +7,7 @@ from . import errors
 from . import ref_base
 from . import artifact_base
 from . import artifact_mem
+from . import artifact_fs
 from . import artifact_local
 from . import artifact_wandb
 from . import weave_types as types
@@ -36,11 +37,26 @@ def _get_name(wb_type: types.Type, obj: typing.Any) -> str:
     # return f"{wb_type.name}-{obj_names[-1]}"
 
 
-def _save_or_publish(obj, name=None, type=None, publish: bool = False, artifact=None):
+def _save_or_publish(
+    obj, name=None, type=None, publish: bool = False, artifact=None, branch=None
+):
     # HAX for W&B publishing.
     project = None
     if name is not None and "/" in name:
         project, name = name.split("/")
+    source_branch = None
+    if name is not None and ":" in name:
+        name, source_branch = name.split(":", 1)
+
+    # source_branch = None
+    # # If we have an existing ref and its a filesystem artifact
+    # # track its branch
+    # existing_ref = _get_ref(obj)
+    # if isinstance(existing_ref, artifact_fs.FilesystemArtifactRef):
+    #     # We don't branch across artifacts for now (name change)... But we could!
+    #     if name is None or existing_ref.name == name:
+    #         source_branch = existing_ref.branch
+
     # TODO: get rid of this? Always type check?
     wb_type = type
     if wb_type is None:
@@ -60,7 +76,7 @@ def _save_or_publish(obj, name=None, type=None, publish: bool = False, artifact=
             # TODO: Potentially add entity and project to namespace the artifact explicitly.
             artifact = artifact_wandb.WandbArtifact(name, type=wb_type.name)
         else:
-            artifact = artifact_local.LocalArtifact(name)
+            artifact = artifact_local.LocalArtifact(name, version=source_branch)
     ref = artifact.set("obj", wb_type, obj)
 
     # Only save if we have a ref into the artifact we created above. Otherwise
@@ -69,7 +85,7 @@ def _save_or_publish(obj, name=None, type=None, publish: bool = False, artifact=
         if project is not None:
             artifact.save(project)
         else:
-            artifact.save()
+            artifact.save(branch=branch)
 
     return ref
 
@@ -79,13 +95,15 @@ def publish(obj, name=None, type=None):
     return _save_or_publish(obj, name, type, True)
 
 
-def save(obj, name=None, type=None, artifact=None) -> artifact_local.LocalArtifactRef:
+def save(
+    obj, name=None, type=None, artifact=None, branch=None
+) -> artifact_local.LocalArtifactRef:
     # print("STORAGE SAVE", name, obj, type, artifact)
     # ref = _get_ref(obj)
     # if ref is not None:
     #     if name is None or ref.artifact._name == name:
     #         return ref
-    return _save_or_publish(obj, name, type, False, artifact=artifact)
+    return _save_or_publish(obj, name, type, False, artifact=artifact, branch=branch)
 
 
 def get(uri_s: typing.Union[str, ref_base.Ref]) -> typing.Any:
@@ -94,6 +112,7 @@ def get(uri_s: typing.Union[str, ref_base.Ref]) -> typing.Any:
     return ref_base.Ref.from_str(uri_s).get()
 
 
+get_local_version_ref = artifact_local.get_local_version_ref
 get_local_version = artifact_local.get_local_version
 
 
@@ -175,6 +194,13 @@ def to_python(obj, wb_type=None):
     val = mapper.apply(obj)
     # TODO: this should be a ConstNode!
     return {"_type": wb_type.to_dict(), "_val": val}
+
+
+def to_safe_const(obj):
+    wb_type = types.TypeRegistry.type_of(obj)
+    mapper = mappers_python.map_to_python(wb_type, artifact_mem.MemArtifact())
+    val = mapper.apply(obj)
+    return graph.ConstNode(wb_type, val)
 
 
 def to_hashable(obj):

@@ -42,30 +42,26 @@ from . import geom
         (
             "object",
             geom.Point2d(1, 2),
-            geom.Point2d.constructor(ops.dict_(**{"x": 1, "y": 2})),  # type: ignore
+            geom.Point2d.constructor(x=1, y=2),  # type: ignore
         ),
         (
             "mixed object",
             {"a": geom.Point2d(1, 2)},
-            ops.dict_(**{"a": geom.Point2d.constructor(ops.dict_(**{"x": 1, "y": 2}))}),  # type: ignore
+            ops.dict_(**{"a": geom.Point2d.constructor(x=1, y=2)}),  # type: ignore
         ),
         (
             "mixed object list",
             [
                 geom.Point2d(1, 2),
                 geom.Point2d.constructor(  # type: ignore
-                    ops.dict_(
-                        **{
-                            "x": weave_internal.make_const_node(types.Int(), 1),
-                            "y": weave_internal.make_const_node(types.Int(), 2),
-                        }
-                    )
+                    x=weave_internal.make_const_node(types.Int(), 1),
+                    y=weave_internal.make_const_node(types.Int(), 2),
                 ),
             ],
             ops.make_list(
                 **{
-                    "0": geom.Point2d.constructor(ops.dict_(**{"x": 1, "y": 2})),  # type: ignore
-                    "1": geom.Point2d.constructor(ops.dict_(**{"x": 1, "y": 2})),  # type: ignore
+                    "0": geom.Point2d.constructor(x=1, y=2),  # type: ignore
+                    "1": geom.Point2d.constructor(x=1, y=2),  # type: ignore
                 }
             ),
         ),

@@ -67,8 +67,8 @@ def test_mapped_pick():
 
 def test_constructor():
     expected = geom.Point2d(0.5, 0.6)
-    point2d_node = geom.Point2d.constructor({"x": 0.5, "y": 0.6})
+    point2d_node = geom.Point2d.constructor(x=0.5, y=0.6)
     assert weave.use(point2d_node) == expected
 
     with pytest.raises(errors.WeaveDispatchError):
-        weave.use(geom.Point2d.constructor({"x": 0.5}))
+        weave.use(geom.Point2d.constructor(x=0.5))

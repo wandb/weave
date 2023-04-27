@@ -26,24 +26,38 @@ def determine_input_type(
     weave_input_type = _create_args_from_op_input_type(declared_input_type)
 
     if isinstance(weave_input_type, op_args.OpNamedArgs):
-        arg_names = get_signature(pyfunc).parameters.keys()
+        sig = get_signature(pyfunc)
+        sig_params = sig.parameters
+        arg_names = sig_params.keys()
+        var_arg_params = [
+            param
+            for param in sig_params.values()
+            if param.kind == param.VAR_POSITIONAL or param.kind == param.VAR_KEYWORD
+        ]
+        is_var_args = len(var_arg_params) > 0
 
         # validate there aren't extra declared Weave types
-        weave_type_extra_arg_names = set(weave_input_type.arg_types.keys()) - set(
-            arg_names
-        )
-        if weave_type_extra_arg_names:
-            raise errors.WeaveDefinitionError(
-                "Weave Types declared for non-existent args: %s."
-                % weave_type_extra_arg_names
+        if not is_var_args:
+            weave_type_extra_arg_names = set(weave_input_type.arg_types.keys()) - set(
+                arg_names
             )
+            if weave_type_extra_arg_names:
+                raise errors.WeaveDefinitionError(
+                    "Weave Types declared for non-existent args: %s."
+                    % weave_type_extra_arg_names
+                )
 
         arg_types = {}
 
         # iterate through function args in order. The function determines
         # the order of arg_types, which is relied on everywhere.
         for input_name in arg_names:
-            if input_name == "_run":
+            param = sig_params[input_name]
+            if (
+                param.kind == param.VAR_POSITIONAL
+                or param.kind == param.VAR_KEYWORD
+                or input_name == "_run"
+            ):
                 continue
 
             python_type = python_input_type.get(input_name)
@@ -65,6 +79,12 @@ def determine_input_type(
                 arg_types[input_name] = existing_weave_type
             else:
                 arg_types[input_name] = types.UnknownType()
+
+        if is_var_args:
+            # Add any remaining weave types if we have var args
+            for key, t in weave_input_type.arg_types.items():
+                if key not in arg_names:
+                    arg_types[key] = t
 
         # validate there aren't missing Weave types
         unknown_type_args = set(

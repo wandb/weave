@@ -365,8 +365,9 @@ def _make_run_history_gql_field(inputs: InputAndStitchProvider, inner: str):
     name="run-history",
     refine_output_type=refine_history_type,
     plugins=wb_gql_op_plugin(_make_run_history_gql_field),
+    output_type=types.List(types.TypedDict({})),
 )
-def history(run: wdt.Run) -> list[dict[str, typing.Any]]:
+def history(run: wdt.Run):
 
     # first check and see if we have actually fetched any history rows. if we have not,
     # we are in the case where we have blindly requested the entire history object.

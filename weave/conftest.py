@@ -62,6 +62,8 @@ def test_artifact_dir():
 
 @pytest.fixture(autouse=True)
 def pre_post_each_test(test_artifact_dir):
+    # Tests rely on full cache mode right now.
+    os.environ["WEAVE_CACHE_MODE"] = "full"
     try:
         shutil.rmtree(test_artifact_dir)
     except (FileNotFoundError, OSError):

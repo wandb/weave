@@ -82,27 +82,27 @@ def geo(
 @weave.op(name="Geo_config")
 def geo_config(
     input_node: weave.Node[list[typing.Any]], config: GeoConfig
-) -> weave.panels.Group2:
+) -> weave.panels.Group:
     unnested = weave.ops.unnest(input_node)
     config = geo_default_config(config, unnested)
-    return weave.panels.Group2(
+    return weave.panels.Group(
         items={
             "x_fn": weave.panels.LabeledItem(
                 label="x",
-                item=weave.panels.ExpressionEditor(
-                    config=weave.panels.ExpressionEditorConfig(config.x_fn)
+                item=weave.panels.FunctionEditor(
+                    config=weave.panels.FunctionEditorConfig(config.x_fn)
                 ),
             ),
             "y_fn": weave.panels.LabeledItem(
                 label="y",
-                item=weave.panels.ExpressionEditor(
-                    config=weave.panels.ExpressionEditorConfig(config.y_fn)
+                item=weave.panels.FunctionEditor(
+                    config=weave.panels.FunctionEditorConfig(config.y_fn)
                 ),
             ),
             "color_fn": weave.panels.LabeledItem(
                 label="color",
-                item=weave.panels.ExpressionEditor(
-                    config=weave.panels.ExpressionEditorConfig(config.color_fn)
+                item=weave.panels.FunctionEditor(
+                    config=weave.panels.FunctionEditorConfig(config.color_fn)
                 ),
             ),
         }

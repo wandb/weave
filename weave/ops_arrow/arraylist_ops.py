@@ -4,6 +4,7 @@ from pyarrow import compute as pc
 
 from .. import weave_types as types
 from ..decorator_arrow_op import arrow_op
+from ..language_features.tagging import tagged_value_type
 
 from .arrow import ArrowWeaveListType, arrow_as_array
 from .list_ import ArrowWeaveList
@@ -65,6 +66,43 @@ def listindex(self, index):
     )
 
 
+def _list_op_output_object_type(input_types):
+    self_type = input_types["self"]
+    object_type = typing.cast(types.List, self_type.object_type)
+    inner_object_type = object_type.object_type
+    # TODO: union
+    if isinstance(inner_object_type, tagged_value_type.TaggedValueType):
+        return inner_object_type.value
+    return inner_object_type
+
+
+def list_dim_downresolver(self: ArrowWeaveList, arrow_operation_name: str):
+    a = arrow_as_array(self._arrow_data)
+    values = a.flatten()
+
+    object_type = typing.cast(types.List, self.object_type)
+    if isinstance(object_type.object_type, tagged_value_type.TaggedValueType):
+        values = values.field("_value")
+
+    start_indexes = a.offsets[:-1]
+    end_indexes = a.offsets[1:]
+    non_0len = pa.compute.not_equal(start_indexes, end_indexes)
+    t = pa.Table.from_arrays([a.value_parent_indices(), values], ["keys", "values"])
+    g = t.group_by("keys")
+    non_0len_agged = g.aggregate([("values", arrow_operation_name)])[
+        f"values_{arrow_operation_name}"
+    ]
+    nulls = pa.nulls(len(a), type=non_0len_agged.type)
+    result = pa.compute.replace_with_mask(
+        nulls, non_0len, non_0len_agged.combine_chunks()
+    )
+    return ArrowWeaveList(
+        result,
+        _list_op_output_object_type({"self": ArrowWeaveListType(self.object_type)}),
+        self._artifact,
+    )
+
+
 @arrow_op(
     name="ArrowWeaveListListNumber-listnumbermax",
     input_type={
@@ -78,32 +116,71 @@ def listindex(self, index):
         ),
     },
     output_type=lambda input_types: ArrowWeaveListType(
-        input_types["self"].object_type.object_type
+        _list_op_output_object_type(input_types)
     ),
 )
 def list_numbers_max(self):
-    # strip tags on list element values - @arrow_op handles this on
-    # the lists themselves, but not the elements
+    return list_dim_downresolver(self, "max")
 
-    self = self.without_tags()
-    a = arrow_as_array(self._arrow_data)
-    start_indexes = a.offsets[:-1]
-    end_indexes = a.offsets[1:]
-    non_0len = pa.compute.not_equal(start_indexes, end_indexes)
-    t = pa.Table.from_arrays(
-        [a.value_parent_indices(), a.flatten()], ["keys", "values"]
-    )
-    g = t.group_by("keys")
-    non_0len_maxes = g.aggregate([("values", "max")])["values_max"]
-    nulls = pa.nulls(len(a), type=a.type.value_type)
-    result = pa.compute.replace_with_mask(
-        nulls, non_0len, non_0len_maxes.combine_chunks()
-    )
-    return ArrowWeaveList(
-        result,
-        self.object_type.object_type,
-        self._artifact,
-    )
+
+@arrow_op(
+    name="ArrowWeaveListListNumber-listnumbermin",
+    input_type={
+        "self": ArrowWeaveListType(
+            types.optional(
+                types.UnionType(
+                    types.List(types.optional(types.Number())),
+                    ArrowWeaveListType(types.optional(types.Number())),
+                )
+            )
+        ),
+    },
+    output_type=lambda input_types: ArrowWeaveListType(
+        _list_op_output_object_type(input_types)
+    ),
+)
+def list_numbers_min(self):
+    return list_dim_downresolver(self, "min")
+
+
+@arrow_op(
+    name="ArrowWeaveListListNumber-listnumbersum",
+    input_type={
+        "self": ArrowWeaveListType(
+            types.optional(
+                types.UnionType(
+                    types.List(types.optional(types.Number())),
+                    ArrowWeaveListType(types.optional(types.Number())),
+                )
+            )
+        ),
+    },
+    output_type=lambda input_types: ArrowWeaveListType(
+        _list_op_output_object_type(input_types)
+    ),
+)
+def list_numbers_sum(self):
+    return list_dim_downresolver(self, "sum")
+
+
+@arrow_op(
+    name="ArrowWeaveListListNumber-listnumberavg",
+    input_type={
+        "self": ArrowWeaveListType(
+            types.optional(
+                types.UnionType(
+                    types.List(types.optional(types.Number())),
+                    ArrowWeaveListType(types.optional(types.Number())),
+                )
+            )
+        ),
+    },
+    output_type=lambda input_types: ArrowWeaveListType(
+        _list_op_output_object_type(input_types)
+    ),
+)
+def list_numbers_avg(self):
+    return list_dim_downresolver(self, "mean")
 
 
 # This iterates over the outer list in python but keeps the inner comparisons vectorized

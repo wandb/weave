@@ -22,5 +22,6 @@ from . import shawn
 from . import wandb
 from . import replicate
 from . import openai
+from . import py
 
 context_state.clear_loading_built_ins(loading_builtins_token)

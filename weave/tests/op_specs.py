@@ -140,6 +140,57 @@ numbers_max = OpSpec(
     ],
 )
 
+numbers_min = OpSpec(
+    op=ops_primitives.numbers_min,
+    kind=OpKind(arity=1, list_op=True),
+    test_cases=[
+        OpSpecTestCase(
+            input=([-10, -99, -100],),
+            expected=-100,
+            expected_type=weave.types.Number(),
+        ),
+        OpSpecTestCase(
+            input=([0, 1, 3],),
+            expected=0,
+            expected_type=weave.types.Number(),
+        ),
+    ],
+)
+
+numbers_avg = OpSpec(
+    op=ops_primitives.numbers_avg,
+    kind=OpKind(arity=1, list_op=True),
+    test_cases=[
+        OpSpecTestCase(
+            input=([-10, -100],),
+            expected=-55.0,
+            expected_type=weave.types.Float(),
+        ),
+        OpSpecTestCase(
+            input=([1, 3],),
+            expected=2.0,
+            expected_type=weave.types.Float(),
+        ),
+    ],
+)
+
+numbers_sum = OpSpec(
+    op=ops_primitives.numbers_sum,
+    kind=OpKind(arity=1, list_op=True),
+    test_cases=[
+        OpSpecTestCase(
+            input=([-10, -99, -100],),
+            expected=-209,
+            expected_type=weave.types.Number(),
+        ),
+        OpSpecTestCase(
+            input=([0, 1, 3],),
+            expected=4,
+            expected_type=weave.types.Number(),
+        ),
+    ],
+)
+
 index = OpSpec(
     op=ops_primitives.List.__getitem__,
     kind=OpKind(arity=2, list_op=True, uniform_input_types=False),
@@ -437,6 +488,9 @@ OP_TEST_SPECS = [
     number_mul,
     string_add,
     numbers_max,
+    numbers_min,
+    numbers_avg,
+    numbers_sum,
     number_to_timestamp,
     index,
     join_all,

@@ -109,9 +109,9 @@ FullTextClassificationPipelineOutputType.instance_classes = (
 @weave.op()
 def full_text_classification_output_render(
     output_node: weave.Node[FullTextClassificationPipelineOutput],
-) -> weave.panels.Group2:
+) -> weave.panels.Group:
     output = typing.cast(FullTextClassificationPipelineOutput, output_node)
-    return weave.panels.Group2(
+    return weave.panels.Group(
         preferHorizontal=True,
         items={
             "input": weave.panels.LabeledItem(label="input", item=output.model_input),

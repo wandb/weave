@@ -43,7 +43,7 @@ def history_key_type_count_to_weave_type(tc: TypeCount) -> types.Type:
             types.union(*[history_key_type_count_to_weave_type(v) for v in tc["items"]])
         )
     elif tc_type == "histogram":
-        return wb_util.Histogram.WeaveType()  # type: ignore
+        return wb_util.WbHistogram.WeaveType()  # type: ignore
     elif tc_type == "table-file":
         extension = types.Const(types.String(), "json")
         return artifact_fs.FilesystemArtifactFileType(extension, table.TableType())

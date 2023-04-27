@@ -85,7 +85,21 @@ static_folder = os.path.join(os.path.dirname(__file__), "frontend")
 blueprint = Blueprint("weave", "weave-server", static_folder=static_folder)
 
 
+def import_ecosystem():
+    if not util.parse_boolean_env_var("WEAVE_SERVER_DISABLE_ECOSYSTEM"):
+        try:
+            from weave.ecosystem import all
+        except ImportError:
+            logging.warning(
+                'Failed to import "weave.ecosystem". Weave ecosystem features will be disabled. '
+                'To fix this, install ecosystem dependencies with "pip install weave[ecosystem]". '
+                "To disable this message, set WEAVE_SERVER_DISABLE_ECOSYSTEM=1."
+            )
+
+
 def make_app():
+    import_ecosystem()
+
     logs.configure_logger()
 
     app = Flask(__name__)
@@ -100,6 +114,7 @@ def make_app():
 
 @blueprint.route("/__weave/ops", methods=["GET"])
 def list_ops():
+    # TODO: this is super slow.
     if not environment.wandb_production():
         registry_mem.memory_registry.load_saved_ops()
     ops = registry_mem.memory_registry.list_ops()
@@ -213,6 +228,12 @@ def frontend(path):
         return send_from_directory(blueprint.static_folder, "index.html")
 
 
+@blueprint.route("/", defaults={"path": None})
+@blueprint.route("/<path:path>")
+def root_frontend(path):
+    return send_from_directory(blueprint.static_folder, "index.html")
+
+
 @blueprint.route("/__weave/hello")
 def hello():
     return "hello"
@@ -256,7 +277,6 @@ if not environment.wandb_production() and DEBUG_MEM:
         return "see logs"
 
 
-# This makes all server logs go into the notebook
 app = make_app()
 
 if os.getenv("WEAVE_SERVER_DEBUG"):
@@ -279,18 +299,5 @@ if os.getenv("WEAVE_SERVER_DEBUG"):
         return response
 
 
-@app.before_first_request
-def before_first_request():
-    if not util.parse_boolean_env_var("WEAVE_SERVER_DISABLE_ECOSYSTEM"):
-        try:
-            from weave.ecosystem import all
-        except ImportError:
-            logging.warning(
-                'Failed to import "weave.ecosystem". Weave ecosystem features will be disabled. '
-                'To fix this, install ecosystem dependencies with "pip install weave[ecosystem]". '
-                "To disable this message, set WEAVE_SERVER_DISABLE_ECOSYSTEM=1."
-            )
-
-
 if __name__ == "__main__":
-    app.run(ssl_context="adhoc", port=9994)
+    app.run(port=9994)

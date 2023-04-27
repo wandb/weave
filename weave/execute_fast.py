@@ -8,6 +8,7 @@ from . import errors
 from . import box
 from . import compile
 from . import engine_trace
+from . import forward_graph
 from . import language_nullability
 from .language_features.tagging import tag_store
 
@@ -43,7 +44,11 @@ def _fast_apply_map_fn(item, index, map_fn):
 
 
 def _resolve_static_branches(map_fn):
+    result_store = forward_graph.get_node_result_store()
     if isinstance(map_fn, graph.OutputNode):
+        if map_fn in result_store:
+            return graph.ConstNode(map_fn.type, result_store[map_fn])
+
         inputs = {
             name: _resolve_static_branches(node)
             for name, node in map_fn.from_op.inputs.items()
@@ -52,10 +57,12 @@ def _resolve_static_branches(map_fn):
         if map_fn.from_op.name == "function-__call__":
             # Special case to expand function calls
             if isinstance(inputs["self"], graph.ConstNode):
-                return weave_internal.better_call_fn(
+                res = weave_internal.better_call_fn(
                     inputs["self"].val,
                     inputs["arg1"],
                 )
+                fixed = compile.compile_fix_calls([res])[0]
+                return _resolve_static_branches(fixed)
 
         if all(isinstance(v, graph.ConstNode) for v in inputs.values()):
             op_def = registry_mem.memory_registry.get_op(map_fn.from_op.name)
@@ -67,7 +74,10 @@ def _resolve_static_branches(map_fn):
             # TODO: if map_fn.type is UnionType we should do something about it here
             # before we blow up in the Const(Type) constructor
             with tracer.trace("resolve_static:op.%s" % op_def.name):
-                res = op_def.resolve_fn(**call_inputs)
+                if language_nullability.should_force_none_result(call_inputs, op_def):
+                    res = None
+                else:
+                    res = op_def.resolve_fn(**call_inputs)
                 use_type = map_fn.type
                 #
                 # Note from Tim: It is completely possible and logically sound
@@ -91,6 +101,7 @@ def _resolve_static_branches(map_fn):
                 #     else:
                 #         # Should we error here?
                 #         pass
+                result_store[map_fn] = res
                 return graph.ConstNode(use_type, res)
         return graph.OutputNode(map_fn.type, map_fn.from_op.name, inputs)
     elif isinstance(map_fn, graph.ConstNode):
@@ -155,6 +166,7 @@ def fast_map_fn(input_list, map_fn):
     with tracer.trace("fast_map:compile2"):
         map_fn = compile.compile([map_fn])[0]
 
+    logging.info("Fast mapping with map_fn: %s", map_fn)
     # now map the remaining weave_fn (after resolving static branches above)
     # over the input list
     with tracer.trace("fast_map:map"):

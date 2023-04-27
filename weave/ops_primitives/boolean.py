@@ -1,5 +1,5 @@
 import typing
-from ..api import op, mutation, weave_class
+from ..api import op, weave_class
 from .. import weave_types as types
 
 
@@ -10,7 +10,6 @@ class Boolean:
         input_type={"self": types.Boolean(), "val": types.Boolean()},
         output_type=types.Boolean(),
     )
-    @mutation
     def set(self: bool, val: bool):  # type: ignore
         return val
 

@@ -492,10 +492,9 @@ class Const(Type):
     def __post_init__(self):
         if isinstance(self.val_type, UnionType):
             # Const Unions are invalid. If something is Const, that means we know what its value
-            # is, which means it is definitely not a Union.
-            raise errors.WeaveInternalError(
-                "Attempted to initialize Const Union, which is invalid"
-            )
+            # is, which means it is definitely not a Union. Replace val_type with the actual type
+            # here.
+            self.__dict__["val_type"] = TypeRegistry.type_of(self.val)
 
     def _hashable(self):
         val_id = id(self.val)
@@ -1061,12 +1060,17 @@ class RefType(Type):
 
 
 @dataclasses.dataclass(frozen=True)
-class LocalArtifactRefType(RefType):
+class FilesystemArtifactRefType(RefType):
     pass
 
 
 @dataclasses.dataclass(frozen=True)
-class WandbArtifactRefType(RefType):
+class LocalArtifactRefType(FilesystemArtifactRefType):
+    pass
+
+
+@dataclasses.dataclass(frozen=True)
+class WandbArtifactRefType(FilesystemArtifactRefType):
     pass
 
 
@@ -1176,6 +1180,10 @@ class RunType(ObjectType):
     def _is_assignable_to(self, other_type) -> typing.Optional[bool]:
         # Use issubclass, we have RunLocalType defined as a subclass of RunType
         if not issubclass(other_type.__class__, RunType):
+            if self.output == NoneType():
+                # If output is None, we don't want to be assignable to basically
+                # all ops (since ops are nullable)
+                return None
             return other_type.assign_type(self.output)
         return None
 

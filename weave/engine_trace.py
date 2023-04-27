@@ -37,6 +37,9 @@ class ContextProvider:
 
 class DummyTrace:
     def trace(self, *args, **kwargs):
+        import logging
+
+        logging.info("Trace: %s", args[0])
         return DummySpan()
 
     @property

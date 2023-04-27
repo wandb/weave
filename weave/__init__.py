@@ -28,5 +28,8 @@ _context.clear_loading_built_ins(_loading_builtins_token)
 
 # Wow, this works! you can do just "weave" in a notebook and render
 # something. Maybe render ecosystem panel?
+# from .ecosystem import ecosystem
+
+
 # def _ipython_display_():
 #     return show(ecosystem())

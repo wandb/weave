@@ -17,14 +17,14 @@ data = weave.save(
     ]
 )
 
-panel: weave.panels.Group2 = weave.panels.Group2(
+panel: weave.panels.Group = weave.panels.Group(
     items={
         "scatter": wandb.Scatter(
             data, x_fn=lambda item: item["a"], y_fn=lambda item: item["b"]
         ),
         "table": lambda scatter: weave.panels.LabeledItem(
             label="Selected items",
-            item=weave.panels.Group2(
+            item=weave.panels.Group(
                 style="height: 400px;",
                 preferHorizontal=True,
                 items={"table": scatter.selected()},

@@ -1,5 +1,5 @@
 import typing
-from ..api import mutation, op, weave_class
+from ..api import op, weave_class
 from .. import weave_types as types
 
 # This matches the output type logic of the frontend
@@ -38,7 +38,6 @@ def getattr_output_type(input_type):
     return types.Invalid()
 
 
-@mutation
 def obj_settattr(self, attr, v):
     setattr(self, attr, v)
     return self

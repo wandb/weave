@@ -476,10 +476,11 @@ def test_non_none(in_type, out_type):
     assert types.non_none(in_type) == out_type
 
 
-def test_const_union_invalid():
-    # assert that creating a const union type raises an error
-    with pytest.raises(errors.WeaveInternalError):
-        types.Const(types.union(types.NoneType(), types.Number()), 5)
+def test_const_union_resolves_union():
+    assert (
+        types.Const(types.union(types.NoneType(), types.Number()), 5).val_type
+        == types.Int()
+    )
 
 
 def test_floatint_merged():
@@ -700,4 +701,16 @@ def test_deserializes_single_member_union():
     assert (
         types.TypeRegistry.type_from_dict({"members": ["int"], "type": "union"})
         == types.Int()
+    )
+
+
+def test_wbrun_not_assignable_to_weave_run():
+    from ..ops_domain import wb_domain_types
+
+    assert not weave.types.optional(wb_domain_types.Run().WeaveType()).assign_type(
+        weave.types.RunType(
+            inputs=weave.types.TypedDict(property_types={}),
+            history=weave.types.List(object_type=weave.types.UnknownType()),
+            output=weave.types.NoneType(),
+        )
     )

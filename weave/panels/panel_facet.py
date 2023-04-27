@@ -89,8 +89,12 @@ class Facet(panel.Panel):
 
     @weave.op(output_type=lambda input_type: input_type["self"].input_node.output_type)
     def selected(self):
-        x_fn = self.config.table["columnSelectFunctions"][self.config.dims.x]
-        y_fn = self.config.table["columnSelectFunctions"][self.config.dims.y]
+        if self.config.selectedCell == None:
+            from ..ops_arrow import list_
+
+            return list_.make_vec_none(0)
+        x_fn = self.config.table.columnSelectFunctions[self.config.dims.x]
+        y_fn = self.config.table.columnSelectFunctions[self.config.dims.y]
         filtered = weave.ops.List.filter(
             self.input_node,
             lambda item: weave.ops.Boolean.bool_and(

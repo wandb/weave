@@ -67,7 +67,10 @@ class TableState:
     def _expr_to_fn_node(self, fn, post_group_dimensionality=False):
         if isinstance(fn, graph.Node):
             return fn
-        object_type = self.input_node.type.object_type
+        self_input_type = self.input_node.type
+        if isinstance(self_input_type, weave_types.Function):
+            self_input_type = self_input_type.output_type
+        object_type = self_input_type.object_type
 
         # TODO: we are not deriving this type correctly
         if post_group_dimensionality:

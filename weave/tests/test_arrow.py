@@ -391,7 +391,7 @@ def test_custom_groupby_intermediate_save():
         ]
     )
     node = data.groupby(lambda row: ops.dict_(a=row["a"]))[0]
-    saved_node = weave.save(node, "test_custom_groupby_intermediate_save")
+    saved_node = weave.save(node, "test_custom_groupby_intermediate_save:latest")
     weave.use(saved_node)
     loaded_node = ops.get(
         f"local-artifact:///test_custom_groupby_intermediate_save:latest/obj"

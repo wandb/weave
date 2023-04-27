@@ -82,10 +82,12 @@ def _dispatch_map_fn_refining(node: graph.Node) -> typing.Optional[graph.OutputN
                     k: n
                     for k, n in zip(op.input_type.arg_types, from_op.inputs.values())
                 }
-            return op(**params)
+            res = op(**params)
+            # logging.info("Dispatched (refine): %s -> %s", node, res.type)
+            return res
         except errors.WeaveDispatchError:
             logging.error(
-                "Error while dispatching\n!=!=!=!=!\nName: %s\nInput Types: %s\nExpression: %s",
+                "Error while dispatching (refine phase)\n!=!=!=!=!\nName: %s\nInput Types: %s\nExpression: %s",
                 from_op.name,
                 from_op.input_types,
                 re.sub(r'[\\]+"', '"', graph_debug.node_expr_str_full(node)),
@@ -125,7 +127,7 @@ def _dispatch_map_fn_no_refine(node: graph.Node) -> typing.Optional[graph.Output
         except errors.WeaveDispatchError as e:
             if _dispatch_error_is_client_error(from_op.name, from_op.input_types):
                 raise errors.WeaveBadRequest(
-                    "Error while dispatching: %s. This is most likely a client error"
+                    "Error while dispatching (no refine phase): %s. This is most likely a client error"
                     % from_op.name
                 )
             else:
@@ -146,7 +148,9 @@ def _dispatch_map_fn_no_refine(node: graph.Node) -> typing.Optional[graph.Output
         ):
             output_type = op.unrefined_output_type_for_params(params)
 
-        return graph.OutputNode(_remove_optional(output_type), op.uri, params)
+        res = graph.OutputNode(_remove_optional(output_type), op.uri, params)
+        # logging.info("Dispatched (no refine): %s -> %s", node, res.type)
+        return res
     return None
 
 
@@ -308,7 +312,26 @@ def compile_await(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
 
 
 def compile_execute(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
-    return graph.map_nodes_full(nodes, _execute_nodes_map_fn)
+    # Actually does the execution here in compile phase.
+    # I made this change to handle cases where we need to pass mutations through
+    # execute calls, which happens when we have Nodes stored in Const nodes (panels)
+    # that we are mutating.
+    # However I think I later solved this with client-side execution and it can maybe
+    # be removed.
+    # I'm leaving this for now as it doesn't affect W&B prod (which never calls execute).
+    with_execute_ops = graph.map_nodes_full(nodes, _execute_nodes_map_fn)
+
+    def _replace_execute(node: graph.Node) -> typing.Optional[graph.Node]:
+        if isinstance(node, graph.OutputNode) and node.from_op.name == "execute":
+            res = weave_internal.use(node.from_op.inputs["node"])
+            if not isinstance(res, graph.Node):
+                raise ValueError(
+                    f"Expected node to be a Node, got {res} of type {type(res)}"
+                )
+            return compile_fix_calls([res])[0]
+        return None
+
+    return graph.map_nodes_full(with_execute_ops, _replace_execute)
 
 
 def compile_refine(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:

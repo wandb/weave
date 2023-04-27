@@ -15,6 +15,7 @@ def op(
     name=None,
     setter=None,
     render_info=None,
+    hidden=False,
     pure=True,
     _op_def_class=op_def.OpDef,
     *,  # Marks the rest of the arguments as keyword-only.
@@ -56,6 +57,7 @@ def op(
             refine_output_type=refine_output_type,
             setter=setter,
             render_info=render_info,
+            hidden=hidden,
             pure=pure,
             plugins=plugins,
             _decl_locals=inspect.currentframe().f_back.f_locals,

@@ -6,13 +6,16 @@ from . import errors
 from . import client_interface
 
 
-def dereference_variables(node: graph.Node, var_values: graph.Frame) -> graph.Node:
+def dereference_variables(
+    node: graph.Node, var_values: graph.Frame, missing_ok: bool = False
+) -> graph.Node:
     def map_fn(n: graph.Node) -> graph.Node:
         if isinstance(n, graph.VarNode):
             try:
                 return var_values[n.name]
             except KeyError:
-                raise errors.WeaveMissingVariableError(n.name)
+                if not missing_ok:
+                    raise errors.WeaveMissingVariableError(n.name)
         return n
 
     return graph.map_nodes_top_level([node], map_fn)[0]

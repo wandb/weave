@@ -67,6 +67,14 @@ class BoxedDatetime(datetime.datetime):
         )
 
 
+class BoxedTimedelta(datetime.timedelta):
+    def __eq__(self, other):
+        return (
+            isinstance(other, datetime.timedelta)
+            and self.total_seconds() == other.total_seconds()
+        )
+
+
 def cannot_have_weakref(obj: typing.Any):
     return isinstance(obj, (BoxedInt, BoxedFloat, BoxedStr, BoxedBool, BoxedNone))
 
@@ -98,6 +106,7 @@ def box(
     BoxedNDArray,
     BoxedNone,
     BoxedDatetime,
+    BoxedTimedelta,
 ]:
     if type(obj) == int:
         return BoxedInt(obj)
@@ -115,6 +124,8 @@ def box(
         return BoxedNDArray(obj)
     elif type(obj) == datetime.datetime:
         return BoxedDatetime.fromtimestamp(obj.timestamp())
+    elif type(obj) == datetime.timedelta:
+        return BoxedTimedelta(seconds=obj.total_seconds())
     elif obj is None:
         return BoxedNone(obj)
     return obj
@@ -123,7 +134,17 @@ def box(
 def unbox(
     obj: T,
 ) -> typing.Union[
-    T, int, float, str, bool, dict, list, np.ndarray, datetime.datetime, None
+    T,
+    int,
+    float,
+    str,
+    bool,
+    dict,
+    list,
+    np.ndarray,
+    datetime.datetime,
+    datetime.timedelta,
+    None,
 ]:
 
     if type(obj) == BoxedInt:
@@ -142,6 +163,8 @@ def unbox(
         return np.array(obj)
     elif type(obj) == BoxedDatetime:
         return datetime.datetime.fromtimestamp(obj.timestamp())
+    elif type(obj) == BoxedTimedelta:
+        return datetime.timedelta(seconds=obj.total_seconds())
     elif type(obj) == BoxedNone:
         return None
     return obj

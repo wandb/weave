@@ -27,6 +27,7 @@ def local_path_refine_type(path: str) -> types.Type:
 @op(
     name="localpath",
     pure=False,
+    render_info={"type": "function"},
     refine_output_type=local_path_refine_type,
 )
 def local_path(

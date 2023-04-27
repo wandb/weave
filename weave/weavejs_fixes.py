@@ -5,6 +5,7 @@ TODO: this file is not complete. We should try to put all compability fixes here
 """
 import typing
 import copy
+import math
 
 from . import weave_types
 from . import graph
@@ -22,6 +23,8 @@ def _convert_specific_opname_to_generic_opname(
         or name == "ArrowWeaveListTypedDict-pick"
     ):
         return "pick", {"obj": inputs["self"], "key": inputs["key"]}
+    elif name == "ArrowWeaveList-concat":
+        return "concat", {"arr": inputs["arr"]}
     elif name == "groupresult-map":
         return "map", {"arr": inputs["self"], "mapFn": inputs["map_fn"]}
     elif name == "groupresult-groupby":
@@ -77,7 +80,9 @@ def convert_specific_ops_to_generic_ops_node(node: graph.Node) -> graph.Node:
     return graph.map_nodes_full([node], convert_specific_op_to_generic_op)[0]
 
 
-def _dict_is_node_like(data: dict):
+def _obj_is_node_like(data: typing.Any):
+    if not isinstance(data, dict):
+        return False
     return data.get("nodeType") in ["const", "output", "var", "void"]
 
 
@@ -89,7 +94,7 @@ def _dict_is_op_like(data: dict):
         if isinstance(data["name"], str) and isinstance(data["inputs"], dict):
             # And the inputs will be dicts that are node-like
             return all(
-                _dict_is_node_like(in_node) for in_node in data["inputs"].values()
+                _obj_is_node_like(in_node) for in_node in data["inputs"].values()
             )
     return False
 
@@ -156,7 +161,22 @@ def recursively_unwrap_unions(obj):
     return obj
 
 
+def remove_nan_and_inf(obj):
+    if isinstance(obj, list):
+        return [remove_nan_and_inf(o) for o in obj]
+    if isinstance(obj, dict):
+        return {k: remove_nan_and_inf(v) for k, v in obj.items()}
+    if isinstance(obj, float):
+        if math.isnan(obj) or math.isinf(obj):
+            return 0
+    return obj
+
+
 def fixup_data(data):
     data = recursively_unwrap_unions(data)
     data = remove_opcall_versions_data(data)
+    # No good! We have to do this because remoteHttp doesn't handle NaN/inf in
+    # response right now.
+    # TODO: fix. Encode as string and then interpret in js side.
+    data = remove_nan_and_inf(data)
     return convert_specific_ops_to_generic_ops_data(data)

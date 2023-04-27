@@ -83,9 +83,10 @@ def plotly_barplot(bar_data: list[BarData]) -> plotly.graph_objs.Figure:
     return fig
 
 
-class ScatterData:
-    x: float
-    y: float
+class ScatterData(typing.TypedDict):
+    x: typing.Optional[float]
+    y: typing.Optional[float]
+    label: typing.Optional[str]
 
 
 class TimeBin(typing.TypedDict):
@@ -107,7 +108,7 @@ class TimeSeriesData(typing.TypedDict):
                 {
                     "x": weave.types.TypedDict(
                         {
-                            key: weave.types.Timestamp()
+                            key: weave.types.optional(weave.types.Timestamp())
                             for key in ["start", "center", "stop"]
                         }
                     ),
@@ -152,6 +153,7 @@ def plotly_time_series(data, mark, labels, label_overrides) -> plotly.graph_objs
             template="plotly_white",
             labels=labels,
         )
+        fig.update_layout(showlegend=False)
         fig.update_traces(width=bin_size)
         fig.update_layout(margin=dict(l=0, r=0, t=0, b=0))
         fig.update_layout(dragmode="select")
@@ -170,7 +172,13 @@ def plotly_time_series(data, mark, labels, label_overrides) -> plotly.graph_objs
 
 @weave.op()
 def plotly_scatter(data: list[ScatterData]) -> plotly.graph_objs.Figure:
-    fig = px.scatter(data, x="x", y="y", template="plotly_white")
+    from ... import storage
+
+    data = storage.to_weavejs(data)
+    color = None
+    if data and "label" in data[0]:
+        color = "label"
+    fig = px.scatter(data, x="x", y="y", color=color, template="plotly_white")
     fig.update_layout(margin=dict(l=0, r=0, t=0, b=0))
     fig.update_layout(dragmode="select")
     return fig

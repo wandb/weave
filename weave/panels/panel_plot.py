@@ -238,16 +238,16 @@ class ConfigOptionsExpanded:
     mark: bool = False
 
 
-@weave.type()
+@weave.type("plotConfig")
 class PlotConfig:
     series: typing.List[Series]
-    axisSettings: AxisSettings
-    legendSettings: LegendSettings
-    configOptionsExpanded: ConfigOptionsExpanded
+    axisSettings: typing.Optional[AxisSettings]
+    legendSettings: typing.Optional[LegendSettings]
+    configOptionsExpanded: typing.Optional[ConfigOptionsExpanded]
     configVersion: int = 7
 
 
-@weave.type()
+@weave.type("plot")
 class Plot(panel.Panel):
     id = "plot"
     config: typing.Optional[PlotConfig] = None
@@ -275,6 +275,7 @@ class Plot(panel.Panel):
             vars = {}
         super().__init__(input_node=input_node, vars=vars)
         self.config = config
+
         if self.config is None:
             if mark is not None:
                 constants = PlotConstants(
@@ -338,8 +339,9 @@ class Plot(panel.Panel):
             if no_legend:
                 self.set_no_legend()
         else:
-            for series in self.config.series:
-                series.table.input_node = self.input_node
+            if self.config.series:
+                for series in self.config.series:
+                    series.table.input_node = self.input_node
 
     def add_series(self, series: Series):
         if self.config is None:

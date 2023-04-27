@@ -250,13 +250,13 @@ def _is_non_simd_node(node: graph.OutputNode, vectorized_keys: set[str]):
         "count",
         "joinToStr",
         "unique",
-        "numbers-sum",
-        "numbers-avg",
+        "numbers-sum",  # this is now SIMD
+        "numbers-avg",  # this is now SIMD
         "numbers-argmax",
         "numbers-argmin",
         "numbers-stddev",
-        "numbers-min",
-        "numbers-max",
+        "numbers-min",  # this is now SIMD
+        "numbers-max",  # this is now SIMD
     ]
     first_arg_is_vectorized = list(node.from_op.inputs.keys())[0] in vectorized_keys
     return first_arg_is_vectorized and any(
@@ -430,6 +430,15 @@ def vectorize(
         elif node_name.endswith("numbers-max"):
             inputs_as_awl = _vectorized_inputs_as_awl(node_inputs, vectorized_keys)
             return arraylist_ops.list_numbers_max(*inputs_as_awl.values())
+        elif node_name.endswith("numbers-min"):
+            inputs_as_awl = _vectorized_inputs_as_awl(node_inputs, vectorized_keys)
+            return arraylist_ops.list_numbers_min(*inputs_as_awl.values())
+        elif node_name.endswith("numbers-avg"):
+            inputs_as_awl = _vectorized_inputs_as_awl(node_inputs, vectorized_keys)
+            return arraylist_ops.list_numbers_avg(*inputs_as_awl.values())
+        elif node_name.endswith("numbers-sum"):
+            inputs_as_awl = _vectorized_inputs_as_awl(node_inputs, vectorized_keys)
+            return arraylist_ops.list_numbers_sum(*inputs_as_awl.values())
         elif node_name == "dropna":
             arg_names = list(node_inputs.keys())
             if arg_names[0] in vectorized_keys:
@@ -491,8 +500,20 @@ def vectorize(
         # Part 3: Attempt to dispatch using the list-like inputs (this is preferred to the final case)
         inputs_as_list = _vectorized_inputs_as_list(node_inputs, vectorized_keys)
         maybe_op = _safe_get_op_for_inputs(node_name, inputs_as_list)
-        if maybe_op is not None:
+        if maybe_op is not None and maybe_op.derived_from is None:
             return maybe_op.lazy_call(*inputs_as_list.values())
+
+        # TODO: pull from another unmerged PR
+        # Mapped ops can be handled with map_each
+        if node_op.derived_from is not None:
+            # TODO: other arguments may also be vectorized. In that case this will crash
+            input_vals = list(node_inputs.values())
+            from . import list_ops
+
+            map_each_op = registry_mem.memory_registry.get_op("ArrowWeaveList-mapEach")
+            return map_each_op(
+                input_vals[0], lambda x: node_op.derived_from(x, *input_vals[1:])
+            )
 
         # Final Fallback: We have no choice anymore. We must bail out completely to mapping
         # over all the vectorized inputs and calling the function directly.
@@ -631,4 +652,5 @@ def _ensure_variadic_fn(
 def _apply_fn_node(awl: ArrowWeaveList, fn: graph.OutputNode) -> ArrowWeaveList:
     vecced = vectorize(_ensure_variadic_fn(fn, awl.object_type))
     called = _call_vectorized_fn_node_maybe_awl(awl, vecced)
+    # print("CALLED ", called)
     return _call_and_ensure_awl(awl, called)

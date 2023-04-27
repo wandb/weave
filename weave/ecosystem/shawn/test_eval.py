@@ -12,12 +12,12 @@ def test_data():
     proc.predictions.append(pred1)
     pred2 = eval.Prediction(datetime.datetime(2022, 10, 8, 10, 31), 1, 4)
     proc.predictions.append(pred2)
-    weave.save(proc, name="proc-a")
+    weave.save(proc, name="proc-a:latest")
 
     proc = eval.PredictionProcess("000", model, [])
     pred3 = eval.Prediction(datetime.datetime(2022, 10, 8, 10, 39), 9, 10)
     proc.predictions.append(pred3)
-    weave.save(proc, name="proc-b")
+    weave.save(proc, name="proc-b:latest")
 
     res = weave.use(
         model.all_predictions(

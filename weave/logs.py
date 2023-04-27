@@ -68,9 +68,10 @@ def default_log_filename() -> typing.Optional[str]:
 
 def env_log_level() -> typing.Any:
     # Default to only showing ERROR logs, unless otherwise specified
-    level = os.environ.get("WEAVE_LOG_LEVEL", "ERROR")
+    default_level = "ERROR"
     if os.environ.get("WEAVE_SERVER_ENABLE_LOGGING"):
-        level = "INFO"
+        default_level = "INFO"
+    level = os.environ.get("WEAVE_LOG_LEVEL", default_level)
     return logging.getLevelName(level)
 
 
@@ -78,6 +79,32 @@ def silence_mpl() -> None:
     mpl_logger = logging.getLogger("matplotlib")
     if mpl_logger:
         mpl_logger.setLevel(logging.CRITICAL)
+
+
+def set_global_log_level(level: int) -> None:
+    # Unused, but runs through all existing loggers and sets their level to the given level
+    root_logger = logging.getLogger()
+    root_logger.setLevel(level)
+    for logger_name in logging.Logger.manager.loggerDict:
+        logger = logging.getLogger(logger_name)
+        logger.setLevel(level)
+
+
+def print_handlers(logger: logging.Logger) -> None:
+    # For debugging
+    print(f"Handlers for logger '{logger.name}':")
+    for handler in logger.handlers:
+        print(f"  {handler}")
+
+
+def print_all_handlers() -> None:
+    # For debugging
+    root_logger = logging.getLogger()
+    print_handlers(root_logger)
+
+    for logger_name in logging.Logger.manager.loggerDict:
+        logger = logging.getLogger(logger_name)
+        print_handlers(logger)
 
 
 class WeaveJSONEncoder(json.JSONEncoder):
@@ -102,12 +129,18 @@ def setup_handler(hander: logging.Handler, settings: LogSettings) -> None:
     hander.setLevel(level)
 
 
+_LOGGING_CONFIGURED = False
+
+
 def enable_stream_logging(
     logger: typing.Optional[logging.Logger] = None,
     wsgi_stream_settings: typing.Optional[LogSettings] = None,
     pid_logfile_settings: typing.Optional[LogSettings] = None,
     server_logfile_settings: typing.Optional[LogSettings] = None,
 ) -> None:
+    global _LOGGING_CONFIGURED
+    _LOGGING_CONFIGURED = True
+
     handler: logging.Handler
     logger = logger or logging.getLogger("root")
 
@@ -133,12 +166,19 @@ def enable_stream_logging(
 
 
 def configure_logger() -> None:
+    if _LOGGING_CONFIGURED:
+        return
     # Disable ddtrace logs, not sure why they're turned on.
     ddtrace_logs = logging.getLogger("ddtrace")
     ddtrace_logs.setLevel(logging.ERROR)
 
     logger = logging.getLogger("root")
     logger.setLevel(env_log_level())
+
+    # Remove StreamHandler from the root logger to avoid stdout logging
+    for handler in logger.handlers:
+        if isinstance(handler, logging.StreamHandler):
+            logger.removeHandler(handler)
 
     dd_env = os.getenv("DD_ENV")
     enable_datadog = dd_env
@@ -183,6 +223,6 @@ def configure_logger() -> None:
             # agent can watch.
             enable_stream_logging(
                 logger,
-                wsgi_stream_settings=LogSettings(LogFormat.PRETTY, "INFO"),
+                wsgi_stream_settings=LogSettings(LogFormat.PRETTY, "DEBUG"),
                 server_logfile_settings=LogSettings(LogFormat.DATADOG, "DEBUG"),
             )
