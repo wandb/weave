@@ -123,7 +123,7 @@ def setup_handler(hander: logging.Handler, settings: LogSettings) -> None:
             "%(levelname)s [%(name)s] [%(filename)s:%(lineno)d] "
             "[dd.trace_id=%(dd.trace_id)s dd.span_id=%(dd.span_id)s] %(message)s",
             timestamp=True,
-            json_encoder=WeaveJSONEncoder,
+            # json_encoder=WeaveJSONEncoder,
         )
     hander.setFormatter(formatter)
     hander.setLevel(level)
