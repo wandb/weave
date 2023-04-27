@@ -17,6 +17,9 @@ from . import io_service
 
 from flask.testing import FlaskClient
 
+# We only need `user` from this
+from .tests.wandb_system_tests_conftest import *
+
 
 ### Disable datadog engine tracing
 

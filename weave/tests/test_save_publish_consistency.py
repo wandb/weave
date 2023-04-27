@@ -8,10 +8,6 @@ import os
 import json
 from contextlib import contextmanager
 
-# from .. import artifact_wandb
-# from .. import artifact_local
-from . import wandb_server_relay
-
 
 @weave.type()
 class RawElement:
@@ -198,9 +194,7 @@ def test_simple_value_save():
     _test_simple_value(_test_save)
 
 
-def test_simple_value_publish():
-    wandb_server_relay.check_server_up()
-    # with wandb_server_relay.relay_server_context() as thing:
+def test_simple_value_publish(user):
     _test_simple_value(_test_publish)
 
 
