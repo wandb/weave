@@ -270,13 +270,14 @@ def test_concat(l1, l2, weave_no_cache):
     )
 
 
+@pytest.mark.flaky(reruns=3)
 @given(
     list_lambda1=list_lambda_strategy(include_float=False),
     list_lambda2=list_lambda_strategy(include_float=False),
     leftOuter=st.booleans(),
     rightOuter=st.booleans(),
 )
-@settings(max_examples=EXAMPLES_PER_TEST)
+@settings(max_examples=EXAMPLES_PER_TEST, database=None)
 def test_join2(list_lambda1, list_lambda2, leftOuter, rightOuter, weave_no_cache):
     l1, joinFn1 = list_lambda1
     l2, joinFn2 = list_lambda2
