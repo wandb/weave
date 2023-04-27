@@ -186,7 +186,8 @@ def get(uri):
     name="ref",
     render_info={"type": "function"},
     input_type={"uri": types.String()},
-    output_type=types.RefType(),
+    # Only works on FilesystemArtifactRef right now, not generic.
+    output_type=types.FilesystemArtifactRefType(),
 )
 def ref(uri):
     return ref_base.Ref.from_str(uri)
