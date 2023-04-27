@@ -9,6 +9,7 @@ import types
 import typing
 import yarl
 import logging
+import requests
 
 
 from . import engine_trace
@@ -125,4 +126,41 @@ class HttpAsync:
                 else:
                     raise server_error_handling.WeaveInternalHttpException.from_code(
                         r.status, "Download failed"
+                    )
+
+
+class Http:
+    def __init__(self, fs: filesystem.Filesystem) -> None:
+        self.fs = fs
+        self.session = requests.Session()
+
+    def __enter__(self) -> "Http":
+        return self
+
+    def __exit__(self, *args: typing.Any) -> None:
+        self.session.close()
+
+    def download_file(
+        self,
+        url: str,
+        path: str,
+        headers: typing.Optional[dict[str, str]] = None,
+        cookies: typing.Optional[dict[str, str]] = None,
+    ) -> None:
+        self.fs.makedirs(os.path.dirname(path), exist_ok=True)
+        with tracer.trace("download_file_task"):
+            # TODO: Error handling when no file or manifest
+
+            # yarl.URL encoded=True is very important! Otherwise aiohttp
+            # will encode the url again and we'll get a 404 for things like
+            # signed URLs
+            with self.session.get(
+                str(yarl.URL(url, encoded=True)), headers=headers, cookies=cookies
+            ) as r:
+                if r.status_code == 200:
+                    with self.fs.open_write(path, mode="wb") as f:
+                        f.write(r.content)
+                else:
+                    raise server_error_handling.WeaveInternalHttpException.from_code(
+                        r.status_code, "Download failed"
                     )

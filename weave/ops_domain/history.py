@@ -37,6 +37,8 @@ def history_key_type_count_to_weave_type(tc: TypeCount) -> types.Type:
             }
         )
     elif tc_type == "list":
+        if "items" not in tc:
+            return types.List(types.UnknownType())
         return types.List(
             types.union(*[history_key_type_count_to_weave_type(v) for v in tc["items"]])
         )

@@ -1,3 +1,4 @@
+import json
 import dataclasses
 import enum
 import pathlib
@@ -106,6 +107,14 @@ def print_all_handlers() -> None:
         print_handlers(logger)
 
 
+class WeaveJSONEncoder(jsonlogger.JsonEncoder):
+    def default(self, obj: typing.Any) -> typing.Any:
+        if obj is None:
+            # This is needed because datadog strips keys with null values from logs
+            return "<<_WEAVE_NONE_>>"
+        return super().default(obj)
+
+
 def setup_handler(hander: logging.Handler, settings: LogSettings) -> None:
     level = logging.getLevelName(settings.level)
     formatter = logging.Formatter(default_log_format)
@@ -114,6 +123,7 @@ def setup_handler(hander: logging.Handler, settings: LogSettings) -> None:
             "%(levelname)s [%(name)s] [%(filename)s:%(lineno)d] "
             "[dd.trace_id=%(dd.trace_id)s dd.span_id=%(dd.span_id)s] %(message)s",
             timestamp=True,
+            json_encoder=WeaveJSONEncoder,
         )
     hander.setFormatter(formatter)
     hander.setLevel(level)

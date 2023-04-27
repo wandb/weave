@@ -6,6 +6,7 @@
 # traces in local development.
 # TODO: Fix
 
+import time
 import atexit
 import queue
 import uuid
@@ -575,5 +576,35 @@ class SyncClient:
         return self.request("sleep", seconds)
 
 
-def get_sync_client() -> SyncClient:
+class ServerlessClient:
+    def __init__(self, fs: filesystem.Filesystem) -> None:
+        self.fs = fs
+        self.http = weave_http.Http(self.fs)
+        self.wandb_api = wandb_api.WandbApi()
+        self.wandb_file_manager = wandb_file_manager.WandbFileManager(
+            self.fs, self.http, self.wandb_api
+        )
+
+    def manifest(
+        self, artifact_uri: artifact_wandb.WeaveWBArtifactURI
+    ) -> typing.Optional[artifact_wandb.WandbArtifactManifest]:
+        return self.wandb_file_manager.manifest(artifact_uri)
+
+    def ensure_file(
+        self, artifact_uri: artifact_wandb.WeaveWBArtifactURI
+    ) -> typing.Optional[str]:
+        return self.wandb_file_manager.ensure_file(artifact_uri)
+
+    def direct_url(
+        self, artifact_uri: artifact_wandb.WeaveWBArtifactURI
+    ) -> typing.Optional[str]:
+        return self.wandb_file_manager.direct_url(artifact_uri)
+
+    def sleep(self, seconds: float) -> None:
+        time.sleep(seconds)
+
+
+def get_sync_client() -> typing.Union[SyncClient, ServerlessClient]:
+    # uncomment this for local debugging
+    # return ServerlessClient(filesystem.get_filesystem())
     return SyncClient(get_server(), filesystem.get_filesystem())
