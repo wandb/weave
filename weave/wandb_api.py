@@ -105,27 +105,6 @@ def from_environment() -> typing.Generator[None, None, None]:
             reset_wandb_api_context(token)
 
 
-# def init_with_cookie(cookie: typing.Optional[str]) -> typing.Optional[contextvars.Token[typing.Optional[WandbApiContext]]]:
-#     if cookie:
-#         cookies = {"wandb": cookie}
-#         headers = {"use-admin-privileges": "true", "x-origin": "https://app.wandb.test"}
-#         return set_wandb_api_context("admin", None, headers, cookies)
-#     return None
-
-# def init() -> typing.Optional[contextvars.Token[typing.Optional[WandbApiContext]]]:
-#     cookie = weave_env.weave_wandb_cookie()
-#     return init_with_cookie(cookie)
-
-# @contextlib.contextmanager
-# def from_cookie(cookie: typing.Optional[str]) -> typing.Generator[None, None, None]:
-#     token = init_with_cookie(cookie)
-#     try:
-#         yield
-#     finally:
-#         if token:
-#             reset_wandb_api_context(token)
-
-
 class WandbApiAsync:
     def __init__(self) -> None:
         self.connector = aiohttp.TCPConnector(limit=50)

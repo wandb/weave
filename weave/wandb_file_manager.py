@@ -169,8 +169,8 @@ class WandbFileManagerAsync:
             await self.http.download_file(
                 download_url,
                 file_path,
-                # headers=headers,
-                # cookies=cookies,
+                headers=headers,
+                cookies=cookies,
                 auth=auth,
             )
             return file_path
