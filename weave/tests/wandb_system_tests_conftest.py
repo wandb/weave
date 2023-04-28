@@ -179,8 +179,8 @@ def check_server_up(
     fixture_url = base_url.replace(LOCAL_BASE_PORT, FIXTURE_SERVICE_PORT)
     fixture_health_endpoint = "health"
 
-    # if os.environ.get("CI") == "true":
-    #     return check_server_health(base_url=base_url, endpoint=app_health_endpoint)
+    if os.environ.get("CI") == "true":
+        return check_server_health(base_url=base_url, endpoint=app_health_endpoint)
 
     if not check_server_health(base_url=base_url, endpoint=app_health_endpoint):
         # start wandb server locally and expose necessary ports to the host
