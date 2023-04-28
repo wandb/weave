@@ -201,7 +201,7 @@ def test_simple_value_save():
     _test_simple_value(_test_save)
 
 
-def test_simple_value_publish(user):
+def test_simple_value_publish(become_test_user):
     _test_simple_value(_test_publish)
 
 
