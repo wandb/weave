@@ -75,9 +75,16 @@ def _save_or_publish(
         if publish:
             # TODO: Potentially add entity and project to namespace the artifact explicitly.
             # TODO (TIM): Not sure why the `type` arg is not happy here. Need to fix before merging.
-            artifact = artifact_wandb.WandbArtifact(name)  # , type=wb_type.name)
+            artifact = artifact_wandb.WandbArtifact(name, type=wb_type.name)
         else:
             artifact = artifact_local.LocalArtifact(name, version=source_branch)
+
+    # TODO:
+    # If the object is a node:
+    # Map all nodes, and for any `get`, if the URI is local, then we need to
+    # recursively call _save_or_publish on the object. (this probably could be made more efficient
+    # by using the existing on-disk files rather than reloading / re-serializing (maybe Danny has this piece)
+
     ref = artifact.set("obj", wb_type, obj)
 
     # Only save if we have a ref into the artifact we created above. Otherwise
