@@ -54,7 +54,8 @@ jobs:
     runs-on: [self-hosted, runner]
     services:
       wandb_server:
-        image: us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer:master
+        image: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:${{ github.sha }}
+        # image: us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer:master
         credentials:
           username: _json_key
           password: ${{ secrets.gcp_sa_key }}
