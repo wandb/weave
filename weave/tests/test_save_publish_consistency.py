@@ -7,6 +7,8 @@ from contextlib import contextmanager
 
 from weave.artifact_local import LocalArtifact
 
+VALUES_WITH_REFS_SHOULD_BE_REFS = False
+
 
 @weave.type()
 class RawElement:
@@ -260,29 +262,44 @@ def _test_referential_saved_value(test_method):
     saved_a_node = weave.save({"a": 1})
     saved_a_value = weave.use(saved_a_node)
     uri = _get_uri_from_get_node(saved_a_node)
-    test_method(
-        [saved_a_value, {"a": 2}],
-        {
-            "obj.type.json": {
-                "type": "list",
-                "objectType": {
-                    "type": "union",
-                    "members": [
-                        {
-                            "type": "Ref",
-                            "objectType": {
-                                "type": "typedDict",
-                                "propertyTypes": {"a": "int"},
+    if VALUES_WITH_REFS_SHOULD_BE_REFS:
+        test_method(
+            [saved_a_value, {"a": 2}],
+            {
+                "obj.type.json": {
+                    "type": "list",
+                    "objectType": {
+                        "type": "union",
+                        "members": [
+                            {
+                                "type": "Ref",
+                                "objectType": {
+                                    "type": "typedDict",
+                                    "propertyTypes": {"a": "int"},
+                                },
                             },
-                        },
-                        {"type": "typedDict", "propertyTypes": {"a": "int"}},
-                    ],
+                            {"type": "typedDict", "propertyTypes": {"a": "int"}},
+                        ],
+                    },
                 },
+                "obj.list.json": [
+                    {"_union_id": 0, "_val": uri},
+                    {"a": 2, "_union_id": 1},
+                ],
             },
-            "obj.list.json": [{"_union_id": 0, "_val": uri}, {"a": 2, "_union_id": 1}],
-        },
-        [saved_a_value._ref, {"a": 2}],
-    )
+            [saved_a_value._ref, {"a": 2}],
+        )
+    else:
+        test_method(
+            [saved_a_value, {"a": 2}],
+            {
+                "obj.type.json": {
+                    "type": "list",
+                    "objectType": {"type": "typedDict", "propertyTypes": {"a": "int"}},
+                },
+                "obj.list.json": [{"a": 1}, {"a": 2}],
+            },
+        )
 
 
 def test_referential_saved_value_save():
@@ -290,8 +307,12 @@ def test_referential_saved_value_save():
 
 
 def test_referential_saved_value_publish(use_local_wandb_backend):
-    _test_referential_saved_value(_test_publish)
-    assert False  # TODO (Tim): We actually need to modify this so that we check for the correctly modified internal URI
+    # If we decide to make values with references stored as references, then this test needs to be modified to reflect
+    # the recursive publish.
+    if VALUES_WITH_REFS_SHOULD_BE_REFS:
+        assert False, "This test needs to be modified to reflect recursive publish"
+    else:
+        _test_referential_saved_value(_test_publish)
 
 
 def _test_referential_saved_node(test_method):
@@ -397,29 +418,44 @@ def _test_referential_published_value(test_method):
     saved_a_node = weave.publish({"a": 1})
     saved_a_value = weave.use(saved_a_node)
     uri = _get_uri_from_get_node(saved_a_node)
-    test_method(
-        [saved_a_value, {"a": 2}],
-        {
-            "obj.type.json": {
-                "type": "list",
-                "objectType": {
-                    "type": "union",
-                    "members": [
-                        {
-                            "type": "Ref",
-                            "objectType": {
-                                "type": "typedDict",
-                                "propertyTypes": {"a": "int"},
+    if VALUES_WITH_REFS_SHOULD_BE_REFS:
+        test_method(
+            [saved_a_value, {"a": 2}],
+            {
+                "obj.type.json": {
+                    "type": "list",
+                    "objectType": {
+                        "type": "union",
+                        "members": [
+                            {
+                                "type": "Ref",
+                                "objectType": {
+                                    "type": "typedDict",
+                                    "propertyTypes": {"a": "int"},
+                                },
                             },
-                        },
-                        {"type": "typedDict", "propertyTypes": {"a": "int"}},
-                    ],
+                            {"type": "typedDict", "propertyTypes": {"a": "int"}},
+                        ],
+                    },
                 },
+                "obj.list.json": [
+                    {"_union_id": 0, "_val": uri},
+                    {"a": 2, "_union_id": 1},
+                ],
             },
-            "obj.list.json": [{"_union_id": 0, "_val": uri}, {"a": 2, "_union_id": 1}],
-        },
-        [saved_a_value._ref, {"a": 2}],
-    )
+            [saved_a_value._ref, {"a": 2}],
+        )
+    else:
+        test_method(
+            [saved_a_value, {"a": 2}],
+            {
+                "obj.type.json": {
+                    "type": "list",
+                    "objectType": {"type": "typedDict", "propertyTypes": {"a": "int"}},
+                },
+                "obj.list.json": [{"a": 1}, {"a": 2}],
+            },
+        )
 
 
 def test_referential_published_value_save(use_local_wandb_backend):
