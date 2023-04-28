@@ -56,12 +56,12 @@ jobs:
       wandb_server:
         # Docker Hub image
         image: us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer:master
-          auth:
-            username: _json_key
-            password: ${{ secrets.gcp_sa_key }}
-          environment:
-            CI: 1
-            WANDB_ENABLE_TEST_CONTAINER: true
+        # auth:
+        #   username: _json_key
+        #   password: ${{ secrets.gcp_sa_key }}
+        # environment:
+        #   CI: 1
+        #   WANDB_ENABLE_TEST_CONTAINER: true
         ports:
           - 8080:8080
           - 8083:8083
