@@ -109,11 +109,12 @@ class TypeRegistry:
 
     @staticmethod
     def type_of(obj: typing.Any) -> "Type":
-        from .ref_base import get_ref
+        # TODO: Tim: Do we want to do support this?
+        # from .ref_base import get_ref
 
-        ref = get_ref(obj)
-        if ref:
-            return RefType.type_of_instance(ref)
+        # ref = get_ref(obj)
+        # if ref:
+        #     return RefType.type_of_instance(ref)
 
         obj_type = type_name_to_type("tagged").type_of(obj)
         if obj_type is not None:
@@ -369,12 +370,10 @@ class Type(metaclass=_TypeSubclassWatcher):
         except NotImplementedError:
             pass
         if d is None:
-            # TODO (Tim): Figure out why this is happening and fix it before merging
-            d = {}
-            # raise errors.WeaveSerializeError(
-            #     "Object is not serializable. Provide instance_<to/from>_dict or <save/load>_instance methods on Type: %s"
-            #     % self
-            # )
+            raise errors.WeaveSerializeError(
+                "Object is not serializable. Provide instance_<to/from>_dict or <save/load>_instance methods on Type: %s"
+                % self
+            )
         with artifact.new_file(f"{name}.object.json") as f:
             json.dump(d, f)
         return None
