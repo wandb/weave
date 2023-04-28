@@ -513,9 +513,7 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         # TODO: what project should we put weave ops in???
         os.environ["WANDB_SILENT"] = "true"
         wandb.require("service")  # speeds things up
-        run = wandb.init(
-            project=project,
-        )
+        run = wandb.init(project=project)
         if run is None:
             raise errors.WeaveInternalError("unexpected, run is None")
         self._writeable_artifact.save()
