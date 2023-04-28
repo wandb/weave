@@ -17,7 +17,8 @@ from . import io_service
 
 from flask.testing import FlaskClient
 
-# We only need `user` from this
+# We only need `use_local_wandb_backend from wandb_system_tests_conftest
+# however, we need to import all for the fixture to be registered
 from .tests.wandb_system_tests_conftest import *
 
 

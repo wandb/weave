@@ -1,7 +1,3 @@
-# Test for weave.show
-# The outputs of weave.show (the generated panel urls and their arguments)
-# need to match what javascript expects.
-
 import wandb
 import pytest
 import weave
@@ -295,7 +291,7 @@ def test_referential_saved_value_save():
 
 def test_referential_saved_value_publish(use_local_wandb_backend):
     _test_referential_saved_value(_test_publish)
-    assert False  # TODO: We actually need to modify this so that we check for the correctly modified internal URI
+    assert False  # TODO (Tim): We actually need to modify this so that we check for the correctly modified internal URI
 
 
 def _test_referential_saved_node(test_method):
@@ -394,7 +390,7 @@ def test_referential_saved_node_save():
 
 def test_referential_saved_node_publish(use_local_wandb_backend):
     _test_referential_saved_node(_test_publish)
-    assert False  # TODO: We actually need to modify this so that we check for the correctly modified internal URI
+    assert False  # TODO (Tim): We actually need to modify this so that we check for the correctly modified internal URI
 
 
 def _test_referential_published_value(test_method):

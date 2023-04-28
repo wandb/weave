@@ -5,15 +5,12 @@ import secrets
 import string
 import subprocess
 
-# import threading
 import time
 import unittest.mock
 import urllib.parse
 
 from contextlib import contextmanager
 
-# from pathlib import Path
-# from queue import Empty, Queue
 from typing import Any, Generator, Optional, Union, Literal
 
 import pytest
@@ -23,6 +20,52 @@ import wandb.old.settings
 import wandb.util
 
 from weave.wandb_api import wandb_api_context, WandbApiContext
+
+
+def determine_scope(fixture_name, config):
+    return config.getoption("--user-scope")
+
+
+@pytest.fixture(scope=determine_scope)
+def use_local_wandb_backend(
+    worker_id: str, fixture_fn, base_url, wandb_debug
+) -> Generator[str, None, None]:
+    username = f"user-{worker_id}-{random_string()}"
+    command = UserFixtureCommand(command="up", username=username)
+    fixture_fn(command)
+    command = UserFixtureCommand(
+        command="password", username=username, password=username
+    )
+    fixture_fn(command)
+
+    with _become_user(username, username, username, base_url):
+        yield username
+
+        if not wandb_debug:
+            command = UserFixtureCommand(command="down", username=username)
+            fixture_fn(command)
+
+
+@contextmanager
+def _become_user(api_key, entity, username, base_url):
+    with unittest.mock.patch.dict(
+        os.environ,
+        {
+            "WANDB_API_KEY": api_key,
+            "WANDB_ENTITY": entity,
+            "WANDB_USERNAME": username,
+            "WANDB_BASE_URL": base_url,
+        },
+    ):
+        with wandb_api_context(WandbApiContext(api_key=api_key)):
+            yield
+
+
+##################################################################
+## The following code is a selection copied from the wandb sdk. ##
+## wandb/tests/unit_tests/conftest.py                           ##
+##################################################################
+
 
 # # `local-testcontainer` ports
 LOCAL_BASE_PORT = "8080"
@@ -73,10 +116,6 @@ def random_string(length: int = 12) -> str:
     return "".join(
         secrets.choice(string.ascii_lowercase + string.digits) for _ in range(length)
     )
-
-
-def determine_scope(fixture_name, config):
-    return config.getoption("--user-scope")
 
 
 @pytest.fixture(scope="session")
@@ -245,45 +284,3 @@ def fixture_fn(base_url, wandb_server_tag, wandb_server_pull):
         pytest.fail("wandb server is not running")
 
     yield fixture_util
-
-
-@contextmanager
-def _become_user(api_key, entity, username, base_url):
-    with unittest.mock.patch.dict(
-        os.environ,
-        {
-            "WANDB_API_KEY": api_key,
-            "WANDB_ENTITY": entity,
-            "WANDB_USERNAME": username,
-            "WANDB_BASE_URL": base_url,
-        },
-    ):
-        with wandb_api_context(WandbApiContext(api_key=api_key)):
-            yield
-
-
-@pytest.fixture(scope=determine_scope)
-def use_local_wandb_backend(
-    worker_id: str, fixture_fn, base_url, wandb_debug
-) -> Generator[str, None, None]:
-    username = f"user-{worker_id}-{random_string()}"
-    command = UserFixtureCommand(command="up", username=username)
-    fixture_fn(command)
-    command = UserFixtureCommand(
-        command="password", username=username, password=username
-    )
-    fixture_fn(command)
-
-    with _become_user(username, username, username, base_url):
-        yield username
-
-        if not wandb_debug:
-            command = UserFixtureCommand(command="down", username=username)
-            fixture_fn(command)
-
-
-# @pytest.fixture(scope="session", autouse=True)
-# def env_teardown():
-#     wandb.teardown()
-#     yield
-#     wandb.teardown()

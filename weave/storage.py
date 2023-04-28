@@ -74,6 +74,7 @@ def _save_or_publish(
         # TODO: refactor types to artifacts have a common base class
         if publish:
             # TODO: Potentially add entity and project to namespace the artifact explicitly.
+            # TODO (TIM): Not sure why the `type` arg is not happy here. Need to fix before merging.
             artifact = artifact_wandb.WandbArtifact(name)  # , type=wb_type.name)
         else:
             artifact = artifact_local.LocalArtifact(name, version=source_branch)
@@ -85,7 +86,9 @@ def _save_or_publish(
         if project is not None:
             artifact.save(project)
         else:
-            # temp thing for testing
+            # TODO (Tim): I believe Danny should be fixing this - for now, we just
+            # use artifact.save since wandb artifact does not have the concept of
+            # branches.
             if publish:
                 artifact.save()
             else:

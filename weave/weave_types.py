@@ -369,7 +369,7 @@ class Type(metaclass=_TypeSubclassWatcher):
         except NotImplementedError:
             pass
         if d is None:
-            # TODO: Why is this all of a sudden failing on tests???
+            # TODO (Tim): Figure out why this is happening and fix it before merging
             d = {}
             # raise errors.WeaveSerializeError(
             #     "Object is not serializable. Provide instance_<to/from>_dict or <save/load>_instance methods on Type: %s"

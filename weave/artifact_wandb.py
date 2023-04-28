@@ -511,14 +511,10 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
     def save(self, project: str = "weave_ops"):
         # TODO: technically save should be sufficient but we need the run to grab the entity name and project name
         # TODO: what project should we put weave ops in???
-        # TODO: uncomment before publish
-        # os.environ["WANDB_SILENT"] = "true"
-        # os.environ["WANDB_API_KEY"] = "1824812581259009ca9981580f8f8a9012409eee"
-        # os.environ["WANDB_BASE_URL"] = "http://localhost:8080"
+        os.environ["WANDB_SILENT"] = "true"
         wandb.require("service")  # speeds things up
         run = wandb.init(
             project=project,
-            # settings=wandb.Settings(api_key="1824812581259009ca9981580f8f8a9012409eee", init_timeout=5),
         )
         if run is None:
             raise errors.WeaveInternalError("unexpected, run is None")
