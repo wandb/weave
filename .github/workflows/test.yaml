@@ -52,20 +52,20 @@ jobs:
     needs:
       - build-container-
     runs-on: [self-hosted, runner]
-    services:
-      wandb_server:
-        # Docker Hub image
-        image: us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer:master
-        # auth:
-        #   username: _json_key
-        #   password: ${{ secrets.gcp_sa_key }}
-        # environment:
-        #   CI: 1
-        #   WANDB_ENABLE_TEST_CONTAINER: true
-        ports:
-          - 8080:8080
-          - 8083:8083
-          - 9015:9015
+    # services:
+    #   wandb_server:
+    #     # Docker Hub image
+    #     image: us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer:master
+    #     # auth:
+    #     #   username: _json_key
+    #     #   password: ${{ secrets.gcp_sa_key }}
+    #     # environment:
+    #     #   CI: 1
+    #     #   WANDB_ENABLE_TEST_CONTAINER: true
+    #     ports:
+    #       - 8080:8080
+    #       - 8083:8083
+    #       - 9015:9015
     container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:${{ github.sha }}
     steps:
       # - uses: datadog/agent-github-action@v1.3
