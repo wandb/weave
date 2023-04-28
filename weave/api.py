@@ -35,11 +35,15 @@ Node = _graph.Node
 
 
 def save(node_or_obj, name=None):
+    if isinstance(node_or_obj, _graph.ConstNode):
+        node_or_obj = node_or_obj.val
     ref = _storage.save(node_or_obj, name=name)
     return _ops.get(str(ref))
 
 
 def publish(node_or_obj, name=None):
+    if isinstance(node_or_obj, _graph.ConstNode):
+        node_or_obj = node_or_obj.val
     node_or_obj = _recursively_publish_local_references(node_or_obj)
     ref = _storage.publish(node_or_obj, name=name)
     return _ops.get(str(ref))
