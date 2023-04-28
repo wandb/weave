@@ -4,6 +4,8 @@ import typing
 import logging
 import contextvars
 import contextlib
+
+from weave.ref_base import Ref
 from . import debug_compile
 
 from . import compile_domain
@@ -324,6 +326,8 @@ def compile_execute(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
     def _replace_execute(node: graph.Node) -> typing.Optional[graph.Node]:
         if isinstance(node, graph.OutputNode) and node.from_op.name == "execute":
             res = weave_internal.use(node.from_op.inputs["node"])
+            if isinstance(res, Ref):
+                res = res.get()
             if not isinstance(res, graph.Node):
                 raise ValueError(
                     f"Expected node to be a Node, got {res} of type {type(res)}"
