@@ -2,11 +2,14 @@
 # The outputs of weave.show (the generated panel urls and their arguments)
 # need to match what javascript expects.
 
+import wandb
 import pytest
 import weave
 import os
 import json
 from contextlib import contextmanager
+
+from weave.artifact_local import LocalArtifact
 
 
 @weave.type()
@@ -92,7 +95,11 @@ def _assert_uri_is_remotely_published(uri):
 
 
 def _get_local_dir_from_uri(uri):
-    return weave.ref_base.Ref.from_str(uri).artifact._read_dirname
+    art = weave.ref_base.Ref.from_str(uri).artifact
+    if isinstance(art, LocalArtifact):
+        return art._read_dirname
+    else:
+        return art._saved_artifact.download()
 
 
 def _test_save_or_publish(user_data, contents, use_publish=False, exp_user_data=None):

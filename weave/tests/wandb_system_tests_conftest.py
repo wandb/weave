@@ -11,7 +11,8 @@ import unittest.mock
 import urllib.parse
 from collections.abc import Sequence
 
-# from contextlib import contextmanager
+from contextlib import contextmanager
+
 # from pathlib import Path
 # from queue import Empty, Queue
 from typing import Any, Dict, Generator, List, Optional, Union, Literal
@@ -21,6 +22,8 @@ import requests
 import wandb
 import wandb.old.settings
 import wandb.util
+
+from weave.wandb_api import wandb_api_context, WandbApiContext
 
 # from wandb.sdk.interface.interface_queue import InterfaceQueue
 # from wandb.sdk.internal import context
@@ -647,29 +650,44 @@ def fixture_fn(base_url, wandb_server_tag, wandb_server_pull):
     yield fixture_util
 
 
-@pytest.fixture(scope=determine_scope)
-# @pytest.fixture()
-def user(
-    worker_id: str, fixture_fn, base_url, wandb_debug
-) -> Generator[str, None, None]:
-    username = f"user-master-z9rdrzif181s"
-    # username = f"user-{worker_id}-{random_string()}"
-    # command = UserFixtureCommand(command="up", username=username)
-    # fixture_fn(command)
-    # command = UserFixtureCommand(
-    #     command="password", username=username, password=username
-    # )
-    # fixture_fn(command)
-
+@contextmanager
+def _become_user(api_key, entity, username, base_url):
+    cookie = api_key
     with unittest.mock.patch.dict(
         os.environ,
         {
-            "WANDB_API_KEY": username,
-            "WANDB_ENTITY": username,
+            "WANDB_API_KEY": api_key,
+            "WANDB_ENTITY": entity,
             "WANDB_USERNAME": username,
             "WANDB_BASE_URL": base_url,
         },
     ):
+        with wandb_api_context(
+            WandbApiContext(
+                # This might not be correct
+                # user_id = username,
+                api_key=api_key
+                # headers: typing.Optional[dict[str, str]] = None
+                # cookies: typing.Optional[dict[str, str]] = None
+            )
+        ):
+            # with from_cookie(cookie):
+            yield
+
+
+@pytest.fixture(scope=determine_scope)
+def user(
+    worker_id: str, fixture_fn, base_url, wandb_debug
+) -> Generator[str, None, None]:
+    username = f"user-{worker_id}-{random_string()}"
+    command = UserFixtureCommand(command="up", username=username)
+    fixture_fn(command)
+    command = UserFixtureCommand(
+        command="password", username=username, password=username
+    )
+    fixture_fn(command)
+
+    with _become_user(username, username, username, base_url):
         yield username
 
         if not wandb_debug:
@@ -865,3 +883,9 @@ def user(
 #         )
 
 #     yield helper
+
+# @pytest.fixture(scope="session", autouse=True)
+# def env_teardown():
+#     wandb.teardown()
+#     yield
+#     wandb.teardown()

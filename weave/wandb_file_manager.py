@@ -7,6 +7,7 @@ import json
 import typing
 import base64
 import urllib
+from aiohttp import BasicAuth
 
 from wandb import util as wandb_util
 
@@ -159,14 +160,18 @@ class WandbFileManagerAsync:
             wandb_api_context = wandb_api.get_wandb_api_context()
             headers = None
             cookies = None
+            auth = None
             if wandb_api_context is not None:
                 headers = wandb_api_context.headers
                 cookies = wandb_api_context.cookies
+                if wandb_api_context.api_key is not None:
+                    auth = BasicAuth("api", wandb_api_context.api_key)
             await self.http.download_file(
                 download_url,
                 file_path,
-                headers=headers,
-                cookies=cookies,
+                # headers=headers,
+                # cookies=cookies,
+                auth=auth,
             )
             return file_path
 

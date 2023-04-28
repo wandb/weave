@@ -108,6 +108,7 @@ class HttpAsync:
         path: str,
         headers: typing.Optional[dict[str, str]] = None,
         cookies: typing.Optional[dict[str, str]] = None,
+        auth: typing.Optional[aiohttp.BasicAuth] = None,
     ) -> None:
         await self.fs.makedirs(os.path.dirname(path), exist_ok=True)
         with tracer.trace("download_file_task"):
@@ -117,7 +118,7 @@ class HttpAsync:
             # will encode the url again and we'll get a 404 for things like
             # signed URLs
             async with self.session.get(
-                yarl.URL(url, encoded=True), headers=headers, cookies=cookies
+                yarl.URL(url, encoded=True), headers=headers, cookies=cookies, auth=auth
             ) as r:
                 if r.status == 200:
                     async with self.fs.open_write(path, mode="wb") as f:

@@ -1,4 +1,5 @@
-wandb @ git+https://github.com/wandb/client.git@fc4e34525c69c1c6eebd4dee2ef64c501b338720
+# wandb @ git+https://github.com/wandb/client.git@fc4e34525c69c1c6eebd4dee2ef64c501b338720
+wandb @ git+https://github.com/wandb/client.git@db744fa24211e0c29ab4f0d233119567d0e57e1c
 datadog==0.44.0
 ddtrace==1.7.5  # do NOT use 1.9.3, it breaks artifact manager
 python-json-logger>=2.0.4
