@@ -22,6 +22,14 @@ import wandb.util
 from weave.wandb_api import wandb_api_context, WandbApiContext
 
 
+@dataclasses.dataclass
+class LocalBackendFixturePayload:
+    username: str
+    password: str
+    api_key: str
+    base_url: str
+
+
 def determine_scope(fixture_name, config):
     return config.getoption("--user-scope")
 
@@ -29,7 +37,7 @@ def determine_scope(fixture_name, config):
 @pytest.fixture(scope=determine_scope)
 def use_local_wandb_backend(
     worker_id: str, fixture_fn, base_url, wandb_debug
-) -> Generator[str, None, None]:
+) -> Generator[LocalBackendFixturePayload, None, None]:
     username = f"user-{worker_id}-{random_string()}"
     command = UserFixtureCommand(command="up", username=username)
     fixture_fn(command)
@@ -39,7 +47,12 @@ def use_local_wandb_backend(
     fixture_fn(command)
 
     with _become_user(username, username, username, base_url):
-        yield username
+        yield LocalBackendFixturePayload(
+            username=username,
+            password=username,
+            api_key=username,
+            base_url=base_url,
+        )
 
         if not wandb_debug:
             command = UserFixtureCommand(command="down", username=username)

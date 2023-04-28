@@ -1,4 +1,6 @@
 import typing
+
+from weave import artifact_local, ref_base
 from . import graph as _graph
 from . import graph_mapper as _graph_mapper
 from . import storage as _storage
@@ -38,8 +40,41 @@ def save(node_or_obj, name=None):
 
 
 def publish(node_or_obj, name=None):
+    node_or_obj = _recursively_publish_local_references(node_or_obj)
     ref = _storage.publish(node_or_obj, name=name)
     return _ops.get(str(ref))
+
+
+def _recursively_publish_local_references(obj: typing.Any):
+    if not isinstance(obj, _graph.Node):
+        return obj
+
+    return _graph.map_nodes_full([obj], _recursively_publish_local_references_in_nodes)[
+        0
+    ]
+
+
+def _recursively_publish_local_references_in_nodes(node: _graph.Node) -> _graph.Node:
+    if not (isinstance(node, _graph.OutputNode) and node.from_op.name == "get"):
+        return node
+
+    uri_node = node.from_op.inputs["uri"]
+    if not isinstance(uri_node, _graph.ConstNode):
+        return node
+
+    uri = uri_node.val
+    if not isinstance(uri, str):
+        return node
+
+    new_ref = ref_base.Ref.from_str(uri)
+    if not isinstance(new_ref, artifact_local.LocalArtifactRef):
+        return node
+
+    # This use/publish pattern could be more efficient once we get Danny's new artifact API.
+    value = use(node)
+    new_node = publish(value)
+
+    return new_node
 
 
 # def save(node_or_obj, name=None):

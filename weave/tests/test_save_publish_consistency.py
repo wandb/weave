@@ -80,6 +80,10 @@ def _assert_equal_nodes(a, b):
     assert a.to_json() == b.to_json()
 
 
+def _assert_not_equal_nodes(a, b):
+    assert a.to_json() != b.to_json()
+
+
 def _get_uri_from_get_node(node):
     return node.from_op.inputs["uri"].val
 
@@ -315,93 +319,97 @@ def test_referential_saved_value_publish(use_local_wandb_backend):
         _test_referential_saved_value(_test_publish)
 
 
-def _test_referential_saved_node(test_method):
-    saved_a_node = weave.save(weave.ops.dict_(a=1))
-    uri = _get_uri_from_get_node(saved_a_node)
-    test_method(
-        weave.ops.make_list(a=saved_a_node, b=weave.ops.dict_(a=2)),
-        {
-            "obj.type.json": {
-                "type": "function",
-                "inputTypes": {},
-                "outputType": {
-                    "type": "list",
-                    "objectType": {
-                        "type": "union",
-                        "members": [
-                            {
-                                "type": "function",
-                                "inputTypes": {},
-                                "outputType": {
-                                    "type": "typedDict",
-                                    "propertyTypes": {"a": "int"},
-                                },
-                            },
-                            {"type": "typedDict", "propertyTypes": {"a": "int"}},
-                        ],
-                    },
-                },
-            },
-            "obj.object.json": {
-                "nodeType": "output",
-                "type": {
-                    "type": "list",
-                    "objectType": {
-                        "type": "union",
-                        "members": [
-                            {
-                                "type": "function",
-                                "inputTypes": {},
-                                "outputType": {
-                                    "type": "typedDict",
-                                    "propertyTypes": {"a": "int"},
-                                },
-                            },
-                            {"type": "typedDict", "propertyTypes": {"a": "int"}},
-                        ],
-                    },
-                },
-                "fromOp": {
-                    "name": "list",
-                    "inputs": {
-                        "a": {
-                            "nodeType": "output",
-                            "type": {
-                                "type": "function",
-                                "inputTypes": {},
-                                "outputType": {
-                                    "type": "typedDict",
-                                    "propertyTypes": {"a": "int"},
-                                },
-                            },
-                            "fromOp": {
-                                "name": "get",
-                                "inputs": {
-                                    "uri": {
-                                        "nodeType": "const",
-                                        "type": "string",
-                                        "val": uri,
-                                    }
-                                },
-                            },
-                        },
-                        "b": {
-                            "nodeType": "output",
-                            "type": {
+def _test_referential_saved_node_contents(uri):
+    return {
+        "obj.type.json": {
+            "type": "function",
+            "inputTypes": {},
+            "outputType": {
+                "type": "list",
+                "objectType": {
+                    "type": "union",
+                    "members": [
+                        {
+                            "type": "function",
+                            "inputTypes": {},
+                            "outputType": {
                                 "type": "typedDict",
                                 "propertyTypes": {"a": "int"},
                             },
-                            "fromOp": {
-                                "name": "dict",
-                                "inputs": {
-                                    "a": {"nodeType": "const", "type": "int", "val": 2}
-                                },
+                        },
+                        {"type": "typedDict", "propertyTypes": {"a": "int"}},
+                    ],
+                },
+            },
+        },
+        "obj.object.json": {
+            "nodeType": "output",
+            "type": {
+                "type": "list",
+                "objectType": {
+                    "type": "union",
+                    "members": [
+                        {
+                            "type": "function",
+                            "inputTypes": {},
+                            "outputType": {
+                                "type": "typedDict",
+                                "propertyTypes": {"a": "int"},
+                            },
+                        },
+                        {"type": "typedDict", "propertyTypes": {"a": "int"}},
+                    ],
+                },
+            },
+            "fromOp": {
+                "name": "list",
+                "inputs": {
+                    "a": {
+                        "nodeType": "output",
+                        "type": {
+                            "type": "function",
+                            "inputTypes": {},
+                            "outputType": {
+                                "type": "typedDict",
+                                "propertyTypes": {"a": "int"},
+                            },
+                        },
+                        "fromOp": {
+                            "name": "get",
+                            "inputs": {
+                                "uri": {
+                                    "nodeType": "const",
+                                    "type": "string",
+                                    "val": uri,
+                                }
+                            },
+                        },
+                    },
+                    "b": {
+                        "nodeType": "output",
+                        "type": {
+                            "type": "typedDict",
+                            "propertyTypes": {"a": "int"},
+                        },
+                        "fromOp": {
+                            "name": "dict",
+                            "inputs": {
+                                "a": {"nodeType": "const", "type": "int", "val": 2}
                             },
                         },
                     },
                 },
             },
         },
+    }
+
+
+def _test_referential_saved_node(test_method):
+    saved_a_node = weave.save(weave.ops.dict_(a=1))
+    uri = _get_uri_from_get_node(saved_a_node)
+    test_method(
+        weave.ops.make_list(a=saved_a_node, b=weave.ops.dict_(a=2)),
+        _test_referential_saved_node_contents(uri),
     )
 
 
@@ -409,10 +417,27 @@ def test_referential_saved_node_save():
     _test_referential_saved_node(_test_save)
 
 
-# TODO: Add one more level of nesting
 def test_referential_saved_node_publish(use_local_wandb_backend):
-    _test_referential_saved_node(_test_publish)
-    assert False  # TODO (Tim): We actually need to modify this so that we check for the correctly modified internal URI
+    # This is the one that breaks the pattern so we write it out explicitly
+    saved_a_node = weave.save(weave.ops.dict_(a=1))
+    uri = _get_uri_from_get_node(saved_a_node)
+    user_data = weave.ops.make_list(a=saved_a_node, b=weave.ops.dict_(a=2))
+    saved_node = weave.publish(user_data)
+
+    # Step 1: Verify the loaded object is equal to the original object
+    saved_value = weave.use(saved_node)
+    _assert_not_equal_nodes(saved_value, user_data)
+
+    # Step 2: Verify serialized representation is correct
+    uri = _get_uri_from_get_node(saved_node)
+    _assert_uri_is_remotely_published(uri)
+    local_dir = _get_local_dir_from_uri(uri)
+    _assert_path_contents(
+        local_dir,
+        _test_referential_saved_node_contents(
+            f"wandb-artifact:///{use_local_wandb_backend.username}/weave_ops/function:55409408fe25aa970a51/obj"
+        ),
+    )
 
 
 def _test_referential_published_value(test_method):
