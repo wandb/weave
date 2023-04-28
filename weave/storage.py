@@ -77,7 +77,6 @@ def _save_or_publish(
             artifact = artifact_wandb.WandbArtifact(name, type=wb_type.name)
         else:
             artifact = artifact_local.LocalArtifact(name, version=source_branch)
-
     ref = artifact.set("obj", wb_type, obj)
 
     # Only save if we have a ref into the artifact we created above. Otherwise

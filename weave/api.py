@@ -49,9 +49,8 @@ def _recursively_publish_local_references(obj: typing.Any):
     if not isinstance(obj, _graph.Node):
         return obj
 
-    return _graph.map_nodes_full([obj], _recursively_publish_local_references_in_nodes)[
-        0
-    ]
+    res = _graph.map_nodes_full([obj], _recursively_publish_local_references_in_nodes)
+    return res[0]
 
 
 def _recursively_publish_local_references_in_nodes(node: _graph.Node) -> _graph.Node:
@@ -75,22 +74,6 @@ def _recursively_publish_local_references_in_nodes(node: _graph.Node) -> _graph.
     new_node = publish(value)
 
     return new_node
-
-
-# def save(node_or_obj, name=None):
-#     if isinstance(node_or_obj, _graph.Node):
-#         return _ops.save(node_or_obj, name=name)
-#     else:
-#         ref = _storage.save(node_or_obj, name=name)
-#         return _ops.get(str(ref))
-
-
-# def publish(node_or_obj, name=None):
-#     if isinstance(node_or_obj, _graph.Node):
-#         node_or_obj = use(node_or_obj)
-
-#     ref = _storage.publish(node_or_obj, name)
-#     return _weave_internal.make_const_node(ref.type, ref.obj)
 
 
 def get(ref_str):

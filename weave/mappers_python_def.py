@@ -203,16 +203,11 @@ class RefToPyRef(mappers_weave.RefMapper):
         self._use_stable_refs = use_stable_refs
 
     def apply(self, obj: ref_base.Ref):
-        ref = obj
-        # We  don't need this if we don't change the type_of of reffed objects
-        # ref = ref_base.get_ref(obj)
-        # if ref is None:
-        #     raise errors.WeaveSerializeError('Cannot serialize ref "%s"' % obj)
         try:
             if self._use_stable_refs:
-                return ref.uri
+                return obj.uri
             else:
-                return ref.initial_uri
+                return obj.initial_uri
         except NotImplementedError:
             raise errors.WeaveSerializeError('Cannot serialize ref "%s"' % obj)
 

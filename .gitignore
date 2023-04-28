@@ -17,5 +17,5 @@ gha-creds-*.json
 .vscode/launch.json
 .mypy_cache
 .hypothesis
-wandb
 .env
+wandb
