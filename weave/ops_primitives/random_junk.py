@@ -1,6 +1,7 @@
 # Ideas for ops, but not production ready.
 
-from ..api import op, weave_class
+from weave import graph, weave_internal
+from ..api import op
 from .. import weave_types as types
 from .. import api
 
@@ -22,6 +23,9 @@ def compare_versions(one_version):
     for i, version in enumerate(versions):
         v_data = version.get()
         label = str(api.expr(version))
+        # Is this correct ??
+        if isinstance(v_data, graph.Node):
+            v_data = weave_internal.use(v_data)
         for row in v_data:
             row.update({"version": label})
             data.append(row)
