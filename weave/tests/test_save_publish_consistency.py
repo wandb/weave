@@ -137,56 +137,6 @@ def _test_publish(user_data, contents, exp_user_data=None):
     _test_save_or_publish(user_data, contents, True, exp_user_data)
 
 
-# version_count = 0
-
-
-# def _new_save(self, project: str = "weave_ops"):
-#     global version_count
-#     a_name = self._writeable_artifact.name
-#     a_version = f"v_{version_count}"
-#     version_count += 1
-#     uri = artifact_wandb.WeaveWBArtifactURI(
-#         a_name, a_version, "test_entity", "test_project"
-#     )
-#     self._set_read_artifact_uri(uri)
-
-
-# def _new_get_wandb_read_artifact_uri(path: str):
-#     print(path)
-#     entity, project, name_version = path.split("/")
-#     name, version = name_version.split(":")
-#     return artifact_wandb.WeaveWBArtifactURI(
-#         name,
-#         version,
-#         entity,
-#         project,
-#     )
-
-
-# @contextmanager
-# def _patched_wandb_artifact_save():
-#     orig_save = artifact_wandb.WandbArtifact.save
-#     orig_get_wandb_read_artifact_uri = artifact_wandb.get_wandb_read_artifact_uri
-#     artifact_wandb.WandbArtifact.save = _new_save
-#     artifact_wandb.get_wandb_read_artifact_uri = _new_get_wandb_read_artifact_uri
-#     try:
-#         yield
-#     finally:
-#         artifact_wandb.WandbArtifact.save = orig_save
-#         artifact_wandb.get_wandb_read_artifact_uri = orig_get_wandb_read_artifact_uri
-
-
-# General Case Structure: Create an {Object Type} object in the {Object space} space, persist it using {Persistance Type}, load it from URI. Verify:
-#   * The loaded object is equal to the original object
-#   * If Referential, the persisted object references the source object
-#   * If Referential and Published, the all saved references are also published.
-#
-# Variations:
-#   * Object type: Simple vs Structured vs Referential (Saved) vs Referential (Published)
-#   * Object space: Value vs Node
-#   * Persistance type: Save vs Publish
-
-
 def _test_simple_value(test_method):
     test_method(
         1,
@@ -201,7 +151,7 @@ def test_simple_value_save():
     _test_simple_value(_test_save)
 
 
-def test_simple_value_publish(become_test_user):
+def test_simple_value_publish(use_local_wandb_backend):
     _test_simple_value(_test_publish)
 
 
@@ -223,7 +173,7 @@ def test_simple_node_save():
     _test_simple_node(_test_save)
 
 
-def test_simple_node_publish():
+def test_simple_node_publish(use_local_wandb_backend):
     _test_simple_node(_test_publish)
 
 
@@ -244,7 +194,7 @@ def test_structured_value_save():
     _test_structured_value(_test_save)
 
 
-def test_structured_value_publish():
+def test_structured_value_publish(use_local_wandb_backend):
     _test_structured_value(_test_publish)
 
 
@@ -306,7 +256,7 @@ def test_structured_node_save():
     _test_structured_node(_test_save)
 
 
-def test_structured_node_publish():
+def test_structured_node_publish(use_local_wandb_backend):
     _test_structured_node(_test_publish)
 
 
@@ -343,7 +293,7 @@ def test_referential_saved_value_save():
     _test_referential_saved_value(_test_save)
 
 
-def test_referential_saved_value_publish():
+def test_referential_saved_value_publish(use_local_wandb_backend):
     _test_referential_saved_value(_test_publish)
     assert False  # TODO: We actually need to modify this so that we check for the correctly modified internal URI
 
@@ -442,7 +392,7 @@ def test_referential_saved_node_save():
     _test_referential_saved_node(_test_save)
 
 
-def test_referential_saved_node_publish():
+def test_referential_saved_node_publish(use_local_wandb_backend):
     _test_referential_saved_node(_test_publish)
     assert False  # TODO: We actually need to modify this so that we check for the correctly modified internal URI
 
@@ -476,11 +426,11 @@ def _test_referential_published_value(test_method):
     )
 
 
-def test_referential_published_value_save():
+def test_referential_published_value_save(use_local_wandb_backend):
     _test_referential_published_value(_test_save)
 
 
-def test_referential_published_value_publish():
+def test_referential_published_value_publish(use_local_wandb_backend):
     _test_referential_published_value(_test_publish)
 
 
@@ -574,9 +524,9 @@ def _test_referential_published_node(test_method):
     )
 
 
-def test_referential_published_node_save():
+def test_referential_published_node_save(use_local_wandb_backend):
     _test_referential_published_node(_test_save)
 
 
-def test_referential_published_node_publish():
+def test_referential_published_node_publish(use_local_wandb_backend):
     _test_referential_published_node(_test_publish)

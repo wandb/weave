@@ -263,7 +263,7 @@ def _become_user(api_key, entity, username, base_url):
 
 
 @pytest.fixture(scope=determine_scope)
-def become_test_user(
+def use_local_wandb_backend(
     worker_id: str, fixture_fn, base_url, wandb_debug
 ) -> Generator[str, None, None]:
     username = f"user-{worker_id}-{random_string()}"
@@ -282,8 +282,8 @@ def become_test_user(
             fixture_fn(command)
 
 
-@pytest.fixture(scope="session", autouse=True)
-def env_teardown():
-    wandb.teardown()
-    yield
-    wandb.teardown()
+# @pytest.fixture(scope="session", autouse=True)
+# def env_teardown():
+#     wandb.teardown()
+#     yield
+#     wandb.teardown()
