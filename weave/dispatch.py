@@ -247,7 +247,11 @@ def get_op_for_inputs(name: str, kwargs: dict[str, types.Type]) -> op_def.OpDef:
             util.raise_exception_with_sentry_if_available(err, [name])
         return ops[0]
 
-    if name.startswith("panel_table") or name.startswith("Query"):
+    if (
+        name.startswith("panel_table")
+        or name.startswith("Query")
+        or name.startswith("Facet")
+    ):
         # The types don't work for TableState for some reason. This is hacked elsewhere..
         # Hack it some more :(
         # TODO: remove.
