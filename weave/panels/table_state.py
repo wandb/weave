@@ -17,7 +17,7 @@ from ..language_features.tagging import tagged_value_type
 @decorator_type.type()
 class PanelDef:
     panelId: str
-    panelConfig: typing.Any
+    panelConfig: typing.Any = dataclasses.field(default_factory=lambda: None)
 
 
 class SortDef(typing.TypedDict):
@@ -27,7 +27,7 @@ class SortDef(typing.TypedDict):
 
 @decorator_type.type()
 class TableState:
-    input_node: graph.Node
+    input_node: graph.Node = dataclasses.field(default_factory=lambda: graph.VoidNode())
     autoColumns: bool = dataclasses.field(default=False)
     columns: dict[str, PanelDef] = dataclasses.field(default_factory=dict)
     preFilterFunction: graph.Node = dataclasses.field(

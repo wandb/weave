@@ -1,3 +1,4 @@
+import dataclasses
 import typing
 import weave
 from .. import panel
@@ -32,7 +33,9 @@ class FacetConfig:
     dims: FacetDimsConfig
     cellSize: FacetCellSize
     padding: int
-    selectedCell: typing.Optional[FacetCell]
+    selectedCell: typing.Optional[FacetCell] = dataclasses.field(
+        default_factory=lambda: None
+    )
 
 
 @weave.type()

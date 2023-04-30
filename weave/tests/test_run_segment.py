@@ -94,8 +94,8 @@ def create_branch(
                 n=length, starting_step=previous_segment_branch_step + 1
             )
 
-            return RunSegment(name, ref.uri, previous_segment_branch_index, new_metrics)
-    return RunSegment(name, None, 0, random_metrics(length, 0))
+            return RunSegment(name, new_metrics, ref.uri, previous_segment_branch_index)
+    return RunSegment(name, random_metrics(length, 0), None, 0)
 
 
 def create_experiment(
@@ -154,21 +154,21 @@ def test_experiment_branching(branch_frac, num_steps, num_runs):
 @pytest.mark.parametrize("delta_step", [1, 2, 3])
 def test_explicit_experiment_construction(delta_step):
     root_segment = RunSegment(
-        "my-first-run", None, 0, random_metrics(10, delta_step=delta_step)
+        "my-first-run", random_metrics(10, delta_step=delta_step), None, 0
     )
     ref1 = storage.save(root_segment)
     segment1 = RunSegment(
         "my-second-run",
+        random_metrics(10, 5 * delta_step, delta_step=delta_step),
         ref1.uri,
         4,
-        random_metrics(10, 5 * delta_step, delta_step=delta_step),
     )
     ref2 = storage.save(segment1)
     segment2 = RunSegment(
         "my-third-run",
+        random_metrics(5, 10 * delta_step, delta_step=delta_step),
         ref2.uri,
         4,
-        random_metrics(5, 10 * delta_step, delta_step=delta_step),
     )
     storage.save(segment2)
     experiment = api.use(segment2.experiment())
@@ -191,24 +191,24 @@ def test_explicit_experiment_construction(delta_step):
 
 
 def test_invalid_explicit_experiment_construction():
-    root_segment = RunSegment("my-first-run", None, 0, random_metrics(10))
+    root_segment = RunSegment("my-first-run", random_metrics(10))
     ref1 = storage.save(root_segment)
 
     # this run has no metrics
     segment1 = RunSegment(
         "my-second-run",
+        root_segment.metrics._limit(0),
         ref1.uri,
         4,
-        root_segment.metrics._limit(0),
     )
     ref2 = storage.save(segment1)
 
     # this run tries to branch off a run with no metrics, which is not possible
     segment2 = RunSegment(
         "my-third-run",
+        random_metrics(5, 10),
         ref2.uri,
         5,
-        random_metrics(5, 10),
     )
     storage.save(segment2)
 
@@ -218,7 +218,7 @@ def test_invalid_explicit_experiment_construction():
 
 def test_vectorized_unnest_list_for_panelplot():
     metrics = random_metrics(10)
-    root_segment = weave.save(RunSegment("my-first-run", None, 0, metrics))
+    root_segment = weave.save(RunSegment("my-first-run", metrics))
 
     def map_fn(row):
         return ops.dict_(
@@ -327,7 +327,7 @@ def test_group_by_bins_arrow_vectorized():
 
 # cache busting didn't work properly with this query before
 def test_map_merge_cache_busting():
-    root_segment = RunSegment("my-first-run", None, 0, random_metrics(10))
+    root_segment = RunSegment("my-first-run", random_metrics(10))
     ref = storage.save(root_segment)
 
     def map_fn_1_body(row):

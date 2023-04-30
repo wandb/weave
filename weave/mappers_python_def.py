@@ -65,9 +65,7 @@ class ObjectDictToObject(mappers_weave.ObjectMapper):
                 # None haxxx
                 # TODO: remove
                 obj_val = obj.get(k)
-                if obj_val is None:
-                    result[k] = None
-                else:
+                if obj_val is not None:
                     v = serializer.apply(obj_val)
                     result[k] = v
 

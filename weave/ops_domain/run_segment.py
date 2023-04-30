@@ -1,3 +1,4 @@
+import dataclasses
 import typing
 from typing import Optional, cast
 from ..api import use, get, Node
@@ -14,15 +15,19 @@ _loading_builtins_token = _context.set_loading_built_ins()
 @weave.type()
 class RunSegment:
     run_name: str
-    prior_run_ref: Optional[str]
-
-    # index of the prior run's
-    prior_run_branch_index: Optional[int]
 
     # this is an ArrowWeaveList containing a table with an arbitrary schema
     # except that one column should be called "step" and have cells of any
     # integer type
     metrics: typing.TypeVar("MetricRows")  # type: ignore
+
+    prior_run_ref: typing.Optional[str] = dataclasses.field(
+        default_factory=lambda: None
+    )
+    # index of the prior run's
+    prior_run_branch_index: typing.Optional[int] = dataclasses.field(
+        default_factory=lambda: None
+    )
 
     @property
     def prior_run_branch_step(self) -> Optional[int]:
