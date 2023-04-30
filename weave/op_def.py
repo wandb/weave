@@ -176,6 +176,7 @@ class OpDef:
     instance: typing.Union[None, graph.Node]
     hidden: bool
     pure: bool
+    mutation: bool
     raw_resolve_fn: typing.Callable
     _output_type: typing.Optional[
         typing.Union[
@@ -211,6 +212,7 @@ class OpDef:
         hidden=False,
         render_info=None,
         pure=True,
+        mutation=False,
         is_builtin: typing.Optional[bool] = None,
         weave_fn: typing.Optional[graph.Node] = None,
         *,
@@ -226,6 +228,7 @@ class OpDef:
         self.render_info = render_info
         self.hidden = hidden
         self.pure = pure
+        self.mutation = mutation
         self.is_builtin = (
             is_builtin
             if is_builtin is not None
@@ -246,6 +249,12 @@ class OpDef:
 
     def __call__(_self, *args, **kwargs):
         # Uses _self instead of self, because self is a typical op argument!
+        if _self.mutation:
+            # This is hacky. We call the resolver directly, and don't
+            # convert arguments to Const nodes. There is no type checking.
+            # May need to fix this, but the patterns in test_mutation2 work
+            # now.
+            return _self.resolve_fn(*args, **kwargs)
         if context_state.eager_mode():
             return _self.eager_call(*args, **kwargs)
         else:

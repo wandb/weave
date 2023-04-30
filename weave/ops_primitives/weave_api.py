@@ -2,7 +2,7 @@ import typing
 import time
 
 from weave.graph import Node
-from ..api import op, weave_class
+from ..api import op, weave_class, mutation
 from .. import weave_types as types
 from .. import errors
 from .. import storage
@@ -307,27 +307,25 @@ def mutate_op_body(
     return res
 
 
-@op(
-    pure=False,
-    name="set",
-    input_type={"self": types.Function({}, types.Any())},
-)
-def set(self, val: typing.Any, root_args: typing.Any) -> typing.Any:
-    # This implements mutations. Note that its argument must be a
-    # Node. You can call it like this:
-    # weave.use(ops.set(weave_internal.const(csv[-1]["type"]), "YY"))
+@mutation
+def set(
+    self: graph.Node[typing.Any], val: typing.Any, root_args: typing.Any = None
+) -> typing.Any:
+    if root_args is None:
+        root_args = {}
+
     if isinstance(self, graph.ConstNode):
         return val
 
     return mutate_op_body(self, root_args, lambda _: val)
 
 
-@op(
-    pure=False,
-    name="append",
-    input_type={"self": types.Function({}, types.Any())},
-)
-def append(self, val: typing.Any, root_args: typing.Any) -> typing.Any:
+@mutation
+def append(
+    self: graph.Node[list], val: typing.Any, root_args: typing.Any = None
+) -> typing.Any:
+    if root_args is None:
+        root_args = {}
     return mutate_op_body(self, root_args, lambda v: v + [val])
 
 
@@ -344,44 +342,37 @@ class FunctionOps:
         return weave_internal.use(called)
 
 
-# Run mutations. These should be dot-chainable from Run Node, but
-# we'll need to bring back the mutation decorator to make that work
-# (to tell execute that these should be eager and receive the Node
-# as first argument instead of resolve value).
-def run_set_state(self: graph.Node["Run"], state):
-    r = typing.cast(runs.Run, self)
-    weave_internal.use(set(weave_internal.const(r.state), state, {}))
-
-
-def run_print(self: graph.Node["Run"], s: str):
-    r = typing.cast(runs.Run, self)
-    weave_internal.use(append(weave_internal.const(r.prints), s, {}))
-
-
-def run_log(self: graph.Node["Run"], v: typing.Any):
-    r = typing.cast(runs.Run, self)
-    weave_internal.use(append(weave_internal.const(r.history), v, {}))
-
-
-def run_set_inputs(self: graph.Node["Run"], v: typing.Any):
-    r = typing.cast(runs.Run, self)
-    weave_internal.use(set(weave_internal.const(r.inputs), v, {}))
-
-
-def run_set_output(self: graph.Node["Run"], v: typing.Any):
-    r = typing.cast(runs.Run, self)
-    # Prior mutation code had this
-    # # Force the output to be a ref.
-    # # TODO: this is probably not the right place to do this.
-    # if not isinstance(v, storage.Ref):
-    #     v = storage.save(v)
-    # self.output = v
-    # return self
-    weave_internal.use(set(weave_internal.const(r.output), v, {}))
-
-
 @weave_class(weave_type=types.RunType)
 class Run:
+    # TODO: the first arg type to these mutations should be Node[Run], not just
+    # plain Run. They work for now but may not be callable from WeaveJS. We
+    # should make weave_class automatically wrap the self arg in Node[] for
+    # mutation ops!
+    @mutation
+    def set_state(self, state: str) -> None:
+        r = typing.cast(runs.Run, self)
+        set(r.state, state)
+
+    @mutation
+    def set_inputs(self, v: typing.Any) -> None:
+        r = typing.cast(runs.Run, self)
+        set(r.inputs, v)
+
+    @mutation
+    def set_output(self, v: typing.Any) -> None:
+        r = typing.cast(runs.Run, self)
+        set(r.output, v)
+
+    @mutation
+    def print(self, s: str) -> None:
+        r = typing.cast(runs.Run, self)
+        append(r.prints, s)
+
+    @mutation
+    def log(self, v: typing.Any) -> None:
+        r = typing.cast(runs.Run, self)
+        append(r.history, v)
+
     @op(
         name="run-await",
         output_type=lambda input_types: input_types["self"].output,

@@ -71,6 +71,10 @@ def _call_execute(function_node: graph.Node) -> graph.OutputNode:
     )
 
 
+def _quote_node(node: graph.Node) -> graph.Node:
+    return weave_internal.const(node)
+
+
 def _dispatch_map_fn_refining(node: graph.Node) -> typing.Optional[graph.OutputNode]:
     if isinstance(node, graph.OutputNode):
         from_op = node.from_op
@@ -82,7 +86,7 @@ def _dispatch_map_fn_refining(node: graph.Node) -> typing.Optional[graph.OutputN
                     k: n
                     for k, n in zip(op.input_type.arg_types, from_op.inputs.values())
                 }
-            res = op(**params)
+            res = op.lazy_call(**params)
             # logging.info("Dispatched (refine): %s -> %s", node, res.type)
             return res
         except errors.WeaveDispatchError:
@@ -255,9 +259,40 @@ def _make_auto_op_map_fn(when_type: type[types.Type], call_op_fn):
     return fn
 
 
+def _make_inverse_auto_op_map_fn(when_type: type[types.Type], call_op_fn):
+    def fn(node: graph.Node) -> typing.Optional[graph.Node]:
+        if isinstance(node, graph.OutputNode):
+            node_inputs = node.from_op.inputs
+            op_def = registry_mem.memory_registry.get_op(node.from_op.name)
+            new_inputs: dict[str, graph.Node] = {}
+            for k, input_node in node_inputs.items():
+                actual_input_type = input_node.type
+                new_inputs[k] = input_node
+                if isinstance(actual_input_type, when_type):
+                    continue
+                if isinstance(op_def.input_type, op_args.OpNamedArgs):
+                    op_input_type = op_def.input_type.arg_types[k]
+                elif isinstance(op_def.input_type, op_args.OpVarArgs):
+                    op_input_type = op_def.input_type.arg_type
+                else:
+                    raise ValueError(
+                        f"Unexpected op input type {op_def.input_type} for op {op_def.name}"
+                    )
+                if callable(op_input_type):
+                    continue
+                if isinstance(op_input_type, when_type):
+                    new_inputs[k] = call_op_fn(input_node)
+            return graph.OutputNode(node.type, node.from_op.name, new_inputs)
+        return None
+
+    return fn
+
+
 _await_run_outputs_map_fn = _make_auto_op_map_fn(types.RunType, _call_run_await)
 
 _execute_nodes_map_fn = _make_auto_op_map_fn(types.Function, _call_execute)
+
+_quote_nodes_map_fn = _make_inverse_auto_op_map_fn(types.Function, _quote_node)
 
 
 def compile_apply_column_pushdown(leaf_nodes: list[graph.Node]) -> list[graph.Node]:
@@ -332,6 +367,10 @@ def compile_execute(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
         return None
 
     return graph.map_nodes_full(with_execute_ops, _replace_execute)
+
+
+def compile_quote(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
+    return graph.map_nodes_full(nodes, _quote_nodes_map_fn)
 
 
 def compile_refine(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
@@ -409,6 +448,8 @@ def _compile(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
         n = compile_await(n)
     with tracer.trace("compile:execute"):
         n = compile_execute(n)
+    with tracer.trace("compile:quote"):
+        n = compile_quote(n)
 
     # Some ops require const input nodes. This pass executes any branches necessary
     # to ensure that requirement holds.

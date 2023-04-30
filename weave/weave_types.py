@@ -1005,6 +1005,13 @@ class Function(Type):
             return other_type.assign_type(self.output_type)
         return None
 
+    def assign_type(self, next_type: Type) -> bool:
+        if not self.input_types and not isinstance(next_type, Function):
+            # Allow assignment of T to () -> T.
+            # Compile handles this in the compile_quote pass.
+            return self.output_type.assign_type(next_type)
+        return super().assign_type(next_type)
+
     @classmethod
     def type_of_instance(cls, obj):
         if isinstance(obj.type, Function):

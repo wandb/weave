@@ -20,6 +20,7 @@ def op(
     _op_def_class=op_def.OpDef,
     *,  # Marks the rest of the arguments as keyword-only.
     plugins=None,
+    mutation=False,
 ):
     """Decorator for declaring an op.
 
@@ -60,6 +61,7 @@ def op(
             hidden=hidden,
             pure=pure,
             plugins=plugins,
+            mutation=mutation,
             _decl_locals=inspect.currentframe().f_back.f_locals,
         )
 

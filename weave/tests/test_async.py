@@ -14,12 +14,12 @@ def test_run_basic():
 
     run_node = ops.get(f"local-artifact:///{run_name}/obj")
     assert api.use(run_node.state) == "pending"
-    ops.run_set_state(run_node, "running")
+    run_node.set_state("running")
     assert api.use(run_node.state) == "running"
-    ops.run_print(run_node, "Hello")
-    ops.run_print(run_node, "Hello again")
-    ops.run_log(run_node, {"x": 49.0})
-    ops.run_set_output(run_node, "some-output")
+    run_node.print("Hello")
+    run_node.print("Hello again")
+    run_node.log({"x": 49.0})
+    run_node.set_output("some-output")
 
     saved_prints = api.use(run_node.prints)
     assert saved_prints == ["Hello", "Hello again"]
