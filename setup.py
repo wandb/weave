@@ -26,7 +26,7 @@ with open("requirements.ecosystem.txt") as requirements_file:
 
 setup(
     name="weave",
-    version="0.0.4.dev1",
+    version="0.0.5.dev1",
     description="Weave internal development package.",
     author="Weights & Biases",
     author_email="support@wandb.com",
