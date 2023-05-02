@@ -20,6 +20,7 @@ from . import file_util
 from . import weave_types as types
 from . import artifact_fs
 from . import filesystem
+from . import wandb_artifact_pusher
 
 from urllib import parse
 
@@ -509,20 +510,17 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         raise NotImplementedError()
 
     def save(self, project: str = "weave_ops"):
-        # TODO: technically save should be sufficient but we need the run to grab the entity name and project name
-        # TODO: what project should we put weave ops in???
-        os.environ["WANDB_SILENT"] = "true"
-        wandb.require("service")  # speeds things up
-        run = wandb.init(project=project)
-        if run is None:
-            raise errors.WeaveInternalError("unexpected, run is None")
-        self._writeable_artifact.save()
-        self._writeable_artifact.wait()
-        run.finish()
-
-        a_name, a_version = self._writeable_artifact.name.split(":")
-        uri = WeaveWBArtifactURI(a_name, a_version, run.entity, project)
-        self._set_read_artifact_uri(uri)
+        res = wandb_artifact_pusher.write_artifact_to_wandb(
+            self._writeable_artifact, project
+        )
+        self._set_read_artifact_uri(
+            WeaveWBArtifactURI(
+                name=res.artifact_name,
+                version=res.version_str,
+                entity_name=res.entity_name,
+                project_name=res.project_name,
+            )
+        )
 
     def _manifest(self) -> typing.Optional[WandbArtifactManifest]:
         if self._read_artifact_uri is None:

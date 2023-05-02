@@ -8,6 +8,8 @@ import pathlib
 import typing
 from . import util
 from . import errors
+from urllib.parse import urlparse
+import netrc
 
 # There are currently two cache modes:
 # - full: cache all cacheable intermediate results
@@ -71,3 +73,38 @@ def weave_wandb_cookie() -> typing.Optional[str]:
                 "Please delete ~/.netrc while using WEAVE_WANDB_COOKIE to avoid using your credentials"
             )
     return cookie
+
+
+def _wandb_api_key_via_env() -> typing.Optional[str]:
+    api_key = os.environ.get("WANDB_API_KEY")
+    if api_key and is_public():
+        raise errors.WeaveConfigurationError(
+            "WANDB_API_KEY should not be set in public mode."
+        )
+    return api_key
+
+
+def _wandb_api_key_via_netrc() -> typing.Optional[str]:
+    netrc_path = os.path.expanduser("~/.netrc")
+    if not os.path.exists(netrc_path):
+        return None
+    nrc = netrc.netrc(netrc_path)
+    res = nrc.authenticators(urlparse(wandb_base_url()).netloc)
+    api_key = None
+    if res:
+        user, account, api_key = res
+    if api_key and is_public():
+        raise errors.WeaveConfigurationError(
+            "~/.netrc should not be set in public mode."
+        )
+    return api_key
+
+
+def weave_wandb_api_key() -> typing.Optional[str]:
+    env_api_key = _wandb_api_key_via_env()
+    netrc_api_key = _wandb_api_key_via_netrc()
+    if env_api_key and netrc_api_key:
+        raise errors.WeaveConfigurationError(
+            "WANDB_API_KEY should not be set in both ~/.netrc and the environment."
+        )
+    return env_api_key or netrc_api_key

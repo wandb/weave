@@ -28,6 +28,8 @@ from weave import environment
 from weave import logs
 from weave import filesystem
 from weave.server_error_handling import client_safe_http_exceptions_as_werkzeug
+from weave import storage
+from weave import wandb_api
 
 # PROFILE_DIR = "/tmp/weave/profile"
 PROFILE_DIR = None
@@ -114,19 +116,20 @@ def make_app():
 
 @blueprint.route("/__weave/ops", methods=["GET"])
 def list_ops():
-    # TODO: this is super slow.
-    if not environment.wandb_production():
-        registry_mem.memory_registry.load_saved_ops()
-    ops = registry_mem.memory_registry.list_ops()
-    ret = []
-    for op in ops:
-        try:
-            serialized_op = op.to_dict()
-        except errors.WeaveSerializeError:
-            continue
-        if serialized_op["output_type"] != "any":
-            ret.append(serialized_op)
-    return {"data": ret}
+    with wandb_api.from_environment():
+        # TODO: this is super slow.
+        if not environment.wandb_production():
+            registry_mem.memory_registry.load_saved_ops()
+        ops = registry_mem.memory_registry.list_ops()
+        ret = []
+        for op in ops:
+            try:
+                serialized_op = op.to_dict()
+            except errors.WeaveSerializeError:
+                continue
+            if serialized_op["output_type"] != "any":
+                ret.append(serialized_op)
+        return {"data": ret}
 
 
 @blueprint.route("/__weave/execute", methods=["POST"])

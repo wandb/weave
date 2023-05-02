@@ -3,6 +3,7 @@
 # module.
 
 import dataclasses
+import os
 import typing
 import graphql
 import gql
@@ -12,7 +13,7 @@ import contextvars
 
 from gql.transport.aiohttp import AIOHTTPTransport
 from gql.transport.requests import RequestsHTTPTransport
-
+from requests.auth import HTTPBasicAuth
 
 from . import engine_trace
 from . import environment as weave_env
@@ -24,7 +25,7 @@ tracer = engine_trace.tracer()  # type: ignore
 
 @dataclasses.dataclass
 class WandbApiContext:
-    user_id: str
+    user_id: typing.Optional[str] = None
     api_key: typing.Optional[str] = None
     headers: typing.Optional[dict[str, str]] = None
     cookies: typing.Optional[dict[str, str]] = None
@@ -43,7 +44,7 @@ _wandb_api_context: contextvars.ContextVar[
 
 
 def set_wandb_api_context(
-    user_id: str,
+    user_id: typing.Optional[str],
     api_key: typing.Optional[str],
     headers: typing.Optional[dict],
     cookies: typing.Optional[dict],
@@ -91,7 +92,10 @@ def init() -> typing.Optional[contextvars.Token[typing.Optional[WandbApiContext]
     if cookie:
         cookies = {"wandb": cookie}
         headers = {"use-admin-privileges": "true", "x-origin": "https://app.wandb.test"}
-        return set_wandb_api_context("admin", "<not_used>", headers, cookies)
+        return set_wandb_api_context("admin", None, headers, cookies)
+    api_key = weave_env.weave_wandb_api_key()
+    if api_key:
+        return set_wandb_api_context("admin", api_key, None, None)
     return None
 
 
@@ -115,9 +119,12 @@ class WandbApiAsync:
         wandb_context = get_wandb_api_context()
         headers = None
         cookies = None
+        auth = None
         if wandb_context is not None:
             headers = wandb_context.headers
             cookies = wandb_context.cookies
+            if wandb_context.api_key is not None:
+                auth = aiohttp.BasicAuth("api", wandb_context.api_key)
         url_base = weave_env.wandb_base_url()
         transport = AIOHTTPTransport(
             url=url_base + "/graphql",
@@ -127,6 +134,7 @@ class WandbApiAsync:
             },
             headers=headers,
             cookies=cookies,
+            auth=auth,
         )
         # Warning: we do not use the recommended context manager pattern, because we're
         # using connector_owner to tell the session not to close our connection pool.
@@ -204,14 +212,15 @@ class WandbApi:
         wandb_context = get_wandb_api_context()
         headers = None
         cookies = None
+        auth = None
         if wandb_context is not None:
             headers = wandb_context.headers
             cookies = wandb_context.cookies
+            if wandb_context.api_key is not None:
+                auth = HTTPBasicAuth("api", wandb_context.api_key)
         url_base = weave_env.wandb_base_url()
         transport = RequestsHTTPTransport(
-            url=url_base + "/graphql",
-            headers=headers,
-            cookies=cookies,
+            url=url_base + "/graphql", headers=headers, cookies=cookies, auth=auth
         )
         # Warning: we do not use the recommended context manager pattern, because we're
         # using connector_owner to tell the session not to close our connection pool.
