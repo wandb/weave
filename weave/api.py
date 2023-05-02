@@ -26,6 +26,7 @@ from .server import capture_weave_server_logs
 from .val_const import const
 from .file_base import File, Dir
 from .dispatch import RuntimeConstNode
+from weave import artifact_local, ref_base
 
 from .weave_internal import define_fn
 
@@ -46,6 +47,52 @@ def publish(node_or_obj, name=None):
 
     ref = _storage.publish(node_or_obj, name)
     return _weave_internal.make_const_node(ref.type, ref.obj)
+
+
+# def save(node_or_obj, name=None):
+#     if isinstance(node_or_obj, _graph.ConstNode):
+#         node_or_obj = node_or_obj.val
+#     ref = _storage.save(node_or_obj, name=name)
+#     return _ops.get(str(ref))
+
+
+# def publish(node_or_obj, name=None):
+#     if isinstance(node_or_obj, _graph.ConstNode):
+#         node_or_obj = node_or_obj.val
+#     node_or_obj = _recursively_publish_local_references(node_or_obj)
+#     ref = _storage.publish(node_or_obj, name=name)
+#     return _ops.get(str(ref))
+
+
+def _recursively_publish_local_references(obj: typing.Any):
+    if not isinstance(obj, _graph.Node):
+        return obj
+
+    res = _graph.map_nodes_full([obj], _recursively_publish_local_references_in_nodes)
+    return res[0]
+
+
+def _recursively_publish_local_references_in_nodes(node: _graph.Node) -> _graph.Node:
+    if not (isinstance(node, _graph.OutputNode) and node.from_op.name == "get"):
+        return node
+
+    uri_node = node.from_op.inputs["uri"]
+    if not isinstance(uri_node, _graph.ConstNode):
+        return node
+
+    uri = uri_node.val
+    if not isinstance(uri, str):
+        return node
+
+    new_ref = ref_base.Ref.from_str(uri)
+    if not isinstance(new_ref, artifact_local.LocalArtifactRef):
+        return node
+
+    # This use/publish pattern could be more efficient once we get Danny's new artifact API.
+    value = use(node)
+    new_node = publish(value)
+
+    return new_node
 
 
 def get(ref_str):
