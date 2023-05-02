@@ -104,11 +104,17 @@ def _get_local_dir_from_uri(uri):
         return art._saved_artifact.download()
 
 
+publish_count = 0
+
+
 def _test_save_or_publish(user_data, contents, use_publish=False, exp_user_data=None):
+    global publish_count
     if exp_user_data is None:
         exp_user_data = user_data
     if use_publish:
-        saved_node = weave.publish(user_data)
+        publish_name = f"test_publish_{publish_count}"
+        publish_count += 1
+        saved_node = weave.publish(user_data, f"weave_ops/{publish_name}")
     else:
         saved_node = weave.save(user_data)
 
