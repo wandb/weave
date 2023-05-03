@@ -18,6 +18,27 @@ from urllib.parse import quote
 from .. import artifact_fs
 from .. import artifact_wandb
 
+
+static_art_file_gql = """
+            commitHash
+            artifactSequence {
+                id
+                name
+                defaultArtifactType {
+                    id
+                    name
+                    project {
+                        id
+                        name
+                        entity {
+                            id
+                            name
+                        }
+                    }
+                }
+            }
+        """
+
 # Section 1/6: Tag Getters
 # None
 
@@ -312,12 +333,16 @@ def artifact_version_link(
 # need more work to get artifact version file metadata.
 
 
-@op(name="artifactVersion-isWeaveObject")
+@op(
+    name="artifactVersion-isWeaveObject",
+    plugins=wb_gql_op_plugin(lambda inputs, inner: static_art_file_gql),
+)
 def artifact_version_is_weave_object(
     artifactVersion: wdt.ArtifactVersion,
 ) -> bool:
-    # TODO: Need to copy over some logic from the old codebase
-    return False
+    art_local = _artifact_version_to_wb_artifact(artifactVersion)
+    path = art_local._manifest_entry("obj.type.json")
+    return path is not None
 
 
 @op(name="artifactVersion-files")
@@ -455,27 +480,6 @@ def _artifact_version_to_wb_artifact(artifactVersion: wdt.ArtifactVersion):
             home_sequence_name, commit_hash, entity_name, project_name
         ),
     )
-
-
-static_art_file_gql = """
-            commitHash
-            artifactSequence {
-                id
-                name
-                defaultArtifactType {
-                    id
-                    name
-                    project {
-                        id
-                        name
-                        entity {
-                            id
-                            name
-                        }
-                    }
-                }
-            }
-        """
 
 
 @op(

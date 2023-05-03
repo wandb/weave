@@ -32,6 +32,13 @@ gql_prop_op(
     types.Timestamp(),
 )
 
+gql_prop_op(
+    "artifactMembership-commitHash",
+    wdt.ArtifactCollectionMembershipType,
+    "commitHash",
+    types.String(),
+)
+
 # Section 4/6: Direct Relationship Ops
 gql_direct_edge_op(
     "artifactMembership-collection",

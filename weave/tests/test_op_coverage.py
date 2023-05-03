@@ -66,7 +66,6 @@ js_op_exceptions = set(
         "throwError",
         "get-tag",
         "internal-lambdaClosureArgBridge",
-        "artifactMembership-commitHash",
         "artifactMembership-id",
         "artifactType-sequences",
         "artifactType-portfolios",
