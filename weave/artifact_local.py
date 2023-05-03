@@ -14,6 +14,7 @@ from . import util
 from . import errors
 
 from . import weave_types as types
+from . import artifact_wandb
 from . import artifact_fs
 from . import file_base
 from . import file_util
@@ -56,6 +57,7 @@ class LocalArtifactType(artifact_fs.FilesystemArtifactType):
 
 class LocalArtifact(artifact_fs.FilesystemArtifact):
     _existing_dirs: list[str]
+    _original_uri: typing.Optional[str]
 
     def __init__(self, name: str, version: typing.Optional[str] = None):
         # LocalArtifacts are created frequently, sometimes in cases where
@@ -70,11 +72,21 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
             raise ValueError('Artifact name cannot contain "/" or "\\" or ".." or ":"')
         self.name = name
         self._version = version
-        self._branch = None
+        self._branch: typing.Optional[str] = None
         self._root = os.path.join(local_artifact_dir(), name)
+        self._original_uri = None
         self._path_handlers: dict[str, typing.Any] = {}
         self._setup_dirs()
         self._existing_dirs = []
+
+    @classmethod
+    def fork_from_artifact(
+        cls,
+        artifact: artifact_fs.FilesystemArtifact,
+    ):
+        new_artifact = cls(artifact.name, version=artifact.version)
+        new_artifact._original_uri = artifact.uri
+        return new_artifact
 
     # If an object has a _ref property, it will be used by ref_base._get_ref()
     @property
@@ -107,7 +119,7 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
         return self._branch
 
     @property
-    def branch_point(self):
+    def branch_point(self) -> artifact_fs.BranchPointType:
         return self.read_metadata().get("branch_point")
 
     def get_other_version(self, version: str) -> typing.Optional["LocalArtifact"]:
@@ -294,6 +306,7 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
         if branch != self._branch:
             # new branch
             metadata["branch_point"] = {
+                "original_uri": self._original_uri,
                 "branch": self._branch,
                 "commit": self._version,
                 "n_commits": 1,

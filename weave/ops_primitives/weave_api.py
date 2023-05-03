@@ -16,6 +16,16 @@ from .. import artifact_local
 from .. import compile
 from .. import runs
 from .. import artifact_fs
+from .. import artifact_wandb
+
+
+def is_hexadecimal(s):
+    """
+    Returns True if the input string s is a hexadecimal value, False otherwise.
+    """
+    return all(c.isdigit() or c.isalpha() for c in s) and all(
+        c in "0123456789abcdefABCDEF" for c in s
+    )
 
 
 @weave_class(weave_type=types.RefType)
@@ -163,15 +173,98 @@ def get_returntype(uri):
 def _save(name, obj, setter_options, action=None):
 
     obj_uri = uris.WeaveURI.parse(name)
-
     branch = setter_options.get("branch")
-    ref = storage.save(obj, name=obj_uri.name + ":" + obj_uri.version, branch=branch)
+
+    art_ref = obj_uri.to_ref()
+    forked = None
+    if isinstance(art_ref, artifact_fs.FilesystemArtifactRef):
+        art = art_ref.artifact
+        if branch is not None and branch != art.branch:
+            forked = artifact_local.LocalArtifact(name=art.name, version=art.version)
+            forked._original_uri = name
+
+    ref = storage.save(
+        obj,
+        name=obj_uri.name + ":" + obj_uri.version,
+        branch=branch,
+        artifact=forked,
+    )
     return ref.branch_uri
+
+
+def _merge(name) -> str:
+    """Save the object, propagating changes back to the original artifact"""
+    obj_uri = uris.WeaveURI.parse(name)
+    if not isinstance(
+        obj_uri,
+        (artifact_wandb.WeaveWBArtifactURI, artifact_local.WeaveLocalArtifactURI),
+    ):
+        raise errors.WeaveInternalError(
+            "Cannot merge artifact of type %s" % type(obj_uri)
+        )
+
+    head_ref = obj_uri.to_ref()
+    obj_metadata = head_ref.artifact.read_metadata()
+    if "branch_point" not in obj_metadata:
+        raise errors.WeaveInternalError(
+            "Cannot merge into artifact without branch_point"
+        )
+
+    branch_point: artifact_fs.BranchPointType = obj_metadata["branch_point"]
+    to_uri = uris.WeaveURI.parse(branch_point["original_uri"])
+    if not isinstance(
+        to_uri,
+        (artifact_local.WeaveLocalArtifactURI, artifact_wandb.WeaveWBArtifactURI),
+    ):
+        raise errors.WeaveInternalError(
+            "Cannot merge into artifact of type %s" % type(obj_uri)
+        )
+
+    to_ref = to_uri.to_ref()
+
+    if isinstance(to_ref.artifact, artifact_wandb.WandbArtifact):
+        original_artifact_hash = to_ref.artifact.commit_hash
+    else:
+        original_artifact_hash = to_ref.artifact.version
+
+    if branch_point["commit"] != original_artifact_hash:
+        raise errors.WeaveUnmergableArtifactsError(
+            "Cannot merge artifacts: "
+            "target artifact commit hash does not match branch point"
+        )
+
+    if isinstance(to_uri, artifact_wandb.WeaveWBArtifactURI):
+        ref = storage._save_or_publish(
+            head_ref.get(),
+            name=to_uri.project_name + "/" + to_uri.name,
+            publish=True,
+        )
+    else:
+        if to_uri.version is None:
+            raise errors.WeaveInternalError(
+                "Cannot merge into artifact without version"
+            )
+
+        if len(to_uri.version) == 32 and is_hexadecimal(to_uri.version):
+            name = to_uri.name
+        else:
+            name = to_uri.name + ":" + to_uri.version
+
+        ref = storage._save_or_publish(
+            head_ref.get(),
+            name=name,
+            branch=branch_point["branch"],
+        )
+    return ref.branch_uri
+
+
+def _set(name, obj, setter_options, action=None):
+    return _save(name, obj, setter_options, action=action)
 
 
 @op(
     pure=False,
-    setter=_save,
+    setter=_set,
     name="get",
     input_type={"uri": types.String()},
     output_type=types.Any(),
@@ -327,6 +420,22 @@ def append(
     if root_args is None:
         root_args = {}
     return mutate_op_body(self, root_args, lambda v: v + [val])
+
+
+@mutation
+def merge(self, root_args: typing.Any = None) -> typing.Any:
+    self = compile.compile_fix_calls([self])[0]
+
+    if not isinstance(self, graph.OutputNode):
+        raise errors.WeaveInternalError("Merge target must be an OutputNode")
+
+    if self.from_op.name != "get":
+        raise errors.WeaveInternalError("Merge target must be a get")
+
+    if not isinstance(self.from_op.inputs["uri"], graph.ConstNode):
+        raise errors.WeaveInternalError("Merge op argument must be a const string")
+
+    return _merge(self.from_op.inputs["uri"].val)
 
 
 @weave_class(weave_type=types.Function)

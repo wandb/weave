@@ -363,6 +363,20 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         self._local_path: dict[str, str] = {}
 
     @property
+    def branch(self) -> typing.Optional[str]:
+        # all branching is local for now. we could support remote branches
+        # but in this initial implementation, assume only LocalArtifacts
+        # live on branches.
+        return None
+
+    @property
+    def branch_point(self) -> typing.Optional[artifact_fs.BranchPointType]:
+        # all branching is local for now. we could support remote branches
+        # but in this initial implementation, assume only LocalArtifacts
+        # live on branches.
+        return None
+
+    @property
     def _read_artifact_uri(self) -> typing.Optional["WeaveWBArtifactURI"]:
         if self._resolved_read_artifact_uri is not None:
             return self._resolved_read_artifact_uri
@@ -402,6 +416,20 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
 
     def __repr__(self):
         return "<WandbArtifact %s>" % self.name
+
+    @property
+    def commit_hash(self) -> str:
+        if not self.is_saved:
+            raise errors.WeaveInternalError(
+                "cannot get commit hash of an unsaved artifact"
+            )
+        resolved_uri = self._read_artifact_uri
+        if resolved_uri is None:
+            raise errors.WeaveInternalError("cannot resolve commit hash of artifact")
+        version = resolved_uri.version
+        if version is None:
+            raise errors.WeaveInternalError("resolved uri has no version")
+        return version
 
     @property
     def is_saved(self) -> bool:

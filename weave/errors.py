@@ -1,3 +1,7 @@
+class WeaveUnmergableArtifactsError(Exception):
+    pass
+
+
 class WeaveBaseError(Exception):
     pass
 

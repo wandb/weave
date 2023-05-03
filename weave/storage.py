@@ -38,7 +38,12 @@ def _get_name(wb_type: types.Type, obj: typing.Any) -> str:
 
 
 def _save_or_publish(
-    obj, name=None, type=None, publish: bool = False, artifact=None, branch=None
+    obj,
+    name=None,
+    type=None,
+    publish: bool = False,
+    artifact=None,
+    branch=None,
 ):
     # HAX for W&B publishing.
     project = None
@@ -96,7 +101,11 @@ def publish(obj, name=None, type=None):
 
 
 def save(
-    obj, name=None, type=None, artifact=None, branch=None
+    obj,
+    name=None,
+    type=None,
+    artifact=None,
+    branch=None,
 ) -> artifact_local.LocalArtifactRef:
     # print("STORAGE SAVE", name, obj, type, artifact)
     # ref = _get_ref(obj)

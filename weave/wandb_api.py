@@ -229,7 +229,7 @@ class WandbApi:
         # Closing the session just closes the connector, which we don't want anyway, so we don't
         # bother.
         client = gql.Client(transport=transport, fetch_schema_from_transport=False)
-        session = client.connect_sync(reconnecting=False)  # type: ignore
+        session = client.connect_sync()  # type: ignore
         return session.execute(query, kwargs)
 
     SERVER_INFO_QUERY = gql.gql(

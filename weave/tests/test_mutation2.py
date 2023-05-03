@@ -1,5 +1,6 @@
 import weave
 from .. import weave_internal
+from .. import uris
 
 
 def test_mutation_set_direct_call():
@@ -47,3 +48,30 @@ def test_mutation_lazy_works_without_quoting():
 
     new_art = weave.storage.get("local-artifact:///art:main/obj")
     assert new_art == [1, 2, 3, 4]
+
+
+def test_merge():
+    weave.save({"a": 5, "b": 6}, "my-dict:latest")
+    dict_obj = weave.ops.get("local-artifact:///my-dict:latest/obj")
+    weave.ops.set(dict_obj["a"], 17, root_args={"branch": "my-branch"})
+    modified_dict_obj = weave.ops.get("local-artifact:///my-dict:my-branch/obj")
+    new_uri = weave.ops.merge(modified_dict_obj)
+    dict_obj_node = weave.ops.get(new_uri)
+    assert (
+        weave.use(dict_obj_node)
+        == weave.use(weave.ops.get("local-artifact:///my-dict:latest/obj"))
+        == {"a": 17, "b": 6}
+    )
+
+
+def test_merge_no_version():
+    get_node = weave.save({"a": 5, "b": 6}, "my-dict")
+    uri = get_node.from_op.inputs["uri"].val  # type: ignore
+
+    # uri now has a direct commit hash for the version
+    dict_obj = weave.ops.get(uri)
+    weave.ops.set(dict_obj["a"], 17, root_args={"branch": "my-branch"})
+    modified_dict_obj = weave.ops.get("local-artifact:///my-dict:my-branch/obj")
+    new_uri = weave.ops.merge(modified_dict_obj)
+    dict_obj_node = weave.ops.get(new_uri)
+    assert weave.use(dict_obj_node) == {"a": 17, "b": 6}

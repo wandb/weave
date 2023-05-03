@@ -26,6 +26,7 @@ class BranchPointType(typing.TypedDict):
     branch: str
     commit: str
     n_commits: int
+    original_uri: str
 
 
 class FilesystemArtifact(artifact_base.Artifact):
