@@ -50,8 +50,8 @@ def publish(node_or_obj, name=None):
 
 
 # def save(node_or_obj, name=None):
-#     if isinstance(node_or_obj, _graph.ConstNode):
-#         node_or_obj = node_or_obj.val
+#     if isinstance(node_or_obj, _graph.OutputNode) and node_or_obj.from_op.name == "get":
+#         return node_or_obj
 #     ref = _storage.save(node_or_obj, name=name)
 #     return _ops.get(str(ref))
 

@@ -2,6 +2,9 @@ import functools
 import json
 import typing
 
+from weave.api import publish
+from weave.weave_internal import use
+
 from . import errors
 from . import weave_types
 from . import uris
@@ -95,6 +98,13 @@ class Op(typing.Generic[OpInputNodeT]):
         return its
 
     def to_json(self) -> dict:
+        # if self.name == 'get':
+        #     uri_node = self.inputs.get('uri')
+        #     if isinstance(uri_node, ConstNode):
+        #         if isinstance(uri_node.val, str) and uri_node.val.startswith('local-artifact://'):
+        #             # Publish the local artifact to the remote artifact store.
+        #             weave.publish(weave.use(self))
+
         json_inputs = {}
         for k, v in self.inputs.items():
             json_inputs[k] = v.to_json()
@@ -134,6 +144,14 @@ class OutputNode(Node, typing.Generic[OpInputNodeT]):
         return iter(self.from_op.inputs.items())
 
     def to_json(self) -> dict:
+        # if is_publishing():
+        #     if self.from_op.name == 'get':
+        #         uri_node = self.from_op.inputs.get('uri')
+        #         if isinstance(uri_node, ConstNode):
+        #             if isinstance(uri_node.val, str) and uri_node.val.startswith('local-artifact://'):
+        #                 # Publish the local artifact to the remote artifact store.
+        #                 return publish(use(self)).to_json()
+
         return {
             "nodeType": "output",
             "type": self.type.to_dict(),
