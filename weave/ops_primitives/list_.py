@@ -1,4 +1,3 @@
-import logging
 import numpy as np
 import pandas as pd
 import json
@@ -825,3 +824,21 @@ def join_to_str(arr, sep):
 )
 def contains(arr, element):
     return element in arr
+
+
+@op(
+    pure=False,
+    output_type=lambda input_types: input_types["arr"],
+    name="list-randomlyDownsample",
+)
+def sample(arr: list[typing.Any], n: int):
+    if n < 0:
+        raise ValueError("n must be non-negative")
+    elif n >= len(arr):
+        return arr
+
+    zeros = np.zeros(len(arr), dtype=bool)
+    indices = np.random.choice(len(zeros), n, replace=False)
+    zeros[indices] = True
+
+    return [arr[i] for i in range(len(arr)) if zeros[i]]

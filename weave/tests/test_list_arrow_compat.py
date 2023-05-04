@@ -9,6 +9,7 @@ import numpy as np
 import pytest
 from ..tests import tag_test_util as ttu
 from .. import ops
+import itertools
 
 from weave import weave_types as types
 from ..language_features.tagging import tag_store, make_tag_getter_op, tagged_value_type
@@ -679,3 +680,80 @@ def test_tag_pushdown_on_list_of_lists(use_arrow):
     assert output == [
         [data[i][j] + 3 + i + j - 2 + i for j in range(3)] for i in range(3)
     ]
+
+
+@pytest.mark.parametrize(
+    "use_arrow",
+    [True, False],
+)
+def test_sample(use_arrow):
+    input_array = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    if use_arrow:
+        input_array_node = weave.save(arrow.to_arrow(input_array))
+        sample_node = input_array_node.randomlyDownsample(5)
+    else:
+        sample_node = list_.sample(input_array, 5)
+    result = weave.use(sample_node)
+
+    if use_arrow:
+        result = result.to_pylist_tagged()
+
+    assert len(result) == 5
+    assert len(set(result)) == 5
+    assert set(result).issubset(set(input_array))
+    assert sorted(result) == result
+
+
+@pytest.mark.parametrize(
+    "use_arrow",
+    [True, False],
+)
+def test_sample_10(use_arrow):
+    input_array = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    if use_arrow:
+        input_array_node = weave.save(arrow.to_arrow(input_array))
+        sample_node_10 = input_array_node.randomlyDownsample(10)
+    else:
+        sample_node_10 = list_.sample(input_array, 10)
+    result_10 = weave.use(sample_node_10)
+
+    if use_arrow:
+        result_10 = result_10.to_pylist_tagged()
+
+    assert result_10 == input_array
+
+
+@pytest.mark.parametrize(
+    "use_arrow",
+    [True, False],
+)
+def test_sample_bad(use_arrow):
+    input_array = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    if use_arrow:
+        input_array_node = weave.save(arrow.to_arrow(input_array))
+        bad_node = input_array_node.randomlyDownsample(-1)
+    else:
+        bad_node = list_.sample(input_array, -1)
+
+    with pytest.raises(ValueError):
+        weave.use(bad_node)
+
+
+@pytest.mark.parametrize(
+    "use_arrow, input_array",
+    list(itertools.product([True, False], [[], list(range(10))])),
+)
+def test_sample_length_zero_list(use_arrow, input_array):
+    input_array = []
+    if use_arrow:
+        input_array_node = weave.save(arrow.to_arrow(input_array))
+        bad_node = input_array_node.randomlyDownsample(0)
+    else:
+        bad_node = list_.sample(input_array, 0)
+
+    result = weave.use(bad_node)
+
+    if use_arrow:
+        result = result.to_pylist_tagged()
+
+    assert result == []

@@ -1,3 +1,4 @@
+import random
 import pyarrow as pa
 import pyarrow.compute as pc
 import numpy as np
@@ -832,5 +833,35 @@ def vectorized_is_none(self):
     return ArrowWeaveList(
         self._arrow_data.is_null(),
         types.Boolean(),
+        self._artifact,
+    )
+
+
+@op(
+    name="ArrowWeaveList-randomlyDownsample",
+    input_type={
+        "self": ArrowWeaveListType(),
+        "n": types.Int(),
+    },
+    output_type=lambda input_types: input_types["self"],
+    pure=False,
+)
+def sample(self, n):
+    if n < 0:
+        raise ValueError("n must be non-negative")
+
+    elif n >= len(self):
+        return self
+
+    arr = np.zeros(len(self), dtype=bool)
+    indices = np.random.choice(len(self), n, replace=False)
+    arr[indices] = True
+
+    arrow_data = self._arrow_data
+    new_arrow_data = arrow_data.filter(pa.array(arr))
+
+    return ArrowWeaveList(
+        new_arrow_data,
+        self.object_type,
         self._artifact,
     )
