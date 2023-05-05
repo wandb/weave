@@ -1,5 +1,5 @@
 import typing
-import datetime
+import random
 import math
 
 from ..api import op, weave_class
@@ -372,3 +372,41 @@ def stddev(numbers):
     if len(non_null_numbers) == 0:
         return None
     return np.std(non_null_numbers).tolist()
+
+
+@op(
+    name="number-random_normal",
+)
+def random_normal_single(mean: float, std: float) -> float:
+    """
+    Generate a single random number drawn from a univariate Gaussian distribution
+    with mean `mean` and standard deviation `std`.
+
+    Args:
+        mean (float): The mean of the Gaussian distribution.
+        std (float): The standard deviation of the Gaussian distribution.
+
+    Returns:
+        float: A single float representing the random number generated.
+    """
+    return random.gauss(mean, std)
+
+
+@op(
+    name="numbers-random_normal",
+)
+def random_normal(mean: float, std: float, n: int) -> list[float]:
+    """
+    Generate a list of `n` random numbers drawn from a univariate Gaussian distribution with
+    mean `mean` and standard deviation `std`.
+
+    Args:
+        mean (float): The mean of the Gaussian distribution.
+        std (float): The standard deviation of the Gaussian distribution.
+        n (int): The number of random numbers to generate.
+
+    Returns:
+        list[float]: A list of `n` floats representing the random numbers generated.
+    """
+    samples = [random.gauss(mean, std) for _ in range(n)]
+    return samples
