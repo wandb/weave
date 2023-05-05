@@ -3,14 +3,22 @@ import wandb
 
 # Example of end to end integration test
 def test_run_logging(user_by_api_key_in_env):
-    run = wandb.init()
+    run = wandb.init(project="project_exists")
     run.log({"a": 1})
     run.finish()
 
-    summary_node = weave.ops.project(run.entity, run.project).run(run.id).summary()
+    summary_node = weave.ops.project(run.entity, run.project).run(run.id).summary()["a"]
     summary = weave.use(summary_node)
 
-    assert summary.get("a") == 1
+    assert summary == 1
+
+    is_none_node = weave.ops.project(run.entity, run.project).isNone()
+
+    assert weave.use(is_none_node) == False
+
+    is_none_node = weave.ops.project(run.entity, "project_does_not_exist").isNone()
+
+    assert weave.use(is_none_node) == True
 
 
 # Test each of the auth strategies

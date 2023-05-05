@@ -7,6 +7,7 @@ from .. import registry_mem
 from ..language_features.tagging import tagged_value_type
 from ..ops_domain import wb_domain_types
 from ..ops_primitives import _dict_utils
+import wandb
 
 """
 Tests in this file whould be used to test the graphs that can be constructed

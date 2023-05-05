@@ -62,5 +62,8 @@ def querytoobj(result_dict, result_key, output_type):
         raise ValueError(
             f"Invalid output type for gqlroot-querytoobj, must be a GQLTypeMixin, got {output_type}"
         )
-    res = output_type.instance_class.from_gql(result_dict[result_key])
+    res_gql = result_dict[result_key]
+    if res_gql == None:
+        return None
+    res = output_type.instance_class.from_gql(res_gql)
     return res
