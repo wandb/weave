@@ -53,6 +53,9 @@ def _save_or_publish(
     if name is not None and ":" in name:
         name, source_branch = name.split(":", 1)
 
+    if project is None and publish:
+        project = "weave_ops"
+
     # source_branch = None
     # # If we have an existing ref and its a filesystem artifact
     # # track its branch
@@ -79,7 +82,11 @@ def _save_or_publish(
         # TODO: refactor types to artifacts have a common base class
         if publish:
             # TODO: Potentially add entity and project to namespace the artifact explicitly.
+            from weave.mappers_publisher import map_to_python_remote
+
             artifact = artifact_wandb.WandbArtifact(name, type=wb_type.name)
+            mapper = map_to_python_remote(wb_type, artifact)
+            obj = mapper.apply(obj)
         else:
             artifact = artifact_local.LocalArtifact(name, version=source_branch)
     ref = artifact.set("obj", wb_type, obj)

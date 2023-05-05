@@ -1,5 +1,8 @@
 import contextlib
 import logging
+import typing
+
+from weave.client_interface import ClientInterface
 
 from . import util
 from . import client
@@ -66,7 +69,7 @@ def _make_default_client():
     return client.Client(server.InProcessServer())
 
 
-def get_client():
+def get_client() -> typing.Optional[ClientInterface]:
     c = context_state.get_client()
     if c is None:
         c = _make_default_client()
