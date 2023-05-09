@@ -95,6 +95,9 @@ class Group(panel.Panel, typing.Generic[GroupConfigType]):
             self.config.layered = options["layered"]
         if "preferHorizontal" in options:
             self.config.preferHorizontal = options["preferHorizontal"]
+            self.config.layoutMode = (
+                "horizontal" if options["preferHorizontal"] else "vertical"
+            )
         if "equalSize" in options:
             self.config.equalSize = options["equalSize"]
         if "style" in options:

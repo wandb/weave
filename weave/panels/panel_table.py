@@ -3,6 +3,7 @@ import typing
 
 import weave
 from weave import weave_internal
+from weave.graph import ConstNode, Node, OutputNode
 from .. import panel
 from . import table_state
 
@@ -11,6 +12,8 @@ from . import table_state
 class TableConfig:
     tableState: table_state.TableState
     rowSize: int = dataclasses.field(default_factory=lambda: 1)
+    pinnedRows: dict[str, list[int]] = dataclasses.field(default_factory=dict)
+    activeRowForGrouping: dict[str, int] = dataclasses.field(default_factory=dict)
 
 
 class ColumnDef(typing.TypedDict):
@@ -67,46 +70,68 @@ class Table(panel.Panel):
         return result
 
 
-@weave.op(name="panel_table-columns_refine")
-def columns_refine(self: Table) -> weave.types.Type:
-    columns = self.get_final_named_select_functions()
-    inner_type = weave.types.TypedDict(
-        {
-            col_def["columnName"]: col_def["columnSelectFunction"].type
-            for col_def in columns.values()
+def _get_composite_group_key(self: Table) -> str:
+    if self.config is None:
+        return ""
+    group_by_keys = self.config.tableState.groupBy
+    group_by_keys = group_by_keys or []
+    return ",".join(group_by_keys)
+
+
+def _get_pinned_node(self: Table, data_or_rows_node: Node) -> Node:
+    if self.config is None:
+        return weave.ops.make_list()
+
+    composite_group_key = _get_composite_group_key(self)
+    pinned_data = self.config.pinnedRows.get(composite_group_key)
+    if pinned_data is None or len(pinned_data) == 0:
+        return weave.ops.make_list()
+
+    return weave.ops.make_list(
+        **{
+            f"v_{pin_ndx}": OutputNode(
+                data_or_rows_node.type,
+                "index",
+                {
+                    "arr": data_or_rows_node,
+                    "index": ConstNode(weave.types.Int(), row_ndx),
+                },
+            )
+            for pin_ndx, row_ndx in enumerate(pinned_data)
         }
     )
 
-    # Since we are executing the node, tags don't come out!
-    # if self.config and self.config.tableState.groupBy:
-    #     inner_type = tagged_value_type.TaggedValueType(weave.types.TypedDict({
-    #         "groupKey": weave.types.TypedDict({
-    #             columns[key]['columnName']: columns[key]["columnSelectFunction"].type
-    #             for key in self.config.tableState.groupBy
-    #         })
-    #     }), inner_type)
 
-    return weave.types.List(inner_type)
+def _get_active_node(self: Table, data_or_rows_node: Node) -> Node:
+    composite_group_key = _get_composite_group_key(self)
+    if self.config is None or self.config.activeRowForGrouping is None:
+        return ConstNode(weave.types.NoneType(), None)
+
+    active_index = self.config.activeRowForGrouping.get(composite_group_key)
+
+    if active_index is None:
+        return ConstNode(weave.types.NoneType(), None)
+
+    return OutputNode(
+        data_or_rows_node.type,
+        "index",
+        {
+            "arr": data_or_rows_node,
+            "index": ConstNode(weave.types.Int(), active_index),
+        },
+    )
 
 
-@weave.op(
-    name="panel_table-columns",
-    output_type=weave.types.List(weave.types.TypedDict({})),
-    refine_output_type=columns_refine,
-)
-# TODO: should this be named rows?
-def columns(self: Table):
-    # What a shame we have to execute the table :(
-
+def _get_rows_node(self: Table) -> Node:
     # Apply Filters
-    table_node = self.input_node
+    data_node = self.input_node
     if (
         self.config
         and self.config.tableState.preFilterFunction is not None
         and self.config.tableState.preFilterFunction.type != weave.types.Invalid()
     ):
-        table_node = weave.ops.List.filter(
-            table_node,
+        data_node = weave.ops.List.filter(
+            data_node,
             lambda row: weave_internal.call_fn(
                 self.config.tableState.preFilterFunction, {"row": row}
             ),
@@ -118,8 +143,8 @@ def columns(self: Table):
     group_ids: typing.Set[str] = set()
     if self.config and self.config.tableState.groupBy:
         group_ids = set(self.config.tableState.groupBy)
-        table_node = weave.ops.List.groupby(
-            table_node,
+        data_node = weave.ops.List.groupby(
+            data_node,
             lambda row: weave.ops.dict_(
                 **{
                     columns[col_id]["columnName"]: weave_internal.call_fn(
@@ -131,8 +156,8 @@ def columns(self: Table):
         )
 
     # Apply Selection
-    table_node = weave.ops.List.map(
-        table_node,
+    data_node = weave.ops.List.map(
+        data_node,
         lambda row: weave.ops.dict_(
             **{
                 col_def["columnName"]: (
@@ -165,8 +190,8 @@ def columns(self: Table):
             # else:
             #     return row_node[col_name]
 
-        table_node = weave.ops.List.sort(
-            table_node,
+        data_node = weave.ops.List.sort(
+            data_node,
             lambda row: weave.ops.make_list(
                 **{
                     f"{sort_ndx}": make_sort_fn(sort_def, row)
@@ -176,4 +201,103 @@ def columns(self: Table):
             [sort_def["dir"] for sort_def in sort_defs],
         )
 
-    return weave_internal.use(table_node)
+    return data_node
+
+
+def _get_row_type(self: Table) -> weave.types.Type:
+    columns = self.get_final_named_select_functions()
+    inner_type = weave.types.TypedDict(
+        {
+            col_def["columnName"]: col_def["columnSelectFunction"].type
+            for col_def in columns.values()
+        }
+    )
+
+    # Since we are executing the node, tags don't come out!
+    # if self.config and self.config.tableState.groupBy:
+    #     inner_type = tagged_value_type.TaggedValueType(weave.types.TypedDict({
+    #         "groupKey": weave.types.TypedDict({
+    #             columns[key]['columnName']: columns[key]["columnSelectFunction"].type
+    #             for key in self.config.tableState.groupBy
+    #         })
+    #     }), inner_type)
+
+    return inner_type
+
+
+@weave.op(name="panel_table-rows_refine")
+def rows_refine(self: Table) -> weave.types.Type:
+    return weave.types.List(_get_row_type(self))
+
+
+@weave.op(name="panel_table-rows_single_refine")
+def rows_single_refine(self: Table) -> weave.types.Type:
+    return _get_row_type(self)
+
+
+@weave.op(name="panel_table-data_refine")
+def data_refine(self: Table) -> weave.types.Type:
+    return self.input_node.type
+
+
+@weave.op(name="panel_table-data_single_refine")
+def data_single_refine(self: Table) -> weave.types.Type:
+    if not hasattr(self.input_node.type, "object_type"):
+        return weave.types.Any()
+    return self.input_node.type.object_type  # type: ignore
+
+
+@weave.op(
+    name="panel_table-rows",
+    output_type=weave.types.List(weave.types.TypedDict({})),
+    refine_output_type=rows_refine,
+)
+def rows(self: Table):
+    rows_node = _get_rows_node(self)
+    return weave_internal.use(rows_node)
+
+
+@weave.op(
+    name="panel_table-pinned_data",
+    # We can't use the refine_output_type here, because it will become
+    # non-weavifiable and not sent over the wire.
+    # output_type=lambda inputs: inputs['self'].input_node.output_type,
+    refine_output_type=data_refine,
+)
+def pinned_data(self: Table) -> typing.List[typing.Any]:
+    pinned_data_node = _get_pinned_node(self, self.input_node)
+    return weave.use(pinned_data_node)
+
+
+@weave.op(
+    name="panel_table-pinned_rows",
+    output_type=weave.types.List(weave.types.TypedDict({})),
+    refine_output_type=rows_refine,
+)
+def pinned_rows(self: Table):
+    rows_node = _get_rows_node(self)
+    pinned_data_node = _get_pinned_node(self, rows_node)
+    return weave.use(pinned_data_node)
+
+
+@weave.op(
+    name="panel_table-active_data",
+    # We can't use the refine_output_type here, because it will become
+    # non-weavifiable and not sent over the wire.
+    # output_type=lambda inputs: inputs['self'].input_node.output_type.object_type,
+    refine_output_type=data_single_refine,
+)
+def active_data(self: Table) -> typing.Optional[typing.Any]:
+    data_node = _get_active_node(self, self.input_node)
+    return weave.use(data_node)
+
+
+@weave.op(
+    name="panel_table-active_row",
+    output_type=weave.types.List(weave.types.TypedDict({})),
+    refine_output_type=rows_single_refine,
+)
+def active_row(self: Table):
+    rows_node = _get_rows_node(self)
+    data_node = _get_active_node(self, rows_node)
+    return weave.use(data_node)
