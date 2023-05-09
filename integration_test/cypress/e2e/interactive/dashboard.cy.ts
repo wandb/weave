@@ -3,7 +3,7 @@ import {exec} from '../testlib';
 
 const gotoBlankDashboard = async () => {
   const result = await promisify(
-    exec('python cypress/e2e/interactive/distribution.py', 10000)
+    exec('python cypress/e2e/interactive/blank.py', 10000)
   );
   const url = result.stdout;
   // E.g. for devmode
@@ -11,7 +11,7 @@ const gotoBlankDashboard = async () => {
   //   '/?fullScreen=&expNode=%7B%22nodeType%22%3A+%22output%22%2C+%22type%22%3A+%7B%22type%22%3A+%22Group%22%2C+%22_base_type%22%3A+%7B%22type%22%3A+%22Panel%22%2C+%22_base_type%22%3A+%7B%22type%22%3A+%22Object%22%7D%7D%2C+%22_is_object%22%3A+true%2C+%22input_node%22%3A+%7B%22type%22%3A+%22function%22%2C+%22inputTypes%22%3A+%7B%7D%2C+%22outputType%22%3A+%22invalid%22%7D%2C+%22vars%22%3A+%7B%22type%22%3A+%22typedDict%22%2C+%22propertyTypes%22%3A+%7B%7D%7D%2C+%22config%22%3A+%7B%22type%22%3A+%22GroupConfig%22%2C+%22_base_type%22%3A+%7B%22type%22%3A+%22Object%22%7D%2C+%22_is_object%22%3A+true%2C+%22items%22%3A+%7B%22type%22%3A+%22typedDict%22%2C+%22propertyTypes%22%3A+%7B%22op-multi_distribution0%22%3A+%7B%22type%22%3A+%22op-multi_distribution%22%2C+%22_base_type%22%3A+%7B%22type%22%3A+%22Panel%22%2C+%22_base_type%22%3A+%7B%22type%22%3A+%22Object%22%7D%7D%2C+%22_is_object%22%3A+true%2C+%22input_node%22%3A+%7B%22type%22%3A+%22function%22%2C+%22inputTypes%22%3A+%7B%7D%2C+%22outputType%22%3A+%7B%22type%22%3A+%22list%22%2C+%22objectType%22%3A+%7B%22type%22%3A+%22typedDict%22%2C+%22propertyTypes%22%3A+%7B%22name%22%3A+%22string%22%2C+%22loss1%22%3A+%7B%22type%22%3A+%22list%22%2C+%22objectType%22%3A+%22float%22%7D%2C+%22loss2%22%3A+%7B%22type%22%3A+%22list%22%2C+%22objectType%22%3A+%22float%22%7D%2C+%22str_val%22%3A+%7B%22type%22%3A+%22list%22%2C+%22objectType%22%3A+%22string%22%7D%7D%7D%7D%7D%2C+%22vars%22%3A+%7B%22type%22%3A+%22typedDict%22%2C+%22propertyTypes%22%3A+%7B%7D%7D%2C+%22config%22%3A+%7B%22type%22%3A+%22op-multi_distributionConfig%22%2C+%22_base_type%22%3A+%7B%22type%22%3A+%22Object%22%7D%2C+%22_is_object%22%3A+true%2C+%22value_fn%22%3A+%7B%22type%22%3A+%22function%22%2C+%22inputTypes%22%3A+%7B%22item%22%3A+%7B%22type%22%3A+%22typedDict%22%2C+%22propertyTypes%22%3A+%7B%22name%22%3A+%22string%22%2C+%22loss1%22%3A+%22float%22%2C+%22loss2%22%3A+%22float%22%2C+%22str_val%22%3A+%22string%22%7D%7D%7D%2C+%22outputType%22%3A+%7B%22type%22%3A+%22typedDict%22%2C+%22propertyTypes%22%3A+%7B%22name%22%3A+%22string%22%2C+%22loss1%22%3A+%22float%22%2C+%22loss2%22%3A+%22float%22%2C+%22str_val%22%3A+%22string%22%7D%7D%7D%2C+%22label_fn%22%3A+%7B%22type%22%3A+%22function%22%2C+%22inputTypes%22%3A+%7B%22item%22%3A+%7B%22type%22%3A+%22typedDict%22%2C+%22propertyTypes%22%3A+%7B%22name%22%3A+%22string%22%2C+%22loss1%22%3A+%22float%22%2C+%22loss2%22%3A+%22float%22%2C+%22str_val%22%3A+%22string%22%7D%7D%7D%2C+%22outputType%22%3A+%22invalid%22%7D%2C+%22bin_size%22%3A+%7B%22type%22%3A+%22function%22%2C+%22inputTypes%22%3A+%7B%7D%2C+%22outputType%22%3A+%22float%22%7D%7D%2C+%22id%22%3A+%22string%22%7D%7D%7D%2C+%22gridConfig%22%3A+%22none%22%2C+%22liftChildVars%22%3A+%22none%22%2C+%22allowedPanels%22%3A+%22none%22%2C+%22enableAddPanel%22%3A+%22none%22%2C+%22childNameBase%22%3A+%22none%22%2C+%22showExpressions%22%3A+%22boolean%22%2C+%22layered%22%3A+%22boolean%22%2C+%22preferHorizontal%22%3A+%22boolean%22%2C+%22equalSize%22%3A+%22boolean%22%2C+%22style%22%3A+%22string%22%2C+%22grid%22%3A+%22boolean%22%7D%2C+%22id%22%3A+%22string%22%7D%2C+%22fromOp%22%3A+%7B%22name%22%3A+%22get%22%2C+%22inputs%22%3A+%7B%22uri%22%3A+%7B%22nodeType%22%3A+%22const%22%2C+%22type%22%3A+%22string%22%2C+%22val%22%3A+%22local-artifact%3A%2F%2F%2Fdashboard-op-multi_distribution0%3Alatest%2Fobj%22%7D%7D%7D%7D&exp=get%28%0A++++%22local-artifact%3A%2F%2F%2Fdashboard-op-multi_distribution0%3Alatest%2Fobj%22%29';
   cy.viewport(1600, 900);
   cy.visit(url);
-  cy.wait(10000);
+  cy.wait(2000);
 
   cy.get('[data-weavepath=root]').last().trigger('mouseover');
   cy.get('i.cog').first().click();
@@ -80,7 +80,7 @@ const sliderSetValue = (path: string[], value: number) => {
 
 describe('dashboard', () => {
   it('dashboard', async () => {
-    gotoBlankDashboard();
+    await gotoBlankDashboard();
 
     // Setup sidebar
     panelTypeInputExpr(['sidebar', 'query0'], 'range(0, 100, 1)');
@@ -98,12 +98,12 @@ describe('dashboard', () => {
 
     // Add another table panel
     addMainPanel();
-    panelTypeInputExpr(['main', 'panel1'], 'panel0.columns');
+    panelTypeInputExpr(['main', 'panel1'], 'panel0.all_rows');
     tableCheckContainsValue(['main', 'panel1'], '5.657');
 
     // Add plot panel
     addMainPanel();
-    panelTypeInputExpr(['main', 'panel2'], 'panel0.columns');
+    panelTypeInputExpr(['main', 'panel2'], 'panel0.all_rows');
     panelChangeId(['main', 'panel2'], 'plot');
 
     sliderSetValue(['sidebar', 'query2'], 0.5);

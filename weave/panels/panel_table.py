@@ -248,7 +248,7 @@ def data_single_refine(self: Table) -> weave.types.Type:
 
 
 @weave.op(
-    name="panel_table-rows",
+    name="panel_table-all_rows",
     output_type=weave.types.List(weave.types.TypedDict({})),
     refine_output_type=rows_refine,
 )

@@ -64,7 +64,7 @@ def test_publish_group(user_by_api_key_in_env):
                 ],
             ),
             "plot": lambda table: weave.panels.Plot(
-                table.rows(),
+                table.all_rows(),
                 x=lambda row: row["c_0"],
                 y=lambda row: row["c_1"],
             ),
