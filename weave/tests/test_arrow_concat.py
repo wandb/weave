@@ -7,6 +7,11 @@ from ..ops_domain import wbmedia
 from .. import artifact_local
 from .. import storage
 
+# This is not a valid artifact, but we need one to test. We set _read_dirname
+# so that the artifact's is_saved property is True, so that everything works
+# as expected.
+UNSAVED_TEST_ARTIFACT = artifact_local.LocalArtifact("artifact2", "latest")
+UNSAVED_TEST_ARTIFACT._read_dirname = "x"
 
 CONCAT_TEST_CASES = [
     ([1, 2, 3], [4, 5, 6]),
@@ -32,7 +37,7 @@ CONCAT_TEST_CASES = [
         [1, 2, 3],
         [
             wbmedia.ImageArtifactFileRef(
-                artifact_local.LocalArtifact("artifact", "latest"),
+                UNSAVED_TEST_ARTIFACT,
                 "path",
                 "format",
                 25,
@@ -47,7 +52,7 @@ CONCAT_TEST_CASES = [
     (
         [
             wbmedia.ImageArtifactFileRef(
-                artifact_local.LocalArtifact("artifact1", "latest"),
+                UNSAVED_TEST_ARTIFACT,
                 "path1",
                 "format1",
                 25,
@@ -73,7 +78,7 @@ CONCAT_TEST_CASES = [
         ],
         [
             wbmedia.ImageArtifactFileRef(
-                artifact_local.LocalArtifact("artifact2", "latest"),
+                UNSAVED_TEST_ARTIFACT,
                 "path2",
                 "format2",
                 50,
@@ -91,7 +96,7 @@ CONCAT_TEST_CASES = [
             {
                 "a": 7,
                 "b": wbmedia.ImageArtifactFileRef(
-                    artifact_local.LocalArtifact("artifact2", "latest"),
+                    UNSAVED_TEST_ARTIFACT,
                     "path2",
                     "format2",
                     50,
@@ -110,7 +115,7 @@ CONCAT_TEST_CASES = [
             {
                 "a": 7,
                 "b": wbmedia.ImageArtifactFileRef(
-                    artifact_local.LocalArtifact("artifact2", "latest"),
+                    UNSAVED_TEST_ARTIFACT,
                     "path2",
                     "format2",
                     50,
@@ -146,7 +151,7 @@ CONCAT_TEST_CASES = [
             {
                 "a": 7,
                 "b": wbmedia.ImageArtifactFileRef(
-                    artifact_local.LocalArtifact("artifact2", "latest"),
+                    UNSAVED_TEST_ARTIFACT,
                     "path2",
                     "format2",
                     50,
@@ -177,7 +182,7 @@ CONCAT_TEST_CASES = [
             {
                 "a": 7,
                 "b": wbmedia.ImageArtifactFileRef(
-                    artifact_local.LocalArtifact("artifact2", "latest"),
+                    UNSAVED_TEST_ARTIFACT,
                     "path2",
                     "format2",
                     50,
@@ -204,7 +209,7 @@ CONCAT_TEST_CASES = [
             {
                 "a": 45,
                 "b": wbmedia.ImageArtifactFileRef(
-                    artifact_local.LocalArtifact("artifact2", "latest"),
+                    UNSAVED_TEST_ARTIFACT,
                     "path2",
                     "format2",
                     50,
@@ -221,7 +226,7 @@ CONCAT_TEST_CASES = [
             {
                 "a": 11,
                 "b": wbmedia.ImageArtifactFileRef(
-                    artifact_local.LocalArtifact("artifact2", "latest"),
+                    UNSAVED_TEST_ARTIFACT,
                     "path2",
                     "format2",
                     67,
@@ -247,6 +252,9 @@ def fix_for_compare(x1):
             **{k: fix_for_compare(v) for k, v in dataclasses.asdict(x1).items()}
         )
     elif isinstance(x1, artifact_local.LocalArtifact):
+        # Same hack as what we did to construct UNSAVED_TEST_ARTIFACT above.
+        if x1._read_dirname is None:
+            x1._read_dirname = "x"
         return (x1.name, x1.version)
     return x1
 

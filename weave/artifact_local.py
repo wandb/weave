@@ -98,9 +98,15 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
     def __repr__(self):
         return "<LocalArtifact(%s) %s %s>" % (id(self), self.name, self._version)
 
+    def delete(self):
+        shutil.rmtree(self._root)
+
+    def rename(self, new_name: str):
+        shutil.move(self._root, os.path.join(local_artifact_dir(), new_name))
+
     @property
     def is_saved(self) -> bool:
-        return self._version is not None
+        return self._read_dirname is not None and self._version is not None
 
     @property
     def version(self):

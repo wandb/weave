@@ -5,14 +5,6 @@ from .. import weave_types as types
 
 @weave_class(weave_type=types.Boolean)
 class Boolean:
-    @op(
-        name="boolean-set",
-        input_type={"self": types.Boolean(), "val": types.Boolean()},
-        output_type=types.Boolean(),
-    )
-    def set(self: bool, val: bool):  # type: ignore
-        return val
-
     @op(name="boolean-equal")
     def bool_equals(lhs: typing.Optional[bool], rhs: typing.Optional[bool]) -> bool:  # type: ignore
         return lhs == rhs

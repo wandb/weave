@@ -138,6 +138,14 @@ def objects(of_type: types.Type, alias: str, timestamp: int):
     return storage.objects(of_type, alias)
 
 
+# Return all local artifacts
+# TODO: this is a placeholder used for loading dashboards. We won't really want to load
+# all of them!
+@op(render_info={"type": "function"})
+def local_artifacts() -> list[artifact_local.LocalArtifact]:
+    return storage.local_artifacts()
+
+
 # TODO: used_by, created_by, and change them to use filter instead
 #    to get filter output type right, I'll have to implement using refineOutputType
 #    for now. We can optimize by moving this to the type system a little later.
@@ -145,7 +153,10 @@ def objects(of_type: types.Type, alias: str, timestamp: int):
 
 
 def op_get_return_type(uri):
-    return ref_base.Ref.from_str(uri).type
+    ref = ref_base.Ref.from_str(uri)
+    if not ref.is_saved:
+        return types.NoneType()
+    return ref.type
 
 
 def get_const_val(list_type_or_node):
@@ -171,7 +182,6 @@ def get_returntype(uri):
 
 
 def _save(name, obj, setter_options, action=None):
-
     obj_uri = uris.WeaveURI.parse(name)
     branch = setter_options.get("branch")
 
@@ -271,7 +281,10 @@ def _set(name, obj, setter_options, action=None):
     refine_output_type=get_returntype,
 )
 def get(uri):
-    return storage.get(uri)
+    ref = ref_base.Ref.from_str(uri)
+    if not ref.is_saved:
+        return None
+    return ref.get()
 
 
 @op(
@@ -436,6 +449,62 @@ def merge(self, root_args: typing.Any = None) -> typing.Any:
         raise errors.WeaveInternalError("Merge op argument must be a const string")
 
     return _merge(self.from_op.inputs["uri"].val)
+
+
+@mutation
+def delete_artifact(
+    self: graph.Node[typing.Any], root_args: typing.Any = None
+) -> typing.Any:
+    if not isinstance(self, graph.OutputNode):
+        raise errors.WeaveInternalError("Merge target must be an OutputNode")
+
+    if self.from_op.name != "get":
+        raise errors.WeaveInternalError("Merge target must be a get")
+
+    if not isinstance(self.from_op.inputs["uri"], graph.ConstNode):
+        raise errors.WeaveInternalError("Merge op argument must be a const string")
+
+    name = self.from_op.inputs["uri"].val
+
+    obj_uri = uris.WeaveURI.parse(name)
+    if not isinstance(
+        obj_uri,
+        (artifact_wandb.WeaveWBArtifactURI, artifact_local.WeaveLocalArtifactURI),
+    ):
+        raise errors.WeaveInternalError(
+            "Cannot merge artifact of type %s" % type(obj_uri)
+        )
+
+    head_ref = obj_uri.to_ref()
+    head_ref.artifact.delete()
+
+
+@mutation
+def rename_artifact(
+    self: graph.Node[typing.Any], new_name: str, root_args: typing.Any = None
+) -> typing.Any:
+    if not isinstance(self, graph.OutputNode):
+        raise errors.WeaveInternalError("Merge target must be an OutputNode")
+
+    if self.from_op.name != "get":
+        raise errors.WeaveInternalError("Merge target must be a get")
+
+    if not isinstance(self.from_op.inputs["uri"], graph.ConstNode):
+        raise errors.WeaveInternalError("Merge op argument must be a const string")
+
+    name = self.from_op.inputs["uri"].val
+
+    obj_uri = uris.WeaveURI.parse(name)
+    if not isinstance(
+        obj_uri,
+        (artifact_wandb.WeaveWBArtifactURI, artifact_local.WeaveLocalArtifactURI),
+    ):
+        raise errors.WeaveInternalError(
+            "Cannot merge artifact of type %s" % type(obj_uri)
+        )
+
+    head_ref = obj_uri.to_ref()
+    head_ref.artifact.rename(new_name)
 
 
 @weave_class(weave_type=types.Function)

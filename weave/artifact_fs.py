@@ -107,6 +107,12 @@ class FilesystemArtifact(artifact_base.Artifact):
     def uri(self) -> str:
         return str(self.uri_obj)
 
+    def delete(self) -> None:
+        raise NotImplementedError
+
+    def rename(self, new_name: str) -> None:
+        raise NotImplementedError
+
     def direct_url(self, path: str) -> typing.Optional[str]:
         raise NotImplementedError
 
@@ -152,7 +158,7 @@ class FilesystemArtifactRef(artifact_base.ArtifactRef):
         raise NotImplementedError
 
     def __repr__(self) -> str:
-        return f"<{self.__class__}({id(self)}) artifact={self.artifact} path={self.path} type={self.type} obj={self.obj is not None} extra={self.extra}"
+        return f"<{self.__class__}({id(self)}) artifact={self.artifact} path={self.path} type={self.type} extra={self.extra}"
 
     @property
     def type(self) -> types.Type:

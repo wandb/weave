@@ -27,3 +27,10 @@ def artifact_file(
     None, artifact_fs.FilesystemArtifactFile  # , artifact_fs.FilesystemArtifactDir
 ]:
     return artifact.path_info(path)  # type:ignore
+
+
+@op(
+    name="FilesystemArtifact-artifactName",
+)
+def artifact_artifactname(artifact: artifact_fs.FilesystemArtifact) -> str:
+    return artifact.name

@@ -151,6 +151,20 @@ def clear_ref(obj):
 get_ref = _get_ref
 
 
+# Return all local artifacts.
+# Warning: may iterate a lot of the filesystem!
+def local_artifacts() -> typing.List[artifact_local.LocalArtifact]:
+    result = []
+    obj_paths = sorted(
+        pathlib.Path(artifact_local.local_artifact_dir()).iterdir(),
+        key=os.path.getctime,
+    )
+    for art_path in obj_paths:
+        if os.path.basename(art_path) != "tmp":
+            result.append(artifact_local.LocalArtifact(art_path.name, None))
+    return result
+
+
 def all_objects():
     result = []
     obj_paths = sorted(
