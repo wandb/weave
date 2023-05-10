@@ -105,12 +105,9 @@ def _get_pinned_node(self: Table, data_or_rows_node: Node) -> Node:
 def _get_active_node(self: Table, data_or_rows_node: Node) -> Node:
     composite_group_key = _get_composite_group_key(self)
     if self.config is None or self.config.activeRowForGrouping is None:
-        return ConstNode(weave.types.NoneType(), None)
-
-    active_index = self.config.activeRowForGrouping.get(composite_group_key)
-
-    if active_index is None:
-        return ConstNode(weave.types.NoneType(), None)
+        active_index = 0
+    else:
+        active_index = self.config.activeRowForGrouping.get(composite_group_key, 0)
 
     return OutputNode(
         data_or_rows_node.type,
@@ -232,7 +229,7 @@ def rows_refine(self: Table) -> weave.types.Type:
 
 @weave.op(name="panel_table-rows_single_refine")
 def rows_single_refine(self: Table) -> weave.types.Type:
-    return _get_row_type(self)
+    return weave.types.optional(_get_row_type(self))
 
 
 @weave.op(name="panel_table-data_refine")
@@ -244,7 +241,7 @@ def data_refine(self: Table) -> weave.types.Type:
 def data_single_refine(self: Table) -> weave.types.Type:
     if not hasattr(self.input_node.type, "object_type"):
         return weave.types.Any()
-    return self.input_node.type.object_type  # type: ignore
+    return weave.types.optional(self.input_node.type.object_type)  # type: ignore
 
 
 @weave.op(
@@ -294,7 +291,7 @@ def active_data(self: Table) -> typing.Optional[typing.Any]:
 
 @weave.op(
     name="panel_table-active_row",
-    output_type=weave.types.List(weave.types.TypedDict({})),
+    output_type=weave.types.optional(weave.types.TypedDict({})),
     refine_output_type=rows_single_refine,
 )
 def active_row(self: Table):

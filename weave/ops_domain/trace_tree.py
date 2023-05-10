@@ -90,8 +90,8 @@ class WBTraceTree:
     root_span_dumps: str  # Span
     model_dict_dumps: typing.Optional[
         str
-    ]  # typing.Optional[typing.Dict[str, typing.Any]]
-    model_hash: typing.Optional[str]
+    ] = None  # typing.Optional[typing.Dict[str, typing.Any]]
+    model_hash: typing.Optional[str] = None
 
     @weave.op()
     def startTime(self) -> typing.Optional[int]:
