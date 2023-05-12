@@ -310,8 +310,13 @@ def compile_apply_column_pushdown(leaf_nodes: list[graph.Node]) -> list[graph.No
         if isinstance(node, graph.OutputNode) and node.from_op.name == "project-runs2":
             forward_obj = p.get_result(node)
             run_cols = compile_table.get_projection(forward_obj)
-            config_cols = list(run_cols.get("config", {}).keys())
-            summary_cols = list(run_cols.get("summary", {}).keys())
+            config_cols = []
+            summary_cols = []
+            for col in run_cols:
+                if col.startswith("config."):
+                    config_cols.append(col[7:])
+                elif col.startswith("summary."):
+                    summary_cols.append(col[8:])
             return graph.OutputNode(
                 node.type,
                 "project-runs2_with_columns",
