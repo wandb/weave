@@ -36,6 +36,7 @@
 
 import json
 import typing
+from typing_extensions import NotRequired
 import logging
 from .. import compile_table
 from ..compile_domain import wb_gql_op_plugin, InputAndStitchProvider
@@ -316,6 +317,8 @@ def refine_history_type(run: wdt.Run) -> types.Type:
 class SampledHistorySpec(typing.TypedDict):
     keys: list[str]
     samples: int
+    minStep: NotRequired[int]
+    maxStep: NotRequired[int]
 
 
 def _history_key_to_sampled_history_spec(key: str) -> SampledHistorySpec:
@@ -328,6 +331,8 @@ def _history_key_to_sampled_history_spec(key: str) -> SampledHistorySpec:
         # for discussion.
         "keys": [key, "_timestamp"] if key == "_step" else [key, "_step"],
         "samples": 2**63 - 1,  # max int64
+
+        "maxStep": 10, # THIS IS OBVIOUSLY WRONG AND JUST FOR THE PROOF OF CONCEPT
     }
 
 
