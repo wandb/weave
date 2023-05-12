@@ -46,3 +46,6 @@ from .panel_domain import *
 
 # Incomplete
 from .panel_histogram import *
+
+# legacy
+from .panel_legacy import *
