@@ -62,7 +62,7 @@ class UntypedOpaqueDict:
     @classmethod
     def from_json_dict(cls, json_dict: dict):
         inst = cls(json_str=json.dumps(json_dict, separators=(",", ":")))
-        inst.__dict__["json_dict"] = json_dict
+        inst._json_dict = json_dict
         return inst
 
     def get(self, key):
