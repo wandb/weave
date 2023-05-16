@@ -1,7 +1,6 @@
 name: mutations-perf
 
 on:
-
   workflow_dispatch:
     inputs:
       test:
