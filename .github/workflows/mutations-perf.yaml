@@ -20,3 +20,7 @@ jobs:
           fetch-depth: 2
       - name: echo
         run: echo "hello world"
+      - name: Install dependencies
+        run: pip install dataset
+      - name: Run Webgpt Comparisons performance test
+        run: python webgpt_data_load_test.py
