@@ -1,0 +1,20 @@
+name: mutations-perf
+
+on:
+  workflow_dispatch:
+    inputs:
+      test:
+        description: 'Test to run'
+        required: true
+        default: 'test'
+
+jobs:
+  run-perf:
+    name: Run Performance Test
+    runs-on: [self-hosted, builder]
+    env:
+      REGISTRY: us-east4-docker.pkg.dev/weave-support-367421/weave-images
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 2
