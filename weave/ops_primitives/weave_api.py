@@ -367,7 +367,6 @@ def mutate_op_body(
     op_inputs = []
     arg0 = list(nodes[0].from_op.inputs.values())[0].val
     for node in nodes:
-        print(f"YO: {node}")
         inputs = {}
         arg0_name = list(node.from_op.inputs.keys())[0]
         inputs[arg0_name] = arg0
@@ -385,19 +384,16 @@ def mutate_op_body(
         op_inputs.append(inputs)
         op_def = registry_mem.memory_registry.get_op(node.from_op.name)
         arg0 = op_def.resolve_fn(**inputs)
-        print(arg0)
         results.append(arg0)
 
     # Make the updates backwards
     res = make_new_value(arg0)
-    print("YO: all res", res, results)
 
     for i, (node, inputs, result) in reversed(
         list(enumerate(zip(nodes, op_inputs, results)))
     ):
         op_def = registry_mem.memory_registry.get_op(node.from_op.name)
         if not op_def.setter:
-            print("YO:res1", res)
             return res
             # TODO: we can't raise the error here. Some of the tests
             # rely on partial setter chains.
@@ -413,8 +409,7 @@ def mutate_op_body(
             res = op_def.setter.func(*args)  # type: ignore
         except AttributeError:
             res = op_def.setter(*args)
-        print("YO:update value", res)
-    print("YO:res2", res)
+
     return res
 
 
