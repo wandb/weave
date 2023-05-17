@@ -44,7 +44,8 @@ def main(update_duration=60):
         if curr_time - st0 > 3:
             print(f"Items modified: {count}, {count/(curr_time - t0):0.2f} updates per sec")
             st0 = curr_time
-    print(f"Items modified after 5 minutes: {count}")
+    print(f"Items modified after {update_duration} seconds: {count}")
+    print(f"::set-output name=updates-per-sec::{count/(curr_time - t0):0.2f}")
 
 
 if __name__ == "__main__":
