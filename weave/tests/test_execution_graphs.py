@@ -45,7 +45,7 @@ def test_zlib_playback():
 filter_node = ""
 
 # Paste zlib below (from DD)
-zlib_str = ""
+zlib_str = "eJzdVU1v4yAQ/Ssrzo4CGPx13V566V5yW1UVxtihccDCeLVR5P++4Ni7TtPmQ+leerERM/Nm5j0Y9qAyrFm3INsDpQvhFj8Pq9WuESADurNNZ0EASqO3PxqQoQDYg4mpnduXhVvGMUlhGoYUYkhTnIA+cChs691a4cOlcjBDmlbUJchwAH6x2sGRABit7QszlTMj2g+h/wrgWrUe4JB0PyUvO8Wt1GqC9t4evg/GklfH/pZVlSg8Dqvm2+5XPEjuMzRGN8LY3QTlgAvx+/ta8E2jpbLO3X9dgb70bujNGqmqaWsi8SPqyNveTj1O+vy/dU/yIQIhJTBKMEkIInP5Gsk3R/rp/BVkNAAbsXN6hRd7iq7u6VNaVd02F2be7X2k3YrDdf3C5kdjIhnDMIIpjgnFYYIwnpM8JD9imRkDsjgYLRnCF3lOTniu5XBznGCCX3sfvqgGkwh+TMEooihEUZJANBfB07XgRjArHo8LWTkyTsRJLyqC4KdIctdVv5ewEGNCE+JYI5DEYTonrHoz2TsjXdPo/ASfcowTE9Sas3rBjJUl4zZbLpeeo6xrhVngGEUp4jklRV6KJEeYRpCUApVxHtOQL/0sOp9tPIpjNnhTaQdWbgpxj9033ZyPuU6S3DDF1+++MX9NV5HkIp/9mTJOrqfxiYfPff8HAIWm+g=="
 
 # Paste graphs below (from DD or Network tab to test)
 execute_payloads: list[dict] = []

@@ -190,7 +190,10 @@ def _save(name, obj, setter_options, action=None):
     if isinstance(art_ref, artifact_fs.FilesystemArtifactRef):
         art = art_ref.artifact
         if branch is not None and branch != art.branch:
-            forked = artifact_local.LocalArtifact(name=art.name, version=art.version)
+            version = art.version
+            if isinstance(art, artifact_wandb.WandbArtifact):
+                version = art.commit_hash
+            forked = artifact_local.LocalArtifact(name=art.name, version=version)
             forked._original_uri = name
 
     ref = storage.save(
@@ -505,6 +508,41 @@ def rename_artifact(
 
     head_ref = obj_uri.to_ref()
     head_ref.artifact.rename(new_name)
+
+
+@mutation
+def publish_artifact(
+    self: graph.Node[typing.Any],
+    project_name: str,
+    artifact_name: str,
+    # root_args: typing.Any = None,
+) -> typing.Any:
+    if not isinstance(self, graph.OutputNode):
+        raise errors.WeaveInternalError("Publish target must be an OutputNode")
+
+    if self.from_op.name != "get":
+        raise errors.WeaveInternalError("Publish target must be a get")
+
+    if not isinstance(self.from_op.inputs["uri"], graph.ConstNode):
+        raise errors.WeaveInternalError("Publish op argument must be a const string")
+
+    name = self.from_op.inputs["uri"].val
+
+    obj_uri = uris.WeaveURI.parse(name)
+    if not isinstance(
+        obj_uri,
+        (artifact_wandb.WeaveWBArtifactURI, artifact_local.WeaveLocalArtifactURI),
+    ):
+        raise errors.WeaveInternalError(
+            "Cannot merge artifact of type %s" % type(obj_uri)
+        )
+
+    head_ref = obj_uri.to_ref()
+    ref = storage.publish(
+        head_ref.get(), f"{project_name}/{artifact_name}", head_ref.type
+    )
+    return get(str(ref))
+    # return weave_internal.make_const_node(ref.type, ref.obj)
 
 
 @weave_class(weave_type=types.Function)
