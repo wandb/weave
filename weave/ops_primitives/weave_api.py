@@ -59,6 +59,16 @@ def save_to_ref(obj: typing.Any, name: typing.Optional[str]):
     return ref
 
 
+@op(
+    name="save_to_uri",
+    output_type=types.RefType(),
+    hidden=True,
+)
+def save_to_uri(obj: typing.Any, name: typing.Optional[str]):
+    ref = storage.save(obj, name=name)
+    return str(ref.uri)
+
+
 def usedby_output_type(op_name: str) -> types.Type:
     op_def = registry_mem.memory_registry.get_op(op_name)
 
