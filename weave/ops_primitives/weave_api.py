@@ -385,7 +385,7 @@ def mutate_op_body(
         op_inputs.append(inputs)
         op_def = registry_mem.memory_registry.get_op(node.from_op.name)
         arg0 = op_def.resolve_fn(**inputs)
-        print(arg0)
+        # print("YO:", arg0)
         results.append(arg0)
 
     # Make the updates backwards
