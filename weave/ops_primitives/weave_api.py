@@ -542,7 +542,6 @@ def publish_artifact(
         head_ref.get(), f"{project_name}/{artifact_name}", head_ref.type
     )
     return get(str(ref))
-    # return weave_internal.make_const_node(ref.type, ref.obj)
 
 
 @weave_class(weave_type=types.Function)
