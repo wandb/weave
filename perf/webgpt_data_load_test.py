@@ -5,7 +5,7 @@ import weave
 import argh
 
 
-def main():
+def main(update_duration=60):
     print("loading dataset")
     dataset = load_dataset("openai/webgpt_comparisons", split="train", keep_in_memory=True)
     print("removing columns from the dataset")
@@ -25,14 +25,16 @@ def main():
 
     op = weave.save(weave_input, name="webgpt-data:main")
 
-    print("saved dataset")
+    print(f"saved dataset, {len(weave_input)} items")
     # Write to random items
 
     t0 = time.time()
     num_rows = len(weave.use(op))
     count = 0
+
+    print(f"starting to update items for {update_duration} seconds")
     st0 = time.time()
-    while time.time() - t0 < 2*60:
+    while time.time() - t0 < update_duration:
         idx = random.randint(0, num_rows)
         # In reality we'll be setting the feedback column but this tests the same operation
         rand_str = random.choice(["👍👎"])
