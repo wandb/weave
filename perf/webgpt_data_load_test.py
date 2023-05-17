@@ -5,7 +5,7 @@ import weave
 import argh
 
 
-def main(update_duration=60):
+def main(update_duration=60, output_file="/tmp/output.md"):
     print("loading dataset")
     dataset = load_dataset("openai/webgpt_comparisons", split="train", keep_in_memory=True)
     print("removing columns from the dataset")
@@ -44,9 +44,19 @@ def main(update_duration=60):
         if curr_time - st0 > 3:
             print(f"Items modified: {count}, {count/(curr_time - t0):0.2f} updates per sec")
             st0 = curr_time
-    print(f"Items modified after {update_duration} seconds: {count}")
-    print(f"::set-output name=updates-per-sec::{count/(curr_time - t0):0.2f}")
+    ups = count/(curr_time - t0)
+    status = "🟥"
+    if ups > 10:
+        status = "🟧"
+    elif ups > 100:
+        status = "🟩"
 
+    print(f"Items modified after {update_duration} seconds: {count}")
+    print(f"::set-output name=updates-per-sec::{ups:0.2f}")
+    with open(output_file, "w") as f:
+        f.write(f"Items modified after {update_duration} seconds: {count}\n")
+        f.write(f"Updates per second: {ups:0.2f}\n")
+        f.write(f"# status: {status}")
 
 if __name__ == "__main__":
     argh.dispatch_command(main)
