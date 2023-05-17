@@ -62,7 +62,7 @@ gql_connection_op(
     "projects",
     wdt.ProjectType,
     {},
-    lambda inputs: f"first: 100",
+    # lambda inputs: f"first: 100",
 )
 
 # Section 6/6: Non Standard Business Logic Ops

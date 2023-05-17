@@ -22,7 +22,9 @@ class InputProvider:
         if key not in self.raw:
             raise KeyError(f"Input {key} not found")
         if key not in self._dumps_cache:
-            self._dumps_cache[key] = json.dumps(self.raw[key])
+            self._dumps_cache[key] = json.dumps(
+                self.raw[key] if self.raw[key] != None else ""
+            )
         return self._dumps_cache[key]
 
 

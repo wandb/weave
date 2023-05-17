@@ -332,12 +332,17 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
         tmpdir_root = pathlib.Path(os.path.join(local_artifact_dir(), "tmp"))
         tmpdir_root.mkdir(exist_ok=True)
 
-        if branch is not None:
-            link_name = os.path.join(self._root, branch)
+        def make_link(dirname: str):
+            link_name = os.path.join(self._root, dirname)
             with tempfile.TemporaryDirectory(dir=tmpdir_root) as d:
                 temp_path = os.path.join(d, "tmplink")
                 os.symlink(commit_hash, temp_path)
                 os.rename(temp_path, link_name)
+
+        if branch is not None:
+            make_link(branch)
+        else:
+            make_link("latest")
 
         if branch is not None:
             self._branch = branch
