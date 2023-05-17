@@ -20,6 +20,8 @@ jobs:
           fetch-depth: 2
       - name: echo
         run: echo "hello world"
+      - name: Setup upterm session
+        uses: lhotari/action-upterm@v1
       - name: Install dependencies
         run: pip install dataset
       - name: Run Webgpt Comparisons performance test
