@@ -40,7 +40,7 @@ jobs:
         env:
           DD_SERVICE: weave-python
           DD_ENV: ci
-        run: WB_SERVER_HOST=http://wandbservice WEAVE_SERVER_DISABLE_ECOSYSTEM=1 source /root/venv/bin/activate && cd weave && pip install -e . && cd .. && python perf/webgpt_data_load_test.py
+        run: WB_SERVER_HOST=http://wandbservice WEAVE_SERVER_DISABLE_ECOSYSTEM=1 source /root/venv/bin/activate && pip install -e . && python perf/webgpt_data_load_test.py
 
 
   build-container:
