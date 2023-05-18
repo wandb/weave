@@ -55,7 +55,7 @@ def main(update_duration=60, output_file="/tmp/output.md"):
     print(f"::set-output name=updates-per-sec::{ups:0.2f}")
     with open(output_file, "w") as f:
         f.write(f"Items modified after {update_duration} seconds: {count}\n")
-        f.write(f"Updates per second: {ups:0.2f}\n")
+        f.write(f"Updates per second: `{ups:0.2f}`\n")
         f.write(f"# status: {status}")
 
 if __name__ == "__main__":
