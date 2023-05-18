@@ -5,7 +5,7 @@ import weave
 import argh
 
 
-def main(update_duration=60, output_file="/tmp/output.md"):
+def main(update_duration=60, output_file="/tmp/output.md", only_download_data=False):
     print("loading dataset")
     dataset = load_dataset("openai/webgpt_comparisons", split="train", keep_in_memory=True)
     print("removing columns from the dataset")
@@ -22,6 +22,9 @@ def main(update_duration=60, output_file="/tmp/output.md"):
     for data in dataset:
         data.update(feedback="?")
         weave_input.append(data)
+
+    if only_download_data:
+        return
 
     op = weave.save(weave_input, name="webgpt-data:main")
 
