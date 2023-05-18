@@ -449,7 +449,7 @@ def append(
 
 
 @mutation
-def merge(self, root_args: typing.Any = None) -> typing.Any:
+def merge(self: graph.Node[typing.Any], root_args: typing.Any = None) -> typing.Any:
     self = compile.compile_fix_calls([self])[0]
 
     if not isinstance(self, graph.OutputNode):
