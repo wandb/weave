@@ -49,7 +49,10 @@ jobs:
       - name: Adding markdown
         run: cat /tmp/output.md >> $GITHUB_STEP_SUMMARY
       - name: Create Flamegraph
-        run: flameprof /tmp/cprof.out > /tmp/cprof.svg
+        run: |
+          set -euo pipefail
+          pip install flameprof
+          flameprof /tmp/cprof.out > /tmp/cprof.svg
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
         with:
