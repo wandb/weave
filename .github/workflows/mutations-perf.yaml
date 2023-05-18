@@ -46,7 +46,7 @@ jobs:
           pip install -e .
           pip install -r perf/requirements.txt
           python -m cProfile -o /tmp/load_test.prof perf/webgpt_data_load_test.py
-          flameprof /tmp/cprof.out > /tmp/cprof.svg
+          flameprof /tmp/load_test.prof > /tmp/load_test.svg
       - name: Adding markdown
         run: cat /tmp/output.md >> $GITHUB_STEP_SUMMARY
       - name: Upload Artifact
