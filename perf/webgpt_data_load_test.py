@@ -46,9 +46,9 @@ def main(update_duration=60, output_file="/tmp/output.md"):
             st0 = curr_time
     ups = count/(curr_time - t0)
     status = "🟥"
-    if ups > 10:
+    if ups > 1:
         status = "🟧"
-    elif ups > 100:
+    elif ups > 5:
         status = "🟩"
 
     print(f"Items modified after {update_duration} seconds: {count}")
