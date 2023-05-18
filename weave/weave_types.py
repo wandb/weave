@@ -109,7 +109,6 @@ class TypeRegistry:
 
     @staticmethod
     def type_of(obj: typing.Any) -> "Type":
-
         obj_type = type_name_to_type("tagged").type_of(obj)
         if obj_type is not None:
             return obj_type
@@ -125,8 +124,10 @@ class TypeRegistry:
         #
         # TODO: Its a small that we need to hardcode here. Fix this.
         potential_types = instance_class_to_potential_type(type(obj))  # type: ignore
-        if "function" in (t.name for t in potential_types):
-            potential_types = [Function]
+        for t in potential_types:
+            if t.name == "function":
+                potential_types = [Function]
+                break
 
         for type_ in reversed(potential_types):
             obj_type = type_.type_of(obj)
@@ -763,6 +764,16 @@ class UnionType(Type):
         )
 
 
+from multiprocessing.dummy import Pool
+
+
+def compute_type(item):
+    obj_type = TypeRegistry.type_of(item)
+    if obj_type is None:
+        raise Exception("can't detect type for object: %s" % item)
+    return obj_type
+
+
 @dataclasses.dataclass(frozen=True)
 class List(Type):
     name = "list"
@@ -775,10 +786,9 @@ class List(Type):
         if not obj:
             return cls(UnknownType())
         list_obj_type = TypeRegistry.type_of(obj[0])
-        for item in obj[1:]:
-            obj_type = TypeRegistry.type_of(item)
-            if obj_type is None:
-                raise Exception("can't detect type for object: %s" % item)
+        with Pool() as p:
+            obj_types = p.map(compute_type, obj[1:])
+        for obj_type in obj_types:
             list_obj_type = merge_types(list_obj_type, obj_type)
         return cls(list_obj_type)
 
@@ -1164,6 +1174,7 @@ def literal(val: typing.Any) -> Const:
 
 
 RUN_STATE_TYPE = string_enum_type("pending", "running", "finished", "failed")
+
 
 # TODO: get rid of all the underscores. This is another
 #    conflict with making ops automatically lazy
