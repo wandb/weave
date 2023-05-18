@@ -520,13 +520,13 @@ def rename_artifact(
     head_ref.artifact.rename(new_name)
 
 
-@mutation
+@op()
 def publish_artifact(
     self: graph.Node[typing.Any],
-    project_name: str,
-    artifact_name: str,
+    artifact_name: typing.Optional[str],
+    project_name: typing.Optional[str],
     # root_args: typing.Any = None,
-) -> typing.Any:
+) -> str:
     if not isinstance(self, graph.OutputNode):
         raise errors.WeaveInternalError("Publish target must be an OutputNode")
 
@@ -548,10 +548,11 @@ def publish_artifact(
         )
 
     head_ref = obj_uri.to_ref()
-    ref = storage.publish(
-        head_ref.get(), f"{project_name}/{artifact_name}", head_ref.type
-    )
-    return get(str(ref))
+    art_name = artifact_name or head_ref.artifact.name
+    if project_name:
+        art_name = f"{project_name}/{art_name}"
+    ref = storage.publish(head_ref.get(), art_name, head_ref.type)
+    return str(ref)
 
 
 @weave_class(weave_type=types.Function)
