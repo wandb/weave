@@ -6,6 +6,7 @@ import argh
 
 
 def main(update_duration=60, output_file="/tmp/output.md", only_download_data=False):
+    print(f"starting main with update_duration={update_duration}, output_file={output_file}, only_download_data={only_download_data}")
     print("loading dataset")
     dataset = load_dataset("openai/webgpt_comparisons", split="train", keep_in_memory=True)
     print("removing columns from the dataset")
