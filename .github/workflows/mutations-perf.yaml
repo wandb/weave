@@ -41,9 +41,10 @@ jobs:
           DD_SERVICE: weave-python
           DD_ENV: ci
         run: |
-          WB_SERVER_HOST=http://wandbservice WEAVE_SERVER_DISABLE_ECOSYSTEM=1 source /root/venv/bin/activate &&
+          set -euo pipefail
+          WB_SERVER_HOST=http://wandbservice WEAVE_SERVER_DISABLE_ECOSYSTEM=1 source /root/venv/bin/activate
           pip install -e .
-          && pip install -r perf/requirements.txt &&
+          pip install -r perf/requirements.txt
           python -m cProfile -o /tmp/load_test.prof perf/webgpt_data_load_test.py
       - name: Adding markdown
         run: cat /tmp/output.md >> $GITHUB_STEP_SUMMARY
