@@ -67,6 +67,10 @@ def _save_or_publish(
 
     # TODO: get rid of this? Always type check?
     wb_type = type
+    if isinstance(obj, tuple) and len(obj) == 3:
+        obj, delta, path = obj
+    else:
+        delta = None
     if wb_type is None:
         try:
             wb_type = types.TypeRegistry.type_of(obj)
@@ -75,7 +79,18 @@ def _save_or_publish(
                 "weave type error during serialization for object: %s. %s"
                 % (obj, str(e.args))
             )
+    delta_wb_type = None
+    if delta is not None:
+        try:
+            delta_wb_type = types.TypeRegistry.type_of(delta)
+        except errors.WeaveTypeError as e:
+            raise errors.WeaveSerializeError(
+                "weave type error during serialization for object: %s. %s"
+                % (delta, str(e.args))
+            )
     obj = box.box(obj)
+    delta = box.box(delta)
+
     if artifact is None:
         if name is None:
             name = _get_name(wb_type, obj)
@@ -89,7 +104,17 @@ def _save_or_publish(
             obj = mapper.apply(obj)
         else:
             artifact = artifact_local.LocalArtifact(name, version=source_branch)
-    ref = artifact.set("obj", wb_type, obj)
+    if delta is not None and delta_wb_type is not None:
+        print("yo: SAVING DELTA")
+        delta_t = types.TypeRegistry.type_of([{"val": 0, "path": ['.a', '[1]']}])
+        try:
+            o = artifact.get("delta", )
+        except:
+            o = []
+        o.append({"val": delta, "path": path})
+        ref = artifact.set("delta", delta_t, o)
+    else:
+        ref = artifact.set("obj", wb_type, obj)
 
     # Only save if we have a ref into the artifact we created above. Otherwise
     #     nothing new was created, so just return the existing ref.
@@ -98,7 +123,7 @@ def _save_or_publish(
             artifact.save(project)
         else:
             artifact.save(branch=branch)
-
+    print("YO: ref", ref)
     return ref
 
 

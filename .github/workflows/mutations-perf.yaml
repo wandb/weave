@@ -45,8 +45,8 @@ jobs:
           WB_SERVER_HOST=http://wandbservice WEAVE_SERVER_DISABLE_ECOSYSTEM=1 source /root/venv/bin/activate
           pip install -e .
           pip install -r perf/requirements.txt
-          python perf/webgpt_data_load_test.py --only-download-data
-          python -m cProfile -o /tmp/load_test.prof perf/webgpt_data_load_test.py
+          python perf/webgpt_data_load_test.py test --only-download-data
+          python -m cProfile -o /tmp/load_test.prof perf/webgpt_data_load_test.py {{ github.event.inputs.test }}
           flameprof /tmp/load_test.prof > /tmp/load_test.svg
       - name: Adding markdown
         run: cat /tmp/output.md >> $GITHUB_STEP_SUMMARY

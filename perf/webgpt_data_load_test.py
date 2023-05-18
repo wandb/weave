@@ -4,8 +4,14 @@ import time
 import weave
 import argh
 
+def simple():
+    op = weave.save([{'a': 1},{'a': 2}], name="webgpt-data3:main")
+    op_address = op[0]["a"].set(0)
+    op = weave.get(op_address)
+    op_address = op[0]["a"].set(40)
+    # print(weave.use(weave.get(op_address)))
 
-def main(update_duration=60, output_file="/tmp/output.md", only_download_data=False):
+def test(update_duration=60, output_file="/tmp/output.md", only_download_data=False):
     print(f"starting main with update_duration={update_duration}, output_file={output_file}, only_download_data={only_download_data}")
     print("loading dataset")
     dataset = load_dataset("openai/webgpt_comparisons", split="train", keep_in_memory=True)
@@ -41,7 +47,7 @@ def main(update_duration=60, output_file="/tmp/output.md", only_download_data=Fa
     while time.time() - t0 < update_duration:
         idx = random.randint(0, num_rows)
         # In reality we'll be setting the feedback column but this tests the same operation
-        rand_str = random.choice(["👍👎"])
+        rand_str = random.choice("👍👎")
         op[idx]["feedback"].set(rand_str)
         count += 1
         curr_time = time.time()
@@ -63,4 +69,4 @@ def main(update_duration=60, output_file="/tmp/output.md", only_download_data=Fa
         f.write(f"# status: {status}")
 
 if __name__ == "__main__":
-    argh.dispatch_command(main)
+    argh.dispatch_commands([test, simple])

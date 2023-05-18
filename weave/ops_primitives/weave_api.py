@@ -182,6 +182,7 @@ def get_returntype(uri):
 
 
 def _save(name, obj, setter_options, action=None):
+    print(f"_save: {name}, {obj}, {setter_options}, {action}")
     obj_uri = uris.WeaveURI.parse(name)
     branch = setter_options.get("branch")
 
@@ -192,6 +193,10 @@ def _save(name, obj, setter_options, action=None):
         if branch is not None and branch != art.branch:
             forked = artifact_local.LocalArtifact(name=art.name, version=art.version)
             forked._original_uri = name
+
+    if 'val' in setter_options and 'path' in setter_options:
+        obj = (obj, setter_options['val'], setter_options['path'])
+    # print(f"obj: {obj}")
 
     ref = storage.save(
         obj,
@@ -354,12 +359,16 @@ def mutate_op_body(
     root_args: typing.Any,
     make_new_value: typing.Callable[[typing.Any], typing.Any],
 ):
+    print(f"YO: mutate_op_body: {self}, {root_args}, {make_new_value}")
     # This implements mutations. Note that its argument must be a
     # Node. You can call it like this:
     # weave.use(ops.set(weave_internal.const(csv[-1]["type"]), "YY"))
 
     self = compile.compile_fix_calls([self])[0]
+    print(f"YO: compiled stuff: {type(self)}")
     nodes = graph.linearize(self)
+    for node in nodes:
+        print(f"YO: node: {type(node)} {node.from_op.name}, {node.from_op.inputs.get('key')}, {node.from_op.inputs.get('index')}")
     if nodes is None:
         raise errors.WeaveInternalError("Set error")
 
@@ -367,8 +376,9 @@ def mutate_op_body(
     results = []
     op_inputs = []
     arg0 = list(nodes[0].from_op.inputs.values())[0].val
+    path = []
     for node in nodes:
-        # print(f"YO: {node}")
+        print(f"YO: Node: {node}")
         inputs = {}
         arg0_name = list(node.from_op.inputs.keys())[0]
         inputs[arg0_name] = arg0
@@ -386,19 +396,25 @@ def mutate_op_body(
         op_inputs.append(inputs)
         op_def = registry_mem.memory_registry.get_op(node.from_op.name)
         arg0 = op_def.resolve_fn(**inputs)
-        # print("YO:", arg0)
+        print("YO:", arg0)
         results.append(arg0)
+        if node.from_op.name == "list-__getitem__":
+            path.append(f'[{node.from_op.inputs["index"].val}]')
+        elif node.from_op.name == "typedDict-pick":
+            path.append(f'.{node.from_op.inputs["key"].val}')
+        else:
+            path.append(f'__')
+    print("YO: path", path)
 
     # Make the updates backwards
     res = make_new_value(arg0)
-    # print("YO: all res", res, results)
+    print("YO: all res", res, results)
 
     for i, (node, inputs, result) in reversed(
         list(enumerate(zip(nodes, op_inputs, results)))
     ):
         op_def = registry_mem.memory_registry.get_op(node.from_op.name)
         if not op_def.setter:
-            # print("YO:res1", res)
             return res
             # TODO: we can't raise the error here. Some of the tests
             # rely on partial setter chains.
@@ -409,13 +425,15 @@ def mutate_op_body(
         args.append(res)
         if i == 0 and node.from_op.name == "get":
             # TODO hardcoded get to take root_args. Should just check if available on setter.
+            root_args["path"] = path[i+1:]
             args.append(root_args)
         try:
             res = op_def.setter.func(*args)  # type: ignore
         except AttributeError:
+            print("trying setter")
             res = op_def.setter(*args)
-        # print("YO:update value", res)
-    # print("YO:res2", res)
+        print("YO:updated value", res)
+    print("YO:res2", res)
     return res
 
 
@@ -423,8 +441,9 @@ def mutate_op_body(
 def set(
     self: graph.Node[typing.Any], val: typing.Any, root_args: typing.Any = None
 ) -> typing.Any:
+    print("YO: setting with root args", root_args)
     if root_args is None:
-        root_args = {}
+        root_args = {"mama": "mia", "val": val}
 
     if isinstance(self, graph.ConstNode):
         return val
