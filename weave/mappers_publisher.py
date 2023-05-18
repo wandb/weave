@@ -114,11 +114,16 @@ def _uri_is_local_artifact(uri: str) -> bool:
 
 
 def _local_op_get_to_published_op_get(node: graph.Node) -> graph.Node:
-    new_node = ref_to_node(
-        storage._save_or_publish(
-            weave_internal.use(node, context.get_client()), publish=True, type=node.type
-        )
-    )
+    obj_to_pub = weave_internal.use(node, context.get_client())
+
+    # // SUPER HACK _ THIS CANNOT BE CHECK IN. only happens on network? client doesn't resolve?
+    from weave.artifact_local import LocalArtifactRef
+
+    if isinstance(obj_to_pub, LocalArtifactRef):
+        obj_to_pub = storage.deref(obj_to_pub)
+
+    published = storage._save_or_publish(obj_to_pub, publish=True, type=node.type)
+    new_node = ref_to_node(published)
 
     if new_node is None:
         raise errors.WeaveSerializeError(

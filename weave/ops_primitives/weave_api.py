@@ -551,7 +551,8 @@ def publish_artifact(
     art_name = artifact_name or head_ref.artifact.name
     if project_name:
         art_name = f"{project_name}/{art_name}"
-    ref = storage.publish(head_ref.get(), art_name, head_ref.type)
+    ref = storage.publish(head_ref.get(), art_name)
+    # ref = storage.publish(head_ref.get(), art_name, head_ref.type)
     return str(ref)
 
 
