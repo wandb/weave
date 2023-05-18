@@ -77,6 +77,12 @@ gql_prop_op(
     "createdAt",
     types.Timestamp(),
 )
+gql_prop_op(
+    "project-updatedAt",
+    wdt.ProjectType,
+    "updatedAt",
+    types.Timestamp(),
+)
 
 gql_prop_op(
     "project-internalId",
@@ -153,7 +159,7 @@ gql_connection_op(
     "artifactTypes",
     wdt.ArtifactTypeType,
     {},
-    lambda inputs: "first: 10",
+    # lambda inputs: "first: 10",
 )
 
 gql_connection_op(

@@ -133,3 +133,36 @@ def runs_render(
             lambda run: run.createdAt(),
         ],
     )
+
+
+@weave.op()
+def artifacts_render(
+    artifacts: weave.Node[list[wb_domain_types.ArtifactCollection]],
+) -> weave.panels.Table:
+    # This breaks if there is a variable in the node
+    # types_names = weave.use(artifacts._get_op("type")().name().unique())
+    # return weave.panels.Card(
+    #     title="Artifacts",
+    #     subtitle="",
+    #     content=[
+    #         weave.panels.CardTab(name=type_name, content=[type_name])
+    #         for type_name in types_names
+    #     ],
+    # )
+    return weave.panels.Table(
+        artifacts,
+        columns=[
+            lambda artifact: weave.panels.WeaveLink(
+                artifact._get_op("name")(),
+                vars={
+                    "entity_name": entity_name_op(artifact.project().entity()),
+                    "project_name": project_name_op(artifact.project()),
+                    "artifact_name": artifact._get_op("name")(),
+                },
+                to=lambda input, vars: weave.ops.project(
+                    vars["entity_name"], vars["project_name"]
+                ).artifact(vars["artifact_name"]),
+            ),
+            lambda artifact: artifact.createdAt(),
+        ],
+    )

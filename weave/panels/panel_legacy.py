@@ -57,6 +57,7 @@ panels = [
     LPanel("string-compare", "PanelStringCompare"),
     LPanel("debug-expression-graph", "PanelDebugExpressionGraph"),
     LPanel("tracer", "PanelTracer"),
+    LPanel("RootBrowser", "RootBrowser"),
 ]
 
 did_define = False

@@ -200,7 +200,7 @@ def _resolve_required_consts(node: graph.Node) -> typing.Optional[graph.Node]:
     for input_name, input_node in node.from_op.inputs.items():
         if input_name in required_const_input_names:
             if not isinstance(input_node, graph.ConstNode):
-                result = weave_internal.use(input_node)
+                result = weave_internal.use(_compile([input_node])[0])
                 new_inputs[input_name] = graph.ConstNode(input_node.type, result)
     return graph.OutputNode(
         node.type,

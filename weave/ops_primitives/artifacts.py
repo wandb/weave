@@ -1,5 +1,7 @@
 import typing
 
+from weave.artifact_local import LocalArtifact
+
 from . import types
 from ..api import op
 from .. import artifact_fs
@@ -34,3 +36,34 @@ def artifact_file(
 )
 def artifact_artifactname(artifact: artifact_fs.FilesystemArtifact) -> str:
     return artifact.name
+
+
+@op(
+    name="FilesystemArtifact-artifactForVersion",
+)
+def artifact_version_artifact_for_version(
+    artifact: artifact_fs.FilesystemArtifact,
+    version: str,
+) -> artifact_fs.FilesystemArtifact:
+    if not isinstance(artifact, LocalArtifact):
+        raise ValueError(f"Artifact {artifact.name} is not a local artifact")
+
+    if artifact._version is not None:
+        if artifact._version == version:
+            return artifact
+        else:
+            raise ValueError(f"Artifact {artifact.name} is not version {version}")
+
+    possible_art = LocalArtifact(artifact.name, version)
+    if possible_art._read_dirname == None:
+        return None  # type: ignore
+    return possible_art
+
+
+@op(
+    name="FilesystemArtifact-weaveType",
+)
+def artifact_version_weave_type(
+    artifact: artifact_fs.FilesystemArtifact,
+) -> types.Type:
+    return artifact_fs.FilesystemArtifactRef(artifact, "obj").type

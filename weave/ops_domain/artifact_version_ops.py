@@ -335,14 +335,28 @@ def artifact_version_link(
 
 @op(
     name="artifactVersion-isWeaveObject",
-    plugins=wb_gql_op_plugin(lambda inputs, inner: static_art_file_gql),
+    plugins=wb_gql_op_plugin(lambda inputs, inner: "metadata"),
 )
 def artifact_version_is_weave_object(
     artifactVersion: wdt.ArtifactVersion,
 ) -> bool:
-    art_local = _artifact_version_to_wb_artifact(artifactVersion)
-    path = art_local._manifest_entry("obj.type.json")
-    return path is not None
+    return (
+        (artifactVersion.gql.get("metadata") or {})
+        .get("_weave_meta", {})
+        .get("is_weave_object", False)
+    )
+
+
+@op(
+    name="artifactVersion-weaveType",
+    plugins=wb_gql_op_plugin(lambda inputs, inner: static_art_file_gql),
+)
+def artifact_version_weave_type(
+    artifactVersion: wdt.ArtifactVersion,
+) -> types.Type:
+    return artifact_fs.FilesystemArtifactRef(
+        _artifact_version_to_wb_artifact(artifactVersion), "obj"
+    ).type
 
 
 @op(name="artifactVersion-files")

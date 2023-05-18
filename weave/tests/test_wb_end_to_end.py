@@ -44,7 +44,7 @@ def test_basic_publish_user_by_api_key_netrc(user_by_api_key_netrc):
 
 
 def _test_basic_publish(user_fixture):
-    a = weave.publish([1, 2, 3], "weave_ops/list")
+    a = weave.publish([1, 2, 3], "weave/list")
     # Getting the ref for `a` is not a final API. Expect
     # that changes to the publish flow will bread this test
     # and you might need to update how you get the ref.
@@ -52,6 +52,6 @@ def _test_basic_publish(user_fixture):
     uri = ref.uri
     assert (
         uri
-        == f"wandb-artifact:///{user_fixture.username}/weave_ops/list:0cdf3358dc939f961ca9/obj"
+        == f"wandb-artifact:///{user_fixture.username}/weave/list:0cdf3358dc939f961ca9/obj"
     )
     assert weave.ref_base.Ref.from_str(uri).get() == [1, 2, 3]

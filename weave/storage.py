@@ -54,7 +54,7 @@ def _save_or_publish(
         name, source_branch = name.split(":", 1)
 
     if project is None and publish:
-        project = "weave_ops"
+        project = artifact_wandb.DEFAULT_WEAVE_OBJ_PROJECT
 
     # source_branch = None
     # # If we have an existing ref and its a filesystem artifact
@@ -87,6 +87,12 @@ def _save_or_publish(
             artifact = artifact_wandb.WandbArtifact(name, type=wb_type.name)
             mapper = map_to_python_remote(wb_type, artifact)
             obj = mapper.apply(obj)
+            panel_type = types.type_name_to_type("Panel")
+            artifact._writeable_artifact.metadata["_weave_meta"] = {
+                "is_weave_obj": True,
+                "type_name": wb_type.name,
+                "is_panel": panel_type and panel_type().assign_type(wb_type),
+            }
         else:
             artifact = artifact_local.LocalArtifact(name, version=source_branch)
     ref = artifact.set("obj", wb_type, obj)

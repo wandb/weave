@@ -3,7 +3,7 @@ import weave
 
 def test_publish_values(user_by_api_key_in_env):
     data = ["a", "b", "c"]
-    res = weave.publish(data, "weave_ops/list")
+    res = weave.publish(data, "weave/list")
     assert weave.use(res) == data
 
 
@@ -22,7 +22,7 @@ def test_publish_panel(user_by_api_key_in_env):
             lambda row: row["c"],
         ],
     )
-    res = weave.publish(table_obj, "weave_ops/table")
+    res = weave.publish(table_obj, "weave/table")
     assert isinstance(res, weave.graph.Node)
 
 

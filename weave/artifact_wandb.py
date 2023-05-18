@@ -29,6 +29,8 @@ if typing.TYPE_CHECKING:
 
 quote_slashes = functools.partial(parse.quote, safe="")
 
+DEFAULT_WEAVE_OBJ_PROJECT = "weave"
+
 
 class WandbArtifactManifestEntry(typing.TypedDict):
     digest: str
@@ -537,7 +539,7 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
     def write_metadata(self, dirname):
         raise NotImplementedError()
 
-    def save(self, project: str = "weave_ops"):
+    def save(self, project: str = DEFAULT_WEAVE_OBJ_PROJECT):
         res = wandb_artifact_pusher.write_artifact_to_wandb(
             self._writeable_artifact, project
         )

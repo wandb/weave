@@ -1,6 +1,7 @@
 from .any import *
 from .list_ import *
 from .obj import *
+from .type import *
 from .string import *
 from .number import *
 from .number_bin import *
