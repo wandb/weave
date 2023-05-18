@@ -1,3 +1,4 @@
+import dataclasses
 import typing
 import time
 
@@ -201,6 +202,7 @@ def _save(name, obj, setter_options, action=None):
         art = art_ref.artifact
         if branch is not None and branch != art.branch:
             version = art.version
+            # THIS IS SUS
             if isinstance(art, artifact_wandb.WandbArtifact):
                 version = art.commit_hash
             forked = artifact_local.LocalArtifact(name=art.name, version=version)
@@ -215,9 +217,22 @@ def _save(name, obj, setter_options, action=None):
     return ref.branch_uri
 
 
-def _merge(name) -> str:
-    """Save the object, propagating changes back to the original artifact"""
-    obj_uri = uris.WeaveURI.parse(name)
+@dataclasses.dataclass
+class _MergeSpec:
+    to_uri: artifact_wandb.WeaveWBArtifactURI | artifact_local.WeaveLocalArtifactURI
+    head_ref: artifact_local.LocalArtifactRef | artifact_wandb.WandbArtifactRef
+    branch_point: artifact_fs.BranchPointType
+
+
+def get_merge_spec_uri(uri: str) -> typing.Optional[_MergeSpec]:
+    try:
+        return _get_merge_spec_unsafe(uri)
+    except errors.WeaveInternalError:
+        return None
+
+
+def _get_merge_spec_unsafe(uri: str) -> _MergeSpec:
+    obj_uri = uris.WeaveURI.parse(uri)
     if not isinstance(
         obj_uri,
         (artifact_wandb.WeaveWBArtifactURI, artifact_local.WeaveLocalArtifactURI),
@@ -242,6 +257,19 @@ def _merge(name) -> str:
         raise errors.WeaveInternalError(
             "Cannot merge into artifact of type %s" % type(obj_uri)
         )
+    return _MergeSpec(
+        to_uri=to_uri,
+        head_ref=head_ref,
+        branch_point=branch_point,
+    )
+
+
+def _merge(name) -> str:
+    """Save the object, propagating changes back to the original artifact"""
+    merge_spec = _get_merge_spec_unsafe(name)
+    to_uri = merge_spec.to_uri
+    head_ref = merge_spec.head_ref
+    branch_point = merge_spec.branch_point
 
     to_ref = to_uri.to_ref()
 
@@ -253,7 +281,9 @@ def _merge(name) -> str:
     if branch_point["commit"] != original_artifact_hash:
         raise errors.WeaveUnmergableArtifactsError(
             "Cannot merge artifacts: "
-            "target artifact commit hash does not match branch point"
+            "target artifact commit hash does not match branch point",
+            f" original_artifact_hash: {original_artifact_hash}; ",
+            f" branch_point: {branch_point['commit']}",
         )
 
     if isinstance(to_uri, artifact_wandb.WeaveWBArtifactURI):

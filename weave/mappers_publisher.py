@@ -10,6 +10,7 @@ from . import mappers_python_def
 from .language_features.tagging import tagged_value_type
 import dataclasses
 from weave import weave_internal, context, storage
+from .ops_primitives import weave_api
 
 
 class RefToPyRef(mappers.Mapper):
@@ -94,6 +95,9 @@ def _node_publish_mapper(node: graph.Node) -> typing.Optional[graph.Node]:
         node = typing.cast(graph.OutputNode, node)
         uri = _uri_of_get_node(node)
         if uri is not None and _uri_is_local_artifact(uri):
+            # Be sure to merge the node if needed before continuing with the publish.
+            if weave_api.get_merge_spec_uri(uri):
+                return _node_publish_mapper(weave_api.get(weave_api._merge(uri)))
             return _local_op_get_to_published_op_get(node)
     return node
 
