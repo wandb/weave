@@ -52,8 +52,8 @@ jobs:
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
         with:
-          name: cprof.svg
-          path: /tmp/cprof.svg
+          name: load_test.svg
+          path: /tmp/load_test.svg
 
 
   build-container:
