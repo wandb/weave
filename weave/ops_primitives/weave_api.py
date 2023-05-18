@@ -270,8 +270,6 @@ def _merge(name) -> str:
 import random
 
 def _set(name, obj, setter_options, action=None):
-    if random.random() < 0.9:
-        return name
     return _save(name, obj, setter_options, action=action)
 
 
