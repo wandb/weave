@@ -37,11 +37,11 @@ def save(node_or_obj, name=None):
         return _ops.save(node_or_obj, name=name)
     else:
         ref = _storage.save(node_or_obj, name=name)
-        # if ref.branch is not None:
-        #     uri = ref.branch_uri
-        # else:
-        #     uri = ref.uri
-        return _ops.get(str(ref))
+        if ref.branch is not None:
+            uri = ref.branch_uri
+        else:
+            uri = ref.uri
+        return _ops.get(uri)
 
 
 def publish(node_or_obj, name=None):
