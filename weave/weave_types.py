@@ -774,6 +774,9 @@ def compute_type(item):
     return obj_type
 
 
+import orjson
+
+
 @dataclasses.dataclass(frozen=True)
 class List(Type):
     name = "list"
@@ -800,12 +803,14 @@ class List(Type):
     def save_instance(self, obj, artifact, name):
         serializer = mappers_python.map_to_python(self, artifact)
         result = serializer.apply(obj)
-        with artifact.new_file(f"{name}.list.json") as f:
-            json.dump(result, f, allow_nan=False)
+        with artifact.new_file(f"{name}.list.json", binary=True) as f:
+            json = orjson.dumps(result)
+            f.write(json)
 
     def load_instance(self, artifact, name, extra=None):
-        with artifact.open(f"{name}.list.json") as f:
-            result = json.load(f)
+        with artifact.open(f"{name}.list.json", binary=True) as f:
+            filedata = f.read()
+            result = orjson.loads(filedata)
         mapper = mappers_python.map_from_python(self, artifact)
         return mapper.apply(result)
 
