@@ -75,3 +75,18 @@ def test_merge_no_version():
     new_uri = weave.ops.merge(modified_dict_obj)
     dict_obj_node = weave.ops.get(new_uri)
     assert weave.use(dict_obj_node) == {"a": 17, "b": 6}
+
+
+def test_merge_list_type():
+    from .. import object_context
+
+    weave.save([], "my-list:latest")
+    obj = weave.ops.get("local-artifact:///my-list:latest/obj")
+    with object_context.object_context():
+        obj.append({"a": "x"}, {})
+        obj.append([1], {})
+
+    assert weave.use(weave.ops.get("local-artifact:///my-list:latest/obj")) == [
+        {"a": "x"},
+        [1],
+    ]

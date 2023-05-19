@@ -13,10 +13,10 @@ import weave
         "b": weave.types.Int(),
         "sleep": weave.types.Float(),
     },
-    output_type=weave.types.RunType(
-        weave.types.TypedDict({}),
-        weave.types.List(weave.types.TypedDict({})),
-        weave.types.Int(),
+    output_type=weave.types.Function(
+        output_type=weave.types.RunType(
+            output=weave.types.Int(),
+        )
     ),
 )
 def slowmult(a, b, sleep, _run=None):
@@ -94,10 +94,10 @@ AsyncDemoTrainResultType.instance_class = AsyncDemoTrainResult
             )
         ),
     },
-    output_type=weave.types.RunType(
-        weave.types.TypedDict({}),
-        weave.types.List(weave.types.TypedDict({})),
-        AsyncDemoTrainResultType(),
+    output_type=weave.types.Function(
+        output_type=weave.types.RunType(
+            output=AsyncDemoTrainResultType(),
+        )
     ),
 )
 def train(dataset, _run=None):

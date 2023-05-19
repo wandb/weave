@@ -41,6 +41,7 @@ _OBJ_TAGS_CURR_NODE_ID: contextvars.ContextVar[int] = contextvars.ContextVar(
     "obj_tags_curr_node", default=-1
 )
 
+
 # gets the current tag memory map for the current node
 def _current_obj_tag_mem_map() -> typing.Optional[dict[int, dict[str, typing.Any]]]:
     node_tags = _OBJ_TAGS_MEM_MAP.get()
@@ -69,6 +70,7 @@ def set_curr_node(node_id: int, parent_node_ids: list[int]) -> typing.Iterator[N
 _VISITED_OBJ_IDS: contextvars.ContextVar[set[int]] = contextvars.ContextVar(
     "visited_obj_ids", default=set()
 )
+
 
 # Callers can create an isolated tagging context by using this context manager
 # This is primarily used by the executor to prevent tags from leaking between
@@ -146,7 +148,13 @@ def add_tags(
     if not box.cannot_have_weakref(obj) and id_val not in mem_map:
         # Ensure we cleanup the tags when the object is garbage collected.
         # Python is happy to reuse IDs after they are freed!
-        weakref.finalize(obj, _remove_tags, mem_map, id_val)
+        try:
+            weakref.finalize(obj, _remove_tags, mem_map, id_val)
+        except:
+            # Extreme bug here!
+            # Can't box pydantic objects, like those from langchain.
+            # TODO: fix
+            pass
     assert box.is_boxed(obj), "Can only tag boxed objects"
     existing_tags = get_tags(obj) if is_tagged(obj) else {}
     if give_precedence_to_existing_tags:
@@ -160,7 +168,6 @@ def add_tags(
 # Note: this is not recursive, it only returns the tags directly assocaited with
 # the given object
 def get_tags(obj: typing.Any) -> dict[str, typing.Any]:
-
     id_val = get_id(obj)
     if id_val in _VISITED_OBJ_IDS.get():
         raise ValueError("Cannot get tags for an object that is being visited")

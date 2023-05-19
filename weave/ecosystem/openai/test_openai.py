@@ -106,7 +106,13 @@ def test_large_const_node(test_artifact_dir):
                                 },
                                 "prints": {"type": "list", "objectType": "string"},
                                 "inputs": {"type": "typedDict", "propertyTypes": {}},
-                                "history": {"type": "list", "objectType": "any"},
+                                "history": {
+                                    "type": "list",
+                                    "objectType": {
+                                        "type": "typedDict",
+                                        "propertyTypes": {},
+                                    },
+                                },
                                 "output": {
                                     "type": "gpt3_fine_tune_type",
                                     "_base_type": {"type": "Object"},

@@ -12,6 +12,8 @@ from . import weave_types as types
 from . import uris
 from . import errors
 from . import file_base
+from . import object_context
+
 from .language_features.tagging import tag_store
 
 
@@ -161,7 +163,7 @@ class FilesystemArtifactRef(artifact_base.ArtifactRef):
         return f"<{self.__class__}({id(self)}) artifact={self.artifact} path={self.path} type={self.type} extra={self.extra}"
 
     @property
-    def type(self) -> types.Type:
+    def _outer_type(self) -> types.Type:
         if self._type is not None:
             return self._type
         if self.path is None:
@@ -171,8 +173,22 @@ class FilesystemArtifactRef(artifact_base.ArtifactRef):
                 type_json = json.load(f)
         except FileNotFoundError:
             return types.TypeRegistry.type_of(self.artifact.path_info(self.path))
-        self._type = types.TypeRegistry.type_from_dict(type_json)
+        loaded_type = types.TypeRegistry.type_from_dict(type_json)
+        self._type = loaded_type
         return self._type
+
+    @property
+    def type(self) -> types.Type:
+        obj_ctx = object_context.get_object_context()
+        if obj_ctx:
+            t = obj_ctx.lookup_ref_type(str(self))
+            if not isinstance(t, object_context.NoResult):
+                return t
+
+        if not self.is_saved:
+            return types.NoneType()
+
+        return self._outer_type
 
     @property
     def name(self) -> str:
@@ -230,7 +246,9 @@ class FilesystemArtifactRef(artifact_base.ArtifactRef):
         # since they break idempotency. When we figure that out, we may
         # be able to remove this.
         with tag_store.isolated_tagging_context():
-            return self.type.load_instance(self.artifact, self.path, extra=self.extra)
+            return self._outer_type.load_instance(
+                self.artifact, self.path, extra=self.extra
+            )
 
     def local_ref_str(self) -> str:
         if self.path is None:

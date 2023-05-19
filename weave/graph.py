@@ -9,6 +9,7 @@ from . import storage
 
 T = typing.TypeVar("T")
 
+
 # The Generic here is currently only used in op definitions, its not actually
 # applied within the class. See infer_types.py for usage.
 class Node(typing.Generic[T]):
@@ -180,7 +181,6 @@ class ConstNode(Node):
         return cls(weave_types.TypeRegistry.type_from_dict(obj["type"]), val)
 
     def to_json(self) -> dict:
-
         val = storage.to_python(self.val)["_val"]  # type: ignore
         # mapper = mappers_python.map_to_python(self.type, None)
         # val = mapper.apply(self.val)

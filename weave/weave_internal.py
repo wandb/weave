@@ -144,3 +144,15 @@ def refine_graph(node: graph.Node) -> graph.Node:
         raise NotImplementedError(
             "refine_graph cannot yet handle nodes of type %s" % type(node)
         )
+
+
+def manual_call(
+    op_name: str, inputs: dict[str, graph.Node], output_type: types.Type
+) -> graph.Node:
+    """Produce an output node manually.
+
+    You can produce incorrect nodes this way. Use with caution.
+    """
+    from . import dispatch
+
+    return dispatch.RuntimeOutputNode(output_type, op_name, inputs)

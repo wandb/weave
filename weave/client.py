@@ -23,4 +23,8 @@ class NonCachingClient:
         self.server = server
 
     def execute(self, nodes):
-        return self.server.execute(nodes, no_cache=True)
+        res = self.server.execute(nodes, no_cache=True)
+        return [
+            r if isinstance(n.type, weave_types.RefType) else storage.deref(r)
+            for (n, r) in zip(nodes, res)
+        ]

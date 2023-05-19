@@ -72,7 +72,6 @@ class ArrowArrayType(types.Type):
             pq.write_table(table, f)
 
     def load_instance(self, artifact, name, extra=None):
-
         with artifact.open(f"{name}.parquet", binary=True) as f:
             deserialized = pq.read_table(f)
             deserialized = deserialized["arr"].combine_chunks()

@@ -14,6 +14,8 @@ from . import client
 from .language_features.tagging.tag_store import isolated_tagging_context
 from . import logs
 from . import io_service
+from . import logs
+import logging
 
 from flask.testing import FlaskClient
 
@@ -63,7 +65,10 @@ def test_artifact_dir():
 
 
 @pytest.fixture(autouse=True)
-def pre_post_each_test(test_artifact_dir):
+def pre_post_each_test(test_artifact_dir, caplog):
+    # TODO: can't get this to work. I was trying to setup pytest log capture
+    # to use our custom log stuff, so that it indents nested logs properly.
+    caplog.handler.setFormatter(logging.Formatter(logs.default_log_format))
     # Tests rely on full cache mode right now.
     os.environ["WEAVE_CACHE_MODE"] = "full"
     try:
@@ -141,7 +146,6 @@ class HttpServerTestClient:
         headers: typing.Optional[dict[str, typing.Any]] = None,
         no_cache=False,
     ):
-
         _headers: dict[str, typing.Any] = {}
         if headers is not None:
             _headers = headers

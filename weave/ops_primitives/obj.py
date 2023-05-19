@@ -2,6 +2,7 @@ import typing
 from ..api import op, weave_class
 from .. import weave_types as types
 
+
 # This matches the output type logic of the frontend
 # We know that this is going to need refinement, but are
 # rolling with it in the first iteration. We need to get to the point
@@ -18,6 +19,9 @@ def getattr_output_type(input_type):
         key = input_type["name"].val
         property_types = self_arg.property_types()
         return property_types.get(key, types.Invalid())
+
+    if isinstance(self_arg, types.Any):
+        return types.Any()
 
     # TODO: In particular, this branch should go away since
     # we anticipate getattr will eventually just target the
@@ -46,7 +50,8 @@ def obj_settattr(self, attr, v):
 @op(
     name="Object-__getattr__",
     setter=obj_settattr,
+    input_type={"self": types.ObjectType()},
     output_type=getattr_output_type,
 )
-def obj_getattr(self: typing.Any, name: str):
+def obj_getattr(self, name: str):
     return getattr(self, name)

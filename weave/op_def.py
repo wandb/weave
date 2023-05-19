@@ -167,7 +167,7 @@ class OpDef:
         typing.Callable[[typing.Dict[str, types.Type]], types.Type],
     ]
     refine_output_type: typing.Optional["OpDef"]
-    setter = str
+    setter: typing.Optional[typing.Callable] = None
     version: typing.Optional[str]
     location: typing.Optional[uris.WeaveURI]
     is_builtin: bool = False
@@ -254,7 +254,10 @@ class OpDef:
             # convert arguments to Const nodes. There is no type checking.
             # May need to fix this, but the patterns in test_mutation2 work
             # now.
-            return _self.resolve_fn(*args, **kwargs)
+            from . import object_context
+
+            with object_context.object_context():
+                return _self.resolve_fn(*args, **kwargs)
         if context_state.eager_mode():
             return _self.eager_call(*args, **kwargs)
         else:
@@ -402,9 +405,11 @@ class OpDef:
 
     @property
     def is_async(self):
+        ot = self.concrete_output_type
         return (
             not callable(self.raw_output_type)
-            and self.concrete_output_type.name == "Run"
+            and isinstance(ot, types.Function)
+            and isinstance(ot.output_type, types.RunType)
         )
 
     def to_dict(self):

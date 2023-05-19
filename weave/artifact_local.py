@@ -182,6 +182,16 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
         return str(self._get_read_path(name))
 
     @property
+    def initial_uri_obj(self) -> uris.WeaveURI:
+        version = self._branch or self._version
+        if version is None:
+            raise errors.WeaveInternalError("Cannot get uri for unsaved artifact!")
+        return WeaveLocalArtifactURI(
+            self.name,
+            version,
+        )
+
+    @property
     def uri_obj(self) -> uris.WeaveURI:
         version = self._version
         if version is None:
@@ -296,7 +306,7 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
                 src_path = os.path.join(self._write_dirname, path)
                 target_path = os.path.join(tmpdir, path)
                 if os.path.isdir(src_path):
-                    shutil.copytree(src_path, target_path)
+                    shutil.copytree(src_path, target_path, dirs_exist_ok=True)
                 else:
                     shutil.copyfile(src_path, target_path)
             try:

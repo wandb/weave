@@ -58,8 +58,9 @@ def _dispatch_error_is_client_error(
 
 
 def _call_run_await(run_node: graph.Node) -> graph.OutputNode:
-    run_node_type = typing.cast(types.RunType, run_node.type)
-    return graph.OutputNode(run_node_type.output, "run-await", {"self": run_node})
+    return graph.OutputNode(
+        run_node.type.output_type.output, "run-await", {"self": run_node}  # type: ignore
+    )
 
 
 # We don't want to import the op definitions themselves here, since
@@ -209,7 +210,7 @@ def _resolve_required_consts(node: graph.Node) -> typing.Optional[graph.Node]:
     )
 
 
-def _make_auto_op_map_fn(when_type: type[types.Type], call_op_fn):
+def _make_auto_op_map_fn(when_type: typing.Callable[[types.Type], bool], call_op_fn):
     def fn(node: graph.Node) -> typing.Optional[graph.Node]:
         if isinstance(node, graph.OutputNode):
             node_inputs = node.from_op.inputs
@@ -237,7 +238,7 @@ def _make_auto_op_map_fn(when_type: type[types.Type], call_op_fn):
             for k, input_node in node_inputs.items():
                 actual_input_type = input_node.type
                 new_inputs[k] = input_node
-                if not isinstance(actual_input_type, when_type):
+                if not when_type(actual_input_type):
                     continue
                 if isinstance(op_def.input_type, op_args.OpNamedArgs):
                     op_input_type = op_def.input_type.arg_types[k]
@@ -249,7 +250,7 @@ def _make_auto_op_map_fn(when_type: type[types.Type], call_op_fn):
                     )
                 if callable(op_input_type):
                     continue
-                if not isinstance(op_input_type, when_type):
+                if not when_type(op_input_type):
                     new_inputs[k] = call_op_fn(input_node)
                     swapped = True
             if swapped:
@@ -288,9 +289,15 @@ def _make_inverse_auto_op_map_fn(when_type: type[types.Type], call_op_fn):
     return fn
 
 
-_await_run_outputs_map_fn = _make_auto_op_map_fn(types.RunType, _call_run_await)
+_await_run_outputs_map_fn = _make_auto_op_map_fn(
+    lambda t: isinstance(t, types.Function)
+    and isinstance(t.output_type, types.RunType),
+    _call_run_await,
+)
 
-_execute_nodes_map_fn = _make_auto_op_map_fn(types.Function, _call_execute)
+_execute_nodes_map_fn = _make_auto_op_map_fn(
+    lambda t: isinstance(t, types.Function), _call_execute
+)
 
 _quote_nodes_map_fn = _make_inverse_auto_op_map_fn(types.Function, _quote_node)
 
@@ -355,6 +362,7 @@ def compile_execute(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
     # be removed.
     # I'm leaving this for now as it doesn't affect W&B prod (which never calls execute).
     with_execute_ops = graph.map_nodes_full(nodes, _execute_nodes_map_fn)
+    return with_execute_ops
 
     def _replace_execute(node: graph.Node) -> typing.Optional[graph.Node]:
         if isinstance(node, graph.OutputNode) and node.from_op.name == "execute":

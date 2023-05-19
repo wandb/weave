@@ -1,9 +1,13 @@
 import typing
 import weakref
+import contextlib
+import contextvars
+import collections
 
 from . import uris
 from . import box
 from . import weave_types as types
+from . import object_context
 
 # We store Refs here if we can't attach them directly to the object
 REFS: weakref.WeakValueDictionary[int, "Ref"] = weakref.WeakValueDictionary()
@@ -32,13 +36,28 @@ class Ref:
 
     @property
     def obj(self) -> typing.Any:
+        obj_ctx = object_context.get_object_context()
+        if obj_ctx:
+            val = obj_ctx.lookup_ref_val(str(self.initial_uri))
+            if not isinstance(val, object_context.NoResult):
+                return val
+
         if self._obj is not None:
             return self._obj
+
+        if not self.is_saved:
+            return None
+
         obj = self._get()
+
         obj = box.box(obj)
         if self.type.name != "tagged":
             _put_ref(obj, self)
         self._obj = obj
+
+        if obj_ctx is not None:
+            obj_ctx.add_ref(str(self.initial_uri), obj, self.type)
+
         return obj
 
     @property
@@ -92,7 +111,7 @@ def get_ref(obj: typing.Any) -> typing.Optional[Ref]:
 def _put_ref(obj: typing.Any, ref: Ref) -> None:
     try:
         obj._ref = ref
-    except AttributeError:
+    except (AttributeError, ValueError):
         if isinstance(obj, (int, float, str, list, dict, set)):
             return
         REFS[id(obj)] = ref

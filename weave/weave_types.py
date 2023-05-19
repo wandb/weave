@@ -109,7 +109,6 @@ class TypeRegistry:
 
     @staticmethod
     def type_of(obj: typing.Any) -> "Type":
-
         obj_type = type_name_to_type("tagged").type_of(obj)
         if obj_type is not None:
             return obj_type
@@ -289,8 +288,8 @@ class Type(metaclass=_TypeSubclassWatcher):
             return any(t.assign_type(next_type) for t in self.members)  # type: ignore
 
         is_assignable_to = next_type._is_assignable_to(self)
-        if is_assignable_to is not None:
-            return is_assignable_to
+        if is_assignable_to:
+            return True
 
         return self._assign_type_inner(next_type)
 
@@ -312,9 +311,7 @@ class Type(metaclass=_TypeSubclassWatcher):
         # Now check that all type vars match
         for prop_name in self.type_vars:
             if not hasattr(next_type, prop_name):
-                raise errors.WeaveInternalError(
-                    "type %s missing attributes of base type %s" % (next_type, self)
-                )
+                return False
             if not getattr(self, prop_name).assign_type(getattr(next_type, prop_name)):
                 return False
         return True
@@ -797,7 +794,12 @@ class List(Type):
         with artifact.open(f"{name}.list.json") as f:
             result = json.load(f)
         mapper = mappers_python.map_from_python(self, artifact)
-        return mapper.apply(result)
+        mapped_result = mapper.apply(result)
+
+        # TODO: scan through for ID
+        if extra is not None:
+            return mapped_result[int(extra[0])]
+        return mapped_result
 
 
 @dataclasses.dataclass(frozen=True)
@@ -858,7 +860,10 @@ class TypedDict(Type):
         with artifact.open(f"{name}.typedDict.json") as f:
             result = json.load(f)
         mapper = mappers_python.map_from_python(self, artifact)
-        return mapper.apply(result)
+        mapped_result = mapper.apply(result)
+        if extra is not None:
+            return mapped_result[extra[0]]
+        return mapped_result
 
 
 @dataclasses.dataclass(frozen=True)
@@ -906,8 +911,20 @@ class Dict(Type):
 
 @dataclasses.dataclass(frozen=True)
 class ObjectType(Type):
+    def __init__(self, **attr_types: Type):
+        self.__dict__["attr_types"] = attr_types
+        for k, v in attr_types.items():
+            self.__dict__[k] = v
+
+    @property
+    def type_vars(self):
+        if self.__class__ == ObjectType:
+            return self.attr_types
+        else:
+            return super().type_vars
+
     def property_types(self) -> dict[str, Type]:
-        return {}
+        return self.type_vars
 
     @classmethod
     def type_of_instance(cls, obj):
@@ -1165,10 +1182,12 @@ def literal(val: typing.Any) -> Const:
 
 RUN_STATE_TYPE = string_enum_type("pending", "running", "finished", "failed")
 
+
 # TODO: get rid of all the underscores. This is another
 #    conflict with making ops automatically lazy
 @dataclasses.dataclass(frozen=True)
 class RunType(ObjectType):
+    id: Type = String()
     inputs: Type = TypedDict({})
     history: Type = List(TypedDict({}))
     output: Type = Any()

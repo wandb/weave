@@ -56,16 +56,6 @@ def _save_or_publish(
     if project is None and publish:
         project = artifact_wandb.DEFAULT_WEAVE_OBJ_PROJECT
 
-    # source_branch = None
-    # # If we have an existing ref and its a filesystem artifact
-    # # track its branch
-    # existing_ref = _get_ref(obj)
-    # if isinstance(existing_ref, artifact_fs.FilesystemArtifactRef):
-    #     # We don't branch across artifacts for now (name change)... But we could!
-    #     if name is None or existing_ref.name == name:
-    #         source_branch = existing_ref.branch
-
-    # TODO: get rid of this? Always type check?
     wb_type = type
     if wb_type is None:
         try:
@@ -120,11 +110,6 @@ def save(
     artifact=None,
     branch=None,
 ) -> artifact_local.LocalArtifactRef:
-    # print("STORAGE SAVE", name, obj, type, artifact)
-    # ref = _get_ref(obj)
-    # if ref is not None:
-    #     if name is None or ref.artifact._name == name:
-    #         return ref
     return _save_or_publish(obj, name, type, False, artifact=artifact, branch=branch)
 
 
@@ -223,11 +208,25 @@ def recursively_unwrap_arrow(obj):
 def to_python(obj, wb_type=None):
     if wb_type is None:
         wb_type = types.TypeRegistry.type_of(obj)
-    # Note, we use ArtifactMem here, which means the serialized object
-    # may have refs to non-saved objects.
-    # TODO: need to revisit this as we start to use custom objects.
-    mapper = mappers_python.map_to_python(wb_type, artifact_mem.MemArtifact())
+
+    # First map the object using a MemArtifact to capture any custom object refs.
+    art = artifact_mem.MemArtifact()
+    mapper = mappers_python.map_to_python(wb_type, art)
     val = mapper.apply(obj)
+
+    if art.ref_count() > 0:
+        # There are custom objects, create a local artifact to persist them.
+        fs_art = artifact_local.LocalArtifact(wb_type.name, "latest")
+        # Save all the reffed objects into the new artifact.
+        for mem_ref in art.refs():
+            fs_art.set(mem_ref.path, mem_ref._type, mem_ref._obj)
+        fs_art.save()
+        # now map the original object again. Because there are now existing refs
+        # to the local artifact for any custom objects, this new value will contain
+        # those existing refs as absolute refs. We provide None for artifact because
+        # it should not be used in this pass.
+        mapper = mappers_python.map_to_python(wb_type, None)
+        val = mapper.apply(obj)
     # TODO: this should be a ConstNode!
     return {"_type": wb_type.to_dict(), "_val": val}
 
@@ -237,19 +236,6 @@ def to_safe_const(obj):
     mapper = mappers_python.map_to_python(wb_type, artifact_mem.MemArtifact())
     val = mapper.apply(obj)
     return graph.ConstNode(wb_type, val)
-
-
-def to_hashable(obj):
-    wb_type = types.TypeRegistry.type_of(obj)
-    art = artifact_mem.MemArtifact()
-    mapper = mappers_python.map_to_python(wb_type, art)
-    val = mapper.apply(obj)
-    if art.ref_count() > 0:
-        raise errors.WeaveSerializeError(
-            "Cannot hash object that contains custom objects"
-        )
-    # TODO: this should be a ConstNode!
-    return {"_type": wb_type.to_dict(), "_val": val}
 
 
 def from_python(obj, wb_type=None):

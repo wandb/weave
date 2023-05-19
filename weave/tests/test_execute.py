@@ -1,4 +1,5 @@
 import typing
+import os
 import weave
 from .. import api
 from .. import weave_types as types
@@ -8,6 +9,7 @@ from .. import execute
 from .. import environment
 from . import test_wb
 import pytest
+
 
 execute_test_count_op_run_count = 0
 
@@ -150,3 +152,30 @@ def test_outer_tags_propagate_on_cache_hit(fake_wandb):
     # tags even on cache hits.
     run_names_res = weave.use(row.run().name())
     assert run_names_res == "amber-glade-100"
+
+
+@weave.op()
+def expensive_op(x: int) -> int:
+    return x + 10000
+
+
+def test_cache_column():
+    os.environ["WEAVE_CACHE_MODE"] = "minimal"
+
+    input_vals = list(range(10))
+    expected_result = [{"x": x, "y": x + 10000} for x in input_vals]
+
+    l = weave.save(input_vals)
+    mapped = l.map(lambda x: weave.ops.dict_(x=x, y=expensive_op(x)))
+    res = weave.use(mapped)
+    assert res == expected_result
+    # TODO: this test is not complete.
+
+    latest_obj = weave.use(
+        weave.ops.get("local-artifact:///run-op-expensive_op:latest/obj")
+    )
+    assert len(latest_obj) == len(input_vals)
+    assert len(weave.versions(latest_obj)) == 1
+
+    # res = weave.use(mapped)
+    # assert res == [{"x": 1, "y": 10001}, {"x": 2, "y": 10002}, {"x": 3, "y": 10003}]

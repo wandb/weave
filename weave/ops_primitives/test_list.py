@@ -6,8 +6,11 @@ from .. import box
 from . import list_
 from . import dict
 from . import number
+from . import runs
+from . import errors
 from .. import weave_internal
 from ..tests import weavejs_ops
+from ..tests import geom
 from ..language_features.tagging import make_tag_getter_op, tag_store, tagged_value_type
 
 
@@ -183,7 +186,6 @@ def test_dropna_tagged():
 
 
 def test_preserve_tags_on_mapped_elements():
-
     data = [1]
     for i, item in enumerate(data):
         data[i] = tag_store.add_tags(box.box(item), {"row": i})
@@ -226,3 +228,25 @@ def test_group_over_tagged():
             {"a": 1, "b": 1, "y": "x"},
         ],
     ]
+
+
+def test_lookup():
+    l = weave.save([{"id": 5, "b": 5}, {"id": 6, "b": 6}])
+    assert weave.use(l.lookup(0)) == None
+    assert weave.use(l.lookup(5)) == {"id": 5, "b": 5}
+
+    # can't call on TypedDict with no id
+    l = weave.save([{"b": 5}, {"b": 6}])
+    with pytest.raises(errors.WeaveDispatchError):
+        l.lookup(0)
+
+    l = weave.save(
+        [runs.Run("a", "cool-op", output=25), runs.Run("b", "cool-op", output=26)]
+    )
+    assert weave.use(l.lookup(0)) == None
+    assert weave.use(l.lookup("a")) == runs.Run("a", "cool-op", output=25)
+
+    # Can't call on object with no ID
+    l = weave.save([geom.Point2d(0, 5)])
+    with pytest.raises(errors.WeaveDispatchError):
+        l.lookup(0)

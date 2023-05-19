@@ -46,8 +46,8 @@ def test_stable_when_fetching_input():
     # (which we know by checking that they come from the same ref in the code)
     train1 = async_demo.train(get_dataset)
     train2 = async_demo.train(get_dataset)
-    run_id1 = api.use(train1.id)
-    run_id2 = api.use(train2.id)
+    run_id1 = api.use(train1.id())
+    run_id2 = api.use(train2.id())
     assert run_id1 == run_id2
     api.use(train1.await_final_output())
     api.use(train2.await_final_output())

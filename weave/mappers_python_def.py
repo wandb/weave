@@ -14,6 +14,7 @@ from . import errors
 from . import box
 from . import mappers_python
 from . import val_const
+from . import artifact_fs
 from . import timestamp as weave_timestamp
 from .language_features.tagging import tagged_value_type
 
@@ -89,7 +90,6 @@ class UnionToPyUnion(mappers_weave.UnionMapper):
         for i, (member_type, member_mapper) in enumerate(
             zip(self.type.members, self._member_mappers)
         ):
-
             # TODO: Should types.TypeRegistry.type_of always return a const type??
             if isinstance(member_type, types.Const) and not isinstance(
                 obj_type, types.Const
@@ -251,7 +251,7 @@ class DefaultToPy(mappers.Mapper):
         # If the ref exists elsewhere, just return its uri.
         # TODO: This doesn't deal with MemArtifactRef!
         existing_ref = storage._get_ref(obj)
-        if existing_ref:
+        if isinstance(existing_ref, artifact_fs.FilesystemArtifactRef):
             if existing_ref.is_saved:
                 if self._use_stable_refs:
                     uri = existing_ref.uri

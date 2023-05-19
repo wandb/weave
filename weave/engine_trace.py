@@ -1,16 +1,24 @@
 import os
 import typing
+import logging
+
+from . import logs
+
 
 # Thanks co-pilot!
 class DummySpan:
     def __init__(self, *args, **kwargs):
-        pass
+        self.args = args
+        self.log_indent_token = None
 
     def __enter__(self):
+        logging.info("-> %s", self.args[0])
+        self.log_indent_token = logs.increment_indent()
         return self
 
     def __exit__(self, *args, **kwargs):
-        pass
+        logs.reset_indent(self.log_indent_token)
+        logging.info("<- %s", self.args[0])
 
     def set_tag(self, *args, **kwargs):
         pass
@@ -37,10 +45,7 @@ class ContextProvider:
 
 class DummyTrace:
     def trace(self, *args, **kwargs):
-        import logging
-
-        logging.info("Trace: %s", args[0])
-        return DummySpan()
+        return DummySpan(*args)
 
     @property
     def context_provider(self) -> ContextProvider:

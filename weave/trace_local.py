@@ -2,42 +2,41 @@ import hashlib
 import typing
 from typing import Mapping
 import json
+import dataclasses
 import random
 
 from . import storage
-from . import runs_local
 from . import ref_base
 from . import op_def
-from . import errors
+from . import weave_types as types
+from . import runs
+from . import graph
+from . import artifact_local
+from . import weave_internal
+from . import cache_policy
+
+
+@dataclasses.dataclass
+class RunKey:
+    op_simple_name: str
+    id: str
 
 
 def _value_id(val):
-    try:
-        hash_val = json.dumps(storage.to_hashable(val))
-    except errors.WeaveSerializeError:
-        # This is a lame fallback. We will fall back here if an object
-        # contains a reference to a custom type. When we generate a random
-        # ID, nothing downstream of us will be cacheable.
-        # It'd be better to not even try to serialize this object, and warn.
-        # TODO: Fix later.
-        hash_val = random.random()
+    hash_val = json.dumps(storage.to_python(val))
     hash = hashlib.md5()
     hash.update(json.dumps(hash_val).encode())
     return hash.hexdigest()
 
 
-def make_run_id(op_def: op_def.OpDef, inputs_refs: Mapping[str, typing.Any]) -> str:
+def make_run_key(op_def: op_def.OpDef, inputs_refs: Mapping[str, typing.Any]) -> RunKey:
     hash_val: typing.Any
     if not op_def.pure:
         hash_val = random.random()
     else:
         hashable_inputs = {}
         for name, obj in inputs_refs.items():
-            ref = storage._get_ref(obj)
-            if ref is not None:
-                hashable_inputs[name] = str(ref)
-            else:
-                hashable_inputs[name] = _value_id(obj)
+            hashable_inputs[name] = _value_id(obj)
         hash_val = {
             "op_name": op_def.name,
             "op_version": op_def.version,
@@ -49,28 +48,106 @@ def make_run_id(op_def: op_def.OpDef, inputs_refs: Mapping[str, typing.Any]) -> 
     # For now, put op_def name in the run ID. This makes debugging much
     # easier because you can inspect the local artifact directly names.
     # This may not be what we want in production.
-    return "%s-%s" % (op_def.simple_name, hash.hexdigest())
+    return RunKey(op_def.simple_name, hash.hexdigest())
 
 
+# Trace interface. Makes use of objects and mutations to store trace data.
+# Manually constructs nodes and op calls to avoid recursively calling
+# the execute engine, either via use or type refinement.
 class TraceLocal:
-    @classmethod
-    def _run_artifact_name(cls, run_id: str) -> str:
-        return f"run-{run_id}"
+    def new_run(
+        self,
+        run_key: RunKey,
+        inputs: typing.Optional[dict[str, ref_base.Ref]] = None,
+        output: typing.Any = None,
+    ) -> graph.Node[runs.Run]:
+        run = runs.Run(run_key.id, run_key.op_simple_name)
+        if inputs is not None:
+            run.inputs = inputs
+        if output is not None:
+            run.output = output
+        self.save_run(run)
+        return self.get_run(run_key)
 
-    def new_run(self, run_id: str, op_name: str) -> runs_local.LocalRun:
-        run = runs_local.LocalRun(run_id, op_name)
-        run.local_store = self
-        return run
+    def _single_run(self, run_key: RunKey) -> graph.Node[runs.Run]:
+        single_uri = artifact_local.WeaveLocalArtifactURI(
+            f"run-{run_key.op_simple_name}-{run_key.id}", "latest", "obj"
+        )
+        return weave_internal.manual_call(
+            "get",
+            {"uri": graph.ConstNode(types.String(), str(single_uri))},
+            types.RunType(),
+        )
 
-    def get_run(self, run_id: str) -> typing.Optional[runs_local.LocalRun]:
-        run = storage.get_local_version(self._run_artifact_name(run_id), "latest")
-        if run is None:
-            return None
-        run.local_store = self
-        return run
+    def _run_table(self, run_key: RunKey):
+        table_uri = artifact_local.WeaveLocalArtifactURI(
+            f"run-{run_key.op_simple_name}", "latest", "obj"
+        )
+        return weave_internal.manual_call(
+            "get",
+            {"uri": graph.ConstNode(types.String(), str(table_uri))},
+            types.List(types.RunType()),
+        )
 
-    def save_run(self, run: runs_local.LocalRun):
-        return self.save_object(run, name=self._run_artifact_name(run.id))
+    def _should_save_to_table(self, run_key: RunKey):
+        # Restricted to just a couple ops for now.
+        # A NOTE: for the future, async ops definitely can't be saved to
+        # table (until we have safe table writes)
+        return cache_policy.should_cache(run_key.op_simple_name)
+
+    def get_run(self, run_key: RunKey) -> graph.Node[runs.Run]:
+        if self._should_save_to_table(run_key):
+            return weave_internal.manual_call(
+                "listobject-lookup",
+                {
+                    "arr": self._run_table(run_key),
+                    "id": graph.ConstNode(types.String(), run_key.id),
+                },
+                types.RunType(),
+            )
+        return self._single_run(run_key)
+
+    def get_run_val(self, run_key: RunKey) -> typing.Optional[runs.Run]:
+        from . import execute_fast
+
+        res = execute_fast._execute_fn_no_engine(None, None, self.get_run(run_key))
+        return res
+
+    def save_run(self, run: runs.Run):
+        from .ops_primitives import weave_api
+
+        run_key = RunKey(run.op_name, run.id)
+        if self._should_save_to_table(run_key):
+            weave_api.append(self._run_table(run_key), run, {})
+        else:
+            weave_api.set(self._single_run(run_key), run, {})
+
+    def save_run_output(self, od: op_def.OpDef, run_key: RunKey, output: typing.Any):
+        if not od.pure:
+            # If an op is impure, its output is saved to a name that does not
+            # include run ID. This means consuming pure runs will hit cache if
+            # the output of an impure op is the same as it was last time.
+            # However that also means we can traceback through impure ops if we want
+            # to see the actual query that run for a given object.
+            # TODO: revisit this behavior
+            return self.save_object(output)
+        if (
+            run_key.op_simple_name == "op-expensive_op"
+            or run_key.op_simple_name == "BaseRetrievalQA-run"
+        ):
+            art_name = f"run-{run_key.op_simple_name}-output"
+            existing_objs = storage.get_local_version(art_name, "latest")
+            if existing_objs is None:
+                existing_objs = []
+            existing_objs.append(output)
+            obj_ref = self.save_object(existing_objs, name=art_name)
+            obj_ref._obj = output
+            obj_ref._type = types.TypeRegistry.type_of(output)
+            obj_ref.extra = [run_key.id]
+            return obj_ref
+        return self.save_object(
+            output, name=f"run-{run_key.op_simple_name}-{run_key.id}-output"
+        )
 
     def save_object(
         self, obj: typing.Any, name: typing.Optional[str] = None

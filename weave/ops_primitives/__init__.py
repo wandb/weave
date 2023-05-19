@@ -15,6 +15,7 @@ from .file_artifact import *
 from .weave_api import *
 from .pandas_ import *
 from .csv_ import *
+from .json_ import *
 from .sql import *
 from .artifacts import *
 from .random_junk import *

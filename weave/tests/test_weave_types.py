@@ -670,7 +670,6 @@ def test_parse_const_type():
 
 
 def test_init_image():
-
     image_ref_type = wbmedia.ImageArtifactFileRefType({"a": [1, 2, 3]})
     assert image_ref_type.boxLayers == types.TypedDict(
         {
@@ -714,3 +713,9 @@ def test_wbrun_not_assignable_to_weave_run():
             output=weave.types.NoneType(),
         )
     )
+
+
+def test_generic_object_type():
+    t = types.ObjectType(id=types.String())
+    assert t.assign_type(types.RunType(output=types.Int()))
+    assert not t.assign_type(types.RefType())

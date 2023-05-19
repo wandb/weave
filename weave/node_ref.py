@@ -5,6 +5,12 @@ from . import graph
 from . import ref_base
 from . import ops
 
+# Notes for the future:
+# - I added list.lookup to lookup rows in a list by ID. I think we probably should
+# add a weave.Table type which is a list of dicts that have ID. Then we can define
+# node reference to use id lookup instead of index. Maybe figure out how to make
+# it a multi-index so we can match pandas.
+
 
 def node_to_ref(node: graph.Node) -> typing.Optional[ref_base.Ref]:
     """Converts a Node to equivalent Ref if possible.

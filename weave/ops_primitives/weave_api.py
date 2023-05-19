@@ -17,6 +17,7 @@ from .. import compile
 from .. import runs
 from .. import artifact_fs
 from .. import artifact_wandb
+from .. import object_context
 
 
 def is_hexadecimal(s):
@@ -44,6 +45,24 @@ class RefNodeMethods:
 def save(obj: typing.Any, name: typing.Optional[str]):
     ref = storage.save(obj, name=name)
     return ref.obj
+
+
+# TODO: this is not used yet. We might want to call it save.
+# it completes a transaction
+@mutation
+def finish(obj: graph.Node[typing.Any], name: typing.Optional[str] = None) -> None:
+    print("SAVE", obj)
+    nodes = graph.linearize(obj)
+    if nodes is None:
+        raise errors.WeaveInternalError("save must be called on a linear graph")
+    node0 = nodes[0]
+    if node0.from_op.name != "get":
+        raise errors.WeaveInternalError("save must be called on a get node")
+    target_uri = node0.from_op.inputs["uri"].val
+    obj_ctx = object_context.get_object_context()
+    if obj_ctx is None:
+        raise errors.WeaveInternalError("save must be called inside a mutation")
+    obj_ctx.finish_mutation(target_uri)
 
 
 # TODO: This should not be a separate op.
@@ -154,8 +173,6 @@ def local_artifacts() -> list[artifact_local.LocalArtifact]:
 
 def op_get_return_type(uri):
     ref = ref_base.Ref.from_str(uri)
-    if not ref.is_saved:
-        return types.NoneType()
     return ref.type
 
 
@@ -181,25 +198,33 @@ def get_returntype(uri):
     return op_get_return_type(uri)
 
 
-def _save(name, obj, setter_options, action=None):
-    obj_uri = uris.WeaveURI.parse(name)
-    branch = setter_options.get("branch")
+def _save(
+    get_uri,
+    obj,
+    root_args,
+    make_new_type: typing.Callable[[types.Type], types.Type],
+    mutation_record: object_context.MutationRecord,
+):
+    source_uri = uris.WeaveURI.parse(get_uri)
 
-    art_ref = obj_uri.to_ref()
-    forked = None
-    if isinstance(art_ref, artifact_fs.FilesystemArtifactRef):
-        art = art_ref.artifact
-        if branch is not None and branch != art.branch:
-            forked = artifact_local.LocalArtifact(name=art.name, version=art.version)
-            forked._original_uri = name
-
-    ref = storage.save(
-        obj,
-        name=obj_uri.name + ":" + obj_uri.version,
-        branch=branch,
-        artifact=forked,
+    target_branch = root_args.get("branch")
+    if target_branch is None:
+        target_branch = source_uri.version
+    target_uri = artifact_local.WeaveLocalArtifactURI(
+        source_uri.name, target_branch, source_uri.path  # type: ignore
     )
-    return ref.branch_uri
+
+    ctx = object_context.get_object_context()
+    if ctx:
+        ctx.add_mutation(
+            str(target_uri), str(source_uri), obj, make_new_type, mutation_record
+        )
+    else:
+        # Save immediately
+        with object_context.object_context() as ctx:
+            ctx.add_mutation(
+                str(target_uri), str(source_uri), obj, make_new_type, mutation_record
+            )
 
 
 def _merge(name) -> str:
@@ -268,13 +293,9 @@ def _merge(name) -> str:
     return ref.branch_uri
 
 
-def _set(name, obj, setter_options, action=None):
-    return _save(name, obj, setter_options, action=action)
-
-
 @op(
     pure=False,
-    setter=_set,
+    setter=_save,
     name="get",
     input_type={"uri": types.String()},
     output_type=types.Any(),
@@ -282,9 +303,10 @@ def _set(name, obj, setter_options, action=None):
 )
 def get(uri):
     ref = ref_base.Ref.from_str(uri)
-    if not ref.is_saved:
-        return None
-    return ref.get()
+    # if not ref.is_saved:
+    #     return None
+    res = ref.get()
+    return res
 
 
 @op(
@@ -352,6 +374,8 @@ def mutate_op_body(
     self,
     root_args: typing.Any,
     make_new_value: typing.Callable[[typing.Any], typing.Any],
+    make_new_type: typing.Callable[[types.Type], types.Type],
+    mutation_record: object_context.MutationRecord,
 ):
     # This implements mutations. Note that its argument must be a
     # Node. You can call it like this:
@@ -405,10 +429,15 @@ def mutate_op_body(
         if i == 0 and node.from_op.name == "get":
             # TODO hardcoded get to take root_args. Should just check if available on setter.
             args.append(root_args)
+            args.append(make_new_type)
+            args.append(mutation_record)
+        setter = op_def.setter
         try:
-            res = op_def.setter.func(*args)  # type: ignore
+            setter = setter.func  # type: ignore
         except AttributeError:
-            res = op_def.setter(*args)
+            pass
+
+        res = setter(*args)
 
     return res
 
@@ -423,7 +452,13 @@ def set(
     if isinstance(self, graph.ConstNode):
         return val
 
-    return mutate_op_body(self, root_args, lambda _: val)
+    return mutate_op_body(
+        self,
+        root_args,
+        lambda _: val,
+        lambda _: types.TypeRegistry.type_of(val),
+        object_context.MutationRecord("op-set", [self, val, root_args]),
+    )
 
 
 @mutation
@@ -432,7 +467,13 @@ def append(
 ) -> typing.Any:
     if root_args is None:
         root_args = {}
-    return mutate_op_body(self, root_args, lambda v: v + [val])
+    return mutate_op_body(
+        self,
+        root_args,
+        lambda v: [val] if v == None else v + [val],
+        lambda t: types.merge_types(t, types.List(types.TypeRegistry.type_of(val))),
+        object_context.MutationRecord("op-append", [self, val, root_args]),
+    )
 
 
 @mutation
@@ -552,18 +593,26 @@ class Run:
         append(r.history, v)
 
     @op(
+        input_type={"self": types.Function(output_type=types.RunType())},
+    )
+    def id(self) -> str:
+        return weave_internal.use(self).id  # type: ignore
+
+    @op(
         name="run-await",
-        output_type=lambda input_types: input_types["self"].output,
+        input_type={"self": types.Function(output_type=types.RunType())},
+        output_type=lambda input_types: input_types["self"].output_type.output,
     )
     def await_final_output(self):
+        # time.sleep(1000)
         sleep_mult = 1
-        while self.state == "pending" or self.state == "running":
+        run_val = weave_internal.use(self)
+        while run_val.state == "pending" or run_val.state == "running":
             sleep_time = 0.1 * sleep_mult
             if sleep_time > 3:
                 sleep_time = 3
             sleep_mult *= 1.3
             time.sleep(sleep_time)
+            run_val = weave_internal.use(self)
 
-            self = artifact_local.get_local_version(f"run-{self.id}", "latest")
-
-        return self.output
+        return run_val.output

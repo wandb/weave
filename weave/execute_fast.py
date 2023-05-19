@@ -1,6 +1,7 @@
 import logging
 
 from . import graph
+from . import execute
 from . import registry_mem
 from . import weave_internal
 from . import weave_types as types
@@ -13,12 +14,15 @@ from . import language_nullability
 from .language_features.tagging import tag_store
 
 from . import ref_base
+from . import cache_policy
+from . import object_context
 
 
-def _fast_apply_map_fn(item, index, map_fn):
+def _execute_fn_no_engine(item, index, map_fn):
+    # executes map_fn without using the execute engine.
     if isinstance(map_fn, graph.OutputNode):
         inputs = {
-            name: _fast_apply_map_fn(item, index, node)
+            name: _execute_fn_no_engine(item, index, node)
             for name, node in map_fn.from_op.inputs.items()
         }
         op_def = registry_mem.memory_registry.get_op(map_fn.from_op.name)
@@ -126,11 +130,24 @@ def op_can_be_async(op_name: str) -> bool:
 
 
 def _can_fast_map(map_fn):
-    async_op_nodes = graph.filter_nodes_full(
+    not_fastmappable_nodes = graph.filter_nodes_full(
         [map_fn],
-        lambda n: isinstance(n, graph.OutputNode) and op_can_be_async(n.from_op.name),
+        lambda n: isinstance(n, graph.OutputNode)
+        and (
+            op_can_be_async(n.from_op.name)
+            or cache_policy.should_cache(n.from_op.full_name)
+        ),
     )
-    return len(async_op_nodes) == 0
+    return len(not_fastmappable_nodes) == 0
+
+
+def _should_batch_cache(map_fn):
+    table_cache_nodes = graph.filter_nodes_full(
+        [map_fn],
+        lambda n: isinstance(n, graph.OutputNode)
+        and (cache_policy.should_table_cache(n.from_op.full_name)),
+    )
+    return len(table_cache_nodes) > 0
 
 
 def _slow_map_fn(input_list, map_fn):
@@ -145,6 +162,9 @@ def _slow_map_fn(input_list, map_fn):
                 },
             )
         )
+    if _should_batch_cache(map_fn):
+        with object_context.object_context():
+            return weave_internal.use(calls)
     return weave_internal.use(calls)
 
 
@@ -184,6 +204,6 @@ def fast_map_fn(input_list, map_fn):
                     item, list_tags, give_precedence_to_existing_tags=True
                 )
 
-            item_result = _fast_apply_map_fn(item, i, map_fn)
+            item_result = _execute_fn_no_engine(item, i, map_fn)
             result.append(item_result)
         return result

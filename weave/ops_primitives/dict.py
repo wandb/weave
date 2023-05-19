@@ -105,6 +105,15 @@ class TypedDict:
     def merge(lhs, rhs):
         return {**lhs, **rhs}
 
+    @op(
+        name="typedDict-values",
+        output_type=lambda input_types: types.List(
+            types.union(*input_types["self"].property_types.values())
+        ),
+    )
+    def values(self):
+        return self.values()
+
     __getitem__ = pick
 
 

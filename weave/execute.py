@@ -33,6 +33,7 @@ from .language_features.tagging import process_opdef_resolve_fn
 from .language_features.tagging import opdef_util
 
 # Trace / cache
+from . import cache_policy
 from . import trace_local
 from . import ref_base
 
@@ -240,24 +241,26 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
     return stats
 
 
-def async_op_body(run_id, run_body, inputs):
-    run = TRACE_LOCAL.get_run(run_id)
-    run.state = "running"
-    run.save()
-    dereffed_inputs = {}
-    for input_name, input in inputs.items():
-        dereffed_inputs[input_name] = ref_base.deref(input)
-    run_body(**dereffed_inputs, _run=run)
-    run.state = "finished"
-    run.save()
+def async_op_body(run_key: trace_local.RunKey, run_body, inputs, wandb_api_ctx):
+    with wandb_api.wandb_api_context(wandb_api_ctx):
+        run = TRACE_LOCAL.get_run(run_key)
+        if run is None:
+            raise ValueError("No run found for key: %s" % run_key)
+        run.set_state("running")  # type: ignore
+        dereffed_inputs = {}
+        for input_name, input in inputs.items():
+            dereffed_inputs[input_name] = ref_base.deref(input)
+        run_body(**dereffed_inputs, _run=run)
+        run.set_state("finished")  # type: ignore
 
 
 def execute_async_op(
-    op_def: op_def.OpDef, inputs: Mapping[str, typing.Any], run_id: str
+    op_def: op_def.OpDef, inputs: Mapping[str, typing.Any], run_key: trace_local.RunKey
 ):
+    wandb_api_ctx = wandb_api.get_wandb_api_context()
     job = threading.Thread(
         target=async_op_body,
-        args=(run_id, op_def.resolve_fn, inputs),
+        args=(run_key, op_def.resolve_fn, inputs, wandb_api_ctx),
     )
     job.start()
 
@@ -324,25 +327,12 @@ def execute_forward_node(
     if fg.has_result(node):
         return {"cache_used": False, "already_executed": True}
 
+    op_def = registry_mem.memory_registry.get_op(node.from_op.name)
+
     cache_mode = environment.cache_mode()
     if cache_mode == environment.CacheMode.MINIMAL:
         no_cache = True
-        if not node.from_op.name.startswith("mapped") and (
-            node.from_op.name.endswith("file-table")
-            or node.from_op.name.endswith("file-joinedTable")
-            or node.from_op.name.endswith("readcsv")
-            or node.from_op.name.endswith("table-2DProjection")
-            or node.from_op.name.endswith("ArrowWeaveList-2DProjection")
-            # or node.from_op.name.endswith("artifactVersion-file")
-            # or node.from_op.name.endswith("FilesystemArtifact-file")
-        ):
-            # Always cache file-table for now. file-table converts from the W&B json
-            # table format to the much faster Weave arrow format. Since Weave cache
-            # is like permanent memoization, this means each W&B table we encounter will
-            # only be converted once.
-            # Also cache artifactVersion-file and FilesystemArtifact-file. They require
-            # loading a wandb artifact, which right now makes a sequence of 3-5 requests
-            # to the W&B API.
+        if cache_policy.should_cache(op_def.simple_name):
             no_cache = False
 
     use_cache = not no_cache
@@ -358,30 +348,30 @@ def execute_forward_node(
     tracer = engine_trace.tracer()
 
     with tracer.trace("execute-read-cache"):
-        op_def = registry_mem.memory_registry.get_op(node.from_op.name)
         input_nodes = node.from_op.inputs
 
         input_refs: dict[str, ref_base.Ref] = {}
         for input_name, input_node in input_nodes.items():
             input_refs[input_name] = fg.get_result(input_node)
 
+        run_key = None
         if use_cache or op_def.is_async:
             # Compute the run ID, which is deterministic if the op is pure
-            run_id = trace_local.make_run_id(op_def, input_refs)
+            run_key = trace_local.make_run_key(op_def, input_refs)
 
-        if use_cache and op_def.pure:
-            run = TRACE_LOCAL.get_run(run_id)
-            if run is not None:
-                logging.debug("Cache hit, returning")
+        if run_key and op_def.pure:
+            run = TRACE_LOCAL.get_run_val(run_key)
+            if run is not None and run != None:  # stupid box none makes us check !=
                 # Watch out, we handle loading async runs in different ways.
                 if op_def.is_async:
-                    forward_node.set_result(run)
+                    forward_node.set_result(TRACE_LOCAL.get_run(run_key))
                     return {"cache_used": True, "already_executed": False}
                 else:
                     if run.output is not None:
                         output_ref = run.output
                         # We must deref here to restore tags
                         output = output_ref.get()
+                        logging.debug("Cache hit, returning")
 
                         # Flowed tags are not cacheable(!),
                         # because they may contain graph dependent information,
@@ -408,7 +398,7 @@ def execute_forward_node(
             for input_name, input in input_refs.items()
         }
 
-    if op_def.is_async:
+    if op_def.is_async and run_key:
         with tracer.trace("execute-async"):
             input_refs = {}
             for input_name, input in inputs.items():
@@ -416,11 +406,8 @@ def execute_forward_node(
                 if ref is None:
                     ref = TRACE_LOCAL.save_object(input)
                 input_refs[input_name] = ref
-            run = TRACE_LOCAL.new_run(run_id, op_def.name)
-            run.inputs = input_refs
-            run.save()
-
-            execute_async_op(op_def, input_refs, run_id)
+            run = TRACE_LOCAL.new_run(run_key, inputs=input_refs)  # type: ignore
+            execute_async_op(op_def, input_refs, run_key)
             forward_node.set_result(run)
     else:
         result: typing.Any
@@ -440,7 +427,7 @@ def execute_forward_node(
                 logging.debug("Op resulted in ref")
                 # If the op produced an object which has a ref (as in the case of get())
                 # the result is the ref. This enables memoization after impure ops. E.g.
-                # if get('x:latest') produces version x:1, we use x:1 for our make_run_id
+                # if get('x:latest') produces version x:1, we use x:1 for our make_run_key
                 # calculation
 
                 # Add tags from the result to the ref
@@ -448,17 +435,8 @@ def execute_forward_node(
                     tag_store.add_tags(ref, tag_store.get_tags(result))
                 result = ref
             else:
-                if use_cache:
-                    # If an op is impure, its output is saved to a name that does not
-                    # include run ID. This means consuming pure runs will hit cache if
-                    # the output of an impure op is the same as it was last time.
-                    # However that also means we can traceback through impure ops if we want
-                    # to see the actual query that run for a given object.
-                    # TODO: revisit this behavior
-                    output_name = None
-                    if op_def.pure:
-                        output_name = "run-%s-output" % run_id
-                    result = TRACE_LOCAL.save_object(result, name=output_name)
+                if use_cache and run_key:
+                    result = TRACE_LOCAL.save_run_output(op_def, run_key, result)
 
             forward_node.set_result(result)
 
@@ -466,10 +444,7 @@ def execute_forward_node(
             # TODO: This actually should work correctly, but mutation tracing
             #    does not really work yet. (mutated objects set their run output
             #    as the original ref rather than the new ref, which causes problems)
-            if use_cache and not is_run_op(node.from_op):
+            if use_cache and run_key is not None and not is_run_op(node.from_op):
                 logging.debug("Saving run")
-                run = TRACE_LOCAL.new_run(run_id, op_def.name)
-                run.inputs = input_refs
-                run.output = result
-                run.save()
+                TRACE_LOCAL.new_run(run_key, inputs=input_refs, output=result)
     return {"cache_used": False, "already_executed": False}

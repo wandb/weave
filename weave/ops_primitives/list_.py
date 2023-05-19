@@ -721,7 +721,6 @@ def join_all(arrs, joinFn, outer: bool):
 
         # Look through each arr mapping to find the rows for this join key
         for arr_lookup in join_key_mapping:
-
             # Get the values matching this key for this array
             arr_vals = arr_lookup.get(k, default_vals)
 
@@ -842,3 +841,58 @@ def sample(arr: list[typing.Any], n: int):
     zeros[indices] = True
 
     return [arr[i] for i in range(len(arr)) if zeros[i]]
+
+
+ID_TYPE = types.UnionType(types.String(), types.Int())
+
+
+def _typeddict_lookup_setter(arr, id, v):
+    for i, row in enumerate(arr):
+        if row.get("id") == id:
+            break
+    else:
+        return arr
+    arr[i] = v
+    return arr
+
+
+@op(
+    name="listtypedict-lookup",
+    setter=_typeddict_lookup_setter,
+    input_type={
+        "arr": types.List(types.TypedDict({"id": ID_TYPE})),
+        "id": ID_TYPE,
+    },
+    output_type=getitem_output_type,
+)
+def typedict_lookup(arr, id):
+    for row in arr:
+        if row.get("id") == id:
+            return row
+    return None
+
+
+def _object_lookup_setter(arr, id, v):
+    for i, row in enumerate(arr):
+        if row.id == id:
+            break
+    else:
+        return arr
+    arr[i] = v
+    return arr
+
+
+@op(
+    name="listobject-lookup",
+    setter=_object_lookup_setter,
+    input_type={
+        "arr": types.List(types.ObjectType(id=ID_TYPE)),
+        "id": ID_TYPE,
+    },
+    output_type=getitem_output_type,
+)
+def object_lookup(arr, id):
+    for row in arr:
+        if row.id == id:
+            return row
+    return None

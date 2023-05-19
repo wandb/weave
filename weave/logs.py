@@ -11,6 +11,8 @@ from logging.handlers import WatchedFileHandler
 from flask.logging import wsgi_errors_stream
 from pythonjsonlogger import jsonlogger
 import typing
+import contextlib
+import contextvars
 import warnings
 
 from . import environment
@@ -27,7 +29,41 @@ class LogSettings:
     level: str
 
 
-default_log_format = "[%(asctime)s] %(levelname)s in %(module)s (Thread Name: %(threadName)s): %(message)s"
+_log_indent: contextvars.ContextVar[int] = contextvars.ContextVar(
+    "_log_indent", default=0
+)
+
+
+def increment_indent() -> contextvars.Token[int]:
+    indent = _log_indent.get()
+    return _log_indent.set(indent + 1)
+
+
+def reset_indent(token: contextvars.Token[int]) -> None:
+    _log_indent.reset(token)
+
+
+@contextlib.contextmanager
+def indent_logs() -> typing.Iterator:
+    token = increment_indent()
+    try:
+        yield
+    finally:
+        reset_indent(token)
+
+
+def get_indent() -> int:
+    return _log_indent.get()
+
+
+class IndentFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        indent = get_indent()
+        record.indent = "  " * indent  # type: ignore
+        return True
+
+
+default_log_format = "[%(asctime)s] %(levelname)s in %(module)s (Thread Name: %(threadName)s): %(indent)s%(message)s"
 
 
 def get_logdir() -> typing.Optional[str]:
@@ -125,6 +161,7 @@ def setup_handler(hander: logging.Handler, settings: LogSettings) -> None:
             timestamp=True,
             json_encoder=WeaveJSONEncoder,
         )
+    hander.addFilter(IndentFilter())
     hander.setFormatter(formatter)
     hander.setLevel(level)
 
@@ -152,7 +189,6 @@ def enable_stream_logging(
     if pid_logfile_settings is not None:
         log_filename = default_log_filename()
         if log_filename:
-
             handler = WatchedFileHandler(log_filename, mode="w")
             setup_handler(handler, pid_logfile_settings)
             logger.addHandler(handler)

@@ -7,6 +7,8 @@ import re
 
 import wandb
 
+from . import test_helpers
+
 from ..weavejs_fixes import recursively_unwrap_unions
 
 from .. import api as weave
@@ -16,6 +18,7 @@ from .. import storage
 from .. import artifact_wandb
 from .. import artifact_mem
 from .. import mappers_python
+from .. import ops_arrow
 from ..weave_internal import make_const_node
 
 
@@ -364,3 +367,48 @@ def test_branch_point():
     assert ref4.branch == "other2"
     assert ref4.branch_point["branch"] == "other"
     assert ref4.branch_point["commit"] == ref3.version
+
+
+def test_to_python_norefs():
+    data = [{"a": 5}, {"a": 6}]
+    result = storage.to_python(data)
+    assert result["_val"] == data
+
+    assert len(storage.local_artifacts()) == 0
+    data2 = storage.from_python(result)
+    assert data == data2
+
+
+def test_to_python_ref():
+    custom_obj = ops_arrow.to_arrow([{"x": 14}])
+    data = [{"a": 5}, {"a": custom_obj}]
+    result = storage.to_python(data)
+
+    # There should be one artifact
+    assert len(storage.local_artifacts()) == 1
+
+    # The result should have a ref into that artifact
+    assert result["_val"] == [
+        {"a": {"_union_id": 0, "_val": 5}},
+        {
+            "a": {
+                "_union_id": 1,
+                "_val": test_helpers.RegexMatcher("local-artifact:///list:.*/a/0"),
+            }
+        },
+    ]
+
+    data2 = storage.from_python(result)
+    assert data[0] == data2[0]
+    assert data[1]["a"].to_pylist_raw() == data2[1]["a"].to_pylist_raw()
+
+
+def test_to_python_toplevel_ref():
+    data = ops_arrow.to_arrow([{"x": 14}])
+    result = storage.to_python(data)
+    assert result["_val"] == test_helpers.RegexMatcher(
+        "local-artifact:///ArrowWeaveList:.*/0"
+    )
+
+    data2 = storage.from_python(result)
+    assert data.to_pylist_raw() == data2.to_pylist_raw()

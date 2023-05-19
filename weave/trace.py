@@ -24,23 +24,33 @@ def get_obj_creator(ref: ref_base.Ref) -> typing.Optional[runs.Run]:
             and artifact_local.local_artifact_exists(art_name, "latest")
         ):
             try:
-                run = artifact_local.get_local_version(art_name, "latest")
+                cache_obj = artifact_local.get_local_version(art_name, "latest")
             except errors.WeaveSerializeError:
                 # This happens because we don't load all ecosystem modules, and so we can't
                 # deserializes everything.
                 continue
-            if isinstance(run.output, ref_base.Ref) and str(run.output) == str(ref):
-                # If any input is also the ref, this run did not create obj, since
-                # the obj already existed. This fixes an infinite loop where list-createIndexCheckpointTag
-                # which just returns its input would be treated as a the obj creator
-                # TODO: This whole thing is a pile of hacks, not production ready! Fix! We should
-                #     not need heuristics.
-                # TODO: for one, if we order all the artifacts by created_at, then
-                #     the first one will be the creator. Can't do that in this branch
-                #     since it doesn't have the created at change.
-                if any(str(input) == str(ref) for input in run.inputs.values()):
-                    continue
-                return run
+
+            def _is_creator(run):
+                if isinstance(run.output, ref_base.Ref) and str(run.output) == str(ref):
+                    # If any input is also the ref, this run did not create obj, since
+                    # the obj already existed. This fixes an infinite loop where list-createIndexCheckpointTag
+                    # which just returns its input would be treated as a the obj creator
+                    # TODO: This whole thing is a pile of hacks, not production ready! Fix! We should
+                    #     not need heuristics.
+                    # TODO: for one, if we order all the artifacts by created_at, then
+                    #     the first one will be the creator. Can't do that in this branch
+                    #     since it doesn't have the created at change.
+                    if any(str(input) == str(ref) for input in run.inputs.values()):
+                        return False
+                    return True
+
+            if isinstance(cache_obj._ref.type, types.List):
+                for run in cache_obj:
+                    if _is_creator(run):
+                        return run
+            else:
+                if _is_creator(cache_obj):
+                    return cache_obj
     return None
 
 

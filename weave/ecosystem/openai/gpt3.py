@@ -289,13 +289,10 @@ Gpt3FineTuneType.instance_class = Gpt3FineTune
         ),
     },
     output_type=weave.types.RunType(
-        weave.types.TypedDict({}),
-        weave.types.List(weave.types.Any()),
-        Gpt3FineTuneType(),
+        output=Gpt3FineTuneType(),
     ),
 )
 def finetune_gpt3(training_dataset, hyperparameters, _run=None):
-
     uploaded = weave.use(upload_gpt3_dataset(training_dataset))
     create_args = {"training_file": uploaded.id}
     for k, v in hyperparameters.items():
@@ -333,13 +330,10 @@ def finetune_gpt3(training_dataset, hyperparameters, _run=None):
         ),
     },
     output_type=weave.types.RunType(
-        weave.types.TypedDict({}),
-        weave.types.List(weave.types.Any()),
-        Gpt3FineTuneType(),
+        output=Gpt3FineTuneType(),
     ),
 )
 def finetune_gpt3_demo(training_dataset, hyperparameters, _run=None):
-
     print("!!! FINE TUNE DEMO, NOT REALLY FINE-TUNING !!!")
     weave.use(_run.print_("Creating fine tune"))
     resp = {

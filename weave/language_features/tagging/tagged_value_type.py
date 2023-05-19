@@ -366,7 +366,12 @@ class TaggedValueToPy(TaggedValueMapper):
     def apply(self, obj: typing.Any) -> dict:
         result = {}
         obj_tags = tag_store.get_tags(obj)
-        if len(set(self.type.tag.property_types.keys()) - set(obj_tags.keys())) > 0:
+        expected_tag_keys = set(
+            key
+            for key, tag_type in self.type.tag.property_types.items()
+            if not types.is_optional(tag_type)
+        )
+        if len(expected_tag_keys - set(obj_tags.keys())) > 0:
             raise errors.WeaveTypeError(
                 f"Expected tags {self.type.tag.property_types.keys()}, found {obj_tags.keys()}"
             )

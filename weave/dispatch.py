@@ -419,6 +419,8 @@ class DispatchMixin:
         use_type = types.non_none(node_self.type)
         if isinstance(use_type, TaggedValueType):
             use_type = use_type.value
+        if isinstance(use_type, types.Function):
+            use_type = use_type.output_type
         if isinstance(use_type, types.ObjectType):
             # Definitely an ObjectType
             if attr in use_type.property_types():
