@@ -109,7 +109,6 @@ class TypeRegistry:
 
     @staticmethod
     def type_of(obj: typing.Any) -> "Type":
-
         obj_type = type_name_to_type("tagged").type_of(obj)
         if obj_type is not None:
             return obj_type
@@ -763,6 +762,9 @@ class UnionType(Type):
         )
 
 
+import orjson
+
+
 @dataclasses.dataclass(frozen=True)
 class List(Type):
     name = "list"
@@ -790,12 +792,13 @@ class List(Type):
     def save_instance(self, obj, artifact, name):
         serializer = mappers_python.map_to_python(self, artifact)
         result = serializer.apply(obj)
-        with artifact.new_file(f"{name}.list.json") as f:
-            json.dump(result, f, allow_nan=False)
+        with artifact.new_file(f"{name}.list.json", binary=True) as f:
+            json = orjson.dumps(result)
+            f.write(json)
 
     def load_instance(self, artifact, name, extra=None):
         with artifact.open(f"{name}.list.json") as f:
-            result = json.load(f)
+            result = orjson.loads(f.read())
         mapper = mappers_python.map_from_python(self, artifact)
         return mapper.apply(result)
 
@@ -1164,6 +1167,7 @@ def literal(val: typing.Any) -> Const:
 
 
 RUN_STATE_TYPE = string_enum_type("pending", "running", "finished", "failed")
+
 
 # TODO: get rid of all the underscores. This is another
 #    conflict with making ops automatically lazy

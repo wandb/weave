@@ -24,6 +24,7 @@ sqlalchemy>=2.0.1
 pymysql>=1.0.2
 aioprocessing>=2.0.1
 janus>=1.0.0
+orjson
 
 setuptools>=65.5.1 # not directly required, pinned by Snyk to avoid a vulnerability
 wheel>=0.38.0 # not directly required, pinned by Snyk to avoid a vulnerability
