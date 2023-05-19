@@ -267,9 +267,13 @@ def _merge(name) -> str:
         )
     return ref.branch_uri
 
+
 import random
 
+
 def _set(name, obj, setter_options, action=None):
+    if random.random() < 0.9:
+        return
     return _save(name, obj, setter_options, action=action)
 
 
