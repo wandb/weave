@@ -2,46 +2,26 @@ from enum import Enum
 import json
 import logging
 import typing
-import dataclasses
 
 from .. import api as weave
 
 
-class StatusCode:
-    SUCCESS = "SUCCESS"
-    ERROR = "ERROR"
-
-
-class SpanKind:
-    LLM = "LLM"
-    CHAIN = "CHAIN"
-    AGENT = "AGENT"
-    TOOL = "TOOL"
-
-
-@weave.type()
-class Result:
+class Result(typing.TypedDict):
     inputs: typing.Optional[typing.Dict[str, typing.Any]]
     outputs: typing.Optional[typing.Dict[str, typing.Any]]
 
 
-@weave.type()
-class Span:
+class Span(typing.TypedDict):
     span_id: typing.Optional[str]
-    # TODO: had to change this, what does it break?
-    _name: typing.Optional[str]
+    name: typing.Optional[str]
     start_time_ms: typing.Optional[int]
     end_time_ms: typing.Optional[int]
     status_code: typing.Optional[str]
     status_message: typing.Optional[str]
     attributes: typing.Optional[typing.Dict[str, typing.Any]]
-    results: typing.Optional[typing.List[Result]] = dataclasses.field(
-        default_factory=lambda: None
-    )
-    child_spans: typing.Optional[typing.List[dict]] = dataclasses.field(
-        default_factory=lambda: None
-    )
-    span_kind: typing.Optional[str] = dataclasses.field(default_factory=lambda: None)
+    results: typing.Optional[typing.List[Result]]
+    child_spans: typing.Optional[typing.List[dict]]
+    span_kind: typing.Optional[str]
 
 
 def stringified_output(obj: typing.Any) -> str:
