@@ -114,11 +114,8 @@ def _uri_is_local_artifact(uri: str) -> bool:
 
 
 def _local_op_get_to_published_op_get(node: graph.Node) -> graph.Node:
-    new_node = ref_to_node(
-        storage._save_or_publish(
-            weave_internal.use(node, context.get_client()), publish=True, type=node.type
-        )
-    )
+    obj = weave_internal.use(node, context.get_client())
+    new_node = ref_to_node(storage._direct_publish(obj, assume_weave_type=node.type))
 
     if new_node is None:
         raise errors.WeaveSerializeError(
@@ -132,8 +129,5 @@ def _local_ref_to_published_ref(ref: ref_base.Ref) -> ref_base.Ref:
     node = ref_to_node(ref)
     if node is None:
         raise errors.WeaveSerializeError(f"Failed to serialize {ref} to published ref")
-    return storage._save_or_publish(
-        weave_internal.use(node, context.get_client()),
-        publish=True,
-        type=ref.type,
-    )
+    obj = weave_internal.use(node, context.get_client())
+    return storage._direct_publish(obj, assume_weave_type=ref.type)

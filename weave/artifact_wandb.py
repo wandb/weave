@@ -366,9 +366,12 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
 
     @property
     def branch(self) -> typing.Optional[str]:
-        # all branching is local for now. we could support remote branches
-        # but in this initial implementation, assume only LocalArtifacts
-        # live on branches.
+        if self._unresolved_read_artifact_or_client_uri is not None:
+            branch = self._unresolved_read_artifact_or_client_uri.version
+
+        if branch is not None and not string_is_likely_commit_hash(branch):
+            return branch
+
         return None
 
     @property
@@ -444,7 +447,12 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
     def version(self):
         if not self.is_saved:
             raise errors.WeaveInternalError("cannot get version of an unsaved artifact")
-        return self._saved_artifact.version
+
+        # Note: W&B Artifact's `version` is often the `v0` alias, which is not what
+        # we want here (despite the same name for the property). In Weave world, `version`
+        # refers to either: a) a commit hash, or b) a branch name. Therefore, in this
+        # case, we explicitly want the commit hash, not the differently-defined `version`.
+        return self._saved_artifact.commit_hash
 
     @property
     def created_at(self):
@@ -539,14 +547,21 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
     def write_metadata(self, dirname):
         raise NotImplementedError()
 
-    def save(self, project: str = DEFAULT_WEAVE_OBJ_PROJECT):
+    def save(
+        self,
+        project: str = DEFAULT_WEAVE_OBJ_PROJECT,
+        entity_name: typing.Optional[str] = None,
+        branch: typing.Optional[str] = None,
+    ):
+        additional_aliases = [] if branch is None else [branch]
         res = wandb_artifact_pusher.write_artifact_to_wandb(
-            self._writeable_artifact, project
+            self._writeable_artifact, project, entity_name, additional_aliases
         )
+        version = res.version_str if branch is None else branch
         self._set_read_artifact_uri(
             WeaveWBArtifactURI(
                 name=res.artifact_name,
-                version=res.version_str,
+                version=version,
                 entity_name=res.entity_name,
                 project_name=res.project_name,
             )
@@ -690,6 +705,15 @@ def is_hex_string(s: str) -> bool:
         return False
 
 
+WANDB_COMMIT_HASH_LENGTH = 20
+
+
+def string_is_likely_commit_hash(version: str) -> bool:
+    # This is the heuristic we use everywhere to tell if a version is an alias or not
+    # if self.version:
+    return is_hex_string(version) and len(version) == WANDB_COMMIT_HASH_LENGTH
+
+
 # Used to refer to objects stored in WB Artifacts. This URI must not change and
 # matches the existing artifact schemes
 @dataclasses.dataclass
@@ -777,12 +801,8 @@ class WeaveWBArtifactURI(uris.WeaveURI):
 
     @property
     def resolved_artifact_uri(self) -> "WeaveWBArtifactURI":
-        # This is the heuristic we use everywhere to tell if a version is an alias or not
-        # if self.version:
-        if self.version and is_hex_string(self.version) and len(self.version) == 20:
+        if self.version and string_is_likely_commit_hash(self.version):
             return self
-        # if self.version and is_hex_string(self.version) and len(self.version) == 20:
-        #     return self
         if self._resolved_artifact_uri is None:
             path = f"{self.entity_name}/{self.project_name}/{self.name}"
             if self.version:

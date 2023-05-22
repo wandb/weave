@@ -25,7 +25,6 @@ class FilesystemArtifactType(types.Type):
 
 
 class BranchPointType(typing.TypedDict):
-    branch: str
     commit: str
     n_commits: int
     original_uri: str
@@ -190,14 +189,17 @@ class FilesystemArtifactRef(artifact_base.ArtifactRef):
 
         return self._outer_type
 
+    # Artifact Name (unique per project, unique per local-artifact user namespace)
     @property
     def name(self) -> str:
         return self.artifact.name
 
+    # The identifier for the artifact (typically the commit_hash, but can be branch)
     @property
     def version(self) -> str:
         return self.artifact.version
 
+    # An optional branchname by which this artifact is identified.
     @property
     def branch(self) -> typing.Optional[str]:
         return self.artifact.branch
@@ -210,23 +212,29 @@ class FilesystemArtifactRef(artifact_base.ArtifactRef):
     def is_saved(self) -> bool:
         return self.artifact.is_saved
 
+    # The original URI used to construct the artifact
     @property
     def initial_uri(self) -> str:
         uri = typing.cast("FilesystemArtifactURI", self.artifact.initial_uri_obj)
+        uri = typing.cast("FilesystemArtifactURI", uri.parse(str(uri)))
         uri.path = self.path
         uri.extra = self.extra
         return str(uri)
 
+    # A stable, fully qualified URI for this artifact (always uses commit_hash for version)
     @property
     def uri(self) -> str:
         uri = typing.cast("FilesystemArtifactURI", self.artifact.uri_obj)
+        uri = typing.cast("FilesystemArtifactURI", uri.parse(str(uri)))
         uri.path = self.path
         uri.extra = self.extra
         return str(uri)
 
+    # A URI suitable to branch from (will include branchname if appropriate)
     @property
     def branch_uri(self) -> str:
         uri = typing.cast("FilesystemArtifactURI", self.artifact.uri_obj)
+        uri = typing.cast("FilesystemArtifactURI", uri.parse(str(uri)))
         uri.path = self.path
         uri.extra = self.extra
         if self.branch is not None:

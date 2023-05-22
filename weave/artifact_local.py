@@ -80,13 +80,21 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
         self._existing_dirs = []
 
     @classmethod
-    def fork_from_artifact(
+    def fork_from_uri(
         cls,
-        artifact: artifact_fs.FilesystemArtifact,
+        source_uri: typing.Union[
+            "WeaveLocalArtifactURI", artifact_wandb.WeaveWBArtifactURI
+        ],
     ):
-        new_artifact = cls(artifact.name, version=artifact.version)
-        new_artifact._original_uri = artifact.uri
-        return new_artifact
+        art = cls(source_uri.name, source_uri.version)
+        art._original_uri = str(source_uri)
+        source_art = source_uri.to_ref().artifact
+        if not isinstance(source_art, (LocalArtifact, artifact_wandb.WandbArtifact)):
+            raise errors.WeaveInternalError(
+                "Cannot fork from non-local artifact: %s" % source_art
+            )
+        art._version = source_art.version
+        return art
 
     # If an object has a _ref property, it will be used by ref_base._get_ref()
     @property
@@ -154,6 +162,13 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
                         os.path.realpath(self._read_dirname)
                     )
                     self._read_dirname = os.path.join(self._root, self._version)
+        if self._branch != None:
+            self._original_uri = str(
+                WeaveLocalArtifactURI(
+                    self.name,
+                    self._branch,
+                )
+            )
 
     def _get_read_path(self, path: str) -> pathlib.Path:
         read_dirname = pathlib.Path(self._read_dirname)
@@ -275,7 +290,9 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
                 if f != ".artifact-version.json":
                     full_path = os.path.join(dirpath, f)
                     manifest[f] = md5_hash_file(full_path)
-        commit_hash = md5_string(json.dumps(manifest, sort_keys=True, indent=2))
+        commit_hash = md5_string(json.dumps(manifest, sort_keys=True, indent=2))[
+            : artifact_wandb.WANDB_COMMIT_HASH_LENGTH
+        ]
 
         new_dirname = os.path.join(self._root, commit_hash)
 
@@ -319,11 +336,12 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
             branch = self._branch
 
         metadata = {}
-        if branch != self._branch:
+        if self._original_uri != None and (
+            branch != self._branch or self._original_uri.startswith("wandb-artifact://")
+        ):
             # new branch
             metadata["branch_point"] = {
                 "original_uri": self._original_uri,
-                "branch": self._branch,
                 "commit": self._version,
                 "n_commits": 1,
             }

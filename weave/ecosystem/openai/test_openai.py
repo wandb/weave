@@ -202,5 +202,5 @@ def test_large_const_node(test_artifact_dir):
     # Asserting that weavejs_fixes.remove_opcall_versions_data works
     assert (
         graph.node_expr_str(col_sel_fn2)
-        == 'finetune_gpt3(local-artifact:///list:f909a3e7a090a0a57dbd03801ddebd51/obj, {"n_epochs": 2}).model().complete(row)["choices"][0]["text"]'
+        == 'finetune_gpt3(local-artifact:///list:f909a3e7a090a0a57dbd/obj, {"n_epochs": 2}).model().complete(row)["choices"][0]["text"]'
     )

@@ -1,4 +1,18 @@
+import typing
+
+import pytest
+
 import weave
+from weave import storage
+from weave.artifact_fs import BranchPointType, FilesystemArtifactRef
+from weave.artifact_local import LocalArtifact, LocalArtifactRef, WeaveLocalArtifactURI
+from weave.artifact_wandb import (
+    WandbArtifact,
+    WandbArtifactRef,
+    WeaveWBArtifactURI,
+    string_is_likely_commit_hash,
+)
+from weave.uris import WeaveURI
 
 
 def test_publish_values(user_by_api_key_in_env):
@@ -72,3 +86,870 @@ def test_publish_group(user_by_api_key_in_env):
     )
 
     res = weave.publish(group)
+
+
+"""
+TODO: These tests were written in prep for the launch and need to be cleaned up
+and made more maintainable/understandable. This is a followup action on Tim.
+
+The following tests exercise the save & publish flows. There are 2 dimensions to test:
+
+* The `Location` of the data.
+* The `Action` to take on the data.
+
+There are 6 possible `Location` types:
+
+1. Remote with commit hash (eg. `wandb-artifact://ENTITY/PROJECT/NAME:HASH`)
+2. Remote with branch (eg. `wandb-artifact://ENTITY/PROJECT/NAME:BRANCH`)
+3-4. Local with commit hash (eg. `wandb-artifact://ENTITY/PROJECT/NAME:HASH`). Variants:
+    a. No branchpoint
+    b. With branchpoint
+5-6. Local with branch (eg. `wandb-artifact://ENTITY/PROJECT/NAME:BRANCH`). Variants:
+    a. No branchpoint
+    b. With branchpoint
+
+There are 3 actions:
+
+1. `Persist`: Directly persist data (eq. save or publish directly)
+2. `Mutate`: Generate new version via Mutation
+3. `Merge`: Apply changes to branchpoint (only applicable to locations with branchpoint)
+   * The branchpoint URI can be any of the 6 location types above.
+
+In summary, there will be 22 tests:
+   
+* 6 `Persist` tests
+* 6 `Mutate` tests
+* 2 * 6 `Merge` tests (2 types of branchpoints, and 6 branch location types.)
+   * -2 cases that are not possible
+"""
+
+# Persist tests
+def test_persist_to_remote_with_commit_hash(user_by_api_key_in_env):
+    data = ["test_data"]
+    target_entity = user_by_api_key_in_env.username
+    target_project_name = "test_project"
+    target_artifact_name = "test_artifact"
+    expected_commit_hash = "74d5ba98aca469b59e18"
+    branch_name = None
+
+    p_ref = storage._direct_publish(
+        obj=data,
+        name=target_artifact_name,
+        wb_project_name=target_project_name,
+        wb_entity_name=target_entity,
+        branch_name=branch_name,
+    )
+
+    _perform_post_persist_assertions(
+        is_local=False,
+        data=data,
+        p_ref=p_ref,
+        target_artifact_name=target_artifact_name,
+        expected_commit_hash=expected_commit_hash,
+        target_entity=target_entity,
+        target_project_name=target_project_name,
+        branch_name=branch_name,
+    )
+
+
+def test_persist_to_remote_with_branch(user_by_api_key_in_env):
+    data = ["test_data"]
+    target_entity = user_by_api_key_in_env.username
+    target_project_name = "test_project"
+    target_artifact_name = "test_artifact"
+    expected_commit_hash = "74d5ba98aca469b59e18"
+    branch_name = "test_branch"
+
+    p_ref = storage._direct_publish(
+        obj=data,
+        name=target_artifact_name,
+        wb_project_name=target_project_name,
+        wb_entity_name=target_entity,
+        branch_name=branch_name,
+    )
+
+    _perform_post_persist_assertions(
+        is_local=False,
+        data=data,
+        p_ref=p_ref,
+        target_artifact_name=target_artifact_name,
+        expected_commit_hash=expected_commit_hash,
+        target_entity=target_entity,
+        target_project_name=target_project_name,
+        branch_name=branch_name,
+    )
+
+
+def test_persist_to_local_with_commit_hash(user_by_api_key_in_env):
+    data = ["test_data"]
+    target_artifact_name = "test_artifact"
+    expected_commit_hash = "b11179315e19b4207282"
+    branch_name = None
+
+    p_ref = storage._direct_save(
+        obj=data,
+        name=target_artifact_name,
+        branch_name=branch_name,
+    )
+
+    _perform_post_persist_assertions(
+        is_local=True,
+        data=data,
+        p_ref=p_ref,
+        target_artifact_name=target_artifact_name,
+        expected_commit_hash=expected_commit_hash,
+        branch_name=branch_name,
+    )
+
+
+# Skipping as this one does not make logical sense.
+# def test_persist_to_local_with_commit_hash_and_branchpoint(user_by_api_key_in_env):
+#     pass
+
+
+def test_persist_to_local_with_branch(user_by_api_key_in_env):
+    data = ["test_data"]
+    target_artifact_name = "test_artifact"
+    expected_commit_hash = "b11179315e19b4207282"
+    branch_name = "my_branch"
+
+    p_ref = storage._direct_save(
+        obj=data,
+        name=target_artifact_name,
+        branch_name=branch_name,
+    )
+
+    _perform_post_persist_assertions(
+        is_local=True,
+        data=data,
+        p_ref=p_ref,
+        target_artifact_name=target_artifact_name,
+        expected_commit_hash=expected_commit_hash,
+        branch_name=branch_name,
+    )
+
+
+def test_persist_to_local_with_branch_and_branchpoint(user_by_api_key_in_env):
+    data = ["test_data"]
+    target_artifact_name = "test_artifact"
+    expected_commit_hash = "b11179315e19b4207282"
+    branch_name = "my_branch"
+
+    source_branch_name = "initial_branch"
+    source_commit_hash = "741eb73e40d3b38b046b"
+
+    # First, save a local artifact with a branch
+    p_ref = storage._direct_save(
+        obj=["initial_data"],
+        name=target_artifact_name,
+        branch_name=source_branch_name,
+    )
+
+    # Then, save a new local artifact with a branchpoint
+    new_p_ref = storage._direct_save(
+        obj=data,
+        name=target_artifact_name,
+        branch_name=branch_name,
+        source_branch_name=source_branch_name,
+    )
+
+    _perform_post_persist_assertions(
+        is_local=True,
+        data=data,
+        p_ref=new_p_ref,
+        target_artifact_name=target_artifact_name,
+        expected_commit_hash=expected_commit_hash,
+        branch_name=branch_name,
+        expected_branchpoint=BranchPointType(
+            commit=source_commit_hash,
+            n_commits=1,
+            original_uri=str(p_ref.branch_uri).replace("/obj", ""),
+        ),
+    )
+
+
+def _perform_post_persist_assertions(
+    is_local: bool,
+    data: typing.Any,
+    p_ref: FilesystemArtifactRef,
+    target_artifact_name: str,
+    expected_commit_hash: str,
+    target_entity: typing.Optional[str] = None,
+    target_project_name: typing.Optional[str] = None,
+    branch_name: typing.Optional[str] = None,
+    expected_branchpoint: typing.Optional[BranchPointType] = None,
+):
+    p_uri: WeaveURI
+    p_art: typing.Union[WandbArtifact, LocalArtifact]
+
+    if is_local:
+        assert isinstance(p_ref, LocalArtifactRef)
+        p_art = p_ref.artifact
+        assert isinstance(p_art, LocalArtifact)
+        p_uri = p_art.uri_obj
+        assert isinstance(p_uri, WeaveLocalArtifactURI)
+        assert target_entity is None
+        assert target_project_name is None
+        expected_uri_with_hash = (
+            f"local-artifact:///{target_artifact_name}:{expected_commit_hash}/obj"
+        )
+        expected_uri_with_branch = None
+        if branch_name:
+            expected_uri_with_branch = (
+                f"local-artifact:///{target_artifact_name}:{branch_name}/obj"
+            )
+    else:
+        assert isinstance(p_ref, WandbArtifactRef)
+        p_art = p_ref.artifact
+        assert isinstance(p_art, WandbArtifact)
+        p_uri = p_art.uri_obj
+        assert isinstance(p_uri, WeaveWBArtifactURI)
+        assert target_entity is not None
+        assert target_project_name is not None
+        expected_uri_with_hash = f"wandb-artifact:///{target_entity}/{target_project_name}/{target_artifact_name}:{expected_commit_hash}/obj"
+        expected_uri_with_branch = None
+        if branch_name:
+            expected_uri_with_branch = f"wandb-artifact:///{target_entity}/{target_project_name}/{target_artifact_name}:{branch_name}/obj"
+
+    # Data Assertions
+    get_op = weave.ops.get(expected_uri_with_hash)
+    get_res = weave.use(get_op)
+    assert p_ref.obj == get_res == data
+    # Only check branch if expected_uri_with_branch is not None
+    if expected_uri_with_branch:
+        get_op = weave.ops.get(expected_uri_with_branch)
+        get_res = weave.use(get_op)
+        assert get_res == data
+
+    # Identity Assertions (entity, project, name, version)
+    if not is_local:
+        assert isinstance(p_uri, WeaveWBArtifactURI)
+        assert p_uri.entity_name == target_entity
+        assert p_uri.project_name == target_project_name
+    assert p_ref.name == p_art.name == p_uri.name == target_artifact_name
+    assert string_is_likely_commit_hash(expected_commit_hash) and (
+        p_ref.version == p_art.version == p_uri.version == expected_commit_hash
+    )
+    if not is_local:
+        assert isinstance(p_art, WandbArtifact)
+        assert p_art.commit_hash == expected_commit_hash
+    else:
+        assert p_art.version == expected_commit_hash
+
+    assert p_ref.branch == p_art.branch == branch_name
+
+    # Branchpoint Assertions
+    assert p_ref.branch_point == p_art.branch_point == expected_branchpoint
+
+    # URI Assertions
+    assert p_ref.initial_uri == expected_uri_with_branch or expected_uri_with_hash
+    assert p_ref.uri == expected_uri_with_hash
+    assert p_ref.branch_uri == expected_uri_with_branch or expected_uri_with_hash
+
+
+# Mutate tests
+def test_mutate_remote_with_commit_hash(user_by_api_key_in_env):
+    data = ["test_data"]
+    target_entity = user_by_api_key_in_env.username
+    target_project_name = "test_project"
+    target_artifact_name = "test_artifact"
+    expected_commit_hash = "74d5ba98aca469b59e18"
+    branch_name = None
+
+    new_data = ["test_data_2"]
+    new_commit_hash = "61f78c8877df22942d23"
+
+    p_ref = storage._direct_publish(
+        obj=data,
+        name=target_artifact_name,
+        wb_project_name=target_project_name,
+        wb_entity_name=target_entity,
+        branch_name=branch_name,
+    )
+
+    assert p_ref.version == expected_commit_hash
+
+    obj = weave.ops.get(p_ref.uri)[0]
+    obj.set(new_data[0])
+    new_branch_name = f"user-{p_ref.version}"
+    new_uri = f"local-artifact:///{target_artifact_name}:{new_branch_name}/obj"
+    new_p_ref = LocalArtifactRef.from_str(new_uri)
+
+    _perform_post_persist_assertions(
+        is_local=True,
+        data=new_data,
+        p_ref=new_p_ref,
+        target_artifact_name=target_artifact_name,
+        expected_commit_hash=new_commit_hash,
+        branch_name=new_branch_name,
+        expected_branchpoint=BranchPointType(
+            commit=expected_commit_hash,
+            n_commits=1,
+            original_uri=str(p_ref.branch_uri).replace("/obj", ""),
+        ),
+    )
+
+
+def test_mutate_remote_with_branch(user_by_api_key_in_env):
+    data = ["test_data"]
+    target_entity = user_by_api_key_in_env.username
+    target_project_name = "test_project"
+    target_artifact_name = "test_artifact"
+    expected_commit_hash = "74d5ba98aca469b59e18"
+    branch_name = "remote_branch"
+
+    new_data = ["test_data_2"]
+    new_commit_hash = "61f78c8877df22942d23"
+
+    p_ref = storage._direct_publish(
+        obj=data,
+        name=target_artifact_name,
+        wb_project_name=target_project_name,
+        wb_entity_name=target_entity,
+        branch_name=branch_name,
+    )
+
+    assert p_ref.version == expected_commit_hash
+    assert branch_name in p_ref.branch_uri
+
+    obj = weave.ops.get(p_ref.branch_uri)[0]
+    obj.set(new_data[0])
+    new_branch_name = f"user-{branch_name}"
+    new_p_ref = LocalArtifactRef.from_str(
+        f"local-artifact:///{target_artifact_name}:{new_branch_name}/obj"
+    )
+
+    _perform_post_persist_assertions(
+        is_local=True,
+        data=new_data,
+        p_ref=new_p_ref,
+        target_artifact_name=target_artifact_name,
+        expected_commit_hash=new_commit_hash,
+        branch_name=new_branch_name,
+        expected_branchpoint=BranchPointType(
+            commit=expected_commit_hash,
+            n_commits=1,
+            original_uri=str(p_ref.branch_uri).replace("/obj", ""),
+        ),
+    )
+
+
+def test_mutate_local_with_commit_hash(user_by_api_key_in_env, new_branch_name=None):
+    data = ["test_data"]
+    target_artifact_name = "test_artifact"
+    expected_commit_hash = "b11179315e19b4207282"
+    branch_name = None
+
+    new_data = ["test_data_2"]
+    new_commit_hash = "61f78c8877df22942d23"
+
+    p_ref = storage._direct_save(
+        obj=data,
+        name=target_artifact_name,
+        branch_name=branch_name,
+    )
+
+    assert p_ref.version == expected_commit_hash
+
+    obj = weave.ops.get(p_ref.uri)[0]
+    if new_branch_name == None:
+        obj.set(new_data[0])
+        new_branch_name = new_commit_hash
+        expected_branchpoint = None
+    else:
+        obj.set(new_data[0], root_args={"branch": new_branch_name})
+        branch_name = new_branch_name
+        expected_branchpoint = BranchPointType(
+            commit=expected_commit_hash,
+            n_commits=1,
+            original_uri=str(p_ref.branch_uri).replace("/obj", ""),
+        )
+    new_p_ref = LocalArtifactRef.from_str(
+        f"local-artifact:///{target_artifact_name}:{new_branch_name}/obj"
+    )
+
+    _perform_post_persist_assertions(
+        is_local=True,
+        data=new_data,
+        p_ref=new_p_ref,
+        target_artifact_name=target_artifact_name,
+        expected_commit_hash=new_commit_hash,
+        branch_name=branch_name,
+        expected_branchpoint=expected_branchpoint,
+    )
+
+
+def test_mutate_local_with_commit_hash_and_branchpoint(
+    user_by_api_key_in_env, new_branch_name=None
+):
+    data = ["test_data"]
+    target_entity = user_by_api_key_in_env.username
+    target_project_name = "test_project"
+    target_artifact_name = "test_artifact"
+    expected_commit_hash = "74d5ba98aca469b59e18"
+    branch_name = "remote_branch"
+
+    new_data = ["test_data_2"]
+    new_commit_hash = "61f78c8877df22942d23"
+
+    p_ref = storage._direct_publish(
+        obj=data,
+        name=target_artifact_name,
+        wb_project_name=target_project_name,
+        wb_entity_name=target_entity,
+        branch_name=branch_name,
+    )
+
+    assert p_ref.version == expected_commit_hash
+    assert branch_name in p_ref.branch_uri
+
+    obj = weave.ops.get(p_ref.branch_uri)[0]
+    obj.set("PLACEHOLDER")
+    mod_ref = LocalArtifactRef.from_uri(
+        WeaveLocalArtifactURI.parse(
+            f"local-artifact:///{target_artifact_name}:user-{branch_name}/obj"
+        )
+    )
+    obj = weave.ops.get(mod_ref.branch_uri)[0]
+    if new_branch_name == None:
+        obj.set(new_data[0])
+        branch_name = None
+        new_branch_name = new_commit_hash
+        expected_branchpoint = BranchPointType(
+            commit=expected_commit_hash,
+            n_commits=2,
+            original_uri=str(p_ref.branch_uri).replace("/obj", ""),
+        )
+    else:
+        obj.set(new_data[0], root_args={"branch": new_branch_name})
+        branch_name = new_branch_name
+        expected_branchpoint = BranchPointType(
+            commit="0dc63f69254034abd6f9",
+            n_commits=1,
+            original_uri=str(mod_ref.branch_uri).replace("/obj", ""),
+        )
+
+    new_p_ref = LocalArtifactRef.from_str(
+        f"local-artifact:///{target_artifact_name}:{new_branch_name}/obj"
+    )
+
+    _perform_post_persist_assertions(
+        is_local=True,
+        data=new_data,
+        p_ref=new_p_ref,
+        target_artifact_name=target_artifact_name,
+        expected_commit_hash=new_commit_hash,
+        branch_name=branch_name,
+        expected_branchpoint=expected_branchpoint,
+    )
+
+
+def test_mutate_local_with_branch(user_by_api_key_in_env, new_branch_name=None):
+    data = ["test_data"]
+    target_artifact_name = "test_artifact"
+    expected_commit_hash = "b11179315e19b4207282"
+    branch_name = "my_branch"
+
+    new_data = ["test_data_2"]
+    new_commit_hash = "61f78c8877df22942d23"
+
+    p_ref = storage._direct_save(
+        obj=data,
+        name=target_artifact_name,
+        branch_name=branch_name,
+    )
+
+    assert p_ref.version == expected_commit_hash
+
+    obj = weave.ops.get(p_ref.branch_uri)[0]
+    if new_branch_name == None:
+        obj.set(new_data[0])
+        new_branch_name = new_commit_hash
+        expected_branchpoint = None
+    else:
+        obj.set(new_data[0], root_args={"branch": new_branch_name})
+        branch_name = new_branch_name
+        expected_branchpoint = BranchPointType(
+            commit=expected_commit_hash,
+            n_commits=1,
+            original_uri=str(p_ref.branch_uri).replace("/obj", ""),
+        )
+    new_branch_name = branch_name
+    new_p_ref = LocalArtifactRef.from_str(
+        f"local-artifact:///{target_artifact_name}:{new_branch_name}/obj"
+    )
+
+    _perform_post_persist_assertions(
+        is_local=True,
+        data=new_data,
+        p_ref=new_p_ref,
+        target_artifact_name=target_artifact_name,
+        expected_commit_hash=new_commit_hash,
+        branch_name=new_branch_name,
+        expected_branchpoint=expected_branchpoint,
+    )
+
+
+def test_mutate_local_with_branch_and_branchpoint(user_by_api_key_in_env):
+    data = ["test_data"]
+    target_entity = user_by_api_key_in_env.username
+    target_project_name = "test_project"
+    target_artifact_name = "test_artifact"
+    expected_commit_hash = "74d5ba98aca469b59e18"
+    branch_name = "remote_branch"
+
+    new_data = ["test_data_2"]
+    new_commit_hash = "61f78c8877df22942d23"
+
+    p_ref = storage._direct_publish(
+        obj=data,
+        name=target_artifact_name,
+        wb_project_name=target_project_name,
+        wb_entity_name=target_entity,
+        branch_name=branch_name,
+    )
+
+    assert p_ref.version == expected_commit_hash
+    assert branch_name in p_ref.branch_uri
+
+    obj = weave.ops.get(p_ref.branch_uri)[0]
+    obj.set("PLACEHOLDER")
+    obj = weave.ops.get(
+        f"local-artifact:///{target_artifact_name}:user-{branch_name}/obj"
+    )[0]
+    obj.set(new_data[0])
+    new_p_ref = LocalArtifactRef.from_str(
+        f"local-artifact:///{target_artifact_name}:user-{branch_name}/obj"
+    )
+
+    _perform_post_persist_assertions(
+        is_local=True,
+        data=new_data,
+        p_ref=new_p_ref,
+        target_artifact_name=target_artifact_name,
+        expected_commit_hash=new_commit_hash,
+        branch_name=f"user-{branch_name}",
+        expected_branchpoint=BranchPointType(
+            commit=expected_commit_hash,
+            n_commits=2,
+            original_uri=str(p_ref.branch_uri).replace("/obj", ""),
+        ),
+    )
+
+
+# Merge Tests
+
+
+def test_merge_from_local_with_commit_hash_onto_remote_with_commit_hash(
+    user_by_api_key_in_env,
+):
+    test_mutate_remote_with_commit_hash(user_by_api_key_in_env)
+
+    merged_uri = weave.ops.merge(
+        weave.ops.get("local-artifact:///test_artifact:61f78c8877df22942d23/obj")
+    )
+
+    assert merged_uri.startswith("wandb-artifact://")
+    assert "5a61da7b34feb72c2af8" in merged_uri
+
+    new_p_ref = WandbArtifactRef.from_str(merged_uri)
+
+    _perform_post_persist_assertions(
+        is_local=False,
+        target_entity=user_by_api_key_in_env.username,
+        target_project_name="test_project",
+        data=["test_data_2"],
+        p_ref=new_p_ref,
+        target_artifact_name="test_artifact",
+        expected_commit_hash="5a61da7b34feb72c2af8",
+        branch_name=None,
+    )
+
+
+def test_merge_from_local_with_commit_hash_onto_remote_with_branch(
+    user_by_api_key_in_env,
+):
+    test_mutate_remote_with_branch(user_by_api_key_in_env)
+
+    merged_uri = weave.ops.merge(
+        weave.ops.get("local-artifact:///test_artifact:61f78c8877df22942d23/obj")
+    )
+
+    assert merged_uri.startswith("wandb-artifact://")
+    assert "remote_branch" in merged_uri
+
+    new_p_ref = WandbArtifactRef.from_str(merged_uri)
+
+    _perform_post_persist_assertions(
+        is_local=False,
+        target_entity=user_by_api_key_in_env.username,
+        target_project_name="test_project",
+        data=["test_data_2"],
+        p_ref=new_p_ref,
+        target_artifact_name="test_artifact",
+        expected_commit_hash="5a61da7b34feb72c2af8",
+        branch_name="remote_branch",
+    )
+
+
+def test_merge_from_local_with_commit_hash_onto_local_with_commit_hash(
+    user_by_api_key_in_env,
+):
+    test_mutate_local_with_commit_hash(user_by_api_key_in_env, "new_branch_name")
+
+    merged_uri = weave.ops.merge(
+        weave.ops.get("local-artifact:///test_artifact:61f78c8877df22942d23/obj")
+    )
+
+    assert merged_uri.startswith("local-artifact://")
+    assert "61f78c8877df22942d23" in merged_uri
+
+    new_p_ref = WandbArtifactRef.from_str(merged_uri)
+
+    _perform_post_persist_assertions(
+        is_local=True,
+        data=["test_data_2"],
+        p_ref=new_p_ref,
+        target_artifact_name="test_artifact",
+        expected_commit_hash="61f78c8877df22942d23",
+        branch_name=None,
+    )
+
+
+# def test_merge_from_local_with_commit_hash_onto_local_with_commit_hash_and_branchpoint(
+#     user_by_api_key_in_env,
+# ):
+#     # Leaving the test stub here for completeness of the permutations, but I am
+#     # not convinced it is even possible to get into this state.
+#     pass
+
+
+def test_merge_from_local_with_commit_hash_onto_local_with_branch(
+    user_by_api_key_in_env,
+):
+    test_mutate_local_with_branch(user_by_api_key_in_env, "new_branch_name")
+
+    merged_uri = weave.ops.merge(
+        weave.ops.get("local-artifact:///test_artifact:61f78c8877df22942d23/obj")
+    )
+
+    assert merged_uri.startswith("local-artifact://")
+    assert "my_branch" in merged_uri
+
+    new_p_ref = WandbArtifactRef.from_str(merged_uri)
+
+    _perform_post_persist_assertions(
+        is_local=True,
+        data=["test_data_2"],
+        p_ref=new_p_ref,
+        target_artifact_name="test_artifact",
+        expected_commit_hash="61f78c8877df22942d23",
+        branch_name="my_branch",
+    )
+
+
+def test_merge_from_local_with_commit_hash_onto_local_with_branch_and_branchpoint(
+    user_by_api_key_in_env,
+):
+    test_mutate_local_with_commit_hash_and_branchpoint(
+        user_by_api_key_in_env, "new_branch_name"
+    )
+
+    merged_uri = weave.ops.merge(
+        weave.ops.get("local-artifact:///test_artifact:61f78c8877df22942d23/obj")
+    )
+
+    assert merged_uri.startswith("local-artifact://")
+    assert "remote_branch" in merged_uri
+
+    new_p_ref = WandbArtifactRef.from_str(merged_uri)
+
+    _perform_post_persist_assertions(
+        is_local=True,
+        data=["test_data_2"],
+        p_ref=new_p_ref,
+        target_artifact_name="test_artifact",
+        expected_commit_hash="61f78c8877df22942d23",
+        branch_name="user-remote_branch",
+        expected_branchpoint=BranchPointType(
+            n_commits=2,
+            commit="74d5ba98aca469b59e18",
+            original_uri=f"wandb-artifact:///{user_by_api_key_in_env.username}/test_project/test_artifact:remote_branch",
+        ),
+    )
+
+    merged_uri_2 = weave.ops.merge(weave.ops.get(merged_uri))
+    new_p_ref_2 = WandbArtifactRef.from_str(merged_uri_2)
+
+    assert merged_uri_2.startswith("wandb-artifact://")
+    assert "remote_branch" in merged_uri_2
+
+    new_p_ref = WandbArtifactRef.from_str(merged_uri_2)
+
+    _perform_post_persist_assertions(
+        is_local=False,
+        data=["test_data_2"],
+        p_ref=new_p_ref_2,
+        target_artifact_name="test_artifact",
+        expected_commit_hash="5a61da7b34feb72c2af8",
+        branch_name="remote_branch",
+        target_entity=user_by_api_key_in_env.username,
+        target_project_name="test_project",
+    )
+
+
+# Merge Tests
+
+
+def test_merge_from_local_with_branch_onto_remote_with_commit_hash(
+    user_by_api_key_in_env,
+):
+    test_mutate_remote_with_commit_hash(user_by_api_key_in_env)
+
+    merged_uri = weave.ops.merge(
+        weave.ops.get("local-artifact:///test_artifact:user-74d5ba98aca469b59e18/obj")
+    )
+
+    assert merged_uri.startswith("wandb-artifact://")
+    assert "5a61da7b34feb72c2af8" in merged_uri
+
+    new_p_ref = WandbArtifactRef.from_str(merged_uri)
+
+    _perform_post_persist_assertions(
+        is_local=False,
+        target_entity=user_by_api_key_in_env.username,
+        target_project_name="test_project",
+        data=["test_data_2"],
+        p_ref=new_p_ref,
+        target_artifact_name="test_artifact",
+        expected_commit_hash="5a61da7b34feb72c2af8",
+        branch_name=None,
+    )
+
+
+def test_merge_from_local_with_branch_onto_remote_with_branch(user_by_api_key_in_env):
+    test_mutate_remote_with_branch(user_by_api_key_in_env)
+
+    merged_uri = weave.ops.merge(
+        weave.ops.get("local-artifact:///test_artifact:user-remote_branch/obj")
+    )
+
+    assert merged_uri.startswith("wandb-artifact://")
+    assert "remote_branch" in merged_uri
+
+    new_p_ref = WandbArtifactRef.from_str(merged_uri)
+
+    _perform_post_persist_assertions(
+        is_local=False,
+        target_entity=user_by_api_key_in_env.username,
+        target_project_name="test_project",
+        data=["test_data_2"],
+        p_ref=new_p_ref,
+        target_artifact_name="test_artifact",
+        expected_commit_hash="5a61da7b34feb72c2af8",
+        branch_name="remote_branch",
+    )
+
+
+def test_merge_from_local_with_branch_onto_local_with_commit_hash(
+    user_by_api_key_in_env,
+):
+    test_mutate_local_with_commit_hash(user_by_api_key_in_env, "new_branch_name")
+
+    merged_uri = weave.ops.merge(
+        weave.ops.get("local-artifact:///test_artifact:new_branch_name/obj")
+    )
+
+    assert merged_uri.startswith("local-artifact://")
+    assert "61f78c8877df22942d23" in merged_uri
+
+    new_p_ref = WandbArtifactRef.from_str(merged_uri)
+
+    _perform_post_persist_assertions(
+        is_local=True,
+        data=["test_data_2"],
+        p_ref=new_p_ref,
+        target_artifact_name="test_artifact",
+        expected_commit_hash="61f78c8877df22942d23",
+        branch_name=None,
+    )
+
+
+# def test_merge_from_local_with_branch_onto_local_with_commit_hash_and_branchpoint(
+#     user_by_api_key_in_env,
+# ):
+#     # Leaving the test stub here for completeness of the permutations, but I am
+#     # not convinced it is even possible to get into this state.
+#     pass
+
+
+def test_merge_from_local_with_branch_onto_local_with_branch(user_by_api_key_in_env):
+    test_mutate_local_with_branch(user_by_api_key_in_env, "new_branch_name")
+
+    merged_uri = weave.ops.merge(
+        weave.ops.get("local-artifact:///test_artifact:new_branch_name/obj")
+    )
+
+    assert merged_uri.startswith("local-artifact://")
+    assert "my_branch" in merged_uri
+
+    new_p_ref = WandbArtifactRef.from_str(merged_uri)
+
+    _perform_post_persist_assertions(
+        is_local=True,
+        data=["test_data_2"],
+        p_ref=new_p_ref,
+        target_artifact_name="test_artifact",
+        expected_commit_hash="61f78c8877df22942d23",
+        branch_name="my_branch",
+    )
+
+
+def test_merge_from_local_with_branch_onto_local_with_branch_and_branchpoint(
+    user_by_api_key_in_env,
+):
+    test_mutate_local_with_commit_hash_and_branchpoint(
+        user_by_api_key_in_env, "new_branch_name"
+    )
+
+    merged_uri = weave.ops.merge(
+        weave.ops.get("local-artifact:///test_artifact:new_branch_name/obj")
+    )
+
+    assert merged_uri.startswith("local-artifact://")
+    assert "remote_branch" in merged_uri
+
+    new_p_ref = WandbArtifactRef.from_str(merged_uri)
+
+    _perform_post_persist_assertions(
+        is_local=True,
+        data=["test_data_2"],
+        p_ref=new_p_ref,
+        target_artifact_name="test_artifact",
+        expected_commit_hash="61f78c8877df22942d23",
+        branch_name="user-remote_branch",
+        expected_branchpoint=BranchPointType(
+            n_commits=2,
+            commit="74d5ba98aca469b59e18",
+            original_uri=f"wandb-artifact:///{user_by_api_key_in_env.username}/test_project/test_artifact:remote_branch",
+        ),
+    )
+
+    merged_uri_2 = weave.ops.merge(weave.ops.get(merged_uri))
+    new_p_ref_2 = WandbArtifactRef.from_str(merged_uri_2)
+
+    assert merged_uri_2.startswith("wandb-artifact://")
+    assert "remote_branch" in merged_uri_2
+
+    new_p_ref = WandbArtifactRef.from_str(merged_uri_2)
+
+    _perform_post_persist_assertions(
+        is_local=False,
+        data=["test_data_2"],
+        p_ref=new_p_ref_2,
+        target_artifact_name="test_artifact",
+        expected_commit_hash="5a61da7b34feb72c2af8",
+        branch_name="remote_branch",
+        target_entity=user_by_api_key_in_env.username,
+        target_project_name="test_project",
+    )

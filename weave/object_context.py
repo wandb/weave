@@ -90,7 +90,7 @@ class ObjectContext:
                 self.objects[target_uri].mutations.append(mutation)
 
     def finish_mutation(self, target_uri: str) -> None:
-        from . import artifact_local
+        from . import artifact_local, artifact_wandb
 
         target_record = self.objects.get(target_uri)
         if target_record is None:
@@ -100,15 +100,30 @@ class ObjectContext:
 
         if target_record.branched_from_uri is None:
             source_uri = uris.WeaveURI.parse(target_uri)
+            art = artifact_local.LocalArtifact(source_uri.name, source_uri.version)
         else:
             source_uri = uris.WeaveURI.parse(target_record.branched_from_uri)
-
-        art = artifact_local.LocalArtifact(source_uri.name, source_uri.version)
-        if target_record.branched_from_uri is not None:
-            art._original_uri = str(art.uri)
+            # Note: the mutation bookeeping is done at the individual object level,
+            # so the path component is often non-empty. However, since we are managing
+            # state at the artifact level, we need to ensure the path is empty to conform
+            # to the expectations of the branching logic.
+            source_uri.path = ""  # type: ignore
+            art = artifact_local.LocalArtifact.fork_from_uri(source_uri)  # type: ignore
 
         obj = box.box(target_record.val)
         target_branch = uris.WeaveURI.parse(target_uri).version
+        if target_branch is None:
+            raise ValueError("No branch to finish mutation on")
+
+        from weave import artifact_wandb
+
+        # Hack: if the target branch looks like a commit hash, then we
+        # don't want to use it as a branch - this is the case that we are
+        # mutating an artifact directly without a branch. Seems like we
+        # might want to put this logic elsewhere, but for now this works.
+        if artifact_wandb.string_is_likely_commit_hash(target_branch):
+            target_branch = None
+
         ref = art.set("obj", types.TypeRegistry.type_of(obj), obj)
         art.save(branch=target_branch)  # type: ignore
 

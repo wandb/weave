@@ -1,4 +1,5 @@
 import os
+import re
 import typing
 import pathlib
 import functools
@@ -37,70 +38,128 @@ def _get_name(wb_type: types.Type, obj: typing.Any) -> str:
     # return f"{wb_type.name}-{obj_names[-1]}"
 
 
-def _save_or_publish(
-    obj,
-    name=None,
-    type=None,
-    publish: bool = False,
-    artifact=None,
-    branch=None,
+def _get_weave_type(obj: typing.Any):
+    try:
+        return types.TypeRegistry.type_of(obj)
+    except errors.WeaveTypeError as e:
+        raise errors.WeaveSerializeError(
+            "weave type error during serialization for object: %s. %s"
+            % (obj, str(e.args))
+        )
+
+
+def _ensure_object_components_are_published(
+    obj: typing.Any, wb_type: types.Type, artifact: artifact_wandb.WandbArtifact
 ):
-    # HAX for W&B publishing.
-    project = None
-    if name is not None and "/" in name:
-        project, name = name.split("/")
-    source_branch = None
-    if name is not None and ":" in name:
-        name, source_branch = name.split(":", 1)
+    from weave.mappers_publisher import map_to_python_remote
 
-    if project is None and publish:
-        project = artifact_wandb.DEFAULT_WEAVE_OBJ_PROJECT
+    mapper = map_to_python_remote(wb_type, artifact)
+    return mapper.apply(obj)
 
-    wb_type = type
-    if wb_type is None:
-        try:
-            wb_type = types.TypeRegistry.type_of(obj)
-        except errors.WeaveTypeError as e:
-            raise errors.WeaveSerializeError(
-                "weave type error during serialization for object: %s. %s"
-                % (obj, str(e.args))
-            )
+
+def _update_weave_meta(wb_type: types.Type, artifact: artifact_wandb.WandbArtifact):
+    panel_type = types.type_name_to_type("Panel")
+    artifact._writeable_artifact.metadata["_weave_meta"] = {
+        "is_weave_obj": True,
+        "type_name": wb_type.name,
+        "is_panel": panel_type and panel_type().assign_type(wb_type),
+    }
+
+
+def _assert_valid_name_part(part: typing.Optional[str] = None):
+    if part is None:
+        return
+    # if not re.match(r"^[a-zA-Z0-9_\-.]+$", part): # from W&B Artifacts
+    if not re.match(r"^[a-zA-Z0-9_\-]+$", part):
+        raise ValueError(
+            "Invalid name part %s. Must be alphanumeric, dashes, or underscores." % part
+        )
+
+
+def _direct_publish(
+    obj: typing.Any,
+    name: typing.Optional[str] = None,
+    wb_project_name: typing.Optional[str] = None,
+    wb_artifact_type_name: typing.Optional[str] = None,
+    wb_entity_name: typing.Optional[str] = None,
+    branch_name: typing.Optional[str] = None,
+    assume_weave_type: typing.Optional[types.Type] = None,
+):
+    weave_type = assume_weave_type or _get_weave_type(obj)
+
+    wb_project_name = wb_project_name or artifact_wandb.DEFAULT_WEAVE_OBJ_PROJECT
+    name = name or _get_name(weave_type, obj)
+    wb_artifact_type_name = wb_artifact_type_name or weave_type.name
+
+    _assert_valid_name_part(name)
+    _assert_valid_name_part(wb_project_name)
+    _assert_valid_name_part(wb_artifact_type_name)
+    _assert_valid_name_part(branch_name)
+    _assert_valid_name_part(wb_entity_name)
+    # Validate entity name once we have them
+
     obj = box.box(obj)
-    if artifact is None:
-        if name is None:
-            name = _get_name(wb_type, obj)
-        # TODO: refactor types to artifacts have a common base class
-        if publish:
-            # TODO: Potentially add entity and project to namespace the artifact explicitly.
-            from weave.mappers_publisher import map_to_python_remote
-
-            artifact = artifact_wandb.WandbArtifact(name, type=wb_type.name)
-            mapper = map_to_python_remote(wb_type, artifact)
-            obj = mapper.apply(obj)
-            panel_type = types.type_name_to_type("Panel")
-            artifact._writeable_artifact.metadata["_weave_meta"] = {
-                "is_weave_obj": True,
-                "type_name": wb_type.name,
-                "is_panel": panel_type and panel_type().assign_type(wb_type),
-            }
-        else:
-            artifact = artifact_local.LocalArtifact(name, version=source_branch)
-    ref = artifact.set("obj", wb_type, obj)
+    artifact = artifact_wandb.WandbArtifact(name, type=wb_artifact_type_name)
+    obj = _ensure_object_components_are_published(obj, weave_type, artifact)
+    _update_weave_meta(weave_type, artifact)
+    ref = artifact.set("obj", weave_type, obj)
 
     # Only save if we have a ref into the artifact we created above. Otherwise
     #     nothing new was created, so just return the existing ref.
     if ref.artifact == artifact:
-        if project is not None:
-            artifact.save(project)
-        else:
-            artifact.save(branch=branch)
+        artifact.save(
+            project=wb_project_name, entity_name=wb_entity_name, branch=branch_name
+        )
+
+    return ref
+
+
+def _direct_save(
+    obj: typing.Any,
+    name: typing.Optional[str] = None,
+    branch_name: typing.Optional[str] = None,
+    source_branch_name: typing.Optional[str] = None,
+    assume_weave_type: typing.Optional[types.Type] = None,
+    artifact: typing.Optional[artifact_local.LocalArtifact] = None,
+):
+    weave_type = assume_weave_type or _get_weave_type(obj)
+    name = name or _get_name(weave_type, obj)
+
+    _assert_valid_name_part(name)
+    _assert_valid_name_part(branch_name)
+    _assert_valid_name_part(source_branch_name)
+
+    obj = box.box(obj)
+    if artifact is None:
+        # Using `version=source_branch_name` feels too magical. Would be better
+        # to have a classmethod on LocalArtifact that takes a branch name and
+        # returns an artifact with that branch name. This also precludes
+        # directly saving an artifact with a branchpoint that is not local
+        artifact = artifact_local.LocalArtifact(name, version=source_branch_name)
+    ref = artifact.set("obj", weave_type, obj)
+
+    # Only save if we have a ref into the artifact we created above. Otherwise
+    #     nothing new was created, so just return the existing ref.
+    if ref.artifact == artifact:
+        artifact.save(branch=branch_name)
 
     return ref
 
 
 def publish(obj, name=None, type=None):
+    # We would probably refactor this method to be more like _direct_publish. This effectively
+    # just a wrapper that let's the user specify project name with a slash.
     # TODO: should we only expose save for our API with a "remote" flag or something
-    return _save_or_publish(obj, name, type, True)
+    project_name = None
+    if name is not None and "/" in name:
+        project_name, name = name.split("/")
+
+    return _direct_publish(
+        obj,
+        name=name,
+        wb_project_name=project_name,
+        assume_weave_type=type,
+    )
 
 
 def save(
@@ -110,7 +169,20 @@ def save(
     artifact=None,
     branch=None,
 ) -> artifact_local.LocalArtifactRef:
-    return _save_or_publish(obj, name, type, False, artifact=artifact, branch=branch)
+    # We would probably refactor this method to be more like _direct_save. This effectively
+    # just a wrapper that let's the user specify source_branch name with a slash.
+    source_branch = None
+    if name is not None and ":" in name:
+        name, source_branch = name.split(":", 1)
+
+    return _direct_save(
+        obj=obj,
+        name=name,
+        branch_name=branch,
+        source_branch_name=source_branch,
+        assume_weave_type=type,
+        artifact=artifact,
+    )
 
 
 def get(uri_s: typing.Union[str, ref_base.Ref]) -> typing.Any:

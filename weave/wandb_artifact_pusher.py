@@ -1,5 +1,6 @@
 import dataclasses
 import datetime
+import typing
 import wandb
 from wandb.sdk.internal.artifacts import ArtifactSaver, _manifest_json_from_proto
 
@@ -22,11 +23,14 @@ class WeaveWBArtifactURIComponents:
 
 
 def write_artifact_to_wandb(
-    artifact: wandb.Artifact, project_name: str
+    artifact: wandb.Artifact,
+    project_name: str,
+    entity_name: typing.Optional[str] = None,
+    additional_aliases: list = [],
 ) -> WeaveWBArtifactURIComponents:
     # Get handles to the public and internal APIs
     p_api = wandb_public_api()
-    entity_name = p_api.default_entity
+    entity_name = entity_name or p_api.default_entity
     i_api = InternalApi({"project": project_name, "entity": entity_name})
 
     # Extract Artifact Attributes
@@ -78,7 +82,7 @@ def write_artifact_to_wandb(
         sequence_client_id=artifact._sequence_client_id,
         metadata=artifact.metadata,
         description=artifact.description,
-        aliases=["latest"],
+        aliases=["latest"] + additional_aliases,
         use_after_commit=False,
         finalize=artifact.finalize,
     )

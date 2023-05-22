@@ -20,15 +20,6 @@ from .. import artifact_wandb
 from .. import object_context
 
 
-def is_hexadecimal(s):
-    """
-    Returns True if the input string s is a hexadecimal value, False otherwise.
-    """
-    return all(c.isdigit() or c.isalpha() for c in s) and all(
-        c in "0123456789abcdefABCDEF" for c in s
-    )
-
-
 @weave_class(weave_type=types.RefType)
 class RefNodeMethods:
     @op(output_type=lambda input_type: input_type["self"].object_type)
@@ -210,6 +201,12 @@ def _save(
     target_branch = root_args.get("branch")
     if target_branch is None:
         target_branch = source_uri.version
+
+        # If we are mutating a remote artifact, we want to make a
+        # new branch with `user-` prefix. Still not convinced this is certainly
+        # needed, but keeping in line with the client-enforced behavior.
+        if isinstance(source_uri, artifact_wandb.WeaveWBArtifactURI):
+            target_branch = "user-" + target_branch
     target_uri = artifact_local.WeaveLocalArtifactURI(
         source_uri.name, target_branch, source_uri.path  # type: ignore
     )
@@ -268,11 +265,22 @@ def _merge(name) -> str:
             "target artifact commit hash does not match branch point"
         )
 
+    shared_branch_name = (
+        None
+        if to_uri != None
+        and to_uri.version is not None
+        and artifact_wandb.string_is_likely_commit_hash(to_uri.version)
+        else to_uri.version
+    )
+
     if isinstance(to_uri, artifact_wandb.WeaveWBArtifactURI):
-        ref = storage._save_or_publish(
-            head_ref.get(),
-            name=to_uri.project_name + "/" + to_uri.name,
-            publish=True,
+
+        ref = storage._direct_publish(
+            obj=head_ref.get(),
+            name=to_uri.name,
+            wb_project_name=to_uri.project_name,
+            wb_entity_name=to_uri.entity_name,
+            branch_name=shared_branch_name,
         )
     else:
         if to_uri.version is None:
@@ -280,15 +288,11 @@ def _merge(name) -> str:
                 "Cannot merge into artifact without version"
             )
 
-        if len(to_uri.version) == 32 and is_hexadecimal(to_uri.version):
-            name = to_uri.name
-        else:
-            name = to_uri.name + ":" + to_uri.version
-
-        ref = storage._save_or_publish(
-            head_ref.get(),
-            name=name,
-            branch=branch_point["branch"],
+        ref = storage._direct_save(
+            obj=head_ref.get(),
+            name=to_uri.name,
+            source_branch_name=shared_branch_name,
+            branch_name=shared_branch_name,
         )
     return ref.branch_uri
 

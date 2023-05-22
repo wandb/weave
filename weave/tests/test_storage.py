@@ -167,7 +167,7 @@ def test_ref_type(test_artifact_dir):
             "_base_type": {"type": "FilesystemArtifactRef"},
             "objectType": {"type": "typedDict", "propertyTypes": {"x": "int"}},
         },
-        "_val": "local-artifact:///my-dict:10e1804d2dd19195ac2d236f357b9288/obj",
+        "_val": "local-artifact:///my-dict:10e1804d2dd19195ac2d/obj",
     }
     ref2 = storage.from_python(python_ref)
     obj2 = storage.deref(ref2)
@@ -350,7 +350,7 @@ def test_branch_point():
     data2[0]["a"] = 7
     ref2 = storage.save(data2, "data:main", branch="other")
     assert ref2.branch == "other"
-    assert ref2.branch_point["branch"] == "main"
+    assert ref2.branch_point["original_uri"] == "local-artifact:///data:main"
     assert ref2.branch_point["commit"] == ref.version
 
     data3 = storage.get("local-artifact:///data:other/obj")
@@ -358,14 +358,14 @@ def test_branch_point():
     ref3 = storage.save(data3, "data:other")
     assert ref3.branch == "other"
     # Still points to main branch point since we didn't fork
-    assert ref3.branch_point["branch"] == "main"
+    assert ref3.branch_point["original_uri"] == "local-artifact:///data:main"
     assert ref3.branch_point["commit"] == ref.version
 
     data4 = storage.get("local-artifact:///data:other/obj")
     data4[0]["a"] = 8
     ref4 = storage.save(data4, "data:other", branch="other2")
     assert ref4.branch == "other2"
-    assert ref4.branch_point["branch"] == "other"
+    assert ref4.branch_point["original_uri"] == "local-artifact:///data:other"
     assert ref4.branch_point["commit"] == ref3.version
 
 
