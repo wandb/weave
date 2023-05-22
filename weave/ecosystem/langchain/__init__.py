@@ -1,5 +1,6 @@
 import dataclasses
 import typing
+import json
 
 import weave
 from weave import artifact_base
@@ -22,6 +23,7 @@ from langchain.chains import HypotheticalDocumentEmbedder
 from langchain.chains.llm import LLMChain
 from langchain.llms.base import BaseLLM
 from langchain.llms.openai import BaseOpenAI
+from langchain.callbacks.tracers.base import BaseTracer
 from langchain.chains import RetrievalQA
 from langchain.chains.base import Chain
 from langchain.chains.retrieval_qa.base import BaseRetrievalQA
@@ -38,8 +40,20 @@ from langchain.prompts.chat import (
     AIMessagePromptTemplate,
     SystemMessagePromptTemplate,
 )
+from langchain.callbacks.tracers.schemas import Run
+
+from ...ops_domain import trace_tree
+from ... import storage
+from . import util
 
 import faiss
+
+
+class WeaveTracer(BaseTracer):
+    run: typing.Optional[Run]
+
+    def _persist_run(self, run: "Run") -> None:
+        self.run = run
 
 
 @dataclasses.dataclass(frozen=True)
@@ -442,7 +456,9 @@ def retrieval_qa_from_chain_type(
 ) -> RetrievalQA:
     retriever = retriever.as_retriever()
     return RetrievalQA.from_chain_type(
-        llm=language_model, chain_type=chain_type, retriever=retriever
+        llm=language_model,
+        chain_type=chain_type,
+        retriever=retriever,
     )
 
 
@@ -456,11 +472,30 @@ class BaseChatModelOps:
         return self.predict(text)
 
 
+class RunResult(typing.TypedDict):
+    result: str
+    trace: trace_tree.WBTraceTree
+
+
 @weave.weave_class(weave_type=BaseRetrievalQAType)
 class BaseRetrievalQAOps:
     @weave.op()
-    def run(chain: BaseRetrievalQA, query: str) -> str:
+    def run(chain: BaseRetrievalQA, query: str) -> RunResult:
         if query == None:
             # TODO: weave engine doesn't handle nullability on args that aren't the first
             return None  # type: ignore
-        return chain.run(query)
+        tracer = WeaveTracer()
+        result = chain.run(query, callbacks=[tracer])
+        lc_run = tracer.run
+        if lc_run is None:
+            raise ValueError("LangChain run was not recorded")
+        span = util.safely_convert_lc_run_to_wb_span(lc_run)
+        if span is None:
+            raise ValueError("Could not convert LangChain run to Weave span")
+
+        # Returns the langchain trace as part of the result... not really what we
+        # want.
+        return RunResult(
+            result=result,
+            trace=trace_tree.WBTraceTree(json.dumps(storage.to_python(span)["_val"])),
+        )
