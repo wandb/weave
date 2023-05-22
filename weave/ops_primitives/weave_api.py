@@ -233,6 +233,7 @@ def _save(
             ctx.add_mutation(
                 str(target_uri), str(source_uri), obj, make_new_type, mutation_record
             )
+    return str(target_uri)
 
 
 @dataclasses.dataclass

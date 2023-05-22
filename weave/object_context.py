@@ -67,9 +67,14 @@ class ObjectContext:
         if source_uri != target_uri:
             branched_from_uri = source_uri
 
-        source_record = self.objects.get(source_uri)
-        if branched_from_uri is not None and source_record is None:
-            raise ValueError("Can't branch object that doesn't exist")
+        # source_record = self.objects.get(source_uri)
+        # if branched_from_uri is not None and source_record is None:
+        #     raise ValueError(
+        #         "Can't branch object that doesn't exist",
+        #         target_uri,
+        #         source_uri,
+        #         (self.objects).keys(),
+        #     )
 
         target_record = self.objects.get(target_uri)
         if target_record is None:

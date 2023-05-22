@@ -1,7 +1,9 @@
 import typing
 from weave import box, graph
+from weave.artifact_wandb import string_is_likely_commit_hash
 from weave.language_features.tagging import tag_store
 from weave.node_ref import ref_to_node
+from weave.uris import WeaveURI
 from . import mappers
 from . import ref_base
 from . import weave_types as types
@@ -117,16 +119,34 @@ def _uri_is_local_artifact(uri: str) -> bool:
     return uri.startswith("local-artifact://")
 
 
+def _uri_from_get_node(
+    node: typing.Optional[graph.Node],
+) -> typing.Optional[WeaveURI]:
+    if node is None or not _node_is_op_get(node):
+        return None
+    uri = _uri_of_get_node(node)  # type: ignore
+    if uri is None:
+        return None
+    return WeaveURI.parse(uri)
+
+
 def _local_op_get_to_published_op_get(node: graph.Node) -> graph.Node:
+    uri = _uri_from_get_node(node)
+    name = None
+    version = None
+    if uri is not None:
+        name = uri.name
+        if uri.version is not None and not string_is_likely_commit_hash(uri.version):
+            version = uri.version
     obj = weave_internal.use(node, context.get_client())
 
-    # # // SUPER HACK _ THIS CANNOT BE CHECK IN. only happens on network? client doesn't resolve?
-    # from weave.artifact_local import LocalArtifactRef
+    print("PUBLISHED A - PRE", name, version)
+    pub_ref = storage._direct_publish(
+        obj, name, branch_name=version, assume_weave_type=node.type
+    )
+    new_node = ref_to_node(pub_ref)
 
-    # if isinstance(obj_to_pub, LocalArtifactRef):
-    #     obj_to_pub = storage.deref(obj_to_pub)
-
-    new_node = ref_to_node(storage._direct_publish(obj, assume_weave_type=node.type))
+    print("PUBLISHED A", pub_ref, new_node, name, version)
 
     if new_node is None:
         raise errors.WeaveSerializeError(
@@ -138,7 +158,21 @@ def _local_op_get_to_published_op_get(node: graph.Node) -> graph.Node:
 
 def _local_ref_to_published_ref(ref: ref_base.Ref) -> ref_base.Ref:
     node = ref_to_node(ref)
+    uri = _uri_from_get_node(node)
+    name = None
+    version = None
+    if uri is not None:
+        name = uri.name
+        if uri.version is not None and not string_is_likely_commit_hash(uri.version):
+            version = uri.version
     if node is None:
         raise errors.WeaveSerializeError(f"Failed to serialize {ref} to published ref")
     obj = weave_internal.use(node, context.get_client())
-    return storage._direct_publish(obj, assume_weave_type=ref.type)
+    print("PUBLISHED B - PRE", name, version)
+    pub_ref = storage._direct_publish(
+        obj, name, branch_name=version, assume_weave_type=ref.type
+    )
+
+    print("PUBLISHED B", pub_ref, name, version)
+
+    return pub_ref
