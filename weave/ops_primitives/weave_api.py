@@ -237,8 +237,12 @@ def _save(
 
 @dataclasses.dataclass
 class _MergeSpec:
-    to_uri: artifact_wandb.WeaveWBArtifactURI | artifact_local.WeaveLocalArtifactURI
-    head_ref: artifact_local.LocalArtifactRef | artifact_wandb.WandbArtifactRef
+    to_uri: typing.Union[
+        artifact_wandb.WeaveWBArtifactURI, artifact_local.WeaveLocalArtifactURI
+    ]
+    head_ref: typing.Union[
+        artifact_local.LocalArtifactRef, artifact_wandb.WandbArtifactRef
+    ]
     branch_point: artifact_fs.BranchPointType
 
 
