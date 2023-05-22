@@ -1,3 +1,4 @@
+import dataclasses
 import typing
 import time
 
@@ -67,6 +68,16 @@ def finish(obj: graph.Node[typing.Any], name: typing.Optional[str] = None) -> No
 def save_to_ref(obj: typing.Any, name: typing.Optional[str]):
     ref = storage.save(obj, name=name)
     return ref
+
+
+@op(
+    name="save_to_uri",
+    output_type=types.RefType(),
+    hidden=True,
+)
+def save_to_uri(obj: typing.Any, name: typing.Optional[str]):
+    ref = storage.save(obj, name=name)
+    return str(ref.uri)
 
 
 def usedby_output_type(op_name: str) -> types.Type:
@@ -224,9 +235,23 @@ def _save(
             )
 
 
-def _merge(name) -> str:
-    """Save the object, propagating changes back to the original artifact"""
-    obj_uri = uris.WeaveURI.parse(name)
+@dataclasses.dataclass
+class _MergeSpec:
+    to_uri: artifact_wandb.WeaveWBArtifactURI | artifact_local.WeaveLocalArtifactURI
+    head_ref: artifact_local.LocalArtifactRef | artifact_wandb.WandbArtifactRef
+    branch_point: artifact_fs.BranchPointType
+
+
+def get_merge_spec_uri(uri: str) -> typing.Optional[_MergeSpec]:
+    try:
+        return _get_merge_spec_unsafe(uri)
+    except errors.WeaveInternalError:
+        return None
+
+
+def _get_merge_spec_unsafe(uri: str) -> _MergeSpec:
+    obj_uri = uris.WeaveURI.parse(uri)
+
     if not isinstance(
         obj_uri,
         (artifact_wandb.WeaveWBArtifactURI, artifact_local.WeaveLocalArtifactURI),
@@ -252,17 +277,32 @@ def _merge(name) -> str:
             "Cannot merge into artifact of type %s" % type(obj_uri)
         )
 
+    return _MergeSpec(
+        to_uri=to_uri,
+        head_ref=head_ref,
+        branch_point=branch_point,
+    )
+
+
+def _merge(name) -> str:
+    """Save the object, propagating changes back to the original artifact"""
+    merge_spec = _get_merge_spec_unsafe(name)
+    to_uri = merge_spec.to_uri
+    head_ref = merge_spec.head_ref
+    branch_point = merge_spec.branch_point
+
     to_ref = to_uri.to_ref()
 
     if isinstance(to_ref.artifact, artifact_wandb.WandbArtifact):
         original_artifact_hash = to_ref.artifact.commit_hash
     else:
         original_artifact_hash = to_ref.artifact.version
-
     if branch_point["commit"] != original_artifact_hash:
         raise errors.WeaveUnmergableArtifactsError(
             "Cannot merge artifacts: "
-            "target artifact commit hash does not match branch point"
+            "target artifact commit hash does not match branch point",
+            f" original_artifact_hash: {original_artifact_hash}; ",
+            f" branch_point: {branch_point['commit']}",
         )
 
     shared_branch_name = (
@@ -481,7 +521,7 @@ def append(
 
 
 @mutation
-def merge(self, root_args: typing.Any = None) -> typing.Any:
+def merge(self: graph.Node[typing.Any], root_args: typing.Any = None) -> typing.Any:
     self = compile.compile_fix_calls([self])[0]
 
     if not isinstance(self, graph.OutputNode):
@@ -550,6 +590,39 @@ def rename_artifact(
 
     head_ref = obj_uri.to_ref()
     head_ref.artifact.rename(new_name)
+
+
+@op()
+def publish_artifact(
+    self: graph.Node[typing.Any],
+    artifact_name: typing.Optional[str],
+    project_name: typing.Optional[str],
+    # root_args: typing.Any = None,
+) -> str:
+    if not isinstance(self, graph.OutputNode):
+        raise errors.WeaveInternalError("Publish target must be an OutputNode")
+
+    if self.from_op.name != "get":
+        raise errors.WeaveInternalError("Publish target must be a get")
+
+    if not isinstance(self.from_op.inputs["uri"], graph.ConstNode):
+        raise errors.WeaveInternalError("Publish op argument must be a const string")
+
+    name = self.from_op.inputs["uri"].val
+
+    obj_uri = uris.WeaveURI.parse(name)
+    if not isinstance(
+        obj_uri,
+        (artifact_wandb.WeaveWBArtifactURI, artifact_local.WeaveLocalArtifactURI),
+    ):
+        raise errors.WeaveInternalError(
+            "Cannot merge artifact of type %s" % type(obj_uri)
+        )
+
+    head_ref = obj_uri.to_ref()
+    art_name = artifact_name or head_ref.artifact.name
+    ref = storage._direct_publish(head_ref, art_name, project_name)
+    return str(ref)
 
 
 @weave_class(weave_type=types.Function)

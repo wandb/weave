@@ -953,3 +953,141 @@ def test_merge_from_local_with_branch_onto_local_with_branch_and_branchpoint(
         target_entity=user_by_api_key_in_env.username,
         target_project_name="test_project",
     )
+
+
+## Custom Flow
+
+
+def test_publish_saved_node(user_by_api_key_in_env):
+    data = ["test_publish_saved_node"]
+    saved = weave.save(data)
+    assert saved.from_op.inputs["uri"].val.startswith("local-artifact://")
+    assert weave.use(saved) == data
+
+    published = weave.ops.publish_artifact(saved, "weave_ops", "my_list")
+    assert published.from_op.inputs["uri"].val.startswith("wandb-artifact://")
+    assert weave.use(published) == data
+
+
+def test_publish_saved_node_execution(user_by_api_key_in_env):
+    data = ["test_publish_saved_node_execution"]
+    saved = weave.save(data)
+    assert saved.from_op.inputs["uri"].val.startswith("local-artifact://")
+    assert weave.use(saved) == data
+
+    published = weave.ops.publish_artifact.lazy_call(
+        weave.ops.get(saved.from_op.inputs["uri"]), "weave_ops", "my_list"
+    )
+    after_publish = weave.use(published)
+    assert after_publish.from_op.inputs["uri"].val.startswith("wandb-artifact://")
+    assert weave.use(after_publish) == data
+
+
+def _uri_is_local(uri: str) -> bool:
+    return uri.startswith("local-artifact://")
+
+
+def _uri_is_remote(uri: str) -> bool:
+    return uri.startswith("wandb-artifact://")
+
+
+def _get_uri_version(uri: str) -> str:
+    return uri.split(":")[-1].split("/")[0]
+
+
+def _replace_uri_version(uri: str, new_version: str) -> str:
+    return uri.replace(_get_uri_version(uri), new_version)
+
+
+def _get_uri_from_get_node(node: weave.graph.Node) -> str:
+    return node.from_op.inputs["uri"].val  # type: ignore
+
+
+def test_end_to_end_save_and_publish_flow(user_by_api_key_in_env):
+    # Step 1: Save some data locally.
+    data = ["data_a"]
+    saved_node = weave.save(data)
+    saved_uri = _get_uri_from_get_node(saved_node)
+    saved_version = _get_uri_version(saved_uri)
+    assert _uri_is_local(saved_uri)
+    assert weave.use(saved_node) == data
+
+    # Step 2: Make a branching mutation.
+    branched_uri = weave.ops.set(
+        saved_node[0],
+        "test_publish_saved_node_execution_2",
+        root_args={"branch": "my-branch"},
+    )
+    branched_data = ["test_publish_saved_node_execution_2"]
+    assert branched_uri == saved_uri.replace(saved_version, "my-branch")
+    branched_node = weave.ops.get(branched_uri)
+    assert weave.use(branched_node) == branched_data
+
+    # Step 3: Merge the change back into the main branch.
+    merged_uri = weave.ops.merge(branched_node)
+    assert merged_uri.startswith("local-artifact://")
+    assert merged_uri != saved_uri != branched_uri
+    merged_node = weave.ops.get(merged_uri)
+    assert weave.use(merged_node) == branched_data
+
+    # Step 4: Publish the new version remotely
+    published_node = weave.ops.publish_artifact(merged_node, "weave_ops", "my_list")
+    published_uri = published_node.from_op.inputs["uri"].val
+    assert published_uri.startswith("wandb-artifact://")
+    assert weave.use(published_node) == branched_data
+
+    # Step 5: Modify the remote version
+    published_branched_uri = weave.ops.set(
+        published_node[0],
+        "test_publish_saved_node_execution_3",
+        root_args={"branch": "my-branch-2"},
+    )
+    published_branched_data = ["test_publish_saved_node_execution_3"]
+    assert published_branched_uri == "local-artifact:///my_list:my-branch-2/obj"
+    published_branched_node = weave.ops.get(published_branched_uri)
+    assert weave.use(published_branched_node) == published_branched_data
+
+    # Step 6: Merge the remote change back into the main branch.
+    published_merged_uri = weave.ops.merge(published_branched_node)
+    assert published_merged_uri.startswith("wandb-artifact://")
+    assert published_merged_uri != published_uri
+    published_merged_node = weave.ops.get(published_merged_uri)
+    assert weave.use(published_merged_node) == published_branched_data
+
+
+def test_publish_with_branch(user_by_api_key_in_env):
+    data = ["data_a"]
+    saved_node = weave.save(data, "obj_name:obj_alias")
+    saved_uri = saved_node.from_op.inputs["uri"].val
+    assert saved_uri == "local-artifact:///obj_name:obj_alias/obj"
+    assert weave.use(saved_node) == data
+
+    published_node = weave.ops.publish_artifact(
+        saved_node, "remote_obj_name", "project_name"
+    )
+    published_uri = weave.use(published_node)  # published_obj.from_op.inputs["uri"].val
+    assert published_uri.startswith("wandb-artifact://")
+    assert published_uri.endswith("/obj")
+    commit_hash = published_uri.split("project_name/remote_obj_name:")[1].split("/obj")[
+        0
+    ]
+    assert weave.use(weave.get(published_uri)) == data
+    latest_uri = published_uri.replace(commit_hash, "latest")
+    latest_remote_node = weave.ops.get(latest_uri)
+    assert weave.use(latest_remote_node) == data
+
+    published_branched_uri = weave.ops.set(
+        latest_remote_node[0],
+        "test_publish_saved_node_execution_3",
+        # root_args={"branch": "my-branch"},
+    )
+    published_branched_data = ["test_publish_saved_node_execution_3"]
+    assert published_branched_uri == "local-artifact:///remote_obj_name:latest/obj"
+    published_branched_node = weave.ops.get(published_branched_uri)
+    assert weave.use(published_branched_node) == published_branched_data
+
+    published_merged_uri = weave.ops.merge(published_branched_node)
+    assert published_merged_uri.startswith("wandb-artifact://")
+    assert published_merged_uri == latest_uri
+    published_merged_node = weave.ops.get(published_merged_uri)
+    assert weave.use(published_merged_node) == published_branched_data
