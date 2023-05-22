@@ -47,9 +47,10 @@ class PILImageOps:
     @weave.op(input_type={"self": PILImageType()})
     def image_bytes(self) -> str:
         f = io.BytesIO()
-        self.save(f, format="png")  # type: ignore
+        self.save(f, format="png", compress_level=3)  # type: ignore
         f.seek(0)
-        return binascii.hexlify(f.read()).decode("ISO-8859-1")
+        res = binascii.hexlify(f.read()).decode("ISO-8859-1")
+        return res
 
     @weave.op()
     def width_(self) -> int:

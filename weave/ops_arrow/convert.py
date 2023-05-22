@@ -128,7 +128,6 @@ def recursively_build_pyarrow_array(
                 mapper,
                 mappers_arrow.TypedDictToArrowStruct,
             ):
-
                 for py_obj in py_objs:
                     if py_obj is None:
                         data.append(None)
@@ -464,6 +463,8 @@ def to_compare_safe(awl: ArrowWeaveList) -> ArrowWeaveList:
             col._arrow_data.type
         ):
             return ArrowWeaveList(col._arrow_data, types.Number(), None)
+        elif pa.types.is_timestamp(col._arrow_data.type):
+            return ArrowWeaveList(col._arrow_data, types.Timestamp(), None)
         elif pa.types.is_boolean(col._arrow_data.type):
             return ArrowWeaveList(col._arrow_data, types.Boolean(), None)
         elif ArtifactAssetType.assign_type(col.object_type):

@@ -109,11 +109,11 @@ class TimeSeriesData(typing.TypedDict):
                     "x": weave.types.TypedDict(
                         {
                             key: weave.types.optional(weave.types.Timestamp())
-                            for key in ["start", "center", "stop"]
+                            for key in ["start", "stop"]
                         }
                     ),
-                    "y": weave.types.Float(),
-                    "label": weave.types.String(),
+                    "y": weave.types.optional(weave.types.Float()),
+                    "label": weave.types.optional(weave.types.String()),
                 }
             )
         ),
@@ -129,9 +129,14 @@ class TimeSeriesData(typing.TypedDict):
     }
 )
 def plotly_time_series(data, mark, labels, label_overrides) -> plotly.graph_objs.Figure:
+    data = list(data)  # do this to get out of arrow :(
     labels = {**labels, **label_overrides}
+
+    def bin_center(bin):
+        return bin["x"]["start"] + (bin["x"]["stop"] - bin["x"]["start"]) / 2
+
     if mark == "point":
-        data = [{**d, "x": d["x"]["center"]} for d in data]  # type: ignore
+        data = [{**d, "x": bin_center(d)} for d in data]  # type: ignore
         fig = px.scatter(
             data, x="x", y="y", color="label", template="plotly_white", labels=labels
         )
@@ -159,7 +164,7 @@ def plotly_time_series(data, mark, labels, label_overrides) -> plotly.graph_objs
         fig.update_layout(dragmode="select")
         return fig
     elif mark == "line":
-        data = [{**d, "x": d["x"]["center"]} for d in data]  # type: ignore
+        data = [{**d, "x": bin_center(d)} for d in data]  # type: ignore
         fig = px.line(
             data, x="x", y="y", color="label", template="plotly_white", labels=labels
         )

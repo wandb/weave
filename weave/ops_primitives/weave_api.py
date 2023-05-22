@@ -27,6 +27,18 @@ class RefNodeMethods:
         return storage.deref(self)
 
 
+@op(
+    input_type={
+        "self": types.FilesystemArtifactRefType(types.Any()),
+    },
+)
+def created_by(self) -> typing.Optional[runs.Run]:
+    print("IN CREATED BY")
+    # TODO: engine derefences blindly before passing in, but we expect ref! Hack
+    # here by just getting ._ref
+    return trace.get_obj_creator(self._ref)
+
+
 # Hmm... This returns the same obj, not a ref anymore
 # TODO: is this what we want?
 @op(

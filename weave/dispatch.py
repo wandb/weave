@@ -332,12 +332,19 @@ class BoundPotentialOpDefs:
             self.potential_ops, dict(zip(input_keys[1:], input_types[1:]))
         )
         if not ops:
-            err = errors.WeaveDispatchError(
-                f'Cannot dispatch choose op from "{self.potential_ops}"; no matching op found'
-            )
-            util.raise_exception_with_sentry_if_available(
-                err, [str(self.potential_ops)]
-            )
+            if any(callable(v) for v in args + tuple(kwargs.values())):
+                # _dispatch_remaining_args is broken for callable args. They
+                # are dispatchable, and this can be fixed! bind_params in op_def
+                # does it correctly. "test_dispatch_lambda" tests this case.
+                # TODO: add proper fix
+                ops = self.potential_ops
+            else:
+                err = errors.WeaveDispatchError(
+                    f'Cannot dispatch choose op from "{self.potential_ops}"; no matching op found'
+                )
+                util.raise_exception_with_sentry_if_available(
+                    err, [str(self.potential_ops)]
+                )
         op = _resolve_op_ambiguity(ops, input_types[0])
         params = op.input_type.create_param_dict([self.self_node] + list(args), kwargs)
         return op(**params)

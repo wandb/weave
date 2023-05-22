@@ -78,8 +78,13 @@ def check_case(called: graph.Node, result_type: weave.types.Type, result: typing
     assert result_type.assign_type(
         called.type
     ), f"Expected op output type: {result_type}, but got {called.type}"
+
+    # This is a way to save the final output, preserving tags.
     result_ref = weave.use(weave.ops.save_to_ref(called, None))
-    actual_result = storage.get(str(result_ref))
+    if result_ref == None:
+        actual_result = None
+    else:
+        actual_result = storage.get(str(result_ref))
     assert_equal_with_tags(called, actual_result, result)
 
     # # We can't check the type of the output we received, because execution
@@ -590,7 +595,6 @@ def make_binary_vectorscalar_variants(
         )
 
         if not is_null_consuming:
-
             vecgroup_variants.append(
                 base_vec.variant(
                     "vec-with-none",

@@ -42,6 +42,13 @@ def get_node_result_store():
     return store
 
 
+def get_or_create_node_result_store():
+    res = _node_result_store.get()
+    if res is None:
+        res = collections.defaultdict(lambda: NoResult)
+    return res
+
+
 class ForwardNode:
     node: graph.OutputNode[ExecutableNode]
     input_to: dict["ForwardNode", typing.Literal[True]]

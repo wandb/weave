@@ -216,6 +216,16 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
             version,
         )
 
+    def path_uri(self, path) -> uris.WeaveURI:
+        version = self._version
+        if version is None:
+            raise errors.WeaveInternalError("Cannot get uri for unsaved artifact!")
+        return WeaveLocalArtifactURI(
+            self.name,
+            self._version,
+            path,
+        )
+
     def _makedir(self, dirname: str):
         # Keep track of directories we've already created so we don't
         # create them multiple times, makedir is expensive if you call

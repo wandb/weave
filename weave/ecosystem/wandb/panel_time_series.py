@@ -225,7 +225,7 @@ def time_series(
     # So doing a little bit of type: ignore here.
     # TODO: Fix
 
-    unnested = weave.ops.unnest(input_node)
+    unnested = input_node.unnest()  # type: ignore
     config = time_series_default_config(config, weave_internal.const(unnested.type))
 
     min_x = config.min_x(input_node)  # type: ignore
@@ -242,6 +242,7 @@ def time_series(
     ).argmin()
 
     bin_size = TIME_SERIES_BIN_SIZES_SEC_NODE[bin_size_index]  # type: ignore
+    bin_size_ms = bin_size * 1000
 
     def bin_fn(item):
         label_fn_output_type = config.label.type.output_type
@@ -249,20 +250,25 @@ def time_series(
 
         # convert timestamp to seconds
         timestamp = config.x(item)
-        seconds = timestamp.toNumber()  # type: ignore
-        delta_seconds = seconds - min_x.toNumber()  # type: ignore
+        # seconds = timestamp.toNumber()  # type: ignore
+        # delta_seconds = seconds - min_x.toNumber()  # type: ignore
 
-        bin_start_sec = min_x.toNumber() + round(delta_seconds / bin_size) * bin_size
-        bin_end_sec = bin_start_sec + bin_size
+        # bin_start_sec = min_x.toNumber() + round(delta_seconds / bin_size) * bin_size
+        bin_start_ms = timestamp.floor(bin_size_ms)
+        bin_end_ms = timestamp.ceil(bin_size_ms)
+        # bin_end_sec = bin_start_ms + bin_size
 
-        bin_center_sec = (bin_start_sec + bin_end_sec) * 0.5
-        bin_center = date.from_number(bin_center_sec)
-        bin_start = date.from_number(bin_start_sec)
-        bin_end = date.from_number(bin_end_sec)
+        # bin_center_sec = (bin_start_ms + bin_end_sec) * 0.5
+        # bin_center = date.from_number(bin_center_sec)
+        # bin_start = #date.from_number(bin_start_sec)
+        bin_start = bin_start_ms
+        bin_end = bin_end_ms
+        # bin_end = date.from_number(bin_end_sec)
 
-        group_items["bin"] = weave.ops.dict_(
-            start=bin_start, center=bin_center, stop=bin_end
-        )
+        # group_items["bin"] = weave.ops.dict_(
+        #     start=bin_start, center=bin_center, stop=bin_end
+        # )
+        group_items["bin"] = weave.ops.dict_(start=bin_start, stop=bin_end)
 
         if label_fn_output_type == weave.types.Invalid():
             group_items["label"] = "no_label"
@@ -288,6 +294,7 @@ def time_series(
         # this is needed because otherwise the lines look like a scrambled mess
         .sort(lambda item: weave.ops.make_list(a=item["x"]["center"]), ["asc"])
     )
+    print("BINNED", binned)
 
     default_labels = weave.ops.dict_(
         x=function_to_string(config.x),
@@ -379,6 +386,9 @@ class TimeSeries(weave.Panel):
                     if not isinstance(value, weave.graph.Node):
                         if attr in ["min_x", "max_x", "mark", "axis_labels"]:
                             value = weave.make_node(value)
+                        if attr in ["min_x", "max_x"]:
+                            value = weave_internal.const(value)
+                            # value = weave.make_node(value)
                         elif attr in ["x", "label"]:
                             value = weave.define_fn(
                                 {"item": unnested.type.object_type}, value

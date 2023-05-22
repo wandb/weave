@@ -15,7 +15,13 @@ def should_table_cache(op_name: str) -> bool:
     # will succeed. Since runs are cached by user right now, this just means
     # that if the user makes parallel requests that require table caching,
     # only one of the requests values will make it into the cache.
-    return op_name == "op-expensive_op" or op_name == "BaseRetrievalQA-run"
+    return (
+        op_name == "op-expensive_op"
+        or op_name == "BaseRetrievalQA-run"
+        or op_name == "BaseChatModel-predict"
+        or op_name == "op-stable_diffusion"
+        or op_name == "op-img2prompt"
+    )
 
 
 def should_cache(op_name: str) -> bool:

@@ -76,7 +76,9 @@ def _list_op_output_object_type(input_types):
     return inner_object_type
 
 
-def list_dim_downresolver(self: ArrowWeaveList, arrow_operation_name: str):
+def list_dim_downresolver(
+    self: ArrowWeaveList, arrow_operation_name: str, output_object_type=None
+):
     a = arrow_as_array(self._arrow_data)
     values = a.flatten()
 
@@ -96,11 +98,33 @@ def list_dim_downresolver(self: ArrowWeaveList, arrow_operation_name: str):
     result = pa.compute.replace_with_mask(
         nulls, non_0len, non_0len_agged.combine_chunks()
     )
+    if output_object_type == None:
+        output_object_type = _list_op_output_object_type(
+            {"self": ArrowWeaveListType(self.object_type)}
+        )
     return ArrowWeaveList(
         result,
-        _list_op_output_object_type({"self": ArrowWeaveListType(self.object_type)}),
+        output_object_type,
         self._artifact,
     )
+
+
+@arrow_op(
+    name="ArrowWeaveListListNumber-listnumbercount",
+    input_type={
+        "self": ArrowWeaveListType(
+            types.optional(
+                types.UnionType(
+                    types.List(),
+                    ArrowWeaveListType(),
+                )
+            )
+        ),
+    },
+    output_type=ArrowWeaveListType(types.Int()),
+)
+def list_numbers_count(self):
+    return list_dim_downresolver(self, "count", types.Int())
 
 
 @arrow_op(

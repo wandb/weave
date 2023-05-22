@@ -247,7 +247,7 @@ def _is_non_simd_node(node: graph.OutputNode, vectorized_keys: set[str]):
         "unnest",
         "flatten",
         "2DProjection",
-        "count",
+        "count",  # this is now SIMD
         "joinToStr",
         "unique",
         "numbers-sum",  # this is now SIMD
@@ -427,6 +427,9 @@ def vectorize(
         if node_name.endswith("index") or node_name.endswith("__getitem__"):
             inputs_as_awl = _vectorized_inputs_as_awl(node_inputs, vectorized_keys)
             return arraylist_ops.listindex(*inputs_as_awl.values())
+        elif node_name.endswith("count"):
+            inputs_as_awl = _vectorized_inputs_as_awl(node_inputs, vectorized_keys)
+            return arraylist_ops.list_numbers_count(*inputs_as_awl.values())
         elif node_name.endswith("numbers-max"):
             inputs_as_awl = _vectorized_inputs_as_awl(node_inputs, vectorized_keys)
             return arraylist_ops.list_numbers_max(*inputs_as_awl.values())
@@ -436,7 +439,7 @@ def vectorize(
         elif node_name.endswith("numbers-avg"):
             inputs_as_awl = _vectorized_inputs_as_awl(node_inputs, vectorized_keys)
             return arraylist_ops.list_numbers_avg(*inputs_as_awl.values())
-        elif node_name.endswith("numbers-sum"):
+        elif node_name.endswith("sum"):
             inputs_as_awl = _vectorized_inputs_as_awl(node_inputs, vectorized_keys)
             return arraylist_ops.list_numbers_sum(*inputs_as_awl.values())
         elif node_name == "dropna":
@@ -503,17 +506,22 @@ def vectorize(
         if maybe_op is not None and maybe_op.derived_from is None:
             return maybe_op.lazy_call(*inputs_as_list.values())
 
-        # TODO: pull from another unmerged PR
         # Mapped ops can be handled with map_each
         if node_op.derived_from is not None:
             # TODO: other arguments may also be vectorized. In that case this will crash
             input_vals = list(node_inputs.values())
-            from . import list_ops
-
             map_each_op = registry_mem.memory_registry.get_op("ArrowWeaveList-mapEach")
             return map_each_op(
                 input_vals[0], lambda x: node_op.derived_from(x, *input_vals[1:])
             )
+        # If an op is already an arrow version, we may still need to use op pick
+        # to lift it to another dimension. This needs to be generalized I think.
+        # Added for now for timeseries plot.
+        if node_op.name == "ArrowWeaveListTypedDict-pick":
+            input_vals = list(node_inputs.values())
+            map_each_op = registry_mem.memory_registry.get_op("ArrowWeaveList-mapEach")
+            pick_op = registry_mem.memory_registry.get_op("typedDict-pick")
+            return map_each_op(input_vals[0], lambda x: pick_op(x, *input_vals[1:]))
 
         # Final Fallback: We have no choice anymore. We must bail out completely to mapping
         # over all the vectorized inputs and calling the function directly.
@@ -650,7 +658,14 @@ def _ensure_variadic_fn(
 
 
 def _apply_fn_node(awl: ArrowWeaveList, fn: graph.OutputNode) -> ArrowWeaveList:
+    from .. import execute_fast
+
+    fn = execute_fast._resolve_static_branches(fn)
+    from .. import graph_debug
+
+    print("FN", graph_debug.node_expr_str_full(fn))
     vecced = vectorize(_ensure_variadic_fn(fn, awl.object_type))
+    print("VECCED", graph_debug.node_expr_str_full(vecced))
     called = _call_vectorized_fn_node_maybe_awl(awl, vecced)
     # print("CALLED ", called)
     return _call_and_ensure_awl(awl, called)

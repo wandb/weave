@@ -1,6 +1,7 @@
 import typing
 import pyarrow.compute as pc
 import pyarrow as pa
+import datetime
 
 from ..decorator_arrow_op import arrow_op
 from .. import weave_types as types
@@ -389,7 +390,7 @@ def to_timestamp(self):
         mask = adjustment_mask()
 
     data_as_timestamp = (
-        pc.floor(data).cast("int64").cast(pa.timestamp("ms", tz="+00:00"))
+        pc.floor(data).cast("int64").cast(pa.timestamp("ms", tz=datetime.timezone.utc))
     )
     return ArrowWeaveList(
         data_as_timestamp,

@@ -163,18 +163,22 @@ class FilesystemArtifactRef(artifact_base.ArtifactRef):
 
     @property
     def _outer_type(self) -> types.Type:
-        if self._type is not None:
-            return self._type
         if self.path is None:
             return types.TypeRegistry.type_of(self.artifact)
+
+        # This block is required to fix some W&B tests that mock artifacts and don't
+        # provide a .type.json file. They rely on the ref being constructed with a
+        # type. When _get is called, it calls _outer_type to try to read the artifact,
+        # which needs to early return here to avoid the type.json read.
+        if self.extra is None and self._type is not None:
+            return self._type
+
         try:
             with self.artifact.open(f"{self.path}.type.json") as f:
                 type_json = json.load(f)
         except FileNotFoundError:
             return types.TypeRegistry.type_of(self.artifact.path_info(self.path))
-        loaded_type = types.TypeRegistry.type_from_dict(type_json)
-        self._type = loaded_type
-        return self._type
+        return types.TypeRegistry.type_from_dict(type_json)
 
     @property
     def type(self) -> types.Type:
@@ -184,10 +188,37 @@ class FilesystemArtifactRef(artifact_base.ArtifactRef):
             if not isinstance(t, object_context.NoResult):
                 return t
 
+        if self._type is not None:
+            return self._type
+
         if not self.is_saved:
             return types.NoneType()
 
-        return self._outer_type
+        ot = self._outer_type
+        if self.extra is not None:
+            # This is some hacking to make extra refs work (a ref that's a pointer to
+            # an item in a list)...
+            # Not a general solution!
+            # TODO: fix
+            from . import types_numpy
+
+            if isinstance(ot, types.List):
+                self._type = ot.object_type
+            elif isinstance(ot, types_numpy.NumpyArrayType):
+                # The Numpy type implementation is not consistent with how list extra refs
+                # work!
+                # TODO: fix
+                self._type = ot
+            else:
+                print(
+                    "SELF TYPE",
+                )
+                raise errors.WeaveInternalError(
+                    f"Cannot get type of {self} with extra {self.extra}"
+                )
+        else:
+            self._type = ot
+        return self._type
 
     # Artifact Name (unique per project, unique per local-artifact user namespace)
     @property

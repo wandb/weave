@@ -2,6 +2,7 @@ import typing
 import random
 import datetime
 import numpy as np
+import pytz
 
 
 def make_id() -> int:
@@ -21,6 +22,10 @@ class BoxedNone:
 
     def __eq__(self, other):
         return self.val == other
+
+
+def is_none(val):
+    return val is None or isinstance(val, BoxedNone)
 
 
 class BoxedBool:
@@ -123,7 +128,7 @@ def box(
     elif type(obj) == np.ndarray:
         return BoxedNDArray(obj)
     elif type(obj) == datetime.datetime:
-        return BoxedDatetime.fromtimestamp(obj.timestamp())
+        return BoxedDatetime.fromtimestamp(obj.timestamp(), tz=pytz.UTC)
     elif type(obj) == datetime.timedelta:
         return BoxedTimedelta(seconds=obj.total_seconds())
     elif obj is None:
@@ -146,7 +151,6 @@ def unbox(
     datetime.timedelta,
     None,
 ]:
-
     if type(obj) == BoxedInt:
         return int(obj)
     elif type(obj) == BoxedFloat:

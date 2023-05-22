@@ -23,7 +23,12 @@ class RunKey:
 
 
 def _value_id(val):
-    hash_val = json.dumps(storage.to_python(val))
+    # Important, do not include the type here, as it can change.
+    # This happens because you can have a ref to an item that's in a list.
+    # The list's object_type can change as items are appended to it.
+    # We don't know the specific type of each item within the list without
+    # further refinement.
+    hash_val = json.dumps(storage.to_python(val)["_val"])
     hash = hashlib.md5()
     hash.update(json.dumps(hash_val).encode())
     return hash.hexdigest()
@@ -143,7 +148,7 @@ class TraceLocal:
             obj_ref = self.save_object(existing_objs, name=art_name)
             obj_ref._obj = output
             obj_ref._type = types.TypeRegistry.type_of(output)
-            obj_ref.extra = [run_key.id]
+            obj_ref.extra = [str(len(existing_objs) - 1)]
             return obj_ref
         return self.save_object(
             output, name=f"run-{run_key.op_simple_name}-{run_key.id}-output"

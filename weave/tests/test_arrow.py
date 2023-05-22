@@ -226,7 +226,6 @@ def test_custom_types():
 
 
 def test_custom_types_tagged():
-
     im1 = tag_store.add_tags(Image.linear_gradient("L").rotate(0), {"a": 1})
     im2 = tag_store.add_tags(Image.linear_gradient("L").rotate(4), {"a": 2})
 
@@ -278,7 +277,6 @@ def test_custom_in_list_saveload():
 
 
 def test_custom_tagged_groupby1():
-
     im1 = tag_store.add_tags(Image.linear_gradient("L").rotate(0), {"a": 1})
     im2 = tag_store.add_tags(Image.linear_gradient("L").rotate(4), {"a": 2})
     raw_data = box.box([{"a": 5, "im": im1}, {"a": 6, "im": im2}])
@@ -648,7 +646,6 @@ def test_arrow_nullable_concat():
 
 
 def test_arrow_weave_list_groupby_struct_type_table():
-
     table = pa.Table.from_pylist(
         [{"d": {"a": 1, "b": 2}, "c": 1}, {"d": {"a": 3, "b": 4}, "c": 2}]
     )
@@ -912,7 +909,6 @@ def test_arrow_union_two_struct_types_as_single_struct_type():
 
 
 def test_arrow_concat_nested_union():
-
     raw_datal = [{"b": 1}]
     raw_datar = [{"b": "c"}]
 
@@ -940,7 +936,6 @@ def test_arrow_concat_nested_union():
 
 
 def test_arrow_concat_nested_union_with_optional_type():
-
     raw_datal = [{"b": 1}]
     raw_datar = [{"b": "c", "c": 3.3}]
 
@@ -969,7 +964,6 @@ def test_arrow_concat_nested_union_with_optional_type():
 
 
 def test_arrow_concat_nested_union_with_optional_type_and_custom_type():
-
     raw_datal = [{"b": 1, "x": Point2(1, 2)}]
     raw_datar = [{"b": "c", "c": 3.3}]
 
@@ -999,7 +993,6 @@ def test_arrow_concat_nested_union_with_optional_type_and_custom_type():
 
 
 def test_arrow_concat_degenerate_types():
-
     raw_datal = [{"b": 1, "x": Point2(1, 2)}]
     raw_datar = [{"b": "c", "x": {"x": 1, "y": 2}}]
 
@@ -1506,7 +1499,10 @@ def test_count_on_group():
     col = weave.save(arrow.to_arrow([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]))
     col = col.groupby(lambda x: x % 2)
     col = col.map(lambda x: x.count())
-    assert weave.use(col).to_pylist_raw() == [5, 5]
+    assert weave.use(col).to_pylist_raw() == [
+        {"_tag": {"groupKey": 1}, "_value": 5},
+        {"_tag": {"groupKey": 0}, "_value": 5},
+    ]
 
 
 def test_limit_on_group():

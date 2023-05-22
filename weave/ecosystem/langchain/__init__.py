@@ -17,6 +17,7 @@ from langchain.embeddings.openai import OpenAIEmbeddings
 from langchain.llms import OpenAI
 from langchain.chat_models.base import BaseChatModel
 from langchain.chat_models import ChatOpenAI
+from langchain.chat_models import ChatAnthropic
 from langchain.chains import HypotheticalDocumentEmbedder
 from langchain.chains.llm import LLMChain
 from langchain.llms.base import BaseLLM
@@ -252,6 +253,23 @@ class BaseChatModelType(BaseLanguageModelType):
 class ChatOpenAIType(BaseChatModelType):
     instance_classes = ChatOpenAI
 
+    def property_types(self) -> dict[str, Type]:
+        return {
+            "model_name": weave.types.String(),
+            "temperature": weave.types.Float(),
+        }
+
+
+@dataclasses.dataclass(frozen=True)
+class ChatAnthropicType(BaseChatModelType):
+    instance_classes = ChatAnthropic
+
+    def property_types(self) -> dict[str, Type]:
+        return {
+            "model": weave.types.String(),
+            "temperature": weave.types.Float(),
+        }
+
 
 @dataclasses.dataclass(frozen=True)
 class BaseCombineDocumentsChainType(ChainType):
@@ -339,7 +357,7 @@ class FAISSType(VectorStoreType):
         return FAISS.load_local(artifact.path(name), OpenAIEmbeddings())
 
 
-@weave.op(pure=True)
+@weave.op()
 def faiss_from_documents(
     documents: list[Document],
     embeddings: Embeddings,
@@ -400,6 +418,11 @@ def chat_openai(model_name: str, temperature: float) -> ChatOpenAI:
 
 
 @weave.op(render_info={"type": "function"})
+def chat_anthropic(model_name: str, temperature: float) -> ChatAnthropic:
+    return ChatAnthropic(model=model_name, temperature=temperature)
+
+
+@weave.op(render_info={"type": "function"})
 def llm_chain(llm: BaseLanguageModel, prompt: BasePromptTemplate) -> LLMChain:
     return LLMChain(llm=llm, prompt=prompt)
 
@@ -421,6 +444,16 @@ def retrieval_qa_from_chain_type(
     return RetrievalQA.from_chain_type(
         llm=language_model, chain_type=chain_type, retriever=retriever
     )
+
+
+@weave.weave_class(weave_type=BaseChatModelType)
+class BaseChatModelOps:
+    @weave.op()
+    def predict(self: BaseChatModel, text: str) -> str:
+        if text == None:
+            # TODO: weave engine doesn't handle nullability on args that aren't the first
+            return None  # type: ignore
+        return self.predict(text)
 
 
 @weave.weave_class(weave_type=BaseRetrievalQAType)

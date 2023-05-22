@@ -76,7 +76,12 @@ class ObjectDictToObject(mappers_weave.ObjectMapper):
 
         if "artifact" in constructor_sig.parameters and "artifact" not in result:
             result["artifact"] = self._artifact
-        return instance_class(**result)
+        try:
+            return instance_class(**result)
+        except:
+            raise errors.WeaveSerializeError(
+                "Failed to construct %s with %s" % (instance_class, result)
+            )
 
 
 class ListToPyList(mappers_weave.ListMapper):

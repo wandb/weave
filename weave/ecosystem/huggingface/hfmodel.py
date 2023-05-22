@@ -40,7 +40,7 @@ class HFModelType(weave.types.ObjectType):
         return {
             "_id": weave.types.String(),
             "_sha": weave.types.String(),
-            "_pipeline_tag": weave.types.String(),
+            "_pipeline_tag": weave.types.optional(weave.types.String()),
             "_tags": weave.types.List(weave.types.String()),
             "_downloads": weave.types.Int(),
             "_likes": weave.types.Int(),

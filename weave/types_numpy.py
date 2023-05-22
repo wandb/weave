@@ -30,6 +30,7 @@ class NumpyArrayLoader:
         return self._arr[index]
 
 
+# TODO: this doesn't match how extra works for list types...
 class NumpyArrayType(types.Type):
     instance_classes = np.ndarray
     name = "WeaveNDArray"

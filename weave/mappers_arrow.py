@@ -57,7 +57,6 @@ class StringToArrow(mappers_python.StringToPyString):
 
 class TaggedValueToArrowStruct(tagged_value_type.TaggedValueToPy):
     def result_type(self):
-
         with _strings_as_dictionaries():
             tag_type = self._tag_serializer.result_type()
         value_type = self._value_serializer.result_type()
@@ -192,7 +191,7 @@ class BoolToArrowBool(mappers_python.BoolToPyBool):
 
 class TimestampToArrowTimestamp(mappers_python.TimestampToPyTimestamp):
     def result_type(self):
-        return pa.timestamp("ms", tz="+00:00")
+        return pa.timestamp("ms", tz="UTC")
 
 
 class FloatToArrowFloat(mappers.Mapper):

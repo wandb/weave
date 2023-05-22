@@ -42,7 +42,7 @@ class Registry:
             # if we're not loading an existing op, save it.
             ref = storage.save(op, name=op.name + ":latest")
             version = ref.version
-            location = ref.artifact.uri_obj
+            location = ref.artifact.path_uri("obj")
         version = location.version if location is not None else None
         op.version = version
         op.location = location

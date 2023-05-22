@@ -48,7 +48,7 @@ def _execute_fn_no_engine(item, index, map_fn):
 
 
 def _resolve_static_branches(map_fn):
-    result_store = forward_graph.get_node_result_store()
+    result_store = forward_graph.get_or_create_node_result_store()
     if isinstance(map_fn, graph.OutputNode):
         if map_fn in result_store:
             return graph.ConstNode(map_fn.type, result_store[map_fn])

@@ -36,6 +36,7 @@ from .language_features.tagging import opdef_util
 from . import cache_policy
 from . import trace_local
 from . import ref_base
+from . import object_context
 
 # Language Features
 from . import language_nullability
@@ -143,6 +144,7 @@ def execute_nodes(nodes, no_cache=False):
                 # ),
             )
         )
+
     with wandb_api.from_environment():
         with memo.memo_storage():
             with tag_store.isolated_tagging_context():
@@ -209,7 +211,24 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
                         for input_node in forward_node.node.from_op.inputs.values()
                     ],
                 ):
-                    report = execute_forward_node(fg, forward_node, no_cache=no_cache)
+                    op_def = registry_mem.memory_registry.get_op(
+                        forward_node.node.from_op.name
+                    )
+                    # Lambdas and async functions do not use object_context (object caching
+                    # and mutational transactions).
+                    if op_def.is_async or any(
+                        isinstance(input_node.type, types.Function)
+                        for input_node in forward_node.node.from_op.inputs.values()
+                    ):
+                        report = execute_forward_node(
+                            fg, forward_node, no_cache=no_cache
+                        )
+                    else:
+                        with object_context.object_context():
+                            report = execute_forward_node(
+                                fg, forward_node, no_cache=no_cache
+                            )
+
             except:
                 import traceback
 
@@ -412,11 +431,17 @@ def execute_forward_node(
     else:
         result: typing.Any
         with tracer.trace("execute-sync"):
+            # TODO: This logic should all move into resolve_fn of op_def...
             if language_nullability.should_force_none_result(inputs, op_def):
                 if isinstance(op_def.concrete_output_type, types.TypeType):
                     result = types.NoneType()
                 else:
                     result = None
+                # Still need to flow tags
+                if opdef_util.should_flow_tags(op_def):
+                    result = process_opdef_resolve_fn.flow_tags(
+                        next(iter(inputs.values())), box.box(result)
+                    )
             else:
                 result = execute_sync_op(op_def, inputs)
 
@@ -435,7 +460,7 @@ def execute_forward_node(
                     tag_store.add_tags(ref, tag_store.get_tags(result))
                 result = ref
             else:
-                if use_cache and run_key:
+                if use_cache and run_key and not box.is_none(result):
                     result = TRACE_LOCAL.save_run_output(op_def, run_key, result)
 
             forward_node.set_result(result)
@@ -444,7 +469,12 @@ def execute_forward_node(
             # TODO: This actually should work correctly, but mutation tracing
             #    does not really work yet. (mutated objects set their run output
             #    as the original ref rather than the new ref, which causes problems)
-            if use_cache and run_key is not None and not is_run_op(node.from_op):
+            if (
+                use_cache
+                and run_key is not None
+                and not is_run_op(node.from_op)
+                and not box.is_none(result)
+            ):
                 logging.debug("Saving run")
                 TRACE_LOCAL.new_run(run_key, inputs=input_refs, output=result)
     return {"cache_used": False, "already_executed": False}

@@ -148,6 +148,24 @@ def from_number(number):
 
 
 @op(
+    name="date-floor",
+    input_type={"date": types.union(types.Timestamp(), types.LegacyDate())},
+    output_type=types.Timestamp(),
+)
+def floor(date, multiple_ms: int):
+    raise NotImplementedError("floor not implemented")
+
+
+@op(
+    name="date-ceil",
+    input_type={"date": types.union(types.Timestamp(), types.LegacyDate())},
+    output_type=types.Timestamp(),
+)
+def ceil(date, multiple_ms: int):
+    raise NotImplementedError("ceil not implemented")
+
+
+@op(
     name="date_round-month",
     input_type={"date": types.union(types.Timestamp(), types.LegacyDate())},
     output_type=types.Timestamp(),
