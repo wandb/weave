@@ -597,7 +597,9 @@ def rename_artifact(
     head_ref.artifact.rename(new_name)
 
 
-@op()
+@op(
+    hidden=True,
+)
 def publish_artifact(
     self: graph.Node[typing.Any],
     artifact_name: typing.Optional[str],
