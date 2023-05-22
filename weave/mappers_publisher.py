@@ -140,13 +140,10 @@ def _local_op_get_to_published_op_get(node: graph.Node) -> graph.Node:
             version = uri.version
     obj = weave_internal.use(node, context.get_client())
 
-    print("PUBLISHED A - PRE", name, version)
     pub_ref = storage._direct_publish(
         obj, name, branch_name=version, assume_weave_type=node.type
     )
     new_node = ref_to_node(pub_ref)
-
-    print("PUBLISHED A", pub_ref, new_node, name, version)
 
     if new_node is None:
         raise errors.WeaveSerializeError(
@@ -168,11 +165,9 @@ def _local_ref_to_published_ref(ref: ref_base.Ref) -> ref_base.Ref:
     if node is None:
         raise errors.WeaveSerializeError(f"Failed to serialize {ref} to published ref")
     obj = weave_internal.use(node, context.get_client())
-    print("PUBLISHED B - PRE", name, version)
+
     pub_ref = storage._direct_publish(
         obj, name, branch_name=version, assume_weave_type=ref.type
     )
-
-    print("PUBLISHED B", pub_ref, name, version)
 
     return pub_ref
