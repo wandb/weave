@@ -158,10 +158,10 @@ class Http:
             with self.session.get(
                 str(yarl.URL(url, encoded=True)), headers=headers, cookies=cookies
             ) as r:
-                if r.status_code == 200:
+                if r.status_code == 200:  # type: ignore
                     with self.fs.open_write(path, mode="wb") as f:
-                        f.write(r.content)
+                        f.write(r.content)  # type: ignore
                 else:
                     raise server_error_handling.WeaveInternalHttpException.from_code(
-                        r.status_code, "Download failed"
+                        r.status_code, "Download failed"  # type: ignore
                     )
