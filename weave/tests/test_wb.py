@@ -1216,8 +1216,28 @@ def test_run_history(fake_wandb):
     )
 
 
+def run_history_as_of_mocker(q, ndx):
+    return {
+        "project_518fa79465d8ffaeb91015dce87e092f": {
+            **fwb.project_payload,  # type: ignore
+            "runs_c1233b7003317090ab5e2a75db4ad965": {
+                "edges": [
+                    {
+                        "node": {
+                            **fwb.run_payload,  # type: ignore
+                            "history_c81e728d9d4c2f636f067f89cc14862c": example_history[
+                                2
+                            ],
+                        }
+                    }
+                ]
+            },
+        }
+    }
+
+
 def test_run_history_as_of(fake_wandb):
-    fake_wandb.fake_api.add_mock(run_history_mocker)
+    fake_wandb.fake_api.add_mock(run_history_as_of_mocker)
     node = ops.project("stacey", "mendeleev").runs()[0].historyAsOf(2)
     assert isinstance(node.type, TaggedValueType)
     assert types.TypedDict(
@@ -1225,11 +1245,11 @@ def test_run_history_as_of(fake_wandb):
             "_step": types.Number(),
             "_timestamp": types.Number(),
             "_runtime": types.Number(),
-            "predictions_10K": types.optional(
-                artifact_fs.FilesystemArtifactFileType(
-                    types.Const(types.String(), "json"), table.TableType()
-                )
-            ),
+            "accuracy": types.Number(),
+            "epoch": types.Number(),
+            "loss": types.Number(),
+            "val_accuracy": types.Number(),
+            "val_loss": types.Number(),
         }
     ).assign_type(node.type.value)
 

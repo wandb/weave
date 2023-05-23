@@ -447,51 +447,45 @@ def get_history(run: wdt.Run, columns=None):
     ]
 
 
-def binary_search(
-    input_list: list[typing.Any], search_key: str, target: typing.Any
-) -> typing.Optional[int]:
-    low = 0
-    high = len(input_list) - 1
-
-    while low <= high:
-        mid = (low + high) // 2
-        guess = input_list[mid][search_key]
-
-        if guess == target:
-            return mid
-        if guess > target:
-            high = mid - 1
-        else:
-            low = mid + 1
-    return None
+def _history_as_of_plugin(inputs, inner):
+    min_step = (
+        inputs.raw["asOfStep"]
+        if "asOfStep" in inputs.raw and inputs.raw["asOfStep"] != None
+        else 0
+    )
+    max_step = min_step + 1
+    alias = _make_alias(str(inputs.raw["asOfStep"]), prefix="history")
+    return f"{alias}: history(minStep: {min_step}, maxStep: {max_step})"
 
 
 def _get_history_as_of_step(run: wdt.Run, asOfStep: int):
-    history = get_history(run)
-    index = binary_search(history, "_step", asOfStep)
-    if index is not None:
-        return history[index]
-    return None
+    alias = _make_alias(str(asOfStep), prefix="history")
+
+    data = run.gql[alias]
+    if isinstance(data, list):
+        if len(data) > 0:
+            data = data[0]
+        else:
+            data = None
+    if data is None:
+        return {}
+    return json.loads(data)
 
 
 @op(
     render_info={"type": "function"},
-    plugins=wb_gql_op_plugin(lambda inputs, inner: "historyKeys"),
+    plugins=wb_gql_op_plugin(_history_as_of_plugin),
 )
 def _refine_history_as_of_type(run: wdt.Run, asOfStep: int) -> types.Type:
-    history_type = refine_history_type.resolve_fn(run)
-    if types.List().assign_type(history_type):
-        return history_type.object_type  # type: ignore
-    return history_type
+    return wb_util.process_run_dict_type(_get_history_as_of_step(run, asOfStep))
 
 
 @op(
     name="run-historyAsOf",
     refine_output_type=_refine_history_as_of_type,
-    plugins=wb_gql_op_plugin(_make_run_history_gql_field),
-    output_type=types.TypedDict({}),
+    plugins=wb_gql_op_plugin(_history_as_of_plugin),
 )
-def history_as_of(run: wdt.Run, asOfStep: int):
+def history_as_of(run: wdt.Run, asOfStep: int) -> dict[str, typing.Any]:
     return _get_history_as_of_step(run, asOfStep)
 
 
