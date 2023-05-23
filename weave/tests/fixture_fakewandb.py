@@ -15,6 +15,8 @@ import shutil
 import weave
 import wandb
 
+from urllib import parse
+
 from wandb.sdk.wandb_artifacts import Artifact
 
 # Note: We're mocking out the whole io_service right now. This is too
@@ -306,6 +308,11 @@ class FakeIoServiceClient:
                 return None
             return entry.local_path
         return f"{artifact_uri.entity_name}/{artifact_uri.project_name}/{artifact_uri.name}_{artifact_uri.version}/{artifact_uri.path}"
+
+    def ensure_file_downloaded(self, download_url):
+        # assumes the file is already in the testdata directory
+        _, netloc, path, _, _, _ = parse.urlparse(download_url)
+        return os.path.join("wandb_file_manager", netloc, path.lstrip("/"))
 
 
 @dataclass

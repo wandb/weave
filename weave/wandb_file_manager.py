@@ -22,6 +22,8 @@ from . import environment as weave_env
 from . import cache
 
 
+from urllib import parse
+
 tracer = engine_trace.tracer()  # type: ignore
 
 
@@ -175,6 +177,44 @@ class WandbFileManagerAsync:
             )
             return file_path
 
+    async def ensure_file_downloaded(
+        self,
+        download_url: str,
+    ) -> typing.Optional[str]:
+        """Ensures a history parquet file from an http/https URI."""
+        schema, netloc, path, _, _, _ = parse.urlparse(download_url)
+        path = "/".join([netloc, path.lstrip("/")])
+        if schema not in ("http", "https"):
+            raise errors.WeaveInternalError(
+                "ensure_file_downloaded only supports http/https URIs"
+            )
+        if path is None:
+            raise errors.WeaveInternalError(
+                "Artifact URI has no path in call to ensure_file"
+            )
+        with tracer.trace("wandb_file_manager.ensure_file_downloaded") as span:
+            span.set_tag("download_url", str(download_url))
+            file_path = f"wandb_file_manager/{path}"
+            if await self.fs.exists(file_path):
+                return file_path
+            wandb_api_context = wandb_api.get_wandb_api_context()
+            headers = None
+            cookies = None
+            auth = None
+            if wandb_api_context is not None:
+                headers = wandb_api_context.headers
+                cookies = wandb_api_context.cookies
+                if wandb_api_context.api_key is not None:
+                    auth = BasicAuth("api", wandb_api_context.api_key)
+            await self.http.download_file(
+                download_url,
+                file_path,
+                headers=headers,
+                cookies=cookies,
+                auth=auth,
+            )
+            return file_path
+
     async def direct_url(
         self, art_uri: artifact_wandb.WeaveWBArtifactURI
     ) -> typing.Optional[str]:
@@ -262,6 +302,40 @@ class WandbFileManager:
         if manifest is None:
             return None
         return _local_path_and_download_url(art_uri, manifest)
+
+    def ensure_file_downloaded(
+        self,
+        download_url: str,
+    ) -> typing.Optional[str]:
+        """Ensures a history parquet file from an http/https URI."""
+        schema, netloc, path, _, _, _ = parse.urlparse(download_url)
+        path = "/".join([netloc, path.lstrip("/")])
+        if schema not in ("http", "https"):
+            raise errors.WeaveInternalError(
+                "ensure_file_downloaded only supports http/https URIs"
+            )
+        if path is None:
+            raise errors.WeaveInternalError(
+                "Artifact URI has no path in call to ensure_file"
+            )
+        with tracer.trace("wandb_file_manager.ensure_file_downloaded") as span:
+            span.set_tag("download_url", str(download_url))
+            file_path = f"wandb_file_manager/{path}"
+            if self.fs.exists(file_path):
+                return file_path
+            wandb_api_context = wandb_api.get_wandb_api_context()
+            headers = None
+            cookies = None
+            if wandb_api_context is not None:
+                headers = wandb_api_context.headers
+                cookies = wandb_api_context.cookies
+            self.http.download_file(
+                download_url,
+                file_path,
+                headers=headers,
+                cookies=cookies,
+            )
+            return file_path
 
     def ensure_file(
         self, art_uri: artifact_wandb.WeaveWBArtifactURI

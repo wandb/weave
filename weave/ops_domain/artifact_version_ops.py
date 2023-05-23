@@ -340,11 +340,9 @@ def artifact_version_link(
 def artifact_version_is_weave_object(
     artifactVersion: wdt.ArtifactVersion,
 ) -> bool:
-    return (
-        (artifactVersion.gql.get("metadata") or {})
-        .get("_weave_meta", {})
-        .get("is_weave_object", False)
-    )
+    raw_meta = artifactVersion.gql.get("metadata") or "{}"
+    raw_meta_dict = json.loads(raw_meta)
+    return raw_meta_dict.get("_weave_meta", {}).get("is_weave_obj", False)
 
 
 @op(

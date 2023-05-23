@@ -36,7 +36,6 @@
 
 import json
 import typing
-import logging
 from .. import compile_table
 from ..compile_domain import wb_gql_op_plugin, InputAndStitchProvider
 from ..api import op
@@ -54,6 +53,11 @@ from . import history as history_util
 from ..ops_primitives import _dict_utils
 from .. import util
 from .. import errors
+from .. import io_service
+
+from pyarrow import compute as pc
+import pyarrow as pa
+from pyarrow import parquet as pq
 
 from ..compile_table import KeyTree
 
@@ -305,7 +309,7 @@ def refine_history_type(run: wdt.Run) -> types.Type:
 
         # _step is a special key that is always guaranteed to be a nonnull number.
         # other keys may be undefined at particular steps so we make them optional.
-        if key == "_step":
+        if key in ["_step", "_runtime", "_timestamp"]:
             prop_types[key] = wt
         else:
             prop_types[key] = types.optional(wt)
@@ -316,19 +320,6 @@ def refine_history_type(run: wdt.Run) -> types.Type:
 class SampledHistorySpec(typing.TypedDict):
     keys: list[str]
     samples: int
-
-
-def _history_key_to_sampled_history_spec(key: str) -> SampledHistorySpec:
-    return {
-        # select both desired key and step so we know how to merge downstream
-        # we need to select _timestamp (which is always included, along with step),
-        # because sampledHistory does not support selecting just _step
-        # (it will return nothing in that case).
-        # see (https://weightsandbiases.slack.com/archives/CR1B10HFW/p1680743091778719)
-        # for discussion.
-        "keys": [key, "_timestamp"] if key == "_step" else [key, "_step"],
-        "samples": 2**63 - 1,  # max int64
-    }
 
 
 def _make_run_history_gql_field(inputs: InputAndStitchProvider, inner: str):
@@ -344,9 +335,6 @@ def _make_run_history_gql_field(inputs: InputAndStitchProvider, inner: str):
         # If no keys, then we cowardly refuse to blindly fetch entire history table
         return "historyKeys"
 
-    specs = [
-        json.dumps(_history_key_to_sampled_history_spec(key)) for key in top_level_keys
-    ]
     project_fragment = """
         project {
         id
@@ -358,7 +346,14 @@ def _make_run_history_gql_field(inputs: InputAndStitchProvider, inner: str):
     }
     """
 
-    return f"historyKeys, sampledHistorySubset: sampledHistory(specs: {json.dumps(specs)}), {project_fragment}"
+    return f"""
+    historyKeys
+    parquetHistory(liveKeys: {json.dumps(top_level_keys)}) {{
+        liveData
+        parquetUrls
+    }}
+    {project_fragment}
+    """
 
 
 @op(
@@ -372,9 +367,9 @@ def history(run: wdt.Run):
     # first check and see if we have actually fetched any history rows. if we have not,
     # we are in the case where we have blindly requested the entire history object.
     # we refuse to fetch that, so instead we will just inspect the historyKeys and return
-    # a dummy history object that can be used as a proxy for downstream ops (e.g., count).
+    # a dummy history object that can bte used as a proxy for downstream ops (e.g., count).
 
-    if "sampledHistorySubset" not in run.gql:
+    if "parquetHistory" not in run.gql:
         last_step = run.gql["historyKeys"]["lastStep"]
         history_keys = run.gql["historyKeys"]["keys"]
         for key, key_details in history_keys.items():
@@ -391,37 +386,53 @@ def history(run: wdt.Run):
         assert len(steps) == count
         return steps
 
+    columns = list(run.gql["historyKeys"]["keys"].keys())
+    return get_history(run, columns=columns)
+
+
+def get_history(run: wdt.Run, columns=None):
     # we have fetched some specific rows.
+    # download the files from the urls
+    io = io_service.get_sync_client()
+    tables = []
+    for url in run.gql["parquetHistory"]["parquetUrls"]:
+        local_path = io.ensure_file_downloaded(url)
+        if local_path is not None:
+            path = io.fs.path(local_path)
+            table = pq.read_table(path, columns=columns)
+            tables.append(table)
+    history = pa.concat_tables(tables)
 
-    # get all the unique steps and sort them
-    step_set: set[int] = set()
+    # turn the liveset into an arrow table. the liveset is a list of dictionaries
+    live_data = run.gql["parquetHistory"]["liveData"]
+    for row in live_data:
+        for field in history.schema:
+            if field.name not in row:
+                row[field.name] = None
 
-    # also get all the keys in the data
-    keys: set[str] = set()
-    for spec_history in run.gql["sampledHistorySubset"]:
-        for row in spec_history:
-            step_set.add(row["_step"])
-            for key in row.keys():
-                keys.add(key)
-    unique_steps = sorted(step_set)
+    # sort the history by step
+    table_sorted_indices = pa.compute.bottom_k_unstable(
+        table, sort_keys=["_step"], k=len(table)
+    )
 
-    # initialize the history to be empty
-    history: dict[int, dict[str, typing.Any]] = {}
-    for step in unique_steps:
-        row = {key: None for key in keys}
-        row["_step"] = step
-        history[step] = row
+    # get binary fields from history schema - these are serialized json
+    binary_fields = [
+        field.name for field in history.schema if pa.types.is_binary(field.type)
+    ]
 
-    # update the history with the data from each spec
-    for spec in run.gql["sampledHistorySubset"]:
-        for row in spec:
-            step = row["_step"]
-            history_row = history[step]
-            for key in row.keys():
-                history_row[key] = row[key]
+    history = history.take(table_sorted_indices).to_pylist()
 
-    # convert the history to a list of rows
-    history_list = [history[step] for step in unique_steps]
+    # deserialize json
+    for field in binary_fields:
+        for row in history:
+            if row[field] is not None:
+                row[field] = json.loads(row[field])
+
+    # parquet stores step as a float, but we want it as an int
+    for row in history:
+        row["_step"] = int(row["_step"])
+
+    history.extend(live_data)
 
     return [
         wb_util.process_run_dict_obj(
@@ -432,49 +443,55 @@ def history(run: wdt.Run):
                 run.gql["name"],
             ),
         )
-        for row in history_list
+        for row in history
     ]
 
 
-def _history_as_of_plugin(inputs, inner):
-    min_step = (
-        inputs.raw["asOfStep"]
-        if "asOfStep" in inputs.raw and inputs.raw["asOfStep"] != None
-        else 0
-    )
-    max_step = min_step + 1
-    alias = _make_alias(str(inputs.raw["asOfStep"]), prefix="history")
-    return f"{alias}: history(minStep: {min_step}, maxStep: {max_step})"
+def binary_search(
+    input_list: list[typing.Any], search_key: str, target: typing.Any
+) -> typing.Optional[int]:
+    low = 0
+    high = len(input_list) - 1
+
+    while low <= high:
+        mid = (low + high) // 2
+        guess = input_list[mid][search_key]
+
+        if guess == target:
+            return mid
+        if guess > target:
+            high = mid - 1
+        else:
+            low = mid + 1
+    return None
 
 
 def _get_history_as_of_step(run: wdt.Run, asOfStep: int):
-    alias = _make_alias(str(asOfStep), prefix="history")
-
-    data = run.gql[alias]
-    if isinstance(data, list):
-        if len(data) > 0:
-            data = data[0]
-        else:
-            data = None
-    if data is None:
-        return {}
-    return json.loads(data)
+    history = get_history(run)
+    index = binary_search(history, "_step", asOfStep)
+    if index is not None:
+        return history[index]
+    return None
 
 
 @op(
     render_info={"type": "function"},
-    plugins=wb_gql_op_plugin(_history_as_of_plugin),
+    plugins=wb_gql_op_plugin(lambda inputs, inner: "historyKeys"),
 )
 def _refine_history_as_of_type(run: wdt.Run, asOfStep: int) -> types.Type:
-    return wb_util.process_run_dict_type(_get_history_as_of_step(run, asOfStep))
+    history_type = refine_history_type.resolve_fn(run)
+    if types.List().assign_type(history_type):
+        return history_type.object_type  # type: ignore
+    return history_type
 
 
 @op(
     name="run-historyAsOf",
     refine_output_type=_refine_history_as_of_type,
-    plugins=wb_gql_op_plugin(_history_as_of_plugin),
+    plugins=wb_gql_op_plugin(_make_run_history_gql_field),
+    output_type=types.TypedDict({}),
 )
-def history_as_of(run: wdt.Run, asOfStep: int) -> dict[str, typing.Any]:
+def history_as_of(run: wdt.Run, asOfStep: int):
     return _get_history_as_of_step(run, asOfStep)
 
 
