@@ -1,7 +1,9 @@
 import typing
 from weave import box, graph
+from weave.artifact_wandb import string_is_likely_commit_hash
 from weave.language_features.tagging import tag_store
 from weave.node_ref import ref_to_node
+from weave.uris import WeaveURI
 from . import mappers
 from . import ref_base
 from . import weave_types as types
@@ -10,6 +12,7 @@ from . import mappers_python_def
 from .language_features.tagging import tagged_value_type
 import dataclasses
 from weave import weave_internal, context, storage
+from .ops_primitives import weave_api
 
 
 class RefToPyRef(mappers.Mapper):
@@ -94,6 +97,9 @@ def _node_publish_mapper(node: graph.Node) -> typing.Optional[graph.Node]:
         node = typing.cast(graph.OutputNode, node)
         uri = _uri_of_get_node(node)
         if uri is not None and _uri_is_local_artifact(uri):
+            # Be sure to merge the node if needed before continuing with the publish.
+            if weave_api.get_merge_spec_uri(uri):
+                return _node_publish_mapper(weave_api.get(weave_api._merge(uri)))
             return _local_op_get_to_published_op_get(node)
     return node
 
@@ -113,9 +119,36 @@ def _uri_is_local_artifact(uri: str) -> bool:
     return uri.startswith("local-artifact://")
 
 
-def _local_op_get_to_published_op_get(node: graph.Node) -> graph.Node:
+def _name_and_branch_from_node(
+    node: typing.Optional[graph.Node],
+) -> typing.Tuple[typing.Optional[str], typing.Optional[str]]:
+    name: typing.Optional[str] = None
+    version: typing.Optional[str] = None
+    if node is not None and _node_is_op_get(node):
+        uri_str = _uri_of_get_node(node)  # type: ignore
+        if uri_str is not None:
+            uri = WeaveURI.parse(uri_str)
+            name = uri.name
+            if uri.version is not None and not string_is_likely_commit_hash(
+                uri.version
+            ):
+                version = uri.version
+
+    return (name, version)
+
+
+def _local_op_get_to_pub_ref(node: graph.Node) -> ref_base.Ref:
     obj = weave_internal.use(node, context.get_client())
-    new_node = ref_to_node(storage._direct_publish(obj, assume_weave_type=node.type))
+    name, version = _name_and_branch_from_node(node)
+
+    return storage._direct_publish(
+        obj, name, branch_name=version, assume_weave_type=node.type
+    )
+
+
+def _local_op_get_to_published_op_get(node: graph.Node) -> graph.Node:
+    pub_ref = _local_op_get_to_pub_ref(node)
+    new_node = ref_to_node(pub_ref)
 
     if new_node is None:
         raise errors.WeaveSerializeError(
@@ -127,7 +160,7 @@ def _local_op_get_to_published_op_get(node: graph.Node) -> graph.Node:
 
 def _local_ref_to_published_ref(ref: ref_base.Ref) -> ref_base.Ref:
     node = ref_to_node(ref)
+
     if node is None:
         raise errors.WeaveSerializeError(f"Failed to serialize {ref} to published ref")
-    obj = weave_internal.use(node, context.get_client())
-    return storage._direct_publish(obj, assume_weave_type=ref.type)
+    return _local_op_get_to_pub_ref(node)

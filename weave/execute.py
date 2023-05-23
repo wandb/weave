@@ -216,9 +216,12 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
                     )
                     # Lambdas and async functions do not use object_context (object caching
                     # and mutational transactions).
-                    if op_def.is_async or any(
-                        isinstance(input_node.type, types.Function)
-                        for input_node in forward_node.node.from_op.inputs.values()
+                    if op_def.is_async or (
+                        any(
+                            isinstance(input_node.type, types.Function)
+                            for input_node in forward_node.node.from_op.inputs.values()
+                        )
+                        and not op_def.mutation
                     ):
                         report = execute_forward_node(
                             fg, forward_node, no_cache=no_cache
