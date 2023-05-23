@@ -251,6 +251,7 @@ def get_op_for_inputs(name: str, kwargs: dict[str, types.Type]) -> op_def.OpDef:
         name.startswith("panel_table")
         or name.startswith("Query")
         or name.startswith("Facet")
+        or name.startswith("panel_plot")
     ):
         # The types don't work for TableState for some reason. This is hacked elsewhere..
         # Hack it some more :(

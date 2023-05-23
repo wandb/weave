@@ -891,7 +891,7 @@ class Dict(Type):
         # Note this differs from Python's Dict in that keys are always strings!
         # TODO: consider if we can / should accept key_type. Would make JS side
         # harder since js objects can only have string keys.
-        if not isinstance(self.key_type, String):
+        if not String().assign_type(self.key_type):
             raise Exception("Dict only supports string keys!")
 
     def _assign_type_inner(self, other_type):

@@ -5,10 +5,14 @@ import weave
 
 from .. import panel
 from . import table_state
+from . import panel_table
 import dataclasses
 
 from .. import graph
 from .. import errors
+from .. import weave_internal
+from .. import weave_types as types
+from ..ops_primitives import list_, dict as dict_, boolean
 
 
 @weave.type()
@@ -24,7 +28,14 @@ class DimConfig:
 
 
 DimName = typing.Literal[
-    "x", "y", "color", "label", "tooltip", "pointSize", "pointShape", "y2"
+    "x",
+    "y",
+    "color",
+    "label",
+    "tooltip",
+    "pointSize",
+    "pointShape",
+    "y2",
 ]
 MarkOption = typing.Optional[typing.Literal["area", "line", "point", "bar", "boxplot"]]
 PointShapeOption = typing.Literal[
@@ -40,7 +51,14 @@ PointShapeOption = typing.Literal[
 ]
 
 LabelOption = typing.Literal["series"]
-LineStyleOption = typing.Literal["series", "solid", "dashed", "dotted", "dot-dashed"]
+LineStyleOption = typing.Literal[
+    "solid",
+    "dashed",
+    "dotted",
+    "dot-dashed",
+    "short-dashed",
+    "series",
+]
 
 SelectFunction = typing.Union[graph.Node, typing.Callable[[typing.Any], typing.Any]]
 
@@ -83,7 +101,7 @@ class PlotUIState:
 
 
 def default_axis():
-    return AxisSetting(noLabels=False, noTitle=False, noTicks=False)
+    return AxisSetting(noLabels=False, noTitle=False, noTicks=False, scale=None)
 
 
 @weave.type()
@@ -92,6 +110,14 @@ class Series:
     dims: DimConfig
     constants: PlotConstants
     uiState: PlotUIState
+
+    @property
+    def y_expr_str(self):
+        y_col_id = self.dims.y
+        y_fn = self.table.columnSelectFunctions[y_col_id]
+        if isinstance(y_fn, graph.Node):
+            return graph.node_expr_str(y_fn)
+        return None
 
     def clone(self):
         series = Series.__new__(Series)
@@ -105,10 +131,10 @@ class Series:
 
     def __init__(
         self,
-        input_node: graph.Node = None,
-        table: table_state.TableState = None,
-        dims: DimConfig = None,
-        constants: PlotConstants = None,
+        input_node: typing.Optional[graph.Node] = None,
+        table: typing.Optional[table_state.TableState] = None,
+        dims: typing.Optional[DimConfig] = None,
+        constants: typing.Optional[PlotConstants] = None,
         select_functions: typing.Optional[typing.Dict[DimName, SelectFunction]] = None,
     ):
         if input_node is not None:
@@ -126,7 +152,7 @@ class Series:
 
         if select_functions:
             for dimname in select_functions:
-                table.update_col(_dims[dimname], select_functions[dimname])
+                table.update_col(getattr(dims, dimname), select_functions[dimname])
 
         uiState = PlotUIState(pointShape="expression", label="expression")
 
@@ -203,18 +229,30 @@ for dim in dataclasses.fields(PlotConstants):
     setattr(Series, f"get_{dim.name}_constant", make_get_constant(dim.name))
 
 
+ScaleType = typing.Literal["linear", "log"]
+
+
+@weave.type()
+class Scale:
+    type: typing.Optional[ScaleType]
+    range: typing.Optional[dict[typing.Literal["field"], typing.Callable[[str], str]]]
+    base: typing.Optional[float]  # for log scale
+
+
 @weave.type()
 class AxisSetting:
     noLabels: bool
     noTitle: bool
     noTicks: bool
+    scale: typing.Optional[Scale] = None
 
 
 @weave.type()
 class AxisSettings:
     x: AxisSetting
     y: AxisSetting
-    color: typing.Optional[AxisSetting]
+    color: AxisSetting
+    # todo: figure out how to reproduce [key: string]: LegendSetting in python type system
 
 
 @weave.type()
@@ -238,13 +276,31 @@ class ConfigOptionsExpanded:
     mark: bool = False
 
 
+DiscreteSelection = typing.List[str]
+ContinuousSelection = typing.Tuple[float, float]
+Selection = typing.Optional[typing.Union[ContinuousSelection, DiscreteSelection]]
+
+
+@weave.type()
+class AxisSelections:
+    x: typing.Optional[Selection] = None
+    y: typing.Optional[Selection] = None
+
+
+@weave.type()
+class Signals:
+    domain: AxisSelections
+    selection: AxisSelections
+
+
 @weave.type("plotConfig")
 class PlotConfig:
     series: typing.List[Series]
     axisSettings: typing.Optional[AxisSettings]
     legendSettings: typing.Optional[LegendSettings]
     configOptionsExpanded: typing.Optional[ConfigOptionsExpanded]
-    configVersion: int = 7
+    signals: Signals
+    configVersion: int = 11
 
 
 @weave.type("plot")
@@ -257,7 +313,7 @@ class Plot(panel.Panel):
         input_node=None,
         vars=None,
         config: typing.Optional[PlotConfig] = None,
-        constants: PlotConstants = None,
+        constants: typing.Optional[PlotConstants] = None,
         mark: typing.Optional[MarkOption] = None,
         x: typing.Optional[SelectFunction] = None,
         y: typing.Optional[SelectFunction] = None,
@@ -270,6 +326,7 @@ class Plot(panel.Panel):
         series: typing.Optional[typing.Union[Series, typing.List[Series]]] = None,
         no_axes: bool = False,
         no_legend: bool = False,
+        signals: typing.Optional[Signals] = None,
     ):
         if vars is None:
             vars = {}
@@ -287,7 +344,7 @@ class Plot(panel.Panel):
                 )
 
             select_functions: typing.Optional[dict[DimName, SelectFunction]] = None
-            for (field, maybe_dim) in zip(
+            for field, maybe_dim in zip(
                 dataclasses.fields(DimConfig),
                 [x, y, color, label, tooltip, pointShape, lineStyle, y2],
             ):
@@ -326,11 +383,19 @@ class Plot(panel.Panel):
             config_legendSettings = LegendSettings(
                 x=LegendSetting(), y=LegendSetting(), color=LegendSetting()
             )
+
+            if signals is None:
+                signals = Signals(
+                    domain=AxisSelections(x=None, y=None),
+                    selection=AxisSelections(x=None, y=None),
+                )
+
             self.config = PlotConfig(
                 series=config_series,
                 axisSettings=config_axisSettings,
                 legendSettings=config_legendSettings,
                 configOptionsExpanded=ConfigOptionsExpanded(),
+                signals=signals,
             )
 
             if no_axes:
@@ -351,15 +416,32 @@ class Plot(panel.Panel):
     def set_no_axes(self):
         if self.config is None:
             raise errors.WeaveInternalError("config is None")
+
+        if self.config.axisSettings is None:
+            self.config.axisSettings = AxisSettings(
+                x=default_axis(), y=default_axis(), color=default_axis()
+            )
+
         self.config.axisSettings.x = AxisSetting(
-            noLabels=True, noTitle=True, noTicks=True
+            noLabels=True,
+            noTitle=True,
+            noTicks=True,
+            scale=None,
         )
         self.config.axisSettings.y = AxisSetting(
-            noLabels=True, noTitle=True, noTicks=True
+            noLabels=True,
+            noTitle=True,
+            noTicks=True,
+            scale=None,
         )
 
     def set_no_legend(self):
-        self.config.legendSettings.color = LegendSetting(noLegend=True)
+        if self.config is None:
+            raise errors.WeaveInternalError("config is None")
+
+        self.config.legendSettings = LegendSettings(
+            x=LegendSetting(True), y=LegendSetting(True), color=LegendSetting(True)
+        )
 
 
 def make_set_all_series(dim_name: str) -> typing.Callable[[Plot, typing.Any], None]:
@@ -437,3 +519,125 @@ for dim in dataclasses.fields(DimConfig):
 for dim in dataclasses.fields(PlotConstants):
     setattr(Plot, f"set_{dim.name}_constant", make_set_constant_all_series(dim.name))
     setattr(Plot, f"get_{dim.name}_constant", make_get_constant_all_series(dim.name))
+
+
+def selection_is_continuous(selection: Selection) -> bool:
+    return (
+        isinstance(selection, (tuple, list))
+        and len(selection) == 2
+        and all(isinstance(i, (int, float)) for i in selection)
+    )
+
+
+def selection_is_discrete(selection: Selection) -> bool:
+    return not selection_is_continuous(selection)
+
+
+def filter_node_to_selection(
+    node: graph.Node, selection: Selection, key: str
+) -> graph.Node:
+
+    if selection_is_continuous(selection):
+        selection = typing.cast(ContinuousSelection, selection)
+
+        def predicate(row: graph.Node[types.TypedDict]):
+            target = dict_.TypedDict.pick(row, key)
+            return boolean.Boolean.bool_and(
+                target >= selection[0], target <= selection[1]  # type: ignore
+            )
+
+    else:
+
+        def predicate(row: graph.Node[types.TypedDict]):
+            target = dict_.TypedDict.pick(row, key)
+            return list_.contains(selection, target)
+
+    node_type = typing.cast(
+        types.List,
+        node.type,
+    )
+
+    filter = weave_internal.define_fn({"row": node_type.object_type}, predicate)
+    return list_.List.filter(node, filter)
+
+
+def _get_rows_selected_node(plot: Plot) -> graph.Node:
+    if plot.config is None:
+        raise errors.WeaveInternalError("config is None")
+
+    selection = plot.config.signals.selection
+
+    table_nodes: typing.List[graph.Node[types.List]] = []
+    for series in plot.config.series:
+        table_config = panel_table.TableConfig(tableState=series.table)
+        table_panel = panel_table.Table(plot.input_node, config=table_config)
+        node = list_.unnest(panel_table.rows(table_panel))
+        columns = table_panel.get_final_named_select_functions()
+
+        if selection.x is None and selection.y is None:
+            # nothing selected
+            table_nodes.append(list_.make_list())
+            continue
+
+        if selection.x is not None:
+            col_id = series.dims.x
+            col = columns.get(col_id, None)
+            if col is not None:
+                key = col["columnName"]
+                node = filter_node_to_selection(node, selection.x, key)
+
+        if selection.y is not None:
+            col_id = series.dims.y
+            col = columns.get(col_id, None)
+            if col is not None:
+                key = col["columnName"]
+                node = filter_node_to_selection(node, selection.y, key)
+
+        if len(plot.config.series) > 1:
+
+            def merge_func(row: graph.Node[types.TypedDict]):
+                return dict_.TypedDict.merge(
+                    row, dict_.dict_(y_expr_str=series.y_expr_str)
+                )
+
+            func = weave_internal.define_fn({"row": node.type.object_type}, merge_func)
+            node = list_.List.map(node, func)
+
+        table_nodes.append(node)
+
+    node_list = list_.make_list(
+        **{str(i): node for (i, node) in enumerate(table_nodes)}
+    )
+    concatted = list_.List.concat(node_list)
+    return concatted
+
+
+@weave.op(name="panel_plot-rows_selected_refine")
+def rows_selected_refine(self: Plot) -> weave.types.Type:
+    if self.config is None:
+        raise errors.WeaveInternalError("config is None")
+
+    nodes = []
+    for series in self.config.series:
+        table_config = panel_table.TableConfig(tableState=series.table)
+        table_panel = panel_table.Table(self.input_node, config=table_config)
+        node = list_.unnest(panel_table.rows(table_panel))
+        if len(self.config.series) > 1:
+            node = dict_.TypedDict.merge(
+                node[0], dict_.dict_(y_expr_str=series.y_expr_str)
+            )
+        else:
+            node = node[0]
+        nodes.append(node)
+    table_row_types = [node.type for node in nodes]  # type: ignore
+    return types.List(types.union(*table_row_types))
+
+
+@weave.op(
+    name="panel_plot-rows_selected",
+    output_type=weave.types.List(weave.types.TypedDict({})),
+    refine_output_type=rows_selected_refine,
+)
+def rows_selected(self: Plot):
+    rows_selected_node = _get_rows_selected_node(self)
+    return weave.use(rows_selected_node)

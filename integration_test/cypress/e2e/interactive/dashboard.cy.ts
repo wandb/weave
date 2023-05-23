@@ -20,7 +20,7 @@ const gotoBlankDashboard = async () => {
 };
 
 const addSidebarPanel = () => {
-  getPanel(['sidebar']).find('button').contains('Add query').click();
+  getPanel(['sidebar']).find('button').contains('Add var').click();
 };
 
 const addMainPanel = () => {
@@ -83,17 +83,17 @@ describe('dashboard', () => {
     await gotoBlankDashboard();
 
     // Setup sidebar
-    panelTypeInputExpr(['sidebar', 'query0'], 'range(0, 100, 1)');
+    panelTypeInputExpr(['sidebar', 'var0'], 'range(0, 100, 1)');
     addSidebarPanel();
-    panelTypeInputExpr(['sidebar', 'query1'], '2.5');
+    panelTypeInputExpr(['sidebar', 'var1'], '2.5');
     addSidebarPanel();
-    panelTypeInputExpr(['sidebar', 'query2'], 'query1');
-    dashboardConvertToControl(['sidebar', 'query2']);
+    panelTypeInputExpr(['sidebar', 'var2'], 'var1');
+    dashboardConvertToControl(['sidebar', 'var2']);
 
     // Add table panel
-    panelTypeInputExpr(['main', 'panel0'], 'query0');
+    panelTypeInputExpr(['main', 'panel0'], 'var0');
     panelChangeId(['main', 'panel0'], 'table');
-    tableAppendColumn(['main', 'panel0'], 'row ** query1');
+    tableAppendColumn(['main', 'panel0'], 'row ** var1');
     tableCheckContainsValue(['main', 'panel0'], '5.657');
 
     // Add another table panel
@@ -106,7 +106,7 @@ describe('dashboard', () => {
     panelTypeInputExpr(['main', 'panel2'], 'panel0.all_rows');
     panelChangeId(['main', 'panel2'], 'plot');
 
-    sliderSetValue(['sidebar', 'query2'], 0.5);
+    sliderSetValue(['sidebar', 'var2'], 0.5);
     tableCheckContainsValue(['main', 'panel0'], '1.414');
     tableCheckContainsValue(['main', 'panel1'], '1.414');
   });
