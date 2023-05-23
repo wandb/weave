@@ -194,6 +194,9 @@ class Server:
 
         # Register handlers
         self.register_handler_fn("ensure_manifest", self.handle_ensure_manifest)
+        self.register_handler_fn(
+            "ensure_file_downloaded", self.handle_ensure_file_downloaded
+        )
         self.register_handler_fn("ensure_file", self.handle_ensure_file)
         self.register_handler_fn("direct_url", self.handle_direct_url)
         self.register_handler_fn("sleep", self.handle_sleep)
@@ -384,6 +387,11 @@ class Server:
         uri = artifact_wandb.WeaveWBArtifactURI.parse(artifact_uri)
         return await self.wandb_file_manager.ensure_file(uri)
 
+    async def handle_ensure_file_downloaded(
+        self, download_url: str
+    ) -> typing.Optional[str]:
+        return await self.wandb_file_manager.ensure_file_downloaded(download_url)
+
     async def handle_direct_url(self, artifact_uri: str) -> typing.Optional[str]:
         uri = artifact_wandb.WeaveWBArtifactURI.parse(artifact_uri)
         return await self.wandb_file_manager.direct_url(uri)
@@ -567,6 +575,9 @@ class SyncClient:
     ) -> typing.Optional[str]:
         return self.request("ensure_file", str(artifact_uri))
 
+    def ensure_file_downloaded(self, download_url: str) -> typing.Optional[str]:
+        return self.request("ensure_file_downloaded", download_url)
+
     def direct_url(
         self, artifact_uri: artifact_wandb.WeaveWBArtifactURI
     ) -> typing.Optional[str]:
@@ -594,6 +605,9 @@ class ServerlessClient:
         self, artifact_uri: artifact_wandb.WeaveWBArtifactURI
     ) -> typing.Optional[str]:
         return self.wandb_file_manager.ensure_file(artifact_uri)
+
+    def ensure_file_downloaded(self, download_url: str) -> typing.Optional[str]:
+        return self.wandb_file_manager.ensure_file_downloaded(download_url)
 
     def direct_url(
         self, artifact_uri: artifact_wandb.WeaveWBArtifactURI

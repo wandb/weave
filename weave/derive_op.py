@@ -223,6 +223,7 @@ class MappedDeriveOpHandler(DeriveOpHandler):
                 orig_op.name.endswith("file-table")
                 or orig_op.name.endswith("file-joinedTable")
                 or orig_op.name.endswith("file-partitionedTable")
+                or orig_op.name.endswith("run-history")
             ):
                 wandb_api_ctx = wandb_api.get_wandb_api_context()
                 memo_ctx = memo._memo_storage.get()
