@@ -20,7 +20,7 @@ const gotoBlankDashboard = async () => {
 };
 
 const addSidebarPanel = () => {
-  getPanel(['sidebar']).find('button').contains('Add var').click();
+  getPanel(['sidebar']).find('button').contains('Add query').click();
 };
 
 const addMainPanel = () => {
