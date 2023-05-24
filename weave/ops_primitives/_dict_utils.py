@@ -32,22 +32,27 @@ class MergeInputTypes(typing.TypedDict):
 def typeddict_merge_output_type(
     input_types: MergeInputTypes,
 ) -> typing.Union[types.TypedDict, types.UnionType, types.NoneType, types.UnknownType]:
-    self = input_types["self"]
+    self: types.Type = input_types["self"]
     other = input_types["other"]
     self_ok = types.UnionType(types.TypedDict({}), types.NoneType()).assign_type(self)
-    if not self_ok or not isinstance(other, types.TypedDict):
+
+    value_type = self
+    if isinstance(self, tagged_value_type.TaggedValueType):
+        value_type = self.value
+
+    if not self_ok or not isinstance(value_type, types.TypedDict):
         return types.UnknownType()
 
     # create property types without merging nested dictionary types (for now)
-    if isinstance(self, types.TypedDict):
+    if isinstance(value_type, types.TypedDict):
         property_types = {
-            **self.property_types,
+            **self.property_types,  # type: ignore
             **other.property_types,
         }
 
         return types.TypedDict(property_types=property_types)
-    elif isinstance(self, types.UnionType):
-        if not self.is_simple_nullable():
+    elif isinstance(value_type, types.UnionType):
+        if not value_type.is_simple_nullable():
             return types.UnknownType()
         non_null_member = types.non_none(self)
         return types.UnionType(
@@ -56,7 +61,7 @@ def typeddict_merge_output_type(
             ),
             types.NoneType(),
         )
-    elif isinstance(self, types.NoneType):
+    elif isinstance(value_type, types.NoneType):
         return types.NoneType()
     else:
         raise errors.WeaveTypeError(f"Unhandled types for dict merge: {self}, {other}")
