@@ -98,7 +98,7 @@ class TraceLocal:
         # Restricted to just a couple ops for now.
         # A NOTE: for the future, async ops definitely can't be saved to
         # table (until we have safe table writes)
-        return cache_policy.should_cache(run_key.op_simple_name)
+        return cache_policy.should_table_cache(run_key.op_simple_name)
 
     def get_run(self, run_key: RunKey) -> graph.Node[runs.Run]:
         if self._should_save_to_table(run_key):
