@@ -50,10 +50,14 @@ from .wandb_domain_gql import (
 )
 from . import wb_util
 from . import history as history_util
-from ..ops_primitives import _dict_utils
+from ..ops_primitives import _dict_utils, make_list
+from ..ops_arrow.list_ops import concat
+from ..ops_arrow import ArrowWeaveList
 from .. import util
 from .. import errors
 from .. import io_service
+
+from ..api import use
 
 from pyarrow import compute as pc
 import pyarrow as pa
@@ -279,6 +283,14 @@ def summary(run: wdt.Run) -> dict[str, typing.Any]:
     )
 
 
+def _history_keys(run: wdt.Run) -> list[str]:
+    if "historyKeys" not in run.gql:
+        raise ValueError("historyKeys not in run gql")
+    history_type: types.List = refine_history_type.raw_resolve_fn(run)
+    object_type = typing.cast(types.TypedDict, history_type.object_type)
+    return list(object_type.property_types.keys())
+
+
 @op(
     render_info={"type": "function"},
     plugins=wb_gql_op_plugin(lambda inputs, inner: "historyKeys"),
@@ -386,7 +398,7 @@ def history(run: wdt.Run):
         assert len(steps) == count
         return steps
 
-    columns = list(run.gql["historyKeys"]["keys"].keys())
+    columns = _history_keys(run)
     return get_history(run, columns=columns)
 
 
@@ -399,20 +411,35 @@ def get_history(run: wdt.Run, columns=None):
         local_path = io.ensure_file_downloaded(url)
         if local_path is not None:
             path = io.fs.path(local_path)
-            table = pq.read_table(path, columns=columns)
-            tables.append(table)
-    history = pa.concat_tables(tables)
+            meta = pq.read_metadata(path)
+            file_schema = meta.schema
+            columns_to_read = [c for c in columns if c in file_schema.names]
+            table = pq.read_table(path, columns=columns_to_read)
+
+            # convert table to ArrowWeaveList
+            awl: ArrowWeaveList = ArrowWeaveList(table)
+            tables.append(awl)
+
+    list = make_list(**{str(i): table for i, table in enumerate(tables)})
+    concatted = concat(list)
+    rb = pa.RecordBatch.from_struct_array(
+        use(concatted)._arrow_data
+    )  # this pivots to columnar layout
+    history = pa.Table.from_batches([rb])
+
+    if columns is None:
+        columns = history.object_type.property_types  # type: ignore
 
     # turn the liveset into an arrow table. the liveset is a list of dictionaries
     live_data = run.gql["parquetHistory"]["liveData"]
     for row in live_data:
-        for field in history.schema:
-            if field.name not in row:
-                row[field.name] = None
+        for colname in columns:
+            if colname not in row:
+                row[colname] = None
 
     # sort the history by step
     table_sorted_indices = pa.compute.bottom_k_unstable(
-        table, sort_keys=["_step"], k=len(table)
+        history, sort_keys=["_step"], k=len(history)
     )
 
     # get binary fields from history schema - these are serialized json

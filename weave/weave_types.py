@@ -557,6 +557,12 @@ class String(BasicType):
     #     return Const(cls(), obj)
 
 
+# TODO: support this in weave0. for weave1 use only now (dont send over wire)
+class Bytes(BasicType):
+    name = "bytes"
+    instance_classes = bytes
+
+
 class Number(BasicType):
     name = "number"
 

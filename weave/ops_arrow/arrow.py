@@ -30,6 +30,8 @@ def arrow_type_to_weave_type(pa_type: pa.DataType) -> types.Type:
         return types.Boolean()
     elif pa.types.is_temporal(pa_type):
         return types.Timestamp()
+    elif pa.types.is_binary(pa_type):
+        return types.Bytes()
     elif pa.types.is_list(pa_type):
         return types.List(arrow_field_to_weave_type(pa_type.value_field))
     elif pa.types.is_struct(pa_type):
