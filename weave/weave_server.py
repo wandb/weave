@@ -242,6 +242,18 @@ def hello():
     return "hello"
 
 
+@blueprint.route("/__weave/wb_viewer", methods=["POST"])
+def wb_viewer():
+    wandb_api.init()
+    current_context = wandb_api.get_wandb_api_context()
+    if not current_context:
+        with wandb_api.from_environment():
+            current_context = wandb_api.get_wandb_api_context()
+    authenticated = current_context is not None
+
+    return {"authenticated": authenticated}
+
+
 DEBUG_MEM = False
 if not environment.wandb_production() and DEBUG_MEM:
     # To use, hit /objgraph_getnewids to set a baseline, then do some requests.
