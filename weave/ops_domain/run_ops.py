@@ -421,11 +421,15 @@ def get_history(run: wdt.Run, columns=None):
             tables.append(awl)
 
     list = make_list(**{str(i): table for i, table in enumerate(tables)})
-    concatted = concat(list)
-    rb = pa.RecordBatch.from_struct_array(
-        use(concatted)._arrow_data
-    )  # this pivots to columnar layout
-    history = pa.Table.from_batches([rb])
+    concatted = use(concat(list))
+    if isinstance(concatted, ArrowWeaveList):
+        rb = pa.RecordBatch.from_struct_array(
+            concatted._arrow_data
+        )  # this pivots to columnar layout
+        history = pa.Table.from_batches([rb])
+    else:
+        # empty table
+        history = None
 
     if columns is None:
         columns = history.object_type.property_types  # type: ignore
@@ -436,6 +440,9 @@ def get_history(run: wdt.Run, columns=None):
         for colname in columns:
             if colname not in row:
                 row[colname] = None
+
+    if history is None:
+        return live_data
 
     # sort the history by step
     table_sorted_indices = pa.compute.bottom_k_unstable(
