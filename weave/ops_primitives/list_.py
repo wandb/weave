@@ -18,7 +18,7 @@ from ..language_features.tagging import (
     tagged_value_type_helpers,
 )
 import functools
-
+from ..profile import Profile
 
 def getitem_output_type(input_types):
     self_type = input_types["arr"]
@@ -227,18 +227,19 @@ class List:
         output_type=lambda input_types: input_types["arr"].object_type,
     )
     def concat(arr):
-        res = []
-        arr = [item for item in arr if item != None]
-        for sublist in arr:
-            if not tag_store.is_tagged(sublist):
-                res.extend(sublist)
-            else:
-                tags = tag_store.get_tags(sublist)
-                for i in sublist:
-                    obj = box.box(i)
-                    tag_store.add_tags(obj, tags)
-                    res.append(obj)
-        return res
+        with Profile("concat"):
+            res = []
+            arr = [item for item in arr if item != None]
+            for sublist in arr:
+                if not tag_store.is_tagged(sublist):
+                    res.extend(sublist)
+                else:
+                    tags = tag_store.get_tags(sublist)
+                    for i in sublist:
+                        obj = box.box(i)
+                        tag_store.add_tags(obj, tags)
+                        res.append(obj)
+            return res
 
 
 def group_result_index_output_type(input_types):
@@ -345,12 +346,13 @@ def list_indexCheckpoint(arr):
     # or other data structures. Need to improve this.
     # if not isinstance(arr, list):
     #     return arr
-    res = []
-    for item in arr:
-        item = box.box(item)
-        tag_store.add_tags(item, {"indexCheckpoint": len(res)})
-        res.append(item)
-    return res
+    with Profile("list_indexCheckpoint"):
+        res = []
+        for item in arr:
+            item = box.box(item)
+            tag_store.add_tags(item, {"indexCheckpoint": len(res)})
+            res.append(item)
+        return res
 
 
 def is_list_like(list_type_or_node):

@@ -1,10 +1,13 @@
 import contextlib
 import contextvars
 import collections
+import logging
 import typing
 
 from . import graph
 from . import errors
+
+from .profile import getsize
 
 
 ExecutableNode = typing.Union[graph.OutputNode, graph.ConstNode]
@@ -32,7 +35,12 @@ def node_result_store():
         yield store
     finally:
         if token is not None:
+            # logging.info(f"STORE FINAL SIZE: {getsize(store) / 1000000}MB")
             _node_result_store.reset(token)
+        # else:
+        #     logging.info(f"STORE SIZE: {getsize(store) / 1000000}MB")
+        # for n in store:
+        #     logging.info(f"\nSIZE OF RESULT for {n}:\n{getsize(store[n]) / 1000000}MB\n")
 
 
 def get_node_result_store():
@@ -69,8 +77,17 @@ class ForwardNode:
         return self.result is not NoResult
 
     def set_result(self, result: typing.Any) -> None:
-        get_node_result_store()[self.node] = result
-
+        store = get_node_result_store()
+        # logging.info(self.node in store)
+        # if self.node not in store:
+        # result_size_mb = getsize(result) / 1000000
+        # if result_size_mb >= 10:
+        #     logging.info(f"ADDING {result_size_mb}MB TO STORE")
+        # size_before = getsize(store)
+        store[self.node] = result
+        # size_after = getsize(store)
+        # if size_after > size_before:
+        #     logging.info(f"SIZE INCREASED by {(size_after - size_before) / 1000000}MB")
 
 # Each execute.execute_nodes call gets its own ForwardGraph, and walks all
 # the nodes in it. But it will skip executing nodes if the result already

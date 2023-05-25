@@ -7,6 +7,8 @@ import time
 import threading
 import typing
 
+from weave.profile import getsize
+
 # Configuration
 from . import wandb_api
 
@@ -60,7 +62,7 @@ class ExecuteStats:
     def add_node(self, node, execution_time, cache_used, already_executed):
         self.node_stats.append((node, execution_time, cache_used, already_executed))
 
-    def summary(self) -> dict[str, OpExecuteStats]:
+    def summary(self) -> list[tuple[str, OpExecuteStats]]:
         op_counts: dict = {}
         for node, t, cache_used, already_executed in self.node_stats:
             if isinstance(node, graph.OutputNode):
@@ -82,9 +84,7 @@ class ExecuteStats:
             stats["avg_time"] = stats["total_time"] / stats["count"]
         sortable_stats = [(k, v) for k, v in op_counts.items()]
 
-        return dict(
-            list(reversed(sorted(sortable_stats, key=lambda s: s[1]["total_time"])))
-        )
+        return list(reversed(sorted(sortable_stats, key=lambda s: s[1]["total_time"])))
 
 
 def is_panelplot_data_fetch_query(node: graph.Node) -> bool:
@@ -175,12 +175,21 @@ def execute_nodes(nodes, no_cache=False):
                                 _debug_node_stack(fg, node)
 
                         res = [fg.get_result(n) for n in nodes]
+                        # logging.info(f"NODES: {nodes}")
+                        # logging.info(f"RESULT ARRAY SIZE: {getsize(res) / 1000000}MB")
+                        # for n in nodes:
+                        #     logging.info(f"\nRESULT for {n}\n{fg.get_result(n)}\n")
+                        
+                    logging.info("[PROFILE] Resetting node result store: start")
+                    start = time.time()
+                elapsed = time.time() - start
+                logging.info(f"[PROFILE] Resetting node result store: {elapsed}s")
 
     top_level_stats = get_top_level_stats()
     if top_level_stats is not None:
         top_level_stats["node_count"] += sum(
-            stats["count"] for stats in summary.values()
-        ) - sum(stats["already_executed"] for stats in summary.values())
+            stats["count"] for stats in map(lambda t: t[1], summary)
+        ) - sum(stats["already_executed"] for stats in map(lambda t: t[1], summary))
 
     return res
 

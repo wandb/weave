@@ -7,7 +7,7 @@ import typing
 
 
 def wandb_public_api() -> public.Api:
-    return public.Api(timeout=30)
+    return public.Api(timeout=30, api_key="")
 
 
 def wandb_gql_query(

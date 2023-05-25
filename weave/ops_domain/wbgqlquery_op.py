@@ -6,7 +6,7 @@ from ..wandb_client_api import wandb_gql_query
 from ..language_features.tagging import tagged_value_type
 from .. import engine_trace
 from .. import errors
-
+from ..profile import Profile, getsize
 
 def _wbgqlquery_output_type(input_types: dict[str, types.Type]) -> types.Type:
     ot = input_types["alias_list"]
@@ -28,7 +28,9 @@ def wbgqlquery(query_str, alias_list):
     tracer = engine_trace.tracer()
     with tracer.trace("wbgqlquery:public_api"):
         logging.info("Executing GQL query: %s", query_str)
-        gql_payload = wandb_gql_query(query_str)
+        with Profile("GQL query"):
+            gql_payload = wandb_gql_query(query_str)
+            # logging.info(f"GQL PAYLOAD SIZE: {getsize(gql_payload) / 1000000}MB")
     for alias in alias_list:
         if alias not in gql_payload:
             raise errors.WeaveGQLExecuteMissingAliasError(

@@ -57,6 +57,8 @@ from .. import errors
 
 from ..compile_table import KeyTree
 
+from ..profile import Profile
+
 # number of rows of example data to look at to determine history type
 ROW_LIMIT_FOR_TYPE_INTERROGATION = 10
 
@@ -368,72 +370,120 @@ def _make_run_history_gql_field(inputs: InputAndStitchProvider, inner: str):
     output_type=types.List(types.TypedDict({})),
 )
 def history(run: wdt.Run):
+    with Profile("run-history-0"):
 
-    # first check and see if we have actually fetched any history rows. if we have not,
-    # we are in the case where we have blindly requested the entire history object.
-    # we refuse to fetch that, so instead we will just inspect the historyKeys and return
-    # a dummy history object that can be used as a proxy for downstream ops (e.g., count).
+        # first check and see if we have actually fetched any history rows. if we have not,
+        # we are in the case where we have blindly requested the entire history object.
+        # we refuse to fetch that, so instead we will just inspect the historyKeys and return
+        # a dummy history object that can be used as a proxy for downstream ops (e.g., count).
 
-    if "sampledHistorySubset" not in run.gql:
-        last_step = run.gql["historyKeys"]["lastStep"]
-        history_keys = run.gql["historyKeys"]["keys"]
-        for key, key_details in history_keys.items():
-            if key == "_step":
-                type_counts: list[history_util.TypeCount] = key_details["typeCounts"]
-                count = type_counts[0]["count"]
-                break
-        else:
-            return []
+        if "sampledHistorySubset" not in run.gql:
+            last_step = run.gql["historyKeys"]["lastStep"]
+            history_keys = run.gql["historyKeys"]["keys"]
+            for key, key_details in history_keys.items():
+                if key == "_step":
+                    type_counts: list[history_util.TypeCount] = key_details["typeCounts"]
+                    count = type_counts[0]["count"]
+                    break
+            else:
+                return []
 
-        # generate fake steps
-        steps = [{"_step": i} for i in range(count)]
-        steps[-1]["_step"] = last_step
-        assert len(steps) == count
-        return steps
+            # generate fake steps
+            steps = [{"_step": i} for i in range(count)]
+            steps[-1]["_step"] = last_step
+            assert len(steps) == count
+            return steps
 
-    # we have fetched some specific rows.
+    with Profile("run-history-1"):
+        # we have fetched some specific rows.
 
-    # get all the unique steps and sort them
-    step_set: set[int] = set()
+        # get all the unique steps and sort them
+        step_set: set[int] = set()
 
-    # also get all the keys in the data
-    keys: set[str] = set()
-    for spec_history in run.gql["sampledHistorySubset"]:
-        for row in spec_history:
-            step_set.add(row["_step"])
-            for key in row.keys():
-                keys.add(key)
-    unique_steps = sorted(step_set)
+        # also get all the keys in the data
+        keys: set[str] = set()
+        for spec_history in run.gql["sampledHistorySubset"]:
+            for row in spec_history:
+                step_set.add(row["_step"])
+                for key in row.keys():
+                    keys.add(key)
+        unique_steps = sorted(step_set)
 
-    # initialize the history to be empty
-    history: dict[int, dict[str, typing.Any]] = {}
-    for step in unique_steps:
-        row = {key: None for key in keys}
-        row["_step"] = step
-        history[step] = row
+    with Profile("run-history-2"):
 
-    # update the history with the data from each spec
-    for spec in run.gql["sampledHistorySubset"]:
-        for row in spec:
-            step = row["_step"]
-            history_row = history[step]
-            for key in row.keys():
-                history_row[key] = row[key]
+        # initialize the history to be empty
+        history: dict[int, dict[str, typing.Any]] = {}
+        for step in unique_steps:
+            row = {key: None for key in keys}
+            row["_step"] = step
+            history[step] = row
 
-    # convert the history to a list of rows
-    history_list = [history[step] for step in unique_steps]
+    with Profile("run-history-3"):
 
-    return [
-        wb_util.process_run_dict_obj(
-            row,
-            wb_util.RunPath(
-                run.gql["project"]["entity"]["name"],
-                run.gql["project"]["name"],
-                run.gql["name"],
-            ),
-        )
-        for row in history_list
-    ]
+        # update the history with the data from each spec
+        for spec in run.gql["sampledHistorySubset"]:
+            for row in spec:
+                step = row["_step"]
+                history_row = history[step]
+                for key in row.keys():
+                    history_row[key] = row[key]
+
+    with Profile("run-history-4"):
+
+        # convert the history to a list of rows
+        history_list = [history[step] for step in unique_steps]
+
+    run_path = wb_util.RunPath(
+        run.gql["project"]["entity"]["name"],
+        run.gql["project"]["name"],
+        run.gql["name"],
+    )
+
+    # history_list_experiment = history_list.copy()
+    # with Profile("run-history-experiment"):
+        # steps_need_processing: set[int] = set()
+        # for row in history_list_experiment:
+        #     for key in row:
+        #         if key == "_step":
+        #             continue
+        #         if isinstance(row[key], dict) and "_type" in row[key]:
+        #             steps_need_processing.add(row["_step"])
+        # for row in history_list_experiment:
+        #     # if row["_step"] in steps_need_processing:
+        #     for key in row:
+        #         # row[key] = row[key]
+        #         # row[key] = wb_util._process_run_dict_item(
+        #         #     row[key],
+        #         #     run_path
+        #         # )
+
+        #         if isinstance(row[key], dict) and "_type" in row[key]:
+        #             row[key] = wb_util._process_run_dict_item(
+        #                 row[key],
+        #                 run_path
+        #             )
+
+        # [
+        #     {
+        #         k:
+        #             wb_util._process_run_dict_item(v, run_path)
+        #             if isinstance(v, dict) and "_type" in v
+        #             else v
+        #         for k, v in row.items()
+        #     }
+        #     for row in history_list_experiment
+        # ]
+
+
+
+    with Profile("run-history-5"):
+        return [
+            wb_util.process_run_dict_obj(
+                row,
+                run_path,
+            )
+            for row in history_list
+        ]
 
 
 def _history_as_of_plugin(inputs, inner):

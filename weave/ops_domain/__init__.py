@@ -13,6 +13,7 @@ from . import org_ops
 from . import report_ops
 from . import run_queue_ops
 from . import repo_insight_ops
+from . import wb_domain_types
 
 
 # TODO: Investigate these
