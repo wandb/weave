@@ -23,45 +23,22 @@ class ScatterConfig:
     )
 
 
-# This is boilerplate that I'd like to get rid of.
-def _scatter_set_default_config(config, input_node, new_config):
-    return new_config
-
-
-def _scatter_default_config_output_type(input_type):
-    # We have to do shenaningans to pass the input type through
-    # because it might be a subtype since the input type has unions
-    # TOOD: Fix
-    config_type = input_type["config"]
-    if config_type == None:
-        return ScatterConfig.WeaveType()
-    if isinstance(config_type, weave.types.Const):
-        return config_type.val_type
-    return config_type
-
-
 # TODO: really annoying that I need the setter here.
-@weave.op(
-    setter=_scatter_set_default_config,
-    output_type=_scatter_default_config_output_type,
-)
-def scatter_default_config(
-    config: typing.Optional[ScatterConfig],
-    input_node_type: weave.types.Type,
-):
-    if config == None:
-        return ScatterConfig(
-            x_fn=weave.define_fn(
-                {"item": input_node_type.object_type}, lambda item: item  # type: ignore
-            ),
-            y_fn=weave.define_fn(
-                {"item": input_node_type.object_type}, lambda item: item  # type: ignore
-            ),
-            label_fn=weave.define_fn(
-                {"item": input_node_type.object_type}, lambda item: item  # type: ignore
-            ),
-        )
-    return config
+@weave.op(name="Scatter_initialize")
+def scatter_initialize(
+    input_node: weave.Node[list[typing.Any]],
+) -> ScatterConfig:
+    return ScatterConfig(
+        x_fn=weave.define_fn(
+            {"item": input_node.type.object_type}, lambda item: item  # type: ignore
+        ),
+        y_fn=weave.define_fn(
+            {"item": input_node.type.object_type}, lambda item: item  # type: ignore
+        ),
+        label_fn=weave.define_fn(
+            {"item": input_node.type.object_type}, lambda item: item  # type: ignore
+        ),
+    )
 
 
 # The render op. This renders the panel.
@@ -70,7 +47,14 @@ def scatter(
     input_node: weave.Node[list[typing.Any]], config: ScatterConfig
 ) -> weave_plotly.PanelPlotly:
     unnested = weave.ops.unnest(input_node)
-    config = scatter_default_config(config, weave_internal.const(unnested.type))
+    if (
+        not weave.types.optional(weave.types.Float()).assign_type(config.x_fn.type)
+        or not weave.types.optional(weave.types.Float()).assign_type(config.y_fn.type)
+        or not weave.types.optional(weave.types.String()).assign_type(
+            config.label_fn.type
+        )
+    ):
+        return weave.panels.PanelHtml(weave.ops.Html("No data"))  # type: ignore
     if config.label_fn.type == weave.types.Invalid():
         plot_data = unnested.map(
             lambda item: weave.ops.dict_(x=config.x_fn(item), y=config.y_fn(item))  # type: ignore
@@ -88,8 +72,6 @@ def scatter(
 def scatter_config(
     input_node: weave.Node[list[typing.Any]], config: ScatterConfig
 ) -> weave.panels.Group:
-    unnested = weave.ops.unnest(input_node)
-    config = scatter_default_config(config, weave_internal.const(unnested.type))
     return weave.panels.Group(
         items={
             "x_fn": weave.panels.LabeledItem(
@@ -163,9 +145,7 @@ class Scatter(weave.Panel):
     @weave.op(output_type=lambda input_type: input_type["self"].input_node.output_type)
     def selected(self):
         unnested = weave.ops.unnest(self.input_node)
-        config = scatter_default_config(
-            self.config, weave_internal.const(unnested.type)
-        )
+        config = self.config
         filtered = unnested.filter(
             lambda item: weave.ops.Boolean.bool_and(
                 weave.ops.Boolean.bool_and(

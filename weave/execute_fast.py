@@ -61,8 +61,20 @@ def _resolve_static_branches(map_fn):
         if map_fn.from_op.name == "function-__call__":
             # Special case to expand function calls
             if isinstance(inputs["self"], graph.ConstNode):
+                # Weird case, sometimes we have a double-const
+                # function Const<Const<Function>>, that we __getattr__
+                # out in _resolve_static branches, wrapping it with a Const
+                # in the code below here.
+                # Other times we have we just <Const<Function>>. This happens
+                # in the Scatter-selected path for example, I'm not exactly sure
+                # why. Just patching here for now.
+                self = inputs["self"]
+                if isinstance(self, graph.ConstNode) and isinstance(
+                    self.val, graph.ConstNode
+                ):
+                    self = self.val
                 res = weave_internal.better_call_fn(
-                    inputs["self"].val,
+                    self,
                     inputs["arg1"],
                 )
                 fixed = compile.compile_fix_calls([res])[0]

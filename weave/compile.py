@@ -104,6 +104,9 @@ def _dispatch_map_fn_refining(node: graph.Node) -> typing.Optional[graph.OutputN
                 )
             else:
                 raise
+        except:
+            raise errors.WeaveInternalError("Error while dispatching: %s." % node)
+
     return None
 
 

@@ -5,8 +5,6 @@ import weave
 from weave import weave_internal
 
 from . import weave_plotly
-from ...ops_primitives import date
-from ...ops_primitives import dict as dict_ops
 from ...language_features.tagging import tagged_value_type
 
 TIME_SERIES_BIN_SIZES_SEC = [
@@ -80,23 +78,6 @@ class TimeSeriesConfig:
     )
 
 
-# This is boilerplate that I'd like to get rid of.
-def _multi_distribution_set_default_config(config, input_node, new_config):
-    return new_config
-
-
-def _multi_distribution_default_config_output_type(input_type):
-    # We have to do shenaningans to pass the input type through
-    # because it might be a subtype since the input type has unions
-    # TOOD: Fix
-    config_type = input_type["config"]
-    if config_type == None:
-        return TimeSeriesConfig.WeaveType()
-    if isinstance(config_type, weave.types.Const):
-        return config_type.val_type
-    return config_type
-
-
 def first_column_of_type(
     node_type: weave.types.Type,
     desired_type: weave.types.Type,
@@ -141,55 +122,51 @@ def first_column_of_type(
     )
 
 
-# TODO: really annoying that I need the setter here.
-# TODO make this actually work
-@weave.op(
-    setter=_multi_distribution_set_default_config,
-    output_type=_multi_distribution_default_config_output_type,
-)
-def time_series_default_config(
-    config: typing.Optional[TimeSeriesConfig],
-    input_node_type: weave.types.Type,
-):
+@weave.op()
+def time_series_initialize(
+    input_node: weave.Node[list[typing.Any]],
+) -> TimeSeriesConfig:
     # TODO: unnested_table should be Node, that way we don't evaluate it just
     # to figure it outs type here.
     # TODO: we need input variables (frame) available here. For now we have
     # manually construct them :(
-    if config == None:
-        col_fn, item_fn = first_column_of_type(
-            input_node_type, weave.types.optional(weave.types.Timestamp())
-        )
+    col_fn, item_fn = first_column_of_type(
+        input_node.type, weave.types.optional(weave.types.Timestamp())
+    )
 
-        min_x_called = col_fn.val.min()
-        min_x = weave_internal.const(
-            min_x_called,
-            weave.types.Function(col_fn.type.input_types, min_x_called.type),  # type: ignore
-        )
+    min_x_called = col_fn.val.min()
+    min_x = weave_internal.const(
+        min_x_called,
+        weave.types.Function(col_fn.type.input_types, min_x_called.type),  # type: ignore
+    )
 
-        max_x_called = col_fn.val.max()
-        max_x = weave_internal.const(
-            max_x_called,
-            weave.types.Function(col_fn.type.input_types, max_x_called.type),  # type: ignore
-        )
+    max_x_called = col_fn.val.max()
+    max_x = weave_internal.const(
+        max_x_called,
+        weave.types.Function(col_fn.type.input_types, max_x_called.type),  # type: ignore
+    )
 
-        config = TimeSeriesConfig(
-            x=item_fn,
-            label=first_column_of_type(
-                input_node_type,
-                weave.types.optional(
-                    weave.types.union(
-                        weave.types.String(),
-                        weave.types.Boolean(),
-                    )
-                ),
-            )[1],
-            agg=weave_internal.define_fn(
-                {"group": input_node_type},  # type: ignore
-                lambda group: group.count(),
+    mark = weave_internal.const("bar")
+
+    config = TimeSeriesConfig(
+        x=item_fn,
+        label=first_column_of_type(
+            input_node.type,
+            weave.types.optional(
+                weave.types.union(
+                    weave.types.String(),
+                    weave.types.Boolean(),
+                )
             ),
-            min_x=min_x,
-            max_x=max_x,
-        )
+        )[1],
+        agg=weave_internal.define_fn(
+            {"group": input_node.type},  # type: ignore
+            lambda group: group.count(),
+        ),
+        min_x=min_x,
+        max_x=max_x,
+        mark=mark,
+    )
 
     return config
 
@@ -221,12 +198,8 @@ def time_series(
 ) -> weave_plotly.PanelPlotly:
     # NOTE: everything inside this function is operating on nodes. There are no concrete values in here.
     # We are just constructing a graph here. It will be executed later on.
-    # I can't edit the frontend right now and I want to get this test passing.
-    # So doing a little bit of type: ignore here.
-    # TODO: Fix
 
     unnested = input_node.unnest()  # type: ignore
-    config = time_series_default_config(config, weave_internal.const(unnested.type))
 
     min_x = config.min_x(input_node)  # type: ignore
     max_x = config.max_x(input_node)  # type: ignore
@@ -250,24 +223,13 @@ def time_series(
 
         # convert timestamp to seconds
         timestamp = config.x(item)
-        # seconds = timestamp.toNumber()  # type: ignore
-        # delta_seconds = seconds - min_x.toNumber()  # type: ignore
 
-        # bin_start_sec = min_x.toNumber() + round(delta_seconds / bin_size) * bin_size
         bin_start_ms = timestamp.floor(bin_size_ms)
         bin_end_ms = timestamp.ceil(bin_size_ms)
-        # bin_end_sec = bin_start_ms + bin_size
 
-        # bin_center_sec = (bin_start_ms + bin_end_sec) * 0.5
-        # bin_center = date.from_number(bin_center_sec)
-        # bin_start = #date.from_number(bin_start_sec)
         bin_start = bin_start_ms
         bin_end = bin_end_ms
-        # bin_end = date.from_number(bin_end_sec)
 
-        # group_items["bin"] = weave.ops.dict_(
-        #     start=bin_start, center=bin_center, stop=bin_end
-        # )
         group_items["bin"] = weave.ops.dict_(start=bin_start, stop=bin_end)
 
         if label_fn_output_type == weave.types.Invalid():
@@ -294,12 +256,14 @@ def time_series(
         # this is needed because otherwise the lines look like a scrambled mess
         .sort(lambda item: weave.ops.make_list(a=item["x"]["center"]), ["asc"])
     )
-    print("BINNED", binned)
 
     default_labels = weave.ops.dict_(
-        x=function_to_string(config.x),
-        y=function_to_string(config.agg),
-        label=function_to_string(config.label),
+        # x=function_to_string(config.x),
+        # y=function_to_string(config.agg),
+        # label=function_to_string(config.label),
+        x="x",
+        y="y",
+        label="label",
     )
 
     fig = weave_plotly.plotly_time_series(
@@ -313,39 +277,22 @@ def time_series(
 def time_series_config(
     input_node: weave.Node[list[typing.Any]], config: TimeSeriesConfig
 ) -> weave.panels.Group:
-    unnested = weave.ops.unnest(input_node)
-    config = time_series_default_config(config, weave_internal.const(unnested.type))
     return weave.panels.Group(
         items={
             "x": weave.panels.LabeledItem(
-                label="x",
-                item=weave.panels.FunctionEditor(
-                    config=weave.panels.FunctionEditorConfig(config.x)
-                ),
+                label="x", item=weave.panels.FunctionEditor(config.x)
             ),
             "label": weave.panels.LabeledItem(
-                label="label",
-                item=weave.panels.FunctionEditor(
-                    config=weave.panels.FunctionEditorConfig(config.label)
-                ),
+                label="label", item=weave.panels.FunctionEditor(config.label)
             ),
             "min_x": weave.panels.LabeledItem(
-                label="min_x",
-                item=weave.panels.FunctionEditor(
-                    config=weave.panels.FunctionEditorConfig(config.min_x)
-                ),
+                label="min_x", item=weave.panels.FunctionEditor(config.min_x)
             ),
             "max_x": weave.panels.LabeledItem(
-                label="max_x",
-                item=weave.panels.FunctionEditor(
-                    config=weave.panels.FunctionEditorConfig(config.max_x)
-                ),
+                label="max_x", item=weave.panels.FunctionEditor(config.max_x)
             ),
             "agg": weave.panels.LabeledItem(
-                label="agg",
-                item=weave.panels.FunctionEditor(
-                    config=weave.panels.FunctionEditorConfig(config.agg)
-                ),
+                label="agg", item=weave.panels.FunctionEditor(config.agg)
             ),
             "mark": weave.panels.LabeledItem(
                 label="mark",

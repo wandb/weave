@@ -22,40 +22,20 @@ class DistributionConfig:
     )
 
 
-# This is boilerplate that I'd like to get rid of.
-def _multi_distribution_set_default_config(config, input_node, new_config):
-    return new_config
-
-
-def _multi_distribution_default_config_output_type(input_type):
-    # We have to do shenaningans to pass the input type through
-    # because it might be a subtype since the input type has unions
-    # TOOD: Fix
-    config_type = input_type["config"]
-    if config_type == None:
-        return DistributionConfig.WeaveType()
-    if isinstance(config_type, weave.types.Const):
-        return config_type.val_type
-    return config_type
-
-
 # TODO: really annoying that I need the setter here.
-@weave.op(
-    setter=_multi_distribution_set_default_config,
-    output_type=_multi_distribution_default_config_output_type,
-)
-def multi_distribution_default_config(
-    config: typing.Optional[DistributionConfig],
-    unnested_node: list[typing.Any],
-):
-    input_type_item_type = weave.type_of(unnested_node).object_type  # type: ignore
-    if config == None:
-        return DistributionConfig(
-            value_fn=weave.define_fn({"item": input_type_item_type}, lambda item: item),
-            label_fn=weave.define_fn({"item": input_type_item_type}, lambda item: item),
-            bin_size=panel_util.make_node(10),
-        )
-    return config
+@weave.op()
+def multi_distribution_initialize(
+    input_node: weave.Node[list[typing.Any]],
+) -> DistributionConfig:
+    return DistributionConfig(
+        value_fn=weave.define_fn(
+            {"item": input_node.type.object_type}, lambda item: item  # type: ignore
+        ),
+        label_fn=weave.define_fn(
+            {"item": input_node.type.object_type}, lambda item: item  # type: ignore
+        ),
+        bin_size=panel_util.make_node(10),
+    )
 
 
 # The render op. This renders the panel.
@@ -72,7 +52,6 @@ def multi_distribution(
         # TODO: need a nicer way to return error states
         return weave.panels.PanelHtml(weave.ops.Html("Invalid value_fn"))  # type: ignore
     unnested = weave.ops.unnest(input_node)
-    config = multi_distribution_default_config(config, unnested)
     bin_size = weave.ops.execute(config.bin_size)
 
     def bin_func(item):
@@ -108,7 +87,6 @@ def multi_distribution_panel_plot(
     input_node: weave.Node[list[typing.Any]], config: DistributionConfig
 ) -> weave.panels.Plot:
     unnested = weave.ops.unnest(input_node)
-    config = multi_distribution_default_config(config, unnested)
     bin_size = weave.ops.execute(config.bin_size)
 
     def bin_func(item):
@@ -151,7 +129,6 @@ def multi_distribution_config(
     input_node: weave.Node[list[typing.Any]], config: DistributionConfig
 ) -> weave.panels.Group:
     unnested = weave.ops.unnest(input_node)
-    config = multi_distribution_default_config(config, unnested)
     return weave.panels.Group(
         items={
             "value_fn": weave.panels.LabeledItem(

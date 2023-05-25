@@ -173,12 +173,17 @@ class ConstNode(Node):
 
     @classmethod
     def from_json(cls, obj: dict) -> "ConstNode":
+        from . import dispatch
+
         val = obj["val"]
         if isinstance(val, dict) and "nodeType" in val:
             val = Node.node_from_json(val)
         else:
             val = storage.from_python({"_type": obj["type"], "_val": obj["val"]})  # type: ignore
-        return cls(weave_types.TypeRegistry.type_from_dict(obj["type"]), val)
+        t = weave_types.TypeRegistry.type_from_dict(obj["type"])
+        if isinstance(t, weave_types.Function):
+            cls = dispatch.RuntimeConstNode
+        return cls(t, val)
 
     def to_json(self) -> dict:
         val = storage.to_python(self.val)["_val"]  # type: ignore
