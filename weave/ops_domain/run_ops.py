@@ -486,7 +486,13 @@ def read_history_parquet(run: wdt.Run, columns=None):
     else:
         # empty table
         parquet_history = None
-    return parquet_history
+
+    # sort the history by step
+    table_sorted_indices = pa.compute.bottom_k_unstable(
+        parquet_history, sort_keys=["_step"], k=len(parquet_history)
+    )
+
+    return parquet_history.take(table_sorted_indices)
 
 
 def _get_history(run: wdt.Run, columns=None):
@@ -505,17 +511,10 @@ def _get_history(run: wdt.Run, columns=None):
     if parquet_history is None:
         return live_data
 
-    # sort the history by step
-    table_sorted_indices = pa.compute.bottom_k_unstable(
-        parquet_history, sort_keys=["_step"], k=len(parquet_history)
-    )
-
     # get binary fields from history schema - these are serialized json
     binary_fields = [
         field.name for field in parquet_history.schema if pa.types.is_binary(field.type)
     ]
-
-    parquet_history = parquet_history.take(table_sorted_indices).to_pylist()
 
     # deserialize json
     for field in binary_fields:
