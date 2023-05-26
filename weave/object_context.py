@@ -90,7 +90,7 @@ class ObjectContext:
                 self.objects[target_uri].mutations.append(mutation)
 
     def finish_mutation(self, target_uri: str) -> None:
-        from . import artifact_local, artifact_wandb
+        from . import artifact_fs, artifact_local, artifact_wandb
 
         target_record = self.objects.get(target_uri)
         if target_record is None:
@@ -123,8 +123,9 @@ class ObjectContext:
         # might want to put this logic elsewhere, but for now this works.
         if artifact_wandb.string_is_likely_commit_hash(target_branch):
             target_branch = None
-
-        ref = art.set("obj", types.TypeRegistry.type_of(obj), obj)
+        weave_type = types.TypeRegistry.type_of(obj)
+        ref = art.set("obj", weave_type, obj)
+        artifact_fs.update_weave_meta(weave_type, art)
         art.save(branch=target_branch)  # type: ignore
 
     def finish_mutations(self) -> None:

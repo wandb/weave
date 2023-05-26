@@ -1,7 +1,8 @@
+import os
+import pathlib
 import typing
 
-from weave.artifact_local import LocalArtifact
-
+from ..artifact_local import WORKING_DIR_PREFIX, LocalArtifact
 from . import types
 from ..api import op
 from .. import artifact_fs
@@ -39,6 +40,13 @@ def artifact_artifactname(artifact: artifact_fs.FilesystemArtifact) -> str:
 
 
 @op(
+    name="FilesystemArtifact-artifactVersion",
+)
+def artifact_artifactversion(artifact: artifact_fs.FilesystemArtifact) -> str:
+    return artifact.branch or artifact.version
+
+
+@op(
     name="FilesystemArtifact-artifactForVersion",
 )
 def artifact_version_artifact_for_version(
@@ -67,3 +75,59 @@ def artifact_version_weave_type(
     artifact: artifact_fs.FilesystemArtifact,
 ) -> types.Type:
     return artifact_fs.FilesystemArtifactRef(artifact, "obj").type
+
+
+@op(
+    name="FilesystemArtifact-metadata",
+)
+def filesystem_artifact_metadata(
+    artifact: artifact_fs.FilesystemArtifact,
+) -> dict:
+    return artifact.metadata.as_dict()
+
+
+@op(
+    name="FilesystemArtifact-getLatestVersion",
+)
+def most_recent_version(
+    artifact: artifact_fs.FilesystemArtifact,
+) -> artifact_fs.FilesystemArtifact:
+    if not isinstance(artifact, LocalArtifact):
+        raise ValueError(f"Artifact {artifact.name} is not a local artifact")
+
+    if artifact._branch is not None and artifact._branch == "latest":
+        return artifact
+
+    possible_art = LocalArtifact(artifact.name, "latest")
+    if possible_art._read_dirname != None:
+        return possible_art
+
+    obj_paths = sorted(
+        pathlib.Path(artifact._root).iterdir(),
+        key=os.path.getctime,
+    )
+    if not obj_paths:
+        return None  # type: ignore
+
+    latest_sym = None
+    latest_dir = None
+
+    for obj_path in reversed(obj_paths):
+        if not obj_path.name.startswith(
+            WORKING_DIR_PREFIX
+        ) and not obj_path.name.startswith("."):
+            if obj_path.is_symlink() and latest_sym is None:
+                latest_sym = obj_path
+            elif obj_path.is_dir() and latest_dir is None:
+                latest_dir = obj_path
+            if latest_sym is not None and latest_dir is not None:
+                break
+
+    if latest_dir is not None:
+        if latest_sym is not None:
+            latest_sym_points_to = latest_sym.resolve()
+            if os.path.realpath(latest_sym_points_to) == os.path.realpath(latest_dir):
+                return LocalArtifact(artifact.name, latest_sym.name)
+            return LocalArtifact(artifact.name, obj_path.name)
+
+    return None  # type: ignore

@@ -21,6 +21,8 @@ from . import file_util
 from . import filesystem
 from . import environment
 
+WORKING_DIR_PREFIX = "__working__"
+
 
 def local_artifact_dir() -> str:
     d = os.path.join(filesystem.get_filesystem_dir(), "local-artifacts")
@@ -58,6 +60,7 @@ class LocalArtifactType(artifact_fs.FilesystemArtifactType):
 class LocalArtifact(artifact_fs.FilesystemArtifact):
     _existing_dirs: list[str]
     _original_uri: typing.Optional[str]
+    _metadata: dict[str, typing.Any]
 
     def __init__(self, name: str, version: typing.Optional[str] = None):
         # LocalArtifacts are created frequently, sometimes in cases where
@@ -76,8 +79,9 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
         self._root = os.path.join(local_artifact_dir(), name)
         self._original_uri = None
         self._path_handlers: dict[str, typing.Any] = {}
-        self._setup_dirs()
         self._existing_dirs = []
+        self._metadata = {}
+        self._setup_dirs()
 
     @classmethod
     def fork_from_uri(
@@ -94,6 +98,7 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
                 "Cannot fork from non-local artifact: %s" % source_art
             )
         art._version = source_art.version
+        art._metadata = source_art.metadata.as_dict()
         return art
 
     # If an object has a _ref property, it will be used by ref_base._get_ref()
@@ -143,7 +148,7 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
 
     def _setup_dirs(self):
         self._write_dirname = os.path.join(
-            self._root, "working-%s" % util.rand_string_n(12)
+            self._root, f"{WORKING_DIR_PREFIX}-{util.rand_string_n(12)}"
         )
         self._read_dirname = None
         if self._version:
@@ -169,6 +174,7 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
                     self._branch,
                 )
             )
+        self._makedir(self._write_dirname)
 
     def _get_read_path(self, path: str) -> pathlib.Path:
         read_dirname = pathlib.Path(self._read_dirname)
@@ -345,7 +351,13 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
         if branch is None:
             branch = self._branch
 
-        metadata = {}
+        metadata = {**self.metadata.as_dict()}
+        # I don't think we need to delete this, but doing so
+        # to be safe
+        if "branch_point" in metadata:
+            del metadata["branch_point"]
+        if "created_at" in metadata:
+            del metadata["created_at"]
         if self._original_uri != None and (
             branch != self._branch or self._original_uri.startswith("wandb-artifact://")
         ):
@@ -420,6 +432,15 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
         else:
             return None
 
+    @property
+    def metadata(self) -> artifact_fs.ArtifactMetadata:
+        read_metadata = {
+            k: v
+            for k, v in self.read_metadata().items()
+            if k != "branch_point" and k != "created_at"
+        }
+        return artifact_fs.ArtifactMetadata(self._metadata, read_metadata)
+
 
 LocalArtifactType.instance_classes = LocalArtifact
 
@@ -433,7 +454,7 @@ class LocalArtifactRef(artifact_fs.FilesystemArtifactRef):
         for version_name in os.listdir(artifact_path):
             if (
                 not os.path.islink(os.path.join(artifact_path, version_name))
-                and not version_name.startswith("working")
+                and not version_name.startswith(WORKING_DIR_PREFIX)
                 and not version_name.startswith(".")
             ):
                 # This is ass-backward, have to get the full object to just

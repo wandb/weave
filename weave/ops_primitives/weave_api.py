@@ -641,7 +641,12 @@ def publish_artifact(
 
     head_ref = obj_uri.to_ref()
     art_name = artifact_name or head_ref.artifact.name
-    ref = storage._direct_publish(head_ref.get(), art_name, project_name)
+    ref = storage._direct_publish(
+        head_ref.get(),
+        art_name,
+        project_name,
+        metadata=head_ref.artifact.metadata.as_dict(),
+    )
     return str(ref)
 
 

@@ -667,6 +667,19 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
             self, path, total_size, sub_dirs, files
         )
 
+    @property
+    def metadata(self) -> artifact_fs.ArtifactMetadata:
+        mutable_metadata = {}
+        readonly_metadata = {}
+        if (
+            hasattr(self, "_writeable_artifact")
+            and self._writeable_artifact is not None
+        ):
+            mutable_metadata = self._writeable_artifact.metadata
+        if self.is_saved:
+            readonly_metadata = self._saved_artifact.metadata
+        return artifact_fs.ArtifactMetadata(mutable_metadata, readonly_metadata)
+
 
 WandbArtifactType.instance_classes = WandbArtifact
 
