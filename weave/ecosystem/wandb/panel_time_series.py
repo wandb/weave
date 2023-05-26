@@ -4,7 +4,8 @@ import typing
 import weave
 from weave import weave_internal
 
-from . import weave_plotly
+from ...panels import panel_plot
+from .weave_plotly import plotly_time_series
 from ...language_features.tagging import tagged_value_type
 
 TIME_SERIES_BIN_SIZES_SEC = [
@@ -195,7 +196,7 @@ def function_to_string(fn) -> str:
 @weave.op()
 def time_series(
     input_node: weave.Node[list[typing.Any]], config: TimeSeriesConfig
-) -> weave_plotly.PanelPlotly:
+) -> panel_plot.Plot:
     # NOTE: everything inside this function is operating on nodes. There are no concrete values in here.
     # We are just constructing a graph here. It will be executed later on.
 
@@ -257,19 +258,20 @@ def time_series(
         .sort(lambda item: weave.ops.make_list(a=item["x"]["center"]), ["asc"])
     )
 
+    """
     default_labels = weave.ops.dict_(
-        # x=function_to_string(config.x),
-        # y=function_to_string(config.agg),
-        # label=function_to_string(config.label),
         x="x",
         y="y",
         label="label",
     )
+    """
 
-    fig = weave_plotly.plotly_time_series(
-        binned, config.mark, default_labels, config.axis_labels
+    return panel_plot.Plot(
+        binned,
+        x=lambda row: row["x"],
+        y=lambda row: row["y"],
+        label=lambda row: row["label"],
     )
-    return weave_plotly.PanelPlotly(fig)
 
 
 # The config render op. This renders the config editor.
