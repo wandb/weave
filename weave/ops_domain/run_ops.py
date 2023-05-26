@@ -426,13 +426,13 @@ def get_history(run: wdt.Run, columns=None):
         rb = pa.RecordBatch.from_struct_array(
             concatted._arrow_data
         )  # this pivots to columnar layout
-        history = pa.Table.from_batches([rb])
+        parquet_history = pa.Table.from_batches([rb])
     else:
         # empty table
-        history = None
+        parquet_history = None
 
     if columns is None:
-        columns = history.object_type.property_types  # type: ignore
+        columns = parquet_history.object_type.property_types  # type: ignore
 
     # turn the liveset into an arrow table. the liveset is a list of dictionaries
     live_data = run.gql["parquetHistory"]["liveData"]
@@ -441,32 +441,32 @@ def get_history(run: wdt.Run, columns=None):
             if colname not in row:
                 row[colname] = None
 
-    if history is None:
+    if parquet_history is None:
         return live_data
 
     # sort the history by step
     table_sorted_indices = pa.compute.bottom_k_unstable(
-        history, sort_keys=["_step"], k=len(history)
+        parquet_history, sort_keys=["_step"], k=len(parquet_history)
     )
 
     # get binary fields from history schema - these are serialized json
     binary_fields = [
-        field.name for field in history.schema if pa.types.is_binary(field.type)
+        field.name for field in parquet_history.schema if pa.types.is_binary(field.type)
     ]
 
-    history = history.take(table_sorted_indices).to_pylist()
+    parquet_history = parquet_history.take(table_sorted_indices).to_pylist()
 
     # deserialize json
     for field in binary_fields:
-        for row in history:
+        for row in parquet_history:
             if row[field] is not None:
                 row[field] = json.loads(row[field])
 
     # parquet stores step as a float, but we want it as an int
-    for row in history:
+    for row in parquet_history:
         row["_step"] = int(row["_step"])
 
-    history.extend(live_data)
+    parquet_history.extend(live_data)
 
     return [
         wb_util.process_run_dict_obj(
@@ -477,7 +477,7 @@ def get_history(run: wdt.Run, columns=None):
                 run.gql["name"],
             ),
         )
-        for row in history
+        for row in parquet_history
     ]
 
 
