@@ -1194,8 +1194,14 @@ def test_run_history(fake_wandb):
 
     # now we'll create a graph that fetches two columns and execute it
     epoch_node = node["epoch"]
-    pred_node = node["_runtime"]
-    assert types.List(types.optional(types.Number())).assign_type(pred_node.type.value)
+    pred_node = node["predictions_10K"]
+    assert types.List(
+        types.optional(
+            artifact_fs.FilesystemArtifactFileType(
+                types.Const(types.String(), "json"), table.TableType()
+            ),
+        )
+    ).assign_type(pred_node.type.value)
 
     # simulates what a table call would do, selecting multiple columns
     result = weave.use([epoch_node, pred_node])
@@ -1204,7 +1210,10 @@ def test_run_history(fake_wandb):
     # check the types, result lengths
     assert all(len(r) == 10 for r in result)
     assert all(r == None or isinstance(r, (int, float)) for r in result[0])
-    assert all(r == None or isinstance(r, (int, float)) for r in result[1])
+    assert all(
+        r == None or isinstance(r, artifact_fs.FilesystemArtifactFile)
+        for r in result[1]
+    )
 
 
 def test_run_history_2(fake_wandb, history2):
@@ -1234,14 +1243,8 @@ def test_run_history_2(fake_wandb, history2):
 
     # now we'll create a graph that fetches two columns and execute it
     epoch_node = node["epoch"]
-    pred_node = node[""]
-    assert types.List(
-        types.optional(
-            artifact_fs.FilesystemArtifactFileType(
-                types.Const(types.String(), "json"), table.TableType()
-            ),
-        )
-    ).assign_type(pred_node.type.value)
+    pred_node = node["_runtime"]
+    assert types.List(types.optional(types.Number())).assign_type(pred_node.type.value)
 
     # simulates what a table call would do, selecting multiple columns
     result = weave.use([epoch_node, pred_node])
@@ -1250,10 +1253,7 @@ def test_run_history_2(fake_wandb, history2):
     # check the types, result lengths
     assert all(len(r) == 10 for r in result)
     assert all(r == None or isinstance(r, (int, float)) for r in result[0])
-    assert all(
-        r == None or isinstance(r, artifact_fs.FilesystemArtifactFile)
-        for r in result[1]
-    )
+    assert all(r == None or isinstance(r, (int, float)) for r in result[1])
 
 
 def run_history_as_of_mocker(q, ndx):
