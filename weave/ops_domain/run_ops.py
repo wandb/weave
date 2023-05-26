@@ -439,7 +439,7 @@ def _get_history2(run: wdt.Run, columns=None):
         live_data = None
 
     if len(parquet_history) > 0:
-        parquet_history = ArrowWeaveList(pa.concat_tables(parquet_history))
+        parquet_history = ArrowWeaveList(parquet_history)
     else:
         parquet_history = None
 
@@ -449,7 +449,7 @@ def _get_history2(run: wdt.Run, columns=None):
         return parquet_history
     elif len(parquet_history) == 0:
         return live_data
-    return use(concat([live_data, parquet_history]))
+    return use(concat([parquet_history, live_data]))
 
 
 def get_history(run: wdt.Run, columns=None):
