@@ -516,6 +516,8 @@ def _get_history(run: wdt.Run, columns=None):
         field.name for field in parquet_history.schema if pa.types.is_binary(field.type)
     ]
 
+    parquet_history = parquet_history.to_pylist()
+
     # deserialize json
     for field in binary_fields:
         for row in parquet_history:
