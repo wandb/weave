@@ -283,19 +283,7 @@ def summary(run: wdt.Run) -> dict[str, typing.Any]:
     )
 
 
-def _history_keys(run: wdt.Run) -> list[str]:
-    if "historyKeys" not in run.gql:
-        raise ValueError("historyKeys not in run gql")
-    history_type: types.List = refine_history_type.raw_resolve_fn(run)
-    object_type = typing.cast(types.TypedDict, history_type.object_type)
-    return list(object_type.property_types.keys())
-
-
-@op(
-    render_info={"type": "function"},
-    plugins=wb_gql_op_plugin(lambda inputs, inner: "historyKeys"),
-)
-def refine_history_type(run: wdt.Run) -> types.Type:
+def _refine_history_type(run: wdt.Run) -> types.Type:
     prop_types: dict[str, types.Type] = {}
     historyKeys = run.gql["historyKeys"]["keys"]
 
@@ -327,6 +315,37 @@ def refine_history_type(run: wdt.Run) -> types.Type:
             prop_types[key] = types.optional(wt)
 
     return types.List(types.TypedDict(prop_types))
+
+
+def _history_keys(run: wdt.Run) -> list[str]:
+    if "historyKeys" not in run.gql:
+        raise ValueError("historyKeys not in run gql")
+    history_type: types.Type = _refine_history_type(run)
+    object_type = typing.cast(
+        types.TypedDict, typing.cast(types.List, history_type).object_type
+    )
+    return list(object_type.property_types.keys())
+
+
+def _history_keys_scalar_only(run: wdt.Run) -> list[str]:
+    """Return the history keys that are not JSON objects"""
+    if "historyKeys" not in run.gql:
+        raise ValueError("historyKeys not in run gql")
+    type = typing.cast(types.TypedDict, _refine_history_type(run))
+    all_keys = list(type.property_types.keys())
+    return list(
+        filter(
+            lambda k: types.BasicType().assign_type(type.property_types[k]), all_keys
+        )
+    )
+
+
+@op(
+    render_info={"type": "function"},
+    plugins=wb_gql_op_plugin(lambda inputs, inner: "historyKeys"),
+)
+def refine_history_type(run: wdt.Run) -> types.Type:
+    return _refine_history_type(run)
 
 
 class SampledHistorySpec(typing.TypedDict):
@@ -402,9 +421,40 @@ def history(run: wdt.Run):
     return get_history(run, columns=columns)
 
 
-def get_history(run: wdt.Run, columns=None):
-    # we have fetched some specific rows.
-    # download the files from the urls
+def get_history2(run: wdt.Run, columns=None):
+    """Dont read binary columns. Keep everything in arrow. Faster, but not as full featured as get_history"""
+    scalar_keys = _history_keys_scalar_only(run)
+    columns = [c for c in columns if c in scalar_keys]
+    parquet_history = read_history_parquet(run, columns=columns)
+
+    # turn the liveset into an arrow table. the liveset is a list of dictionaries
+    live_data = run.gql["parquetHistory"]["liveData"]
+    for row in live_data:
+        for colname in columns:
+            if colname not in row:
+                row[colname] = None
+
+    # turn live data into arrow
+    if len(live_data) > 0:
+        live_data = ArrowWeaveList(pa.array(live_data))
+    else:
+        live_data = None
+
+    if len(parquet_history) > 0:
+        parquet_history = ArrowWeaveList(pa.concat_tables(parquet_history))
+    else:
+        parquet_history = None
+
+    if len(live_data) == 0 and len(parquet_history) == 0:
+        return []
+    elif len(live_data) == 0:
+        return parquet_history
+    elif len(parquet_history) == 0:
+        return live_data
+    return use(concat([live_data, parquet_history]))
+
+
+def read_history_parquet(run: wdt.Run, columns=None):
     io = io_service.get_sync_client()
     tables = []
     for url in run.gql["parquetHistory"]["parquetUrls"]:
@@ -419,7 +469,6 @@ def get_history(run: wdt.Run, columns=None):
             # convert table to ArrowWeaveList
             awl: ArrowWeaveList = ArrowWeaveList(table)
             tables.append(awl)
-
     list = make_list(**{str(i): table for i, table in enumerate(tables)})
     concatted = use(concat(list))
     if isinstance(concatted, ArrowWeaveList):
@@ -430,9 +479,14 @@ def get_history(run: wdt.Run, columns=None):
     else:
         # empty table
         parquet_history = None
+    return parquet_history
 
-    if columns is None:
-        columns = parquet_history.object_type.property_types  # type: ignore
+
+def get_history(run: wdt.Run, columns=None):
+    # we have fetched some specific rows.
+    # download the files from the urls
+
+    parquet_history = read_history_parquet(run, columns=columns)
 
     # turn the liveset into an arrow table. the liveset is a list of dictionaries
     live_data = run.gql["parquetHistory"]["liveData"]
