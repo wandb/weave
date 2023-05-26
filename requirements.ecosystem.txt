@@ -9,6 +9,7 @@ bertviz>=1.4.0
 datasets>=2.9.0
 transformers<4.21
 plotly>=5.13.0
+faiss-cpu>=1.7.4
 
 # spaCy Requirements:
 spacy>=3.0.0,<4.0.0
