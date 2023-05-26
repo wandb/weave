@@ -9,6 +9,9 @@
 
 
 def should_table_cache(op_name: str) -> bool:
+    # Note: this currently means "execute" in parallel, table caching
+    # is disabled for the moment!
+
     # Cache the results of this op in a single run table. This is experimental
     # and not actually safe in a distributed environment. If there multiple
     # writers write in parallel to a table use weave mutations, only one
@@ -18,6 +21,7 @@ def should_table_cache(op_name: str) -> bool:
     return (
         op_name == "op-expensive_op"
         or op_name == "BaseRetrievalQA-run"
+        or op_name == "Chain-run"
         or op_name == "BaseChatModel-predict"
         or op_name == "op-stable_diffusion"
         or op_name == "op-img2prompt"

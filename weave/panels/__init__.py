@@ -49,3 +49,6 @@ from .panel_histogram import *
 
 # legacy
 from .panel_legacy import *
+
+# top level board
+from .panel_board import Board, BoardPanel, BoardPanelLayout

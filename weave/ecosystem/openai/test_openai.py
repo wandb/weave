@@ -188,11 +188,9 @@ def test_large_const_node(test_artifact_dir):
     show_panel_params = _show_params(panel)
     panel_params = weave.use(show_panel_params["weave_node"])
 
-    # Top-level is a Group panel (root)
-    panel_group_config = panel_params.config
+    panel_config = panel_params.config
     # Ensure that we sent the dataset as a get(<ref>) rather than as a const list
     # (this behavior is currently implemented in graph.py:ConstNode)
-    panel_config = panel_group_config.items["table0"].config
 
     table_state = panel_config.tableState
     col_select_fns = table_state.columnSelectFunctions

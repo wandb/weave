@@ -112,10 +112,19 @@ class Group(panel.Panel, typing.Generic[GroupConfigType]):
 
         items = {}
         for name, p in self.config.items.items():
-            injected = panel.run_variable_lambdas(p, frame)
+            try:
+                injected = panel.run_variable_lambdas(p, frame)
+            except weave.errors.WeaveDefinitionError:
+                return
             child = panel_util.child_item(injected)
             if not isinstance(child, graph.Node):
                 child._normalize(frame)
+            if isinstance(child, Group):
+                # lift group vars
+                for child_name, child_item in child.config.items.items():
+                    frame[child_name] = weave_internal.make_var_node(
+                        weave.type_of(child_item), child_name
+                    )
             items[name] = child
 
             # We build up config one item at a time. Construct a version

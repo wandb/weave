@@ -68,6 +68,8 @@ class Facet(panel.Panel):
                 self.set_select(options["select"])
             if "detail" in options:
                 self.set_detail(options["detail"])
+            if "cell_size" in options:
+                self.set_cell_size(*options["cell_size"])
 
     def debug_dim_select_functions(self):
         for dim in ["x", "y", "select", "detail"]:
@@ -83,6 +85,9 @@ class Facet(panel.Panel):
 
     def set_y(self, expr):
         self.config.table.update_col(self.config.dims.y, expr)
+
+    def set_cell_size(self, w, h):
+        self.config.cellSize = FacetCellSize(w=w, h=h)
 
     def set_select(self, expr):
         self.config.table.update_col(self.config.dims.select, expr)

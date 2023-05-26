@@ -14,19 +14,50 @@ class NoResult:
     pass
 
 
+class NodeResultStore:
+    _from_store: typing.Optional[collections.defaultdict[graph.OutputNode, typing.Any]]
+    _store: collections.defaultdict[graph.OutputNode, typing.Any]
+
+    def __init__(
+        self, initialize_with: typing.Optional["NodeResultStore"] = None
+    ) -> None:
+        if initialize_with is None:
+            self._from_store = None
+        else:
+            self._from_store = initialize_with._store
+        self._store = collections.defaultdict(lambda: NoResult)
+
+    def has(self, node: graph.OutputNode) -> bool:
+        return not self[node] is NoResult
+
+    def __setitem__(self, key: graph.OutputNode, value: typing.Any):
+        self._store[key] = value
+
+    def __getitem__(self, key: graph.OutputNode) -> typing.Any:
+        res = self._store[key]
+        if isinstance(res, NoResult) and self._from_store is not None:
+            return self._from_store[key]
+        return res
+
+    def merge(self, other: "NodeResultStore"):
+        for key, value in other._store.items():
+            self._store[key] = value
+
+
 _node_result_store: contextvars.ContextVar[
-    typing.Optional[dict[graph.Node, typing.Any]]
+    typing.Optional[NodeResultStore]
 ] = contextvars.ContextVar("_top_level_forward_graph_ctx", default=None)
 
 
 # Each top level call to execute.execute_nodes creates its own result store.
 # Recursive calls share the top level result store.
 @contextlib.contextmanager
-def node_result_store():
-    store = _node_result_store.get()
+def node_result_store(store: typing.Optional[NodeResultStore] = None):
+    if store is None:
+        store = _node_result_store.get()
     token = None
     if store is None:
-        store = collections.defaultdict(lambda: NoResult)
+        store = NodeResultStore()
         token = _node_result_store.set(store)
     try:
         yield store
@@ -38,15 +69,8 @@ def node_result_store():
 def get_node_result_store():
     store = _node_result_store.get()
     if store is None:
-        raise errors.WeaveInternalError("No node result store found")
+        return NodeResultStore()
     return store
-
-
-def get_or_create_node_result_store():
-    res = _node_result_store.get()
-    if res is None:
-        res = collections.defaultdict(lambda: NoResult)
-    return res
 
 
 class ForwardNode:
@@ -57,6 +81,7 @@ class ForwardNode:
         self.node = node
         self.input_to = {}
         self.cache_id = None
+        self.result_store = get_node_result_store()
 
     def __str__(self):
         return "<ForwardNode(%s): %s input_to %s>" % (
@@ -69,14 +94,14 @@ class ForwardNode:
 
     @property
     def result(self) -> typing.Any:
-        return get_node_result_store()[self.node]
+        return self.result_store[self.node]
 
     @property
     def has_result(self) -> bool:
-        return self.result is not NoResult
+        return self.result_store.has(self.node)
 
     def set_result(self, result: typing.Any) -> None:
-        get_node_result_store()[self.node] = result
+        self.result_store[self.node] = result
 
 
 # Each execute.execute_nodes call gets its own ForwardGraph, and walks all

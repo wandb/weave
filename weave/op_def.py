@@ -455,6 +455,8 @@ class OpDef:
             serialized["render_info"] = self.render_info
         if self.refine_output_type is not None:
             serialized["refine_output_type_op_name"] = self.refine_output_type.name
+        if self.derived_ops and "mapped" in self.derived_ops:
+            serialized["mappable"] = True
 
         return serialized
 

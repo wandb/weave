@@ -11,6 +11,7 @@ import time
 import requests
 import traceback
 import time
+import pprint
 
 
 from weave.language_features.tagging.tag_store import isolated_tagging_context
@@ -58,8 +59,9 @@ def handle_request(request, deref=False, serialize_fn=storage.to_python):
         nodes = serialize.deserialize(request["graphs"])
 
     with tracer.trace("request:execute"):
-        with context.execution_client():
-            result = execute.execute_nodes(nodes)
+        with execute.top_level_stats() as stats:
+            with context.execution_client():
+                result = execute.execute_nodes(nodes)
     with tracer.trace("request:deref"):
         if deref:
             result = [
@@ -68,6 +70,8 @@ def handle_request(request, deref=False, serialize_fn=storage.to_python):
             ]
     # print("Server request %s (%0.5fs): %s..." % (start_time,
     #                                              time.time() - start_time, [n.from_op.name for n in nodes[:3]]))
+
+    logging.info("FINAL STATS\n%s" % pprint.pformat(stats.op_summary()))
 
     # Forces output to be untagged
     with tracer.trace("serialize_response"):
