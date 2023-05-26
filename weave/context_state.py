@@ -21,6 +21,9 @@ _loading_built_ins: contextvars.ContextVar[
 ] = contextvars.ContextVar("loading_builtins", default=False)
 
 
+_history_version = contextvars.ContextVar("history_version", default=1)
+
+
 @contextlib.contextmanager
 def loading_op_location(location):
     token = _loading_op_location.set(location)
@@ -147,3 +150,11 @@ def analytics_enabled():
 
 def disable_analytics():
     return _analytics_enabled.set(False)
+
+
+def get_history_version():
+    return _history_version.get()
+
+
+def set_history_version(version):
+    _history_version.set(version)

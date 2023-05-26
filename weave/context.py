@@ -1,5 +1,4 @@
 import contextlib
-import logging
 import typing
 
 from weave.client_interface import ClientInterface
@@ -52,6 +51,10 @@ def use_frontend_devmode():
 
     # point frontend to vite server
     context_state.set_frontend_url("http://localhost:3000")
+
+
+def use_history2():
+    context_state.set_history_version(2)
 
 
 def _make_default_client():

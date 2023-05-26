@@ -56,6 +56,7 @@ from ..ops_arrow import ArrowWeaveList
 from .. import util
 from .. import errors
 from .. import io_service
+from .. import context_state
 
 from ..api import use
 
@@ -285,6 +286,10 @@ def summary(run: wdt.Run) -> dict[str, typing.Any]:
 
 def _refine_history_type(run: wdt.Run) -> types.Type:
     prop_types: dict[str, types.Type] = {}
+
+    if "historyKeys" not in run.gql:
+        raise ValueError("historyKeys not in run gql")
+
     historyKeys = run.gql["historyKeys"]["keys"]
 
     for key, key_details in historyKeys.items():
@@ -298,6 +303,12 @@ def _refine_history_type(run: wdt.Run) -> types.Type:
                 for tc in type_counts
             ]
         )
+
+        if context_state.get_history_version() == 2 and not types.optional(
+            types.BasicType()
+        ).assign_type(wt):
+            continue
+
         if wt == types.UnknownType():
             util.capture_exception_with_sentry_if_available(
                 errors.WeaveTypeWarning(
@@ -325,19 +336,6 @@ def _history_keys(run: wdt.Run) -> list[str]:
         types.TypedDict, typing.cast(types.List, history_type).object_type
     )
     return list(object_type.property_types.keys())
-
-
-def _history_keys_scalar_only(run: wdt.Run) -> list[str]:
-    """Return the history keys that are not JSON objects"""
-    if "historyKeys" not in run.gql:
-        raise ValueError("historyKeys not in run gql")
-    type = typing.cast(types.TypedDict, _refine_history_type(run))
-    all_keys = list(type.property_types.keys())
-    return list(
-        filter(
-            lambda k: types.BasicType().assign_type(type.property_types[k]), all_keys
-        )
-    )
 
 
 @op(
@@ -421,9 +419,9 @@ def history(run: wdt.Run):
     return get_history(run, columns=columns)
 
 
-def get_history2(run: wdt.Run, columns=None):
+def _get_history2(run: wdt.Run, columns=None):
     """Dont read binary columns. Keep everything in arrow. Faster, but not as full featured as get_history"""
-    scalar_keys = _history_keys_scalar_only(run)
+    scalar_keys = _history_keys(run)
     columns = [c for c in columns if c in scalar_keys]
     parquet_history = read_history_parquet(run, columns=columns)
 
@@ -454,6 +452,15 @@ def get_history2(run: wdt.Run, columns=None):
     return use(concat([live_data, parquet_history]))
 
 
+def get_history(run: wdt.Run, columns=None):
+    if context_state.get_history_version() == 1:
+        return _get_history(run, columns=columns)
+    elif context_state.get_history_version() == 2:
+        return _get_history2(run, columns=columns)
+    else:
+        raise ValueError("Unknown history version")
+
+
 def read_history_parquet(run: wdt.Run, columns=None):
     io = io_service.get_sync_client()
     tables = []
@@ -482,7 +489,7 @@ def read_history_parquet(run: wdt.Run, columns=None):
     return parquet_history
 
 
-def get_history(run: wdt.Run, columns=None):
+def _get_history(run: wdt.Run, columns=None):
     # we have fetched some specific rows.
     # download the files from the urls
 
