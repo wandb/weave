@@ -6,6 +6,7 @@ import typing
 import pytest
 import shutil
 import tempfile
+from . import context
 from . import context_state
 from . import weave_server
 from .tests import fixture_fakewandb
@@ -195,3 +196,9 @@ def io_server_factory():
         io_service.SERVER.shutdown()
 
     io_service.SERVER = original_server
+
+
+@pytest.fixture()
+def history2():
+    with context.with_history_version(2):
+        yield

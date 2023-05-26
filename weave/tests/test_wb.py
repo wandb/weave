@@ -1216,6 +1216,60 @@ def test_run_history(fake_wandb):
     )
 
 
+def test_run_history_2(fake_wandb, history2):
+    fake_wandb.fake_api.add_mock(run_history_mocker)
+    node = ops.project("stacey", "mendeleev").runs()[0].history()
+    assert isinstance(node.type, TaggedValueType)
+    assert types.List(
+        types.TypedDict(
+            {
+                "_step": types.Number(),
+                # we no longer send back system metrics
+                # "system/gpu.0.powerWatts": types.optional(types.Number()),
+                "epoch": types.optional(types.Number()),
+                "predictions_10K": types.optional(
+                    artifact_fs.FilesystemArtifactFileType(
+                        types.Const(types.String(), "json"), table.TableType()
+                    ),
+                ),
+            }
+        )
+    ).assign_type(node.type.value)
+
+    # this should just return dummy history
+    assert weave.use(node) == [{"_step": i} for i in range(10)]
+
+    # now we'll fetch a just one of the columns
+    new_node = node["epoch"]
+    assert types.List(
+        types.optional(types.Number()),
+    ).assign_type(new_node.type.value)
+    assert weave.use(new_node) == [0, None, 1, None, 2, None, 3, None, 4, None]
+
+    # now we'll create a graph that fetches two columns and execute it
+    epoch_node = node["epoch"]
+    pred_node = node["predictions_10K"]
+    assert types.List(
+        types.optional(
+            artifact_fs.FilesystemArtifactFileType(
+                types.Const(types.String(), "json"), table.TableType()
+            ),
+        )
+    ).assign_type(pred_node.type.value)
+
+    # simulates what a table call would do, selecting multiple columns
+    result = weave.use([epoch_node, pred_node])
+    assert len(result) == 2
+
+    # check the types, result lengths
+    assert all(len(r) == 10 for r in result)
+    assert all(r == None or isinstance(r, (int, float)) for r in result[0])
+    assert all(
+        r == None or isinstance(r, artifact_fs.FilesystemArtifactFile)
+        for r in result[1]
+    )
+
+
 def run_history_as_of_mocker(q, ndx):
     return {
         "project_518fa79465d8ffaeb91015dce87e092f": {

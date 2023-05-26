@@ -53,8 +53,18 @@ def use_frontend_devmode():
     context_state.set_frontend_url("http://localhost:3000")
 
 
-def use_history2():
-    context_state.set_history_version(2)
+def use_history_version(version: int):
+    context_state.set_history_version(version)
+
+
+@contextlib.contextmanager
+def with_history_version(version: int):
+    old_version = context_state.get_history_version()
+    try:
+        context_state.set_history_version(version)
+        yield
+    finally:
+        context_state.set_history_version(old_version)
 
 
 def _make_default_client():
