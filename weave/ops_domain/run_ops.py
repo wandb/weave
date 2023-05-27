@@ -52,7 +52,7 @@ from . import wb_util
 from . import history as history_util
 from ..ops_primitives import _dict_utils, make_list
 from ..ops_arrow.list_ops import concat
-from ..ops_arrow import ArrowWeaveList
+from ..ops_arrow import ArrowWeaveList, ArrowWeaveListType
 from .. import util
 from .. import errors
 from .. import io_service
@@ -61,7 +61,6 @@ from .. import engine_trace
 
 from ..api import use
 
-from pyarrow import compute as pc
 import pyarrow as pa
 from pyarrow import parquet as pq
 
@@ -328,7 +327,11 @@ def _refine_history_type(run: wdt.Run) -> types.Type:
         else:
             prop_types[key] = types.optional(wt)
 
-    return types.List(types.TypedDict(prop_types))
+    ListType = (
+        ArrowWeaveListType if context_state.get_history_version() == 2 else types.List
+    )
+
+    return ListType(types.TypedDict(prop_types))
 
 
 def _history_keys(run: wdt.Run) -> list[str]:
@@ -436,18 +439,18 @@ def _get_history2(run: wdt.Run, columns=None):
                 row[colname] = None
 
     # turn live data into arrow
-    if len(live_data) > 0:
+    if live_data is not None and len(live_data) > 0:
         live_data = ArrowWeaveList(pa.array(live_data))
     else:
-        live_data = None
+        live_data = []
 
-    if len(parquet_history) > 0:
+    if parquet_history is not None and len(parquet_history) > 0:
         parquet_history = ArrowWeaveList(parquet_history)
     else:
-        parquet_history = None
+        parquet_history = []
 
     if len(live_data) == 0 and len(parquet_history) == 0:
-        return []
+        return None
     elif len(live_data) == 0:
         return parquet_history
     elif len(parquet_history) == 0:
@@ -456,9 +459,12 @@ def _get_history2(run: wdt.Run, columns=None):
 
 
 def get_history(run: wdt.Run, columns=None):
-    if context_state.get_history_version() == 1:
+    history_version = context_state.get_history_version()
+    with tracer.trace("get_history") as span:
+        span.set_tag("history_version", history_version)
+    if history_version == 1:
         return _get_history(run, columns=columns)
-    elif context_state.get_history_version() == 2:
+    elif history_version == 2:
         return _get_history2(run, columns=columns)
     else:
         raise ValueError("Unknown history version")
@@ -466,6 +472,7 @@ def get_history(run: wdt.Run, columns=None):
 
 def read_history_parquet(run: wdt.Run, columns=None):
     io = io_service.get_sync_client()
+    object_type = typing.cast(types.List, _refine_history_type(run)).object_type
     tables = []
     for url in run.gql["parquetHistory"]["parquetUrls"]:
         local_path = io.ensure_file_downloaded(url)
@@ -481,7 +488,8 @@ def read_history_parquet(run: wdt.Run, columns=None):
                 table = pq.read_table(path, columns=columns_to_read)
 
             # convert table to ArrowWeaveList
-            awl: ArrowWeaveList = ArrowWeaveList(table)
+            with tracer.trace("make_awl") as span:
+                awl: ArrowWeaveList = ArrowWeaveList(table, object_type=object_type)
             tables.append(awl)
     list = make_list(**{str(i): table for i, table in enumerate(tables)})
     concatted = use(concat(list))
@@ -495,25 +503,30 @@ def read_history_parquet(run: wdt.Run, columns=None):
         return None
 
     # sort the history by step
-    table_sorted_indices = pa.compute.bottom_k_unstable(
-        parquet_history, sort_keys=["_step"], k=len(parquet_history)
-    )
+    with tracer.trace("pq.sort"):
+        table_sorted_indices = pa.compute.bottom_k_unstable(
+            parquet_history, sort_keys=["_step"], k=len(parquet_history)
+        )
 
-    return parquet_history.take(table_sorted_indices)
+    with tracer.trace("pq.take"):
+        return parquet_history.take(table_sorted_indices)
 
 
 def _get_history(run: wdt.Run, columns=None):
     # we have fetched some specific rows.
     # download the files from the urls
 
-    parquet_history = read_history_parquet(run, columns=columns)
+    with tracer.trace("read_history_parquet"):
+        parquet_history = read_history_parquet(run, columns=columns)
 
     # turn the liveset into an arrow table. the liveset is a list of dictionaries
     live_data = run.gql["parquetHistory"]["liveData"]
-    for row in live_data:
-        for colname in columns:
-            if colname not in row:
-                row[colname] = None
+
+    with tracer.trace("liveSet.impute"):
+        for row in live_data:
+            for colname in columns:
+                if colname not in row:
+                    row[colname] = None
 
     if parquet_history is None:
         return live_data
@@ -523,13 +536,15 @@ def _get_history(run: wdt.Run, columns=None):
         field.name for field in parquet_history.schema if pa.types.is_binary(field.type)
     ]
 
-    parquet_history = parquet_history.to_pylist()
+    with tracer.trace("pq.to_pylist"):
+        parquet_history = parquet_history.to_pylist()
 
     # deserialize json
-    for field in binary_fields:
-        for row in parquet_history:
-            if row[field] is not None:
-                row[field] = json.loads(row[field])
+    with tracer.trace("json.loads"):
+        for field in binary_fields:
+            for row in parquet_history:
+                if row[field] is not None:
+                    row[field] = json.loads(row[field])
 
     # parquet stores step as a float, but we want it as an int
     for row in parquet_history:
@@ -537,17 +552,18 @@ def _get_history(run: wdt.Run, columns=None):
 
     parquet_history.extend(live_data)
 
-    return [
-        wb_util.process_run_dict_obj(
-            row,
-            wb_util.RunPath(
-                run.gql["project"]["entity"]["name"],
-                run.gql["project"]["name"],
-                run.gql["name"],
-            ),
-        )
-        for row in parquet_history
-    ]
+    with tracer.trace("process_run_dict_obj"):
+        return [
+            wb_util.process_run_dict_obj(
+                row,
+                wb_util.RunPath(
+                    run.gql["project"]["entity"]["name"],
+                    run.gql["project"]["name"],
+                    run.gql["name"],
+                ),
+            )
+            for row in parquet_history
+        ]
 
 
 def _history_as_of_plugin(inputs, inner):
