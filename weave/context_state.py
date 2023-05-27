@@ -21,9 +21,6 @@ _loading_built_ins: contextvars.ContextVar[
 ] = contextvars.ContextVar("loading_builtins", default=False)
 
 
-_history_version = contextvars.ContextVar("history_version", default=1)
-
-
 @contextlib.contextmanager
 def loading_op_location(location):
     token = _loading_op_location.set(location)

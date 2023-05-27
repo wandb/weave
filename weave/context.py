@@ -1,4 +1,5 @@
 import contextlib
+import logging
 import typing
 
 from weave.client_interface import ClientInterface

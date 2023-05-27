@@ -6,7 +6,6 @@ import typing
 import pytest
 import shutil
 import tempfile
-from . import context
 from . import context_state
 from . import weave_server
 from .tests import fixture_fakewandb
