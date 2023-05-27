@@ -57,6 +57,7 @@ from .. import util
 from .. import errors
 from .. import io_service
 from .. import context_state
+from .. import engine_trace
 
 from ..api import use
 
@@ -65,6 +66,8 @@ import pyarrow as pa
 from pyarrow import parquet as pq
 
 from ..compile_table import KeyTree
+
+tracer = engine_trace.tracer()
 
 # number of rows of example data to look at to determine history type
 ROW_LIMIT_FOR_TYPE_INTERROGATION = 10
@@ -468,10 +471,14 @@ def read_history_parquet(run: wdt.Run, columns=None):
         local_path = io.ensure_file_downloaded(url)
         if local_path is not None:
             path = io.fs.path(local_path)
-            meta = pq.read_metadata(path)
+            with tracer.trace("pq.read_metadata") as span:
+                span.set_tag("path", path)
+                meta = pq.read_metadata(path)
             file_schema = meta.schema
             columns_to_read = [c for c in columns if c in file_schema.names]
-            table = pq.read_table(path, columns=columns_to_read)
+            with tracer.trace("pq.read_table") as span:
+                span.set_tag("path", path)
+                table = pq.read_table(path, columns=columns_to_read)
 
             # convert table to ArrowWeaveList
             awl: ArrowWeaveList = ArrowWeaveList(table)
