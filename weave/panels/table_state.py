@@ -17,6 +17,7 @@ from ..language_features.tagging import tagged_value_type
 @decorator_type.type()
 class PanelDef:
     panelId: str
+    panelVars: dict[str, graph.Node] = dataclasses.field(default_factory=dict)
     panelConfig: typing.Any = dataclasses.field(default_factory=lambda: None)
 
 
@@ -93,7 +94,7 @@ class TableState:
     ):
         col_id = self._new_col_id()
         if panel_def is None:
-            panel_def = PanelDef("", None)
+            panel_def = PanelDef("", {}, None)
         self.columns[col_id] = panel_def
         self.columnNames[col_id] = name
         self.order.append(col_id)
@@ -129,7 +130,9 @@ class TableState:
         if isinstance(selected, panel.Panel):
             self.columnSelectFunctions[col_id] = selected.input_node
             self.columns[col_id] = PanelDef(
-                panelId=selected.id, panelConfig=selected.config
+                panelVars=selected.vars,
+                panelId=selected.id,
+                panelConfig=selected.config,
             )
         else:
             # TOTAL HACK HERE THIS IS NOT GENERAL!

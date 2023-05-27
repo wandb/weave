@@ -98,6 +98,8 @@ class Group(panel.Panel, typing.Generic[GroupConfigType]):
             self.config.layoutMode = (
                 "horizontal" if options["preferHorizontal"] else "vertical"
             )
+        if "layoutMode" in options:
+            self.config.layoutMode = options["layoutMode"]
         if "equalSize" in options:
             self.config.equalSize = options["equalSize"]
         if "style" in options:

@@ -519,7 +519,7 @@ class Const(Type):
             # fancier types. We can fix later if we need to.
             if self.__class__ != next_type.__class__:
                 return False
-            if self.val == next_type.val:
+            if self.val == None or self.val == next_type.val:
                 return True
         return False
 

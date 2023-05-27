@@ -67,10 +67,7 @@ def python_type_to_type(
             return weave_type(*args)
     elif is_typed_dict_like(py_type):
         return weave_types.TypedDict(
-            {
-                k: python_type_to_type(py_type.__annotations__[k])
-                for k in py_type.__required_keys__
-            }
+            {k: python_type_to_type(t) for k, t in py_type.__annotations__.items()}
         )
     weave_type = simple_python_type_to_type(py_type)
     if weave_type == weave_types.UnknownType():

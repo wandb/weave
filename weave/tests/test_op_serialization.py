@@ -40,4 +40,7 @@ def test_explicit_experiment_construction(op_name, op):
         # Don't check these for now, it indicates the op had a callable output type.
         # We are not currently sending those to WeaveJS
         return
+    from rich import print
+
+    print(op_as_dict)
     assert_valid_output_type(op_as_dict)
