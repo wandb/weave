@@ -17,6 +17,7 @@ from .. import graph
 from .. import artifact_fs
 from ..ops_domain import wb_domain_types as wdt
 from ..ops_domain import artifact_membership_ops as amo
+from ..ops_arrow import ArrowWeaveListType
 from ..ops_primitives import list_, dict_
 from .. import weave_types as types
 from ..ops_primitives.file import _as_w0_dict_
@@ -1236,10 +1237,21 @@ def test_run_history_2(fake_wandb, history2):
 
     # now we'll fetch a just one of the columns
     new_node = node["epoch"]
-    assert types.List(
+    assert ArrowWeaveListType(
         types.optional(types.Number()),
     ).assign_type(new_node.type.value)
-    assert weave.use(new_node) == [0, None, 1, None, 2, None, 3, None, 4, None]
+    assert weave.use(new_node).to_pylist_raw() == [
+        0,
+        None,
+        1,
+        None,
+        2,
+        None,
+        3,
+        None,
+        4,
+        None,
+    ]
 
     # now we'll create a graph that fetches two columns and execute it
     epoch_node = node["epoch"]
