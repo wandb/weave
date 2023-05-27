@@ -485,7 +485,7 @@ def read_history_parquet(run: wdt.Run, columns=None):
         parquet_history = pa.Table.from_batches([rb])
     else:
         # empty table
-        parquet_history = None
+        return None
 
     # sort the history by step
     table_sorted_indices = pa.compute.bottom_k_unstable(
