@@ -127,8 +127,7 @@ def list_ops():
                 serialized_op = op.to_dict()
             except errors.WeaveSerializeError:
                 continue
-            if serialized_op["output_type"] != "any":
-                ret.append(serialized_op)
+            ret.append(serialized_op)
         return {"data": ret}
 
 

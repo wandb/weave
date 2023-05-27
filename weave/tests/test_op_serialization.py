@@ -34,12 +34,13 @@ def assert_valid_output_type(op_dict):
 @pytest.mark.parametrize("op_name, op", [(op.name, op) for op in ops])
 def test_explicit_experiment_construction(op_name, op):
     # Just make sure that this is successful
-    op_as_dict = op.to_dict()
-    assert op_as_dict is not None
-    if op_as_dict["output_type"] == "any":
+    try:
+        op_as_dict = op.to_dict()
+    except weave.errors.WeaveSerializeError:
         # Don't check these for now, it indicates the op had a callable output type.
         # We are not currently sending those to WeaveJS
         return
+    assert op_as_dict is not None
     from rich import print
 
     print(op_as_dict)

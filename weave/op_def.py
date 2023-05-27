@@ -423,9 +423,10 @@ class OpDef:
                 output_type = self.concrete_output_type.to_dict()
             else:
                 # no refine and we have a callable output type. This
-                # can't be used by js at the moment. Setting output_type
-                # to any causes list_ops to not send it.
-                output_type = "any"
+                # can't be used by js at the moment.
+                raise errors.WeaveSerializeError(
+                    "op not serializable for weavejs: %s" % self.name
+                )
 
             # TODO: Consider removing the ability for an output_type to
             # be a function - they all must be Types or ConstNodes. Probably
