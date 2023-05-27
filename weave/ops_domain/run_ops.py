@@ -436,7 +436,7 @@ def history(run: wdt.Run):
 
 
 @op(
-    name="run-history2",
+    name="run-historyFast",
     refine_output_type=refine_history2_type,
     plugins=wb_gql_op_plugin(_make_run_history_gql_field),
     output_type=ArrowWeaveListType(types.TypedDict({})),

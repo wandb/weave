@@ -1219,7 +1219,7 @@ def test_run_history(fake_wandb):
 
 def test_run_history_2(fake_wandb):
     fake_wandb.fake_api.add_mock(run_history_mocker)
-    node = ops.project("stacey", "mendeleev").runs()[0].history2()
+    node = ops.project("stacey", "mendeleev").runs()[0].historyFast()
     assert isinstance(node.type, TaggedValueType)
     assert types.List(
         types.TypedDict(
