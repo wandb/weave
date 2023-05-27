@@ -150,11 +150,3 @@ def analytics_enabled():
 
 def disable_analytics():
     return _analytics_enabled.set(False)
-
-
-def get_history_version():
-    return _history_version.get()
-
-
-def set_history_version(version):
-    _history_version.set(version)

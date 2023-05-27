@@ -286,7 +286,7 @@ def summary(run: wdt.Run) -> dict[str, typing.Any]:
     )
 
 
-def _refine_history_type(run: wdt.Run) -> types.Type:
+def _refine_history_type(run: wdt.Run, history_version: int) -> types.Type:
     prop_types: dict[str, types.Type] = {}
 
     if "historyKeys" not in run.gql:
@@ -306,9 +306,9 @@ def _refine_history_type(run: wdt.Run) -> types.Type:
             ]
         )
 
-        if context_state.get_history_version() == 2 and not types.optional(
-            types.BasicType()
-        ).assign_type(wt):
+        if history_version == 2 and not types.optional(types.BasicType()).assign_type(
+            wt
+        ):
             continue
 
         if wt == types.UnknownType():
@@ -327,17 +327,15 @@ def _refine_history_type(run: wdt.Run) -> types.Type:
         else:
             prop_types[key] = types.optional(wt)
 
-    ListType = (
-        ArrowWeaveListType if context_state.get_history_version() == 2 else types.List
-    )
+    ListType = ArrowWeaveListType if history_version == 2 else types.List
 
     return ListType(types.TypedDict(prop_types))
 
 
-def _history_keys(run: wdt.Run) -> list[str]:
+def _history_keys(run: wdt.Run, history_version: int) -> list[str]:
     if "historyKeys" not in run.gql:
         raise ValueError("historyKeys not in run gql")
-    history_type: types.Type = _refine_history_type(run)
+    history_type: types.Type = _refine_history_type(run, history_version)
     object_type = typing.cast(
         types.TypedDict, typing.cast(types.List, history_type).object_type
     )
@@ -349,7 +347,16 @@ def _history_keys(run: wdt.Run) -> list[str]:
     plugins=wb_gql_op_plugin(lambda inputs, inner: "historyKeys"),
 )
 def refine_history_type(run: wdt.Run) -> types.Type:
-    return _refine_history_type(run)
+    return _refine_history_type(run, 1)
+
+
+@op(
+    render_info={"type": "function"},
+    plugins=wb_gql_op_plugin(lambda inputs, inner: "historyKeys"),
+    hidden=True,
+)
+def refine_history2_type(run: wdt.Run) -> types.Type:
+    return _refine_history_type(run, 2)
 
 
 class SampledHistorySpec(typing.TypedDict):
@@ -391,14 +398,7 @@ def _make_run_history_gql_field(inputs: InputAndStitchProvider, inner: str):
     """
 
 
-@op(
-    name="run-history",
-    refine_output_type=refine_history_type,
-    plugins=wb_gql_op_plugin(_make_run_history_gql_field),
-    output_type=types.List(types.TypedDict({})),
-)
-def history(run: wdt.Run):
-
+def _history_body(run: wdt.Run, history_version: int):
     # first check and see if we have actually fetched any history rows. if we have not,
     # we are in the case where we have blindly requested the entire history object.
     # we refuse to fetch that, so instead we will just inspect the historyKeys and return
@@ -421,15 +421,36 @@ def history(run: wdt.Run):
         assert len(steps) == count
         return steps
 
-    columns = _history_keys(run)
-    return get_history(run, columns=columns)
+    columns = _history_keys(run, history_version)
+    return get_history(run, history_version, columns=columns)
+
+
+@op(
+    name="run-history",
+    refine_output_type=refine_history_type,
+    plugins=wb_gql_op_plugin(_make_run_history_gql_field),
+    output_type=types.List(types.TypedDict({})),
+)
+def history(run: wdt.Run):
+    return _history_body(run, 1)
+
+
+@op(
+    name="run-history2",
+    refine_output_type=refine_history2_type,
+    plugins=wb_gql_op_plugin(_make_run_history_gql_field),
+    output_type=ArrowWeaveListType(types.TypedDict({})),
+    hidden=True,
+)
+def history2(run: wdt.Run):
+    return _history_body(run, 2)
 
 
 def _get_history2(run: wdt.Run, columns=None):
     """Dont read binary columns. Keep everything in arrow. Faster, but not as full featured as get_history"""
-    scalar_keys = _history_keys(run)
+    scalar_keys = _history_keys(run, 2)
     columns = [c for c in columns if c in scalar_keys]
-    parquet_history = read_history_parquet(run, columns=columns)
+    parquet_history = read_history_parquet(run, 2, columns=columns)
 
     # turn the liveset into an arrow table. the liveset is a list of dictionaries
     live_data = run.gql["parquetHistory"]["liveData"]
@@ -458,8 +479,7 @@ def _get_history2(run: wdt.Run, columns=None):
     return use(concat([parquet_history, live_data]))
 
 
-def get_history(run: wdt.Run, columns=None):
-    history_version = context_state.get_history_version()
+def get_history(run: wdt.Run, history_version: int, columns=None):
     with tracer.trace("get_history") as span:
         span.set_tag("history_version", history_version)
     if history_version == 1:
@@ -470,9 +490,11 @@ def get_history(run: wdt.Run, columns=None):
         raise ValueError("Unknown history version")
 
 
-def read_history_parquet(run: wdt.Run, columns=None):
+def read_history_parquet(run: wdt.Run, history_version: int, columns=None):
     io = io_service.get_sync_client()
-    object_type = typing.cast(types.List, _refine_history_type(run)).object_type
+    object_type = typing.cast(
+        types.List, _refine_history_type(run, history_version)
+    ).object_type
     tables = []
     for url in run.gql["parquetHistory"]["parquetUrls"]:
         local_path = io.ensure_file_downloaded(url)
@@ -517,7 +539,7 @@ def _get_history(run: wdt.Run, columns=None):
     # download the files from the urls
 
     with tracer.trace("read_history_parquet"):
-        parquet_history = read_history_parquet(run, columns=columns)
+        parquet_history = read_history_parquet(run, 1, columns=columns)
 
     # turn the liveset into an arrow table. the liveset is a list of dictionaries
     live_data = run.gql["parquetHistory"]["liveData"]
