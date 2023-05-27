@@ -6,6 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from . import weave_types as types
 from . import context
+from . import context_state
 from . import op_args
 from . import registry_mem
 from . import op_def
@@ -226,6 +227,7 @@ class MappedDeriveOpHandler(DeriveOpHandler):
                 or orig_op.name.endswith("run-history")
             ):
                 wandb_api_ctx = wandb_api.get_wandb_api_context()
+                history_version = context_state.get_history_version()
                 memo_ctx = memo._memo_storage.get()
 
                 def do_one(x):
@@ -236,9 +238,10 @@ class MappedDeriveOpHandler(DeriveOpHandler):
                         called = orig_op(x, **new_inputs)
                         with wandb_api.wandb_api_context(wandb_api_ctx):
                             with context.execution_client():
-                                # Use the use path to get caching.
-                                res = weave_internal.use(called)
-                                res = storage.deref(res)
+                                with context.with_history_version(history_version):
+                                    # Use the use path to get caching.
+                                    res = weave_internal.use(called)
+                                    res = storage.deref(res)
                     finally:
                         memo._memo_storage.reset(memo_token)
                     return res
