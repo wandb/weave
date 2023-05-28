@@ -8,9 +8,8 @@ from .panel_auto import *
 from .panel_labeled_item import LabeledItem
 from .panel_card import Card, CardTab
 from .panel_group import Group
+from .panel_each import Each
 
-from .panel_layout_flow import LayoutFlow
-from .panel_layout_bank import LayoutBank
 from .panel_facet_tabs import FacetTabs
 from .panel_sections import Sections
 
@@ -20,7 +19,6 @@ from .panel_weavelink import WeaveLink
 from .panel_table import Table, ColumnDef
 from .panel_plot import Plot
 from .panel_facet import Facet
-from .panel_each import Each
 from .panel_each_column import EachColumn
 from .panel_color import Color
 from .panel_html import PanelHtml
