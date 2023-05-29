@@ -180,6 +180,12 @@ class FilesystemArtifact(artifact_base.Artifact):
     ]:
         raise NotImplementedError
 
+    def previous_uri(self) -> typing.Optional[str]:
+        raise NotImplementedError
+
+    def undo(self) -> typing.Optional["FilesystemArtifact"]:
+        raise NotImplementedError
+
 
 FilesystemArtifactType.instance_classes = FilesystemArtifact
 
