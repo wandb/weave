@@ -9,7 +9,7 @@ from .arrow import offsets_starting_at_zero
 from . import convert
 
 if typing.TYPE_CHECKING:
-    from list_ import ArrowWeaveList
+    from list_ import ArrowWeaveList  # type: ignore[import]
 
 
 def recursively_encode_pyarrow_strings_as_dictionaries(array: pa.Array) -> pa.Array:

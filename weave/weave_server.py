@@ -42,8 +42,8 @@ tracer = engine_trace.tracer()
 
 def custom_dd_patch():
     import wandb
-    import wandb_gql
-    import wandb_graphql
+    import wandb_gql  # type: ignore[import]
+    import wandb_graphql  # type: ignore[import]
 
     orig_execute = wandb_gql.Client.execute
 
@@ -271,7 +271,7 @@ if not environment.wandb_production() and DEBUG_MEM:
     # obj = objgraph.by_type('TypedDict')[100]
 
     import gc
-    import objgraph
+    import objgraph  # type: ignore[import]
 
     @blueprint.route("/pdb")
     def pdb():
