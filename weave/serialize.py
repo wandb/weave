@@ -140,9 +140,16 @@ def _deserialize_node(
                     fn_body_node["varName"],
                 )
             elif fn_body_node["nodeType"] == "const":
+                fn_body_const_val = fn_body_node["val"]
+                if (
+                    isinstance(fn_body_const_val, dict)
+                    and "nodeType" in fn_body_const_val
+                ):
+                    # This case happens when we have a quoted function.
+                    fn_body_const_val = graph.Node.node_from_json(fn_body_const_val)
                 parsed_fn_body_node = weave_internal.make_const_node(
                     types.TypeRegistry.type_from_dict(fn_body_node["type"]),
-                    fn_body_node["val"],
+                    fn_body_const_val,
                 )
             elif fn_body_node["nodeType"] == "output":
                 op = nodes[fn_body_node["fromOp"]]

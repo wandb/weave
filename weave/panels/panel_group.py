@@ -73,16 +73,14 @@ GroupConfigType = typing.TypeVar("GroupConfigType")
 
 
 @weave.type()
-class Group(panel.Panel, typing.Generic[GroupConfigType]):
+class Group(panel.Panel):
     id = "Group"
-    config: typing.Optional[GroupConfigType] = dataclasses.field(
+    config: typing.Optional[GroupConfig] = dataclasses.field(
         default_factory=lambda: None
     )
     # items: typing.TypeVar("items") = dataclasses.field(default_factory=dict)
 
     def __init__(self, input_node=graph.VoidNode(), vars=None, config=None, **options):
-        if vars is None:
-            vars = {}
         super().__init__(input_node=input_node, vars=vars)
         self.config = config
         if self.config is None:

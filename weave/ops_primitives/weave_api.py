@@ -331,7 +331,6 @@ def _merge(name) -> str:
     )
 
     if isinstance(to_uri, artifact_wandb.WeaveWBArtifactURI):
-
         ref = storage._direct_publish(
             obj=head_ref.get(),
             name=to_uri.name,

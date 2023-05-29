@@ -44,21 +44,24 @@ def spacy_doc_ent_to_html(spacy_doc: spacy_lib.tokens.doc.Doc) -> weave.ops.Html
     return weave.ops.Html(html)
 
 
-@weave.op()
-def spacy_doc_render(
-    spacy_doc: weave.Node[spacy_lib.tokens.doc.Doc],
-) -> weave.panels.Card:
-    return weave.panels.Card(
-        title="Spacy Visualization",
-        subtitle="",
-        content=[
-            weave.panels.CardTab(
-                name="Dependencies",
-                content=weave.panels.PanelHtml(spacy_doc_dep_to_html(spacy_doc)),  # type: ignore
-            ),
-            weave.panels.CardTab(
-                name="Named Entities",
-                content=weave.panels.PanelHtml(spacy_doc_ent_to_html(spacy_doc)),  # type: ignore
-            ),
-        ],
-    )
+@weave.type()
+class SpacyDocPanel(weave.Panel):
+    id = "SpacyDocPanel"
+    input_node: weave.Node[spacy_lib.tokens.doc.Doc]
+
+    @weave.op()
+    def render(self) -> weave.panels.Card:
+        return weave.panels.Card(
+            title="Spacy Visualization",
+            subtitle="",
+            content=[
+                weave.panels.CardTab(
+                    name="Dependencies",
+                    content=weave.panels.PanelHtml(spacy_doc_dep_to_html(self.input_node)),  # type: ignore
+                ),
+                weave.panels.CardTab(
+                    name="Named Entities",
+                    content=weave.panels.PanelHtml(spacy_doc_ent_to_html(self.input_node)),  # type: ignore
+                ),
+            ],
+        )

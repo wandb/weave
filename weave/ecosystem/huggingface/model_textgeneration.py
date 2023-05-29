@@ -45,20 +45,25 @@ class FullTextGenerationPipelineOutput(hfmodel.FullPipelineOutput):
 FullTextGenerationPipelineOutputType.instance_classes = FullTextGenerationPipelineOutput
 
 
-@weave.op()
-def full_text_generation_output_render(
-    output_node: weave.Node[FullTextGenerationPipelineOutput],
-) -> weave.panels.Group:
-    output = typing.cast(FullTextGenerationPipelineOutput, output_node)
-    return weave.panels.Group(
-        preferHorizontal=True,
-        items={
-            "input": weave.panels.LabeledItem(label="input", item=output.model_input),
-            "output": weave.panels.LabeledItem(
-                label="output", item=output.model_output
-            ),
-        },
-    )
+@weave.type()
+class FullTextGenerationPanel(weave.Panel):
+    id = "FullTextGenerationPanel"
+    input_node: weave.Node[FullTextGenerationPipelineOutput]
+
+    @weave.op()
+    def render(self) -> weave.panels.Group:
+        output = typing.cast(FullTextGenerationPipelineOutput, self.input_node)
+        return weave.panels.Group(
+            preferHorizontal=True,
+            items={
+                "input": weave.panels.LabeledItem(
+                    label="input", item=output.model_input
+                ),
+                "output": weave.panels.LabeledItem(
+                    label="output", item=output.model_output
+                ),
+            },
+        )
 
 
 @weave.weave_class(weave_type=HFModelTextGenerationType)

@@ -5,6 +5,7 @@ from .. import api as weave
 from .. import ops
 from .. import op_def
 from .. import panels
+from .. import panel
 from weave import context_state
 
 loading_builtins_token = context_state.set_loading_built_ins()
@@ -27,6 +28,7 @@ Click the links in the sidebar to get started.
 from .. import registry_mem
 
 op_org_name = registry_mem.memory_registry.get_op("user-name")
+
 
 # TODO: using TypedDict here so we get automatic Object rendering
 # But it'd be nice to use @weave.type() style so we have '.' attribute access instead
@@ -79,79 +81,83 @@ def ecosystem() -> Ecosystem:
     )
 
 
-@weave.op()
-def ecosystem_render(
-    ecosystem: weave.Node[Ecosystem],
-) -> panels.Card:
-    return panels.Card(
-        title="Weave",
-        subtitle="",
-        content=[
-            panels.CardTab(
-                name="Intro",
-                content=panels.PanelMarkdown(INTRO),  # type: ignore
-            ),
-            panels.CardTab(
-                name="Organizations",
-                content=panels.Table(
-                    weave.save(
-                        [
-                            "wandb",
-                            "huggingface",
-                            "deepmind",
-                            "blueriver",
-                            "google",
-                            "openai",
-                            "microsoft",
-                        ],
-                        name="org_list",
-                    ),
-                    columns=[
-                        lambda org_name: panels.WeaveLink(
-                            org_name, lambda org_name: ops.entity(org_name)  # type: ignore
-                        )  # type: ignore
-                    ],
-                ),  # type: ignore
-            ),
-            panels.CardTab(
-                name="Packages",
-                content=panels.Table(
-                    ecosystem.packages(),  # type: ignore
-                    columns=[
-                        lambda pack: panels.WeaveLink(
-                            pack.op_name(),
-                            vars={"package_root_op": ops.call_op(pack.op_name())},
-                            to=lambda input, vars: vars["package_root_op"],
+@weave.type()
+class EcosystemPanel(panel.Panel):
+    id = "EcosystemPanel"
+    input_node: weave.Node[Ecosystem]
+
+    @weave.op()
+    def render(self) -> panels.Card:
+        ecosystem = self.input_node
+        return panels.Card(
+            title="Weave",
+            subtitle="",
+            content=[
+                panels.CardTab(
+                    name="Intro",
+                    content=panels.PanelMarkdown(INTRO),  # type: ignore
+                ),
+                panels.CardTab(
+                    name="Organizations",
+                    content=panels.Table(
+                        weave.save(
+                            [
+                                "wandb",
+                                "huggingface",
+                                "deepmind",
+                                "blueriver",
+                                "google",
+                                "openai",
+                                "microsoft",
+                            ],
+                            name="org_list",
                         ),
-                        lambda pack: pack.output_type(),
-                    ],
+                        columns=[
+                            lambda org_name: panels.WeaveLink(
+                                org_name, lambda org_name: ops.entity(org_name)  # type: ignore
+                            )  # type: ignore
+                        ],
+                    ),  # type: ignore
                 ),
-            ),
-            panels.CardTab(
-                name="Datasets",
-                content=panels.Table(
-                    ecosystem.datasets(),  # type: ignore
-                    columns=[
-                        lambda op: op.op_name(),
-                        lambda op: op.output_type(),
-                    ],
+                panels.CardTab(
+                    name="Packages",
+                    content=panels.Table(
+                        ecosystem.packages(),  # type: ignore
+                        columns=[
+                            lambda pack: panels.WeaveLink(
+                                pack.op_name(),
+                                vars={"package_root_op": ops.call_op(pack.op_name())},
+                                to=lambda input, vars: vars["package_root_op"],
+                            ),
+                            lambda pack: pack.output_type(),
+                        ],
+                    ),
                 ),
-            ),
-            panels.CardTab(
-                name="Models", content=panels.Table(ecosystem.models())  # type: ignore
-            ),
-            panels.CardTab(
-                name="Ops",
-                content=panels.Table(
-                    ecosystem.ops(),  # type: ignore
-                    columns=[
-                        lambda op: op.op_name(),
-                        lambda op: op.output_type(),
-                    ],
+                panels.CardTab(
+                    name="Datasets",
+                    content=panels.Table(
+                        ecosystem.datasets(),  # type: ignore
+                        columns=[
+                            lambda op: op.op_name(),
+                            lambda op: op.output_type(),
+                        ],
+                    ),
                 ),
-            ),
-        ],
-    )
+                panels.CardTab(
+                    name="Models", content=panels.Table(ecosystem.models())  # type: ignore
+                ),
+                panels.CardTab(
+                    name="Ops",
+                    content=panels.Table(
+                        ecosystem.ops(),  # type: ignore
+                        columns=[
+                            lambda op: op.op_name(),
+                            lambda op: op.output_type(),
+                        ],
+                    ),
+                ),
+            ],
+        )
 
 
 context_state.clear_loading_built_ins(loading_builtins_token)

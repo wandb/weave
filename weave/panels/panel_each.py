@@ -22,6 +22,7 @@ class EachConfig:
 @weave.type()
 class Each(panel.Panel):
     id = "Each"
+    input_node: graph.Node[list[typing.Any]]
     config: typing.Optional[EachConfig] = dataclasses.field(
         default_factory=lambda: None
     )

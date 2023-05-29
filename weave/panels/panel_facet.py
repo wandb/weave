@@ -41,6 +41,7 @@ class FacetConfig:
 @weave.type()
 class Facet(panel.Panel):
     id = "Facet"
+    input_node: weave.Node[list[typing.Any]]
     config: typing.Optional[FacetConfig] = None
 
     def __init__(self, input_node, vars=None, config=None, **options):

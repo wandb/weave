@@ -75,8 +75,11 @@ def shap_plot_text(shap_values: shap.Explanation) -> weave.ops.Html:
     return weave.ops.Html(html)
 
 
-@weave.op()
-def shap_plot_text_render(
-    shap_values: weave.Node[shap.Explanation],
-) -> weave.panels.PanelHtml:
-    return weave.panels.PanelHtml(shap_plot_text(shap_values))
+@weave.type()
+class ShapPlotText(weave.Panel):
+    id = "ShapPlotText"
+    input_node: weave.Node[shap.Explanation]
+
+    @weave.op()
+    def render(self) -> weave.panels.PanelHtml:
+        return weave.panels.PanelHtml(shap_plot_text(self.input_node))

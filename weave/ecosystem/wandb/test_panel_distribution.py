@@ -14,7 +14,7 @@ def test_flow():
             {"label": "y", "values": [random.gauss(9, 4) for i in range(5)]},
         ]
     )
-    panel = panel_distribution.MultiDistribution(
+    panel = panel_distribution.Distribution(
         items, value_fn=lambda x: x["values"], label_fn=lambda x: x["label"]
     )
 
@@ -25,7 +25,7 @@ def test_flow():
     config_node = weave_internal.make_const_node(weave.type_of(config_var), config_var)
 
     rendered = weave.use(
-        panel_distribution.multi_distribution_panel_plot(input_node, config_node)
+        panel_distribution.distribution_panel_plot_render(input_node, config_node)
     )
 
     rendered_config = rendered.config.series[0]

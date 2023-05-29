@@ -57,12 +57,6 @@ def test_large_const_node(test_artifact_dir):
             "type": "Group",
             "_base_type": {"type": "Panel", "_base_type": {"type": "Object"}},
             "_is_object": True,
-            "input_node": {
-                "type": "function",
-                "inputTypes": {},
-                "outputType": "invalid",
-            },
-            "vars": {"type": "typedDict", "propertyTypes": {}},
             "config": {
                 "type": "GroupConfig",
                 "_base_type": {"type": "Object"},
@@ -165,6 +159,20 @@ def test_large_const_node(test_artifact_dir):
                 "style": "string",
             },
             "id": "string",
+            "input_node": {
+                "type": "function",
+                "inputTypes": {},
+                "outputType": "unknown",
+            },
+            "vars": {
+                "type": "dict",
+                "key_type": "string",
+                "objectType": {
+                    "type": "function",
+                    "inputTypes": {},
+                    "outputType": "unknown",
+                },
+            },
         },
         "fromOp": {
             "name": "get",

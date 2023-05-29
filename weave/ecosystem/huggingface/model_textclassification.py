@@ -65,23 +65,26 @@ class ClassificationResult:
 ClassificationResultType.instance_classes = ClassificationResult
 
 
-@weave.op()
-def classification_result_render(
-    results: weave.Node[list[ClassificationResult]],
-) -> weave.panels.Table:
-    from .huggingface_models import huggingface
+@weave.type()
+class ClassificationResultPanel(weave.Panel):
+    id = "ClassificationResultPanel"
+    input_node: weave.Node[list[ClassificationResult]]
 
-    return weave.panels.Table(
-        results,
-        columns=[
-            lambda result_row: weave.panels.WeaveLink(
-                result_row.model_name(), to=lambda input: huggingface().model(input)  # type: ignore
-            ),
-            lambda result_row: result_row.model_input,
-            lambda result_row: result_row.score(),
-            lambda result_row: result_row.label(),
-        ],
-    )
+    @weave.op()
+    def render(self) -> weave.panels.Table:
+        from .huggingface_models import huggingface
+
+        return weave.panels.Table(
+            self.input_node,
+            columns=[
+                lambda result_row: weave.panels.WeaveLink(
+                    result_row.model_name(), to=lambda input: huggingface().model(input)  # type: ignore
+                ),
+                lambda result_row: result_row.model_input,
+                lambda result_row: result_row.score(),
+                lambda result_row: result_row.label(),
+            ],
+        )
 
 
 class TextClassificationPipelineOutput(typing.TypedDict):
@@ -106,25 +109,30 @@ FullTextClassificationPipelineOutputType.instance_classes = (
 )
 
 
-@weave.op()
-def full_text_classification_output_render(
-    output_node: weave.Node[FullTextClassificationPipelineOutput],
-) -> weave.panels.Group:
-    output = typing.cast(FullTextClassificationPipelineOutput, output_node)
-    return weave.panels.Group(
-        preferHorizontal=True,
-        items={
-            "input": weave.panels.LabeledItem(label="input", item=output.model_input),
-            "output": weave.panels.LabeledItem(
-                label="output",
-                item=weave.panels.Plot(
-                    input_node=typing.cast(weave.Node, output.model_output),
-                    x=lambda class_score: class_score["score"],
-                    y=lambda class_score: class_score["label"],
+@weave.type()
+class FullTextClassificationResultPanel(weave.Panel):
+    id = "FullTextClassificationResultPanel"
+    input_node: weave.Node[FullTextClassificationPipelineOutput]
+
+    @weave.op()
+    def render(self) -> weave.panels.Group:
+        output = typing.cast(FullTextClassificationPipelineOutput, self.input_node)
+        return weave.panels.Group(
+            preferHorizontal=True,
+            items={
+                "input": weave.panels.LabeledItem(
+                    label="input", item=output.model_input
                 ),
-            ),
-        },
-    )
+                "output": weave.panels.LabeledItem(
+                    label="output",
+                    item=weave.panels.Plot(
+                        input_node=typing.cast(weave.Node, output.model_output),
+                        x=lambda class_score: class_score["score"],
+                        y=lambda class_score: class_score["label"],
+                    ),
+                ),
+            },
+        )
 
 
 @weave.weave_class(weave_type=HFModelTextClassificationType)

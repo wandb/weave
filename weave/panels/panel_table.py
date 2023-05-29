@@ -26,6 +26,7 @@ class ColumnDef(typing.TypedDict):
 @weave.type("tablePanel")
 class Table(panel.Panel):
     id = "table"
+    input_node: weave.Node[list[typing.Any]]
     config: typing.Optional[TableConfig] = dataclasses.field(
         default_factory=lambda: None
     )

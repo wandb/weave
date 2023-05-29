@@ -23,6 +23,7 @@ class QueryConfig:
 @weave.type()
 class Query(panel.Panel):
     id = "Query"
+    input_node: weave.Node[list[typing.Any]]
     config: typing.Optional[QueryConfig] = dataclasses.field(
         default_factory=lambda: None
     )

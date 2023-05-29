@@ -6,11 +6,13 @@ from .. import panel
 from .. import panel_util
 from .. import graph
 
+CardContentType = typing.TypeVar("CardContentType")
+
 
 @weave.type()
-class CardTab:
+class CardTab(typing.Generic[CardContentType]):
     name: str
-    content: panel.Panel
+    content: CardContentType
 
 
 @weave.type()

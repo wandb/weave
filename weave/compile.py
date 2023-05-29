@@ -220,7 +220,7 @@ def _make_auto_op_map_fn(when_type: typing.Callable[[types.Type], bool], call_op
             op_def = registry_mem.memory_registry.get_op(node.from_op.name)
             if (
                 op_def.name == "tag-indexCheckpoint"
-                or op_def.name == "Object-__getattr__"
+                # or op_def.name == "Object-__getattr__"
                 or op_def.name == "set"
                 # panel_scatter and panel_distribution have the incorrect
                 # input types for their config arg. They should be weave.Node.

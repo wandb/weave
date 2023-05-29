@@ -32,62 +32,70 @@ def full_model_info_to_hfmodel(
     return hfmodel.HFModel(**kwargs)
 
 
-@weave.op()
-def models_render(
-    models: weave.Node[list[hfmodel.HFModel]],
-) -> weave.panels.Table:
-    return weave.panels.Table(
-        models,
-        columns=[
-            lambda model_row: weave.panels.WeaveLink(
-                model_row.id(), to=lambda input: huggingface().model(input)  # type: ignore
-            ),
-            lambda model_row: model_row.sha(),
-            lambda model_row: model_row.pipeline_tag(),
-            lambda model_row: model_row.tags(),
-            lambda model_row: model_row.downloads(),
-            lambda model_row: model_row.likes(),
-            lambda model_row: model_row.library_name(),
-        ],
-    )
+@weave.type()
+class HuggingfaceModelsPanel(weave.Panel):
+    id = "HuggingfaceModelsPanel"
+    input_node: weave.Node[list[hfmodel.HFModel]]
+
+    @weave.op()
+    def render(self) -> weave.panels.Table:
+        return weave.panels.Table(
+            self.input_node,
+            columns=[
+                lambda model_row: weave.panels.WeaveLink(
+                    model_row.id(), to=lambda input: huggingface().model(input)  # type: ignore
+                ),
+                lambda model_row: model_row.sha(),
+                lambda model_row: model_row.pipeline_tag(),
+                lambda model_row: model_row.tags(),
+                lambda model_row: model_row.downloads(),
+                lambda model_row: model_row.likes(),
+                lambda model_row: model_row.library_name(),
+            ],
+        )
 
 
-@weave.op(pure=False)
-def model_render(
-    model_node: weave.Node[hfmodel.HFModel],
-) -> weave.panels.Card:
-    model = typing.cast(hfmodel.HFModel, model_node)
-    return weave.panels.Card(
-        title=model.id(),
-        subtitle="HuggingFace Hub Model",
-        content=[
-            weave.panels.CardTab(
-                name="Model Card",
-                content=weave.panels.PanelMarkdown(model.readme()),  # type: ignore
-            ),
-            weave.panels.CardTab(
-                name="Metadata",
-                content=weave.panels.Group(
-                    items={
-                        "id": weave.panels.LabeledItem(item=model.id(), label="ID"),
-                        "pipeline_tag": weave.panels.LabeledItem(
-                            item=model.pipeline_tag(), label="Pipeline tag"
-                        ),
-                    }
+@weave.type()
+class HuggingfaceModelPanel(weave.Panel):
+    id = "HuggingfaceModelPanel"
+    input_node: weave.Node[hfmodel.HFModel]
+
+    @weave.op(pure=False)
+    def render(self) -> weave.panels.Card:
+        model = typing.cast(hfmodel.HFModel, self.input_node)
+        return weave.panels.Card(
+            title=model.id(),
+            subtitle="HuggingFace Hub Model",
+            content=[
+                weave.panels.CardTab(
+                    name="Model Card",
+                    content=weave.panels.PanelMarkdown(model.readme()),  # type: ignore
                 ),
-            ),
-            weave.panels.CardTab(
-                name="Inference Logs",
-                content=weave.panels.Table(
-                    weave.ops.used_by(model, model.call.name),
-                    columns=[
-                        lambda run: run.output.model_input,
-                        lambda run: run.output.model_output[0]["generated_text"],
-                    ],
+                weave.panels.CardTab(
+                    name="Metadata",
+                    content=weave.panels.Group(
+                        items={
+                            "id": weave.panels.LabeledItem(item=model.id(), label="ID"),
+                            "pipeline_tag": weave.panels.LabeledItem(
+                                item=model.pipeline_tag(), label="Pipeline tag"
+                            ),
+                        }
+                    ),
                 ),
-            ),
-        ],
-    )
+                # Broke in panel refactor. Don't have concrete op name available here so
+                # can't get the right type for the output.
+                # weave.panels.CardTab(
+                #     name="Inference Logs",
+                #     content=weave.panels.Table(
+                #         weave.ops.used_by(model, model.call.op_name()),
+                #         columns=[
+                #             lambda run: run.output.model_input,
+                #             lambda run: run.output.model_output[0]["generated_text"],
+                #         ],
+                #     ),
+                # ),
+            ],
+        )
 
 
 @weave.type()
@@ -122,15 +130,18 @@ def huggingface() -> HuggingFacePackage:
     return HuggingFacePackage()
 
 
-@weave.op()
-def hfm_render(
-    hfm_node: weave.Node[HuggingFacePackage],
-) -> weave.panels.Card:
-    hfm_node = typing.cast(HuggingFacePackage, hfm_node)  # type: ignore
-    return weave.panels.Card(
-        title="Huggingface Package",
-        subtitle="Browse Models and Datasets",
-        content=[
-            weave.panels.CardTab(name="Models", content=hfm_node.models()),  # type: ignore
-        ],
-    )
+@weave.type()
+class HuggingfacePackagePanel(weave.Panel):
+    id = "HuggingfacePackagePanel"
+    input_node: weave.Node[HuggingFacePackage]
+
+    @weave.op()
+    def render(self) -> weave.panels.Card:
+        pack = typing.cast(HuggingFacePackage, self.input_node)  # type: ignore
+        return weave.panels.Card(
+            title="Huggingface Package",
+            subtitle="Browse Models and Datasets",
+            content=[
+                weave.panels.CardTab(name="Models", content=pack.models()),  # type: ignore
+            ],
+        )
