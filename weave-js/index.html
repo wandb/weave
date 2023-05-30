@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<!--
+  We disable Google Translate because it does not play well with React 16
+  See https://github.com/facebook/react/issues/11538
+-->
+<html lang="en" class="notranslate">
+  <head>
+    <!-- anti-flicker snippet for Google Optimize -->
+    <style>
+      .async-hide {
+        opacity: 0 !important;
+      }
+    </style>
+    <meta name="robots" content="max-image-preview:large" />
+    <!--ROBOTS_TAG_PLACEHOLDER-->
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="functions-insert-dynamic-og" />
+    <meta name="functions-insert-dynamic-meta" />
+    <meta name="referrer" content="no-referrer-when-downgrade" />
+    <link rel="icon" href="/favicon.ico" />
+    <title>Weave Panel</title>
+  </head>
+
+  <script src="./env.js" type="module"></script>
+  <body>
+    <div id="root"></div>
+
+    <script type="module" src="./src/entrypoint.tsx"></script>
+  </body>
+</html>

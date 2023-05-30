@@ -1,0 +1,714 @@
+// These definitions are needed by Weave Python, do not delete them.
+// The primary reason we still need these is for ops that have refineType
+// methods that cannot be expressed as Weave DAGs yet. So we reimplement
+// the refine logic in JS to make things work.
+
+import * as _ from 'lodash';
+
+import {
+  ALL_DIR_TYPE,
+  constNumber,
+  dict,
+  filePathToType,
+  isConstType,
+  isSimpleTypeShape,
+  isTaggedValue,
+  isTaggedValueLike,
+  isTypedDict,
+  isUnion,
+  list,
+  nonNullable,
+  taggedValue,
+  taggedValueValueType,
+  Type,
+  typedDict,
+  union,
+} from '../../model';
+import {ALL_BASIC_TYPES, ListType} from '../../model/types';
+import {makeOp} from '../../opStore';
+import {opIndex} from '../primitives';
+
+// import * as TypeHelpers from '../model/typeHelpers';
+// import * as Types from '../model/types';
+// import {opIndex} from '../ops.primitives';
+
+function valToTypeSimple(val: any): Type {
+  if (typeof val === 'string' || val === null) {
+    return 'string';
+  } else if (typeof val === 'number') {
+    return 'number';
+  } else if (typeof val === 'boolean') {
+    return 'boolean';
+  } else {
+    return 'any';
+  }
+}
+
+export const opDirOpenReturnType = makeOp({
+  hidden: true,
+  name: 'dir-pathReturnType',
+  description: 'hello',
+  argDescriptions: {
+    conf: 'hello',
+    size: 'hello',
+  },
+  returnValueDescription: 'hello',
+  argTypes: {
+    dir: {type: 'dir'},
+    path: 'string',
+  },
+  returnType: inputTypes => 'type',
+  resolver: ({path}) => {
+    throw new Error('not implemented');
+  },
+});
+
+export const opDirOpen = makeOp({
+  hidden: true,
+  name: 'dir-path',
+  description: 'hello',
+  argDescriptions: {
+    conf: 'hello',
+    size: 'hello',
+  },
+  returnValueDescription: 'hello',
+  argTypes: {
+    dir: ALL_DIR_TYPE,
+    path: 'string',
+  },
+  returnType: inputTypes => ({type: 'file'}),
+  resolver: ({path}) => {
+    throw new Error('not implemented');
+  },
+  resolveOutputType: async (node, executableNode, client) => {
+    const typeNode = opDirOpenReturnType(executableNode.fromOp.inputs as any);
+    let newType: Type = await client.query(typeNode);
+    if (!isSimpleTypeShape(newType) && (newType as any).type === 'local_file') {
+      newType = filePathToType(
+        (executableNode.fromOp.inputs.path as any).val as any
+      );
+    }
+    return {
+      ...node,
+      type: newType,
+    };
+  },
+});
+
+export const opLocalArtifact = makeOp({
+  hidden: true,
+  name: 'root-localArtifact',
+  description: 'hello',
+  argDescriptions: {
+    conf: 'hello',
+    size: 'hello',
+  },
+  returnValueDescription: 'hello',
+  renderInfo: {type: 'function'},
+  argTypes: {
+    path: 'string',
+  },
+  returnType: inputTypes => 'artifactVersion',
+  resolver: ({path}) => {
+    throw new Error('not implemented');
+  },
+});
+
+export const opRootString = makeOp({
+  hidden: true,
+  name: 'root-string',
+  description: 'hello',
+  argDescriptions: {
+    conf: 'hello',
+    size: 'hello',
+  },
+  returnValueDescription: 'hello',
+  renderInfo: {type: 'function'},
+  argTypes: {
+    v: 'string',
+  },
+  returnType: inputTypes => 'string',
+  resolver: ({path}) => {
+    throw new Error('not implemented');
+  },
+});
+
+export const opLocalArtifactGet = makeOp({
+  hidden: true,
+  name: 'localArtifact-get',
+  description: 'hello',
+  argDescriptions: {
+    conf: 'hello',
+    size: 'hello',
+  },
+  returnValueDescription: 'hello',
+  argTypes: {
+    artifact: 'artifactVersion',
+    name: 'string',
+  },
+  returnType: inputTypes => ({
+    type: 'file',
+    extension: 'json',
+    wbObjectType: {type: 'image-file'},
+  }),
+  resolver: ({path}) => {
+    throw new Error('not implemented');
+  },
+});
+
+export const opSnowflakeTable = makeOp({
+  hidden: true,
+  name: 'local-snowflaketable',
+  description: 'hello',
+  argDescriptions: {
+    conf: 'hello',
+    size: 'hello',
+  },
+  returnValueDescription: 'hello',
+  renderInfo: {type: 'function'},
+  argTypes: {
+    path: 'string',
+  },
+  returnType: inputTypes => list(typedDict({})),
+  resolver: ({path}) => {
+    throw new Error('not implemented');
+  },
+  resolveOutputType: async (node, executableNode, client) => {
+    const firstRowNode = opIndex({arr: executableNode, index: constNumber(1)});
+    const firstRow = await client.query(firstRowNode);
+    let newType: Type = list(typedDict({}));
+
+    if (firstRow != null) {
+      newType = list(typedDict(_.mapValues(firstRow, v => valToTypeSimple(v))));
+    }
+    return {
+      ...node,
+      type: newType,
+    };
+  },
+});
+
+export const opSqlConn = makeOp({
+  name: 'local-sqlconnection',
+  description: 'hello',
+  argDescriptions: {
+    conf: 'hello',
+    size: 'hello',
+  },
+  returnValueDescription: 'hello',
+  renderInfo: {type: 'function'},
+  argTypes: {
+    path: 'string',
+  },
+  returnType: inputTypes => 'sqlconnection',
+  resolver: ({path}) => {
+    throw new Error('not implemented');
+  },
+});
+
+export const opSqlConnTables = makeOp({
+  hidden: true,
+  name: 'sqlconnection-tables',
+  description: 'hello',
+  argDescriptions: {
+    conf: 'hello',
+    size: 'hello',
+  },
+  returnValueDescription: 'hello',
+  argTypes: {
+    conn: 'sqlconnection',
+  },
+  returnType: inputTypes => typedDict({}),
+  resolver: ({path}) => {
+    throw new Error('not implemented');
+  },
+  resolveOutputType: async (node, executableNode, client) => {
+    const firstRowNode = opSqlConnTablesType({
+      conn: executableNode.fromOp.inputs.conn as any,
+    });
+    const newType: Type = await client.query(firstRowNode);
+    return {
+      ...node,
+      type: newType,
+    };
+  },
+});
+
+export const opSqlConnTablesType = makeOp({
+  hidden: true,
+  name: 'sqlconnection-tablesType',
+  description: 'hello',
+  argDescriptions: {
+    conf: 'hello',
+    size: 'hello',
+  },
+  returnValueDescription: 'hello',
+  renderInfo: {type: 'function'},
+  argTypes: {
+    conn: 'sqlconnection',
+  },
+  returnType: inputTypes => 'type',
+  resolver: ({path}) => {
+    throw new Error('not implemented');
+  },
+});
+
+export const opSqlConnTable = makeOp({
+  hidden: true,
+  name: 'sqlconnection-table',
+  description: 'hello',
+  argDescriptions: {
+    conf: 'hello',
+    size: 'hello',
+  },
+  returnValueDescription: 'hello',
+  argTypes: {
+    conn: 'sqlconnection',
+    name: 'string',
+  },
+  returnType: inputTypes => typedDict({}),
+  resolver: ({path}) => {
+    throw new Error('not implemented');
+  },
+  resolveOutputType: async (node, executableNode, client) => {
+    const firstRowNode = opIndex({arr: executableNode, index: constNumber(1)});
+    const firstRow = await client.query(firstRowNode);
+    let newType: Type = list(typedDict({}));
+
+    if (firstRow != null) {
+      newType = list(typedDict(_.mapValues(firstRow, v => valToTypeSimple(v))));
+    }
+    return {
+      ...node,
+      type: newType,
+    };
+  },
+});
+
+export const opGetReturnType = makeOp({
+  hidden: true,
+  name: 'getReturnType',
+  description: 'hello',
+  argDescriptions: {
+    conf: 'hello',
+    size: 'hello',
+  },
+  returnValueDescription: 'hello',
+  renderInfo: {type: 'function'},
+  argTypes: {
+    path: 'string',
+  },
+  returnType: inputTypes => 'type',
+  resolver: ({path}) => {
+    throw new Error('not implemented');
+  },
+});
+
+export const opGet = makeOp({
+  hidden: true,
+  name: 'get',
+  renderInfo: {type: 'function'},
+  description: 'hello',
+  argDescriptions: {
+    conf: 'hello',
+    size: 'hello',
+  },
+  returnValueDescription: 'hello',
+  argTypes: {
+    uri: 'string',
+  },
+  returnType: inputTypes => 'any',
+  resolver: ({path}) => {
+    throw new Error('not implemented');
+  },
+  resolveOutputType: async (node, executableNode, client) => {
+    const typeNode = opGetReturnType(executableNode.fromOp.inputs as any);
+    const newType: Type = await client.query(typeNode);
+    return {
+      ...node,
+      type: newType,
+    };
+  },
+});
+export const opSave = makeOp({
+  hidden: true,
+  name: 'save',
+  description: 'hello',
+  argDescriptions: {
+    obj: 'hello',
+    name: 'hello',
+  },
+  returnValueDescription: 'hello',
+  argTypes: {
+    obj: 'any',
+    name: 'string',
+  },
+  returnType: inputTypes => inputTypes.obj.type,
+  resolver: ({path}) => {
+    throw new Error('not implemented');
+  },
+});
+
+export const opArtifactVersionFileType = makeOp({
+  hidden: true,
+  name: 'artifactVersion-fileReturnType',
+  description: 'hello',
+  argDescriptions: {
+    conf: 'hello',
+    size: 'hello',
+  },
+  returnValueDescription: 'hello',
+  renderInfo: {type: 'function'},
+  argTypes: {
+    path: 'string',
+  },
+  returnType: inputTypes => 'type',
+  resolver: ({path}) => {
+    throw new Error('not implemented');
+  },
+});
+
+export const opRefGet = makeOp({
+  hidden: false,
+  name: 'Ref-get',
+  description: 'hello',
+  argDescriptions: {
+    conf: 'hello',
+    size: 'hello',
+  },
+  returnValueDescription: 'hello',
+  argTypes: {
+    self: {
+      type: 'union',
+      members: [
+        {type: 'Ref' as any, objectType: 'any'},
+        {type: 'FilesystemArtifactRef', objectType: 'any'},
+      ],
+    },
+  },
+  returnType: inputTypes => {
+    const selfType = inputTypes.self.type;
+    if (isUnion(selfType)) {
+      return union(selfType.members.map(m => m.objectType));
+    }
+    return (inputTypes.self.type as any).objectType;
+  },
+  resolver: ({path}) => {
+    throw new Error('not implemented');
+  },
+});
+
+export const opExecute = makeOp({
+  hidden: true,
+  name: 'execute',
+  description: 'hello',
+  argDescriptions: {
+    conf: 'hello',
+    size: 'hello',
+  },
+  returnValueDescription: 'hello',
+  argTypes: {
+    node: {type: 'function', inputTypes: {}, outputType: 'any'},
+  },
+  returnType: inputTypes => inputTypes.node.type.outputType,
+  resolver: ({path}) => {
+    throw new Error('not implemented');
+  },
+});
+
+export const opFunctionCall = makeOp({
+  hidden: true,
+  name: 'function-__call__',
+  argTypes: {
+    self: {type: 'function', inputTypes: {}, outputType: 'any'},
+  },
+  returnType: inputTypes => inputTypes.self.type.outputType,
+  resolver: ({path}) => {
+    throw new Error('not implemented');
+  },
+});
+
+export const opScatterSelected = makeOp({
+  hidden: true,
+  name: 'Scatter-selected',
+  argTypes: {
+    self: {type: 'Scatter'} as any,
+  },
+  returnType: inputTypes => {
+    // Note ! Somethign is wrong here. self is a ConstNode,
+    // not a type!
+    // TODO: FIX!
+    return inputTypes.self.type.input_node.outputType;
+  },
+  resolver: ({path}) => {
+    throw new Error('not implemented');
+  },
+});
+
+export const opGeoSelected = makeOp({
+  hidden: true,
+  name: 'Geo-selected',
+  argTypes: {
+    self: {type: 'Geo'} as any,
+  },
+  returnType: inputTypes => {
+    // Note ! Somethign is wrong here. self is a ConstNode,
+    // not a type!
+    // TODO: FIX!
+    return inputTypes.self.type.input_node.outputType;
+  },
+  resolver: ({path}) => {
+    throw new Error('not implemented');
+  },
+});
+
+export const opFacetSelected = makeOp({
+  hidden: true,
+  name: 'Facet-selected',
+  argTypes: {
+    self: {type: 'Facet'} as any,
+  },
+  returnType: inputTypes => {
+    // Note ! Somethign is wrong here. self is a ConstNode,
+    // not a type!
+    // TODO: FIX!
+    return inputTypes.self.type.input_node.outputType;
+  },
+  resolver: ({path}) => {
+    throw new Error('not implemented');
+  },
+});
+
+const unwrapConstType = (type: Type): Type => {
+  if (isConstType(type)) {
+    if (type.valType === 'type') {
+      return unwrapConstType(type.val);
+    } else {
+      return unwrapConstType(type.valType);
+    }
+  }
+  return type;
+};
+
+// This Op is a WIP - we are currently iterating on the design of Types
+// which will result in refactoring this op to be more generic. Ultimately,
+// we should not have all these conditionals to handle different circumstances.
+// For now we will check this in and keep moving forward.
+export const opObjGetAttr = makeOp({
+  hidden: true,
+  name: 'Object-__getattr__',
+  argTypes: {
+    self: 'any',
+    name: 'string',
+  },
+  returnType: inputNodes => {
+    let selfType = unwrapConstType(inputNodes.self.type);
+    // If the name node is not a const, then we have no idea what the return will be.
+    if (inputNodes.name.nodeType !== 'const') {
+      return 'unknown';
+      // If the self node is of type `type`, then we have three special cases:
+    } else if (isSimpleTypeShape(selfType) && selfType === 'type') {
+      // First, a special case where we are getting the `property_types` off of the `dict` type. (support both python and ts casings)
+      if (
+        inputNodes.name.val === 'property_types' ||
+        inputNodes.name.val === 'propertyTypes'
+      ) {
+        return dict('type');
+        // Next, we are getting the members of a union
+      } else if (inputNodes.name.val === 'members') {
+        return list('type');
+      }
+      return 'type';
+    }
+
+    // If we made it this far, we are assuming that they input type is a subclass of `objectType`
+    const key = inputNodes.name.val;
+    if (isTaggedValueLike(selfType)) {
+      selfType = taggedValueValueType(selfType);
+    }
+    if (!(selfType as any)._is_object) {
+      console.warn(
+        'encountered invalid type for Object-__getattr__ return type: ',
+        inputNodes.self.type
+      );
+      return 'unknown';
+    }
+    const propertyTypes = selfType as any;
+    const propertyType = propertyTypes[key];
+    if (propertyType == null) {
+      return 'unknown';
+    }
+    return propertyType;
+  },
+  resolver: inputs => {
+    let self = inputs.self;
+    if (self == null) {
+      return null;
+    }
+    // In the very specific case that the incoming object itself is a const type...
+    if (self.type === 'const') {
+      // If the property is a valid const property...
+      if (inputs.name === 'val') {
+        return self.val;
+      } else if (inputs.name === 'valType') {
+        return self.valType;
+      }
+      self = unwrapConstType(self);
+    }
+
+    // Next, in the specific case that we are getting the `property_types` off of a dictionary... (support both python and ts casings)
+    if (inputs.name === 'property_types' || inputs.name === 'propertyTypes') {
+      if (self.propertyTypes != null) {
+        return self.propertyTypes;
+      }
+    }
+
+    // Next, in the specific case that we are getting `object_type` from a list (support both python and ts casings)
+    if (inputs.name === 'object_type' || inputs.name === 'objectType') {
+      if (self.objectType != null) {
+        return self.objectType;
+      }
+    }
+
+    // // Finally, in the case that we are getting a property off of an object...
+    return self[inputs.name];
+  },
+});
+
+export const opTypeNewType = makeOp({
+  hidden: true,
+  name: 'type-__newType__',
+  argTypes: {
+    name: 'string',
+    manyX: 'unknown',
+  },
+  returnType: 'type',
+  resolver: inputs => {
+    if (ALL_BASIC_TYPES.includes(inputs.name)) {
+      return inputs.name;
+    } else {
+      return {
+        type: inputs.name,
+        ..._.mapValues(_.omit(inputs, 'name'), (val, key) => {
+          if (val.type === 'const') {
+            if (val.valType === 'type') {
+              val = val.val;
+            } else {
+              val = val.valType;
+            }
+          }
+          return val;
+        }),
+      };
+    }
+  },
+});
+
+export const opGetTagType = makeOp({
+  hidden: true,
+  name: 'op_get_tag_type',
+  argTypes: {
+    obj_type: 'type',
+  },
+  returnType: 'type',
+  resolver: inputs => {
+    if (isTaggedValue(inputs.obj_type)) {
+      return inputs.obj_type.tag;
+    }
+    return 'none';
+  },
+});
+
+export const opMakeTypeTagged = makeOp({
+  hidden: true,
+  name: 'op_make_type_tagged',
+  argTypes: {
+    obj_type: 'type',
+    tag_type: 'type',
+  },
+  returnType: 'type',
+  resolver: inputs => {
+    if (isTypedDict(inputs.tag_type)) {
+      taggedValue(inputs.tag_type, inputs.obj_type);
+    }
+    return inputs.obj_type;
+  },
+});
+
+export const opMakeTypeKeyTag = makeOp({
+  hidden: true,
+  name: 'op_make_type_key_tag',
+  argTypes: {
+    obj_type: 'type',
+    key: 'string',
+    tag_type: 'type',
+  },
+  returnType: 'type',
+  resolver: inputs => {
+    let currentTags = {[inputs.key]: inputs.tag_type};
+    if (isTaggedValue(inputs.tag_type) && isTypedDict(inputs.tag_type.tag)) {
+      currentTags = {...currentTags, ...inputs.tag_type.tag.propertyTypes};
+    }
+    if (isTypedDict(inputs.tag_type)) {
+      taggedValue(inputs.tag_type, inputs.obj_type);
+    }
+    return taggedValue(typedDict(currentTags), inputs.obj_type);
+  },
+});
+
+export const opNonNone = makeOp({
+  hidden: true,
+  name: 'op-non_none',
+  argTypes: {
+    obj_type: 'type',
+  },
+  returnType: 'type',
+  resolver: inputs => {
+    return nonNullable(inputs.obj_type);
+  },
+});
+
+export const opToPy = makeOp({
+  hidden: true,
+  name: 'op-to_py',
+  argTypes: {
+    self: 'any',
+  },
+  returnType: inputNodes => inputNodes.self.type,
+  resolver: inputs => {
+    throw new Error('cant resolve op-to_py in js');
+  },
+});
+
+export const opCrossProduct = makeOp({
+  name: 'op-cross_product',
+  renderInfo: {
+    type: 'function',
+  },
+  description: 'hello',
+  argDescriptions: {
+    conf: 'hello',
+    size: 'hello',
+  },
+  returnValueDescription: 'hello',
+  argTypes: {
+    obj: {
+      type: 'dict',
+      objectType: {
+        type: 'list',
+        objectType: 'any',
+      },
+    },
+  },
+  returnType: inputNodes => {
+    const objType = inputNodes.obj.type as Type;
+    if (isTypedDict(objType)) {
+      const newPropTypes = _.mapValues(
+        objType.propertyTypes,
+        propType => (propType as ListType).objectType
+      );
+      return {type: 'list', objectType: typedDict(newPropTypes)};
+    }
+    throw new Error('unhandled type in op-cross-product');
+  },
+});

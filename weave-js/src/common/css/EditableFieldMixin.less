@@ -1,0 +1,151 @@
+@import './globals.less';
+.editable-field-mixin( @iconSize: 16px;
+@iconColor: @gray400;
+@iconWidth: 24px;
+@iconVerticalOffset: -6px;
+@iconRightMargin: 8px;
+@labelFontSize: 13px;
+@labelTextTransform: uppercase;
+@labelWidth: 110px;
+@fieldFontSize: inherit;
+@fieldFontFamily: inherit;
+@fieldFontColor: @textPrimary;
+@fieldFontOpacity: 1;
+@fieldLineHeight: inherit;
+@placeholderColor: @gray500) {
+    display: flex;
+    align-items: center;
+    margin: 8px 0;
+    i.icon.label-icon {
+        font-size: @iconSize;
+        color: @iconColor;
+        width: @iconWidth;
+        flex-shrink: 0;
+        margin-top: @iconVerticalOffset;
+        margin-right: @iconRightMargin;
+    }
+    label {
+        text-transform: @labelTextTransform;
+        width: @labelWidth;
+        flex-shrink: 0;
+        font-size: @labelFontSize;
+        color: @gray700;
+        margin-top: 2px;
+        align-self: flex-start;
+    }
+    .field-content,
+    .ui.header.field-content {
+        padding: 4px 8px;
+        margin: -4px -8px;
+        border-radius: 4px;
+        white-space: pre-wrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-size: @fieldFontSize;
+        font-family: @fieldFontFamily;
+        color: @fieldFontColor;
+        line-height: @fieldLineHeight;
+        opacity: @fieldFontOpacity;
+        &.placeholder {
+            color: @placeholderColor;
+        }
+    }
+    &:not(.read-only):hover {
+        cursor: pointer;
+        .field-content,
+        .ui.header.field-content {
+            background: rgba(0, 0, 0, 0.05);
+        }
+    }
+    .input-url-http {
+        color: @placeholderColor;
+        margin-right: -8px;
+    }
+    .ui.input {
+        margin: -4px -8px;
+        input {
+            font-size: @fieldFontSize;
+            font-family: @fieldFontFamily;
+            color: @fieldFontColor;
+            line-height: @fieldLineHeight;
+            opacity: @fieldFontOpacity;
+            border: none;
+            padding: 4px 8px;
+            width: 100%;
+            background: none !important;
+            &:focus {
+                color: @fieldFontColor;
+            }
+            &::placeholder,
+            &:focus::placeholder {
+                color: @placeholderColor;
+            }
+        }
+    }
+    .save-action-wrapper {
+        height: 22px;
+        width: 26px;
+        text-align: center;
+        margin-left: 4px;
+    }
+    .ui.form {
+        width: 100%;
+        max-width: 800px;
+        textarea {
+            padding: 4px 8px;
+            margin: -4px -8px;
+            border: none;
+            box-shadow: none;
+            font-weight: normal;
+            background: none;
+            font-size: @fieldFontSize;
+            font-family: @fieldFontFamily;
+            color: @fieldFontColor;
+            line-height: @fieldLineHeight;
+            opacity: @fieldFontOpacity;
+            &:focus {
+                color: @fieldFontColor;
+            }
+            &::placeholder,
+            &:focus::placeholder {
+                color: @placeholderColor;
+            }
+        }
+    }
+    &.url {
+        .ui.input {
+            overflow: hidden;
+            padding-left: 8px;
+            width: 300px;
+            &::before {
+                margin-top: 4px;
+                content: 'http://';
+                font-size: @fieldFontSize;
+                font-family: @fieldFontFamily;
+                color: @placeholderColor;
+                line-height: @fieldLineHeight;
+            }
+            .url-http {
+                color: @placeholderColor;
+            }
+            input {
+                padding-left: 0;
+                width: 200px;
+        }
+        }
+        i.icon.goto-link-icon {
+            cursor: pointer;
+            color: @iconColor;
+            font-size: 20px;
+            margin-top: 2px;
+            margin-left: 6px;
+            &:hover {
+                color: @primaryText;
+            }
+        }
+    }
+    i.icon.wbic-ic-edit {
+        margin-left: 6px;
+        color: @gray500;
+    }
+}
