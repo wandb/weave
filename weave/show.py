@@ -33,7 +33,10 @@ def make_container(
 ) -> panel.Panel:
     from weave.panels import Group
 
-    return Group(preferHorizontal=True, showExpressions=True, items={name: obj})
+    if isinstance(obj, graph.Node):
+        return Group(preferHorizontal=True, showExpressions=True, items={name: obj})
+    else:
+        return obj
 
 
 def make_show_obj(obj: typing.Any) -> tuple[typing.Union[panel.Panel, graph.Node], str]:

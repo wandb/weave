@@ -1,4 +1,5 @@
 import logging
+import typing
 
 from . import graph
 from . import execute
@@ -15,7 +16,8 @@ from .language_features.tagging import tag_store
 
 from . import ref_base
 from . import cache_policy
-from . import object_context
+
+# from . import object_context
 
 
 def _execute_fn_no_engine(item, index, map_fn):
@@ -48,9 +50,9 @@ def _execute_fn_no_engine(item, index, map_fn):
 
 
 def _resolve_static_branches(map_fn):
-    result_store = forward_graph.get_or_create_node_result_store()
+    result_store = forward_graph.get_node_result_store()
     if isinstance(map_fn, graph.OutputNode):
-        if map_fn in result_store:
+        if result_store.has(map_fn):
             return graph.ConstNode(map_fn.type, result_store[map_fn])
 
         inputs = {
@@ -60,19 +62,13 @@ def _resolve_static_branches(map_fn):
 
         if map_fn.from_op.name == "function-__call__":
             # Special case to expand function calls
-            if isinstance(inputs["self"], graph.ConstNode):
-                # Weird case, sometimes we have a double-const
-                # function Const<Const<Function>>, that we __getattr__
-                # out in _resolve_static branches, wrapping it with a Const
-                # in the code below here.
-                # Other times we have we just <Const<Function>>. This happens
-                # in the Scatter-selected path for example, I'm not exactly sure
-                # why. Just patching here for now.
-                self = inputs["self"]
-                if isinstance(self, graph.ConstNode) and isinstance(
-                    self.val, graph.ConstNode
+            self = inputs["self"]
+            if isinstance(self, graph.ConstNode):
+                if isinstance(self.val, graph.ConstNode) and isinstance(
+                    self.val.type, types.Function
                 ):
                     self = self.val
+
                 res = weave_internal.better_call_fn(
                     self,
                     inputs["arg1"],
@@ -153,15 +149,6 @@ def _can_fast_map(map_fn):
     return len(not_fastmappable_nodes) == 0
 
 
-def _should_batch_cache(map_fn):
-    table_cache_nodes = graph.filter_nodes_full(
-        [map_fn],
-        lambda n: isinstance(n, graph.OutputNode)
-        and (cache_policy.should_table_cache(n.from_op.full_name)),
-    )
-    return len(table_cache_nodes) > 0
-
-
 def _slow_map_fn(input_list, map_fn):
     calls = []
     for i, row in enumerate(input_list):
@@ -174,9 +161,6 @@ def _slow_map_fn(input_list, map_fn):
                 },
             )
         )
-    if _should_batch_cache(map_fn):
-        with object_context.object_context():
-            return weave_internal.use(calls)
     return weave_internal.use(calls)
 
 
@@ -185,15 +169,16 @@ def fast_map_fn(input_list, map_fn):
     # TODO: Perform this recursively in the main compile pass
     tracer = engine_trace.tracer()
 
-    if not _can_fast_map(map_fn):
-        logging.warning("Cannot fast map, falling back to slow map for: %s", map_fn)
-        return _slow_map_fn(input_list, map_fn)
-
     # we can resolve any branches that do not have variable node ancestors
     # one time up front.
     with tracer.trace("fast_map:resolve_static"):
         map_fn = _resolve_static_branches(map_fn)
     # Need to compile again after resolving static branches.
+
+    if not _can_fast_map(map_fn):
+        logging.warning("Cannot fast map, falling back to slow map for: %s", map_fn)
+        return _slow_map_fn(input_list, map_fn)
+
     # For example, we may have fetched an expression out of a Const node.
     with tracer.trace("fast_map:compile2"):
         map_fn = compile.compile([map_fn])[0]

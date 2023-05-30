@@ -17,6 +17,7 @@ from .. import graph
 from .. import artifact_fs
 from ..ops_domain import wb_domain_types as wdt
 from ..ops_domain import artifact_membership_ops as amo
+from ..ops_arrow import ArrowWeaveListType
 from ..ops_primitives import list_, dict_
 from .. import weave_types as types
 from ..ops_primitives.file import _as_w0_dict_
@@ -1214,6 +1215,57 @@ def test_run_history(fake_wandb):
         r == None or isinstance(r, artifact_fs.FilesystemArtifactFile)
         for r in result[1]
     )
+
+
+def test_run_history_2(fake_wandb):
+    fake_wandb.fake_api.add_mock(run_history_mocker)
+    node = ops.project("stacey", "mendeleev").runs()[0].history2()
+    assert isinstance(node.type, TaggedValueType)
+    assert ArrowWeaveListType(
+        types.TypedDict(
+            {
+                "_step": types.Number(),
+                # we no longer send back system metrics
+                # "system/gpu.0.powerWatts": types.optional(types.Number()),
+                "epoch": types.optional(types.Number()),
+            }
+        )
+    ).assign_type(node.type.value)
+
+    # this should just return dummy history
+    assert weave.use(node).to_pylist_raw() == [{"_step": i} for i in range(10)]
+
+    # now we'll fetch a just one of the columns
+    new_node = node["epoch"]
+    assert ArrowWeaveListType(
+        types.optional(types.Number()),
+    ).assign_type(new_node.type.value)
+    assert weave.use(new_node).to_pylist_raw() == [
+        0,
+        None,
+        1,
+        None,
+        2,
+        None,
+        3,
+        None,
+        4,
+        None,
+    ]
+
+    # now we'll create a graph that fetches two columns and execute it
+    epoch_node = node["epoch"]
+    pred_node = node["_runtime"]
+    assert types.List(types.optional(types.Number())).assign_type(pred_node.type.value)
+
+    # simulates what a table call would do, selecting multiple columns
+    result = weave.use([epoch_node, pred_node])
+    assert len(result) == 2
+
+    # check the types, result lengths
+    assert all(len(r) == 10 for r in result)
+    assert all(r == None or isinstance(r, (int, float)) for r in result[0])
+    assert all(r == None or isinstance(r, (int, float)) for r in result[1])
 
 
 def run_history_as_of_mocker(q, ndx):

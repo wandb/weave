@@ -250,3 +250,24 @@ def test_lookup():
     l = weave.save([geom.Point2d(0, 5)])
     with pytest.raises(errors.WeaveDispatchError):
         l.lookup(0)
+
+
+def test_cross_product():
+    obj = weave.save({"a": ["x", "y", "z"], "b": [1, 2, 3]})
+    cp = list_.cross_product(obj)
+    assert cp.type == weave.types.List(
+        object_type=weave.types.TypedDict(
+            property_types={"a": weave.types.String(), "b": weave.types.Int()}
+        )
+    )
+    assert weave.use(cp) == [
+        {"a": "x", "b": 1},
+        {"a": "x", "b": 2},
+        {"a": "x", "b": 3},
+        {"a": "y", "b": 1},
+        {"a": "y", "b": 2},
+        {"a": "y", "b": 3},
+        {"a": "z", "b": 1},
+        {"a": "z", "b": 2},
+        {"a": "z", "b": 3},
+    ]

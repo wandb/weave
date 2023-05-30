@@ -7,6 +7,8 @@ from weave.graph import ConstNode, Node, OutputNode
 from .. import panel
 from . import table_state
 
+from .panel_query import Query
+
 
 @weave.type("tablePanelConfig")
 class TableConfig:
@@ -24,6 +26,7 @@ class ColumnDef(typing.TypedDict):
 @weave.type("tablePanel")
 class Table(panel.Panel):
     id = "table"
+    input_node: weave.Node[list[typing.Any]]
     config: typing.Optional[TableConfig] = dataclasses.field(
         default_factory=lambda: None
     )
@@ -70,7 +73,7 @@ class Table(panel.Panel):
         return result
 
 
-def _get_composite_group_key(self: Table) -> str:
+def _get_composite_group_key(self: typing.Union[Table, Query]) -> str:
     if self.config is None:
         return ""
     group_by_keys = self.config.tableState.groupBy
@@ -78,7 +81,7 @@ def _get_composite_group_key(self: Table) -> str:
     return ",".join(group_by_keys)
 
 
-def _get_pinned_node(self: Table, data_or_rows_node: Node) -> Node:
+def _get_pinned_node(self: typing.Union[Table, Query], data_or_rows_node: Node) -> Node:
     if self.config is None:
         return weave.ops.make_list()
 
@@ -241,6 +244,9 @@ def data_refine(self: Table) -> weave.types.Type:
 def data_single_refine(self: Table) -> weave.types.Type:
     if not hasattr(self.input_node.type, "object_type"):
         return weave.types.Any()
+    # input_node.type should be FunctionType (since its a Node)
+    # but for some reason its not.
+    # TODO: fix
     return weave.types.optional(self.input_node.type.object_type)  # type: ignore
 
 
@@ -254,14 +260,14 @@ def rows(self: Table):
     return weave_internal.use(rows_node)
 
 
+# Defined on both Table and Query
 @weave.op(
     name="panel_table-pinned_data",
-    # We can't use the refine_output_type here, because it will become
-    # non-weavifiable and not sent over the wire.
-    # output_type=lambda inputs: inputs['self'].input_node.output_type,
+    # we define output_type for pyton and refine_output_type for JS
+    output_type=lambda inputs: inputs["self"].input_node.output_type,
     refine_output_type=data_refine,
 )
-def pinned_data(self: Table) -> typing.List[typing.Any]:
+def pinned_data(self: typing.Union[Table, Query]):
     pinned_data_node = _get_pinned_node(self, self.input_node)
     return weave.use(pinned_data_node)
 

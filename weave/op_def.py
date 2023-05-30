@@ -415,9 +415,18 @@ class OpDef:
     def to_dict(self):
         output_type = self.raw_output_type
         if callable(output_type):
-            # Don't try to send ops with callable output types yet, code path
-            # not ready.
-            output_type = "any"
+            # We can't callable output types to JS yet.
+            if self.refine_output_type is not None:
+                # if we have a callable output type and refine, js can correctly
+                # make use of this op. We set our output type to concrete_output_type
+                # and rely on refinement to get the correct output type.
+                output_type = self.concrete_output_type.to_dict()
+            else:
+                # no refine and we have a callable output type. This
+                # can't be used by js at the moment.
+                raise errors.WeaveSerializeError(
+                    "op not serializable for weavejs: %s" % self.name
+                )
 
             # TODO: Consider removing the ability for an output_type to
             # be a function - they all must be Types or ConstNodes. Probably
@@ -455,6 +464,8 @@ class OpDef:
             serialized["render_info"] = self.render_info
         if self.refine_output_type is not None:
             serialized["refine_output_type_op_name"] = self.refine_output_type.name
+        if self.derived_ops and "mapped" in self.derived_ops:
+            serialized["mappable"] = True
 
         return serialized
 

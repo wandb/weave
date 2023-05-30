@@ -2,26 +2,46 @@ from enum import Enum
 import json
 import logging
 import typing
+import dataclasses
 
 from .. import api as weave
 
 
-class Result(typing.TypedDict):
+class StatusCode:
+    SUCCESS = "SUCCESS"
+    ERROR = "ERROR"
+
+
+class SpanKind:
+    LLM = "LLM"
+    CHAIN = "CHAIN"
+    AGENT = "AGENT"
+    TOOL = "TOOL"
+
+
+@weave.type()
+class Result:
     inputs: typing.Optional[typing.Dict[str, typing.Any]]
     outputs: typing.Optional[typing.Dict[str, typing.Any]]
 
 
-class Span(typing.TypedDict):
+@weave.type()
+class Span:
     span_id: typing.Optional[str]
-    name: typing.Optional[str]
+    # TODO: had to change this, what does it break?
+    _name: typing.Optional[str]
     start_time_ms: typing.Optional[int]
     end_time_ms: typing.Optional[int]
     status_code: typing.Optional[str]
     status_message: typing.Optional[str]
     attributes: typing.Optional[typing.Dict[str, typing.Any]]
-    results: typing.Optional[typing.List[Result]]
-    child_spans: typing.Optional[typing.List[dict]]
-    span_kind: typing.Optional[str]
+    results: typing.Optional[typing.List[Result]] = dataclasses.field(
+        default_factory=lambda: None
+    )
+    child_spans: typing.Optional[typing.List[dict]] = dataclasses.field(
+        default_factory=lambda: None
+    )
+    span_kind: typing.Optional[str] = dataclasses.field(default_factory=lambda: None)
 
 
 def stringified_output(obj: typing.Any) -> str:
@@ -38,9 +58,9 @@ def stringified_output(obj: typing.Any) -> str:
 
 
 def get_first_error(span: Span) -> typing.Optional[str]:
-    if span.get("status_code") == "ERROR":
-        return span.get("status_message") or ""
-    for child in span.get("child_spans") or []:
+    if span.status_code == "ERROR":
+        return span.status_message or ""
+    for child in span.child_spans or []:
         error = get_first_error(child)  # type: ignore
         if error is not None:
             return error
@@ -53,10 +73,10 @@ def get_trace_input_str(span: Span) -> str:
             "\n\n".join(
                 [
                     f"**{ndx}.{eKey}:** {eValue}"
-                    for eKey, eValue in (result.get("inputs") or {}).items()
+                    for eKey, eValue in (result.inputs or {}).items()
                 ]
             )
-            for ndx, result in enumerate(span.get("results") or [])
+            for ndx, result in enumerate(span.results or [])
         ]
     )
 
@@ -67,18 +87,18 @@ def get_trace_output_str(span: Span) -> str:
             "\n\n".join(
                 [
                     f"**{ndx}.{eKey}:** {eValue}"
-                    for eKey, eValue in (result.get("outputs") or {}).items()
+                    for eKey, eValue in (result.outputs or {}).items()
                 ]
             )
-            for ndx, result in enumerate(span.get("results") or [])
+            for ndx, result in enumerate(span.results or [])
         ]
     )
 
 
 def get_chain_repr(span: Span) -> str:
-    basic_name: str = span.get("name") or span.get("span_kind") or "Unknown"
+    basic_name: str = span._name or span.span_kind or "Unknown"
     inner_calls = []
-    for child in span.get("child_spans") or []:
+    for child in span.child_spans or []:
         inner_calls.append(get_chain_repr(child))  # type: ignore
     if len(inner_calls) == 0:
         return basic_name
@@ -97,32 +117,34 @@ class WBTraceTree:
     def startTime(self) -> typing.Optional[int]:
         try:
             root_span: Span = json.loads(self.root_span_dumps)
-            return root_span.get("start_time_ms")
+            return root_span.start_time_ms
         except Exception:
             logging.warning("Failed to parse root span")
             return None
 
     @weave.op()
     def traceSummaryDict(self) -> dict:
-        root_span: Span = {
-            "span_id": None,
-            "name": None,
-            "start_time_ms": None,
-            "end_time_ms": None,
-            "status_code": None,
-            "status_message": None,
-            "attributes": None,
-            "results": None,
-            "child_spans": None,
-            "span_kind": None,
-        }
+        root_span: Span = Span(
+            **{
+                "span_id": None,
+                "name": None,
+                "start_time_ms": None,
+                "end_time_ms": None,
+                "status_code": None,
+                "status_message": None,
+                "attributes": None,
+                "results": None,
+                "child_spans": None,
+                "span_kind": None,
+            }
+        )
         try:
             root_span = json.loads(self.root_span_dumps)
         except Exception:
             logging.warning("Failed to parse root span")
         return {
-            "isSuccess": root_span.get("status_code") in [None, "SUCCESS"],
-            "startTime": root_span.get("start_time_ms"),
+            "isSuccess": root_span.status_code in [None, "SUCCESS"],
+            "startTime": root_span.start_time_ms,
             "formattedInput": get_trace_input_str(root_span),
             "formattedOutput": get_trace_output_str(root_span),
             "formattedChain": get_chain_repr(root_span),

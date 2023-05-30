@@ -281,15 +281,15 @@ class Type(metaclass=_TypeSubclassWatcher):
         if next_type.name == "tagged":
             next_type = next_type._assignment_form  # type: ignore
 
+        is_assignable_to = next_type._is_assignable_to(self)
+        if is_assignable_to:
+            return True
+
         # Check class attribute directly instead of isinstance for performance
         if next_type.__class__ == UnionType:
             return all(self.assign_type(t) for t in next_type.members)  # type: ignore
         if self.__class__ == UnionType:
             return any(t.assign_type(next_type) for t in self.members)  # type: ignore
-
-        is_assignable_to = next_type._is_assignable_to(self)
-        if is_assignable_to:
-            return True
 
         return self._assign_type_inner(next_type)
 
@@ -519,7 +519,7 @@ class Const(Type):
             # fancier types. We can fix later if we need to.
             if self.__class__ != next_type.__class__:
                 return False
-            if self.val == next_type.val:
+            if self.val == None or self.val == next_type.val:
                 return True
         return False
 

@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import json
+import itertools
 import typing
 
 from . import projection_utils
@@ -740,11 +741,6 @@ def join_all(arrs, joinFn, outer: bool):
     return results
 
 
-@op(name="range")
-def op_range(start: int, stop: int, step: int) -> list[int]:
-    return list(range(start, stop, step))
-
-
 @op(
     name="table-2DProjection",
     input_type={
@@ -896,3 +892,29 @@ def object_lookup(arr, id):
         if row.id == id:
             return row
     return None
+
+
+def _cross_product_output_type(input_types):
+    obj_type = input_types["obj"]
+    if isinstance(obj_type, types.TypedDict):
+        new_prop_types = {}
+        for k, v in obj_type.property_types.items():
+            new_prop_types[k] = v.object_type
+        return types.List(
+            types.TypedDict(
+                {
+                    **new_prop_types,
+                }
+            )
+        )
+    return types.List(types.Dict(types.String(), types.String()))
+
+
+@op(render_info={"type": "function"}, output_type=_cross_product_output_type)
+def cross_product(obj: dict[str, list]):
+    keys = list(obj.keys())
+    values = list(obj.values())
+    res = []
+    for v in itertools.product(*values):
+        res.append(dict(zip(keys, v)))
+    return res

@@ -4,6 +4,8 @@ import dataclasses
 import pickle
 import torch
 import weave
+from ... import op_def_type
+
 
 import transformers
 
@@ -45,6 +47,7 @@ class HFModelType(weave.types.ObjectType):
             "_downloads": weave.types.Int(),
             "_likes": weave.types.Int(),
             "_library_name": weave.types.optional(weave.types.String()),
+            "call": op_def_type.OpDefType(),
         }
 
 
@@ -64,7 +67,7 @@ class HFModel:
     # Just putting it here to get nice autocomplete, but there's probably a better
     # and more general way to do this.
     # TODO: Fix
-    call: typing.ClassVar[weave.OpDef]
+    # call: weave.OpDef
 
     def tokenizer(self):
         return transformers.AutoTokenizer.from_pretrained(self._id)

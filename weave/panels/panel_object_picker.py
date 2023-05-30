@@ -22,16 +22,13 @@ class ObjectPicker(panel.Panel):
     config: ObjectPickerConfig = dataclasses.field(default_factory=ObjectPickerConfig)
 
     def __init__(self, input_node=graph.VoidNode(), vars=None, config=None, **options):
-        if vars is None:
-            vars = {}
+        super().__init__(input_node=input_node, vars=vars)
         self.config = config
         if self.config is None:
             self.config = ObjectPickerConfig()
         if "label" in options:
             self.config.label = options["label"]
-        super().__init__(input_node=input_node, vars=vars)
 
-    def __post_init__(self):
         # I originally tried to use a VarNode here. With the following comment:
         #   Set choice to a VarNode of the correct type (an item in our input
         #   list). This ensures that ObjectPickers stored in variables have a

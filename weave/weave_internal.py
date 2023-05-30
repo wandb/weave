@@ -33,7 +33,15 @@ def better_call_fn(weave_fn: graph.ConstNode, *inputs: graph.Frame) -> graph.Nod
     for input_name, input in zip(weave_fn.type.input_types.keys(), inputs):  # type: ignore
         call_inputs[input_name] = input
     res = call_fn(weave_fn.val, call_inputs)  # type: ignore
-    return make_output_node(res.type, res.from_op.name, res.from_op.inputs)  # type: ignore
+    # Convert to Runtime nodes so dispatch works.
+    if isinstance(res, graph.OutputNode):
+        return make_output_node(res.type, res.from_op.name, res.from_op.inputs)  # type: ignore
+    elif isinstance(res, graph.VarNode):
+        return make_var_node(res.type, res.name)
+    elif isinstance(res, graph.ConstNode):
+        return make_const_node(res.type, res.val)
+    else:
+        raise errors.WeaveInternalError("Invalid Node: %s" % res)
 
 
 def use(

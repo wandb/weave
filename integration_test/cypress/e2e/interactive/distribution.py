@@ -21,6 +21,6 @@ items = weave.save(
     ]
 )
 
-panel: wandb.MultiDistribution = wandb.MultiDistribution(items)
+panel: wandb.Distribution = wandb.Distribution(items)
 
 print(weave.show_url(panel))

@@ -18,12 +18,6 @@ def test_show_simple_call(cereal_csv):
             "type": "Group",
             "_base_type": {"type": "Panel", "_base_type": {"type": "Object"}},
             "_is_object": True,
-            "input_node": {
-                "type": "function",
-                "inputTypes": {},
-                "outputType": "invalid",
-            },
-            "vars": {"type": "typedDict", "propertyTypes": {}},
             "config": {
                 "type": "GroupConfig",
                 "_base_type": {"type": "Object"},
@@ -72,6 +66,20 @@ def test_show_simple_call(cereal_csv):
                 "style": "string",
             },
             "id": "string",
+            "input_node": {
+                "type": "function",
+                "inputTypes": {},
+                "outputType": "unknown",
+            },
+            "vars": {
+                "type": "dict",
+                "key_type": "string",
+                "objectType": {
+                    "type": "function",
+                    "inputTypes": {},
+                    "outputType": "unknown",
+                },
+            },
         },
         "fromOp": {
             "name": "get",

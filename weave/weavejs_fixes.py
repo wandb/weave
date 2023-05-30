@@ -37,7 +37,7 @@ def _convert_specific_opname_to_generic_opname(
         return "map", {"arr": inputs["self"], "mapFn": inputs["map_fn"]}
     elif name == "list-groupby":
         return "groupby", {"arr": inputs["self"], "groupByFn": inputs["group_by_fn"]}
-    elif name == "list-filter":
+    elif name == "list-filter" or name == "ArrowWeaveList-filter":
         return "filter", {"arr": inputs["self"], "filterFn": inputs["filter_fn"]}
     elif name == "list-__getitem__":
         return "index", {"arr": inputs["arr"], "index": inputs["index"]}

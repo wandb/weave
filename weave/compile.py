@@ -220,7 +220,7 @@ def _make_auto_op_map_fn(when_type: typing.Callable[[types.Type], bool], call_op
             op_def = registry_mem.memory_registry.get_op(node.from_op.name)
             if (
                 op_def.name == "tag-indexCheckpoint"
-                or op_def.name == "Object-__getattr__"
+                # or op_def.name == "Object-__getattr__"
                 or op_def.name == "set"
                 # panel_scatter and panel_distribution have the incorrect
                 # input types for their config arg. They should be weave.Node.
@@ -308,29 +308,50 @@ _quote_nodes_map_fn = _make_inverse_auto_op_map_fn(types.Function, _quote_node)
 def compile_apply_column_pushdown(leaf_nodes: list[graph.Node]) -> list[graph.Node]:
     # This is specific to project-runs2 (not yet used in W&B production) for now. But it
     # is a general pattern that will work for all arrow tables.
+
+    op_names = [
+        "project-runs2",
+        "run-history2",
+        "mapped_run-history2",
+        "run-history",
+        "mapped_run-history",
+    ]
+
     if not graph.filter_nodes_full(
         leaf_nodes,
-        lambda n: isinstance(n, graph.OutputNode) and n.from_op.name == "project-runs2",
+        lambda n: isinstance(n, graph.OutputNode) and n.from_op.name in op_names,
     ):
         return leaf_nodes
 
     p = stitch.stitch(leaf_nodes)
 
     def _replace_with_column_pushdown(node: graph.Node) -> graph.Node:
-        if isinstance(node, graph.OutputNode) and node.from_op.name == "project-runs2":
+        if isinstance(node, graph.OutputNode) and node.from_op.name in op_names:
             forward_obj = p.get_result(node)
             run_cols = compile_table.get_projection(forward_obj)
-            config_cols = list(run_cols.get("config", {}).keys())
-            summary_cols = list(run_cols.get("summary", {}).keys())
-            return graph.OutputNode(
-                node.type,
-                "project-runs2_with_columns",
-                {
-                    "project": node.from_op.inputs["project"],
-                    "config_cols": weave_internal.const(config_cols),
-                    "summary_cols": weave_internal.const(summary_cols),
-                },
-            )
+            if node.from_op.name == "project-runs2":
+                config_cols = list(run_cols.get("config", {}).keys())
+                summary_cols = list(run_cols.get("summary", {}).keys())
+                return graph.OutputNode(
+                    node.type,
+                    "project-runs2_with_columns",
+                    {
+                        "project": node.from_op.inputs["project"],
+                        "config_cols": weave_internal.const(config_cols),
+                        "summary_cols": weave_internal.const(summary_cols),
+                    },
+                )
+            if "run-history" in node.from_op.name:
+                history_cols = list(run_cols.keys())
+                if len(history_cols) > 0:
+                    return graph.OutputNode(
+                        node.type,
+                        node.from_op.name + "_with_columns",
+                        {
+                            "run": node.from_op.inputs["run"],
+                            "history_cols": weave_internal.const(history_cols),
+                        },
+                    )
         return node
 
     return graph.map_nodes_full(leaf_nodes, _replace_with_column_pushdown)

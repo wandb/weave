@@ -4,6 +4,7 @@
       "def": {
         "name": "int_concat",
         "input_types": { "a": "int", "b": "int" },
+        "mappable": true,
         "output_type": "string"
       },
       "example_io": [

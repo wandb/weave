@@ -30,6 +30,38 @@ class BranchPointType(typing.TypedDict):
     original_uri: str
 
 
+@dataclasses.dataclass
+class ArtifactMetadata:
+    """
+    Simple class to represent metadata for an artifact. Since
+    Artifacts can be any where between non-saved, saved, and mutated,
+    their metadata itself is split into two parts: mutable and readonly.
+
+    Mutable metadata is metadata takes precedence over readonly metadata.
+    """
+
+    _mutable_metadata: typing.Dict[str, typing.Any]
+    _readonly_metadata: typing.Dict[str, typing.Any]
+
+    def __getitem__(self, key: str) -> typing.Any:
+        return self._mutable_metadata.get(key, self._readonly_metadata.get(key))
+
+    def __setitem__(self, key: str, value: typing.Any) -> None:
+        self._mutable_metadata[key] = value
+
+    def __delitem__(self, key: str) -> None:
+        del self._mutable_metadata[key]
+
+    def __contains__(self, key: str) -> bool:
+        return key in self._mutable_metadata or key in self._readonly_metadata
+
+    def as_dict(self) -> typing.Dict[str, typing.Any]:
+        return {**self._readonly_metadata, **self._mutable_metadata}
+
+    def update(self, other: typing.Dict[str, typing.Any]) -> None:
+        self._mutable_metadata.update(other)
+
+
 class FilesystemArtifact(artifact_base.Artifact):
     RefClass: typing.ClassVar[typing.Type["FilesystemArtifactRef"]]
     name: str
@@ -108,6 +140,10 @@ class FilesystemArtifact(artifact_base.Artifact):
     def uri(self) -> str:
         return str(self.uri_obj)
 
+    @property
+    def metadata(self) -> ArtifactMetadata:
+        raise NotImplementedError
+
     def delete(self) -> None:
         raise NotImplementedError
 
@@ -142,6 +178,12 @@ class FilesystemArtifact(artifact_base.Artifact):
             "FilesystemArtifactFile", "FilesystemArtifactDir", "FilesystemArtifactRef"
         ]
     ]:
+        raise NotImplementedError
+
+    def previous_uri(self) -> typing.Optional[str]:
+        raise NotImplementedError
+
+    def undo(self) -> typing.Optional["FilesystemArtifact"]:
         raise NotImplementedError
 
 
@@ -364,7 +406,7 @@ class FilesystemArtifactFile(file_base.File):
             return self.artifact.digest(self.path)
         else:
             # This matches how WandB calculates digests for files
-            from wandb.sdk.lib import hashutil
+            from wandb.sdk.lib import hashutil  # type: ignore[attr-defined]
 
             return hashutil.md5_file_b64(self.artifact.path(self.path))
 
@@ -410,3 +452,12 @@ class FilesystemArtifactDir(file_base.Dir):
 
 
 FilesystemArtifactDirType.instance_classes = FilesystemArtifactDir
+
+
+def update_weave_meta(wb_type: types.Type, artifact: FilesystemArtifact) -> None:
+    panel_type = types.type_name_to_type("Panel")
+    artifact.metadata["_weave_meta"] = {
+        "is_weave_obj": True,
+        "type_name": wb_type.name,
+        "is_panel": panel_type and panel_type().assign_type(wb_type),
+    }

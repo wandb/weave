@@ -1,4 +1,5 @@
 import json
+import typing
 
 from .. import api as weave
 from .. import file_base
@@ -29,3 +30,8 @@ def refine_readjsonl(self) -> weave.types.Type:
 def readjsonl(self):
     with self.open() as f:
         return load_jsonl(f)
+
+
+@weave.op()
+def json_dumps(data: typing.Any) -> str:
+    return json.dumps(data)

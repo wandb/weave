@@ -2,6 +2,7 @@ import typing
 from ..api import op, weave_class
 from .. import weave_types as types
 import re
+import json
 import numpy as np
 
 
@@ -13,6 +14,10 @@ def string(v: str) -> str:
 @op(name="string-lastLetter")
 def lastLetter(v: str) -> str:
     return v[-1]
+
+
+def _json_parse(string: str) -> typing.Any:
+    return json.loads(string)
 
 
 @weave_class(weave_type=types.String)
@@ -163,6 +168,28 @@ class String:
     @op(name="string-rStrip")
     def rstrip(str: str) -> str:  # type: ignore[misc]
         return str.rstrip()
+
+    @op()
+    def format(self, named_items: dict[str, typing.Union[str, int]]) -> str:
+        return self.format(**named_items)
+
+    @op()
+    def json_parse_refine(self) -> types.Type:
+        return types.TypeRegistry.type_of(_json_parse(self))  # type: ignore
+
+    @op(refine_output_type=json_parse_refine)
+    def json_parse(self) -> typing.Any:
+        return _json_parse(self)  # type: ignore
+
+    # I'd prefer json_parse(s, Type), or json_parse(s).cast(Type), but
+    # for now this is easy. We know the output type is list at call time
+    # so ops are dispatchable. And then we refine to get the full type.
+    @op(refine_output_type=json_parse_refine)
+    def json_parse_list(self) -> list[typing.Any]:
+        res = _json_parse(self)  # type: ignore
+        if not isinstance(res, list):
+            raise ValueError("Expected a list")
+        return res
 
 
 types.String.instance_class = String

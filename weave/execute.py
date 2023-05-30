@@ -2,9 +2,11 @@ import logging
 import contextlib
 import contextvars
 from collections.abc import Mapping
+import itertools
 import pprint
 import time
 import threading
+from concurrent.futures import ThreadPoolExecutor
 import typing
 
 # Configuration
@@ -37,6 +39,7 @@ from . import cache_policy
 from . import trace_local
 from . import ref_base
 from . import object_context
+from . import memo
 
 # Language Features
 from . import language_nullability
@@ -48,45 +51,81 @@ PRINT_DEBUG = False
 
 
 class OpExecuteStats(typing.TypedDict):
-    avg_time: float
-    cached_used: int
+    cache_used: int
     already_executed: int
     count: int
     total_time: float
 
 
+class OpExecuteSummaryStats(OpExecuteStats):
+    avg_time: float
+
+
 class ExecuteStats:
+    op_stats: dict[str, OpExecuteStats]
+
     def __init__(self):
-        self.node_stats = []
+        self.op_stats = {}
 
-    def add_node(self, node, execution_time, cache_used, already_executed):
-        self.node_stats.append((node, execution_time, cache_used, already_executed))
+    def add_node(
+        self,
+        node: graph.OutputNode,
+        execution_time: float,
+        cache_used: bool,
+        already_executed: bool,
+    ):
+        op_stats = self.op_stats.setdefault(
+            node.from_op.name,
+            {
+                "count": 0,
+                "total_time": 0,
+                "cache_used": 0,
+                "already_executed": 0,
+            },
+        )
+        op_stats["cache_used"] += int(cache_used)
+        op_stats["already_executed"] += int(already_executed)
+        op_stats["count"] += 1
+        op_stats["total_time"] += execution_time
 
-    def summary(self) -> dict[str, OpExecuteStats]:
-        op_counts: dict = {}
-        for node, t, cache_used, already_executed in self.node_stats:
-            if isinstance(node, graph.OutputNode):
-                op_counts.setdefault(
-                    node.from_op.name,
-                    {
-                        "count": 0,
-                        "total_time": 0,
-                        "cache_used": 0,
-                        "already_executed": 0,
-                    },
-                )
-                op_counts[node.from_op.name]["count"] += 1
-                op_counts[node.from_op.name]["total_time"] += t
-                op_counts[node.from_op.name]["cache_used"] += int(cache_used)
-                if already_executed:
-                    op_counts[node.from_op.name]["already_executed"] += 1
-        for stats in op_counts.values():
-            stats["avg_time"] = stats["total_time"] / stats["count"]
-        sortable_stats = [(k, v) for k, v in op_counts.items()]
+    def merge(self, other: "ExecuteStats"):
+        for op_name, op_stats in other.op_stats.items():
+            if op_name not in self.op_stats:
+                self.op_stats[op_name] = op_stats
+            else:
+                self.op_stats[op_name]["count"] += op_stats["count"]
+                self.op_stats[op_name]["total_time"] += op_stats["total_time"]
+                self.op_stats[op_name]["cache_used"] += op_stats["cache_used"]
+                self.op_stats[op_name]["already_executed"] += op_stats[
+                    "already_executed"
+                ]
+
+    def op_summary(self) -> dict[str, OpExecuteSummaryStats]:
+        summary_op_stats: dict[str, OpExecuteSummaryStats] = {}
+        for op_name, op_stats in self.op_stats.items():
+            summary_op_stats[op_name] = {
+                **op_stats,  # type: ignore
+                "avg_time": op_stats["total_time"] / op_stats["count"],
+            }
+        sortable_stats = [(k, v) for k, v in summary_op_stats.items()]
 
         return dict(
             list(reversed(sorted(sortable_stats, key=lambda s: s[1]["total_time"])))
         )
+
+    def summary(self) -> OpExecuteStats:
+        summary: OpExecuteStats = {
+            "count": 0,
+            "total_time": 0,
+            "cache_used": 0,
+            "already_executed": 0,
+        }
+        for op_stats in self.op_stats.values():
+            summary["count"] += op_stats["count"]
+            summary["total_time"] += op_stats["total_time"]
+            summary["cache_used"] += op_stats["cache_used"]
+            summary["already_executed"] += op_stats["already_executed"]
+        return summary
 
 
 def is_panelplot_data_fetch_query(node: graph.Node) -> bool:
@@ -101,12 +140,8 @@ def is_panelplot_data_fetch_query(node: graph.Node) -> bool:
     return False
 
 
-class FullStats(typing.TypedDict):
-    node_count: int
-
-
 _top_level_stats_ctx: contextvars.ContextVar[
-    typing.Optional[FullStats]
+    typing.Optional[ExecuteStats]
 ] = contextvars.ContextVar("_top_level_stats_ctx", default=None)
 
 
@@ -116,7 +151,7 @@ def top_level_stats():
     stats = _top_level_stats_ctx.get()
     token = None
     if stats is None:
-        stats = {"node_count": 0}
+        stats = ExecuteStats()
         token = _top_level_stats_ctx.set(stats)
     try:
         yield stats
@@ -125,7 +160,7 @@ def top_level_stats():
             _top_level_stats_ctx.reset(token)
 
 
-def get_top_level_stats() -> typing.Optional[FullStats]:
+def get_top_level_stats() -> typing.Optional[ExecuteStats]:
     return _top_level_stats_ctx.get()
 
 
@@ -157,21 +192,21 @@ def execute_nodes(nodes, no_cache=False):
                 # assumption is violated.
                 with forward_graph.node_result_store():
                     nodes = compile.compile(nodes)
-                    # logging.info(
-                    #     "Compiled %s leaf nodes.\n%s"
-                    #     % (
-                    #         len(nodes),
-                    #         "\n".join(
-                    #             [graph_debug.node_expr_str_full(n) for n in nodes]
-                    #         ),
-                    #     )
-                    # )
+                    logging.info(
+                        "Compiled %s leaf nodes.\n%s"
+                        % (
+                            len(nodes),
+                            "\n".join(
+                                [graph_debug.node_expr_str_full(n) for n in nodes]
+                            ),
+                        )
+                    )
                     fg = forward_graph.ForwardGraph()
                     fg.add_nodes(nodes)
 
                     with context.execution_client():
                         stats = execute_forward(fg, no_cache=no_cache)
-                        summary = stats.summary()
+                        summary = stats.op_summary()
                         logging.info("Execution summary\n%s" % pprint.pformat(summary))
                         if PRINT_DEBUG:
                             for node in nodes:
@@ -181,9 +216,7 @@ def execute_nodes(nodes, no_cache=False):
 
     top_level_stats = get_top_level_stats()
     if top_level_stats is not None:
-        top_level_stats["node_count"] += sum(
-            stats["count"] for stats in summary.values()
-        ) - sum(stats["already_executed"] for stats in summary.values())
+        top_level_stats.merge(stats)
 
     return res
 
@@ -196,62 +229,126 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
     while len(to_run):
         running_now = list(to_run)
         to_run = {}
-        for forward_node in running_now:
-            start_time = time.time()
-            span = None
-            if isinstance(forward_node.node, graph.OutputNode):
-                span = tracer.trace(
-                    "op.%s" % graph.op_full_name(forward_node.node.from_op)
-                )
-            try:
-                with tag_store.set_curr_node(
-                    id(forward_node.node),
-                    [
-                        id(input_node)
-                        for input_node in forward_node.node.from_op.inputs.values()
-                    ],
-                ):
-                    op_def = registry_mem.memory_registry.get_op(
-                        forward_node.node.from_op.name
+
+        def _key(n):
+            return n.node.from_op.name
+
+        groups = itertools.groupby(sorted(running_now, key=_key), key=_key)
+
+        for op_name, group_iter in groups:
+            group = list(group_iter)
+            op_def = registry_mem.memory_registry.get_op(op_name)
+            if cache_policy.should_table_cache(op_name):
+                # Parallel threaded case
+                wandb_api_ctx = wandb_api.get_wandb_api_context()
+                memo_ctx = memo._memo_storage.get()
+                result_store = forward_graph.get_node_result_store()
+                outer_tls = get_top_level_stats()
+
+                def do_one(
+                    x,
+                ) -> typing.Tuple[
+                    forward_graph.ForwardNode,
+                    NodeExecutionReport,
+                    float,
+                    forward_graph.NodeResultStore,
+                    ExecuteStats,
+                ]:
+                    # TODO: I don't think this handles tags correctly.
+                    memo_token = memo._memo_storage.set(memo_ctx)
+                    try:
+                        with wandb_api.wandb_api_context(wandb_api_ctx):
+                            with context.execution_client():
+                                with forward_graph.node_result_store(
+                                    result_store
+                                ) as thread_result_store:
+                                    with top_level_stats() as tls:
+                                        start_time = time.time()
+                                        result_report = execute_forward_node(
+                                            fg, x, no_cache
+                                        )
+                                        return (
+                                            x,
+                                            result_report,
+                                            time.time() - start_time,
+                                            thread_result_store,
+                                            tls,
+                                        )
+                    finally:
+                        memo._memo_storage.reset(memo_token)
+
+                for (
+                    fn,
+                    report,
+                    duration,
+                    item_result_store,
+                    item_stats,
+                ) in ThreadPoolExecutor(max_workers=10).map(do_one, group):
+                    stats.add_node(
+                        fn.node,
+                        duration,
+                        report["cache_used"],
+                        report.get("already_executed") or False,
                     )
-                    # Lambdas and async functions do not use object_context (object caching
-                    # and mutational transactions).
-                    if op_def.is_async or (
-                        any(
-                            isinstance(input_node.type, types.Function)
-                            for input_node in forward_node.node.from_op.inputs.values()
+
+                    result_store.merge(item_result_store)
+                    if outer_tls is not None:
+                        outer_tls.merge(item_stats)
+            else:
+                # Sequential in process case
+                for forward_node in group:
+                    start_time = time.time()
+                    span = None
+                    if isinstance(forward_node.node, graph.OutputNode):
+                        span = tracer.trace(
+                            "op.%s" % graph.op_full_name(forward_node.node.from_op)
                         )
-                        and not op_def.mutation
-                    ):
-                        report = execute_forward_node(
-                            fg, forward_node, no_cache=no_cache
-                        )
-                    else:
-                        with object_context.object_context():
-                            report = execute_forward_node(
-                                fg, forward_node, no_cache=no_cache
+                    try:
+                        with tag_store.set_curr_node(
+                            id(forward_node.node),
+                            [
+                                id(input_node)
+                                for input_node in forward_node.node.from_op.inputs.values()
+                            ],
+                        ):
+                            # Lambdas and async functions do not use object_context (object caching
+                            # and mutational transactions).
+                            if op_def.is_async or (
+                                any(
+                                    isinstance(input_node.type, types.Function)
+                                    for input_node in forward_node.node.from_op.inputs.values()
+                                )
+                                and not op_def.mutation
+                            ):
+                                report = execute_forward_node(
+                                    fg, forward_node, no_cache=no_cache
+                                )
+                            else:
+                                with object_context.object_context():
+                                    report = execute_forward_node(
+                                        fg, forward_node, no_cache=no_cache
+                                    )
+
+                    except:
+                        import traceback
+
+                        logging.info(
+                            "Exception during execution of: %s\n%s"
+                            % (
+                                graph_debug.node_expr_str_full(forward_node.node),
+                                traceback.format_exc(),
                             )
-
-            except:
-                import traceback
-
-                logging.info(
-                    "Exception during execution of: %s\n%s"
-                    % (
-                        graph_debug.node_expr_str_full(forward_node.node),
-                        traceback.format_exc(),
+                        )
+                        raise
+                    finally:
+                        if span is not None:
+                            span.finish()
+                    stats.add_node(
+                        forward_node.node,
+                        time.time() - start_time,
+                        report["cache_used"],
+                        report.get("already_executed") or False,
                     )
-                )
-                raise
-            finally:
-                if span is not None:
-                    span.finish()
-            stats.add_node(
-                forward_node.node,
-                time.time() - start_time,
-                report["cache_used"],
-                report.get("already_executed"),
-            )
         for forward_node in running_now:
             for downstream_forward_node in forward_node.input_to:
                 ready_to_run = True
@@ -362,7 +459,7 @@ def execute_forward_node(
         return {"cache_used": False}
 
     # This is expensive!
-    logging.info(
+    logging.debug(
         "Executing op: %s"  # expr: %s"
         % (node.from_op.name)  # , graph_debug.node_expr_str_full(node))
     )

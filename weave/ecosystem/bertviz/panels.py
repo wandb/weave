@@ -31,20 +31,21 @@ def head_view(attention: huggingface.ModelOutputAttention) -> weave.ops.Html:
     return weave.ops.Html(html.data)
 
 
-# An op that returns a panel is treated by the WeaveUI code as a panel. It will
-# show up in the panel choices if the current expression's output type matches
-# the type of the panel input (the first argument in the op declaration.)
-@weave.op()
-def head_view_panel_render(
-    attention: weave.Node[huggingface.ModelOutputAttention],
-) -> weave.panels.PanelHtml:
-    # This is a lazy call! It doesn't execute anything
-    html = head_view(attention)
+@weave.type()
+class BertvizHeadView(weave.Panel):
+    id = "BertvizHeadView"
+    # Panels specify their input type.
+    input_node: weave.Node[huggingface.ModelOutputAttention]
 
-    # We add the lazy call as input to the returned Html panel. Nothing has been
-    # computed so far. The UI's Html panel will perform a useNodeValue operation on its
-    # input node. Only then will the head_view function finally be called.
-    return weave.panels.PanelHtml(html)
+    @weave.op()
+    def render(self) -> weave.panels.PanelHtml:
+        # This is a lazy call! It doesn't execute anything
+        html = head_view(self.input_node)
+
+        # We add the lazy call as input to the returned Html panel. Nothing has been
+        # computed so far. The UI's Html panel will perform a useNodeValue operation on its
+        # input node. Only then will the head_view function finally be called.
+        return weave.panels.PanelHtml(html)
 
 
 @weave.op()
@@ -64,9 +65,13 @@ def model_view(attention: huggingface.ModelOutputAttention) -> weave.ops.Html:
     return weave.ops.Html(html.data)
 
 
-@weave.op()
-def model_view_panel_render(
-    attention: weave.Node[huggingface.ModelOutputAttention],
-) -> weave.panels.PanelHtml:
-    html = model_view(attention)
-    return weave.panels.PanelHtml(html)
+@weave.type()
+class BertvizModelView(weave.Panel):
+    id = "BertvizModelView"
+    # Panels specify their input type.
+    input_node: weave.Node[huggingface.ModelOutputAttention]
+
+    @weave.op()
+    def model_view_panel_render(self) -> weave.panels.PanelHtml:
+        html = model_view(self.input_node)
+        return weave.panels.PanelHtml(html)

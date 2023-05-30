@@ -51,9 +51,27 @@ def floor(self, multiple_ms: int):
 )
 def ceil(self, multiple_ms: int):
     return ArrowWeaveList(
-        pc.ceil_temporal(self._arrow_data, multiple=multiple_ms, unit="millisecond"),
+        pc.ceil_temporal(
+            self._arrow_data,
+            multiple=multiple_ms,
+            unit="millisecond",
+            ceil_is_strictly_greater=True,
+        ),
         types.optional(types.Timestamp()),
         self._artifact,
+    )
+
+
+@arrow_op(
+    name="ArrowWeaveListDate-__lt__",
+    input_type=binary_input_type,
+    output_type=ARROW_WEAVE_LIST_BOOLEAN_TYPE,
+)
+def le(self, other):
+    if isinstance(other, ArrowWeaveList):
+        other = other._arrow_data
+    return ArrowWeaveList(
+        pc.less(self._arrow_data, other), types.Boolean(), self._artifact
     )
 
 
@@ -62,11 +80,24 @@ def ceil(self, multiple_ms: int):
     input_type=binary_input_type,
     output_type=ARROW_WEAVE_LIST_BOOLEAN_TYPE,
 )
-def le(self, other):
+def lt(self, other):
     if isinstance(other, ArrowWeaveList):
         other = other._arrow_data
     return ArrowWeaveList(
         pc.less_equal(self._arrow_data, other), types.Boolean(), self._artifact
+    )
+
+
+@arrow_op(
+    name="ArrowWeaveListDate-__gt__",
+    input_type=binary_input_type,
+    output_type=ARROW_WEAVE_LIST_BOOLEAN_TYPE,
+)
+def gt(self, other):
+    if isinstance(other, ArrowWeaveList):
+        other = other._arrow_data
+    return ArrowWeaveList(
+        pc.greater(self._arrow_data, other), types.Boolean(), self._artifact
     )
 
 

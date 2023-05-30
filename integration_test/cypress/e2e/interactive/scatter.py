@@ -19,7 +19,7 @@ data = weave.save(
 
 panel: weave.panels.Group = weave.panels.Group(
     items={
-        "scatter": wandb.Scatter(
+        "scatter": wandb.Scatter(  # type: ignore
             data, x_fn=lambda item: item["a"], y_fn=lambda item: item["b"]
         ),
         "table": lambda scatter: weave.panels.LabeledItem(

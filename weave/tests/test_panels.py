@@ -112,3 +112,13 @@ def test_facet_selected():
         },
     )
     assert facet.config.items["selected"].type == data.type
+
+
+def test_board():
+    # Just make sure it runs for now.
+    weave.panels.Board(
+        {
+            "nums": weave.ops.range(0, 3, 1),
+        },
+        [weave.panels.BoardPanel(id="panel0", panel=lambda nums: nums)],
+    )

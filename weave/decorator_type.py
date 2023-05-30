@@ -11,10 +11,19 @@ from . import decorator_op
 _py_type = type
 
 
-def type(__override_name: str = None, __is_simple: bool = False):
+def type(
+    __override_name: typing.Optional[str] = None,
+    __is_simple: bool = False,
+    __init: typing.Optional[bool] = None,
+):
     def wrap(target):
-
-        dc = dataclasses.dataclass(target)
+        init = False
+        if __init is not None:
+            init = __init
+        else:
+            init = getattr(target.__bases__[0], "__init", True)
+        target.__init = init
+        dc = dataclasses.dataclass(target, init=init)
         fields = dataclasses.fields(dc)
         target_name = target.__name__
         if __override_name is not None:

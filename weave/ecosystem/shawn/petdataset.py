@@ -65,20 +65,23 @@ DOG_BREEDS = [
 ]
 
 
-@weave.op()
-def petadataset_render(
-    models: weave.Node[list[OxfordIIITPetDatasetItem]], config: PetadataRenderConfig
-) -> weave.panels.Table:
-    return weave.panels.Table(
-        models,
-        columns=[
-            lambda item: item["id"],
-            lambda item: item["image"],
-            lambda item: item["combined_class_id"],
-            lambda item: item["species_id"],
-            lambda item: item["breed_id"],
-        ],
-    )
+@weave.type()
+class PetDatasetPanel(weave.Panel):
+    id = "PetDatasetPanel"
+    input_node: weave.Node[list[OxfordIIITPetDatasetItem]]
+
+    @weave.op()
+    def render(self) -> weave.panels.Table:
+        return weave.panels.Table(
+            self.input_node,
+            columns=[
+                lambda item: item["id"],
+                lambda item: item["image"],
+                lambda item: item["combined_class_id"],
+                lambda item: item["species_id"],
+                lambda item: item["breed_id"],
+            ],
+        )
 
 
 @weave.op()

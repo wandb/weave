@@ -73,16 +73,14 @@ GroupConfigType = typing.TypeVar("GroupConfigType")
 
 
 @weave.type()
-class Group(panel.Panel, typing.Generic[GroupConfigType]):
+class Group(panel.Panel):
     id = "Group"
-    config: typing.Optional[GroupConfigType] = dataclasses.field(
+    config: typing.Optional[GroupConfig] = dataclasses.field(
         default_factory=lambda: None
     )
     # items: typing.TypeVar("items") = dataclasses.field(default_factory=dict)
 
     def __init__(self, input_node=graph.VoidNode(), vars=None, config=None, **options):
-        if vars is None:
-            vars = {}
         super().__init__(input_node=input_node, vars=vars)
         self.config = config
         if self.config is None:
@@ -98,6 +96,8 @@ class Group(panel.Panel, typing.Generic[GroupConfigType]):
             self.config.layoutMode = (
                 "horizontal" if options["preferHorizontal"] else "vertical"
             )
+        if "layoutMode" in options:
+            self.config.layoutMode = options["layoutMode"]
         if "equalSize" in options:
             self.config.equalSize = options["equalSize"]
         if "style" in options:
@@ -112,10 +112,19 @@ class Group(panel.Panel, typing.Generic[GroupConfigType]):
 
         items = {}
         for name, p in self.config.items.items():
-            injected = panel.run_variable_lambdas(p, frame)
+            try:
+                injected = panel.run_variable_lambdas(p, frame)
+            except weave.errors.WeaveDefinitionError:
+                return
             child = panel_util.child_item(injected)
             if not isinstance(child, graph.Node):
                 child._normalize(frame)
+            if isinstance(child, Group):
+                # lift group vars
+                for child_name, child_item in child.config.items.items():
+                    frame[child_name] = weave_internal.make_var_node(
+                        weave.type_of(child_item), child_name
+                    )
             items[name] = child
 
             # We build up config one item at a time. Construct a version

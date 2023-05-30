@@ -719,3 +719,9 @@ def test_generic_object_type():
     t = types.ObjectType(id=types.String())
     assert t.assign_type(types.RunType(output=types.Int()))
     assert not t.assign_type(types.RefType())
+
+
+def test_union_auto_execute():
+    assert weave.types.optional(weave.types.Timestamp()).assign_type(
+        weave.types.Function(output_type=weave.types.optional(weave.types.Timestamp()))
+    )

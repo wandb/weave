@@ -57,15 +57,6 @@ def _ensure_object_components_are_published(
     return mapper.apply(obj)
 
 
-def _update_weave_meta(wb_type: types.Type, artifact: artifact_wandb.WandbArtifact):
-    panel_type = types.type_name_to_type("Panel")
-    artifact._writeable_artifact.metadata["_weave_meta"] = {
-        "is_weave_obj": True,
-        "type_name": wb_type.name,
-        "is_panel": panel_type and panel_type().assign_type(wb_type),
-    }
-
-
 def _assert_valid_name_part(part: typing.Optional[str] = None):
     if part is None:
         return
@@ -83,6 +74,7 @@ def _direct_publish(
     wb_artifact_type_name: typing.Optional[str] = None,
     wb_entity_name: typing.Optional[str] = None,
     branch_name: typing.Optional[str] = None,
+    metadata: typing.Optional[typing.Dict[str, typing.Any]] = None,
     assume_weave_type: typing.Optional[types.Type] = None,
 ):
     weave_type = assume_weave_type or _get_weave_type(obj)
@@ -100,8 +92,9 @@ def _direct_publish(
 
     obj = box.box(obj)
     artifact = artifact_wandb.WandbArtifact(name, type=wb_artifact_type_name)
+    artifact.metadata.update(metadata or {})
     obj = _ensure_object_components_are_published(obj, weave_type, artifact)
-    _update_weave_meta(weave_type, artifact)
+    artifact_fs.update_weave_meta(weave_type, artifact)
     ref = artifact.set("obj", weave_type, obj)
 
     # Only save if we have a ref into the artifact we created above. Otherwise
@@ -136,6 +129,7 @@ def _direct_save(
         # returns an artifact with that branch name. This also precludes
         # directly saving an artifact with a branchpoint that is not local
         artifact = artifact_local.LocalArtifact(name, version=source_branch_name)
+        artifact_fs.update_weave_meta(weave_type, artifact)
     ref = artifact.set("obj", weave_type, obj)
 
     # Only save if we have a ref into the artifact we created above. Otherwise

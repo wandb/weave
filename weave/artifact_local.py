@@ -21,6 +21,8 @@ from . import file_util
 from . import filesystem
 from . import environment
 
+WORKING_DIR_PREFIX = "__working__"
+
 
 def local_artifact_dir() -> str:
     d = os.path.join(filesystem.get_filesystem_dir(), "local-artifacts")
@@ -55,9 +57,13 @@ class LocalArtifactType(artifact_fs.FilesystemArtifactType):
     # Weave handles loading from that Ref automatically.
 
 
+RESERVED_METADATA_KEYS = ["branch_point", "created_at", "previous_commit_uri"]
+
+
 class LocalArtifact(artifact_fs.FilesystemArtifact):
     _existing_dirs: list[str]
     _original_uri: typing.Optional[str]
+    _metadata: dict[str, typing.Any]
 
     def __init__(self, name: str, version: typing.Optional[str] = None):
         # LocalArtifacts are created frequently, sometimes in cases where
@@ -76,8 +82,9 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
         self._root = os.path.join(local_artifact_dir(), name)
         self._original_uri = None
         self._path_handlers: dict[str, typing.Any] = {}
-        self._setup_dirs()
         self._existing_dirs = []
+        self._metadata = {}
+        self._setup_dirs()
 
     @classmethod
     def fork_from_uri(
@@ -94,6 +101,7 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
                 "Cannot fork from non-local artifact: %s" % source_art
             )
         art._version = source_art.version
+        art._metadata = source_art.metadata.as_dict()
         return art
 
     # If an object has a _ref property, it will be used by ref_base._get_ref()
@@ -133,8 +141,54 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
         return self._branch
 
     @property
-    def branch_point(self) -> artifact_fs.BranchPointType:
+    def branch_point(self) -> typing.Optional[artifact_fs.BranchPointType]:
         return self.read_metadata().get("branch_point")
+
+    def previous_uri(self) -> typing.Optional[str]:
+        previous_commit_uri = self.read_metadata().get("previous_commit_uri")
+        if previous_commit_uri is not None:
+            return previous_commit_uri
+
+        branch_point = self.branch_point
+        if branch_point is not None:
+            original_uri = branch_point["original_uri"]
+            return original_uri
+        return None
+
+    def undo(self) -> typing.Optional[artifact_fs.FilesystemArtifact]:
+        # Fetch the previous uri (could be from a local commit or a branch)
+        previous_uri = self.previous_uri()
+        if previous_uri is None:
+            return None
+
+        # Should we delete the current version?
+        # self.delete()
+
+        # Make sure we're undoing to an artifact uri
+        original_uri_obj = uris.WeaveURI.parse(previous_uri)
+        if not isinstance(
+            original_uri_obj, (artifact_wandb.WeaveWBArtifactURI, WeaveLocalArtifactURI)
+        ):
+            raise errors.WeaveInternalError(
+                "Cannot undo to non artifact uri: %s" % previous_uri
+            )
+
+        # Get the previous version
+        previous_version = original_uri_obj.to_ref().artifact
+
+        # If we are currently on a branch, and our previous version is local, then
+        # we want to manually update the branch to point to the previous version.
+        branch_name = self.branch
+        if branch_name != None and isinstance(previous_version, LocalArtifact):
+            commit_hash = previous_version.version
+            if commit_hash != None and artifact_wandb.likely_commit_hash(commit_hash):
+                previous_version._branch = branch_name
+                link_name = os.path.join(previous_version._root, branch_name)
+                target_name = os.path.join(previous_version._root, commit_hash)
+                safe_os_symlink(target_name, link_name)
+
+        # Return the previous version
+        return previous_version
 
     def get_other_version(self, version: str) -> typing.Optional["LocalArtifact"]:
         if not local_artifact_exists(self.name, version):
@@ -143,7 +197,7 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
 
     def _setup_dirs(self):
         self._write_dirname = os.path.join(
-            self._root, "working-%s" % util.rand_string_n(12)
+            self._root, f"{WORKING_DIR_PREFIX}-{util.rand_string_n(12)}"
         )
         self._read_dirname = None
         if self._version:
@@ -169,6 +223,7 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
                     self._branch,
                 )
             )
+        self._makedir(self._write_dirname)
 
     def _get_read_path(self, path: str) -> pathlib.Path:
         read_dirname = pathlib.Path(self._read_dirname)
@@ -345,7 +400,15 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
         if branch is None:
             branch = self._branch
 
-        metadata = {}
+        metadata = {**self.metadata.as_dict()}
+        # I don't think we need to delete this, but doing so
+        # to be safe
+        last_previous_uri = None
+        for key in RESERVED_METADATA_KEYS:
+            if key in metadata:
+                if key == "previous_commit_uri":
+                    last_previous_uri = metadata[key]
+                del metadata[key]
         if self._original_uri != None and (
             branch != self._branch or self._original_uri.startswith("wandb-artifact://")
         ):
@@ -360,22 +423,25 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
             if self.branch_point:
                 metadata["branch_point"] = self.branch_point
                 metadata["branch_point"]["n_commits"] += 1
+        if (
+            self.is_saved
+            and self.version
+            and artifact_wandb.likely_commit_hash(self.version)
+            and self.version != commit_hash
+        ):
+            metadata["previous_commit_uri"] = str(self.uri_obj)
+        elif last_previous_uri != None:
+            # TODO: Refactor this to be more sane - we should be explicit about
+            # what metadata carries over and protect against duplicate saves
+            metadata["previous_commit_uri"] = last_previous_uri
         self.write_metadata(new_dirname, metadata)
 
         self._version = commit_hash
         self._setup_dirs()
 
-        # Example of one of many races here
-        # ensure tempdir root exists
-        tmpdir_root = pathlib.Path(os.path.join(local_artifact_dir(), "tmp"))
-        tmpdir_root.mkdir(exist_ok=True)
-
         def make_link(dirname: str):
             link_name = os.path.join(self._root, dirname)
-            with tempfile.TemporaryDirectory(dir=tmpdir_root) as d:
-                temp_path = os.path.join(d, "tmplink")
-                os.symlink(commit_hash, temp_path)
-                os.rename(temp_path, link_name)
+            safe_os_symlink(commit_hash, link_name)
 
         if branch is not None:
             make_link(branch)
@@ -420,6 +486,27 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
         else:
             return None
 
+    @property
+    def metadata(self) -> artifact_fs.ArtifactMetadata:
+        read_metadata = {
+            k: v
+            for k, v in self.read_metadata().items()
+            if k not in RESERVED_METADATA_KEYS
+        }
+        return artifact_fs.ArtifactMetadata(self._metadata, read_metadata)
+
+
+def safe_os_symlink(target_path: str, symlink_path: str):
+    # Example of one of many races here
+    # ensure tempdir root exists
+    tmpdir_root = pathlib.Path(os.path.join(local_artifact_dir(), "tmp"))
+    tmpdir_root.mkdir(exist_ok=True)
+    tmp_path_name = f"tmplink-{util.rand_string_n(12)}"
+    with tempfile.TemporaryDirectory(dir=tmpdir_root) as d:
+        temp_path = os.path.join(d, tmp_path_name)
+        os.symlink(target_path, temp_path)
+        os.rename(temp_path, symlink_path)
+
 
 LocalArtifactType.instance_classes = LocalArtifact
 
@@ -433,7 +520,7 @@ class LocalArtifactRef(artifact_fs.FilesystemArtifactRef):
         for version_name in os.listdir(artifact_path):
             if (
                 not os.path.islink(os.path.join(artifact_path, version_name))
-                and not version_name.startswith("working")
+                and not version_name.startswith(WORKING_DIR_PREFIX)
                 and not version_name.startswith(".")
             ):
                 # This is ass-backward, have to get the full object to just

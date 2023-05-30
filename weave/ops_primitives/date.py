@@ -1,3 +1,4 @@
+import dateutil
 from ..api import op, type
 from .. import weave_types as types
 import datetime
@@ -12,6 +13,20 @@ import datetime
     output_type=types.optional(types.TimeDelta()),
 )
 def datetime_sub(lhs, rhs):
+    if rhs == None:
+        return None
+    return lhs - rhs
+
+
+@op(
+    name="datetimetd-sub",
+    input_type={
+        "lhs": types.Timestamp(),
+        "rhs": types.optional(types.TimeDelta()),
+    },
+    output_type=types.optional(types.Timestamp()),
+)
+def datetimetd_sub(lhs, rhs):
     if rhs == None:
         return None
     return lhs - rhs
@@ -221,3 +236,13 @@ def timestamp_min(values):
 def timestamp_max(values):
     values = [v for v in values if v != None]
     return max(values) if len(values) > 0 else None
+
+
+@op(render_info={"type": "function"})
+def date_parse(dt_s: str) -> datetime.datetime:
+    return dateutil.parser.parse(dt_s)  # type: ignore
+
+
+@op(render_info={"type": "function"})
+def days(days: int) -> datetime.timedelta:
+    return datetime.timedelta(days=days)

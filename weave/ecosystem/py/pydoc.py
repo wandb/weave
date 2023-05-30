@@ -129,85 +129,97 @@ def function_doc(pyfunction: types.FunctionType) -> weave.ops.Markdown:
     return weave.ops.Markdown(pyfunction.__doc__ or "")
 
 
-@weave.op()
-def module_render(
-    module: weave.Node[types.ModuleType],
-) -> weave.panels.Card:
-    return weave.panels.Card(
-        title=module.module_name(),  # type: ignore
-        subtitle="python module",
-        content=[
-            weave.panels.CardTab(
-                name="Description",
-                content=weave.panels.PanelMarkdown(module.module_doc()),  # type: ignore
-            ),
-            weave.panels.CardTab(
-                name="Classes",
-                content=weave.panels.Table(
-                    module.module_classes(),  # type: ignore
-                    columns=[
-                        lambda c: weave.panels.WeaveLink(
-                            c.class_name(),
-                            to=lambda inp: module.module_class(inp),  # type: ignore
-                        )
-                    ],
+@weave.type()
+class ModulePanel(weave.Panel):
+    id = "ModulePanel"
+    input_node: weave.Node[types.ModuleType]
+
+    @weave.op()
+    def render(self) -> weave.panels.Card:
+        module = self.input_node
+        return weave.panels.Card(
+            title=module.module_name(),  # type: ignore
+            subtitle="python module",
+            content=[
+                weave.panels.CardTab(
+                    name="Description",
+                    content=weave.panels.PanelMarkdown(module.module_doc()),  # type: ignore
                 ),
-            ),
-            weave.panels.CardTab(
-                name="Functions",
-                content=weave.panels.Table(
-                    module.module_functions(),  # type: ignore
-                    columns=[
-                        lambda c: weave.panels.WeaveLink(
-                            c.function_name(),
-                            to=lambda inp: module.module_function(inp),  # type: ignore
-                        )
-                    ],
+                weave.panels.CardTab(
+                    name="Classes",
+                    content=weave.panels.Table(
+                        module.module_classes(),  # type: ignore
+                        columns=[
+                            lambda c: weave.panels.WeaveLink(
+                                c.class_name(),
+                                to=lambda inp: module.module_class(inp),  # type: ignore
+                            )
+                        ],
+                    ),
                 ),
-            ),
-        ],
-    )
-
-
-@weave.op()
-def class_render(
-    cls: weave.Node[type],
-) -> weave.panels.Card:
-    return weave.panels.Card(
-        title=cls.class_name(),  # type: ignore
-        subtitle="python class",
-        content=[
-            weave.panels.CardTab(
-                name="Description",
-                content=weave.panels.PanelMarkdown(cls.pyclass_doc()),  # type: ignore
-            ),
-            weave.panels.CardTab(
-                name="Methods",
-                content=weave.panels.Table(
-                    cls.class_methods(),  # type: ignore
-                    columns=[
-                        lambda m: weave.panels.WeaveLink(
-                            m.function_name(),
-                            to=lambda inp: cls.class_method(inp),  # type: ignore
-                        )
-                    ],
+                weave.panels.CardTab(
+                    name="Functions",
+                    content=weave.panels.Table(
+                        module.module_functions(),  # type: ignore
+                        columns=[
+                            lambda c: weave.panels.WeaveLink(
+                                c.function_name(),
+                                to=lambda inp: module.module_function(inp),  # type: ignore
+                            )
+                        ],
+                    ),
                 ),
-            ),
-        ],
-    )
+            ],
+        )
 
 
-@weave.op()
-def function_render(
-    func: weave.Node[types.FunctionType],
-) -> weave.panels.Card:
-    return weave.panels.Card(
-        title=func.function_name(),  # type: ignore
-        subtitle="python function",
-        content=[
-            weave.panels.CardTab(
-                name="Description",
-                content=weave.panels.PanelMarkdown(func.function_doc()),  # type: ignore
-            ),
-        ],
-    )
+@weave.type()
+class ClassPanel(weave.Panel):
+    id = "ClassPanel"
+    input_node: weave.Node[type]
+
+    @weave.op()
+    def render(self) -> weave.panels.Card:
+        cls = self.input_node
+        return weave.panels.Card(
+            title=cls.class_name(),  # type: ignore
+            subtitle="python class",
+            content=[
+                weave.panels.CardTab(
+                    name="Description",
+                    content=weave.panels.PanelMarkdown(cls.pyclass_doc()),  # type: ignore
+                ),
+                weave.panels.CardTab(
+                    name="Methods",
+                    content=weave.panels.Table(
+                        cls.class_methods(),  # type: ignore
+                        columns=[
+                            lambda m: weave.panels.WeaveLink(
+                                m.function_name(),
+                                to=lambda inp: cls.class_method(inp),  # type: ignore
+                            )
+                        ],
+                    ),
+                ),
+            ],
+        )
+
+
+@weave.type()
+class FunctionPanel(weave.Panel):
+    id = "FunctionPanel"
+    input_node: weave.Node[types.FunctionType]
+
+    @weave.op()
+    def render(self) -> weave.panels.Card:
+        func = self.input_node
+        return weave.panels.Card(
+            title=func.function_name(),  # type: ignore
+            subtitle="python function",
+            content=[
+                weave.panels.CardTab(
+                    name="Description",
+                    content=weave.panels.PanelMarkdown(func.function_doc()),  # type: ignore
+                ),
+            ],
+        )

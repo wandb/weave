@@ -106,13 +106,15 @@ def number_right_mult(
 @arrow_op(
     name="ArrowWeaveListNumber-div",
     input_type=binary_input_type,
-    output_type=self_type_output_type_fn,
+    output_type=ArrowWeaveListType(types.Float()),
 )
 def __truediv__(self, other):
     if isinstance(other, ArrowWeaveList):
-        other = other._arrow_data
+        other = other._arrow_data.cast(pa.float64())
     return ArrowWeaveList(
-        pc.divide(self._arrow_data, other), types.Number(), self._artifact
+        pc.divide(self._arrow_data.cast(pa.float64()), other),
+        types.Float(),
+        self._artifact,
     )
 
 

@@ -18,6 +18,8 @@ from . import box
 from . import memo
 from . import storage
 from . import weave_internal
+from . import execute_fast
+from . import cache_policy
 
 from .language_features.tagging import tag_store
 
@@ -74,6 +76,7 @@ disallow_mapping_type_name_list = [
     "dataframeTable",
     "ArrowWeaveList",
 ]
+
 
 # This class implements a nullable mappable derived op handler. It will create a new op
 # that is capable of handling a List<Optional<T>> input for a given op that takes a T
@@ -217,6 +220,19 @@ class MappedDeriveOpHandler(DeriveOpHandler):
             first_arg_name = list(new_inputs)[0]
             list_ = new_inputs.pop(first_arg_name)
 
+            if cache_policy.should_table_cache(orig_op.name):
+                # TODO: This whole resolver should be replaced with this
+                # execution path. It is now the correct way to do it. But
+                # I didn't update that path to handle / fix list tags, or to
+                # return the right thing when this is a type resolver. So
+                # we need to make those changes. Just doing this for now to
+                # get new ops parallelized correctly.
+                map_fn = weave_internal.define_fn(
+                    {"row": first_arg.type}, lambda x: orig_op(x, **new_inputs)
+                ).val
+                res = execute_fast.fast_map_fn(list_, map_fn)
+                return res
+
             # Just do file-table in parallel for now. We'll do parallelization
             # more generally in the future.
             if (
@@ -224,6 +240,7 @@ class MappedDeriveOpHandler(DeriveOpHandler):
                 or orig_op.name.endswith("file-joinedTable")
                 or orig_op.name.endswith("file-partitionedTable")
                 or orig_op.name.endswith("run-history")
+                or orig_op.name.endswith("run-history2")
             ):
                 wandb_api_ctx = wandb_api.get_wandb_api_context()
                 memo_ctx = memo._memo_storage.get()

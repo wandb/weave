@@ -11,8 +11,8 @@ ItemType = typing.TypeVar("ItemType")
 
 @weave.type()
 class LabeledItemConfig(typing.Generic[ItemType]):
-    label: str
-    item: ItemType
+    label: str = dataclasses.field(default_factory=lambda: "")
+    item: ItemType = dataclasses.field(default_factory=lambda: graph.VoidNode())  # type: ignore
 
 
 @weave.type()

@@ -328,8 +328,6 @@ class Plot(panel.Panel):
         no_legend: bool = False,
         signals: typing.Optional[Signals] = None,
     ):
-        if vars is None:
-            vars = {}
         super().__init__(input_node=input_node, vars=vars)
         self.config = config
 
@@ -536,7 +534,6 @@ def selection_is_discrete(selection: Selection) -> bool:
 def filter_node_to_selection(
     node: graph.Node, selection: Selection, key: str
 ) -> graph.Node:
-
     if selection_is_continuous(selection):
         selection = typing.cast(ContinuousSelection, selection)
 

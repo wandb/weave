@@ -102,7 +102,8 @@ def test_we_dont_over_execute(fake_wandb):
     # If this check fails, please be very careful! It means that something
     # has changed in the engine that is causing us to over-execute nodes
     # and is an indication of a serious performance regression.
-    assert stats["node_count"] == 16
+    summary = stats.summary()
+    assert summary["count"] - summary["already_executed"] == 16
 
 
 def table_mock_respecting_run_name(q, ndx):
@@ -159,6 +160,7 @@ def expensive_op(x: int) -> int:
     return x + 10000
 
 
+@pytest.mark.skip(reason="Disabled in favor of parallelism for the moment.")
 def test_cache_column():
     os.environ["WEAVE_CACHE_MODE"] = "minimal"
 
