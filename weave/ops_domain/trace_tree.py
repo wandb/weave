@@ -127,7 +127,7 @@ class WBTraceTree:
         root_span: Span = Span(
             **{
                 "span_id": None,
-                "name": None,
+                "_name": None,
                 "start_time_ms": None,
                 "end_time_ms": None,
                 "status_code": None,
@@ -139,9 +139,18 @@ class WBTraceTree:
             }
         )
         try:
-            root_span = json.loads(self.root_span_dumps)
+            loaded_dump = json.loads(self.root_span_dumps)
         except Exception:
             logging.warning("Failed to parse root span")
+        else:
+            for key in loaded_dump:
+                if key == "name":
+                    setattr(root_span, "_name", loaded_dump[key])
+                elif key == "results":
+                    setattr(root_span, key, [Result(**r) for r in loaded_dump[key]])
+                else:
+                    setattr(root_span, key, loaded_dump[key])
+
         return {
             "isSuccess": root_span.status_code in [None, "SUCCESS"],
             "startTime": root_span.start_time_ms,

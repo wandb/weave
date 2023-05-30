@@ -588,7 +588,9 @@ def read_history_parquet(run: wdt.Run, history_version: int, columns=None):
                 span.set_tag("path", path)
                 meta = pq.read_metadata(path)
             file_schema = meta.schema
-            columns_to_read = [c for c in columns if c in file_schema.names]
+            columns_to_read = [
+                c for c in columns if c in file_schema.to_arrow_schema().names
+            ]
             with tracer.trace("pq.read_table") as span:
                 span.set_tag("path", path)
                 table = pq.read_table(path, columns=columns_to_read)
