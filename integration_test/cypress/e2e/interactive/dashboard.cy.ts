@@ -24,7 +24,7 @@ const addSidebarPanel = () => {
 };
 
 const addMainPanel = () => {
-  getPanel(['main']).find('button').contains('+').click();
+  getPanel(['main']).find('button').contains('+').click({force: true});
 };
 
 const dashboardConvertToControl = (path: string[]) => {
