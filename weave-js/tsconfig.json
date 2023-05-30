@@ -24,7 +24,8 @@
     "noFallthroughCasesInSwitch": true,
     "noImplicitReturns": true,
     "paths": {
-      "@wandb/weave/*": ["src/*"]
+      "@wandb/weave/*": ["src/*"],
+      "plotly\\.js": ["plotly.js-dist-min"],
     },
     "preserveSymlinks": true,
     "resolveJsonModule": true,

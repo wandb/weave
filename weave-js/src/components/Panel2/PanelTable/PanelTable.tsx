@@ -153,7 +153,7 @@ export const PanelTable: React.FC<
   return (
     <GrowToParent data-test="panel-table-2-wrapper">
       <AutoSizer style={{width: '100%', height: '100%', overflow: 'hidden'}}>
-        {({height, width}) => {
+        {({height, width}: {height: number; width: number}) => {
           return (
             <PanelTableInnerConfigSetter
               {...props}

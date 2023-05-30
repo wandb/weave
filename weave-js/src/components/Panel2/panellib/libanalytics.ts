@@ -1,3 +1,9 @@
+declare global {
+  interface Window {
+    analytics?: any;
+  }
+}
+
 function recordWeavePanelEvent(
   action: string,
   payload?: {[key: string]: string}
