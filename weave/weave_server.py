@@ -88,6 +88,9 @@ blueprint = Blueprint("weave", "weave-server", static_folder=static_folder)
 
 
 def import_ecosystem():
+    # Import the MVP
+    from weave.ecosystem import langchain, replicate
+
     if not util.parse_boolean_env_var("WEAVE_SERVER_DISABLE_ECOSYSTEM"):
         try:
             from weave.ecosystem import all
