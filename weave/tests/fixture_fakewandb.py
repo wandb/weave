@@ -106,7 +106,7 @@ class FakeFilesystemManifest:
             if os.path.exists(target) and os.path.isdir(target):
                 return [
                     os.path.join(cur_dir, sub_path)
-                    for sub_path in os.listdir(target)
+                    for sub_path in sorted(os.listdir(target), reverse=True)
                     if os.path.isfile(os.path.join(target, sub_path))
                 ]
         return []
@@ -334,7 +334,6 @@ class SetupResponse:
             "fake_project": "test_project",
         },
     ):
-
         artifact_uri = WeaveWBArtifactURI.parse(
             f"wandb-artifact:///{entity_name}/{project_name}/{artifact.name}:{artifact.commit_hash}"
         )
