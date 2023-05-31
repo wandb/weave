@@ -320,8 +320,7 @@ const PanelBankFlowSectionInnerComp: React.FC<AllPanelBankFlowSectionProps> = ({
           updateFlowConfig({rowsPerPage: newRowsPerPage});
           setCurrentPage(newCurrentPage);
           setResizingSectionHeight(null);
-        }}
-      >
+        }}>
         <div
           className={`flow-section ${
             resizingSectionHeight != null ? 'resizing-section' : ''
@@ -331,8 +330,7 @@ const PanelBankFlowSectionInnerComp: React.FC<AllPanelBankFlowSectionProps> = ({
             height: noPanels
               ? DEFAULT_PANEL_SIZE
               : pageHeight + paginationHeight,
-          }}
-        >
+          }}>
           <DropTarget
             className="flow-section__page"
             style={{
@@ -366,8 +364,7 @@ const PanelBankFlowSectionInnerComp: React.FC<AllPanelBankFlowSectionProps> = ({
                   new Set(inactivePanelRefs.map(r => r.id))
                 );
               }
-            }}
-          >
+            }}>
             {noPanels ? (
               <EmptyPanelBankSectionWatermark />
             ) : (
@@ -377,8 +374,7 @@ const PanelBankFlowSectionInnerComp: React.FC<AllPanelBankFlowSectionProps> = ({
                   position: 'relative',
                   transform: `translateY(-${currentPage * pageHeight}px)`,
                   transition: 'transform 0.5s',
-                }}
-              >
+                }}>
                 {dropPreviewPosition && (
                   <div
                     key="drop-preview"
@@ -457,8 +453,7 @@ const PanelBankFlowSectionInnerComp: React.FC<AllPanelBankFlowSectionProps> = ({
                         ]}
                         onResize={onPanelResize}
                         onResizeStop={onPanelResizeStop}
-                        onResizeStart={() => setResizingRefId(panelRefId)}
-                      >
+                        onResizeStart={() => setResizingRefId(panelRefId)}>
                         <DragSource
                           key={panelRefId}
                           partRef={panelRef}
@@ -480,8 +475,7 @@ const PanelBankFlowSectionInnerComp: React.FC<AllPanelBankFlowSectionProps> = ({
                               : {
                                   transform: `translate(${boxPosition[0]}px, ${boxPosition[1]}px)`,
                                 }),
-                          }}
-                        >
+                          }}>
                           {renderPanel(panelRef)}
                         </DragSource>
                       </Resizable>
@@ -504,15 +498,13 @@ const PanelBankFlowSectionInnerComp: React.FC<AllPanelBankFlowSectionProps> = ({
                     disabled={currentPage === 0}
                     className="page-up wb-icon-button"
                     size="tiny"
-                    onClick={() => setCurrentPage(currentPage - 1)}
-                  >
+                    onClick={() => setCurrentPage(currentPage - 1)}>
                     <DropTarget
                       partRef={panelBankSectionConfigRef}
                       isValidDropTarget={ctx => isPanel(ctx.dragRef)}
                       onDragEnter={() => {
                         setCurrentPage(currentPage - 1);
-                      }}
-                    >
+                      }}>
                       <LegacyWBIcon name="previous" />
                     </DropTarget>
                   </Button>
@@ -520,15 +512,13 @@ const PanelBankFlowSectionInnerComp: React.FC<AllPanelBankFlowSectionProps> = ({
                     disabled={currentPage === maxPage}
                     className="page-down wb-icon-button"
                     size="tiny"
-                    onClick={() => setCurrentPage(currentPage + 1)}
-                  >
+                    onClick={() => setCurrentPage(currentPage + 1)}>
                     <DropTarget
                       partRef={panelBankSectionConfigRef}
                       isValidDropTarget={ctx => isPanel(ctx.dragRef)}
                       onDragEnter={() => {
                         setCurrentPage(currentPage + 1);
-                      }}
-                    >
+                      }}>
                       <LegacyWBIcon name="next" />
                     </DropTarget>
                   </Button>

@@ -18,6 +18,7 @@ import * as S from './styles';
 import {Suggestions} from './suggestions';
 import {WeaveExpressionProps} from './types';
 import {trace} from './util';
+import styled from 'styled-components';
 
 // We attach some stuff to the window for test automation (see automation.ts)
 declare global {
@@ -191,7 +192,7 @@ export const WeaveExpression: React.FC<WeaveExpressionProps> = props => {
 
   // Run button placement
   return (
-    <div spellCheck="false">
+    <Container spellCheck="false">
       <Slate
         editor={editor}
         value={slateValue}
@@ -244,7 +245,7 @@ export const WeaveExpression: React.FC<WeaveExpressionProps> = props => {
           suggestionIndex={suggestionIndex}
         />
       </Slate>
-    </div>
+    </Container>
   );
 };
 
@@ -252,3 +253,7 @@ export const focusEditor = (editor: Editor): void => {
   ReactEditor.focus(editor);
   Transforms.select(editor, Editor.end(editor, []));
 };
+
+const Container = styled.div`
+  width: 100%;
+`;

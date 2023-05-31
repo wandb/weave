@@ -26,8 +26,11 @@ import {useWeaveContext} from '../../context';
 import {WeaveExpression} from '../../panel/WeaveExpression';
 import {useNodeWithServerType} from '../../react';
 import {consoleLog} from '../../util';
-import {getPanelStacksForType, usePanelStacksForType} from './availablePanels';
-import {panelSpecById} from './availablePanels';
+import {
+  getPanelStacksForType,
+  panelSpecById,
+  usePanelStacksForType,
+} from './availablePanels';
 import * as ConfigPanel from './ConfigPanel';
 import {PanelInput, PanelProps} from './panel';
 import {Panel, PanelConfigEditor} from './PanelComp';
@@ -512,8 +515,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
     <Styles.Main
       data-weavepath={props.pathEl ?? 'root'}
       onMouseEnter={() => setHoverPanel(true)}
-      onMouseLeave={() => setHoverPanel(false)}
-    >
+      onMouseLeave={() => setHoverPanel(false)}>
       {props.editable && (
         <Styles.EditorBar>
           <div style={{width: '100%'}}>
@@ -528,8 +530,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
                 boxShadow: 'none',
                 padding: '5px',
                 backgroundColor: inputHighlighted ? '#edf8f6' : undefined,
-              }}
-            >
+              }}>
               <Menu.Menu style={{fontSize: '1rem', flex: '1 1 auto'}}>
                 <Menu.Item style={{padding: 0, flex: '1 1 auto'}}>
                   {props.prefixHeader}
@@ -538,8 +539,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
                       style={{
                         whiteSpace: 'nowrap',
                         marginRight: 8,
-                      }}
-                    >
+                      }}>
                       <ValidatingTextInput
                         dataTest="panel-expression-path"
                         onCommit={props.updateName ?? (() => {})}
@@ -567,8 +567,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
                     }}
                     onMouseEnter={() => setHoverExpression(true)}
                     onMouseLeave={() => setHoverExpression(false)}
-                    data-test="panel-expression-expression"
-                  >
+                    data-test="panel-expression-expression">
                     <WeaveExpression
                       expr={panelInputExpr}
                       setExpression={updateExpression}
@@ -583,8 +582,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
                       nonExpressionPanelId != null && (
                         <Styles.BarButton
                           // disabled={isLoading}
-                          onClick={setToNoneExpression}
-                        >
+                          onClick={setToNoneExpression}>
                           <Icon
                             name="sliders"
                             // style={{
@@ -597,8 +595,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
                       <Styles.BarButton
                         // disabled={isLoading}
                         data-test="panel-config"
-                        onClick={() => setInspectingPanel(props.pathEl ?? '')}
-                      >
+                        onClick={() => setInspectingPanel(props.pathEl ?? '')}>
                         <Icon
                           name="cog"
                           // style={{
@@ -618,8 +615,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
         <PanelContextProvider
           newVars={newVars}
           handleVarEvent={handleVarEvent}
-          newPath={props.pathEl}
-        >
+          newPath={props.pathEl}>
           <Panel
             input={panelInput}
             panelSpec={handler}
@@ -634,10 +630,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
   );
 };
 
-const ChildPanelConfigWrapper = styled.div`
-  padding-left: 8px;
-  margin-bottom: 5px;
-`;
+const NEW_INSPECTOR_IMPLEMENTED_FOR = new Set([`plot`]);
 
 export const ChildPanelConfigComp: React.FC<ChildPanelProps> = props => {
   const {
@@ -647,7 +640,6 @@ export const ChildPanelConfigComp: React.FC<ChildPanelProps> = props => {
     panelConfig,
     handler,
     curPanelId,
-    curPanelName,
     panelOptions,
     handleVarEvent,
     handlePanelChange,
@@ -686,84 +678,73 @@ export const ChildPanelConfigComp: React.FC<ChildPanelProps> = props => {
     return <></>;
   }
 
-  if (pathStr !== '<root>' && pathStr.startsWith(selectedPathStr)) {
-    // We are selected, expose controls for input expression, panel selection,
-    // our config, and misc operations
+  // If we are selected, expose controls for input expression, panel selection,
+  // our config, and misc operations
+  // If child is selected, render our config only
+  // HAX: config component must check path for itself and passthrough
+  //      as needed, for now
+  const curPanelSelected =
+    pathStr !== '<root>' && pathStr.startsWith(selectedPathStr);
+
+  const dashboardConfigOptions = curPanelSelected ? (
+    <>
+      <ConfigPanel.ConfigOption label={`Type`}>
+        <ConfigPanel.ModifiedDropdownConfigField
+          value={curPanelId}
+          options={panelOptions}
+          onChange={(e, {value}) => {
+            if (typeof value === `string` && value) {
+              handlePanelChange(value);
+            }
+          }}
+        />
+      </ConfigPanel.ConfigOption>
+
+      <VariableEditor config={config} updateConfig={updatePanelConfig} />
+
+      {curPanelId !== 'Group' && (
+        <ConfigPanel.ConfigOption label="Input" multiline>
+          <PanelContextProvider
+            newVars={config.vars}
+            handleVarEvent={handleVarEvent}>
+            <ConfigPanel.ExpressionConfigField
+              expr={panelInputExpr}
+              setExpression={updateExpression}
+            />
+          </PanelContextProvider>
+        </ConfigPanel.ConfigOption>
+      )}
+    </>
+  ) : null;
+
+  if (curPanelId == null || handler == null) {
     return (
       <>
-        <ConfigPanel.ConfigOption label={props.pathEl ?? ''}>
-          <PanelNameEditor
-            value={curPanelName}
-            autocompleteOptions={panelOptions}
-            setValue={handlePanelChange}
-          />
-        </ConfigPanel.ConfigOption>
-        <ChildPanelConfigWrapper>
-          <VariableEditor config={config} updateConfig={updatePanelConfig} />
-          {curPanelId !== 'Group' && (
-            <ConfigPanel.ConfigOption label="input">
-              <PanelContextProvider
-                newVars={config.vars}
-                handleVarEvent={handleVarEvent}
-              >
-                <ConfigPanel.ExpressionConfigField
-                  expr={panelInputExpr}
-                  setExpression={updateExpression}
-                />
-              </PanelContextProvider>
-            </ConfigPanel.ConfigOption>
-          )}
-          {curPanelId == null || handler == null ? (
-            <div>
-              No panel for type{' '}
-              {defaultLanguageBinding.printType(panelInput.type)}
-            </div>
-          ) : (
-            <PanelContextProvider
-              newVars={newVars}
-              newPath={props.pathEl}
-              handleVarEvent={handleVarEvent}
-            >
-              <PanelConfigEditor
-                input={panelInput}
-                panelSpec={handler}
-                config={panelConfig}
-                updateConfig={updatePanelConfig}
-                updateConfig2={updatePanelConfig2}
-                updateInput={props.updateInput}
-              />
-            </PanelContextProvider>
-          )}
-        </ChildPanelConfigWrapper>
+        {dashboardConfigOptions}
+        <div>
+          No panel for type {defaultLanguageBinding.printType(panelInput.type)}
+        </div>
       </>
     );
   }
 
-  // Child is selected -- render our config only
-  // hack: config component must check path for itself and passthrough
-  //       as needed, for now
   return (
     <>
-      {curPanelId == null || handler == null ? (
-        <div>
-          No panel for type {defaultLanguageBinding.printType(panelInput.type)}
-        </div>
-      ) : (
-        <PanelContextProvider
-          newVars={newVars}
-          newPath={props.pathEl}
-          handleVarEvent={handleVarEvent}
-        >
-          <PanelConfigEditor
-            input={panelInput}
-            panelSpec={handler}
-            config={panelConfig}
-            updateConfig={updatePanelConfig}
-            updateConfig2={updatePanelConfig2}
-            updateInput={updatePanelInput}
-          />
-        </PanelContextProvider>
-      )}
+      {!NEW_INSPECTOR_IMPLEMENTED_FOR.has(handler.id) && dashboardConfigOptions}
+      <PanelContextProvider
+        newVars={newVars}
+        newPath={props.pathEl}
+        handleVarEvent={handleVarEvent}
+        dashboardConfigOptions={dashboardConfigOptions}>
+        <PanelConfigEditor
+          input={panelInput}
+          panelSpec={handler}
+          config={panelConfig}
+          updateConfig={updatePanelConfig}
+          updateConfig2={updatePanelConfig2}
+          updateInput={curPanelSelected ? props.updateInput : updatePanelInput}
+        />
+      </PanelContextProvider>
     </>
   );
 };
@@ -840,8 +821,7 @@ export const VariableEditor: React.FC<{
                 [nextVarName(config.vars)]: voidNode(),
               },
             })
-          }
-        >
+          }>
           {/* + New variable */}
         </div>
       </div>
@@ -854,19 +834,14 @@ export const VariableView: React.FC<{
 }> = ({newVars}) => {
   const frame = newVars;
   const weave = useWeaveContext();
-  if (Object.keys(frame).length === 0) {
-    return <></>;
-  }
   return (
-    <ConfigPanel.ConfigOption label="variables">
-      <div style={{fontFamily: 'monospace', fontSize: 12}}>
-        {_.map(frame, (value, key) => (
-          <div key={key}>
-            {key} = {weave.expToString(value)}
-          </div>
-        ))}
-      </div>
-    </ConfigPanel.ConfigOption>
+    <>
+      {_.map(frame, (value, key) => (
+        <ConfigPanel.ConfigOption key={key} label={_.capitalize(key)}>
+          {weave.expToString(value)}
+        </ConfigPanel.ConfigOption>
+      ))}
+    </>
   );
 };
 

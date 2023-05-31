@@ -100,7 +100,8 @@ export const PanelQuery: React.FC<PanelQueryProps> = props => {
     },
     [tableState, updateTableState]
   );
-  const [pageNum, setPageNum] = useState(0);
+  // const [pageNum, setPageNum] = useState(0);
+  const [pageNum] = useState(0);
   const {pageSize} = tableState;
   const visibleRowsNode = useMemo(() => {
     const rowsNode = Table.getRowsNode(
@@ -188,8 +189,7 @@ export const PanelQuery: React.FC<PanelQueryProps> = props => {
         // flex: '1 1 auto',
         paddingLeft: '12px',
         paddingBottom: '5px',
-      }}
-    >
+      }}>
       <div style={{display: 'flex'}}>
         <div style={{marginRight: 8}}>
           <WBIcon name="filter" />

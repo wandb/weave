@@ -9,7 +9,7 @@ import {
   resolveVar,
 } from '@wandb/weave/core';
 import {consoleGroup, consoleLog} from '@wandb/weave/util';
-import React, {useCallback, useContext, useMemo} from 'react';
+import React, {ReactNode, useCallback, useContext, useMemo} from 'react';
 
 import {useDeepMemo} from '../../hookUtils';
 
@@ -124,6 +124,8 @@ export interface PanelContextState {
     // all var node handler's along the way will be called.
     notifyWhom: 'path' | 'root'
   ) => void;
+
+  dashboardConfigOptions?: ReactNode;
 }
 
 export const PanelContext = React.createContext<PanelContextState | null>(null);
@@ -154,6 +156,7 @@ export const PanelContextProvider: React.FC<{
     target: NodeOrVoidNode,
     event: ExpressionEvent
   ) => void;
+  dashboardConfigOptions?: ReactNode;
 }> = React.memo(
   ({
     newVars,
@@ -162,6 +165,7 @@ export const PanelContextProvider: React.FC<{
     children,
     inPanelMaybe,
     handleVarEvent,
+    dashboardConfigOptions,
   }) => {
     // A lot of callers pass new vars in without useMemo, so we deep memo
     // here. Could probably get away with memoizing each var be reference
@@ -212,6 +216,7 @@ export const PanelContextProvider: React.FC<{
         selectedPath: selectedPath ?? prevSelectedPath,
         inPanelMaybe: inPanelMaybe ?? false,
         triggerExpressionEvent,
+        dashboardConfigOptions,
       };
     }, [
       childFrame,
@@ -222,6 +227,7 @@ export const PanelContextProvider: React.FC<{
       prevSelectedPath,
       inPanelMaybe,
       triggerExpressionEvent,
+      dashboardConfigOptions,
     ]);
 
     return (

@@ -62,8 +62,7 @@ const SelectPanel: React.FC<{
       newVars={{
         ...vars,
         row: inputNode,
-      }}
-    >
+      }}>
       <PanelComp2
         input={selectFunction}
         inputType={selectFunction.type}
@@ -196,8 +195,7 @@ const PanelFacetFlexMode: React.FC<PanelFacetProps> = props => {
             onResize={(e, data) => {
               setResizingSize({w: data.size.width, h: data.size.height});
             }}
-            onResizeStop={() => props.updateConfig({cellSize: resizingSize})}
-          >
+            onResizeStop={() => props.updateConfig({cellSize: resizingSize})}>
             <div style={{width: config.cellSize.w, height: config.cellSize.h}}>
               {cell}
             </div>
@@ -336,8 +334,7 @@ const PanelFacetGridMode: React.FC<PanelFacetProps> = props => {
         display: 'inline-block',
         marginLeft: 'auto',
         marginRight: 'auto',
-      }}
-    >
+      }}>
       <div
         // TODO: I'm just putting this in
         style={{
@@ -346,8 +343,7 @@ const PanelFacetGridMode: React.FC<PanelFacetProps> = props => {
           gridTemplateRows: 24,
           gridAutoColumns: config.cellSize.w,
           gridAutoRows: config.cellSize.h,
-        }}
-      >
+        }}>
         {Object.keys(xPos).map(xKey => (
           <div
             key={'col-' + xKey}
@@ -358,8 +354,7 @@ const PanelFacetGridMode: React.FC<PanelFacetProps> = props => {
               whiteSpace: 'nowrap',
               textOverflow: 'ellipsis',
               fontSize: 10,
-            }}
-          >
+            }}>
             {xKey}
           </div>
         ))}
@@ -373,8 +368,7 @@ const PanelFacetGridMode: React.FC<PanelFacetProps> = props => {
               whiteSpace: 'nowrap',
               textOverflow: 'ellipsis',
               fontSize: 12,
-            }}
-          >
+            }}>
             {yKey}
           </div>
         ))}
@@ -397,8 +391,7 @@ const PanelFacetGridMode: React.FC<PanelFacetProps> = props => {
               onResize={(e, data) => {
                 setResizingSize({w: data.size.width, h: data.size.height});
               }}
-              onResizeStop={() => props.updateConfig({cellSize: resizingSize})}
-            >
+              onResizeStop={() => props.updateConfig({cellSize: resizingSize})}>
               <div
                 style={{
                   width: config.cellSize.w,
@@ -409,8 +402,7 @@ const PanelFacetGridMode: React.FC<PanelFacetProps> = props => {
                 }}
                 onClick={() =>
                   props.updateConfig({selectedCell: {x: xKey, y: yKey}})
-                }
-              >
+                }>
                 <PanelContextProvider newVars={cellVars}>
                   <SelectPanel
                     inputNode={cellNode}

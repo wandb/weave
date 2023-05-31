@@ -201,7 +201,7 @@ const PanelExpression: React.FC<PanelExpressionProps> = props => {
           </S.PanelHandlerContent>
         </S.PanelHandler>
         {props.standalone ? (
-          <S.InspectorWrapper>
+          <S.SidebarWrapper>
             <Sidebar close={() => setConfigOpen(false)} collapsed={!configOpen}>
               {configOpen && (
                 <ConfigComponent
@@ -211,7 +211,7 @@ const PanelExpression: React.FC<PanelExpressionProps> = props => {
                 />
               )}
             </Sidebar>
-          </S.InspectorWrapper>
+          </S.SidebarWrapper>
         ) : null}
       </S.Main>
     </ThemeProvider>

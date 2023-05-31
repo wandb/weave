@@ -36,13 +36,13 @@ export const themes = {
 
 export const PanelNameSpan = styled.span`
   text-transform: capitalize;
-  color: ${props => props.theme.panelName};
+  display: flex;
+  align-items: center;
 `;
 
 export const InlineContentEditable = styled(StrippedContentEditable)<{
   disabled?: boolean;
 }>`
-  background: ${props => (props.disabled ? 'none' : props.theme.clickable)};
   margin: 0;
   padding: 0 2px;
   line-height: 20px;

@@ -112,10 +112,11 @@ export const ConfigurationContentControls = styled.div`
   justify-content: flex-end;
 `;
 
-export const InspectorWrapper = styled.div`
+export const SidebarWrapper = styled.div`
   position: absolute;
   right: 0;
   top: 0;
   bottom: 0;
   box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.2);
+  z-index: 100;
 `;

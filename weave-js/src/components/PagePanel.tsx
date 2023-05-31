@@ -1,9 +1,10 @@
+import * as globals from '@wandb/weave/common/css/globals.styles';
 import Loader from '@wandb/weave/common/components/WandbLoader';
 import getConfig from '../config';
 import {Node, NodeOrVoidNode, voidNode} from '@wandb/weave/core';
 import produce from 'immer';
 import moment from 'moment';
-import React, {useMemo} from 'react';
+import React from 'react';
 import {useCallback, useEffect, useState} from 'react';
 import {Button, Icon, Input} from 'semantic-ui-react';
 import {ThemeProvider} from 'styled-components';
@@ -23,28 +24,25 @@ import {dummyProps, useConfig} from './Panel2/panel';
 import * as Styles from './Panel2/PanelExpression/styles';
 import {
   PanelInteractContextProvider,
-  useCloseEditor,
   useEditorIsOpen,
 } from './Panel2/PanelInteractContext';
 import {PanelRenderedConfigContextProvider} from './Panel2/PanelRenderedConfigContext';
 import {PanelRootBrowser} from './Panel2/PanelRootBrowser/PanelRootBrowser';
 import {useNewPanelFromRootQueryCallback} from './Panel2/PanelRootBrowser/util';
-import Sidebar from './Sidebar/Sidebar';
+import Inspector from './Sidebar/Inspector';
 import {useNodeWithServerType} from '../react';
 import {inJupyterCell, weaveTypeIsPanel} from './PagePanelComponents/util';
-
-const HEADER_HEIGHT = 56;
 
 const EditorSidebar: React.FC<{
   config: ChildPanelFullConfig;
   updateConfig: (newConfig: ChildPanelFullConfig) => void;
   updateConfig2: (change: (oldConfig: any) => any) => void;
 }> = props => {
-  const closeEditor = useCloseEditor();
   const editorIsOpen = useEditorIsOpen();
+
   return (
-    <Styles.InspectorWrapper>
-      <Sidebar close={closeEditor} collapsed={!editorIsOpen}>
+    <Styles.SidebarWrapper>
+      <Inspector collapsed={!editorIsOpen}>
         {editorIsOpen && (
           <ChildPanelConfigComp
             // pathEl={CHILD_NAME}
@@ -53,8 +51,8 @@ const EditorSidebar: React.FC<{
             updateConfig2={props.updateConfig2}
           />
         )}
-      </Sidebar>
-    </Styles.InspectorWrapper>
+      </Inspector>
+    </Styles.SidebarWrapper>
   );
 };
 
@@ -71,6 +69,7 @@ const Home: React.FC<HomeProps> = props => {
   const weave = useWeaveContext();
   const name = 'dashboard-' + (newName === '' ? defaultName : newName);
   const makeNewDashboard = useNewPanelFromRootQueryCallback();
+  const {urlPrefixed} = getConfig();
   const newDashboard = useCallback(() => {
     makeNewDashboard(name, voidNode(), true, newDashExpr => {
       if (inJupyter) {
@@ -91,7 +90,7 @@ const Home: React.FC<HomeProps> = props => {
         });
       }
     });
-  }, [inJupyter, makeNewDashboard, name, props, weave]);
+  }, [inJupyter, makeNewDashboard, name, props, urlPrefixed, weave]);
   const [rootConfig, updateRootConfig] = useConfig();
   const updateInput = useCallback(
     (newInput: Node) => {
@@ -112,8 +111,7 @@ const Home: React.FC<HomeProps> = props => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-      }}
-    >
+      }}>
       <div
         style={{
           width: '100%',
@@ -123,8 +121,7 @@ const Home: React.FC<HomeProps> = props => {
           justifyContent: 'center',
           // marginTop: 16,
           // marginBottom: 16,
-        }}
-      >
+        }}>
         <div
           style={{
             width: '90%',
@@ -134,8 +131,7 @@ const Home: React.FC<HomeProps> = props => {
             justifyContent: 'center',
             flexDirection: 'column',
             gap: 16,
-          }}
-        >
+          }}>
           <div
             style={{
               display: 'flex',
@@ -145,8 +141,7 @@ const Home: React.FC<HomeProps> = props => {
               border: '1px solid #eee',
               gap: 16,
               width: '100%',
-            }}
-          >
+            }}>
             <div
               style={{
                 flexGrow: 1,
@@ -154,16 +149,14 @@ const Home: React.FC<HomeProps> = props => {
                 display: 'flex',
                 alignItems: 'center',
                 gap: 8,
-              }}
-            >
+              }}>
               <div
                 style={{width: '100%', display: 'flex', alignItems: 'center'}}
                 onKeyUp={e => {
                   if (e.key === 'Enter') {
                     newDashboard();
                   }
-                }}
-              >
+                }}>
                 <Input
                   placeholder={defaultName}
                   style={{flexGrow: 1}}
@@ -176,8 +169,7 @@ const Home: React.FC<HomeProps> = props => {
                   display: 'flex',
                   flex: 1,
                   width: '100%',
-                }}
-              >
+                }}>
                 <Button onClick={newDashboard}>New dashboard</Button>
               </div>
             </div>
@@ -191,8 +183,7 @@ const Home: React.FC<HomeProps> = props => {
               display: 'flex',
               flexDirection: 'column',
               overflow: 'hidden',
-            }}
-          >
+            }}>
             {/* <div style={{marginBottom: 32}}>Your Weave Objects</div> */}
             <div style={{flexGrow: 1, overflow: 'auto'}}>
               <PanelRootBrowser
@@ -328,7 +319,8 @@ const PagePanel: React.FC = props => {
 
   // Moved here from PanelExpression, not sure if working yet.
   // TODO: play/pause
-  const [weaveIsAutoRefresh, setWeaveIsAutoRefresh] = React.useState(
+  // const [weaveIsAutoRefresh, setWeaveIsAutoRefresh] = React.useState(
+  const [, /*weaveIsAutoRefresh*/ setWeaveIsAutoRefresh] = React.useState(
     weave.client.isPolling()
   );
   const onPollChangeListener = React.useCallback((isPolling: boolean) => {
@@ -341,12 +333,12 @@ const PagePanel: React.FC = props => {
     };
   }, [weave, onPollChangeListener]);
 
-  const toggleAutoRefresh = React.useCallback(
-    (val: boolean) => {
-      weave.client.setPolling(!weaveIsAutoRefresh);
-    },
-    [weave, weaveIsAutoRefresh]
-  );
+  // const toggleAutoRefresh = React.useCallback(
+  //   (val: boolean) => {
+  //     weave.client.setPolling(!weaveIsAutoRefresh);
+  //   },
+  //   [weave, weaveIsAutoRefresh]
+  // );
 
   const goHome = React.useCallback(() => {
     updateConfig({
@@ -379,12 +371,12 @@ const PagePanel: React.FC = props => {
             style={{
               position,
               backgroundColor: '#fff',
+              color: globals.TEXT_PRIMARY_COLOR,
               top: 0,
               bottom: 0,
               left: 0,
               right: 0,
-            }}
-          >
+            }}>
             {config.input_node.nodeType === 'void' ? (
               <Home updateConfig={updateConfig} inJupyter={inJupyter} />
             ) : (
@@ -394,29 +386,19 @@ const PagePanel: React.FC = props => {
                   height: '100%',
                   display: 'flex',
                   flexDirection: 'column',
-                }}
-              >
+                }}>
                 {!inJupyter && (
-                  <div
-                    style={{
-                      flex: `0 0 ${HEADER_HEIGHT}px`,
-                      height: `${HEADER_HEIGHT}px`,
-                      overflow: 'hidden',
-                    }}
-                  >
-                    <PersistenceManager
-                      inputNode={config.input_node}
-                      updateNode={updateInputNode}
-                      goHome={goHome}
-                    />
-                  </div>
+                  <PersistenceManager
+                    inputNode={config.input_node}
+                    updateNode={updateInputNode}
+                    goHome={goHome}
+                  />
                 )}
                 <div
                   style={{
                     flex: '1 1 300px',
                     overflow: 'hidden',
-                  }}
-                >
+                  }}>
                   <ChildPanel
                     editable={inJupyter || !isPanel}
                     prefixHeader={
@@ -455,8 +437,7 @@ const PagePanel: React.FC = props => {
                                 ),
                                 '_blank'
                               );
-                            }}
-                          >
+                            }}>
                             <Icon name="external square alternate" />
                           </Styles.BarButton>
                         )}
@@ -493,6 +474,3 @@ const PagePanel: React.FC = props => {
 };
 
 export default PagePanel;
-function urlPrefixed(arg0: string): string | URL | undefined {
-  throw new Error('Function not implemented.');
-}

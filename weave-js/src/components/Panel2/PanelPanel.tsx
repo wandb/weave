@@ -1,9 +1,11 @@
+import * as globals from '@wandb/weave/common/css/globals.styles';
 import {useTraceUpdate} from '@wandb/weave/common/util/hooks';
-import {constNodeUnsafe, Node, voidNode} from '@wandb/weave/core';
+import {constNodeUnsafe, Node} from '@wandb/weave/core';
 import produce from 'immer';
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
-import {Button, Icon} from 'semantic-ui-react';
+import React, {useCallback, useEffect, useMemo} from 'react';
 
+import _ from 'lodash';
+import styled, {css} from 'styled-components';
 import {useWeaveContext} from '../../context';
 import * as CGReact from '../../react';
 import {useMutation} from '../../react';
@@ -16,13 +18,23 @@ import {
   ChildPanelFullConfig,
   getFullChildPanel,
 } from './ChildPanel';
+import {
+  IconBack as IconBackUnstyled,
+  IconClose as IconCloseUnstyled,
+  IconOverflowHorizontal as IconOverflowHorizontalUnstyled,
+} from './Icons';
 import * as Panel2 from './panel';
 import {Panel2Loader} from './PanelComp';
 import {PanelContextProvider} from './PanelContext';
 import {fixChildData, toWeaveType} from './PanelGroup';
-import {useSelectedPath, useSetInspectingPanel} from './PanelInteractContext';
+import {
+  useCloseEditor,
+  useSelectedPath,
+  useSetInspectingPanel,
+} from './PanelInteractContext';
 import {useSetPanelRenderedConfig} from './PanelRenderedConfigContext';
-import * as PanelTree from './panelTree';
+import {OutlineItemMenuPopup} from '../Sidebar/OutlineItemMenuPopup';
+import {getConfigForPath} from './panelTree';
 
 const inputType = {type: 'Panel' as const};
 type PanelPanelProps = Panel2.PanelProps<
@@ -134,23 +146,17 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
     panelUpdateConfig,
     panelUpdateConfig2,
   } = usePanelPanelCommon(props);
-  const selected = useMemo(
-    () =>
-      selectedPanel.length === 1
-        ? ['root']
-        : selectedPanel.filter(s => s !== ''),
+
+  const closeEditor = useCloseEditor();
+
+  const showOutline = useMemo(
+    () => selectedPanel.filter(s => s).length === 0,
     [selectedPanel]
   );
-  const [outlineExpanded, setOutlineExpanded] = useState(true);
-  const [inspectorExpanded, setInspectorExpanded] = useState(true);
 
-  const handleEmptyDashboard = useCallback(() => {
-    panelUpdateConfig2(oldConfig => {
-      const res = PanelTree.ensureDashboard(voidNode());
-      consoleLog('EMPTY STATE', res);
-      return res;
-    });
-  }, [panelUpdateConfig2]);
+  const goBackToOutline = useCallback(() => {
+    setSelectedPanel([``]);
+  }, [setSelectedPanel]);
 
   if (loading) {
     return <Panel2Loader />;
@@ -159,104 +165,158 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
     throw new Error('Panel config is null after loading');
   }
 
-  return (
-    <div
-      style={{
-        width: '100%',
-        height: '100%',
-        overflowX: 'hidden',
-        overflowY: 'hidden',
-        // wordBreak: 'normal',
-        display: 'flex',
-        flexDirection: 'column',
-      }}>
-      <div
-        style={{
-          display: 'flex',
-          paddingTop: 4,
-          marginBottom: 4,
-          paddingLeft: 10,
-          borderTop: '1px solid #ccc',
-        }}>
-        <Button size="mini" onClick={handleEmptyDashboard}>
-          Reset Dashboard
-        </Button>
-      </div>
-      <div
-        style={{
-          paddingLeft: 2,
-          paddingTop: 4,
-          paddingBottom: 4,
-          borderTop: '1px solid #ccc',
-          display: 'flex',
-          alignItems: 'center',
-          cursor: 'pointer',
-        }}
-        onClick={() => setOutlineExpanded(expanded => !expanded)}>
-        <Icon
-          size="mini"
-          name={outlineExpanded ? 'chevron down' : 'chevron right'}
+  if (showOutline) {
+    return (
+      <Container>
+        <Header>
+          <HeaderTop>
+            <HeaderTopLeft>
+              <HeaderTopText>Outline</HeaderTopText>
+            </HeaderTopLeft>
+            <HeaderTopRight>
+              <IconButton onClick={closeEditor}>
+                <IconClose />
+              </IconButton>
+            </HeaderTopRight>
+          </HeaderTop>
+        </Header>
+        <Outline
+          config={panelConfig}
+          updateConfig={panelUpdateConfig}
+          updateConfig2={panelUpdateConfig2}
+          setSelected={setSelectedPanel}
+          selected={selectedPanel}
         />
-        <span style={{fontWeight: 'bold'}}>Outline</span>
-      </div>
-      {outlineExpanded && (
-        <div
-          style={{
-            flex: '0 0 auto',
-            overflowX: 'hidden',
-            maxHeight: 350,
-            overflowY: 'auto',
-            padding: '0 8px',
-          }}>
-          <Outline
+      </Container>
+    );
+  }
+
+  return (
+    <Container>
+      <Header>
+        <HeaderTop>
+          <HeaderTopLeft canGoBack onClick={goBackToOutline}>
+            <IconButton>
+              <IconBack />
+            </IconButton>
+            <HeaderTopText>Outline</HeaderTopText>
+          </HeaderTopLeft>
+          <HeaderTopRight>
+            <OutlineItemMenuPopup
+              config={panelConfig}
+              localConfig={getConfigForPath(panelConfig, selectedPanel)}
+              path={selectedPanel}
+              updateConfig={panelUpdateConfig}
+              updateConfig2={panelUpdateConfig2}
+              goBackToOutline={goBackToOutline}
+              trigger={
+                <IconButton>
+                  <IconOverflowHorizontal />
+                </IconButton>
+              }
+            />
+            <IconButton onClick={closeEditor}>
+              <IconClose />
+            </IconButton>
+          </HeaderTopRight>
+        </HeaderTop>
+        <HeaderTitle>{_.last(selectedPanel)}</HeaderTitle>
+      </Header>
+      <Body>
+        <PanelContextProvider newVars={{}} selectedPath={selectedPanel}>
+          <ChildPanelConfigComp
             config={panelConfig}
             updateConfig={panelUpdateConfig}
             updateConfig2={panelUpdateConfig2}
-            setSelected={setSelectedPanel}
-            selected={selectedPanel}
           />
-        </div>
-      )}
-      <div
-        style={{
-          paddingLeft: 2,
-          paddingTop: 4,
-          paddingBottom: 4,
-          borderTop: '1px solid #ccc',
-          display: 'flex',
-          alignItems: 'center',
-          cursor: 'pointer',
-        }}
-        onClick={() => setInspectorExpanded(expanded => !expanded)}>
-        <Icon
-          size="mini"
-          name={inspectorExpanded ? 'chevron down' : 'chevron right'}
-        />
-        {selected.map((s, i) => (
-          <span key={i}>
-            <span style={{fontWeight: 'bold'}}>{s}</span>
-            {i < selected.length - 1 ? <span> | </span> : null}
-          </span>
-        ))}
-      </div>
-      <div style={{overflowY: 'auto', padding: '4px', flexGrow: 1}}>
-        {/* height: 99% gets rid of scrollbar content is small enough. Not sure why
-        this is needed */}
-        <div style={{height: '99%'}}>
-          {inspectorExpanded && (
-            <PanelContextProvider newVars={{}} selectedPath={selectedPanel}>
-              <ChildPanelConfigComp
-                config={panelConfig}
-                updateConfig={panelUpdateConfig}
-                updateConfig2={panelUpdateConfig2}
-              />
-            </PanelContextProvider>
-          )}
-        </div>
-      </div>
-    </div>
+        </PanelContextProvider>
+      </Body>
+    </Container>
   );
 };
+
+const IconButton = styled.div`
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  color: ${globals.GRAY_500};
+  &:hover {
+    color: ${globals.GRAY_600};
+    background-color: ${globals.GRAY_50};
+  }
+
+  &:not(:last-child) {
+    margin-right: 4px;
+  }
+`;
+
+const iconStyles = css`
+  width: 18px;
+`;
+const IconBack = styled(IconBackUnstyled)`
+  ${iconStyles}
+`;
+const IconClose = styled(IconCloseUnstyled)`
+  ${iconStyles}
+`;
+const IconOverflowHorizontal = styled(IconOverflowHorizontalUnstyled)`
+  ${iconStyles}
+`;
+
+const Container = styled.div`
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  height: 100%;
+`;
+
+const Header = styled.div`
+  padding: 16px;
+  border-bottom: 1px solid ${globals.GRAY_350};
+`;
+
+const HeaderTop = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+`;
+
+const HeaderTopLeft = styled.div<{canGoBack?: boolean}>`
+  display: flex;
+  align-items: center;
+  ${p =>
+    p.canGoBack &&
+    css`
+      color: ${globals.GRAY_500};
+      cursor: pointer;
+    `}
+`;
+
+const HeaderTopRight = styled.div`
+  display: flex;
+  align-items: center;
+`;
+
+const HeaderTopText = styled.div`
+  font-weight: 600;
+`;
+
+const HeaderTitle = styled.div`
+  font-family: 'Inconsolata', monospace;
+  font-size: 20px;
+  font-weight: 600;
+  margin-top: 16px;
+`;
+
+const Body = styled.div`
+  flex-grow: 1;
+  overflow-x: hidden;
+  overflow-y: auto;
+`;
 
 export const PanelPanel: React.FC<PanelPanelProps> = props => {
   const {loading, panelConfig, panelUpdateConfig, panelUpdateConfig2} =

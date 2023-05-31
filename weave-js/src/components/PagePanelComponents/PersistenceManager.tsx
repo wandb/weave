@@ -1,10 +1,10 @@
+import * as globals from '@wandb/weave/common/css/globals.styles';
 import {NodeOrVoidNode, voidNode} from '@wandb/weave/core';
 import {
   useMakeMutation,
   useMutation,
   useNodeWithServerType,
 } from '@wandb/weave/react';
-import _ from 'lodash';
 import React, {useMemo, useRef, useState} from 'react';
 import {useCallback} from 'react';
 import {Button, Input, Modal} from 'semantic-ui-react';
@@ -49,6 +49,7 @@ import {
   getAvailableActions,
   useStateMachine,
 } from './persistenceStateMachine';
+import {WBButton} from '../../common/components/elements/WBButtonNew';
 
 const CustomPopover = styled(Popover)`
   .MuiPaper-root {
@@ -69,17 +70,21 @@ const PersistenceControlsWrapper = styled.div`
   gap: 12px;
 `;
 
+const HEADER_HEIGHT = 48;
+
 const MainHeaderWrapper = styled.div`
-  width: 100%;
-  height: 100%;
+  position: relative;
+  flex: 0 0 ${HEADER_HEIGHT}px;
+  height: ${HEADER_HEIGHT}px;
+  overflow: hidden;
   z-index: 100;
   display: flex;
-  flex-direction: row;
   justify-content: space-between;
-  padding: 16px;
-  background-color: #181b1f;
   align-items: center;
-  color: #f5f5f5;
+  padding: 0 12px;
+  background-color: ${globals.WHITE};
+  border-bottom: 1px solid ${globals.GRAY_350};
+  font-size: 15px;
 `;
 
 const HeaderCenterControlsPrimary = styled.span`
@@ -97,6 +102,7 @@ const HeaderCenterControls = styled.div`
   flex-direction: row;
   align-items: center;
   gap: 4px;
+  font-size: 16px;
 `;
 
 const CustomMenu = styled.div`
@@ -118,10 +124,11 @@ const MenuItem = styled.div<{hasBorder?: boolean}>`
   flex-direction: row;
   justify-content: left;
   align-items: center;
-  padding: 12px 16px;
+  padding: 4px 16px;
   gap: 10px;
   cursor: pointer;
   border-bottom: ${props => (props.hasBorder ? '1px solid #ddd;' : 'default')};
+  font-size: 15px;
 
   &:hover {
     background-color: #f5f5f5;
@@ -229,54 +236,26 @@ const HeaderPersistenceControls: React.FC<{
   return (
     <PersistenceControlsWrapper>
       {acting ? (
-        <Button
-          loading
-          size="tiny"
-          style={{
-            padding: '4px 16px 4px 16px',
-            margin: '4px',
-            backgroundColor: '#0096AD',
-            borderColor: '#0096AD',
-            color: '#F6F6F6',
-            fontWeight: '600',
-          }}>
+        <WBButton loading variant={`confirm`}>
           Working
-        </Button>
+        </WBButton>
       ) : storeAction ? (
         <>
           <PersistenceLabel>
             {persistenceStateToLabel[nodeState]}
           </PersistenceLabel>
-          <Button
+          <WBButton
+            variant={`confirm`}
             onClick={() => {
               takeAction(storeAction);
-            }}
-            size="tiny"
-            style={{
-              padding: '4px 16px 4px 16px',
-              margin: '4px',
-              backgroundColor: '#0096AD',
-              borderColor: '#0096AD',
-              color: '#F6F6F6',
-              fontWeight: '600',
             }}>
             {persistenceActionToLabel[storeAction]}
-          </Button>
+          </WBButton>
         </>
       ) : (
-        <Button
-          size="tiny"
-          disabled
-          style={{
-            padding: '4px 16px 4px 16px',
-            margin: '4px',
-            backgroundColor: '#006474',
-            borderColor: '#006474',
-            color: '#cdcdcd',
-            fontWeight: '600',
-          }}>
+        <WBButton disabled variant={`plain`}>
           {persistenceStateToLabel[nodeState]}
-        </Button>
+        </WBButton>
       )}
     </PersistenceControlsWrapper>
   );

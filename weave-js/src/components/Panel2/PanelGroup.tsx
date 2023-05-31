@@ -1,3 +1,4 @@
+import * as globals from '@wandb/weave/common/css/globals.styles';
 import {
   constNodeUnsafe,
   dereferenceAllVars,
@@ -50,7 +51,7 @@ const LAYOUT_MODES = [
 ];
 
 export interface PanelGroupConfig {
-  layoutMode: typeof LAYOUT_MODES[number];
+  layoutMode: (typeof LAYOUT_MODES)[number];
   equalSize?: boolean;
   showExpressions?: boolean;
   style?: string;
@@ -450,8 +451,10 @@ export const PanelGroupConfigComponent: React.FC<PanelGroupProps> = props => {
   const pathStr = path.join('.');
   const selectedPathStr = selectedPath?.join('.') ?? '';
 
+  const curPanelSelected = pathStr.startsWith(selectedPathStr);
+
   // We are selected.  Render our config
-  // if (pathStr.startsWith(selectedPathStr)) {
+  // if (curPanelSelected) {
   //   return (
   //     <>
   //       <ConfigPanel.ConfigOption label="Layout mode">
@@ -494,10 +497,57 @@ export const PanelGroupConfigComponent: React.FC<PanelGroupProps> = props => {
   //   );
   // }
 
+  const childrenConfig = _.map(config.items, (item, name) => {
+    const renderedItem = (
+      <PanelContextProvider key={name} newVars={newVars}>
+        <ChildPanelConfigComp
+          allowedPanels={config.allowedPanels}
+          pathEl={'' + name}
+          config={item}
+          updateConfig={newItemConfig =>
+            updateConfig(
+              produce(config, draft => {
+                draft.items[name] = newItemConfig;
+              })
+            )
+          }
+          updateConfig2={(change: (oldConfig: any) => any) => {
+            if (updateConfig2 == null) {
+              return;
+            }
+            return updateConfig2(currentConfig => {
+              currentConfig = currentConfig ?? PANEL_GROUP_DEFAULT_CONFIG();
+              const fullChildPanel = getFullChildPanel(
+                currentConfig?.items?.[name]
+              );
+              const changed = change(fullChildPanel);
+              return produce(currentConfig, draft => {
+                draft.items[name] = changed;
+              });
+            });
+          }}
+        />
+      </PanelContextProvider>
+    );
+
+    newVars = {
+      ...newVars,
+      ...getItemVars(
+        name,
+        item,
+        pushFrame(stack, newVars),
+        weave,
+        config.allowedPanels
+      ),
+    };
+
+    return renderedItem;
+  });
+
   // One of our descendants is selected.  Render children only
   return (
     <>
-      {pathStr.startsWith(selectedPathStr) && (
+      {curPanelSelected && (
         <>
           <ConfigPanel.ConfigOption label="layout">
             <ConfigPanel.ModifiedDropdownConfigField
@@ -536,53 +586,12 @@ export const PanelGroupConfigComponent: React.FC<PanelGroupProps> = props => {
         </ConfigPanel.ConfigOption> */}
         </>
       )}
-      {_.map(config.items, (item, name) => {
-        const renderedItem = (
-          <PanelContextProvider key={name} newVars={newVars}>
-            <ChildPanelConfigComp
-              allowedPanels={config.allowedPanels}
-              pathEl={'' + name}
-              config={item}
-              updateConfig={newItemConfig =>
-                updateConfig(
-                  produce(config, draft => {
-                    draft.items[name] = newItemConfig;
-                  })
-                )
-              }
-              updateConfig2={(change: (oldConfig: any) => any) => {
-                if (updateConfig2 == null) {
-                  return;
-                }
-                return updateConfig2(currentConfig => {
-                  currentConfig = currentConfig ?? PANEL_GROUP_DEFAULT_CONFIG();
-                  const fullChildPanel = getFullChildPanel(
-                    currentConfig?.items?.[name]
-                  );
-                  const changed = change(fullChildPanel);
-                  return produce(currentConfig, draft => {
-                    draft.items[name] = changed;
-                  });
-                });
-              }}
-            />
-          </PanelContextProvider>
-        );
-
-        newVars = {
-          ...newVars,
-          ...getItemVars(
-            name,
-            item,
-            pushFrame(stack, newVars),
-            weave,
-            config.allowedPanels
-          ),
-        };
-
-        return renderedItem;
-      })}
-      {pathStr.startsWith(selectedPathStr) && (
+      {curPanelSelected ? (
+        <ChildConfigContainer>{childrenConfig}</ChildConfigContainer>
+      ) : (
+        childrenConfig
+      )}
+      {curPanelSelected && (
         <Button size="mini" onClick={handleAddPanel}>
           Add Child
         </Button>
@@ -590,6 +599,21 @@ export const PanelGroupConfigComponent: React.FC<PanelGroupProps> = props => {
     </>
   );
 };
+
+const ChildConfigContainer = styled.div`
+  position: relative;
+  padding-left: 2px;
+
+  &:before {
+    content: '';
+    position: absolute;
+    top: 12px;
+    bottom: 12px;
+    left: 0;
+    width: 2px;
+    background-color: ${globals.GRAY_350};
+  }
+`;
 
 export const PanelGroupItem: React.FC<{
   item: ChildPanelConfig;
@@ -656,8 +680,7 @@ export const PanelGroupItem: React.FC<{
   return (
     <PanelContextProvider
       newVars={siblingVars}
-      handleVarEvent={handleSiblingVarEvent}
-    >
+      handleVarEvent={handleSiblingVarEvent}>
       <ChildPanel
         allowedPanels={config.allowedPanels}
         pathEl={'' + name}
@@ -852,8 +875,7 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
           <Button
             size="tiny"
             style={{position: 'absolute', top: 0, right: 0}}
-            onClick={handleAddPanel}
-          >
+            onClick={handleAddPanel}>
             +
           </Button>
         )}
@@ -886,8 +908,7 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
     <Group
       layered={config.layoutMode === 'layer'}
       preferHorizontal={config.layoutMode === 'horizontal'}
-      compStyle={config.style}
-    >
+      compStyle={config.style}>
       {Object.entries(config.items).map(([name, item]) => {
         const childPanelConfig = getFullChildPanel(item).config;
         // Hacky: pull width up from child to here.
@@ -904,8 +925,7 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
             width={width}
             layered={config.layoutMode === 'layer'}
             preferHorizontal={config.layoutMode === 'horizontal'}
-            equalSize={config.equalSize}
-          >
+            equalSize={config.equalSize}>
             {childPanelsByKey[name]}
           </GroupItem>
         );

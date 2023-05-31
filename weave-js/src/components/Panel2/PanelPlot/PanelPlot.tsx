@@ -8,7 +8,6 @@ import CustomPanelRenderer, {
 } from '@wandb/weave/common/components/Vega3/CustomPanelRenderer';
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import {
-  constFunction,
   ConstNode,
   constNodeUnsafe,
   constNumber,
@@ -29,11 +28,8 @@ import {
   opArray,
   // opContains,
   // opDateToNumber,
-  opDict,
   // opFilter,
   opIndex,
-  opMap,
-  opMerge,
   // opNumberGreaterEqual,
   // opNumberLessEqual,
   // opNumberMult,
@@ -108,6 +104,10 @@ import {
   ScaleType,
   SeriesConfig,
 } from './versions';
+import {ConfigSection} from '../ConfigPanel';
+import {IconButton} from '../../IconButton';
+import {IconOverflowHorizontal} from '../Icons';
+import styled from 'styled-components';
 
 const recordEvent = makeEventRecorder('Plot');
 
@@ -277,7 +277,7 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
   const inputNode = input;
 
   const weave = useWeaveContext();
-  const {frame, stack} = usePanelContext();
+  const {frame, stack, dashboardConfigOptions} = usePanelContext();
 
   // this migrates the config and returns a config of the latest version
   const {config} = useConfig(inputNode, props.config);
@@ -598,14 +598,32 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
   }, [config.series, input, weave]);
 
   return useMemo(
-    () => (
-      <>
-        {enableDashUi && <VariableView newVars={cellFrame} />}
-        {configTabs}
-        {activeTabIndex === 0 && seriesButtons}
-      </>
-    ),
-    [enableDashUi, cellFrame, configTabs, activeTabIndex, seriesButtons]
+    () =>
+      enableDashUi ? (
+        <>
+          <ConfigSection label={`Properties`}>
+            {dashboardConfigOptions}
+            <VariableView newVars={cellFrame} />
+            {seriesConfigDom}
+          </ConfigSection>
+          <ConfigSection label={`Labels`}>{labelConfigDom}</ConfigSection>
+        </>
+      ) : (
+        <>
+          {configTabs}
+          {activeTabIndex === 0 && seriesButtons}
+        </>
+      ),
+    [
+      enableDashUi,
+      dashboardConfigOptions,
+      cellFrame,
+      seriesConfigDom,
+      labelConfigDom,
+      configTabs,
+      activeTabIndex,
+      seriesButtons,
+    ]
   );
 };
 
@@ -1020,17 +1038,23 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
           // offset={'10px, -10px'}
           position="left center"
           trigger={
-            <div>
-              <HighlightedIcon>
-                <LegacyWBIcon name="overflow" />
-              </HighlightedIcon>
-            </div>
+            enableDashUi ? (
+              <ConfigDimMenuButton>
+                <IconOverflowHorizontal />
+              </ConfigDimMenuButton>
+            ) : (
+              <div>
+                <HighlightedIcon>
+                  <LegacyWBIcon name="overflow" />
+                </HighlightedIcon>
+              </div>
+            )
           }
           options={dimOptions.filter(o => !Array.isArray(o))}
           sections={dimOptions.filter(o => Array.isArray(o)) as DimOption[][]}
         />
       ) : undefined,
-    [dimOptions]
+    [dimOptions, enableDashUi]
   );
 
   const updateGroupBy = useCallback(
@@ -1082,9 +1106,7 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
   } else if (PlotState.isDropdown(dimension)) {
     const dimName = dimension.name;
     return (
-      <ConfigDimLabel
-        {...props}
-        postfixComponent={postFixComponent || undefined}>
+      <ConfigDimLabel {...props} postfixComponent={postFixComponent}>
         <ConfigPanel.ModifiedDropdownConfigField
           selection
           placeholder={dimension.defaultState().compareValue}
@@ -1109,9 +1131,7 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
   } else if (PlotState.isWeaveExpression(dimension)) {
     return (
       <>
-        <ConfigDimLabel
-          {...props}
-          postfixComponent={postFixComponent || undefined}>
+        <ConfigDimLabel {...props} postfixComponent={postFixComponent}>
           <WeaveExpressionDimConfig
             dimName={dimension.name}
             input={input}
@@ -1121,7 +1141,7 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
           />
         </ConfigDimLabel>
         {enableDashUi && (
-          <ConfigPanel.ConfigOption label={`groupby ${dimension.name}`}>
+          <ConfigPanel.ConfigOption label={`Group by ${dimension.name}`}>
             <Checkbox
               checked={config.series[0].table.groupBy.includes(
                 config.series[0].dims[dimension.name]
@@ -2931,3 +2951,7 @@ const ORG_DASHBOARD_TEMPLATE_OVERLAY = {
 };
 
 export default Spec;
+
+const ConfigDimMenuButton = styled(IconButton)`
+  margin-left: 4px;
+`;

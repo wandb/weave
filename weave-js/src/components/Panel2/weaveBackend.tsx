@@ -274,8 +274,7 @@ const registerUserPanel = (
           return (
             <PanelContextProvider
               newVars={panelVars}
-              handleVarEvent={handleVarEvent}
-            >
+              handleVarEvent={handleVarEvent}>
               <Panel
                 panelSpec={renderAsPanel.id}
                 input={inputNode}

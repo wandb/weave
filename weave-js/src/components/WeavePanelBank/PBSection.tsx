@@ -45,8 +45,7 @@ export const PBSection: React.FC<PBSectionProps> = props => {
             setPanelBankHeight(
               contentRect.bounds ? contentRect.bounds.height : 0
             );
-          }}
-        >
+          }}>
           {({measureRef}) => (
             <div className="panel-bank__sections" ref={measureRef}>
               <div className="panel-bank__section">
@@ -64,13 +63,11 @@ export const PBSection: React.FC<PBSectionProps> = props => {
                         width: '100%',
                         height: '100%',
                       }}
-                      className="editable-panel"
-                    >
+                      className="editable-panel">
                       <DragHandle
                         key={`draghandle-${panelRef.id}`}
                         className="draggable-handle"
-                        partRef={panelRef}
-                      >
+                        partRef={panelRef}>
                         <LegacyWBIcon title="" name="handle" />
                       </DragHandle>
                       {props.renderPanel(panelRef)}

@@ -3,16 +3,21 @@ import React, {SVGProps} from 'react';
 import {ReactComponent as DownSVGRaw} from '../../assets/icon-chevron-down.svg';
 import {ReactComponent as UpSVGRaw} from '../../assets/icon-chevron-up.svg';
 import {ReactComponent as NextSVGRaw} from '../../assets/icon-chevron-next.svg';
-import {ReactComponent as ImportIconClose} from '../../assets/icon-close.svg';
-import {ReactComponent as ImportIconCopy} from '../../assets/icon-copy.svg';
 import {ReactComponent as ToolSVGRaw} from '../../assets/icon-flash-bolt.svg';
 import {ReactComponent as PromptSVGRaw} from '../../assets/icon-forum-chat-bubble.svg';
-import {ReactComponent as ImportIconFullScreenModeExpand} from '../../assets/icon-full-screen-mode-expand.svg';
 import {ReactComponent as ChainSVGRaw} from '../../assets/icon-link-alt.svg';
 import {ReactComponent as LLMSVGRaw} from '../../assets/icon-model.svg';
-import {ReactComponent as ImportIconOverflowHorizontal} from '../../assets/icon-overflow-horizontal.svg';
 import {ReactComponent as AgentSVGRaw} from '../../assets/icon-robot-service-member.svg';
+import {ReactComponent as ImportIconBack} from '../../assets/icon-back.svg';
+import {ReactComponent as ImportIconCaret} from '../../assets/icon-caret.svg';
+import {ReactComponent as ImportIconChartVerticalBars} from '../../assets/icon-chart-vertical-bars.svg';
+import {ReactComponent as ImportIconClose} from '../../assets/icon-close.svg';
+import {ReactComponent as ImportIconColumnAlt} from '../../assets/icon-column-alt.svg';
+import {ReactComponent as ImportIconCopy} from '../../assets/icon-copy.svg';
+import {ReactComponent as ImportIconFullScreenModeExpand} from '../../assets/icon-full-screen-mode-expand.svg';
+import {ReactComponent as ImportIconOverflowHorizontal} from '../../assets/icon-overflow-horizontal.svg';
 import {ReactComponent as ImportIconTextLanguageAlt} from '../../assets/icon-text-language-alt.svg';
+import {ReactComponent as ImportIconWeave} from '../../assets/icon-weave.svg';
 import {ReactComponent as WeaveLogo} from '../../assets/icon-weave-logo.svg';
 import {ReactComponent as LeftArrow} from '../../assets/icon-left-arrow.svg';
 import {ReactComponent as Docs} from '../../assets/icon-docs.svg';
@@ -33,8 +38,20 @@ const updateIconProps = (props: SVGIconProps) => {
   };
 };
 
+export const IconBack = (props: SVGIconProps) => (
+  <ImportIconBack {...updateIconProps(props)} />
+);
+export const IconCaret = (props: SVGIconProps) => (
+  <ImportIconCaret {...updateIconProps(props)} />
+);
+export const IconChartVerticalBars = (props: SVGIconProps) => (
+  <ImportIconChartVerticalBars {...updateIconProps(props)} />
+);
 export const IconClose = (props: SVGIconProps) => (
   <ImportIconClose {...updateIconProps(props)} />
+);
+export const IconColumnAlt = (props: SVGIconProps) => (
+  <ImportIconColumnAlt {...updateIconProps(props)} />
 );
 export const IconCopy = (props: SVGIconProps) => (
   <ImportIconCopy {...updateIconProps(props)} />
@@ -47,6 +64,9 @@ export const IconOverflowHorizontal = (props: SVGIconProps) => (
 );
 export const IconTextLanguageAlt = (props: SVGIconProps) => (
   <ImportIconTextLanguageAlt {...updateIconProps(props)} />
+);
+export const IconWeave = (props: SVGIconProps) => (
+  <ImportIconWeave {...updateIconProps(props)} />
 );
 
 export const IconWeaveLogo = (props: SVGIconProps) => (

@@ -124,6 +124,21 @@ export const panelChildren = (
   return null;
 };
 
+export function getConfigForPath(
+  config: ChildPanelFullConfig,
+  path: string[]
+): ChildPanelFullConfig {
+  if (path.length === 0) {
+    return config;
+  }
+  const key = path[0];
+  const children = panelChildren(config);
+  if (children == null) {
+    throw new Error('Children not found');
+  }
+  return getConfigForPath(children[key], path.slice(1));
+}
+
 export const nextPanelName = (
   existingNames: string[],
   varNameBase?: string

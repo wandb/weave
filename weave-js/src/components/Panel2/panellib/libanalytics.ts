@@ -1,6 +1,8 @@
 declare global {
   interface Window {
-    analytics?: any;
+    analytics?: {
+      track: (name: string, data?: {[key: string]: any}) => void;
+    };
   }
 }
 

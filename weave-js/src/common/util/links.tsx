@@ -87,7 +87,7 @@ export const TargetBlank: FCWithRef<
     // Enforce an absolute prefixed url for blank targets
     if (
       passthroughProps.href != null &&
-      !passthroughProps.href.startsWith('http')
+      !(passthroughProps.href.indexOf('://') > 0) // regex for http, file, s3, gs, etc
     ) {
       passthroughProps.href = getConfig().urlPrefixed(passthroughProps.href);
     }

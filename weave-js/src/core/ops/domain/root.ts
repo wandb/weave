@@ -1,5 +1,7 @@
+import fetch from 'isomorphic-unfetch';
+
 import type {TypedDictType} from '../../model';
-import {hash, typedDict} from '../../model';
+import {hash, list, typedDict} from '../../model';
 import {makeOp} from '../../opStore';
 import {docType} from '../../util/docs';
 import {makeTaggingStandardOp} from '../opKinds';
@@ -475,3 +477,104 @@ export const opRootRepoInsightsProductUsage = makeRepoInsightsOp(
   'rpt_product_usage',
   repoInsightsRowTypes.rpt_product_usage
 );
+
+export const opRootAuditLogs = makeOp({
+  hidden: true,
+  name: 'root-_root_audit_logs_',
+  argTypes: {
+    url: 'string' as const,
+    numDays: 'number' as const,
+    anonymize: 'boolean' as const,
+  },
+  returnType: typedDict({
+    data: list(
+      typedDict({
+        // AuditLog
+        timestamp: 'string' as const,
+        actor_user_id: 'number' as const,
+        audit_log_error: 'string' as const,
+        action: 'string' as const,
+
+        // DeanomizedContext
+        actor_email: 'string' as const,
+        user_email: 'string' as const,
+        entity_name: 'string' as const,
+        project_name: 'string' as const,
+        report_name: 'string' as const,
+
+        // StaticContext
+        entity_asset: 'number' as const,
+        user_asset: 'number' as const,
+        artifact_asset: 'number' as const,
+        project_asset: 'number' as const,
+        report_asset: 'number' as const,
+        response_code: 'number' as const,
+        cli_version: 'string' as const,
+        actor_ip: 'string' as const,
+      })
+    ),
+    error: 'string' as const,
+  }),
+  renderInfo: {type: 'function'},
+  description: `Directly fetch all ${docType('artifact', {
+    plural: true,
+  })} - only available in local W&B deployments`,
+  argDescriptions: {},
+  returnValueDescription: `A ${docType('list')} of ${docType('artifact', {
+    plural: true,
+  })}`,
+  resolver: async (inputs, forwardGraph, forwardOp, context) => {
+    // check if cache has data
+    const cacheKey = inputs.url + inputs.numDays + inputs.anonymize;
+    const cachedData = auditLogDataCache.get(cacheKey);
+    if (cachedData) {
+      const {data: data1, time} = cachedData;
+      const now = new Date().getTime();
+      // if data is less than 5 minutes old, return it
+      if (now - time < 5 * 60 * 1000) {
+        return {data: data1, error: ''};
+      }
+    }
+
+    // if cache is empty or data is more than 5 minutes old, fetch data
+    const {data, error} = await getAuditLogData(
+      inputs.url,
+      inputs.numDays,
+      inputs.anonymize
+    );
+
+    // if no error, set the data in cache
+    if (error.length === 0) {
+      auditLogDataCache.set(cacheKey, {data, time: new Date().getTime()});
+    }
+
+    return {data, error};
+  },
+});
+
+// add cache to audit log data
+const auditLogDataCache = new Map<string, {data: any[]; time: number}>();
+
+const getAuditLogData = async (
+  url: string,
+  numDays: number,
+  anonymize: boolean
+) => {
+  try {
+    const req = url + '?numDays=' + numDays + '&anonymize=' + anonymize;
+    // eslint-disable-next-line wandb/no-unprefixed-urls
+    const res = await fetch(req, {method: 'GET'});
+    if (!res.ok) {
+      return {data: [], error: 'res is not ok: ' + (await res.text())};
+    } else {
+      const text = await res.text();
+      const lines = text.split('\n');
+      const data = lines
+        .filter((line: string) => line.length > 0)
+        .map((line: string) => JSON.parse(line));
+      return {data, error: ''};
+    }
+  } catch (e) {
+    return {data: [], error: 'error parsing audit log data: ' + String(e)};
+  }
+};

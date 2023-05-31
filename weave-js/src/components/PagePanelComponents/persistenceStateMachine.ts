@@ -164,7 +164,7 @@ export const getAvailableActions = (
   state: PersistenceState,
   isAuthenticated: boolean
 ): ActionSetType => {
-  let actions = persistenceActions[state];
+  const actions = persistenceActions[state];
   if (!isAuthenticated) {
     return {
       storeAction:

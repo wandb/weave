@@ -48,7 +48,8 @@ const PanelNameEditor: React.FC<PanelNameEditorProps> = props => {
                 // setAutocompleterQuery(v);
                 setAutocompleterOpen(true);
               }}
-              onChange={v => {}}></InlineContentEditable>
+              onChange={v => {}}
+            />
           )}
         </WBSuggester>
       </PanelNameSpan>
