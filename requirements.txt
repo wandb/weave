@@ -30,8 +30,3 @@ wheel>=0.38.0 # not directly required, pinned by Snyk to avoid a vulnerability
 
 # Used for domain ops
 graphql-core>3
-
-# Used for MVP ecosystem
-langchain>=0.0.132
-openai
-faiss-cpu
