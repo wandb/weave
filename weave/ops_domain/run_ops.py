@@ -56,7 +56,7 @@ from ..ops_arrow import ArrowWeaveList, ArrowWeaveListType
 from .. import util
 from .. import errors
 from .. import io_service
-from ..mappers_arrow import map_to_arrow
+from .. import context_state
 from .. import engine_trace
 
 from ..api import use
@@ -286,9 +286,7 @@ def summary(run: wdt.Run) -> dict[str, typing.Any]:
     )
 
 
-def _refine_history_type(
-    run: wdt.Run, history_version: int, columns: typing.Optional[list[str]] = None
-) -> types.Type:
+def _refine_history_type(run: wdt.Run, history_version: int) -> types.Type:
     prop_types: dict[str, types.Type] = {}
 
     if "historyKeys" not in run.gql:
@@ -297,10 +295,9 @@ def _refine_history_type(
     historyKeys = run.gql["historyKeys"]["keys"]
 
     for key, key_details in historyKeys.items():
-        if key.startswith("system/") or (columns is not None and key not in columns):
+        if key.startswith("system/"):
             # skip system metrics for now
             continue
-
         type_counts: list[history_util.TypeCount] = key_details["typeCounts"]
         wt = types.union(
             *[
@@ -338,13 +335,10 @@ def _refine_history_type(
 def _history_keys(run: wdt.Run, history_version: int) -> list[str]:
     if "historyKeys" not in run.gql:
         raise ValueError("historyKeys not in run gql")
-    if "parquetHistory" not in run.gql:
-        raise ValueError("parquetHistory not in run gql")
     history_type: types.Type = _refine_history_type(run, history_version)
     object_type = typing.cast(
         types.TypedDict, typing.cast(types.List, history_type).object_type
     )
-
     return list(object_type.property_types.keys())
 
 
@@ -404,36 +398,13 @@ def _make_run_history_gql_field(inputs: InputAndStitchProvider, inner: str):
     """
 
 
-def _make_history_result(
-    result: typing.Optional[typing.Union[pa.Array, list]],
-    history_version: int,
-    object_type: types.Type,
-) -> typing.Union[ArrowWeaveList, list]:
-    if history_version == 1:
-        if isinstance(result, (list, ArrowWeaveList)):
-            return result
-        raise ValueError(
-            f"Invalid history result for history version {history_version}"
-        )
-    elif history_version == 2:
-        if isinstance(result, list):
-            mapper = map_to_arrow(object_type, None, [])
-            result = pa.array(result, type=mapper.result_type())
-        return ArrowWeaveList(result, object_type)
-    else:
-        raise ValueError(f"Invalid history version {history_version}")
-
-
-def _history_body(
-    run: wdt.Run, history_version: int, columns: typing.Optional[list[str]] = None
-):
+def _history_body(run: wdt.Run, history_version: int):
     # first check and see if we have actually fetched any history rows. if we have not,
     # we are in the case where we have blindly requested the entire history object.
     # we refuse to fetch that, so instead we will just inspect the historyKeys and return
     # a dummy history object that can bte used as a proxy for downstream ops (e.g., count).
 
-    if columns is None:
-        step_type = types.TypedDict({"_step": types.Int()})
+    if "parquetHistory" not in run.gql:
         last_step = run.gql["historyKeys"]["lastStep"]
         history_keys = run.gql["historyKeys"]["keys"]
         for key, key_details in history_keys.items():
@@ -442,14 +413,15 @@ def _history_body(
                 count = type_counts[0]["count"]
                 break
         else:
-            return _make_history_result([], history_version, step_type)
+            return []
 
         # generate fake steps
         steps = [{"_step": i} for i in range(count)]
         steps[-1]["_step"] = last_step
         assert len(steps) == count
-        return _make_history_result(steps, history_version, step_type)
+        return steps
 
+    columns = _history_keys(run, history_version)
     return get_history(run, history_version, columns=columns)
 
 
@@ -474,65 +446,11 @@ def history2(run: wdt.Run):
     return _history_body(run, 2)
 
 
-def get_full_columns(columns: typing.Optional[list[str]]):
-    if columns is None:
-        return None
-    return list(set([*columns, "_step", "_runtime", "_timestamp"]))
-
-
-@op(
-    render_info={"type": "function"},
-    plugins=wb_gql_op_plugin(lambda inputs, inner: "historyKeys"),
-    hidden=True,
-)
-def refine_history2_with_columns_type(
-    run: wdt.Run, history_cols: list[str]
-) -> types.Type:
-    return _refine_history_type(run, 2, columns=get_full_columns(history_cols))
-
-
-@op(
-    name="run-history2_with_columns",
-    refine_output_type=refine_history2_with_columns_type,
-    plugins=wb_gql_op_plugin(_make_run_history_gql_field),
-    output_type=ArrowWeaveListType(types.TypedDict({})),
-    hidden=True,
-)
-def history2_with_columns(run: wdt.Run, history_cols: list[str]):
-    return _history_body(run, 2, columns=get_full_columns(history_cols))
-
-
-@op(
-    render_info={"type": "function"},
-    plugins=wb_gql_op_plugin(lambda inputs, inner: "historyKeys"),
-    hidden=True,
-)
-def refine_history_with_columns_type(
-    run: wdt.Run, history_cols: list[str]
-) -> types.Type:
-    return _refine_history_type(run, 1, columns=get_full_columns(history_cols))
-
-
-@op(
-    name="run-history_with_columns",
-    refine_output_type=refine_history_with_columns_type,
-    plugins=wb_gql_op_plugin(_make_run_history_gql_field),
-    output_type=types.List(types.TypedDict({})),
-    hidden=True,
-)
-def history_with_columns(run: wdt.Run, history_cols: list[str]):
-    return _history_body(run, 1, columns=get_full_columns(history_cols))
-
-
 def _get_history2(run: wdt.Run, columns=None):
     """Dont read binary columns. Keep everything in arrow. Faster, but not as full featured as get_history"""
     scalar_keys = _history_keys(run, 2)
     columns = [c for c in columns if c in scalar_keys]
     parquet_history = read_history_parquet(run, 2, columns=columns)
-
-    _object_type = typing.cast(
-        types.List, _refine_history_type(run, 2, columns=columns)
-    ).object_type
 
     # turn the liveset into an arrow table. the liveset is a list of dictionaries
     live_data = run.gql["parquetHistory"]["liveData"]
@@ -543,19 +461,17 @@ def _get_history2(run: wdt.Run, columns=None):
 
     # turn live data into arrow
     if live_data is not None and len(live_data) > 0:
-        with tracer.trace("live_data_to_arrow"):
-            live_data = ArrowWeaveList(pa.array(live_data), _object_type)
+        live_data = ArrowWeaveList(pa.array(live_data))
     else:
         live_data = []
 
     if parquet_history is not None and len(parquet_history) > 0:
-        with tracer.trace("parquet_history_to_arrow"):
-            parquet_history = ArrowWeaveList(parquet_history, _object_type)
+        parquet_history = ArrowWeaveList(parquet_history)
     else:
         parquet_history = []
 
     if len(live_data) == 0 and len(parquet_history) == 0:
-        return ArrowWeaveList(pa.array([]), _object_type)
+        return None
     elif len(live_data) == 0:
         return parquet_history
     elif len(parquet_history) == 0:
@@ -577,7 +493,7 @@ def get_history(run: wdt.Run, history_version: int, columns=None):
 def read_history_parquet(run: wdt.Run, history_version: int, columns=None):
     io = io_service.get_sync_client()
     object_type = typing.cast(
-        types.List, _refine_history_type(run, history_version, columns=columns)
+        types.List, _refine_history_type(run, history_version)
     ).object_type
     tables = []
     for url in run.gql["parquetHistory"]["parquetUrls"]:

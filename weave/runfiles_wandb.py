@@ -23,7 +23,7 @@ if typing.TYPE_CHECKING:
 
 @memo.memo
 def get_wandb_read_run(path: str) -> "WBRun":
-    return wandb_client_api.wandb_public_api().run(path)  # type: ignore[no-untyped-call]
+    return wandb_client_api.wandb_public_api().run(path)
 
 
 def wandb_run_dir() -> str:
@@ -69,8 +69,6 @@ class WandbRunFiles(artifact_fs.FilesystemArtifact):
     def run(self) -> "WBRun":
         if self._read_run is None:
             self._read_run = get_wandb_read_run(self.name)
-        if self._read_run is None:
-            raise errors.WeaveInternalError(f"Could not read run {self.name}")
         return self._read_run
 
     @property
@@ -102,7 +100,7 @@ class WandbRunFiles(artifact_fs.FilesystemArtifact):
 
         # Finally, download the file in an isolated directory:
         with _isolated_download_and_atomic_mover(static_file_path) as (tmp_dir, mover):
-            with self.run.file(path).download(tmp_dir, replace=True) as fp:  # type: ignore[no-untyped-call]
+            with self.run.file(path).download(tmp_dir, replace=True) as fp:
                 downloaded_file_path = fp.name
             mover(downloaded_file_path)
 

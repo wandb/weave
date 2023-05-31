@@ -369,7 +369,7 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         if self._unresolved_read_artifact_or_client_uri is not None:
             branch = self._unresolved_read_artifact_or_client_uri.version
 
-        if branch is not None and not likely_commit_hash(branch):
+        if branch is not None and not string_is_likely_commit_hash(branch):
             return branch
 
         return None
@@ -721,7 +721,7 @@ def is_hex_string(s: str) -> bool:
 WANDB_COMMIT_HASH_LENGTH = 20
 
 
-def likely_commit_hash(version: str) -> bool:
+def string_is_likely_commit_hash(version: str) -> bool:
     # This is the heuristic we use everywhere to tell if a version is an alias or not
     # if self.version:
     return is_hex_string(version) and len(version) == WANDB_COMMIT_HASH_LENGTH
@@ -814,7 +814,7 @@ class WeaveWBArtifactURI(uris.WeaveURI):
 
     @property
     def resolved_artifact_uri(self) -> "WeaveWBArtifactURI":
-        if self.version and likely_commit_hash(self.version):
+        if self.version and string_is_likely_commit_hash(self.version):
             return self
         if self._resolved_artifact_uri is None:
             path = f"{self.entity_name}/{self.project_name}/{self.name}"

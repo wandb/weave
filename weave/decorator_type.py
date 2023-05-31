@@ -12,7 +12,7 @@ _py_type = type
 
 
 def type(
-    __override_name: typing.Optional[str] = None,
+    __override_name: str = None,
     __is_simple: bool = False,
     __init: typing.Optional[bool] = None,
 ):

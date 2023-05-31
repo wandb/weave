@@ -121,7 +121,7 @@ class ObjectContext:
         # don't want to use it as a branch - this is the case that we are
         # mutating an artifact directly without a branch. Seems like we
         # might want to put this logic elsewhere, but for now this works.
-        if artifact_wandb.likely_commit_hash(target_branch):
+        if artifact_wandb.string_is_likely_commit_hash(target_branch):
             target_branch = None
         weave_type = types.TypeRegistry.type_of(obj)
         ref = art.set("obj", weave_type, obj)

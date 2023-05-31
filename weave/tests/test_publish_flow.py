@@ -10,7 +10,7 @@ from weave.artifact_wandb import (
     WandbArtifact,
     WandbArtifactRef,
     WeaveWBArtifactURI,
-    likely_commit_hash,
+    string_is_likely_commit_hash,
 )
 from weave.uris import WeaveURI
 
@@ -327,7 +327,7 @@ def _perform_post_persist_assertions(
         assert p_uri.entity_name == target_entity
         assert p_uri.project_name == target_project_name
     assert p_ref.name == p_art.name == p_uri.name == target_artifact_name
-    assert likely_commit_hash(expected_commit_hash) and (
+    assert string_is_likely_commit_hash(expected_commit_hash) and (
         p_ref.version == p_art.version == p_uri.version == expected_commit_hash
     )
     if not is_local:

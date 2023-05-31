@@ -72,7 +72,7 @@ class HFModelTextGeneration(hfmodel.HFModel):
     @weave.op()
     def pipeline(
         self,
-    ) -> transformers.pipelines.Pipeline:
+    ) -> transformers.pipelines.text_generation.TextGenerationPipeline:
         return transformers.pipeline(
             self._pipeline_tag,
             model=self._id,

@@ -2,8 +2,6 @@ import os
 import pathlib
 import typing
 
-from .. import ref_base
-
 from ..artifact_local import WORKING_DIR_PREFIX, LocalArtifact
 from . import types
 from ..api import op
@@ -133,25 +131,3 @@ def most_recent_version(
             return LocalArtifact(artifact.name, obj_path.name)
 
     return None  # type: ignore
-
-
-@op(
-    name="FilesystemArtifact-previousURI",
-)
-def previous_uri(
-    artifact: artifact_fs.FilesystemArtifact,
-) -> typing.Optional[str]:
-    return artifact.previous_uri()
-
-
-@op(
-    name="FilesystemArtifact-rootFromURI",
-    pure=False,
-)
-def from_uri(
-    uri: str,
-) -> typing.Optional[artifact_fs.FilesystemArtifact]:
-    ref = ref_base.Ref.from_str(uri)
-    if not isinstance(ref, (artifact_fs.FilesystemArtifactRef)):
-        return None
-    return ref.artifact

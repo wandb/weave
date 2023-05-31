@@ -200,7 +200,7 @@ def test_op_method_inferred_self():
     @weave.weave_class(weave_type=SomeWeaveType)
     class SomeWeaveObj:
         @weave.op()
-        def my_op(self, a: int) -> str:  # type: ignore[empty-body]
+        def my_op(self, a: int) -> str:
             pass
 
     assert SomeWeaveObj.my_op.input_type.arg_types == {

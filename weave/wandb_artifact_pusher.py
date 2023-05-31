@@ -53,7 +53,7 @@ def write_artifact_to_wandb(
     )
 
     # Produce a run to log the artifact to
-    new_run = p_api.create_run(project=project_name, entity=entity_name)  # type: ignore[no-untyped-call]
+    new_run = p_api.create_run(project=project_name, entity=entity_name)
     i_api.set_current_run_id(new_run.id)
 
     # Setup the FileStream and FilePusher
@@ -64,7 +64,7 @@ def write_artifact_to_wandb(
     # Finalize the artifact and construct the manifest.
     artifact.finalize()
     manifest_dict = _manifest_json_from_proto(
-        InterfaceBase()._make_artifact(artifact).manifest  # type: ignore[abstract, attr-defined]
+        InterfaceBase()._make_artifact(artifact).manifest
     )
 
     # Save the Artifact and the associated files
@@ -84,6 +84,7 @@ def write_artifact_to_wandb(
         description=artifact.description,
         aliases=["latest"] + additional_aliases,
         use_after_commit=False,
+        finalize=artifact.finalize,
     )
 
     # Mark the run as complete
@@ -93,10 +94,9 @@ def write_artifact_to_wandb(
     pusher.finish()
     pusher.join()
 
-    if res is not None:
-        commit_hash = wandb.apis.public.Artifact.from_id(
-            res["id"], p_api.client
-        ).commit_hash
+    commit_hash = wandb.apis.public.Artifact.from_id(
+        res["id"], p_api.client
+    ).commit_hash
 
     # Return the URI of the artifact
     return WeaveWBArtifactURIComponents(

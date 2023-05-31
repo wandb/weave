@@ -4,7 +4,7 @@ from . import debug_types
 from . import types
 
 
-def assign_type_weave0_weave1(w0_type: types.Type, w1_type: types.Type) -> bool:  # type: ignore[empty-body]
+def assign_type_weave0_weave1(w0_type: types.Type, w1_type: types.Type) -> bool:
     pass
 
 
