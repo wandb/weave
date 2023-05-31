@@ -24,6 +24,7 @@ class SliderConfig:
 @weave.type()
 class Slider(panel.Panel):
     id = "Slider"
+    input_node: weave.Node[float]
     config: typing.Optional[SliderConfig] = dataclasses.field(
         default_factory=SliderConfig
     )

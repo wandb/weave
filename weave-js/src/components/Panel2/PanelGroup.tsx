@@ -50,7 +50,7 @@ const LAYOUT_MODES = [
 ];
 
 export interface PanelGroupConfig {
-  layoutMode: typeof LAYOUT_MODES[number];
+  layoutMode: (typeof LAYOUT_MODES)[number];
   equalSize?: boolean;
   showExpressions?: boolean;
   style?: string;
@@ -595,6 +595,7 @@ export const PanelGroupItem: React.FC<{
   item: ChildPanelConfig;
   name: string;
   config: PanelGroupConfig;
+  updateInput: (newConfig: PanelGroupConfig) => void;
   updateConfig: (newConfig: PanelGroupConfig) => void;
   updateConfig2: (
     change: (oldConfig: PanelGroupConfig) => Partial<PanelGroupConfig>
@@ -610,6 +611,7 @@ export const PanelGroupItem: React.FC<{
   item,
   name,
   config,
+  updateInput,
   updateConfig,
   updateConfig2,
   handleSiblingVarEvent,
@@ -656,9 +658,9 @@ export const PanelGroupItem: React.FC<{
   return (
     <PanelContextProvider
       newVars={siblingVars}
-      handleVarEvent={handleSiblingVarEvent}
-    >
+      handleVarEvent={handleSiblingVarEvent}>
       <ChildPanel
+        passthroughUpdate={!config.showExpressions}
         allowedPanels={config.allowedPanels}
         pathEl={'' + name}
         config={item}
@@ -666,6 +668,7 @@ export const PanelGroupItem: React.FC<{
         updateConfig={itemUpdateConfig}
         updateConfig2={itemUpdateConfig2}
         updateName={itemUpdateName}
+        updateInput={updateInput}
       />
     </PanelContextProvider>
   );
@@ -808,6 +811,7 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
             item={item}
             name={name}
             config={config}
+            updateInput={props.updateInput}
             updateConfig={updateConfig}
             updateConfig2={updateConfig2}
           />
@@ -852,8 +856,7 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
           <Button
             size="tiny"
             style={{position: 'absolute', top: 0, right: 0}}
-            onClick={handleAddPanel}
-          >
+            onClick={handleAddPanel}>
             +
           </Button>
         )}
@@ -886,8 +889,7 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
     <Group
       layered={config.layoutMode === 'layer'}
       preferHorizontal={config.layoutMode === 'horizontal'}
-      compStyle={config.style}
-    >
+      compStyle={config.style}>
       {Object.entries(config.items).map(([name, item]) => {
         const childPanelConfig = getFullChildPanel(item).config;
         // Hacky: pull width up from child to here.
@@ -904,8 +906,7 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
             width={width}
             layered={config.layoutMode === 'layer'}
             preferHorizontal={config.layoutMode === 'horizontal'}
-            equalSize={config.equalSize}
-          >
+            equalSize={config.equalSize}>
             {childPanelsByKey[name]}
           </GroupItem>
         );

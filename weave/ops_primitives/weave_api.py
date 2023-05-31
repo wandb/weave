@@ -137,8 +137,12 @@ def used_by(obj: typing.Any, op_name: str):
 
 
 @op()
-def call_op(name: str) -> Node[types.Any]:
-    return weave_internal.make_output_node(types.Any(), name, {})
+def call_op(name: str, args: dict[str, typing.Any]) -> Node[typing.Any]:
+    op_def = registry_mem.memory_registry.get_op(name)
+    call_args = {}
+    for (k, v), new_arg_val in zip(op_def.input_type.arg_types.items(), args.values()):
+        call_args[k] = weave_internal.const(new_arg_val, v)
+    return weave_internal.make_output_node(types.Any(), name, call_args)
 
 
 @op()

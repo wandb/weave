@@ -1018,7 +1018,7 @@ class Function(Type):
     instance_classes: typing.ClassVar[typing.List[type]] = []
 
     input_types: dict[str, Type] = dataclasses.field(default_factory=dict)
-    output_type: Type = dataclasses.field(default_factory=lambda: UnknownType())
+    output_type: Type = dataclasses.field(default_factory=lambda: Any())
 
     def _hashable(self):
         return (

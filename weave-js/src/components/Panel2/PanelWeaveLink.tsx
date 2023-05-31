@@ -13,6 +13,7 @@ import {
   constNodeUnsafe,
   expressionVariables,
   Frame,
+  isFunction,
   NodeOrVoidNode,
   opDict,
   taggableValue,
@@ -105,12 +106,17 @@ export const PanelWeaveLink: React.FC<PanelLabeledItemProps> = props => {
     }
     // Pass the evaluated variable results back into the config.to expression
     // as const nodes.
-    return weave.callFunction(
+    let res = weave.callFunction(
       toExpr,
       _.mapValues(varsResult.result, (v, k) =>
         constNodeUnsafe(taggableValue(vars[k].type), v)
       )
     );
+    // In the case of call_op, we have a const with val node here. Unwrap it.
+    if (res.nodeType === 'const' && isFunction(res.type)) {
+      res = res.val;
+    }
+    return res;
   }, [toExpr, vars, varsResult.loading, varsResult.result, weave]);
 
   const onClickLink = useCallback(() => {
@@ -131,7 +137,7 @@ export const PanelWeaveLink: React.FC<PanelLabeledItemProps> = props => {
 
 export const Spec: Panel2.PanelSpec = {
   hidden: true,
-  id: 'weavelink',
+  id: 'WeaveLink',
   Component: PanelWeaveLink,
   inputType,
 };

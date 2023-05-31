@@ -355,13 +355,13 @@ export function isAssignableTo(type: Type, toType: Type): boolean {
     } else if (type.type === 'typedDict' && toType.type === 'dict') {
       // Must have all keys in toType and types must match
       const properties = Object.keys(type.propertyTypes);
-      if (properties.length === 0) {
-        // Must have at least one key to match. This is kind of odd,
-        // we can revisit later if we need. This prevents us from creating
-        // panels like PanelIdCompare when we have an empty {}, like in the
-        // return type of opTableRows.
-        return false;
-      }
+      // if (properties.length === 0) {
+      //   // Must have at least one key to match. This is kind of odd,
+      //   // we can revisit later if we need. This prevents us from creating
+      //   // panels like PanelIdCompare when we have an empty {}, like in the
+      //   // return type of opTableRows.
+      //   return false;
+      // }
       for (const key of properties) {
         const keyType = type.propertyTypes[key];
         if (!isAssignableTo(keyType!, toType.objectType)) {

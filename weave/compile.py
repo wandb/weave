@@ -241,6 +241,14 @@ def _make_auto_op_map_fn(when_type: typing.Callable[[types.Type], bool], call_op
             for k, input_node in node_inputs.items():
                 actual_input_type = input_node.type
                 new_inputs[k] = input_node
+                if (
+                    isinstance(input_node, graph.OutputNode)
+                    and input_node.from_op.name == "op-call_op"
+                ):
+                    # Op call_op returns a node and is used to construct
+                    # WeaveLinks that link to called ops. We don't want to
+                    # automatically execute these!
+                    continue
                 if not when_type(actual_input_type):
                     continue
                 if isinstance(op_def.input_type, op_args.OpNamedArgs):

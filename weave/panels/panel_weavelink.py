@@ -18,7 +18,8 @@ class WeaveLinkConfig:
 
 @weave.type()
 class WeaveLink(panel.Panel):
-    id = "weavelink"
+    id = "WeaveLink"
+    config: typing.Optional[WeaveLinkConfig] = None
     input_node: graph.Node[typing.Any]
 
     def __init__(
@@ -27,7 +28,7 @@ class WeaveLink(panel.Panel):
         # This is frame
         to: typing.Callable[
             [graph.VarNode, typing.Dict[str, graph.VarNode]], graph.Node
-        ],
+        ] = None,
         vars: typing.Dict[str, graph.Node] = {},
         config=None,
     ):
@@ -49,10 +50,3 @@ class WeaveLink(panel.Panel):
             )
         else:
             self.config.to = to_node(input_node)
-
-    # @property
-    # def config(self):
-    #     return {
-    #         "to": self._to.to_json(),
-    #         "vars": {var_name: node.to_json() for var_name, node in self._vars.items()},
-    #     }

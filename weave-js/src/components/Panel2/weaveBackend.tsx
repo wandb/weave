@@ -180,7 +180,7 @@ const useUserPanelVars = (
         return;
       }
       updateConfig2((oldConfig: UserPanelConfig): UserPanelConfig => {
-        const oldRenderAsPanel = oldConfig[renderAsPanelConfigAttr] ?? {
+        const oldRenderAsPanel = oldConfig?.[renderAsPanelConfigAttr] ?? {
           id: renderOpResult.result.id,
           input_node: renderOpResult.result.input_node,
           config: renderOpResult.result.config,
@@ -191,7 +191,7 @@ const useUserPanelVars = (
             input_node: oldRenderAsPanel.input_node,
             config: {
               ...oldRenderAsPanel.config,
-              ...change(oldConfig[renderAsPanelConfigAttr]),
+              ...change(oldRenderAsPanel.config),
             },
           },
         };
@@ -274,8 +274,7 @@ const registerUserPanel = (
           return (
             <PanelContextProvider
               newVars={panelVars}
-              handleVarEvent={handleVarEvent}
-            >
+              handleVarEvent={handleVarEvent}>
               <Panel
                 panelSpec={renderAsPanel.id}
                 input={inputNode}
@@ -371,9 +370,6 @@ const loadWeaveObjects = (): Promise<OpStore> => {
           renderOps[
             op.name.slice(0, op.name.length - RENDER_OP_SUFFIX.length)
           ] = op;
-        } else {
-          // Old-style
-          renderOps[op.name] = op;
         }
       }
       for (const op of Object.values(remoteOpStore.allOps())) {

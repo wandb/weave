@@ -160,4 +160,119 @@ class EcosystemPanel(panel.Panel):
         )
 
 
+@weave.op(render_info={"type": "function"})
+def make_string_cool(input: str) -> str:
+    return "cool: " + input
+
+
+from .langchain import ChatOpenAI
+
+
+@weave.op(render_info={"type": "function"})
+def chat_gpt(model_name: str, temperature: float) -> ChatOpenAI:
+    return ChatOpenAI(model_name=model_name, temperature=temperature)
+
+
+@weave.type()
+class Package:
+    name: str
+    ops: list[op_def.OpDef]
+
+    @weave.op()
+    def package_name(self) -> str:
+        # Needed becuase of "name" name collision (varNode)
+        return self.name
+
+    @weave.op()
+    def op(self, name: str) -> op_def.OpDef:
+        for op in self.ops:
+            if op.name == name:
+                return op
+        raise ValueError(f"Op {name} not found in package {self.name}")
+
+
+from . import langchain
+
+packages = [
+    Package(name="OpenAI", ops=[make_string_cool, langchain.chat_openai]),
+]
+
+
+@weave.op(render_info={"type": "function"})
+def package(name: str) -> Package:
+    for pack in packages:
+        if pack.name == name:
+            return pack
+    raise ValueError(f"Package {name} not found")
+
+
+@weave.type()
+class PackagePanel(panel.Panel):
+    id = "PackagePanel"
+    input_node: weave.Node[Package]
+
+    @weave.op()
+    def render(self) -> panels.Card:
+        pack = self.input_node
+        return panels.Card(
+            title=pack.name,
+            subtitle="",
+            content=[
+                panels.CardTab(
+                    name="Ops",
+                    content=panels.Table(
+                        pack.ops,
+                        columns=[
+                            lambda op: panels.WeaveLink(
+                                op.op_name(),
+                                vars={
+                                    "package_name": pack.package_name(),
+                                    "op_name": op.op_name(),
+                                },
+                                to=lambda input, vars: package(vars["package_name"]).op(
+                                    vars["op_name"]
+                                ),
+                            ),
+                            lambda op: op.output_type(),
+                        ],
+                    ),
+                ),
+            ],
+        )
+
+
+@weave.type()
+class OpPanel(panel.Panel):
+    id = "OpPanel"
+    input_node: weave.Node[op_def.OpDef]
+
+    @weave.op()
+    def render(self) -> panels.Group:
+        inputs = self.input_node.input_type()
+        return panels.Group(
+            items={
+                "name": self.input_node.op_name(),
+                "inputs": panels.Group(
+                    items={
+                        "name": "Paramaters",
+                        "arg0": panels.StringEditor("hello"),
+                        "arg1": panels.Slider(0.7),
+                        "go": lambda arg0, arg1: panels.WeaveLink(
+                            "Go!",
+                            vars={
+                                # "op": self.input_node.op_name(),
+                                # "arg": value.value(),
+                                "called": ops.call_op(
+                                    self.input_node.op_name(),
+                                    ops.dict_(input=arg0.value(), arg1=arg1.value()),
+                                ),
+                            },
+                            to=lambda input, args: args["called"],
+                        ),
+                    }
+                ),
+            }
+        )
+
+
 context_state.clear_loading_built_ins(loading_builtins_token)
