@@ -194,7 +194,7 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
   return (
     <Container>
       <Header>
-        <HeaderTop>
+        <HeaderTop lessLeftPad>
           <HeaderTopLeft canGoBack onClick={goBackToOutline}>
             <IconButton>
               <IconBack />
@@ -275,14 +275,15 @@ const Container = styled.div`
 `;
 
 const Header = styled.div`
-  padding: 16px;
+  padding: 16px 0;
   border-bottom: 1px solid ${globals.GRAY_350};
 `;
 
-const HeaderTop = styled.div`
+const HeaderTop = styled.div<{lessLeftPad?: boolean}>`
   display: flex;
   justify-content: space-between;
   align-items: center;
+  padding: 0 8px 0 ${p => (p.lessLeftPad ? 8 : 12)}px;
 `;
 
 const HeaderTopLeft = styled.div<{canGoBack?: boolean}>`
@@ -310,6 +311,7 @@ const HeaderTitle = styled.div`
   font-size: 20px;
   font-weight: 600;
   margin-top: 16px;
+  padding: 0 12px;
 `;
 
 const Body = styled.div`

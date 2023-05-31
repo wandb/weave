@@ -1,41 +1,32 @@
+import {KeyboardShortcut} from '@wandb/weave/common/components/elements/KeyboardShortcut';
+import {WBButton} from '@wandb/weave/common/components/elements/WBButtonNew';
 import * as globals from '@wandb/weave/common/css/globals.styles';
+import {isMac} from '@wandb/weave/common/util/browser';
 import {NodeOrVoidNode, voidNode} from '@wandb/weave/core';
 import {
   useMakeMutation,
   useMutation,
   useNodeWithServerType,
 } from '@wandb/weave/react';
-import React, {useMemo, useRef, useState} from 'react';
-import {useCallback} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {Button, Input, Modal} from 'semantic-ui-react';
 
-import {
-  branchPointIsRemote,
-  isLocalURI,
-  uriFromNode,
-  useIsAuthenticated,
-  weaveTypeIsPanel,
-  determineURISource,
-  determineURIIdentifier,
-  BranchPointType,
-} from './util';
+import {Popover} from '@material-ui/core';
+import styled, {css} from 'styled-components';
 import {
   IconAddNew,
+  IconBack,
+  IconCopy,
   IconDelete,
   IconDocs,
   IconDown,
-  IconLeftArrow,
   IconPencilEdit,
-  IconStack,
+  IconRedo,
   IconSystem,
   IconUndo,
   IconUp,
   IconWeaveLogo,
 } from '../Panel2/Icons';
-import styled from 'styled-components';
-import {Popover} from '@material-ui/core';
-import moment from 'moment';
-import {useNewPanelFromRootQueryCallback} from '../Panel2/PanelRootBrowser/util';
 import {
   useBranchPointFromURIString,
   usePreviousVersionFromURIString,
@@ -49,7 +40,18 @@ import {
   getAvailableActions,
   useStateMachine,
 } from './persistenceStateMachine';
-import {WBButton} from '../../common/components/elements/WBButtonNew';
+import {
+  BranchPointType,
+  branchPointIsRemote,
+  determineURIIdentifier,
+  determineURISource,
+  isLocalURI,
+  uriFromNode,
+  useIsAuthenticated,
+  weaveTypeIsPanel,
+} from './util';
+import moment from 'moment';
+import {useNewPanelFromRootQueryCallback} from '../Panel2/PanelRootBrowser/util';
 
 const CustomPopover = styled(Popover)`
   .MuiPaper-root {
@@ -105,34 +107,56 @@ const HeaderCenterControls = styled.div`
   font-size: 16px;
 `;
 
-const CustomMenu = styled.div`
-  /* width: 250px; */
+const CustomMenu = styled.div<{width?: number}>`
+  padding: 8px 0;
+  ${p =>
+    p.width != null &&
+    css`
+      width: ${p.width}px;
+    `}
 `;
 
-const MenuText = styled.div``;
-
-const MenuIcon = styled.div`
-  display: flex;
-  flex-direction: row;
-  justify-content: center;
-  width: 16px;
-  height: 100%;
-`;
-
-const MenuItem = styled.div<{hasBorder?: boolean}>`
+const MenuItem = styled.div<{disabled?: boolean}>`
   display: flex;
   flex-direction: row;
   justify-content: left;
   align-items: center;
   padding: 4px 16px;
   gap: 10px;
-  cursor: pointer;
-  border-bottom: ${props => (props.hasBorder ? '1px solid #ddd;' : 'default')};
   font-size: 15px;
 
-  &:hover {
-    background-color: #f5f5f5;
+  ${p =>
+    p.disabled
+      ? css`
+          color: ${globals.GRAY_500};
+        `
+      : css`
+          cursor: pointer;
+          &:hover {
+            background-color: #f5f5f5;
+          }
+        `}
+`;
+
+const MenuIcon = styled.div`
+  width: 18px;
+  height: 18px;
+  svg {
+    width: 100%;
+    height: 100%;
   }
+`;
+
+const MenuText = styled.div`
+  flex-grow: 1;
+`;
+
+const MenuShortcut = styled(KeyboardShortcut).attrs({lightMode: true})``;
+
+const MenuDivider = styled.div`
+  height: 1px;
+  margin: 6px 0;
+  background-color: ${globals.GRAY_350};
 `;
 
 const HeaderLeftControls = styled.div`
@@ -144,12 +168,11 @@ const HeaderLeftControls = styled.div`
   flex: 1 1 30px;
 `;
 
-const WeaveLogo = styled(IconWeaveLogo)`
+const WeaveLogo = styled(IconWeaveLogo)<{open: boolean}>`
   width: 32px;
   height: 32px;
-  transform: rotate(0deg);
-  transition: all 0.3s ease-out;
-  transform: ${props => (props.rotate ? `rotate(180deg)` : '')};
+  transform: rotate(${props => (props.open ? 180 : 0)}deg);
+  transition: transform 0.3s ease-out;
 `;
 
 export const PersistenceManager: React.FC<{
@@ -298,17 +321,60 @@ const HeaderFileControls: React.FC<{
   }, [goHome, inputNode, isLocal, makeMutation]);
 
   const previousVersionURI = usePreviousVersionFromURIString(maybeURI);
-
+  const canUndo = !!(previousVersionURI && maybeURI);
   const undoArtifact = useMutation(inputNode, 'undo_artifact', updateNode);
-
-  const onBack = useCallback(() => {
+  const undo = useCallback(() => {
     undoArtifact({});
   }, [undoArtifact]);
+
+  // TODO: Implement redo
+  const canRedo = false;
+  const redo = useCallback(() => {}, []);
+
+  const inputType = useNodeWithServerType(inputNode).result?.type;
+  const isPanel = weaveTypeIsPanel(inputType || ('any' as const));
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent): void {
+      if ((isMac && !e.metaKey) || (!isMac && !e.ctrlKey)) {
+        return;
+      }
+      if (e.key === `z` && canUndo) {
+        undo();
+        return;
+      }
+      if (e.key === `y` && canRedo) {
+        redo();
+        return;
+      }
+    }
+
+    document.addEventListener(`keydown`, onKeyDown);
+    return () => {
+      document.removeEventListener(`keydown`, onKeyDown);
+    };
+  }, [canUndo, undo, canRedo, redo]);
+
+  const name =
+    (isPanel ? 'dashboard' : 'object') +
+    '-' +
+    moment().format('YY_MM_DD_hh_mm_ss');
+  const makeNewDashboard = useNewPanelFromRootQueryCallback();
+  const newDashboard = useCallback(() => {
+    const node = isPanel ? voidNode() : inputNode;
+
+    makeNewDashboard(name, node, true, newDashExpr => {
+      updateNode(newDashExpr);
+    });
+  }, [inputNode, isPanel, makeNewDashboard, name, updateNode]);
+
+  // TODO: Implement dashboard duplication
+  const canDuplicateDashboard = false;
+  const duplicateDashboard = useCallback(() => {}, []);
 
   return (
     <>
       <HeaderCenterControls>
-        {previousVersionURI && maybeURI && <IconUndo onClick={onBack} />}
         {entityProjectName && (
           <HeaderCenterControlsSecondary
             onClick={() => {
@@ -350,21 +416,22 @@ const HeaderFileControls: React.FC<{
           vertical: 'top',
           horizontal: 'center',
         }}>
-        <CustomMenu>
+        <CustomMenu width={242}>
           {currentVersion && (
-            <MenuItem
-              hasBorder={true}
-              onClick={() => {
-                setAnchorFileEl(null);
-              }}>
-              <MenuIcon>
-                <IconSystem />
-              </MenuIcon>
-              <MenuText>
-                Version ({isLocal ? 'Local' : 'W&B'}): {currentVersion}
-              </MenuText>
-            </MenuItem>
+            <>
+              <MenuItem disabled>
+                <MenuIcon>
+                  <IconSystem />
+                </MenuIcon>
+                <MenuText>
+                  Version ({isLocal ? 'Local' : 'W&B'}): {currentVersion}
+                </MenuText>
+              </MenuItem>
+
+              <MenuDivider />
+            </>
           )}
+
           {renameAction && (
             <MenuItem
               onClick={() => {
@@ -377,17 +444,73 @@ const HeaderFileControls: React.FC<{
               <MenuText>Rename</MenuText>
             </MenuItem>
           )}
-          {isLocal && (
+          {canUndo && (
             <MenuItem
               onClick={() => {
                 setAnchorFileEl(null);
-                deleteCurrentNode();
+                undo();
               }}>
               <MenuIcon>
-                <IconDelete />
+                <IconUndo />
               </MenuIcon>
-              <MenuText>Delete</MenuText>
+              <MenuText>Undo</MenuText>
+              <MenuShortcut keys={[isMac ? `Cmd` : `Ctrl`, `Z`]} />
             </MenuItem>
+          )}
+          {canRedo && (
+            <MenuItem
+              onClick={() => {
+                setAnchorFileEl(null);
+                redo();
+              }}>
+              <MenuIcon>
+                <IconRedo />
+              </MenuIcon>
+              <MenuText>Redo</MenuText>
+              <MenuShortcut keys={[isMac ? `Cmd` : `Ctrl`, `Y`]} />
+            </MenuItem>
+          )}
+
+          <MenuDivider />
+
+          <MenuItem
+            onClick={() => {
+              setAnchorFileEl(null);
+              newDashboard();
+            }}>
+            <MenuIcon>
+              <IconAddNew />
+            </MenuIcon>
+            <MenuText>New board</MenuText>
+          </MenuItem>
+          {canDuplicateDashboard && (
+            <MenuItem
+              onClick={() => {
+                setAnchorFileEl(null);
+                duplicateDashboard();
+              }}>
+              <MenuIcon>
+                <IconCopy />
+              </MenuIcon>
+              <MenuText>Duplicate board</MenuText>
+            </MenuItem>
+          )}
+
+          {isLocal && (
+            <>
+              <MenuDivider />
+
+              <MenuItem
+                onClick={() => {
+                  setAnchorFileEl(null);
+                  deleteCurrentNode();
+                }}>
+                <MenuIcon>
+                  <IconDelete />
+                </MenuIcon>
+                <MenuText>Delete</MenuText>
+              </MenuItem>
+            </>
           )}
         </CustomMenu>
       </CustomPopover>
@@ -417,24 +540,9 @@ const HeaderLogoControls: React.FC<{
   updateNode: (node: NodeOrVoidNode) => void;
   headerEl: HTMLElement | null;
   goHome?: () => void;
-}> = ({inputNode, updateNode, headerEl, goHome}) => {
-  const inputType = useNodeWithServerType(inputNode).result?.type;
-  const isPanel = weaveTypeIsPanel(inputType || ('any' as const));
+}> = ({headerEl, goHome}) => {
   const [anchorHomeEl, setAnchorHomeEl] = useState<HTMLElement | null>(null);
   const expandedHomeControls = Boolean(anchorHomeEl);
-
-  const name =
-    (isPanel ? 'dashboard' : 'object') +
-    '-' +
-    moment().format('YY_MM_DD_hh_mm_ss');
-  const makeNewDashboard = useNewPanelFromRootQueryCallback();
-  const newDashboard = useCallback(() => {
-    const node = isPanel ? voidNode() : inputNode;
-
-    makeNewDashboard(name, node, true, newDashExpr => {
-      updateNode(newDashExpr);
-    });
-  }, [inputNode, isPanel, makeNewDashboard, name, updateNode]);
 
   return (
     <>
@@ -442,7 +550,7 @@ const HeaderLogoControls: React.FC<{
         onClick={e => {
           setAnchorHomeEl(headerEl);
         }}>
-        <WeaveLogo />
+        <WeaveLogo open={anchorHomeEl != null} />
         {expandedHomeControls ? <IconUp /> : <IconDown />}
       </HeaderLeftControls>
       <CustomPopover
@@ -459,25 +567,14 @@ const HeaderLogoControls: React.FC<{
         }}>
         <CustomMenu>
           <MenuItem
-            hasBorder={true}
             onClick={() => {
               setAnchorHomeEl(null);
               goHome?.();
             }}>
             <MenuIcon>
-              <IconLeftArrow />
+              <IconBack />
             </MenuIcon>
             <MenuText>Back to boards</MenuText>
-          </MenuItem>
-          <MenuItem
-            onClick={() => {
-              setAnchorHomeEl(null);
-              newDashboard();
-            }}>
-            <MenuIcon>
-              <IconAddNew />
-            </MenuIcon>
-            <MenuText>{isPanel ? 'Start' : 'Seed'} new board</MenuText>
           </MenuItem>
           <MenuItem
             onClick={() => {
@@ -489,14 +586,8 @@ const HeaderLogoControls: React.FC<{
             </MenuIcon>
             <MenuText>Weave documentation</MenuText>
           </MenuItem>
-          <MenuItem
-            onClick={() => {
-              setAnchorHomeEl(null);
-              window.open('https://github.com/wandb/weave-internal', '_blank');
-            }}>
-            <MenuIcon>
-              <IconStack />
-            </MenuIcon>
+          <MenuDivider />
+          <MenuItem disabled>
             <MenuText>Weave 0.0.6</MenuText>
           </MenuItem>
         </CustomMenu>

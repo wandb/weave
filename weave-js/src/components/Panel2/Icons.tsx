@@ -16,10 +16,11 @@ import {ReactComponent as ImportIconColumnAlt} from '../../assets/icon-column-al
 import {ReactComponent as ImportIconCopy} from '../../assets/icon-copy.svg';
 import {ReactComponent as ImportIconFullScreenModeExpand} from '../../assets/icon-full-screen-mode-expand.svg';
 import {ReactComponent as ImportIconOverflowHorizontal} from '../../assets/icon-overflow-horizontal.svg';
+import {ReactComponent as ImportIconRedo} from '../../assets/icon-redo.svg';
 import {ReactComponent as ImportIconTextLanguageAlt} from '../../assets/icon-text-language-alt.svg';
+import {ReactComponent as ImportIconUndo} from '../../assets/icon-undo.svg';
 import {ReactComponent as ImportIconWeave} from '../../assets/icon-weave.svg';
 import {ReactComponent as WeaveLogo} from '../../assets/icon-weave-logo.svg';
-import {ReactComponent as LeftArrow} from '../../assets/icon-left-arrow.svg';
 import {ReactComponent as Docs} from '../../assets/icon-docs.svg';
 import {ReactComponent as Stack} from '../../assets/icon-stack.svg';
 import {ReactComponent as Delete} from '../../assets/icon-delete.svg';
@@ -27,7 +28,6 @@ import {ReactComponent as PencilEdit} from '../../assets/icon-pencil-edit.svg';
 import {ReactComponent as System} from '../../assets/icon-system.svg';
 import {ReactComponent as Table} from '../../assets/icon-table.svg';
 import {ReactComponent as AddNew} from '../../assets/icon-add-new.svg';
-import {ReactComponent as Undo} from '../../assets/ic-undo.svg';
 
 type SVGIconProps = SVGProps<SVGElement>;
 const updateIconProps = (props: SVGIconProps) => {
@@ -62,8 +62,14 @@ export const IconFullScreenModeExpand = (props: SVGIconProps) => (
 export const IconOverflowHorizontal = (props: SVGIconProps) => (
   <ImportIconOverflowHorizontal {...updateIconProps(props)} />
 );
+export const IconRedo = (props: SVGIconProps) => (
+  <ImportIconRedo {...updateIconProps(props)} />
+);
 export const IconTextLanguageAlt = (props: SVGIconProps) => (
   <ImportIconTextLanguageAlt {...updateIconProps(props)} />
+);
+export const IconUndo = (props: SVGIconProps) => (
+  <ImportIconUndo {...updateIconProps(props)} />
 );
 export const IconWeave = (props: SVGIconProps) => (
   <ImportIconWeave {...updateIconProps(props)} />
@@ -79,9 +85,6 @@ export const IconUp = (props: SVGIconProps) => (
 
 export const IconDown = (props: SVGIconProps) => (
   <DownSVGRaw {...updateIconProps(props)} />
-);
-export const IconLeftArrow = (props: SVGIconProps) => (
-  <LeftArrow {...updateIconProps(props)} />
 );
 export const IconDocs = (props: SVGIconProps) => (
   <Docs {...updateIconProps(props)} />
@@ -103,9 +106,6 @@ export const IconTable = (props: SVGIconProps) => (
 );
 export const IconAddNew = (props: SVGIconProps) => (
   <AddNew {...updateIconProps(props)} />
-);
-export const IconUndo = (props: SVGIconProps) => (
-  <Undo {...updateIconProps(props)} />
 );
 
 const style = {
