@@ -4,10 +4,10 @@ import getConfig from '../config';
 import {Node, NodeOrVoidNode, voidNode} from '@wandb/weave/core';
 import produce from 'immer';
 import moment from 'moment';
-import React from 'react';
+import React, {FC} from 'react';
 import {useCallback, useEffect, useState} from 'react';
 import {Button, Icon, Input} from 'semantic-ui-react';
-import {ThemeProvider} from 'styled-components';
+import styled, {ThemeProvider} from 'styled-components';
 
 import {useWeaveContext} from '../context';
 import {consoleLog} from '../util';
@@ -32,29 +32,6 @@ import {useNewPanelFromRootQueryCallback} from './Panel2/PanelRootBrowser/util';
 import Inspector from './Sidebar/Inspector';
 import {useNodeWithServerType} from '../react';
 import {inJupyterCell, weaveTypeIsPanel} from './PagePanelComponents/util';
-
-const EditorSidebar: React.FC<{
-  config: ChildPanelFullConfig;
-  updateConfig: (newConfig: ChildPanelFullConfig) => void;
-  updateConfig2: (change: (oldConfig: any) => any) => void;
-}> = props => {
-  const editorIsOpen = useEditorIsOpen();
-
-  return (
-    <Styles.SidebarWrapper>
-      <Inspector collapsed={!editorIsOpen}>
-        {editorIsOpen && (
-          <ChildPanelConfigComp
-            // pathEl={CHILD_NAME}
-            config={props.config}
-            updateConfig={props.updateConfig}
-            updateConfig2={props.updateConfig2}
-          />
-        )}
-      </Inspector>
-    </Styles.SidebarWrapper>
-  );
-};
 
 interface HomeProps {
   updateConfig: (newConfig: ChildPanelFullConfig) => void;
@@ -319,7 +296,6 @@ const PagePanel: React.FC = props => {
 
   // Moved here from PanelExpression, not sure if working yet.
   // TODO: play/pause
-  // const [weaveIsAutoRefresh, setWeaveIsAutoRefresh] = React.useState(
   const [, /*weaveIsAutoRefresh*/ setWeaveIsAutoRefresh] = React.useState(
     weave.client.isPolling()
   );
@@ -333,13 +309,6 @@ const PagePanel: React.FC = props => {
     };
   }, [weave, onPollChangeListener]);
 
-  // const toggleAutoRefresh = React.useCallback(
-  //   (val: boolean) => {
-  //     weave.client.setPolling(!weaveIsAutoRefresh);
-  //   },
-  //   [weave, weaveIsAutoRefresh]
-  // );
-
   const goHome = React.useCallback(() => {
     updateConfig({
       vars: {},
@@ -349,15 +318,6 @@ const PagePanel: React.FC = props => {
     });
   }, [updateConfig]);
 
-  const position = fullScreen ? 'fixed' : 'absolute';
-
-  const {urlPrefixed} = getConfig();
-
-  const typedInputNode = useNodeWithServerType(config.input_node);
-  const isPanel = weaveTypeIsPanel(
-    typedInputNode.result?.type || {type: 'Panel' as any}
-  );
-
   if (loading) {
     return <Loader name="page-panel-loader" />;
   }
@@ -366,17 +326,7 @@ const PagePanel: React.FC = props => {
     <ThemeProvider theme={themes.light}>
       <PanelRenderedConfigContextProvider>
         <PanelInteractContextProvider>
-          <div
-            className="weave-root"
-            style={{
-              position,
-              backgroundColor: '#fff',
-              color: globals.TEXT_PRIMARY_COLOR,
-              top: 0,
-              bottom: 0,
-              left: 0,
-              right: 0,
-            }}>
+          <WeaveRoot className="weave-root" fullScreen={fullScreen}>
             {config.input_node.nodeType === 'void' ? (
               <Home updateConfig={updateConfig} inJupyter={inJupyter} />
             ) : (
@@ -394,60 +344,12 @@ const PagePanel: React.FC = props => {
                     goHome={goHome}
                   />
                 )}
-                <div
-                  style={{
-                    flex: '1 1 300px',
-                    overflow: 'hidden',
-                  }}>
-                  <ChildPanel
-                    editable={inJupyter || !isPanel}
-                    prefixHeader={
-                      inJupyter ? (
-                        <Icon
-                          style={{cursor: 'pointer', color: '#555'}}
-                          name="home"
-                          onClick={goHome}
-                        />
-                      ) : (
-                        <></>
-                      )
-                    }
-                    prefixButtons={
-                      <>
-                        {/* <Styles.ConfigButton
-                          onClick={toggleAutoRefresh}
-                          style={{
-                            padding: '8px',
-                          }}>
-                          <Icon
-                            name={weaveIsAutoRefresh ? 'pause' : 'play'}
-                            style={{margin: 0}}
-                          />
-                        </Styles.ConfigButton> */}
-                        {inJupyter && (
-                          <Styles.BarButton
-                            onClick={() => {
-                              const expStr = weave
-                                .expToString(config.input_node)
-                                .replace(/\n+/g, '')
-                                .replace(/\s+/g, '');
-                              window.open(
-                                urlPrefixed(
-                                  `?exp=${encodeURIComponent(expStr)}`
-                                ),
-                                '_blank'
-                              );
-                            }}>
-                            <Icon name="external square alternate" />
-                          </Styles.BarButton>
-                        )}
-                      </>
-                    }
-                    config={config}
-                    updateConfig={updateConfig}
-                    updateConfig2={updateConfig2}
-                  />
-                </div>
+                <PageContent
+                  config={config}
+                  updateConfig={updateConfig}
+                  updateConfig2={updateConfig2}
+                  goHome={goHome}
+                />
                 {/* <div
                   style={{
                     flex: '0 0 22px',
@@ -461,12 +363,7 @@ const PagePanel: React.FC = props => {
               </div>
             )}
             {/* <ArtifactManager /> */}
-          </div>
-          <EditorSidebar
-            config={config}
-            updateConfig={updateConfig}
-            updateConfig2={updateConfig2}
-          />
+          </WeaveRoot>
         </PanelInteractContextProvider>
       </PanelRenderedConfigContextProvider>
     </ThemeProvider>
@@ -474,3 +371,92 @@ const PagePanel: React.FC = props => {
 };
 
 export default PagePanel;
+
+type PageContentProps = {
+  config: ChildPanelFullConfig;
+  updateConfig: (newConfig: ChildPanelFullConfig) => void;
+  updateConfig2: (change: (oldConfig: any) => any) => void;
+  goHome: () => void;
+};
+
+export const PageContent: FC<PageContentProps> = ({
+  config,
+  updateConfig,
+  updateConfig2,
+  goHome,
+}) => {
+  const weave = useWeaveContext();
+  const editorIsOpen = useEditorIsOpen();
+  const inJupyter = inJupyterCell();
+  const {urlPrefixed} = getConfig();
+
+  const typedInputNode = useNodeWithServerType(config.input_node);
+  const isPanel = weaveTypeIsPanel(
+    typedInputNode.result?.type || {type: 'Panel' as any}
+  );
+
+  return (
+    <PageContentContainer>
+      <ChildPanel
+        editable={inJupyter || !isPanel}
+        prefixHeader={
+          inJupyter ? (
+            <Icon
+              style={{cursor: 'pointer', color: '#555'}}
+              name="home"
+              onClick={goHome}
+            />
+          ) : (
+            <></>
+          )
+        }
+        prefixButtons={
+          <>
+            {inJupyter && (
+              <Styles.BarButton
+                onClick={() => {
+                  const expStr = weave
+                    .expToString(config.input_node)
+                    .replace(/\n+/g, '')
+                    .replace(/\s+/g, '');
+                  window.open(
+                    urlPrefixed(`?exp=${encodeURIComponent(expStr)}`),
+                    '_blank'
+                  );
+                }}>
+                <Icon name="external square alternate" />
+              </Styles.BarButton>
+            )}
+          </>
+        }
+        config={config}
+        updateConfig={updateConfig}
+        updateConfig2={updateConfig2}
+      />
+      <Inspector active={editorIsOpen}>
+        <ChildPanelConfigComp
+          // pathEl={CHILD_NAME}
+          config={config}
+          updateConfig={updateConfig}
+          updateConfig2={updateConfig2}
+        />
+      </Inspector>
+    </PageContentContainer>
+  );
+};
+
+const WeaveRoot = styled.div<{fullScreen: boolean}>`
+  position: ${p => (p.fullScreen ? `fixed` : `absolute`)};
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background-color: ${globals.WHITE};
+  color: ${globals.TEXT_PRIMARY_COLOR};
+`;
+
+const PageContentContainer = styled.div`
+  flex: 1 1 300px;
+  overflow: hidden;
+  display: flex;
+`;

@@ -1,40 +1,30 @@
 import React from 'react';
 import styled from 'styled-components';
 
-type InspectorProps = {
-  className?: string;
-  collapsed: boolean;
-};
+type InspectorProps = {active: boolean};
 
-export const Inspector: React.FC<InspectorProps> = props => {
-  const {collapsed, children} = props;
+export const Inspector: React.FC<InspectorProps> = ({active, children}) => {
   return (
-    <>
-      <Wrapper
-        data-test="weave-sidebar"
-        className={props.className}
-        collapsed={collapsed}>
-        <Main>{children}</Main>
-      </Wrapper>
-    </>
+    <Container active={active} data-test="weave-sidebar">
+      <Content>{children}</Content>
+    </Container>
   );
 };
 
 export default Inspector;
 
-export const Wrapper = styled.div<{collapsed: boolean}>`
-  height: 100vh;
-  width: ${props => (props.collapsed ? 0 : 328)}px;
-  background: white;
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  display: flex;
+const WIDTH_PX = 328;
+
+export const Container = styled.div<{active: boolean}>`
+  flex-shrink: 0;
   font-size: 15px;
-  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.2);
+
+  width: ${p => (p.active ? WIDTH_PX : 0)}px;
+  transition: width 0.3s;
 `;
 
-export const Main = styled.div`
-  flex-grow: 1;
-  overflow: hidden;
+export const Content = styled.div`
+  width: ${WIDTH_PX}px;
 `;

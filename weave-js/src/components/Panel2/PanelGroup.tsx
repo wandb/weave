@@ -874,7 +874,7 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
         {config.enableAddPanel && (
           <Button
             size="tiny"
-            style={{position: 'absolute', top: 0, right: 0}}
+            style={{position: 'absolute', top: 16, right: 16, zIndex: 1}}
             onClick={handleAddPanel}>
             +
           </Button>
