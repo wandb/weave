@@ -326,7 +326,7 @@ def _merge(name) -> str:
         None
         if to_uri != None
         and to_uri.version is not None
-        and artifact_wandb.string_is_likely_commit_hash(to_uri.version)
+        and artifact_wandb.likely_commit_hash(to_uri.version)
         else to_uri.version
     )
 
@@ -536,75 +536,69 @@ def append(
     )
 
 
+def _get_uri_from_node(node: graph.Node[typing.Any], op_title: str) -> str:
+    if not isinstance(node, graph.OutputNode):
+        raise errors.WeaveInternalError(f"{op_title} target must be an OutputNode")
+
+    if node.from_op.name != "get":
+        raise errors.WeaveInternalError(f"{op_title} target must be a get")
+
+    if not isinstance(node.from_op.inputs["uri"], graph.ConstNode):
+        raise errors.WeaveInternalError(
+            f"{op_title} op argument must be a const string"
+        )
+
+    return node.from_op.inputs["uri"].val
+
+
+def _artifact_ref_from_uri(
+    uri: str, op_title: str
+) -> typing.Union[artifact_wandb.WandbArtifactRef, artifact_local.LocalArtifactRef]:
+    obj_uri = uris.WeaveURI.parse(uri)
+    if not isinstance(
+        obj_uri,
+        (artifact_wandb.WeaveWBArtifactURI, artifact_local.WeaveLocalArtifactURI),
+    ):
+        raise errors.WeaveInternalError(
+            f"Cannot {op_title} artifact of type %s" % type(obj_uri)
+        )
+
+    return obj_uri.to_ref()
+
+
 @mutation
 def merge(self: graph.Node[typing.Any], root_args: typing.Any = None) -> typing.Any:
     self = compile.compile_fix_calls([self])[0]
-
-    if not isinstance(self, graph.OutputNode):
-        raise errors.WeaveInternalError("Merge target must be an OutputNode")
-
-    if self.from_op.name != "get":
-        raise errors.WeaveInternalError("Merge target must be a get")
-
-    if not isinstance(self.from_op.inputs["uri"], graph.ConstNode):
-        raise errors.WeaveInternalError("Merge op argument must be a const string")
-
-    return _merge(self.from_op.inputs["uri"].val)
+    return _merge(_get_uri_from_node(self, "Merge"))
 
 
 @mutation
 def delete_artifact(
     self: graph.Node[typing.Any], root_args: typing.Any = None
 ) -> typing.Any:
-    if not isinstance(self, graph.OutputNode):
-        raise errors.WeaveInternalError("Merge target must be an OutputNode")
-
-    if self.from_op.name != "get":
-        raise errors.WeaveInternalError("Merge target must be a get")
-
-    if not isinstance(self.from_op.inputs["uri"], graph.ConstNode):
-        raise errors.WeaveInternalError("Merge op argument must be a const string")
-
-    name = self.from_op.inputs["uri"].val
-
-    obj_uri = uris.WeaveURI.parse(name)
-    if not isinstance(
-        obj_uri,
-        (artifact_wandb.WeaveWBArtifactURI, artifact_local.WeaveLocalArtifactURI),
-    ):
-        raise errors.WeaveInternalError(
-            "Cannot merge artifact of type %s" % type(obj_uri)
-        )
-
-    head_ref = obj_uri.to_ref()
+    head_ref = _artifact_ref_from_uri(_get_uri_from_node(self, "Delete"), "Delete")
     head_ref.artifact.delete()
+
+
+@mutation
+def undo_artifact(
+    self: graph.Node[typing.Any], root_args: typing.Any = None
+) -> typing.Any:
+    head_ref = _artifact_ref_from_uri(_get_uri_from_node(self, "Undo"), "Undo")
+    art = head_ref.artifact.undo()
+    if art is None:
+        raise errors.WeaveInternalError("Cannot undo artifact")
+    base_uri = str(art.initial_uri_obj)
+    if head_ref.path is not None:
+        base_uri = base_uri + "/" + head_ref.path
+    return base_uri
 
 
 @mutation
 def rename_artifact(
     self: graph.Node[typing.Any], new_name: str, root_args: typing.Any = None
 ) -> typing.Any:
-    if not isinstance(self, graph.OutputNode):
-        raise errors.WeaveInternalError("Merge target must be an OutputNode")
-
-    if self.from_op.name != "get":
-        raise errors.WeaveInternalError("Merge target must be a get")
-
-    if not isinstance(self.from_op.inputs["uri"], graph.ConstNode):
-        raise errors.WeaveInternalError("Merge op argument must be a const string")
-
-    name = self.from_op.inputs["uri"].val
-
-    obj_uri = uris.WeaveURI.parse(name)
-    if not isinstance(
-        obj_uri,
-        (artifact_wandb.WeaveWBArtifactURI, artifact_local.WeaveLocalArtifactURI),
-    ):
-        raise errors.WeaveInternalError(
-            "Cannot merge artifact of type %s" % type(obj_uri)
-        )
-
-    head_ref = obj_uri.to_ref()
+    head_ref = _artifact_ref_from_uri(_get_uri_from_node(self, "Rename"), "Rename")
     head_ref.artifact.rename(new_name)
 
 
@@ -618,27 +612,7 @@ def publish_artifact(
     project_name: typing.Optional[str],
     # root_args: typing.Any = None,
 ) -> str:
-    if not isinstance(self, graph.OutputNode):
-        raise errors.WeaveInternalError("Publish target must be an OutputNode")
-
-    if self.from_op.name != "get":
-        raise errors.WeaveInternalError("Publish target must be a get")
-
-    if not isinstance(self.from_op.inputs["uri"], graph.ConstNode):
-        raise errors.WeaveInternalError("Publish op argument must be a const string")
-
-    name = self.from_op.inputs["uri"].val
-
-    obj_uri = uris.WeaveURI.parse(name)
-    if not isinstance(
-        obj_uri,
-        (artifact_wandb.WeaveWBArtifactURI, artifact_local.WeaveLocalArtifactURI),
-    ):
-        raise errors.WeaveInternalError(
-            "Cannot merge artifact of type %s" % type(obj_uri)
-        )
-
-    head_ref = obj_uri.to_ref()
+    head_ref = _artifact_ref_from_uri(_get_uri_from_node(self, "Publish"), "Publish")
     art_name = artifact_name or head_ref.artifact.name
     ref = storage._direct_publish(
         head_ref.get(),

@@ -148,7 +148,7 @@ class WeaveJSONEncoder(jsonlogger.JsonEncoder):
         if obj is None:
             # This is needed because datadog strips keys with null values from logs
             return "<<_WEAVE_NONE_>>"
-        return super().default(obj)
+        return super().default(obj)  # type: ignore[no-untyped-call]
 
 
 def setup_handler(hander: logging.Handler, settings: LogSettings) -> None:
@@ -160,7 +160,7 @@ def setup_handler(hander: logging.Handler, settings: LogSettings) -> None:
             "[dd.trace_id=%(dd.trace_id)s dd.span_id=%(dd.span_id)s] %(message)s",
             timestamp=True,
             json_encoder=WeaveJSONEncoder,
-        )
+        )  # type: ignore[no-untyped-call]
     hander.addFilter(IndentFilter())
     hander.setFormatter(formatter)
     hander.setLevel(level)

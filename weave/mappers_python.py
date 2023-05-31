@@ -8,7 +8,7 @@ if typing.TYPE_CHECKING:
     from . import weave_types
 
 
-def map_to_python(
+def map_to_python(  # type: ignore[empty-body]
     type_: "weave_types.Type",
     artifact: "artifact_base.Artifact",
     path: list[str] = [],
@@ -17,7 +17,7 @@ def map_to_python(
     pass
 
 
-def map_from_python(
+def map_from_python(  # type: ignore[empty-body]
     type_: "weave_types.Type",
     artifact: "artifact_base.Artifact",
     path: list[str] = [],

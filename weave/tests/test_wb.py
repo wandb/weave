@@ -1221,7 +1221,7 @@ def test_run_history_2(fake_wandb):
     fake_wandb.fake_api.add_mock(run_history_mocker)
     node = ops.project("stacey", "mendeleev").runs()[0].history2()
     assert isinstance(node.type, TaggedValueType)
-    assert types.List(
+    assert ArrowWeaveListType(
         types.TypedDict(
             {
                 "_step": types.Number(),
@@ -1233,7 +1233,7 @@ def test_run_history_2(fake_wandb):
     ).assign_type(node.type.value)
 
     # this should just return dummy history
-    assert weave.use(node) == [{"_step": i} for i in range(10)]
+    assert weave.use(node).to_pylist_raw() == [{"_step": i} for i in range(10)]
 
     # now we'll fetch a just one of the columns
     new_node = node["epoch"]

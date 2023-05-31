@@ -1,6 +1,6 @@
 import typing
 from weave import box, graph
-from weave.artifact_wandb import string_is_likely_commit_hash
+from weave.artifact_wandb import likely_commit_hash
 from weave.language_features.tagging import tag_store
 from weave.node_ref import ref_to_node
 from weave.uris import WeaveURI
@@ -129,9 +129,7 @@ def _name_and_branch_from_node(
         if uri_str is not None:
             uri = WeaveURI.parse(uri_str)
             name = uri.name
-            if uri.version is not None and not string_is_likely_commit_hash(
-                uri.version
-            ):
+            if uri.version is not None and not likely_commit_hash(uri.version):
                 version = uri.version
 
     return (name, version)

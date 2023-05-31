@@ -70,7 +70,6 @@ def plotly_barplot(bar_data: list[BarData]) -> plotly.graph_objs.Figure:
         fig = plotly.graph_objs.Figure()
         fig.update_layout(template="plotly_white")
         return fig
-    bar_data = list(bar_data)  # do this to get out of arrow :(
     fig = px.bar(
         bar_data,
         x="value",

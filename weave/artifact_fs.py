@@ -180,6 +180,12 @@ class FilesystemArtifact(artifact_base.Artifact):
     ]:
         raise NotImplementedError
 
+    def previous_uri(self) -> typing.Optional[str]:
+        raise NotImplementedError
+
+    def undo(self) -> typing.Optional["FilesystemArtifact"]:
+        raise NotImplementedError
+
 
 FilesystemArtifactType.instance_classes = FilesystemArtifact
 
@@ -400,7 +406,7 @@ class FilesystemArtifactFile(file_base.File):
             return self.artifact.digest(self.path)
         else:
             # This matches how WandB calculates digests for files
-            from wandb.sdk.lib import hashutil
+            from wandb.sdk.lib import hashutil  # type: ignore[attr-defined]
 
             return hashutil.md5_file_b64(self.artifact.path(self.path))
 

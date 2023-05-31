@@ -105,19 +105,9 @@ def _full_output_type(
             param0_is_const=True,
             param0_const_val=param0_type.val,
         )
-    if not isinstance(op_input0_type, types.Function) and isinstance(
-        param0_type, types.Function
+    if not isinstance(op_input0_type, tagged_value_type.TaggedValueType) and isinstance(
+        param0_type, tagged_value_type.TaggedValueType
     ):
-        return _full_output_type(
-            {**params, param0_name: param0_type.output_type},
-            op_input0_type,
-            op_output_type,
-            param0_is_const=param0_is_const,
-            param0_const_val=param0_const_val,
-        )
-    elif not isinstance(
-        op_input0_type, tagged_value_type.TaggedValueType
-    ) and isinstance(param0_type, tagged_value_type.TaggedValueType):
         return tagged_value_type.TaggedValueType(
             param0_type.tag,
             _full_output_type(
