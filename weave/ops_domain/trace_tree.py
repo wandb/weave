@@ -27,14 +27,14 @@ class Result:
 
 @weave.type()
 class Span:
-    span_id: typing.Optional[str]
+    span_id: typing.Optional[str] = None
     # TODO: had to change this, what does it break?
-    _name: typing.Optional[str]
-    start_time_ms: typing.Optional[int]
-    end_time_ms: typing.Optional[int]
-    status_code: typing.Optional[str]
-    status_message: typing.Optional[str]
-    attributes: typing.Optional[typing.Dict[str, typing.Any]]
+    _name: typing.Optional[str] = None
+    start_time_ms: typing.Optional[int] = None
+    end_time_ms: typing.Optional[int] = None
+    status_code: typing.Optional[str] = None
+    status_message: typing.Optional[str] = None
+    attributes: typing.Optional[typing.Dict[str, typing.Any]] = None
     results: typing.Optional[typing.List[Result]] = dataclasses.field(
         default_factory=lambda: None
     )
@@ -42,6 +42,22 @@ class Span:
         default_factory=lambda: None
     )
     span_kind: typing.Optional[str] = dataclasses.field(default_factory=lambda: None)
+
+    def get_child_spans(self) -> typing.List["Span"]:
+        return [Span.from_dump(s) for s in self.child_spans or []]
+
+    @classmethod
+    def from_dump(cls, dump_dict: dict) -> "Span":
+        root_span = cls()
+        for key in dump_dict:
+            if key == "name":
+                setattr(root_span, "_name", dump_dict[key])
+            elif key == "results":
+                setattr(root_span, key, [Result(**r) for r in dump_dict[key]])
+            else:
+                setattr(root_span, key, dump_dict[key])
+
+        return root_span
 
 
 def stringified_output(obj: typing.Any) -> str:
@@ -60,7 +76,7 @@ def stringified_output(obj: typing.Any) -> str:
 def get_first_error(span: Span) -> typing.Optional[str]:
     if span.status_code == "ERROR":
         return span.status_message or ""
-    for child in span.child_spans or []:
+    for child in span.get_child_spans() or []:
         error = get_first_error(child)  # type: ignore
         if error is not None:
             return error
@@ -98,7 +114,7 @@ def get_trace_output_str(span: Span) -> str:
 def get_chain_repr(span: Span) -> str:
     basic_name: str = span._name or span.span_kind or "Unknown"
     inner_calls = []
-    for child in span.child_spans or []:
+    for child in span.get_child_spans():
         inner_calls.append(get_chain_repr(child))  # type: ignore
     if len(inner_calls) == 0:
         return basic_name
@@ -124,32 +140,13 @@ class WBTraceTree:
 
     @weave.op()
     def traceSummaryDict(self) -> dict:
-        root_span: Span = Span(
-            **{
-                "span_id": None,
-                "_name": None,
-                "start_time_ms": None,
-                "end_time_ms": None,
-                "status_code": None,
-                "status_message": None,
-                "attributes": None,
-                "results": None,
-                "child_spans": None,
-                "span_kind": None,
-            }
-        )
+        root_span = Span()
         try:
             loaded_dump = json.loads(self.root_span_dumps)
         except Exception:
             logging.warning("Failed to parse root span")
         else:
-            for key in loaded_dump:
-                if key == "name":
-                    setattr(root_span, "_name", loaded_dump[key])
-                elif key == "results":
-                    setattr(root_span, key, [Result(**r) for r in loaded_dump[key]])
-                else:
-                    setattr(root_span, key, loaded_dump[key])
+            root_span = Span.from_dump(loaded_dump)
 
         return {
             "isSuccess": root_span.status_code in [None, "SUCCESS"],
