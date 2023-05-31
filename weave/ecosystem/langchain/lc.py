@@ -489,14 +489,6 @@ class RunResult(typing.TypedDict):
 @weave.weave_class(weave_type=ChainType)
 class ChainOps:
     @weave.op()
-    def run(chain: Chain, query: str) -> str:
-        result = chain.run(query)
-        return result
-
-
-@weave.weave_class(weave_type=BaseRetrievalQAType)
-class BaseRetrievalQAOps:
-    @weave.op()
     def run(chain: BaseRetrievalQA, query: str) -> RunResult:
         if query == None:
             # TODO: weave engine doesn't handle nullability on args that aren't the first
@@ -516,3 +508,27 @@ class BaseRetrievalQAOps:
             result=result,
             trace=trace_tree.WBTraceTree(json.dumps(storage.to_python(span)["_val"])),
         )
+
+
+# @weave.weave_class(weave_type=BaseRetrievalQAType)
+# class BaseRetrievalQAOps:
+#     @weave.op()
+#     def run(chain: BaseRetrievalQA, query: str) -> RunResult:
+#         if query == None:
+#             # TODO: weave engine doesn't handle nullability on args that aren't the first
+#             return None  # type: ignore
+#         tracer = WeaveTracer()
+#         result = chain.run(query, callbacks=[tracer])
+#         lc_run = tracer.run
+#         if lc_run is None:
+#             raise ValueError("LangChain run was not recorded")
+#         span = util.safely_convert_lc_run_to_wb_span(lc_run)
+#         if span is None:
+#             raise ValueError("Could not convert LangChain run to Weave span")
+
+#         # Returns the langchain trace as part of the result... not really what we
+#         # want.
+#         return RunResult(
+#             result=result,
+#             trace=trace_tree.WBTraceTree(json.dumps(storage.to_python(span)["_val"])),
+#         )

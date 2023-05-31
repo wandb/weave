@@ -2079,6 +2079,93 @@ export const opTable2DProjection = makeConfigurableStandardOp({
   },
 });
 
+export const opTableProjection2D = makeConfigurableStandardOp({
+  name: 'table-projection2D',
+  hidden: true,
+  typeConfig: {
+    dims: 1,
+  },
+  argTypes: {
+    table: {
+      type: 'list' as const,
+      objectType: maybe({
+        type: 'typedDict' as const,
+        propertyTypes: {},
+      }),
+    },
+    projectionAlgorithm: 'string',
+    inputCardinality: 'string',
+    inputColumnNames: {type: 'list' as const, objectType: 'string'},
+    algorithmOptions: {
+      type: 'typedDict',
+      propertyTypes: {
+        tsne: {
+          type: 'typedDict' as const,
+          propertyTypes: {
+            perplexity: 'number',
+            learningRate: 'number',
+            iterations: 'number',
+          },
+        },
+        pca: {type: 'typedDict' as const, propertyTypes: {}},
+        umap: {
+          type: 'typedDict' as const,
+          propertyTypes: {
+            neighbors: 'number',
+            minDist: 'number',
+            spread: 'number',
+          },
+        },
+      },
+    },
+  },
+  description: `Apply a 2D projection to a ${docType('list')} of ${docType(
+    'typedDict',
+    {plural: true}
+  )}`,
+  argDescriptions: {
+    table: `${docType('list')} of ${docType('typedDict', {
+      plural: true,
+    })} to project`,
+    projectionAlgorithm: 'Algorithm to use (pca, tsne, umap)',
+    inputCardinality: 'Cardinality of the input data (single, multiple)',
+    inputColumnNames: 'List of column names to project',
+    algorithmOptions: 'Options for the algorithm',
+  },
+  returnValueDescription: `${docType('list')} of ${docType('typedDict', {
+    plural: true,
+  })} with projected columns`,
+  returnType: ({table}) => {
+    return replaceListElementType(
+      typedDict({
+        projection: typedDict({
+          x: 'number',
+          y: 'number',
+        }),
+        source: listObjectType(table),
+      }),
+      table as ListType
+    );
+  },
+  resolver: async (
+    {
+      table,
+      inputCardinality,
+      inputColumnNames,
+      algorithmOptions,
+      projectionAlgorithm,
+    },
+    inputTypes,
+    rawInputs,
+    forwardGraph,
+    forwardOp,
+    context,
+    engine
+  ) => {
+    throw new Error('not implemented in js');
+  },
+});
+
 export const opRange = makeOp({
   // hidden: true,
   name: 'range',

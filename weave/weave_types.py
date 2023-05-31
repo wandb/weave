@@ -521,7 +521,13 @@ class Const(Type):
                 return False
             if self.val == None or self.val == next_type.val:
                 return True
-        return False
+
+        # TODO: should be "return False"! But we allow assign non const
+        #     to const now. Because type_of("x") is String, not Const(String, "x").
+        #     Why? Because we don't want to detect a column of non-uniform
+        #     strings as a giant union.
+        #     For example see test_plot_constants_assign
+        return self.val_type.assign_type(next_type)
 
     @classmethod
     def from_dict(cls, d):

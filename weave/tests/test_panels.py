@@ -1,6 +1,7 @@
 import pytest
 from rich import print
 
+from weave.panels import panel_plot
 from ..panels.panel_group import Group
 from ..panels.panel_slider import Slider
 from .. import weave_internal
@@ -121,4 +122,16 @@ def test_board():
             "nums": weave.ops.range(0, 3, 1),
         },
         [weave.panels.BoardPanel(id="panel0", panel=lambda nums: nums)],
+    )
+
+
+def test_plot_constants_assign():
+    assert panel_plot.PlotConstants.WeaveType().assign_type(
+        weave.type_of(panel_plot.PlotConstants())
+    )
+
+
+def test_plot_assign():
+    assert weave.panels.Plot.WeaveType().assign_type(
+        weave.type_of(weave.panels.Plot([{"a": 5}]))
     )

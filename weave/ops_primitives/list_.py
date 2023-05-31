@@ -761,7 +761,68 @@ def join_all(arrs, joinFn, outer: bool):
         )
     ),
 )
-def list_2d_projection(
+def list_2Dprojection(
+    table,
+    projectionAlgorithm,
+    inputCardinality,
+    inputColumnNames,
+    algorithmOptions,
+):
+    inputColumnNames = list(set(inputColumnNames))
+    if len(inputColumnNames) == 0 or len(table) < 2:
+        projection = [[0, 0] for row in table]
+    else:
+        embeddings = []
+        for row in table:
+            if inputCardinality == "single":
+                embeddings.append(
+                    tag_aware_dict_val_for_escaped_key(row, inputColumnNames[0])
+                )
+            else:
+                embeddings.append(
+                    [
+                        tag_aware_dict_val_for_escaped_key(row, c)
+                        for c in inputColumnNames
+                    ]
+                )
+        np_array_of_embeddings = np.array(embeddings)
+        np_projection = projection_utils.perform_2D_projection(
+            np_array_of_embeddings, projectionAlgorithm, algorithmOptions
+        )
+        projection = np_projection.tolist()
+    return [
+        {
+            "projection": {
+                "x": p[0],
+                "y": p[1],
+            },
+            "source": row,
+        }
+        for p, row in zip(projection, table)
+    ]
+
+
+@op(
+    name="table-projection2D",
+    input_type={
+        "table": types.List(types.optional(types.TypedDict({}))),
+        "projectionAlgorithm": types.String(),
+        "inputCardinality": types.String(),
+        "inputColumnNames": types.List(types.String()),
+        "algorithmOptions": types.TypedDict({}),
+    },
+    output_type=lambda input_types: types.List(
+        types.TypedDict(
+            {
+                "projection": types.TypedDict(
+                    {"x": types.Number(), "y": types.Number()}
+                ),
+                "source": input_types["table"].object_type,
+            }
+        )
+    ),
+)
+def list_projection2D(
     table,
     projectionAlgorithm,
     inputCardinality,
