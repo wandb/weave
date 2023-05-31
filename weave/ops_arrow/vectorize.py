@@ -663,9 +663,7 @@ def _apply_fn_node(awl: ArrowWeaveList, fn: graph.OutputNode) -> ArrowWeaveList:
     fn = execute_fast._resolve_static_branches(fn)
     from .. import graph_debug
 
-    print("FN", graph_debug.node_expr_str_full(fn))
     vecced = vectorize(_ensure_variadic_fn(fn, awl.object_type))
-    print("VECCED", graph_debug.node_expr_str_full(vecced))
     called = _call_vectorized_fn_node_maybe_awl(awl, vecced)
     # print("CALLED ", called)
     return _call_and_ensure_awl(awl, called)
