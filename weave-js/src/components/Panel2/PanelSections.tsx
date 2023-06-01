@@ -18,7 +18,7 @@ import {
 } from './ChildPanel';
 import * as ConfigPanel from './ConfigPanel';
 import * as Panel2 from './panel';
-import {PanelContextProvider} from './PanelContext';
+import {PanelContextProvider, usePanelContext} from './PanelContext';
 
 type PanelSectionsConfig = {
   section: NodeOrVoidNode;
@@ -120,6 +120,7 @@ export const PanelSectionsConfigComp: React.FC<PanelSectionsProps> = props => {
     updateSectionExpr,
     itemType,
   } = usePanelSectionsCommon(props);
+  const {dashboardConfigOptions} = usePanelContext();
   const tabVars = useMemo(() => {
     return {
       row: varNode(itemType, 'row'),
@@ -132,7 +133,8 @@ export const PanelSectionsConfigComp: React.FC<PanelSectionsProps> = props => {
     };
   }, [props.input.type]);
   return (
-    <div style={{height: '100%'}}>
+    <ConfigPanel.ConfigSection label={`Properties`}>
+      {dashboardConfigOptions}
       <ConfigPanel.ConfigOption label={'section'}>
         <PanelContextProvider newVars={tabVars}>
           <ConfigPanel.ExpressionConfigField
@@ -141,15 +143,17 @@ export const PanelSectionsConfigComp: React.FC<PanelSectionsProps> = props => {
           />
         </PanelContextProvider>
       </ConfigPanel.ConfigOption>
-      <PanelContextProvider newVars={panelVars}>
-        <ChildPanelConfigComp
-          pathEl="panel"
-          config={config.panel}
-          updateConfig={updateChildPanelConfig}
-          updateConfig2={updateChildPanelConfig2}
-        />
-      </PanelContextProvider>
-    </div>
+      <ConfigPanel.ChildConfigContainer>
+        <PanelContextProvider newVars={panelVars}>
+          <ChildPanelConfigComp
+            pathEl="panel"
+            config={config.panel}
+            updateConfig={updateChildPanelConfig}
+            updateConfig2={updateChildPanelConfig2}
+          />
+        </PanelContextProvider>
+      </ConfigPanel.ChildConfigContainer>
+    </ConfigPanel.ConfigSection>
   );
 };
 

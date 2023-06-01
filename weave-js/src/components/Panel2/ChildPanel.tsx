@@ -49,6 +49,7 @@ import {
 import {getStackIdAndName} from './panellib/libpanel';
 import PanelNameEditor from './PanelNameEditor';
 import {TableState} from './PanelTable/tableState';
+import {ConfigSection} from './ConfigPanel';
 
 // This could be rendered as a code block with assignments, like
 // so.
@@ -630,7 +631,17 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
   );
 };
 
-const NEW_INSPECTOR_IMPLEMENTED_FOR = new Set([`plot`]);
+const NEW_INSPECTOR_IMPLEMENTED_FOR = new Set([
+  `plot`,
+  `histogram`,
+  `Group`,
+  `Each`,
+  `EachColumn`,
+  `Facet`,
+  `FacetTabs`,
+  `LabeledItem`,
+  `Sections`,
+]);
 
 export const ChildPanelConfigComp: React.FC<ChildPanelProps> = props => {
   const {
@@ -730,7 +741,12 @@ export const ChildPanelConfigComp: React.FC<ChildPanelProps> = props => {
 
   return (
     <>
-      {!NEW_INSPECTOR_IMPLEMENTED_FOR.has(handler.id) && dashboardConfigOptions}
+      {!NEW_INSPECTOR_IMPLEMENTED_FOR.has(handler.id) &&
+        dashboardConfigOptions != null && (
+          <ConfigSection label={`Properties`}>
+            {dashboardConfigOptions}
+          </ConfigSection>
+        )}
       <PanelContextProvider
         newVars={newVars}
         newPath={props.pathEl}

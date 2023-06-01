@@ -1,4 +1,3 @@
-import * as globals from '@wandb/weave/common/css/globals.styles';
 import {
   constNodeUnsafe,
   dereferenceAllVars,
@@ -445,7 +444,7 @@ export const PanelGroupConfigComponent: React.FC<PanelGroupProps> = props => {
   const {handleAddPanel} = usePanelGroupCommon(props);
   const config = props.config ?? PANEL_GROUP_DEFAULT_CONFIG();
   const {updateConfig, updateConfig2} = props;
-  const {path, selectedPath, stack} = usePanelContext();
+  const {path, selectedPath, stack, dashboardConfigOptions} = usePanelContext();
   let newVars: {[name: string]: NodeOrVoidNode} = {};
 
   const pathStr = path.join('.');
@@ -453,7 +452,7 @@ export const PanelGroupConfigComponent: React.FC<PanelGroupProps> = props => {
 
   const curPanelSelected = pathStr.startsWith(selectedPathStr);
 
-  // We are selected.  Render our config
+  // We are selected. Render our config.
   // if (curPanelSelected) {
   //   return (
   //     <>
@@ -544,21 +543,24 @@ export const PanelGroupConfigComponent: React.FC<PanelGroupProps> = props => {
     return renderedItem;
   });
 
-  // One of our descendants is selected.  Render children only
+  if (!curPanelSelected) {
+    // One of our descendants is selected.  Render children only
+    return <>{childrenConfig}</>;
+  }
+
+  // We are selected. Render our config.
   return (
     <>
-      {curPanelSelected && (
-        <>
-          <ConfigPanel.ConfigOption label="layout">
-            <ConfigPanel.ModifiedDropdownConfigField
-              options={LAYOUT_MODES.map(m => ({key: m, value: m, text: m}))}
-              value={config.layoutMode}
-              onChange={(e, {value}) =>
-                updateConfig({layoutMode: value as any})
-              }
-            />
-          </ConfigPanel.ConfigOption>
-          {/* <ConfigPanel.ConfigOption label="Equal size">
+      <ConfigPanel.ConfigSection label={`Properties`}>
+        {dashboardConfigOptions}
+        <ConfigPanel.ConfigOption label="layout">
+          <ConfigPanel.ModifiedDropdownConfigField
+            options={LAYOUT_MODES.map(m => ({key: m, value: m, text: m}))}
+            value={config.layoutMode}
+            onChange={(e, {value}) => updateConfig({layoutMode: value as any})}
+          />
+        </ConfigPanel.ConfigOption>
+        {/* <ConfigPanel.ConfigOption label="Equal size">
           <Checkbox
             checked={config.equalSize ?? false}
             onChange={(e, {checked}) => updateConfig({equalSize: !!checked})}
@@ -572,7 +574,7 @@ export const PanelGroupConfigComponent: React.FC<PanelGroupProps> = props => {
             }
           />
         </ConfigPanel.ConfigOption> */}
-          {/* <ConfigPanel.ConfigOption label="Style">
+        {/* <ConfigPanel.ConfigOption label="Style">
           <ConfigPanel.TextInputConfigField
             dataTest={`style`}
             value={config.style ?? ''}
@@ -584,36 +586,18 @@ export const PanelGroupConfigComponent: React.FC<PanelGroupProps> = props => {
             }}
           />
         </ConfigPanel.ConfigOption> */}
-        </>
-      )}
-      {curPanelSelected ? (
-        <ChildConfigContainer>{childrenConfig}</ChildConfigContainer>
-      ) : (
-        childrenConfig
-      )}
-      {curPanelSelected && (
+        <ConfigPanel.ChildConfigContainer>
+          {childrenConfig}
+        </ConfigPanel.ChildConfigContainer>
+      </ConfigPanel.ConfigSection>
+      <ConfigPanel.ConfigSection>
         <Button size="mini" onClick={handleAddPanel}>
           Add Child
         </Button>
-      )}
+      </ConfigPanel.ConfigSection>
     </>
   );
 };
-
-const ChildConfigContainer = styled.div`
-  position: relative;
-  padding-left: 2px;
-
-  &:before {
-    content: '';
-    position: absolute;
-    top: 12px;
-    bottom: 12px;
-    left: 0;
-    width: 2px;
-    background-color: ${globals.GRAY_350};
-  }
-`;
 
 export const PanelGroupItem: React.FC<{
   item: ChildPanelConfig;

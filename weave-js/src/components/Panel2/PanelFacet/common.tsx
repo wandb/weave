@@ -6,7 +6,7 @@ import {usePanelStacksForType} from '../availablePanels';
 import {ChildPanelConfigComp} from '../ChildPanel';
 import * as ConfigPanel from '../ConfigPanel';
 import * as Panel2 from '../panel';
-import {PanelContextProvider} from '../PanelContext';
+import {PanelContextProvider, usePanelContext} from '../PanelContext';
 import {PanelPlotProps} from '../PanelPlot/PanelPlot';
 import * as TableState from '../PanelTable/tableState';
 
@@ -145,6 +145,7 @@ export const DimConfig: React.FC<{
 export const PanelFacetConfig: React.FC<PanelFacetProps> = props => {
   const {input, updateConfig: propsUpdateConfig, updateConfig2} = props;
   const weave = useWeaveContext();
+  const {dashboardConfigOptions} = usePanelContext();
   const config = useConfig(props.config);
   const updateConfig = useCallback(
     (newConfig: Partial<FacetConfig>) => {
@@ -188,7 +189,8 @@ export const PanelFacetConfig: React.FC<PanelFacetProps> = props => {
   );
 
   return (
-    <div>
+    <ConfigPanel.ConfigSection label={`Properties`}>
+      {dashboardConfigOptions}
       <ConfigPanel.ConfigOption label={'x'}>
         <DimConfig
           dimName="x"
@@ -207,68 +209,72 @@ export const PanelFacetConfig: React.FC<PanelFacetProps> = props => {
           updateTableConfig={updateTableConfig}
         />
       </ConfigPanel.ConfigOption>
-      <PanelContextProvider newVars={columnVars}>
-        <ChildPanelConfigComp
-          pathEl="select"
-          config={{
-            vars: cellPanel.panelVars ?? {},
-            input_node: config.table.columnSelectFunctions[config.dims.select],
-            id: cellPanel.panelId,
-            config: cellPanel.panelConfig,
-          }}
-          updateConfig={newChildPanelConfig => {
-            let newTableConfig = TableState.updateColumnPanelConfig(
-              tableConfig,
-              config.dims.select,
-              newChildPanelConfig.config
-            );
-            newTableConfig = TableState.updateColumnSelect(
-              newTableConfig,
-              config.dims.select,
-              newChildPanelConfig.input_node
-            );
-            newTableConfig = TableState.updateColumnPanelId(
-              newTableConfig,
-              config.dims.select,
-              newChildPanelConfig.id
-            );
-            updateTableConfig(newTableConfig);
-          }}
-          updateConfig2={change => {
-            if (updateConfig2 != null) {
-              updateConfig2(oldConfig => {
-                const mappedOldConfig = {
-                  vars: {},
-                  input_node:
-                    oldConfig.table.columnSelectFunctions[
-                      oldConfig.dims.select
-                    ],
-                  id: oldConfig.table.columns[oldConfig.dims.select].panelId,
-                  config:
-                    oldConfig.table.columns[oldConfig.dims.select].panelConfig,
-                };
-                const newChildPanelConfig = change(mappedOldConfig);
-                let newTConf = TableState.updateColumnPanelConfig(
-                  oldConfig.table,
-                  config.dims.select,
-                  newChildPanelConfig.config
-                );
-                newTConf = TableState.updateColumnSelect(
-                  newTConf,
-                  config.dims.select,
-                  newChildPanelConfig.input_node
-                );
-                newTConf = TableState.updateColumnPanelId(
-                  newTConf,
-                  config.dims.select,
-                  newChildPanelConfig.id
-                );
-                return {table: newTConf};
-              });
-            }
-          }}
-        />
-      </PanelContextProvider>
-    </div>
+      <ConfigPanel.ChildConfigContainer>
+        <PanelContextProvider newVars={columnVars}>
+          <ChildPanelConfigComp
+            pathEl="select"
+            config={{
+              vars: cellPanel.panelVars ?? {},
+              input_node:
+                config.table.columnSelectFunctions[config.dims.select],
+              id: cellPanel.panelId,
+              config: cellPanel.panelConfig,
+            }}
+            updateConfig={newChildPanelConfig => {
+              let newTableConfig = TableState.updateColumnPanelConfig(
+                tableConfig,
+                config.dims.select,
+                newChildPanelConfig.config
+              );
+              newTableConfig = TableState.updateColumnSelect(
+                newTableConfig,
+                config.dims.select,
+                newChildPanelConfig.input_node
+              );
+              newTableConfig = TableState.updateColumnPanelId(
+                newTableConfig,
+                config.dims.select,
+                newChildPanelConfig.id
+              );
+              updateTableConfig(newTableConfig);
+            }}
+            updateConfig2={change => {
+              if (updateConfig2 != null) {
+                updateConfig2(oldConfig => {
+                  const mappedOldConfig = {
+                    vars: {},
+                    input_node:
+                      oldConfig.table.columnSelectFunctions[
+                        oldConfig.dims.select
+                      ],
+                    id: oldConfig.table.columns[oldConfig.dims.select].panelId,
+                    config:
+                      oldConfig.table.columns[oldConfig.dims.select]
+                        .panelConfig,
+                  };
+                  const newChildPanelConfig = change(mappedOldConfig);
+                  let newTConf = TableState.updateColumnPanelConfig(
+                    oldConfig.table,
+                    config.dims.select,
+                    newChildPanelConfig.config
+                  );
+                  newTConf = TableState.updateColumnSelect(
+                    newTConf,
+                    config.dims.select,
+                    newChildPanelConfig.input_node
+                  );
+                  newTConf = TableState.updateColumnPanelId(
+                    newTConf,
+                    config.dims.select,
+                    newChildPanelConfig.id
+                  );
+                  return {table: newTConf};
+                });
+              }
+            }}
+          />
+        </PanelContextProvider>
+      </ConfigPanel.ChildConfigContainer>
+    </ConfigPanel.ConfigSection>
   );
 };

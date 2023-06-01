@@ -11,7 +11,8 @@ import {
   useChildPanelProps,
 } from './ChildPanel';
 import * as Panel2 from './panel';
-import {PanelContextProvider} from './PanelContext';
+import {PanelContextProvider, usePanelContext} from './PanelContext';
+import {ChildConfigContainer, ConfigSection} from './ConfigPanel';
 
 type PanelEachConfig = {
   pbConfig: PanelBankSectionConfig;
@@ -72,6 +73,7 @@ const usePanelEachCommon = (props: PanelEachProps) => {
 
 export const PanelEachConfigComp: React.FC<PanelEachProps> = props => {
   const {childPanelPanelProps} = usePanelEachCommon(props);
+  const {dashboardConfigOptions} = usePanelContext();
   const itemNode = opIndex({
     arr: props.input,
     index: varNode('number', 'itemIndex'),
@@ -84,9 +86,14 @@ export const PanelEachConfigComp: React.FC<PanelEachProps> = props => {
   }, [itemNode]);
 
   return (
-    <PanelContextProvider newVars={newVars}>
-      <ChildPanelConfigComp {...childPanelPanelProps} />
-    </PanelContextProvider>
+    <ConfigSection label={`Properties`}>
+      {dashboardConfigOptions}
+      <ChildConfigContainer>
+        <PanelContextProvider newVars={newVars}>
+          <ChildPanelConfigComp {...childPanelPanelProps} />
+        </PanelContextProvider>
+      </ChildConfigContainer>
+    </ConfigSection>
   );
 };
 
