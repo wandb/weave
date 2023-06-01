@@ -16,7 +16,7 @@ def single_distribution(input_node: weave.Node[list[float]]) -> weave.panels.Plo
         binned,
         x=lambda row: row["value"],
         y=lambda row: row["count"],
-        mark="bar",
+        mark=weave.graph.ConstNode(weave.types.String(), "bar"),
     )
 
 

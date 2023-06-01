@@ -65,7 +65,7 @@ SelectFunction = typing.Union[graph.Node, typing.Callable[[typing.Any], typing.A
 
 @weave.type()
 class PlotConstants:
-    mark: typing.Optional[typing.Union[MarkOption, SelectFunction]]
+    mark: typing.Optional[SelectFunction]
     pointShape: PointShapeOption
     label: LabelOption
     lineStyle: LineStyleOption
@@ -83,7 +83,7 @@ class PlotConstantsInputDict(typing.TypedDict):
     # when we drop support for Python 3.10 and python 3.11 is released
 
     # this will mimic the behavior of ? in typescript
-    mark: typing.Optional[typing.Union[MarkOption, SelectFunction]]
+    mark: typing.Optional[SelectFunction]
     pointShape: typing.Optional[PointShapeOption]
     label: typing.Optional[LabelOption]
     lineStyle: typing.Optional[LineStyleOption]
@@ -244,6 +244,7 @@ class AxisSetting:
     noLabels: bool
     noTitle: bool
     noTicks: bool
+    title: typing.Optional[SelectFunction] = None
     scale: typing.Optional[Scale] = None
 
 
@@ -314,7 +315,7 @@ class Plot(panel.Panel):
         vars=None,
         config: typing.Optional[PlotConfig] = None,
         constants: typing.Optional[PlotConstants] = None,
-        mark: typing.Optional[typing.Union[MarkOption, SelectFunction]] = None,
+        mark: typing.Optional[SelectFunction] = None,
         x: typing.Optional[SelectFunction] = None,
         y: typing.Optional[SelectFunction] = None,
         color: typing.Optional[SelectFunction] = None,
@@ -326,6 +327,9 @@ class Plot(panel.Panel):
         series: typing.Optional[typing.Union[Series, typing.List[Series]]] = None,
         no_axes: bool = False,
         no_legend: bool = False,
+        x_title: typing.Optional[SelectFunction] = None,
+        y_title: typing.Optional[SelectFunction] = None,
+        color_title: typing.Optional[SelectFunction] = None,
         signals: typing.Optional[Signals] = None,
     ):
         super().__init__(input_node=input_node, vars=vars)
@@ -372,6 +376,10 @@ class Plot(panel.Panel):
             config_axisSettings = AxisSettings(
                 x=default_axis(), y=default_axis(), color=default_axis()
             )
+
+            config_axisSettings.x.title = x_title
+            config_axisSettings.y.title = y_title
+            config_axisSettings.color.title = color_title
 
             config_legendSettings = LegendSettings(
                 x=LegendSetting(), y=LegendSetting(), color=LegendSetting()

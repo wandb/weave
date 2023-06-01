@@ -354,4 +354,7 @@ class TimeSeries(weave.Panel):
             y=lambda row: row["y"],
             label=lambda row: row["label"],
             mark=config.mark,
+            x_title=function_to_string(config.x),
+            y_title=function_to_string(config.agg),
+            color_title=function_to_string(config.label),
         )
