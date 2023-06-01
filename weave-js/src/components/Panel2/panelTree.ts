@@ -22,6 +22,7 @@ import {
   getFullChildPanel,
 } from './ChildPanel';
 import {PANEL_GROUP2_ID, PanelGroupConfig} from './PanelGroup';
+import {PanelBankSectionConfig} from '../WeavePanelBank/panelbank';
 
 export type PanelTreeNode = ChildPanelConfig;
 
@@ -295,6 +296,7 @@ interface Dashboard extends GroupNode {
       sidebar: GroupNode;
       main: GroupNode;
     };
+    gridConfig: PanelBankSectionConfig;
   };
 }
 
