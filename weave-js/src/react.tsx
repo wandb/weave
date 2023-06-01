@@ -213,7 +213,7 @@ const errorToText = (e: any) => {
     e.traceback != null &&
     _.isArray(e.traceback)
   ) {
-    return e.message + '\n\n' + 'Traceback:\n' + e.traceback.join('\n');
+    return e.message + '\n\nTraceback:\n' + e.traceback.join('\n');
   } else {
     return '';
   }
