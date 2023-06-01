@@ -1594,15 +1594,16 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
   const {loading: markLoading, result: markListFromNode} =
     LLReact.useNodeValue(markListNode);
 
+  const markList = useMemo(() => markListFromNode ?? [], [markListFromNode]);
+
   const plotTables = useMemo(
     () => (result.loading ? [] : (result.result as any[][])),
     [result]
   );
 
   const hasLine = useMemo(
-    () =>
-      markLoading ? false : markListFromNode.some(mark => mark === 'line'),
-    [markListFromNode, markLoading]
+    () => (markLoading ? false : markList.some(mark => mark === 'line')),
+    [markList, markLoading]
   );
 
   const loading = useMemo(
@@ -1683,7 +1684,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
       .filter(
         (table, i) =>
           getMark(
-            markListFromNode[i],
+            markList[i],
             config.series[i],
             listOfTableNodes[i],
             vegaReadyTables[i]
@@ -1700,7 +1701,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     flatPlotTables,
     listOfTableNodes,
     vegaReadyTables,
-    markListFromNode,
+    markList,
   ]);
 
   const colorFieldIsRangeForSeries = useMemo(
@@ -1724,7 +1725,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     return concattedTable.filter(row => {
       const s = config.series[row._seriesIndex];
       const mark = getMark(
-        markListFromNode[row._seriesIndex],
+        markList[row._seriesIndex],
         s,
         listOfTableNodes[row._seriesIndex],
         vegaReadyTables[row._seriesIndex]
@@ -1734,7 +1735,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
   }, [
     concattedTable,
     config.series,
-    markListFromNode,
+    markList,
     listOfTableNodes,
     vegaReadyTables,
   ]);
@@ -1942,7 +1943,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
       const colorAxisType = getColorAxisType(series, vegaReadyTable);
 
       const mark: NonNullable<MarkOption> = getMark(
-        markListFromNode[i],
+        markList[i],
         series,
         listOfTableNodes[i],
         vegaReadyTable
@@ -2320,7 +2321,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     xScaleAndDomain,
     yScaleAndDomain,
     globalColorScales,
-    markListFromNode,
+    markList,
   ]);
 
   useEffect(() => {
