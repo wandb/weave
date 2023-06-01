@@ -64,12 +64,14 @@ export const PBSection: React.FC<PBSectionProps> = props => {
                         height: '100%',
                       }}
                       className="editable-panel">
-                      <DragHandle
-                        key={`draghandle-${panelRef.id}`}
-                        className="draggable-handle"
-                        partRef={panelRef}>
-                        <LegacyWBIcon title="" name="handle" />
-                      </DragHandle>
+                      {props.mode === 'grid' && (
+                        <DragHandle
+                          key={`draghandle-${panelRef.id}`}
+                          className="draggable-handle"
+                          partRef={panelRef}>
+                          <LegacyWBIcon title="" name="handle" />
+                        </DragHandle>
+                      )}
                       {props.renderPanel(panelRef)}
                     </div>
                   )}

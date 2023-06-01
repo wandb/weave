@@ -35,7 +35,11 @@ export const PanelNewImage: React.FC<PanelNewImageProps> = props => {
         width: '100%',
         height: '100%',
       }}>
-      <img src={url} alt="panel-im" />
+      <img
+        style={{objectFit: 'contain', width: '100%', height: '100%'}}
+        src={url}
+        alt="panel-im"
+      />
     </div>
   );
 };

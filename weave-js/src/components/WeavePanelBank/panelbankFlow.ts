@@ -17,8 +17,8 @@ export function panelOnActivePage(
 }
 
 export interface GetPagingParamsParams {
-  panelBankWidth: number;
-  panelBankHeight: number;
+  containerWidth: number;
+  containerHeight: number;
   panelCount: number;
   flowConfig: PanelBankFlowSectionConfig;
 }
@@ -30,20 +30,20 @@ export interface PagingParams {
 }
 
 export function getPagingParams({
-  panelBankWidth,
-  panelBankHeight,
+  containerWidth,
+  containerHeight,
   panelCount,
   flowConfig,
 }: GetPagingParamsParams): PagingParams {
   const {gutterWidth, rowsPerPage} = flowConfig;
-  const {boxWidth} = getBoxDimensions(
-    panelBankWidth,
-    panelBankHeight,
-    flowConfig
-  );
+  const {boxWidth} = getBoxDimensions({
+    containerWidth,
+    containerHeight,
+    flowConfig,
+  });
   const panelsPerRow = Math.max(
     1,
-    Math.floor(panelBankWidth / (boxWidth + gutterWidth))
+    Math.floor(containerWidth / (boxWidth + gutterWidth))
   );
   const panelsPerPage = panelsPerRow * rowsPerPage;
   const maxPage = Math.max(0, Math.ceil(panelCount / panelsPerPage) - 1);
@@ -60,35 +60,100 @@ export interface BoxDimensions {
 }
 
 // Returns a standard size if on mobile, custom size if not
-export function getBoxDimensions(
-  panelBankWidth: number,
-  panelBankHeight: number,
-  flowConfig: PanelBankFlowSectionConfig
-): BoxDimensions {
-  const {gutterWidth} = flowConfig;
-  const mobile = isMobile();
-  const boxWidth = mobile
-    ? panelBankWidth - 2 * gutterWidth
-    : flowConfig.snapToColumns
-    ? getColumnWidth(panelBankWidth, flowConfig)
-    : flowConfig.boxWidth;
-  // Subtract for footer
-  const boxHeight = (panelBankHeight - 32) / flowConfig.rowsPerPage;
-  return {boxWidth, boxHeight};
+export function getBoxDimensions({
+  containerWidth,
+  containerHeight,
+  flowConfig,
+}: {
+  containerWidth: number;
+  containerHeight: number;
+  flowConfig: PanelBankFlowSectionConfig;
+}): BoxDimensions {
+  const {gutterWidth, columnsPerPage, rowsPerPage, snapToColumns, boxWidth} =
+    flowConfig;
+
+  const boxHeight = getBoxDimension({
+    containerPx: containerHeight,
+    gutterPx: gutterWidth,
+    boxesPerDimension: rowsPerPage,
+  });
+
+  if (isMobile()) {
+    return {boxWidth: containerWidth - 2 * gutterWidth, boxHeight};
+  }
+  if (!snapToColumns) {
+    return {boxWidth, boxHeight};
+  }
+  return {
+    boxWidth: getBoxDimension({
+      containerPx: containerWidth,
+      gutterPx: gutterWidth,
+      boxesPerDimension: columnsPerPage,
+    }),
+    boxHeight,
+  };
 }
 
-export function getColumnWidth(
-  panelBankWidth: number,
-  flowConfig: PanelBankFlowSectionConfig,
-  columnCount?: number
-): number {
-  const {gutterWidth} = flowConfig;
-  columnCount = columnCount || flowConfig.columnsPerPage;
+export function getBoxDimension({
+  containerPx,
+  gutterPx,
+  boxesPerDimension,
+}: {
+  containerPx: number;
+  gutterPx: number;
+  boxesPerDimension: number; // columnsPerPage or rowsPerPage
+}) {
   return Math.floor(
-    (panelBankWidth - gutterWidth * (columnCount + 1)) / columnCount
+    (containerPx - gutterPx * (boxesPerDimension + 1)) / boxesPerDimension
   );
 }
 
+export const getSnappedItemCount = ({
+  unsnappedPx,
+  gutterPx,
+  containerPx,
+}: {
+  unsnappedPx: number;
+  gutterPx: number;
+  containerPx: number;
+}) => {
+  const snapWidths = [...Array(12).keys()].map(colCount =>
+    getBoxDimension({containerPx, gutterPx, boxesPerDimension: colCount + 1})
+  );
+  let closestIndex = 0;
+  snapWidths.forEach((columnWidth, i) => {
+    if (
+      Math.abs(unsnappedPx - columnWidth) <
+      Math.abs(unsnappedPx - snapWidths[closestIndex])
+    ) {
+      closestIndex = i;
+    }
+  });
+  return closestIndex + 1;
+};
+
+export const getSnappedDimension = ({
+  unsnappedPx,
+  containerPx,
+  gutterPx,
+}: {
+  unsnappedPx: number;
+  containerPx: number;
+  gutterPx: number;
+}) => {
+  const newItemCount = getSnappedItemCount({
+    unsnappedPx,
+    containerPx,
+    gutterPx,
+  });
+  return getBoxDimension({
+    containerPx,
+    gutterPx,
+    boxesPerDimension: newItemCount,
+  });
+};
+
+// TODO: we should have a standard isMobile check somewhere else
 export function isMobile(): boolean {
   return window.innerWidth <= 852;
 }
