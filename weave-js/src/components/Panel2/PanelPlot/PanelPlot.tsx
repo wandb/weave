@@ -8,6 +8,7 @@ import CustomPanelRenderer, {
 } from '@wandb/weave/common/components/Vega3/CustomPanelRenderer';
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import {
+  constNode,
   // constFunction,
   ConstNode,
   constNodeUnsafe,
@@ -27,6 +28,7 @@ import {
   oneOrMany,
   // opAnd,
   opArray,
+  opDict,
   // opContains,
   // opDateToNumber,
   // opDict,
@@ -112,6 +114,7 @@ import {
 } from './versions';
 import {config} from 'process';
 import {migrate} from './versions/v2';
+import {GraphEventName} from 'cytoscape';
 
 const recordEvent = makeEventRecorder('Plot');
 
@@ -366,31 +369,47 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
   //     .then(() => toast('Code copied to clipboard!'));
   // }, [config, input.type, weave]);
 
+  const titlesNode = useMemo(
+    () => PlotState.getAxisTitlesNode(config.axisSettings),
+    [config.axisSettings]
+  );
+
+  const {loading: titlesLoading, result: titles} =
+    LLReact.useNodeValue(titlesNode);
+
   const labelConfigDom = useMemo(() => {
-    return (
+    return titlesLoading ? (
+      <Panel2Loader />
+    ) : (
       <>
-        {['X Axis Label', 'Y Axis Label', 'Color Legend Label'].map(name => {
-          const dimName = name.split(' ')[0].toLowerCase() as
-            | 'x'
-            | 'y'
-            | 'color';
-          return (
-            <ConfigPanel.ConfigOption key={name} label={name}>
-              <ConfigPanel.TextInputConfigField
-                dataTest={`${name}-label`}
-                // Truncate string to prevent exploding panel for now.
-                value={config.axisSettings[dimName].title}
-                label={''}
-                onChange={(event, {value}) => {
-                  const newConfig = produce(config, draft => {
-                    _.set(draft, `axisSettings.${dimName}.title`, value);
-                  });
-                  updateConfig(newConfig);
-                }}
-              />
-            </ConfigPanel.ConfigOption>
-          );
-        })}
+        {['X Axis Label', 'Y Axis Label', 'Color Legend Label'].map(
+          (name, i) => {
+            const dimName = name.split(' ')[0].toLowerCase() as
+              | 'x'
+              | 'y'
+              | 'color';
+            return (
+              <ConfigPanel.ConfigOption key={name} label={name}>
+                <ConfigPanel.TextInputConfigField
+                  dataTest={`${name}-label`}
+                  // Truncate string to prevent exploding panel for now.
+                  value={titles[dimName]}
+                  label={''}
+                  onChange={(event, {value}) => {
+                    const newConfig = produce(config, draft => {
+                      _.set(
+                        draft,
+                        `axisSettings.${dimName}.title`,
+                        constNodeUnsafe('string', value)
+                      );
+                    });
+                    updateConfig(newConfig);
+                  }}
+                />
+              </ConfigPanel.ConfigOption>
+            );
+          }
+        )}
         {config.series.map((series, i) => {
           const seriesName = `Series ${i + 1} Name`;
           return (
@@ -1590,6 +1609,14 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     [config.series]
   );
 
+  const titleNode = useMemo(
+    () => PlotState.getAxisTitlesNode(config.axisSettings),
+    [config.axisSettings]
+  );
+
+  const {loading: titlesLoading, result: titles} =
+    LLReact.useNodeValue(titleNode);
+
   // if mark is a node, auto evaluate it
   const {loading: markLoading, result: markListFromNode} =
     LLReact.useNodeValue(markListNode);
@@ -1607,8 +1634,8 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
   );
 
   const loading = useMemo(
-    () => result.loading || markLoading || isRefining,
-    [result.loading, markLoading, isRefining]
+    () => result.loading || markLoading || isRefining || titlesLoading,
+    [result.loading, markLoading, isRefining, titlesLoading]
   );
 
   const flatPlotTables = useMemo(

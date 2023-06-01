@@ -13,6 +13,7 @@ import {
   numberBin,
   oneOrMany,
   opCount,
+  opDict,
   opGetRunTag,
   opNumberBin,
   opNumbersBinEqual,
@@ -26,6 +27,7 @@ import {
   union,
   varNode,
   voidNode,
+  VoidNode,
   WeaveInterface,
   withNamedTag,
 } from '@wandb/weave/core';
@@ -956,7 +958,7 @@ export function defaultPlot(inputNode: Node, stack: Stack): PlotConfig {
   tableState = TableState.appendEmptyColumn(tableState);
   const pointShapeColId = tableState.order[tableState.order.length - 1];
 
-  const axisSettings: PlotConfig['axisSettings'] = {
+  const axisSettings: v1.PlotConfig['axisSettings'] = {
     x: {},
     y: {},
     color: {},
@@ -1478,3 +1480,17 @@ export function selectionContainsValue(
     return selection.includes(value);
   }
 }
+
+export const getAxisTitlesNode = (axisSettings: PlotConfig['axisSettings']) =>
+  opDict(
+    ['x' as const, 'y' as const, 'color' as const]
+      .map(axisName => ({
+        axisName,
+        title: axisSettings[axisName].title,
+      }))
+      .reduce((acc, val, i) => {
+        const {axisName, title} = val;
+        acc[axisName] = title;
+        return acc;
+      }, {} as {[K in keyof PlotConfig['axisSettings']]: Node | VoidNode}) as any
+  );
