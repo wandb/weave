@@ -203,7 +203,16 @@ export function toWeaveType(o: any): any {
     return {
       type: 'Signals',
       _is_object: true,
-      ..._.mapValues(o, toWeaveType),
+      domain: {
+        ..._.mapValues(o.domain, toWeaveType),
+        type: 'AxisSelections',
+        _is_object: true,
+      },
+      selection: {
+        ..._.mapValues(o.selection, toWeaveType),
+        type: 'AxisSelections',
+        _is_object: true,
+      },
     };
   }
 
