@@ -2,7 +2,7 @@ import * as weave from '@wandb/weave/core';
 import * as v10 from './v10';
 import * as v11 from './v11';
 
-export type SeriesConfig = Omit<
+export type LazySeriesConfig = Omit<
   v11.SeriesConfig,
   'constants' | 'axisSettings'
 > & {
@@ -11,7 +11,7 @@ export type SeriesConfig = Omit<
   };
 };
 
-export type AxisSettings = {
+export type LazyAxisSettings = {
   x: Omit<v10.AxisSetting, 'title'> & {
     title: weave.Node<'string'> | weave.VoidNode;
   };
@@ -23,19 +23,27 @@ export type AxisSettings = {
   };
 };
 
-export type PlotConfig = Omit<
+export type LazyPlotConfig = Omit<
   v11.PlotConfig,
   'configVersion' | 'series' | 'axisSettings'
 > & {
+  configType: 'lazy';
   configVersion: 12;
-  series: SeriesConfig[];
-  axisSettings: AxisSettings;
+  series: LazySeriesConfig[];
+  axisSettings: LazyAxisSettings;
 };
 
-export const migrate = (config: v11.PlotConfig): PlotConfig => {
+export type ConcretePlotConfig = Omit<v11.PlotConfig, 'configVersion'> & {
+  configType: 'concrete';
+  configVersion: 12;
+};
+
+export const migrate = (config: v11.PlotConfig): LazyPlotConfig => {
+  // noop migration, but if we are on version 12 we know that input configs can now be lazy
   return {
     ...config,
     configVersion: 12,
+    configType: 'lazy',
     series: config.series.map(series => ({
       ...series,
       constants: {
@@ -71,3 +79,11 @@ export const migrate = (config: v11.PlotConfig): PlotConfig => {
     },
   };
 };
+
+export const migrateConcrete = (
+  config: v11.PlotConfig
+): ConcretePlotConfig => ({
+  ...config,
+  configType: 'concrete',
+  configVersion: 12,
+});

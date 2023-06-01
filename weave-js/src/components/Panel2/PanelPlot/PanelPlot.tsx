@@ -24,6 +24,7 @@ import {
   listObjectType,
   maybe,
   Node,
+  NodeOrVoidNode,
   numberBin,
   oneOrMany,
   // opAnd,
@@ -45,6 +46,7 @@ import {
   opRunName,
   OpStore,
   opUnnest,
+  Stack,
   // OutputNode,
   Type,
   typedDict,
@@ -96,6 +98,8 @@ import {
 import {PanelPlotRadioButtons} from './RadioButtons';
 import {
   AnyPlotConfig,
+  ConcretePlotConfig,
+  ConcreteSeriesConfig,
   // AxisSelections,
   // ContinuousSelection,
   DEFAULT_SCALE_TYPE,
@@ -112,9 +116,6 @@ import {
   ScaleType,
   SeriesConfig,
 } from './versions';
-import {config} from 'process';
-import {migrate} from './versions/v2';
-import {GraphEventName} from 'cytoscape';
 
 const recordEvent = makeEventRecorder('Plot');
 
@@ -226,7 +227,7 @@ const useConfig = (
             s.table = loadable.result[i];
           });
         });
-  }, [loadable, newConfig]);
+  }, [loadable.result, newConfig, loadable.loading]);
 
   const final = useMemo(
     () => ({
@@ -278,6 +279,25 @@ const stringHashCode = (str: string) => {
   return hash;
 };
 
+const useConcreteConfig = (
+  configNode: NodeOrVoidNode,
+  input: Node,
+  stack: Stack
+): {config: ConcretePlotConfig; loading: boolean} => {
+  const concreteConfigUse = LLReact.useNodeValue(configNode);
+  const concreteConfigEvaluationResult: ConcretePlotConfig | undefined =
+    concreteConfigUse.result;
+
+  const concreteConfigLoading = concreteConfigUse.loading;
+  const config = useMemo(() => {
+    if (concreteConfigLoading) {
+      return PlotState.defaultConcretePlot(input, stack);
+    }
+    return concreteConfigEvaluationResult!;
+  }, [concreteConfigEvaluationResult, concreteConfigLoading]);
+  return {config, loading: concreteConfigLoading};
+};
+
 const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
   const {input, updateConfig: propsUpdateConfig} = props;
 
@@ -291,14 +311,16 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
 
   const updateConfig = useCallback(
     (newConfig?: Partial<PlotConfig>) => {
-      if (!newConfig) {
-        // if config is undefined, just use the default plot
-        propsUpdateConfig(defaultPlot(input, stack));
-      } else {
-        propsUpdateConfig({
-          ...config,
-          ...newConfig,
-        });
+      if (config) {
+        if (!newConfig) {
+          // if config is undefined, just use the default plot
+          propsUpdateConfig(defaultPlot(input, stack));
+        } else {
+          propsUpdateConfig({
+            ...config,
+            ...newConfig,
+          });
+        }
       }
     },
     [config, propsUpdateConfig, input, stack]
@@ -312,6 +334,8 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
     const newConfig = PlotState.condensePlotConfig(config, weave);
     updateConfig(newConfig);
   }, [weave, config, updateConfig]);
+
+  const configAsNode = useMemo(() => PlotState.configToNode(config), [config]);
 
   // const exportAsCode = useCallback(() => {
   //   if (navigator?.clipboard == null) {
@@ -1356,13 +1380,12 @@ function filterTableNodeToSelection(
 */
 
 function getMark(
-  configMark: MarkOption,
-  series: SeriesConfig,
+  series: ConcreteSeriesConfig,
   tableNode: Node,
   vegaReadyTable: TableState.TableState
 ): NonNullable<MarkOption> {
-  if (configMark != null) {
-    return configMark;
+  if (series.constants.mark != null) {
+    return series.constants.mark;
   }
   let mark: MarkOption = 'point';
   const objType = listObjectType(tableNode.type);
@@ -1415,7 +1438,7 @@ type VegaTimeUnit = 'yearweek' | 'yearmonth';
 
 // Color axis type gets a separate function because color axes can share multiple scales - one for each axis type.
 function getColorAxisType(
-  series: SeriesConfig,
+  series: ConcreteSeriesConfig,
   vegaReadyTable: TableState.TableState
 ): PlotState.VegaAxisType | undefined {
   let colorAxisType: PlotState.VegaAxisType | undefined;
@@ -1512,7 +1535,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
   const isDashboard = useIsDashboard();
 
   const inputNode = input;
-  const {frame} = usePanelContext();
+  const {frame, stack} = usePanelContext();
   const {config, isRefining} = useConfig(inputNode, props.config);
 
   const configRef = useRef<PlotConfig>(config);
@@ -1596,46 +1619,28 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
   flatResultNodeRef.current = flatResultNode;
   const result = LLReact.useNodeValue(flatResultNode);
 
-  const markListNode = useMemo(
-    () =>
-      opArray(
-        config.series
-          .map((series, i) => series.constants.mark)
-          .reduce((acc, val, i) => {
-            acc[i] = val;
-            return acc;
-          }, {} as {[key: string]: Node | VoidNode}) as any
-      ),
-    [config.series]
+  const configAsNode = useMemo(() => PlotState.configToNode(config), [config]);
+  const {config: concreteConfig, loading: concreteConfigLoading} =
+    useConcreteConfig(configAsNode, input, stack);
+
+  const loading = useMemo(
+    () => result.loading || concreteConfigLoading || isRefining,
+    [result.loading, concreteConfigLoading, isRefining]
   );
-
-  const titleNode = useMemo(
-    () => PlotState.getAxisTitlesNode(config.axisSettings),
-    [config.axisSettings]
-  );
-
-  const {loading: titlesLoading, result: titles} =
-    LLReact.useNodeValue(titleNode);
-
-  // if mark is a node, auto evaluate it
-  const {loading: markLoading, result: markListFromNode} =
-    LLReact.useNodeValue(markListNode);
-
-  const markList = useMemo(() => markListFromNode ?? [], [markListFromNode]);
 
   const plotTables = useMemo(
-    () => (result.loading ? [] : (result.result as any[][])),
-    [result]
+    () => (loading ? [] : (result.result as any[][])),
+    [result, loading]
   );
 
   const hasLine = useMemo(
-    () => (markLoading ? false : markList.some(mark => mark === 'line')),
-    [markList, markLoading]
-  );
-
-  const loading = useMemo(
-    () => result.loading || markLoading || isRefining || titlesLoading,
-    [result.loading, markLoading, isRefining, titlesLoading]
+    () =>
+      concreteConfig == null || loading
+        ? false
+        : concreteConfig.series
+            .map((s, i) => getMark(s, listOfTableNodes[i], vegaReadyTables[i]))
+            .some(mark => mark === 'line'),
+    [concreteConfig, loading, listOfTableNodes, vegaReadyTables]
   );
 
   const flatPlotTables = useMemo(
@@ -1707,12 +1712,15 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
       return dashMap.solid;
     };
 
+    if (concreteConfig == null) {
+      return scale;
+    }
+
     flatPlotTables
       .filter(
         (table, i) =>
           getMark(
-            markList[i],
-            config.series[i],
+            concreteConfig.series[i],
             listOfTableNodes[i],
             vegaReadyTables[i]
           ) === 'line'
@@ -1724,11 +1732,10 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     return scale;
   }, [
     weave,
-    config.series,
+    concreteConfig.series,
     flatPlotTables,
     listOfTableNodes,
     vegaReadyTables,
-    markList,
   ]);
 
   const colorFieldIsRangeForSeries = useMemo(
@@ -1750,9 +1757,8 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
 
   const concattedLineTable = useMemo(() => {
     return concattedTable.filter(row => {
-      const s = config.series[row._seriesIndex];
+      const s = concreteConfig.series[row._seriesIndex];
       const mark = getMark(
-        markList[row._seriesIndex],
         s,
         listOfTableNodes[row._seriesIndex],
         vegaReadyTables[row._seriesIndex]
@@ -1761,8 +1767,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     });
   }, [
     concattedTable,
-    config.series,
-    markList,
+    concreteConfig.series,
     listOfTableNodes,
     vegaReadyTables,
   ]);
@@ -1947,7 +1952,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
   const layerSpecs = useMemo(() => {
     const dataSpecs = flatPlotTables.map((flatPlotTable, i) => {
       const vegaReadyTable = vegaReadyTables[i];
-      const series = config.series[i];
+      const series = concreteConfig.series[i];
       // filter out weave1 _type key
       const dims = _.omitBy(series.dims, (v, k) =>
         k.startsWith('_')
@@ -1961,8 +1966,8 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
         throw new Error('Invalid plot data type');
       }
 
-      const xAxisType = PlotState.getAxisType(config.series[0], 'x');
-      const yAxisType = PlotState.getAxisType(config.series[0], 'y');
+      const xAxisType = PlotState.getAxisType(concreteConfig.series[0], 'x');
+      const yAxisType = PlotState.getAxisType(concreteConfig.series[0], 'y');
 
       const xTimeUnit = getAxisTimeUnit(isDashboard);
       const yTimeUnit = getAxisTimeUnit(isDashboard);
@@ -1970,7 +1975,6 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
       const colorAxisType = getColorAxisType(series, vegaReadyTable);
 
       const mark: NonNullable<MarkOption> = getMark(
-        markList[i],
         series,
         listOfTableNodes[i],
         vegaReadyTable
@@ -2348,7 +2352,6 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     xScaleAndDomain,
     yScaleAndDomain,
     globalColorScales,
-    markList,
   ]);
 
   useEffect(() => {

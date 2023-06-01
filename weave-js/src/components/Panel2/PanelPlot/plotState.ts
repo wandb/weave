@@ -1,9 +1,11 @@
 import {
   allObjPaths,
+  constNodeUnsafe,
   constNumber,
   constString,
   dict,
   isAssignableTo,
+  isNodeOrVoidNode,
   isVoidNode,
   list,
   maybe,
@@ -12,6 +14,7 @@ import {
   nullableTaggableValue,
   numberBin,
   oneOrMany,
+  opArray,
   opCount,
   opDict,
   opGetRunTag,
@@ -38,6 +41,8 @@ import * as TableState from '../PanelTable/tableState';
 import {
   AnyPlotConfig,
   AxisSelections,
+  ConcretePlotConfig,
+  ConcreteSeriesConfig,
   ContinuousSelection,
   DEFAULT_POINT_SIZE,
   DIM_NAME_MAP,
@@ -45,6 +50,7 @@ import {
   LINE_SHAPES,
   MARK_OPTIONS,
   migrate,
+  migrateConcrete,
   PLOT_DIMS_UI,
   PlotConfig,
   POINT_SHAPES,
@@ -52,6 +58,7 @@ import {
   SeriesConfig,
 } from './versions';
 import * as v1 from './versions/v1';
+import {toWeaveType} from '../toWeaveType';
 
 export type DimType =
   | 'optionSelect'
@@ -939,7 +946,7 @@ export function isValidConfig(config: PlotConfig): {
   return {valid: true, reason: ''};
 }
 
-export function defaultPlot(inputNode: Node, stack: Stack): PlotConfig {
+function defaultPlotCommon(inputNode: Node, stack: Stack): v1.PlotConfig {
   const exampleRow = TableState.getExampleRow(inputNode);
 
   let tableState = TableState.emptyTable();
@@ -1252,23 +1259,42 @@ export function defaultPlot(inputNode: Node, stack: Stack): PlotConfig {
     pointShape: pointShapeColId,
   };
 
-  const migrated = migrate({
+  return {
     configVersion: 1,
     axisSettings,
     legendSettings,
     dims,
     table: tableState,
-  });
+  };
+}
 
-  return produce(migrated, draft => {
+function postprocessDefaultConfig<T extends PlotConfig | ConcretePlotConfig>(
+  config: T
+): T {
+  return produce(config, draft => {
     draft.series.forEach(s => {
       s.uiState.pointShape = 'dropdown';
     });
   });
 }
 
+export function defaultPlot(inputNode: Node, stack: Stack): PlotConfig {
+  const v1config = defaultPlotCommon(inputNode, stack);
+  const migrated = migrate(v1config);
+  return postprocessDefaultConfig(migrated);
+}
+
+export function defaultConcretePlot(
+  inputNode: Node,
+  stack: Stack
+): ConcretePlotConfig {
+  const v1config = defaultPlotCommon(inputNode, stack);
+  const migrated = migrateConcrete(v1config);
+  return postprocessDefaultConfig(migrated);
+}
+
 export function defaultSeriesName(
-  series: SeriesConfig,
+  series: SeriesConfig | ConcreteSeriesConfig,
   weave: WeaveInterface
 ): string {
   if (series.seriesName != null) {
@@ -1376,9 +1402,9 @@ export function getDimTypes(
   );
 }
 
-export function getAxisType(
-  firstSeriesInConfig: SeriesConfig,
-  axisName: keyof SeriesConfig['dims'],
+export function getAxisType<T extends ConcreteSeriesConfig | SeriesConfig>(
+  firstSeriesInConfig: T,
+  axisName: keyof T['dims'],
   overrideTable?: TableState.TableState
 ): VegaAxisType | null {
   let {table} = firstSeriesInConfig;
@@ -1481,9 +1507,38 @@ export function selectionContainsValue(
   }
 }
 
+const objectToNode = (obj: any): NodeOrVoidNode => {
+  if (obj == null) {
+    return voidNode();
+  } else if (isNodeOrVoidNode(obj)) {
+    return obj;
+  } else if (_.isPlainObject(obj)) {
+    return opDict(
+      Object.keys(obj).reduce((acc, key) => {
+        acc[key] = objectToNode(obj[key]);
+        return acc;
+      }, {} as {[key: string]: NodeOrVoidNode}) as any
+    );
+  } else if (_.isArray(obj)) {
+    return opArray(
+      obj.reduce((acc, val, i) => {
+        acc[i] = objectToNode(val);
+        return acc;
+      }, {}) as any
+    );
+  } else {
+    return constNodeUnsafe(toWeaveType(obj), obj);
+  }
+};
+
+export const configToNode = (config: PlotConfig | ConcretePlotConfig): Node => {
+  return objectToNode(config) as Node;
+};
+
 export const getAxisTitlesNode = (axisSettings: PlotConfig['axisSettings']) =>
   opDict(
     ['x' as const, 'y' as const, 'color' as const]
+      .filter(axisName => axisSettings[axisName].title != null)
       .map(axisName => ({
         axisName,
         title: axisSettings[axisName].title,

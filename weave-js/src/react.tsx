@@ -50,7 +50,7 @@ import {
 
 import {PanelCompContext} from './components/Panel2/PanelComp';
 import {usePanelContext} from './components/Panel2/PanelContext';
-import {toWeaveType} from './components/Panel2/PanelGroup';
+import {toWeaveType} from './components/Panel2/toWeaveType';
 import {ClientContext, useWeaveContext, useWeaveDashUiEnable} from './context';
 import {getUnresolvedVarNodes} from './core/callers';
 import {useDeepMemo} from './hookUtils';

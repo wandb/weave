@@ -26,7 +26,8 @@ import {
 import * as Panel2 from './panel';
 import {Panel2Loader} from './PanelComp';
 import {PanelContextProvider} from './PanelContext';
-import {fixChildData, toWeaveType} from './PanelGroup';
+import {fixChildData} from './PanelGroup';
+import {toWeaveType} from './toWeaveType';
 import {
   useCloseEditor,
   useSelectedPath,

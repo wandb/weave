@@ -23,7 +23,7 @@ export const LINE_SHAPES = v9.LINE_SHAPE_OPTIONS;
 export const SCALE_TYPES = v10.SCALE_TYPES;
 export const DEFAULT_SCALE_TYPE = v10.DEFAULT_SCALE_TYPE;
 
-export const {migrate} = migrator
+const migrateCommon = migrator
   .makeMigrator(v2.migrate)
   .add(v3.migrate)
   .add(v4.migrate)
@@ -33,8 +33,12 @@ export const {migrate} = migrator
   .add(v8.migrate)
   .add(v9.migrate)
   .add(v10.migrate)
-  .add(v11.migrate)
-  .add(v12.migrate);
+  .add(v11.migrate);
+
+export const {migrate} = migrateCommon.add(v12.migrate);
+export const {migrate: migrateConcrete} = migrateCommon.add(
+  v12.migrateConcrete
+);
 
 export type AnyPlotConfig = Parameters<typeof migrate>[number];
 export type PlotConfig = ReturnType<typeof migrate>;
@@ -48,3 +52,6 @@ export type Selection = v11.Selection;
 export type ContinuousSelection = v11.ContinuousSelection;
 export type DiscreteSelection = v11.DiscreteSelection;
 export type AxisSelections = v11.AxisSelections;
+export type LazyPlotConfig = v12.LazyPlotConfig;
+export type ConcretePlotConfig = v12.ConcretePlotConfig;
+export type ConcreteSeriesConfig = ConcretePlotConfig['series'][number];
