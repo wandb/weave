@@ -11,8 +11,8 @@ def default_panel_bank_flow_section_config():
         isOpen=True,
         flowConfig=panel_group.PanelBankFlowSectionConfig(
             snapToColumns=True,
-            columnsPerPage=3,
-            rowsPerPage=2,
+            columnsPerPage=1,
+            rowsPerPage=1,
             gutterWidth=0,
             boxWidth=64,
             boxHeight=64,

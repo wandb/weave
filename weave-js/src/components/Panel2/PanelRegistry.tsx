@@ -82,7 +82,7 @@ const initSpecs = () => {
   if (panelSpecs.length === 0) {
     panelSpecs = [
       ExprSpec,
-      RootBrowserSpec,
+      // RootBrowserSpec,
 
       IdCompareSpec,
       IdCompareCountSpec,

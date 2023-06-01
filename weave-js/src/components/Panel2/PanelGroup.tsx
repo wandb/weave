@@ -55,7 +55,7 @@ export interface PanelGroupConfig {
   showExpressions?: boolean;
   style?: string;
   items: {[key: string]: ChildPanelConfig};
-  gridConfig?: PanelBankSectionConfig;
+  gridConfig: PanelBankSectionConfig;
   allowedPanels?: string[];
   enableAddPanel?: boolean;
   childNameBase?: string;
@@ -66,6 +66,7 @@ export const PANEL_GROUP_DEFAULT_CONFIG = (): PanelGroupConfig => ({
   equalSize: true,
   showExpressions: true,
   items: {},
+  gridConfig: getSectionConfig([], undefined),
 });
 
 const inputType = 'any';
@@ -441,6 +442,20 @@ const usePanelGroupCommon = (props: PanelGroupProps) => {
           input_node: voidNode(),
           config: undefined,
         };
+        if (currentConfig.layoutMode === 'flow') {
+          // If there is only one panel, and one row and column, add a second
+          // column. This is a nice behavior in notebooks.
+          const nRows = currentConfig.gridConfig?.flowConfig.rowsPerPage ?? 1;
+          const nCols =
+            currentConfig.gridConfig?.flowConfig.columnsPerPage ?? 1;
+          if (
+            Object.keys(currentConfig.items).length === 1 &&
+            nRows === 1 &&
+            nCols === 1
+          ) {
+            draft.gridConfig.flowConfig.columnsPerPage = 2;
+          }
+        }
       });
     });
   }, [props.config?.allowedPanels, props.config?.childNameBase, updateConfig2]);
@@ -857,7 +872,7 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
 
   if (config.layoutMode === 'grid' || config.layoutMode === 'flow') {
     return (
-      <div style={{position: 'relative'}}>
+      <>
         <PBSection
           mode={config.layoutMode}
           config={gridConfig}
@@ -872,7 +887,7 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
             +
           </Button>
         )}
-      </div>
+      </>
     );
   }
 

@@ -34,7 +34,12 @@ def make_container(
     from weave.panels import Group
 
     if isinstance(obj, graph.Node):
-        return Group(preferHorizontal=True, showExpressions=True, items={name: obj})
+        return Group(
+            items={name: obj},
+            layoutMode="flow",
+            enableAddPanel=True,
+            showExpressions=True,
+        )
     else:
         return obj
 
