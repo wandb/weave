@@ -1534,18 +1534,3 @@ const objectToNode = (obj: any): NodeOrVoidNode => {
 export const configToNode = (config: PlotConfig | ConcretePlotConfig): Node => {
   return objectToNode(config) as Node;
 };
-
-export const getAxisTitlesNode = (axisSettings: PlotConfig['axisSettings']) =>
-  opDict(
-    ['x' as const, 'y' as const, 'color' as const]
-      .filter(axisName => axisSettings[axisName].title != null)
-      .map(axisName => ({
-        axisName,
-        title: axisSettings[axisName].title,
-      }))
-      .reduce((acc, val, i) => {
-        const {axisName, title} = val;
-        acc[axisName] = title;
-        return acc;
-      }, {} as {[K in keyof PlotConfig['axisSettings']]: Node | VoidNode}) as any
-  );

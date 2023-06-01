@@ -42,6 +42,7 @@ export const {migrate: migrateConcrete} = migrateCommon.add(
 
 export type AnyPlotConfig = Parameters<typeof migrate>[number];
 export type PlotConfig = ReturnType<typeof migrate>;
+export type ConcretePlotConfig = ReturnType<typeof migrateConcrete>;
 
 export type SeriesConfig = PlotConfig['series'][number];
 export type MarkOption = v11.PlotConfig['series'][number]['constants']['mark'];
@@ -52,6 +53,4 @@ export type Selection = v11.Selection;
 export type ContinuousSelection = v11.ContinuousSelection;
 export type DiscreteSelection = v11.DiscreteSelection;
 export type AxisSelections = v11.AxisSelections;
-export type LazyPlotConfig = v12.LazyPlotConfig;
-export type ConcretePlotConfig = v12.ConcretePlotConfig;
 export type ConcreteSeriesConfig = ConcretePlotConfig['series'][number];
