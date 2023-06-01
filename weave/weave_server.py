@@ -16,6 +16,7 @@ from flask import request
 from flask import abort
 from flask_cors import CORS
 from flask import send_from_directory
+import wandb
 
 from weave import server
 from weave import storage
@@ -41,7 +42,6 @@ tracer = engine_trace.tracer()
 
 
 def custom_dd_patch():
-    import wandb
     import wandb_gql  # type: ignore[import]
     import wandb_graphql  # type: ignore[import]
 
@@ -88,13 +88,16 @@ blueprint = Blueprint("weave", "weave-server", static_folder=static_folder)
 
 
 def import_ecosystem():
-    # Import the MVP
-    from weave.ecosystem import langchain, replicate
+    # Attempt to import MVP ecosystem modules
+    try:
+        from weave.ecosystem import langchain, replicate
+    except ImportError:
+        pass
 
     if not util.parse_boolean_env_var("WEAVE_SERVER_DISABLE_ECOSYSTEM"):
         try:
             from weave.ecosystem import all
-        except ImportError:
+        except (ImportError, OSError, wandb.Error):
             logging.warning(
                 'Failed to import "weave.ecosystem". Weave ecosystem features will be disabled. '
                 'To fix this, install ecosystem dependencies with "pip install weave[ecosystem]". '
@@ -109,9 +112,9 @@ def make_app():
 
     app = Flask(__name__)
     app.register_blueprint(blueprint)
-
     # Very important! We rely on key ordering on both sides!
-    app.config["JSON_SORT_KEYS"] = False
+    app.json.sort_keys = False
+
     CORS(app, supports_credentials=True)
 
     return app
@@ -227,6 +230,9 @@ def send_local_file(path):
 def frontend(path):
     """Serve the frontend with a simple fileserver over HTTP."""
     full_path = pathlib.Path(blueprint.static_folder) / path
+    # prevent path traversal
+    if not full_path.resolve().is_relative_to(blueprint.static_folder):
+        return abort(403)
     if path and full_path.exists():
         return send_from_directory(blueprint.static_folder, path)
     else:

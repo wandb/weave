@@ -1,5 +1,4 @@
 import pytest
-from rich import print
 
 from weave.panels import panel_plot
 from ..panels.panel_group import Group

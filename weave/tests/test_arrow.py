@@ -1843,8 +1843,6 @@ def test_identity_awl_operations_3(
     if isinstance(concat_with_weave_type, types.UnionType):
         concat_with_weave_type = types.merge_many_types(concat_with_weave_type.members)
 
-    from rich import print
-
     print("ASSUMED WEAVE TYPE", assumed_weave_type)
     print("DATA", data)
     print("CONCAT WITH WEAVE TYPE", concat_with_weave_type)

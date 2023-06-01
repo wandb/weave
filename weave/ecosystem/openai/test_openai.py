@@ -7,7 +7,6 @@ from ... import storage
 from ... import graph
 from .. import panels
 from ...show import _show_params
-from rich import print
 
 
 def test_gpt3model_inferred_type():

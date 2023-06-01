@@ -1,37 +1,21 @@
 wandb @ git+https://github.com/wandb/client.git@9677cabd08018dc7c0431eb430eb403a812028ad
-datadog==0.44.0
-ddtrace==1.7.5  # do NOT use 1.9.3, it breaks artifact manager
 python-json-logger>=2.0.4
 numpy>=1.21
 pandas>=1.5.3
 ipython>=8.9
-flask>=2.1,<2.3
+flask>=2.1
 flask_cors>=3.0.10
 notebook>=6.5.2
-pyarrow==10.0.1
+pyarrow>=10.0.1
 ipynbname>=2021.3.2
 pillow>=9.4.0
-analytics-python>=1.2.9
-rich>=13.3.1
-replicate>=0.4.0
-duckdb>=0.6.1
-scikit-learn>=1.2.1
-umap-learn>=0.5.3
+scikit-learn>=1.2.1  # used for embedding projection
+umap-learn>=0.5.3  # used for embedding projection
 aiofiles>=22.1.0
 gql[requests]>=3.4.0
 aiohttp>=3.8.3
-sqlalchemy>=2.0.1
-pymysql>=1.0.2
 aioprocessing>=2.0.1
 janus>=1.0.0
-
-setuptools>=65.5.1 # not directly required, pinned by Snyk to avoid a vulnerability
-wheel>=0.38.0 # not directly required, pinned by Snyk to avoid a vulnerability
-
+analytics-python>=1.2.9
 # Used for domain ops
 graphql-core>3
-
-# Used for MVP ecosystem
-langchain>=0.0.132
-openai
-faiss-cpu

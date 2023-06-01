@@ -11,7 +11,6 @@ import pyarrow.parquet as pc
 import pyarrow.dataset as ds
 import pyarrow.feather as pf
 import pyarrow.compute as pc
-import duckdb
 
 import typing
 import weave
@@ -76,6 +75,8 @@ def read_runs(
         live = ds.dataset(f"/tmp/runs.{project_name}.live.parquet").to_table(
             columns=columns
         )
+    import duckdb
+
     with tracer.trace("ddb_connect"):
         con = duckdb.connect()
     if limit is not None:

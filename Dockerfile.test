@@ -4,10 +4,10 @@ FROM cypress/included:10.11.0 as builder
 RUN apt update
 RUN apt -y install python3-venv gcc python3-dev g++
 RUN rm /bin/sh && ln -s /bin/bash /bin/sh
-COPY requirements.txt requirements.test.txt requirements.dev.txt /root/
+COPY requirements.* /root/
 WORKDIR /root
 RUN python3 -m venv venv
-RUN /bin/bash -c "source venv/bin/activate && pip install -r requirements.test.txt -r requirements.dev.txt"
+RUN --mount=type=cache,target=/root/.cache /bin/bash -c "source venv/bin/activate && pip install -r requirements.test.txt -r requirements.dev.txt"
 
 ENTRYPOINT "/bin/bash"
 
@@ -16,7 +16,7 @@ FROM builder
 WORKDIR /root
 COPY requirements.ecosystem.txt /root
 
-RUN /bin/bash -c "source venv/bin/activate && pip install -r requirements.ecosystem.txt"
+RUN --mount=type=cache,target=/root/.cache /bin/bash -c "source venv/bin/activate && pip install -r requirements.ecosystem.txt"
 COPY integration_test/package.json /root/integration_test/package.json
 COPY integration_test/package-lock.json /root/integration_test/package-lock.json
 RUN cd integration_test && npm install
