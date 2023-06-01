@@ -21,8 +21,8 @@ repos:
     rev: "v8.41.0"
     hooks:
     -   id: eslint
-        files: \.[jt]sx?$
-        exclude: ^weave/frontend/.*$|^.*node_modules/.*$
+        files: weave-js/.*\.[jt]sx?$
+        exclude: ^.*node_modules/.*$
         types: [file]
         args: [--fix, --config, weave-js/.eslintrc.json]
         additional_dependencies:

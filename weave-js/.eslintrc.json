@@ -18,5 +18,6 @@
         ]
       }
     ]
-  }
+  },
+  "ignorePatterns": ["eslint-plugin-wandb/"]
 }
