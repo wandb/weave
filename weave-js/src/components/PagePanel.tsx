@@ -421,7 +421,7 @@ export const PageContent: FC<PageContentProps> = ({
                     .replace(/\n+/g, '')
                     .replace(/\s+/g, '');
                   window.open(
-                    urlPrefixed(`?exp=${encodeURIComponent(expStr)}`),
+                    urlPrefixed(`/?exp=${encodeURIComponent(expStr)}`),
                     '_blank'
                   );
                 }}>

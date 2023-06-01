@@ -105,7 +105,7 @@ def _show_params(obj):
 
 def show_url(obj=None):
     params = _show_params(obj)
-    panel_url = f"{context.get_frontend_url()}/__frontend/weave_jupyter?fullScreen"
+    panel_url = f"{context.get_frontend_url()}?fullScreen"
     if "weave_node" in params:
         panel_url += "&expNode=%s" % urllib.parse.quote(
             json.dumps(params["weave_node"].to_json())
