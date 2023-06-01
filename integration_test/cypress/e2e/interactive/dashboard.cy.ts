@@ -12,11 +12,7 @@ const gotoBlankDashboard = async () => {
   cy.viewport(1600, 900);
   cy.visit(url);
   cy.wait(2000);
-
-  cy.get('[data-weavepath=root]').last().trigger('mouseover');
-  cy.get('i.cog').first().click();
-  cy.get('button').contains('Reset Dashboard').click();
-  cy.get('i.x').click();
+  cy.get('[data-cy="new-dashboard-input"]').click().type('test{enter}');
 };
 
 const addSidebarPanel = () => {

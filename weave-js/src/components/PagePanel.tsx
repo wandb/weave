@@ -135,6 +135,7 @@ const Home: React.FC<HomeProps> = props => {
                   }
                 }}>
                 <Input
+                  data-cy="new-dashboard-input"
                   placeholder={defaultName}
                   style={{flexGrow: 1}}
                   value={newName}
