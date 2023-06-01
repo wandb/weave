@@ -8,6 +8,7 @@ import CustomPanelRenderer, {
 } from '@wandb/weave/common/components/Vega3/CustomPanelRenderer';
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import {
+  // constFunction,
   ConstNode,
   constNodeUnsafe,
   constNumber,
@@ -28,8 +29,11 @@ import {
   opArray,
   // opContains,
   // opDateToNumber,
+  // opDict,
   // opFilter,
   opIndex,
+  // opMap,
+  // opMerge,
   // opNumberGreaterEqual,
   // opNumberLessEqual,
   // opNumberMult,
@@ -45,6 +49,7 @@ import {
   TypedDictType,
   union,
   varNode,
+  VoidNode,
   voidNode,
   withoutTags,
 } from '@wandb/weave/core';
@@ -95,6 +100,7 @@ import {
   DIM_NAME_MAP,
   // DiscreteSelection,
   LINE_SHAPES,
+  MARK_OPTIONS,
   MarkOption,
   PLOT_DIMS_UI,
   PlotConfig,
@@ -104,10 +110,8 @@ import {
   ScaleType,
   SeriesConfig,
 } from './versions';
-import {ConfigSection} from '../ConfigPanel';
-import {IconButton} from '../../IconButton';
-import {IconOverflowHorizontal} from '../Icons';
-import styled from 'styled-components';
+import {config} from 'process';
+import {migrate} from './versions/v2';
 
 const recordEvent = makeEventRecorder('Plot');
 
@@ -277,7 +281,7 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
   const inputNode = input;
 
   const weave = useWeaveContext();
-  const {frame, stack, dashboardConfigOptions} = usePanelContext();
+  const {frame, stack} = usePanelContext();
 
   // this migrates the config and returns a config of the latest version
   const {config} = useConfig(inputNode, props.config);
@@ -598,32 +602,14 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
   }, [config.series, input, weave]);
 
   return useMemo(
-    () =>
-      enableDashUi ? (
-        <>
-          <ConfigSection label={`Properties`}>
-            {dashboardConfigOptions}
-            <VariableView newVars={cellFrame} />
-            {seriesConfigDom}
-          </ConfigSection>
-          <ConfigSection label={`Labels`}>{labelConfigDom}</ConfigSection>
-        </>
-      ) : (
-        <>
-          {configTabs}
-          {activeTabIndex === 0 && seriesButtons}
-        </>
-      ),
-    [
-      enableDashUi,
-      dashboardConfigOptions,
-      cellFrame,
-      seriesConfigDom,
-      labelConfigDom,
-      configTabs,
-      activeTabIndex,
-      seriesButtons,
-    ]
+    () => (
+      <>
+        {enableDashUi && <VariableView newVars={cellFrame} />}
+        {configTabs}
+        {activeTabIndex === 0 && seriesButtons}
+      </>
+    ),
+    [enableDashUi, cellFrame, configTabs, activeTabIndex, seriesButtons]
   );
 };
 
@@ -1038,23 +1024,17 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
           // offset={'10px, -10px'}
           position="left center"
           trigger={
-            enableDashUi ? (
-              <ConfigDimMenuButton>
-                <IconOverflowHorizontal />
-              </ConfigDimMenuButton>
-            ) : (
-              <div>
-                <HighlightedIcon>
-                  <LegacyWBIcon name="overflow" />
-                </HighlightedIcon>
-              </div>
-            )
+            <div>
+              <HighlightedIcon>
+                <LegacyWBIcon name="overflow" />
+              </HighlightedIcon>
+            </div>
           }
           options={dimOptions.filter(o => !Array.isArray(o))}
           sections={dimOptions.filter(o => Array.isArray(o)) as DimOption[][]}
         />
       ) : undefined,
-    [dimOptions, enableDashUi]
+    [dimOptions]
   );
 
   const updateGroupBy = useCallback(
@@ -1106,7 +1086,9 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
   } else if (PlotState.isDropdown(dimension)) {
     const dimName = dimension.name;
     return (
-      <ConfigDimLabel {...props} postfixComponent={postFixComponent}>
+      <ConfigDimLabel
+        {...props}
+        postfixComponent={postFixComponent || undefined}>
         <ConfigPanel.ModifiedDropdownConfigField
           selection
           placeholder={dimension.defaultState().compareValue}
@@ -1131,7 +1113,9 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
   } else if (PlotState.isWeaveExpression(dimension)) {
     return (
       <>
-        <ConfigDimLabel {...props} postfixComponent={postFixComponent}>
+        <ConfigDimLabel
+          {...props}
+          postfixComponent={postFixComponent || undefined}>
           <WeaveExpressionDimConfig
             dimName={dimension.name}
             input={input}
@@ -1141,7 +1125,7 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
           />
         </ConfigDimLabel>
         {enableDashUi && (
-          <ConfigPanel.ConfigOption label={`Group by ${dimension.name}`}>
+          <ConfigPanel.ConfigOption label={`groupby ${dimension.name}`}>
             <Checkbox
               checked={config.series[0].table.groupBy.includes(
                 config.series[0].dims[dimension.name]
@@ -1353,12 +1337,13 @@ function filterTableNodeToSelection(
 */
 
 function getMark(
+  configMark: MarkOption,
   series: SeriesConfig,
   tableNode: Node,
   vegaReadyTable: TableState.TableState
 ): NonNullable<MarkOption> {
-  if (series.constants.mark) {
-    return series.constants.mark;
+  if (configMark != null) {
+    return configMark;
   }
   let mark: MarkOption = 'point';
   const objType = listObjectType(tableNode.type);
@@ -1531,11 +1516,6 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     [config.series, vegaReadyTables, weave]
   );
 
-  const hasLine = useMemo(
-    () => config.series.some(series => series.constants.mark === 'line'),
-    [config.series]
-  );
-
   const listOfTableNodes = useMemo(() => {
     return vegaReadyTables.map(val =>
       opUnnest({
@@ -1597,9 +1577,37 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
   flatResultNodeRef.current = flatResultNode;
   const result = LLReact.useNodeValue(flatResultNode);
 
+  const markListNode = useMemo(
+    () =>
+      opArray(
+        config.series
+          .map((series, i) => series.constants.mark)
+          .reduce((acc, val, i) => {
+            acc[i] = val;
+            return acc;
+          }, {} as {[key: string]: Node | VoidNode}) as any
+      ),
+    [config.series]
+  );
+
+  // if mark is a node, auto evaluate it
+  const {loading: markLoading, result: markListFromNode} =
+    LLReact.useNodeValue(markListNode);
+
   const plotTables = useMemo(
     () => (result.loading ? [] : (result.result as any[][])),
     [result]
+  );
+
+  const hasLine = useMemo(
+    () =>
+      markLoading ? false : markListFromNode.some(mark => mark === 'line'),
+    [markListFromNode, markLoading]
+  );
+
+  const loading = useMemo(
+    () => result.loading || markLoading || isRefining,
+    [result.loading, markLoading, isRefining]
   );
 
   const flatPlotTables = useMemo(
@@ -1674,15 +1682,26 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     flatPlotTables
       .filter(
         (table, i) =>
-          getMark(config.series[i], listOfTableNodes[i], vegaReadyTables[i]) ===
-          'line'
+          getMark(
+            markListFromNode[i],
+            config.series[i],
+            listOfTableNodes[i],
+            vegaReadyTables[i]
+          ) === 'line'
       )
       .forEach((table, i) => {
         scale.domain.push(PlotState.defaultSeriesName(config.series[i], weave));
         scale.range.push(getStrokeDash(config.series[i].constants.lineStyle));
       });
     return scale;
-  }, [weave, config.series, flatPlotTables, listOfTableNodes, vegaReadyTables]);
+  }, [
+    weave,
+    config.series,
+    flatPlotTables,
+    listOfTableNodes,
+    vegaReadyTables,
+    markListFromNode,
+  ]);
 
   const colorFieldIsRangeForSeries = useMemo(
     () =>
@@ -1702,10 +1721,23 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
   const concattedTable = useMemo(() => flatPlotTables.flat(), [flatPlotTables]);
 
   const concattedLineTable = useMemo(() => {
-    return concattedTable.filter(
-      row => config.series[row._seriesIndex].constants.mark === 'line'
-    );
-  }, [concattedTable, config.series]);
+    return concattedTable.filter(row => {
+      const s = config.series[row._seriesIndex];
+      const mark = getMark(
+        markListFromNode[row._seriesIndex],
+        s,
+        listOfTableNodes[row._seriesIndex],
+        vegaReadyTables[row._seriesIndex]
+      );
+      return mark === 'line';
+    });
+  }, [
+    concattedTable,
+    config.series,
+    markListFromNode,
+    listOfTableNodes,
+    vegaReadyTables,
+  ]);
 
   const normalizedTable = useMemo(() => {
     const colNameLookups = vegaCols.map(mapping => _.invert(mapping));
@@ -1910,6 +1942,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
       const colorAxisType = getColorAxisType(series, vegaReadyTable);
 
       const mark: NonNullable<MarkOption> = getMark(
+        markListFromNode[i],
         series,
         listOfTableNodes[i],
         vegaReadyTable
@@ -2287,6 +2320,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     xScaleAndDomain,
     yScaleAndDomain,
     globalColorScales,
+    markListFromNode,
   ]);
 
   useEffect(() => {
@@ -2764,8 +2798,8 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
         position: 'relative',
         alignItems: 'flex-start',
       }}
-      className={result.loading ? 'loading' : ''}>
-      {result.loading || isRefining ? (
+      className={loading ? 'loading' : ''}>
+      {loading ? (
         <div style={{width: '100%', height: '100%'}}>{loaderComp}</div>
       ) : (
         <>
@@ -2951,7 +2985,3 @@ const ORG_DASHBOARD_TEMPLATE_OVERLAY = {
 };
 
 export default Spec;
-
-const ConfigDimMenuButton = styled(IconButton)`
-  margin-left: 4px;
-`;

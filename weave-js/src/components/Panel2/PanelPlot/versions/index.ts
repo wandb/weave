@@ -9,6 +9,7 @@ import * as v8 from './v8';
 import * as v9 from './v9';
 import * as v10 from './v10';
 import * as v11 from './v11';
+import * as v12 from './v12';
 
 export type {Scale, ScaleType} from './v10';
 export type {Signals} from './v11';
@@ -32,13 +33,14 @@ export const {migrate} = migrator
   .add(v8.migrate)
   .add(v9.migrate)
   .add(v10.migrate)
-  .add(v11.migrate);
+  .add(v11.migrate)
+  .add(v12.migrate);
 
 export type AnyPlotConfig = Parameters<typeof migrate>[number];
 export type PlotConfig = ReturnType<typeof migrate>;
 
 export type SeriesConfig = PlotConfig['series'][number];
-export type MarkOption = PlotConfig['series'][number]['constants']['mark'];
+export type MarkOption = v11.PlotConfig['series'][number]['constants']['mark'];
 export type LineShapeOption =
   PlotConfig['series'][number]['constants']['lineStyle'];
 export type AxisSettings = PlotConfig['axisSettings'];
