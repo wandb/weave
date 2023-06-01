@@ -4,7 +4,7 @@ import typing
 import weave
 from weave import weave_internal
 
-from . import weave_plotly
+from ...panels import panel_plot
 from ...language_features.tagging import tagged_value_type
 
 TIME_SERIES_BIN_SIZES_SEC = [
@@ -273,7 +273,7 @@ class TimeSeries(weave.Panel):
         )
 
     @weave.op()
-    def render(self) -> weave_plotly.PanelPlotly:
+    def render(self) -> panel_plot.Plot:
         input_node = self.input_node
         config = typing.cast(TimeSeriesConfig, self.config)
         # NOTE: everything inside this function is operating on nodes. There are no concrete values in here.
@@ -346,7 +346,12 @@ class TimeSeries(weave.Panel):
             label="label",
         )
 
-        fig = weave_plotly.plotly_time_series(
-            binned, config.mark, default_labels, config.axis_labels
+        print("tsconfig", config)
+
+        return panel_plot.Plot(
+            binned,
+            x=lambda row: row["x"]["start"],
+            y=lambda row: row["y"],
+            label=lambda row: row["label"],
+            mark=config.mark,
         )
-        return weave_plotly.PanelPlotly(fig)

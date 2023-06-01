@@ -65,7 +65,7 @@ SelectFunction = typing.Union[graph.Node, typing.Callable[[typing.Any], typing.A
 
 @weave.type()
 class PlotConstants:
-    mark: MarkOption
+    mark: typing.Optional[typing.Union[MarkOption, SelectFunction]]
     pointShape: PointShapeOption
     label: LabelOption
     lineStyle: LineStyleOption
@@ -83,7 +83,7 @@ class PlotConstantsInputDict(typing.TypedDict):
     # when we drop support for Python 3.10 and python 3.11 is released
 
     # this will mimic the behavior of ? in typescript
-    mark: typing.Optional[MarkOption]
+    mark: typing.Optional[typing.Union[MarkOption, SelectFunction]]
     pointShape: typing.Optional[PointShapeOption]
     label: typing.Optional[LabelOption]
     lineStyle: typing.Optional[LineStyleOption]
@@ -300,7 +300,7 @@ class PlotConfig:
     legendSettings: typing.Optional[LegendSettings]
     configOptionsExpanded: typing.Optional[ConfigOptionsExpanded]
     signals: Signals
-    configVersion: int = 11
+    configVersion: int = 12
 
 
 @weave.type("plot")
@@ -314,7 +314,7 @@ class Plot(panel.Panel):
         vars=None,
         config: typing.Optional[PlotConfig] = None,
         constants: typing.Optional[PlotConstants] = None,
-        mark: typing.Optional[MarkOption] = None,
+        mark: typing.Optional[typing.Union[MarkOption, SelectFunction]] = None,
         x: typing.Optional[SelectFunction] = None,
         y: typing.Optional[SelectFunction] = None,
         color: typing.Optional[SelectFunction] = None,
@@ -332,10 +332,9 @@ class Plot(panel.Panel):
         self.config = config
 
         if self.config is None:
-            if mark is not None:
-                constants = PlotConstants(mark=mark)
-            else:
-                constants = PlotConstants()
+            constants = PlotConstants(
+                mark=mark, pointShape=None, lineStyle=None, label=None
+            )
 
             select_functions: typing.Optional[dict[DimName, SelectFunction]] = None
             for field, maybe_dim in zip(
@@ -391,6 +390,8 @@ class Plot(panel.Panel):
                 configOptionsExpanded=ConfigOptionsExpanded(),
                 signals=signals,
             )
+
+            print(self.config)
 
             if no_axes:
                 self.set_no_axes()
