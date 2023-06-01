@@ -36,7 +36,7 @@ def test_local_file_pure_cached(cereal_csv):
 def test_execute_no_cache():
     nine = weave_internal.make_const_node(types.Number(), 9)
     res = execute.execute_nodes([nine + 3], no_cache=True)
-    assert res == [12]
+    assert res.unwrap() == [12]
 
 
 REFINE_CALLED = 0

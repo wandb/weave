@@ -329,21 +329,47 @@ def _map_nodes(
     return already_mapped[node]
 
 
+OnErrorFnType = typing.Optional[typing.Callable[[int, Exception], Node]]
+
+
 def map_nodes_top_level(
     leaf_nodes: list[Node],
     map_fn: typing.Callable[[Node], typing.Optional[Node]],
+    on_error: OnErrorFnType = None,
 ) -> list[Node]:
     """Map nodes in dag represented by leaf nodes, but not sub-lambdas"""
     already_mapped: dict[Node, Node] = {}
-    return [_map_nodes(n, map_fn, already_mapped, False) for n in leaf_nodes]
+    results: list[Node] = []
+    for node_ndx, node in enumerate(leaf_nodes):
+        try:
+            results.append(_map_nodes(node, map_fn, already_mapped, False))
+        except Exception as e:
+            if on_error:
+                results.append(on_error(node_ndx, e))
+            else:
+                raise e
+
+    return results
 
 
 def map_nodes_full(
-    leaf_nodes: list[Node], map_fn: typing.Callable[[Node], typing.Optional[Node]]
+    leaf_nodes: list[Node],
+    map_fn: typing.Callable[[Node], typing.Optional[Node]],
+    on_error: OnErrorFnType = None,
 ) -> list[Node]:
     """Map nodes in dag represented by leaf nodes, including sub-lambdas"""
     already_mapped: dict[Node, Node] = {}
-    return [_map_nodes(n, map_fn, already_mapped, True) for n in leaf_nodes]
+    results: list[Node] = []
+    for node_ndx, node in enumerate(leaf_nodes):
+        try:
+            results.append(_map_nodes(node, map_fn, already_mapped, True))
+        except Exception as e:
+            if on_error:
+                results.append(on_error(node_ndx, e))
+            else:
+                raise e
+
+    return results
 
 
 def all_nodes_full(leaf_nodes: list[Node]) -> list[Node]:

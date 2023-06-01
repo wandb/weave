@@ -144,6 +144,30 @@ export class RemoteHttpServer implements Server {
     );
   }
 
+  public async queryEach(
+    nodes: Node[]
+    // withBackendCacheReset?: boolean
+  ): Promise<Array<PromiseSettledResult<any>>> {
+    GlobalCGEventTracker.remoteHttpServerQueryBatchRequests++;
+    // TODO: pass withBackendCacheReset across the network
+
+    this.trace(`Enqueue ${nodes.length} nodes`);
+    return await Promise.allSettled(
+      nodes.map(
+        node =>
+          new Promise((resolve, reject) => {
+            this.pendingNodes.set(node, {
+              node,
+              resolve,
+              reject,
+              state: 'waiting',
+              retries: 0,
+            });
+          })
+      )
+    );
+  }
+
   public debugMeta(): {id: string} & {[prop: string]: any} {
     return {
       id: 'RemoteHttpServer',
@@ -162,7 +186,7 @@ export class RemoteHttpServer implements Server {
     record.resolve(result);
   }
 
-  private rejectNode(node: Node, e: any) {
+  private rejectNode(node: Node, e: {message: string; traceback: string[]}) {
     const record = this.pendingNodes.get(node);
     if (record == null) {
       throw new Error(
@@ -170,7 +194,7 @@ export class RemoteHttpServer implements Server {
       );
     }
     this.pendingNodes.delete(node);
-    record.reject(new Error('Node execution failed' + e));
+    record.reject(e);
   }
 
   private getWaitingNodes() {
@@ -246,10 +270,24 @@ export class RemoteHttpServer implements Server {
           }
         });
 
-      const resolveValues = (val: () => any) =>
-        indexes.forEach(i => this.resolveNode(nodeEntries[i].node, val()));
       const rejectAll = (e: any) =>
         indexes.forEach(i => this.rejectNode(nodeEntries[i].node, e));
+
+      const resolveOrReject = (response: {
+        data: any[];
+        errors: Array<{message: string; traceback: string[]}>;
+        node_to_error: {[nodeNdx: number]: number};
+      }) => {
+        (indexes as number[]).forEach((entryIndex, nodeIndex) => {
+          const currentNode = nodeEntries[entryIndex].node;
+          const nodeErrorNdx = response.node_to_error[nodeIndex];
+          if (nodeErrorNdx != null) {
+            this.rejectNode(currentNode, response.errors[nodeErrorNdx]);
+          } else {
+            this.resolveNode(currentNode, response.data[nodeIndex]);
+          }
+        });
+      };
 
       setState('active');
       const p = new Promise(async resolve => {
@@ -335,8 +373,7 @@ export class RemoteHttpServer implements Server {
               throw new Error('Weave response deserialization failed' + err);
             }
 
-            const values = respJson.data;
-            resolveValues(() => values.shift());
+            resolveOrReject(respJson);
           } else {
             if ([502, 503, 504].includes(fetchResponse.status)) {
               // Retryable

@@ -123,6 +123,7 @@ def stitch(
     leaf_nodes: list[graph.Node],
     var_values: typing.Optional[dict[str, ObjectRecorder]] = None,
     stitched_graph: typing.Optional[StitchedGraph] = None,
+    on_error: graph.OnErrorFnType = None,
 ) -> StitchedGraph:
     """Given a list of leaf nodes, stitch the graph together."""
 
@@ -158,7 +159,7 @@ def stitch(
             raise errors.WeaveInternalError("Unexpected node type")
         return node
 
-    graph.map_nodes_top_level(leaf_nodes, handle_node)
+    graph.map_nodes_top_level(leaf_nodes, handle_node, on_error)
 
     return sg
 

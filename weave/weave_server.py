@@ -6,6 +6,7 @@ import time
 import traceback
 import sys
 import base64
+import typing
 import zlib
 import urllib.parse
 from flask import json
@@ -18,7 +19,7 @@ from flask_cors import CORS
 from flask import send_from_directory
 import wandb
 
-from weave import server
+from weave import server, value_or_error
 from weave import storage
 from weave import registry_mem
 from weave import errors
@@ -37,6 +38,7 @@ PROFILE_DIR = None
 if PROFILE_DIR is not None:
     pathlib.Path(PROFILE_DIR).mkdir(parents=True, exist_ok=True)
 
+ERROR_STR_LIMIT = 10000
 
 tracer = engine_trace.tracer()
 
@@ -137,6 +139,49 @@ def list_ops():
         return {"data": ret}
 
 
+class ErrorDetailsDict(typing.TypedDict):
+    message: str
+    traceback: list[str]
+
+
+class ResponseDict(typing.TypedDict):
+    data: list[typing.Any]
+    errors: list[ErrorDetailsDict]
+    node_to_error: dict[int, int]
+
+
+def _exception_to_error_details(e: Exception) -> ErrorDetailsDict:
+    return {
+        "message": str(e),
+        "traceback": traceback.format_tb(e.__traceback__),
+    }
+
+
+def _value_or_errors_to_response(
+    vore: value_or_error.ValueOrErrors,
+) -> ResponseDict:
+    error_lookup: dict[Exception, int] = {}
+    node_errors: dict[int, int] = {}
+    data: list[typing.Any] = []
+    for val, error in vore.iter_items():
+        if error != None:
+            error = typing.cast(Exception, error)
+            data.append(None)
+            if error in error_lookup:
+                error_ndx = error_lookup[error]
+            else:
+                error_ndx = len(error_lookup)
+                error_lookup[error] = error_ndx
+            node_errors[len(data) - 1] = error_ndx
+        else:
+            data.append(val)
+    return {
+        "data": data,
+        "errors": [_exception_to_error_details(k) for k in error_lookup.keys()],
+        "node_to_error": node_errors,
+    }
+
+
 @blueprint.route("/__weave/execute", methods=["POST"])
 def execute():
     """Execute endpoint used by WeaveJS."""
@@ -189,9 +234,9 @@ def execute():
                     "http://localhost:8080/snakeviz/"
                     + urllib.parse.quote(profile_filename),
                 )
-    fixed_response = [weavejs_fixes.fixup_data(r) for r in response]
+    fixed_response = response.safe_map(weavejs_fixes.fixup_data)
 
-    response = {"data": fixed_response}
+    response = _value_or_errors_to_response(fixed_response)
 
     if request.headers.get("x-weave-include-execution-time"):
         response["execution_time"] = (elapsed) * 1000
@@ -208,7 +253,7 @@ def execute_v2():
     response = server.handle_request(request.json, deref=True)
     # print("RESPONSE BEFORE SERI", response)
 
-    return {"data": response}
+    return {"data": response.unwrap()}
 
 
 @blueprint.route("/__weave/file/<path:path>")

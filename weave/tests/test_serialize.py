@@ -34,7 +34,7 @@ def test_serialize(fake_wandb):
 
     ser = serialize.serialize([filtered])
     deser = serialize.deserialize(ser)
-    ser2 = serialize.serialize(deser)
+    ser2 = serialize.serialize(deser.unwrap())
     assert ser == ser2
 
 
@@ -51,7 +51,7 @@ def test_serialize_nested_function():
 
     ser = serialize.serialize([filtered])
     deser = serialize.deserialize(ser)
-    ser2 = serialize.serialize(deser)
+    ser2 = serialize.serialize(deser.unwrap())
     assert ser == ser2
 
 
@@ -142,7 +142,9 @@ def test_lambda_node_serialization():
     mapped_1 = arr_1.map(lambda x: x + 1)
     mapped_2 = arr_2.map(lambda x: x + 1)
 
-    [des_1, des_2] = serialize.deserialize(serialize.serialize([mapped_1, mapped_2]))
+    [des_1, des_2] = serialize.deserialize(
+        serialize.serialize([mapped_1, mapped_2])
+    ).unwrap()
     assert des_1 is des_2
 
     # Case 2: different array, same function  - should have different deserialized mem address
@@ -151,7 +153,9 @@ def test_lambda_node_serialization():
     mapped_1 = arr_1.map(lambda x: x + 1)
     mapped_2 = arr_2.map(lambda x: x + 1)
 
-    [des_1, des_2] = serialize.deserialize(serialize.serialize([mapped_1, mapped_2]))
+    [des_1, des_2] = serialize.deserialize(
+        serialize.serialize([mapped_1, mapped_2])
+    ).unwrap()
     assert des_1 is not des_2
 
     # Case 3: same array, different function  - should have different deserialized mem address
@@ -160,7 +164,9 @@ def test_lambda_node_serialization():
     mapped_1 = arr_1.map(lambda x: x + 1)
     mapped_2 = arr_2.map(lambda x: x + 2)
 
-    [des_1, des_2] = serialize.deserialize(serialize.serialize([mapped_1, mapped_2]))
+    [des_1, des_2] = serialize.deserialize(
+        serialize.serialize([mapped_1, mapped_2])
+    ).unwrap()
     assert des_1 is not des_2
 
     # Case 4: different array, different function  - should have different deserialized mem address
@@ -169,5 +175,7 @@ def test_lambda_node_serialization():
     mapped_1 = arr_1.map(lambda x: x + 1)
     mapped_2 = arr_2.map(lambda x: x + 2)
 
-    [des_1, des_2] = serialize.deserialize(serialize.serialize([mapped_1, mapped_2]))
+    [des_1, des_2] = serialize.deserialize(
+        serialize.serialize([mapped_1, mapped_2])
+    ).unwrap()
     assert des_1 is not des_2
