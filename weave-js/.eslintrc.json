@@ -1,6 +1,6 @@
 {
   "extends": ["react-app"],
-  "plugins": ["node", "wandb"],
+  "plugins": ["node", "wandb", "prettier"],
   "rules": {
     "node/no-process-env": "error",
     "wandb/no-a-tags": "error",

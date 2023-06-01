@@ -17,3 +17,17 @@ repos:
         stages: [commit]
         language: system
         entry: jupyter nbconvert --ClearOutputPreprocessor.enabled=True --inplace
+  - repo: https://github.com/pre-commit/mirrors-eslint
+    rev: "v8.41.0"
+    hooks:
+    -   id: eslint
+        files: \.[jt]sx?$
+        exclude: ^weave/frontend/.*$|^.*node_modules/.*$
+        types: [file]
+        args: [--fix, --config, weave-js/.eslintrc.json]
+        additional_dependencies:
+          - eslint@8.41.0
+          - eslint-config-react-app@7.0.1
+          - eslint-plugin-node@11.1.0
+          - eslint-plugin-prettier@2.2.0
+        
