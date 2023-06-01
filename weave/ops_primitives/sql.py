@@ -1,9 +1,6 @@
 import copy
 import math
-import sqlalchemy
 import functools
-from sqlalchemy import orm
-
 
 from ..api import op, weave_class
 from .. import decorator_type
@@ -12,6 +9,12 @@ from . import list_
 from . import graph
 
 from ..language_features.tagging import tagged_value_type
+
+try:
+    import sqlalchemy
+    from sqlalchemy import orm
+except ImportError:
+    pass
 
 
 @decorator_type.type("sqlconnection")

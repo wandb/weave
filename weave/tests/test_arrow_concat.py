@@ -264,8 +264,6 @@ def fix_for_compare(x1):
     CONCAT_TEST_CASES,  # ids=lambda arg: str(weave.type_of(arg).object_type)
 )
 def test_extend(l1, l2):
-    from rich import print
-
     print()
     print("L1", l1)
     print("L2", l2)
@@ -294,7 +292,6 @@ def test_extend(l1, l2):
     print("RESULT", result.to_pylist_tagged())
     # print("RESULT ARROW", result._arrow_data)
     # print("EXP ARROW", expected._arrow_data)
-    from rich import print
 
     # assert result.object_type == expected.object_type
     assert fix_for_compare(result.to_pylist_tagged()) == fix_for_compare(
@@ -336,8 +333,6 @@ CONCAT_WBTYPED_TEST_CASES = [
     CONCAT_WBTYPED_TEST_CASES,
 )
 def test_concat_wbtyped(l1, l2, l1_wb_type, l2_wb_type):
-    from rich import print
-
     print()
     print("L1", l1)
     print("L2", l2)
@@ -431,8 +426,6 @@ for i in range(100):
 
 @pytest.mark.parametrize("l1, l2", random_cases)
 def test_random(l1, l2):
-    from rich import print
-
     print("L1", l1)
     print("L2", l2)
     a1 = to_arrow(l1)

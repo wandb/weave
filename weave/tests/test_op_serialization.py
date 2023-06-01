@@ -41,7 +41,6 @@ def test_explicit_experiment_construction(op_name, op):
         # We are not currently sending those to WeaveJS
         return
     assert op_as_dict is not None
-    from rich import print
 
     print(op_as_dict)
     assert_valid_output_type(op_as_dict)

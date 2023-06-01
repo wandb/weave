@@ -43,10 +43,24 @@ def why_not_assignable(to_type: Type, from_type: Type) -> typing.Optional[str]:
         if reason is not None:
             reasons.append(reason)
 
+    elif not isinstance(from_type, Const) and isinstance(to_type, Const):
+        # Weird const behavior, allow assigning non-const to const (see weave_types)
+        reason = why_not_assignable(to_type.val_type, from_type)
+        if reason is not None:
+            reasons.append(reason)
+
     elif isinstance(from_type, Function) and not isinstance(to_type, Function):
         reason = why_not_assignable(to_type, from_type.output_type)
         if reason is not None:
             reasons.append(reason)
+
+    elif isinstance(from_type, TypedDict) and isinstance(to_type, Dict):
+        for k, from_td_type in from_type.property_types.items():
+            sub_reason = why_not_assignable(to_type.object_type, from_td_type)
+            if sub_reason is not None:
+                reasons.append(
+                    f"Property {k} is not assignable\n{textwrap.indent(sub_reason, '  ')}"
+                )
 
     elif isinstance(from_type, TypedDict) and isinstance(to_type, TypedDict):
         for k, to_type_type in to_type.property_types.items():
@@ -72,6 +86,8 @@ def why_not_assignable(to_type: Type, from_type: Type) -> typing.Optional[str]:
                     reasons.append(
                         f"Property {k} is not assignable\n{textwrap.indent(sub_reason, '  ')}"
                     )
+    else:
+        reasons.append(f"Incompatible types")
     if reasons:
         indented_reasons = textwrap.indent("\n".join(reasons), "  ")
         return f"{short_type(to_type)} !<- {short_type(from_type)}\n{indented_reasons}"

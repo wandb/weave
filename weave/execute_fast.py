@@ -77,44 +77,8 @@ def _resolve_static_branches(map_fn):
                 return _resolve_static_branches(fixed)
 
         if all(isinstance(v, graph.ConstNode) for v in inputs.values()):
-            op_def = registry_mem.memory_registry.get_op(map_fn.from_op.name)
-            call_inputs = {name: node.val for name, node in inputs.items()}
-            for key in call_inputs:
-                if isinstance(call_inputs[key], ref_base.Ref):
-                    call_inputs[key] = call_inputs[key].get()
-            tracer = engine_trace.tracer()
-            # TODO: if map_fn.type is UnionType we should do something about it here
-            # before we blow up in the Const(Type) constructor
-            with tracer.trace("resolve_static:op.%s" % op_def.name):
-                if language_nullability.should_force_none_result(call_inputs, op_def):
-                    res = None
-                else:
-                    res = op_def.resolve_fn(**call_inputs)
-                use_type = map_fn.type
-                #
-                # Note from Tim: It is completely possible and logically sound
-                # to encounter a union type here. However during execution, we
-                # will hit an error since const types raise when they are
-                # unions. This raise is also logical and sound. The unfortunate
-                # truth is that at this point we could be in any number of valid
-                # member states of the union and don't "know" which one we are
-                # in until we open the box and look inside. So, correctly
-                # resolving the type requires looking at the data itself. I
-                # wrote this code below to implement the fix, but it ended up
-                # not being needed for the problem I was working on. Leaving
-                # here for future reference, when it inevitably comes up again.
-                #
-                # if isinstance(use_type, types.UnionType):
-                #     # WARNING: Expensive! maybe we should just allow unions in ConstNode?
-                #     # Another idea: just strip off None or choose None based on null.
-                #     res_type = types.TypeRegistry.type_of(res)
-                #     if use_type.assign_type(res_type):
-                #         use_type = res_type
-                #     else:
-                #         # Should we error here?
-                #         pass
-                result_store[map_fn] = res
-                return graph.ConstNode(use_type, res)
+            res = weave_internal.use(map_fn)
+            return graph.ConstNode(map_fn.type, res)
         return graph.OutputNode(map_fn.type, map_fn.from_op.name, inputs)
     elif isinstance(map_fn, graph.ConstNode):
         return map_fn

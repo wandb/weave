@@ -5,7 +5,6 @@
 from .. import ops
 from ..show import _show_params
 from . import test_helpers
-from rich import print
 
 
 def test_show_simple_call(cereal_csv):

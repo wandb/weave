@@ -20,7 +20,6 @@ def should_table_cache(op_name: str) -> bool:
     # only one of the requests values will make it into the cache.
     return (
         op_name == "op-expensive_op"
-        or op_name == "BaseRetrievalQA-run"
         or op_name == "Chain-run"
         or op_name == "BaseChatModel-predict"
         or op_name == "op-stable_diffusion"
@@ -34,7 +33,9 @@ def should_cache(op_name: str) -> bool:
         or op_name.endswith("file-joinedTable")
         or op_name.endswith("readcsv")
         or op_name.endswith("table-2DProjection")
+        or op_name.endswith("table-projection2D")
         or op_name.endswith("ArrowWeaveList-2DProjection")
+        or op_name.endswith("ArrowWeaveList-projection2D")
         or op_name.endswith("faiss_from_documents")
         or op_name == "FAISS-document_embeddings"
         or should_table_cache(op_name)

@@ -1,7 +1,6 @@
 import PIL
 import os
 import typing
-from rich import progress
 
 import weave
 
@@ -100,7 +99,7 @@ def petdataset(
     random.shuffle(lines)
 
     with open(annotations_list_path) as f:
-        for i, line in progress.track(zip(range(50), lines)):
+        for i, line in zip(range(50), lines):
             # skip comments
             if line.startswith("#"):
                 continue

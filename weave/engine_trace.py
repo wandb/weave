@@ -117,10 +117,5 @@ def statsd():
     return _STATSD
 
 
-from ddtrace import tracer as ddtrace_tracer
-
-x = ddtrace_tracer.current_trace_context()
-
-
 def datadog_is_enabled():
     return os.getenv("DD_ENV")

@@ -37,8 +37,6 @@ class UnionMember:
 
 
 def indent_print(indent: int = 0, *args) -> None:
-    # from rich import print
-
     if DEBUG:
         print("    " * indent + " ".join([str(a) for a in args]))
 

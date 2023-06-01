@@ -34,12 +34,17 @@ def test_const_assignment(type_name, type_cls):
     # Validate that you can assign a const type to a general type
     assert cls_type.assign_type(const_type)
 
+    # strict Const assignability is disabled. See weave_types.py and
+    # test_plot_constants_assign
     # Validate that you cannot assign a general type to a const type
-    assert not const_type.assign_type(cls_type)
+    # assert not const_type.assign_type(cls_type)
 
     # Validate that unions are automatically unwrapped
     union_type = weave.types.UnionType(cls_type, const_type)
     assert union_type.assign_type(const_type)
     assert union_type.assign_type(cls_type)
     assert cls_type.assign_type(union_type)
-    assert not const_type.assign_type(union_type)
+
+    # strict Const assignability is disabled. See weave_types.py and
+    # test_plot_constants_assign
+    # assert not const_type.assign_type(union_type)

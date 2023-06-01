@@ -290,3 +290,100 @@ def awl_2d_projection(
         ),
         table._artifact,
     )
+
+
+@arrow_op(
+    name="ArrowWeaveList-projection2D",
+    input_type={
+        "table": ArrowWeaveListType(types.TypedDict({})),
+        "projectionAlgorithm": types.String(),
+        "inputCardinality": types.String(),
+        "inputColumnNames": types.List(types.String()),
+        "algorithmOptions": types.TypedDict({}),
+    },
+    output_type=lambda input_types: ArrowWeaveListType(
+        types.TypedDict(
+            {
+                "projection": types.TypedDict(
+                    {"x": types.Number(), "y": types.Number()}
+                ),
+                "source": input_types["table"].object_type,
+            }
+        )
+    ),
+)
+def awl_projection_2d(
+    table,
+    projectionAlgorithm,
+    inputCardinality,
+    inputColumnNames,
+    algorithmOptions,
+):
+    inputColumnNames = list(set(inputColumnNames))
+    source_column = arrow_as_array(table._arrow_data)
+    data = table._arrow_data_asarray_no_tags()
+
+    def default_projection():
+        return np.array([[0, 0] for row in data])
+
+    if len(inputColumnNames) == 0 or len(data) < 2:
+        np_projection = default_projection()
+    else:
+        if inputCardinality == "single":
+            path = _dict_utils.split_escaped_string(inputColumnNames[0])
+            np_array_of_embeddings = np.stack(
+                _awl_pick(data, path).to_numpy(False), axis=0
+            )
+        else:
+            column_data = [
+                _awl_pick(data, _dict_utils.split_escaped_string(c))
+                for c in inputColumnNames
+            ]
+            # Filter out null columns
+            column_data = [
+                col for col in column_data if not isinstance(col, pa.NullArray)
+            ]
+            np_array_of_embeddings = np.array(column_data).T
+        # remove 0-only columns
+        np_array_of_embeddings = np_array_of_embeddings[
+            :, ~(np_array_of_embeddings.sum(axis=0) == 0)
+        ]
+        # If the selected data is not a 2D array, or if it has less than 2 columns, then
+        # we can't perform a 2D projection. In this case, we just return a 2D array of
+        # zeros.
+        if (
+            len(np_array_of_embeddings.shape) != 2
+            or np_array_of_embeddings.shape[1] < 2
+        ):
+            np_projection = default_projection()
+        else:
+            np_array_of_embeddings = np.nan_to_num(np_array_of_embeddings, copy=False)
+            np_projection = projection_utils.perform_2D_projection(
+                np_array_of_embeddings, projectionAlgorithm, algorithmOptions
+            )
+    x_column = np_projection[:, 0]
+    y_column = np_projection[:, 1]
+
+    projection_column = pa.StructArray.from_arrays(
+        [pa.array(x_column), pa.array(y_column)], ["x", "y"]
+    )
+
+    projection_column = pa.StructArray.from_arrays(
+        [projection_column, source_column], ["projection", "source"]
+    )
+
+    return ArrowWeaveList(
+        projection_column,
+        types.TypedDict(
+            {
+                "projection": types.TypedDict(
+                    {
+                        "x": types.Number(),
+                        "y": types.Number(),
+                    }
+                ),
+                "source": table.object_type,
+            }
+        ),
+        table._artifact,
+    )

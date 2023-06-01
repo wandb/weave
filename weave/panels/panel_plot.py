@@ -333,13 +333,9 @@ class Plot(panel.Panel):
 
         if self.config is None:
             if mark is not None:
-                constants = PlotConstants(
-                    mark=mark, pointShape=None, lineStyle=None, label=None
-                )
+                constants = PlotConstants(mark=mark)
             else:
-                constants = PlotConstants(
-                    mark=None, pointShape=None, lineStyle=None, label=None
-                )
+                constants = PlotConstants()
 
             select_functions: typing.Optional[dict[DimName, SelectFunction]] = None
             for field, maybe_dim in zip(

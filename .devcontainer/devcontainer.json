@@ -1,0 +1,41 @@
+{
+	"name": "Weave Development",
+	"image": "mcr.microsoft.com/devcontainers/python:0-3.10",
+
+	// More features: https://containers.dev/features.
+	"features": {
+        "ghcr.io/devcontainers/features/node:1": "latest",
+        "ghcr.io/devcontainers/features/rust:1": "latest"
+    },
+
+	"mounts": [
+		"source=codespaces-linux-cache,target=/home/vscode/.cache,consistency=delegated,type=volume",
+	],
+
+	"customizations": {
+		"vscode": {
+			"settings": {},
+			"extensions": [
+				"ms-python.python",
+				"bungcip.better-toml",
+				"charliermarsh.ruff",
+				"ms-toolsai.jupyter",
+				"ms-azuretools.vscode-docker",
+				"GitHub.copilot",
+				"ms-python.black-formatter"
+			]
+		}
+	},
+	
+	"portsAttributes": {
+		"9000": {
+			"label": "Weave Dev Server",
+			"onAutoForward": "notify"
+		}
+	},
+
+	"postCreateCommand": "bash ./.devcontainer/postCreateCommand.sh"
+	
+	// Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
+	// "remoteUser": "root"
+}

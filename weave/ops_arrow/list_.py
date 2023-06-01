@@ -534,8 +534,6 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         arr = self._arrow_data
         type_match_summary = weave_arrow_type_check(self.object_type, arr)
         if type_match_summary != None:
-            from rich import print
-
             print()
             print("ArrowWeaveList VALIDATION ERROR")
             print()

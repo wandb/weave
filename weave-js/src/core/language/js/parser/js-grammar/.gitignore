@@ -1,0 +1,3 @@
+build/
+!bindings/node/*
+tree-sitter-weave.wasm
