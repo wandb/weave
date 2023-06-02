@@ -355,7 +355,7 @@ class Plot(panel.Panel):
                     select_functions[typing.cast(DimName, field.name)] = maybe_dim
 
             signals = Signals(domain=AxisSelections(), selection=AxisSelections())
-            if domain_x:
+            if domain_x is not None:
                 signals.domain.x = domain_x
 
             # TODO: use
