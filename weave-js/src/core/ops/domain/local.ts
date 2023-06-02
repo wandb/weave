@@ -521,7 +521,7 @@ export const opObjGetAttr = makeStandardOp({
     }
 
     const attrTypes = unionObjectTypeAttrTypes(selfType);
-    return attrTypes[attrName] ?? 'none';
+    return attrTypes[attrName] ?? 'unknown';
   },
   resolver: inputs => {
     let self = inputs.self;

@@ -198,7 +198,6 @@ export function autoTableColumnExpressions(
       let expr: Node = varNode(tableRowType, 'row');
       const pathStr: string[] = [];
       for (const p of path) {
-        console.log(expr, p);
         if (!p.startsWith('__object__')) {
           pathStr.push(p);
         } else {

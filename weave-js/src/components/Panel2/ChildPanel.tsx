@@ -121,7 +121,8 @@ export const initPanel = async (
   inputNode = await weave.refineNode(inputNode, stack);
   const {curPanelId: id} = getPanelStacksForType(inputNode.type, panelId, {
     allowedPanels,
-    stackIdFilter: stackId => !stackId.includes('.'),
+    stackIdFilter: stackId =>
+      stackId.includes('maybe') || !stackId.includes('.'),
   });
   if (id == null) {
     return {id: '', config: undefined};
@@ -198,7 +199,8 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
     panelId,
     {
       allowedPanels: props.allowedPanels,
-      stackIdFilter: stackId => !stackId.includes('.'),
+      stackIdFilter: stackId =>
+        stackId.includes('maybe') || !stackId.includes('.'),
     }
   );
 
