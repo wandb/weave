@@ -6,13 +6,7 @@ type LazyStringOrNull = weave.Node<{
   type: 'union';
   members: ['string', 'none'];
 }>;
-type LazyDomain = weave.Node<{
-  type: 'typedDict';
-  propertyTypes: {
-    x: 'none' | {type: 'list'; objectType: 'any'};
-    y: 'none' | {type: 'list'; objectType: 'any'};
-  };
-}>;
+type LazyAxisSelection = weave.Node<{type: 'list'; objectType: 'any'}>;
 
 export type SeriesConfig = Omit<
   v11.SeriesConfig,
@@ -44,7 +38,10 @@ export type AxisSettings = {
 };
 
 export type Signals = Omit<v11.PlotConfig['signals'], 'domain'> & {
-  domain: v11.PlotConfig['signals']['domain'] | LazyDomain;
+  domain: {
+    x?: LazyAxisSelection | v11.PlotConfig['signals']['domain']['x'];
+    y?: LazyAxisSelection | v11.PlotConfig['signals']['domain']['y'];
+  };
 };
 
 export type PlotConfig = Omit<

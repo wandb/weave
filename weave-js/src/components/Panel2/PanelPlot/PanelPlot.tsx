@@ -17,12 +17,14 @@ import {
   escapeDots,
   Frame,
   isAssignableTo,
+  isNodeOrVoidNode,
   isTypedDict,
   isVoidNode,
   list,
   listObjectType,
   maybe,
   Node,
+  NodeOrVoidNode,
   numberBin,
   oneOrMany,
   // opAnd,
@@ -1606,8 +1608,34 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
   const {config: concreteConfig, loading: concreteConfigLoading} =
     useConcreteConfig(config, input, stack);
 
+  const configRef = useRef<PlotConfig>(config);
+  configRef.current = config;
+
   const concreteConfigRef = useRef<ConcretePlotConfig>(concreteConfig);
   concreteConfigRef.current = concreteConfig;
+
+  const domainNodes: {x: NodeOrVoidNode; y: NodeOrVoidNode} = useMemo(() => {
+    return {
+      x: isNodeOrVoidNode(config.signals.domain.x)
+        ? config.signals.domain.x
+        : voidNode(),
+      y: isNodeOrVoidNode(config.signals.domain.y)
+        ? config.signals.domain.y
+        : voidNode(),
+    };
+  }, [config.signals]);
+
+  // enables domain sharing
+  const mutateDomainX = LLReact.useMutation(domainNodes.x, 'set');
+  const mutateDomainY = LLReact.useMutation(domainNodes.y, 'set');
+
+  const mutateDomain = useMemo(
+    () => ({x: mutateDomainX, y: mutateDomainY}),
+    [mutateDomainX, mutateDomainY]
+  );
+
+  const mutateDomainRef = useRef(mutateDomain);
+  mutateDomainRef.current = mutateDomain;
 
   const loading = useMemo(
     () => result.loading || concreteConfigLoading || isRefining,
@@ -2592,7 +2620,9 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
       vegaView.addEventListener('mouseup', async () => {
         const currBrushMode = brushModeRef.current;
         const currUpdateConfig = updateConfigRef.current;
-        const currConfig = concreteConfigRef.current;
+        const currConfig = configRef.current;
+        const currMutateDomain = mutateDomainRef.current;
+        const currConcreteConfig = concreteConfigRef.current;
         const currSetToolTipsEnabled = setToolTipsEnabledRef.current;
         const signalName = `brush`;
         const dataName = `brush_store`;
@@ -2606,7 +2636,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
         const data = selection?.data[dataName];
 
         if (!_.isEmpty(signal)) {
-          let newConfigSignals = currConfig.signals;
+          let newConfigSignals = currConcreteConfig.signals;
 
           ['x' as const, 'y' as const].forEach(dimName => {
             const axisSignal = signal[dimName];
@@ -2616,7 +2646,10 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
             newConfigSignals = produce(newConfigSignals, draft => {
               const axisSetting = draft[settingName];
               if (
-                !_.isEqual(currConfig.signals[settingName][dimName], axisSignal)
+                !_.isEqual(
+                  currConcreteConfig.signals[settingName][dimName],
+                  axisSignal
+                )
               ) {
                 axisSetting[dimName] = axisSignal;
               }
@@ -2630,18 +2663,18 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
             }
           });
 
-          if (newConfigSignals !== currConfig.signals) {
+          if (newConfigSignals !== currConcreteConfig.signals) {
             currUpdateConfig({signals: newConfigSignals});
           }
         } else if (
           _.isEmpty(data) &&
           !(
-            _.isEmpty(currConfig.signals.selection.x) &&
-            _.isEmpty(currConfig.signals.selection.y)
+            _.isEmpty(currConcreteConfig.signals.selection.x) &&
+            _.isEmpty(currConcreteConfig.signals.selection.y)
           )
         ) {
           currUpdateConfig({
-            signals: produce(currConfig.signals, draft => {
+            signals: produce(currConcreteConfig.signals, draft => {
               ['x' as const, 'y' as const].forEach(axisName => {
                 draft.selection[axisName] = undefined;
               });
