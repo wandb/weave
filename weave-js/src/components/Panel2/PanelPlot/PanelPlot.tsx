@@ -2415,8 +2415,8 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
 
   const vegaSpec = useMemo(() => {
     const newSpec: any = {layer: layerSpecs};
-    const axisSettings = config.axisSettings;
-    const legendSettings = config.legendSettings;
+    const axisSettings = concreteConfig.axisSettings;
+    const legendSettings = concreteConfig.legendSettings;
     newSpec.encoding = {x: {axis: {}}, y: {axis: {}}, color: {axis: {}}};
     if (layerSpecs.some(spec => spec.encoding?.x != null)) {
       ['x' as const, 'y' as const, 'color' as const].forEach(axisName => {
@@ -2442,7 +2442,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     } else {
       newSpec.encoding.x.axis.title =
         axisSettings.x.title ??
-        PlotState.defaultAxisLabel(config.series, 'x', weave);
+        PlotState.defaultAxisLabel(concreteConfig.series, 'x', weave);
     }
     if (axisSettings.x.noLabels) {
       newSpec.encoding.x.axis.labels = false;
@@ -2468,7 +2468,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
       } else {
         newSpec.encoding.y.axis.title =
           axisSettings.y.title ??
-          PlotState.defaultAxisLabel(config.series, 'y', weave);
+          PlotState.defaultAxisLabel(concreteConfig.series, 'y', weave);
       }
       if (axisSettings.y.noLabels) {
         newSpec.encoding.y.axis.labels = false;
@@ -2496,7 +2496,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
       } else {
         newSpec.encoding.color.title =
           axisSettings.color?.title ??
-          PlotState.defaultAxisLabel(config.series, 'label', weave);
+          PlotState.defaultAxisLabel(concreteConfig.series, 'label', weave);
       }
 
       if (legendSettings.color.noLegend) {
@@ -2511,8 +2511,8 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     config.series,
     isDashboard,
     layerSpecs,
-    config.axisSettings,
-    config.legendSettings,
+    concreteConfig.axisSettings,
+    concreteConfig.legendSettings,
   ]);
 
   // get the series object from the config by its index
