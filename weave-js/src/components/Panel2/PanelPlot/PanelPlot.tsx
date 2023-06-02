@@ -116,6 +116,7 @@ import {
   ScaleType,
   SeriesConfig,
 } from './versions';
+import {Config} from 'vega-lite';
 
 const recordEvent = makeEventRecorder('Plot');
 
@@ -280,25 +281,59 @@ const stringHashCode = (str: string) => {
 };
 
 const useConcreteConfig = (
-  configNode: NodeOrVoidNode,
+  config: PlotConfig,
   input: Node,
   stack: Stack
 ): {config: ConcretePlotConfig; loading: boolean} => {
-  const concreteConfigUse = LLReact.useNodeValue(configNode);
-  const concreteConfigEvaluationResult: ConcretePlotConfig | undefined =
-    concreteConfigUse.result;
+  const lazyConfigElementsNode = useMemo(
+    () =>
+      opDict(
+        config.lazyPaths.reduce((acc, path, i) => {
+          acc[path] = PlotState.getThroughArray(config, path.split('.'));
+        }, {} as any)
+      ),
+    [config.lazyPaths]
+  );
+
+  const concreteConfigUse = LLReact.useNodeValue(lazyConfigElementsNode);
+  const concreteConfigEvaluationResult = concreteConfigUse.result as
+    | {[K in PlotConfig['lazyPaths'][number]]: any}
+    | undefined;
 
   const concreteConfigLoading = concreteConfigUse.loading;
-  const config = useMemo(() => {
-    if (concreteConfigLoading) {
-      return _.omit(
-        PlotState.defaultPlot(input, stack),
+
+  return useMemo(() => {
+    if (config.lazyPaths.length === 0) {
+      return {
+        config: _.omit(config, ['lazyPaths']) as ConcretePlotConfig,
+        loading: false,
+      };
+    } else if (concreteConfigLoading) {
+      return {
+        config: _.omit(
+          PlotState.defaultPlot(input, stack),
+          'lazyPaths'
+        ) as ConcretePlotConfig,
+        loading: true,
+      };
+    } else {
+      // generate the new config with the concrete values obtained from the execution of the lazy paths
+      const newConfig = _.omit(
+        produce(config, draft => {
+          draft.lazyPaths.forEach(path => {
+            PlotState.setThroughArray(
+              draft,
+              path.split('.'),
+              concreteConfigEvaluationResult![path]
+            );
+          });
+        }),
         'lazyPaths'
       ) as ConcretePlotConfig;
+
+      return {config: newConfig, loading: false};
     }
-    return concreteConfigEvaluationResult!;
   }, [concreteConfigEvaluationResult, concreteConfigLoading]);
-  return {config, loading: concreteConfigLoading};
 };
 
 const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
@@ -336,9 +371,8 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
     updateConfig(newConfig);
   }, [weave, config, updateConfig]);
 
-  const configAsNode = useMemo(() => PlotState.configToNode(config), [config]);
   const {config: concreteConfig, loading: configLoading} = useConcreteConfig(
-    configAsNode,
+    config,
     input,
     stack
   );

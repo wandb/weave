@@ -1,5 +1,6 @@
 import {
   allObjPaths,
+  constNode,
   constNodeUnsafe,
   constNumber,
   constString,
@@ -1495,34 +1496,50 @@ export function selectionContainsValue(
   }
 }
 
-const objectToNode = (
-  obj: any,
-  path: string,
-  lazyPaths: readonly string[]
-): NodeOrVoidNode => {
-  if (obj == null) {
-    return voidNode();
-  } else if (isNodeOrVoidNode(obj) && lazyPaths.includes(path)) {
-    return obj;
-  } else if (_.isPlainObject(obj)) {
-    return opDict(
-      Object.keys(obj).reduce((acc, key) => {
-        acc[key] = objectToNode(obj[key], [...path, key].join('.'), lazyPaths);
-        return acc;
-      }, {} as {[key: string]: NodeOrVoidNode}) as any
-    );
-  } else if (_.isArray(obj)) {
-    return opArray(
-      obj.reduce((acc, val, i) => {
-        acc[i] = objectToNode(val, [...path, '#'].join('.'), lazyPaths);
-        return acc;
-      }, {}) as any
-    );
-  } else {
-    return constNodeUnsafe(toWeaveType(obj), obj);
+export function setThroughArray(
+  object: any,
+  path: (string | number)[],
+  value: any
+): any {
+  if (path.length === 0) {
+    return object;
   }
-};
 
-export const configToNode = (config: PlotConfig): Node => {
-  return objectToNode(config, '', config.lazyPaths) as Node;
-};
+  const [first, ...rest] = path;
+
+  if (first === '#') {
+    if (Array.isArray(object)) {
+      object.forEach((item: any, index: number) => {
+        setThroughArray(item, rest, value);
+      });
+    }
+  } else if (typeof object[first] === 'object' && object[first] !== null) {
+    setThroughArray(object[first], rest, value);
+  } else if (rest.length === 0) {
+    object[first] = value;
+  }
+
+  return object;
+}
+
+export function getThroughArray(object: any, path: (string | number)[]): any {
+  if (path.length === 0) {
+    return object;
+  }
+
+  const [first, ...rest] = path;
+
+  if (first === '#') {
+    if (Array.isArray(object)) {
+      return object.map((item: any) => getThroughArray(item, rest));
+    } else {
+      return undefined;
+    }
+  } else if (typeof object[first] === 'object' && object[first] !== null) {
+    return getThroughArray(object[first], rest);
+  } else if (rest.length === 0) {
+    return object[first];
+  } else {
+    return undefined;
+  }
+}
