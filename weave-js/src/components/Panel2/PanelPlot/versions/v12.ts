@@ -4,7 +4,7 @@ import * as v11 from './v11';
 
 type LazyStringOrNull = weave.Node<'string'> | weave.VoidNode;
 
-export type LazySeriesConfig = Omit<
+export type SeriesConfig = Omit<
   v11.SeriesConfig,
   'constants' | 'axisSettings'
 > & {
@@ -14,13 +14,13 @@ export type LazySeriesConfig = Omit<
 };
 
 const lazyPaths = [
-  ['series' as const, 'constants' as const, 'mark' as const] as const,
-  ['axisSettings' as const, 'x' as const, 'title' as const] as const,
-  ['axisSettings' as const, 'y' as const, 'title' as const] as const,
-  ['axisSettings' as const, 'color' as const, 'title' as const] as const,
+  'series.#.constants.mark' as const, // # means all array indices
+  'axisSettings.x.title' as const,
+  'axisSettings.y.title' as const,
+  'axisSettings.color.title' as const,
 ];
 
-export type LazyAxisSettings = {
+export type AxisSettings = {
   x: Omit<v10.AxisSetting, 'title'> & {
     title?: LazyStringOrNull | string;
   };
@@ -32,30 +32,25 @@ export type LazyAxisSettings = {
   };
 };
 
-export type LazyPlotConfig = Omit<
+export type PlotConfig = Omit<
   v11.PlotConfig,
   'configVersion' | 'series' | 'axisSettings'
 > & {
   configVersion: 12;
-  series: LazySeriesConfig[];
-  axisSettings: LazyAxisSettings;
+  series: SeriesConfig[];
+  axisSettings: AxisSettings;
   lazyPaths: typeof lazyPaths;
 };
 
+// ConcretePlotConfig is a subtype of PlotConfig
 export type ConcretePlotConfig = Omit<v11.PlotConfig, 'configVersion'> & {
   configVersion: 12;
 };
 
-export const migrateConcrete = (config: v11.PlotConfig): ConcretePlotConfig => {
+export const migrate = (config: v11.PlotConfig): PlotConfig => {
   return {
     ...config,
     configVersion: 12,
-  };
-};
-
-export const migrate = (config: v11.PlotConfig): LazyPlotConfig => {
-  return {
-    ...migrateConcrete(config),
     lazyPaths: [],
   };
 };

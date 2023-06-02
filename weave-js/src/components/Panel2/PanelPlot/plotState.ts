@@ -50,7 +50,6 @@ import {
   LINE_SHAPES,
   MARK_OPTIONS,
   migrate,
-  migrateConcrete,
   PLOT_DIMS_UI,
   PlotConfig,
   POINT_SHAPES,
@@ -59,6 +58,7 @@ import {
 } from './versions';
 import * as v1 from './versions/v1';
 import {toWeaveType} from '../toWeaveType';
+import {number} from 'yargs';
 
 export type DimType =
   | 'optionSelect'
@@ -626,7 +626,7 @@ export function addSeriesFromSeries(
 ) {
   const dimConstructor = dimConstructors[blankDimName];
   const dim = dimConstructor(series, weave);
-  const newSeries: SeriesConfig = dim.imputeThisSeriesWithDefaultState();
+  const newSeries = dim.imputeThisSeriesWithDefaultState();
   return produce(config, draft => {
     draft.series.push(newSeries);
     draft.configOptionsExpanded[blankDimName] = true;
@@ -702,7 +702,7 @@ export function removeRedundantSeries(
   // populate seriesToRemove
   config.series.reduce((acc, s) => {
     // when should a series be removed?
-    // 0. when it's degenerate with other series up to void nodes
+    // 0. when it's degenerate with other series up to vo˜ nodes
     // 1. when all of its non shared dims are voidNodes
     // 2. when all of its dims are shared
 
@@ -1268,29 +1268,17 @@ function defaultPlotCommon(inputNode: Node, stack: Stack): v1.PlotConfig {
   };
 }
 
-function postprocessDefaultConfig<T extends PlotConfig | ConcretePlotConfig>(
-  config: T
-): T {
-  return produce(config, draft => {
+export function defaultPlot(inputNode: Node, stack: Stack): PlotConfig {
+  // We know this wont be lazy since we are migrating it from a v1 config. So we can
+  // safely type it as a concrete config.
+
+  const v1config = defaultPlotCommon(inputNode, stack);
+  const migrated = migrate(v1config);
+  return produce(migrated, draft => {
     draft.series.forEach(s => {
       s.uiState.pointShape = 'dropdown';
     });
   });
-}
-
-export function defaultPlot(inputNode: Node, stack: Stack): PlotConfig {
-  const v1config = defaultPlotCommon(inputNode, stack);
-  const migrated = migrate(v1config);
-  return postprocessDefaultConfig(migrated);
-}
-
-export function defaultConcretePlot(
-  inputNode: Node,
-  stack: Stack
-): ConcretePlotConfig {
-  const v1config = defaultPlotCommon(inputNode, stack);
-  const migrated = migrateConcrete(v1config);
-  return postprocessDefaultConfig(migrated);
 }
 
 export function defaultSeriesName(
@@ -1507,22 +1495,26 @@ export function selectionContainsValue(
   }
 }
 
-const objectToNode = (obj: any): NodeOrVoidNode => {
+const objectToNode = (
+  obj: any,
+  path: string,
+  lazyPaths: readonly string[]
+): NodeOrVoidNode => {
   if (obj == null) {
     return voidNode();
-  } else if (isNodeOrVoidNode(obj)) {
+  } else if (isNodeOrVoidNode(obj) && lazyPaths.includes(path)) {
     return obj;
   } else if (_.isPlainObject(obj)) {
     return opDict(
       Object.keys(obj).reduce((acc, key) => {
-        acc[key] = objectToNode(obj[key]);
+        acc[key] = objectToNode(obj[key], [...path, key].join('.'), lazyPaths);
         return acc;
       }, {} as {[key: string]: NodeOrVoidNode}) as any
     );
   } else if (_.isArray(obj)) {
     return opArray(
       obj.reduce((acc, val, i) => {
-        acc[i] = objectToNode(val);
+        acc[i] = objectToNode(val, [...path, '#'].join('.'), lazyPaths);
         return acc;
       }, {}) as any
     );
@@ -1531,6 +1523,6 @@ const objectToNode = (obj: any): NodeOrVoidNode => {
   }
 };
 
-export const configToNode = (config: PlotConfig | ConcretePlotConfig): Node => {
-  return objectToNode(config) as Node;
+export const configToNode = (config: PlotConfig): Node => {
+  return objectToNode(config, '', config.lazyPaths) as Node;
 };

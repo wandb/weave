@@ -291,7 +291,10 @@ const useConcreteConfig = (
   const concreteConfigLoading = concreteConfigUse.loading;
   const config = useMemo(() => {
     if (concreteConfigLoading) {
-      return PlotState.defaultConcretePlot(input, stack);
+      return _.omit(
+        PlotState.defaultPlot(input, stack),
+        'lazyPaths'
+      ) as ConcretePlotConfig;
     }
     return concreteConfigEvaluationResult!;
   }, [concreteConfigEvaluationResult, concreteConfigLoading]);
@@ -311,16 +314,14 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
 
   const updateConfig = useCallback(
     (newConfig?: Partial<PlotConfig>) => {
-      if (config) {
-        if (!newConfig) {
-          // if config is undefined, just use the default plot
-          propsUpdateConfig(defaultPlot(input, stack));
-        } else {
-          propsUpdateConfig({
-            ...config,
-            ...newConfig,
-          });
-        }
+      if (!newConfig) {
+        // if config is undefined, just use the default plot
+        propsUpdateConfig(defaultPlot(input, stack));
+      } else {
+        propsUpdateConfig({
+          ...config,
+          ...newConfig,
+        });
       }
     },
     [config, propsUpdateConfig, input, stack]
@@ -336,73 +337,14 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
   }, [weave, config, updateConfig]);
 
   const configAsNode = useMemo(() => PlotState.configToNode(config), [config]);
-
-  // const exportAsCode = useCallback(() => {
-  //   if (navigator?.clipboard == null) {
-  //     return;
-  //   }
-
-  //   if (config.series.length !== 1) {
-  //     toast('Multi-series plots are not currently supported');
-  //     return;
-  //   }
-
-  //   const series = config.series[0];
-
-  //   const dimConfigured = (dim: keyof SeriesConfig['dims']) =>
-  //     series.table.columnSelectFunctions[series.dims[dim]].type !== 'invalid';
-
-  //   if (!dimConfigured('x') || !dimConfigured('y')) {
-  //     toast(
-  //       "Can't export to code: Required dimensions x and/or y are not configured"
-  //     );
-  //     return;
-  //   }
-
-  //   const dimArgument = (dim: keyof SeriesConfig['dims']) =>
-  //     `${dim}=lambda row: ${weave.expToString(
-  //       series.table.columnSelectFunctions[series.dims[dim]],
-  //       null
-  //     )},`;
-
-  //   const inputTypeText = toPythonTyping(input.type);
-
-  //   const dims: Array<keyof SeriesConfig['dims']> = [
-  //     'x',
-  //     'y',
-  //     'label',
-  //     'tooltip',
-  //   ];
-
-  //   const codeText = [
-  //     '@weave.op()',
-  //     `def my_panel(input: weave.Node[${inputTypeText}]) -> panels.Plot:`,
-  //     '  return panels.Plot(',
-  //     '    input,',
-  //     ...dims.reduce<string[]>((memo, field) => {
-  //       if (dimConfigured(field)) {
-  //         memo.push(`    ${dimArgument(field)}`);
-  //       }
-  //       return memo;
-  //     }, [] as string[]),
-  //     '  )\n',
-  //   ].join('\n');
-
-  //   navigator.clipboard
-  //     .writeText(codeText)
-  //     .then(() => toast('Code copied to clipboard!'));
-  // }, [config, input.type, weave]);
-
-  const titlesNode = useMemo(
-    () => PlotState.getAxisTitlesNode(config.axisSettings),
-    [config.axisSettings]
+  const {config: concreteConfig, loading: configLoading} = useConcreteConfig(
+    configAsNode,
+    input,
+    stack
   );
 
-  const {loading: titlesLoading, result: titles} =
-    LLReact.useNodeValue(titlesNode);
-
   const labelConfigDom = useMemo(() => {
-    return titlesLoading ? (
+    return configLoading ? (
       <Panel2Loader />
     ) : (
       <>
@@ -417,7 +359,7 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
                 <ConfigPanel.TextInputConfigField
                   dataTest={`${name}-label`}
                   // Truncate string to prevent exploding panel for now.
-                  value={titles[dimName]}
+                  value={concreteConfig.axisSettings[dimName].title}
                   label={''}
                   onChange={(event, {value}) => {
                     const newConfig = produce(config, draft => {
