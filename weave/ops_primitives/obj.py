@@ -1,4 +1,6 @@
 import typing
+
+from .. import codify
 from ..api import op, weave_class
 from .. import weave_types as types
 
@@ -55,3 +57,12 @@ def obj_settattr(self, attr, v):
 )
 def obj_getattr(self, name: str):
     return getattr(self, name, None)
+
+
+@op(
+    name="__internal__-generateCodeForObject",
+    input_type={"obj": types.Any()},
+    hidden=True,
+)
+def generate_code_for_object(obj) -> str:
+    return codify.object_to_code(obj)

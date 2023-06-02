@@ -8,6 +8,7 @@ from . import weave_types as types
 # this patches the `Type` class to enable the make method - needed due to circular references
 from . import make_type as _make_type
 from . import ops
+from . import codify
 from .graph import Node  # used as a type in op definitions
 from .show import show, show_url
 from .api import *

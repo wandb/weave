@@ -271,7 +271,7 @@ def recursively_unwrap_arrow(obj):
     return obj
 
 
-def to_python(obj, wb_type=None):
+def to_python(obj: typing.Any, wb_type: typing.Optional[types.Type] = None) -> dict:
     if wb_type is None:
         wb_type = types.TypeRegistry.type_of(obj)
 
@@ -285,13 +285,14 @@ def to_python(obj, wb_type=None):
         fs_art = artifact_local.LocalArtifact(wb_type.name, "latest")
         # Save all the reffed objects into the new artifact.
         for mem_ref in art.refs():
-            fs_art.set(mem_ref.path, mem_ref._type, mem_ref._obj)
+            if mem_ref.path is not None and mem_ref._type is not None:
+                fs_art.set(mem_ref.path, mem_ref._type, mem_ref._obj)
         fs_art.save()
         # now map the original object again. Because there are now existing refs
         # to the local artifact for any custom objects, this new value will contain
         # those existing refs as absolute refs. We provide None for artifact because
         # it should not be used in this pass.
-        mapper = mappers_python.map_to_python(wb_type, None)
+        mapper = mappers_python.map_to_python(wb_type, None)  # type: ignore
         val = mapper.apply(obj)
     # TODO: this should be a ConstNode!
     return {"_type": wb_type.to_dict(), "_val": val}
@@ -304,10 +305,10 @@ def to_safe_const(obj):
     return graph.ConstNode(wb_type, val)
 
 
-def from_python(obj, wb_type=None):
+def from_python(obj: dict, wb_type: typing.Optional[types.Type] = None) -> typing.Any:
     if wb_type is None:
         wb_type = types.TypeRegistry.type_from_dict(obj["_type"])
-    mapper = mappers_python.map_from_python(wb_type, None)
+    mapper = mappers_python.map_from_python(wb_type, None)  # type: ignore
     res = mapper.apply(obj["_val"])
     return res
 

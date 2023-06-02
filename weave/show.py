@@ -129,7 +129,7 @@ def show(obj=None, height=400):
     usage_analytics.show_called()
     panel_url = show_url(obj)
 
-    iframe = IFrame(panel_url, "100%", "%spx" % height)
+    iframe = IFrame(panel_url, "100%", "%spx" % height, ['allow="clipboard-write"'])
     display(iframe)
 
 

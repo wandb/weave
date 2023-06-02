@@ -28,6 +28,7 @@ import {
 } from '../Panel2/Icons';
 import {
   useBranchPointFromURIString,
+  useCopyCodeFromURI,
   usePreviousVersionFromURIString,
 } from './hooks';
 import {
@@ -391,6 +392,8 @@ const HeaderFileControls: React.FC<{
   const canDuplicateDashboard = false;
   const duplicateDashboard = useCallback(() => {}, []);
 
+  const {copyStatus, onCopy} = useCopyCodeFromURI(maybeURI);
+
   return (
     <>
       <HeaderCenterControls>
@@ -481,6 +484,20 @@ const HeaderFileControls: React.FC<{
               </MenuIcon>
               <MenuText>Redo</MenuText>
               <MenuShortcut keys={[isMac ? `Cmd` : `Ctrl`, `Y`]} />
+            </MenuItem>
+          )}
+
+          <MenuDivider />
+
+          {maybeURI && (
+            <MenuItem
+              onClick={() => {
+                onCopy().finally(() => setAnchorFileEl(null));
+              }}>
+              <MenuIcon>
+                <IconCopy />
+              </MenuIcon>
+              <MenuText>Copy Code</MenuText>
             </MenuItem>
           )}
 

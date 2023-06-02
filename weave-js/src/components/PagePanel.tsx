@@ -1,7 +1,7 @@
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import Loader from '@wandb/weave/common/components/WandbLoader';
 import getConfig from '../config';
-import {Node, NodeOrVoidNode, voidNode} from '@wandb/weave/core';
+import {Node, NodeOrVoidNode, maybe, voidNode} from '@wandb/weave/core';
 import produce from 'immer';
 import moment from 'moment';
 import React, {FC} from 'react';
@@ -31,7 +31,12 @@ import {PanelRootBrowser} from './Panel2/PanelRootBrowser/PanelRootBrowser';
 import {useNewPanelFromRootQueryCallback} from './Panel2/PanelRootBrowser/util';
 import Inspector from './Sidebar/Inspector';
 import {useNodeWithServerType} from '../react';
-import {inJupyterCell, weaveTypeIsPanel} from './PagePanelComponents/util';
+import {
+  inJupyterCell,
+  uriFromNode,
+  weaveTypeIsPanel,
+} from './PagePanelComponents/util';
+import {useCopyCodeFromURI} from './PagePanelComponents/hooks';
 
 interface HomeProps {
   updateConfig: (newConfig: ChildPanelFullConfig) => void;
@@ -395,6 +400,8 @@ export const PageContent: FC<PageContentProps> = ({
   const isPanel = weaveTypeIsPanel(
     typedInputNode.result?.type || {type: 'Panel' as any}
   );
+  const maybeUri = uriFromNode(config.input_node);
+  const {copyStatus, onCopy} = useCopyCodeFromURI(maybeUri);
 
   return (
     <PageContentContainer>
@@ -414,19 +421,29 @@ export const PageContent: FC<PageContentProps> = ({
         prefixButtons={
           <>
             {inJupyter && (
-              <Styles.BarButton
-                onClick={() => {
-                  const expStr = weave
-                    .expToString(config.input_node)
-                    .replace(/\n+/g, '')
-                    .replace(/\s+/g, '');
-                  window.open(
-                    urlPrefixed(`/?exp=${encodeURIComponent(expStr)}`),
-                    '_blank'
-                  );
-                }}>
-                <Icon name="external square alternate" />
-              </Styles.BarButton>
+              <>
+                <Styles.BarButton
+                  onClick={() => {
+                    const expStr = weave
+                      .expToString(config.input_node)
+                      .replace(/\n+/g, '')
+                      .replace(/\s+/g, '');
+                    window.open(
+                      urlPrefixed(`/?exp=${encodeURIComponent(expStr)}`),
+                      '_blank'
+                    );
+                  }}>
+                  <Icon name="external square alternate" />
+                </Styles.BarButton>
+                {maybeUri && (
+                  <Styles.BarButton
+                    onClick={() => {
+                      onCopy();
+                    }}>
+                    <Icon name="copy" />
+                  </Styles.BarButton>
+                )}
+              </>
             )}
           </>
         }
