@@ -392,7 +392,7 @@ const HeaderFileControls: React.FC<{
   const canDuplicateDashboard = false;
   const duplicateDashboard = useCallback(() => {}, []);
 
-  const {copyStatus, onCopy} = useCopyCodeFromURI(maybeURI);
+  const {onCopy} = useCopyCodeFromURI(maybeURI);
 
   return (
     <>

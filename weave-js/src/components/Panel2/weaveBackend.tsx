@@ -20,7 +20,6 @@ import {
 import {memoize} from 'lodash';
 import React, {useCallback, useMemo, useRef} from 'react';
 
-import {useWeaveContext} from '../../context';
 import {useGatedValue} from '../../hookUtils';
 import {useNodeValue} from '../../react';
 import {consoleWarn} from '../../util';
@@ -66,7 +65,6 @@ const useUserPanelVars = (
 ) => {
   const {updateConfig, updateConfig2} = props;
   const initialLoading = useRef(true);
-  const weave = useWeaveContext();
   const {stack} = usePanelContext();
 
   const itemNode = useMemo(
@@ -79,10 +77,9 @@ const useUserPanelVars = (
           vars: {},
         },
         stack,
-        weave,
         undefined
       ),
-    [panelId, props.config, props.input, stack, weave]
+    [panelId, props.config, props.input, stack]
   );
 
   const renderOpName = `${panelId}${
@@ -330,7 +327,6 @@ const registerUserPanel = (
             vars: {},
           },
           stack,
-          weave,
           undefined
         ),
       });

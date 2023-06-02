@@ -1,7 +1,7 @@
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import Loader from '@wandb/weave/common/components/WandbLoader';
 import getConfig from '../config';
-import {Node, NodeOrVoidNode, maybe, voidNode} from '@wandb/weave/core';
+import {Node, NodeOrVoidNode, voidNode} from '@wandb/weave/core';
 import produce from 'immer';
 import moment from 'moment';
 import React, {FC} from 'react';
@@ -401,7 +401,7 @@ export const PageContent: FC<PageContentProps> = ({
     typedInputNode.result?.type || {type: 'Panel' as any}
   );
   const maybeUri = uriFromNode(config.input_node);
-  const {copyStatus, onCopy} = useCopyCodeFromURI(maybeUri);
+  const {onCopy} = useCopyCodeFromURI(maybeUri);
 
   return (
     <PageContentContainer>

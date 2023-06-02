@@ -9,7 +9,6 @@ import {
   Stack,
   Type,
   voidNode,
-  Weave,
 } from '@wandb/weave/core';
 import produce, {Draft} from 'immer';
 import * as _ from 'lodash';
@@ -17,7 +16,6 @@ import React, {useCallback, useMemo} from 'react';
 import {Button} from 'semantic-ui-react';
 import styled, {css} from 'styled-components';
 
-import {useWeaveContext} from '../../context';
 import {IdObj, PanelBankSectionConfig} from '../WeavePanelBank/panelbank';
 import {getSectionConfig, PBSection} from '../WeavePanelBank/PBSection';
 import {getPanelStacksForType} from './availablePanels';
@@ -316,8 +314,7 @@ export function toWeaveType(o: any): any {
 }
 
 export const fixChildData = (
-  fullItem: ChildPanelFullConfig,
-  weave: Weave
+  fullItem: ChildPanelFullConfig
 ): ChildPanelFullConfig => {
   if (isGroupNode(fullItem)) {
     return {
@@ -328,7 +325,7 @@ export const fixChildData = (
           : {
               ...fullItem.config,
               items: _.mapValues(fullItem.config.items, item =>
-                fixChildData(getFullChildPanel(item), weave)
+                fixChildData(getFullChildPanel(item))
               ),
             },
     };
@@ -336,7 +333,7 @@ export const fixChildData = (
   return fullItem;
 };
 
-function dereferenceItemVars(item: any, stack: Stack, weave: Weave): any {
+function dereferenceItemVars(item: any, stack: Stack): any {
   // We fully dereference variables found with panels here. Because on the server
   // we end up with const(Panel).config... we need any expressions fetched in that
   // way to be executable (no variables present).
@@ -353,13 +350,13 @@ function dereferenceItemVars(item: any, stack: Stack, weave: Weave): any {
         item.config == null
           ? undefined
           : _.mapValues(item.config, child =>
-              dereferenceItemVars(child, childStack, weave)
+              dereferenceItemVars(child, childStack)
             ),
     };
   } else if (isNodeOrVoidNode(item)) {
     return dereferenceAllVars(item, stack).node;
   } else if (_.isPlainObject(item)) {
-    return _.mapValues(item, child => dereferenceItemVars(child, stack, weave));
+    return _.mapValues(item, child => dereferenceItemVars(child, stack));
   }
   return item;
 }
@@ -367,7 +364,6 @@ function dereferenceItemVars(item: any, stack: Stack, weave: Weave): any {
 export function makeItemNode(
   item: ChildPanelConfig,
   stack: Stack,
-  weave: Weave,
   allowedPanels: string[] | undefined
 ): NodeOrVoidNode {
   let fullItem = getFullChildPanel(item);
@@ -385,36 +381,35 @@ export function makeItemNode(
     config: curPanelId === fullItem.id ? fullItem.config : undefined,
     _renderAsPanel: fullItem?.config?._renderAsPanel,
   } as any;
-  fullItem = fixChildData(fullItem, weave);
+  fullItem = fixChildData(fullItem);
 
   // Walk through the value, dereferencing encountered variables.
-  fullItem = dereferenceItemVars(fullItem, stack, weave);
+  fullItem = dereferenceItemVars(fullItem, stack);
 
   const weaveType = toWeaveType(fullItem);
   return constNodeUnsafe(weaveType, fullItem);
 }
 
-function getItemVars(
+export function getItemVars(
   varName: string,
   item: ChildPanelConfig,
   stack: Stack,
-  weave: Weave,
   allowedPanels: string[] | undefined
 ): {[name: string]: NodeOrVoidNode} {
   const fullItem = getFullChildPanel(item);
   if (isGroupNode(fullItem)) {
     // Recursive group variables are hoisted
     const result = _.mapValues(fullItem.config.items, i =>
-      makeItemNode(i, stack, weave, fullItem.config.allowedPanels)
+      makeItemNode(i, stack, fullItem.config.allowedPanels)
     );
     // some of the notebooks have not been updated to fetch nested
     // variables instead of accessing from the sidebar, so leaving this
     // here for now.
-    result[varName] = makeItemNode(fullItem, stack, weave, allowedPanels);
+    result[varName] = makeItemNode(fullItem, stack, allowedPanels);
     return result;
   }
   return {
-    [varName]: makeItemNode(fullItem, stack, weave, allowedPanels),
+    [varName]: makeItemNode(fullItem, stack, allowedPanels),
   };
 }
 
@@ -464,7 +459,6 @@ const usePanelGroupCommon = (props: PanelGroupProps) => {
 };
 
 export const PanelGroupConfigComponent: React.FC<PanelGroupProps> = props => {
-  const weave = useWeaveContext();
   const {handleAddPanel} = usePanelGroupCommon(props);
   const config = props.config ?? PANEL_GROUP_DEFAULT_CONFIG();
   const {updateConfig, updateConfig2} = props;
@@ -559,7 +553,6 @@ export const PanelGroupConfigComponent: React.FC<PanelGroupProps> = props => {
         name,
         item,
         pushFrame(stack, newVars),
-        weave,
         config.allowedPanels
       ),
     };
@@ -733,7 +726,6 @@ const useSectionConfig = (
 };
 
 export const PanelGroup: React.FC<PanelGroupProps> = props => {
-  const weave = useWeaveContext();
   const config = props.config ?? PANEL_GROUP_DEFAULT_CONFIG();
   const {stack} = usePanelContext();
   const {updateConfig, updateConfig2} = props;
@@ -847,18 +839,11 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
       keyedChildPanels[name] = unwrappedItem;
       newVars = {
         ...newVars,
-        ...getItemVars(name, item, stack, weave, config.allowedPanels),
+        ...getItemVars(name, item, stack, config.allowedPanels),
       };
     });
     return keyedChildPanels;
-  }, [
-    config,
-    handleSiblingVarEvent,
-    stack,
-    updateConfig,
-    updateConfig2,
-    weave,
-  ]);
+  }, [config, handleSiblingVarEvent, stack, updateConfig, updateConfig2]);
   const {gridConfig, updateGridConfig2} = useSectionConfig(
     props.config,
     updateConfig2

@@ -1,6 +1,6 @@
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import {useTraceUpdate} from '@wandb/weave/common/util/hooks';
-import {constNodeUnsafe, Node} from '@wandb/weave/core';
+import {constNodeUnsafe, Node, Stack} from '@wandb/weave/core';
 import produce from 'immer';
 import React, {useCallback, useEffect, useMemo} from 'react';
 
@@ -22,7 +22,7 @@ import {
 import {IconBack, IconClose, IconOverflowHorizontal} from './Icons';
 import * as Panel2 from './panel';
 import {Panel2Loader} from './PanelComp';
-import {PanelContextProvider} from './PanelContext';
+import {PanelContextProvider, usePanelContext} from './PanelContext';
 import {fixChildData, toWeaveType} from './PanelGroup';
 import {
   useCloseEditor,
@@ -51,6 +51,7 @@ const usePanelPanelCommon = (props: PanelPanelProps) => {
   const setSelectedPanel = useSetInspectingPanel();
   const panelConfig = props.config;
   const initialLoading = panelConfig == null;
+  const {stack} = usePanelContext();
 
   const setPanelConfig = updateConfig2;
 
@@ -62,22 +63,30 @@ const usePanelPanelCommon = (props: PanelPanelProps) => {
         // Python may mass us unitialized panels (panels that don't have
         // configs, or even just expressions). We walk through and initialize
         // them here to make sure our panel state is valid.
-        const hydratedPanel = await asyncMapPanels(
-          loadedPanel,
-          async (panel: ChildPanelFullConfig) => {
-            if (panel.config != null) {
-              return panel;
+        let hydratedPanel: ChildPanelFullConfig;
+        try {
+          hydratedPanel = await asyncMapPanels(
+            loadedPanel,
+            stack,
+            async (panel: ChildPanelFullConfig, childStack: Stack) => {
+              if (panel.config != null) {
+                return panel;
+              }
+              const {id, config} = await initPanel(
+                weave,
+                panel.input_node,
+                panel.id,
+                undefined,
+                childStack
+              );
+              return {...panel, id, config};
             }
-            const {id, config} = await initPanel(
-              weave,
-              panel.input_node,
-              panel.id,
-              undefined,
-              []
-            );
-            return {...panel, id, config};
-          }
-        );
+          );
+          // const hydratedPanel = loadedPanel;
+        } catch (e) {
+          console.error('Error hydrating panel', e);
+          return;
+        }
 
         setPanelConfig(() => hydratedPanel);
       };
@@ -89,6 +98,7 @@ const usePanelPanelCommon = (props: PanelPanelProps) => {
     panelQuery.loading,
     panelQuery.result,
     setPanelConfig,
+    stack,
     weave,
   ]);
   useTraceUpdate('panelQuery', {
@@ -124,12 +134,12 @@ const usePanelPanelCommon = (props: PanelPanelProps) => {
       setPanelConfig(origConfig => ({...origConfig, ...newConfig}));
       // Uncomment to enable panel state saving
       // Need to do fixChildData because the panel config is not fully hydrated.
-      const fixedConfig = fixChildData(getFullChildPanel(newConfig), weave);
+      const fixedConfig = fixChildData(getFullChildPanel(newConfig));
       setServerPanelConfig({
         val: constNodeUnsafe(toWeaveType(fixedConfig), fixedConfig),
       });
     },
-    [setPanelConfig, setServerPanelConfig, weave]
+    [setPanelConfig, setServerPanelConfig]
   );
   const panelUpdateConfig2 = useCallback(
     (change: (oldConfig: ChildPanelConfig) => ChildPanelFullConfig) => {
@@ -145,14 +155,14 @@ const usePanelPanelCommon = (props: PanelPanelProps) => {
         });
         consoleLog('PANEL PANEL CONFIG UPDATE2', newConfig);
         // Need to do fixChildData because the panel config is not fully hydrated.
-        const fixedConfig = fixChildData(getFullChildPanel(newConfig), weave);
+        const fixedConfig = fixChildData(getFullChildPanel(newConfig));
         setServerPanelConfig({
           val: constNodeUnsafe(toWeaveType(fixedConfig), fixedConfig),
         });
         return newConfig;
       });
     },
-    [setPanelConfig, setServerPanelConfig, weave]
+    [setPanelConfig, setServerPanelConfig]
   );
   consoleLog('PANEL PANEL RENDER CONFIG', panelConfig);
 
