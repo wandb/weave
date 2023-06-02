@@ -1021,7 +1021,7 @@ const PanelTableInner: React.FC<
         <div
           style={{
             textAlign: 'center',
-            position: 'absolute',
+            position: 'relative',
             width: '100%',
             height: `${
               height -
