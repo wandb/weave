@@ -12,7 +12,7 @@ import * as v11 from './v11';
 import * as v12 from './v12';
 
 export type {Scale, ScaleType} from './v10';
-export type {Signals} from './v11';
+export type {Signals} from './v12';
 
 export const PLOT_DIMS_UI = v2.PLOT_DIMS_UI;
 export const MARK_OPTIONS = v7.MARK_OPTIONS;

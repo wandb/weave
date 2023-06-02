@@ -2,7 +2,17 @@ import * as weave from '@wandb/weave/core';
 import * as v10 from './v10';
 import * as v11 from './v11';
 
-type LazyStringOrNull = weave.Node<'string'> | weave.VoidNode;
+type LazyStringOrNull = weave.Node<{
+  type: 'union';
+  members: ['string', 'none'];
+}>;
+type LazyDomain = weave.Node<{
+  type: 'typedDict';
+  propertyTypes: {
+    x: 'none' | {type: 'list'; objectType: 'any'};
+    y: 'none' | {type: 'list'; objectType: 'any'};
+  };
+}>;
 
 export type SeriesConfig = Omit<
   v11.SeriesConfig,
@@ -18,6 +28,7 @@ const lazyPaths = [
   'axisSettings.x.title' as const,
   'axisSettings.y.title' as const,
   'axisSettings.color.title' as const,
+  'signals.domain' as const,
 ];
 
 export type AxisSettings = {
@@ -32,14 +43,19 @@ export type AxisSettings = {
   };
 };
 
+export type Signals = Omit<v11.PlotConfig['signals'], 'domain'> & {
+  domain: v11.PlotConfig['signals']['domain'] | LazyDomain;
+};
+
 export type PlotConfig = Omit<
   v11.PlotConfig,
-  'configVersion' | 'series' | 'axisSettings'
+  'configVersion' | 'series' | 'axisSettings' | 'signals'
 > & {
   configVersion: 12;
   series: SeriesConfig[];
   axisSettings: AxisSettings;
   lazyPaths: typeof lazyPaths;
+  signals: Signals;
 };
 
 // ConcretePlotConfig is a subtype of PlotConfig

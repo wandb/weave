@@ -8,7 +8,6 @@ import CustomPanelRenderer, {
 } from '@wandb/weave/common/components/Vega3/CustomPanelRenderer';
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import {
-  constNode,
   // constFunction,
   ConstNode,
   constNodeUnsafe,
@@ -24,7 +23,6 @@ import {
   listObjectType,
   maybe,
   Node,
-  NodeOrVoidNode,
   numberBin,
   oneOrMany,
   // opAnd,
@@ -53,7 +51,6 @@ import {
   TypedDictType,
   union,
   varNode,
-  VoidNode,
   voidNode,
   withoutTags,
 } from '@wandb/weave/core';
@@ -106,7 +103,6 @@ import {
   DIM_NAME_MAP,
   // DiscreteSelection,
   LINE_SHAPES,
-  MARK_OPTIONS,
   MarkOption,
   PLOT_DIMS_UI,
   PlotConfig,
@@ -116,7 +112,6 @@ import {
   ScaleType,
   SeriesConfig,
 } from './versions';
-import {Config} from 'vega-lite';
 
 const recordEvent = makeEventRecorder('Plot');
 
@@ -302,7 +297,7 @@ const useConcreteConfig = (
           return acc;
         }, {} as any)
       ),
-    [config.lazyPaths]
+    [config]
   );
 
   const concreteConfigUse = LLReact.useNodeValue(lazyConfigElementsNode);
@@ -343,7 +338,13 @@ const useConcreteConfig = (
 
       return {config: newConfig, loading: false};
     }
-  }, [concreteConfigEvaluationResult, concreteConfigLoading]);
+  }, [
+    concreteConfigEvaluationResult,
+    concreteConfigLoading,
+    config,
+    input,
+    stack,
+  ]);
 };
 
 const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
@@ -443,7 +444,7 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
         })}
       </>
     );
-  }, [config, updateConfig]);
+  }, [config, updateConfig, concreteConfig.axisSettings, configLoading]);
 
   const seriesConfigDom = useMemo(() => {
     const firstSeries = config.series[0];
@@ -1524,9 +1525,6 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
   const {frame, stack} = usePanelContext();
   const {config, isRefining} = useConfig(inputNode, props.config);
 
-  const configRef = useRef<PlotConfig>(config);
-  configRef.current = config;
-
   // side effect
   useEffect(() => {
     if (config.configVersion !== props.config?.configVersion) {
@@ -1607,6 +1605,9 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
 
   const {config: concreteConfig, loading: concreteConfigLoading} =
     useConcreteConfig(config, input, stack);
+
+  const concreteConfigRef = useRef<ConcretePlotConfig>(concreteConfig);
+  concreteConfigRef.current = concreteConfig;
 
   const loading = useMemo(
     () => result.loading || concreteConfigLoading || isRefining,
@@ -1701,10 +1702,6 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
       return dashMap.solid;
     };
 
-    if (concreteConfig == null) {
-      return scale;
-    }
-
     flatPlotTables
       .filter(
         (table, i) =>
@@ -1715,8 +1712,12 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
           ) === 'line'
       )
       .forEach((table, i) => {
-        scale.domain.push(PlotState.defaultSeriesName(config.series[i], weave));
-        scale.range.push(getStrokeDash(config.series[i].constants.lineStyle));
+        scale.domain.push(
+          PlotState.defaultSeriesName(concreteConfig.series[i], weave)
+        );
+        scale.range.push(
+          getStrokeDash(concreteConfig.series[i].constants.lineStyle)
+        );
       });
     return scale;
   }, [
@@ -1774,7 +1775,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
 
   const tooltipLineData: {[x: string]: ConstNode} = useMemo(() => {
     // concatenate all plot tables into one and group by x value
-    const showSeries = config.series.length > 1;
+    const showSeries = concreteConfig.series.length > 1;
     return _.mapValues(
       _.groupBy(concattedLineTable, row => row[vegaCols[row._seriesIndex].x]),
       rows => {
@@ -1793,7 +1794,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
             const mappedPropTypes = _.mapKeys(rowType.propertyTypes, (v, k) =>
               PlotState.fixKeyForVega(k)
             );
-            const series = config.series[row._seriesIndex];
+            const series = concreteConfig.series[row._seriesIndex];
             const seriesName = PlotState.defaultSeriesName(series, weave);
 
             // x
@@ -1807,7 +1808,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
             // TODO: make this work for discrete domains
             let returnEarly = false;
             ['x' as const, 'y' as const].forEach(axis => {
-              const domain = config.signals.domain[axis];
+              const domain = concreteConfig.signals.domain[axis];
               if (domain) {
                 if (
                   !PlotState.selectionContainsValue(
@@ -1859,7 +1860,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     listOfTableNodes,
     weave,
     vegaReadyTables,
-    config.signals.domain,
+    concreteConfig.signals.domain,
   ]);
 
   const brushableAxes = useMemo(
@@ -1919,13 +1920,17 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
 
   const xScaleAndDomain = useMemo(
     () =>
-      config.signals.domain.x ? {scale: {domain: config.signals.domain.x}} : {},
-    [config.signals.domain.x]
+      concreteConfig.signals.domain.x
+        ? {scale: {domain: concreteConfig.signals.domain.x}}
+        : {},
+    [concreteConfig.signals.domain.x]
   );
   const yScaleAndDomain = useMemo(
     () =>
-      config.signals.domain.y ? {scale: {domain: config.signals.domain.y}} : {},
-    [config.signals.domain.y]
+      concreteConfig.signals.domain.y
+        ? {scale: {domain: concreteConfig.signals.domain.y}}
+        : {},
+    [concreteConfig.signals.domain.y]
   );
 
   const [globalColorScales, setGlobalColorScales] = useState<any[]>();
@@ -2375,7 +2380,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     });
     const lineTooltipData = normalizedTable.filter(row => {
       for (const axis of [`x`, `y`] as const) {
-        const domain = config.signals.domain[axis];
+        const domain = concreteConfig.signals.domain[axis];
         if (domain) {
           if (!PlotState.selectionContainsValue(domain, row[axis])) {
             return false;
@@ -2566,7 +2571,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
       if (hasUnit) {
         vegaView.addSignalListener('unit', (name, value) => {
           const currHasLine = hasLineRef.current;
-          const currConfig = configRef.current;
+          const currConfig = concreteConfigRef.current;
           const currSetGlobalColorScales = setGlobalColorScalesRef.current;
           const currNeedsNewColorScale = needsNewColorScaleRef.current;
 
@@ -2587,7 +2592,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
       vegaView.addEventListener('mouseup', async () => {
         const currBrushMode = brushModeRef.current;
         const currUpdateConfig = updateConfigRef.current;
-        const currConfig = configRef.current;
+        const currConfig = concreteConfigRef.current;
         const currSetToolTipsEnabled = setToolTipsEnabledRef.current;
         const signalName = `brush`;
         const dataName = `brush_store`;
@@ -2650,7 +2655,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
       });
 
       vegaView.addEventListener('dblclick', async () => {
-        const currConfig = configRef.current;
+        const currConfig = concreteConfigRef.current;
         const currUpdateConfig = updateConfigRef.current;
         if (!_.isEmpty(currConfig.signals.domain)) {
           const newSignals = produce(currConfig.signals, draft => {

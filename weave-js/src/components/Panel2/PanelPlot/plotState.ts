@@ -1,12 +1,9 @@
 import {
   allObjPaths,
-  constNode,
-  constNodeUnsafe,
   constNumber,
   constString,
   dict,
   isAssignableTo,
-  isNodeOrVoidNode,
   isVoidNode,
   list,
   maybe,
@@ -15,9 +12,7 @@ import {
   nullableTaggableValue,
   numberBin,
   oneOrMany,
-  opArray,
   opCount,
-  opDict,
   opGetRunTag,
   opNumberBin,
   opNumbersBinEqual,
@@ -31,7 +26,6 @@ import {
   union,
   varNode,
   voidNode,
-  VoidNode,
   WeaveInterface,
   withNamedTag,
 } from '@wandb/weave/core';
@@ -42,7 +36,6 @@ import * as TableState from '../PanelTable/tableState';
 import {
   AnyPlotConfig,
   AxisSelections,
-  ConcretePlotConfig,
   ConcreteSeriesConfig,
   ContinuousSelection,
   DEFAULT_POINT_SIZE,
@@ -58,8 +51,6 @@ import {
   SeriesConfig,
 } from './versions';
 import * as v1 from './versions/v1';
-import {toWeaveType} from '../toWeaveType';
-import {number} from 'yargs';
 
 export type DimType =
   | 'optionSelect'
@@ -1498,7 +1489,7 @@ export function selectionContainsValue(
 
 export function setThroughArray(
   object: any,
-  path: (string | number)[],
+  path: Array<string | number>,
   value: any
 ): any {
   if (path.length === 0) {
@@ -1522,7 +1513,10 @@ export function setThroughArray(
   return object;
 }
 
-export function getThroughArray(object: any, path: (string | number)[]): any {
+export function getThroughArray(
+  object: any,
+  path: Array<string | number>
+): any {
   if (path.length === 0) {
     return object;
   }
