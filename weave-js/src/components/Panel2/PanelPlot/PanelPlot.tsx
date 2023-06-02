@@ -2660,6 +2660,9 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
               newConfigSignals = produce(newConfigSignals, draft => {
                 draft.selection[dimName] = undefined;
               });
+              if (dimName === 'x') {
+                currMutateDomain.x(signal.domain[dimName]);
+              }
             }
           });
 
