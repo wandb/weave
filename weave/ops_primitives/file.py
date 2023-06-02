@@ -97,6 +97,8 @@ def get_file_uri(file_path):
 
 
 def get_directory_structure(dir_path):
+    # TODO: after writing this, it seems like we could use local_file.get_path_info
+    # instead!
     # Thanks gpt-4?
     structure = {}
     for dirpath, dirnames, filenames in os.walk(dir_path):
