@@ -281,11 +281,13 @@ DiscreteSelection = typing.List[str]
 ContinuousSelection = typing.Tuple[float, float]
 Selection = typing.Optional[typing.Union[ContinuousSelection, DiscreteSelection]]
 
+LazySelection = typing.Union[Selection, SelectFunction]
+
 
 @weave.type()
 class AxisSelections:
-    x: typing.Optional[Selection] = None
-    y: typing.Optional[Selection] = None
+    x: typing.Optional[LazySelection] = None
+    y: typing.Optional[LazySelection] = None
 
 
 @weave.type()
@@ -302,14 +304,6 @@ class PlotConfig:
     configOptionsExpanded: typing.Optional[ConfigOptionsExpanded]
     signals: Signals
     configVersion: int = 12
-    lazyPaths: list[str] = dataclasses.field(
-        default_factory=lambda: [
-            "series.#.constants.mark",
-            "axisSettings.x.title",
-            "axisSettings.y.title",
-            "axisSettings.color.title",
-        ]
-    )
 
 
 @weave.type("plot")
@@ -338,7 +332,9 @@ class Plot(panel.Panel):
         x_title: typing.Optional[SelectFunction] = None,
         y_title: typing.Optional[SelectFunction] = None,
         color_title: typing.Optional[SelectFunction] = None,
-        signals: typing.Optional[Signals] = None,
+        domain_x: typing.Optional[SelectFunction] = None,
+        # TODO: uncomment
+        # domain_y: typing.Optional[SelectFunction] = None,
     ):
         super().__init__(input_node=input_node, vars=vars)
         self.config = config
@@ -357,6 +353,16 @@ class Plot(panel.Panel):
                     if select_functions is None:
                         select_functions = {}
                     select_functions[typing.cast(DimName, field.name)] = maybe_dim
+
+            signals = Signals(domain=AxisSelections(), selection=AxisSelections())
+            if domain_x:
+                signals.domain.x = domain_x
+
+            # TODO: use
+            """
+            if domain_y:
+                signals.domain.y = domain_y
+            """
 
             if not (
                 (series is not None)
@@ -393,12 +399,6 @@ class Plot(panel.Panel):
                 x=LegendSetting(), y=LegendSetting(), color=LegendSetting()
             )
 
-            if signals is None:
-                signals = Signals(
-                    domain=AxisSelections(x=None, y=None),
-                    selection=AxisSelections(x=None, y=None),
-                )
-
             self.config = PlotConfig(
                 series=config_series,
                 axisSettings=config_axisSettings,
@@ -406,8 +406,6 @@ class Plot(panel.Panel):
                 configOptionsExpanded=ConfigOptionsExpanded(),
                 signals=signals,
             )
-
-            print(self.config)
 
             if no_axes:
                 self.set_no_axes()
@@ -545,8 +543,13 @@ def selection_is_discrete(selection: Selection) -> bool:
 
 
 def filter_node_to_selection(
-    node: graph.Node, selection: Selection, key: str
+    node: graph.Node, selection: LazySelection, key: str
 ) -> graph.Node:
+    if isinstance(selection, graph.Node):
+        selection = weave_internal.call_fn(selection, {})
+
+    selection = typing.cast(Selection, selection)
+
     if selection_is_continuous(selection):
         selection = typing.cast(ContinuousSelection, selection)
 

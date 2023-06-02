@@ -77,6 +77,10 @@ class TimeSeriesConfig:
         )
     )
 
+    domain_x: weave.Node[typing.Optional[typing.Any]] = dataclasses.field(
+        default_factory=lambda: weave.graph.ConstNode(weave.types.NoneType(), None)
+    )
+
 
 def first_column_of_type(
     node_type: weave.types.Type,
@@ -161,7 +165,16 @@ class TimeSeries(weave.Panel):
         # TODO: add the ability to configure options here
         if self.config is None:
             self.config = TimeSeriesConfig()
-            for attr in ["x", "min_x", "max_x", "label", "mark", "agg", "axis_labels"]:
+            for attr in [
+                "x",
+                "min_x",
+                "max_x",
+                "label",
+                "mark",
+                "agg",
+                "axis_labels",
+                "domain_x",
+            ]:
                 if attr in options:
                     value = options[attr]
                     if not isinstance(value, weave.graph.Node):
@@ -236,7 +249,6 @@ class TimeSeries(weave.Panel):
     # The config render op. This renders the config editor.
     @weave.op()
     def render_config(self) -> weave.panels.Group:
-        input_node = self.input_node
         config = typing.cast(TimeSeriesConfig, self.config)
         return weave.panels.Group(
             items={
@@ -346,8 +358,6 @@ class TimeSeries(weave.Panel):
             label="label",
         )
 
-        print("tsconfig", config)
-
         return panel_plot.Plot(
             binned,
             x=lambda row: row["x"]["start"],
@@ -357,4 +367,5 @@ class TimeSeries(weave.Panel):
             x_title=function_to_string(config.x),
             y_title=function_to_string(config.agg),
             color_title=function_to_string(config.label),
+            domain_x=config.domain_x,
         )
