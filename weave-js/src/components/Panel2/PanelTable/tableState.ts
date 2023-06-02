@@ -1,5 +1,6 @@
 import {
   allObjPaths,
+  rootObject,
   constFunction,
   ConstNode,
   constNodeUnsafe,
@@ -33,6 +34,7 @@ import {
   opMerge,
   opNumbersMax,
   opNumbersMin,
+  opObjGetAttr,
   opOffset,
   opPick,
   opSort,
@@ -125,10 +127,13 @@ export function emptyTable(): TableState {
 }
 
 export function initTableWithPickColumns(
-  pickCols: string[],
   inputArrayNode: Node,
   weave: WeaveInterface
 ) {
+  const arrayType = inputArrayNode.type;
+  let allColumns: Node[] = [];
+  const objectType = listObjectType(arrayType);
+
   let ts = emptyTable();
   const exNode = getRowExampleNode(
     ts.preFilterFunction,
@@ -140,16 +145,25 @@ export function initTableWithPickColumns(
     inputArrayNode,
     weave
   );
-  if (pickCols.length === 0) {
+
+  if (
+    isAssignableTo(nonNullable(objectType), {
+      type: 'union',
+      members: [typedDict({}), rootObject()],
+    })
+  ) {
+    allColumns = autoTableColumnExpressions(exNode.type, objectType);
+    console.log('ALL COLUMNS', allColumns);
+  }
+  const columns =
+    allColumns.length > 100 ? allColumns.slice(0, 100) : allColumns;
+  if (columns.length === 0) {
     // If no columns are provided, at least fill it with a general row column.
     ts = addColumnToTable(ts, varNode(exNode.type, 'row')).table;
   } else {
-    const addCols: AddColumnEntries = pickCols.map(colKey => ({
-      selectFn: opPick({
-        obj: varNode(exNode.type, 'row') as any,
-        key: constString(colKey),
-      }),
-      keyName: colKey,
+    const addCols: AddColumnEntries = columns.map(colExpr => ({
+      selectFn: colExpr,
+      keyName: '',
     }));
 
     ts = addColumnsToTable(ts, addCols).table;
@@ -172,11 +186,44 @@ function isNDArrayLike(type: Type): boolean {
 // Try to pick nice default columns to make a table for the given object
 // type. See the initial columns test in tableState.test.ts to see examples
 // of current behavior.
-export function initTableColumnsFromObjectType(objectType: Type): string[] {
+export function autoTableColumnExpressions(
+  tableRowType: Type,
+  objectType: Type
+): Node[] {
   const allPaths = allObjPaths(objectType).filter(
     path => !isNDArrayLike(path.type) && !isAssignableTo(path.type, 'none')
   );
-  return allPaths.map(pt => pt.path.map(escapeDots).join('.'));
+  console.log('ALL PATHS', allPaths);
+  return allPaths
+    .map(pt => pt.path.map(escapeDots))
+    .map(path => {
+      let expr: Node = varNode(tableRowType, 'row');
+      const pathStr: string[] = [];
+      for (const p of path) {
+        console.log(expr, p);
+        if (!p.startsWith('__object__')) {
+          pathStr.push(p);
+        } else {
+          if (pathStr.length > 0) {
+            expr = opPick({
+              obj: expr,
+              key: constString(pathStr.join('.')),
+            });
+          }
+          expr = opObjGetAttr({
+            self: expr,
+            name: constString(p.slice('__object__'.length)),
+          });
+        }
+      }
+      if (pathStr.length > 0) {
+        expr = opPick({
+          obj: expr,
+          key: constString(pathStr.join('.')),
+        });
+      }
+      return expr;
+    });
 }
 
 // Given a row node that we're going to render as a table, try to
@@ -190,19 +237,10 @@ export function initTableFromTableType(
   inputArrayNode: Node,
   weave: WeaveInterface
 ) {
-  const arrayType = inputArrayNode.type;
-  let allColumns: string[] = [];
-  const objectType = listObjectType(arrayType);
-  if (isAssignableTo(nonNullable(objectType), typedDict({}))) {
-    allColumns = initTableColumnsFromObjectType(objectType);
-  }
-  const columns =
-    allColumns.length > 100 ? allColumns.slice(0, 100) : allColumns;
-
-  let table = initTableWithPickColumns(columns, inputArrayNode, weave);
+  let table = initTableWithPickColumns(inputArrayNode, weave);
   table = maybeAddCompareColumn(table, inputArrayNode, weave);
   table = setAutoColumns(table, true);
-  return {table, allColumns};
+  return {table};
 }
 
 function maybeAddCompareColumn(

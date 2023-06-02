@@ -124,8 +124,8 @@ def make_app():
 def list_ops():
     with wandb_api.from_environment():
         # TODO: this is super slow.
-        if not environment.wandb_production():
-            registry_mem.memory_registry.load_saved_ops()
+        # if not environment.wandb_production():
+        #     registry_mem.memory_registry.load_saved_ops()
         ops = registry_mem.memory_registry.list_ops()
         ret = []
         for op in ops:

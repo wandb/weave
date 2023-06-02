@@ -188,7 +188,7 @@ const PanelTableInnerConfigSetter: React.FC<
 > = props => {
   const weave = useWeaveContext();
   const {input, updateConfig, config} = props;
-  const {tableState, autoTable, allColumns, loading} = useAutomatedTableState(
+  const {tableState, autoTable, loading} = useAutomatedTableState(
     input,
     config.tableState,
     weave
@@ -227,7 +227,6 @@ const PanelTableInnerConfigSetter: React.FC<
       {...props}
       config={protectedConfig}
       autoTable={autoTable}
-      allColumns={allColumns}
       updateConfig={protectedUpdateConfig}
       showColumnSelect={showColumnSelect}
       setShowColumnSelect={setShowColumnSelect}
@@ -241,7 +240,6 @@ const PanelTableInner: React.FC<
     width: number;
     config: PanelTableConfig;
     autoTable: Table.TableState;
-    allColumns: string[];
     showColumnSelect: boolean;
     setShowColumnSelect: (value: boolean) => void;
     rowActions?: RowActionItems;
@@ -260,7 +258,6 @@ const PanelTableInner: React.FC<
     width,
     config,
     autoTable,
-    allColumns,
     showColumnSelect,
     setShowColumnSelect,
   } = props;
@@ -880,11 +877,7 @@ const PanelTableInner: React.FC<
               open={showColumnSelect}
               onClose={() => setShowColumnSelect(false)}>
               <Modal.Content>
-                <ColumnSelector
-                  tableState={tableState}
-                  update={updateTable}
-                  allColumnNames={allColumns}
-                />
+                <ColumnSelector tableState={tableState} update={updateTable} />
               </Modal.Content>
               <Modal.Actions>
                 <Button
@@ -917,7 +910,6 @@ const PanelTableInner: React.FC<
     showColumnSelect,
     tableState,
     updateTable,
-    allColumns,
     setRowSize,
     updateIndexOffset,
     downloadDataAsCSV,

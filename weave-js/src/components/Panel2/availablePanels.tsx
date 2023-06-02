@@ -157,6 +157,7 @@ function scoreHandlerStack(type: Type, hs: PanelStack) {
   if (
     sidAndName.id.includes('Expression') ||
     sidAndName.id.includes('Auto') ||
+    sidAndName.id.includes('object') ||
     sidAndName.id.includes('any-obj') ||
     sidAndName.id.includes('debug-expression-graph')
   ) {
@@ -180,7 +181,7 @@ function stackHasHiddenPanel(panelStack: PanelStack): boolean {
 // chosen, pass it as the second argument. The curPanelId will match
 // panelId if it is available, otherwise it will revert to the first
 // available panel.
-interface GetPanelStacksForTypeOpts {
+export interface GetPanelStacksForTypeOpts {
   excludeTable?: boolean;
   excludePlot?: boolean;
   excludeMultiTable?: boolean;

@@ -12,6 +12,7 @@ import {
   NodeOrVoidNode,
   replaceChainRoot,
   Stack,
+  Type,
   varNode,
   voidNode,
   Weave,
@@ -29,6 +30,7 @@ import {consoleLog} from '../../util';
 import {
   getPanelStacksForType,
   panelSpecById,
+  PanelStack,
   usePanelStacksForType,
 } from './availablePanels';
 import * as ConfigPanel from './ConfigPanel';
@@ -89,6 +91,38 @@ export const getFullChildPanel = (
   }
 };
 
+function childPanelGetPanelsForType(
+  type: Type,
+  panelId: string | undefined,
+  opts: {allowedPanels?: string[]}
+): {
+  curPanelId: string | undefined;
+  stackIds: Array<{id: string; displayName: string}>;
+} {
+  const {curPanelId, stackIds} = getPanelStacksForType(type, panelId, opts);
+  const sids = stackIds.filter(s => !s.id.includes('.'));
+  return {curPanelId, stackIds: sids};
+}
+
+function useChildPanelGetPanelsForType(
+  type: Type,
+  panelId: string | undefined,
+  opts: {allowedPanels?: string[]}
+): {
+  curPanelId: string | undefined;
+  stackIds: Array<{id: string; displayName: string}>;
+  handler: PanelStack | undefined;
+} {
+  const {curPanelId, stackIds} = usePanelStacksForType(type, panelId, opts);
+  const sids = stackIds.filter(s => !s.id.includes('.'));
+  const handler = curPanelId != null ? panelSpecById(curPanelId) : undefined;
+  return {
+    curPanelId,
+    stackIds: sids,
+    handler,
+  };
+}
+
 const initPanelConfig = async (
   weave: Weave,
   id: string,
@@ -111,7 +145,7 @@ const initPanel = async (
   stack: Stack
 ): Promise<{id: string; config: any}> => {
   inputNode = await weave.refineNode(inputNode, stack);
-  const {curPanelId: id} = getPanelStacksForType(inputNode.type, panelId, {
+  const {curPanelId: id} = childPanelGetPanelsForType(inputNode.type, panelId, {
     allowedPanels,
   });
   if (id == null) {
@@ -184,11 +218,12 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
   const {stack} = usePanelContext();
 
   panelInputExpr = useNodeWithServerType(panelInputExpr).result;
-  const {handler, curPanelId, stackIds} = usePanelStacksForType(
+  const {curPanelId, stackIds, handler} = useChildPanelGetPanelsForType(
     panelInputExpr.type,
     panelId,
     {allowedPanels: props.allowedPanels}
   );
+  console.log('CUR PANEL ID', stackIds, handler);
 
   const panelOptions = useMemo(() => {
     return stackIds.map(si => {

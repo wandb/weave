@@ -61,6 +61,16 @@ export const PanelSubTypes: ContainerPanelType[] = [
   {type: 'container_panel_type'},
 ];
 
+interface ObjectTypeAttrs {
+  [key: string]: Type;
+}
+interface ObjectTypeBase {
+  type: string;
+  is_object: true;
+  _base_type: Type;
+}
+export type ObjectType = ObjectTypeBase & ObjectTypeAttrs;
+
 // End Weave Python additions
 
 // TODO: figure out how this merges with dict
@@ -70,6 +80,10 @@ export interface TypedDictType {
   // undefined here forces us to handle cases where properties
   // missing
   propertyTypes: {[key: string]: Type | undefined};
+}
+
+export interface RootObjectType {
+  type: 'Object';
 }
 
 export interface Dict<T extends Type = Type> {
@@ -407,6 +421,8 @@ export type ComplexType =
   // End Weave Python additions
   | HistogramType
   | TypedDictType
+  | RootObjectType
+  | ObjectType
   | AllListType // WeavePython: changed this to support many list types
   // | Tensor
   | Dict
