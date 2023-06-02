@@ -107,11 +107,11 @@ function opToString(
   const opDef = opStore.getOpDef(op.name);
 
   // Special case for __getattr__
-  // if (op.name.endsWith('__getattr__')) {
-  //   return `${innerNodeToString(argValues[0])}.${innerNodeToString(
-  //     argValues[1]
-  //   ).slice(1, -1)}`;
-  // }
+  if (op.name.endsWith('__getattr__')) {
+    return `${innerNodeToString(argValues[0])}.${innerNodeToString(
+      argValues[1]
+    ).slice(1, -1)}`;
+  }
 
   switch (opDef.renderInfo.type) {
     case 'arrayLiteral': {
@@ -161,10 +161,6 @@ function opToString(
       return `${argValues.length > 0 ? innerNodeToString(argValues[0]) : ''}${
         level != null ? '\n  ' : ''
       }.${opDisplayName(op, opStore)}${unaryOpArgs}`;
-    case 'getAttr':
-      return `${innerNodeToString(argValues[0])}.${innerNodeToString(
-        argValues[1]
-      ).slice(1, -1)}`;
     case 'function':
       const opArgs = argValues
         .map(innerNodeToString)

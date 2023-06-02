@@ -8,25 +8,37 @@ import * as S from './OpDoc.styles';
 export interface OpDocProps {
   opName: string;
   className?: string;
+
+  // For __getattr__ ops only
+  attributeName?: string;
 }
 
-const OpDoc: React.FC<OpDocProps> = ({opName, className}) => {
+const OpDoc: React.FC<OpDocProps> = ({opName, className, attributeName}) => {
   const {client} = useWeaveContext();
   const opDef = client.opStore.getOpDef(opName);
 
+  // Special case for __getattr__
+  const isGetAttr = opName.endsWith('__getattr__');
+
   // NOTE: this assumes we'll only be documenting binary, function, and chain ops
   // it'll need some tweaking if we decide to document "pick", for instance.
-  const displayName = opDisplayName({name: opName}, client.opStore);
+  const displayName = isGetAttr
+    ? attributeName
+    : opDisplayName({name: opName}, client.opStore);
 
   const description = markdown.sanitizeHTML(
-    markdown.generateHTML(opDef.description)
+    markdown.generateHTML(
+      isGetAttr
+        ? `Retrieve this object's **${attributeName}** attribute.`
+        : opDef.description
+    )
   );
-  const argDescriptions = Object.entries(opDef.argDescriptions).map(
-    ([argName, argDescription]) => [
-      argName,
-      markdown.sanitizeHTML(markdown.generateHTML(argDescription)),
-    ]
-  );
+  const argDescriptions = isGetAttr
+    ? []
+    : Object.entries(opDef.argDescriptions).map(([argName, argDescription]) => [
+        argName,
+        markdown.sanitizeHTML(markdown.generateHTML(argDescription)),
+      ]);
   if (opDef.renderInfo.type === 'chain') {
     // the first argument to a chain operator is implicit -- it's the thing before the
     // dot -- it would be confusing to show it in the docs as an argument
@@ -34,7 +46,11 @@ const OpDoc: React.FC<OpDocProps> = ({opName, className}) => {
   }
 
   const returnValueDescription = markdown.sanitizeHTML(
-    markdown.generateHTML(opDef.returnValueDescription)
+    markdown.generateHTML(
+      isGetAttr
+        ? `This object's **${attributeName}** attribute`
+        : opDef.returnValueDescription
+    )
   );
   return (
     <div
