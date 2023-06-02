@@ -166,22 +166,6 @@ const useConfig = (
       stack
     );
 
-    // ensure that the domain is valid for the axis type
-    ['x' as const, 'y' as const].forEach(axisName => {
-      ['domain' as const, 'selection' as const].forEach(signalName => {
-        if (
-          !PlotState.isValidDomainForAxisType(
-            migratedConfig.signals[signalName][axisName],
-            PlotState.getAxisType(migratedConfig.series[0], axisName)
-          )
-        ) {
-          migratedConfig = produce(migratedConfig, draft => {
-            draft.signals[signalName][axisName] = undefined;
-          });
-        }
-      });
-    });
-
     return migratedConfig;
   }, [propsConfig, inputNode, stack]);
 
@@ -323,7 +307,7 @@ const useConcreteConfig = (
       };
     } else {
       // generate the new config with the concrete values obtained from the execution of the lazy paths
-      const newConfig = _.omit(
+      let newConfig = _.omit(
         produce(config, draft => {
           draft.lazyPaths.forEach(path => {
             PlotState.setThroughArray(
@@ -335,6 +319,22 @@ const useConcreteConfig = (
         }),
         'lazyPaths'
       ) as ConcretePlotConfig;
+
+      // ensure that the domain is valid for the axis type
+      ['x' as const, 'y' as const].forEach(axisName => {
+        ['domain' as const, 'selection' as const].forEach(signalName => {
+          if (
+            !PlotState.isValidDomainForAxisType(
+              newConfig.signals[signalName][axisName],
+              PlotState.getAxisType(newConfig.series[0], axisName)
+            )
+          ) {
+            newConfig = produce(newConfig, draft => {
+              draft.signals[signalName][axisName] = undefined;
+            });
+          }
+        });
+      });
 
       return {config: newConfig, loading: false};
     }
@@ -1854,7 +1854,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
       }
     );
   }, [
-    config.series,
+    concreteConfig.series,
     concattedLineTable,
     vegaCols,
     listOfTableNodes,
@@ -2308,7 +2308,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
         {
           // filter out all data from this spec, this is just for rendering the brush zoom.
           transform: [{filter: 'false'}],
-          data: {name: `wandb-${config.series.length}`},
+          data: {name: `wandb-${concreteConfig.series.length}`},
           encoding: _.pick(dummyEncodings, ['x', 'y']),
           mark: 'point',
           params: [
@@ -2338,8 +2338,8 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     colorFieldIsRangeForSeries,
     listOfTableNodes,
     isOrgDashboard,
-    config.series,
-    config?.vegaOverlay,
+    concreteConfig.series,
+    concreteConfig?.vegaOverlay,
     isDashboard,
     hasLine,
     brushableAxes,
@@ -2368,7 +2368,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
 
         for (const axis of [`x`, `y`] as const) {
           if (
-            config.axisSettings[axis].scale?.type === `log` &&
+            concreteConfig.axisSettings[axis].scale?.type === `log` &&
             row[vegaCols[i][axis]] <= 0
           ) {
             return false;
@@ -2402,7 +2402,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
       });
     }
     if (hasLine || !isDashboard) {
-      data[`wandb-${config.series.length}`] = lineTooltipData;
+      data[`wandb-${concreteConfig.series.length}`] = lineTooltipData;
     }
     return data;
   }, [
@@ -2412,9 +2412,9 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     vegaCols,
     layerSpecs,
     normalizedTable,
-    config.axisSettings,
-    config.series,
-    config.signals.domain,
+    concreteConfig.axisSettings,
+    concreteConfig.series,
+    concreteConfig.signals.domain,
     globalColorScales,
   ]);
 
@@ -2513,7 +2513,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     return newSpec;
   }, [
     weave,
-    config.series,
+    concreteConfig.series,
     isDashboard,
     layerSpecs,
     concreteConfig.axisSettings,
@@ -2537,12 +2537,12 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
       // draw the brush
       let action = vegaView;
       const brushStore = {
-        unit: `layer_${config.series.length + (hasLine ? 1 : 0)}`,
+        unit: `layer_${concreteConfig.series.length + (hasLine ? 1 : 0)}`,
         fields: [] as Array<{field: string; channel: string; type: string}>,
       };
 
       ['x' as const, 'y' as const].forEach(axisName => {
-        const axisSelection = config.signals.selection[axisName];
+        const axisSelection = concreteConfig.signals.selection[axisName];
         if (axisSelection) {
           action = action.signal(`brush_${axisName}`, axisSelection);
           brushStore.fields.push({

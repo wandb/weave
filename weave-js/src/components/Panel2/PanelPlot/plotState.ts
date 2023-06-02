@@ -36,6 +36,7 @@ import * as TableState from '../PanelTable/tableState';
 import {
   AnyPlotConfig,
   AxisSelections,
+  ConcretePlotConfig,
   ConcreteSeriesConfig,
   ContinuousSelection,
   DEFAULT_POINT_SIZE,
@@ -1421,10 +1422,10 @@ export function getAxisType<T extends ConcreteSeriesConfig | SeriesConfig>(
 }
 
 export function clearSelection(
-  config: PlotConfig,
-  selection: keyof PlotConfig['signals'],
+  config: ConcretePlotConfig,
+  selection: keyof ConcretePlotConfig['signals'],
   axis?: keyof AxisSelections
-): PlotConfig {
+): ConcretePlotConfig {
   let keys: Array<keyof AxisSelections> = Object.keys(
     config.signals[selection]
   ) as Array<keyof AxisSelections>;
