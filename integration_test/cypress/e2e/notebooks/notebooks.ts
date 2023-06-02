@@ -64,7 +64,7 @@ function forEachWeaveOutputCellInNotebook(
         const url = new URL(src);
 
         // TODO: This switches depending on if in devmode
-        cy.visit('/__frontend/weave' + url.search);
+        cy.visit('/__frontend/weave_frontend' + url.search);
         // cy.visit('http://localhost:3000/' + url.search);
 
         cellTest(cell.id);
