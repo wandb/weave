@@ -275,17 +275,19 @@ export class RemoteHttpServer implements Server {
 
       const resolveOrReject = (response: {
         data: any[];
-        errors: Array<{message: string; traceback: string[]}>;
-        node_to_error: {[nodeNdx: number]: number};
+        errors?: Array<{message: string; traceback: string[]}>;
+        node_to_error?: {[nodeNdx: number]: number};
       }) => {
         (indexes as number[]).forEach((entryIndex, nodeIndex) => {
           const currentNode = nodeEntries[entryIndex].node;
-          const nodeErrorNdx = response.node_to_error[nodeIndex];
-          if (nodeErrorNdx != null) {
-            this.rejectNode(currentNode, response.errors[nodeErrorNdx]);
-          } else {
-            this.resolveNode(currentNode, response.data[nodeIndex]);
+          if (response.node_to_error != null && response.errors != null) {
+            const nodeErrorNdx = response.node_to_error[nodeIndex];
+            if (nodeErrorNdx != null) {
+              this.rejectNode(currentNode, response.errors[nodeErrorNdx]);
+              return;
+            }
           }
+          this.resolveNode(currentNode, response.data[nodeIndex]);
         });
       };
 
