@@ -141,13 +141,18 @@ export const useWeaveExpressionState = (
     [weave, editor]
   );
 
+  // For some reason, when we use `props.onFocus` instead,
+  // ESLint complains about a missing `useCallback` dependency on `props`.
+  const {onBlur: propsOnBlur, onFocus: propsOnFocus} = props;
   const [isFocused, setIsFocused] = React.useState(false);
   const onBlur = React.useCallback(() => {
     setIsFocused(false);
-  }, [setIsFocused]);
+    propsOnBlur?.();
+  }, [setIsFocused, propsOnBlur]);
   const onFocus = React.useCallback(() => {
     setIsFocused(true);
-  }, [setIsFocused]);
+    propsOnFocus?.();
+  }, [setIsFocused, propsOnFocus]);
 
   // Internal state should never be reinstantiated, but props will change
   // when a new expression is entered.  Capture these changes and dispatch
@@ -264,7 +269,8 @@ export const useRunButtonVisualState = (
   editor: Editor,
   isDirty: boolean,
   isValid: boolean,
-  isFocused: boolean
+  isFocused: boolean,
+  truncate = false
 ) => {
   const container = React.useRef<HTMLDivElement | null>(null);
   const applyButton = React.useRef<HTMLDivElement | null>(null);
@@ -279,6 +285,7 @@ export const useRunButtonVisualState = (
 
     if (
       !isValid ||
+      (truncate && !isFocused) ||
       (!isDirty && (!isFocused || Editor.string(editor, []).trim() === ''))
     ) {
       buttonNode.style.display = 'none';

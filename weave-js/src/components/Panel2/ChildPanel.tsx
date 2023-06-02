@@ -1,5 +1,11 @@
 import EditableField from '@wandb/weave/common/components/EditableField';
-import {linkHoverBlue} from '@wandb/weave/common/css/globals.styles';
+import {
+  linkHoverBlue,
+  GRAY_50,
+  GRAY_350,
+  Colors,
+  hexToRGB,
+} from '@wandb/weave/common/css/globals.styles';
 import {ValidatingTextInput} from '@wandb/weave/components/ValidatingTextInput';
 import {
   defaultLanguageBinding,
@@ -19,7 +25,7 @@ import {
 import {isValidVarName} from '@wandb/weave/core/util/var';
 import * as _ from 'lodash';
 import React, {useCallback, useMemo, useState} from 'react';
-import {Icon, Menu} from 'semantic-ui-react';
+import {Icon, Menu, Popup} from 'semantic-ui-react';
 import styled from 'styled-components';
 
 import {useWeaveContext} from '../../context';
@@ -50,6 +56,8 @@ import {getStackIdAndName} from './panellib/libpanel';
 import PanelNameEditor from './PanelNameEditor';
 import {TableState} from './PanelTable/tableState';
 import {ConfigSection} from './ConfigPanel';
+import {IconPencilEdit} from './Icons';
+import {IconButton} from '../IconButton';
 
 // This could be rendered as a code block with assignments, like
 // so.
@@ -506,7 +514,14 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
   );
 
   const [hoverPanel, setHoverPanel] = useState(false);
-  const [hoverExpression, setHoverExpression] = useState(false);
+
+  const [expressionFocused, setExpressionFocused] = useState(false);
+  const onFocusExpression = useCallback(() => {
+    setExpressionFocused(true);
+  }, []);
+  const onBlurExpression = useCallback(() => {
+    setExpressionFocused(false);
+  }, []);
 
   return curPanelId == null || handler == null ? (
     <div>
@@ -519,100 +534,68 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
       onMouseLeave={() => setHoverPanel(false)}>
       {props.editable && (
         <Styles.EditorBar>
-          <div style={{width: '100%'}}>
-            <Menu
-              borderless
-              style={{
-                border: 'none',
-                minHeight: '2rem',
-                marginBottom: '2px',
-                borderBottom: '1px solid lightgray',
-                borderRadius: '0px',
-                boxShadow: 'none',
-                padding: '5px',
-                backgroundColor: inputHighlighted ? '#edf8f6' : undefined,
-              }}>
-              <Menu.Menu style={{fontSize: '1rem', flex: '1 1 auto'}}>
-                <Menu.Item style={{padding: 0, flex: '1 1 auto'}}>
-                  {props.prefixHeader}
-                  {props.pathEl != null && (
-                    <div
-                      style={{
-                        whiteSpace: 'nowrap',
-                        marginRight: 8,
-                      }}>
-                      <ValidatingTextInput
-                        dataTest="panel-expression-path"
-                        onCommit={props.updateName ?? (() => {})}
-                        validateInput={validateName}
-                        initialValue={props.pathEl}
-                      />{' '}
-                      ={' '}
-                    </div>
-                  )}
-                  {curPanelId !== 'Expression' &&
-                    curPanelId !== 'RootBrowser' && (
-                      <PanelNameEditor
-                        value={curPanelId ?? ''}
-                        autocompleteOptions={panelOptions}
-                        setValue={handlePanelChange}
-                      />
-                    )}
-                  <div style={{width: 4}} />
-                  <div
-                    style={{
-                      flexGrow: 1,
-                      borderRadius: 3,
-                      backgroundColor: hoverExpression ? '#f2f2fa' : undefined,
-                      padding: '0 4px',
-                    }}
-                    onMouseEnter={() => setHoverExpression(true)}
-                    onMouseLeave={() => setHoverExpression(false)}
-                    data-test="panel-expression-expression">
-                    <WeaveExpression
-                      expr={panelInputExpr}
-                      setExpression={updateExpression}
-                      noBox
+          <EditorBarContent>
+            {props.prefixHeader}
+            {props.pathEl != null && (
+              <EditorPath>
+                <ValidatingTextInput
+                  dataTest="panel-expression-path"
+                  onCommit={props.updateName ?? (() => {})}
+                  validateInput={validateName}
+                  initialValue={props.pathEl}
+                />{' '}
+                ={' '}
+              </EditorPath>
+            )}
+            {curPanelId !== 'Expression' && curPanelId !== 'RootBrowser' && (
+              <PanelNameEditor
+                value={curPanelId ?? ''}
+                autocompleteOptions={panelOptions}
+                setValue={handlePanelChange}
+              />
+            )}
+            <EditorExpression data-test="panel-expression-expression">
+              <WeaveExpression
+                expr={panelInputExpr}
+                setExpression={updateExpression}
+                noBox
+                truncate={!expressionFocused}
+                onFocus={onFocusExpression}
+                onBlur={onBlurExpression}
+              />
+            </EditorExpression>
+            <EditorIcons visible={hoverPanel}>
+              {props.prefixButtons}
+              {(curPanelId === 'Expression' || curPanelId === 'RootBrowser') &&
+                nonExpressionPanelId != null && (
+                  <IconButton
+                    // disabled={isLoading}
+                    onClick={setToNoneExpression}>
+                    <Icon
+                      name="sliders"
+                      // style={{
+                      //   color: configOpen ? '#2e78c7' : 'inherit',
+                      // }}
                     />
-                  </div>
-                  <div style={{position: 'absolute', right: 0, top: -3}}>
-                    {hoverPanel && props.prefixButtons}
-                    {hoverPanel &&
-                      (curPanelId === 'Expression' ||
-                        curPanelId === 'RootBrowser') &&
-                      nonExpressionPanelId != null && (
-                        <Styles.BarButton
-                          // disabled={isLoading}
-                          onClick={setToNoneExpression}>
-                          <Icon
-                            name="sliders"
-                            // style={{
-                            //   color: configOpen ? '#2e78c7' : 'inherit',
-                            // }}
-                          />
-                        </Styles.BarButton>
-                      )}
-                    {hoverPanel && (
-                      <Styles.BarButton
-                        // disabled={isLoading}
-                        data-test="panel-config"
-                        onClick={() => setInspectingPanel(props.pathEl ?? '')}>
-                        <Icon
-                          name="cog"
-                          // style={{
-                          //   color: configOpen ? '#2e78c7' : 'inherit',
-                          // }}
-                        />
-                      </Styles.BarButton>
-                    )}
-                  </div>
-                </Menu.Item>
-              </Menu.Menu>
-            </Menu>
-          </div>
+                  </IconButton>
+                )}
+              <Tooltip
+                position="top center"
+                trigger={
+                  <IconButton
+                    // disabled={isLoading}
+                    data-test="panel-config"
+                    onClick={() => setInspectingPanel(props.pathEl ?? '')}>
+                    <IconPencilEdit />
+                  </IconButton>
+                }>
+                Open panel editor
+              </Tooltip>
+            </EditorIcons>
+          </EditorBarContent>
         </Styles.EditorBar>
       )}
-      <div style={{flexGrow: 1, overflowY: 'auto'}}>
+      <PanelContainer>
         <PanelContextProvider
           newVars={newVars}
           handleVarEvent={handleVarEvent}
@@ -626,7 +609,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
             updateInput={updatePanelInput}
           />
         </PanelContextProvider>
-      </div>
+      </PanelContainer>
     </Styles.Main>
   );
 };
@@ -634,6 +617,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
 const NEW_INSPECTOR_IMPLEMENTED_FOR = new Set([
   `plot`,
   `histogram`,
+  `row`,
   `Group`,
   `Each`,
   `EachColumn`,
@@ -905,3 +889,70 @@ export const useChildPanelProps = (
     updateConfig2,
   };
 };
+
+const EditorBarContent = styled.div`
+  display: flex;
+  align-items: flex-start;
+  width: calc(100% + 16px);
+  flex-shrink: 0;
+  position: relative;
+  left: -8px;
+  padding: 0 16px 8px;
+  border-bottom: 1px solid ${GRAY_350};
+  margin-bottom: 8px;
+  line-height: 20px;
+`;
+
+const EditorPath = styled.div`
+  white-space: nowrap;
+  margin-right: 8px;
+
+  input {
+    font-family: inherit;
+  }
+`;
+
+const EditorExpression = styled.div`
+  flex-grow: 1;
+  margin-left: 4px;
+  overflow: hidden;
+  &:hover {
+    background-color: ${GRAY_50};
+  }
+`;
+
+const EditorIcons = styled.div<{visible: boolean}>`
+  height: 20px;
+  display: flex;
+  align-items: center;
+  margin-left: 8px;
+  visibility: ${p => (p.visible ? `visible` : `hidden`)};
+`;
+
+const Tooltip = styled(Popup).attrs({
+  basic: true, // This removes the pointing arrow.
+  mouseEnterDelay: 500,
+  popperModifiers: {
+    preventOverflow: {
+      // Prevent popper from erroneously constraining the popup.
+      // Without this, tooltips in single row table cells get positioned under the cursor,
+      // causing them to immediately close.
+      boundariesElement: 'viewport',
+    },
+  },
+})`
+  && {
+    color: ${Colors.WHITE};
+    background: ${Colors.GRAY_800};
+    border-color: ${Colors.GRAY_700};
+    box-shadow: 0px 4px 6px ${hexToRGB(Colors.BLACK, 0.2)};
+    font-size: 14px;
+    line-height: 140%;
+    max-width: 300px;
+  }
+`;
+
+const PanelContainer = styled.div`
+  flex-grow: 1;
+  overflow-y: auto;
+`;

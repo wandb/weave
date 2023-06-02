@@ -19,12 +19,12 @@ import {
   IconCopy,
   IconDelete,
   IconDocs,
-  IconDown,
+  IconDown as IconDownUnstyled,
   IconPencilEdit,
   IconRedo,
   IconSystem,
   IconUndo,
-  IconUp,
+  IconUp as IconUpUnstyled,
   IconWeaveLogo,
 } from '../Panel2/Icons';
 import {
@@ -89,15 +89,34 @@ const MainHeaderWrapper = styled.div`
   font-size: 15px;
 `;
 
+const iconStyles = css`
+  color: ${globals.GRAY_500};
+`;
+const IconUp = styled(IconUpUnstyled)`
+  ${iconStyles}
+`;
+const IconDown = styled(IconDownUnstyled)`
+  ${iconStyles}
+`;
+
+const controlsStyles = css`
+  &:hover {
+    ${IconUp}, ${IconDown} {
+      color: ${globals.GRAY_800};
+    }
+  }
+`;
+
 const HeaderCenterControlsPrimary = styled.span`
-  font-weight: bold;
+  font-weight: 600;
 `;
 
 const HeaderCenterControlsSecondary = styled.span`
-  color: #d5d5d5;
+  color: ${globals.GRAY_500};
 `;
 
 const HeaderCenterControls = styled.div`
+  ${controlsStyles}
   flex: 0 1 auto;
   cursor: pointer;
   display: flex;
@@ -116,12 +135,12 @@ const CustomMenu = styled.div<{width?: number}>`
     `}
 `;
 
-const MenuItem = styled.div<{disabled?: boolean}>`
+const MenuItem = styled.div<{disabled?: boolean; noIcon?: boolean}>`
   display: flex;
   flex-direction: row;
   justify-content: left;
   align-items: center;
-  padding: 4px 16px;
+  padding: 4px 16px 4px ${p => (p.noIcon ? 18 : 16)}px;
   gap: 10px;
   font-size: 15px;
 
@@ -160,6 +179,7 @@ const MenuDivider = styled.div`
 `;
 
 const HeaderLeftControls = styled.div`
+  ${controlsStyles}
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -418,20 +438,14 @@ const HeaderFileControls: React.FC<{
         }}>
         <CustomMenu width={242}>
           {currentVersion && (
-            <>
-              <MenuItem disabled>
-                <MenuIcon>
-                  <IconSystem />
-                </MenuIcon>
-                <MenuText>
-                  Version ({isLocal ? 'Local' : 'W&B'}): {currentVersion}
-                </MenuText>
-              </MenuItem>
-
-              <MenuDivider />
-            </>
+            <MenuItem disabled noIcon>
+              <MenuText>
+                Version ({isLocal ? 'Local' : 'W&B'}): {currentVersion}
+              </MenuText>
+            </MenuItem>
           )}
 
+          {(renameAction || canUndo || canRedo) && <MenuDivider />}
           {renameAction && (
             <MenuItem
               onClick={() => {

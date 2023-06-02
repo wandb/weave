@@ -16,7 +16,7 @@ import {OutlineItemMenuPopup} from './OutlineItemMenuPopup';
 
 const OutlineItem = styled.div``;
 
-const OutlineItemMenuButton = styled(IconButton)`
+const OutlineItemMenuButton = styled(IconButton).attrs({small: true})`
   margin-right: 8px;
 `;
 
@@ -27,7 +27,7 @@ const OutlineItemTitle = styled.div<{level: number}>`
   user-select: none;
   padding-top: 4px;
   padding-bottom: 4px;
-  padding-left: ${p => p.level * 24 + 12}px;
+  padding-left: ${p => p.level * 11 + 8}px;
 
   &:hover {
     background-color: ${globals.GRAY_50};
@@ -41,7 +41,7 @@ const OutlineItemTitle = styled.div<{level: number}>`
 const OutlineItemToggle = styled.div<{expanded: boolean}>`
   display: flex;
   width: 18px;
-  margin-right: 6px;
+  margin-right: 4px;
   cursor: pointer;
   transform: rotate(${p => (p.expanded ? 0 : -90)}deg);
 
@@ -61,7 +61,7 @@ const OutlineItemName = styled.div``;
 
 const OutlineItemPanelID = styled.div`
   color: ${globals.GRAY_500};
-  font-size: 14px;
+  font-size: 15px;
   font-family: 'Inconsolata', monospace;
   margin-left: 10px;
   flex-grow: 1;

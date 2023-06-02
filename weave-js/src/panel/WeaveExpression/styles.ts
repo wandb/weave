@@ -26,7 +26,7 @@ export const EditableContainer = styled.div<{
     `}
 `;
 
-export const WeaveEditable = styled(Editable)`
+export const WeaveEditable = styled(Editable)<{truncate?: boolean}>`
   width: 100%;
   min-height: 20px;
   line-height: 20px;
@@ -75,6 +75,16 @@ export const WeaveEditable = styled(Editable)`
     display: none;
   }
   */
+
+  ${p =>
+    p.truncate &&
+    css`
+      & > div {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+    `}
 `;
 
 export const ApplyButton = styled(Button)`
