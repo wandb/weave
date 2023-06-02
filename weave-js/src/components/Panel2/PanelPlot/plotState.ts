@@ -4,6 +4,7 @@ import {
   constString,
   dict,
   isAssignableTo,
+  isNodeOrVoidNode,
   isVoidNode,
   list,
   maybe,
@@ -42,6 +43,7 @@ import {
   DEFAULT_POINT_SIZE,
   DIM_NAME_MAP,
   DiscreteSelection,
+  LAZY_PATHS,
   LINE_SHAPES,
   MARK_OPTIONS,
   migrate,
@@ -1537,4 +1539,26 @@ export function getThroughArray(
   } else {
     return undefined;
   }
+}
+
+function pathIsNode(obj: any, path: Array<string | number>): boolean {
+  const [first, ...rest] = path;
+
+  if (first === '#') {
+    if (rest.length > 0 && _.isArray(obj)) {
+      return obj.every(item => pathIsNode(item, rest));
+    } else {
+      return false;
+    }
+  } else if (rest.length === 0) {
+    return isNodeOrVoidNode(obj[first]);
+  } else {
+    return pathIsNode(obj[first], rest);
+  }
+}
+
+export function lazyPaths(config: PlotConfig): typeof LAZY_PATHS {
+  return LAZY_PATHS.filter(path => {
+    return pathIsNode(config, path.split('.'));
+  });
 }

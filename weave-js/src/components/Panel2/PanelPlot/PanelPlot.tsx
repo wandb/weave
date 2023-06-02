@@ -11,6 +11,7 @@ import {
   // constFunction,
   ConstNode,
   constNodeUnsafe,
+  constNone,
   constNumber,
   constString,
   // constStringList,
@@ -103,6 +104,7 @@ import {
   // ContinuousSelection,
   DEFAULT_SCALE_TYPE,
   DIM_NAME_MAP,
+  LAZY_PATHS,
   // DiscreteSelection,
   LINE_SHAPES,
   MarkOption,
@@ -114,6 +116,8 @@ import {
   ScaleType,
   SeriesConfig,
 } from './versions';
+import {isNode} from '@babel/types';
+import {toWeaveType} from '../toWeaveType';
 
 const recordEvent = makeEventRecorder('Plot');
 
@@ -269,7 +273,7 @@ const useConcreteConfig = (
   const lazyConfigElementsNode = useMemo(
     () =>
       opDict(
-        config.lazyPaths.reduce((acc, path) => {
+        PlotState.lazyPaths(config).reduce((acc, path) => {
           let elementNode = PlotState.getThroughArray(config, path.split('.'));
           if (_.isArray(elementNode)) {
             elementNode = opArray(
@@ -278,6 +282,9 @@ const useConcreteConfig = (
                 return innerAcc;
               }, {} as any) as any
             );
+          }
+          if (elementNode == null) {
+            elementNode = constNone();
           }
           acc[path] = elementNode;
           return acc;
@@ -288,13 +295,19 @@ const useConcreteConfig = (
 
   const concreteConfigUse = LLReact.useNodeValue(lazyConfigElementsNode);
   const concreteConfigEvaluationResult = concreteConfigUse.result as
-    | {[K in PlotConfig['lazyPaths'][number]]: any}
+    | {[K in (typeof LAZY_PATHS)[number]]: any}
     | undefined;
 
   const concreteConfigLoading = concreteConfigUse.loading;
 
+  const lazyPaths = useMemo(() => {
+    return PlotState.lazyPaths(config);
+  }, [config]);
+  const lazyPathsRef = useRef(lazyPaths);
+  lazyPathsRef.current = lazyPaths;
+
   return useMemo(() => {
-    if (config.lazyPaths.length === 0) {
+    if (lazyPaths.length === 0) {
       return {
         config: _.omit(config, ['lazyPaths']) as ConcretePlotConfig,
         loading: false,
@@ -311,7 +324,7 @@ const useConcreteConfig = (
       // generate the new config with the concrete values obtained from the execution of the lazy paths
       let newConfig = _.omit(
         produce(config, draft => {
-          draft.lazyPaths.forEach(path => {
+          lazyPaths.forEach(path => {
             PlotState.setThroughArray(
               draft,
               path.split('.'),
@@ -1614,6 +1627,12 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
   const concreteConfigRef = useRef<ConcretePlotConfig>(concreteConfig);
   concreteConfigRef.current = concreteConfig;
 
+  const lazyPaths = useMemo(() => {
+    return PlotState.lazyPaths(config);
+  }, [config]);
+  const lazyPathsRef = useRef(lazyPaths);
+  lazyPathsRef.current = lazyPaths;
+
   const domainNodes: {x: NodeOrVoidNode; y: NodeOrVoidNode} = useMemo(() => {
     return {
       x: isNodeOrVoidNode(config.signals.domain.x)
@@ -2621,6 +2640,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
         const currBrushMode = brushModeRef.current;
         const currUpdateConfig = updateConfigRef.current;
         const currConfig = configRef.current;
+        const currLazyPaths = lazyPathsRef.current;
         const currMutateDomain = mutateDomainRef.current;
         const currConcreteConfig = concreteConfigRef.current;
         const currSetToolTipsEnabled = setToolTipsEnabledRef.current;
@@ -2636,7 +2656,8 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
         const data = selection?.data[dataName];
 
         if (!_.isEmpty(signal)) {
-          let newConfigSignals = currConcreteConfig.signals;
+          let newConfigSignals: PlotConfig['signals'] =
+            currConcreteConfig.signals;
 
           ['x' as const, 'y' as const].forEach(dimName => {
             const axisSignal = signal[dimName];
@@ -2660,8 +2681,23 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
               newConfigSignals = produce(newConfigSignals, draft => {
                 draft.selection[dimName] = undefined;
               });
-              if (dimName === 'x') {
-                currMutateDomain.x(signal.domain[dimName]);
+              if (
+                dimName === 'x' &&
+                currLazyPaths.includes('signals.domain.x')
+              ) {
+                newConfigSignals = {
+                  ...newConfigSignals,
+                  domain: {
+                    ...newConfigSignals.domain,
+                    x: config.signals.domain.x,
+                  },
+                };
+                currMutateDomain.x({
+                  val: constNodeUnsafe(
+                    toWeaveType(signal[dimName]),
+                    signal[dimName]
+                  ),
+                });
               }
             }
           });

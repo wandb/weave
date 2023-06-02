@@ -17,12 +17,13 @@ export type SeriesConfig = Omit<
   };
 };
 
-const lazyPaths = [
+export const LAZY_PATHS = [
   'series.#.constants.mark' as const, // # means all array indices
   'axisSettings.x.title' as const,
   'axisSettings.y.title' as const,
   'axisSettings.color.title' as const,
-  'signals.domain' as const,
+  'signals.domain.x' as const,
+  'signals.domain.y' as const,
 ];
 
 export type AxisSettings = {
@@ -51,11 +52,9 @@ export type PlotConfig = Omit<
   configVersion: 12;
   series: SeriesConfig[];
   axisSettings: AxisSettings;
-  lazyPaths: typeof lazyPaths;
   signals: Signals;
 };
 
-// ConcretePlotConfig is a subtype of PlotConfig
 export type ConcretePlotConfig = Omit<v11.PlotConfig, 'configVersion'> & {
   configVersion: 12;
 };
@@ -64,6 +63,5 @@ export const migrate = (config: v11.PlotConfig): PlotConfig => {
   return {
     ...config,
     configVersion: 12,
-    lazyPaths: [],
   };
 };
