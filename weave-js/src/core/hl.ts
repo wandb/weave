@@ -60,6 +60,7 @@ import {
   isBinaryOp,
   isBracketsOp,
   isDotChainedOp,
+  isGetAttr,
   isUnaryOp,
   opDisplayName,
   opInputsAreValid,
@@ -1072,6 +1073,20 @@ function simpleOpString(op: EditingOp, opStore: OpStore): string {
     )} ${simpleNodeString(argValues[1], opStore)}`;
   }
 
+  if (isGetAttr(op, opStore)) {
+    // Note, we skip rendering left hand side (obj.) when it is a
+    // variable. So x.count is just count
+    const obj = argValues[0];
+    const key = argValues[1];
+    if (obj.nodeType === 'var' && key.nodeType === 'const') {
+      return key.val;
+    }
+    return `${simpleNodeString(obj, opStore)}.${simpleNodeString(
+      key,
+      opStore
+    )}`;
+  }
+
   if (isBracketsOp(op, opStore)) {
     // Note, we skip rendering left hand side (obj.) when it is a
     // variable. So x.count is just count
@@ -1085,6 +1100,7 @@ function simpleOpString(op: EditingOp, opStore: OpStore): string {
       opStore
     )}]`;
   }
+
   if (isDotChainedOp(op, opStore)) {
     // Note, we skip rendering left hand side (obj.) when it is a
     // variable. So x.count is just count

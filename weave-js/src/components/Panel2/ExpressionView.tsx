@@ -9,6 +9,7 @@ import {
   isBracketsOp,
   isConstNodeWithType,
   isDotChainedOp,
+  isGetAttr,
   opDisplayName,
   opNeedsParens,
   OpStore,
@@ -57,6 +58,24 @@ const OpView: React.FC<{op: EditingOp}> = ({op}) => {
         <NodeView node={argValues[0]} /> {opSymbol(op, client.opStore)}{' '}
         <NodeView node={argValues[1]} />
         {needsParens && ')'}
+      </span>
+    );
+  }
+
+  if (isGetAttr(op, client.opStore)) {
+    const obj = argValues[0];
+    // If we're picking directly of a variable and we the key is a const,
+    // just render the key itself with no quotes
+    const key = argValues[1];
+    if (obj.nodeType === 'var' && key.nodeType === 'const') {
+      return <span>{key.val}</span>;
+    }
+    // Otherwise [] index notation
+    return (
+      <span>
+        <NodeView node={argValues[0]} />
+        .
+        <NodeView node={argValues[1]} />
       </span>
     );
   }

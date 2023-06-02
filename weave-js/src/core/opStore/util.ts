@@ -59,6 +59,10 @@ export function isBracketsOp(op: {name: string}, opStore: OpStore) {
   return opStore.getOpDef(op.name).renderInfo.type === 'brackets';
 }
 
+export function isGetAttr(op: {name: string}, opStore: OpStore) {
+  return op.name === 'Object-__getattr__';
+}
+
 enum Side {
   LEFT,
   RIGHT,
