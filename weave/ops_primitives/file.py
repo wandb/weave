@@ -4,12 +4,15 @@ import typing
 from ..artifact_fs import FilesystemArtifactDir, FilesystemArtifactFile
 from ..artifact_wandb import WandbArtifact, WandbArtifactManifest
 from ..ops_domain.wbmedia import ImageArtifactFileRef
+from .. import file_local
 from ..api import op
 from .. import weave_types as types
 from .. import file_base
 from .. import engine_trace
 from .. import errors
 from .. import wandb_file_manager
+import os
+import urllib.parse
 
 
 @op(name="dir-pathReturnType")
@@ -30,7 +33,6 @@ def open(
 def _file_dict_from_manifest(
     file: FilesystemArtifactFile, manifest: WandbArtifactManifest
 ) -> dict:
-
     art = file.artifact
     if not isinstance(art, WandbArtifact):
         return _file_dict(file)
@@ -86,37 +88,90 @@ def _file_dict(file: FilesystemArtifactFile) -> dict:
     }
 
 
+def get_file_size(file_path):
+    return os.path.getsize(file_path)
+
+
+def get_file_uri(file_path):
+    return urllib.parse.urljoin("file:", urllib.request.pathname2url(file_path))
+
+
+def get_directory_structure(dir_path):
+    # Thanks gpt-4?
+    structure = {}
+    for dirpath, dirnames, filenames in os.walk(dir_path):
+        sub_structure = structure
+        relpath = os.path.relpath(dirpath, dir_path)
+        dirs = relpath.split(os.sep) if relpath != "." else []
+        for dir in dirs:
+            if dir not in sub_structure:
+                sub_structure[dir] = {
+                    "fullPath": os.path.join(dir_path, *dirs),
+                    "size": 0,
+                    "dirs": {},
+                    "files": {},
+                }
+            sub_structure = sub_structure[dir]["dirs"]
+
+        size = sum(get_file_size(os.path.join(dirpath, f)) for f in filenames)
+        files = {
+            f: {
+                "fullPath": os.path.join(dirpath, f),
+                "size": get_file_size(os.path.join(dirpath, f)),
+                "url": get_file_uri(os.path.join(dirpath, f)),
+            }
+            for f in filenames
+        }
+
+        sub_structure.update(
+            {
+                os.path.basename(dirpath): {
+                    "fullPath": dirpath,
+                    "size": size,
+                    "dirs": {},
+                    "files": files,
+                }
+            }
+        )
+
+    return structure[os.path.basename(dir_path)]
+
+
 @op(
     name="dir-_as_w0_dict_",
 )
 def _as_w0_dict_(dir: file_base.Dir) -> dict:
-    if isinstance(dir, FilesystemArtifactDir) and isinstance(
-        dir.artifact, WandbArtifact
-    ):
-        manifest = dir.artifact._manifest()
+    if isinstance(dir, file_local.LocalDir):
+        return get_directory_structure(dir.fullPath)
+
+    elif isinstance(dir, FilesystemArtifactDir):
+        if isinstance(dir, FilesystemArtifactDir) and isinstance(
+            dir.artifact, WandbArtifact
+        ):
+            manifest = dir.artifact._manifest()
+        else:
+            manifest = None
+        return {
+            "fullPath": dir.fullPath,
+            "size": dir.size,
+            "dirs": {
+                k: {
+                    "fullPath": v.fullPath,
+                    "size": v.size,
+                    "dirs": v.dirs,
+                    "files": v.files,
+                }
+                for k, v in dir.dirs.items()
+            },
+            "files": {
+                k: _file_dict_from_manifest(v, manifest)
+                if manifest is not None
+                else _file_dict(v)
+                for k, v in dir.files.items()
+            },
+        }
     else:
-        manifest = None
-    if not isinstance(dir, FilesystemArtifactDir):
-        raise errors.WeaveInternalError("Dir must be FilesystemArtifactDir")
-    return {
-        "fullPath": dir.fullPath,
-        "size": dir.size,
-        "dirs": {
-            k: {
-                "fullPath": v.fullPath,
-                "size": v.size,
-                "dirs": v.dirs,
-                "files": v.files,
-            }
-            for k, v in dir.dirs.items()
-        },
-        "files": {
-            k: _file_dict_from_manifest(v, manifest)
-            if manifest is not None
-            else _file_dict(v)
-            for k, v in dir.files.items()
-        },
-    }
+        raise TypeError(f"Unsupported type {type(dir)}")
 
 
 @op(name="file-directUrlAsOf")

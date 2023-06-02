@@ -238,10 +238,14 @@ const PanelPreviewDir: React.FC<PanelPreviewDirProps> = props => {
     return <div></div>;
   }
   const dir = dirValue.result;
+  const dirViewPath =
+    props.context == null
+      ? [dirValue.result.fullPath]
+      : props.context.path ?? [];
   return (
     <DirView
       dir={dir}
-      path={props.context.path!}
+      path={dirViewPath}
       setFilePath={path => {
         if (props.updateInput != null) {
           props.updateInput(
@@ -250,7 +254,7 @@ const PanelPreviewDir: React.FC<PanelPreviewDirProps> = props => {
               ({input}) =>
                 opDirOpen({
                   dir: input,
-                  path: constString(path.join('/')),
+                  path: constString(path[path.length - 1]),
                 } as any) as any
             ).val as any
           );
