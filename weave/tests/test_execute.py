@@ -179,6 +179,7 @@ def test_cache_column():
     assert len(weave.versions(latest_obj)) == 1
 
 
+@pytest.mark.skip("was used for table caching which is disabled")
 def test_none_not_cached():
     os.environ["WEAVE_CACHE_MODE"] = "minimal"
 

@@ -289,6 +289,36 @@ export const addChild = (
   return setPath(node, [...path, nextPanelName(panelNames)], value);
 };
 
+export const asyncMapPanels = async (
+  node: PanelTreeNode,
+  fn: (node: ChildPanelFullConfig) => Promise<ChildPanelFullConfig>
+): Promise<ChildPanelFullConfig> => {
+  const fullNode = getFullChildPanel(node);
+  let withMappedChildren: ChildPanelFullConfig = fullNode;
+  if (isGroupNode(fullNode)) {
+    const items: {[key: string]: ChildPanelFullConfig} = {};
+    for (const key of Object.keys(fullNode.config.items)) {
+      items[key] = await asyncMapPanels(fullNode.config.items[key], fn);
+    }
+    withMappedChildren = {
+      ...fullNode,
+      config: {...fullNode.config, items},
+    };
+  } else if (isStandardPanel(fullNode.id)) {
+    const children: {[key: string]: ChildPanelFullConfig} = {};
+    for (const key of Object.keys(STANDARD_PANEL_CHILD_KEYS[fullNode.id])) {
+      children[key] = await asyncMapPanels(fullNode.config[key], fn);
+    }
+    withMappedChildren = {
+      ...fullNode,
+      config: {...fullNode.config, ...children},
+    };
+  } else if (isTableStatePanel(fullNode.id)) {
+    // TODO: not yet handled
+  }
+  return fn(withMappedChildren);
+};
+
 interface Dashboard extends GroupNode {
   config: {
     layoutMode: 'horizontal';

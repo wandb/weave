@@ -71,7 +71,7 @@ export const useAutomatedTableState = (
   currentTableState: Table.TableState | undefined,
   weave: WeaveInterface
 ) => {
-  const {table: autoTable, allColumns} = useMemo(
+  const {table: autoTable} = useMemo(
     () => Table.initTableFromTableType(input, weave),
     [input, weave]
   );
@@ -106,9 +106,8 @@ export const useAutomatedTableState = (
       tableState: state,
       autoTable,
       tableIsDefault,
-      allColumns,
     }),
-    [loading, state, autoTable, tableIsDefault, allColumns]
+    [loading, state, autoTable, tableIsDefault]
   );
 };
 

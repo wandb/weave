@@ -18,7 +18,7 @@ def getattr_output_type(input_type):
             return types.UnknownType()
         key = input_type["name"].val
         property_types = self_arg.property_types()
-        return property_types.get(key, types.Invalid())
+        return property_types.get(key, types.NoneType())
 
     if isinstance(self_arg, types.Any):
         return types.Any()
@@ -54,4 +54,4 @@ def obj_settattr(self, attr, v):
     output_type=getattr_output_type,
 )
 def obj_getattr(self, name: str):
-    return getattr(self, name)
+    return getattr(self, name, None)

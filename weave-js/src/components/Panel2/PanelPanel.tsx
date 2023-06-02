@@ -17,6 +17,7 @@ import {
   ChildPanelConfigComp,
   ChildPanelFullConfig,
   getFullChildPanel,
+  initPanel,
 } from './ChildPanel';
 import {IconBack, IconClose, IconOverflowHorizontal} from './Icons';
 import * as Panel2 from './panel';
@@ -30,7 +31,7 @@ import {
 } from './PanelInteractContext';
 import {useSetPanelRenderedConfig} from './PanelRenderedConfigContext';
 import {OutlineItemMenuPopup} from '../Sidebar/OutlineItemMenuPopup';
-import {getConfigForPath} from './panelTree';
+import {asyncMapPanels, getConfigForPath} from './panelTree';
 import {IconButton} from '../IconButton';
 
 const inputType = {type: 'Panel' as const};
@@ -55,10 +56,41 @@ const usePanelPanelCommon = (props: PanelPanelProps) => {
 
   useEffect(() => {
     if (initialLoading && !panelQuery.loading) {
-      setPanelConfig(() => getFullChildPanel(panelQuery.result));
+      const doLoad = async () => {
+        const loadedPanel = getFullChildPanel(panelQuery.result);
+
+        // Python may mass us unitialized panels (panels that don't have
+        // configs, or even just expressions). We walk through and initialize
+        // them here to make sure our panel state is valid.
+        const hydratedPanel = await asyncMapPanels(
+          loadedPanel,
+          async (panel: ChildPanelFullConfig) => {
+            if (panel.config != null) {
+              return panel;
+            }
+            const {id, config} = await initPanel(
+              weave,
+              panel.input_node,
+              panel.id,
+              undefined,
+              []
+            );
+            return {...panel, id, config};
+          }
+        );
+
+        setPanelConfig(() => hydratedPanel);
+      };
+      doLoad();
       return;
     }
-  }, [initialLoading, panelQuery.loading, panelQuery.result, setPanelConfig]);
+  }, [
+    initialLoading,
+    panelQuery.loading,
+    panelQuery.result,
+    setPanelConfig,
+    weave,
+  ]);
   useTraceUpdate('panelQuery', {
     loading: panelQuery.loading,
     result: panelQuery.result,

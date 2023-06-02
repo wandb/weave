@@ -3,9 +3,9 @@ import {
   dynamicMatchWithMapping,
   MatchMode,
 } from '@wandb/weave/common/util/columnMatching';
-import {constString, opPick, varNode} from '@wandb/weave/core';
+import {Node} from '@wandb/weave/core';
 import {cloneDeep as _cloneDeep} from 'lodash';
-import React, {useCallback, useState} from 'react';
+import React, {useCallback, useMemo, useState} from 'react';
 import {Button, Dropdown, Grid, Icon, List} from 'semantic-ui-react';
 
 import {useWeaveContext} from '../../../context';
@@ -18,15 +18,30 @@ import {ColumnEntry} from './tableState';
 const MAX_COLUMNS_SHOWN = 100;
 
 interface ColumnSelectorProps {
+  inputNode: Node;
   tableState: Table.TableState;
-  allColumnNames: string[];
-
   update(state: Table.TableState): void;
 }
 
 const ColumnSelector: React.FC<ColumnSelectorProps> = React.memo(
-  ({tableState, allColumnNames, update}) => {
+  ({inputNode, tableState, update}) => {
     const weave = useWeaveContext();
+    const defaultTable = Table.initTableWithPickColumns(inputNode, weave);
+    const colNameMap = useMemo(() => {
+      const m: {[key: string]: string} = {};
+      for (const colId of defaultTable.order) {
+        m[
+          Table.getTableColumnName(
+            defaultTable.columnNames,
+            defaultTable.columnSelectFunctions,
+            colId,
+            weave.client.opStore
+          )
+        ] = colId;
+      }
+      return m;
+    }, [defaultTable, weave.client.opStore]);
+    const allColumnNames = Object.keys(colNameMap);
     const [draggingColumn, setDraggingColumn] = useState<
       ColumnEntry | undefined
     >();
@@ -149,15 +164,21 @@ const ColumnSelector: React.FC<ColumnSelectorProps> = React.memo(
         getSearchMatches(
           allColumnNames
             .filter(name => !usedColNames.has(name))
-            .map(colName => ({
-              name: colName,
-              selectFn: opPick({
-                obj: varNode('any', 'row') as any,
-                key: constString(colName),
-              }),
-            }))
+            .map(colName => {
+              const colId = colNameMap[colName];
+              return {
+                name: colName,
+                selectFn: defaultTable.columnSelectFunctions[colId],
+              };
+            })
         ),
-      [getSearchMatches, allColumnNames, usedColNames]
+      [
+        getSearchMatches,
+        allColumnNames,
+        usedColNames,
+        colNameMap,
+        defaultTable.columnSelectFunctions,
+      ]
     );
 
     const searchedColumnsUsed = React.useMemo(

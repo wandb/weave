@@ -12,11 +12,11 @@ import React, {useEffect, useMemo, useState} from 'react';
 import {Spec as PanelEachColumn} from './components/Panel2/PanelEachColumn';
 import {Spec as PanelExpr} from './components/Panel2/PanelExpr';
 import {Spec as PanelFacet} from './components/Panel2/PanelFacet';
-import {Spec as PanelFacetTabs} from './components/Panel2/PanelFacetTabs';
+// import {Spec as PanelFacetTabs} from './components/Panel2/PanelFacetTabs';
 import {Spec as PanelGroup} from './components/Panel2/PanelGroup';
 import {Spec as PanelEach} from './components/Panel2/PanelEach';
 import {Spec as PanelRootBrowser} from './components/Panel2/PanelRootBrowser/PanelRootBrowser';
-import {Spec as PanelSections} from './components/Panel2/PanelSections';
+// import {Spec as PanelSections} from './components/Panel2/PanelSections';
 import {Spec as PanelSlider} from './components/Panel2/PanelSlider';
 import {
   RowSize,
@@ -109,9 +109,9 @@ const UNHIDE_PANELS = [
   PanelExpr,
   PanelRootBrowser,
   PanelFacet,
-  PanelFacetTabs,
+  // PanelFacetTabs,
+  // PanelSections,
   PanelEach,
-  PanelSections,
   PanelSlider,
 ];
 

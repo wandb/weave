@@ -13,20 +13,20 @@ import {
   isConstType,
   isSimpleTypeShape,
   isTaggedValue,
-  isTaggedValueLike,
   isTypedDict,
   isUnion,
   list,
   nonNullable,
   taggedValue,
-  taggedValueValueType,
   Type,
   typedDict,
   union,
+  unionObjectTypeAttrTypes,
 } from '../../model';
 import {ALL_BASIC_TYPES, ListType} from '../../model/types';
 import {makeOp} from '../../opStore';
 import {opIndex} from '../primitives';
+import {makeStandardOp} from '../opKinds';
 
 // import * as TypeHelpers from '../model/typeHelpers';
 // import * as Types from '../model/types';
@@ -494,51 +494,34 @@ const unwrapConstType = (type: Type): Type => {
 // which will result in refactoring this op to be more generic. Ultimately,
 // we should not have all these conditionals to handle different circumstances.
 // For now we will check this in and keep moving forward.
-export const opObjGetAttr = makeOp({
+export const opObjGetAttr = makeStandardOp({
   hidden: true,
   name: 'Object-__getattr__',
   argTypes: {
     self: 'any',
     name: 'string',
   },
-  returnType: inputNodes => {
-    let selfType = unwrapConstType(inputNodes.self.type);
+  returnType: (inputTypes, inputs) => {
+    const selfType = unwrapConstType(inputTypes.self);
     // If the name node is not a const, then we have no idea what the return will be.
-    if (inputNodes.name.nodeType !== 'const') {
+    if (inputs.name.nodeType !== 'const') {
       return 'unknown';
       // If the self node is of type `type`, then we have three special cases:
-    } else if (isSimpleTypeShape(selfType) && selfType === 'type') {
+    }
+    const attrName = inputs.name.val;
+    if (isSimpleTypeShape(selfType) && selfType === 'type') {
       // First, a special case where we are getting the `property_types` off of the `dict` type. (support both python and ts casings)
-      if (
-        inputNodes.name.val === 'property_types' ||
-        inputNodes.name.val === 'propertyTypes'
-      ) {
+      if (attrName === 'property_types' || attrName === 'propertyTypes') {
         return dict('type');
         // Next, we are getting the members of a union
-      } else if (inputNodes.name.val === 'members') {
+      } else if (attrName === 'members') {
         return list('type');
       }
       return 'type';
     }
 
-    // If we made it this far, we are assuming that they input type is a subclass of `objectType`
-    const key = inputNodes.name.val;
-    if (isTaggedValueLike(selfType)) {
-      selfType = taggedValueValueType(selfType);
-    }
-    if (!(selfType as any)._is_object) {
-      console.warn(
-        'encountered invalid type for Object-__getattr__ return type: ',
-        inputNodes.self.type
-      );
-      return 'unknown';
-    }
-    const propertyTypes = selfType as any;
-    const propertyType = propertyTypes[key];
-    if (propertyType == null) {
-      return 'unknown';
-    }
-    return propertyType;
+    const attrTypes = unionObjectTypeAttrTypes(selfType);
+    return attrTypes[attrName] ?? 'none';
   },
   resolver: inputs => {
     let self = inputs.self;
@@ -710,5 +693,40 @@ export const opCrossProduct = makeOp({
       return {type: 'list', objectType: typedDict(newPropTypes)};
     }
     throw new Error('unhandled type in op-cross-product');
+  },
+});
+
+export const opChainRun = makeStandardOp({
+  name: 'Chain-run',
+  description: 'hello',
+  argDescriptions: {
+    conf: 'hello',
+    size: 'hello',
+  },
+  returnValueDescription: 'hello',
+  argTypes: {
+    chain: {
+      type: 'Chain',
+    } as any,
+    query: 'string',
+  },
+  returnType: inputTypes => {
+    return {
+      type: 'ChainRunResult',
+      _is_object: true,
+      _base_type: {
+        type: 'Object',
+      },
+      chain: inputTypes.chain,
+      query: 'string',
+      result: 'string',
+      latency: 'number',
+      trace: {
+        type: 'wb_trace_tree',
+      },
+    } as any;
+  },
+  resolver: inputs => {
+    throw new Error('cant resolve op-chain-run in js');
   },
 });

@@ -22,7 +22,6 @@ import {
   IconDown as IconDownUnstyled,
   IconPencilEdit,
   IconRedo,
-  IconSystem,
   IconUndo,
   IconUp as IconUpUnstyled,
   IconWeaveLogo,

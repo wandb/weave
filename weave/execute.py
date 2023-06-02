@@ -39,7 +39,7 @@ from .language_features.tagging import process_opdef_resolve_fn
 from .language_features.tagging import opdef_util
 
 # Trace / cache
-from . import cache_policy
+from . import op_policy
 from . import trace_local
 from . import ref_base
 from . import object_context
@@ -52,6 +52,10 @@ TRACE_LOCAL = trace_local.TraceLocal()
 
 # Set this to true when debugging for costly, but detailed storyline of execution
 PRINT_DEBUG = False
+
+# Must be power of 2
+MAX_PARALLELISM = 16
+assert MAX_PARALLELISM & (MAX_PARALLELISM - 1) == 0
 
 
 class OpExecuteStats(typing.TypedDict):
@@ -168,6 +172,27 @@ def get_top_level_stats() -> typing.Optional[ExecuteStats]:
     return _top_level_stats_ctx.get()
 
 
+_parallel_budget_ctx: contextvars.ContextVar[
+    typing.Optional[int]
+] = contextvars.ContextVar("_parallel_budget_ctx", default=MAX_PARALLELISM)
+
+
+def get_parallel_budget():
+    budget = _parallel_budget_ctx.get()
+    if budget is None:
+        return MAX_PARALLELISM
+    return budget
+
+
+@contextlib.contextmanager
+def parallel_budget_ctx(budget: typing.Optional[int]):
+    token = _parallel_budget_ctx.set(budget)
+    try:
+        yield
+    finally:
+        _parallel_budget_ctx.reset(token)
+
+
 def execute_nodes(nodes, no_cache=False) -> value_or_error.ValueOrErrors[typing.Any]:
     tracer = engine_trace.tracer()
     with tracer.trace("execute-log-graph"):
@@ -201,14 +226,14 @@ def execute_nodes(nodes, no_cache=False) -> value_or_error.ValueOrErrors[typing.
                         for node, err in compile_results.iter_items()
                         if err == None
                     ]
-                    logging.info(
-                        "Compiled %s leaf nodes.\n%s"
+                    logging.debug(
+                        "Compiled %s leaf nodes. (showing first 10)\n%s"
                         % (
                             len(nodes_to_print),
                             "\n".join(
                                 [
                                     graph_debug.node_expr_str_full(node)
-                                    for node in nodes_to_print
+                                    for node in nodes_to_print[:10]
                                 ]
                             ),
                         )
@@ -257,15 +282,22 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
 
         groups = itertools.groupby(sorted(running_now, key=_key), key=_key)
 
+        parallel_budget = get_parallel_budget()
+
         for op_name, group_iter in groups:
             group = list(group_iter)
             op_def = registry_mem.memory_registry.get_op(op_name)
-            if cache_policy.should_table_cache(op_name):
+            if parallel_budget != 1 and op_policy.should_run_in_parallel(op_name):
                 # Parallel threaded case
                 wandb_api_ctx = wandb_api.get_wandb_api_context()
                 memo_ctx = memo._memo_storage.get()
                 result_store = forward_graph.get_node_result_store()
                 outer_tls = get_top_level_stats()
+
+                parallelism = min(len(group), parallel_budget)
+                remaining_budget_per_thread = parallel_budget // len(group)
+                if remaining_budget_per_thread <= 0:
+                    remaining_budget_per_thread = 1
 
                 def do_one(
                     x,
@@ -281,38 +313,45 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
                     try:
                         with wandb_api.wandb_api_context(wandb_api_ctx):
                             with context.execution_client():
-                                with forward_graph.node_result_store(
-                                    result_store
-                                ) as thread_result_store:
-                                    with top_level_stats() as tls:
-                                        start_time = time.time()
-                                        try:
-                                            result_report = execute_forward_node(
-                                                fg, x, no_cache
+                                with parallel_budget_ctx(remaining_budget_per_thread):
+                                    with forward_graph.node_result_store(
+                                        result_store
+                                    ) as thread_result_store:
+                                        with top_level_stats() as tls:
+                                            start_time = time.time()
+                                            try:
+                                                result_report = execute_forward_node(
+                                                    fg, x, no_cache
+                                                )
+                                            except Exception as e:
+                                                x.set_result(
+                                                    forward_graph.ErrorResult(e)
+                                                )
+                                                result_report = {
+                                                    "cache_used": False,
+                                                    "already_executed": False,
+                                                }
+                                            return (
+                                                x,
+                                                result_report,
+                                                time.time() - start_time,
+                                                thread_result_store,
+                                                tls,
                                             )
-                                        except Exception as e:
-                                            x.set_result(forward_graph.ErrorResult(e))
-                                            result_report = {
-                                                "cache_used": False,
-                                                "already_executed": False,
-                                            }
-                                        return (
-                                            x,
-                                            result_report,
-                                            time.time() - start_time,
-                                            thread_result_store,
-                                            tls,
-                                        )
                     finally:
                         memo._memo_storage.reset(memo_token)
 
+                logging.info(
+                    "Running %s on %s threads with %s remaining parallel budget each"
+                    % (op_name, parallelism, remaining_budget_per_thread)
+                )
                 for (
                     fn,
                     report,
                     duration,
                     item_result_store,
                     item_stats,
-                ) in ThreadPoolExecutor(max_workers=10).map(do_one, group):
+                ) in ThreadPoolExecutor(max_workers=parallel_budget).map(do_one, group):
                     stats.add_node(
                         fn.node,
                         duration,
@@ -480,7 +519,7 @@ def execute_forward_node(
     cache_mode = environment.cache_mode()
     if cache_mode == environment.CacheMode.MINIMAL:
         no_cache = True
-        if cache_policy.should_cache(op_def.simple_name):
+        if op_policy.should_cache(op_def.simple_name):
             no_cache = False
 
     use_cache = not no_cache

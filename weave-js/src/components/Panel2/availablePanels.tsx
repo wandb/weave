@@ -154,9 +154,13 @@ function scoreHandlerStack(type: Type, hs: PanelStack) {
   if (hs.inputType === 'any') {
     scoreHs -= 50;
   }
+  if (sidAndName.id.indexOf('Facet') > -1) {
+    scoreHs -= 10;
+  }
   if (
     sidAndName.id.includes('Expression') ||
     sidAndName.id.includes('Auto') ||
+    sidAndName.id.includes('object') ||
     sidAndName.id.includes('any-obj') ||
     sidAndName.id.includes('debug-expression-graph')
   ) {
@@ -180,12 +184,13 @@ function stackHasHiddenPanel(panelStack: PanelStack): boolean {
 // chosen, pass it as the second argument. The curPanelId will match
 // panelId if it is available, otherwise it will revert to the first
 // available panel.
-interface GetPanelStacksForTypeOpts {
+export interface GetPanelStacksForTypeOpts {
   excludeTable?: boolean;
   excludePlot?: boolean;
   excludeMultiTable?: boolean;
   excludeBarChart?: boolean;
   showDebug?: boolean;
+  stackIdFilter?: (stackId: string) => boolean;
   allowedPanels?: string[];
 }
 export function getPanelStacksForType(
@@ -243,6 +248,11 @@ export function getPanelStacksForType(
         hs => PanelLib.getStackIdAndName(hs).id.indexOf('debug') === -1
       );
     }
+    if (opts.stackIdFilter != null) {
+      handlerStacks = handlerStacks.filter(hs =>
+        opts.stackIdFilter!(PanelLib.getStackIdAndName(hs).id)
+      );
+    }
     // make sure we only allow projection to flow into plot (for now)
     handlerStacks = handlerStacks.filter(
       hs =>
@@ -259,7 +269,7 @@ export function getPanelStacksForType(
   const configuredStackIndex = stackIds.findIndex(si => si.id === panelId);
   let backupConfiguredStackIndex = -1;
   // If there is not an exact match...
-  if (panelId != null) {
+  if (panelId != null && panelId !== '') {
     // Fallback to any panels which are converters to the current panel (example Table -> Merge.Table)
     backupConfiguredStackIndex = stackIds.findIndex(si =>
       si.id.endsWith(panelId)
@@ -273,14 +283,21 @@ export function getPanelStacksForType(
     }
   }
 
-  let curPanelId =
-    configuredStackIndex !== -1
-      ? stackIds[configuredStackIndex].id
-      : backupConfiguredStackIndex !== -1
-      ? stackIds[backupConfiguredStackIndex].id
-      : stackIds.length > 0 && stackIds[0].id !== 'layout-container'
-      ? stackIds[0].id
-      : undefined;
+  let curPanelId: string | undefined;
+  if (configuredStackIndex !== -1) {
+    curPanelId = panelId;
+  } else if (backupConfiguredStackIndex !== -1) {
+    curPanelId = stackIds[backupConfiguredStackIndex].id;
+  } else if (stackIds.length > 0) {
+    // Automatically choose a new panel.
+    const autoPanelStacks = handlerStacks.filter(hs => {
+      // Never choose something with Group
+      return !PanelLib.getStackIdAndName(hs).id.includes('Group');
+    });
+    if (autoPanelStacks.length > 0) {
+      curPanelId = PanelLib.getStackIdAndName(autoPanelStacks[0]).id;
+    }
+  }
 
   if (curPanelId === 'Group' && panelId !== 'Group') {
     // Don't automatically choose Group. Go to Expression instead.

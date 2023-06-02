@@ -25,7 +25,7 @@ import {
 import {isValidVarName} from '@wandb/weave/core/util/var';
 import * as _ from 'lodash';
 import React, {useCallback, useMemo, useState} from 'react';
-import {Icon, Menu, Popup} from 'semantic-ui-react';
+import {Icon, Popup} from 'semantic-ui-react';
 import styled from 'styled-components';
 
 import {useWeaveContext} from '../../context';
@@ -111,7 +111,7 @@ const initPanelConfig = async (
   return undefined;
 };
 
-const initPanel = async (
+export const initPanel = async (
   weave: Weave,
   inputNode: NodeOrVoidNode,
   panelId: string | undefined,
@@ -121,6 +121,7 @@ const initPanel = async (
   inputNode = await weave.refineNode(inputNode, stack);
   const {curPanelId: id} = getPanelStacksForType(inputNode.type, panelId, {
     allowedPanels,
+    stackIdFilter: stackId => !stackId.includes('.'),
   });
   if (id == null) {
     return {id: '', config: undefined};
@@ -192,10 +193,13 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
   const {stack} = usePanelContext();
 
   panelInputExpr = useNodeWithServerType(panelInputExpr).result;
-  const {handler, curPanelId, stackIds} = usePanelStacksForType(
+  const {curPanelId, stackIds, handler} = usePanelStacksForType(
     panelInputExpr.type,
     panelId,
-    {allowedPanels: props.allowedPanels}
+    {
+      allowedPanels: props.allowedPanels,
+      stackIdFilter: stackId => !stackId.includes('.'),
+    }
   );
 
   const panelOptions = useMemo(() => {
@@ -266,6 +270,9 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
       if (isAssignableTo(config.input_node.type, newExpression.type)) {
         // If type didn't change, keep current settings
         updateConfig({...config, input_node: newExpression});
+      } else if (curPanelId === 'Each') {
+        // "stick" to each
+        updateConfig({...config, input_node: newExpression});
       } else if (props.allowedPanels != null && config.id === 'Expression') {
         // Major hacks here. allowedPanels is currently only set in the sidebar,
         // so use that to detect if we're there.
@@ -282,7 +289,14 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
         initPanelForInput(newExpression);
       }
     },
-    [weave, config, props.allowedPanels, updateConfig, initPanelForInput]
+    [
+      weave,
+      curPanelId,
+      config,
+      props.allowedPanels,
+      updateConfig,
+      initPanelForInput,
+    ]
   );
 
   let updatePanelInput: ((newInput: Node) => void) | undefined = useCallback(
@@ -476,7 +490,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
     curPanelId,
     newVars,
     panelOptions,
-    inputHighlighted,
+    // inputHighlighted,
     panelInputExpr,
     handlePanelChange,
     handleVarEvent,

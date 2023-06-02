@@ -99,8 +99,8 @@ export const getSectionConfig = (
     isOpen: true,
     flowConfig: {
       snapToColumns: true,
-      columnsPerPage: 3,
-      rowsPerPage: 2,
+      columnsPerPage: 2,
+      rowsPerPage: 1,
       gutterWidth: 0,
       boxWidth: 64,
       boxHeight: 64,
