@@ -1510,13 +1510,13 @@ export function setThroughArray(
   if (first === '#') {
     if (Array.isArray(object)) {
       object.forEach((item: any, index: number) => {
-        setThroughArray(item, rest, value);
+        setThroughArray(item, rest, value[index]);
       });
     }
-  } else if (typeof object[first] === 'object' && object[first] !== null) {
-    setThroughArray(object[first], rest, value);
   } else if (rest.length === 0) {
     object[first] = value;
+  } else if (typeof object[first] === 'object' && object[first] !== null) {
+    setThroughArray(object[first], rest, value);
   }
 
   return object;

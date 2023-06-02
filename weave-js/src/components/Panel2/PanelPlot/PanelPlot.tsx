@@ -288,8 +288,18 @@ const useConcreteConfig = (
   const lazyConfigElementsNode = useMemo(
     () =>
       opDict(
-        config.lazyPaths.reduce((acc, path, i) => {
-          acc[path] = PlotState.getThroughArray(config, path.split('.'));
+        config.lazyPaths.reduce((acc, path) => {
+          let elementNode = PlotState.getThroughArray(config, path.split('.'));
+          if (_.isArray(elementNode)) {
+            elementNode = opArray(
+              elementNode.reduce((innerAcc, node, i) => {
+                innerAcc[i] = node;
+                return innerAcc;
+              }, {} as any) as any
+            );
+          }
+          acc[path] = elementNode;
+          return acc;
         }, {} as any)
       ),
     [config.lazyPaths]
@@ -1595,14 +1605,17 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
   flatResultNodeRef.current = flatResultNode;
   const result = LLReact.useNodeValue(flatResultNode);
 
-  const configAsNode = useMemo(() => PlotState.configToNode(config), [config]);
   const {config: concreteConfig, loading: concreteConfigLoading} =
-    useConcreteConfig(configAsNode, input, stack);
+    useConcreteConfig(config, input, stack);
 
   const loading = useMemo(
     () => result.loading || concreteConfigLoading || isRefining,
     [result.loading, concreteConfigLoading, isRefining]
   );
+
+  if (!loading) {
+    console.log('concreteConfig', concreteConfig);
+  }
 
   const plotTables = useMemo(
     () => (loading ? [] : (result.result as any[][])),

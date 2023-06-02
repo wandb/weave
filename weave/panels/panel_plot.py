@@ -302,12 +302,12 @@ class PlotConfig:
     configOptionsExpanded: typing.Optional[ConfigOptionsExpanded]
     signals: Signals
     configVersion: int = 12
-    lazyPaths: list[list[str]] = dataclasses.field(
+    lazyPaths: list[str] = dataclasses.field(
         default_factory=lambda: [
-            ["series", "#", "constants", "mark"],
-            ["axisSettings", "x", "title"],
-            ["axisSettings", "y", "title"],
-            ["axisSettings", "color", "title"],
+            "series.#.constants.mark",
+            "axisSettings.x.title",
+            "axisSettings.y.title",
+            "axisSettings.color.title",
         ]
     )
 
