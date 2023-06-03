@@ -1,13 +1,15 @@
-import * as helpers from '@wandb/weave/core/model/helpers';
 import * as weave from '@wandb/weave/core';
 import * as v10 from './v10';
 import * as v11 from './v11';
 
-const maybeString = helpers.maybe('string');
-const maybeListOfAny = helpers.maybe(helpers.list('any'));
-
-type LazyStringOrNull = weave.Node<typeof maybeString>;
-type LazyAxisSelection = weave.Node<typeof maybeListOfAny>;
+type LazyStringOrNull = weave.Node<{
+  type: 'union';
+  members: ['string', 'none'];
+}>;
+type LazyAxisSelection = weave.Node<{
+  type: 'union';
+  members: [{type: 'list'; objectType: 'any'}, 'none'];
+}>;
 
 export type SeriesConfig = Omit<
   v11.SeriesConfig,
@@ -68,46 +70,46 @@ export const migrate = (config: v11.PlotConfig): PlotConfig => {
       ...series,
       constants: {
         ...series.constants,
-        mark:
-          series.constants.mark == null
-            ? weave.constNone()
-            : weave.constString(series.constants.mark),
+        mark: weave.constNode(
+          {type: 'union', members: ['string', 'none']},
+          series.constants.mark
+        ),
       },
     })),
     axisSettings: {
       x: {
         ...config.axisSettings.x,
-        title:
-          config.axisSettings.x.title == null
-            ? weave.constNone()
-            : weave.constString(config.axisSettings.x.title),
+        title: weave.constNode(
+          {type: 'union', members: ['string', 'none']},
+          config.axisSettings.x.title ?? null
+        ),
       },
       y: {
         ...config.axisSettings.y,
-        title:
-          config.axisSettings.y.title == null
-            ? weave.constNone()
-            : weave.constString(config.axisSettings.y.title),
+        title: weave.constNode(
+          {type: 'union', members: ['string', 'none']},
+          config.axisSettings.y.title ?? null
+        ),
       },
       color: {
         ...config.axisSettings.color,
-        title:
-          config.axisSettings.color.title == null
-            ? weave.constNone()
-            : weave.constString(config.axisSettings.color.title),
+        title: weave.constNode(
+          {type: 'union', members: ['string', 'none']},
+          config.axisSettings.color.title ?? null
+        ),
       },
     },
     signals: {
       ...config.signals,
       domain: {
-        x:
-          config.signals.domain.x == null
-            ? weave.constNone()
-            : weave.constNodeUnsafe(maybeListOfAny, config.signals.domain.x),
-        y:
-          config.signals.domain.y == null
-            ? weave.constNone()
-            : weave.constNodeUnsafe(maybeListOfAny, config.signals.domain.y),
+        x: weave.constNode(
+          {type: 'union', members: [{type: 'list', objectType: 'any'}, 'none']},
+          config.signals.domain.x ?? null
+        ),
+        y: weave.constNode(
+          {type: 'union', members: [{type: 'list', objectType: 'any'}, 'none']},
+          config.signals.domain.y ?? null
+        ),
       },
     },
   };
