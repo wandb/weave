@@ -147,6 +147,7 @@ interface PanelCompContextState {
 export const PanelCompContext = React.createContext<PanelCompContextState>({
   panelPath: [],
 });
+PanelCompContext.displayName = 'PanelCompContext';
 
 interface PanelFullscreenContextState {
   isFullscreen: boolean;
@@ -160,6 +161,7 @@ export const PanelFullscreenContext =
       // console.log('goFullscreen not implemented');
     },
   });
+PanelFullscreenContext.displayName = 'PanelFullscreenContext';
 
 const PanelComp2Component = (props: PanelComp2Props) => {
   const ctx = useContext(PanelCompContext);

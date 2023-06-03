@@ -26,6 +26,7 @@ export interface PanelInteractContextValue {
 
 export const PanelInteractContext =
   React.createContext<PanelInteractContextValue | null>(null);
+PanelInteractContext.displayName = 'PanelInteractContext';
 
 export const PanelInteractContextProvider: React.FC<{}> = React.memo(
   ({children}) => {
@@ -42,6 +43,7 @@ export const PanelInteractContextProvider: React.FC<{}> = React.memo(
     );
   }
 );
+PanelInteractContextProvider.displayName = 'PanelInteractContextProvider';
 
 const usePanelInteractContext = () => {
   const context = useContext(PanelInteractContext);

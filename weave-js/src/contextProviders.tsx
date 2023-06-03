@@ -61,6 +61,8 @@ export const ComputeGraphContextProviderFromClient: React.FC<{client: Client}> =
       </div>
     );
   });
+ComputeGraphContextProviderFromClient.displayName =
+  'ComputeGraphContextProviderFromClient';
 
 const useRemoteEcosystemClient = (
   isAdmin: boolean = false,
@@ -102,6 +104,8 @@ export const RemoteEcosystemComputeGraphContextProvider: React.FC<{
     />
   );
 });
+RemoteEcosystemComputeGraphContextProvider.displayName =
+  'RemoteEcosystemComputeGraphContextProvider';
 
 const UNHIDE_PANELS = [
   PanelGroup,
@@ -145,3 +149,5 @@ export const NotebookComputeGraphContextProvider: React.FC = React.memo(
     );
   }
 );
+NotebookComputeGraphContextProvider.displayName =
+  'NotebookComputeGraphContextProvider';

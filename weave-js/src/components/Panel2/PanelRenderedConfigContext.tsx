@@ -25,8 +25,9 @@ export interface PanelRenderedConfigContextValue {
 
 export const PanelRenderedConfigContext =
   React.createContext<PanelRenderedConfigContextValue | null>(null);
+PanelRenderedConfigContext.displayName = 'PanelRenderedConfigContext';
 
-export const PanelRenderedConfigContextProvider: React.FC<{}> = React.memo(
+export const PanelRenderedConfigContextProvider: React.FC = React.memo(
   ({children}) => {
     const [state, setState] = useState<PanelRenderedConfigContextState>({
       panelConfig: {},
@@ -40,6 +41,8 @@ export const PanelRenderedConfigContextProvider: React.FC<{}> = React.memo(
     );
   }
 );
+PanelRenderedConfigContextProvider.displayName =
+  'PanelRenderedConfigContextProvider';
 
 const usePanelRenderedConfigContext = () => {
   const context = useContext(PanelRenderedConfigContext);

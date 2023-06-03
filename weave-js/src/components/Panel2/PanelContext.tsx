@@ -129,6 +129,7 @@ export interface PanelContextState {
 }
 
 export const PanelContext = React.createContext<PanelContextState | null>(null);
+PanelContext.displayName = 'PanelContext';
 
 const DEFAULT_CONTEXT: PanelContextState = {
   frame: {},
@@ -235,6 +236,7 @@ export const PanelContextProvider: React.FC<{
     );
   }
 );
+PanelContextProvider.displayName = 'PanelContextProvider';
 
 export const useExpressionHoverHandlers = (node: NodeOrVoidNode) => {
   const {triggerExpressionEvent} = usePanelContext();

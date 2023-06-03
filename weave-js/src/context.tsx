@@ -23,8 +23,10 @@ export interface WeaveFeatures {
 export const ClientContext = React.createContext<ClientState>({
   client: undefined,
 });
+ClientContext.displayName = 'ClientContext';
 
 export const WeaveContext = createContext<WeaveApp | null>(null);
+WeaveContext.displayName = 'WeaveContext';
 
 export const useWeaveContext = () => {
   const clientContext = useContext(ClientContext);
@@ -40,6 +42,7 @@ export const useWeaveContext = () => {
 export const WeaveFeaturesContext = createContext<WeaveFeatures>({
   betaFeatures: {},
 });
+WeaveFeaturesContext.displayName = 'WeaveFeaturesContext';
 
 export const useWeaveFeaturesContext = () => {
   return useContext(WeaveFeaturesContext);
