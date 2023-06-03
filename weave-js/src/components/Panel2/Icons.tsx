@@ -28,6 +28,10 @@ import {ReactComponent as PencilEdit} from '../../assets/icon-pencil-edit.svg';
 import {ReactComponent as System} from '../../assets/icon-system.svg';
 import {ReactComponent as Table} from '../../assets/icon-table.svg';
 import {ReactComponent as AddNew} from '../../assets/icon-add-new.svg';
+import {ReactComponent as OpenNewTab} from '../../assets/icon-open-new-tab.svg';
+import {ReactComponent as Home} from '../../assets/icon-home.svg';
+import {ReactComponent as Checkmark} from '../../assets/icon-checkmark.svg';
+import {ReactComponent as Loading} from '../../assets/icon-loading.svg';
 
 type SVGIconProps = SVGProps<SVGElement>;
 const updateIconProps = (props: SVGIconProps) => {
@@ -106,6 +110,18 @@ export const IconTable = (props: SVGIconProps) => (
 );
 export const IconAddNew = (props: SVGIconProps) => (
   <AddNew {...updateIconProps(props)} />
+);
+export const IconOpenNewTab = (props: SVGIconProps) => (
+  <OpenNewTab {...updateIconProps(props)} />
+);
+export const IconHome = (props: SVGIconProps) => (
+  <Home {...updateIconProps(props)} />
+);
+export const IconCheckmark = (props: SVGIconProps) => (
+  <Checkmark {...updateIconProps(props)} />
+);
+export const IconLoading = (props: SVGIconProps) => (
+  <Loading {...updateIconProps(props)} />
 );
 
 const style = {

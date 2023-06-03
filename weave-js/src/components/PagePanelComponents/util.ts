@@ -88,9 +88,15 @@ export const branchPointIsRemote = (branchPoint: BranchPointType | null) => {
   return branchPoint?.original_uri.startsWith(REMOTE_URI_PREFIX) ?? false;
 };
 
-export const weaveTypeIsPanel = (weaveType: Type) => {
+export const weaveTypeIsPanel = (weaveType?: Type) => {
   return isAssignableTo(weaveType || ('any' as const), {
     type: 'Panel' as any,
+  });
+};
+
+export const weaveTypeIsPanelGroup = (weaveType?: Type) => {
+  return isAssignableTo(weaveType || ('any' as const), {
+    type: 'Group' as any,
   });
 };
 

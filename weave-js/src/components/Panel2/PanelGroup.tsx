@@ -413,6 +413,40 @@ export function getItemVars(
   };
 }
 
+export const addPanelToGroupConfig = (
+  currentConfig: PanelGroupConfig,
+  allowedPanels?: string[],
+  childNameBase?: string
+) => {
+  let panelId = '';
+  if (allowedPanels != null) {
+    panelId = allowedPanels[0];
+  }
+  return produce(currentConfig, draft => {
+    draft.items[
+      nextPanelName(Object.keys(currentConfig.items), childNameBase)
+    ] = {
+      vars: {},
+      id: panelId,
+      input_node: voidNode(),
+      config: undefined,
+    };
+    if (currentConfig.layoutMode === 'flow') {
+      // If there is only one panel, and one row and column, add a second
+      // column. This is a nice behavior in notebooks.
+      const nRows = currentConfig.gridConfig?.flowConfig.rowsPerPage ?? 1;
+      const nCols = currentConfig.gridConfig?.flowConfig.columnsPerPage ?? 1;
+      if (
+        Object.keys(currentConfig.items).length === 1 &&
+        nRows === 1 &&
+        nCols === 1
+      ) {
+        draft.gridConfig.flowConfig.columnsPerPage = 2;
+      }
+    }
+  });
+};
+
 const usePanelGroupCommon = (props: PanelGroupProps) => {
   const {updateConfig2} = props;
   if (updateConfig2 == null) {
@@ -421,37 +455,11 @@ const usePanelGroupCommon = (props: PanelGroupProps) => {
 
   const handleAddPanel = useCallback(() => {
     updateConfig2(currentConfig => {
-      let panelId = '';
-      if (props.config?.allowedPanels != null) {
-        panelId = props.config.allowedPanels[0];
-      }
-      return produce(currentConfig, draft => {
-        draft.items[
-          nextPanelName(
-            Object.keys(currentConfig.items),
-            props.config?.childNameBase
-          )
-        ] = {
-          vars: {},
-          id: panelId,
-          input_node: voidNode(),
-          config: undefined,
-        };
-        if (currentConfig.layoutMode === 'flow') {
-          // If there is only one panel, and one row and column, add a second
-          // column. This is a nice behavior in notebooks.
-          const nRows = currentConfig.gridConfig?.flowConfig.rowsPerPage ?? 1;
-          const nCols =
-            currentConfig.gridConfig?.flowConfig.columnsPerPage ?? 1;
-          if (
-            Object.keys(currentConfig.items).length === 1 &&
-            nRows === 1 &&
-            nCols === 1
-          ) {
-            draft.gridConfig.flowConfig.columnsPerPage = 2;
-          }
-        }
-      });
+      return addPanelToGroupConfig(
+        currentConfig,
+        props.config?.allowedPanels,
+        props.config?.childNameBase
+      );
     });
   }, [props.config?.allowedPanels, props.config?.childNameBase, updateConfig2]);
 

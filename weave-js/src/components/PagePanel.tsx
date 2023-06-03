@@ -25,6 +25,8 @@ import * as Styles from './Panel2/PanelExpression/styles';
 import {
   PanelInteractContextProvider,
   useEditorIsOpen,
+  useSetInspectingPanel,
+  useCloseEditor,
 } from './Panel2/PanelInteractContext';
 import {PanelRenderedConfigContextProvider} from './Panel2/PanelRenderedConfigContext';
 import {PanelRootBrowser} from './Panel2/PanelRootBrowser/PanelRootBrowser';
@@ -35,8 +37,77 @@ import {
   inJupyterCell,
   uriFromNode,
   weaveTypeIsPanel,
+  weaveTypeIsPanelGroup,
 } from './PagePanelComponents/util';
 import {useCopyCodeFromURI} from './PagePanelComponents/hooks';
+import {
+  IconAddNew,
+  IconCheckmark,
+  IconClose,
+  IconCopy,
+  IconHome,
+  IconLoading,
+  IconOpenNewTab,
+  IconPencilEdit,
+} from './Panel2/Icons';
+import {addPanelToGroupConfig} from './Panel2/PanelGroup';
+
+const JupyterControlsHelpText = styled.div<{active: boolean}>`
+  width: max-content;
+  position: absolute;
+  top: -50px;
+  border-radius: 4px;
+  left: 50%;
+  transform: translate(-50%, 0);
+  text-align: center;
+  color: #fff;
+  background-color: #1d1f24;
+  padding: 10px 12px;
+  font-size: 14px;
+  opacity: 0.8;
+
+  transition: display 0.3s ease-in-out;
+
+  visibility: ${props => (props.active ? '' : 'hidden')};
+  opacity: ${props => (props.active ? 0.8 : 0)};
+  transition: visibility 0s, opacity 0.3s ease-in-out;
+`;
+
+const JupyterControlsMain = styled.div<{reveal?: boolean}>`
+  position: absolute;
+  bottom: ${props => (props.reveal ? '0px' : '-60px')};
+  box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+  left: 50%;
+  transform: translate(-50%, 0);
+  height: 40px;
+  background-color: white;
+  border: 1px solid #ddd;
+  border-bottom: none;
+  border-radius: 8px 8px 0px 0px;
+  display: flex;
+  justify-content: space-evenly;
+  align-items: center;
+  transition: bottom 0.3s ease-in-out;
+  gap: 8px;
+  padding: 0px 8px;
+  z-index: 100;
+`;
+
+const JupyterControlsIcon = styled.div`
+  width: 25px;
+  height: 25px;
+  padding: 4px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  transition: background-color 0.1s ease-in-out;
+  border-radius: 4px;
+  &:hover {
+    background: #0096ad1a;
+    color: #0096ad;
+  }
+`;
 
 interface HomeProps {
   updateConfig: (newConfig: ChildPanelFullConfig) => void;
@@ -400,13 +471,40 @@ export const PageContent: FC<PageContentProps> = ({
   const isPanel = weaveTypeIsPanel(
     typedInputNode.result?.type || {type: 'Panel' as any}
   );
+  const isGroup = weaveTypeIsPanelGroup(typedInputNode.result?.type);
   const maybeUri = uriFromNode(config.input_node);
   const {onCopy} = useCopyCodeFromURI(maybeUri);
 
+  const [showJupyterControls, setShowJupyterControls] = useState(false);
+  const pageHeight = 400; // static for now
+  const onMouseMove = useCallback(
+    (e: React.MouseEvent) => {
+      if (inJupyter) {
+        const y = e.clientY;
+        if (y > 0.9 * pageHeight) {
+          setShowJupyterControls(true);
+        } else {
+          setShowJupyterControls(false);
+        }
+      }
+    },
+    [inJupyter]
+  );
+
+  const openNewTab = useCallback(() => {
+    const expStr = weave
+      .expToString(config.input_node)
+      .replace(/\n+/g, '')
+      .replace(/\s+/g, '');
+    window.open(urlPrefixed(`/?exp=${encodeURIComponent(expStr)}`), '_blank');
+  }, [config.input_node, urlPrefixed, weave]);
+
   return (
-    <PageContentContainer>
+    <PageContentContainer
+      onMouseLeave={e => setShowJupyterControls(false)}
+      onMouseMove={onMouseMove}>
       <ChildPanel
-        editable={inJupyter || !isPanel}
+        editable={!isPanel}
         prefixHeader={
           inJupyter ? (
             <Icon
@@ -422,17 +520,7 @@ export const PageContent: FC<PageContentProps> = ({
           <>
             {inJupyter && (
               <>
-                <Styles.BarButton
-                  onClick={() => {
-                    const expStr = weave
-                      .expToString(config.input_node)
-                      .replace(/\n+/g, '')
-                      .replace(/\s+/g, '');
-                    window.open(
-                      urlPrefixed(`/?exp=${encodeURIComponent(expStr)}`),
-                      '_blank'
-                    );
-                  }}>
+                <Styles.BarButton onClick={openNewTab}>
                   <Icon name="external square alternate" />
                 </Styles.BarButton>
                 {maybeUri && (
@@ -459,7 +547,139 @@ export const PageContent: FC<PageContentProps> = ({
           updateConfig2={updateConfig2}
         />
       </Inspector>
+      {inJupyter && (
+        <JupyterPageControls
+          reveal={showJupyterControls}
+          goHome={goHome}
+          openNewTab={openNewTab}
+          maybeUri={maybeUri}
+          isGroup={isGroup}
+          updateConfig2={updateConfig2}
+        />
+      )}
     </PageContentContainer>
+  );
+};
+
+const JupyterPageControls: React.FC<{
+  reveal: boolean;
+  goHome: () => void;
+  openNewTab: () => void;
+  maybeUri: string | null;
+  isGroup: boolean;
+  updateConfig2: (change: (oldConfig: any) => any) => void;
+}> = props => {
+  const [hoverText, setHoverText] = useState('');
+  const {copyStatus, onCopy} = useCopyCodeFromURI(props.maybeUri);
+  const setInspectingPanel = useSetInspectingPanel();
+  const closeEditor = useCloseEditor();
+  const editorIsOpen = useEditorIsOpen();
+  const addPanelToGroup = useCallback(() => {
+    props.updateConfig2(oldConfig => {
+      console.log(oldConfig);
+      return {
+        ...oldConfig,
+        config: {
+          ...oldConfig.config,
+          config: addPanelToGroupConfig(
+            oldConfig.config.config,
+            ['panel'],
+            'panel'
+          ),
+        },
+      };
+    });
+  }, [props]);
+
+  return (
+    <JupyterControlsMain
+      reveal={props.reveal}
+      onMouseLeave={e => {
+        setHoverText('');
+      }}>
+      <JupyterControlsHelpText active={hoverText !== ''}>
+        {hoverText}
+      </JupyterControlsHelpText>
+
+      <JupyterControlsIcon
+        onClick={onCopy}
+        onMouseEnter={e => {
+          setHoverText('Copy dash code');
+        }}
+        onMouseLeave={e => {
+          setHoverText('');
+        }}>
+        {copyStatus === 'loading' ? (
+          <IconLoading />
+        ) : copyStatus === 'success' ? (
+          <IconCheckmark />
+        ) : (
+          <IconCopy />
+        )}
+      </JupyterControlsIcon>
+
+      {editorIsOpen ? (
+        <JupyterControlsIcon
+          onClick={() => {
+            closeEditor();
+            setHoverText('Edit configuration');
+          }}
+          onMouseEnter={e => {
+            setHoverText('Close configuration editor');
+          }}
+          onMouseLeave={e => {
+            setHoverText('');
+          }}>
+          <IconClose />
+        </JupyterControlsIcon>
+      ) : (
+        <JupyterControlsIcon
+          onClick={() => {
+            setInspectingPanel(['']);
+            setHoverText('Close configuration editor');
+          }}
+          onMouseEnter={e => {
+            setHoverText('Edit configuration');
+          }}
+          onMouseLeave={e => {
+            setHoverText('');
+          }}>
+          <IconPencilEdit />
+        </JupyterControlsIcon>
+      )}
+      {props.isGroup && (
+        <JupyterControlsIcon
+          onClick={addPanelToGroup}
+          onMouseEnter={e => {
+            setHoverText('Add new panel');
+          }}
+          onMouseLeave={e => {
+            setHoverText('');
+          }}>
+          <IconAddNew />
+        </JupyterControlsIcon>
+      )}
+      <JupyterControlsIcon
+        onClick={props.openNewTab}
+        onMouseEnter={e => {
+          setHoverText('Open dash in new tab');
+        }}
+        onMouseLeave={e => {
+          setHoverText('');
+        }}>
+        <IconOpenNewTab />
+      </JupyterControlsIcon>
+      <JupyterControlsIcon
+        onClick={props.goHome}
+        onMouseEnter={e => {
+          setHoverText('Go home');
+        }}
+        onMouseLeave={e => {
+          setHoverText('');
+        }}>
+        <IconHome />
+      </JupyterControlsIcon>
+    </JupyterControlsMain>
   );
 };
 

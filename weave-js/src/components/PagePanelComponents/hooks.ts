@@ -108,7 +108,7 @@ export const useCopyCodeFromURI = (maybeUri: string | null) => {
       .finally(() => {
         setTimeout(() => {
           setCopyStatus('ready');
-        }, 2500);
+        }, 750);
       });
   }, [getCode]);
 
