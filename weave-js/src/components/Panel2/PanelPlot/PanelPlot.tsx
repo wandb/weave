@@ -119,6 +119,7 @@ import {
 } from './versions';
 import {isNode} from '@babel/types';
 import {toWeaveType} from '../toWeaveType';
+import {AdvancedDynamicTextureInstrumentation} from '@babylonjs/gui';
 
 const recordEvent = makeEventRecorder('Plot');
 
@@ -2650,19 +2651,40 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
           let newConfigSignals: PlotConfig['signals'] = currConfig.signals;
 
           ['x' as const, 'y' as const].forEach(dimName => {
-            const axisSignal = signal[dimName];
+            const axisSignal: [number, number] | string[] | undefined =
+              signal[dimName];
 
             const settingName =
               currBrushMode === 'zoom' ? 'domain' : 'selection';
             newConfigSignals = produce(newConfigSignals, draft => {
-              const axisSetting = draft[settingName];
-              if (
-                !_.isEqual(
-                  currConcreteConfig.signals[settingName][dimName],
-                  axisSignal
-                )
-              ) {
-                axisSetting[dimName] = axisSignal;
+              // there's some redundancy here, but doing it this way ensures that
+              // the compiler gets the types of the lazy/eager paths right
+              if (settingName === 'selection') {
+                const axisSetting = draft[settingName];
+                if (
+                  !_.isEqual(
+                    currConcreteConfig.signals[settingName][dimName],
+                    axisSignal
+                  )
+                ) {
+                  axisSetting[dimName] = axisSignal;
+                }
+              } else {
+                const axisSetting = draft[settingName];
+                if (
+                  !_.isEqual(
+                    currConcreteConfig.signals[settingName][dimName],
+                    axisSignal
+                  )
+                ) {
+                  axisSetting[dimName] = constNode(
+                    {
+                      type: 'union',
+                      members: [{type: 'list', objectType: 'any'}, 'none'],
+                    },
+                    axisSignal ?? null
+                  );
+                }
               }
             });
 
@@ -2680,8 +2702,11 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
                   },
                 };
                 currMutateDomain.x({
-                  val: constNodeUnsafe(
-                    toWeaveType(signal[dimName]),
+                  val: constNode(
+                    {
+                      type: 'union',
+                      members: [{type: 'list', objectType: 'any'}, 'none'],
+                    },
                     signal[dimName]
                   ),
                 });
