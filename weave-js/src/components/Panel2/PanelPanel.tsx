@@ -1,6 +1,6 @@
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import {useTraceUpdate} from '@wandb/weave/common/util/hooks';
-import {constNodeUnsafe, Node, Stack} from '@wandb/weave/core';
+import {constNodeUnsafe, Node} from '@wandb/weave/core';
 import produce from 'immer';
 import React, {useCallback, useEffect, useMemo} from 'react';
 
@@ -17,7 +17,6 @@ import {
   ChildPanelConfigComp,
   ChildPanelFullConfig,
   getFullChildPanel,
-  initPanel,
 } from './ChildPanel';
 import {IconBack, IconClose, IconOverflowHorizontal} from './Icons';
 import * as Panel2 from './panel';
@@ -31,7 +30,7 @@ import {
 } from './PanelInteractContext';
 import {useSetPanelRenderedConfig} from './PanelRenderedConfigContext';
 import {OutlineItemMenuPopup} from '../Sidebar/OutlineItemMenuPopup';
-import {asyncMapPanels, getConfigForPath} from './panelTree';
+import {getConfigForPath} from './panelTree';
 import {IconButton} from '../IconButton';
 
 const inputType = {type: 'Panel' as const};
@@ -60,34 +59,37 @@ const usePanelPanelCommon = (props: PanelPanelProps) => {
       const doLoad = async () => {
         const loadedPanel = getFullChildPanel(panelQuery.result);
 
+        // Hydration is not totally correct yet and results in invalid states.
+        // Turning it off for now. This means the UI can be consistent in other
+        // ways: panels which expect to always have a config may have undefined.
         // Python may mass us unitialized panels (panels that don't have
         // configs, or even just expressions). We walk through and initialize
         // them here to make sure our panel state is valid.
-        let hydratedPanel: ChildPanelFullConfig;
-        try {
-          hydratedPanel = await asyncMapPanels(
-            loadedPanel,
-            stack,
-            async (panel: ChildPanelFullConfig, childStack: Stack) => {
-              if (panel.config != null) {
-                return panel;
-              }
-              const {id, config} = await initPanel(
-                weave,
-                panel.input_node,
-                panel.id,
-                undefined,
-                childStack
-              );
-              return {...panel, id, config};
-            }
-          );
-          // const hydratedPanel = loadedPanel;
-        } catch (e) {
-          console.error('Error hydrating panel', e);
-          return;
-        }
+        // let hydratedPanel: ChildPanelFullConfig;
+        // try {
+        //   hydratedPanel = await asyncMapPanels(
+        //     loadedPanel,
+        //     stack,
+        //     async (panel: ChildPanelFullConfig, childStack: Stack) => {
+        //       if (panel.config != null) {
+        //         return panel;
+        //       }
+        //       const {id, config} = await initPanel(
+        //         weave,
+        //         panel.input_node,
+        //         panel.id,
+        //         undefined,
+        //         childStack
+        //       );
+        //       return {...panel, id, config};
+        //     }
+        //   );
+        // } catch (e) {
+        //   console.error('Error hydrating panel', e);
+        //   return;
+        // }
 
+        const hydratedPanel = loadedPanel;
         setPanelConfig(() => hydratedPanel);
       };
       doLoad();

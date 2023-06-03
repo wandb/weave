@@ -63,6 +63,15 @@ const usePbLayoutConfig = (
 };
 
 const usePanelEachCommon = (props: PanelEachProps) => {
+  // Augh, we have to do this because PanelPanel doesn't properly
+  // hydrate the config.
+  // essentially it needs to walk the PanelTree, finding and initializing
+  // any uninitialized panels.
+  // TODO: Fix PanelPanel
+  props = {
+    ...props,
+    config: props.config == null ? PANEL_EACH_DEFAULT_CONFIG : props.config,
+  };
   const childPanelPanelProps = useChildPanelProps(props, 'panel');
   return useMemo(
     () => ({

@@ -22,7 +22,7 @@ CACHE_OP_NAMES = [
     "table-projection2D",
     "ArrowWeaveList-2DProjection",
     "ArrowWeaveList-projection2D",
-    "faiss_from_documents",
+    "op-faiss_from_documents",
     "FAISS-document_embeddings",
     # These are parallelized by derive_op only, in a custom way
     # Should move them to CACHE_AND_PARALLEL_OP_NAMES once that
