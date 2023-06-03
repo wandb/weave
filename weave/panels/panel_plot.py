@@ -60,12 +60,22 @@ LineStyleOption = typing.Literal[
     "series",
 ]
 
+LAZY_PATHS = [
+    "series.#.constants.mark",
+    "axisSettings.x.title",
+    "axisSettings.y.title",
+    "axisSettings.color.title",
+    "signals.domain.x",
+    "signals.domain.y",
+]
+
+
 SelectFunction = typing.Union[graph.Node, typing.Callable[[typing.Any], typing.Any]]
 
 
 @weave.type()
 class PlotConstants:
-    mark: typing.Optional[SelectFunction]
+    mark: SelectFunction
     pointShape: PointShapeOption
     label: LabelOption
     lineStyle: LineStyleOption
@@ -83,7 +93,7 @@ class PlotConstantsInputDict(typing.TypedDict):
     # when we drop support for Python 3.10 and python 3.11 is released
 
     # this will mimic the behavior of ? in typescript
-    mark: typing.Optional[SelectFunction]
+    mark: SelectFunction
     pointShape: typing.Optional[PointShapeOption]
     label: typing.Optional[LabelOption]
     lineStyle: typing.Optional[LineStyleOption]
@@ -306,6 +316,81 @@ class PlotConfig:
     configVersion: int = 12
 
 
+def set_through_array(
+    obj: typing.Any, path: typing.List[str], value: typing.Any
+) -> typing.Any:
+    if len(path) == 0:
+        return obj
+
+    first, *rest = path
+
+    if first == "#":
+        if isinstance(obj, list):
+            for i, item in enumerate(obj):
+                set_through_array(item, rest, value[i])
+    elif len(rest) == 0:
+        if isinstance(obj, dict):
+            obj[first] = value
+        else:
+            setattr(obj, first, value)
+    elif hasattr(obj[first], "__dict__") or isinstance(getattr(obj, first, None), dict):
+        set_through_array(getattr(obj, first), rest, value)
+
+    return obj
+
+
+def get_through_array(
+    obj: typing.Any, path: typing.List[str], coerce_list_of_nodes_to_node=False
+) -> typing.Any:
+    if len(path) == 0:
+        return obj
+
+    first, *rest = path
+
+    if first == "#":
+        if isinstance(obj, list):
+            result = [
+                get_through_array(
+                    item,
+                    rest,
+                    coerce_list_of_nodes_to_node=coerce_list_of_nodes_to_node,
+                )
+                for item in obj
+            ]
+            if coerce_list_of_nodes_to_node and all(
+                isinstance(item, graph.Node) for item in result
+            ):
+                result = list_.make_list({i: item for i, item in enumerate(result)})
+            return result
+        else:
+            return None
+    elif hasattr(obj[first], "__dict__") or isinstance(getattr(obj, first, None), dict):
+        return get_through_array(
+            getattr(obj, first),
+            rest,
+            coerce_list_of_nodes_to_node=coerce_list_of_nodes_to_node,
+        )
+    elif len(rest) == 0:
+        if isinstance(obj, dict):
+            return obj[first]
+        else:
+            return getattr(obj, first, None)
+    else:
+        return None
+
+
+def ensure_node(
+    obj: typing.Any,
+    path: typing.List[str],
+    type: typing.Optional[weave.types.Type] = None,
+) -> None:
+    value = get_through_array(obj, path)
+    if not isinstance(value, graph.Node):
+        if type is None:
+            type = weave.types.TypeRegistry.type_of(value)
+        set_through_array(obj, path, graph.ConstNode(type, value))
+
+
 @weave.type("plot")
 class Plot(panel.Panel):
     id = "plot"
@@ -317,7 +402,7 @@ class Plot(panel.Panel):
         vars=None,
         config: typing.Optional[PlotConfig] = None,
         constants: typing.Optional[PlotConstants] = None,
-        mark: typing.Optional[SelectFunction] = None,
+        mark: typing.Optional[typing.Union[SelectFunction, MarkOption]] = None,
         x: typing.Optional[SelectFunction] = None,
         y: typing.Optional[SelectFunction] = None,
         color: typing.Optional[SelectFunction] = None,
@@ -338,6 +423,10 @@ class Plot(panel.Panel):
     ):
         super().__init__(input_node=input_node, vars=vars)
         self.config = config
+
+        import pdb
+
+        pdb.set_trace()
 
         if self.config is None:
             constants = PlotConstants(
@@ -406,6 +495,9 @@ class Plot(panel.Panel):
                 configOptionsExpanded=ConfigOptionsExpanded(),
                 signals=signals,
             )
+
+            for path in LAZY_PATHS:
+                ensure_node(self.config, path.split("."))
 
             if no_axes:
                 self.set_no_axes()
