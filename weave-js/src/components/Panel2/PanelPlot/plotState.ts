@@ -1318,7 +1318,7 @@ export function defaultSeriesName(
 
 // defaultAxisLabel returns the default label for a given encodable axis
 export const defaultAxisLabel = (
-  series: SeriesConfig[],
+  series: ConcreteSeriesConfig[],
   axisName: ExpressionDimName,
   weave: WeaveInterface
 ): string => {

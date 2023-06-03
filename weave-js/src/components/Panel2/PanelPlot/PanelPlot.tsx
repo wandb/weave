@@ -8,6 +8,7 @@ import CustomPanelRenderer, {
 } from '@wandb/weave/common/components/Vega3/CustomPanelRenderer';
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import {
+  constNode,
   // constFunction,
   ConstNode,
   constNodeUnsafe,
@@ -1497,10 +1498,7 @@ const useLatestData = (
 
 const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
   const weave = useWeaveContext();
-  const {input, updateConfig} = props;
-
-  const updateConfigRef = useRef<PanelPlotProps['updateConfig']>(updateConfig);
-  updateConfigRef.current = updateConfig;
+  const {input, updateConfig: propsUpdateConfig} = props;
 
   const [brushMode, setBrushMode] = useState<BrushMode>('zoom');
 
@@ -1521,6 +1519,24 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
   const inputNode = input;
   const {frame, stack} = usePanelContext();
   const {config, isRefining} = useConfig(inputNode, props.config);
+
+  const updateConfig = useCallback(
+    (newConfig?: Partial<PlotConfig>) => {
+      if (!newConfig) {
+        // if config is undefined, just use the default plot
+        propsUpdateConfig(defaultPlot(input, stack));
+      } else {
+        propsUpdateConfig({
+          ...config,
+          ...newConfig,
+        });
+      }
+    },
+    [config, propsUpdateConfig, input, stack]
+  );
+
+  const updateConfigRef = useRef<typeof updateConfig>(updateConfig);
+  updateConfigRef.current = updateConfig;
 
   // side effect
   useEffect(() => {
@@ -1608,12 +1624,6 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
 
   const concreteConfigRef = useRef<ConcretePlotConfig>(concreteConfig);
   concreteConfigRef.current = concreteConfig;
-
-  const lazyPaths = useMemo(() => {
-    return PlotState.lazyPaths(config);
-  }, [config]);
-  const lazyPathsRef = useRef(lazyPaths);
-  lazyPathsRef.current = lazyPaths;
 
   const domainNodes: {x: NodeOrVoidNode; y: NodeOrVoidNode} = useMemo(() => {
     return {
@@ -2622,7 +2632,6 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
         const currBrushMode = brushModeRef.current;
         const currUpdateConfig = updateConfigRef.current;
         const currConfig = configRef.current;
-        const currLazyPaths = lazyPathsRef.current;
         const currMutateDomain = mutateDomainRef.current;
         const currConcreteConfig = concreteConfigRef.current;
         const currSetToolTipsEnabled = setToolTipsEnabledRef.current;
@@ -2638,8 +2647,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
         const data = selection?.data[dataName];
 
         if (!_.isEmpty(signal)) {
-          let newConfigSignals: PlotConfig['signals'] =
-            currConcreteConfig.signals;
+          let newConfigSignals: PlotConfig['signals'] = currConfig.signals;
 
           ['x' as const, 'y' as const].forEach(dimName => {
             const axisSignal = signal[dimName];
@@ -2663,10 +2671,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
               newConfigSignals = produce(newConfigSignals, draft => {
                 draft.selection[dimName] = undefined;
               });
-              if (
-                dimName === 'x' &&
-                currLazyPaths.includes('signals.domain.x')
-              ) {
+              if (dimName === 'x') {
                 newConfigSignals = {
                   ...newConfigSignals,
                   domain: {
@@ -2684,7 +2689,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
             }
           });
 
-          if (newConfigSignals !== currConcreteConfig.signals) {
+          if (newConfigSignals !== currConfig.signals) {
             currUpdateConfig({signals: newConfigSignals});
           }
         } else if (
@@ -2695,7 +2700,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
           )
         ) {
           currUpdateConfig({
-            signals: produce(currConcreteConfig.signals, draft => {
+            signals: produce(currConfig.signals, draft => {
               ['x' as const, 'y' as const].forEach(axisName => {
                 draft.selection[axisName] = undefined;
               });
@@ -2709,11 +2714,26 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
       });
 
       vegaView.addEventListener('dblclick', async () => {
-        const currConfig = concreteConfigRef.current;
+        const currConfig = configRef.current;
         const currUpdateConfig = updateConfigRef.current;
         if (!_.isEmpty(currConfig.signals.domain)) {
           const newSignals = produce(currConfig.signals, draft => {
-            draft.domain = {};
+            draft.domain = {
+              x: constNode(
+                {
+                  type: 'union',
+                  members: [{type: 'list', objectType: 'any'}, 'none'],
+                },
+                null
+              ),
+              y: constNode(
+                {
+                  type: 'union',
+                  members: [{type: 'list', objectType: 'any'}, 'none'],
+                },
+                null
+              ),
+            };
           });
           currUpdateConfig({signals: newSignals});
         }
