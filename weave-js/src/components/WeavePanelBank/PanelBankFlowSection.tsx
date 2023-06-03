@@ -49,7 +49,7 @@ const PanelBankFlowSectionInnerComp: React.FC<AllPanelBankFlowSectionProps> = ({
 }: AllPanelBankFlowSectionProps) => {
   const [resizingRefId, setResizingRefId] = useState<string | null>(null);
 
-  const {snapToColumns, gutterWidth} = flowConfig;
+  const {snapToColumns, gutterWidth, columnsPerPage, rowsPerPage} = flowConfig;
 
   const panelCount = activePanelRefs.length;
   const {panelsPerPage, panelsPerRow, maxPage} = getPagingParams({
@@ -191,14 +191,25 @@ const PanelBankFlowSectionInnerComp: React.FC<AllPanelBankFlowSectionProps> = ({
     ]
   );
 
+  // This state stores [rowsPerPage, columnsPerPage].
+  // Updates dynamically onPanelResize, to show the '3x4' text overlay indicating the new grid size
+  const [resizingGridSize, setResizingGridSize] = useState([
+    columnsPerPage,
+    rowsPerPage,
+  ]);
+
   const onPanelResize = useCallback(
     (e: React.SyntheticEvent<Element, Event>, data: ResizeCallbackData) => {
       setResizingPanelSize({
         width: data.size.width,
         height: data.size.height,
       });
+      setResizingGridSize([
+        getClosestColumnCount(data.size.width),
+        getClosestRowCount(data.size.height),
+      ]);
     },
-    []
+    [getClosestColumnCount, getClosestRowCount]
   );
 
   const panelResizePreviewStyle = useMemo(() => {
@@ -209,7 +220,6 @@ const PanelBankFlowSectionInnerComp: React.FC<AllPanelBankFlowSectionProps> = ({
       _.findIndex(renderPanelRefs, {id: resizingRefId}) % panelsPerPage
     );
     return {
-      // height: resizingSize.height,
       height: getSnappedHeight({unsnappedHeight: resizingPanelSize.height}),
       width: getSnappedWidth({unsnappedWidth: resizingPanelSize.width}),
       transform:
@@ -234,7 +244,11 @@ const PanelBankFlowSectionInnerComp: React.FC<AllPanelBankFlowSectionProps> = ({
 
   return (
     <>
-      <div className="resize-preview" style={panelResizePreviewStyle} />
+      <div className="resize-preview" style={panelResizePreviewStyle}>
+        <div className="resize-preview-message">
+          <h2>{`${resizingGridSize[0]} x ${resizingGridSize[1]}`}</h2>
+        </div>
+      </div>
       <div
         className={`flow-section ${
           resizingRefId != null ? 'resizing-panel' : ''
