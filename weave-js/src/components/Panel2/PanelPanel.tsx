@@ -1,6 +1,6 @@
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import {useTraceUpdate} from '@wandb/weave/common/util/hooks';
-import {constNodeUnsafe, Node} from '@wandb/weave/core';
+import {constNodeUnsafe, Node, NodeOrVoidNode} from '@wandb/weave/core';
 import produce from 'immer';
 import React, {useCallback, useEffect, useMemo} from 'react';
 
@@ -38,6 +38,40 @@ type PanelPanelProps = Panel2.PanelProps<
   typeof inputType,
   ChildPanelFullConfig
 >;
+
+export const useUpdateConfigForPanelNode = (
+  input: NodeOrVoidNode,
+  updateInput?: (newInput: NodeOrVoidNode) => void
+) => {
+  const weave = useWeaveContext();
+  const handleRootUpdate = useCallback(
+    (newVal: Node) => {
+      consoleLog('PANEL PANEL HANDLE ROOT UPDATE', newVal);
+      if (
+        weave.expToString(input) !== weave.expToString(newVal) &&
+        updateInput
+      ) {
+        updateInput(newVal as any);
+      }
+    },
+    [input, updateInput, weave]
+  );
+
+  const setServerPanelConfig = useMutation(input, 'set', handleRootUpdate);
+
+  const updateConfigForPanelNode = useCallback(
+    (newConfig: any) => {
+      // Need to do fixChildData because the panel config is not fully hydrated.
+      const fixedConfig = fixChildData(getFullChildPanel(newConfig));
+      setServerPanelConfig({
+        val: constNodeUnsafe(toWeaveType(fixedConfig), fixedConfig),
+      });
+    },
+    [setServerPanelConfig]
+  );
+
+  return updateConfigForPanelNode;
+};
 
 const usePanelPanelCommon = (props: PanelPanelProps) => {
   const weave = useWeaveContext();
@@ -110,23 +144,9 @@ const usePanelPanelCommon = (props: PanelPanelProps) => {
 
   useSetPanelRenderedConfig(panelConfig);
 
-  const handleRootUpdate = useCallback(
-    (newVal: Node) => {
-      consoleLog('PANEL PANEL HANDLE ROOT UPDATE', newVal);
-      if (
-        weave.expToString(props.input) !== weave.expToString(newVal) &&
-        updateInput
-      ) {
-        updateInput(newVal as any);
-      }
-    },
-    [props.input, updateInput, weave]
-  );
-
-  const setServerPanelConfig = useMutation(
+  const updateConfigForPanelNode = useUpdateConfigForPanelNode(
     props.input,
-    'set',
-    handleRootUpdate
+    updateInput as any
   );
 
   const panelUpdateConfig = useCallback(
@@ -135,13 +155,9 @@ const usePanelPanelCommon = (props: PanelPanelProps) => {
       consoleLog('PANEL PANEL CONFIG UPDATE TYPE', toWeaveType(newConfig));
       setPanelConfig(origConfig => ({...origConfig, ...newConfig}));
       // Uncomment to enable panel state saving
-      // Need to do fixChildData because the panel config is not fully hydrated.
-      const fixedConfig = fixChildData(getFullChildPanel(newConfig));
-      setServerPanelConfig({
-        val: constNodeUnsafe(toWeaveType(fixedConfig), fixedConfig),
-      });
+      updateConfigForPanelNode(newConfig);
     },
-    [setPanelConfig, setServerPanelConfig]
+    [setPanelConfig, updateConfigForPanelNode]
   );
   const panelUpdateConfig2 = useCallback(
     (change: (oldConfig: ChildPanelConfig) => ChildPanelFullConfig) => {
@@ -156,15 +172,11 @@ const usePanelPanelCommon = (props: PanelPanelProps) => {
           }
         });
         consoleLog('PANEL PANEL CONFIG UPDATE2', newConfig);
-        // Need to do fixChildData because the panel config is not fully hydrated.
-        const fixedConfig = fixChildData(getFullChildPanel(newConfig));
-        setServerPanelConfig({
-          val: constNodeUnsafe(toWeaveType(fixedConfig), fixedConfig),
-        });
+        updateConfigForPanelNode(newConfig);
         return newConfig;
       });
     },
-    [setPanelConfig, setServerPanelConfig]
+    [setPanelConfig, updateConfigForPanelNode]
   );
   consoleLog('PANEL PANEL RENDER CONFIG', panelConfig);
 

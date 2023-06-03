@@ -54,6 +54,7 @@ import {
   PANEL_GROUP_DEFAULT_CONFIG,
   addPanelToGroupConfig,
 } from './Panel2/PanelGroup';
+import {useUpdateConfigForPanelNode} from './Panel2/PanelPanel';
 
 const JupyterControlsHelpText = styled.div<{active: boolean}>`
   width: max-content;
@@ -459,12 +460,8 @@ type PageContentProps = {
   goHome: () => void;
 };
 
-export const PageContent: FC<PageContentProps> = ({
-  config,
-  updateConfig,
-  updateConfig2,
-  goHome,
-}) => {
+export const PageContent: FC<PageContentProps> = props => {
+  const {config, updateConfig, updateConfig2, goHome} = props;
   const weave = useWeaveContext();
   const editorIsOpen = useEditorIsOpen();
   const inJupyter = inJupyterCell();
@@ -558,6 +555,7 @@ export const PageContent: FC<PageContentProps> = ({
       </Inspector>
       {inJupyter && (
         <JupyterPageControls
+          {...props}
           reveal={showJupyterControls}
           goHome={goHome}
           openNewTab={openNewTab}
@@ -571,62 +569,78 @@ export const PageContent: FC<PageContentProps> = ({
   );
 };
 
-const JupyterPageControls: React.FC<{
-  reveal: boolean;
-  goHome: () => void;
-  openNewTab: () => void;
-  maybeUri: string | null;
-  isGroup: boolean;
-  isPanel: boolean;
-  updateConfig2: (change: (oldConfig: any) => any) => void;
-}> = props => {
+const JupyterPageControls: React.FC<
+  PageContentProps & {
+    reveal: boolean;
+    goHome: () => void;
+    openNewTab: () => void;
+    maybeUri: string | null;
+    isGroup: boolean;
+    isPanel: boolean;
+    updateConfig2: (change: (oldConfig: any) => any) => void;
+  }
+> = props => {
   const [hoverText, setHoverText] = useState('');
   const {copyStatus, onCopy} = useCopyCodeFromURI(props.maybeUri);
   const setInspectingPanel = useSetInspectingPanel();
   const closeEditor = useCloseEditor();
   const editorIsOpen = useEditorIsOpen();
-  const addPanelToPanel = useCallback(() => {
+  const updateInput = useCallback((newInput: NodeOrVoidNode) => {
     props.updateConfig2(oldConfig => {
-      let newInnerPanelConfig: any;
-      if (props.isGroup) {
-        newInnerPanelConfig = {
-          ...oldConfig.config,
-          config: addPanelToGroupConfig(
-            oldConfig.config.config,
-            ['panel'],
-            'panel'
-          ),
-        };
-      } else {
-        newInnerPanelConfig = {
-          _type: 'Group',
-          config: addPanelToGroupConfig(
-            addPanelToGroupConfig(
-              PANEL_GROUP_DEFAULT_CONFIG(),
-              undefined,
-              'panel',
-              oldConfig.config
-            ),
-            ['panel'],
-            'panel'
-          ),
-          id: 'Group',
-          input_node: {
-            nodeType: 'void',
-            type: 'invalid',
-          },
-          vars: {},
-        };
-      }
-
-      const finalConfig = {
+      return {
         ...oldConfig,
-        config: newInnerPanelConfig,
+        input_node: newInput,
       };
-
-      return finalConfig;
     });
-  }, [props]);
+  }, []);
+  const updateConfigForPanelNode = useUpdateConfigForPanelNode(
+    props.config.input_node,
+    updateInput
+  );
+  const addPanelToPanel = useCallback(() => {
+    if (props.isPanel) {
+      props.updateConfig2(oldConfig => {
+        // props.updateConfig2(oldConfig => {
+        let newInnerPanelConfig: ChildPanelFullConfig;
+        if (props.isGroup) {
+          newInnerPanelConfig = {
+            ...oldConfig.config,
+            config: addPanelToGroupConfig(
+              oldConfig.config.config,
+              [''],
+              'panel'
+            ),
+          };
+        } else {
+          newInnerPanelConfig = {
+            config: addPanelToGroupConfig(
+              addPanelToGroupConfig(
+                PANEL_GROUP_DEFAULT_CONFIG(),
+                undefined,
+                'panel',
+                oldConfig.config
+              ),
+              [''],
+              'panel'
+            ),
+            id: 'Group',
+            input_node: {
+              nodeType: 'void',
+              type: 'invalid',
+            },
+            vars: {},
+          };
+        }
+
+        updateConfigForPanelNode(newInnerPanelConfig);
+
+        return {
+          ...oldConfig,
+          config: newInnerPanelConfig,
+        };
+      });
+    }
+  }, [props, updateConfigForPanelNode]);
 
   return (
     <JupyterControlsMain
