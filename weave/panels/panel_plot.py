@@ -333,10 +333,10 @@ def set_through_array(
             obj[first] = value
         else:
             setattr(obj, first, value)
-    elif hasattr(obj[first], "__dict__") or isinstance(getattr(obj, first, None), dict):
+    elif hasattr(obj, first):
         set_through_array(getattr(obj, first), rest, value)
 
-    return obj
+    raise ValueError(f"Could not set {path} in {obj} to {value}")
 
 
 def get_through_array(
@@ -363,8 +363,8 @@ def get_through_array(
                 result = list_.make_list({i: item for i, item in enumerate(result)})
             return result
         else:
-            return None
-    elif hasattr(obj[first], "__dict__") or isinstance(getattr(obj, first, None), dict):
+            raise ValueError(f"Could not get {path} in {obj}: not a list")
+    elif hasattr(obj, first):
         return get_through_array(
             getattr(obj, first),
             rest,
@@ -376,7 +376,7 @@ def get_through_array(
         else:
             return getattr(obj, first, None)
     else:
-        return None
+        raise ValueError(f"Could not get {path} in {obj}")
 
 
 def ensure_node(
@@ -423,10 +423,6 @@ class Plot(panel.Panel):
     ):
         super().__init__(input_node=input_node, vars=vars)
         self.config = config
-
-        import pdb
-
-        pdb.set_trace()
 
         if self.config is None:
             constants = PlotConstants(
