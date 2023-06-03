@@ -49,7 +49,7 @@ class PanelBankSectionConfig(typing.TypedDict):
 @weave.type()
 class GroupConfig(typing.Generic[ItemsType]):
     layoutMode: str = dataclasses.field(default_factory=lambda: "vertical")
-    showExpressions: bool = dataclasses.field(default_factory=lambda: False)
+    showExpressions: bool = dataclasses.field(default_factory=lambda: True)
     equalSize: bool = dataclasses.field(default_factory=lambda: True)
     style: str = dataclasses.field(default_factory=lambda: "")
     items: ItemsType = dataclasses.field(default_factory=dict)  # type: ignore

@@ -50,7 +50,10 @@ import {
   IconOpenNewTab,
   IconPencilEdit,
 } from './Panel2/Icons';
-import {addPanelToGroupConfig} from './Panel2/PanelGroup';
+import {
+  PANEL_GROUP_DEFAULT_CONFIG,
+  addPanelToGroupConfig,
+} from './Panel2/PanelGroup';
 
 const JupyterControlsHelpText = styled.div<{active: boolean}>`
   width: max-content;
@@ -503,42 +506,48 @@ export const PageContent: FC<PageContentProps> = ({
     <PageContentContainer
       onMouseLeave={e => setShowJupyterControls(false)}
       onMouseMove={onMouseMove}>
-      <ChildPanel
-        editable={!isPanel}
-        prefixHeader={
-          inJupyter ? (
-            <Icon
-              style={{cursor: 'pointer', color: '#555'}}
-              name="home"
-              onClick={goHome}
-            />
-          ) : (
-            <></>
-          )
-        }
-        prefixButtons={
-          <>
-            {inJupyter && (
-              <>
-                <Styles.BarButton onClick={openNewTab}>
-                  <Icon name="external square alternate" />
-                </Styles.BarButton>
-                {maybeUri && (
-                  <Styles.BarButton
-                    onClick={() => {
-                      onCopy();
-                    }}>
-                    <Icon name="copy" />
+      <div
+        style={{
+          flex: '1 1 auto',
+          overflow: 'hidden',
+        }}>
+        <ChildPanel
+          editable={!isPanel}
+          prefixHeader={
+            inJupyter ? (
+              <Icon
+                style={{cursor: 'pointer', color: '#555'}}
+                name="home"
+                onClick={goHome}
+              />
+            ) : (
+              <></>
+            )
+          }
+          prefixButtons={
+            <>
+              {inJupyter && (
+                <>
+                  <Styles.BarButton onClick={openNewTab}>
+                    <Icon name="external square alternate" />
                   </Styles.BarButton>
-                )}
-              </>
-            )}
-          </>
-        }
-        config={config}
-        updateConfig={updateConfig}
-        updateConfig2={updateConfig2}
-      />
+                  {maybeUri && (
+                    <Styles.BarButton
+                      onClick={() => {
+                        onCopy();
+                      }}>
+                      <Icon name="copy" />
+                    </Styles.BarButton>
+                  )}
+                </>
+              )}
+            </>
+          }
+          config={config}
+          updateConfig={updateConfig}
+          updateConfig2={updateConfig2}
+        />
+      </div>
       <Inspector active={editorIsOpen}>
         <ChildPanelConfigComp
           // pathEl={CHILD_NAME}
@@ -576,18 +585,44 @@ const JupyterPageControls: React.FC<{
   const editorIsOpen = useEditorIsOpen();
   const addPanelToGroup = useCallback(() => {
     props.updateConfig2(oldConfig => {
-      console.log(oldConfig);
-      return {
-        ...oldConfig,
-        config: {
+      let newInnerPanelConfig: any;
+      if (props.isGroup) {
+        newInnerPanelConfig = {
           ...oldConfig.config,
           config: addPanelToGroupConfig(
             oldConfig.config.config,
             ['panel'],
             'panel'
           ),
-        },
+        };
+      } else {
+        newInnerPanelConfig = {
+          _type: 'Group',
+          config: addPanelToGroupConfig(
+            addPanelToGroupConfig(
+              PANEL_GROUP_DEFAULT_CONFIG(),
+              undefined,
+              'panel',
+              oldConfig.config
+            ),
+            ['panel'],
+            'panel'
+          ),
+          id: 'Group',
+          input_node: {
+            nodeType: 'void',
+            type: 'invalid',
+          },
+          vars: {},
+        };
+      }
+
+      const finalConfig = {
+        ...oldConfig,
+        config: newInnerPanelConfig,
       };
+
+      return finalConfig;
     });
   }, [props]);
 
@@ -604,7 +639,7 @@ const JupyterPageControls: React.FC<{
       <JupyterControlsIcon
         onClick={onCopy}
         onMouseEnter={e => {
-          setHoverText('Copy dash code');
+          setHoverText('Copy code');
         }}
         onMouseLeave={e => {
           setHoverText('');
@@ -647,22 +682,22 @@ const JupyterPageControls: React.FC<{
           <IconPencilEdit />
         </JupyterControlsIcon>
       )}
-      {props.isGroup && (
-        <JupyterControlsIcon
-          onClick={addPanelToGroup}
-          onMouseEnter={e => {
-            setHoverText('Add new panel');
-          }}
-          onMouseLeave={e => {
-            setHoverText('');
-          }}>
-          <IconAddNew />
-        </JupyterControlsIcon>
-      )}
+
+      <JupyterControlsIcon
+        onClick={addPanelToGroup}
+        onMouseEnter={e => {
+          setHoverText('Add new panel');
+        }}
+        onMouseLeave={e => {
+          setHoverText('');
+        }}>
+        <IconAddNew />
+      </JupyterControlsIcon>
+
       <JupyterControlsIcon
         onClick={props.openNewTab}
         onMouseEnter={e => {
-          setHoverText('Open dash in new tab');
+          setHoverText('Open in new tab');
         }}
         onMouseLeave={e => {
           setHoverText('');
