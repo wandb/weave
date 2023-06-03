@@ -698,11 +698,7 @@ export const PanelGroupItem: React.FC<{
         allowedPanels={config.allowedPanels}
         pathEl={'' + name}
         config={item}
-        editable={
-          config.layoutMode !== 'layer' &&
-          config.showExpressions &&
-          !(item && 'id' in item && item.id === 'Group')
-        }
+        editable={config.layoutMode !== 'layer' && config.showExpressions}
         updateConfig={itemUpdateConfig}
         updateConfig2={itemUpdateConfig2}
         updateName={itemUpdateName}
