@@ -563,6 +563,7 @@ export const PageContent: FC<PageContentProps> = ({
           openNewTab={openNewTab}
           maybeUri={maybeUri}
           isGroup={isGroup}
+          isPanel={isPanel}
           updateConfig2={updateConfig2}
         />
       )}
@@ -576,6 +577,7 @@ const JupyterPageControls: React.FC<{
   openNewTab: () => void;
   maybeUri: string | null;
   isGroup: boolean;
+  isPanel: boolean;
   updateConfig2: (change: (oldConfig: any) => any) => void;
 }> = props => {
   const [hoverText, setHoverText] = useState('');
@@ -583,7 +585,7 @@ const JupyterPageControls: React.FC<{
   const setInspectingPanel = useSetInspectingPanel();
   const closeEditor = useCloseEditor();
   const editorIsOpen = useEditorIsOpen();
-  const addPanelToGroup = useCallback(() => {
+  const addPanelToPanel = useCallback(() => {
     props.updateConfig2(oldConfig => {
       let newInnerPanelConfig: any;
       if (props.isGroup) {
@@ -683,16 +685,18 @@ const JupyterPageControls: React.FC<{
         </JupyterControlsIcon>
       )}
 
-      <JupyterControlsIcon
-        onClick={addPanelToGroup}
-        onMouseEnter={e => {
-          setHoverText('Add new panel');
-        }}
-        onMouseLeave={e => {
-          setHoverText('');
-        }}>
-        <IconAddNew />
-      </JupyterControlsIcon>
+      {props.isPanel && (
+        <JupyterControlsIcon
+          onClick={addPanelToPanel}
+          onMouseEnter={e => {
+            setHoverText('Add new panel');
+          }}
+          onMouseLeave={e => {
+            setHoverText('');
+          }}>
+          <IconAddNew />
+        </JupyterControlsIcon>
+      )}
 
       <JupyterControlsIcon
         onClick={props.openNewTab}
