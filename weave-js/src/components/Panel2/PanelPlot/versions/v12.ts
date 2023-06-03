@@ -1,19 +1,20 @@
+import * as helpers from '@wandb/weave/core/model/helpers';
 import * as weave from '@wandb/weave/core';
 import * as v10 from './v10';
 import * as v11 from './v11';
 
-type LazyStringOrNull = weave.Node<{
-  type: 'union';
-  members: ['string', 'none'];
-}>;
-type LazyAxisSelection = weave.Node<{type: 'list'; objectType: 'any'}>;
+const maybeString = helpers.maybe('string');
+const maybeListOfAny = helpers.maybe(helpers.list('any'));
+
+type LazyStringOrNull = weave.Node<typeof maybeString>;
+type LazyAxisSelection = weave.Node<typeof maybeListOfAny>;
 
 export type SeriesConfig = Omit<
   v11.SeriesConfig,
   'constants' | 'axisSettings'
 > & {
   constants: Omit<v11.SeriesConfig['constants'], 'mark'> & {
-    mark: LazyStringOrNull | v11.SeriesConfig['constants']['mark'];
+    mark: LazyStringOrNull;
   };
 };
 
@@ -28,20 +29,20 @@ export const LAZY_PATHS = [
 
 export type AxisSettings = {
   x: Omit<v10.AxisSetting, 'title'> & {
-    title?: LazyStringOrNull | string;
+    title: LazyStringOrNull;
   };
   y: Omit<v10.AxisSetting, 'title'> & {
-    title?: LazyStringOrNull | string;
+    title: LazyStringOrNull;
   };
   color: Omit<v10.AxisSetting, 'title'> & {
-    title?: LazyStringOrNull | string;
+    title: LazyStringOrNull;
   };
 };
 
 export type Signals = Omit<v11.PlotConfig['signals'], 'domain'> & {
   domain: {
-    x?: LazyAxisSelection | v11.PlotConfig['signals']['domain']['x'];
-    y?: LazyAxisSelection | v11.PlotConfig['signals']['domain']['y'];
+    x: LazyAxisSelection;
+    y: LazyAxisSelection;
   };
 };
 
@@ -63,5 +64,51 @@ export const migrate = (config: v11.PlotConfig): PlotConfig => {
   return {
     ...config,
     configVersion: 12,
+    series: config.series.map(series => ({
+      ...series,
+      constants: {
+        ...series.constants,
+        mark:
+          series.constants.mark == null
+            ? weave.constNone()
+            : weave.constString(series.constants.mark),
+      },
+    })),
+    axisSettings: {
+      x: {
+        ...config.axisSettings.x,
+        title:
+          config.axisSettings.x.title == null
+            ? weave.constNone()
+            : weave.constString(config.axisSettings.x.title),
+      },
+      y: {
+        ...config.axisSettings.y,
+        title:
+          config.axisSettings.y.title == null
+            ? weave.constNone()
+            : weave.constString(config.axisSettings.y.title),
+      },
+      color: {
+        ...config.axisSettings.color,
+        title:
+          config.axisSettings.color.title == null
+            ? weave.constNone()
+            : weave.constString(config.axisSettings.color.title),
+      },
+    },
+    signals: {
+      ...config.signals,
+      domain: {
+        x:
+          config.signals.domain.x == null
+            ? weave.constNone()
+            : weave.constNodeUnsafe(maybeListOfAny, config.signals.domain.x),
+        y:
+          config.signals.domain.y == null
+            ? weave.constNone()
+            : weave.constNodeUnsafe(maybeListOfAny, config.signals.domain.y),
+      },
+    },
   };
 };
