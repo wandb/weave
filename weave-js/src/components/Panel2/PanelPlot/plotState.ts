@@ -31,7 +31,7 @@ import {
   withNamedTag,
 } from '@wandb/weave/core';
 import {immerable, produce} from 'immer';
-import * as _ from 'lodash';
+import _ from 'lodash';
 
 import * as TableState from '../PanelTable/tableState';
 import {
@@ -40,6 +40,7 @@ import {
   ConcretePlotConfig,
   ConcreteSeriesConfig,
   ContinuousSelection,
+  DEFAULT_LAZY_PATH_VALUES,
   DEFAULT_POINT_SIZE,
   DIM_NAME_MAP,
   DiscreteSelection,
@@ -1274,6 +1275,21 @@ export function defaultPlot(inputNode: Node, stack: Stack): PlotConfig {
       s.uiState.pointShape = 'dropdown';
     });
   });
+}
+
+export function defaultConcretePlot(
+  inputNode: Node,
+  stack: Stack
+): ConcretePlotConfig {
+  const lazyConfig: any = migrate(defaultPlotCommon(inputNode, stack));
+  LAZY_PATHS.forEach(path => {
+    setThroughArray(
+      lazyConfig,
+      path.split('.'),
+      DEFAULT_LAZY_PATH_VALUES[path]
+    );
+  });
+  return lazyConfig;
 }
 
 export function defaultSeriesName(

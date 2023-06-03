@@ -29,6 +29,17 @@ export const LAZY_PATHS = [
   'signals.domain.y' as const,
 ];
 
+export const DEFAULT_LAZY_PATH_VALUES: {
+  [K in (typeof LAZY_PATHS)[number]]: Exclude<any, weave.Node>;
+} = {
+  'series.#.constants.mark': null,
+  'axisSettings.x.title': null,
+  'axisSettings.y.title': null,
+  'axisSettings.color.title': null,
+  'signals.domain.x': null,
+  'signals.domain.y': null,
+};
+
 export type AxisSettings = {
   x: Omit<v10.AxisSetting, 'title'> & {
     title: LazyStringOrNull;

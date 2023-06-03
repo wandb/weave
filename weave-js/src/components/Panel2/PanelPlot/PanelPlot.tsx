@@ -273,7 +273,7 @@ const useConcreteConfig = (
   const lazyConfigElementsNode = useMemo(
     () =>
       opDict(
-        PlotState.lazyPaths(config).reduce((acc, path) => {
+        LAZY_PATHS.reduce((acc, path) => {
           let elementNode = PlotState.getThroughArray(config, path.split('.'));
           if (_.isArray(elementNode)) {
             elementNode = opArray(
@@ -300,59 +300,41 @@ const useConcreteConfig = (
 
   const concreteConfigLoading = concreteConfigUse.loading;
 
-  const lazyPaths = useMemo(() => {
-    return PlotState.lazyPaths(config);
-  }, [config]);
-  const lazyPathsRef = useRef(lazyPaths);
-  lazyPathsRef.current = lazyPaths;
-
   return useMemo(() => {
-    if (lazyPaths.length === 0) {
-      return {
-        config: _.omit(config, ['lazyPaths']) as ConcretePlotConfig,
-        loading: false,
-      };
-    } else if (concreteConfigLoading) {
-      return {
-        config: _.omit(
-          PlotState.defaultPlot(input, stack),
-          'lazyPaths'
-        ) as ConcretePlotConfig,
-        loading: true,
-      };
+    let loading: boolean = false;
+    let newConfig: any;
+    if (concreteConfigLoading) {
+      newConfig = PlotState.defaultConcretePlot(input, stack);
+      loading = true;
     } else {
       // generate the new config with the concrete values obtained from the execution of the lazy paths
-      let newConfig = _.omit(
-        produce(config, draft => {
-          lazyPaths.forEach(path => {
-            PlotState.setThroughArray(
-              draft,
-              path.split('.'),
-              concreteConfigEvaluationResult![path]
-            );
-          });
-        }),
-        'lazyPaths'
-      ) as ConcretePlotConfig;
-
-      // ensure that the domain is valid for the axis type
-      ['x' as const, 'y' as const].forEach(axisName => {
-        ['domain' as const, 'selection' as const].forEach(signalName => {
-          if (
-            !PlotState.isValidDomainForAxisType(
-              newConfig.signals[signalName][axisName],
-              PlotState.getAxisType(newConfig.series[0], axisName)
-            )
-          ) {
-            newConfig = produce(newConfig, draft => {
-              draft.signals[signalName][axisName] = undefined;
-            });
-          }
+      newConfig = produce(config, draft => {
+        LAZY_PATHS.forEach(path => {
+          PlotState.setThroughArray(
+            draft,
+            path.split('.'),
+            concreteConfigEvaluationResult![path]
+          );
         });
       });
-
-      return {config: newConfig, loading: false};
     }
+    // ensure that the domain is valid for the axis type
+    ['x' as const, 'y' as const].forEach(axisName => {
+      ['domain' as const, 'selection' as const].forEach(signalName => {
+        if (
+          !PlotState.isValidDomainForAxisType(
+            newConfig.signals[signalName][axisName],
+            PlotState.getAxisType(newConfig.series[0], axisName)
+          )
+        ) {
+          newConfig = produce(newConfig, (draft: any) => {
+            draft.signals[signalName][axisName] = undefined;
+          });
+        }
+      });
+    });
+
+    return {config: newConfig, loading};
   }, [
     concreteConfigEvaluationResult,
     concreteConfigLoading,

@@ -23,6 +23,7 @@ export const LINE_SHAPES = v9.LINE_SHAPE_OPTIONS;
 export const SCALE_TYPES = v10.SCALE_TYPES;
 export const DEFAULT_SCALE_TYPE = v10.DEFAULT_SCALE_TYPE;
 export const LAZY_PATHS = v12.LAZY_PATHS;
+export const DEFAULT_LAZY_PATH_VALUES = v12.DEFAULT_LAZY_PATH_VALUES;
 
 const migrateCommon = migrator
   .makeMigrator(v2.migrate)
