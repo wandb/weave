@@ -20,14 +20,12 @@ import {
   Frame,
   isAssignableTo,
   isConstNode,
-  isNodeOrVoidNode,
   isTypedDict,
   isVoidNode,
   list,
   listObjectType,
   maybe,
   Node,
-  NodeOrVoidNode,
   numberBin,
   oneOrMany,
   // opAnd,
@@ -44,7 +42,7 @@ import {
   // opNumberLessEqual,
   // opNumberMult,
   opPick,
-  opRandomlyDownsample,
+  // opRandomlyDownsample,
   opRunId,
   opRunName,
   OpStore,
@@ -118,13 +116,11 @@ import {
   ScaleType,
   SeriesConfig,
 } from './versions';
-import {isNode} from '@babel/types';
 import {toWeaveType} from '../toWeaveType';
-import {AdvancedDynamicTextureInstrumentation} from '@babylonjs/gui';
 
 const recordEvent = makeEventRecorder('Plot');
 
-const PANELPLOT_MAX_DATAPOINTS = 2000;
+// const PANELPLOT_MAX_DATAPOINTS = 2000;
 
 const defaultFontStyleDict = {
   titleFont: 'Source Sans Pro',

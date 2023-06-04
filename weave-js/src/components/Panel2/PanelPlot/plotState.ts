@@ -4,7 +4,6 @@ import {
   constString,
   dict,
   isAssignableTo,
-  isNodeOrVoidNode,
   isVoidNode,
   list,
   maybe,
