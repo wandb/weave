@@ -3125,7 +3125,3 @@ const ORG_DASHBOARD_TEMPLATE_OVERLAY = {
 };
 
 export default Spec;
-
-const ConfigDimMenuButton = styled(IconButton).attrs({small: true})`
-  margin-left: 4px;
-`;
