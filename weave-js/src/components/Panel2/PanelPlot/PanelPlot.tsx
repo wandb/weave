@@ -2059,7 +2059,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
       const newSpec = _.merge(
         _.cloneDeep(PLOT_TEMPLATE),
         isOrgDashboard ? _.cloneDeep(ORG_DASHBOARD_TEMPLATE_OVERLAY) : {},
-        config?.vegaOverlay ?? {}
+        concreteConfig?.vegaOverlay ?? {}
       );
 
       // create the data spec for the layer
@@ -2336,7 +2336,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     }, {});
 
     const lineTooltipSpec = {
-      data: {name: `wandb-${config.series.length}`},
+      data: {name: `wandb-${concreteConfig.series.length}`},
       encoding: _.pick(dummyEncodings, ['x']),
       layer: [
         {
