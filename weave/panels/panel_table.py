@@ -3,7 +3,9 @@ import typing
 
 import weave
 from weave import weave_internal
-from weave.graph import ConstNode, Node, OutputNode
+from weave import codify
+from weave import codifiable_value_mixin
+from weave.graph import ConstNode, Node, OutputNode, VoidNode
 from .. import panel
 from . import table_state
 
@@ -24,7 +26,7 @@ class ColumnDef(typing.TypedDict):
 
 
 @weave.type("tablePanel")
-class Table(panel.Panel):
+class Table(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
     id = "table"
     input_node: weave.Node[list[typing.Any]]
     config: typing.Optional[TableConfig] = dataclasses.field(
@@ -71,6 +73,40 @@ class Table(panel.Panel):
                         columnSelectFunction=fn_node,
                     )
         return result
+
+    def to_code(self) -> typing.Optional[str]:
+        field_vals: list[tuple[str, str]] = []
+        if self.config is not None:
+            ts = self.config.tableState
+            if ts.autoColumns:
+                return None
+            if not isinstance(ts.preFilterFunction, VoidNode):
+                return None
+            if ts.groupBy != []:
+                return None
+            if ts.sort != []:
+                return None
+
+            code_cols = []
+            for col_id in ts.order:
+                if ts.columnNames[col_id] != "":
+                    return None
+                if ts.columns[col_id] != table_state.PanelDef("", {}, None):
+                    return None
+                code_cols.append(
+                    codify.lambda_wrapped_object_to_code_no_format(
+                        ts.columnSelectFunctions[col_id], ["row"]
+                    )
+                )
+            if len(code_cols) > 0:
+                field_vals.append(("columns", "[" + ",".join(code_cols) + ",]"))
+
+        param_str = ""
+        if len(field_vals) > 0:
+            param_str = (
+                ",".join([f_name + "=" + f_val for f_name, f_val in field_vals]) + ","
+            )
+        return f"""weave.panels.panel_table.Table({codify.object_to_code_no_format(self.input_node)}, {param_str})"""
 
 
 def _get_composite_group_key(self: typing.Union[Table, Query]) -> str:

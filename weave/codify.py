@@ -1,3 +1,5 @@
+import contextlib
+import contextvars
 import dataclasses
 import inspect
 import typing
@@ -9,7 +11,7 @@ from . import graph, registry_mem, codifiable_value_mixin, storage, weave_types
 
 # User-facing Apis
 def object_to_code(obj: typing.Any) -> str:
-    raw_code = _object_to_code_no_format(obj)
+    raw_code = object_to_code_no_format(obj)
     formatted_code = black.format_str(raw_code, mode=black.FileMode())
     return formatted_code
 
@@ -19,9 +21,9 @@ def load(d: dict) -> typing.Any:
 
 
 # Internal Apis
-def _object_to_code_no_format(obj: typing.Any) -> str:
+def object_to_code_no_format(obj: typing.Any) -> str:
     for method in [
-        # _try_otc_using_codifiable_mixin, # TODO: Refactor this in followup to use duck typing.
+        _try_otc_using_codifiable_mixin,  # TODO: Refactor this in followup to use duck typing.
         _try_otc_using_primitives,
         # _try_otc_using_type,  # I am pretty sure this is fragile. Skipping for now.
         _try_otc_using_nodes,
@@ -39,11 +41,42 @@ def _object_to_code_no_format(obj: typing.Any) -> str:
     return _otc_using_storage_fallback(obj)
 
 
-# def _try_otc_using_codifiable_mixin(obj: typing.Any) -> typing.Optional[str]:
-#     # Do this for Plot, Group, and Table.
-#     if isinstance(obj, codifiable_value_mixin.CodifiableValueMixin):
-#         return obj.to_code(_object_to_code_no_format)
-#     return None
+_var_node_frame: contextvars.ContextVar[
+    typing.Optional[list[str]]
+] = contextvars.ContextVar("var_node_frame", default=None)
+
+
+@contextlib.contextmanager
+def additional_var_nodes(names: list[str]) -> typing.Generator[None, None, None]:
+    current_frame = _var_node_frame.get()
+    if current_frame is None:
+        current_frame = []
+    new_frame = current_frame + names
+    token = _var_node_frame.set(new_frame)
+    yield
+    _var_node_frame.reset(token)
+
+
+def lambda_wrapped_object_to_code_no_format(
+    obj: typing.Any, new_lambda_vars: list[str]
+) -> str:
+    if len(new_lambda_vars) == 0:
+        return object_to_code_no_format(obj)
+    else:
+        with additional_var_nodes(new_lambda_vars):
+            return (
+                f"lambda {', '.join(new_lambda_vars)}: {object_to_code_no_format(obj)}"
+            )
+
+
+# Private Apis
+def _try_otc_using_codifiable_mixin(obj: typing.Any) -> typing.Optional[str]:
+    # TODO:
+    #  * Make mixin a protocol.
+    #  * Do this for Plot, Group, and Table.
+    if isinstance(obj, codifiable_value_mixin.CodifiableValueMixin):
+        return obj.to_code()
+    return None
 
 
 # def load_type(type_name: str, d: dict):
@@ -69,11 +102,11 @@ def _try_otc_using_primitives(obj: typing.Any) -> typing.Optional[str]:
     if isinstance(obj, (int, float, str, bool, type(None))):
         return repr(obj)
     elif isinstance(obj, list):
-        return f"""[{", ".join(_object_to_code_no_format(x) for x in obj)}]"""
+        return f"""[{", ".join(object_to_code_no_format(x) for x in obj)}]"""
     elif isinstance(obj, tuple):
-        return f"""({", ".join(_object_to_code_no_format(x) for x in obj)},)"""
+        return f"""({", ".join(object_to_code_no_format(x) for x in obj)},)"""
     elif isinstance(obj, dict):
-        return f"""{{{", ".join(f"{_object_to_code_no_format(k)}: {_object_to_code_no_format(v)}" for k, v in obj.items())}}}"""
+        return f"""{{{", ".join(f"{object_to_code_no_format(k)}: {object_to_code_no_format(v)}" for k, v in obj.items())}}}"""
     return None
 
 
@@ -121,7 +154,7 @@ def _try_otc_using_dataclasses(obj: typing.Any) -> typing.Optional[str]:
                     continue
                 fields_to_use[field_name] = obj_val
 
-    res = f"""{qualified_classpath}.{qualified_classname}({", ".join(f"{k}={_object_to_code_no_format(v)}" for k, v in fields_to_use.items())})"""
+    res = f"""{qualified_classpath}.{qualified_classname}({", ".join(f"{k}={object_to_code_no_format(v)}" for k, v in fields_to_use.items())})"""
     return res
 
 
@@ -153,22 +186,49 @@ def _equality_helper(a: typing.Any, b: typing.Any) -> bool:
 
 
 def _type_to_code(t: weave_types.Type) -> str:
-    return _object_to_code_no_format(t)
+    return object_to_code_no_format(t)
 
 
 def _node_to_code(node: graph.Node) -> str:
     if isinstance(node, graph.VoidNode):
         return "weave.graph.VoidNode()"
     elif isinstance(node, graph.VarNode):
+        current_frame = _var_node_frame.get()
+
+        if current_frame is not None and node.name in current_frame:
+            return node.name
         return f"weave.weave_internal.make_var_node({_type_to_code(node.type)}, '{node.name}')"
     elif isinstance(node, graph.ConstNode):
-        value_code = _object_to_code_no_format(node.val)
-        # TODO: Special case lambdas
-        return value_code
+        if isinstance(node.type, weave_types.Function):
+            vars = list(node.type.input_types.keys())
+            return lambda_wrapped_object_to_code_no_format(node.val, vars)
+        else:
+            return object_to_code_no_format(node.val)
     elif isinstance(node, graph.OutputNode):
         full_op_name = node.from_op.name
         prefix = ""
         inputs = list(node.from_op.inputs.values())
+
+        if node.from_op.name == "dict":
+            args = ",".join(
+                [
+                    key + "=" + _node_to_code(val)
+                    for key, val in node.from_op.inputs.items()
+                ]
+            )
+            if len(node.from_op.inputs) > 0:
+                args += ","
+            return f"weave.ops_primitives.dict.dict_({args})"
+        elif node.from_op.name == "list":
+            args = ",".join(
+                [
+                    key + "=" + _node_to_code(val)
+                    for key, val in node.from_op.inputs.items()
+                ]
+            )
+            if len(node.from_op.inputs) > 0:
+                args += ","
+            return f"weave.ops_primitives.list_.make_list({args})"
 
         is_root = len(inputs) == 0 or not isinstance(
             inputs[0], (graph.OutputNode, graph.VarNode)
@@ -187,6 +247,14 @@ def _node_to_code(node: graph.Node) -> str:
             inputs = inputs[1:]
 
         params = ",".join([_node_to_code(n) for n in inputs])
+
+        # Special syntax
+        if op_name == "pick":
+            return f"{prefix}[{params}]"
+
+        if len(inputs) > 0:
+            params += ","
+
         return f"{prefix}.{op_name}({params})"
     else:
         raise ValueError(f"Unknown node type: {node}")

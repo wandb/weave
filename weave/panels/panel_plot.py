@@ -2,6 +2,8 @@
 import copy
 import typing
 import weave
+from weave import codifiable_value_mixin
+from weave import codify
 
 from .. import panel
 from . import table_state
@@ -304,7 +306,7 @@ class PlotConfig:
 
 
 @weave.type("plot")
-class Plot(panel.Panel):
+class Plot(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
     id = "plot"
     config: typing.Optional[PlotConfig] = None
 
@@ -436,6 +438,66 @@ class Plot(panel.Panel):
         self.config.legendSettings = LegendSettings(
             x=LegendSetting(True), y=LegendSetting(True), color=LegendSetting(True)
         )
+
+    def to_code(self) -> typing.Optional[str]:
+        field_vals: list[tuple[str, str]] = []
+        default_signals = Signals(
+            domain=AxisSelections(x=None, y=None),
+            selection=AxisSelections(x=None, y=None),
+        )
+        default_axisSettings = AxisSettings(
+            x=default_axis(), y=default_axis(), color=default_axis()
+        )
+
+        default_legendSettings = LegendSettings(
+            x=LegendSetting(), y=LegendSetting(), color=LegendSetting()
+        )
+        default_configOptionsExpanded = ConfigOptionsExpanded()
+
+        if self.config is not None:
+            if self.config.signals != default_signals:
+                return None
+            if self.config.axisSettings != default_axisSettings:
+                return None
+            if self.config.legendSettings != default_legendSettings:
+                return None
+            if self.config.configOptionsExpanded != default_configOptionsExpanded:
+                return None
+            if len(self.config.series) != 1:
+                return None
+
+            # At this point we can turn the series into the params
+            series = self.config.series[0]
+            mark = series.constants.mark
+            if mark != None:
+                field_vals.append(("mark", codify.object_to_code_no_format(mark)))
+            for dim_name in [
+                "color",
+                "label",
+                "pointShape",
+                "tooltip",
+                "x",
+                "y",
+                "y2",
+            ]:
+                table_col_id = getattr(series.dims, dim_name)
+                sel_fn = series.table.columnSelectFunctions[table_col_id]
+                if not isinstance(sel_fn, graph.VoidNode):
+                    field_vals.append(
+                        (
+                            dim_name,
+                            codify.lambda_wrapped_object_to_code_no_format(
+                                sel_fn, ["row"]
+                            ),
+                        )
+                    )
+
+        param_str = ""
+        if len(field_vals) > 0:
+            param_str = (
+                ",".join([f_name + "=" + f_val for f_name, f_val in field_vals]) + ","
+            )
+        return f"""weave.panels.panel_plot.Plot({codify.object_to_code_no_format(self.input_node)}, {param_str})"""
 
 
 def make_set_all_series(dim_name: str) -> typing.Callable[[Plot, typing.Any], None]:
