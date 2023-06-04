@@ -1,3 +1,5 @@
+import contextlib
+import contextvars
 import dataclasses
 import inspect
 import random
@@ -24,6 +26,18 @@ class PanelDef:
 class SortDef(typing.TypedDict):
     dir: str
     columnId: str
+
+
+_use_consistent_col_ids: contextvars.ContextVar[
+    typing.Optional[bool]
+] = contextvars.ContextVar("use_consistent_col_ids", default=False)
+
+
+@contextlib.contextmanager
+def use_consistent_col_ids(val: bool = True):
+    token = _use_consistent_col_ids.set(val)
+    yield
+    _use_consistent_col_ids.reset(token)
 
 
 @decorator_type.type()
@@ -61,6 +75,12 @@ class TableState:
         return copy.deepcopy(self)
 
     def _new_col_id(self):
+        if _use_consistent_col_ids.get():
+            if hasattr(self, "_col_id_counter"):
+                self._col_id_counter += 1
+            else:
+                self._col_id_counter = 0
+            return f"col_{self._col_id_counter}"
         return "".join(
             random.choice(string.ascii_uppercase + string.digits) for _ in range(14)
         )

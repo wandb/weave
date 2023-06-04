@@ -6,6 +6,8 @@ import typing
 import pytest
 import shutil
 import tempfile
+
+from weave.panels import table_state
 from . import context_state
 from . import weave_server
 from .tests import fixture_fakewandb
@@ -195,3 +197,9 @@ def io_server_factory():
         io_service.SERVER.shutdown()
 
     io_service.SERVER = original_server
+
+
+@pytest.fixture()
+def consistent_table_col_ids():
+    with table_state.use_consistent_col_ids():
+        yield

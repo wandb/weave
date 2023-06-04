@@ -2,5 +2,5 @@ import typing
 
 
 class CodifiableValueMixin:
-    def to_code(self, to_code_fn: typing.Callable[[typing.Any], str]) -> str:
+    def to_code(self) -> typing.Optional[str]:
         raise NotImplementedError()

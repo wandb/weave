@@ -2,6 +2,8 @@ import dataclasses
 import copy
 import typing
 import weave
+from weave import codifiable_value_mixin
+from weave import codify
 
 from .. import weave_internal
 from .. import graph
@@ -74,7 +76,7 @@ GroupConfigType = typing.TypeVar("GroupConfigType")
 
 
 @weave.type()
-class Group(panel.Panel):
+class Group(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
     id = "Group"
     config: typing.Optional[GroupConfig] = dataclasses.field(
         default_factory=lambda: None
@@ -141,6 +143,69 @@ class Group(panel.Panel):
             frame[name] = config_var.items[name]
 
         self.config.items = items
+
+    def to_code(self) -> typing.Optional[str]:
+        field_vals: list[tuple[str, str]] = []
+
+        if self.config and self.config:
+            gc = self.config
+
+            if gc.equalSize != True:
+                return None
+            if gc.style != "":
+                return None
+            if (
+                gc.gridConfig is not None
+                and gc.gridConfig != default_panel_bank_flow_section_config()
+            ):
+                return None
+            if gc.liftChildVars is not None:
+                return None
+            if gc.allowedPanels is not None:
+                return None
+            if gc.childNameBase is not None:
+                return None
+
+            if self.config.layoutMode != "vertical":
+                field_vals.append(("layoutMode", codify.object_to_code(gc.layoutMode)))
+            if gc.showExpressions != False:
+                field_vals.append(
+                    ("showExpressions", codify.object_to_code(gc.showExpressions))
+                )
+            if hasattr(gc, "layered") and gc.layered != False:
+                field_vals.append(("layered", codify.object_to_code(gc.layered)))
+            if gc.enableAddPanel != None and gc.enableAddPanel != False:
+                field_vals.append(
+                    ("enableAddPanel", codify.object_to_code(gc.enableAddPanel))
+                )
+            prior_vars: list[str] = []
+            code_items_map = {}
+            if gc.items != {}:
+                for item_name, item in gc.items.items():
+                    code_items_map[
+                        item_name
+                    ] = codify.lambda_wrapped_object_to_code_no_format(item, prior_vars)
+                    prior_vars.append(item_name)
+                if len(code_items_map) > 0:
+                    items_val = (
+                        ",".join(
+                            ['"' + n + '":' + i for n, i in code_items_map.items()]
+                        )
+                        + ","
+                    )
+                    items_val = "{" + items_val + "}"
+                    field_vals.append(("items", items_val))
+
+        input_node_str = ""
+        if not isinstance(self.input_node, graph.VoidNode):
+            input_node_str = codify.object_to_code(self.input_node) + ","
+
+        param_str = ""
+        if len(field_vals) > 0:
+            param_str = (
+                ",".join([f_name + "=" + f_val for f_name, f_val in field_vals]) + ","
+            )
+        return f"""weave.panels.panel_group.Group({input_node_str} {param_str})"""
 
     # @property
     # def config(self):
