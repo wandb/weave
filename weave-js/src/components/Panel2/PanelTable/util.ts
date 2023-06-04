@@ -18,7 +18,7 @@ import {
   WeaveInterface,
 } from '@wandb/weave/core';
 import _ from 'lodash';
-import React, {useCallback, useMemo} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 
 import {useRefEqualExpr} from '../../../react';
 import {usePanelContext} from '../PanelContext';
@@ -66,6 +66,19 @@ export const nodeIsValidList = (
   );
 };
 
+// useLoadOnce returns true only for the first loading state, and false thereafter
+function useLoadOnce(isLoading: boolean) {
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+
+  useEffect(() => {
+    if (isLoading && !hasLoadedOnce) {
+      setHasLoadedOnce(true);
+    }
+  }, [hasLoadedOnce, isLoading]);
+
+  return {hasLoadedOnce};
+}
+
 export const useAutomatedTableState = (
   input: Node,
   currentTableState: Table.TableState | undefined,
@@ -93,6 +106,8 @@ export const useAutomatedTableState = (
     weave
   );
 
+  const {hasLoadedOnce} = useLoadOnce(loading);
+
   const tableIsDefault = useMemo(() => {
     return (
       currentTableState == null ||
@@ -103,11 +118,12 @@ export const useAutomatedTableState = (
   return React.useMemo(
     () => ({
       loading,
+      hasLoadedOnce,
       tableState: state,
       autoTable,
       tableIsDefault,
     }),
-    [loading, state, autoTable, tableIsDefault]
+    [loading, hasLoadedOnce, state, autoTable, tableIsDefault]
   );
 };
 
