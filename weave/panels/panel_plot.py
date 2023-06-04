@@ -69,23 +69,38 @@ LAZY_PATHS = [
     "signals.domain.y",
 ]
 
+LAZY_PATH_TYPES = {
+    "series.#.constants.mark": weave.types.optional(weave.types.String()),
+    "axisSettings.x.title": weave.types.optional(weave.types.String()),
+    "axisSettings.y.title": weave.types.optional(weave.types.String()),
+    "axisSettings.color.title": weave.types.optional(weave.types.String()),
+    "signals.domain.x": weave.types.optional(weave.types.List(weave.types.Any())),
+    "signals.domain.y": weave.types.optional(weave.types.List(weave.types.Any())),
+}
+
 
 SelectFunction = typing.Union[graph.Node, typing.Callable[[typing.Any], typing.Any]]
 
 
 @weave.type()
 class PlotConstants:
-    mark: SelectFunction
-    pointShape: PointShapeOption
-    label: LabelOption
-    lineStyle: LineStyleOption
+    mark: SelectFunction = dataclasses.field(
+        default_factory=lambda: graph.ConstNode(
+            weave.types.optional(weave.types.String()), None
+        )
+    )
+    pointShape: PointShapeOption = "circle"
+    label: LabelOption = "series"
+    lineStyle: LineStyleOption = "solid"
 
+    """
     def __init__(self, **kwargs):
         # set defaults
         self.mark = kwargs.get("mark", None)
         self.pointShape = kwargs.get("pointShape", "circle")
         self.label = kwargs.get("label", "series")
         self.lineStyle = kwargs.get("lineStyle", "solid")
+    """
 
 
 class PlotConstantsInputDict(typing.TypedDict):
@@ -318,16 +333,18 @@ class PlotConfig:
 
 def set_through_array(
     obj: typing.Any, path: typing.List[str], value: typing.Any
-) -> typing.Any:
+) -> None:
     if len(path) == 0:
-        return obj
+        return
 
     first, *rest = path
 
     if first == "#":
         if isinstance(obj, list):
             for i, item in enumerate(obj):
-                set_through_array(item, rest, value[i])
+                set_through_array(
+                    item, rest, (value[i] if isinstance(value, list) else value)
+                )
     elif len(rest) == 0:
         if isinstance(obj, dict):
             obj[first] = value
@@ -335,8 +352,8 @@ def set_through_array(
             setattr(obj, first, value)
     elif hasattr(obj, first):
         set_through_array(getattr(obj, first), rest, value)
-
-    raise ValueError(f"Could not set {path} in {obj} to {value}")
+    else:
+        raise ValueError(f"Could not set {path} in {obj} to {value}")
 
 
 def get_through_array(
@@ -385,6 +402,10 @@ def ensure_node(
     type: typing.Optional[weave.types.Type] = None,
 ) -> None:
     value = get_through_array(obj, path)
+    if isinstance(value, list):
+        if not all(item == value[0] for item in value):
+            raise ValueError(f"Cannot ensure node for {path}: not all values are equal")
+        value = value[0]
     if not isinstance(value, graph.Node):
         if type is None:
             type = weave.types.TypeRegistry.type_of(value)
@@ -426,7 +447,7 @@ class Plot(panel.Panel):
 
         if self.config is None:
             constants = PlotConstants(
-                mark=mark, pointShape=None, lineStyle=None, label=None
+                mark=typing.cast(SelectFunction, mark),
             )
 
             select_functions: typing.Optional[dict[DimName, SelectFunction]] = None
@@ -493,7 +514,9 @@ class Plot(panel.Panel):
             )
 
             for path in LAZY_PATHS:
-                ensure_node(self.config, path.split("."))
+                ensure_node(
+                    self.config, path.split(".")
+                )  # , type=LAZY_PATH_TYPES[path])
 
             if no_axes:
                 self.set_no_axes()

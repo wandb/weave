@@ -1499,7 +1499,11 @@ const useLatestData = (
 
 const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
   const weave = useWeaveContext();
-  const {input, updateConfig: propsUpdateConfig} = props;
+  const {
+    input,
+    updateConfig: propsUpdateConfig,
+    updateConfig2: propsUpdateConfig2,
+  } = props;
 
   const [brushMode, setBrushMode] = useState<BrushMode>('zoom');
 
@@ -1534,6 +1538,13 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
       }
     },
     [config, propsUpdateConfig, input, stack]
+  );
+
+  const updateConfig2 = useCallback(
+    (change: (oldConfig: PlotConfig) => PlotConfig) => {
+      return propsUpdateConfig2!(change as any);
+    },
+    [propsUpdateConfig2]
   );
 
   const updateConfigRef = useRef<typeof updateConfig>(updateConfig);
@@ -1595,13 +1606,14 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
           });
       }
       */
-
+      /*
       if (isDash) {
         node = opRandomlyDownsample({
           arr: node,
           n: constNumber(PANELPLOT_MAX_DATAPOINTS),
         });
       }
+      */
 
       acc[i] = node;
 
@@ -1626,20 +1638,54 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
   const concreteConfigRef = useRef<ConcretePlotConfig>(concreteConfig);
   concreteConfigRef.current = concreteConfig;
 
-  const domainNodes: {x: NodeOrVoidNode; y: NodeOrVoidNode} = useMemo(() => {
-    return {
-      x: isNodeOrVoidNode(config.signals.domain.x)
-        ? config.signals.domain.x
-        : voidNode(),
-      y: isNodeOrVoidNode(config.signals.domain.y)
-        ? config.signals.domain.y
-        : voidNode(),
-    };
-  }, [config.signals]);
-
   // enables domain sharing
-  const mutateDomainX = LLReact.useMutation(domainNodes.x, 'set');
-  const mutateDomainY = LLReact.useMutation(domainNodes.y, 'set');
+  const handleRootUpdateX = useCallback(
+    (newVal: Node) => {
+      if (
+        weave.expToString(newVal) !== weave.expToString(config.signals.domain.x)
+      ) {
+        updateConfig2((oldConfig: PlotConfig) => ({
+          ...oldConfig,
+          signals: {
+            ...oldConfig.signals,
+            domain: {...oldConfig.signals.domain, x: newVal as any},
+          },
+        }));
+      }
+    },
+    [updateConfig2, config.signals.domain.x, weave]
+  );
+
+  const mutateDomainX = LLReact.useMutation(
+    config.signals.domain.x,
+    'set',
+    handleRootUpdateX,
+    false
+  );
+
+  const handleRootUpdateY = useCallback(
+    (newVal: Node) => {
+      if (
+        weave.expToString(newVal) !== weave.expToString(config.signals.domain.y)
+      ) {
+        updateConfig2((oldConfig: PlotConfig) => ({
+          ...oldConfig,
+          signals: {
+            ...oldConfig.signals,
+            domain: {...oldConfig.signals.domain, y: newVal as any},
+          },
+        }));
+      }
+    },
+    [updateConfig2, config.signals.domain.y, weave]
+  );
+
+  const mutateDomainY = LLReact.useMutation(
+    config.signals.domain.y,
+    'set',
+    handleRootUpdateY,
+    false
+  );
 
   const mutateDomain = useMemo(
     () => ({x: mutateDomainX, y: mutateDomainY}),
@@ -2678,10 +2724,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
                   )
                 ) {
                   axisSetting[dimName] = constNode(
-                    {
-                      type: 'union',
-                      members: [{type: 'list', objectType: 'any'}, 'none'],
-                    },
+                    toWeaveType(axisSignal),
                     axisSignal ?? null
                   );
                 }
@@ -2693,30 +2736,17 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
               newConfigSignals = produce(newConfigSignals, draft => {
                 draft.selection[dimName] = undefined;
               });
-              if (dimName === 'x') {
-                newConfigSignals = {
-                  ...newConfigSignals,
-                  domain: {
-                    ...newConfigSignals.domain,
-                    x: config.signals.domain.x,
-                  },
-                };
-                currMutateDomain.x({
-                  val: constNode(
-                    {
-                      type: 'union',
-                      members: [{type: 'list', objectType: 'any'}, 'none'],
-                    },
-                    signal[dimName]
-                  ),
-                });
-              }
+              currMutateDomain[dimName]({
+                val: constNode(toWeaveType(signal[dimName]), signal[dimName]),
+              });
             }
           });
 
+          /*
           if (newConfigSignals !== currConfig.signals) {
             currUpdateConfig({signals: newConfigSignals});
           }
+          */
         } else if (
           _.isEmpty(data) &&
           !(
@@ -2740,27 +2770,13 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
 
       vegaView.addEventListener('dblclick', async () => {
         const currConfig = configRef.current;
-        const currUpdateConfig = updateConfigRef.current;
+        const currMutateDomain = mutateDomainRef.current;
         if (!_.isEmpty(currConfig.signals.domain)) {
-          const newSignals = produce(currConfig.signals, draft => {
-            draft.domain = {
-              x: constNode(
-                {
-                  type: 'union',
-                  members: [{type: 'list', objectType: 'any'}, 'none'],
-                },
-                null
-              ),
-              y: constNode(
-                {
-                  type: 'union',
-                  members: [{type: 'list', objectType: 'any'}, 'none'],
-                },
-                null
-              ),
-            };
+          ['x' as const, 'y' as const].forEach(dimName => {
+            currMutateDomain[dimName]({
+              val: constNode('none', null),
+            });
           });
-          currUpdateConfig({signals: newSignals});
         }
       });
 
@@ -2769,7 +2785,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
         currSetToolTipsEnabled(false);
       });
     },
-    [config.signals.selection, config.series.length, hasLine]
+    [concreteConfig.signals.selection, concreteConfig.series.length, hasLine]
   );
 
   const [toolTipPos, setTooltipPos] = useState<{

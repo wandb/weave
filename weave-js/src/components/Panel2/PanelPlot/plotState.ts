@@ -1519,8 +1519,8 @@ export function setThroughArray(
 
   if (first === '#') {
     if (Array.isArray(object)) {
-      object.forEach((item: any, index: number) => {
-        setThroughArray(item, rest, value[index]);
+      object.forEach((item: any) => {
+        setThroughArray(item, rest, value);
       });
     }
   } else if (rest.length === 0) {

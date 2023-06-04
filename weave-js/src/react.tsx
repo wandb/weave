@@ -459,7 +459,8 @@ export const makeCallAction = (
   rootArgs: {[key: string]: any},
   rootType: Type,
   refreshAll: () => Promise<void>,
-  handleRootUpdate?: (newRoot: Node) => void
+  handleRootUpdate?: (newRoot: Node) => void,
+  ignoreNullResult: boolean = true
 ) => {
   return (client: Client, inputs: OpInputs) => {
     consoleLog('MUTATION', actionName, absoluteTarget, target, stack, inputs);
@@ -483,7 +484,7 @@ export const makeCallAction = (
       root_args: rootArgsNode,
     });
     return client.action(calledNode as any).then(final => {
-      if (final == null) {
+      if (final == null && ignoreNullResult) {
         // pass
       } else if (mutationStyle === 'clientRef') {
         // if (final._weaveStateId != null) {
@@ -623,7 +624,8 @@ export const useMakeMutation = () => {
 export const useMutation = (
   target: NodeOrVoidNode,
   actionName: string,
-  handleRootUpdate?: (newRoot: Node) => void
+  handleRootUpdate?: (newRoot: Node) => void,
+  ignoreNullResult: boolean = true
 ) => {
   const refreshAll = useRefreshAllNodes();
   const {stack, triggerExpressionEvent} = usePanelContext();
@@ -649,7 +651,8 @@ export const useMutation = (
         rootArgs,
         rootType,
         refreshAll,
-        handleRootUpdate
+        handleRootUpdate,
+        ignoreNullResult
       ),
     [
       absoluteTarget,
@@ -662,6 +665,7 @@ export const useMutation = (
       rootType,
       target,
       triggerExpressionEvent,
+      ignoreNullResult,
     ]
   );
   return useClientBound(callAction);
