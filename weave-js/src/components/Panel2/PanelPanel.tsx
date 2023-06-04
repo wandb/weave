@@ -18,14 +18,10 @@ import {
   ChildPanelFullConfig,
   getFullChildPanel,
 } from './ChildPanel';
-import {
-  IconBack as IconBackUnstyled,
-  IconClose as IconCloseUnstyled,
-  IconOverflowHorizontal as IconOverflowHorizontalUnstyled,
-} from './Icons';
+import {IconBack, IconClose, IconOverflowHorizontal} from './Icons';
 import * as Panel2 from './panel';
 import {Panel2Loader} from './PanelComp';
-import {PanelContextProvider} from './PanelContext';
+import {PanelContextProvider, usePanelContext} from './PanelContext';
 import {fixChildData} from './PanelGroup';
 import {toWeaveType} from './toWeaveType';
 import {
@@ -36,6 +32,7 @@ import {
 import {useSetPanelRenderedConfig} from './PanelRenderedConfigContext';
 import {OutlineItemMenuPopup} from '../Sidebar/OutlineItemMenuPopup';
 import {getConfigForPath} from './panelTree';
+import {IconButton} from '../IconButton';
 
 const inputType = {type: 'Panel' as const};
 type PanelPanelProps = Panel2.PanelProps<
@@ -54,15 +51,59 @@ const usePanelPanelCommon = (props: PanelPanelProps) => {
   const setSelectedPanel = useSetInspectingPanel();
   const panelConfig = props.config;
   const initialLoading = panelConfig == null;
+  const {stack} = usePanelContext();
 
   const setPanelConfig = updateConfig2;
 
   useEffect(() => {
     if (initialLoading && !panelQuery.loading) {
-      setPanelConfig(() => getFullChildPanel(panelQuery.result));
+      const doLoad = async () => {
+        const loadedPanel = getFullChildPanel(panelQuery.result);
+
+        // Hydration is not totally correct yet and results in invalid states.
+        // Turning it off for now. This means the UI can be consistent in other
+        // ways: panels which expect to always have a config may have undefined.
+        // Python may mass us unitialized panels (panels that don't have
+        // configs, or even just expressions). We walk through and initialize
+        // them here to make sure our panel state is valid.
+        // let hydratedPanel: ChildPanelFullConfig;
+        // try {
+        //   hydratedPanel = await asyncMapPanels(
+        //     loadedPanel,
+        //     stack,
+        //     async (panel: ChildPanelFullConfig, childStack: Stack) => {
+        //       if (panel.config != null) {
+        //         return panel;
+        //       }
+        //       const {id, config} = await initPanel(
+        //         weave,
+        //         panel.input_node,
+        //         panel.id,
+        //         undefined,
+        //         childStack
+        //       );
+        //       return {...panel, id, config};
+        //     }
+        //   );
+        // } catch (e) {
+        //   console.error('Error hydrating panel', e);
+        //   return;
+        // }
+
+        const hydratedPanel = loadedPanel;
+        setPanelConfig(() => hydratedPanel);
+      };
+      doLoad();
       return;
     }
-  }, [initialLoading, panelQuery.loading, panelQuery.result, setPanelConfig]);
+  }, [
+    initialLoading,
+    panelQuery.loading,
+    panelQuery.result,
+    setPanelConfig,
+    stack,
+    weave,
+  ]);
   useTraceUpdate('panelQuery', {
     loading: panelQuery.loading,
     result: panelQuery.result,
@@ -96,12 +137,12 @@ const usePanelPanelCommon = (props: PanelPanelProps) => {
       setPanelConfig(origConfig => ({...origConfig, ...newConfig}));
       // Uncomment to enable panel state saving
       // Need to do fixChildData because the panel config is not fully hydrated.
-      const fixedConfig = fixChildData(getFullChildPanel(newConfig), weave);
+      const fixedConfig = fixChildData(getFullChildPanel(newConfig));
       setServerPanelConfig({
         val: constNodeUnsafe(toWeaveType(fixedConfig), fixedConfig),
       });
     },
-    [setPanelConfig, setServerPanelConfig, weave]
+    [setPanelConfig, setServerPanelConfig]
   );
   const panelUpdateConfig2 = useCallback(
     (change: (oldConfig: ChildPanelConfig) => ChildPanelFullConfig) => {
@@ -117,14 +158,14 @@ const usePanelPanelCommon = (props: PanelPanelProps) => {
         });
         consoleLog('PANEL PANEL CONFIG UPDATE2', newConfig);
         // Need to do fixChildData because the panel config is not fully hydrated.
-        const fixedConfig = fixChildData(getFullChildPanel(newConfig), weave);
+        const fixedConfig = fixChildData(getFullChildPanel(newConfig));
         setServerPanelConfig({
           val: constNodeUnsafe(toWeaveType(fixedConfig), fixedConfig),
         });
         return newConfig;
       });
     },
-    [setPanelConfig, setServerPanelConfig, weave]
+    [setPanelConfig, setServerPanelConfig]
   );
   consoleLog('PANEL PANEL RENDER CONFIG', panelConfig);
 
@@ -236,38 +277,6 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
   );
 };
 
-const IconButton = styled.div`
-  width: 24px;
-  height: 24px;
-  cursor: pointer;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-
-  color: ${globals.GRAY_500};
-  &:hover {
-    color: ${globals.GRAY_600};
-    background-color: ${globals.GRAY_50};
-  }
-
-  &:not(:last-child) {
-    margin-right: 4px;
-  }
-`;
-
-const iconStyles = css`
-  width: 18px;
-`;
-const IconBack = styled(IconBackUnstyled)`
-  ${iconStyles}
-`;
-const IconClose = styled(IconCloseUnstyled)`
-  ${iconStyles}
-`;
-const IconOverflowHorizontal = styled(IconOverflowHorizontalUnstyled)`
-  ${iconStyles}
-`;
-
 const Container = styled.div`
   display: flex;
   flex-direction: column;
@@ -276,7 +285,7 @@ const Container = styled.div`
 `;
 
 const Header = styled.div`
-  padding: 16px 0;
+  padding: 12px 0;
   border-bottom: 1px solid ${globals.GRAY_350};
 `;
 
@@ -309,9 +318,9 @@ const HeaderTopText = styled.div`
 
 const HeaderTitle = styled.div`
   font-family: 'Inconsolata', monospace;
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 600;
-  margin-top: 16px;
+  margin-top: 8px;
   padding: 0 12px;
 `;
 

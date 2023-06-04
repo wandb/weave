@@ -19,7 +19,7 @@ from . import memo
 from . import storage
 from . import weave_internal
 from . import execute_fast
-from . import cache_policy
+from . import op_policy
 
 from .language_features.tagging import tag_store
 
@@ -220,7 +220,7 @@ class MappedDeriveOpHandler(DeriveOpHandler):
             first_arg_name = list(new_inputs)[0]
             list_ = new_inputs.pop(first_arg_name)
 
-            if cache_policy.should_table_cache(orig_op.name):
+            if op_policy.should_run_in_parallel(orig_op.name):
                 # TODO: This whole resolver should be replaced with this
                 # execution path. It is now the correct way to do it. But
                 # I didn't update that path to handle / fix list tags, or to

@@ -11,7 +11,13 @@ The UI state is a tree of panels. There are three types of non-leaf panels:
 
 */
 
-import {Frame, NodeOrVoidNode, voidNode} from '@wandb/weave/core';
+import {
+  Frame,
+  NodeOrVoidNode,
+  pushFrame,
+  Stack,
+  voidNode,
+} from '@wandb/weave/core';
 import produce from 'immer';
 import * as _ from 'lodash';
 
@@ -21,7 +27,8 @@ import {
   ChildPanelFullConfig,
   getFullChildPanel,
 } from './ChildPanel';
-import {PANEL_GROUP2_ID, PanelGroupConfig} from './PanelGroup';
+import {getItemVars, PANEL_GROUP2_ID, PanelGroupConfig} from './PanelGroup';
+import {PanelBankSectionConfig} from '../WeavePanelBank/panelbank';
 
 export type PanelTreeNode = ChildPanelConfig;
 
@@ -284,8 +291,67 @@ export const addChild = (
   path: string[],
   value: PanelTreeNode
 ) => {
-  const panelNames = Object.keys(getPath(node, path).config.items);
-  return setPath(node, [...path, nextPanelName(panelNames)], value);
+  const group = getPath(node, path);
+  if (!isGroupNode(group)) {
+    throw new Error('Cannot add child to non-group panel');
+  }
+  return setPath(node, path, {
+    ...group,
+    config: {
+      ...group.config,
+      items: {
+        ...group.config.items,
+        [nextPanelName(Object.keys(group.config.items))]: value,
+      },
+    },
+  });
+};
+
+// Must match the variables that the rest of the UI
+// pushes onto the stack!
+export const asyncMapPanels = async (
+  node: PanelTreeNode,
+  stack: Stack,
+  fn: (
+    node: ChildPanelFullConfig,
+    stack: Stack
+  ) => Promise<ChildPanelFullConfig>
+): Promise<ChildPanelFullConfig> => {
+  const fullNode = getFullChildPanel(node);
+  let withMappedChildren: ChildPanelFullConfig = fullNode;
+  if (isGroupNode(fullNode)) {
+    const items: {[key: string]: ChildPanelFullConfig} = {};
+    let childFrame: Frame = {};
+    for (const key of Object.keys(fullNode.config.items)) {
+      const childItem = fullNode.config.items[key];
+      items[key] = await asyncMapPanels(
+        fullNode.config.items[key],
+        pushFrame(stack, childFrame),
+        fn
+      );
+      const childVars = getItemVars(key, childItem, stack, undefined);
+      childFrame = {...childFrame, ...childVars};
+    }
+    withMappedChildren = {
+      ...fullNode,
+      config: {...fullNode.config, items},
+    };
+  } else if (isStandardPanel(fullNode.id)) {
+    const children: {[key: string]: ChildPanelFullConfig} = {};
+    for (const key of Object.keys(STANDARD_PANEL_CHILD_KEYS[fullNode.id])) {
+      children[key] = await asyncMapPanels(fullNode.config[key], stack, fn);
+    }
+    withMappedChildren = {
+      ...fullNode,
+      config: {...fullNode.config, ...children},
+    };
+  } else if (isTableStatePanel(fullNode.id)) {
+    // TODO: not yet handled
+  }
+  // TODO: This doesn't create "input" variables like ChildPanel does. But I think that's ok
+  // becuase it only happens at render time?
+
+  return fn(withMappedChildren, stack);
 };
 
 interface Dashboard extends GroupNode {
@@ -295,6 +361,7 @@ interface Dashboard extends GroupNode {
       sidebar: GroupNode;
       main: GroupNode;
     };
+    gridConfig: PanelBankSectionConfig;
   };
 }
 

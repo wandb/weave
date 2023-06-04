@@ -20,15 +20,30 @@ import * as SN from './stylesNew';
 import {IconCaret} from '../Icons';
 import {IconDown as IconDownUnstyled} from '../Icons';
 
+export const ChildConfigContainer = styled.div`
+  position: relative;
+  padding-left: 2px;
+
+  &:before {
+    content: '';
+    position: absolute;
+    top: 12px;
+    bottom: 12px;
+    left: 0;
+    width: 2px;
+    background-color: ${globals.GRAY_350};
+  }
+`;
+
 export const ConfigSectionContainer = styled.div`
-  padding: 0 12px;
+  padding: 12px;
   &:not(:first-child) {
     border-top: 1px solid ${globals.GRAY_350};
   }
 `;
 
 export const ConfigSectionHeader = styled.div`
-  padding: 12px 0;
+  margin-bottom: 12px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -44,11 +59,10 @@ export const ConfigSectionHeaderButton = styled.div<{expanded: boolean}>`
 export const ConfigSectionOptions = styled.div`
   display: flex;
   flex-direction: column;
-  padding-bottom: 12px;
 `;
 
 type ConfigSectionProps = {
-  label: string;
+  label?: string;
 };
 
 export const ConfigSection: FC<ConfigSectionProps> = ({label, children}) => {
@@ -60,12 +74,14 @@ export const ConfigSection: FC<ConfigSectionProps> = ({label, children}) => {
 
   return (
     <ConfigSectionContainer>
-      <ConfigSectionHeader onClick={toggleExpanded}>
-        {label}
-        <ConfigSectionHeaderButton expanded={expanded}>
-          <IconCaret />
-        </ConfigSectionHeaderButton>
-      </ConfigSectionHeader>
+      {label && (
+        <ConfigSectionHeader onClick={toggleExpanded}>
+          {label}
+          <ConfigSectionHeaderButton expanded={expanded}>
+            <IconCaret />
+          </ConfigSectionHeaderButton>
+        </ConfigSectionHeader>
+      )}
       {expanded && <ConfigSectionOptions>{children}</ConfigSectionOptions>}
     </ConfigSectionContainer>
   );

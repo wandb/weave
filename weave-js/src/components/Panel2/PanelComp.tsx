@@ -70,15 +70,18 @@ class PanelCompErrorBoundary extends React.Component<
     // );
   }
 
+  componentDidUpdate(prevProps: any) {
+    if (prevProps.children !== this.props.children && this.state.hasError) {
+      this.setState({hasError: false, customMessage: undefined});
+    }
+  }
+
   render() {
     if (this.state.hasError) {
-      // You can render any custom fallback UI
       return (
         <WeaveMessage>
           {this.state.customMessage ||
-            'Something went wrong. Check the javascript console.'}{' '}
-          {/*eslint-disable-next-line jsx-a11y/anchor-is-valid*/}
-          <a onClick={() => this.setState({hasError: false})}>Reset</a>
+            'Something went wrong. Check the javascript console.'}
         </WeaveMessage>
       );
     }
@@ -144,6 +147,7 @@ interface PanelCompContextState {
 export const PanelCompContext = React.createContext<PanelCompContextState>({
   panelPath: [],
 });
+PanelCompContext.displayName = 'PanelCompContext';
 
 interface PanelFullscreenContextState {
   isFullscreen: boolean;
@@ -157,6 +161,7 @@ export const PanelFullscreenContext =
       // console.log('goFullscreen not implemented');
     },
   });
+PanelFullscreenContext.displayName = 'PanelFullscreenContext';
 
 const PanelComp2Component = (props: PanelComp2Props) => {
   const ctx = useContext(PanelCompContext);

@@ -8,10 +8,12 @@ import {
   ChildPanel,
   ChildPanelConfigComp,
   ChildPanelFullConfig,
+  initPanel,
   useChildPanelProps,
 } from './ChildPanel';
 import * as Panel2 from './panel';
-import {PanelContextProvider} from './PanelContext';
+import {PanelContextProvider, usePanelContext} from './PanelContext';
+import {ChildConfigContainer, ConfigSection} from './ConfigPanel';
 
 type PanelEachConfig = {
   pbConfig: PanelBankSectionConfig;
@@ -61,6 +63,15 @@ const usePbLayoutConfig = (
 };
 
 const usePanelEachCommon = (props: PanelEachProps) => {
+  // Augh, we have to do this because PanelPanel doesn't properly
+  // hydrate the config.
+  // essentially it needs to walk the PanelTree, finding and initializing
+  // any uninitialized panels.
+  // TODO: Fix PanelPanel
+  props = {
+    ...props,
+    config: props.config == null ? PANEL_EACH_DEFAULT_CONFIG : props.config,
+  };
   const childPanelPanelProps = useChildPanelProps(props, 'panel');
   return useMemo(
     () => ({
@@ -72,6 +83,7 @@ const usePanelEachCommon = (props: PanelEachProps) => {
 
 export const PanelEachConfigComp: React.FC<PanelEachProps> = props => {
   const {childPanelPanelProps} = usePanelEachCommon(props);
+  const {dashboardConfigOptions} = usePanelContext();
   const itemNode = opIndex({
     arr: props.input,
     index: varNode('number', 'itemIndex'),
@@ -84,9 +96,14 @@ export const PanelEachConfigComp: React.FC<PanelEachProps> = props => {
   }, [itemNode]);
 
   return (
-    <PanelContextProvider newVars={newVars}>
-      <ChildPanelConfigComp {...childPanelPanelProps} />
-    </PanelContextProvider>
+    <ConfigSection label={`Properties`}>
+      {dashboardConfigOptions}
+      <ChildConfigContainer>
+        <PanelContextProvider newVars={newVars}>
+          <ChildPanelConfigComp {...childPanelPanelProps} />
+        </PanelContextProvider>
+      </ChildConfigContainer>
+    </ConfigSection>
   );
 };
 
@@ -106,7 +123,11 @@ const PanelEachItem: React.FC<PanelEachProps & {itemIndex: number}> = props => {
 
   return (
     <PanelContextProvider newVars={newVars}>
-      <ChildPanel {...childPanelPanelProps} />
+      <ChildPanel
+        {...childPanelPanelProps}
+        passthroughUpdate={true}
+        updateInput={props.updateInput}
+      />
     </PanelContextProvider>
   );
 };
@@ -146,7 +167,29 @@ export const PanelEach: React.FC<PanelEachProps> = props => {
 
 export const Spec: Panel2.PanelSpec = {
   id: 'Each',
-  initialize: () => PANEL_EACH_DEFAULT_CONFIG,
+  initialize: async (weave, inputNode, stack) => {
+    const itemNode = opIndex({
+      arr: inputNode as any,
+      index: varNode('number', 'itemIndex'),
+    });
+    const {id: childPanelId, config: childPanelConfig} = await initPanel(
+      weave,
+      itemNode,
+      undefined,
+      undefined,
+      stack
+    );
+    console.log('childPanelConfig', childPanelId, childPanelConfig);
+    return {
+      pbConfig: getSectionConfig([], undefined),
+      panel: {
+        id: childPanelId,
+        input_node: varNode('any', 'item'),
+        config: childPanelConfig,
+        vars: {},
+      },
+    };
+  },
   ConfigComponent: PanelEachConfigComp,
   Component: PanelEach,
   inputType,

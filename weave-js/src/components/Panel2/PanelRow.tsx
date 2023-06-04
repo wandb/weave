@@ -25,6 +25,7 @@ import * as Panel2 from './panel';
 import {PanelComp2} from './PanelComp';
 import * as PanelLib from './panellib/libpanel';
 import * as Table from './PanelTable/tableState';
+import {usePanelContext} from './PanelContext';
 
 export interface PanelRowConfig {
   pageSize: number;
@@ -77,6 +78,7 @@ const useConfig = (
 
 const PanelRowConfigComp: React.FC<PanelRowProps> = props => {
   const {updateConfig} = props;
+  const {dashboardConfigOptions} = usePanelContext();
   const config = useConfig(props.input.type, props.child, props.config);
   const {pageSize, vertical, filterEmpty} = config;
   const childConfig = useMemo(
@@ -100,7 +102,8 @@ const PanelRowConfigComp: React.FC<PanelRowProps> = props => {
   }, [props.input]);
 
   return (
-    <>
+    <ConfigPanel.ConfigSection label={`Properties`}>
+      {dashboardConfigOptions}
       <ConfigPanel.ConfigOption label={'Page size'}>
         <ConfigPanel.ModifiedDropdownConfigField
           selection
@@ -143,7 +146,7 @@ const PanelRowConfigComp: React.FC<PanelRowProps> = props => {
         updateConfig={updateChildConfig}
         updateContext={props.updateContext}
       />
-    </>
+    </ConfigPanel.ConfigSection>
   );
 };
 

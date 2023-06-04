@@ -36,7 +36,7 @@ def test_local_file_pure_cached(cereal_csv):
 def test_execute_no_cache():
     nine = weave_internal.make_const_node(types.Number(), 9)
     res = execute.execute_nodes([nine + 3], no_cache=True)
-    assert res == [12]
+    assert res.unwrap() == [12]
 
 
 REFINE_CALLED = 0
@@ -179,6 +179,7 @@ def test_cache_column():
     assert len(weave.versions(latest_obj)) == 1
 
 
+@pytest.mark.skip("was used for table caching which is disabled")
 def test_none_not_cached():
     os.environ["WEAVE_CACHE_MODE"] = "minimal"
 

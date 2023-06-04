@@ -38,7 +38,6 @@ import {Spec as PrecomputedHistogramSpec} from './PanelPrecomputedHistogram';
 import {Spec as ProjectionSpec} from './PanelProjectionConverter';
 import {Spec as ProjectOverviewSpec} from './PanelProjectOverview';
 import {weavePythonPanelSpecs} from './PanelRegistryWeavePython';
-import {Spec as RootBrowserSpec} from './PanelRootBrowser/PanelRootBrowser';
 // converters
 import {Spec as RowSpec} from './PanelRow';
 import {Spec as RunColorSpec} from './PanelRunColor';
@@ -82,7 +81,7 @@ const initSpecs = () => {
   if (panelSpecs.length === 0) {
     panelSpecs = [
       ExprSpec,
-      RootBrowserSpec,
+      // RootBrowserSpec,
 
       IdCompareSpec,
       IdCompareCountSpec,

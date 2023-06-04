@@ -1072,10 +1072,13 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
       const fn = enabled
         ? TableState.enableGroupByCol
         : TableState.disableGroupByCol;
-      const newTable = fn(
+      let newTable = fn(
         config.series[0].table,
         config.series[0].dims[dimension.name as keyof SeriesConfig['dims']]
       );
+      if (dimension.name === 'label') {
+        newTable = fn(newTable, config.series[0].dims.color);
+      }
       const newConfig = produce(config, draft => {
         draft.series[0].table = newTable;
       });
@@ -3122,3 +3125,7 @@ const ORG_DASHBOARD_TEMPLATE_OVERLAY = {
 };
 
 export default Spec;
+
+const ConfigDimMenuButton = styled(IconButton).attrs({small: true})`
+  margin-left: 4px;
+`;

@@ -9,6 +9,7 @@ import {RemoteHttpServer} from '../server';
 import {Server} from '../server/types';
 import {ID} from '../util/id';
 import {Client} from './types';
+import _ from 'lodash';
 
 interface ObservableNode<T extends Model.Type = Model.Type> {
   id: string;
@@ -229,40 +230,72 @@ export class BasicClient implements Client {
       //   notDoneObservables,
       //   Array.from(this.observables.entries()).map(([k, l]) => [k, l.hasResult])
       // );
-      let error: any;
-      let results: any[] = [];
-      // console.time('graph execute');
-      try {
-        results = await this.executeForwardListeners(
-          notDoneObservables.map(o => o.node),
-          this.resolveRefreshRequest != null
-        );
-      } catch (e) {
-        error = e;
-        // TODO(np): Do we need to do anything to recover here?
-      }
-      // console.timeEnd('graph execute');
 
-      // notify listeners
-      // console.time('graph notify');
-      if (error != null) {
+      const rejectObservable = (observable: ObservableNode<any>, e: any) => {
+        observable.hasResult = true;
+        for (const observer of observable.observers) {
+          observer.error(e);
+        }
+      };
+
+      const resolveObservable = (
+        observable: ObservableNode<any>,
+        result: any
+      ) => {
+        observable.hasResult = true;
+        observable.lastResult = result;
+        for (const observer of observable.observers) {
+          observer.next(result);
+        }
+      };
+
+      const handleCompleteError = (e: any) => {
         for (const observable of notDoneObservables) {
-          observable.hasResult = true;
-          for (const observer of observable.observers) {
-            observer.error(error);
+          rejectObservable(observable, e);
+        }
+        // TODO(np): Do we need to do anything to recover here?
+      };
+
+      // console.time('graph execute');
+      if (this.server instanceof RemoteHttpServer) {
+        // Modern - Weave1 Server
+        let eachResults: Array<PromiseSettledResult<any>> = [];
+        try {
+          eachResults = await this.server.queryEach(
+            notDoneObservables.map(o => o.node)
+          );
+        } catch (e) {
+          handleCompleteError(e);
+        }
+        for (const [result, observable] of _.zip(
+          eachResults,
+          notDoneObservables
+        )) {
+          if (result == null || observable == null) {
+            // ERROR HERE?
+            continue;
+          }
+          if (result.status === 'rejected') {
+            rejectObservable(observable, result.reason);
+          } else {
+            resolveObservable(observable, result.value);
           }
         }
       } else {
+        let results: any[] = [];
+        try {
+          // Legacy - in-memory server
+          results = await this.executeForwardListeners(
+            notDoneObservables.map(o => o.node),
+            this.resolveRefreshRequest != null
+          );
+        } catch (e) {
+          handleCompleteError(e);
+        }
         for (let i = 0; i < notDoneObservables.length; i++) {
-          const observable = notDoneObservables[i];
-          observable.hasResult = true;
-          observable.lastResult = results[i];
-          for (const observer of observable.observers) {
-            observer.next(results[i]);
-          }
+          resolveObservable(notDoneObservables[i], results[i]);
         }
       }
-      // console.timeEnd('graph notify');
     }
 
     if (Array.from(this.observables.values()).every(obs => obs.hasResult)) {

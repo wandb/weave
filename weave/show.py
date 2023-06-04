@@ -34,7 +34,12 @@ def make_container(
     from weave.panels import Group
 
     if isinstance(obj, graph.Node):
-        return Group(preferHorizontal=True, showExpressions=True, items={name: obj})
+        return Group(
+            items={name: obj},
+            layoutMode="flow",
+            enableAddPanel=True,
+            showExpressions=True,
+        )
     else:
         return obj
 
@@ -100,7 +105,7 @@ def _show_params(obj):
 
 def show_url(obj=None):
     params = _show_params(obj)
-    panel_url = f"{context.get_frontend_url()}/__frontend/weave_jupyter?fullScreen"
+    panel_url = f"{context.get_frontend_url()}?fullScreen"
     if "weave_node" in params:
         panel_url += "&expNode=%s" % urllib.parse.quote(
             json.dumps(params["weave_node"].to_json())
@@ -124,7 +129,7 @@ def show(obj=None, height=400):
     usage_analytics.show_called()
     panel_url = show_url(obj)
 
-    iframe = IFrame(panel_url, "100%", "%spx" % height)
+    iframe = IFrame(panel_url, "100%", "%spx" % height, ['allow="clipboard-write"'])
     display(iframe)
 
 

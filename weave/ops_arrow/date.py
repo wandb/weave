@@ -36,9 +36,9 @@ def to_number(self):
     input_type={"self": ArrowWeaveListType(types.optional(types.Timestamp()))},
     output_type=ArrowWeaveListType(types.optional(types.Timestamp())),
 )
-def floor(self, multiple_ms: int):
+def floor(self, multiple_s: int):
     return ArrowWeaveList(
-        pc.floor_temporal(self._arrow_data, multiple=multiple_ms, unit="millisecond"),
+        pc.floor_temporal(self._arrow_data, multiple=multiple_s, unit="second"),
         types.optional(types.Timestamp()),
         self._artifact,
     )
@@ -49,12 +49,12 @@ def floor(self, multiple_ms: int):
     input_type={"self": ArrowWeaveListType(types.optional(types.Timestamp()))},
     output_type=ArrowWeaveListType(types.optional(types.Timestamp())),
 )
-def ceil(self, multiple_ms: int):
+def ceil(self, multiple_s: int):
     return ArrowWeaveList(
         pc.ceil_temporal(
             self._arrow_data,
-            multiple=multiple_ms,
-            unit="millisecond",
+            multiple=multiple_s,
+            unit="second",
             ceil_is_strictly_greater=True,
         ),
         types.optional(types.Timestamp()),

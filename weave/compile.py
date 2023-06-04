@@ -4,6 +4,8 @@ import typing
 import logging
 import contextvars
 import contextlib
+
+from . import value_or_error
 from . import debug_compile
 
 from . import compile_domain
@@ -305,7 +307,9 @@ _execute_nodes_map_fn = _make_auto_op_map_fn(
 _quote_nodes_map_fn = _make_inverse_auto_op_map_fn(types.Function, _quote_node)
 
 
-def compile_apply_column_pushdown(leaf_nodes: list[graph.Node]) -> list[graph.Node]:
+def compile_apply_column_pushdown(
+    leaf_nodes: list[graph.Node], on_error: graph.OnErrorFnType = None
+) -> list[graph.Node]:
     # This is specific to project-runs2 (not yet used in W&B production) for now. But it
     # is a general pattern that will work for all arrow tables.
 
@@ -323,7 +327,7 @@ def compile_apply_column_pushdown(leaf_nodes: list[graph.Node]) -> list[graph.No
     ):
         return leaf_nodes
 
-    p = stitch.stitch(leaf_nodes)
+    p = stitch.stitch(leaf_nodes, on_error=on_error)
 
     def _replace_with_column_pushdown(node: graph.Node) -> graph.Node:
         if isinstance(node, graph.OutputNode) and node.from_op.name in op_names:
@@ -354,30 +358,41 @@ def compile_apply_column_pushdown(leaf_nodes: list[graph.Node]) -> list[graph.No
                     )
         return node
 
-    return graph.map_nodes_full(leaf_nodes, _replace_with_column_pushdown)
+    return graph.map_nodes_full(leaf_nodes, _replace_with_column_pushdown, on_error)
 
 
-def compile_fix_calls(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
-    return graph.map_nodes_full(nodes, _dispatch_map_fn_no_refine)
+def compile_fix_calls(
+    nodes: typing.List[graph.Node],
+    on_error: graph.OnErrorFnType = None,
+) -> typing.List[graph.Node]:
+    return graph.map_nodes_full(nodes, _dispatch_map_fn_no_refine, on_error)
 
 
 def compile_simple_optimizations(
     nodes: typing.List[graph.Node],
+    on_error: graph.OnErrorFnType = None,
 ) -> typing.List[graph.Node]:
-    return graph.map_nodes_full(nodes, _simple_optimizations)
+    return graph.map_nodes_full(nodes, _simple_optimizations, on_error)
 
 
 def compile_resolve_required_consts(
     nodes: typing.List[graph.Node],
+    on_error: graph.OnErrorFnType = None,
 ) -> typing.List[graph.Node]:
-    return graph.map_nodes_full(nodes, _resolve_required_consts)
+    return graph.map_nodes_full(nodes, _resolve_required_consts, on_error)
 
 
-def compile_await(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
-    return graph.map_nodes_full(nodes, _await_run_outputs_map_fn)
+def compile_await(
+    nodes: typing.List[graph.Node],
+    on_error: graph.OnErrorFnType = None,
+) -> typing.List[graph.Node]:
+    return graph.map_nodes_full(nodes, _await_run_outputs_map_fn, on_error)
 
 
-def compile_execute(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
+def compile_execute(
+    nodes: typing.List[graph.Node],
+    on_error: graph.OnErrorFnType = None,
+) -> typing.List[graph.Node]:
     # Actually does the execution here in compile phase.
     # I made this change to handle cases where we need to pass mutations through
     # execute calls, which happens when we have Nodes stored in Const nodes (panels)
@@ -401,12 +416,18 @@ def compile_execute(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
     return graph.map_nodes_full(with_execute_ops, _replace_execute)
 
 
-def compile_quote(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
-    return graph.map_nodes_full(nodes, _quote_nodes_map_fn)
+def compile_quote(
+    nodes: typing.List[graph.Node],
+    on_error: graph.OnErrorFnType = None,
+) -> typing.List[graph.Node]:
+    return graph.map_nodes_full(nodes, _quote_nodes_map_fn, on_error)
 
 
-def compile_refine(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
-    return graph.map_nodes_full(nodes, _dispatch_map_fn_refining)
+def compile_refine(
+    nodes: typing.List[graph.Node],
+    on_error: graph.OnErrorFnType = None,
+) -> typing.List[graph.Node]:
+    return graph.map_nodes_full(nodes, _dispatch_map_fn_refining, on_error)
 
 
 # This compile pass using the `top_level` mapper since we recurse manually. We can't use
@@ -414,8 +435,9 @@ def compile_refine(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
 # rather than the const node since we need uniqueness based on the lambda op.
 def compile_lambda_uniqueness(
     nodes: typing.List[graph.Node],
+    on_error: graph.OnErrorFnType = None,
 ) -> typing.List[graph.Node]:
-    return graph.map_nodes_top_level(nodes, _compile_lambda_uniqueness)
+    return graph.map_nodes_top_level(nodes, _compile_lambda_uniqueness, on_error)
 
 
 def _compile_lambda_uniqueness(node: graph.Node) -> typing.Optional[graph.Node]:
@@ -455,46 +477,76 @@ def _compile_lambda_uniqueness(node: graph.Node) -> typing.Optional[graph.Node]:
     return node
 
 
-def _compile(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
+const_node = weave_internal.make_const_node(types.NoneType(), None)
+
+
+def _track_errors(fn):
+    def final(
+        nodes: typing.List[graph.Node],
+    ) -> value_or_error.ValueOrErrors[graph.Node]:
+        compile_errors = []
+
+        def on_error(ndx: int, e: Exception):
+            compile_errors.append((ndx, e))
+            return const_node
+
+        inner_res = fn(nodes, on_error)
+
+        results: list[value_or_error.ValueOrError[graph.Node]] = [
+            value_or_error.Value(node) for node in inner_res
+        ]
+        for ndx, e in compile_errors:
+            results[ndx] = value_or_error.Error(e)
+
+        return value_or_error.ValueOrErrors(results)
+
+    return final
+
+
+def _compile(
+    nodes: typing.List[graph.Node],
+) -> value_or_error.ValueOrErrors[graph.Node]:
     tracer = engine_trace.tracer()
     # logging.info("Starting compilation of graph with %s leaf nodes" % len(nodes))
 
-    n = nodes
+    results = value_or_error.ValueOrErrors.from_values(nodes)
 
     # If we're being called from WeaveJS, we need to use dispatch to determine
     # which ops to use. Critically, this first phase does not actually refine
     # op output types, so after this, the types in the graph are not yet correct.
     with tracer.trace("compile:fix_calls"):
-        n = compile_fix_calls(n)
+        results = results.batch_map(_track_errors(compile_fix_calls))
 
     with tracer.trace("compile:simple_optimizations"):
-        n = compile_simple_optimizations(n)
+        results = results.batch_map(_track_errors(compile_simple_optimizations))
 
     with tracer.trace("compile:lambda_uniqueness"):
-        n = compile_lambda_uniqueness(n)
+        results = results.batch_map(_track_errors(compile_lambda_uniqueness))
 
     # Auto-transforms, where we insert operations to convert between types
     # as needed.
     # TODO: is it ok to have this before final refine?
     with tracer.trace("compile:await"):
-        n = compile_await(n)
+        results = results.batch_map(_track_errors(compile_await))
     with tracer.trace("compile:execute"):
-        n = compile_execute(n)
+        results = results.batch_map(_track_errors(compile_execute))
     with tracer.trace("compile:quote"):
-        n = compile_quote(n)
+        results = results.batch_map(_track_errors(compile_quote))
 
     # Some ops require const input nodes. This pass executes any branches necessary
     # to ensure that requirement holds.
     # Only gql ops require this for now.
     with tracer.trace("compile:resolve_required_consts"):
-        n = compile_resolve_required_consts(n)
+        results = results.batch_map(_track_errors(compile_resolve_required_consts))
 
     # Now that we have the correct calls, we can do our forward-looking pushdown
     # optimizations. These do not depend on having correct types in the graph.
     with tracer.trace("compile:gql"):
-        n = compile_domain.apply_domain_op_gql_translation(n)
+        results = results.batch_map(
+            _track_errors(compile_domain.apply_domain_op_gql_translation)
+        )
     with tracer.trace("compile:column_pushdown"):
-        n = compile_apply_column_pushdown(n)
+        results = results.batch_map(_track_errors(compile_apply_column_pushdown))
 
     # Final refine, to ensure the graph types are exactly what Weave python
     # produces. This phase can execute parts of the graph. It's very important
@@ -502,7 +554,7 @@ def _compile(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
     # graph, we reuse any results produced in this phase, instead of re-executing
     # those nodes.
     with tracer.trace("compile:refine"):
-        n = compile_refine(n)
+        results = results.batch_map(_track_errors(compile_refine))
 
     # This is very expensive!
     # loggable_nodes = graph_debug.combine_common_nodes(n)
@@ -512,9 +564,12 @@ def _compile(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
     # )
 
     if DEBUG_COMPILE:
-        debug_compile.check_weave0_compile_result(nodes, n)
+        debug_compile.check_weave0_compile_result(
+            nodes,
+            [item if err == None else const_node for item, err in results.iter_items()],
+        )
 
-    return n
+    return results
 
 
 _compile_disabled: contextvars.ContextVar[bool] = contextvars.ContextVar(
@@ -544,7 +599,9 @@ def enable_compile():
         _compile_disabled.reset(token)
 
 
-def compile(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
+def compile(
+    nodes: typing.List[graph.Node],
+) -> value_or_error.ValueOrErrors[graph.Node]:
     """
     This method is used to "compile" a list of nodes. Here we can add any
     optimizations or graph rewrites
@@ -553,6 +610,6 @@ def compile(nodes: typing.List[graph.Node]) -> typing.List[graph.Node]:
     # calls compile. Use context to ensure we only compile the top level
     # graph.
     if _is_compiling():
-        return nodes
+        return value_or_error.ValueOrErrors.from_values(nodes)
     with _compiling():
         return _compile(nodes)

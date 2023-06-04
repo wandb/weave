@@ -126,6 +126,18 @@ const OutlineItemMenuPopupComp: React.FC<OutlineItemMenuPopupProps> = ({
     },
     [updateConfig2, goBackToOutline]
   );
+  const handleDuplicate = useCallback(
+    (panelPath: string[]) => {
+      updateConfig2(oldConfig => {
+        oldConfig = getFullChildPanel(oldConfig);
+        const targetPanel = getPath(oldConfig, panelPath);
+        return addChild(oldConfig, panelPath.slice(0, -1), targetPanel);
+      });
+
+      goBackToOutline?.();
+    },
+    [updateConfig2, goBackToOutline]
+  );
   const handleAddToQueryBar = useCallback(
     (panelPath: string[]) => {
       updateConfig2(oldConfig => {
@@ -176,6 +188,12 @@ const OutlineItemMenuPopupComp: React.FC<OutlineItemMenuPopupProps> = ({
       });
     }
     items.push({
+      key: 'duplicate',
+      content: 'Duplicate',
+      icon: 'columns',
+      onClick: () => handleDuplicate(path),
+    });
+    items.push({
       key: 'split',
       content: 'Split',
       icon: 'columns',
@@ -195,6 +213,7 @@ const OutlineItemMenuPopupComp: React.FC<OutlineItemMenuPopupProps> = ({
     handleDelete,
     handleSplit,
     handleUnnest,
+    handleDuplicate,
     localConfig.id,
     path,
   ]);

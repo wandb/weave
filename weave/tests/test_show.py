@@ -54,10 +54,31 @@ def test_show_simple_call(cereal_csv):
                         }
                     },
                 },
-                "gridConfig": "none",
+                "gridConfig": {
+                    "type": "typedDict",
+                    "propertyTypes": {
+                        "id": "string",
+                        "name": "string",
+                        "panels": {"type": "list", "objectType": "unknown"},
+                        "isOpen": "boolean",
+                        "flowConfig": {
+                            "type": "typedDict",
+                            "propertyTypes": {
+                                "snapToColumns": "boolean",
+                                "columnsPerPage": "int",
+                                "rowsPerPage": "int",
+                                "gutterWidth": "int",
+                                "boxWidth": "int",
+                                "boxHeight": "int",
+                            },
+                        },
+                        "type": "string",
+                        "sorted": "int",
+                    },
+                },
                 "liftChildVars": "none",
                 "allowedPanels": "none",
-                "enableAddPanel": "none",
+                "enableAddPanel": "boolean",
                 "childNameBase": "none",
                 "layoutMode": "string",
                 "showExpressions": "boolean",

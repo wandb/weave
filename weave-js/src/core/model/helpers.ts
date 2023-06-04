@@ -14,7 +14,9 @@ import {
   ListType,
   LoadedPathMetadata,
   MediaType,
+  ObjectType,
   PathType,
+  RootObjectType,
   SimpleType,
   TableType,
   TaggedValueType,
@@ -57,6 +59,26 @@ export function allObjPaths(objectType: Type, depth = Infinity): PathType[] {
       }
       if (childPaths.length === 0) {
         childPaths = [{path: [key], type: valType}];
+      }
+      paths = [...paths, ...childPaths];
+    }
+  } else if (isObjectTypeLike(objectType)) {
+    for (const [key, valType] of Object.entries(
+      unionObjectTypeAttrTypes(objectType)
+    )) {
+      if (valType == null) {
+        throw new Error('allObjPaths: found null property type');
+      }
+      const objKey = '__object__' + key;
+      let childPaths: PathType[] = [];
+      // if (depth > 0) {
+      //   childPaths = allObjPaths(valType, depth - 1).map(p => ({
+      //     path: [objKey, ...p.path],
+      //     type: p.type,
+      //   }));
+      // }
+      if (childPaths.length === 0) {
+        childPaths = [{path: [objKey], type: valType}];
       }
       paths = [...paths, ...childPaths];
     }
@@ -828,6 +850,10 @@ export function isTypedDict(t: Type): t is TypedDictType {
   return !isSimpleTypeShape(t) && t?.type === 'typedDict';
 }
 
+export function isObjectType(t: any): t is ObjectType {
+  return !isSimpleTypeShape(t) && (t as any)?._is_object;
+}
+
 export function isFunctionType(
   maybeFunctionType: Type
 ): maybeFunctionType is FunctionType {
@@ -846,10 +872,24 @@ export function isTypedDictLike(t: Type): t is TypedDictType | Union {
   );
 }
 
+export function isObjectTypeLike(t: any): t is ObjectType | Union {
+  return (
+    isObjectType(t) ||
+    (isTaggedValue(t) && isObjectTypeLike(t.value)) ||
+    (isUnion(t) && t.members.every(isObjectTypeLike))
+  );
+}
+
 export function typedDict(propertyTypes: {[key: string]: Type}): TypedDictType {
   return {
     type: 'typedDict',
     propertyTypes,
+  };
+}
+
+export function rootObject(): RootObjectType {
+  return {
+    type: 'Object',
   };
 }
 
@@ -1130,6 +1170,75 @@ export const typedDictPropertyTypes = (type: Type): {[key: string]: Type} => {
     throw new Error('typedDictPropertyTypes: expected a typed dict');
   }
   return type.propertyTypes as {[key: string]: Type};
+};
+
+export const objectTypeAttrTypes = (
+  type: ObjectType
+): {[key: string]: Type} => {
+  return _.fromPairs(
+    Object.keys(type)
+      .filter(k => k !== 'type' && !k.startsWith('_'))
+      .map(k => {
+        return [k, type[k]];
+      })
+  );
+};
+
+// Copied from typedDictPropertyTypes
+export const unionObjectTypeAttrTypes = (type: Type): {[key: string]: Type} => {
+  type = nullableTaggableValue(type);
+  if (isUnion(type)) {
+    // TODO: (tim) make this nicer code. This makes a union out of the "union" of keys
+    return type.members.reduce<{[key: string]: any}>((prev, curr, ndx) => {
+      const unwrappedCurr = nullableTaggableValue(curr);
+      if (!isObjectType(unwrappedCurr) && unwrappedCurr !== 'none') {
+        throw new Error(
+          'objectTypeAttrTypes: incoming union type contains non-dict'
+        );
+      }
+      const attrTypes =
+        unwrappedCurr === 'none' ? {} : objectTypeAttrTypes(unwrappedCurr);
+      let newVal: {[key: string]: any} = {};
+      if (ndx === 0) {
+        newVal = unwrappedCurr !== 'none' ? attrTypes : {};
+      } else {
+        for (const existingProp in prev) {
+          if (prev[existingProp] != null) {
+            const prevProp = prev[existingProp];
+            if (unwrappedCurr !== 'none' && attrTypes[existingProp]) {
+              const currProp = attrTypes[existingProp];
+              if (currProp) {
+                newVal[existingProp] = union([prevProp, currProp]);
+              } else {
+                newVal[existingProp] = union([prevProp, 'none']);
+              }
+            } else {
+              newVal[existingProp] = union([prevProp, 'none']);
+            }
+          } else {
+            newVal[existingProp] = prev[existingProp];
+          }
+        }
+
+        if (unwrappedCurr !== 'none') {
+          for (const newProp in attrTypes) {
+            if (attrTypes[newProp]) {
+              const currProp = attrTypes[newProp];
+              if (currProp != null && prev[newProp] == null) {
+                newVal[newProp] = union([currProp, 'none']);
+              }
+            }
+          }
+        }
+      }
+      return newVal;
+    }, {});
+  }
+  if (!isObjectType(type)) {
+    console.log('GOT TYPE', type);
+    throw new Error('unionObjectTypeAttrTypes: expected an ObjectType');
+  }
+  return objectTypeAttrTypes(type) as {[key: string]: Type};
 };
 
 export const isMediaType = (type: Type): type is MediaType => {

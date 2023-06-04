@@ -35,7 +35,9 @@ import {
   isAssignableTo,
   isFunctionType,
   isList,
+  isListLike,
   listObjectType,
+  nullableTaggableValue,
 } from '../../../model/helpers';
 import {intersectionOf} from '../../../model/intersection';
 import {Type} from '../../../model/types';
@@ -429,7 +431,12 @@ class Converter {
             getAttrNode,
             stack
           )) as EditingOutputNode;
-          if (refinedNode.type === 'unknown') {
+          const refinedType = nullableTaggableValue(refinedNode.type);
+          if (
+            refinedType === 'unknown' ||
+            (isListLike(refinedType) &&
+              nullableTaggableValue(listObjectType(refinedType)) === 'unknown')
+          ) {
             throw new Error(`Invalid getattr call`);
           }
           return mapped(getAttrNode);

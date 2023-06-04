@@ -1,6 +1,7 @@
 import dataclasses
 import typing
 import json
+import time
 
 import weave
 from weave import artifact_base
@@ -481,20 +482,33 @@ class BaseLLMOps:
         return self.predict(text)
 
 
-class RunResult(typing.TypedDict):
+ChainTypeVar = typing.TypeVar("ChainTypeVar", bound=Chain)
+
+
+@weave.type()
+class ChainRunResult(typing.Generic[ChainTypeVar]):
+    chain: ChainTypeVar
+    query: str
     result: str
+    latency: float
     trace: trace_tree.WBTraceTree
 
 
 @weave.weave_class(weave_type=ChainType)
 class ChainOps:
-    @weave.op()
-    def run(chain: BaseRetrievalQA, query: str) -> RunResult:
+    @weave.op(
+        output_type=lambda input_type: ChainRunResult.WeaveType(  # type: ignore
+            chain=input_type["chain"]
+        )
+    )
+    def run(chain: Chain, query: str):
         if query == None:
             # TODO: weave engine doesn't handle nullability on args that aren't the first
             return None  # type: ignore
         tracer = WeaveTracer()
+        start_time = time.time()
         result = chain.run(query, callbacks=[tracer])
+        latency = time.time() - start_time
         lc_run = tracer.run
         if lc_run is None:
             raise ValueError("LangChain run was not recorded")
@@ -504,8 +518,11 @@ class ChainOps:
 
         # Returns the langchain trace as part of the result... not really what we
         # want.
-        return RunResult(
+        return ChainRunResult(
+            chain=chain,
+            query=query,
             result=result,
+            latency=latency,
             trace=trace_tree.WBTraceTree(json.dumps(storage.to_python(span)["_val"])),
         )
 

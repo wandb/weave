@@ -199,6 +199,26 @@ const clientEval = (node: NodeOrVoidNode, env: Stack): NodeOrVoidNode => {
   return {...node, fromOp: {...node.fromOp, inputs: nodeInputs as any}};
 };
 
+type ErrorStateType = {message: string; traceback: string[]};
+
+const errorToText = (e: any) => {
+  if (e instanceof Error) {
+    return '' + e;
+  } else if (typeof e === 'string') {
+    return e;
+  } else if (
+    typeof e === 'object' &&
+    e != null &&
+    e.message != null &&
+    e.traceback != null &&
+    _.isArray(e.traceback)
+  ) {
+    return e.message + '\n\nTraceback:\n' + e.traceback.join('\n');
+  } else {
+    return '';
+  }
+};
+
 export const useNodeValue = <T extends Type>(
   node: NodeOrVoidNode<T>,
   memoCacheId: number = 0
@@ -223,7 +243,7 @@ export const useNodeValue = <T extends Type>(
 
   GlobalCGReactTracker.useNodeValue++;
   node = useDeepMemo({node, memoCacheId}).node;
-  const [error, setError] = useState();
+  const [error, setError] = useState<ErrorStateType | undefined>();
   const [result, setResult] = useState<{
     node: NodeOrVoidNode;
     value: any;
@@ -286,8 +306,10 @@ export const useNodeValue = <T extends Type>(
     // Just rethrow the error in the render thread so it can be caught
     // by an error boundary.
     if (error != null) {
-      console.error('useNodeValue error', error);
-      throw new Error(error);
+      const message =
+        'Node execution failed (useNodeValue): ' + errorToText(error);
+      console.error(message);
+      throw new Error(message);
     }
     const loading = result.node.nodeType === 'void' || node !== result.node;
     return {
@@ -803,8 +825,10 @@ export const useNodeWithServerType = (
   const finalResult = useMemo(() => {
     if (error != null) {
       // rethrow in render thread
-      console.error('useNodeWithServerType error', error);
-      throw new Error(error);
+      const message =
+        'Node execution failed (useNodeWithServerType): ' + errorToText(error);
+      console.error(message);
+      throw new Error(message);
     }
     return {
       loading: node !== result.node,

@@ -1,23 +1,48 @@
-import {WBIcon} from '@wandb/ui';
-import React, {useCallback, useMemo, useState} from 'react';
+import React, {useCallback, useMemo} from 'react';
 
-import {WeaveExpression} from '../../panel/WeaveExpression';
-import {ControlFilter} from './ControlFilter';
 import * as Panel from './panel';
 import {PanelContextProvider} from './PanelContext';
 import * as Table from './PanelTable/tableState';
-import {useUpdateConfigKey} from './PanelTable/util';
 import {useWeaveContext} from '@wandb/weave/context';
 import {TableState} from '../..';
 import * as ConfigPanel from './ConfigPanel';
-import {DimConfig} from './PanelFacet/common';
-import * as CGReact from '../../react';
-import {Checkbox} from 'semantic-ui-react';
+import {Button} from 'semantic-ui-react';
+import {
+  ChildPanel,
+  ChildPanelConfigComp,
+  ChildPanelFullConfig,
+} from './ChildPanel';
+import {
+  NodeOrVoidNode,
+  Type,
+  constNodeUnsafe,
+  constString,
+  isAssignableTo,
+  list,
+  listObjectType,
+  mapNodes,
+  maybe,
+  opOr,
+  opStringEqual,
+  Node,
+  varNode,
+  voidNode,
+  Weave,
+} from '@wandb/weave/core';
+import {Spec as SelectEditorSpec} from './PanelSelectEditor';
+import {ExpressionView} from './ExpressionView';
+import {updatePreFilter} from './PanelTable/tableState';
+
+interface Condition {
+  expression: NodeOrVoidNode;
+  editor: ChildPanelFullConfig;
+}
 
 const inputType = {type: 'list' as const, objectType: 'any' as const};
 interface PanelQueryConfig {
   tableState: Table.TableState;
   pinnedRows: {[groupKey: string]: number[]};
+  conditions: Condition[];
   dims: {
     text: TableState.ColumnId;
   };
@@ -30,192 +55,291 @@ export function defaultPanelQuery(): PanelQueryConfig {
   const textColId = tableState.order[tableState.order.length - 1];
   const columnNames = {[textColId]: 'text'};
   tableState = {...tableState, columnNames};
-  console.log('TABLE STATE', tableState);
 
   return {
     tableState,
     pinnedRows: {},
+    conditions: [],
     dims: {
       text: textColId,
     },
   };
 }
 
-export const PanelQueryConfigComponent: React.FC<PanelQueryProps> = props => {
-  const {input, updateConfig: propsUpdateConfig} = props;
-  const config = props.config!;
-  const updateConfig = useCallback(
-    (newConfig: Partial<PanelQueryConfig>) => {
-      propsUpdateConfig({
-        ...config,
-        ...newConfig,
+interface ConditionEditorSpec {
+  panelId: string;
+  initEditor: (expr: NodeOrVoidNode) => ChildPanelFullConfig;
+  toFilterClause: (expr: Node, editor: ChildPanelFullConfig) => NodeOrVoidNode;
+}
+
+const EDITOR_SPECS: {[key: string]: ConditionEditorSpec} = {
+  SelectEditor: {
+    panelId: SelectEditorSpec.id,
+    initEditor(expr) {
+      return {
+        vars: {},
+        id: SelectEditorSpec.id,
+        input_node: constNodeUnsafe({type: 'list', objectType: 'string'}, []),
+        config: {
+          choices: expr,
+        },
+      };
+    },
+    toFilterClause(rowExpr, editor) {
+      if (editor.input_node.nodeType !== 'const') {
+        throw new Error('SelectEditor requires const input');
+      }
+      const selected = editor.input_node.val;
+      if (selected.length === 0) {
+        return voidNode();
+      }
+      let clause = opStringEqual({lhs: rowExpr, rhs: constString(selected[0])});
+      for (let i = 1; i < selected.length; i++) {
+        clause = opOr({
+          lhs: clause,
+          rhs: opStringEqual({lhs: rowExpr, rhs: constString(selected[i])}),
+        });
+      }
+      return clause;
+    },
+  },
+};
+
+const conditionEditorsForType = (type: Type): ConditionEditorSpec[] => {
+  if (isAssignableTo(type, list(maybe('string')))) {
+    return [EDITOR_SPECS.SelectEditor];
+  }
+  return [];
+};
+
+const toFilterExpression = (
+  weave: Weave,
+  input: Node,
+  config: PanelQueryConfig
+): NodeOrVoidNode => {
+  const clauses = config.conditions.map(condition => {
+    const withRow = mapNodes(condition.expression, (checkNode: any) => {
+      if (checkNode.nodeType === 'var' && checkNode.varName === 'queryInput') {
+        return varNode(listObjectType(input.type), 'row');
+      }
+      // TODO: This type remapping is no good
+      if (checkNode.nodeType === 'output') {
+        const opDef = weave.client.opStore.getOpDef(checkNode.fromOp.name);
+        const newOutputType =
+          typeof opDef.outputType === 'function'
+            ? opDef.outputType(checkNode.fromOp.inputs as any)
+            : opDef.outputType;
+        return {
+          ...checkNode,
+          type: newOutputType,
+        };
+      }
+      return checkNode;
+    }) as Node;
+    const editorSpec = EDITOR_SPECS[condition.editor.id];
+    if (editorSpec == null) {
+      return voidNode();
+    }
+    return editorSpec.toFilterClause(withRow, condition.editor);
+  });
+  console.log('CLAUSES', clauses);
+  return clauses[0] ?? voidNode();
+};
+
+type PanelQueryConditionProps = PanelQueryProps & {
+  condition: Condition;
+  index: number;
+};
+
+const usePanelQueryConditionCommon = (props: PanelQueryConditionProps) => {
+  const {condition, updateConfig2, input} = props;
+  const weave = useWeaveContext();
+
+  const newVars = useMemo(() => {
+    return {
+      queryInput: varNode(props.input.type, 'input'),
+    };
+  }, [props.input.type]);
+  if (updateConfig2 == null) {
+    throw new Error('PanelQuery requires updateConfig2');
+  }
+  const updateCondition = useCallback(
+    (newCondition: Partial<Condition>) => {
+      updateConfig2(oldConfig => {
+        const newConditions = [...oldConfig.conditions];
+        newConditions[props.index] = {
+          ...oldConfig.conditions[props.index],
+          ...newCondition,
+        };
+        const newConfig = {
+          ...oldConfig,
+          conditions: newConditions,
+        };
+        const newFilterExpr = toFilterExpression(weave, input, newConfig);
+        const newTableState = updatePreFilter(
+          newConfig.tableState,
+          newFilterExpr
+        );
+        return {
+          ...newConfig,
+          tableState: newTableState,
+        };
       });
     },
-    [config, propsUpdateConfig]
+    [input, props.index, updateConfig2, weave]
+  );
+  const updateConditionExpr = useCallback(
+    async (newExpr: NodeOrVoidNode) => {
+      updateCondition({expression: newExpr});
+      const allowedEditorsSpecs = conditionEditorsForType(newExpr.type);
+      console.log('UPDATE COND', newExpr, allowedEditorsSpecs);
+      const currentEditorValid = allowedEditorsSpecs.find(
+        editor => editor.panelId === condition.editor.id
+      );
+      if (currentEditorValid == null) {
+        if (allowedEditorsSpecs.length > 0) {
+          const newEditorSpec = allowedEditorsSpecs[0];
+          const newEditor = newEditorSpec.initEditor(newExpr);
+          updateCondition({editor: newEditor});
+        } else {
+          updateCondition({
+            editor: {
+              vars: {},
+              input_node: voidNode(),
+              id: 'Expression',
+              config: undefined,
+            },
+          });
+        }
+      }
+    },
+    [condition.editor.id, updateCondition]
   );
 
-  const tableConfig = config.tableState;
-  const updateTableConfig = useCallback(
-    (newTableConfig: TableState.TableState) =>
-      updateConfig({
-        tableState: newTableConfig,
-      }),
-    [updateConfig]
+  const updateEditorConfig = useCallback(
+    (newConfig: ChildPanelFullConfig) => {
+      updateCondition({editor: newConfig});
+    },
+    [updateCondition]
   );
+
+  return useMemo(
+    () => ({
+      newVars,
+      condition,
+      updateConditionExpr,
+      updateEditorConfig,
+    }),
+    [condition, newVars, updateConditionExpr, updateEditorConfig]
+  );
+};
+
+export const PanelQueryConditionConfigComponent: React.FC<
+  PanelQueryConditionProps
+> = props => {
+  const {newVars, condition, updateConditionExpr, updateEditorConfig} =
+    usePanelQueryConditionCommon(props);
+  return (
+    <>
+      <PanelContextProvider newVars={newVars}>
+        <ConfigPanel.ConfigOption label={`expr`}>
+          <ConfigPanel.ExpressionConfigField
+            expr={condition.expression}
+            setExpression={updateConditionExpr}
+          />
+        </ConfigPanel.ConfigOption>
+        <ConfigPanel.ChildConfigContainer>
+          <ChildPanelConfigComp
+            config={condition.editor}
+            updateConfig={updateEditorConfig}
+          />
+        </ConfigPanel.ChildConfigContainer>
+      </PanelContextProvider>
+    </>
+  );
+};
+
+export const PanelQueryConditionComponent: React.FC<
+  PanelQueryConditionProps
+> = props => {
+  const {newVars, condition, updateEditorConfig} =
+    usePanelQueryConditionCommon(props);
+
+  console.log('CONDITION EDITOR', condition.editor);
 
   return (
-    <div>
-      <ConfigPanel.ConfigOption label={'text'}>
-        <DimConfig
-          dimName="text"
-          colId={config.dims.text}
-          input={input}
-          tableConfig={tableConfig}
-          updateTableConfig={updateTableConfig}
-        />
-      </ConfigPanel.ConfigOption>
+    <div style={{height: '100%'}}>
+      <ExpressionView node={condition.expression as any} />
+      <div style={{maxHeight: 300, overflow: 'auto'}}>
+        <PanelContextProvider newVars={newVars}>
+          <ChildPanel
+            config={condition.editor}
+            updateConfig={updateEditorConfig}
+          />
+        </PanelContextProvider>
+      </div>
     </div>
   );
 };
 
-export const PanelQuery: React.FC<PanelQueryProps> = props => {
-  const {updateConfig} = props;
+export const PanelQueryConfigComponent: React.FC<PanelQueryProps> = props => {
+  const {updateConfig2} = props;
+  if (updateConfig2 == null) {
+    throw new Error('PanelQuery requires updateConfig2');
+  }
   const config = props.config!;
-  const weave = useWeaveContext();
-  const tableState = useMemo(() => {
-    return config?.tableState ?? Table.emptyTable();
-  }, [config?.tableState]);
 
-  const preFilterFrame = useMemo(
-    () => Table.getRowFrame(props.input),
-    [props.input]
-  );
-  const updateTableState = useUpdateConfigKey('tableState', updateConfig);
-
-  const setFilterFunction: React.ComponentProps<
-    typeof ControlFilter
-  >['setFilterFunction'] = useCallback(
-    newNode => {
-      return updateTableState(Table.updatePreFilter(tableState, newNode));
-    },
-    [tableState, updateTableState]
-  );
-  // const [pageNum, setPageNum] = useState(0);
-  const [pageNum] = useState(0);
-  const {pageSize} = tableState;
-  const visibleRowsNode = useMemo(() => {
-    const rowsNode = Table.getRowsNode(
-      tableState.preFilterFunction,
-      tableState.groupBy,
-      tableState.columnSelectFunctions,
-      tableState.columnNames,
-      tableState.order,
-      tableState.sort,
-      props.input,
-      weave
-    );
-    return Table.getPagedRowsNode(pageSize, pageNum, rowsNode);
-  }, [
-    tableState.preFilterFunction,
-    tableState.groupBy,
-    tableState.columnSelectFunctions,
-    tableState.columnNames,
-    tableState.order,
-    tableState.sort,
-    props.input,
-    weave,
-    pageSize,
-    pageNum,
-  ]);
-  const resultNode = useMemo(() => {
-    return Table.getResultTableNode(
-      visibleRowsNode,
-      tableState.columnSelectFunctions,
-      tableState.columnNames,
-      tableState.groupBy,
-      tableState.order,
-      weave.client.opStore
-    );
-  }, [
-    visibleRowsNode,
-    tableState.columnSelectFunctions,
-    tableState.columnNames,
-    tableState.groupBy,
-    tableState.order,
-    weave.client.opStore,
-  ]);
-  console.log('RESULT NODE', resultNode);
-  const nodeValueQuery = CGReact.useNodeValue(resultNode);
-  console.log('NVQ', nodeValueQuery);
-  const groupingId = '';
-  const selectedRows = useMemo(
-    () => config.pinnedRows?.[groupingId] ?? [],
-    [config.pinnedRows]
-  );
-
-  const rowItems = useMemo(() => {
-    const itemLabels: Array<{text: string}> = nodeValueQuery.result ?? [];
-    return itemLabels.map((item, i) => ({
-      text: item.text,
-      rowIndex: i + pageNum,
-      checked: selectedRows.includes(i + pageNum),
-    }));
-  }, [nodeValueQuery.result, pageNum, selectedRows]);
-
-  const toggleRow = useCallback(
-    (rowIndex: number) => {
-      const newSelectedRows = [...selectedRows];
-      const index = newSelectedRows.indexOf(rowIndex);
-      if (index === -1) {
-        newSelectedRows.push(rowIndex);
-      } else {
-        newSelectedRows.splice(index, 1);
-      }
-      updateConfig({
-        pinnedRows: {
-          ...config.pinnedRows,
-          [groupingId]: newSelectedRows,
-        },
-      });
-    },
-    [config.pinnedRows, groupingId, selectedRows, updateConfig]
-  );
+  const addCondition = useCallback(() => {
+    updateConfig2(oldConfig => {
+      return {
+        ...oldConfig,
+        conditions: [
+          ...oldConfig.conditions,
+          {
+            expression: voidNode(),
+            editor: {
+              vars: {},
+              input_node: voidNode(),
+              id: 'Expression',
+              config: undefined,
+            },
+          },
+        ],
+      };
+    });
+  }, [updateConfig2]);
 
   return (
-    <div
-      style={{
-        width: '100%',
-        height: '100%',
-        // flex: '1 1 auto',
-        paddingLeft: '12px',
-        paddingBottom: '5px',
-      }}>
-      <div style={{display: 'flex'}}>
-        <div style={{marginRight: 8}}>
-          <WBIcon name="filter" />
-        </div>
-        <div style={{flexGrow: 1, marginTop: 2}}>
-          <PanelContextProvider newVars={preFilterFrame}>
-            <WeaveExpression
-              noBox
-              expr={tableState.preFilterFunction}
-              setExpression={setFilterFunction}
-            />
-          </PanelContextProvider>
-        </div>
-      </div>
-      <div style={{marginLeft: 16}}>
-        {rowItems.map((item, i) => (
-          <div key={i} style={{display: 'flex', alignItems: 'center'}}>
-            <Checkbox
-              checked={item.checked}
-              onChange={e => toggleRow(item.rowIndex)}
-              style={{marginRight: 8}}
-            />
-            {item.text}
-          </div>
-        ))}
-      </div>
+    <ConfigPanel.ConfigSection label={`Conditions`}>
+      {config.conditions.map((condition, i) => (
+        <PanelQueryConditionConfigComponent
+          key={i}
+          {...props}
+          condition={condition}
+          index={i}
+        />
+      ))}
+      <Button size="mini" onClick={addCondition}>
+        Add Condition
+      </Button>
+    </ConfigPanel.ConfigSection>
+  );
+};
+
+export const PanelQuery: React.FC<PanelQueryProps> = props => {
+  const config = props.config!;
+
+  return (
+    <div style={{height: '100%', paddingLeft: 16}}>
+      {config.conditions.map((condition, i) => (
+        <PanelQueryConditionComponent
+          key={i}
+          {...props}
+          condition={condition}
+          index={i}
+        />
+      ))}
+      <Button>Update Query</Button>
     </div>
   );
 };

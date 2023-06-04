@@ -17,6 +17,7 @@ class WeaveActionsContextImpl implements WeaveActionsContextState {
 const emptyActionsContext = new WeaveActionsContextImpl();
 
 const WeaveActionsContext = React.createContext(emptyActionsContext);
+WeaveActionsContext.displayName = 'WeaveActionsContext';
 
 // Exported mostly for debug purposes.  In general, you should use
 // WeaveActionContextProvider to build on the existing actions context.

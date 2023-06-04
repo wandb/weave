@@ -7,6 +7,7 @@ from .. import weave_internal
 from .. import graph
 from .. import panel
 from .. import panel_util
+from .bank import default_panel_bank_flow_section_config
 
 ItemsType = typing.TypeVar("ItemsType")
 
@@ -85,19 +86,22 @@ class Group(panel.Panel):
         self.config = config
         if self.config is None:
             self.config = GroupConfig()
+        if "layoutMode" in options:
+            self.config.layoutMode = options["layoutMode"]
+            self.config.gridConfig = default_panel_bank_flow_section_config()
         if "items" in options:
             self.config.items = options["items"]
         if "showExpressions" in options:
             self.config.showExpressions = options["showExpressions"]
         if "layered" in options:
             self.config.layered = options["layered"]
+        if "enableAddPanel" in options:
+            self.config.enableAddPanel = options["enableAddPanel"]
         if "preferHorizontal" in options:
             self.config.preferHorizontal = options["preferHorizontal"]
             self.config.layoutMode = (
                 "horizontal" if options["preferHorizontal"] else "vertical"
             )
-        if "layoutMode" in options:
-            self.config.layoutMode = options["layoutMode"]
         if "equalSize" in options:
             self.config.equalSize = options["equalSize"]
         if "style" in options:

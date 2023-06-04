@@ -77,5 +77,7 @@ def define_panel(p: LPanel):
 if not did_define:
     for p in panels:
         define_panel(p)
+        if p.typename_override is not None:
+            define_panel(LPanel("maybe." + p.panel_id, "maybe." + p.panel_id))
 
 did_define = True

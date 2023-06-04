@@ -13,7 +13,7 @@ from . import runs
 from . import graph
 from . import artifact_local
 from . import weave_internal
-from . import cache_policy
+from . import op_policy
 
 
 @dataclasses.dataclass
@@ -98,7 +98,7 @@ class TraceLocal:
         # Restricted to just a couple ops for now.
         # A NOTE: for the future, async ops definitely can't be saved to
         # table (until we have safe table writes)
-        return cache_policy.should_table_cache(run_key.op_simple_name)
+        return op_policy.should_table_cache(run_key.op_simple_name)
 
     def get_run(self, run_key: RunKey) -> graph.Node[runs.Run]:
         if self._should_save_to_table(run_key):
@@ -136,20 +136,8 @@ class TraceLocal:
             # to see the actual query that run for a given object.
             # TODO: revisit this behavior
             return self.save_object(output)
-        if (
-            run_key.op_simple_name == "op-expensive_op"
-            or run_key.op_simple_name == "BaseRetrievalQA-run"
-        ):
-            art_name = f"run-{run_key.op_simple_name}-output"
-            existing_objs = storage.get_local_version(art_name, "latest")
-            if existing_objs is None:
-                existing_objs = []
-            existing_objs.append(output)
-            obj_ref = self.save_object(existing_objs, name=art_name)
-            obj_ref._obj = output
-            obj_ref._type = types.TypeRegistry.type_of(output)
-            obj_ref.extra = [str(len(existing_objs) - 1)]
-            return obj_ref
+        # TODO: table caching is currently disabled, but this path doesn't handle it
+        # when we turn it back on!
         return self.save_object(
             output, name=f"run-{run_key.op_simple_name}-{run_key.id}-output"
         )

@@ -24,7 +24,8 @@ import {
   VariableView,
 } from './ChildPanel';
 import * as Panel2 from './panel';
-import {PanelContextProvider} from './PanelContext';
+import {PanelContextProvider, usePanelContext} from './PanelContext';
+import {ChildConfigContainer, ConfigSection} from './ConfigPanel';
 
 interface PanelEachColumnConfig {
   layoutMode: 'absolute' | 'flow';
@@ -146,6 +147,7 @@ export const PanelEachColumnConfigComp: React.FC<
   const config = props.config ?? PANEL_EACH_COLUMN_DEFAULT_CONFIG;
   const {updateChildPanelConfig, updateChildPanelConfig2} =
     usePanelEachColumnCommon(props);
+  const {dashboardConfigOptions} = usePanelContext();
 
   const newVars = useMemo(() => {
     const columnNameNode = varNode('string', '<string>');
@@ -159,17 +161,20 @@ export const PanelEachColumnConfigComp: React.FC<
   }, [props.input]);
 
   return (
-    <div style={{height: '100%'}}>
+    <ConfigSection label={`Properties`}>
+      {dashboardConfigOptions}
       <VariableView newVars={newVars} />
-      <PanelContextProvider newVars={newVars}>
-        <ChildPanelConfigComp
-          pathEl="render"
-          config={config.render}
-          updateConfig={updateChildPanelConfig}
-          updateConfig2={updateChildPanelConfig2}
-        />
-      </PanelContextProvider>
-    </div>
+      <ChildConfigContainer>
+        <PanelContextProvider newVars={newVars}>
+          <ChildPanelConfigComp
+            pathEl="render"
+            config={config.render}
+            updateConfig={updateChildPanelConfig}
+            updateConfig2={updateChildPanelConfig2}
+          />
+        </PanelContextProvider>
+      </ChildConfigContainer>
+    </ConfigSection>
   );
 };
 

@@ -1,4 +1,4 @@
-import {isOutputNode} from '@wandb/weave/core';
+import {ConstNode, isOutputNode} from '@wandb/weave/core';
 import * as React from 'react';
 import {createPortal} from 'react-dom';
 
@@ -36,6 +36,26 @@ export const Suggestions = (props: SuggestionProps) => {
     return null;
   }, [props.items, props.suggestionIndex]);
 
+  const activeOpAttrName = React.useMemo<string | undefined>(() => {
+    if (
+      props.items == null ||
+      props.suggestionIndex == null ||
+      props.items[props.suggestionIndex] == null
+    ) {
+      return undefined;
+    }
+
+    const newNodeOrOp = props.items[props.suggestionIndex].newNodeOrOp;
+    if (
+      isOutputNode(newNodeOrOp) &&
+      newNodeOrOp.fromOp.name.endsWith('__getattr__')
+    ) {
+      return (newNodeOrOp.fromOp.inputs.name as ConstNode).val;
+    }
+
+    return undefined;
+  }, [props.items, props.suggestionIndex]);
+
   trace(`Render Suggestions`, props, activeOpName, paneRef.current, showType);
 
   return createPortal(
@@ -62,7 +82,9 @@ export const Suggestions = (props: SuggestionProps) => {
           ))}
         </ul>
       </S.SuggestionPane>
-      {activeOpName && <S.StyledOpDoc opName={activeOpName} />}
+      {activeOpName && (
+        <S.StyledOpDoc opName={activeOpName} attributeName={activeOpAttrName} />
+      )}
     </S.SuggestionContainer>,
     document.body
   );

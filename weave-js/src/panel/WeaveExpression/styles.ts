@@ -26,7 +26,7 @@ export const EditableContainer = styled.div<{
     `}
 `;
 
-export const WeaveEditable = styled(Editable)`
+export const WeaveEditable = styled(Editable)<{truncate?: boolean}>`
   width: 100%;
   min-height: 20px;
   line-height: 20px;
@@ -38,32 +38,32 @@ export const WeaveEditable = styled(Editable)`
   user-select: text;
 
   &.invalid {
-    border-bottom: 1px dotted red;
+    border-bottom: 1px dotted ${globals.RED};
   }
 
   & span.identifier {
-    color: #d44c1c;
+    color: ${globals.MAGENTA};
   }
 
   span.property_identifier {
-    color: #9d624c;
+    color: ${globals.SIENNA_DARK};
   }
 
   & span.operator {
-    color: #9d624c;
+    color: ${globals.SIENNA_DARK};
   }
 
   & span.string {
-    color: #008a4b;
+    color: ${globals.TEAL};
   }
 
   & span.number,
   & span.null {
-    color: #008a4b;
+    color: ${globals.TEAL};
   }
 
   & span.boolean {
-    color: #008a4b;
+    color: ${globals.TEAL};
   }
 
   & span.ACTIVE_NODE {
@@ -75,6 +75,16 @@ export const WeaveEditable = styled(Editable)`
     display: none;
   }
   */
+
+  ${p =>
+    p.truncate &&
+    css`
+      & > div {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+    `}
 `;
 
 export const ApplyButton = styled(Button)`

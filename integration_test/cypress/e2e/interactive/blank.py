@@ -1,9 +1,6 @@
-import random
 import weave
-from weave.ecosystem import wandb
 
 weave.use_fixed_server_port()
+blank = weave.save(weave.panels.Board({}, []))
 
-items = weave.save([1])
-
-print(weave.show_url(items))
+print(weave.show_url(blank))

@@ -89,5 +89,5 @@ def get_frontend_url():
                 url = s.url
             else:
                 raise RuntimeError("Frontend server is not running")
-        url += "/__frontend/weave_jupyter"
+    url += "/__frontend/weave_jupyter"
     return url

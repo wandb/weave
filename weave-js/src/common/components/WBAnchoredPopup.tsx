@@ -209,3 +209,4 @@ export const WBAnchoredPopup = React.forwardRef<
     );
   }
 );
+WBAnchoredPopup.displayName = 'WBAnchoredPopup';

@@ -188,11 +188,8 @@ const PanelTableInnerConfigSetter: React.FC<
 > = props => {
   const weave = useWeaveContext();
   const {input, updateConfig, config} = props;
-  const {tableState, autoTable, allColumns, loading} = useAutomatedTableState(
-    input,
-    config.tableState,
-    weave
-  );
+  const {tableState, autoTable,  hasLoadedOnce} =
+    useAutomatedTableState(input, config.tableState, weave);
 
   const protectedUpdateConfig = React.useCallback(
     (configPatch: Partial<PanelTableConfig>) => {
@@ -218,7 +215,7 @@ const PanelTableInnerConfigSetter: React.FC<
 
   const [showColumnSelect, setShowColumnSelect] = React.useState(false);
 
-  if (loading) {
+  if (!hasLoadedOnce) {
     return <Panel2Loader />;
   }
 
@@ -227,7 +224,6 @@ const PanelTableInnerConfigSetter: React.FC<
       {...props}
       config={protectedConfig}
       autoTable={autoTable}
-      allColumns={allColumns}
       updateConfig={protectedUpdateConfig}
       showColumnSelect={showColumnSelect}
       setShowColumnSelect={setShowColumnSelect}
@@ -241,7 +237,6 @@ const PanelTableInner: React.FC<
     width: number;
     config: PanelTableConfig;
     autoTable: Table.TableState;
-    allColumns: string[];
     showColumnSelect: boolean;
     setShowColumnSelect: (value: boolean) => void;
     rowActions?: RowActionItems;
@@ -260,7 +255,6 @@ const PanelTableInner: React.FC<
     width,
     config,
     autoTable,
-    allColumns,
     showColumnSelect,
     setShowColumnSelect,
   } = props;
@@ -612,6 +606,7 @@ const PanelTableInner: React.FC<
         };
       }
     );
+    // Add a column for the row index, aka <IndexCell>
     columns.unshift({
       colId: '__controls__',
       key: 'controls',
@@ -881,9 +876,9 @@ const PanelTableInner: React.FC<
               onClose={() => setShowColumnSelect(false)}>
               <Modal.Content>
                 <ColumnSelector
+                  inputNode={props.input}
                   tableState={tableState}
                   update={updateTable}
-                  allColumnNames={allColumns}
                 />
               </Modal.Content>
               <Modal.Actions>
@@ -908,6 +903,7 @@ const PanelTableInner: React.FC<
       </div>
     );
   }, [
+    props.input,
     numVisibleRows,
     config.rowSize,
     props.config.simpleTable,
@@ -917,7 +913,6 @@ const PanelTableInner: React.FC<
     showColumnSelect,
     tableState,
     updateTable,
-    allColumns,
     setRowSize,
     updateIndexOffset,
     downloadDataAsCSV,
@@ -954,13 +949,22 @@ const PanelTableInner: React.FC<
   const onColumnResizeEnd: BaseTableProps<BaseTableDataType>['onColumnResizeEnd'] =
     useCallback(
       ({column, width: resizeWidth}) => {
+        if (props.config.simpleTable) {
+          return;
+        }
+        // TODO: make all these shiftIsPressed features discoverable!!!!
         if (shiftIsPressed) {
           setAllColumnWidths(resizeWidth);
         } else {
           setSingleColumnWidth(column.colId, resizeWidth);
         }
       },
-      [setSingleColumnWidth, setAllColumnWidths, shiftIsPressed]
+      [
+        props.config.simpleTable,
+        shiftIsPressed,
+        setAllColumnWidths,
+        setSingleColumnWidth,
+      ]
     );
 
   const setFilterFunction: React.ComponentProps<
@@ -985,9 +989,7 @@ const PanelTableInner: React.FC<
     <BaseTable
       ignoreFunctionInColumnCompare={false}
       ref={baseTableRef}
-      onColumnResizeEnd={
-        props.config.simpleTable ? undefined : onColumnResizeEnd
-      }
+      onColumnResizeEnd={onColumnResizeEnd}
       fixed
       width={width}
       height={height}
@@ -1021,7 +1023,7 @@ const PanelTableInner: React.FC<
         <div
           style={{
             textAlign: 'center',
-            position: 'absolute',
+            position: 'relative',
             width: '100%',
             height: `${
               height -

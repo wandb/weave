@@ -196,6 +196,8 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
         return LocalArtifact(self.name, version)
 
     def _setup_dirs(self):
+        # NOTE: do not write to the filesystem here! This is called to construct
+        # an artifact that may not exist or ever be read or written to.
         self._write_dirname = os.path.join(
             self._root, f"{WORKING_DIR_PREFIX}-{util.rand_string_n(12)}"
         )
@@ -223,7 +225,6 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
                     self._branch,
                 )
             )
-        self._makedir(self._write_dirname)
 
     def _get_read_path(self, path: str) -> pathlib.Path:
         read_dirname = pathlib.Path(self._read_dirname)
@@ -334,6 +335,7 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
             return obj
 
     def write_metadata(self, dirname, metadata):
+        self._makedir(dirname)
         with file_util.safe_open(
             os.path.join(dirname, ".artifact-version.json"), "w"
         ) as f:
@@ -368,7 +370,8 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
                 os.rename(self._write_dirname, new_dirname)
             except OSError:
                 # Someone already created this version.
-                shutil.rmtree(self._write_dirname)
+                if os.path.exists(self._write_dirname):
+                    shutil.rmtree(self._write_dirname)
         else:
             # read-modify-write of existing version, so copy existing
             # files into new dir first, then overwrite with new files
@@ -384,18 +387,20 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
                         shutil.copytree(src_path, target_path)
                     else:
                         shutil.copyfile(src_path, target_path)
-            for path in os.listdir(self._write_dirname):
-                src_path = os.path.join(self._write_dirname, path)
-                target_path = os.path.join(tmpdir, path)
-                if os.path.isdir(src_path):
-                    shutil.copytree(src_path, target_path, dirs_exist_ok=True)
-                else:
-                    shutil.copyfile(src_path, target_path)
+            if os.path.exists(self._write_dirname):
+                for path in os.listdir(self._write_dirname):
+                    src_path = os.path.join(self._write_dirname, path)
+                    target_path = os.path.join(tmpdir, path)
+                    if os.path.isdir(src_path):
+                        shutil.copytree(src_path, target_path, dirs_exist_ok=True)
+                    else:
+                        shutil.copyfile(src_path, target_path)
             try:
                 os.rename(tmpdir, new_dirname)
             except OSError:
                 shutil.rmtree(tmpdir)
-            shutil.rmtree(self._write_dirname)
+            if os.path.exists(self._write_dirname):
+                shutil.rmtree(self._write_dirname)
 
         if branch is None:
             branch = self._branch

@@ -1,6 +1,38 @@
 import csv
+import pyarrow as pa
+import pyarrow.csv as pa_csv
 from .. import api as weave
 from .. import file_base
+
+
+def sniff_dialect(path: str) -> type[csv.Dialect]:
+    with open(path, newline="") as csvfile:
+        dialect = csv.Sniffer().sniff(csvfile.read(100 * 1024))
+        return dialect
+
+
+def dialect_to_pyarrow_options(
+    dialect: type[csv.Dialect],
+) -> tuple[pa_csv.ReadOptions, pa_csv.ParseOptions]:
+    # Convert a csv.Dialect object to the corresponding pyarrow options.
+    read_options = pa_csv.ReadOptions()
+    parse_options = pa_csv.ParseOptions(
+        delimiter=dialect.delimiter,
+        quote_char=dialect.quotechar,
+        double_quote=dialect.doublequote,
+        escape_char=dialect.escapechar,
+        newlines_in_values=True,
+    )
+    return read_options, parse_options
+
+
+def read_csv_with_dialect(path: str) -> pa.Table:
+    dialect = sniff_dialect(path)
+    read_options, parse_options = dialect_to_pyarrow_options(dialect)
+    table = pa_csv.read_csv(
+        path, read_options=read_options, parse_options=parse_options
+    )
+    return table
 
 
 def convert_type(val):

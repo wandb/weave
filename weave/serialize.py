@@ -7,6 +7,8 @@ import hashlib
 import json
 import random
 
+from . import value_or_error
+
 
 from . import graph
 from . import weave_types as types
@@ -198,7 +200,9 @@ def _deserialize_node(
     return parsed_node
 
 
-def deserialize(serialized: SerializedReturnType) -> "list[graph.Node]":
+def deserialize(
+    serialized: SerializedReturnType,
+) -> value_or_error.ValueOrErrors[graph.Node]:
     # For some reason what javascript sends isn't guaranteed to be sorted
     # along the graph topology. If it were we could do an easy linear
     # implementation. But its not so we recurse for now.
@@ -213,8 +217,9 @@ def deserialize(serialized: SerializedReturnType) -> "list[graph.Node]":
     # This ensures we don't execute the same node many times.
     hashed_nodes: dict[str, graph.Node] = {}
 
+    target_node_values = value_or_error.ValueOrErrors.from_values(target_nodes)
+
     with memo.memo_storage():
-        return [
-            _deserialize_node(i, nodes, parsed_nodes, hashed_nodes)
-            for i in target_nodes
-        ]
+        return target_node_values.safe_map(
+            lambda i: _deserialize_node(i, nodes, parsed_nodes, hashed_nodes)
+        )

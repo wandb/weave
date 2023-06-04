@@ -1,4 +1,5 @@
 from __future__ import print_function
+import dataclasses
 
 import typing
 import logging
@@ -15,6 +16,7 @@ import pprint
 
 
 from weave.language_features.tagging.tag_store import isolated_tagging_context
+from . import value_or_error
 
 from . import execute
 from . import serialize
@@ -51,7 +53,9 @@ OptionalAuthType = typing.Optional[
 logger = logging.getLogger("root")
 
 
-def handle_request(request, deref=False, serialize_fn=storage.to_python):
+def handle_request(
+    request, deref=False, serialize_fn=storage.to_python
+) -> value_or_error.ValueOrErrors[dict[str, typing.Any]]:
     start_time = time.time()
     tracer = engine_trace.tracer()
     # nodes = [graph.Node.node_from_json(n) for n in request["graphs"]]
@@ -61,13 +65,15 @@ def handle_request(request, deref=False, serialize_fn=storage.to_python):
     with tracer.trace("request:execute"):
         with execute.top_level_stats() as stats:
             with context.execution_client():
-                result = execute.execute_nodes(nodes)
+                result = nodes.batch_map(execute.execute_nodes)
     with tracer.trace("request:deref"):
         if deref:
-            result = [
-                r if isinstance(n.type, weave_types.RefType) else storage.deref(r)
-                for (n, r) in zip(nodes, result)
-            ]
+            result = result.zip(nodes).safe_map(
+                lambda t: t[0]
+                if isinstance(t[1].type, weave_types.RefType)
+                else storage.deref(t[0])
+            )
+
     # print("Server request %s (%0.5fs): %s..." % (start_time,
     #                                              time.time() - start_time, [n.from_op.name for n in nodes[:3]]))
 
@@ -77,7 +83,7 @@ def handle_request(request, deref=False, serialize_fn=storage.to_python):
     with tracer.trace("serialize_response"):
         with isolated_tagging_context():
             with wandb_api.from_environment():
-                result = [serialize_fn(r) for r in result]
+                result = result.safe_map(serialize_fn)
 
     logger.info("Server request done in: %ss" % (time.time() - start_time))
     return result
@@ -93,7 +99,7 @@ class SubprocessServer(multiprocessing.Process):
         while True:
             req = self.req_queue.get()
             try:
-                resp = handle_request(req)
+                resp = handle_request(req).unwrap()
                 self.resp_queue.put(resp)
             except:
                 print("Weave subprocess server error")
@@ -127,7 +133,7 @@ class InProcessServer(object):
         pass
 
     def execute(self, nodes, no_cache=False):
-        return execute.execute_nodes(nodes, no_cache=no_cache)
+        return execute.execute_nodes(nodes, no_cache=no_cache).unwrap()
 
 
 class HttpServerClient(object):

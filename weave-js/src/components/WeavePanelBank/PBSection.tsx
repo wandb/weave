@@ -64,12 +64,14 @@ export const PBSection: React.FC<PBSectionProps> = props => {
                         height: '100%',
                       }}
                       className="editable-panel">
-                      <DragHandle
-                        key={`draghandle-${panelRef.id}`}
-                        className="draggable-handle"
-                        partRef={panelRef}>
-                        <LegacyWBIcon title="" name="handle" />
-                      </DragHandle>
+                      {props.mode === 'grid' && (
+                        <DragHandle
+                          key={`draghandle-${panelRef.id}`}
+                          className="draggable-handle"
+                          partRef={panelRef}>
+                          <LegacyWBIcon title="" name="handle" />
+                        </DragHandle>
+                      )}
                       {props.renderPanel(panelRef)}
                     </div>
                   )}
@@ -97,8 +99,8 @@ export const getSectionConfig = (
     isOpen: true,
     flowConfig: {
       snapToColumns: true,
-      columnsPerPage: 3,
-      rowsPerPage: 2,
+      columnsPerPage: 2,
+      rowsPerPage: 1,
       gutterWidth: 0,
       boxWidth: 64,
       boxHeight: 64,

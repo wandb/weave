@@ -17,7 +17,7 @@ from ..ops_primitives import list_ as primitive_list
 from .. import op_def
 
 from .arrow import ArrowWeaveListType, arrow_as_array, offsets_starting_at_zero
-from .list_ import ArrowWeaveList, PathType
+from .list_ import ArrowWeaveList, PathType, is_list_arrowweavelist
 from . import arrow_tags
 from .vectorize import _apply_fn_node_with_tag_pushdown
 from . import convert
@@ -36,7 +36,8 @@ NestedTableColumns = dict[str, typing.Union[dict, pa.ChunkedArray]]
 def unflatten_structs_in_flattened_table(table: pa.Table) -> pa.Table:
     """take a table with column names like {a.b.c: [1,2,3], a.b.d: [4,5,6], a.e: [7,8,9]}
     and return a struct array with the following structure:
-    [ {a: {b: {c: 1, d: 4}, e: 7}}, {a: {b: {c: 2, d: 5}, e: 8}}, {a: {b: {c: 3, d: 6}, e: 9}} ]"""
+    [ {a: {b: {c: 1, d: 4}, e: 7}}, {a: {b: {c: 2, d: 5}, e: 8}}, {a: {b: {c: 3, d: 6}, e: 9}} ]
+    """
 
     def recursively_build_nested_struct_array(
         columns: dict[str, pa.Array]
@@ -864,4 +865,35 @@ def sample(self, n):
         new_arrow_data,
         self.object_type,
         self._artifact,
+    )
+
+
+def flatten_return_object_type(object_type):
+    if types.is_list_like(object_type):
+        object_type = object_type.object_type
+    return object_type
+
+
+def flatten_return_type(input_types):
+    return ArrowWeaveListType(
+        flatten_return_object_type(input_types["arr"].object_type)
+    )
+
+
+@op(
+    name="ArrowWeaveList-flatten",
+    input_type={"arr": ArrowWeaveListType()},
+    output_type=flatten_return_type,
+)
+def flatten(arr):
+    # TODO:
+    #   - handle N levels instead of 1
+    #   - handle tags
+    arrow_data = arr._arrow_data
+    if is_list_arrowweavelist(arr):
+        arrow_data = arrow_data.flatten()
+    return ArrowWeaveList(
+        arrow_data,
+        flatten_return_object_type(arr.object_type),
+        arr._artifact,
     )

@@ -12,8 +12,11 @@ export interface WeaveExpressionProps {
   setExpression?: (expr: NodeOrVoidNode) => void;
   noBox?: boolean;
   onMount?: (editor: Editor) => void;
+  onFocus?: () => void;
+  onBlur?: () => void;
 
   liveUpdate?: boolean;
+  truncate?: boolean;
 }
 
 export interface SuggestionProps {

@@ -61,11 +61,14 @@ def wb_gql_op_plugin(
 # special op that calls such query and constructs the correct type. It makes heavy use of the
 # `stitch` module to do this. Moreover, all GQL is zipped and deduped so that the minimum request
 # is made to the server. See the helper functions below for more details.
-def apply_domain_op_gql_translation(leaf_nodes: list[graph.Node]) -> list[graph.Node]:
+def apply_domain_op_gql_translation(
+    leaf_nodes: list[graph.Node], on_error: graph.OnErrorFnType = None
+) -> list[graph.Node]:
     # Only apply this transformation at least one of the leaf nodes is a root node
     if not graph.filter_nodes_full(leaf_nodes, _is_root_node):
         return leaf_nodes
-    p = stitch.stitch(leaf_nodes)
+
+    p = stitch.stitch(leaf_nodes, on_error=on_error)
 
     query_str_const_node = graph.ConstNode(types.String(), "")
     alias_list_const_node = graph.ConstNode(types.List(types.String()), [])
@@ -103,7 +106,7 @@ def apply_domain_op_gql_translation(leaf_nodes: list[graph.Node]) -> list[graph.
                 },
             )
 
-    res = graph.map_nodes_full(leaf_nodes, _replace_with_merged_gql)
+    res = graph.map_nodes_full(leaf_nodes, _replace_with_merged_gql, on_error)
 
     combined_query_fragment = "\n".join(fragments)
     query_str_const_node.val = _normalize_query_str(

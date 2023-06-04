@@ -70,7 +70,8 @@ export const WeaveExpression: React.FC<WeaveExpressionProps> = props => {
     editor,
     exprIsModified,
     isValid,
-    isFocused
+    isFocused,
+    props.truncate
   );
 
   // Store the editor on the window, so we can modify its state
@@ -217,6 +218,7 @@ export const WeaveExpression: React.FC<WeaveExpressionProps> = props => {
             renderLeaf={leafProps => <Leaf {...leafProps} />}
             style={{overflowWrap: 'anywhere'}}
             scrollSelectionIntoView={() => {}} // no-op to disable Slate's default scroll behavior when dragging an overflowed element
+            truncate={props.truncate}
           />
           {!props.liveUpdate && (
             <Ref

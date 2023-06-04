@@ -1,4 +1,3 @@
-import * as globals from '@wandb/weave/common/css/globals.styles';
 import {
   constNodeUnsafe,
   dereferenceAllVars,
@@ -8,7 +7,6 @@ import {
   replaceChainRoot,
   Stack,
   voidNode,
-  Weave,
 } from '@wandb/weave/core';
 import produce, {Draft} from 'immer';
 import * as _ from 'lodash';
@@ -16,7 +14,6 @@ import React, {useCallback, useMemo} from 'react';
 import {Button} from 'semantic-ui-react';
 import styled, {css} from 'styled-components';
 
-import {useWeaveContext} from '../../context';
 import {IdObj, PanelBankSectionConfig} from '../WeavePanelBank/panelbank';
 import {getSectionConfig, PBSection} from '../WeavePanelBank/PBSection';
 import {getPanelStacksForType} from './availablePanels';
@@ -55,7 +52,7 @@ export interface PanelGroupConfig {
   showExpressions?: boolean;
   style?: string;
   items: {[key: string]: ChildPanelConfig};
-  gridConfig?: PanelBankSectionConfig;
+  gridConfig: PanelBankSectionConfig;
   allowedPanels?: string[];
   enableAddPanel?: boolean;
   childNameBase?: string;
@@ -66,6 +63,7 @@ export const PANEL_GROUP_DEFAULT_CONFIG = (): PanelGroupConfig => ({
   equalSize: true,
   showExpressions: true,
   items: {},
+  gridConfig: getSectionConfig([], undefined),
 });
 
 const inputType = 'any';
@@ -191,8 +189,7 @@ export const panelIdAlternativeMapping: {[jsId: string]: string} = {
 };
 
 export const fixChildData = (
-  fullItem: ChildPanelFullConfig,
-  weave: Weave
+  fullItem: ChildPanelFullConfig
 ): ChildPanelFullConfig => {
   if (isGroupNode(fullItem)) {
     return {
@@ -203,7 +200,7 @@ export const fixChildData = (
           : {
               ...fullItem.config,
               items: _.mapValues(fullItem.config.items, item =>
-                fixChildData(getFullChildPanel(item), weave)
+                fixChildData(getFullChildPanel(item))
               ),
             },
     };
@@ -211,7 +208,7 @@ export const fixChildData = (
   return fullItem;
 };
 
-function dereferenceItemVars(item: any, stack: Stack, weave: Weave): any {
+function dereferenceItemVars(item: any, stack: Stack): any {
   // We fully dereference variables found with panels here. Because on the server
   // we end up with const(Panel).config... we need any expressions fetched in that
   // way to be executable (no variables present).
@@ -228,13 +225,13 @@ function dereferenceItemVars(item: any, stack: Stack, weave: Weave): any {
         item.config == null
           ? undefined
           : _.mapValues(item.config, child =>
-              dereferenceItemVars(child, childStack, weave)
+              dereferenceItemVars(child, childStack)
             ),
     };
   } else if (isNodeOrVoidNode(item)) {
     return dereferenceAllVars(item, stack).node;
   } else if (_.isPlainObject(item)) {
-    return _.mapValues(item, child => dereferenceItemVars(child, stack, weave));
+    return _.mapValues(item, child => dereferenceItemVars(child, stack));
   }
   return item;
 }
@@ -242,7 +239,6 @@ function dereferenceItemVars(item: any, stack: Stack, weave: Weave): any {
 export function makeItemNode(
   item: ChildPanelConfig,
   stack: Stack,
-  weave: Weave,
   allowedPanels: string[] | undefined
 ): NodeOrVoidNode {
   let fullItem = getFullChildPanel(item);
@@ -260,38 +256,71 @@ export function makeItemNode(
     config: curPanelId === fullItem.id ? fullItem.config : undefined,
     _renderAsPanel: fullItem?.config?._renderAsPanel,
   } as any;
-  fullItem = fixChildData(fullItem, weave);
+  fullItem = fixChildData(fullItem);
 
   // Walk through the value, dereferencing encountered variables.
-  fullItem = dereferenceItemVars(fullItem, stack, weave);
+  fullItem = dereferenceItemVars(fullItem, stack);
 
   const weaveType = toWeaveType(fullItem);
   return constNodeUnsafe(weaveType, fullItem);
 }
 
-function getItemVars(
+export function getItemVars(
   varName: string,
   item: ChildPanelConfig,
   stack: Stack,
-  weave: Weave,
   allowedPanels: string[] | undefined
 ): {[name: string]: NodeOrVoidNode} {
   const fullItem = getFullChildPanel(item);
   if (isGroupNode(fullItem)) {
     // Recursive group variables are hoisted
     const result = _.mapValues(fullItem.config.items, i =>
-      makeItemNode(i, stack, weave, fullItem.config.allowedPanels)
+      makeItemNode(i, stack, fullItem.config.allowedPanels)
     );
     // some of the notebooks have not been updated to fetch nested
     // variables instead of accessing from the sidebar, so leaving this
     // here for now.
-    result[varName] = makeItemNode(fullItem, stack, weave, allowedPanels);
+    result[varName] = makeItemNode(fullItem, stack, allowedPanels);
     return result;
   }
   return {
-    [varName]: makeItemNode(fullItem, stack, weave, allowedPanels),
+    [varName]: makeItemNode(fullItem, stack, allowedPanels),
   };
 }
+
+export const addPanelToGroupConfig = (
+  currentConfig: PanelGroupConfig,
+  allowedPanels?: string[],
+  childNameBase?: string
+) => {
+  let panelId = '';
+  if (allowedPanels != null) {
+    panelId = allowedPanels[0];
+  }
+  return produce(currentConfig, draft => {
+    draft.items[
+      nextPanelName(Object.keys(currentConfig.items), childNameBase)
+    ] = {
+      vars: {},
+      id: panelId,
+      input_node: voidNode(),
+      config: undefined,
+    };
+    if (currentConfig.layoutMode === 'flow') {
+      // If there is only one panel, and one row and column, add a second
+      // column. This is a nice behavior in notebooks.
+      const nRows = currentConfig.gridConfig?.flowConfig.rowsPerPage ?? 1;
+      const nCols = currentConfig.gridConfig?.flowConfig.columnsPerPage ?? 1;
+      if (
+        Object.keys(currentConfig.items).length === 1 &&
+        nRows === 1 &&
+        nCols === 1
+      ) {
+        draft.gridConfig.flowConfig.columnsPerPage = 2;
+      }
+    }
+  });
+};
 
 const usePanelGroupCommon = (props: PanelGroupProps) => {
   const {updateConfig2} = props;
@@ -301,23 +330,11 @@ const usePanelGroupCommon = (props: PanelGroupProps) => {
 
   const handleAddPanel = useCallback(() => {
     updateConfig2(currentConfig => {
-      let panelId = '';
-      if (props.config?.allowedPanels != null) {
-        panelId = props.config.allowedPanels[0];
-      }
-      return produce(currentConfig, draft => {
-        draft.items[
-          nextPanelName(
-            Object.keys(currentConfig.items),
-            props.config?.childNameBase
-          )
-        ] = {
-          vars: {},
-          id: panelId,
-          input_node: voidNode(),
-          config: undefined,
-        };
-      });
+      return addPanelToGroupConfig(
+        currentConfig,
+        props.config?.allowedPanels,
+        props.config?.childNameBase
+      );
     });
   }, [props.config?.allowedPanels, props.config?.childNameBase, updateConfig2]);
 
@@ -325,11 +342,10 @@ const usePanelGroupCommon = (props: PanelGroupProps) => {
 };
 
 export const PanelGroupConfigComponent: React.FC<PanelGroupProps> = props => {
-  const weave = useWeaveContext();
   const {handleAddPanel} = usePanelGroupCommon(props);
   const config = props.config ?? PANEL_GROUP_DEFAULT_CONFIG();
   const {updateConfig, updateConfig2} = props;
-  const {path, selectedPath, stack} = usePanelContext();
+  const {path, selectedPath, stack, dashboardConfigOptions} = usePanelContext();
   let newVars: {[name: string]: NodeOrVoidNode} = {};
 
   const pathStr = path.join('.');
@@ -337,7 +353,7 @@ export const PanelGroupConfigComponent: React.FC<PanelGroupProps> = props => {
 
   const curPanelSelected = pathStr.startsWith(selectedPathStr);
 
-  // We are selected.  Render our config
+  // We are selected. Render our config.
   // if (curPanelSelected) {
   //   return (
   //     <>
@@ -420,7 +436,6 @@ export const PanelGroupConfigComponent: React.FC<PanelGroupProps> = props => {
         name,
         item,
         pushFrame(stack, newVars),
-        weave,
         config.allowedPanels
       ),
     };
@@ -428,21 +443,24 @@ export const PanelGroupConfigComponent: React.FC<PanelGroupProps> = props => {
     return renderedItem;
   });
 
-  // One of our descendants is selected.  Render children only
+  if (!curPanelSelected) {
+    // One of our descendants is selected.  Render children only
+    return <>{childrenConfig}</>;
+  }
+
+  // We are selected. Render our config.
   return (
     <>
-      {curPanelSelected && (
-        <>
-          <ConfigPanel.ConfigOption label="layout">
-            <ConfigPanel.ModifiedDropdownConfigField
-              options={LAYOUT_MODES.map(m => ({key: m, value: m, text: m}))}
-              value={config.layoutMode}
-              onChange={(e, {value}) =>
-                updateConfig({layoutMode: value as any})
-              }
-            />
-          </ConfigPanel.ConfigOption>
-          {/* <ConfigPanel.ConfigOption label="Equal size">
+      <ConfigPanel.ConfigSection label={`Properties`}>
+        {dashboardConfigOptions}
+        <ConfigPanel.ConfigOption label="layout">
+          <ConfigPanel.ModifiedDropdownConfigField
+            options={LAYOUT_MODES.map(m => ({key: m, value: m, text: m}))}
+            value={config.layoutMode}
+            onChange={(e, {value}) => updateConfig({layoutMode: value as any})}
+          />
+        </ConfigPanel.ConfigOption>
+        {/* <ConfigPanel.ConfigOption label="Equal size">
           <Checkbox
             checked={config.equalSize ?? false}
             onChange={(e, {checked}) => updateConfig({equalSize: !!checked})}
@@ -456,7 +474,7 @@ export const PanelGroupConfigComponent: React.FC<PanelGroupProps> = props => {
             }
           />
         </ConfigPanel.ConfigOption> */}
-          {/* <ConfigPanel.ConfigOption label="Style">
+        {/* <ConfigPanel.ConfigOption label="Style">
           <ConfigPanel.TextInputConfigField
             dataTest={`style`}
             value={config.style ?? ''}
@@ -468,36 +486,18 @@ export const PanelGroupConfigComponent: React.FC<PanelGroupProps> = props => {
             }}
           />
         </ConfigPanel.ConfigOption> */}
-        </>
-      )}
-      {curPanelSelected ? (
-        <ChildConfigContainer>{childrenConfig}</ChildConfigContainer>
-      ) : (
-        childrenConfig
-      )}
-      {curPanelSelected && (
+        <ConfigPanel.ChildConfigContainer>
+          {childrenConfig}
+        </ConfigPanel.ChildConfigContainer>
+      </ConfigPanel.ConfigSection>
+      <ConfigPanel.ConfigSection>
         <Button size="mini" onClick={handleAddPanel}>
           Add Child
         </Button>
-      )}
+      </ConfigPanel.ConfigSection>
     </>
   );
 };
-
-const ChildConfigContainer = styled.div`
-  position: relative;
-  padding-left: 2px;
-
-  &:before {
-    content: '';
-    position: absolute;
-    top: 12px;
-    bottom: 12px;
-    left: 0;
-    width: 2px;
-    background-color: ${globals.GRAY_350};
-  }
-`;
 
 export const PanelGroupItem: React.FC<{
   item: ChildPanelConfig;
@@ -609,7 +609,6 @@ const useSectionConfig = (
 };
 
 export const PanelGroup: React.FC<PanelGroupProps> = props => {
-  const weave = useWeaveContext();
   const config = props.config ?? PANEL_GROUP_DEFAULT_CONFIG();
   const {stack} = usePanelContext();
   const {updateConfig, updateConfig2} = props;
@@ -723,18 +722,11 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
       keyedChildPanels[name] = unwrappedItem;
       newVars = {
         ...newVars,
-        ...getItemVars(name, item, stack, weave, config.allowedPanels),
+        ...getItemVars(name, item, stack, config.allowedPanels),
       };
     });
     return keyedChildPanels;
-  }, [
-    config,
-    handleSiblingVarEvent,
-    stack,
-    updateConfig,
-    updateConfig2,
-    weave,
-  ]);
+  }, [config, handleSiblingVarEvent, stack, updateConfig, updateConfig2]);
   const {gridConfig, updateGridConfig2} = useSectionConfig(
     props.config,
     updateConfig2
@@ -748,7 +740,7 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
 
   if (config.layoutMode === 'grid' || config.layoutMode === 'flow') {
     return (
-      <div style={{position: 'relative'}}>
+      <>
         <PBSection
           mode={config.layoutMode}
           config={gridConfig}
@@ -763,7 +755,7 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
             +
           </Button>
         )}
-      </div>
+      </>
     );
   }
 

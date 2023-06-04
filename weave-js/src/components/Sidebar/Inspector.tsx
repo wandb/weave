@@ -27,4 +27,5 @@ export const Container = styled.div<{active: boolean}>`
 
 export const Content = styled.div`
   width: ${WIDTH_PX}px;
+  height: 100%;
 `;

@@ -14,6 +14,13 @@ class NoResult:
     pass
 
 
+class ErrorResult:
+    error: Exception
+
+    def __init__(self, error: Exception) -> None:
+        self.error = error
+
+
 class NodeResultStore:
     _from_store: typing.Optional[collections.defaultdict[graph.OutputNode, typing.Any]]
     _store: collections.defaultdict[graph.OutputNode, typing.Any]

@@ -453,10 +453,17 @@
     .drop-preview {
       border: 1px dashed @darkBlue;
       position: absolute;
-      background: @lightBlue;
-      // background: white;
-      opacity: 0.5;
+      background: fade(@lightBlue, 50%);
       z-index: 98;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      .resize-preview-message {
+        border: 1px solid @darkBlue;
+        padding: 0.2rem 0.6rem;
+        border-radius: 4px;
+        background: @white;
+      }
     }
     .drop-preview {
       pointer-events: none;
@@ -544,6 +551,7 @@
       .react-resizable-handle {
         visibility: hidden;
         z-index: 98;
+        transform: scale(2,2)
       }
       &:hover,
       &.resizing {

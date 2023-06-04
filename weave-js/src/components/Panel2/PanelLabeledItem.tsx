@@ -73,14 +73,15 @@ export const PanelLabeledItemConfigComponent: React.FC<
     [config, updateConfig]
   );
 
-  const {path, selectedPath} = usePanelContext();
+  const {path, selectedPath, dashboardConfigOptions} = usePanelContext();
   const pathStr = path.join('.');
   const selectedPathStr = selectedPath?.join('.') ?? '';
 
   if (pathStr === selectedPathStr) {
     // We are selected, render our config
     return (
-      <div>
+      <ConfigPanel.ConfigSection label={`Properties`}>
+        {dashboardConfigOptions}
         <ConfigPanel.ConfigOption label="Label">
           <ConfigPanel.TextInputConfigField
             dataTest={`label`}
@@ -93,7 +94,7 @@ export const PanelLabeledItemConfigComponent: React.FC<
             }}
           />
         </ConfigPanel.ConfigOption>
-      </div>
+      </ConfigPanel.ConfigSection>
     );
   }
 

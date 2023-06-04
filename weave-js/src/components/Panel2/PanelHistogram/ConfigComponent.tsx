@@ -1,12 +1,18 @@
 import React from 'react';
 
-import {ConfigOption, ModifiedDropdownConfigField} from '../ConfigPanel';
+import {
+  ConfigOption,
+  ConfigSection,
+  ModifiedDropdownConfigField,
+} from '../ConfigPanel';
 import {defaultConfig, PanelHistogramProps} from './common';
+import {usePanelContext} from '../PanelContext';
 
 /* eslint-disable no-template-curly-in-string */
 
 const PanelHistogramConfig: React.FC<PanelHistogramProps> = props => {
   const {updateConfig} = props;
+  const {dashboardConfigOptions} = usePanelContext();
   const config = props.config ?? defaultConfig();
   // TODO(np): Need to fix upstream bug where we are getting var node n
   // here
@@ -69,7 +75,8 @@ const PanelHistogramConfig: React.FC<PanelHistogramProps> = props => {
     );
 
   return (
-    <>
+    <ConfigSection label={`Properties`}>
+      {dashboardConfigOptions}
       <ConfigOption label={'Bin mode'}>
         <ModifiedDropdownConfigField
           selection
@@ -136,7 +143,7 @@ const PanelHistogramConfig: React.FC<PanelHistogramProps> = props => {
           }}
         />
       </ConfigOption>
-    </>
+    </ConfigSection>
   );
 };
 
