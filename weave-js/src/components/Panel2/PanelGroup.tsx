@@ -34,8 +34,16 @@ import {LayoutTabs} from './LayoutTabs';
 import * as Panel2 from './panel';
 import {ExpressionEvent, PanelContextProvider} from './PanelContext';
 import {usePanelContext} from './PanelContext';
-import {useSetPanelInputExprIsHighlighted} from './PanelInteractContext';
+import {
+  useSetInspectingPanel,
+  useSetPanelInputExprIsHighlighted,
+} from './PanelInteractContext';
 import {isGroupNode, nextPanelName} from './panelTree';
+import {IconButton} from '../IconButton';
+import {IconAddNew as IconAddNewUnstyled, IconPencilEdit} from './Icons';
+import {WBButton} from '../../common/components/elements/WBButtonNew';
+import {Tooltip} from '../Tooltip';
+import {VarBar} from '../Sidebar/VarBar';
 
 const LAYOUT_MODES = [
   'horizontal' as const,
@@ -140,6 +148,26 @@ export const GroupItem = styled.div<{
           width: 100%;
           margin-bottom: 12px;
         `}
+`;
+
+const ActionBar = styled.div`
+  height: 48px;
+  padding: 0 32px;
+  flex-shrink: 0;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+`;
+
+const IconAddNew = styled(IconAddNewUnstyled)`
+  width: 18px;
+  height: 18px;
+  margin-right: 6px;
+`;
+
+const PBContainer = styled.div`
+  position: relative;
+  height: calc(100% - 48px);
 `;
 
 // This is a mapping from JS PanelIDs to their corresponding Python type name
@@ -735,8 +763,9 @@ const useSectionConfig = (
 
 export const PanelGroup: React.FC<PanelGroupProps> = props => {
   const config = props.config ?? PANEL_GROUP_DEFAULT_CONFIG();
-  const {stack} = usePanelContext();
+  const {stack, path: groupPath} = usePanelContext();
   const {updateConfig, updateConfig2} = props;
+  const setInspectingPanel = useSetInspectingPanel();
 
   if (updateConfig2 == null) {
     // For dev only
@@ -794,7 +823,6 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
     throw new Error('Could not find item path for ' + name);
   };
 
-  const {path: groupPath} = usePanelContext();
   const setPanelIsHighlightedByPath = useSetPanelInputExprIsHighlighted();
   const setItemIsHighlighted = useCallback(
     (name: string, isHighlighted: boolean) => {
@@ -863,23 +891,49 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
     [childPanelsByKey]
   );
 
+  // TODO: This special-case rendering is insane
+  const isVarBar = _.isEqual(groupPath, [`sidebar`]);
+  if (isVarBar) {
+    return (
+      <VarBar
+        config={config}
+        updateConfig={updateConfig}
+        handleSiblingVarEvent={handleSiblingVarEvent}
+        stack={stack}
+        handleAddVar={handleAddPanel}
+      />
+    );
+  }
+
   if (config.layoutMode === 'grid' || config.layoutMode === 'flow') {
     return (
       <>
-        <PBSection
-          mode={config.layoutMode}
-          config={gridConfig}
-          updateConfig2={updateGridConfig2}
-          renderPanel={renderSectionPanel}
-        />
-        {config.enableAddPanel && (
-          <Button
-            size="tiny"
-            style={{position: 'absolute', top: 0, right: 0}}
-            onClick={handleAddPanel}>
-            +
-          </Button>
-        )}
+        <ActionBar>
+          <Tooltip
+            position="bottom right"
+            trigger={
+              <IconButton onClick={() => setInspectingPanel(groupPath)}>
+                <IconPencilEdit />
+              </IconButton>
+            }>
+            Open panel editor
+          </Tooltip>
+          {config.enableAddPanel && (
+            <WBButton onClick={handleAddPanel}>
+              <IconAddNew />
+              New panel
+            </WBButton>
+          )}
+        </ActionBar>
+        <PBContainer>
+          <PBSection
+            mode={config.layoutMode}
+            config={gridConfig}
+            updateConfig2={updateGridConfig2}
+            renderPanel={renderSectionPanel}
+            handleAddPanel={config.enableAddPanel ? handleAddPanel : undefined}
+          />
+        </PBContainer>
       </>
     );
   }

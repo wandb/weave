@@ -15,6 +15,9 @@ import {IdObj, PANEL_BANK_PADDING, PanelBankSectionConfig} from './panelbank';
 import {PanelBankFlowSection} from './PanelBankFlowSection';
 import {getNewGridItemLayout} from './panelbankGrid';
 import {PanelBankGridSection} from './PanelBankGridSection';
+import styled from 'styled-components';
+import {GRAY_25, GRAY_500} from '../../common/css/globals.styles';
+import {IconAddNew as IconAddNewUnstyled} from '../Panel2/Icons';
 
 interface PBSectionProps {
   mode: 'grid' | 'flow';
@@ -23,10 +26,11 @@ interface PBSectionProps {
     fn: (config: PanelBankSectionConfig) => PanelBankSectionConfig
   ) => void;
   renderPanel: (panelRef: IdObj) => React.ReactNode;
+  handleAddPanel?: () => void;
 }
 
 export const PBSection: React.FC<PBSectionProps> = props => {
-  const {config, updateConfig2} = props;
+  const {config, updateConfig2, handleAddPanel} = props;
   const [panelBankWidth, setPanelBankWidth] = useState(0);
   const [panelBankHeight, setPanelBankHeight] = useState(0);
   const PanelBankSectionComponent =
@@ -79,6 +83,14 @@ export const PBSection: React.FC<PBSectionProps> = props => {
                     console.log('MOVE BETWEEN SECTIONS');
                   }}
                 />
+                {handleAddPanel != null && (
+                  <AddPanelBarContainer>
+                    <AddPanelBar onClick={handleAddPanel}>
+                      <IconAddNew />
+                      New panel
+                    </AddPanelBar>
+                  </AddPanelBarContainer>
+                )}
               </div>
             </div>
           )}
@@ -124,3 +136,30 @@ export const getSectionConfig = (
     });
   });
 };
+
+const AddPanelBar = styled.div`
+  height: 48px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  border-radius: 6px;
+  background-color: ${GRAY_25};
+  font-weight: 600;
+  color: ${GRAY_500};
+`;
+
+const AddPanelBarContainer = styled.div`
+  padding: 8px 32px 16px;
+
+  transition: opacity 0.3s;
+  &:not(:hover) {
+    opacity: 0;
+  }
+`;
+
+const IconAddNew = styled(IconAddNewUnstyled)`
+  width: 18px;
+  height: 18px;
+  margin-right: 8px;
+`;

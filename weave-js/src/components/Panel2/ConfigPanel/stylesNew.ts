@@ -12,6 +12,14 @@ export const ConfigOptionLabel = styled.div`
   text-overflow: ellipsis;
 `;
 
+export const ConfigOptionActions = styled.div`
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+`;
+
 export const ConfigOptionField = styled.div`
   display: flex;
   flex-direction: column;
@@ -19,6 +27,7 @@ export const ConfigOptionField = styled.div`
 `;
 
 export const ConfigOption = styled.div<{multiline: boolean}>`
+  position: relative;
   margin: ${p => (p.multiline ? 6 : 2)}px 0;
   min-height: 28px;
   display: flex;
@@ -30,4 +39,8 @@ export const ConfigOption = styled.div<{multiline: boolean}>`
       : css`
           flex-direction: column;
         `}
+
+  &:not(:hover) ${ConfigOptionActions} {
+    display: none;
+  }
 `;

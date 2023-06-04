@@ -58,6 +58,7 @@ import {TableState} from './PanelTable/tableState';
 import {ConfigSection} from './ConfigPanel';
 import {IconPencilEdit} from './Icons';
 import {IconButton} from '../IconButton';
+import {Tooltip} from '../Tooltip';
 
 // This could be rendered as a code block with assignments, like
 // so.
@@ -174,7 +175,7 @@ export const CHILD_PANEL_DEFAULT_CONFIG: ChildPanelFullConfig = {
   id: '',
   config: undefined,
 };
-const useChildPanelConfig = (
+export const useChildPanelConfig = (
   config: ChildPanelConfig
 ): ChildPanelFullConfig => {
   return useMemo(() => getFullChildPanel(config), [config]);
@@ -951,29 +952,6 @@ const EditorIcons = styled.div<{visible: boolean}>`
   align-items: center;
   margin-left: 8px;
   visibility: ${p => (p.visible ? `visible` : `hidden`)};
-`;
-
-const Tooltip = styled(Popup).attrs({
-  basic: true, // This removes the pointing arrow.
-  mouseEnterDelay: 500,
-  popperModifiers: {
-    preventOverflow: {
-      // Prevent popper from erroneously constraining the popup.
-      // Without this, tooltips in single row table cells get positioned under the cursor,
-      // causing them to immediately close.
-      boundariesElement: 'viewport',
-    },
-  },
-})`
-  && {
-    color: ${Colors.WHITE};
-    background: ${Colors.GRAY_800};
-    border-color: ${Colors.GRAY_700};
-    box-shadow: 0px 4px 6px ${hexToRGB(Colors.BLACK, 0.2)};
-    font-size: 14px;
-    line-height: 140%;
-    max-width: 300px;
-  }
 `;
 
 const PanelContainer = styled.div`

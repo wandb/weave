@@ -1,11 +1,9 @@
-import * as globals from '@wandb/weave/common/css/globals.styles';
 import {useTraceUpdate} from '@wandb/weave/common/util/hooks';
 import {constNodeUnsafe, Node} from '@wandb/weave/core';
 import produce from 'immer';
 import React, {useCallback, useEffect, useMemo} from 'react';
 
 import _ from 'lodash';
-import styled, {css} from 'styled-components';
 import {useWeaveContext} from '../../context';
 import * as CGReact from '../../react';
 import {useMutation} from '../../react';
@@ -29,9 +27,10 @@ import {
   useSetInspectingPanel,
 } from './PanelInteractContext';
 import {useSetPanelRenderedConfig} from './PanelRenderedConfigContext';
-import {OutlineItemMenuPopup} from '../Sidebar/OutlineItemMenuPopup';
+import {OutlineItemPopupMenu} from '../Sidebar/OutlineItemPopupMenu';
 import {getConfigForPath} from './panelTree';
 import {IconButton} from '../IconButton';
+import * as SidebarConfig from '../Sidebar/Config';
 
 const inputType = {type: 'Panel' as const};
 type PanelPanelProps = Panel2.PanelProps<
@@ -208,19 +207,19 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
 
   if (showOutline) {
     return (
-      <Container>
-        <Header>
-          <HeaderTop>
-            <HeaderTopLeft>
-              <HeaderTopText>Outline</HeaderTopText>
-            </HeaderTopLeft>
-            <HeaderTopRight>
+      <SidebarConfig.Container>
+        <SidebarConfig.Header>
+          <SidebarConfig.HeaderTop>
+            <SidebarConfig.HeaderTopLeft>
+              <SidebarConfig.HeaderTopText>Outline</SidebarConfig.HeaderTopText>
+            </SidebarConfig.HeaderTopLeft>
+            <SidebarConfig.HeaderTopRight>
               <IconButton onClick={closeEditor}>
                 <IconClose />
               </IconButton>
-            </HeaderTopRight>
-          </HeaderTop>
-        </Header>
+            </SidebarConfig.HeaderTopRight>
+          </SidebarConfig.HeaderTop>
+        </SidebarConfig.Header>
         <Outline
           config={panelConfig}
           updateConfig={panelUpdateConfig}
@@ -228,22 +227,22 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
           setSelected={setSelectedPanel}
           selected={selectedPanel}
         />
-      </Container>
+      </SidebarConfig.Container>
     );
   }
 
   return (
-    <Container>
-      <Header>
-        <HeaderTop lessLeftPad>
-          <HeaderTopLeft canGoBack onClick={goBackToOutline}>
+    <SidebarConfig.Container>
+      <SidebarConfig.Header>
+        <SidebarConfig.HeaderTop lessLeftPad>
+          <SidebarConfig.HeaderTopLeft canGoBack onClick={goBackToOutline}>
             <IconButton>
               <IconBack />
             </IconButton>
-            <HeaderTopText>Outline</HeaderTopText>
-          </HeaderTopLeft>
-          <HeaderTopRight>
-            <OutlineItemMenuPopup
+            <SidebarConfig.HeaderTopText>Outline</SidebarConfig.HeaderTopText>
+          </SidebarConfig.HeaderTopLeft>
+          <SidebarConfig.HeaderTopRight>
+            <OutlineItemPopupMenu
               config={panelConfig}
               localConfig={getConfigForPath(panelConfig, selectedPanel)}
               path={selectedPanel}
@@ -259,11 +258,13 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
             <IconButton onClick={closeEditor}>
               <IconClose />
             </IconButton>
-          </HeaderTopRight>
-        </HeaderTop>
-        <HeaderTitle>{_.last(selectedPanel)}</HeaderTitle>
-      </Header>
-      <Body>
+          </SidebarConfig.HeaderTopRight>
+        </SidebarConfig.HeaderTop>
+        <SidebarConfig.HeaderTitle>
+          {_.last(selectedPanel)}
+        </SidebarConfig.HeaderTitle>
+      </SidebarConfig.Header>
+      <SidebarConfig.Body>
         <PanelContextProvider newVars={{}} selectedPath={selectedPanel}>
           <ChildPanelConfigComp
             config={panelConfig}
@@ -271,63 +272,10 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
             updateConfig2={panelUpdateConfig2}
           />
         </PanelContextProvider>
-      </Body>
-    </Container>
+      </SidebarConfig.Body>
+    </SidebarConfig.Container>
   );
 };
-
-const Container = styled.div`
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  height: 100%;
-`;
-
-const Header = styled.div`
-  padding: 12px 0;
-  border-bottom: 1px solid ${globals.GRAY_350};
-`;
-
-const HeaderTop = styled.div<{lessLeftPad?: boolean}>`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0 8px 0 ${p => (p.lessLeftPad ? 8 : 12)}px;
-`;
-
-const HeaderTopLeft = styled.div<{canGoBack?: boolean}>`
-  display: flex;
-  align-items: center;
-  ${p =>
-    p.canGoBack &&
-    css`
-      color: ${globals.GRAY_500};
-      cursor: pointer;
-    `}
-`;
-
-const HeaderTopRight = styled.div`
-  display: flex;
-  align-items: center;
-`;
-
-const HeaderTopText = styled.div`
-  font-weight: 600;
-`;
-
-const HeaderTitle = styled.div`
-  font-family: 'Inconsolata', monospace;
-  font-size: 18px;
-  font-weight: 600;
-  margin-top: 8px;
-  padding: 0 12px;
-`;
-
-const Body = styled.div`
-  flex-grow: 1;
-  overflow-x: hidden;
-  overflow-y: auto;
-`;
 
 export const PanelPanel: React.FC<PanelPanelProps> = props => {
   const {loading, panelConfig, panelUpdateConfig, panelUpdateConfig2} =

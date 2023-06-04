@@ -91,6 +91,8 @@ const MainHeaderWrapper = styled.div`
 
 const iconStyles = css`
   color: ${globals.GRAY_500};
+  width: 18px;
+  height: 18px;
 `;
 const IconUp = styled(IconUpUnstyled)`
   ${iconStyles}
@@ -618,7 +620,11 @@ const HeaderLogoControls: React.FC<{
           </MenuItem>
           <MenuDivider />
           <MenuItem disabled>
-            <MenuText>Weave 0.0.6</MenuText>
+            <MenuText>
+              Weave 0.0.6
+              <br />
+              by Weights & Biases
+            </MenuText>
           </MenuItem>
         </CustomMenu>
       </CustomPopover>

@@ -12,12 +12,13 @@ import {
   IconWeave as IconWeaveUnstyled,
 } from '../Panel2/Icons';
 import {panelChildren} from '../Panel2/panelTree';
-import {OutlineItemMenuPopup} from './OutlineItemMenuPopup';
+import {OutlineItemPopupMenu} from './OutlineItemPopupMenu';
 
 const OutlineItem = styled.div``;
 
 const OutlineItemMenuButton = styled(IconButton).attrs({small: true})`
-  margin-right: 8px;
+  flex-shrink: 0;
+  margin: 0 8px 0 4px;
 `;
 
 const OutlineItemTitle = styled.div<{level: number}>`
@@ -28,17 +29,19 @@ const OutlineItemTitle = styled.div<{level: number}>`
   padding-top: 4px;
   padding-bottom: 4px;
   padding-left: ${p => p.level * 11 + 8}px;
+  line-height: 130%;
 
   &:hover {
     background-color: ${globals.GRAY_50};
   }
 
   &:not(:hover) ${OutlineItemMenuButton} {
-    display: none;
+    visibility: hidden;
   }
 `;
 
 const OutlineItemToggle = styled.div<{expanded: boolean}>`
+  flex-shrink: 0;
   display: flex;
   width: 18px;
   margin-right: 4px;
@@ -53,11 +56,16 @@ const OutlineItemToggle = styled.div<{expanded: boolean}>`
 `;
 
 const OutlineItemIcon = styled.div`
+  flex-shrink: 0;
   display: flex;
   margin-right: 8px;
 `;
 
-const OutlineItemName = styled.div``;
+const OutlineItemName = styled.div`
+  flex-shrink: 0;
+  max-width: 100px;
+  overflow-wrap: break-word;
+`;
 
 const OutlineItemPanelID = styled.div`
   color: ${globals.GRAY_500};
@@ -65,6 +73,9 @@ const OutlineItemPanelID = styled.div`
   font-family: 'Inconsolata', monospace;
   margin-left: 10px;
   flex-grow: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 `;
 
 const iconStyles = css`
@@ -136,7 +147,7 @@ const OutlinePanel: React.FC<OutlinePanelProps> = props => {
         <OutlineItemName>{name}</OutlineItemName>
         <OutlineItemPanelID>{curPanelId}</OutlineItemPanelID>
         {path.length > 0 && (
-          <OutlineItemMenuPopup
+          <OutlineItemPopupMenu
             config={config}
             localConfig={localConfig}
             path={path}

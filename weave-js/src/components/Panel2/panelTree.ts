@@ -420,7 +420,7 @@ export const ensureDashboard = (node: PanelTreeNode): ChildPanelFullConfig => {
         {
           layoutMode: 'vertical',
           equalSize: false,
-          style: 'width:350px; padding-right: 20px',
+          style: 'width:300px; padding-right: 20px',
           showExpressions: true,
           allowedPanels: ['Expression', 'Query', 'Slider', 'StringEditor'],
           enableAddPanel: true,

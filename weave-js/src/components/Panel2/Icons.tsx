@@ -17,6 +17,9 @@ import {ReactComponent as ImportIconCopy} from '../../assets/icon-copy.svg';
 import {ReactComponent as ImportIconFullScreenModeExpand} from '../../assets/icon-full-screen-mode-expand.svg';
 import {ReactComponent as ImportIconOverflowHorizontal} from '../../assets/icon-overflow-horizontal.svg';
 import {ReactComponent as ImportIconRedo} from '../../assets/icon-redo.svg';
+import {ReactComponent as ImportIconRetry} from '../../assets/icon-retry.svg';
+import {ReactComponent as ImportIconSettingsParameters} from '../../assets/icon-settings-parameters.svg';
+import {ReactComponent as ImportIconSplit} from '../../assets/icon-split.svg';
 import {ReactComponent as ImportIconTextLanguageAlt} from '../../assets/icon-text-language-alt.svg';
 import {ReactComponent as ImportIconUndo} from '../../assets/icon-undo.svg';
 import {ReactComponent as ImportIconWeave} from '../../assets/icon-weave.svg';
@@ -68,6 +71,15 @@ export const IconOverflowHorizontal = (props: SVGIconProps) => (
 );
 export const IconRedo = (props: SVGIconProps) => (
   <ImportIconRedo {...updateIconProps(props)} />
+);
+export const IconRetry = (props: SVGIconProps) => (
+  <ImportIconRetry {...updateIconProps(props)} />
+);
+export const IconSettingsParameters = (props: SVGIconProps) => (
+  <ImportIconSettingsParameters {...updateIconProps(props)} />
+);
+export const IconSplit = (props: SVGIconProps) => (
+  <ImportIconSplit {...updateIconProps(props)} />
 );
 export const IconTextLanguageAlt = (props: SVGIconProps) => (
   <ImportIconTextLanguageAlt {...updateIconProps(props)} />

@@ -1,8 +1,6 @@
 import {callOpVeryUnsafe, NodeOrVoidNode, varNode} from '@wandb/weave/core';
 import produce from 'immer';
 import React, {memo, useCallback, useMemo} from 'react';
-import {Menu, Popup as SemanticPopup} from 'semantic-ui-react';
-import styled from 'styled-components';
 
 import {getFullChildPanel} from '../Panel2/ChildPanel';
 import {emptyTable} from '../Panel2/PanelTable/tableState';
@@ -15,19 +13,15 @@ import {
   setPath,
 } from '../Panel2/panelTree';
 import {OutlinePanelProps} from './Outline';
+import {IconBack, IconDelete, IconRetry, IconSplit} from '../Panel2/Icons';
+import {PopupMenu} from './PopupMenu';
 
-const Popup = styled(SemanticPopup)`
-  &&& {
-    padding: 0;
-  }
-`;
-
-export type OutlineItemMenuPopupProps = Pick<
+export type OutlineItemPopupMenuProps = Pick<
   OutlinePanelProps,
   `config` | `localConfig` | `path` | `updateConfig` | `updateConfig2`
 > & {goBackToOutline?: () => void; trigger: JSX.Element};
 
-const OutlineItemMenuPopupComp: React.FC<OutlineItemMenuPopupProps> = ({
+const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
   config,
   localConfig,
   path,
@@ -175,7 +169,7 @@ const OutlineItemMenuPopupComp: React.FC<OutlineItemMenuPopupProps> = ({
       {
         key: 'delete',
         content: 'Delete',
-        icon: 'trash',
+        icon: <IconDelete />,
         onClick: handleDelete,
       },
     ];
@@ -183,7 +177,7 @@ const OutlineItemMenuPopupComp: React.FC<OutlineItemMenuPopupProps> = ({
       items.push({
         key: 'unnest',
         content: 'Replace with first child',
-        icon: 'level up',
+        icon: <IconRetry />,
         onClick: () => handleUnnest(path),
       });
     }
@@ -196,14 +190,14 @@ const OutlineItemMenuPopupComp: React.FC<OutlineItemMenuPopupProps> = ({
     items.push({
       key: 'split',
       content: 'Split',
-      icon: 'columns',
+      icon: <IconSplit />,
       onClick: () => handleSplit(path),
     });
     if (path.find(p => p === 'main') != null && path.length > 1) {
       items.push({
         key: 'queryBar',
         content: 'Send to query bar',
-        icon: 'arrow left',
+        icon: <IconBack />,
         onClick: () => handleAddToQueryBar(path),
       });
     }
@@ -219,23 +213,8 @@ const OutlineItemMenuPopupComp: React.FC<OutlineItemMenuPopupProps> = ({
   ]);
 
   return (
-    <Popup
-      basic
-      on="click"
-      position="bottom left"
-      popperModifiers={{
-        preventOverflow: {
-          // prevent popper from erroneously constraining the popup to the
-          // table header
-          boundariesElement: 'viewport',
-        },
-      }}
-      trigger={trigger}
-      content={
-        <Menu compact size="small" items={menuItems} secondary vertical />
-      }
-    />
+    <PopupMenu trigger={trigger} position={`bottom left`} items={menuItems} />
   );
 };
 
-export const OutlineItemMenuPopup = memo(OutlineItemMenuPopupComp);
+export const OutlineItemPopupMenu = memo(OutlineItemPopupMenuComp);

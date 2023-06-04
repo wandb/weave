@@ -119,6 +119,7 @@ export const ConfigOption: React.FC<
 const ConfigOptionNew: React.FC<
   {
     label: string;
+    actions?: ReactNode;
     multiline?: boolean;
     // component to append after the the config component, on the same line, such as
     // "add new y" buttons or "delete option" buttons. see panelplot config y for
@@ -128,6 +129,7 @@ const ConfigOptionNew: React.FC<
 > = props => {
   const {
     label,
+    actions,
     multiline = false,
     postfixComponent,
     children,
@@ -136,6 +138,9 @@ const ConfigOptionNew: React.FC<
   return (
     <SN.ConfigOption multiline={multiline} {...restProps}>
       {label && <SN.ConfigOptionLabel>{label}</SN.ConfigOptionLabel>}
+      {actions != null && (
+        <SN.ConfigOptionActions>{actions}</SN.ConfigOptionActions>
+      )}
       <SN.ConfigOptionField>{children}</SN.ConfigOptionField>
       {postfixComponent}
     </SN.ConfigOption>

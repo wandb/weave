@@ -39,7 +39,7 @@ type DefinitionWithEventHandler = Definition & {
   ) => void;
 };
 
-type StackWithHandlers = DefinitionWithEventHandler[];
+export type StackWithHandlers = DefinitionWithEventHandler[];
 
 const propagateExpressionEvent = (
   target: NodeOrVoidNode,
