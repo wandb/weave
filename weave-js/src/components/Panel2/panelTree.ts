@@ -291,8 +291,20 @@ export const addChild = (
   path: string[],
   value: PanelTreeNode
 ) => {
-  const panelNames = Object.keys(getPath(node, path).config.items);
-  return setPath(node, [...path, nextPanelName(panelNames)], value);
+  const group = getPath(node, path);
+  if (!isGroupNode(group)) {
+    throw new Error('Cannot add child to non-group panel');
+  }
+  return setPath(node, path, {
+    ...group,
+    config: {
+      ...group.config,
+      items: {
+        ...group.config.items,
+        [nextPanelName(Object.keys(group.config.items))]: value,
+      },
+    },
+  });
 };
 
 // Must match the variables that the rest of the UI

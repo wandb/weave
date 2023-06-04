@@ -66,6 +66,14 @@ import {IconButton} from '../IconButton';
 // return PanelWhatever(a / 2, panel_whatever_config)
 // ```
 
+const allowPanel = (stackId: string) => {
+  return (
+    stackId.includes('projection') ||
+    stackId.includes('maybe') ||
+    !stackId.includes('.')
+  );
+};
+
 export interface ChildPanelFullConfig {
   vars: Frame;
   input_node: NodeOrVoidNode;
@@ -117,18 +125,19 @@ export const initPanel = async (
   panelId: string | undefined,
   allowedPanels: string[] | undefined,
   stack: Stack
-): Promise<{id: string; config: any}> => {
+): Promise<ChildPanelFullConfig> => {
   inputNode = await weave.refineNode(inputNode, stack);
   const {curPanelId: id} = getPanelStacksForType(inputNode.type, panelId, {
     allowedPanels,
-    stackIdFilter: stackId =>
-      stackId.includes('maybe') || !stackId.includes('.'),
+    stackIdFilter: allowPanel,
   });
   if (id == null) {
-    return {id: '', config: undefined};
+    return {vars: {}, input_node: voidNode(), id: '', config: undefined};
   }
   return {
+    vars: {},
     id,
+    input_node: inputNode,
     config: await initPanelConfig(weave, id, inputNode, stack),
   };
 };
@@ -199,8 +208,7 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
     panelId,
     {
       allowedPanels: props.allowedPanels,
-      stackIdFilter: stackId =>
-        stackId.includes('maybe') || !stackId.includes('.'),
+      stackIdFilter: allowPanel,
     }
   );
 
@@ -269,7 +277,7 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
         return;
       }
 
-      if (isAssignableTo(config.input_node.type, newExpression.type)) {
+      if (isAssignableTo(newExpression.type, config.input_node.type)) {
         // If type didn't change, keep current settings
         updateConfig({...config, input_node: newExpression});
       } else if (curPanelId === 'Each') {

@@ -295,7 +295,7 @@ class TimeSeries(weave.Panel):
         ).argmin()
 
         bin_size = TIME_SERIES_BIN_SIZES_SEC_NODE[bin_size_index]  # type: ignore
-        bin_size_ms = bin_size * 1000
+        bin_size_s = bin_size
 
         def bin_fn(item):
             label_fn_output_type = config.label.type.output_type
@@ -304,8 +304,8 @@ class TimeSeries(weave.Panel):
             # convert timestamp to seconds
             timestamp = config.x(item)
 
-            bin_start_ms = timestamp.floor(bin_size_ms)
-            bin_end_ms = timestamp.ceil(bin_size_ms)
+            bin_start_ms = timestamp.floor(bin_size_s)
+            bin_end_ms = timestamp.ceil(bin_size_s)
 
             bin_start = bin_start_ms
             bin_end = bin_end_ms

@@ -104,7 +104,14 @@ export class RemoteHttpServer implements Server {
     public readonly opStore: OpStore
   ) {
     this.opts = _.defaults({}, inOpts, defaultOpts);
-    this.flushInterval = setInterval(() => this.flush(), BATCH_INTERVAL_MS());
+    this.flushInterval = setInterval(
+      () =>
+        this.flush().catch(e => {
+          console.error('Error flushing RemoteHttpServer', e);
+          clearInterval(this.flushInterval);
+        }),
+      BATCH_INTERVAL_MS()
+    );
     this.trace = isWeaveDebugEnabled()
       ? (...args: any[]) =>
           console.debug(

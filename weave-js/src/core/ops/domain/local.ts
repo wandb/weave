@@ -523,6 +523,7 @@ export const opObjGetAttr = makeStandardOp({
     const attrTypes = unionObjectTypeAttrTypes(selfType);
     return attrTypes[attrName] ?? 'unknown';
   },
+  resolverIsSync: true,
   resolver: inputs => {
     let self = inputs.self;
     if (self == null) {

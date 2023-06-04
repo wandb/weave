@@ -398,7 +398,7 @@ def _flatten(l):
     output_type=flatten_return_type,
 )
 def flatten(arr):
-    return _flatten(list(arr))
+    return _flatten(arr)
 
 
 def unnest_return_type(input_types):

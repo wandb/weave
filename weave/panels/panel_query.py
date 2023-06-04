@@ -13,10 +13,22 @@ class QueryDimsConfig:
     text: str
 
 
+EditorType = typing.TypeVar("EditorType")
+
+
+@weave.type()
+class QueryCondition:
+    expression: weave.Node[typing.Any] = dataclasses.field(
+        default_factory=lambda: weave.graph.VoidNode()
+    )
+    editor: EditorType = dataclasses.field(default_factory=lambda: graph.VoidNode())  # type: ignore
+
+
 @weave.type()
 class QueryConfig:
     tableState: table_state.TableState
     dims: QueryDimsConfig
+    conditions: list[QueryCondition] = dataclasses.field(default_factory=list)
     pinnedRows: dict[str, list[int]] = dataclasses.field(default_factory=dict)
 
 
@@ -40,33 +52,35 @@ class Query(panel.Panel):
                 ),
                 pinnedRows={"": [0]},
             )
-            self.set_text(options["text"])
+        if "conditions" in options:
+            conds = [
+                cond(weave_internal.make_var_node(self.input_node.type, "queryInput"))
+                for cond in options["conditions"]
+            ]
+            self.config.conditions = conds
 
-    def set_text(self, expr):
-        self.config.tableState.update_col(self.config.dims.text, expr)
+    @weave.op()
+    def selected_refine(self) -> weave.types.Type:
+        return self.input_node.type
 
-    # @weave.op()
-    # def selected_refine(self) -> weave.types.Type:
-    #     return self.input_node.type
+    @weave.op(
+        output_type=lambda inputs: inputs["self"].input_node.output_type,
+        refine_output_type=selected_refine,
+    )
+    def selected(self):
+        # What a shame we have to execute the table :(
 
-    # @weave.op(
-    #     output_type=weave.types.List(weave.types.TypedDict({})),
-    #     refine_output_type=selected_refine,
-    # )
-    # def selected(self):
-    #     # What a shame we have to execute the table :(
-
-    #     # Apply Filters
-    #     table_node = self.input_node
-    #     if (
-    #         self.config
-    #         and self.config.tableState.preFilterFunction is not None
-    #         and self.config.tableState.preFilterFunction.type != weave.types.Invalid()
-    #     ):
-    #         table_node = weave.ops.List.filter(
-    #             table_node,
-    #             lambda row: weave_internal.call_fn(
-    #                 self.config.tableState.preFilterFunction, {"row": row}
-    #             ),
-    #         )
-    #     return weave_internal.use(table_node)
+        # Apply Filters
+        table_node = self.input_node
+        if (
+            self.config
+            and self.config.tableState.preFilterFunction is not None
+            and self.config.tableState.preFilterFunction.type != weave.types.Invalid()
+        ):
+            table_node = weave.ops.List.filter(
+                table_node,
+                lambda row: weave_internal.call_fn(
+                    self.config.tableState.preFilterFunction, {"row": row}
+                ),
+            )
+        return weave_internal.use(table_node)

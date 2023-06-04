@@ -55,10 +55,10 @@ import {addPanelToGroupConfig} from './Panel2/PanelGroup';
 const JupyterControlsHelpText = styled.div<{active: boolean}>`
   width: max-content;
   position: absolute;
-  top: -50px;
+  top: 50px
   border-radius: 4px;
-  left: 50%;
-  transform: translate(-50%, 0);
+  right: 48px;
+  // transform: translate(-50%, 0);
   text-align: center;
   color: #fff;
   background-color: #1d1f24;
@@ -75,21 +75,22 @@ const JupyterControlsHelpText = styled.div<{active: boolean}>`
 
 const JupyterControlsMain = styled.div<{reveal?: boolean}>`
   position: absolute;
-  bottom: ${props => (props.reveal ? '0px' : '-60px')};
+  top: 50%;
+  right: ${props => (props.reveal ? '-0px' : '-60px')};
+  transition: right 0.3s ease-in-out;
   box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
-  left: 50%;
-  transform: translate(-50%, 0);
-  height: 40px;
+  transform: translate(0, -50%);
+  width: 40px;
   background-color: white;
   border: 1px solid #ddd;
-  border-bottom: none;
-  border-radius: 8px 8px 0px 0px;
+  border-right: none;
+  border-radius: 8px 0px 0px 8px;
   display: flex;
+  flex-direction: column;
   justify-content: space-evenly;
   align-items: center;
-  transition: bottom 0.3s ease-in-out;
   gap: 8px;
-  padding: 0px 8px;
+  padding: 8px 0px;
   z-index: 100;
 `;
 
@@ -476,12 +477,13 @@ export const PageContent: FC<PageContentProps> = ({
   const {onCopy} = useCopyCodeFromURI(maybeUri);
 
   const [showJupyterControls, setShowJupyterControls] = useState(false);
-  const pageHeight = 400; // static for now
+  const pageWidth = 985; // static for now
+  const jupyterControlsHoverWidth = 60;
   const onMouseMove = useCallback(
     (e: React.MouseEvent) => {
       if (inJupyter) {
-        const y = e.clientY;
-        if (y > 0.9 * pageHeight) {
+        const x = e.clientX;
+        if (pageWidth - x < jupyterControlsHoverWidth) {
           setShowJupyterControls(true);
         } else {
           setShowJupyterControls(false);
@@ -601,22 +603,18 @@ const JupyterPageControls: React.FC<{
         {hoverText}
       </JupyterControlsHelpText>
 
-      <JupyterControlsIcon
-        onClick={onCopy}
-        onMouseEnter={e => {
-          setHoverText('Copy dash code');
-        }}
-        onMouseLeave={e => {
-          setHoverText('');
-        }}>
-        {copyStatus === 'loading' ? (
-          <IconLoading />
-        ) : copyStatus === 'success' ? (
-          <IconCheckmark />
-        ) : (
-          <IconCopy />
-        )}
-      </JupyterControlsIcon>
+      {props.isGroup && (
+        <JupyterControlsIcon
+          onClick={addPanelToGroup}
+          onMouseEnter={e => {
+            setHoverText('Add new panel');
+          }}
+          onMouseLeave={e => {
+            setHoverText('');
+          }}>
+          <IconAddNew />
+        </JupyterControlsIcon>
+      )}
 
       {editorIsOpen ? (
         <JupyterControlsIcon
@@ -647,18 +645,22 @@ const JupyterPageControls: React.FC<{
           <IconPencilEdit />
         </JupyterControlsIcon>
       )}
-      {props.isGroup && (
-        <JupyterControlsIcon
-          onClick={addPanelToGroup}
-          onMouseEnter={e => {
-            setHoverText('Add new panel');
-          }}
-          onMouseLeave={e => {
-            setHoverText('');
-          }}>
-          <IconAddNew />
-        </JupyterControlsIcon>
-      )}
+      <JupyterControlsIcon
+        onClick={onCopy}
+        onMouseEnter={e => {
+          setHoverText('Copy dash code');
+        }}
+        onMouseLeave={e => {
+          setHoverText('');
+        }}>
+        {copyStatus === 'loading' ? (
+          <IconLoading />
+        ) : copyStatus === 'success' ? (
+          <IconCheckmark />
+        ) : (
+          <IconCopy />
+        )}
+      </JupyterControlsIcon>
       <JupyterControlsIcon
         onClick={props.openNewTab}
         onMouseEnter={e => {

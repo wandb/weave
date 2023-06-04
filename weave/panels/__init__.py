@@ -26,10 +26,11 @@ from .panel_markdown import PanelMarkdown
 
 
 # sidebar specific
-from .panel_query import Query
+from .panel_query import Query, QueryConfig, QueryCondition
 
 # editors
 from .panel_slider import Slider, SliderConfig
+from .panel_select import SelectEditor, SelectEditorConfig
 from .panel_string_editor import StringEditor
 from .panel_function_editor import FunctionEditor, FunctionEditorConfig
 

@@ -17,7 +17,7 @@ CACHE_AND_PARALLEL_OP_NAMES = [
 ]
 
 CACHE_OP_NAMES = [
-    "readcsv",
+    "file-readcsv",
     "table-2DProjection",
     "table-projection2D",
     "ArrowWeaveList-2DProjection",
