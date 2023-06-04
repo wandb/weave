@@ -189,13 +189,6 @@ const VarComp: FC<VarProps> = ({
 
   const menuItems: StrictMenuItemProps[] = useMemo(
     () => [
-      // TODO: implement
-      // {
-      //   key: 'convert',
-      //   content: 'Convert to control',
-      //   icon: <IconSettingsParameters />,
-      //   onClick: () => {},
-      // },
       {
         key: 'delete',
         content: 'Delete',

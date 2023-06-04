@@ -1,44 +1,39 @@
 import EditableField from '@wandb/weave/common/components/EditableField';
 import {
-  linkHoverBlue,
-  GRAY_50,
   GRAY_350,
-  Colors,
-  hexToRGB,
+  GRAY_50,
+  linkHoverBlue,
 } from '@wandb/weave/common/css/globals.styles';
 import {ValidatingTextInput} from '@wandb/weave/components/ValidatingTextInput';
 import {
-  defaultLanguageBinding,
-  filterNodes,
   Frame,
   ID,
-  isAssignableTo,
-  isNodeOrVoidNode,
   Node,
   NodeOrVoidNode,
-  replaceChainRoot,
   Stack,
+  Weave,
+  defaultLanguageBinding,
+  filterNodes,
+  isAssignableTo,
+  isNodeOrVoidNode,
+  replaceChainRoot,
   varNode,
   voidNode,
-  Weave,
 } from '@wandb/weave/core';
 import {isValidVarName} from '@wandb/weave/core/util/var';
 import * as _ from 'lodash';
 import React, {useCallback, useMemo, useState} from 'react';
-import {Icon, Popup} from 'semantic-ui-react';
 import styled from 'styled-components';
 
 import {useWeaveContext} from '../../context';
 import {WeaveExpression} from '../../panel/WeaveExpression';
 import {useNodeWithServerType} from '../../react';
 import {consoleLog} from '../../util';
-import {
-  getPanelStacksForType,
-  panelSpecById,
-  usePanelStacksForType,
-} from './availablePanels';
+import {IconButton} from '../IconButton';
+import {Tooltip} from '../Tooltip';
 import * as ConfigPanel from './ConfigPanel';
-import {PanelInput, PanelProps} from './panel';
+import {ConfigSection} from './ConfigPanel';
+import {IconPencilEdit} from './Icons';
 import {Panel, PanelConfigEditor} from './PanelComp';
 import {
   ExpressionEvent,
@@ -52,13 +47,15 @@ import {
   useSetInspectingChildPanel,
   useSetPanelInputExprIsHighlighted,
 } from './PanelInteractContext';
-import {getStackIdAndName} from './panellib/libpanel';
 import PanelNameEditor from './PanelNameEditor';
 import {TableState} from './PanelTable/tableState';
-import {ConfigSection} from './ConfigPanel';
-import {IconPencilEdit} from './Icons';
-import {IconButton} from '../IconButton';
-import {Tooltip} from '../Tooltip';
+import {
+  getPanelStacksForType,
+  panelSpecById,
+  usePanelStacksForType,
+} from './availablePanels';
+import {PanelInput, PanelProps} from './panel';
+import {getStackIdAndName} from './panellib/libpanel';
 
 // This could be rendered as a code block with assignments, like
 // so.
@@ -522,13 +519,6 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
     return null;
   }, [panelOptions]);
 
-  const setToNoneExpression = useCallback(() => {
-    consoleLog('SET TO NONE NOOP');
-    if (nonExpressionPanelId != null) {
-      handlePanelChange(nonExpressionPanelId);
-    }
-  }, [handlePanelChange, nonExpressionPanelId]);
-
   const {frame} = usePanelContext();
 
   const validateName = useCallback(
@@ -591,19 +581,6 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
             </EditorExpression>
             <EditorIcons visible={hoverPanel}>
               {props.prefixButtons}
-              {(curPanelId === 'Expression' || curPanelId === 'RootBrowser') &&
-                nonExpressionPanelId != null && (
-                  <IconButton
-                    // disabled={isLoading}
-                    onClick={setToNoneExpression}>
-                    <Icon
-                      name="sliders"
-                      // style={{
-                      //   color: configOpen ? '#2e78c7' : 'inherit',
-                      // }}
-                    />
-                  </IconButton>
-                )}
               <Tooltip
                 position="top center"
                 trigger={
