@@ -1700,10 +1700,6 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     [result.loading, concreteConfigLoading, isRefining]
   );
 
-  if (!loading) {
-    console.log('concreteConfig', concreteConfig);
-  }
-
   const plotTables = useMemo(
     () => (loading ? [] : (result.result as any[][])),
     [result, loading]
