@@ -19,6 +19,7 @@ import {
   escapeDots,
   Frame,
   isAssignableTo,
+  isConstNode,
   isNodeOrVoidNode,
   isTypedDict,
   isVoidNode,
@@ -1547,8 +1548,8 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     [propsUpdateConfig2]
   );
 
-  const updateConfigRef = useRef<typeof updateConfig>(updateConfig);
-  updateConfigRef.current = updateConfig;
+  const updateConfig2Ref = useRef<typeof updateConfig2>(updateConfig2);
+  updateConfig2Ref.current = updateConfig2;
 
   // side effect
   useEffect(() => {
@@ -1620,7 +1621,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
       return acc;
     }, arrayArg);
     return opArray(reduced as any);
-  }, [vegaReadyTables, listOfTableNodes, isDash]);
+  }, [vegaReadyTables, listOfTableNodes]); //, isDash]);
 
   const flatResultNodeRef = useRef(flatResultNode);
 
@@ -1639,45 +1640,50 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
   concreteConfigRef.current = concreteConfig;
 
   // enables domain sharing
-  const handleRootUpdateX = useCallback(
-    (newVal: Node) => {
-      if (
-        weave.expToString(newVal) !== weave.expToString(config.signals.domain.x)
-      ) {
-        updateConfig2((oldConfig: PlotConfig) => ({
-          ...oldConfig,
-          signals: {
-            ...oldConfig.signals,
-            domain: {...oldConfig.signals.domain, x: newVal as any},
-          },
-        }));
-      }
+
+  const makeHandleRootUpdate = useCallback(
+    (dimName: 'x' | 'y') => {
+      return (newVal: Node) => {
+        const currDomain = configRef.current.signals.domain[dimName];
+        if (weave.expToString(newVal) !== weave.expToString(currDomain)) {
+          updateConfig2((oldConfig: PlotConfig) => ({
+            ...oldConfig,
+            signals: {
+              ...oldConfig.signals,
+              domain: {...oldConfig.signals.domain, [dimName]: newVal as any},
+            },
+          }));
+        }
+      };
     },
-    [updateConfig2, config.signals.domain.x, weave]
+    [updateConfig2, weave]
   );
+
+  const handleRootUpdateX = useMemo(
+    () => makeHandleRootUpdate('x'),
+    [makeHandleRootUpdate]
+  );
+
+  const handleRootUpdateY = useMemo(
+    () => makeHandleRootUpdate('y'),
+    [makeHandleRootUpdate]
+  );
+
+  const handleRootUpdate = useMemo(
+    () => ({
+      x: handleRootUpdateX,
+      y: handleRootUpdateY,
+    }),
+    [handleRootUpdateX, handleRootUpdateY]
+  );
+  const handleRootUpdateRef = useRef(handleRootUpdate);
+  handleRootUpdateRef.current = handleRootUpdate;
 
   const mutateDomainX = LLReact.useMutation(
     config.signals.domain.x,
     'set',
     handleRootUpdateX,
     false
-  );
-
-  const handleRootUpdateY = useCallback(
-    (newVal: Node) => {
-      if (
-        weave.expToString(newVal) !== weave.expToString(config.signals.domain.y)
-      ) {
-        updateConfig2((oldConfig: PlotConfig) => ({
-          ...oldConfig,
-          signals: {
-            ...oldConfig.signals,
-            domain: {...oldConfig.signals.domain, y: newVal as any},
-          },
-        }));
-      }
-    },
-    [updateConfig2, config.signals.domain.y, weave]
   );
 
   const mutateDomainY = LLReact.useMutation(
@@ -2673,11 +2679,12 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
 
       vegaView.addEventListener('mouseup', async () => {
         const currBrushMode = brushModeRef.current;
-        const currUpdateConfig = updateConfigRef.current;
+        const currUpdateConfig2 = updateConfig2Ref.current;
         const currConfig = configRef.current;
         const currMutateDomain = mutateDomainRef.current;
         const currConcreteConfig = concreteConfigRef.current;
         const currSetToolTipsEnabled = setToolTipsEnabledRef.current;
+        const currHandleRootUpdate = handleRootUpdateRef.current;
         const signalName = `brush`;
         const dataName = `brush_store`;
 
@@ -2690,59 +2697,47 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
         const data = selection?.data[dataName];
 
         if (!_.isEmpty(signal)) {
-          let newConfigSignals: PlotConfig['signals'] = currConfig.signals;
+          const settingName = currBrushMode === 'zoom' ? 'domain' : 'selection';
 
-          ['x' as const, 'y' as const].forEach(dimName => {
-            const axisSignal: [number, number] | string[] | undefined =
-              signal[dimName];
+          if (settingName === 'domain') {
+            ['x' as const, 'y' as const].forEach(dimName => {
+              const axisSignal: [number, number] | string[] = signal[dimName];
+              const currentSetting = currConcreteConfig.signals.domain[dimName];
+              const currentSettingNode = currConfig.signals.domain[dimName];
 
-            const settingName =
-              currBrushMode === 'zoom' ? 'domain' : 'selection';
-            newConfigSignals = produce(newConfigSignals, draft => {
-              // there's some redundancy here, but doing it this way ensures that
-              // the compiler gets the types of the lazy/eager paths right
-              if (settingName === 'selection') {
-                const axisSetting = draft[settingName];
-                if (
-                  !_.isEqual(
-                    currConcreteConfig.signals[settingName][dimName],
-                    axisSignal
-                  )
-                ) {
-                  axisSetting[dimName] = axisSignal;
-                }
-              } else {
-                const axisSetting = draft[settingName];
-                if (
-                  !_.isEqual(
-                    currConcreteConfig.signals[settingName][dimName],
-                    axisSignal
-                  )
-                ) {
-                  axisSetting[dimName] = constNode(
-                    toWeaveType(axisSignal),
-                    axisSignal ?? null
+              if (!_.isEqual(currentSetting, axisSignal)) {
+                if (isConstNode(currentSettingNode)) {
+                  currHandleRootUpdate[dimName](
+                    constNode(toWeaveType(axisSignal), axisSignal)
                   );
+                } else {
+                  currMutateDomain[dimName]({
+                    val: constNode(toWeaveType(axisSignal), axisSignal),
+                  });
                 }
+
+                // need to clear out the old selection, if there is one
+                currUpdateConfig2((oldConfig: PlotConfig) => {
+                  return produce(oldConfig, draft => {
+                    draft.signals.selection[dimName] = undefined;
+                  });
+                });
               }
             });
-
-            // if we are in zoom mode, we need to clear the selection
-            if (currBrushMode === 'zoom') {
-              newConfigSignals = produce(newConfigSignals, draft => {
-                draft.selection[dimName] = undefined;
-              });
-              currMutateDomain[dimName]({
-                val: constNode(toWeaveType(signal[dimName]), signal[dimName]),
-              });
-            }
-          });
-
-          /*
-          if (newConfigSignals !== currConfig.signals) {
-            currUpdateConfig({signals: newConfigSignals});
+          } else {
+            ['x' as const, 'y' as const].forEach(dimName => {
+              const axisSignal: [number, number] | string[] = signal[dimName];
+              const currentSetting =
+                currConcreteConfig.signals.selection[dimName];
+              if (!_.isEqual(currentSetting, axisSignal)) {
+                currUpdateConfig2((oldConfig: PlotConfig) => {
+                  return produce(oldConfig, draft => {
+                    draft.signals.selection[dimName] = axisSignal;
+                  });
+                });
+              }
+            });
           }
-          */
         } else if (
           _.isEmpty(data) &&
           !(
@@ -2750,12 +2745,12 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
             _.isEmpty(currConcreteConfig.signals.selection.y)
           )
         ) {
-          currUpdateConfig({
-            signals: produce(currConfig.signals, draft => {
+          currUpdateConfig2((oldConfig: PlotConfig) => {
+            return produce(oldConfig, draft => {
               ['x' as const, 'y' as const].forEach(axisName => {
-                draft.selection[axisName] = undefined;
+                draft.signals.selection[axisName] = undefined;
               });
-            }),
+            });
           });
         }
 
@@ -2767,11 +2762,17 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
       vegaView.addEventListener('dblclick', async () => {
         const currConfig = configRef.current;
         const currMutateDomain = mutateDomainRef.current;
+        const currHandleRootUpdate = handleRootUpdateRef.current;
+
         if (!_.isEmpty(currConfig.signals.domain)) {
           ['x' as const, 'y' as const].forEach(dimName => {
-            currMutateDomain[dimName]({
-              val: constNode('none', null),
-            });
+            if (isConstNode(currConfig.signals.domain[dimName])) {
+              currHandleRootUpdate[dimName](constNone());
+            } else {
+              currMutateDomain[dimName]({
+                val: constNode('none', null),
+              });
+            }
           });
         }
       });
