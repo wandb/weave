@@ -159,5 +159,5 @@ def distribution_panel_plot_render(
         x=lambda row: row["value"],
         y=lambda row: row["count"],
         label=lambda row: row["label"],
-        mark=weave.graph.ConstNode(weave.types.String(), "bar"),
+        mark="bar",
     )

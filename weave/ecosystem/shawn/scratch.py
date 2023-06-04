@@ -13,10 +13,7 @@ def single_distribution(input_node: weave.Node[list[float]]) -> weave.panels.Plo
         lambda group: weave.ops.dict_(value=group.key(), count=group.count())
     )
     return weave.panels.Plot(
-        binned,
-        x=lambda row: row["value"],
-        y=lambda row: row["count"],
-        mark=weave.graph.ConstNode(weave.types.String(), "bar"),
+        binned, x=lambda row: row["value"], y=lambda row: row["count"], mark="bar"
     )
 
 

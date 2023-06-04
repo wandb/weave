@@ -4,7 +4,7 @@ import typing
 import weave
 from weave import weave_internal
 
-from ...panels import panel_plot
+from . import weave_plotly
 from ...language_features.tagging import tagged_value_type
 
 TIME_SERIES_BIN_SIZES_SEC = [
@@ -75,10 +75,6 @@ class TimeSeriesConfig:
             weave.types.Dict(weave.types.String(), weave.types.String()),
             {},
         )
-    )
-
-    domain_x: weave.Node[typing.Optional[typing.Any]] = dataclasses.field(
-        default_factory=lambda: weave.graph.ConstNode(weave.types.NoneType(), None)
     )
 
 
@@ -165,16 +161,7 @@ class TimeSeries(weave.Panel):
         # TODO: add the ability to configure options here
         if self.config is None:
             self.config = TimeSeriesConfig()
-            for attr in [
-                "x",
-                "min_x",
-                "max_x",
-                "label",
-                "mark",
-                "agg",
-                "axis_labels",
-                "domain_x",
-            ]:
+            for attr in ["x", "min_x", "max_x", "label", "mark", "agg", "axis_labels"]:
                 if attr in options:
                     value = options[attr]
                     if not isinstance(value, weave.graph.Node):
@@ -249,6 +236,7 @@ class TimeSeries(weave.Panel):
     # The config render op. This renders the config editor.
     @weave.op()
     def render_config(self) -> weave.panels.Group:
+        input_node = self.input_node
         config = typing.cast(TimeSeriesConfig, self.config)
         return weave.panels.Group(
             items={
@@ -285,7 +273,7 @@ class TimeSeries(weave.Panel):
         )
 
     @weave.op()
-    def render(self) -> panel_plot.Plot:
+    def render(self) -> weave_plotly.PanelPlotly:
         input_node = self.input_node
         config = typing.cast(TimeSeriesConfig, self.config)
         # NOTE: everything inside this function is operating on nodes. There are no concrete values in here.
@@ -358,14 +346,7 @@ class TimeSeries(weave.Panel):
             label="label",
         )
 
-        return panel_plot.Plot(
-            binned,
-            x=lambda row: row["x"]["start"],
-            y=lambda row: row["y"],
-            label=lambda row: row["label"],
-            mark=config.mark,
-            x_title=function_to_string(config.x),
-            y_title=function_to_string(config.agg),
-            color_title=function_to_string(config.label),
-            domain_x=config.domain_x,
+        fig = weave_plotly.plotly_time_series(
+            binned, config.mark, default_labels, config.axis_labels
         )
+        return weave_plotly.PanelPlotly(fig)

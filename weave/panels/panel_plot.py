@@ -61,19 +61,11 @@ LineStyleOption = typing.Literal[
 ]
 
 LAZY_PATHS = [
-    "series.#.constants.mark",
-    "axisSettings.x.title",
-    "axisSettings.y.title",
-    "axisSettings.color.title",
     "signals.domain.x",
     "signals.domain.y",
 ]
 
 LAZY_PATH_TYPES = {
-    "series.#.constants.mark": weave.types.optional(weave.types.String()),
-    "axisSettings.x.title": weave.types.optional(weave.types.String()),
-    "axisSettings.y.title": weave.types.optional(weave.types.String()),
-    "axisSettings.color.title": weave.types.optional(weave.types.String()),
     "signals.domain.x": weave.types.optional(weave.types.List(weave.types.Any())),
     "signals.domain.y": weave.types.optional(weave.types.List(weave.types.Any())),
 }
@@ -84,23 +76,10 @@ SelectFunction = typing.Union[graph.Node, typing.Callable[[typing.Any], typing.A
 
 @weave.type()
 class PlotConstants:
-    mark: SelectFunction = dataclasses.field(
-        default_factory=lambda: graph.ConstNode(
-            weave.types.optional(weave.types.String()), None
-        )
-    )
+    mark: typing.Optional[MarkOption] = None
     pointShape: PointShapeOption = "circle"
     label: LabelOption = "series"
     lineStyle: LineStyleOption = "solid"
-
-    """
-    def __init__(self, **kwargs):
-        # set defaults
-        self.mark = kwargs.get("mark", None)
-        self.pointShape = kwargs.get("pointShape", "circle")
-        self.label = kwargs.get("label", "series")
-        self.lineStyle = kwargs.get("lineStyle", "solid")
-    """
 
 
 class PlotConstantsInputDict(typing.TypedDict):
@@ -108,7 +87,7 @@ class PlotConstantsInputDict(typing.TypedDict):
     # when we drop support for Python 3.10 and python 3.11 is released
 
     # this will mimic the behavior of ? in typescript
-    mark: SelectFunction
+    mark: typing.Optional[MarkOption]
     pointShape: typing.Optional[PointShapeOption]
     label: typing.Optional[LabelOption]
     lineStyle: typing.Optional[LineStyleOption]
@@ -269,7 +248,7 @@ class AxisSetting:
     noLabels: bool
     noTitle: bool
     noTicks: bool
-    title: typing.Optional[SelectFunction] = None
+    title: typing.Optional[str] = None
     scale: typing.Optional[Scale] = None
 
 
@@ -424,7 +403,7 @@ class Plot(panel.Panel):
         vars=None,
         config: typing.Optional[PlotConfig] = None,
         constants: typing.Optional[PlotConstants] = None,
-        mark: typing.Optional[typing.Union[SelectFunction, MarkOption]] = None,
+        mark: typing.Optional[MarkOption] = None,
         x: typing.Optional[SelectFunction] = None,
         y: typing.Optional[SelectFunction] = None,
         color: typing.Optional[SelectFunction] = None,
@@ -436,9 +415,9 @@ class Plot(panel.Panel):
         series: typing.Optional[typing.Union[Series, typing.List[Series]]] = None,
         no_axes: bool = False,
         no_legend: bool = False,
-        x_title: typing.Optional[SelectFunction] = None,
-        y_title: typing.Optional[SelectFunction] = None,
-        color_title: typing.Optional[SelectFunction] = None,
+        x_title: typing.Optional[str] = None,
+        y_title: typing.Optional[str] = None,
+        color_title: typing.Optional[str] = None,
         domain_x: typing.Optional[SelectFunction] = None,
         domain_y: typing.Optional[SelectFunction] = None,
     ):
@@ -446,9 +425,7 @@ class Plot(panel.Panel):
         self.config = config
 
         if self.config is None:
-            constants = PlotConstants(
-                mark=typing.cast(SelectFunction, mark),
-            )
+            constants = PlotConstants(mark=mark)
 
             select_functions: typing.Optional[dict[DimName, SelectFunction]] = None
             for field, maybe_dim in zip(
