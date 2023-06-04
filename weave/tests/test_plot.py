@@ -156,12 +156,11 @@ def test_constructor():
 
     with const_nodes_equal():
         assert plot.config == plot2.config
-        assert series.constants == PlotConstants(
-            mark=graph.ConstNode(weave.types.optional(weave.types.String()), None),
-            label="series",
-            pointShape="circle",
-            lineStyle="solid",
-        )
+    assert series.constants == PlotConstants(
+        label="series",
+        pointShape="circle",
+        lineStyle="solid",
+    )
 
 
 @pytest.mark.skip(
