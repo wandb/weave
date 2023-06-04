@@ -13,7 +13,13 @@ import {
   setPath,
 } from '../Panel2/panelTree';
 import {OutlinePanelProps} from './Outline';
-import {IconBack, IconDelete, IconRetry, IconSplit} from '../Panel2/Icons';
+import {
+  IconBack,
+  IconCopy,
+  IconDelete,
+  IconRetry,
+  IconSplit,
+} from '../Panel2/Icons';
 import {PopupMenu} from './PopupMenu';
 
 export type OutlineItemPopupMenuProps = Pick<
@@ -184,7 +190,7 @@ const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
     items.push({
       key: 'duplicate',
       content: 'Duplicate',
-      icon: 'columns',
+      icon: <IconCopy />,
       onClick: () => handleDuplicate(path),
     });
     items.push({
