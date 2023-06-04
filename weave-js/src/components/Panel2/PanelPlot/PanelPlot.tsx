@@ -169,7 +169,7 @@ const useConfig = (
   const weave = useWeaveContext();
 
   const newConfig = useMemo(() => {
-    let migratedConfig = PlotState.panelPlotDefaultConfig(
+    const migratedConfig = PlotState.panelPlotDefaultConfig(
       inputNode,
       propsConfig,
       stack
@@ -1590,7 +1590,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     } = {};
 
     const reduced = vegaReadyTables.reduce((acc, val, i) => {
-      let node: Node = listOfTableNodes[i];
+      const node: Node = listOfTableNodes[i];
       /*
 
       const series = config.series[i];
@@ -1624,7 +1624,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
       return acc;
     }, arrayArg);
     return opArray(reduced as any);
-  }, [vegaReadyTables, listOfTableNodes]); //, isDash]);
+  }, [vegaReadyTables, listOfTableNodes]); // , isDash]);
 
   const flatResultNodeRef = useRef(flatResultNode);
 
