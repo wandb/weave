@@ -666,8 +666,19 @@ def filter_node_to_selection(
 
         def predicate(row: graph.Node[types.TypedDict]):
             target = dict_.TypedDict.pick(row, key)
+
+            selection_min = selection[0]  # type: ignore
+            selection_max = selection[1]  # type: ignore
+
+            if (
+                weave.types.Timestamp().assign_type(target.type)
+                and isinstance(selection_min, (int, float))
+                and isinstance(selection_max, (int, float))
+            ):
+                target = target.toNumber() * 1000
+
             return boolean.Boolean.bool_and(
-                target >= selection[0], target <= selection[1]  # type: ignore
+                target >= selection_min, target <= selection_max
             )
 
     else:
