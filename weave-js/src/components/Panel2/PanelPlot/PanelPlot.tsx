@@ -167,15 +167,10 @@ const useConfig = (
   const {stack} = usePanelContext();
   const weave = useWeaveContext();
 
-  const newConfig = useMemo(() => {
-    const migratedConfig = PlotState.panelPlotDefaultConfig(
-      inputNode,
-      propsConfig,
-      stack
-    );
-
-    return migratedConfig;
-  }, [propsConfig, inputNode, stack]);
+  const newConfig = useMemo(
+    () => PlotState.panelPlotDefaultConfig(inputNode, propsConfig, stack),
+    [propsConfig, inputNode, stack]
+  );
 
   const defaultColNameStrippedConfig = useMemo(
     () =>
@@ -215,7 +210,7 @@ const useConfig = (
             s.table = loadable.result[i];
           });
         });
-  }, [loadable.result, newConfig, loadable.loading]);
+  }, [loadable, newConfig]);
 
   const final = useMemo(
     () => ({

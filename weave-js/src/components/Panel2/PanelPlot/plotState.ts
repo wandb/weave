@@ -697,7 +697,7 @@ export function removeRedundantSeries(
   // populate seriesToRemove
   config.series.reduce((acc, s) => {
     // when should a series be removed?
-    // 0. when it's degenerate with other series up to vo˜ nodes
+    // 0. when it's degenerate with other series up to void nodes
     // 1. when all of its non shared dims are voidNodes
     // 2. when all of its dims are shared
 
