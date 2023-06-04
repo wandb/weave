@@ -309,6 +309,7 @@ Selection = typing.Optional[typing.Union[ContinuousSelection, DiscreteSelection]
 LazySelection = typing.Union[Selection, SelectFunction]
 
 
+# TODO: split this into 2 - one for lazy, one eager
 @weave.type()
 class AxisSelections:
     x: typing.Optional[LazySelection] = None
@@ -439,8 +440,7 @@ class Plot(panel.Panel):
         y_title: typing.Optional[SelectFunction] = None,
         color_title: typing.Optional[SelectFunction] = None,
         domain_x: typing.Optional[SelectFunction] = None,
-        # TODO: uncomment
-        # domain_y: typing.Optional[SelectFunction] = None,
+        domain_y: typing.Optional[SelectFunction] = None,
     ):
         super().__init__(input_node=input_node, vars=vars)
         self.config = config
@@ -464,11 +464,8 @@ class Plot(panel.Panel):
             if domain_x is not None:
                 signals.domain.x = domain_x
 
-            # TODO: use
-            """
-            if domain_y:
+            if domain_y is not None:
                 signals.domain.y = domain_y
-            """
 
             if not (
                 (series is not None)
