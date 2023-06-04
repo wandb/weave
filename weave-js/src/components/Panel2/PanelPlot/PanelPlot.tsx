@@ -316,7 +316,8 @@ const useConcreteConfig = (
           PlotState.setThroughArray(
             draft,
             path.split('.'),
-            concreteConfigEvaluationResult![path]
+            concreteConfigEvaluationResult![path],
+            false
           );
         });
       });

@@ -1286,7 +1286,8 @@ export function defaultConcretePlot(
     setThroughArray(
       lazyConfig,
       path.split('.'),
-      DEFAULT_LAZY_PATH_VALUES[path]
+      DEFAULT_LAZY_PATH_VALUES[path],
+      true
     );
   });
   return lazyConfig;
@@ -1509,7 +1510,8 @@ export function selectionContainsValue(
 export function setThroughArray(
   object: any,
   path: Array<string | number>,
-  value: any
+  value: any,
+  broadcast: boolean = true
 ): any {
   if (path.length === 0) {
     return object;
@@ -1519,14 +1521,19 @@ export function setThroughArray(
 
   if (first === '#') {
     if (Array.isArray(object)) {
-      object.forEach((item: any) => {
-        setThroughArray(item, rest, value);
+      object.forEach((item: any, index: number) => {
+        setThroughArray(
+          item,
+          rest,
+          broadcast ? value : value[index],
+          broadcast
+        );
       });
     }
   } else if (rest.length === 0) {
     object[first] = value;
   } else if (typeof object[first] === 'object' && object[first] !== null) {
-    setThroughArray(object[first], rest, value);
+    setThroughArray(object[first], rest, value, broadcast);
   }
 
   return object;
