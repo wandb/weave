@@ -58,7 +58,7 @@ interface MenuContentProps {
   // HTMLElement, or any other type that implements getBoundingClientRect
   // to position the menu
   anchor: Pick<HTMLElement, 'getBoundingClientRect'>;
-  actions: NodeAction[];
+  actions: NodeAction[] | (() => NodeAction[]);
   input: Node;
   stack: Stack;
   close: () => void;
@@ -85,11 +85,18 @@ const ActionsContent: React.FC<MenuContentProps> = ({
     Array<{label: string; description?: string; action: NodeAction}>
   >([]);
 
+  const lazyActions = React.useCallback(() => {
+    if (typeof actions === 'function') {
+      return actions();
+    }
+    return actions;
+  }, [actions]);
+
   React.useEffect(() => {
     const resolveActions = async () => {
       setItems(
         await Promise.all(
-          actions.map(async action => {
+          lazyActions().map(async action => {
             return {
               label:
                 typeof action.name === 'function'
@@ -106,7 +113,7 @@ const ActionsContent: React.FC<MenuContentProps> = ({
       );
     };
     resolveActions();
-  }, [actions, stack, input]);
+  }, [stack, input, lazyActions]);
 
   // TODO(np): These look terrible and not useful.
   // Fix truncation to show n tail nodes
@@ -244,7 +251,7 @@ export const ActionsTrigger: React.FC<ActionsTriggerProps> = ({
   const actionsContext = useWeaveActionContext();
   const {stack} = usePanelContext();
 
-  const availableActions = React.useMemo(() => {
+  const getAvailableActions = React.useCallback(() => {
     const result = actionsContext.actions
       .concat(extraActions ?? [])
       .filter(action => action.isAvailable(input, stack));
@@ -295,7 +302,7 @@ export const ActionsTrigger: React.FC<ActionsTriggerProps> = ({
       <TriggerWrapper onClick={toggleActions}>{children}</TriggerWrapper>
       {actionsVisible && anchor != null && (
         <ActionsContent
-          actions={availableActions}
+          actions={getAvailableActions}
           input={input}
           stack={stack}
           anchor={anchor}

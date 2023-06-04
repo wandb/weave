@@ -23,6 +23,7 @@ import {
   Weave,
 } from '@wandb/weave/core';
 import {isValidVarName} from '@wandb/weave/core/util/var';
+import {Draft} from 'immer';
 import * as _ from 'lodash';
 import React, {useCallback, useMemo, useState} from 'react';
 import {Icon, Popup} from 'semantic-ui-react';
@@ -143,9 +144,7 @@ export const initPanel = async (
 };
 
 export const mutateEnsureItemIsFullChildPanel = (
-  // This first argument must be an immer Draft, but typescript blows
-  // up if we annotate it.
-  items: {[key: string]: ChildPanelConfig},
+  items: Draft<{[key: string]: ChildPanelConfig}>,
   key: string
 ): void => {
   const item = items[key];

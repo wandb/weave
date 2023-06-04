@@ -1,14 +1,28 @@
 import {
+  constBoolean,
+  constFunction,
   constNodeUnsafe,
+  constNone,
+  constNumber,
+  constString,
   dereferenceAllVars,
+  getFreeVars,
   isFunctionType,
   isNodeOrVoidNode,
+  maybe,
+  Node,
   NodeOrVoidNode,
+  opFilter,
+  opNot,
+  opNumberEqual,
+  opStringEqual,
   pushFrame,
   replaceChainRoot,
+  resolveVar,
   Stack,
   Type,
   voidNode,
+  WeaveInterface,
 } from '@wandb/weave/core';
 import produce, {Draft} from 'immer';
 import * as _ from 'lodash';
@@ -16,6 +30,7 @@ import React, {useCallback, useMemo} from 'react';
 import {Button} from 'semantic-ui-react';
 import styled, {css} from 'styled-components';
 
+import {NodeAction, WeaveActionContextProvider} from '../../actions';
 import {IdObj, PanelBankSectionConfig} from '../WeavePanelBank/panelbank';
 import {getSectionConfig, PBSection} from '../WeavePanelBank/PBSection';
 import {getPanelStacksForType} from './availablePanels';
@@ -36,6 +51,7 @@ import {ExpressionEvent, PanelContextProvider} from './PanelContext';
 import {usePanelContext} from './PanelContext';
 import {useSetPanelInputExprIsHighlighted} from './PanelInteractContext';
 import {isGroupNode, nextPanelName} from './panelTree';
+import {useWeaveContext} from '@wandb/weave/context';
 
 const LAYOUT_MODES = [
   'horizontal' as const,
@@ -736,6 +752,7 @@ const useSectionConfig = (
 export const PanelGroup: React.FC<PanelGroupProps> = props => {
   const config = props.config ?? PANEL_GROUP_DEFAULT_CONFIG();
   const {stack} = usePanelContext();
+  const weave = useWeaveContext();
   const {updateConfig, updateConfig2} = props;
 
   if (updateConfig2 == null) {
@@ -863,9 +880,97 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
     [childPanelsByKey]
   );
 
+  // TODO(np): Move this out
+  const actions: NodeAction[] = useMemo(() => {
+    console.log(`PanelGroup config`, config);
+
+    // If we're not root group, return empty actions
+    if ((config.items.sidebar as ChildPanelFullConfig)?.config?.items == null) {
+      console.log(`not root group`);
+      return [];
+    }
+
+    // Find all updatable vars from our sidebar child
+    const sidebarItems = (config.items.sidebar as ChildPanelFullConfig).config
+      .items as Record<string, ChildPanelFullConfig>;
+    const updatableVars = Object.entries(sidebarItems)
+      .filter(([k, v]) => v.id === 'Query')
+      .map(([k]) => k);
+
+    if (updatableVars.length === 0) {
+      return [];
+    }
+
+    return updatableVars.map((varName: string) => {
+      return {
+        name: `Filter query: ${varName}`,
+        detail: async (n, stack) => {
+          const value = await weave.client.query(
+            weave.dereferenceAllVars(n, stack)
+          );
+          if (typeof value === 'boolean') {
+            return `${!value ? '!' : ''}${weave.expToString(n, null)}`;
+          }
+          return `${weave.expToString(n, null)} == ${JSON.stringify(value)}`;
+
+          // return 'Test Action from PanelGroup'
+        },
+        icon: 'birthday cake',
+        isAvailable: (n: Node, stack: Stack) => {
+          return (
+            isFilterableNode(weave, n) && descendantOfVarNode(n, stack, varName)
+          );
+        },
+        doAction: async (n: Node, stack: Stack) => {
+          console.log('TEST ACTION', n, stack);
+
+          const value = await weave.client.query(
+            weave.dereferenceAllVars(n, stack)
+          );
+
+          let predicate: Node = constBoolean(true);
+
+          if (weave.typeIsAssignableTo(n.type, maybe('boolean'))) {
+            if (value) {
+              predicate = n;
+            } else {
+              predicate = opNot({bool: n});
+            }
+          } else if (weave.typeIsAssignableTo(n.type, maybe('number'))) {
+            predicate = opNumberEqual({
+              lhs: n,
+              rhs: value === null ? constNone() : constNumber(value),
+            });
+          } else if (weave.typeIsAssignableTo(n.type, maybe('string'))) {
+            predicate = opStringEqual({
+              lhs: n,
+              rhs: value === null ? constNone() : constString(value),
+            });
+          }
+
+          updateConfig2(currentConfig =>
+            produce(currentConfig, draft => {
+              const itemToUpdate = (draft.items.sidebar as ChildPanelFullConfig)
+                ?.config.items[varName];
+
+              if (itemToUpdate == null) {
+                throw new Error(`tried to update non-existent var: ${varName}`);
+              }
+
+              itemToUpdate.input_node = opFilter({
+                arr: itemToUpdate.input_node,
+                filterFn: constFunction({row: 'any'}, row => predicate),
+              });
+            })
+          );
+        },
+      };
+    });
+  }, [config, updateConfig2, weave]);
+
   if (config.layoutMode === 'grid' || config.layoutMode === 'flow') {
     return (
-      <>
+      <WeaveActionContextProvider newActions={actions}>
         <PBSection
           mode={config.layoutMode}
           config={gridConfig}
@@ -880,65 +985,106 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
             +
           </Button>
         )}
-      </>
+      </WeaveActionContextProvider>
     );
   }
 
   if (config.layoutMode === 'tab') {
     const tabNames = Object.keys(config.items);
     return (
-      <div>
-        <LayoutTabs tabNames={tabNames} renderPanel={renderSectionPanel} />
-      </div>
+      <WeaveActionContextProvider newActions={actions}>
+        <div>
+          <LayoutTabs tabNames={tabNames} renderPanel={renderSectionPanel} />
+        </div>
+      </WeaveActionContextProvider>
     );
   }
 
   if (config.layoutMode === 'section') {
     const sectionNames = Object.keys(config.items);
     return (
-      <div>
-        <LayoutSections
-          sectionNames={sectionNames}
-          renderPanel={renderSectionPanel}
-        />
-      </div>
+      <WeaveActionContextProvider newActions={actions}>
+        <div>
+          <LayoutSections
+            sectionNames={sectionNames}
+            renderPanel={renderSectionPanel}
+          />
+        </div>
+      </WeaveActionContextProvider>
     );
   }
 
   return (
-    <Group
-      layered={config.layoutMode === 'layer'}
-      preferHorizontal={config.layoutMode === 'horizontal'}
-      compStyle={config.style}>
-      {Object.entries(config.items).map(([name, item]) => {
-        const childPanelConfig = getFullChildPanel(item).config;
-        // Hacky: pull width up from child to here.
-        // TODO: fix
-        let width: string | undefined;
-        if (childPanelConfig?.style != null) {
-          const styleItems: string[] = childPanelConfig.style.split(';');
-          const widthItem = styleItems.find(i => i.includes('width'));
-          width = widthItem?.split(':')[1];
-        }
-        return (
-          <GroupItem
-            key={name}
-            width={width}
-            layered={config.layoutMode === 'layer'}
-            preferHorizontal={config.layoutMode === 'horizontal'}
-            equalSize={config.equalSize}>
-            {childPanelsByKey[name]}
-          </GroupItem>
-        );
-      })}
-      {config.enableAddPanel && (
-        <Button onClick={handleAddPanel} size="tiny">
-          Add {props.config?.childNameBase ?? 'panel'}
-        </Button>
-      )}
-    </Group>
+    <WeaveActionContextProvider newActions={actions}>
+      <Group
+        layered={config.layoutMode === 'layer'}
+        preferHorizontal={config.layoutMode === 'horizontal'}
+        compStyle={config.style}>
+        {Object.entries(config.items).map(([name, item]) => {
+          const childPanelConfig = getFullChildPanel(item).config;
+          // Hacky: pull width up from child to here.
+          // TODO: fix
+          let width: string | undefined;
+          if (childPanelConfig?.style != null) {
+            const styleItems: string[] = childPanelConfig.style.split(';');
+            const widthItem = styleItems.find(i => i.includes('width'));
+            width = widthItem?.split(':')[1];
+          }
+          return (
+            <GroupItem
+              key={name}
+              width={width}
+              layered={config.layoutMode === 'layer'}
+              preferHorizontal={config.layoutMode === 'horizontal'}
+              equalSize={config.equalSize}>
+              {childPanelsByKey[name]}
+            </GroupItem>
+          );
+        })}
+        {config.enableAddPanel && (
+          <Button onClick={handleAddPanel} size="tiny">
+            Add {props.config?.childNameBase ?? 'panel'}
+          </Button>
+        )}
+      </Group>
+    </WeaveActionContextProvider>
   );
 };
+
+// TODO(np): Move this out
+// Recursively walk the tree, returning true if a var node with the
+// given name is encountered.
+function descendantOfVarNode(
+  node: NodeOrVoidNode,
+  stack: Stack,
+  varName: string
+): boolean {
+  const walkVars = getFreeVars(node);
+  if (walkVars.some(v => v.varName === varName)) {
+    return true;
+  }
+
+  for (const walkVar of walkVars) {
+    const resolved = resolveVar(stack, walkVar.varName);
+    if (resolved == null) {
+      continue;
+    }
+
+    const {closure} = resolved;
+    const {stack: newStack, value: newNode} = closure;
+    return descendantOfVarNode(newNode, newStack, varName);
+  }
+
+  return false;
+}
+
+function isFilterableNode(weave: WeaveInterface, n: NodeOrVoidNode) {
+  return (
+    weave.typeIsAssignableTo(n.type, maybe('string')) ||
+    weave.typeIsAssignableTo(n.type, maybe('number')) ||
+    weave.typeIsAssignableTo(n.type, maybe('boolean'))
+  );
+}
 
 export const PANEL_GROUP2_ID = 'Group';
 
