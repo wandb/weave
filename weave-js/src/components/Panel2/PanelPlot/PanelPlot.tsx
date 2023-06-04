@@ -47,8 +47,8 @@ import {
   opRunName,
   OpStore,
   opUnnest,
-  Stack,
   // OutputNode,
+  Stack,
   Type,
   typedDict,
   TypedDictType,
@@ -58,7 +58,7 @@ import {
   withoutTags,
 } from '@wandb/weave/core';
 import {produce} from 'immer';
-import * as _ from 'lodash';
+import _ from 'lodash';
 import React, {
   FC,
   memo,
@@ -99,13 +99,12 @@ import {PanelPlotRadioButtons} from './RadioButtons';
 import {
   AnyPlotConfig,
   ConcretePlotConfig,
-  ConcreteSeriesConfig,
   // AxisSelections,
   // ContinuousSelection,
   DEFAULT_SCALE_TYPE,
   DIM_NAME_MAP,
-  LAZY_PATHS,
   // DiscreteSelection,
+  LAZY_PATHS,
   LINE_SHAPES,
   MarkOption,
   PLOT_DIMS_UI,
@@ -117,6 +116,10 @@ import {
   SeriesConfig,
 } from './versions';
 import {toWeaveType} from '../toWeaveType';
+import {ConfigSection} from '../ConfigPanel';
+import {IconButton} from '../../IconButton';
+import {IconOverflowHorizontal} from '../Icons';
+import styled from 'styled-components';
 
 const recordEvent = makeEventRecorder('Plot');
 
@@ -350,7 +353,7 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
   const inputNode = input;
 
   const weave = useWeaveContext();
-  const {frame, stack} = usePanelContext();
+  const {frame, stack, dashboardConfigOptions} = usePanelContext();
 
   // this migrates the config and returns a config of the latest version
   const {config} = useConfig(inputNode, props.config);
@@ -379,45 +382,87 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
     updateConfig(newConfig);
   }, [weave, config, updateConfig]);
 
-  const {config: concreteConfig, loading: configLoading} = useConcreteConfig(
-    config,
-    input,
-    stack
-  );
+  // const exportAsCode = useCallback(() => {
+  //   if (navigator?.clipboard == null) {
+  //     return;
+  //   }
+
+  //   if (config.series.length !== 1) {
+  //     toast('Multi-series plots are not currently supported');
+  //     return;
+  //   }
+
+  //   const series = config.series[0];
+
+  //   const dimConfigured = (dim: keyof SeriesConfig['dims']) =>
+  //     series.table.columnSelectFunctions[series.dims[dim]].type !== 'invalid';
+
+  //   if (!dimConfigured('x') || !dimConfigured('y')) {
+  //     toast(
+  //       "Can't export to code: Required dimensions x and/or y are not configured"
+  //     );
+  //     return;
+  //   }
+
+  //   const dimArgument = (dim: keyof SeriesConfig['dims']) =>
+  //     `${dim}=lambda row: ${weave.expToString(
+  //       series.table.columnSelectFunctions[series.dims[dim]],
+  //       null
+  //     )},`;
+
+  //   const inputTypeText = toPythonTyping(input.type);
+
+  //   const dims: Array<keyof SeriesConfig['dims']> = [
+  //     'x',
+  //     'y',
+  //     'label',
+  //     'tooltip',
+  //   ];
+
+  //   const codeText = [
+  //     '@weave.op()',
+  //     `def my_panel(input: weave.Node[${inputTypeText}]) -> panels.Plot:`,
+  //     '  return panels.Plot(',
+  //     '    input,',
+  //     ...dims.reduce<string[]>((memo, field) => {
+  //       if (dimConfigured(field)) {
+  //         memo.push(`    ${dimArgument(field)}`);
+  //       }
+  //       return memo;
+  //     }, [] as string[]),
+  //     '  )\n',
+  //   ].join('\n');
+
+  //   navigator.clipboard
+  //     .writeText(codeText)
+  //     .then(() => toast('Code copied to clipboard!'));
+  // }, [config, input.type, weave]);
 
   const labelConfigDom = useMemo(() => {
-    return configLoading ? (
-      <Panel2Loader />
-    ) : (
+    return (
       <>
-        {['X Axis Label', 'Y Axis Label', 'Color Legend Label'].map(
-          (name, i) => {
-            const dimName = name.split(' ')[0].toLowerCase() as
-              | 'x'
-              | 'y'
-              | 'color';
-            return (
-              <ConfigPanel.ConfigOption key={name} label={name}>
-                <ConfigPanel.TextInputConfigField
-                  dataTest={`${name}-label`}
-                  // Truncate string to prevent exploding panel for now.
-                  value={concreteConfig.axisSettings[dimName].title}
-                  label={''}
-                  onChange={(event, {value}) => {
-                    const newConfig = produce(config, draft => {
-                      _.set(
-                        draft,
-                        `axisSettings.${dimName}.title`,
-                        constNodeUnsafe('string', value)
-                      );
-                    });
-                    updateConfig(newConfig);
-                  }}
-                />
-              </ConfigPanel.ConfigOption>
-            );
-          }
-        )}
+        {['X Axis Label', 'Y Axis Label', 'Color Legend Label'].map(name => {
+          const dimName = name.split(' ')[0].toLowerCase() as
+            | 'x'
+            | 'y'
+            | 'color';
+          return (
+            <ConfigPanel.ConfigOption key={name} label={name}>
+              <ConfigPanel.TextInputConfigField
+                dataTest={`${name}-label`}
+                // Truncate string to prevent exploding panel for now.
+                value={config.axisSettings[dimName].title}
+                label={''}
+                onChange={(event, {value}) => {
+                  const newConfig = produce(config, draft => {
+                    _.set(draft, `axisSettings.${dimName}.title`, value);
+                  });
+                  updateConfig(newConfig);
+                }}
+              />
+            </ConfigPanel.ConfigOption>
+          );
+        })}
         {config.series.map((series, i) => {
           const seriesName = `Series ${i + 1} Name`;
           return (
@@ -441,7 +486,7 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
         })}
       </>
     );
-  }, [config, updateConfig, concreteConfig.axisSettings, configLoading]);
+  }, [config, updateConfig]);
 
   const seriesConfigDom = useMemo(() => {
     const firstSeries = config.series[0];
@@ -629,14 +674,32 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
   }, [config.series, input, weave]);
 
   return useMemo(
-    () => (
-      <>
-        {enableDashUi && <VariableView newVars={cellFrame} />}
-        {configTabs}
-        {activeTabIndex === 0 && seriesButtons}
-      </>
-    ),
-    [enableDashUi, cellFrame, configTabs, activeTabIndex, seriesButtons]
+    () =>
+      enableDashUi ? (
+        <>
+          <ConfigSection label={`Properties`}>
+            {dashboardConfigOptions}
+            <VariableView newVars={cellFrame} />
+            {seriesConfigDom}
+          </ConfigSection>
+          <ConfigSection label={`Labels`}>{labelConfigDom}</ConfigSection>
+        </>
+      ) : (
+        <>
+          {configTabs}
+          {activeTabIndex === 0 && seriesButtons}
+        </>
+      ),
+    [
+      enableDashUi,
+      dashboardConfigOptions,
+      cellFrame,
+      seriesConfigDom,
+      labelConfigDom,
+      configTabs,
+      activeTabIndex,
+      seriesButtons,
+    ]
   );
 };
 
@@ -1051,17 +1114,23 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
           // offset={'10px, -10px'}
           position="left center"
           trigger={
-            <div>
-              <HighlightedIcon>
-                <LegacyWBIcon name="overflow" />
-              </HighlightedIcon>
-            </div>
+            enableDashUi ? (
+              <ConfigDimMenuButton>
+                <IconOverflowHorizontal />
+              </ConfigDimMenuButton>
+            ) : (
+              <div>
+                <HighlightedIcon>
+                  <LegacyWBIcon name="overflow" />
+                </HighlightedIcon>
+              </div>
+            )
           }
           options={dimOptions.filter(o => !Array.isArray(o))}
           sections={dimOptions.filter(o => Array.isArray(o)) as DimOption[][]}
         />
       ) : undefined,
-    [dimOptions]
+    [dimOptions, enableDashUi]
   );
 
   const updateGroupBy = useCallback(
@@ -1116,9 +1185,7 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
   } else if (PlotState.isDropdown(dimension)) {
     const dimName = dimension.name;
     return (
-      <ConfigDimLabel
-        {...props}
-        postfixComponent={postFixComponent || undefined}>
+      <ConfigDimLabel {...props} postfixComponent={postFixComponent}>
         <ConfigPanel.ModifiedDropdownConfigField
           selection
           placeholder={dimension.defaultState().compareValue}
@@ -1143,9 +1210,7 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
   } else if (PlotState.isWeaveExpression(dimension)) {
     return (
       <>
-        <ConfigDimLabel
-          {...props}
-          postfixComponent={postFixComponent || undefined}>
+        <ConfigDimLabel {...props} postfixComponent={postFixComponent}>
           <WeaveExpressionDimConfig
             dimName={dimension.name}
             input={input}
@@ -1155,7 +1220,7 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
           />
         </ConfigDimLabel>
         {enableDashUi && (
-          <ConfigPanel.ConfigOption label={`groupby ${dimension.name}`}>
+          <ConfigPanel.ConfigOption label={`Group by ${dimension.name}`}>
             <Checkbox
               checked={config.series[0].table.groupBy.includes(
                 config.series[0].dims[dimension.name]
@@ -1367,11 +1432,11 @@ function filterTableNodeToSelection(
 */
 
 function getMark(
-  series: ConcreteSeriesConfig,
+  series: SeriesConfig,
   tableNode: Node,
   vegaReadyTable: TableState.TableState
 ): NonNullable<MarkOption> {
-  if (series.constants.mark != null) {
+  if (series.constants.mark) {
     return series.constants.mark;
   }
   let mark: MarkOption = 'point';
@@ -1425,7 +1490,7 @@ type VegaTimeUnit = 'yearweek' | 'yearmonth';
 
 // Color axis type gets a separate function because color axes can share multiple scales - one for each axis type.
 function getColorAxisType(
-  series: ConcreteSeriesConfig,
+  series: SeriesConfig,
   vegaReadyTable: TableState.TableState
 ): PlotState.VegaAxisType | undefined {
   let colorAxisType: PlotState.VegaAxisType | undefined;
@@ -3122,3 +3187,7 @@ const ORG_DASHBOARD_TEMPLATE_OVERLAY = {
 };
 
 export default Spec;
+
+const ConfigDimMenuButton = styled(IconButton).attrs({small: true})`
+  margin-left: 4px;
+`;
