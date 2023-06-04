@@ -6,7 +6,8 @@ export function shouldSkipOpFirstInput(opDef: OpDef): boolean {
   return ['chain', 'brackets', 'binary'].includes(opDef.renderInfo.type);
 }
 
-const SHOW_DEBUG_LOG = false;
+// const SHOW_DEBUG_LOG = false;
+const SHOW_DEBUG_LOG = true;
 
 export const consoleLog = (...msg: any[]) => {
   if (SHOW_DEBUG_LOG) {

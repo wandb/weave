@@ -104,8 +104,8 @@ export class Weave implements WeaveInterface {
     return nodeIsExecutable(node);
   }
 
-  dereferenceAllVars(node: Node, stack: Stack): Node {
-    return dereferenceAllVars(node, stack).node as Node;
+  dereferenceAllVars(node: Node, stack: Stack, exclude?: string[]): Node {
+    return dereferenceAllVars(node, stack, exclude).node as Node;
   }
 
   callFunction(functionNode: NodeOrVoidNode, frame: Frame): Node {

@@ -102,12 +102,20 @@ function dereferenceVariablesFromFrame(
 
 const VAR_NODE_NAME = '__funcParam__';
 
-export function dereferenceAllVars(node: EditingNode, stack: Stack) {
+export function dereferenceAllVars(
+  node: EditingNode,
+  stack: Stack,
+  exclude: string[] = []
+) {
   const usedStack: Stack = [];
   const result = mapNodes(
     node,
     n => {
       if (n.nodeType === 'var') {
+        if (exclude.includes(n.varName)) {
+          return n;
+        }
+
         const resolved = resolveVar(stack, n.varName);
         if (resolved == null) {
           return n;
@@ -125,7 +133,8 @@ export function dereferenceAllVars(node: EditingNode, stack: Stack) {
         }
         const {node: subNode, usedStack: subUsedStack} = dereferenceAllVars(
           closure.value,
-          closure.stack
+          closure.stack,
+          exclude
         );
         for (const s of subUsedStack) {
           usedStack.splice(0, 0, s);
@@ -141,7 +150,7 @@ export function dereferenceAllVars(node: EditingNode, stack: Stack) {
           )
         );
         const {node: dereffedBody, usedStack: bodyUsedStack} =
-          dereferenceAllVars(n.val, subEnv);
+          dereferenceAllVars(n.val, subEnv, exclude);
         for (const s of bodyUsedStack) {
           usedStack.splice(0, 0, s);
         }

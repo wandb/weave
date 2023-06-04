@@ -9,6 +9,8 @@ import {
   getFreeVars,
   isFunctionType,
   isNodeOrVoidNode,
+  isVarNode,
+  mapNodes,
   maybe,
   Node,
   NodeOrVoidNode,
@@ -21,6 +23,7 @@ import {
   resolveVar,
   Stack,
   Type,
+  varNode,
   voidNode,
   WeaveInterface,
 } from '@wandb/weave/core';
@@ -52,6 +55,7 @@ import {usePanelContext} from './PanelContext';
 import {useSetPanelInputExprIsHighlighted} from './PanelInteractContext';
 import {isGroupNode, nextPanelName} from './panelTree';
 import {useWeaveContext} from '@wandb/weave/context';
+import {consoleLog} from '@wandb/weave/util';
 
 const LAYOUT_MODES = [
   'horizontal' as const,
@@ -811,7 +815,7 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
     throw new Error('Could not find item path for ' + name);
   };
 
-  const {path: groupPath} = usePanelContext();
+  const {path: groupPath, triggerExpressionEvent} = usePanelContext();
   const setPanelIsHighlightedByPath = useSetPanelInputExprIsHighlighted();
   const setItemIsHighlighted = useCallback(
     (name: string, isHighlighted: boolean) => {
@@ -922,32 +926,47 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
           );
         },
         doAction: async (n: Node, stack: Stack) => {
-          console.log('TEST ACTION', n, stack);
-
+          // Naively update the query input
+          // Does not work for:
+          // 1. Tables that modify their input expression (must be direct ref to board var)
           const value = await weave.client.query(
             weave.dereferenceAllVars(n, stack)
           );
 
+          const lhs = n; // TODO
+          // const lhs = mapNodes(
+          //   weave.dereferenceAllVars(n, stack, [varName]),
+          //   node => {
+          //     if (isVarNode(node) && node.varName === varName) {
+          //       return varNode(node.type, 'row');
+          //     }
+          //     return node;
+          //   }
+          // ) as Node;
+
+          consoleLog(`doAction got deref'd expr`, lhs);
+
           let predicate: Node = constBoolean(true);
 
-          if (weave.typeIsAssignableTo(n.type, maybe('boolean'))) {
+          if (weave.typeIsAssignableTo(lhs.type, maybe('boolean'))) {
             if (value) {
-              predicate = n;
+              predicate = lhs;
             } else {
-              predicate = opNot({bool: n});
+              predicate = opNot({bool: lhs});
             }
-          } else if (weave.typeIsAssignableTo(n.type, maybe('number'))) {
+          } else if (weave.typeIsAssignableTo(lhs.type, maybe('number'))) {
             predicate = opNumberEqual({
-              lhs: n,
+              lhs: lhs,
               rhs: value === null ? constNone() : constNumber(value),
             });
-          } else if (weave.typeIsAssignableTo(n.type, maybe('string'))) {
+          } else if (weave.typeIsAssignableTo(lhs.type, maybe('string'))) {
             predicate = opStringEqual({
-              lhs: n,
+              lhs: lhs,
               rhs: value === null ? constNone() : constString(value),
             });
           }
 
+          // Instead of this use triggerExpressionEvent
           updateConfig2(currentConfig =>
             produce(currentConfig, draft => {
               const itemToUpdate = (draft.items.sidebar as ChildPanelFullConfig)
@@ -963,6 +982,23 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
               });
             })
           );
+          // const itemToUpdate = (config.items.sidebar as ChildPanelFullConfig)
+          //   ?.config.items[varName];
+          // if (itemToUpdate == null) {
+          //   throw new Error(`tried to update non-existent var: ${varName}`);
+          // }
+
+          // const filtered = opFilter({
+          //   arr: itemToUpdate.input_node,
+          //   filterFn: constFunction({row: 'any'}, row => predicate),
+          // });
+          // console.log(`about to trigger exp event`, n, filtered);
+          // triggerExpressionEvent(
+          //   lhs,
+          //   {id: 'mutate', newRootNode: filtered},
+          //   'all',
+          //   'path'
+          // );
         },
       };
     });
