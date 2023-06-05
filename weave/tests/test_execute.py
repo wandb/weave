@@ -14,7 +14,7 @@ import pytest
 execute_test_count_op_run_count = 0
 
 
-@api.op(input_type={"x": types.Any()}, output_type=types.Number())
+@api.op(input_type={"x": types.Any()}, output_type=types.Number(), hidden=True)
 def execute_test_count_op(x):
     global execute_test_count_op_run_count
     execute_test_count_op_run_count += 1

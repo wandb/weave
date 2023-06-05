@@ -17,6 +17,7 @@ from .. import xgboost as weave_xgb
         "df": weave.types.TypedDict({}),
     },
     output_type=weave.types.TypedDict({"X": weave.types.Any(), "y": weave.types.Any()}),
+    hidden=True,
 )
 def split_labels(df, label_col: str):
     X = df.drop(label_col, axis=1)

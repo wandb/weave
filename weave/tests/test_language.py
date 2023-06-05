@@ -11,7 +11,8 @@ from ..language_features.tagging import make_tag_getter_op, tag_store, tagged_va
     output_type=lambda input_types: tagged_value_type.TaggedValueType(
         weave.types.TypedDict({"a_tag": weave.types.Int()}),
         input_types["x"],
-    )
+    ),
+    hidden=True,
 )
 def _test_op_tag_input(x: typing.Any, tag_val: int):
     x = box.box(x)
@@ -24,12 +25,12 @@ get_a_tag = make_tag_getter_op.make_tag_getter_op(
 )
 
 
-@weave.op()
+@weave.op(hidden=True)
 def _test_op_refining_refine(x: typing.Any) -> weave.types.Type:
     return weave.type_of(x)
 
 
-@weave.op(refine_output_type=_test_op_refining_refine)
+@weave.op(refine_output_type=_test_op_refining_refine, hidden=True)
 def _test_op_refining(x: typing.Any) -> typing.Any:
     return x
 

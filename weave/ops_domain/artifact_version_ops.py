@@ -62,6 +62,7 @@ def _safe_nested_pick(obj: typing.Optional[dict], path: list[str]) -> typing.Any
         "artifactVersionName": types.String(),
     },
     output_type=types.optional(wdt.ArtifactVersionType),
+    hidden=True,
 )
 def root_artifact_version_gql_resolver(
     gql_result, entityName, projectName, artifactTypeName, artifactVersionName

@@ -94,6 +94,7 @@ def make_rpt_op(plot_name, output_row_type):
         name=f"rpt_{plot_name}GQLResolver",
         input_type={"gql_result": types.TypedDict({}), "repoName": types.String()},
         output_type=output_type,
+        hidden=True,
     )
     def root_all_projects_gql_resolver(gql_result, repoName):
         # Copied from root.ts
@@ -156,6 +157,7 @@ def make_rpt_op(plot_name, output_row_type):
             is_root=True,
             root_resolver=root_all_projects_gql_resolver,
         ),
+        hidden=True,
     )
     def root_rpt(repoName):
         raise errors.WeaveGQLCompileError(

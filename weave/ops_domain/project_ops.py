@@ -34,6 +34,7 @@ project = gql_root_op(
     name="root-allProjectsGQLResolver",
     input_type={"gql_result": types.TypedDict({})},
     output_type=types.List(wdt.ProjectType),
+    hidden=True,
 )
 def root_all_projects_gql_resolver(gql_result):
     return [

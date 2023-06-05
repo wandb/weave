@@ -20,6 +20,7 @@ from .. import errors
     name="root-allArtifactsGQLResolver",
     input_type={"gql_result": types.TypedDict({})},
     output_type=types.List(wdt.ArtifactCollectionType),
+    hidden=True,
 )
 def root_all_artifacts_gql_resolver(gql_result):
     return [

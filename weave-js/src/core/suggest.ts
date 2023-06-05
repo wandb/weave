@@ -686,6 +686,20 @@ export async function autosuggest(
   }
 
   result.sort((a, b) => {
+    // Picks first
+    const aIsPick =
+      a.newNodeOrOp.nodeType === 'output' &&
+      a.newNodeOrOp.fromOp.name === 'pick';
+    const bIsPick =
+      b.newNodeOrOp.nodeType === 'output' &&
+      b.newNodeOrOp.fromOp.name === 'pick';
+
+    if (aIsPick && !bIsPick) {
+      return -1;
+    } else if (!aIsPick && bIsPick) {
+      return 1;
+    }
+
     const aIsTagGetter = isTagGetterNodeOrOp(a.newNodeOrOp, client.opStore);
     const bIsTagGetter = isTagGetterNodeOrOp(b.newNodeOrOp, client.opStore);
 

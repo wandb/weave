@@ -19,6 +19,7 @@ from .. import errors
     name="root-allReportsGQLResolver",
     input_type={"gql_result": types.TypedDict({})},
     output_type=types.List(wdt.ReportType),
+    hidden=True,
 )
 def root_all_reports_gql_resolver(gql_result):
     return [

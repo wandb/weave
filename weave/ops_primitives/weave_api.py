@@ -118,7 +118,7 @@ def used_by_callable_output_type(input_type) -> types.Type:
     return usedby_output_type(op_name)
 
 
-@op(render_info={"type": "function"})
+@op(render_info={"type": "function"}, hidden=True)
 def usedby_refine_output_type(obj: typing.Any, op_name: str) -> types.Type:
     return usedby_output_type(op_name)
 
@@ -127,6 +127,7 @@ def usedby_refine_output_type(obj: typing.Any, op_name: str) -> types.Type:
     pure=False,
     output_type=used_by_callable_output_type,
     refine_output_type=usedby_refine_output_type,
+    hidden=True,
 )
 def used_by(obj: typing.Any, op_name: str):
     ref = storage.get_ref(obj)
