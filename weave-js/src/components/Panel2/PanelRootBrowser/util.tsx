@@ -7,6 +7,7 @@ import {
   dereferenceAllVars,
   expressionVariables,
   Node,
+  NodeOrVoidNode,
   opAnd,
   opArtifactMembershipArtifactVersion,
   opArtifactMembershipForAlias,
@@ -143,6 +144,7 @@ export const useNewDashFromItems = () => {
     async (
       panelName: string,
       items: {[name: string]: ChildPanelFullConfig},
+      vars: {[name: string]: NodeOrVoidNode},
       onCreated?: (newPanel: Node) => void
     ) => {
       if (client) {
@@ -165,7 +167,7 @@ export const useNewDashFromItems = () => {
           client,
           onCreated
         );
-        const panelConfig = ensureDashboardFromItems(items);
+        const panelConfig = ensureDashboardFromItems(items, vars);
         await newDashMutation({
           val: constNodeUnsafe(toWeaveType(panelConfig), panelConfig),
         });

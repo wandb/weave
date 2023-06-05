@@ -2,7 +2,14 @@ import {KeyboardShortcut} from '@wandb/weave/common/components/elements/Keyboard
 import {WBButton} from '@wandb/weave/common/components/elements/WBButtonNew';
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import {isMac} from '@wandb/weave/common/util/browser';
-import {NodeOrVoidNode, voidNode} from '@wandb/weave/core';
+import {
+  NodeOrVoidNode,
+  isConstNode,
+  isOutputNode,
+  mapNodes,
+  varNode,
+  voidNode,
+} from '@wandb/weave/core';
 import {
   useMakeMutation,
   useMutation,
@@ -59,6 +66,7 @@ import {
 import {PanelGroupConfig} from '../Panel2/PanelGroup';
 import {getFullChildPanel} from '../Panel2/ChildPanel';
 import _ from 'lodash';
+import {mapPanels} from '../Panel2/panelTree';
 
 const CustomPopover = styled(Popover)`
   .MuiPaper-root {
@@ -608,15 +616,63 @@ const HeaderLogoControls: React.FC<{
     }
   }, [inputConfig, inputNode, isGroup, isPanel]);
 
+  const {processedSeedItems, vars} = useMemo(() => {
+    const varMap: {[uri: string]: {name: string; node: NodeOrVoidNode}} = {};
+    const names = new Set<string>();
+    const processedSeedItems = _.mapValues(seedItems, (item, key) => {
+      return mapPanels(item, [], (panelNode, stack) => {
+        const {input_node} = panelNode;
+        const newInputNode = mapNodes(input_node, inNode => {
+          if (isOutputNode(inNode) && inNode.fromOp.name === 'get') {
+            const uriNode = inNode.fromOp.inputs.uri;
+            if (uriNode != null && isConstNode(uriNode)) {
+              const uriVal = uriNode.val;
+              if (uriVal != null && typeof uriVal === 'string') {
+                if (!(uriVal in varMap)) {
+                  const baseNameParts = uriVal.split(':')[1].split('/');
+                  const baseName = baseNameParts[baseNameParts.length - 1];
+                  let count = 0;
+                  let name = baseName + '_' + count;
+                  while (names.has(name)) {
+                    count++;
+                    name = baseName + '_' + count;
+                  }
+                  names.add(name);
+
+                  varMap[uriVal] = {
+                    name: name,
+                    node: inNode,
+                  };
+                }
+                return varNode(inNode.type, varMap[uriVal].name);
+              }
+            }
+          }
+          return inNode;
+        });
+        return {
+          ...panelNode,
+          input_node: newInputNode as NodeOrVoidNode,
+        };
+      });
+    });
+    const vars = _.fromPairs(
+      Object.entries(varMap).map(([uri, {name, node}]) => {
+        return [name, node];
+      })
+    );
+    return {processedSeedItems, vars};
+  }, [seedItems]);
+
   const name = 'dashboard-' + moment().format('YY_MM_DD_hh_mm_ss');
   const makeNewDashboard = useNewDashFromItems();
   const newDashboard = useCallback(() => {
-    if (seedItems) {
-      makeNewDashboard(name, seedItems, newDashExpr => {
+    if (processedSeedItems) {
+      makeNewDashboard(name, processedSeedItems, vars, newDashExpr => {
         updateNode(newDashExpr);
       });
     }
-  }, [makeNewDashboard, name, seedItems, updateNode]);
+  }, [makeNewDashboard, name, processedSeedItems, vars, updateNode]);
 
   return (
     <>

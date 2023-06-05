@@ -309,14 +309,14 @@ export const addChild = (
 
 // Must match the variables that the rest of the UI
 // pushes onto the stack!
-export const asyncMapPanels = async (
+export const mapPanels =  (
   node: PanelTreeNode,
   stack: Stack,
   fn: (
     node: ChildPanelFullConfig,
     stack: Stack
-  ) => Promise<ChildPanelFullConfig>
-): Promise<ChildPanelFullConfig> => {
+  ) => ChildPanelFullConfig
+): ChildPanelFullConfig => {
   const fullNode = getFullChildPanel(node);
   let withMappedChildren: ChildPanelFullConfig = fullNode;
   if (isGroupNode(fullNode)) {
@@ -324,7 +324,7 @@ export const asyncMapPanels = async (
     let childFrame: Frame = {};
     for (const key of Object.keys(fullNode.config.items)) {
       const childItem = fullNode.config.items[key];
-      items[key] = await asyncMapPanels(
+      items[key] =  mapPanels(
         fullNode.config.items[key],
         pushFrame(stack, childFrame),
         fn
@@ -339,7 +339,7 @@ export const asyncMapPanels = async (
   } else if (isStandardPanel(fullNode.id)) {
     const children: {[key: string]: ChildPanelFullConfig} = {};
     for (const key of Object.keys(STANDARD_PANEL_CHILD_KEYS[fullNode.id])) {
-      children[key] = await asyncMapPanels(fullNode.config[key], stack, fn);
+      children[key] =  mapPanels(fullNode.config[key], stack, fn);
     }
     withMappedChildren = {
       ...fullNode,
@@ -433,7 +433,7 @@ export const ensureDashboard = (node: PanelTreeNode): ChildPanelFullConfig => {
   );
 };
 
-export const ensureDashboardFromItems = (seedItems: {[name: string]: ChildPanelFullConfig}): ChildPanelFullConfig => {
+export const ensureDashboardFromItems = (seedItems: {[name: string]: ChildPanelFullConfig}, vars:  {[name: string]: NodeOrVoidNode}): ChildPanelFullConfig => {
   const mainConfig = {
     layoutMode: 'grid',
     showExpressions: true,
@@ -451,17 +451,19 @@ export const ensureDashboardFromItems = (seedItems: {[name: string]: ChildPanelF
     },
   };
   const main = makeGroup(seedItems, mainConfig);
+  if (Object.keys(vars).length === 0) {
+    vars = {var0: voidNode()}
+  }
+  const sidebarVars = _.mapValues(vars, (node, name) => (getFullChildPanel({
+      vars: {},
+      input_node: node,
+      id: 'Expression',
+      config: null
+  })))
   return makeGroup(
     {
       sidebar: makeGroup(
-        {
-          var0: {
-            vars: {},
-            input_node: voidNode(),
-            id: 'Expression',
-            config: null,
-          },
-        },
+        sidebarVars,
         {
           layoutMode: 'vertical',
           equalSize: false,

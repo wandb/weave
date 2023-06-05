@@ -100,7 +100,7 @@ const usePanelPanelCommon = (props: PanelPanelProps) => {
         // them here to make sure our panel state is valid.
         // let hydratedPanel: ChildPanelFullConfig;
         // try {
-        //   hydratedPanel = await asyncMapPanels(
+        //   hydratedPanel = await mapPanels(
         //     loadedPanel,
         //     stack,
         //     async (panel: ChildPanelFullConfig, childStack: Stack) => {
