@@ -19,8 +19,12 @@ export const Container = styled.div<{active: boolean}>`
   flex-shrink: 0;
   font-size: 15px;
   overflow: hidden;
-  box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.2);
-
+  border-left: ${p => (p.active ? '1px solid #e5e5e5' : 'none')};
+  // Alternative to the border:
+  /* 
+  z-index: 1;
+  box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.2); 
+  */
   width: ${p => (p.active ? WIDTH_PX : 0)}px;
   transition: width 0.3s;
 `;

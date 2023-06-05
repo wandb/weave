@@ -444,21 +444,25 @@ export function getItemVars(
 export const addPanelToGroupConfig = (
   currentConfig: PanelGroupConfig,
   allowedPanels?: string[],
-  childNameBase?: string
+  childNameBase?: string,
+  childConfig?: ChildPanelConfig
 ) => {
   let panelId = '';
   if (allowedPanels != null) {
     panelId = allowedPanels[0];
   }
   return produce(currentConfig, draft => {
+    if (childConfig == null) {
+      childConfig = {
+        vars: {},
+        id: panelId,
+        input_node: voidNode(),
+        config: undefined,
+      };
+    }
     draft.items[
       nextPanelName(Object.keys(currentConfig.items), childNameBase)
-    ] = {
-      vars: {},
-      id: panelId,
-      input_node: voidNode(),
-      config: undefined,
-    };
+    ] = childConfig;
     if (currentConfig.layoutMode === 'flow') {
       // If there is only one panel, and one row and column, add a second
       // column. This is a nice behavior in notebooks.
