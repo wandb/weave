@@ -292,7 +292,9 @@ def to_python(obj: typing.Any, wb_type: typing.Optional[types.Type] = None) -> d
         # to the local artifact for any custom objects, this new value will contain
         # those existing refs as absolute refs. We provide None for artifact because
         # it should not be used in this pass.
-        mapper = mappers_python.map_to_python(wb_type, None)  # type: ignore
+        # TODO: actually had to add artifact here to get HF/Bertviz caching
+        # to work. Why?
+        mapper = mappers_python.map_to_python(wb_type, fs_art)  # type: ignore
         val = mapper.apply(obj)
     # TODO: this should be a ConstNode!
     return {"_type": wb_type.to_dict(), "_val": val}

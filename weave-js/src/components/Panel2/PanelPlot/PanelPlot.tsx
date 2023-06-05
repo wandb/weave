@@ -111,7 +111,7 @@ import styled from 'styled-components';
 
 const recordEvent = makeEventRecorder('Plot');
 
-const PANELPLOT_MAX_DATAPOINTS = 2000;
+const PANELPLOT_MAX_DATAPOINTS = 10000;
 
 const defaultFontStyleDict = {
   titleFont: 'Source Sans Pro',

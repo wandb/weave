@@ -862,7 +862,7 @@ export function axisType(dimType: Type, isDashboard: boolean) {
 // TODO, this produces ugly keys
 export const fixKeyForVega = (key: string) => {
   // Scrub these characters: . [ ] \
-  return key.replace(/[.[\]\\]/g, '');
+  return key.replace(/[.[\]\\(),]/g, '');
 };
 
 export function dimNames(

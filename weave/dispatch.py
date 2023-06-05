@@ -3,6 +3,7 @@ from dataclasses import dataclass
 import functools
 import logging
 import typing
+import json
 
 from .language_features.tagging.is_tag_getter import is_tag_getter
 from .language_features.tagging.tagged_value_type import TaggedValueType
@@ -257,6 +258,15 @@ def get_op_for_inputs(name: str, kwargs: dict[str, types.Type]) -> op_def.OpDef:
         # Hack it some more :(
         # TODO: remove.
         ops = _get_ops_by_name(name)
+
+        # Take that type system!
+        ops = [
+            o
+            for o in ops
+            if name.split("-")[0].removeprefix("panel_").lower()
+            in json.dumps(list(o.input_type.arg_types.values())[0].to_dict()).lower()  # type: ignore
+        ]
+
         return ops[0]
 
     input_keys = list(kwargs.keys())

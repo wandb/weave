@@ -24,6 +24,9 @@ CACHE_OP_NAMES = [
     "ArrowWeaveList-projection2D",
     "op-faiss_from_documents",
     "FAISS-document_embeddings",
+    "HuggingFacePackage-model",
+    "HFModelTextClassification-pipeline",
+    "HFModelTextClassification-call",
     # These are parallelized by derive_op only, in a custom way
     # Should move them to CACHE_AND_PARALLEL_OP_NAMES once that
     # is fixed.

@@ -17,6 +17,7 @@ from .. import errors
 from .. import file_base
 from ..language_features.tagging import tag_store, tagged_value_type
 
+
 # Hack hack hack
 # TODO: we can do this with Weave instead of writing a giant switch statement
 #   (opNumberGreater can operate on Dataframe)
@@ -113,6 +114,9 @@ class DataFrameType(types.Type):
                 weave_type = types.Int()
             elif dtype == np.dtype("float64"):
                 weave_type = types.Float()
+            elif dtype == np.dtype("bool"):
+                weave_type = types.Boolean()
+
             else:
                 raise errors.WeaveTypeError(
                     "Type conversion not implemented for dtype: %s" % dtype

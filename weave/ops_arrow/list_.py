@@ -1327,6 +1327,9 @@ def dataframe_to_arrow(df):
     return ArrowWeaveList(pa.Table.from_pandas(df))
 
 
+pandas_to_awl = dataframe_to_arrow
+
+
 def make_vec_none(length: int) -> ArrowWeaveList:
     return ArrowWeaveList(pa.nulls(length), types.NoneType(), None)
 

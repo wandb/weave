@@ -90,3 +90,7 @@ def type_of(obj: typing.Any) -> types.Type:
 
 def weave(obj: typing.Any) -> RuntimeConstNode:
     return _weave_internal.make_const_node(type_of(obj), obj)  # type: ignore
+
+
+def from_pandas(df):
+    return _ops.pandas_to_awl(df)

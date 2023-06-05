@@ -12,12 +12,10 @@ class SliderConfig:
         default_factory=lambda: weave_internal.make_const_node(weave.types.Float(), 0)
     )
     max: weave.Node[float] = dataclasses.field(
-        default_factory=lambda: weave_internal.make_const_node(weave.types.Float(), 1)
+        default_factory=lambda: weave_internal.make_const_node(weave.types.Float(), 10)
     )
     step: weave.Node[float] = dataclasses.field(
-        default_factory=lambda: weave_internal.make_const_node(
-            weave.types.Float(), 0.01
-        )
+        default_factory=lambda: weave_internal.make_const_node(weave.types.Float(), 0.1)
     )
 
 

@@ -52,7 +52,7 @@ class PanelBankSectionConfig(typing.TypedDict):
 class GroupConfig(typing.Generic[ItemsType]):
     layoutMode: str = dataclasses.field(default_factory=lambda: "vertical")
     showExpressions: bool = dataclasses.field(default_factory=lambda: False)
-    equalSize: bool = dataclasses.field(default_factory=lambda: True)
+    equalSize: bool = dataclasses.field(default_factory=lambda: False)
     style: str = dataclasses.field(default_factory=lambda: "")
     items: ItemsType = dataclasses.field(default_factory=dict)  # type: ignore
     gridConfig: typing.Optional[PanelBankSectionConfig] = dataclasses.field(
@@ -150,7 +150,7 @@ class Group(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
         if self.config and self.config:
             gc = self.config
 
-            if gc.equalSize != True:
+            if gc.equalSize != False:
                 return None
             if gc.style != "":
                 return None
