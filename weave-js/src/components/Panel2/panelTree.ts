@@ -433,6 +433,51 @@ export const ensureDashboard = (node: PanelTreeNode): ChildPanelFullConfig => {
   );
 };
 
+export const ensureDashboardFromItems = (seedItems: {[name: string]: ChildPanelFullConfig}): ChildPanelFullConfig => {
+  const mainConfig = {
+    layoutMode: 'grid',
+    showExpressions: true,
+    enableAddPanel: true,
+    gridConfig: {
+      panels: Object.entries(seedItems).map(([name, item], ndx) => ({
+        id: name,
+        layout: {
+          x: 0,
+          y: ndx * 10,
+          w: 24,
+          h: 9,
+        }
+      }))
+    },
+  };
+  const main = makeGroup(seedItems, mainConfig);
+  return makeGroup(
+    {
+      sidebar: makeGroup(
+        {
+          var0: {
+            vars: {},
+            input_node: voidNode(),
+            id: 'Expression',
+            config: null,
+          },
+        },
+        {
+          layoutMode: 'vertical',
+          equalSize: false,
+          style: 'width:300px; padding-right: 20px',
+          showExpressions: true,
+          allowedPanels: ['Expression', 'Query', 'Slider', 'StringEditor'],
+          enableAddPanel: true,
+          childNameBase: 'var',
+        }
+      ),
+      main,
+    },
+    {layoutMode: 'horizontal'}
+  );
+};
+
 export const ensureSimpleDashboard = (
   node: PanelTreeNode
 ): ChildPanelFullConfig => {

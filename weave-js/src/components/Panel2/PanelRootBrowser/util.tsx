@@ -33,6 +33,7 @@ import {usePanelContext} from '../PanelContext';
 import {toWeaveType} from '../PanelGroup';
 import {
   ensureDashboard,
+  ensureDashboardFromItems,
   ensureSimpleDashboard,
   PanelTreeNode,
 } from '../panelTree';
@@ -41,6 +42,7 @@ import {
   getRowExampleNode,
   addNamedColumnToTable,
 } from '../PanelTable/tableState';
+import {ChildPanelFullConfig} from '../ChildPanel';
 
 export const useCopiedVariableName = (
   expr: Node,
@@ -119,6 +121,51 @@ export const useNewPanelFromRootQueryCallback = () => {
           panelConstructor = ensureDashboard;
         }
         const panelConfig = panelConstructor(rootQuery);
+        await newDashMutation({
+          val: constNodeUnsafe(toWeaveType(panelConfig), panelConfig),
+        });
+        if (onCreated) {
+          onCreated(target);
+        }
+      }
+    },
+    [client, refreshAll, stack, triggerExpressionEvent]
+  );
+  return makeNewDashboard;
+};
+
+export const useNewDashFromItems = () => {
+  const refreshAll = useRefreshAllNodes();
+  const {stack, triggerExpressionEvent} = usePanelContext();
+  const {client} = useClientContext();
+  // const newDashMutation = useMutation(newDashExpr, 'set');
+  const makeNewDashboard = useCallback(
+    async (
+      panelName: string,
+      items: {[name: string]: ChildPanelFullConfig},
+      onCreated?: (newPanel: Node) => void
+    ) => {
+      if (client) {
+        const target = opGet({
+          uri: constString(`local-artifact:///${panelName}:latest/obj`),
+        });
+        const absoluteTarget = dereferenceAllVars(target, stack).node;
+        const {rootArgs, mutationStyle, rootType} =
+          absoluteTargetMutation(absoluteTarget);
+        const newDashMutation = makeMutation(
+          target,
+          'set',
+          refreshAll,
+          stack,
+          triggerExpressionEvent,
+          absoluteTarget,
+          mutationStyle,
+          rootArgs,
+          rootType,
+          client,
+          onCreated
+        );
+        const panelConfig = ensureDashboardFromItems(items);
         await newDashMutation({
           val: constNodeUnsafe(toWeaveType(panelConfig), panelConfig),
         });

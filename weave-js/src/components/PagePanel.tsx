@@ -422,6 +422,7 @@ const PagePanel: React.FC = props => {
                 {!inJupyter && (
                   <PersistenceManager
                     inputNode={config.input_node}
+                    inputConfig={config.config}
                     updateNode={updateInputNode}
                     goHome={goHome}
                   />

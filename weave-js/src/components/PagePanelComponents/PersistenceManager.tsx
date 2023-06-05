@@ -49,9 +49,16 @@ import {
   uriFromNode,
   useIsAuthenticated,
   weaveTypeIsPanel,
+  weaveTypeIsPanelGroup,
 } from './util';
 import moment from 'moment';
-import {useNewPanelFromRootQueryCallback} from '../Panel2/PanelRootBrowser/util';
+import {
+  useNewDashFromItems,
+  useNewPanelFromRootQueryCallback,
+} from '../Panel2/PanelRootBrowser/util';
+import {PanelGroupConfig} from '../Panel2/PanelGroup';
+import {getFullChildPanel} from '../Panel2/ChildPanel';
+import _ from 'lodash';
 
 const CustomPopover = styled(Popover)`
   .MuiPaper-root {
@@ -199,6 +206,7 @@ const WeaveLogo = styled(IconWeaveLogo)<{open: boolean}>`
 
 export const PersistenceManager: React.FC<{
   inputNode: NodeOrVoidNode;
+  inputConfig: any;
   updateNode: (node: NodeOrVoidNode) => void;
   goHome?: () => void;
 }> = props => {
@@ -219,11 +227,11 @@ export const PersistenceManager: React.FC<{
   );
 
   const headerRef = useRef<HTMLDivElement>(null);
-
   return (
     <MainHeaderWrapper ref={headerRef}>
       <HeaderLogoControls
         inputNode={props.inputNode}
+        inputConfig={props.inputConfig}
         updateNode={props.updateNode}
         headerEl={headerRef.current}
         goHome={props.goHome}
@@ -569,12 +577,46 @@ const HeaderFileControls: React.FC<{
 
 const HeaderLogoControls: React.FC<{
   inputNode: NodeOrVoidNode;
+  inputConfig: any;
   updateNode: (node: NodeOrVoidNode) => void;
   headerEl: HTMLElement | null;
   goHome?: () => void;
-}> = ({headerEl, goHome}) => {
+}> = ({inputNode, headerEl, goHome, updateNode, inputConfig}) => {
   const [anchorHomeEl, setAnchorHomeEl] = useState<HTMLElement | null>(null);
   const expandedHomeControls = Boolean(anchorHomeEl);
+  const inputType = useNodeWithServerType(inputNode).result?.type;
+  const isPanel = weaveTypeIsPanel(inputType || ('any' as const));
+  const isGroup = weaveTypeIsPanelGroup(inputType);
+  const seedItems = useMemo(() => {
+    if (isGroup) {
+      const groupConfig: PanelGroupConfig | null = inputConfig?.config;
+      if (groupConfig == null) {
+        return null;
+      }
+      const isDash =
+        isGroup &&
+        'sidebar' in groupConfig.items &&
+        'main' in groupConfig.items;
+      if (isDash) {
+        return null;
+      }
+      return _.mapValues(groupConfig.items, getFullChildPanel);
+    } else if (isPanel) {
+      return {panel0: getFullChildPanel(inputConfig)};
+    } else {
+      return {panel0: getFullChildPanel(inputNode)};
+    }
+  }, [inputConfig, inputNode, isGroup, isPanel]);
+
+  const name = 'dashboard-' + moment().format('YY_MM_DD_hh_mm_ss');
+  const makeNewDashboard = useNewDashFromItems();
+  const newDashboard = useCallback(() => {
+    if (seedItems) {
+      makeNewDashboard(name, seedItems, newDashExpr => {
+        updateNode(newDashExpr);
+      });
+    }
+  }, [makeNewDashboard, name, seedItems, updateNode]);
 
   return (
     <>
@@ -598,6 +640,18 @@ const HeaderLogoControls: React.FC<{
           horizontal: 'center',
         }}>
         <CustomMenu>
+          {seedItems != null && (
+            <MenuItem
+              onClick={() => {
+                setAnchorHomeEl(null);
+                newDashboard();
+              }}>
+              <MenuIcon>
+                <IconAddNew />
+              </MenuIcon>
+              <MenuText>Seed new board</MenuText>
+            </MenuItem>
+          )}
           <MenuItem
             onClick={() => {
               setAnchorHomeEl(null);
