@@ -419,7 +419,7 @@ const PagePanel: React.FC = props => {
                   display: 'flex',
                   flexDirection: 'column',
                 }}>
-                {!inJupyter && (
+                {(!inJupyter || fullScreen) && (
                   <PersistenceManager
                     inputNode={config.input_node}
                     inputConfig={config.config}
@@ -500,7 +500,15 @@ export const PageContent: FC<PageContentProps> = props => {
       .expToString(config.input_node)
       .replace(/\n+/g, '')
       .replace(/\s+/g, '');
-    window.open(urlPrefixed(`/?exp=${encodeURIComponent(expStr)}`), '_blank');
+    // window.open(urlPrefixed(`/?exp=${encodeURIComponent(expStr)}`), '_blank');
+    window.open(
+      urlPrefixed(
+        `/__frontend/weave_jupyter?exp=${encodeURIComponent(
+          expStr
+        )}&fullScreen=true`
+      ),
+      '_blank'
+    );
   }, [config.input_node, urlPrefixed, weave]);
 
   return (
