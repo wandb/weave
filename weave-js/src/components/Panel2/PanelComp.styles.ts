@@ -21,7 +21,8 @@ interface ControlWrapperBarProps {
 }
 export const ControlWrapperBar = styled.div<ControlWrapperBarProps>`
   position: absolute;
-  visibility: ${props => (props.hovering ? 'visible' : 'hidden')};
+  // visibility: ${props => (props.hovering ? 'visible' : 'hidden')};
+  visibility: hidden;
   z-index: 1000;
   display: flex;
   justify-content: flex-end;
