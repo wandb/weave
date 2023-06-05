@@ -44,6 +44,7 @@ import {IconAddNew as IconAddNewUnstyled, IconPencilEdit} from './Icons';
 import {WBButton} from '../../common/components/elements/WBButtonNew';
 import {Tooltip} from '../Tooltip';
 import {VarBar} from '../Sidebar/VarBar';
+import {inJupyterCell} from '../PagePanelComponents/util';
 
 const LAYOUT_MODES = [
   'horizontal' as const,
@@ -153,7 +154,7 @@ export const GroupItem = styled.div<{
 const ActionBar = styled.div`
   height: 48px;
   padding: 0 32px;
-  flex-shrink: 0;
+  flex: 0 0 48px;
   display: flex;
   justify-content: flex-end;
   align-items: center;
@@ -166,8 +167,8 @@ const IconAddNew = styled(IconAddNewUnstyled)`
 `;
 
 const PBContainer = styled.div`
-  position: relative;
-  height: calc(100% - 48px);
+  flex: '1 1 100%';
+  height: 100%;
 `;
 
 // This is a mapping from JS PanelIDs to their corresponding Python type name
@@ -895,6 +896,7 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
     [childPanelsByKey]
   );
 
+  const inJupyter = inJupyterCell();
   // TODO: This special-case rendering is insane
   const isVarBar = _.isEqual(groupPath, [`sidebar`]);
   if (isVarBar) {
@@ -911,24 +913,32 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
 
   if (config.layoutMode === 'grid' || config.layoutMode === 'flow') {
     return (
-      <>
-        <ActionBar>
-          <Tooltip
-            position="bottom right"
-            trigger={
-              <IconButton onClick={() => setInspectingPanel(groupPath)}>
-                <IconPencilEdit />
-              </IconButton>
-            }>
-            Open panel editor
-          </Tooltip>
-          {config.enableAddPanel && (
-            <WBButton onClick={handleAddPanel}>
-              <IconAddNew />
-              New panel
-            </WBButton>
-          )}
-        </ActionBar>
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          height: '100%',
+          width: '100%',
+        }}>
+        {!inJupyter && (
+          <ActionBar>
+            <Tooltip
+              position="bottom right"
+              trigger={
+                <IconButton onClick={() => setInspectingPanel(groupPath)}>
+                  <IconPencilEdit />
+                </IconButton>
+              }>
+              Open panel editor
+            </Tooltip>
+            {config.enableAddPanel && (
+              <WBButton onClick={handleAddPanel}>
+                <IconAddNew />
+                New panel
+              </WBButton>
+            )}
+          </ActionBar>
+        )}
         <PBContainer>
           <PBSection
             mode={config.layoutMode}
@@ -938,7 +948,7 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
             handleAddPanel={config.enableAddPanel ? handleAddPanel : undefined}
           />
         </PBContainer>
-      </>
+      </div>
     );
   }
 

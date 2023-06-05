@@ -18,6 +18,7 @@ import {PanelBankGridSection} from './PanelBankGridSection';
 import styled from 'styled-components';
 import {GRAY_25, GRAY_500} from '../../common/css/globals.styles';
 import {IconAddNew as IconAddNewUnstyled} from '../Panel2/Icons';
+import {inJupyterCell} from '../PagePanelComponents/util';
 
 interface PBSectionProps {
   mode: 'grid' | 'flow';
@@ -35,6 +36,7 @@ export const PBSection: React.FC<PBSectionProps> = props => {
   const [panelBankHeight, setPanelBankHeight] = useState(0);
   const PanelBankSectionComponent =
     props.mode === 'grid' ? PanelBankGridSection : PanelBankFlowSection;
+  const inJupyter = inJupyterCell();
   return (
     <DragDropProvider>
       <div className="panel-bank" style={{height: '100%'}}>
@@ -83,7 +85,7 @@ export const PBSection: React.FC<PBSectionProps> = props => {
                     console.log('MOVE BETWEEN SECTIONS');
                   }}
                 />
-                {handleAddPanel != null && (
+                {handleAddPanel != null && !inJupyter && (
                   <AddPanelBarContainer>
                     <AddPanelBar onClick={handleAddPanel}>
                       <IconAddNew />
