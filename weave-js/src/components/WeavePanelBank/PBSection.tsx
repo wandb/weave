@@ -37,6 +37,7 @@ export const PBSection: React.FC<PBSectionProps> = props => {
   const PanelBankSectionComponent =
     props.mode === 'grid' ? PanelBankGridSection : PanelBankFlowSection;
   const inJupyter = inJupyterCell();
+  const bottomBarHeight = inJupyter ? 0 : 80;
   return (
     <DragDropProvider>
       <div className="panel-bank" style={{height: '100%'}}>
@@ -49,7 +50,9 @@ export const PBSection: React.FC<PBSectionProps> = props => {
                 : 0
             );
             setPanelBankHeight(
-              contentRect.bounds ? contentRect.bounds.height : 0
+              contentRect.bounds
+                ? contentRect.bounds.height - bottomBarHeight
+                : 0
             );
           }}>
           {({measureRef}) => (
