@@ -268,7 +268,7 @@ export const PanelQueryConditionComponent: React.FC<
   console.log('CONDITION EDITOR', condition.editor);
 
   return (
-    <div style={{height: '100%'}}>
+    <div>
       <ExpressionView node={condition.expression as any} />
       <div style={{maxHeight: 300, overflow: 'auto'}}>
         <PanelContextProvider newVars={newVars}>
@@ -339,7 +339,6 @@ export const PanelQuery: React.FC<PanelQueryProps> = props => {
           index={i}
         />
       ))}
-      <Button>Update Query</Button>
     </div>
   );
 };
