@@ -267,6 +267,7 @@ const PagePanel: React.FC = props => {
   const weave = useWeaveContext();
   const urlParams = new URLSearchParams(window.location.search);
   const fullScreen = urlParams.get('fullScreen') != null;
+  const moarfullScreen = urlParams.get('moarFullScreen') != null;
   const expString = urlParams.get('exp');
   const expNode = urlParams.get('expNode');
   const panelId = urlParams.get('panelId') ?? '';
@@ -419,7 +420,7 @@ const PagePanel: React.FC = props => {
                   display: 'flex',
                   flexDirection: 'column',
                 }}>
-                {(!inJupyter || fullScreen) && (
+                {(!inJupyter || moarfullScreen) && (
                   <PersistenceManager
                     inputNode={config.input_node}
                     inputConfig={config.config}
@@ -505,7 +506,7 @@ export const PageContent: FC<PageContentProps> = props => {
       urlPrefixed(
         `/__frontend/weave_jupyter?exp=${encodeURIComponent(
           expStr
-        )}&fullScreen=true`
+        )}&moarFullScreen=true`
       ),
       '_blank'
     );
