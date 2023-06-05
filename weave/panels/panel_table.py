@@ -87,11 +87,21 @@ class Table(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
             if ts.sort != []:
                 return None
 
+            default_column_panel_def = table_state.PanelDef("", {}, None)
+            default_column_panel_def_as_dict = {
+                "panelId": "",
+                "panelConfig": None,
+                "originalKey": "",
+            }
+
             code_cols = []
             for col_id in ts.order:
                 if ts.columnNames[col_id] != "":
                     return None
-                if ts.columns[col_id] != table_state.PanelDef("", {}, None):
+                if (
+                    ts.columns[col_id] != default_column_panel_def
+                    and ts.columns[col_id] != default_column_panel_def_as_dict
+                ):
                     return None
                 code_cols.append(
                     codify.lambda_wrapped_object_to_code_no_format(

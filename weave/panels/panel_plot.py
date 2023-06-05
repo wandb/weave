@@ -454,14 +454,36 @@ class Plot(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
         )
         default_configOptionsExpanded = ConfigOptionsExpanded()
 
+        # These are total hacks and should be removed once we have a proper way
+        # to ensure UI produces the correct types
+        default_axisSettings_asDict: dict = {"x": {}, "y": {}, "color": {}}
+        default_legendSettings_asDict: dict = {"color": {}}
+        default_configOptionsExpanded_asDict: dict = {
+            "x": False,
+            "y": False,
+            "label": False,
+            "tooltip": False,
+            "mark": False,
+        }
+
         if self.config is not None:
             if self.config.signals != default_signals:
                 return None
-            if self.config.axisSettings != default_axisSettings:
+            if (
+                self.config.axisSettings != default_axisSettings
+                and self.config.axisSettings != default_axisSettings_asDict
+            ):
                 return None
-            if self.config.legendSettings != default_legendSettings:
+            if (
+                self.config.legendSettings != default_legendSettings
+                and self.config.legendSettings != default_legendSettings_asDict
+            ):
                 return None
-            if self.config.configOptionsExpanded != default_configOptionsExpanded:
+            if (
+                self.config.configOptionsExpanded != default_configOptionsExpanded
+                and self.config.configOptionsExpanded
+                != default_configOptionsExpanded_asDict
+            ):
                 return None
             if len(self.config.series) != 1:
                 return None

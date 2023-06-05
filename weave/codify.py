@@ -189,7 +189,7 @@ def _type_to_code(t: weave_types.Type) -> str:
     return object_to_code_no_format(t)
 
 
-def _node_to_code(node: graph.Node) -> str:
+def _node_to_code(node: graph.Node, wrap_const_node: bool = True) -> str:
     if isinstance(node, graph.VoidNode):
         return "weave.graph.VoidNode()"
     elif isinstance(node, graph.VarNode):
@@ -203,7 +203,11 @@ def _node_to_code(node: graph.Node) -> str:
             vars = list(node.type.input_types.keys())
             return lambda_wrapped_object_to_code_no_format(node.val, vars)
         else:
-            return object_to_code_no_format(node.val)
+            val_as_code = object_to_code_no_format(node.val)
+            if wrap_const_node:
+                return f"weave.weave_internal.const({val_as_code})"
+            else:
+                return val_as_code
     elif isinstance(node, graph.OutputNode):
         full_op_name = node.from_op.name
         prefix = ""
@@ -212,7 +216,7 @@ def _node_to_code(node: graph.Node) -> str:
         if node.from_op.name == "dict":
             args = ",".join(
                 [
-                    key + "=" + _node_to_code(val)
+                    key + "=" + _node_to_code(val, False)
                     for key, val in node.from_op.inputs.items()
                 ]
             )
@@ -222,7 +226,7 @@ def _node_to_code(node: graph.Node) -> str:
         elif node.from_op.name == "list":
             args = ",".join(
                 [
-                    key + "=" + _node_to_code(val)
+                    key + "=" + _node_to_code(val, False)
                     for key, val in node.from_op.inputs.items()
                 ]
             )
@@ -246,7 +250,7 @@ def _node_to_code(node: graph.Node) -> str:
             prefix = _node_to_code(inputs[0])
             inputs = inputs[1:]
 
-        params = ",".join([_node_to_code(n) for n in inputs])
+        params = ",".join([_node_to_code(n, False) for n in inputs])
 
         # Special syntax
         if op_name == "pick":
