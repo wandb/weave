@@ -667,6 +667,60 @@ def _get_rows_selected_node(plot: Plot) -> graph.Node:
     return concatted
 
 
+def _get_selected_data_node(plot: Plot) -> graph.Node:
+    if plot.config is None:
+        raise errors.WeaveInternalError("config is None")
+
+    selection = plot.config.signals.selection
+
+    table_nodes: typing.List[graph.Node[types.List]] = []
+    for series in plot.config.series:
+        table_config = panel_table.TableConfig(tableState=series.table)
+        table_config.tableState.add_column(lambda row: row, "row")
+        table_panel = panel_table.Table(plot.input_node, config=table_config)
+        node = list_.unnest(panel_table.rows(table_panel))
+        columns = table_panel.get_final_named_select_functions()
+
+        if selection.x is None and selection.y is None:
+            # nothing selected
+            table_nodes.append(list_.make_list())
+            continue
+
+        if selection.x is not None:
+            col_id = series.dims.x
+            col = columns.get(col_id, None)
+            if col is not None:
+                key = col["columnName"]
+                node = filter_node_to_selection(node, selection.x, key)
+
+        if selection.y is not None:
+            col_id = series.dims.y
+            col = columns.get(col_id, None)
+            if col is not None:
+                key = col["columnName"]
+                node = filter_node_to_selection(node, selection.y, key)
+
+        if len(plot.config.series) > 1:
+
+            def merge_func(row: graph.Node[types.TypedDict]):
+                return dict_.TypedDict.merge(
+                    row, dict_.dict_(y_expr_str=series.y_expr_str)
+                )
+
+            func = weave_internal.define_fn({"row": node.type.object_type}, merge_func)
+            node = list_.List.map(node, func)
+
+        table_nodes.append(node)
+
+    node_list = list_.make_list(
+        **{str(i): node for (i, node) in enumerate(table_nodes)}
+    )
+    concatted = list_.List.concat(node_list)
+    if concatted.type.object_type == types.UnknownType():
+        return concatted
+    return concatted["row"]
+
+
 @weave.op(name="panel_plot-rows_selected_refine")
 def rows_selected_refine(self: Plot) -> weave.types.Type:
     if self.config is None:
@@ -688,6 +742,11 @@ def rows_selected_refine(self: Plot) -> weave.types.Type:
     return types.List(types.union(*table_row_types))
 
 
+@weave.op(name="panel_plot-selected_data_refine")
+def selected_data_refine(self: Plot) -> weave.types.Type:
+    return self.input_node.type
+
+
 @weave.op(
     name="panel_plot-rows_selected",
     output_type=weave.types.List(weave.types.TypedDict({})),
@@ -696,3 +755,13 @@ def rows_selected_refine(self: Plot) -> weave.types.Type:
 def rows_selected(self: Plot):
     rows_selected_node = _get_rows_selected_node(self)
     return weave.use(rows_selected_node)
+
+
+@weave.op(
+    name="panel_plot-selected_data",
+    output_type=weave.types.List(weave.types.Any()),
+    refine_output_type=selected_data_refine,
+)
+def selected_data(self: Plot):
+    selected_data_node = _get_selected_data_node(self)
+    return weave.use(selected_data_node)
