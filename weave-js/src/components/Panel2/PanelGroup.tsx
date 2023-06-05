@@ -43,7 +43,7 @@ import {IconButton} from '../IconButton';
 import {IconAddNew as IconAddNewUnstyled, IconPencilEdit} from './Icons';
 import {WBButton} from '../../common/components/elements/WBButtonNew';
 import {Tooltip} from '../Tooltip';
-import {VarBar} from '../Sidebar/VarBar';
+// import {VarBar} from '../Sidebar/VarBar';
 import {inJupyterCell} from '../PagePanelComponents/util';
 
 const LAYOUT_MODES = [
@@ -898,18 +898,18 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
 
   const inJupyter = inJupyterCell();
   // TODO: This special-case rendering is insane
-  const isVarBar = _.isEqual(groupPath, [`sidebar`]);
-  if (isVarBar) {
-    return (
-      <VarBar
-        config={config}
-        updateConfig={updateConfig}
-        handleSiblingVarEvent={handleSiblingVarEvent}
-        stack={stack}
-        handleAddVar={handleAddPanel}
-      />
-    );
-  }
+  // const isVarBar = _.isEqual(groupPath, [`sidebar`]);
+  // if (isVarBar) {
+  //   return (
+  //     <VarBar
+  //       config={config}
+  //       updateConfig={updateConfig}
+  //       handleSiblingVarEvent={handleSiblingVarEvent}
+  //       stack={stack}
+  //       handleAddVar={handleAddPanel}
+  //     />
+  //   );
+  // }
 
   if (config.layoutMode === 'grid' || config.layoutMode === 'flow') {
     return (
