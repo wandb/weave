@@ -4,6 +4,7 @@ numpy>=1.21
 pandas>=1.5.3
 ipython>=8.9
 flask>=2.1
+black>=22.3.0  # used for code generation
 flask_cors>=3.0.10
 notebook>=6.5.2
 pyarrow>=10.0.1

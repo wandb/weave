@@ -115,7 +115,11 @@ def make_app():
     app = Flask(__name__)
     app.register_blueprint(blueprint)
     # Very important! We rely on key ordering on both sides!
-    app.json.sort_keys = False
+    # Flask < 2.2 doesn't have app.json
+    if hasattr(app, "json"):
+        app.json.sort_keys = False
+    else:
+        app.config["JSON_SORT_KEYS"] = False
 
     CORS(app, supports_credentials=True)
 
