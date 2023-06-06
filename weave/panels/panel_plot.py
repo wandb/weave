@@ -640,7 +640,7 @@ def filter_node_to_selection(
 
 
 # TODO: keep in arrow
-def _get_rows_selected_node(plot: Plot) -> graph.Node:
+def _get_selected_output_rows_node(plot: Plot) -> graph.Node:
     if plot.config is None:
         raise errors.WeaveInternalError("config is None")
 
@@ -692,7 +692,7 @@ def _get_rows_selected_node(plot: Plot) -> graph.Node:
 
 
 # TODO: keep in arrow
-def _get_selected_data_node(plot: Plot) -> graph.Node:
+def _get_selected_input_rows_node(plot: Plot) -> graph.Node:
     if plot.config is None:
         raise errors.WeaveInternalError("config is None")
 
@@ -747,8 +747,8 @@ def _get_selected_data_node(plot: Plot) -> graph.Node:
 
 
 # TODO: keep in arrow
-@weave.op(name="panel_plot-rows_selected_refine", hidden=True)
-def rows_selected_refine(self: Plot) -> weave.types.Type:
+@weave.op(name="panel_plot-selected_output_rows_refine", hidden=True)
+def selected_output_rows_refine(self: Plot) -> weave.types.Type:
     if self.config is None:
         raise errors.WeaveInternalError("config is None")
 
@@ -769,28 +769,28 @@ def rows_selected_refine(self: Plot) -> weave.types.Type:
 
 
 # TODO: keep in arrow
-@weave.op(name="panel_plot-selected_data_refine", hidden=True)
-def selected_data_refine(self: Plot) -> weave.types.Type:
+@weave.op(name="panel_plot-selected_input_rows_refine", hidden=True)
+def selected_input_rows_refine(self: Plot) -> weave.types.Type:
     return types.List(typing.cast(weave.types.List, self.input_node.type).object_type)
 
 
 # TODO: keep in arrow
 @weave.op(
-    name="panel_plot-rows_selected",
+    name="panel_plot-selected_output_rows",
     output_type=weave.types.List(weave.types.TypedDict({})),
-    refine_output_type=rows_selected_refine,
+    refine_output_type=selected_output_rows_refine,
 )
-def rows_selected(self: Plot):
-    rows_selected_node = _get_rows_selected_node(self)
-    return weave.use(rows_selected_node)
+def selected_output_rows(self: Plot):
+    selected_output_rows_node = _get_selected_output_rows_node(self)
+    return weave.use(selected_output_rows_node)
 
 
 # TODO: keep in arrow
 @weave.op(
-    name="panel_plot-selected_data",
+    name="panel_plot-selected_input_rows",
     output_type=weave.types.List(weave.types.Any()),
-    refine_output_type=selected_data_refine,
+    refine_output_type=selected_input_rows_refine,
 )
-def selected_data(self: Plot):
-    selected_data_node = _get_selected_data_node(self)
-    return weave.use(selected_data_node)
+def selected_input_rows(self: Plot):
+    selected_input_rows_node = _get_selected_input_rows_node(self)
+    return weave.use(selected_input_rows_node)
