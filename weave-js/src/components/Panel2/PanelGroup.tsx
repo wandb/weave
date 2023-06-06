@@ -111,7 +111,15 @@ export const Group = styled.div<{
     p.isVarBar &&
     css`
       border-right: 1px solid ${GRAY_350};
-      padding-top: 12px;
+      .edit-bar {
+        border-bottom: none;
+        border-top: 1px solid ${GRAY_350};
+        padding-top: 12px;
+        margin-bottom: 0;
+      }
+      > :first-child .edit-bar {
+        border-top: none;
+      }
     `}
           
   ${props => props.compStyle}
@@ -978,6 +986,7 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
 
   return (
     <Group
+      className="group"
       isVarBar={isVarBar}
       layered={config.layoutMode === 'layer'}
       preferHorizontal={config.layoutMode === 'horizontal'}
@@ -1036,8 +1045,8 @@ const AddVarButton = styled.div`
   font-weight: 600;
   padding: 12px;
   cursor: pointer;
+  width: calc(100%);
   border-top: 1px solid ${GRAY_350};
-  width: calc(100% + 20px);
 
   color: ${GRAY_500};
   &:hover {

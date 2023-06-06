@@ -126,6 +126,9 @@ def show(obj=None, height=400):
             "a weave node, try `weave.use()`."
         )
 
+    if util.is_pandas_dataframe(obj):
+        obj = ops.dataframe_to_arrow(obj)
+
     usage_analytics.show_called()
     panel_url = show_url(obj)
 

@@ -167,6 +167,7 @@ def config_to_values(config: dict) -> dict:
 
 @op(
     render_info={"type": "function"},
+    hidden=True,
     plugins=wb_gql_op_plugin(lambda inputs, inner: "config"),
 )
 def refine_config_type(run: wdt.Run) -> types.Type:
@@ -232,6 +233,7 @@ def config(run: wdt.Run) -> dict[str, typing.Any]:
 
 @op(
     render_info={"type": "function"},
+    hidden=True,
     # When refine_summary_type is explicitly requested in the graph, we ask for
     # the entire summaryMetrics field.
     plugins=wb_gql_op_plugin(lambda inputs, inner: "summaryMetrics"),
@@ -350,6 +352,7 @@ def _history_keys(run: wdt.Run, history_version: int) -> list[str]:
 
 @op(
     render_info={"type": "function"},
+    hidden=True,
     plugins=wb_gql_op_plugin(lambda inputs, inner: "historyKeys"),
 )
 def refine_history_type(run: wdt.Run) -> types.Type:
@@ -702,6 +705,7 @@ def _get_history_as_of_step(run: wdt.Run, asOfStep: int):
 @op(
     render_info={"type": "function"},
     plugins=wb_gql_op_plugin(_history_as_of_plugin),
+    hidden=True,
 )
 def _refine_history_as_of_type(run: wdt.Run, asOfStep: int) -> types.Type:
     return wb_util.process_run_dict_type(_get_history_as_of_step(run, asOfStep))

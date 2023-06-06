@@ -112,6 +112,14 @@ def is_notebook():
     return True
 
 
+def is_pandas_dataframe(obj):
+    try:
+        import pandas as pd
+    except ImportError:
+        return False
+    return isinstance(obj, pd.DataFrame)
+
+
 def _resolve_path(path: str, current_working_directory: str) -> list[str]:
     if not os.path.isabs(path):
         path = os.path.join(current_working_directory, path)

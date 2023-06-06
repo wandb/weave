@@ -297,7 +297,11 @@ export function typeToString(
         ].join('\n');
   } else if (type.type === 'ndarray') {
     return `NDArray<${type.shape}>`;
+  } else if (type.type === 'const') {
+    return typeToString(type.valType, simple, level);
   } else if (isMediaType(type)) {
+    return type.type;
+  } else if (type.type != null) {
     return type.type;
   }
   throw new Error(`unhandled type ${JSON.stringify(type)}`);

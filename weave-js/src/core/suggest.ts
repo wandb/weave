@@ -507,7 +507,7 @@ async function autosuggestNodes(
       if (variableNames.length > 0) {
         for (const varName of variableNames) {
           // Recursively suggest results for each variable
-          let vNode = varNode(frame[varName].type, varName);
+          const vNode = varNode(frame[varName].type, varName);
           // const newGraph = maybeReplaceNode(graph, node, vNode);
           // const results = await autosuggestNodes(
           //   client,
@@ -531,6 +531,14 @@ async function autosuggestNodes(
           })
         );
       }
+    } else {
+      const availOps = availableOpsForChain(node, client.opStore);
+      result = availOps.flatMap(opDef => {
+        return callOpVeryUnsafe(opDef.name, {
+          lhs: node,
+          rhs: getPlaceholderArg(opDef, 'rhs') ?? voidNode(),
+        });
+      });
     }
   } else if (node.nodeType === 'var' || node.nodeType === 'output') {
     if (node.type === 'any') {

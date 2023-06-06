@@ -106,7 +106,7 @@ def read_runs(
     return res
 
 
-@weave.op(render_info={"type": "function"})
+@weave.op(render_info={"type": "function"}, hidden=True)
 def refine_runs2_with_columns_type(
     project: wb_domain_types.Project, config_cols: list[str], summary_cols: list[str]
 ) -> weave.types.Type:
@@ -148,7 +148,7 @@ def runs2_with_columns(
     )
 
 
-@weave.op(render_info={"type": "function"})
+@weave.op(render_info={"type": "function"}, hidden=True)
 def refine_runs2_type(project: wb_domain_types.Project) -> weave.types.Type:
     schema = ds.dataset(f"/tmp/runs.{project.gql['name']}.parquet").schema
     return ArrowWeaveListType(arrow_schema_to_weave_type(schema))

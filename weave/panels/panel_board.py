@@ -59,7 +59,7 @@ def Board(vars, panels: list[BoardPanel]):
                 config=panel_group.GroupConfig(
                     layoutMode="vertical",
                     equalSize=False,
-                    style="width:300px; padding-right: 20px",
+                    style="width:300px;",
                     showExpressions=True,
                     allowedPanels=["Expression", "Query", "Slider", "StringEditor"],
                     enableAddPanel=True,

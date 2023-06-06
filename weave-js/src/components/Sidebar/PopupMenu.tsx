@@ -1,7 +1,10 @@
-import React, {memo} from 'react';
+import _ from 'lodash';
+import React, {memo, useMemo} from 'react';
 import {
+  MenuItemProps,
   Menu as SemanticMenu,
   Popup as SemanticPopup,
+  StrictMenuItemProps,
   StrictMenuProps,
   StrictPopupProps,
 } from 'semantic-ui-react';
@@ -9,14 +12,28 @@ import styled from 'styled-components';
 
 import {GRAY_50} from '../../common/css/globals.styles';
 
+export type Section = {
+  label: string;
+  items: StrictMenuItemProps[];
+};
+
 export type PopupMenuProps = Pick<StrictPopupProps, `trigger` | `position`> &
-  Pick<StrictMenuProps, `items`>;
+  Pick<StrictMenuProps, `items`> & {sections?: Section[]};
 
 const PopupMenuComp: React.FC<PopupMenuProps> = ({
   trigger,
   position,
-  items,
+  items = [],
+  sections = [],
 }) => {
+  const allItems = useMemo(() => {
+    return [...items, ..._.flatten(sections.map(sectionToItems))];
+
+    function sectionToItems(s: Section): MenuItemProps[] {
+      return [{header: true, key: s.label, content: s.label}, ...s.items];
+    }
+  }, [items, sections]);
+
   return (
     <Popup
       basic
@@ -30,7 +47,9 @@ const PopupMenuComp: React.FC<PopupMenuProps> = ({
         },
       }}
       trigger={trigger}
-      content={<Menu compact size="small" items={items} secondary vertical />}
+      content={
+        <Menu compact size="small" items={allItems} secondary vertical />
+      }
     />
   );
 };
@@ -56,6 +75,13 @@ const Menu = styled(SemanticMenu)`
 
       &:hover {
         background-color: ${GRAY_50};
+      }
+      &.header {
+        font-weight: 600;
+        cursor: auto;
+        &:hover {
+          background: none;
+        }
       }
 
       svg {

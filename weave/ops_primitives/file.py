@@ -12,7 +12,7 @@ from .. import errors
 from .. import wandb_file_manager
 
 
-@op(name="dir-pathReturnType")
+@op(name="dir-pathReturnType", hidden=True)
 def path_return_type(dir: file_base.Dir, path: str) -> types.Type:
     return types.TypeRegistry.type_of(dir.path_info(path))
 

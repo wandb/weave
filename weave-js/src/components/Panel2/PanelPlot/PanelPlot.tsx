@@ -53,6 +53,7 @@ import * as _ from 'lodash';
 import React, {
   FC,
   memo,
+  ReactNode,
   useCallback,
   useContext,
   useEffect,
@@ -62,7 +63,7 @@ import React, {
 } from 'react';
 import ReactDOM from 'react-dom';
 import {View as VegaView, VisualizationSpec} from 'react-vega';
-import {Button, Checkbox, Tab} from 'semantic-ui-react';
+import {Button, Checkbox, MenuItemProps, Tab} from 'semantic-ui-react';
 import {calculatePosition} from 'vega-tooltip';
 
 import {useWeaveContext, useWeaveDashUiEnable} from '../../../context';
@@ -106,8 +107,15 @@ import {
 } from './versions';
 import {ConfigSection} from '../ConfigPanel';
 import {IconButton} from '../../IconButton';
-import {IconOverflowHorizontal} from '../Icons';
+import {
+  IconAddNew,
+  IconCheckmark,
+  IconDelete,
+  IconOverflowHorizontal,
+  IconWeave,
+} from '../Icons';
 import styled from 'styled-components';
+import {PopupMenu, Section} from '../../Sidebar/PopupMenu';
 
 const recordEvent = makeEventRecorder('Plot');
 
@@ -917,6 +925,10 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
   );
 
   const uiStateOptions = useMemo(() => {
+    if (!PlotState.isDropdownWithExpression(dimension)) {
+      return [null];
+    }
+
     // return true if an expression can be directly switched to a constant
     const isDirectlySwitchable = (
       dim: PlotState.DropdownWithExpressionDimension
@@ -951,59 +963,70 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
       updateConfig(newConfig);
     };
 
-    const switchState = PlotState.isDropdownWithExpression(dimension)
-      ? [
-          {
-            text: 'Input method',
-            icon: null,
-            disabled: true,
-          },
-          {
-            text: 'Select via dropdown',
-            icon: 'wbic-ic-list',
-            active: dimension.mode() === 'dropdown',
-            onClick: () => {
-              clickHandler(dimension, (s, dim) => {
-                if (s.uiState[dim.name] === 'expression') {
-                  s.uiState[dim.name] = 'dropdown';
-                  const expressionValue = dim.expressionDim.state().value;
+    return [
+      [
+        {
+          text: 'Input method',
+          icon: null,
+          disabled: true,
+        },
+        {
+          text: 'Select via dropdown',
+          icon: !enableDashUi ? (
+            'wbic-ic-list'
+          ) : dimension.mode() === `dropdown` ? (
+            <IconCheckmark />
+          ) : (
+            <IconBlank />
+          ),
+          active: dimension.mode() === 'dropdown',
+          onClick: () => {
+            clickHandler(dimension, (s, dim) => {
+              if (s.uiState[dim.name] === 'expression') {
+                s.uiState[dim.name] = 'dropdown';
+                const expressionValue = dim.expressionDim.state().value;
 
-                  // If the current expression has a corresponding dropdown option, use that dropdown value
-                  if (isDirectlySwitchable(dim)) {
-                    s.constants[dim.name] = (expressionValue as ConstNode)
-                      .val as any;
-                  }
+                // If the current expression has a corresponding dropdown option, use that dropdown value
+                if (isDirectlySwitchable(dim)) {
+                  s.constants[dim.name] = (expressionValue as ConstNode)
+                    .val as any;
                 }
-              });
-            },
+              }
+            });
           },
-          {
-            text: 'Enter a Weave Expression',
-            icon: 'wbic-ic-xaxis',
+        },
+        {
+          text: 'Enter a Weave Expression',
+          icon: !enableDashUi ? (
+            'wbic-ic-xaxis'
+          ) : dimension.mode() === `expression` ? (
+            <IconCheckmark />
+          ) : (
+            <IconBlank />
+          ),
 
-            active: dimension.mode() === 'expression',
-            onClick: () => {
-              clickHandler(dimension, (s, dim) => {
-                if (s.uiState[dim.name] === 'dropdown') {
-                  s.uiState[dim.name] = 'expression';
+          active: dimension.mode() === 'expression',
+          onClick: () => {
+            clickHandler(dimension, (s, dim) => {
+              if (s.uiState[dim.name] === 'dropdown') {
+                s.uiState[dim.name] = 'expression';
 
-                  // If the current dropdown is representable as an expression, use that expression
-                  if (isDirectlySwitchable(dim)) {
-                    const colId = s.dims[dim.name];
-                    s.table = TableState.updateColumnSelect(
-                      s.table,
-                      colId,
-                      constString(s.constants[dim.name])
-                    );
-                  }
+                // If the current dropdown is representable as an expression, use that expression
+                if (isDirectlySwitchable(dim)) {
+                  const colId = s.dims[dim.name];
+                  s.table = TableState.updateColumnSelect(
+                    s.table,
+                    colId,
+                    constString(s.constants[dim.name])
+                  );
                 }
-              });
-            },
+              }
+            });
           },
-        ]
-      : null;
-    return [switchState];
-  }, [config, updateConfig, isShared, dimension]);
+        },
+      ],
+    ];
+  }, [config, updateConfig, isShared, dimension, enableDashUi]);
 
   const topLevelDimOptions = useCallback(
     (dimName: (typeof PLOT_DIMS_UI)[number]) => {
@@ -1031,31 +1054,90 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
     [dimension, uiStateOptions, topLevelDimOptions, extraOptions]
   );
 
-  const postFixComponent = useMemo(
-    () =>
-      dimOptions.length > 0 ? (
+  const postFixComponent = useMemo(() => {
+    if (dimOptions.length === 0) {
+      return undefined;
+    }
+
+    if (!enableDashUi) {
+      return (
         <PopupDropdown
-          // offset={'10px, -10px'}
           position="left center"
           trigger={
-            enableDashUi ? (
-              <ConfigDimMenuButton>
-                <IconOverflowHorizontal />
-              </ConfigDimMenuButton>
-            ) : (
-              <div>
-                <HighlightedIcon>
-                  <LegacyWBIcon name="overflow" />
-                </HighlightedIcon>
-              </div>
-            )
+            <div>
+              <HighlightedIcon>
+                <LegacyWBIcon name="overflow" />
+              </HighlightedIcon>
+            </div>
           }
           options={dimOptions.filter(o => !Array.isArray(o))}
           sections={dimOptions.filter(o => Array.isArray(o)) as DimOption[][]}
         />
-      ) : undefined,
-    [dimOptions, enableDashUi]
-  );
+      );
+    }
+
+    const nonArrayDimOptions = dimOptions.filter(
+      o => !Array.isArray(o)
+    ) as DimOption[];
+    const arrayDimOptions = dimOptions.filter(o =>
+      Array.isArray(o)
+    ) as DimOption[][];
+
+    const menuItems: MenuItemProps[] =
+      nonArrayDimOptions.map(dimOptionToMenuItem);
+    const menuSections: Section[] = arrayDimOptions.map(opts => ({
+      label: opts[0].text,
+      items: opts.slice(1).map(dimOptionToMenuItem),
+    }));
+
+    return (
+      <PopupMenu
+        position="bottom left"
+        trigger={
+          <ConfigDimMenuButton>
+            <IconOverflowHorizontal />
+          </ConfigDimMenuButton>
+        }
+        items={menuItems}
+        sections={menuSections}
+      />
+    );
+
+    function dimOptionToMenuItem({
+      text,
+      icon,
+      onClick,
+    }: DimOption): MenuItemProps {
+      return {
+        key: text,
+        content: text,
+        icon: convertIcon(icon),
+        onClick,
+      };
+    }
+
+    function convertIcon(iconStr: ReactNode): ReactNode {
+      if (typeof iconStr !== `string`) {
+        return iconStr;
+      }
+      switch (iconStr) {
+        case `wbic-ic-delete`:
+          return <IconDelete />;
+        case `wbic-ic-plus`:
+          return <IconAddNew />;
+        case `wbic-ic-collapse`:
+          // TODO: replace with proper icon
+          return <IconDelete />;
+        case `wbic-ic-expand`:
+          // TODO: replace with proper icon
+          return <IconDelete />;
+        case null:
+          return null;
+        default:
+          return <IconWeave />;
+      }
+    }
+  }, [dimOptions, enableDashUi]);
 
   const updateGroupBy = useCallback(
     (enabled: boolean) => {
@@ -2957,4 +3039,9 @@ export default Spec;
 
 const ConfigDimMenuButton = styled(IconButton).attrs({small: true})`
   margin-left: 4px;
+`;
+
+const IconBlank = styled.svg`
+  width: 18px;
+  height: 18px;
 `;

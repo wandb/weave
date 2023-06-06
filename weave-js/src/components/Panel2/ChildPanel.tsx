@@ -509,16 +509,6 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
     setInspectingPanel,
   } = useChildPanelCommon(props);
 
-  const nonExpressionPanelId = useMemo(() => {
-    const nonExpressionOption = panelOptions.find(
-      option => option.value !== 'Expression' && option.value !== 'RootBrowser'
-    );
-    if (nonExpressionOption != null) {
-      return nonExpressionOption.value;
-    }
-    return null;
-  }, [panelOptions]);
-
   const {frame} = usePanelContext();
 
   const validateName = useCallback(
@@ -549,7 +539,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
       onMouseLeave={() => setHoverPanel(false)}>
       {props.editable && (
         <Styles.EditorBar>
-          <EditorBarContent>
+          <EditorBarContent className="edit-bar">
             {props.prefixHeader}
             {props.pathEl != null && (
               <EditorPath>
@@ -901,7 +891,6 @@ const EditorBarContent = styled.div`
   left: -8px;
   padding: 0 16px 8px;
   border-bottom: 1px solid ${GRAY_350};
-  margin-bottom: 8px;
   line-height: 20px;
 `;
 

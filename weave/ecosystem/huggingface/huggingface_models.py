@@ -100,7 +100,7 @@ class HuggingfaceModelPanel(weave.Panel):
 
 @weave.type()
 class HuggingFacePackage:
-    @weave.op()
+    @weave.op(hidden=True)
     def model_refine_output_type(self, id: str) -> weave.types.Type:
         api = huggingface_hub.HfApi()
         info = api.model_info(id)

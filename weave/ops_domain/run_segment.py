@@ -63,7 +63,7 @@ class RunSegment:
 
         return prior_experiment.concat(limited)
 
-    @weave.op(render_info={"type": "function"})
+    @weave.op(render_info={"type": "function"}, hidden=True)
     def refine_experiment_type(self) -> types.Type:
         return ArrowWeaveListType(
             object_type=types.TypedDict(

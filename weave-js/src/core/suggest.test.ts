@@ -359,7 +359,7 @@ describe('autosuggest', () => {
     expectOnlyOps(addResult);
     const addAutosuggestNames = addResult.map(r => r.suggestionString);
 
-    expect(addAutosuggestNames).toEqual(['%', '*', '**', '+', '-', '/']);
+    expect(addAutosuggestNames).toEqual(['%', '*', '**', '+', '-', '/', '//']);
 
     const compareOutputNode = opNumberLessEqual({
       lhs: addOutputNode,

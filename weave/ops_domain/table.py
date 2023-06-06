@@ -37,6 +37,7 @@ class Table:
         name="table-rowsType",
         input_type={"table": types.optional(TableType())},
         output_type=types.TypeType(),
+        hidden=True,
     )
     def rows_type(table):
         if table == None:
@@ -85,6 +86,7 @@ class PartitionedTable:
         name="partitionedtable-rowsType",
         input_type={"partitionedtable": PartitionedTableType()},
         output_type=types.TypeType(),
+        hidden=True,
     )
     def partitioned_rows_type(partitionedtable):
         ttype = types.TypeRegistry.type_of(partitionedtable._rows)
@@ -129,6 +131,7 @@ class JoinedTable:
         name="joinedtable-rowsType",
         input_type={"joinedtable": JoinedTableType()},
         output_type=types.TypeType(),
+        hidden=True,
     )
     def joined_rows_type(joinedtable):
         ttype = types.TypeRegistry.type_of(joinedtable._rows)

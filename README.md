@@ -1,57 +1,121 @@
-# Weave internal
+![Weave Logo](./docs/assets/logo_horizontal.svg)
 
-This repository is for pre-release Weave development and internal W&B usage.
+### **Weave** - Interactive Data Exploration Toolkit by [Weights & Biases](https://wandb.ai/)
 
-**Do not share this repo, screenshots, or related information, with anyone outside of W&B unless you have explicit written approval from Shawn.**
+---
 
-# Q3 2022 Goals
+Hello 👋 and welcome to Weave!
 
-Our Q3 goal for Weave is to enable ML engineers at W&B to start making new W&B experiences (gated behind feature flags for now)!
+Weave, developed by the team at Weights and Biases, is a new open-source toolkit designed for performant, interactive data exploration.
+Our mission is to equip Machine Learning practitioners with the best tools to turn data into insights quickly and easily.
 
-# Support
+Whether you are a seasoned data scientist, an aspiring ML practitioner, or just a tech enthusiast eager to play with data, Weave is for you.
 
-Please send questions, feedback & issues in the W&B #weave Slack channel.
+## Quickstart
 
-# Documentation
+Install `weave` using `pip install weave`.
 
-Weave documentation is currently maintained in our internal W&B notion: https://www.notion.so/wandbai/Weave-Python-b4a5ccade5ed460ba0d6ca03e7b82bf2
-
-# Setup instructions
-
-Create a new virtualenv, e.g. `pyenv virtualenv 3.9.7 weave_internal`
-
-Then from the root of this repository run:
+Then start exploring your existing datasets with 1 line of code!:
 
 ```
-pyenv local weave_internal
-pip install -e .
+import weave
+# ... use any existing dataframe
+weave.show(pandas_df)
 ```
 
-If you want to use spacy, please make sure you run
+For example:
 
-```
-python -m spacy download en_core_web_sm
-```
+**1. View a dataframe (in this case the Iris dataset)**
 
-This will install weave and its dependencies in your weave_internal pyenv. It also tells any python instances running in this directory or a subdirectory to use the weave_internal pyenv (the "pyenv local" command does this by creating a file called .python-version that contains the string "weave_internal").
+![first_show](./docs/assets/first_show.png)
 
-Now you can use any of the notebooks in this repository's root directory or the examples/ directory, or `import weave` anywhere else on your system when using the weave_internal pyenv.
+**2. Interactively derive insights**
 
-If you are going to submit PRs to weave-internal, please also install the pre-commit hooks:
+![beginning_exploration](./docs/assets/beginning_exploration.png)
 
-```
-pip install -r requirements.dev.txt
-pre-commit install
-```
+**3. Create and share dashboards**
 
-# Example notebooks
+![configured_iris_panel](./docs/assets/configured_iris_panel.png)
 
-Demo notebooks can be found in / and /examples.
+## 🎉 Why Weave?
 
-Run
+- 🚀 **Performant:** Weave is built with performance in mind. It's designed to handle large datasets smoothly so you can focus on what matters - exploring data and finding insights. Under the hood we optimize execution plans and parallelize computation using Arrow.
+- 🎨 **Interactive:** Weave is all about making data exploration fun and interactive. It empowers you to engage with your data and discover patterns that static graphs can't reveal - without learning complicated APIs! Beautiful and interactive plots to bring your data to life.
+- 🧩 **Modular Ecosystem:** Weave's architecture & compute language is build on Types, Ops, and Panels. Combine different components to build your customized data exploration toolkit, and publish reusable components into the ecosystem for others to use!
+- 💻 **Open-Source:** We believe in the power of open-source. Weave is built by the community, for the community. We are excited to see how you use it and what you build with it.
 
-```
-jupyter notebook
-```
+---
 
-in the root directory, and then use the Jupyter browser to open them.
+## 📚 Getting Started
+
+Before you dive in, make sure you have the required software installed. You'll find all the details in our [Installation Guide](./docs/INSTALLATION.md).
+
+After installation, check out our [Quick Start Guide](./docs/QUICKSTART.md) to get a feel for Weave. For deeper dives, we recommend our [Example Notebooks](./docs/EXAMPLES.md), which are packed with detailed explanations, examples, and even some data exploration wizardry!
+
+---
+
+## 🎁 Feature Statuses
+
+**Important:** Weave is newly open sourced and the APIs are subject to change. Please report any issues to [https://github.com/wandb/weave-internal/issues](https://github.com/wandb/weave-internal/issues).
+
+**Statuses**:
+
+- ✅: **Available:** The feature is relatively stable and ready for use
+- 💡: **Preview:** The feature is code-complete, but may have some rough edges
+- 🚧: **In Development:**: The feature is still in active development - while usable, expect changes.
+- 📝: **Todo:**: The feature has not entered development
+
+| **Category**       | **Feature**                                       | **Status** |
+| ------------------ | ------------------------------------------------- | ---------- |
+| **API**            |                                                   |            |
+|                    | weave.save                                        | ✅         |
+|                    | weave.show                                        | ✅         |
+|                    | weave.publish                                     | 💡         |
+| **Custom Objects** |                                                   |            |
+|                    | Custom Types via @weave.type decorator            | 💡         |
+|                    | Custom Ops via @weave.op decorator                | 💡         |
+|                    | Custom Panels via weave.panels.Panel subclass     | 🚧         |
+| **Persistence**    |                                                   |            |
+|                    | Publish & Save Data                               | ✅         |
+|                    | Publish & Save Custom Python Objects (eg. Models) | 💡         |
+|                    | Publish & Save Configured Dashboards              | 💡         |
+|                    | Publish & Save Panels, Ops, & Types               | 🚧         |
+| **UX**             |                                                   |            |
+|                    | Tables                                            | ✅         |
+|                    | Plots                                             | ✅         |
+|                    | Dashboard Editor                                  | 💡         |
+|                    | Core Component Library                            | 💡         |
+|                    | Code Export                                       | 💡         |
+|                    | Media Types                                       | 🚧         |
+|                    | Version Navigation                                | 🚧         |
+| **Implementation** |                                                   |            |
+|                    | Language Bindings (Python, JS)                    | ✅         |
+|                    | Tests/Code coverage                               | ✅         |
+|                    | Core Language Spec (Types, Ops, Panels)           | 💡         |
+|                    | Benchmarks                                        | 📝         |
+| **Materials**      |                                                   |            |
+|                    | Examples                                          | ✅         |
+|                    | Documentation (API Reference, Guides)             | 🚧         |
+
+---
+
+<!--
+## 👩‍💻 Contribution
+
+Are you passionate about data exploration and open-source projects? Awesome! Weave's community is always looking for contributors. Check out our [Contribution Guide](./CONTRIBUTING.md) to learn how you can make Weave even better!
+
+
+## 📢 Community
+
+Join our thriving community [Discord](discord_link). It's the perfect place to ask questions, share your projects, or just chat about data exploration.
+-->
+
+## 💖 Thanks
+
+Special thanks to everyone who has contributed to Weave, from submitting bug reports and feature requests to contributing code and documentation. Weave wouldn't be what it is today without you!
+
+---
+
+Happy Weaving! 🎉
+
+**Made with 💜 by Weights and Biases**
