@@ -501,15 +501,15 @@ export const PageContent: FC<PageContentProps> = props => {
       .expToString(config.input_node)
       .replace(/\n+/g, '')
       .replace(/\s+/g, '');
-    // window.open(urlPrefixed(`/?exp=${encodeURIComponent(expStr)}`), '_blank');
-    window.open(
-      urlPrefixed(
-        `/__frontend/weave_jupyter?exp=${encodeURIComponent(
-          expStr
-        )}&moarFullScreen=true`
-      ),
-      '_blank'
-    );
+    window.open(urlPrefixed(`/?exp=${encodeURIComponent(expStr)}`), '_blank');
+    // window.open(
+    //   urlPrefixed(
+    //     `/__frontend/weave_jupyter?exp=${encodeURIComponent(
+    //       expStr
+    //     )}&moarFullScreen=true`
+    //   ),
+    //   '_blank'
+    // );
   }, [config.input_node, urlPrefixed, weave]);
 
   return (

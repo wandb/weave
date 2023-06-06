@@ -176,9 +176,8 @@ const IconAddNew = styled(IconAddNewUnstyled)`
   margin-right: 6px;
 `;
 
-const PBContainer = styled.div`
-  flex: '1 1 100%';
-  height: 100%;
+const PBContainer = styled.div<{fullHeight: boolean}>`
+  height: ${p => (p.fullHeight ? `100%` : `calc(100% - 48px)`)};
 `;
 
 // This is a mapping from JS PanelIDs to their corresponding Python type name
@@ -923,13 +922,7 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
 
   if (config.layoutMode === 'grid' || config.layoutMode === 'flow') {
     return (
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          height: '100%',
-          width: '100%',
-        }}>
+      <>
         {!inJupyter && (
           <ActionBar>
             <Tooltip
@@ -949,7 +942,7 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
             )}
           </ActionBar>
         )}
-        <PBContainer>
+        <PBContainer fullHeight={inJupyter}>
           <PBSection
             mode={config.layoutMode}
             config={gridConfig}
@@ -958,7 +951,7 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
             handleAddPanel={config.enableAddPanel ? handleAddPanel : undefined}
           />
         </PBContainer>
-      </div>
+      </>
     );
   }
 

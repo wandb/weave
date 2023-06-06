@@ -8,7 +8,7 @@ import {
 } from '@wandb/weave/common/containers/DragDropContainer';
 import produce from 'immer';
 import * as _ from 'lodash';
-import React, {useState} from 'react';
+import React, {useRef, useState} from 'react';
 import Measure from 'react-measure';
 
 import {IdObj, PANEL_BANK_PADDING, PanelBankSectionConfig} from './panelbank';
@@ -37,6 +37,7 @@ export const PBSection: React.FC<PBSectionProps> = props => {
   const PanelBankSectionComponent =
     props.mode === 'grid' ? PanelBankGridSection : PanelBankFlowSection;
   const inJupyter = inJupyterCell();
+  const addPanelBarRef = useRef<HTMLDivElement | null>(null);
   return (
     <DragDropProvider>
       <div className="panel-bank" style={{height: '100%'}}>
@@ -49,7 +50,10 @@ export const PBSection: React.FC<PBSectionProps> = props => {
                 : 0
             );
             setPanelBankHeight(
-              contentRect.bounds ? contentRect.bounds.height : 0
+              contentRect.bounds
+                ? contentRect.bounds.height -
+                    (addPanelBarRef.current?.offsetHeight ?? 0)
+                : 0
             );
           }}>
           {({measureRef}) => (
@@ -86,7 +90,7 @@ export const PBSection: React.FC<PBSectionProps> = props => {
                   }}
                 />
                 {handleAddPanel != null && !inJupyter && (
-                  <AddPanelBarContainer>
+                  <AddPanelBarContainer ref={addPanelBarRef}>
                     <AddPanelBar onClick={handleAddPanel}>
                       <IconAddNew />
                       New panel
