@@ -1244,7 +1244,7 @@ export const unionObjectTypeAttrTypes = (type: Type): {[key: string]: Type} => {
 export const isMediaType = (type: Type): type is MediaType => {
   return (
     !isSimpleTypeShape(type) &&
-    BASIC_MEDIA_TYPES.filter(mt => type.type === mt.type) != null
+    BASIC_MEDIA_TYPES.filter(mt => type.type === mt.type).length > 0
   );
 };
 

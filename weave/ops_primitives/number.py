@@ -63,6 +63,7 @@ class Number(object):
         return lhs / rhs
 
     @op(
+        name="number-floorDiv",
         input_type=binary_number_op_input_type,
         output_type=types.Number(),
     )

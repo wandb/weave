@@ -220,6 +220,23 @@ export const opNumberDiv = makeNumberOp('/', {
   resolver: ({lhs, rhs}) => (rhs == null ? null : lhs / rhs),
 });
 
+export const opNumberFloorDiv = makeNumberOp('//', {
+  name: 'number-floorDiv',
+  argTypes: numberArgTypes,
+  description: `Divide a ${docType(
+    'number'
+  )} by another then rounds down to the nearest whole number`,
+  argDescriptions: {
+    lhs: `${docType('number')} to divide`,
+    rhs: `${docType('number')} to divide by`,
+  },
+  returnValueDescription: `Truncated quotient of two ${docType('number', {
+    plural: true,
+  })}`,
+  returnType: inputTypes => skipTaggable(inputTypes.rhs, t => t),
+  resolver: ({lhs, rhs}) => (rhs == null ? null : Math.floor(lhs / rhs)),
+});
+
 export const opNumberModulo = makeNumberOp('%', {
   name: 'number-modulo',
   argTypes: numberArgTypes,

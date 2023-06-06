@@ -531,6 +531,14 @@ async function autosuggestNodes(
           })
         );
       }
+    } else {
+      const availOps = availableOpsForChain(node, client.opStore);
+      result = availOps.flatMap(opDef => {
+        return callOpVeryUnsafe(opDef.name, {
+          lhs: node,
+          rhs: getPlaceholderArg(opDef, 'rhs') ?? voidNode(),
+        });
+      });
     }
   } else if (node.nodeType === 'var' || node.nodeType === 'output') {
     if (node.type === 'any') {
