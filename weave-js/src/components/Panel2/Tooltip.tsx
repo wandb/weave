@@ -20,7 +20,7 @@ import styled from 'styled-components';
 import {IconCopy, IconFullScreenModeExpand} from './Icons';
 import {PanelFullscreenContext} from './PanelComp';
 
-const HOVER_DELAY_MS = 200;
+export const HOVER_DELAY_MS = 200;
 
 // Invisible area around tooltip that helps prevent spurious close events
 const TT_MARGIN_PX = 12;
