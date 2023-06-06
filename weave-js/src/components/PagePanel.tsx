@@ -599,14 +599,17 @@ const JupyterPageControls: React.FC<
   const setInspectingPanel = useSetInspectingPanel();
   const closeEditor = useCloseEditor();
   const editorIsOpen = useEditorIsOpen();
-  const updateInput = useCallback((newInput: NodeOrVoidNode) => {
-    props.updateConfig2(oldConfig => {
-      return {
-        ...oldConfig,
-        input_node: newInput,
-      };
-    });
-  }, []);
+  const updateInput = useCallback(
+    (newInput: NodeOrVoidNode) => {
+      props.updateConfig2(oldConfig => {
+        return {
+          ...oldConfig,
+          input_node: newInput,
+        };
+      });
+    },
+    [props]
+  );
   const updateConfigForPanelNode = useUpdateConfigForPanelNode(
     props.config.input_node,
     updateInput

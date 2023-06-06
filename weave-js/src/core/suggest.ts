@@ -507,7 +507,7 @@ async function autosuggestNodes(
       if (variableNames.length > 0) {
         for (const varName of variableNames) {
           // Recursively suggest results for each variable
-          let vNode = varNode(frame[varName].type, varName);
+          const vNode = varNode(frame[varName].type, varName);
           // const newGraph = maybeReplaceNode(graph, node, vNode);
           // const results = await autosuggestNodes(
           //   client,

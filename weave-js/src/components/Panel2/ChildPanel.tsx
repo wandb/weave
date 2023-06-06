@@ -509,16 +509,6 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
     setInspectingPanel,
   } = useChildPanelCommon(props);
 
-  const nonExpressionPanelId = useMemo(() => {
-    const nonExpressionOption = panelOptions.find(
-      option => option.value !== 'Expression' && option.value !== 'RootBrowser'
-    );
-    if (nonExpressionOption != null) {
-      return nonExpressionOption.value;
-    }
-    return null;
-  }, [panelOptions]);
-
   const {frame} = usePanelContext();
 
   const validateName = useCallback(
