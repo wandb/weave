@@ -36,6 +36,7 @@ import {useNodeWithServerType} from '../react';
 import {
   inJupyterCell,
   uriFromNode,
+  useIsAuthenticated,
   weaveTypeIsPanel,
   weaveTypeIsPanelGroup,
 } from './PagePanelComponents/util';
@@ -55,6 +56,7 @@ import {
   addPanelToGroupConfig,
 } from './Panel2/PanelGroup';
 import {useUpdateConfigForPanelNode} from './Panel2/PanelPanel';
+import {isServedLocally} from './PagePanelComponents/util';
 
 const JupyterControlsHelpText = styled.div<{active: boolean}>`
   width: max-content;
@@ -278,6 +280,8 @@ const PagePanel: React.FC = props => {
     panelConfig = JSON.parse(panelConfig);
   }
   const inJupyter = inJupyterCell();
+  const authed = useIsAuthenticated();
+  const isLocal = isServedLocally();
 
   const setUrlExp = useCallback(
     (exp: NodeOrVoidNode) => {
@@ -401,7 +405,23 @@ const PagePanel: React.FC = props => {
     });
   }, [updateConfig]);
 
-  if (loading) {
+  const needsLogin = authed === false && isLocal === false;
+  useEffect(() => {
+    if (needsLogin) {
+      const newOrigin = window.location.origin.replace('//weave.', '//api.');
+      const newUrl = `${newOrigin}/oidc/login?${new URLSearchParams({
+        redirect_to: window.location.href,
+      }).toString()}`;
+      // eslint-disable-next-line wandb/no-unprefixed-urls
+      window.location.replace(newUrl);
+    }
+  }, [authed, isLocal, needsLogin]);
+
+  if (loading || authed === undefined) {
+    return <Loader name="page-panel-loader" />;
+  }
+  if (needsLogin) {
+    // Redirect is coming, just show a loader
     return <Loader name="page-panel-loader" />;
   }
 

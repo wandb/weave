@@ -230,7 +230,7 @@ export const PersistenceManager: React.FC<{
 
   const isAuthenticated = useIsAuthenticated();
   const availableActions = useMemo(
-    () => getAvailableActions(nodeState, isAuthenticated),
+    () => getAvailableActions(nodeState, isAuthenticated ?? false),
     [nodeState, isAuthenticated]
   );
 
