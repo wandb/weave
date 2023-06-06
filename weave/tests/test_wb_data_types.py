@@ -21,7 +21,7 @@ import datetime
 from bokeh.plotting import figure
 import os
 
-from wandb.apis.public import Artifact as PublicArtifact
+from wandb.sdk.artifacts.public_artifact import Artifact as PublicArtifact
 
 
 class RandomClass:

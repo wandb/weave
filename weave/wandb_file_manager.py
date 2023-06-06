@@ -5,11 +5,10 @@
 import datetime
 import json
 import typing
-import base64
 import urllib
 from aiohttp import BasicAuth
 
-from wandb import util as wandb_util
+from wandb.sdk.lib.hashutil import b64_to_hex_id
 
 
 from . import artifact_wandb
@@ -51,7 +50,7 @@ def _local_path_and_download_url(
     manifest_entry = manifest.get_entry_by_path(path)
     if manifest_entry is None:
         return None
-    md5_hex = wandb_util.bytes_to_hex(base64.b64decode(manifest_entry["digest"]))
+    md5_hex = b64_to_hex_id(manifest_entry["digest"])
     base_url = weave_env.wandb_base_url()
     file_path = _file_path(art_uri, md5_hex)
     if manifest.storage_layout == artifact_wandb.WandbArtifactManifest.StorageLayout.V1:
