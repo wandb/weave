@@ -51,6 +51,17 @@ jobs:
       - uses: actions/checkout@v2
       - run: source /root/venv/bin/activate && pre-commit run --all-files
 
+  eslint:
+    name: weavejs-lint-compile
+    runs-on: ubuntu-latest
+    name: Lint and Compile Weavejs
+    steps:
+      - uses: actions/checkout@v1
+      - uses: actions/setup-node@v1
+        with:
+          node-version: '16.x'
+      - run: cd weave-js && yarn install && yarn eslint-fix && yarn tslint-fix && yarn prettier-fix && yarn run tsc
+
   test:
     name: Python unit tests
     timeout-minutes: 15
@@ -174,7 +185,8 @@ jobs:
           # pass the Dashboard record key as an environment variable
           CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
           # pass GitHub token to allow accurately detecting a build vs a re-run build
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN:
+            ${{ secrets.GITHUB_TOKEN }}
             # - uses: actions/upload-artifact@v3
       - name: Upload logs
         uses: actions/upload-artifact@v3
