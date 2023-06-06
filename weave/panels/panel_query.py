@@ -67,7 +67,7 @@ class Query(panel.Panel):
         output_type=lambda inputs: inputs["self"].input_node.output_type,
         refine_output_type=selected_refine,
     )
-    def selected(self):
+    def selected_input_rows(self):
         # What a shame we have to execute the table :(
 
         # Apply Filters

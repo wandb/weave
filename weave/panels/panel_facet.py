@@ -97,7 +97,7 @@ class Facet(panel.Panel):
         self.config.table.update_col(self.config.dims.detail, expr)
 
     @weave.op(output_type=lambda input_type: input_type["self"].input_node.output_type)
-    def selected(self):
+    def selected_input_rows(self):
         if self.config.selectedCell == None:
             from ..ops_arrow import list_
 
