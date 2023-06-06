@@ -165,11 +165,31 @@ def test_image(sdk_obj, expected_type, fake_wandb):
         "test",
         {
             "id": "1234567890",
+            "state": "COMMITTED",
+            "versionIndex": 0,
             "artifactSequence": {
                 "name": "test",
+                "project": {
+                    "name": "test",
+                    "entityName": "test",
+                },
             },
+            "artifactType": {
+                "name": "test",
+            },
+            "description": "",
             "digest": art.digest,
-            "aliases": [],
+            "aliases": [
+                {
+                    "artifactCollectionName": "test",
+                    "alias": "v0",
+                }
+            ],
+            "metadata": {},
+            "commitHash": "12345",
+            "fileCount": 1,
+            "createdAt": "2021-01-01T00:00:00.000Z",
+            "updatedAt": "2021-01-01T00:00:00.000Z",
         },
         api.client,
     )
