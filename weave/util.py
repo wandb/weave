@@ -93,22 +93,29 @@ def find_names(obj):
     return obj_names
 
 
-def is_notebook():
+def is_colab():
     try:
         import google.colab
     except ImportError:
-        try:
-            from IPython import get_ipython
-        except ImportError:
+        return False
+    return True
+
+
+def is_notebook():
+    if is_colab():
+        return True
+    try:
+        from IPython import get_ipython
+    except ImportError:
+        return False
+    else:
+        ip = get_ipython()
+        if ip is None:
             return False
-        else:
-            ip = get_ipython()
-            if ip is None:
-                return False
-            if "IPKernelApp" not in ip.config:
-                return False
-            # if "VSCODE_PID" in os.environ:
-            #     return False
+        if "IPKernelApp" not in ip.config:
+            return False
+        # if "VSCODE_PID" in os.environ:
+        #     return False
     return True
 
 
