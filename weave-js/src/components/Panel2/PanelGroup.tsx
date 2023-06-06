@@ -145,7 +145,7 @@ export const GroupItem = styled.div<{
           margin-bottom 12px;
         `
       : css`
-          flex: 1 1 100px;
+          /* flex: 1 1 100px; */
           width: 100%;
           margin-bottom: 12px;
         `}
