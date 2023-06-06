@@ -1,4 +1,4 @@
-wandb @ git+https://github.com/wandb/client.git@0497e9098daa535230d738cf5dafeaad24b0477c
+wandb @ git+https://github.com/wandb/client.git@83fbf9c7fa2b0e92e227df3ae5cee5eaea44964f
 python-json-logger>=2.0.4
 numpy>=1.21
 pandas>=1.5.3

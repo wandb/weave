@@ -17,7 +17,7 @@ import wandb
 
 from urllib import parse
 
-from wandb.sdk.artifacts.public_artifact import Artifact
+from wandb.sdk.artifacts.artifact import Artifact
 
 # Note: We're mocking out the whole io_service right now. This is too
 # high level and doesn't test the actual io implementation. We should

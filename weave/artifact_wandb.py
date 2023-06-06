@@ -8,7 +8,7 @@ import typing
 
 import wandb
 from wandb.apis import public as wb_public
-from wandb.sdk.artifacts.local_artifact import Artifact as LocalArtifact
+from wandb.sdk.artifacts.artifact import Artifact
 from wandb.sdk.lib.hashutil import hex_to_b64_id, b64_to_hex_id
 
 from . import uris
@@ -356,7 +356,7 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         self._resolved_read_artifact_uri: typing.Optional["WeaveWBArtifactURI"] = None
         self._read_artifact = None
         if not uri:
-            self._writeable_artifact = LocalArtifact(
+            self._writeable_artifact = Artifact(
                 name, "op_def" if type is None else type
             )
         else:

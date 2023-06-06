@@ -3,7 +3,7 @@ import datetime
 import typing
 import wandb
 from wandb.sdk.artifacts.artifact_saver import ArtifactSaver
-from wandb.sdk.artifacts.public_artifact import Artifact
+from wandb.sdk.artifacts.artifact import Artifact
 from wandb.sdk.internal.sender import _manifest_json_from_proto
 
 # from wandb.sdk.internal.artifact_saver import ArtifactSaver # This symbol moved after our pinned version

@@ -21,7 +21,7 @@ import datetime
 from bokeh.plotting import figure
 import os
 
-from wandb.sdk.artifacts.public_artifact import Artifact as PublicArtifact
+from wandb.sdk.artifacts.artifact import Artifact
 
 
 class RandomClass:
@@ -159,8 +159,7 @@ def test_image(sdk_obj, expected_type, fake_wandb):
 
     # Create an artifact that looks like it was loaded remotely so we can use it without mocking backend
     api = FakeApi()
-    logged_artifact = PublicArtifact(
-        api.client,
+    logged_artifact = Artifact.from_attrs(
         "test",
         "test",
         "test",
@@ -172,6 +171,7 @@ def test_image(sdk_obj, expected_type, fake_wandb):
             "digest": art.digest,
             "aliases": [],
         },
+        api.client,
     )
     logged_artifact._manifest = art.manifest
     art._logged_artifact = logged_artifact
