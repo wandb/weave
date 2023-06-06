@@ -54,12 +54,11 @@ jobs:
   eslint:
     name: weavejs-lint-compile
     runs-on: ubuntu-latest
-    name: Lint and Compile Weavejs
     steps:
       - uses: actions/checkout@v1
       - uses: actions/setup-node@v1
         with:
-          node-version: '16.x'
+          node-version: "16.x"
       - run: cd weave-js && yarn install && yarn eslint-fix && yarn tslint-fix && yarn prettier-fix && yarn run tsc
 
   test:
