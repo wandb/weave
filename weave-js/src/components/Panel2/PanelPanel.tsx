@@ -1,7 +1,7 @@
 import {useTraceUpdate} from '@wandb/weave/common/util/hooks';
 import {constNodeUnsafe, Node, NodeOrVoidNode} from '@wandb/weave/core';
 import produce from 'immer';
-import React, {useCallback, useEffect, useMemo} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 
 import _ from 'lodash';
 import {useWeaveContext} from '../../context';
@@ -201,13 +201,19 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
 
   const closeEditor = useCloseEditor();
 
-  const showOutline = useMemo(
+  const [inspectingRoot, setInspectingRoot] = useState(false);
+  const selectedIsRoot = useMemo(
     () => selectedPanel.filter(s => s).length === 0,
     [selectedPanel]
+  );
+  const showOutline = useMemo(
+    () => selectedIsRoot && !inspectingRoot,
+    [selectedIsRoot, inspectingRoot]
   );
 
   const goBackToOutline = useCallback(() => {
     setSelectedPanel([``]);
+    setInspectingRoot(false);
   }, [setSelectedPanel]);
 
   if (loading) {
@@ -238,6 +244,7 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
           updateConfig2={panelUpdateConfig2}
           setSelected={setSelectedPanel}
           selected={selectedPanel}
+          setInspectingRoot={setInspectingRoot}
         />
       </SidebarConfig.Container>
     );
@@ -254,27 +261,31 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
             <SidebarConfig.HeaderTopText>Outline</SidebarConfig.HeaderTopText>
           </SidebarConfig.HeaderTopLeft>
           <SidebarConfig.HeaderTopRight>
-            <OutlineItemPopupMenu
-              config={panelConfig}
-              localConfig={getConfigForPath(panelConfig, selectedPanel)}
-              path={selectedPanel}
-              updateConfig={panelUpdateConfig}
-              updateConfig2={panelUpdateConfig2}
-              goBackToOutline={goBackToOutline}
-              trigger={
-                <IconButton>
-                  <IconOverflowHorizontal />
-                </IconButton>
-              }
-            />
+            {!selectedIsRoot && (
+              <OutlineItemPopupMenu
+                config={panelConfig}
+                localConfig={getConfigForPath(panelConfig, selectedPanel)}
+                path={selectedPanel}
+                updateConfig={panelUpdateConfig}
+                updateConfig2={panelUpdateConfig2}
+                goBackToOutline={goBackToOutline}
+                trigger={
+                  <IconButton>
+                    <IconOverflowHorizontal />
+                  </IconButton>
+                }
+              />
+            )}
             <IconButton onClick={closeEditor}>
               <IconClose />
             </IconButton>
           </SidebarConfig.HeaderTopRight>
         </SidebarConfig.HeaderTop>
-        <SidebarConfig.HeaderTitle>
-          {_.last(selectedPanel)}
-        </SidebarConfig.HeaderTitle>
+        {!selectedIsRoot && (
+          <SidebarConfig.HeaderTitle>
+            {_.last(selectedPanel)}
+          </SidebarConfig.HeaderTitle>
+        )}
       </SidebarConfig.Header>
       <SidebarConfig.Body>
         <PanelContextProvider newVars={{}} selectedPath={selectedPanel}>
