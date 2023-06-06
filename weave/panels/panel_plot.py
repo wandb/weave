@@ -611,6 +611,7 @@ def selection_is_discrete(selection: Selection) -> bool:
     return not selection_is_continuous(selection)
 
 
+# TODO: keep in arrow
 def filter_node_to_selection(
     node: graph.Node, selection: Selection, key: str
 ) -> graph.Node:
@@ -638,6 +639,7 @@ def filter_node_to_selection(
     return list_.List.filter(node, filter)
 
 
+# TODO: keep in arrow
 def _get_rows_selected_node(plot: Plot) -> graph.Node:
     if plot.config is None:
         raise errors.WeaveInternalError("config is None")
@@ -689,6 +691,7 @@ def _get_rows_selected_node(plot: Plot) -> graph.Node:
     return concatted
 
 
+# TODO: keep in arrow
 def _get_selected_data_node(plot: Plot) -> graph.Node:
     if plot.config is None:
         raise errors.WeaveInternalError("config is None")
@@ -743,6 +746,7 @@ def _get_selected_data_node(plot: Plot) -> graph.Node:
     return concatted["row"]
 
 
+# TODO: keep in arrow
 @weave.op(name="panel_plot-rows_selected_refine")
 def rows_selected_refine(self: Plot) -> weave.types.Type:
     if self.config is None:
@@ -764,11 +768,13 @@ def rows_selected_refine(self: Plot) -> weave.types.Type:
     return types.List(types.union(*table_row_types))
 
 
+# TODO: keep in arrow
 @weave.op(name="panel_plot-selected_data_refine")
 def selected_data_refine(self: Plot) -> weave.types.Type:
-    return self.input_node.type
+    return types.List(typing.cast(weave.types.List, self.input_node.type).object_type)
 
 
+# TODO: keep in arrow
 @weave.op(
     name="panel_plot-rows_selected",
     output_type=weave.types.List(weave.types.TypedDict({})),
@@ -779,6 +785,7 @@ def rows_selected(self: Plot):
     return weave.use(rows_selected_node)
 
 
+# TODO: keep in arrow
 @weave.op(
     name="panel_plot-selected_data",
     output_type=weave.types.List(weave.types.Any()),

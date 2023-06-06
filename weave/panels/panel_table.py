@@ -127,6 +127,7 @@ def _get_composite_group_key(self: typing.Union[Table, Query]) -> str:
     return ",".join(group_by_keys)
 
 
+# TODO: preserve arrow
 def _get_pinned_node(self: typing.Union[Table, Query], data_or_rows_node: Node) -> Node:
     if self.config is None:
         return weave.ops.make_list()
@@ -168,6 +169,7 @@ def _get_active_node(self: Table, data_or_rows_node: Node) -> Node:
     )
 
 
+# TODO: preserve arrow for empty list
 def _get_rows_node(self: Table) -> Node:
     # Apply Filters
     data_node = self.input_node
@@ -271,6 +273,7 @@ def _get_row_type(self: Table) -> weave.types.Type:
     return inner_type
 
 
+# TODO: preserve arrow
 @weave.op(name="panel_table-rows_refine")
 def rows_refine(self: Table) -> weave.types.Type:
     return weave.types.List(_get_row_type(self))
@@ -296,6 +299,7 @@ def data_single_refine(self: Table) -> weave.types.Type:
     return weave.types.optional(self.input_node.type.object_type)  # type: ignore
 
 
+# TODO: keep type in arrow
 @weave.op(
     name="panel_table-all_rows",
     output_type=weave.types.List(weave.types.TypedDict({})),
@@ -318,6 +322,7 @@ def pinned_data(self: typing.Union[Table, Query]):
     return weave.use(pinned_data_node)
 
 
+# TODO: preserve arrow
 @weave.op(
     name="panel_table-pinned_rows",
     output_type=weave.types.List(weave.types.TypedDict({})),
