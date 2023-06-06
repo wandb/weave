@@ -570,7 +570,7 @@ export const PageContent: FC<PageContentProps> = props => {
       {inJupyter && (
         <JupyterPageControls
           {...props}
-          reveal={showJupyterControls}
+          reveal={showJupyterControls && !editorIsOpen}
           goHome={goHome}
           openNewTab={openNewTab}
           maybeUri={maybeUri}
