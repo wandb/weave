@@ -1,4 +1,4 @@
-wandb>=0.15.4.dev1
+wandb @ git+https://github.com/wandb/client.git@ddba63a3a6a853472f95486e8afb10e5001c00ba
 python-json-logger>=2.0.4
 numpy>=1.21
 pandas>=1.5.3  # current Colab version
