@@ -111,6 +111,8 @@ import {
   IconAddNew,
   IconCheckmark,
   IconDelete,
+  IconFullScreenModeExpand,
+  IconMinimizeMode,
   IconOverflowHorizontal,
   IconWeave,
 } from '../Icons';
@@ -1127,10 +1129,10 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
           return <IconAddNew />;
         case `wbic-ic-collapse`:
           // TODO: replace with proper icon
-          return <IconDelete />;
+          return <IconMinimizeMode />;
         case `wbic-ic-expand`:
           // TODO: replace with proper icon
-          return <IconDelete />;
+          return <IconFullScreenModeExpand />;
         case null:
           return null;
         default:
