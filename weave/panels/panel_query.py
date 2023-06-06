@@ -59,7 +59,7 @@ class Query(panel.Panel):
             ]
             self.config.conditions = conds
 
-    @weave.op()
+    @weave.op(hidden=True)
     def selected_refine(self) -> weave.types.Type:
         return self.input_node.type
 

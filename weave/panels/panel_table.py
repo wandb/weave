@@ -274,22 +274,22 @@ def _get_row_type(self: Table) -> weave.types.Type:
 
 
 # TODO: preserve arrow
-@weave.op(name="panel_table-rows_refine")
+@weave.op(name="panel_table-rows_refine", hidden=True)
 def rows_refine(self: Table) -> weave.types.Type:
     return weave.types.List(_get_row_type(self))
 
 
-@weave.op(name="panel_table-rows_single_refine")
+@weave.op(name="panel_table-rows_single_refine", hidden=True)
 def rows_single_refine(self: Table) -> weave.types.Type:
     return weave.types.optional(_get_row_type(self))
 
 
-@weave.op(name="panel_table-data_refine")
+@weave.op(name="panel_table-data_refine", hidden=True)
 def data_refine(self: Table) -> weave.types.Type:
     return self.input_node.type
 
 
-@weave.op(name="panel_table-data_single_refine")
+@weave.op(name="panel_table-data_single_refine", hidden=True)
 def data_single_refine(self: Table) -> weave.types.Type:
     if not hasattr(self.input_node.type, "object_type"):
         return weave.types.Any()

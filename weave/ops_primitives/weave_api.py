@@ -142,7 +142,7 @@ def call_op(name: str) -> Node[types.Any]:
     return weave_internal.make_output_node(types.Any(), name, {})
 
 
-@op()
+@op(hidden=True)
 def objects_refine_output_type(
     of_type: types.Type, alias: str, timestamp: int
 ) -> types.Type:
@@ -208,6 +208,7 @@ def op_get_return_type_from_inputs(inputs):
     name="getReturnType",
     input_type={"uri": types.String()},
     output_type=types.TypeType(),
+    hidden=True,
 )
 def get_returntype(uri):
     return op_get_return_type(uri)

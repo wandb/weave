@@ -78,6 +78,7 @@ def writecsv(self: file_base.File, csv_data: list[dict]):
 
 @weave.op(
     name="file-refine_readcsv",
+    hidden=True,
     input_type={"self": file_base.FileBaseType(extension=weave.types.literal("csv"))},
 )
 def refine_readcsv(self) -> weave.types.Type:

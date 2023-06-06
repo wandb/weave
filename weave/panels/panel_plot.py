@@ -747,7 +747,7 @@ def _get_selected_data_node(plot: Plot) -> graph.Node:
 
 
 # TODO: keep in arrow
-@weave.op(name="panel_plot-rows_selected_refine")
+@weave.op(name="panel_plot-rows_selected_refine", hidden=True)
 def rows_selected_refine(self: Plot) -> weave.types.Type:
     if self.config is None:
         raise errors.WeaveInternalError("config is None")
@@ -769,7 +769,7 @@ def rows_selected_refine(self: Plot) -> weave.types.Type:
 
 
 # TODO: keep in arrow
-@weave.op(name="panel_plot-selected_data_refine")
+@weave.op(name="panel_plot-selected_data_refine", hidden=True)
 def selected_data_refine(self: Plot) -> weave.types.Type:
     return types.List(typing.cast(weave.types.List, self.input_node.type).object_type)
 
