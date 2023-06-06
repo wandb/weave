@@ -45,6 +45,7 @@ import {WBButton} from '../../common/components/elements/WBButtonNew';
 import {Tooltip} from '../Tooltip';
 // import {VarBar} from '../Sidebar/VarBar';
 import {inJupyterCell} from '../PagePanelComponents/util';
+import {GRAY_350, GRAY_500, GRAY_800} from '../../common/css/globals.styles';
 
 const LAYOUT_MODES = [
   'horizontal' as const,
@@ -84,6 +85,7 @@ export const Group = styled.div<{
   layered?: boolean;
   preferHorizontal?: boolean;
   compStyle?: string;
+  isVarBar: boolean;
 }>`
   ${props =>
     props.layered
@@ -104,6 +106,14 @@ export const Group = styled.div<{
           width: 100%;
           flex-direction: column;
         `}
+
+  ${p =>
+    p.isVarBar &&
+    css`
+      border-right: 1px solid ${GRAY_350};
+      padding-top: 12px;
+    `}
+          
   ${props => props.compStyle}
 `;
 
@@ -898,7 +908,7 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
 
   const inJupyter = inJupyterCell();
   // TODO: This special-case rendering is insane
-  // const isVarBar = _.isEqual(groupPath, [`sidebar`]);
+  const isVarBar = _.isEqual(groupPath, [`sidebar`]);
   // if (isVarBar) {
   //   return (
   //     <VarBar
@@ -975,6 +985,7 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
 
   return (
     <Group
+      isVarBar={isVarBar}
       layered={config.layoutMode === 'layer'}
       preferHorizontal={config.layoutMode === 'horizontal'}
       compStyle={config.style}>
@@ -999,11 +1010,17 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
           </GroupItem>
         );
       })}
-      {config.enableAddPanel && (
-        <Button onClick={handleAddPanel} size="tiny">
-          Add {props.config?.childNameBase ?? 'panel'}
-        </Button>
-      )}
+      {config.enableAddPanel &&
+        (isVarBar ? (
+          <AddVarButton onClick={handleAddPanel}>
+            New variable
+            <IconAddNew />
+          </AddVarButton>
+        ) : (
+          <Button onClick={handleAddPanel} size="tiny">
+            Add {props.config?.childNameBase ?? 'panel'}
+          </Button>
+        ))}
     </Group>
   );
 };
@@ -1018,3 +1035,24 @@ export const Spec: Panel2.PanelSpec = {
   ConfigComponent: PanelGroupConfigComponent,
   inputType,
 };
+
+const AddVarButton = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
+  padding: 12px;
+  cursor: pointer;
+  border-top: 1px solid ${GRAY_350};
+  width: calc(100% + 20px);
+
+  color: ${GRAY_500};
+  &:hover {
+    color: ${GRAY_800};
+  }
+
+  svg {
+    width: 18px;
+    height: 18px;
+  }
+`;
