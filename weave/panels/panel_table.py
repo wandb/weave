@@ -152,7 +152,7 @@ def _get_pinned_node(self: typing.Union[Table, Query], data_or_rows_node: Node) 
     )
 
 
-def _get_active_node(self: Table, data_or_rows_node: Node) -> Node:
+def _get_selected_node(self: Table, data_or_rows_node: Node) -> Node:
     composite_group_key = _get_composite_group_key(self)
     if self.config is None or self.config.activeRowForGrouping is None:
         active_index = 0
@@ -170,7 +170,7 @@ def _get_active_node(self: Table, data_or_rows_node: Node) -> Node:
 
 
 # TODO: preserve arrow for empty list
-def _get_rows_node(self: Table) -> Node:
+def _get_output_node(self: Table) -> Node:
     # Apply Filters
     data_node = self.input_node
     if (
@@ -274,23 +274,23 @@ def _get_row_type(self: Table) -> weave.types.Type:
 
 
 # TODO: preserve arrow
-@weave.op(name="panel_table-rows_refine", hidden=True)
-def rows_refine(self: Table) -> weave.types.Type:
+@weave.op(name="panel_table-output_rows_refine", hidden=True)
+def output_rows_refine(self: Table) -> weave.types.Type:
     return weave.types.List(_get_row_type(self))
 
 
-@weave.op(name="panel_table-rows_single_refine", hidden=True)
-def rows_single_refine(self: Table) -> weave.types.Type:
+@weave.op(name="panel_table-output_row_refine", hidden=True)
+def output_row_refine(self: Table) -> weave.types.Type:
     return weave.types.optional(_get_row_type(self))
 
 
-@weave.op(name="panel_table-data_refine", hidden=True)
-def data_refine(self: Table) -> weave.types.Type:
+@weave.op(name="panel_table-input_rows_refine", hidden=True)
+def input_rows_refine(self: Table) -> weave.types.Type:
     return self.input_node.type
 
 
-@weave.op(name="panel_table-data_single_refine", hidden=True)
-def data_single_refine(self: Table) -> weave.types.Type:
+@weave.op(name="panel_table-input_row_refine", hidden=True)
+def input_row_refine(self: Table) -> weave.types.Type:
     if not hasattr(self.input_node.type, "object_type"):
         return weave.types.Any()
     # input_node.type should be FunctionType (since its a Node)
@@ -301,57 +301,57 @@ def data_single_refine(self: Table) -> weave.types.Type:
 
 # TODO: keep type in arrow
 @weave.op(
-    name="panel_table-all_rows",
+    name="panel_table-all_output_rows",
     output_type=weave.types.List(weave.types.TypedDict({})),
-    refine_output_type=rows_refine,
+    refine_output_type=output_rows_refine,
 )
-def rows(self: Table):
-    rows_node = _get_rows_node(self)
+def all_output_rows(self: Table):
+    rows_node = _get_output_node(self)
     return weave_internal.use(rows_node)
 
 
 # Defined on both Table and Query
 @weave.op(
-    name="panel_table-pinned_data",
+    name="panel_table-pinned_input_rows",
     # we define output_type for pyton and refine_output_type for JS
     output_type=lambda inputs: inputs["self"].input_node.output_type,
-    refine_output_type=data_refine,
+    refine_output_type=input_rows_refine,
 )
-def pinned_data(self: typing.Union[Table, Query]):
-    pinned_data_node = _get_pinned_node(self, self.input_node)
-    return weave.use(pinned_data_node)
+def pinned_input_rows(self: typing.Union[Table, Query]):
+    pinned_input_rows_node = _get_pinned_node(self, self.input_node)
+    return weave.use(pinned_input_rows_node)
 
 
 # TODO: preserve arrow
 @weave.op(
-    name="panel_table-pinned_rows",
+    name="panel_table-pinned_output_rows",
     output_type=weave.types.List(weave.types.TypedDict({})),
-    refine_output_type=rows_refine,
+    refine_output_type=output_rows_refine,
 )
-def pinned_rows(self: Table):
-    rows_node = _get_rows_node(self)
-    pinned_data_node = _get_pinned_node(self, rows_node)
-    return weave.use(pinned_data_node)
+def pinned_output_rows(self: Table):
+    rows_node = _get_output_node(self)
+    pinned_output_node = _get_pinned_node(self, rows_node)
+    return weave.use(pinned_output_node)
 
 
 @weave.op(
-    name="panel_table-active_data",
+    name="panel_table-selected_input_row",
     # We can't use the refine_output_type here, because it will become
     # non-weavifiable and not sent over the wire.
     # output_type=lambda inputs: inputs['self'].input_node.output_type.object_type,
-    refine_output_type=data_single_refine,
+    refine_output_type=input_row_refine,
 )
-def active_data(self: Table) -> typing.Optional[typing.Any]:
-    data_node = _get_active_node(self, self.input_node)
-    return weave.use(data_node)
+def selected_input_row(self: Table) -> typing.Optional[typing.Any]:
+    selected_node = _get_selected_node(self, self.input_node)
+    return weave.use(selected_node)
 
 
 @weave.op(
-    name="panel_table-active_row",
+    name="panel_table-selected_output_row",
     output_type=weave.types.optional(weave.types.TypedDict({})),
-    refine_output_type=rows_single_refine,
+    refine_output_type=output_row_refine,
 )
-def active_row(self: Table):
-    rows_node = _get_rows_node(self)
-    data_node = _get_active_node(self, rows_node)
+def selected_output_row(self: Table):
+    rows_node = _get_output_node(self)
+    data_node = _get_selected_node(self, rows_node)
     return weave.use(data_node)

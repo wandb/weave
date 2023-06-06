@@ -650,7 +650,7 @@ def _get_selected_output_rows_node(plot: Plot) -> graph.Node:
     for series in plot.config.series:
         table_config = panel_table.TableConfig(tableState=series.table)
         table_panel = panel_table.Table(plot.input_node, config=table_config)
-        node = list_.unnest(panel_table.rows(table_panel))
+        node = list_.unnest(panel_table.all_output_rows(table_panel))
         columns = table_panel.get_final_named_select_functions()
 
         if selection.x is None and selection.y is None:
@@ -703,7 +703,7 @@ def _get_selected_input_rows_node(plot: Plot) -> graph.Node:
         table_config = panel_table.TableConfig(tableState=series.table)
         table_config.tableState.add_column(lambda row: row, "row")
         table_panel = panel_table.Table(plot.input_node, config=table_config)
-        node = list_.unnest(panel_table.rows(table_panel))
+        node = list_.unnest(panel_table.all_output_rows(table_panel))
         columns = table_panel.get_final_named_select_functions()
 
         if selection.x is None and selection.y is None:
@@ -756,7 +756,7 @@ def selected_output_rows_refine(self: Plot) -> weave.types.Type:
     for series in self.config.series:
         table_config = panel_table.TableConfig(tableState=series.table)
         table_panel = panel_table.Table(self.input_node, config=table_config)
-        node = list_.unnest(panel_table.rows(table_panel))
+        node = list_.unnest(panel_table.all_output_rows(table_panel))
         if len(self.config.series) > 1:
             node = dict_.TypedDict.merge(
                 node[0], dict_.dict_(y_expr_str=series.y_expr_str)
