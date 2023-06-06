@@ -99,11 +99,11 @@ After installation, check out our [Quick Start Guide](./docs/QUICKSTART.md) to g
 
 ---
 
-<!--
 ## 👩‍💻 Contribution
 
-Are you passionate about data exploration and open-source projects? Awesome! Weave's community is always looking for contributors. Check out our [Contribution Guide](./CONTRIBUTING.md) to learn how you can make Weave even better!
+Are you passionate about data exploration and open-source projects? Awesome! Weave's community is always looking for contributors. Check out our [Contribution Guide](./docs/CONTRIBUTING.md) to learn how you can make Weave even better!
 
+<!--
 
 ## 📢 Community
 
