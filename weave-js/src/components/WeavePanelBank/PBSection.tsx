@@ -16,9 +16,14 @@ import {PanelBankFlowSection} from './PanelBankFlowSection';
 import {getNewGridItemLayout} from './panelbankGrid';
 import {PanelBankGridSection} from './PanelBankGridSection';
 import styled from 'styled-components';
-import {GRAY_25, GRAY_500} from '../../common/css/globals.styles';
+import {
+  GRAY_25,
+  GRAY_500,
+  SCROLLBAR_STYLES,
+} from '../../common/css/globals.styles';
 import {IconAddNew as IconAddNewUnstyled} from '../Panel2/Icons';
 import {inJupyterCell} from '../PagePanelComponents/util';
+import {useScrollbarVisibility} from '../../core/util/scrollbar';
 
 interface PBSectionProps {
   mode: 'grid' | 'flow';
@@ -37,6 +42,11 @@ export const PBSection: React.FC<PBSectionProps> = props => {
   const PanelBankSectionComponent =
     props.mode === 'grid' ? PanelBankGridSection : PanelBankFlowSection;
   const inJupyter = inJupyterCell();
+  const {
+    visible: sectionsScrollbarVisible,
+    onScroll: onSectionsScroll,
+    onMouseMove: onSectionsMouseMove,
+  } = useScrollbarVisibility();
   const addPanelBarRef = useRef<HTMLDivElement | null>(null);
   return (
     <DragDropProvider>
@@ -57,7 +67,12 @@ export const PBSection: React.FC<PBSectionProps> = props => {
             );
           }}>
           {({measureRef}) => (
-            <div className="panel-bank__sections" ref={measureRef}>
+            <Sections
+              className="panel-bank__sections"
+              ref={measureRef}
+              scrollbarVisible={sectionsScrollbarVisible}
+              onScroll={onSectionsScroll}
+              onMouseMove={onSectionsMouseMove}>
               <div className="panel-bank__section">
                 <PanelBankSectionComponent
                   panelBankWidth={panelBankWidth}
@@ -98,7 +113,7 @@ export const PBSection: React.FC<PBSectionProps> = props => {
                   </AddPanelBarContainer>
                 )}
               </div>
-            </div>
+            </Sections>
           )}
         </Measure>
       </div>
@@ -142,6 +157,10 @@ export const getSectionConfig = (
     });
   });
 };
+
+const Sections = styled.div`
+  ${SCROLLBAR_STYLES}
+`;
 
 const AddPanelBar = styled.div`
   height: 48px;

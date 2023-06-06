@@ -31,6 +31,7 @@ import {OutlineItemPopupMenu} from '../Sidebar/OutlineItemPopupMenu';
 import {getConfigForPath} from './panelTree';
 import {IconButton} from '../IconButton';
 import * as SidebarConfig from '../Sidebar/Config';
+import {useScrollbarVisibility} from '../../core/util/scrollbar';
 
 const inputType = {type: 'Panel' as const};
 type PanelPanelProps = Panel2.PanelProps<
@@ -200,6 +201,11 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
   } = usePanelPanelCommon(props);
 
   const closeEditor = useCloseEditor();
+  const {
+    visible: bodyScrollbarVisible,
+    onScroll: onBodyScroll,
+    onMouseMove: onBodyMouseMove,
+  } = useScrollbarVisibility();
 
   const [inspectingRoot, setInspectingRoot] = useState(false);
   const selectedIsRoot = useMemo(
@@ -287,7 +293,10 @@ export const PanelPanelConfig: React.FC<PanelPanelProps> = props => {
           </SidebarConfig.HeaderTitle>
         )}
       </SidebarConfig.Header>
-      <SidebarConfig.Body>
+      <SidebarConfig.Body
+        scrollbarVisible={bodyScrollbarVisible}
+        onScroll={onBodyScroll}
+        onMouseMove={onBodyMouseMove}>
         <PanelContextProvider newVars={{}} selectedPath={selectedPanel}>
           <ChildPanelConfigComp
             config={panelConfig}

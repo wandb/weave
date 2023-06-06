@@ -1,4 +1,8 @@
-import {GRAY_350, GRAY_500} from '@wandb/weave/common/css/globals.styles';
+import {
+  GRAY_350,
+  GRAY_500,
+  SCROLLBAR_STYLES,
+} from '@wandb/weave/common/css/globals.styles';
 import styled, {css} from 'styled-components';
 
 export const Container = styled.div`
@@ -52,4 +56,5 @@ export const Body = styled.div`
   flex-grow: 1;
   overflow-x: hidden;
   overflow-y: auto;
+  ${SCROLLBAR_STYLES}
 `;

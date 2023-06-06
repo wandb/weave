@@ -279,10 +279,12 @@ export const SCROLLBAR_STYLES = css<{scrollbarVisible: boolean}>`
 
   // Webkit
   ::-webkit-scrollbar {
-    width: 6px;
+    width: 14px;
   }
   ::-webkit-scrollbar-thumb {
     border-radius: 9001px;
+    border: 4px solid transparent;
+    background-clip: padding-box;
     background-color: ${p => hexToRGB(OBLIVION, p.scrollbarVisible ? 0.12 : 0)};
     &:hover {
       background-color: ${p =>
