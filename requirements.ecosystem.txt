@@ -16,4 +16,5 @@ langchain>=0.0.132
 
 # spaCy Requirements:
 spacy>=3.0.0,<4.0.0
-en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.4.0/en_core_web_sm-3.4.0.tar.gz
+# TODO: maybe move this to setup tools...
+# en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.4.0/en_core_web_sm-3.4.0.tar.gz
