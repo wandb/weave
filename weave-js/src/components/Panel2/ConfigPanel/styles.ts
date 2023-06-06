@@ -6,16 +6,19 @@ export const ConfigOption = styled.div`
   display: flex;
   align-items: top;
 `;
+ConfigOption.displayName = 'ConfigOption';
 
 export const ConfigOptionLabel = styled.div`
   width: 70px;
-  padding-top: 0px;
+  padding-top: 0;
   flex-shrink: 0;
   color: #aaa;
 `;
+ConfigOptionLabel.displayName = 'ConfigOptionLabel';
 
 export const ConfigOptionField = styled.div`
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
 `;
+ConfigOptionField.displayName = 'ConfigOptionField';

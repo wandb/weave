@@ -14,12 +14,19 @@ import {
 import {panelChildren} from '../Panel2/panelTree';
 import {OutlineItemPopupMenu} from './OutlineItemPopupMenu';
 
+const OutlineContainer = styled.div`
+  padding: 8px 0;
+`;
+OutlineContainer.displayName = 'OutlineContainer';
+
 const OutlineItem = styled.div``;
+OutlineItem.displayName = 'OutlineItem';
 
 const OutlineItemMenuButton = styled(IconButton).attrs({small: true})`
   flex-shrink: 0;
   margin: 0 8px 0 4px;
 `;
+OutlineItemMenuButton.displayName = 'OutlineItemMenuButton';
 
 const OutlineItemTitle = styled.div<{level: number}>`
   display: flex;
@@ -39,6 +46,7 @@ const OutlineItemTitle = styled.div<{level: number}>`
     visibility: hidden;
   }
 `;
+OutlineItemTitle.displayName = 'OutlineItemTitle';
 
 const OutlineItemToggle = styled.div<{expanded: boolean}>`
   flex-shrink: 0;
@@ -54,18 +62,21 @@ const OutlineItemToggle = styled.div<{expanded: boolean}>`
     background-color: ${globals.GRAY_50};
   }
 `;
+OutlineItemToggle.displayName = 'OutlineItemToggle';
 
 const OutlineItemIcon = styled.div`
   flex-shrink: 0;
   display: flex;
   margin-right: 8px;
 `;
+OutlineItemIcon.displayName = 'OutlineItemIcon';
 
 const OutlineItemName = styled.div`
   flex-shrink: 0;
   max-width: 100px;
   overflow-wrap: break-word;
 `;
+OutlineItemName.displayName = 'OutlineItemName';
 
 const OutlineItemPanelID = styled.div`
   color: ${globals.GRAY_500};
@@ -77,20 +88,27 @@ const OutlineItemPanelID = styled.div`
   overflow: hidden;
   text-overflow: ellipsis;
 `;
+OutlineItemPanelID.displayName = 'OutlineItemPanelID';
 
 const iconStyles = css`
   height: 18px;
   width: 18px;
 `;
+
 const IconCaret = styled(IconCaretUnstyled)`
   ${iconStyles}
 `;
+IconCaret.displayName = 'IconCaret';
+
 const IconOverflowHorizontal = styled(IconOverflowHorizontalUnstyled)`
   ${iconStyles}
 `;
+IconOverflowHorizontal.displayName = 'IconOverflowHorizontal';
+
 const IconWeave = styled(IconWeaveUnstyled)`
   ${iconStyles}
 `;
+IconWeave.displayName = 'IconWeave';
 
 export type OutlinePanelProps = OutlineProps & {
   name: string;
@@ -214,7 +232,3 @@ export const Outline: React.FC<OutlineProps> = props => {
     </OutlineContainer>
   );
 };
-
-const OutlineContainer = styled.div`
-  padding: 8px 0;
-`;

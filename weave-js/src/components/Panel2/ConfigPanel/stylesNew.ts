@@ -11,6 +11,7 @@ export const ConfigOptionLabel = styled.div`
   overflow: hidden;
   text-overflow: ellipsis;
 `;
+ConfigOptionLabel.displayName = 'ConfigOptionLabel';
 
 export const ConfigOptionActions = styled.div`
   position: absolute;
@@ -19,12 +20,14 @@ export const ConfigOptionActions = styled.div`
   display: flex;
   align-items: center;
 `;
+ConfigOptionActions.displayName = 'ConfigOptionActions';
 
 export const ConfigOptionField = styled.div`
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
 `;
+ConfigOptionField.displayName = 'ConfigOptionField';
 
 export const ConfigOption = styled.div<{multiline: boolean}>`
   position: relative;
@@ -44,3 +47,4 @@ export const ConfigOption = styled.div<{multiline: boolean}>`
     display: none;
   }
 `;
+ConfigOption.displayName = 'ConfigOption';

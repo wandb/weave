@@ -34,6 +34,7 @@ export const ChildConfigContainer = styled.div`
     background-color: ${globals.GRAY_350};
   }
 `;
+ChildConfigContainer.displayName = 'ChildConfigContainer';
 
 export const ConfigSectionContainer = styled.div`
   padding: 12px;
@@ -41,6 +42,7 @@ export const ConfigSectionContainer = styled.div`
     border-top: 1px solid ${globals.GRAY_350};
   }
 `;
+ConfigSectionContainer.displayName = 'ConfigSectionContainer';
 
 export const ConfigSectionHeader = styled.div`
   margin-bottom: 12px;
@@ -50,16 +52,19 @@ export const ConfigSectionHeader = styled.div`
   font-weight: 600;
   cursor: pointer;
 `;
+ConfigSectionHeader.displayName = 'ConfigSectionHeader';
 
 export const ConfigSectionHeaderButton = styled.div<{expanded: boolean}>`
   display: flex;
   transform: rotate(${p => (p.expanded ? 0 : 180)}deg);
 `;
+ConfigSectionHeaderButton.displayName = 'ConfigSectionHeaderButton';
 
 export const ConfigSectionOptions = styled.div`
   display: flex;
   flex-direction: column;
 `;
+ConfigSectionOptions.displayName = 'ConfigSectionOptions';
 
 type ConfigSectionProps = {
   label?: string;
@@ -243,6 +248,7 @@ const ConfigFieldWrapper = styled.div<{withIcon?: boolean}>`
     }
   }
 `;
+ConfigFieldWrapper.displayName = 'ConfigFieldWrapper';
 
 const ConfigFieldModifiedDropdown = styled(ModifiedDropdown)`
   &&& {
@@ -261,8 +267,10 @@ const ConfigFieldModifiedDropdown = styled(ModifiedDropdown)`
     }
   }
 `;
+ConfigFieldModifiedDropdown.displayName = 'ConfigFieldModifiedDropdown';
 
 const IconDown = styled(IconDownUnstyled)`
   width: 18px;
   height: 18px;
 `;
+IconDown.displayName = 'IconDown';
