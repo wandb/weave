@@ -10,7 +10,7 @@ Demo notebooks can be found in `/examples.` Simply run `jupyter notebook` or `ju
 ## Weave fundamentals
 
 - [End-to-end walkthrough](../examples/Weave%20demo.ipynb)
-- [Create Weave Ops](../examples/experimental/02%20Tutorial%20-%20Creating%20ops.ipynb)
+- [Create Weave Ops](../examples/create_ops.ipynb)
 - [Organize Weave Panels](../examples/layout_panels.ipynb)
 
 ## Build interactive dashboards
@@ -23,5 +23,4 @@ Demo notebooks can be found in `/examples.` Simply run `jupyter notebook` or `ju
 
 - [BertViz: Visualize attention in transformers](../examples/bert_viz.ipynb)
 - [Browse HuggingFace datasets](../examples/huggingface_datasets.ipynb)
-- [Generate images with Replicate](../examples/image_gen_replicate.ipynb)
-
+- [Generate images with Replicate](../examples/experimental/skip_test/image_gen_replicate.ipynb)
