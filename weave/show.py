@@ -129,26 +129,21 @@ def show(obj=None, height=400):
             "a weave node, try `weave.use()`."
         )
 
-    if util.is_colab():
-        usage_analytics.show_called({"colab": True, "error": True})
-        raise RuntimeError(
-            "`weave.show()` is currently not supported in Google Colab.  We're working on it!  Follow "
-            "progress here: https://github.com/wandb/weave/pull/15"
-        )
-
     if util.is_pandas_dataframe(obj):
         obj = ops.dataframe_to_arrow(obj)
 
-    usage_analytics.show_called()
     panel_url = show_url(obj)
 
     if util.is_colab():
-        port = int(re.search(r":(\d+)/", panel_url).group(1))
+        usage_analytics.show_called({"colab": True})
+        parsed = re.search(r":(\d+)/(.+)", panel_url)
+        port = int(parsed.group(1))
+        path = parsed.group(2)
         shell = """
         (async () => {
                 const url = await google.colab.kernel.proxyPort(%PORT%, {"cache": false});
                 const iframe = document.createElement('iframe');
-                iframe.src = url;
+                iframe.src = url + '%PATH%';
                 iframe.setAttribute('width', '100%');
                 iframe.setAttribute('height', '%HEIGHT%');
                 iframe.setAttribute('frameborder', 0);
@@ -159,12 +154,14 @@ def show(obj=None, height=400):
         replacements = [
             ("%PORT%", "%d" % port),
             ("%HEIGHT%", "%d" % height),
+            ("%PATH%", path),
         ]
         for (k, v) in replacements:
             shell = shell.replace(k, v)
 
         display(Javascript(shell))
     else:
+        usage_analytics.show_called()
         iframe = IFrame(panel_url, "100%", "%spx" % height, ['allow="clipboard-write"'])
         display(iframe)
 
