@@ -130,7 +130,7 @@ def show(obj=None, height=400):
     if util.is_colab():
         usage_analytics.show_called({"colab": True, "error": True})
         raise RuntimeError(
-            "Weave is currently not supported in Google Colab.  We're working on it!  Follow "
+            "`weave.show()` is currently not supported in Google Colab.  We're working on it!  Follow "
             "progress here: https://github.com/wandb/weave/pull/15"
         )
 
