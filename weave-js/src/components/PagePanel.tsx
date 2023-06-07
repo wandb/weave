@@ -1,18 +1,26 @@
-import * as globals from '@wandb/weave/common/css/globals.styles';
 import Loader from '@wandb/weave/common/components/WandbLoader';
-import getConfig from '../config';
-import {Node, NodeOrVoidNode, voidNode} from '@wandb/weave/core';
+import * as globals from '@wandb/weave/common/css/globals.styles';
+import {NodeOrVoidNode, voidNode} from '@wandb/weave/core';
 import produce from 'immer';
-import moment from 'moment';
-import React, {FC, useRef} from 'react';
-import {useCallback, useEffect, useState} from 'react';
-import {Button, Icon, Input} from 'semantic-ui-react';
+import React, {FC, useCallback, useEffect, useRef, useState} from 'react';
+import {Icon} from 'semantic-ui-react';
 import styled, {ThemeProvider} from 'styled-components';
+import getConfig from '../config';
 
 import {useWeaveContext} from '../context';
+import {useNodeWithServerType} from '../react';
 import {consoleLog} from '../util';
-import {useWeaveAutomation} from './automation';
+import {Home} from './PagePanelComponents/Home';
 import {PersistenceManager} from './PagePanelComponents/PersistenceManager';
+import {useCopyCodeFromURI} from './PagePanelComponents/hooks';
+import {
+  inJupyterCell,
+  isServedLocally,
+  uriFromNode,
+  useIsAuthenticated,
+  weaveTypeIsPanel,
+  weaveTypeIsPanelGroup,
+} from './PagePanelComponents/util';
 import {
   CHILD_PANEL_DEFAULT_CONFIG,
   ChildPanel,
@@ -20,27 +28,6 @@ import {
   ChildPanelFullConfig,
 } from './Panel2/ChildPanel';
 import {themes} from './Panel2/Editor.styles';
-import {dummyProps, useConfig} from './Panel2/panel';
-import * as Styles from './Panel2/PanelExpression/styles';
-import {
-  PanelInteractContextProvider,
-  useEditorIsOpen,
-  useSetInspectingPanel,
-  useCloseEditor,
-} from './Panel2/PanelInteractContext';
-import {PanelRenderedConfigContextProvider} from './Panel2/PanelRenderedConfigContext';
-import {PanelRootBrowser} from './Panel2/PanelRootBrowser/PanelRootBrowser';
-import {useNewPanelFromRootQueryCallback} from './Panel2/PanelRootBrowser/util';
-import Inspector from './Sidebar/Inspector';
-import {useNodeWithServerType} from '../react';
-import {
-  inJupyterCell,
-  uriFromNode,
-  useIsAuthenticated,
-  weaveTypeIsPanel,
-  weaveTypeIsPanelGroup,
-} from './PagePanelComponents/util';
-import {useCopyCodeFromURI} from './PagePanelComponents/hooks';
 import {
   IconAddNew,
   IconCheckmark,
@@ -51,12 +38,21 @@ import {
   IconOpenNewTab,
   IconPencilEdit,
 } from './Panel2/Icons';
+import * as Styles from './Panel2/PanelExpression/styles';
 import {
   PANEL_GROUP_DEFAULT_CONFIG,
   addPanelToGroupConfig,
 } from './Panel2/PanelGroup';
+import {
+  PanelInteractContextProvider,
+  useCloseEditor,
+  useEditorIsOpen,
+  useSetInspectingPanel,
+} from './Panel2/PanelInteractContext';
 import {useUpdateConfigForPanelNode} from './Panel2/PanelPanel';
-import {isServedLocally} from './PagePanelComponents/util';
+import {PanelRenderedConfigContextProvider} from './Panel2/PanelRenderedConfigContext';
+import Inspector from './Sidebar/Inspector';
+import {useWeaveAutomation} from './automation';
 
 const JupyterControlsHelpText = styled.div<{active: boolean}>`
   width: max-content;
@@ -115,155 +111,6 @@ const JupyterControlsIcon = styled.div`
     color: #0096ad;
   }
 `;
-
-interface HomeProps {
-  updateConfig: (newConfig: ChildPanelFullConfig) => void;
-  inJupyter: boolean;
-}
-
-const Home: React.FC<HomeProps> = props => {
-  const now = moment().format('YY_MM_DD_hh_mm_ss');
-  const inJupyter = props.inJupyter;
-  const defaultName = now;
-  const [newName, setNewName] = useState('');
-  const weave = useWeaveContext();
-  const name = 'dashboard-' + (newName === '' ? defaultName : newName);
-  const makeNewDashboard = useNewPanelFromRootQueryCallback();
-  const {urlPrefixed} = getConfig();
-  const newDashboard = useCallback(() => {
-    makeNewDashboard(name, voidNode(), true, newDashExpr => {
-      if (inJupyter) {
-        const expStr = weave
-          .expToString(newDashExpr)
-          .replace(/\n+/g, '')
-          .replace(/\s+/g, '');
-        window.open(
-          urlPrefixed(`?exp=${encodeURIComponent(expStr)}`),
-          '_blank'
-        );
-      } else {
-        props.updateConfig({
-          vars: {},
-          input_node: newDashExpr,
-          id: '',
-          config: undefined,
-        });
-      }
-    });
-  }, [inJupyter, makeNewDashboard, name, props, urlPrefixed, weave]);
-  const [rootConfig, updateRootConfig] = useConfig();
-  const updateInput = useCallback(
-    (newInput: Node) => {
-      props.updateConfig({
-        vars: {},
-        input_node: newInput,
-        id: '',
-        config: undefined,
-      });
-    },
-    [props]
-  );
-  return (
-    <div
-      style={{
-        width: '100%',
-        height: '100%',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}>
-      <div
-        style={{
-          width: '100%',
-          height: '90%',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          // marginTop: 16,
-          // marginBottom: 16,
-        }}>
-        <div
-          style={{
-            width: '90%',
-            height: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexDirection: 'column',
-            gap: 16,
-          }}>
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'row',
-              // width: 400,
-              padding: 16,
-              border: '1px solid #eee',
-              gap: 16,
-              width: '100%',
-            }}>
-            <div
-              style={{
-                flexGrow: 1,
-                width: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-              }}>
-              <div
-                style={{width: '100%', display: 'flex', alignItems: 'center'}}
-                onKeyUp={e => {
-                  if (e.key === 'Enter') {
-                    newDashboard();
-                  }
-                }}>
-                <Input
-                  data-cy="new-dashboard-input"
-                  placeholder={defaultName}
-                  style={{flexGrow: 1}}
-                  value={newName}
-                  onChange={(e, {value}) => setNewName(value)}
-                />
-              </div>
-              <div
-                style={{
-                  display: 'flex',
-                  flex: 1,
-                  width: '100%',
-                }}>
-                <Button onClick={newDashboard}>New dashboard</Button>
-              </div>
-            </div>
-          </div>
-          <div
-            style={{
-              width: '100%',
-              height: '100%',
-              padding: 16,
-              border: '1px solid #eee',
-              display: 'flex',
-              flexDirection: 'column',
-              overflow: 'hidden',
-            }}>
-            {/* <div style={{marginBottom: 32}}>Your Weave Objects</div> */}
-            <div style={{flexGrow: 1, overflow: 'auto'}}>
-              <PanelRootBrowser
-                input={voidNode() as any}
-                updateInput={updateInput as any}
-                isRoot={true}
-                config={rootConfig}
-                updateConfig={updateRootConfig}
-                context={dummyProps.context}
-                updateContext={dummyProps.updateContext}
-              />
-              {/* <DashboardList loadDashboard={loadDashboard} /> */}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 const PagePanel: React.FC = props => {
   const weave = useWeaveContext();

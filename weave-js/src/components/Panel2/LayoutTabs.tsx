@@ -2,9 +2,8 @@ import {constStringList, Node} from '@wandb/weave/core';
 import React, {useMemo, useState} from 'react';
 
 import * as CGReact from '../../react';
-
-const HOVER_COLOR = '#00879d';
-const ACTIVE_COLOR = '#6ba6fa';
+import styled, {css} from 'styled-components';
+import {GRAY_350, GRAY_500, TEAL} from '../../common/css/globals.styles';
 
 export const Tabs: React.FC<{
   input: Node;
@@ -16,49 +15,18 @@ export const Tabs: React.FC<{
   const tabNames = useMemo(() => {
     return tabNamesQuery.result ?? ['loading...'];
   }, [tabNamesQuery.result]);
-  const [hoveringIndex, setHoveringIndex] = useState<number | null>(null);
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        width: '100%',
-        overflowX: 'auto',
-        flex: '0 0 auto',
-      }}
-      onMouseLeave={() => setHoveringIndex(null)}>
+    <TabsContainer>
       {tabNames.map((name: string, i: number) => (
-        <div
+        <Tab
           key={i}
-          style={{
-            flexShrink: 0,
-            margin: '0 5px 4px',
-            minWidth: 50,
-            maxWidth: 100,
-            display: 'flex',
-            justifyContent: 'center',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-            cursor: 'pointer',
-            color:
-              hoveringIndex === i
-                ? HOVER_COLOR
-                : activeIndex === i
-                ? ACTIVE_COLOR
-                : undefined,
-            borderBottom:
-              hoveringIndex === i
-                ? `2px solid ${HOVER_COLOR}`
-                : activeIndex === i
-                ? `2px solid ${ACTIVE_COLOR}`
-                : '2px solid #aaa',
-          }}
-          onMouseEnter={() => setHoveringIndex(i)}
+          active={activeIndex === i}
           onClick={() => setActiveIndex(i)}>
-          <div>{name}</div>
-        </div>
+          {name}
+        </Tab>
       ))}
-    </div>
+    </TabsContainer>
   );
 };
 
@@ -68,25 +36,83 @@ export const LayoutTabs: React.FC<{
 }> = props => {
   const [activeIndex, setActiveIndex] = useState(0);
   return (
-    <div
-      style={{
-        width: '100%',
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-      }}>
+    <Container>
       <Tabs
         input={constStringList(props.tabNames)}
         activeIndex={activeIndex}
         setActiveIndex={setActiveIndex}
       />
-      <div
-        style={{
-          flex: '1 1 auto',
-          overflow: 'hidden',
-        }}>
-        {props.renderPanel({id: props.tabNames[activeIndex]})}
-      </div>
-    </div>
+      <Content>{props.renderPanel({id: props.tabNames[activeIndex]})}</Content>
+    </Container>
   );
 };
+
+const Container = styled.div`
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+`;
+
+const Content = styled.div`
+  flex: 1 1 auto;
+  overflow: hidden;
+`;
+
+const TabsContainer = styled.div`
+  position: relative;
+  display: flex;
+  width: 100%;
+  overflow-x: auto;
+  flex: 0 0 auto;
+  margin-bottom: 12px;
+
+  &:after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 1px;
+    background-color: ${GRAY_350};
+  }
+`;
+
+const Tab = styled.div<{active: boolean}>`
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+  min-width: 50px;
+  max-width: 100px;
+  line-height: 32px;
+  padding-bottom: 6px;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  font-weight: 600;
+
+  &:not(:first-child) {
+    margin-left: 32px;
+  }
+
+  ${p =>
+    !p.active
+      ? css`
+          &:not(:hover) {
+            color: ${GRAY_500};
+          }
+        `
+      : css`
+          &:after {
+            content: '';
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: 2px;
+            background-color: ${TEAL};
+          }
+        `}
+`;
