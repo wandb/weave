@@ -223,7 +223,6 @@ export function autoTableColumnExpressions(
             self: expr,
             name: constString(p.slice('__object__'.length)),
           });
-
         }
       }
       if (pathStr.length > 0) {
