@@ -11,7 +11,7 @@ import {
 } from '@wandb/weave/core';
 import copyToClipboard from 'copy-to-clipboard';
 import _ from 'lodash';
-import React, {useCallback, useContext, useMemo, useState} from 'react';
+import React, {useCallback, useContext, useMemo, useRef, useState} from 'react';
 import {Button, Modal, Popup} from 'semantic-ui-react';
 
 import {useWeaveDashUiEnable, useWeaveFeaturesContext} from '../../context';
@@ -28,6 +28,7 @@ import {PanelExportUpdaterContext} from './PanelExportContext';
 import * as PanelLib from './panellib/libpanel';
 import * as TSTypeWithPath from './tsTypeWithPath';
 import {WeaveMessage} from './WeaveMessage';
+import {HOVER_DELAY_MS} from './Tooltip';
 
 class PanelCompErrorBoundary extends React.Component<
   {
@@ -424,7 +425,23 @@ const ControlWrapper: React.FC<ControlWrapperProps> = ({
   const {panelPath} = useContext(PanelCompContext);
 
   const [fullscreen, setFullscreen] = useState(false);
+
   const [hovering, setHovering] = useState(false);
+  const hoverTimeoutIDRef = useRef<number | null>(null);
+  const onHover = useCallback(() => {
+    const timeoutID = window.setTimeout(() => {
+      if (hoverTimeoutIDRef.current !== timeoutID) {
+        return;
+      }
+      setHovering(true);
+    }, HOVER_DELAY_MS);
+    hoverTimeoutIDRef.current = timeoutID;
+  }, []);
+  const onUnhover = useCallback(() => {
+    setHovering(false);
+    hoverTimeoutIDRef.current = null;
+  }, []);
+
   const ConfigComponent = panelProps.panelSpec.ConfigComponent;
   const canFullscreen = shouldEnableFullscreen(
     panelPath,
@@ -463,15 +480,11 @@ const ControlWrapper: React.FC<ControlWrapperProps> = ({
       hovering={hovering}
       onMouseEnter={() => {
         // onExpressionHover();
-        if (!hovering) {
-          setHovering(true);
-        }
+        onHover();
       }}
       onMouseLeave={() => {
         // onExpressionUnhover();
-        if (hovering) {
-          setHovering(false);
-        }
+        onUnhover();
       }}
       canFullscreen={canFullscreen}>
       <S.ControlWrapperBar hovering={hovering}>

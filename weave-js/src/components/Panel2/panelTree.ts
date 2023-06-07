@@ -309,13 +309,10 @@ export const addChild = (
 
 // Must match the variables that the rest of the UI
 // pushes onto the stack!
-export const mapPanels =  (
+export const mapPanels = (
   node: PanelTreeNode,
   stack: Stack,
-  fn: (
-    node: ChildPanelFullConfig,
-    stack: Stack
-  ) => ChildPanelFullConfig
+  fn: (node: ChildPanelFullConfig, stack: Stack) => ChildPanelFullConfig
 ): ChildPanelFullConfig => {
   const fullNode = getFullChildPanel(node);
   let withMappedChildren: ChildPanelFullConfig = fullNode;
@@ -324,7 +321,7 @@ export const mapPanels =  (
     let childFrame: Frame = {};
     for (const key of Object.keys(fullNode.config.items)) {
       const childItem = fullNode.config.items[key];
-      items[key] =  mapPanels(
+      items[key] = mapPanels(
         fullNode.config.items[key],
         pushFrame(stack, childFrame),
         fn
@@ -339,7 +336,7 @@ export const mapPanels =  (
   } else if (isStandardPanel(fullNode.id)) {
     const children: {[key: string]: ChildPanelFullConfig} = {};
     for (const key of Object.keys(STANDARD_PANEL_CHILD_KEYS[fullNode.id])) {
-      children[key] =  mapPanels(fullNode.config[key], stack, fn);
+      children[key] = mapPanels(fullNode.config[key], stack, fn);
     }
     withMappedChildren = {
       ...fullNode,
@@ -420,7 +417,7 @@ export const ensureDashboard = (node: PanelTreeNode): ChildPanelFullConfig => {
         {
           layoutMode: 'vertical',
           equalSize: false,
-          style: 'width:300px; padding-right: 20px',
+          style: 'width:300px;',
           showExpressions: true,
           allowedPanels: ['Expression', 'Query', 'Slider', 'StringEditor'],
           enableAddPanel: true,
@@ -433,7 +430,10 @@ export const ensureDashboard = (node: PanelTreeNode): ChildPanelFullConfig => {
   );
 };
 
-export const ensureDashboardFromItems = (seedItems: {[name: string]: ChildPanelFullConfig}, vars:  {[name: string]: NodeOrVoidNode}): ChildPanelFullConfig => {
+export const ensureDashboardFromItems = (
+  seedItems: {[name: string]: ChildPanelFullConfig},
+  vars: {[name: string]: NodeOrVoidNode}
+): ChildPanelFullConfig => {
   const mainConfig = {
     layoutMode: 'grid',
     showExpressions: true,
@@ -446,34 +446,33 @@ export const ensureDashboardFromItems = (seedItems: {[name: string]: ChildPanelF
           y: ndx * 10,
           w: 24,
           h: 9,
-        }
-      }))
+        },
+      })),
     },
   };
   const main = makeGroup(seedItems, mainConfig);
   if (Object.keys(vars).length === 0) {
-    vars = {var0: voidNode()}
+    vars = {var0: voidNode()};
   }
-  const sidebarVars = _.mapValues(vars, (node, name) => (getFullChildPanel({
+  const sidebarVars = _.mapValues(vars, (node, name) =>
+    getFullChildPanel({
       vars: {},
       input_node: node,
       id: 'Expression',
-      config: null
-  })))
+      config: null,
+    })
+  );
   return makeGroup(
     {
-      sidebar: makeGroup(
-        sidebarVars,
-        {
-          layoutMode: 'vertical',
-          equalSize: false,
-          style: 'width:300px; padding-right: 20px',
-          showExpressions: true,
-          allowedPanels: ['Expression', 'Query', 'Slider', 'StringEditor'],
-          enableAddPanel: true,
-          childNameBase: 'var',
-        }
-      ),
+      sidebar: makeGroup(sidebarVars, {
+        layoutMode: 'vertical',
+        equalSize: false,
+        style: 'width:300px;',
+        showExpressions: true,
+        allowedPanels: ['Expression', 'Query', 'Slider', 'StringEditor'],
+        enableAddPanel: true,
+        childNameBase: 'var',
+      }),
       main,
     },
     {layoutMode: 'horizontal'}

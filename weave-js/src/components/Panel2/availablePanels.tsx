@@ -114,6 +114,10 @@ function scoreHandlerStack(type: Type, hs: PanelStack) {
     scoreHs += 10;
   }
 
+  if (sidAndName.id.endsWith('-file')) {
+    scoreHs += 10;
+  }
+
   if (
     sidAndName.id.startsWith('row') &&
     !isMediaTypeLike(listObjectType(nullableTaggableValue(type)))

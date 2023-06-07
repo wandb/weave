@@ -188,8 +188,11 @@ const PanelTableInnerConfigSetter: React.FC<
 > = props => {
   const weave = useWeaveContext();
   const {input, updateConfig, config} = props;
-  const {tableState, autoTable,  hasLoadedOnce} =
-    useAutomatedTableState(input, config.tableState, weave);
+  const {tableState, autoTable, hasLoadedOnce} = useAutomatedTableState(
+    input,
+    config.tableState,
+    weave
+  );
 
   const protectedUpdateConfig = React.useCallback(
     (configPatch: Partial<PanelTableConfig>) => {

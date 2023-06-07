@@ -2,7 +2,9 @@ import dataclasses
 import datetime
 import typing
 import wandb
-from wandb.sdk.internal.artifacts import ArtifactSaver, _manifest_json_from_proto
+from wandb.sdk.artifacts.artifact_saver import ArtifactSaver
+from wandb.sdk.artifacts.public_artifact import Artifact
+from wandb.sdk.internal.sender import _manifest_json_from_proto
 
 # from wandb.sdk.internal.artifact_saver import ArtifactSaver # This symbol moved after our pinned version
 # from wandb.sdk.internal.sender import _manifest_json_from_proto # This symbol moved after our pinned version
@@ -94,9 +96,7 @@ def write_artifact_to_wandb(
     pusher.join()
 
     if res is not None:
-        commit_hash = wandb.apis.public.Artifact.from_id(
-            res["id"], p_api.client
-        ).commit_hash
+        commit_hash = Artifact.from_id(res["id"], p_api.client).commit_hash
 
     # Return the URI of the artifact
     return WeaveWBArtifactURIComponents(

@@ -29,7 +29,7 @@ export const inJupyterCell = () => {
 declare function btoa(s: string): string;
 
 export const useIsAuthenticated = () => {
-  const [isAuth, setIsAuth] = useState(false);
+  const [isAuth, setIsAuth] = useState<boolean | undefined>(undefined);
   const anonApiKey = getCookie('anon_api_key');
 
   useEffect(() => {

@@ -16,7 +16,7 @@ from .panel_sections import Sections
 # navigation
 from .panel_weavelink import WeaveLink
 
-from .panel_table import Table, ColumnDef
+from .panel_table import Table, TableColumn, ColumnDef
 from .panel_plot import Plot
 from .panel_facet import Facet
 from .panel_each_column import EachColumn

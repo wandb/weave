@@ -173,7 +173,7 @@ class String:
     def format(self, named_items: dict[str, typing.Union[str, int]]) -> str:
         return self.format(**named_items)
 
-    @op()
+    @op(hidden=True)
     def json_parse_refine(self) -> types.Type:
         return types.TypeRegistry.type_of(_json_parse(self))  # type: ignore
 

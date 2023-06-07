@@ -61,7 +61,7 @@ def hf_feature_type_to_type(type_):
     raise weave.errors.WeaveTypeError("unhandled hf type: %s" % type_)
 
 
-@weave.op(render_info={"type": "function"})
+@weave.op(render_info={"type": "function"}, hidden=True)
 def dataset_refine_output_type(name: str) -> weave.types.Type:
     ds = datasets.load_dataset(name, split="train", streaming=True)
     prop_types = {}

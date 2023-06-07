@@ -15,7 +15,9 @@ import {PersistenceManager} from './PagePanelComponents/PersistenceManager';
 import {useCopyCodeFromURI} from './PagePanelComponents/hooks';
 import {
   inJupyterCell,
+  isServedLocally,
   uriFromNode,
+  useIsAuthenticated,
   weaveTypeIsPanel,
   weaveTypeIsPanelGroup,
 } from './PagePanelComponents/util';
@@ -125,6 +127,8 @@ const PagePanel: React.FC = props => {
     panelConfig = JSON.parse(panelConfig);
   }
   const inJupyter = inJupyterCell();
+  const authed = useIsAuthenticated();
+  const isLocal = isServedLocally();
 
   const setUrlExp = useCallback(
     (exp: NodeOrVoidNode) => {
@@ -248,7 +252,23 @@ const PagePanel: React.FC = props => {
     });
   }, [updateConfig]);
 
-  if (loading) {
+  const needsLogin = authed === false && isLocal === false;
+  useEffect(() => {
+    if (needsLogin) {
+      const newOrigin = window.location.origin.replace('//weave.', '//api.');
+      const newUrl = `${newOrigin}/oidc/login?${new URLSearchParams({
+        redirect_to: window.location.href,
+      }).toString()}`;
+      // eslint-disable-next-line wandb/no-unprefixed-urls
+      window.location.replace(newUrl);
+    }
+  }, [authed, isLocal, needsLogin]);
+
+  if (loading || authed === undefined) {
+    return <Loader name="page-panel-loader" />;
+  }
+  if (needsLogin) {
+    // Redirect is coming, just show a loader
     return <Loader name="page-panel-loader" />;
   }
 
@@ -348,15 +368,15 @@ export const PageContent: FC<PageContentProps> = props => {
       .expToString(config.input_node)
       .replace(/\n+/g, '')
       .replace(/\s+/g, '');
-    // window.open(urlPrefixed(`/?exp=${encodeURIComponent(expStr)}`), '_blank');
-    window.open(
-      urlPrefixed(
-        `/__frontend/weave_jupyter?exp=${encodeURIComponent(
-          expStr
-        )}&moarFullScreen=true`
-      ),
-      '_blank'
-    );
+    window.open(urlPrefixed(`/?exp=${encodeURIComponent(expStr)}`), '_blank');
+    // window.open(
+    //   urlPrefixed(
+    //     `/__frontend/weave_jupyter?exp=${encodeURIComponent(
+    //       expStr
+    //     )}&moarFullScreen=true`
+    //   ),
+    //   '_blank'
+    // );
   }, [config.input_node, urlPrefixed, weave]);
 
   return (
@@ -417,7 +437,7 @@ export const PageContent: FC<PageContentProps> = props => {
       {inJupyter && (
         <JupyterPageControls
           {...props}
-          reveal={showJupyterControls}
+          reveal={showJupyterControls && !editorIsOpen}
           goHome={goHome}
           openNewTab={openNewTab}
           maybeUri={maybeUri}
@@ -446,14 +466,17 @@ const JupyterPageControls: React.FC<
   const setInspectingPanel = useSetInspectingPanel();
   const closeEditor = useCloseEditor();
   const editorIsOpen = useEditorIsOpen();
-  const updateInput = useCallback((newInput: NodeOrVoidNode) => {
-    props.updateConfig2(oldConfig => {
-      return {
-        ...oldConfig,
-        input_node: newInput,
-      };
-    });
-  }, []);
+  const updateInput = useCallback(
+    (newInput: NodeOrVoidNode) => {
+      props.updateConfig2(oldConfig => {
+        return {
+          ...oldConfig,
+          input_node: newInput,
+        };
+      });
+    },
+    [props]
+  );
   const updateConfigForPanelNode = useUpdateConfigForPanelNode(
     props.config.input_node,
     updateInput

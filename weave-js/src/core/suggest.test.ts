@@ -322,13 +322,7 @@ describe('autosuggest', () => {
 
     expectOnlyNodes(result);
     const autosuggestNames = suggestResultNames(result);
-    expect(autosuggestNames).toEqual([
-      'x',
-      'x.isNone',
-      'x["a"]',
-      'x["b"]',
-      'x[]',
-    ]);
+    expect(autosuggestNames).toEqual(['x']);
   });
 
   it('suggest for number', async () => {
@@ -344,29 +338,7 @@ describe('autosuggest', () => {
 
     expectOnlyNodes(result);
     const autosuggestNames = suggestResultNames(result);
-    expect(autosuggestNames).toEqual([
-      'x',
-      'x!=',
-      'x%',
-      'x*',
-      'x**',
-      'x+',
-      'x-',
-      'x/',
-      'x<',
-      'x<=',
-      'x==',
-      'x>',
-      'x>=',
-      '-x',
-      'abs(x)',
-      'cos(x)',
-      'gauss(x,,)',
-      'sin(x)',
-      'x.isNone',
-      'x.toString',
-      'x.toTimestamp',
-    ]);
+    expect(autosuggestNames).toEqual(['x']);
   });
 
   it('suggest replacements for binary ops', async () => {
@@ -387,7 +359,7 @@ describe('autosuggest', () => {
     expectOnlyOps(addResult);
     const addAutosuggestNames = addResult.map(r => r.suggestionString);
 
-    expect(addAutosuggestNames).toEqual(['%', '*', '**', '+', '-', '/']);
+    expect(addAutosuggestNames).toEqual(['%', '*', '**', '+', '-', '/', '//']);
 
     const compareOutputNode = opNumberLessEqual({
       lhs: addOutputNode,

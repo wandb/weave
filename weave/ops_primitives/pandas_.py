@@ -322,6 +322,7 @@ def _pd_dtype_to_weave(dtype):
 
 @op(
     name="file-refine_pandasreadcsv",
+    hidden=True,
     input_type={"file": file_base.FileBaseType()},
     output_type=types.TypeType(),
 )

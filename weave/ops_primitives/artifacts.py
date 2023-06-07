@@ -10,7 +10,7 @@ from ..api import op
 from .. import artifact_fs
 
 
-@op(name="FilesystemArtifact-fileRefineType")
+@op(name="FilesystemArtifact-fileRefineType", hidden=True)
 def artifact_file_refine_type(
     artifact: artifact_fs.FilesystemArtifact, path: str
 ) -> types.Type:

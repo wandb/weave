@@ -856,6 +856,7 @@ module.exports = grammar({
           ['-', 'binary_plus'],
           ['*', 'binary_times'],
           ['/', 'binary_times'],
+          ['//', 'binary_times'],
           ['%', 'binary_times'],
           ['**', 'binary_exp', 'right'],
           ['<', 'binary_relation'],
@@ -972,10 +973,7 @@ module.exports = grammar({
       ),
 
     // http://stackoverflow.com/questions/13014947/regex-to-match-a-c-style-multiline-comment/36328890#36328890
-    comment: $ =>
-      token(
-        choice(seq('//', /.*/), seq('/*', /[^*]*\*+([^/*][^*]*\*+)*/, '/'))
-      ),
+    comment: $ => token(seq('/*', /[^*]*\*+([^/*][^*]*\*+)*/, '/')),
 
     template_string: $ =>
       seq(

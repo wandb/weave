@@ -128,9 +128,11 @@ export function emptyTable(): TableState {
 
 export function initTableWithPickColumns(
   inputArrayNode: Node,
-  weave: WeaveInterface
+  weave: WeaveInterface,
+  pickColumns?: string[]
 ) {
   const arrayType = inputArrayNode.type;
+  let addCols: AddColumnEntries = [];
   let allColumns: Node[] = [];
   const objectType = listObjectType(arrayType);
 
@@ -145,28 +147,36 @@ export function initTableWithPickColumns(
     inputArrayNode,
     weave
   );
-
-  if (
-    isAssignableTo(nonNullable(objectType), {
-      type: 'union',
-      members: [typedDict({}), rootObject()],
-    })
-  ) {
-    allColumns = autoTableColumnExpressions(exNode.type, objectType);
-  }
-  const columns =
-    allColumns.length > 100 ? allColumns.slice(0, 100) : allColumns;
-  if (columns.length === 0) {
-    // If no columns are provided, at least fill it with a general row column.
-    ts = addColumnToTable(ts, varNode(exNode.type, 'row')).table;
-  } else {
-    const addCols: AddColumnEntries = columns.map(colExpr => ({
-      selectFn: colExpr,
-      keyName: '',
+  if (pickColumns) {
+    addCols = pickColumns.map(colKey => ({
+      selectFn: opPick({
+        obj: varNode(exNode.type, 'row') as any,
+        key: constString(colKey),
+      }),
+      keyName: colKey,
     }));
-
-    ts = addColumnsToTable(ts, addCols).table;
+  } else {
+    if (
+      isAssignableTo(nonNullable(objectType), {
+        type: 'union',
+        members: [typedDict({}), rootObject()],
+      })
+    ) {
+      allColumns = autoTableColumnExpressions(exNode.type, objectType);
+    }
+    const columns =
+      allColumns.length > 100 ? allColumns.slice(0, 100) : allColumns;
+    if (columns.length === 0) {
+      // If no columns are provided, at least fill it with a general row column.
+      ts = addColumnToTable(ts, varNode(exNode.type, 'row')).table;
+    } else {
+      addCols = columns.map(colExpr => ({
+        selectFn: colExpr,
+        keyName: '',
+      }));
+    }
   }
+  ts = addColumnsToTable(ts, addCols).table;
   return ts;
 }
 

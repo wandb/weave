@@ -8,7 +8,7 @@ import {
 } from '@wandb/weave/common/containers/DragDropContainer';
 import produce from 'immer';
 import * as _ from 'lodash';
-import React, {useState} from 'react';
+import React, {useRef, useState} from 'react';
 import Measure from 'react-measure';
 
 import {IdObj, PANEL_BANK_PADDING, PanelBankSectionConfig} from './panelbank';
@@ -16,13 +16,27 @@ import {PanelBankFlowSection} from './PanelBankFlowSection';
 import {getNewGridItemLayout} from './panelbankGrid';
 import {PanelBankGridSection} from './PanelBankGridSection';
 import styled from 'styled-components';
-import {GRAY_25, GRAY_500} from '../../common/css/globals.styles';
-import {IconAddNew as IconAddNewUnstyled} from '../Panel2/Icons';
+import {
+  GRAY_25,
+  GRAY_500,
+  SCROLLBAR_STYLES,
+} from '../../common/css/globals.styles';
+import {
+  IconAddNew as IconAddNewUnstyled,
+  IconPencilEdit,
+} from '../Panel2/Icons';
 import {inJupyterCell} from '../PagePanelComponents/util';
+import {useScrollbarVisibility} from '../../core/util/scrollbar';
+import {Tooltip} from '../Tooltip';
+import {IconButton} from '../IconButton';
+import {WBButton} from '../../common/components/elements/WBButtonNew';
+import {useSetInspectingPanel} from '../Panel2/PanelInteractContext';
 
 interface PBSectionProps {
   mode: 'grid' | 'flow';
   config: PanelBankSectionConfig;
+  groupPath?: string[];
+  enableAddPanel?: boolean;
   updateConfig2: (
     fn: (config: PanelBankSectionConfig) => PanelBankSectionConfig
   ) => void;
@@ -31,12 +45,21 @@ interface PBSectionProps {
 }
 
 export const PBSection: React.FC<PBSectionProps> = props => {
-  const {config, updateConfig2, handleAddPanel} = props;
+  const {config, groupPath, enableAddPanel, updateConfig2, handleAddPanel} =
+    props;
+  const setInspectingPanel = useSetInspectingPanel();
   const [panelBankWidth, setPanelBankWidth] = useState(0);
   const [panelBankHeight, setPanelBankHeight] = useState(0);
   const PanelBankSectionComponent =
     props.mode === 'grid' ? PanelBankGridSection : PanelBankFlowSection;
   const inJupyter = inJupyterCell();
+  const {
+    visible: sectionsScrollbarVisible,
+    onScroll: onSectionsScroll,
+    onMouseMove: onSectionsMouseMove,
+  } = useScrollbarVisibility();
+  const actionBarRef = useRef<HTMLDivElement | null>(null);
+  const addPanelBarRef = useRef<HTMLDivElement | null>(null);
   return (
     <DragDropProvider>
       <div className="panel-bank" style={{height: '100%'}}>
@@ -49,12 +72,41 @@ export const PBSection: React.FC<PBSectionProps> = props => {
                 : 0
             );
             setPanelBankHeight(
-              contentRect.bounds ? contentRect.bounds.height : 0
+              contentRect.bounds
+                ? contentRect.bounds.height -
+                    (actionBarRef.current?.offsetHeight ?? 0) -
+                    (addPanelBarRef.current?.offsetHeight ?? 0)
+                : 0
             );
           }}>
           {({measureRef}) => (
-            <div className="panel-bank__sections" ref={measureRef}>
+            <Sections
+              className="panel-bank__sections"
+              ref={measureRef}
+              scrollbarVisible={sectionsScrollbarVisible}
+              onScroll={onSectionsScroll}
+              onMouseMove={onSectionsMouseMove}>
               <div className="panel-bank__section">
+                {!inJupyter && groupPath != null && (
+                  <ActionBar ref={actionBarRef}>
+                    <Tooltip
+                      position="bottom right"
+                      trigger={
+                        <IconButton
+                          onClick={() => setInspectingPanel(groupPath)}>
+                          <IconPencilEdit />
+                        </IconButton>
+                      }>
+                      Open panel editor
+                    </Tooltip>
+                    {enableAddPanel && (
+                      <WBButton onClick={handleAddPanel}>
+                        <IconAddNew marginRight={6} />
+                        New panel
+                      </WBButton>
+                    )}
+                  </ActionBar>
+                )}
                 <PanelBankSectionComponent
                   panelBankWidth={panelBankWidth}
                   panelBankHeight={panelBankHeight}
@@ -86,7 +138,7 @@ export const PBSection: React.FC<PBSectionProps> = props => {
                   }}
                 />
                 {handleAddPanel != null && !inJupyter && (
-                  <AddPanelBarContainer>
+                  <AddPanelBarContainer ref={addPanelBarRef}>
                     <AddPanelBar onClick={handleAddPanel}>
                       <IconAddNew />
                       New panel
@@ -94,7 +146,7 @@ export const PBSection: React.FC<PBSectionProps> = props => {
                   </AddPanelBarContainer>
                 )}
               </div>
-            </div>
+            </Sections>
           )}
         </Measure>
       </div>
@@ -139,6 +191,18 @@ export const getSectionConfig = (
   });
 };
 
+const Sections = styled.div`
+  ${SCROLLBAR_STYLES}
+`;
+
+const ActionBar = styled.div`
+  height: 48px;
+  padding: 0 32px;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+`;
+
 const AddPanelBar = styled.div`
   height: 48px;
   display: flex;
@@ -160,8 +224,8 @@ const AddPanelBarContainer = styled.div`
   }
 `;
 
-const IconAddNew = styled(IconAddNewUnstyled)`
+const IconAddNew = styled(IconAddNewUnstyled)<{marginRight?: number}>`
   width: 18px;
   height: 18px;
-  margin-right: 8px;
+  margin-right: ${p => p.marginRight ?? 8}px;
 `;

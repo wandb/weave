@@ -230,7 +230,7 @@ export const PersistenceManager: React.FC<{
 
   const isAuthenticated = useIsAuthenticated();
   const availableActions = useMemo(
-    () => getAvailableActions(nodeState, isAuthenticated),
+    () => getAvailableActions(nodeState, isAuthenticated ?? false),
     [nodeState, isAuthenticated]
   );
 
@@ -619,7 +619,7 @@ const HeaderLogoControls: React.FC<{
   const {processedSeedItems, vars} = useMemo(() => {
     const varMap: {[uri: string]: {name: string; node: NodeOrVoidNode}} = {};
     const names = new Set<string>();
-    const processedSeedItems = _.mapValues(seedItems, (item, key) => {
+    const processedSeedItemsInner = _.mapValues(seedItems, (item, key) => {
       return mapPanels(item, [], (panelNode, stack) => {
         const {input_node} = panelNode;
         const newInputNode = mapNodes(input_node, inNode => {
@@ -632,15 +632,15 @@ const HeaderLogoControls: React.FC<{
                   const baseNameParts = uriVal.split(':')[1].split('/');
                   const baseName = baseNameParts[baseNameParts.length - 1];
                   let count = 0;
-                  let name = baseName + '_' + count;
-                  while (names.has(name)) {
+                  let varName = baseName + '_' + count;
+                  while (names.has(varName)) {
                     count++;
-                    name = baseName + '_' + count;
+                    varName = baseName + '_' + count;
                   }
-                  names.add(name);
+                  names.add(varName);
 
                   varMap[uriVal] = {
-                    name: name,
+                    name: varName,
                     node: inNode,
                   };
                 }
@@ -656,12 +656,12 @@ const HeaderLogoControls: React.FC<{
         };
       });
     });
-    const vars = _.fromPairs(
-      Object.entries(varMap).map(([uri, {name, node}]) => {
-        return [name, node];
+    const varsInner = _.fromPairs(
+      Object.entries(varMap).map(([uri, {name: varMapName, node}]) => {
+        return [varMapName, node];
       })
     );
-    return {processedSeedItems, vars};
+    return {processedSeedItems: processedSeedItemsInner, vars: varsInner};
   }, [seedItems]);
 
   const name = 'dashboard-' + moment().format('YY_MM_DD_hh_mm_ss');

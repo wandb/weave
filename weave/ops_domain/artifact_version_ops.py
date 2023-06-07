@@ -154,9 +154,7 @@ gql_prop_op(
 )
 
 
-@op(
-    plugins=wb_gql_op_plugin(lambda inputs, inner: "metadata"),
-)
+@op(plugins=wb_gql_op_plugin(lambda inputs, inner: "metadata"), hidden=True)
 def refine_metadata(
     artifactVersion: wdt.ArtifactVersion,
 ) -> types.Type:
@@ -416,6 +414,7 @@ def _get_history_metrics(
 
 # This op contains a bunch of custom logic, punting for now
 @op(
+    hidden=True,
     plugins=wb_gql_op_plugin(
         lambda inputs, inner: """
             historyStep
@@ -497,6 +496,7 @@ def _artifact_version_to_wb_artifact(artifactVersion: wdt.ArtifactVersion):
 
 @op(
     name="artifactVersion-_file_refine_output_type",
+    hidden=True,
     output_type=types.TypeType(),
     plugins=wb_gql_op_plugin(lambda inputs, inner: static_art_file_gql),
 )

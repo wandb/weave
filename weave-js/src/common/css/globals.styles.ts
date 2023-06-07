@@ -271,7 +271,7 @@ export const MODAL_SHADOW_NIGHT_MODE = `0px 24px 48px 0px ${hexToRGB(
 )}`;
 
 /* Scrollbars */
-export const SCROLLBAR_STYLES = css<{scrollbarVisible: boolean}>`
+export const SCROLLBAR_STYLES = css<{scrollbarVisible?: boolean}>`
   // Firefox
   scrollbar-width: thin;
   scrollbar-color: ${p => hexToRGB(OBLIVION, p.scrollbarVisible ? 0.12 : 0)}
@@ -279,10 +279,12 @@ export const SCROLLBAR_STYLES = css<{scrollbarVisible: boolean}>`
 
   // Webkit
   ::-webkit-scrollbar {
-    width: 6px;
+    width: 14px;
   }
   ::-webkit-scrollbar-thumb {
     border-radius: 9001px;
+    border: 4px solid transparent;
+    background-clip: padding-box;
     background-color: ${p => hexToRGB(OBLIVION, p.scrollbarVisible ? 0.12 : 0)};
     &:hover {
       background-color: ${p =>

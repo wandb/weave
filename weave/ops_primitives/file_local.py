@@ -19,7 +19,7 @@ def direct_url_as_of(file: file_local.LocalFile, asOf: int) -> str:
     return f"{environment.weave_server_url()}/__weave/file{local_path}"
 
 
-@op(name="localpathReturnType")
+@op(name="localpathReturnType", hidden=True)
 def local_path_refine_type(path: str) -> types.Type:
     return file_local.get_path_type(path)
 

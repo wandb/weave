@@ -2,23 +2,42 @@
 FROM cypress/included:10.11.0 as builder
 
 RUN apt update
-RUN apt -y install python3-venv gcc python3-dev g++
+RUN apt -y install python3-venv python3-dev gcc g++
 RUN rm /bin/sh && ln -s /bin/bash /bin/sh
 COPY requirements.* /root/
 WORKDIR /root
 RUN python3 -m venv venv
-RUN --mount=type=cache,target=/root/.cache /bin/bash -c "source venv/bin/activate && pip install -r requirements.test.txt -r requirements.dev.txt"
+RUN --mount=type=cache,target=/root/.cache /bin/bash -c "source venv/bin/activate && \
+    pip install -r requirements.test.txt -r requirements.dev.txt"
 
 ENTRYPOINT "/bin/bash"
+
+FROM node:16 as js_builder
+
+RUN apt update && apt install -y gcc g++ make libcairo2-dev libjpeg-dev libgif-dev libpango1.0-dev
+
+COPY weave-js /root/weave-js
+WORKDIR /root/weave-js
+RUN --mount=type=cache,target=/usr/local/share/.cache \
+    SHA1=$(find . -not -path "./node_modules/*" -not -path "./build/*" -type f -print0 | sort -z | xargs -0 sha1sum | sha1sum | cut -d " " -f1) && \
+    yarn install --frozen-lockfile && \
+    yarn build && \
+    echo $SHA1 > ./build/sha1.txt && \
+    rm -rf node_modules
 
 # final stage
 FROM builder
 WORKDIR /root
-COPY requirements.ecosystem.txt /root
 
-RUN --mount=type=cache,target=/root/.cache /bin/bash -c "source venv/bin/activate && pip install -r requirements.ecosystem.txt"
+COPY requirements.ecosystem.txt /root
+RUN --mount=type=cache,target=/root/.cache /bin/bash -c "source venv/bin/activate && \
+    pip install -r requirements.ecosystem.txt"
+
 COPY integration_test/package.json /root/integration_test/package.json
 COPY integration_test/package-lock.json /root/integration_test/package-lock.json
-RUN cd integration_test && npm install
+RUN --mount=type=cache,target=/usr/local/share/.cache cd integration_test && npm install
+
+# TODO, currently builder doesn't support --link
+COPY --from=js_builder /root/weave-js/build /root/weave-js-build
 
 ENTRYPOINT "/bin/bash"

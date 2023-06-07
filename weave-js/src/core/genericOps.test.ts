@@ -880,6 +880,7 @@ describe('generic ops', () => {
       'number-sub',
       'number-mult',
       'number-div',
+      'number-floorDiv',
       'number-modulo',
       'number-powBinary',
       'number-equal',

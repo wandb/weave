@@ -14,6 +14,7 @@ def load_jsonl(jsonlfile):
 
 @weave.op(
     name="file-refine_readjsonl",
+    hidden=True,
     input_type={"self": file_base.FileBaseType(extension=weave.types.literal("jsonl"))},
 )
 def refine_readjsonl(self) -> weave.types.Type:

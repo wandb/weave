@@ -302,6 +302,7 @@ def sqlconnection_tables_type(conn):
 
 @op(
     name="sqlconnection-refine_table",
+    hidden=True,
     input_type={"conn": SqlConnection.WeaveType(), "name": types.String()},  # type: ignore
     output_type=types.TypeType(),
 )

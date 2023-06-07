@@ -486,6 +486,7 @@ async function autosuggestNodes(
       ) {
         result.push(constNumber(3.14159));
       }
+
       // Suggest none for equality comparison ops (which are all nullable),
       // if the left hand side might have a null in it based on its input
       // type.
@@ -499,24 +500,24 @@ async function autosuggestNodes(
         result.push(constNone());
       }
     }
+
     if (node.nodeType === 'void') {
       const frame = toFrame(stack);
       const variableNames = Object.keys(frame);
       if (variableNames.length > 0) {
         for (const varName of variableNames) {
           // Recursively suggest results for each variable
-          let vNode = varNode(frame[varName].type, varName);
-          const newGraph = maybeReplaceNode(graph, node, vNode);
-          const results = await autosuggestNodes(
-            client,
-            vNode,
-            newGraph,
-            stack
-          );
-          vNode = results.refinedNode as any;
-
+          const vNode = varNode(frame[varName].type, varName);
+          // const newGraph = maybeReplaceNode(graph, node, vNode);
+          // const results = await autosuggestNodes(
+          //   client,
+          //   vNode,
+          //   newGraph,
+          //   stack
+          // );
+          // vNode = results.refinedNode as any;
           result.push(vNode);
-          result = result.concat(results.suggestions);
+          // result = result.concat(results.suggestions);
         }
       } else if (graph.nodeType === 'void') {
         // Suggest root ops when there are no variables in the frame
@@ -530,6 +531,14 @@ async function autosuggestNodes(
           })
         );
       }
+    } else {
+      const availOps = availableOpsForChain(node, client.opStore);
+      result = availOps.flatMap(opDef => {
+        return callOpVeryUnsafe(opDef.name, {
+          lhs: node,
+          rhs: getPlaceholderArg(opDef, 'rhs') ?? voidNode(),
+        });
+      });
     }
   } else if (node.nodeType === 'var' || node.nodeType === 'output') {
     if (node.type === 'any') {
@@ -686,20 +695,6 @@ export async function autosuggest(
   }
 
   result.sort((a, b) => {
-    // Picks first
-    const aIsPick =
-      a.newNodeOrOp.nodeType === 'output' &&
-      a.newNodeOrOp.fromOp.name === 'pick';
-    const bIsPick =
-      b.newNodeOrOp.nodeType === 'output' &&
-      b.newNodeOrOp.fromOp.name === 'pick';
-
-    if (aIsPick && !bIsPick) {
-      return -1;
-    } else if (!aIsPick && bIsPick) {
-      return 1;
-    }
-
     const aIsTagGetter = isTagGetterNodeOrOp(a.newNodeOrOp, client.opStore);
     const bIsTagGetter = isTagGetterNodeOrOp(b.newNodeOrOp, client.opStore);
 
