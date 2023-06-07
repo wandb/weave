@@ -10,7 +10,8 @@ import {PanelRootBrowser} from '../Panel2/PanelRootBrowser/PanelRootBrowser';
 import {useNewPanelFromRootQueryCallback} from '../Panel2/PanelRootBrowser/util';
 import {dummyProps, useConfig} from '../Panel2/panel';
 import styled from 'styled-components';
-import {IconWeaveLogo} from '../Panel2/Icons';
+import {IconAddNew as IconAddNewUnstyled, IconWeaveLogo} from '../Panel2/Icons';
+import {WBButton} from '../../common/components/elements/WBButtonNew';
 
 type HomeProps = {
   updateConfig: (newConfig: ChildPanelFullConfig) => void;
@@ -62,8 +63,16 @@ const HomeComp: FC<HomeProps> = props => {
   return (
     <>
       <TopBar>
-        <WeaveLogo />
-        Weave
+        <TopBarLeft>
+          <WeaveLogo />
+          Weave
+        </TopBarLeft>
+        <TopBarRight>
+          <WBButton variant={`confirm`} onClick={newDashboard}>
+            <IconAddNew />
+            New board
+          </WBButton>
+        </TopBarRight>
       </TopBar>
       <BrowserContainer>
         <PanelRootBrowser
@@ -185,8 +194,19 @@ const TopBar = styled.div`
   padding: 0 12px;
   display: flex;
   align-items: center;
+  justify-content: space-between;
+`;
+
+const TopBarLeft = styled.div`
+  display: flex;
+  align-items: center;
   font-size: 18px;
   font-weight: 600;
+`;
+
+const TopBarRight = styled.div`
+  display: flex;
+  align-items: center;
 `;
 
 const BrowserContainer = styled.div`
@@ -201,4 +221,10 @@ const WeaveLogo = styled(IconWeaveLogo)`
   width: 32px;
   height: 32px;
   margin-right: 12px;
+`;
+
+const IconAddNew = styled(IconAddNewUnstyled)`
+  width: 18px;
+  height: 18px;
+  margin-right: 6px;
 `;
