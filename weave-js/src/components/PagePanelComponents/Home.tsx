@@ -214,7 +214,7 @@ const BrowserContainer = styled.div`
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 56px;
+  padding: 32px 56px;
 `;
 
 const WeaveLogo = styled(IconWeaveLogo)`
