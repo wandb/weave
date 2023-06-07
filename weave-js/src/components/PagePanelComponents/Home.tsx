@@ -1,17 +1,16 @@
 import {Node, voidNode} from '@wandb/weave/core';
 import moment from 'moment';
-import React, {FC, memo, useCallback, useState} from 'react';
-import {Button, Input} from 'semantic-ui-react';
+import {FC, memo, useCallback, useState} from 'react';
 import getConfig from '../../config';
 
+import styled from 'styled-components';
+import {WBButton} from '../../common/components/elements/WBButtonNew';
 import {useWeaveContext} from '../../context';
 import {ChildPanelFullConfig} from '../Panel2/ChildPanel';
+import {IconAddNew as IconAddNewUnstyled, IconWeaveLogo} from '../Panel2/Icons';
 import {PanelRootBrowser} from '../Panel2/PanelRootBrowser/PanelRootBrowser';
 import {useNewPanelFromRootQueryCallback} from '../Panel2/PanelRootBrowser/util';
 import {dummyProps, useConfig} from '../Panel2/panel';
-import styled from 'styled-components';
-import {IconAddNew as IconAddNewUnstyled, IconWeaveLogo} from '../Panel2/Icons';
-import {WBButton} from '../../common/components/elements/WBButtonNew';
 
 type HomeProps = {
   updateConfig: (newConfig: ChildPanelFullConfig) => void;
@@ -86,104 +85,6 @@ const HomeComp: FC<HomeProps> = props => {
         />
       </BrowserContainer>
     </>
-    // <div
-    //   style={{
-    //     width: '100%',
-    //     height: '100%',
-    //     display: 'flex',
-    //     alignItems: 'center',
-    //     justifyContent: 'center',
-    //   }}>
-    //   <div
-    //     style={{
-    //       width: '100%',
-    //       height: '90%',
-    //       display: 'flex',
-    //       alignItems: 'center',
-    //       justifyContent: 'center',
-    //       // marginTop: 16,
-    //       // marginBottom: 16,
-    //     }}>
-    //     <div
-    //       style={{
-    //         width: '90%',
-    //         height: '100%',
-    //         display: 'flex',
-    //         alignItems: 'center',
-    //         justifyContent: 'center',
-    //         flexDirection: 'column',
-    //         gap: 16,
-    //       }}>
-    //       <div
-    //         style={{
-    //           display: 'flex',
-    //           flexDirection: 'row',
-    //           // width: 400,
-    //           padding: 16,
-    //           border: '1px solid #eee',
-    //           gap: 16,
-    //           width: '100%',
-    //         }}>
-    //         <div
-    //           style={{
-    //             flexGrow: 1,
-    //             width: '100%',
-    //             display: 'flex',
-    //             alignItems: 'center',
-    //             gap: 8,
-    //           }}>
-    //           <div
-    //             style={{width: '100%', display: 'flex', alignItems: 'center'}}
-    //             onKeyUp={e => {
-    //               if (e.key === 'Enter') {
-    //                 newDashboard();
-    //               }
-    //             }}>
-    //             <Input
-    //               data-cy="new-dashboard-input"
-    //               placeholder={defaultName}
-    //               style={{flexGrow: 1}}
-    //               value={newName}
-    //               onChange={(e, {value}) => setNewName(value)}
-    //             />
-    //           </div>
-    //           <div
-    //             style={{
-    //               display: 'flex',
-    //               flex: 1,
-    //               width: '100%',
-    //             }}>
-    //             <Button onClick={newDashboard}>New dashboard</Button>
-    //           </div>
-    //         </div>
-    //       </div>
-    //       <div
-    //         style={{
-    //           width: '100%',
-    //           height: '100%',
-    //           padding: 16,
-    //           border: '1px solid #eee',
-    //           display: 'flex',
-    //           flexDirection: 'column',
-    //           overflow: 'hidden',
-    //         }}>
-    //         {/* <div style={{marginBottom: 32}}>Your Weave Objects</div> */}
-    //         <div style={{flexGrow: 1, overflow: 'auto'}}>
-    //           <PanelRootBrowser
-    //             input={voidNode() as any}
-    //             updateInput={updateInput as any}
-    //             isRoot={true}
-    //             config={rootConfig}
-    //             updateConfig={updateRootConfig}
-    //             context={dummyProps.context}
-    //             updateContext={dummyProps.updateContext}
-    //           />
-    //           {/* <DashboardList loadDashboard={loadDashboard} /> */}
-    //         </div>
-    //       </div>
-    //     </div>
-    //   </div>
-    // </div>
   );
 };
 
