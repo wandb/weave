@@ -3,10 +3,7 @@ import React, {useMemo, useState} from 'react';
 
 import * as CGReact from '../../react';
 import styled, {css} from 'styled-components';
-import {GRAY_350, TEAL} from '../../common/css/globals.styles';
-
-const HOVER_COLOR = '#00879d';
-const ACTIVE_COLOR = '#6ba6fa';
+import {GRAY_350, GRAY_500, TEAL} from '../../common/css/globals.styles';
 
 export const Tabs: React.FC<{
   input: Node;
@@ -63,24 +60,37 @@ const Content = styled.div`
 `;
 
 const TabsContainer = styled.div`
+  position: relative;
   display: flex;
   width: 100%;
   overflow-x: auto;
   flex: 0 0 auto;
-  border-bottom: 1px solid ${GRAY_350};
+
+  &:after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 1px;
+    background-color: ${GRAY_350};
+  }
 `;
 
 const Tab = styled.div<{active: boolean}>`
   position: relative;
+  z-index: 1;
   flex-shrink: 0;
   min-width: 50px;
   max-width: 100px;
   line-height: 32px;
+  padding-bottom: 6px;
   display: flex;
   justify-content: center;
   text-overflow: ellipsis;
   white-space: nowrap;
   cursor: pointer;
+  font-weight: 600;
 
   &:not(:first-child) {
     margin-left: 32px;
@@ -89,9 +99,11 @@ const Tab = styled.div<{active: boolean}>`
   ${p =>
     !p.active
       ? css`
-          &:hover {
-            color: ${HOVER_COLOR};
+          &:not(:hover) {
+            color: ${GRAY_500};
           }
+        `
+      : css`
           &:after {
             content: '';
             position: absolute;
@@ -101,8 +113,5 @@ const Tab = styled.div<{active: boolean}>`
             height: 2px;
             background-color: ${TEAL};
           }
-        `
-      : css`
-          color: ${ACTIVE_COLOR};
         `}
 `;
