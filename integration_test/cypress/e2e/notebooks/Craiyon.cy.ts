@@ -1,7 +1,7 @@
 import {checkWeaveNotebookOutputs} from './notebooks';
 
-describe('../examples/Craiyon.ipynb notebook test', () => {
+describe('../examples/craiyon.ipynb notebook test', () => {
     it('passes', () =>
-        checkWeaveNotebookOutputs('../examples/Craiyon.ipynb')
+        checkWeaveNotebookOutputs('../examples/craiyon.ipynb')
     );
 });
