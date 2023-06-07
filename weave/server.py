@@ -26,6 +26,7 @@ from . import weave_types
 from . import engine_trace
 from . import logs
 from . import wandb_api
+from . import util
 
 
 # A function to monkeypatch the request post method
@@ -185,8 +186,14 @@ class HttpServer(threading.Thread):
         self.srv = make_server(host, port, app, threaded=False)
 
         # if the passed port is zero then a randomly allocated port will be used. this
-        # gets the value of the port that was assigned
-        self.port = self.srv.socket.getsockname()[1]
+        # gets the value of the port that was assigned.  We use portpicker in colab or
+        # if it's available to ensure it's forwarding magic works.
+        try:
+            import portpicker
+
+            self.port = portpicker.pick_unused_port()
+        except ImportError:
+            self.port = self.srv.socket.getsockname()[1]
 
     def run(self):
         if _REQUESTED_SERVER_LOG_LEVEL is None:
@@ -207,7 +214,10 @@ class HttpServer(threading.Thread):
 
     @property
     def url(self):
-        url = f"http://{self.host}"
+        if util.is_colab():
+            url = f"https://{self.host}"
+        else:
+            url = f"http://{self.host}"
         if self.port is not None:
             url = f"{url}:{self.port}"
         return url

@@ -7,6 +7,7 @@ types-aiofiles>=22.1.0.6
 types-all>=1.0.0
 typing_extensions>=4.4.0
 build>=0.10.0
+twine>=4.0.0
 sqlalchemy>=2.0.1
 duckdb # TODO: Remove me once we refactor runs2
 mypy==1.0.0

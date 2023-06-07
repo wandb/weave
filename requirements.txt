@@ -1,15 +1,15 @@
-wandb @ git+https://github.com/wandb/client.git@0497e9098daa535230d738cf5dafeaad24b0477c
+wandb>=0.15.4
 python-json-logger>=2.0.4
 numpy>=1.21
-pandas>=1.5.3
-ipython>=8.9
+pandas>=1.5.3  # current Colab version
+ipython>=7.34  # current Colab version
 flask>=2.1
 black>=22.3.0  # used for code generation
 flask_cors>=3.0.10
-notebook>=6.5.2
-pyarrow>=10.0.1
+notebook>=6.4.8  # current Colab version
+pyarrow>=10.0.1  # TODO: Colab has 9.0.0, can we support?
 ipynbname>=2021.3.2
-pillow>=9.4.0
+pillow>=8.4.0  # current Colab version
 scikit-learn>=1.2.1  # used for embedding projection
 umap-learn>=0.5.3  # used for embedding projection
 aiofiles>=22.1.0

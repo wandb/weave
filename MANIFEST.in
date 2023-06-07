@@ -1,2 +1,10 @@
 include requirements.*
 graft weave/frontend
+graft weave/language_features
+graft weave/ops_primitives
+graft weave/ops_arrow
+graft weave/ops_domain
+graft weave/ecosystem
+graft weave/panels
+global-exclude */__pycache__/*
+global-exclude *.pyc
