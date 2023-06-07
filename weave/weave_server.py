@@ -100,11 +100,12 @@ def import_ecosystem():
         try:
             from weave.ecosystem import all
         except (ImportError, OSError, wandb.Error):
-            logging.warning(
-                'Failed to import "weave.ecosystem". Weave ecosystem features will be disabled. '
-                'To fix this, install ecosystem dependencies with "pip install weave[ecosystem]". '
-                "To disable this message, set WEAVE_SERVER_DISABLE_ECOSYSTEM=1."
-            )
+            pass
+            # logging.warning(
+            #     'Failed to import "weave.ecosystem". Weave ecosystem features will be disabled. '
+            #     'To fix this, install ecosystem dependencies with "pip install weave[ecosystem]". '
+            #     "To disable this message, set WEAVE_SERVER_DISABLE_ECOSYSTEM=1."
+            # )
 
 
 def make_app():

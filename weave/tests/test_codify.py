@@ -155,7 +155,7 @@ def test_group_case(cereal_csv, consistent_table_col_ids):
                     y=lambda row: row["calories"],
                 ),
                 "table": lambda plot: weave.panels.Table(
-                    plot.rows_selected(),
+                    plot.selected_rows(),
                     columns=[
                         lambda row: row["c_0"],
                         lambda row: row["c_1"],
@@ -173,7 +173,7 @@ def test_group_case(cereal_csv, consistent_table_col_ids):
                 y=lambda row: row["calories"],
             ),
             "table": lambda plot: weave.panels.panel_table.Table(
-                plot.rows_selected(),
+                plot.selected_rows(),
                 columns=[
                     lambda row: row["c_0"],
                     lambda row: row["c_1"],
