@@ -277,7 +277,7 @@ const PagePanel: React.FC = props => {
       <PanelRenderedConfigContextProvider>
         <PanelInteractContextProvider>
           <WeaveRoot className="weave-root" fullScreen={fullScreen}>
-            {config.input_node.nodeType === 'void' /*true*/ ? (
+            {config.input_node.nodeType === 'void' ? (
               <Home updateConfig={updateConfig} inJupyter={inJupyter} />
             ) : (
               <div
