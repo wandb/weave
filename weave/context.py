@@ -54,13 +54,24 @@ def use_frontend_devmode():
     context_state.set_frontend_url("http://localhost:3000")
 
 
+def stop_server():
+    global server
+    if server:
+      server.shutdown()
+      server = None
+
+
 def _make_default_client():
     if util.is_notebook():
-        serv = context_state.get_server()
-        if serv is None:
-            serv = server.HttpServer()
-            serv.start()
-            context_state.set_server(serv)
+        global server
+        if 'server' in globals() and server:
+            print("restarting server")
+            stop_server()
+        server = context_state.get_server()
+        if server is None:
+            server = server.HttpServer()
+            server.start()
+            context_state.set_server(server)
         # Falling through here means the notebook kernel uses
         # InprocessServer, but the frontend uses HttpServer.
         # versions() doesn't work when we use the HttpServer currently.
