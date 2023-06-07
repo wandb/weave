@@ -179,8 +179,6 @@ class HttpServer(threading.Thread):
     def __init__(self, port=0, host="localhost"):
         from . import weave_server
 
-        global gport
-
         self.host = host
 
         app = weave_server.app
@@ -189,7 +187,8 @@ class HttpServer(threading.Thread):
 
         # if the passed port is zero then a randomly allocated port will be used. this
         # gets the value of the port that was assigned.
-        if gport is None:
+        global gport
+        if "gport" not in globals():
             gport = port or self.srv.socket.getsockname()[1]
         self.port = gport
 
