@@ -4,24 +4,24 @@ Demo notebooks can be found in `/examples.` Simply run `jupyter notebook` or `ju
 
 ## Get started
 - [Weave quickstart](../examples/weave_quickstart.ipynb)
-- [View and transform images](../examples/Images.ipynb)
-- [Train MNIST and visualize predictions](../examples/Mnist.ipynb)
+- [View and transform images](../examples/images_gen.ipynb)
+- [Train MNIST and visualize predictions](../examples/mnist_train.ipynb)
 
 ## Weave fundamentals
 
 - [End-to-end walkthrough](../examples/Weave%20demo.ipynb)
-- [Create Weave Ops](../tutorial/02%20Tutorial%20-%20Creating%20ops.ipynb)
-- [Organize Weave Panels](../examples/Layout%20panels.ipynb)
+- [Create Weave Ops](../examples/experimental/02%20Tutorial%20-%20Creating%20ops.ipynb)
+- [Organize Weave Panels](../examples/layout_panels.ipynb)
 
 ## Build interactive dashboards
 
 - [Monitor time-series data](../examples/app/Monitor.ipynb)
-- [Visual storytelling](../examples/app/Diffusion%20explore.ipynb)
+- [Visual storytelling](../examples/experimental/skip_test/Diffusion%20explore.ipynb)
 - [Remix art](../examples/app/art_explore.ipynb)
 
 ## Explore the Ecosystem
 
-- [BertViz: Visualize attention in transformers](../examples/Bertviz.ipynb)
-- [Browse HuggingFace datasets](../examples/Huggingface%20datasets.ipynb)
-- [Generate images with Replicate](../examples/Replicate.ipynb)
+- [BertViz: Visualize attention in transformers](../examples/bert_viz.ipynb)
+- [Browse HuggingFace datasets](../examples/huggingface_datasets.ipynb)
+- [Generate images with Replicate](../examples/image_gen_replicate.ipynb)
 
