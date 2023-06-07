@@ -808,12 +808,18 @@ export async function autosuggest(
       result = result.filter(
         item => !stringIsExactMatch(item.suggestionString)
       );
-    } else if (!nodeIsCurrentlyString) {
+    } else {
       // result = result.filter(item => item.suggestionString.includes(query));
       result = result.sort((a, b) => {
         return (
-          (b.suggestionString.includes(query!) ? 1 : -1) -
-          (a.suggestionString.includes(query!) ? 1 : -1)
+          (b.suggestionString.includes(query!) ||
+          b.suggestionString.startsWith('"')
+            ? 1
+            : -1) -
+          (a.suggestionString.includes(query!) ||
+          a.suggestionString.startsWith('"')
+            ? 1
+            : -1)
         );
       });
     }
