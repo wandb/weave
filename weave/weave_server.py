@@ -126,7 +126,8 @@ def make_app():
 
     @app.after_request
     def add_header(response):
-        response.headers["x-colab-notebook-cache-control"] = "no-cache"
+        # TODO: maybe make this dynamic
+        # response.headers["x-colab-notebook-cache-control"] = "no-cache"
         return response
 
     return app

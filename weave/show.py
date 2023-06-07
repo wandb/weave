@@ -141,7 +141,7 @@ def show(obj=None, height=400):
         path = parsed.group(2)
         shell = """
         (async () => {
-                const url = await google.colab.kernel.proxyPort(%PORT%, {"cache": false});
+                const url = await google.colab.kernel.proxyPort(%PORT%, {"cache": true});
                 const iframe = document.createElement('iframe');
                 iframe.src = url + '%PATH%';
                 iframe.setAttribute('width', '100%');

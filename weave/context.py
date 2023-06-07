@@ -64,7 +64,7 @@ def stop_server():
 def _make_default_client():
     if util.is_notebook():
         global serv
-        if "serv" in globals() and serv:
+        if "serv" in globals() and serv and context_state.get_server() is None:
             print("restarting server")
             stop_server()
         serv = context_state.get_server()
