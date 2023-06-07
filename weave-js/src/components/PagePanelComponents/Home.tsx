@@ -1,6 +1,6 @@
 import {Node, voidNode} from '@wandb/weave/core';
 import moment from 'moment';
-import {FC, memo, useCallback, useState} from 'react';
+import React, {FC, memo, useCallback, useState} from 'react';
 import getConfig from '../../config';
 
 import styled from 'styled-components';
