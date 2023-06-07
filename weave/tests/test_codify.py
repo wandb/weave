@@ -70,7 +70,7 @@ import weave
                         ],
                     ),
                     "all_rows": lambda table: weave.panels.Plot(
-                        table.all_rows(),
+                        table.all_output_rows(),
                         x=lambda row: row["c_0"],
                         y=lambda row: row["c_1"],
                     ),
@@ -80,17 +80,17 @@ import weave
                             "rows": weave.panels.Group(
                                 items={
                                     "pinned_rows": weave.panels.Plot(
-                                        table.pinned_rows(),
+                                        table.pinned_output_rows(),
                                         x=lambda row: row["c_0"],
                                         y=lambda row: row["c_1"],
                                     ),
-                                    "active_row": table.active_row(),
+                                    "active_row": table.selected_output_row(),
                                 }
                             ),
                             "data": weave.panels.Group(
                                 items={
-                                    "pinned_data": table.pinned_data(),
-                                    "active_data": table.active_data(),
+                                    "pinned_data": table.pinned_input_rows(),
+                                    "active_data": table.selected_input_row(),
                                 }
                             ),
                         },
@@ -107,7 +107,7 @@ import weave
             ],
         ),
         "all_rows": lambda table: weave.panels.panel_plot.Plot(
-            table.all_rows(),
+            table.all_output_rows(),
             x=lambda row: row["c_0"],
             y=lambda row: row["c_1"],
         ),
@@ -117,17 +117,17 @@ import weave
                 "rows": weave.panels.panel_group.Group(
                     items={
                         "pinned_rows": weave.panels.panel_plot.Plot(
-                            table.pinned_rows(),
+                            table.pinned_output_rows(),
                             x=lambda row: row["c_0"],
                             y=lambda row: row["c_1"],
                         ),
-                        "active_row": lambda pinned_rows: table.active_row(),
+                        "active_row": lambda pinned_rows: table.selected_output_row(),
                     },
                 ),
                 "data": lambda rows: weave.panels.panel_group.Group(
                     items={
-                        "pinned_data": table.pinned_data(),
-                        "active_data": lambda pinned_data: table.active_data(),
+                        "pinned_data": table.pinned_input_rows(),
+                        "active_data": lambda pinned_data: table.selected_input_row(),
                     },
                 ),
             },
@@ -155,7 +155,7 @@ def test_group_case(cereal_csv, consistent_table_col_ids):
                     y=lambda row: row["calories"],
                 ),
                 "table": lambda plot: weave.panels.Table(
-                    plot.rows_selected(),
+                    plot.selected_output_rows(),
                     columns=[
                         lambda row: row["c_0"],
                         lambda row: row["c_1"],
@@ -173,7 +173,7 @@ def test_group_case(cereal_csv, consistent_table_col_ids):
                 y=lambda row: row["calories"],
             ),
             "table": lambda plot: weave.panels.panel_table.Table(
-                plot.rows_selected(),
+                plot.selected_output_rows(),
                 columns=[
                     lambda row: row["c_0"],
                     lambda row: row["c_1"],
