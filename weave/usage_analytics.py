@@ -34,5 +34,5 @@ def use_called():
     track("called use")
 
 
-def show_called():
-    track("called show")
+def show_called(info=None):
+    track("called show", info)
