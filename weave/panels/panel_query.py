@@ -1,4 +1,4 @@
-selimport dataclasses
+import dataclasses
 import typing
 
 import weave
