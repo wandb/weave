@@ -16,7 +16,7 @@ export interface WeaveExpressionProps {
   onBlur?: () => void;
 
   liveUpdate?: boolean;
-  truncate?: boolean;
+  isTruncated?: boolean; // TODO: search for instances of this variable (previously named 'truncate')
 }
 
 export interface SuggestionProps {

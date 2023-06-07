@@ -13,7 +13,7 @@ import React, {FC, ReactNode, useCallback, useState} from 'react';
 import styled, {ThemeProvider, css} from 'styled-components';
 
 import {useWeaveDashUiEnable} from '../../../context';
-import {WeaveExpression} from '../../../panel/WeaveExpression';
+import {WeaveExpression} from '../../../panel/WeaveExpression/WeaveExpression';
 import {themes} from '../Editor.styles';
 import * as S from './styles';
 import * as SN from './stylesNew';

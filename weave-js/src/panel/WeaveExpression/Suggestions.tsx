@@ -11,8 +11,8 @@ import * as S from './styles';
 import type {SuggestionProps} from './types';
 import {trace} from './util';
 import './styles/Suggestions.less';
+import {useWeaveExpressionContext} from '@wandb/weave/panel/WeaveExpression/WeaveExpression';
 import classNames from 'classnames';
-import {useWeaveExpressionContext} from '@wandb/weave/panel/WeaveExpression/contexts/WeaveExpressionContext';
 
 export const Suggestions = (props: SuggestionProps) => {
   const {isBusy} = props;
@@ -22,7 +22,7 @@ export const Suggestions = (props: SuggestionProps) => {
     props,
     weave
   );
-  const {isDocsPanelVisible} = useWeaveExpressionContext();
+  const {isOpDocEnabled} = useWeaveExpressionContext();
 
   const activeOpName = React.useMemo<string | null>(() => {
     if (
@@ -89,7 +89,7 @@ export const Suggestions = (props: SuggestionProps) => {
         </ul>
         {showType ? <div className="type-display">{props.typeStr}</div> : null}
       </div>
-      {activeOpName && isDocsPanelVisible && (
+      {activeOpName && isOpDocEnabled && (
         <S.StyledOpDoc opName={activeOpName} attributeName={activeOpAttrName} />
       )}
     </div>,

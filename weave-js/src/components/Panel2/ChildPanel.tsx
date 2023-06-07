@@ -26,7 +26,7 @@ import React, {useCallback, useMemo, useState} from 'react';
 import styled from 'styled-components';
 
 import {useWeaveContext} from '../../context';
-import {WeaveExpression} from '../../panel/WeaveExpression';
+import {WeaveExpression} from '../../panel/WeaveExpression/WeaveExpression';
 import {useNodeWithServerType} from '../../react';
 import {consoleLog} from '../../util';
 import {IconButton} from '../IconButton';
@@ -564,7 +564,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
                 expr={panelInputExpr}
                 setExpression={updateExpression}
                 noBox
-                truncate={!expressionFocused}
+                isTruncated={!expressionFocused}
                 onFocus={onFocusExpression}
                 onBlur={onBlurExpression}
               />

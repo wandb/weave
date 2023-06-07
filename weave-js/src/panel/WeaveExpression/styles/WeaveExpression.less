@@ -1,0 +1,108 @@
+// TODO: why isn't this working? it works in Suggestions.less, a sibling file...
+//@import '@wandb/weave/common/css/globals.less';
+@import '../../../common/css/globals.less';
+
+.weave-root {
+  .weaveExpression {
+    position: relative;
+    display: flex;
+    flex: 1 1 auto;
+
+    &.hasBox {
+      flex-grow: 1;
+      //border-color: ${(innerProps: {isInvalid?: boolean}) =>
+      //innerProps.isInvalid ? globals.error : '#bbb'};
+      border-radius: 4px;
+      padding: 6px 8px;
+      border: 1px solid #bbbbbb;
+      min-width: 200px;
+
+      &.isInvalid {
+        border-color: @error;
+      }
+    }
+
+    //  ${props =>
+    //    !props.noBox &&
+    //    css`
+    //      border: 1px solid;
+    //      flex-grow: 1;
+    //      border-color: ${(innerProps: {isInvalid?: boolean}) =>
+    //      innerProps.isInvalid ? globals.error : '#bbb'};
+    //      border-radius: 4px;
+    //      padding: 6px 8px;
+    //      min-width: 200px;
+    //`}
+
+  }
+
+  .weaveExpressionSlateEditable {
+    width: 100%;
+    min-height: 20px;
+    line-height: 20px;
+
+    font-family: Inconsolata;
+    cursor: text;
+
+    // Req'd to make editor selectable in Safari
+    user-select: text;
+
+    &.isInvalid {
+      border-bottom: 1px dotted @error;
+    }
+
+    & span.identifier {
+      color: @magenta;
+    }
+
+    span.property_identifier {
+      color: @siennaDark;
+    }
+
+    & span.operator {
+      color: @siennaDark;
+    }
+
+    & span.string {
+      color: @teal;
+    }
+
+    & span.number,
+    & span.null {
+      color: @teal;
+    }
+
+    & span.boolean {
+      color: @teal;
+    }
+
+    // TODO: why is this capitalized
+    & span.ACTIVE_NODE {
+      text-decoration: underline dotted rgba(0, 0, 0, 0.2);
+    }
+
+    /* HACK: attempt to hide large object literals
+    & span.large_object {
+      display: none;
+    }
+    */
+
+    // TODO: test this
+    &.isTruncated {
+      & > div {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+    }
+  }
+
+  .runButton {
+    display: none;
+    position: absolute;
+    font-size: 13px !important;
+    line-height: 20px !important;
+    padding: 0 4px !important;
+    height: 20px;
+  }
+}

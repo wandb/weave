@@ -18,8 +18,11 @@ import React, {useCallback, useMemo, useState} from 'react';
 import {Popup} from 'semantic-ui-react';
 
 import {useWeaveContext} from '../../../context';
-import {focusEditor, WeaveExpression} from '../../../panel/WeaveExpression';
-import {SUGGESTION_OPTION_CLASS} from '../../../panel/WeaveExpression/styles';
+import {
+  focusEditor,
+  WeaveExpression,
+} from '../../../panel/WeaveExpression/WeaveExpression';
+import {SUGGESTION_OPTION_CLASS} from '../../../panel/WeaveExpression/Suggestions';
 import {usePanelStacksForType} from '../availablePanels';
 import * as ExpressionView from '../ExpressionView';
 import {PanelComp2} from '../PanelComp';

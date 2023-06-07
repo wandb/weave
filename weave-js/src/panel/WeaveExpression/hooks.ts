@@ -6,7 +6,7 @@ import {
   WeaveInterface,
 } from '@wandb/weave/core';
 import _ from 'lodash';
-import React from 'react';
+import React, {useMemo} from 'react';
 import {
   Editor,
   Location,
@@ -23,6 +23,9 @@ import {usePanelContext} from '../../components/Panel2/PanelContext';
 import {WeaveExpressionState} from './state';
 import type {SuggestionProps, WeaveExpressionProps} from './types';
 import {getIndexForPoint, moveToNextMissingArg, trace} from './util';
+import {Button} from 'semantic-ui-react';
+import {useWeaveExpressionContext} from '@wandb/weave/panel/WeaveExpression/contexts/WeaveExpressionContext';
+import {useWeaveContext} from '@wandb/weave/context';
 
 // Provides the decorate callback to pass to Slate's Editable
 // component and implements syntax highlighting and styling
@@ -114,6 +117,7 @@ function serializeStack(stack: Stack, weave: WeaveInterface) {
   return _.map(stack, weave.expToString.bind(weave));
 }
 
+// TODO: reconcile this with useWeaveExpressionContext
 export const useWeaveExpressionState = (
   props: WeaveExpressionProps,
   editor: Editor,
@@ -226,102 +230,209 @@ export const useWeaveExpressionState = (
 
   trace(`${internalState.id}: useWeaveExpressionState render`, externalState);
 
+  const {
+    slateValue,
+    suggestions,
+    tsRoot,
+    isDirty,
+    isValid,
+    isBusy,
+    isTruncated,
+  } = externalState;
+  // TODO: some of these change a lot, some not at all. memoize separately.
+  return useMemo(
+    () => ({
+      // Slate's onChange callback
+      onChange,
+
+      // Slate's value prop
+      slateValue,
+
+      // SuggestionState to pass into Suggestions component
+      suggestions,
+
+      // Root of Tree-Sitter parse-tree.
+      tsRoot,
+
+      // Expression has been modified
+      isDirty,
+
+      isTruncated,
+
+      // The empty expression is considered a valid state
+      isValid,
+
+      // When busy, disallow run/submit
+      isBusy,
+
+      // Flush pending expression in non-live-update mode
+      applyPendingExpr,
+
+      // To hide suggestions momentarily
+      suppressSuggestions,
+
+      // Callback to hide suggestions for n milliseconds
+      hideSuggestions,
+
+      // EE focus state
+      isFocused,
+      onFocus,
+      onBlur,
+    }),
+    [
+      onChange,
+      slateValue,
+      suggestions,
+      tsRoot,
+      isDirty,
+      isTruncated,
+      isValid,
+      isBusy,
+      applyPendingExpr,
+      suppressSuggestions,
+      hideSuggestions,
+      isFocused,
+      onFocus,
+      onBlur,
+    ]
+  );
+};
+
+const useRunButtonPosition = () => {
+  const {editor} = useWeaveExpressionContext();
+  const weaveExpressionDomRef = React.useRef<HTMLDivElement | null>(null);
+  const runButtonDomRef = React.useRef<HTMLDivElement | null>(null);
+
+  // TODO: this should probably live somewhere else. editor context?
+  const endNode = ReactEditor.toDOMNode(editor, Editor.last(editor, [])[0]);
+
+  const weaveExpressionDomNode = weaveExpressionDomRef.current;
+  const runButtonDomNode = runButtonDomRef.current;
+
+  // TODO: review this logic. we shold have a reusable hook for getting dimensions+offsets
+  let grandOffset = 0; // better name. what dimension??
+  for (let n = endNode; !n?.dataset.slateEditor; n = n?.parentNode as any) {
+    if (n?.dataset.slateNode === 'element') {
+      grandOffset += n!.offsetHeight;
+    }
+    grandOffset += n!.offsetTop;
+  }
+
+  // TODO: rename
+  const maxLeft =
+    weaveExpressionDomNode == null || runButtonDomNode == null
+      ? 0
+      : weaveExpressionDomNode.offsetWidth - runButtonDomNode.offsetWidth - 5;
+
+  // TODO: rename
+  const naturalLeft = endNode.offsetLeft + endNode.offsetWidth + 10;
+
+  return useMemo(
+    () => ({
+      maxLeft,
+      naturalLeft,
+      grandOffset,
+    }),
+    [grandOffset, maxLeft, naturalLeft]
+  );
+
+  // // Using setProperty because we need the !important priority on these
+  // // since semantic-ui also sets it.
+  // if (naturalLeft > maxLeft) {
+  //   runButtonDomRef.style.setProperty('opacity', '0.3', 'important');
+  // } else {
+  //   runButtonDomRef.style.setProperty('opacity', '1.0', 'important');
+  // }
+  //
+  // buttonNode.style.left = `${Math.min(maxLeft, naturalLeft)}px`;
+  // buttonNode.style.top = `${grandOffset - 20}px`;
+};
+const useRunButtonStyle = () => {
+  const {editor, weaveExpressionState} = useWeaveExpressionContext();
+  const {isValid, isFocused, isDirty, isTruncated} = weaveExpressionState;
+  const {naturalLeft, maxLeft, grandOffset} = useRunButtonPosition();
+
+  const hideButton =
+    !isValid ||
+    (isTruncated && !isFocused) ||
+    (!isDirty && (!isFocused || Editor.string(editor, []).trim() === ''));
   return {
-    // Slate's onChange callback
-    onChange,
-
-    // Slate's value prop
-    slateValue: externalState?.editorValue,
-
-    // SuggestionState to pass into Suggestions component
-    suggestions: externalState?.suggestions,
-
-    // Root of Tree-Sitter parse-tree.
-    tsRoot: externalState?.tsRoot,
-
-    // Expression has been modified
-    exprIsModified: externalState?.exprIsModified,
-
-    // The empty expression is considered a valid state
-    isValid: externalState?.isValid,
-
-    // When busy, disallow run/submit
-    isBusy: externalState?.isBusy,
-
-    // Flush pending expression in non-live-update mode
-    applyPendingExpr,
-
-    // To hide suggestions momentarily
-    suppressSuggestions,
-
-    // Callback to hide suggestions for n milliseconds
-    hideSuggestions,
-
-    // EE focus state
-    isFocused,
-    onFocus,
-    onBlur,
+    display: hideButton ? 'none' : 'inline-block',
+    opacity: naturalLeft > maxLeft ? 0.3 : 1.0,
+    left: `${Math.min(maxLeft, naturalLeft)}px`,
+    top: `${grandOffset - 20}px`,
   };
+
+  // if (naturalLeft > maxLeft) {
+  //   buttonNode.style.setProperty('opacity', '0.3', 'important');
+  // } else {
+  //   buttonNode.style.setProperty('opacity', '1.0', 'important');
+  // }
+
+  // buttonNode.style.left = `${Math.min(maxLeft, naturalLeft)}px`;
+  // buttonNode.style.top = `${grandOffset - 20}px`;
 };
 
 // Manage visibility and position of run button
-export const useRunButtonVisualState = (
-  editor: Editor,
-  isDirty: boolean,
-  isValid: boolean,
-  isFocused: boolean,
-  truncate = false
-) => {
-  const container = React.useRef<HTMLDivElement | null>(null);
-  const applyButton = React.useRef<HTMLDivElement | null>(null);
-
-  React.useEffect(() => {
-    const containerNode = container.current;
-    const buttonNode = applyButton.current;
-
-    if (containerNode == null || buttonNode == null) {
-      return;
-    }
-
-    if (
-      !isValid ||
-      (truncate && !isFocused) ||
-      (!isDirty && (!isFocused || Editor.string(editor, []).trim() === ''))
-    ) {
-      buttonNode.style.display = 'none';
-    } else {
-      buttonNode.style.display = 'inline-block';
-    }
-
-    const endNode = ReactEditor.toDOMNode(editor, Editor.last(editor, [])[0]);
-
-    let grandOffset = 0;
-    for (let n = endNode; !n?.dataset.slateEditor; n = n?.parentNode as any) {
-      if (n?.dataset.slateNode === 'element') {
-        grandOffset += n!.offsetHeight;
-      }
-      grandOffset += n!.offsetTop;
-    }
-
-    const maxLeft = containerNode.offsetWidth - buttonNode.offsetWidth - 5;
-    const naturalLeft = endNode.offsetLeft + endNode.offsetWidth + 10;
-    // Using setProperty because we need the !important priority on these
-    // since semantic-ui also sets it.
-    if (naturalLeft > maxLeft) {
-      buttonNode.style.setProperty('opacity', '0.3', 'important');
-    } else {
-      buttonNode.style.setProperty('opacity', '1.0', 'important');
-    }
-
-    buttonNode.style.left = `${Math.min(maxLeft, naturalLeft)}px`;
-    buttonNode.style.top = `${grandOffset - 20}px`;
-  });
-
-  return {
-    containerRef: container,
-    applyButtonRef: applyButton,
-  };
-};
+// export const useRunButtonVisualState = (
+//   editor: Editor,
+//   isDirty: boolean,
+//   isValid: boolean,
+//   isFocused: boolean,
+//   truncate = false
+// ) => {
+//   const container = React.useRef<HTMLDivElement | null>(null);
+//   const applyButton = React.useRef<HTMLDivElement | null>(null);
+//
+//   React.useEffect(() => {
+//     const containerNode = container.current;
+//     const buttonNode = applyButton.current;
+//
+//     console.log({containerNode, buttonNode});
+//     if (containerNode == null || buttonNode == null) {
+//       return;
+//     }
+//
+//     // console.log(!isValid, truncate, !isFocused, !isDirty);
+//     // if (
+//     //   !isValid ||
+//     //   (truncate && !isFocused) ||
+//     //   (!isDirty && (!isFocused || Editor.string(editor, []).trim() === ''))
+//     // ) {
+//     //   buttonNode.style.display = 'none';
+//     // } else {
+//     //   buttonNode.style.display = 'inline-block';
+//     // }
+//
+//     const endNode = ReactEditor.toDOMNode(editor, Editor.last(editor, [])[0]);
+//
+//     let grandOffset = 0;
+//     for (let n = endNode; !n?.dataset.slateEditor; n = n?.parentNode as any) {
+//       if (n?.dataset.slateNode === 'element') {
+//         grandOffset += n!.offsetHeight;
+//       }
+//       grandOffset += n!.offsetTop;
+//     }
+//
+//     const maxLeft = containerNode.offsetWidth - buttonNode.offsetWidth - 5;
+//     const naturalLeft = endNode.offsetLeft + endNode.offsetWidth + 10;
+//     // Using setProperty because we need the !important priority on these
+//     // since semantic-ui also sets it.
+//     if (naturalLeft > maxLeft) {
+//       buttonNode.style.setProperty('opacity', '0.3', 'important');
+//     } else {
+//       buttonNode.style.setProperty('opacity', '1.0', 'important');
+//     }
+//
+//     buttonNode.style.left = `${Math.min(maxLeft, naturalLeft)}px`;
+//     buttonNode.style.top = `${grandOffset - 20}px`;
+//   });
+//
+//   return {
+//     containerRef: container,
+//     applyButtonRef: applyButton,
+//   };
+// };
 
 export function useSuggestionTakerWithSlateStaticEditor(
   suggestionProps: SuggestionProps,
@@ -333,81 +444,93 @@ export function useSuggestionTakerWithSlateStaticEditor(
 
 // Get a callback for taking suggestions and manage
 // suggestion selection state
-export const useSuggestionTaker = (
-  {node, extraText, isBusy}: SuggestionProps,
-  weave: WeaveInterface,
-  editor: Editor
-) => {
-  const [suggestionIndex, setSuggestionIndex] = React.useState(0);
+export const useSuggestionTaker = () =>
+  //   {
+  //   node,
+  //   extraText,
+  //   isBusy,
+  // }: SuggestionProps
+  // weave: WeaveInterface
+  // editor: Editor
+  {
+    const {suggestions} = useWeaveExpressionContext().weaveExpressionState;
+    const {node, suggestionIndex, isBusy} = suggestions;
+    const weave = useWeaveContext();
+    // TODO: maybe we want to use slateStaticEditor? apparently prevents rerenders. see above
+    const {editor} = useWeaveExpressionContext();
 
-  // Consolidated heuristics to deal with imperfect suggestions results
-  const applyHacks = React.useCallback(
-    (s: AutosuggestResult<any>) => {
-      // const resultString = s.suggestionString.trim();
-      const resultString = weave.expToString(s.newNodeOrOp, null);
-      // By default, append the result to end of activeNodeRange if it exists, otherwise end of entire text
-      let resultAt: Range | Point =
-        (editor.activeNodeRange as Range) ?? Editor.end(editor, []);
+    const [suggestionIndex, setSuggestionIndex] = React.useState(0);
 
-      if (node.nodeType === 'var' || node.nodeType === 'const') {
-        // Suggestions for var nodes always include the var itself
-        // Suggestions for const nodes always replace the const
-        resultAt = editor.activeNodeRange as Range;
-      }
+    // Consolidated heuristics to deal with imperfect suggestions results
+    const applyHacks = React.useCallback(
+      (s: AutosuggestResult<any>) => {
+        // const resultString = s.suggestionString.trim();
+        const resultString = weave.expToString(s.newNodeOrOp, null);
+        // By default, append the result to end of activeNodeRange if it exists, otherwise end of entire text
+        let resultAt: Range | Point =
+          (editor.activeNodeRange as Range) ?? Editor.end(editor, []);
 
-      if (extraText) {
-        // If extraText is present, expand insertion range so we consume it too
-        if (Range.isRange(resultAt)) {
-          const end = Range.end(resultAt);
-          resultAt = {
-            anchor: Range.start(resultAt),
-            focus: {
-              ...end,
-              offset: end.offset + extraText.length,
-            },
-          };
-        } else {
-          // Point
-          resultAt = {
-            anchor: resultAt,
-            focus: {
-              ...(resultAt as Point),
-              offset: (resultAt as Point).offset + extraText.length + 1,
-            },
-          };
+        if (node.nodeType === 'var' || node.nodeType === 'const') {
+          // Suggestions for var nodes always include the var itself
+          // Suggestions for const nodes always replace the const
+          resultAt = editor.activeNodeRange as Range;
         }
-      }
-      return [resultString, resultAt] as [string, Range | Point];
-    },
-    [editor, extraText, node.nodeType, weave]
-  );
 
-  const takeSuggestion = React.useCallback(
-    (s: AutosuggestResult<any>) => {
-      trace('takeSuggestion', s);
+        if (extraText) {
+          // If extraText is present, expand insertion range so we consume it too
+          if (Range.isRange(resultAt)) {
+            const end = Range.end(resultAt);
+            resultAt = {
+              anchor: Range.start(resultAt),
+              focus: {
+                ...end,
+                offset: end.offset + extraText.length,
+              },
+            };
+          } else {
+            // Point
+            resultAt = {
+              anchor: resultAt,
+              focus: {
+                ...(resultAt as Point),
+                offset: (resultAt as Point).offset + extraText.length + 1,
+              },
+            };
+          }
+        }
+        return [resultString, resultAt] as [string, Range | Point];
+      },
+      [editor, extraText, node.nodeType, weave]
+    );
 
-      if (isBusy) {
-        return;
-      }
+    const takeSuggestion = React.useCallback(
+      // (s: AutosuggestResult<any>) => {
+      (selectionIndex: number) => {
+        const suggestion = suggestions.items[selectionIndex];
+        trace('takeSuggestion', suggestion);
 
-      ReactEditor.focus(editor);
-      const [suggestion, insertPoint] = applyHacks(s);
-      const prevSelection = {...editor.selection};
-      Transforms.insertText(editor, suggestion, {
-        at: insertPoint,
-      });
-      Transforms.select(editor, prevSelection as Location);
-      moveToNextMissingArg(editor);
-    },
-    [editor, applyHacks, isBusy]
-  );
+        if (isBusy) {
+          return;
+        }
 
-  return {
-    suggestionIndex,
-    setSuggestionIndex,
-    takeSuggestion,
+        ReactEditor.focus(editor);
+        const [suggestion, insertPoint] = applyHacks(suggestion);
+        const prevSelection = {...editor.selection};
+        Transforms.insertText(editor, suggestion, {
+          at: insertPoint,
+        });
+        Transforms.select(editor, prevSelection as Location);
+        moveToNextMissingArg(editor);
+      },
+      [editor, applyHacks, isBusy]
+    );
+
+    return {
+      suggestionIndex,
+      setSuggestionIndex,
+      takeSuggestion,
+    };
   };
-};
 
 // Managed suggestions component state
 export const useSuggestionVisualState = ({

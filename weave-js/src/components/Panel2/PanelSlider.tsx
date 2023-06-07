@@ -3,7 +3,7 @@ import {constNumber, Node, NodeOrVoidNode, voidNode} from '@wandb/weave/core';
 import React, {useCallback, useMemo} from 'react';
 
 import {useWeaveContext} from '../../context';
-import {WeaveExpression} from '../../panel/WeaveExpression';
+import {WeaveExpression} from '../../panel/WeaveExpression/WeaveExpression';
 import {useMutation, useNodeValue} from '../../react';
 import * as ConfigPanel from './ConfigPanel';
 import * as Panel2 from './panel';

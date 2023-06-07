@@ -6,7 +6,10 @@ import {ThemeProvider} from 'styled-components';
 
 import {WeaveActionContextProvider} from '../../../actions';
 import {useWeaveContext, useWeaveFeaturesContext} from '../../../context';
-import {focusEditor, WeaveExpression} from '../../../panel/WeaveExpression';
+import {
+  focusEditor,
+  WeaveExpression,
+} from '../../../panel/WeaveExpression/WeaveExpression';
 import Sidebar from '../../Sidebar/Sidebar';
 import {themes} from '../Editor.styles';
 import {Panel2Loader, PanelComp2} from '../PanelComp';

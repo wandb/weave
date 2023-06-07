@@ -32,8 +32,9 @@ export class WeaveExpressionState {
   public readonly id: string;
   public readonly isBusy: boolean;
   public readonly isValid: boolean;
-  public readonly exprIsModified: boolean;
-  public readonly editorValue: SlateNode[];
+  public readonly isDirty: boolean; // true if expression has been modified
+  public readonly isTruncated: boolean;
+  public readonly slateValue: SlateNode[];
   public readonly suggestions: SuggestionProps;
   public readonly tsRoot: SyntaxNode | undefined;
   public readonly initializing: boolean;
@@ -78,8 +79,9 @@ export class WeaveExpressionState {
 
     this.isBusy = false;
     this.isValid = true;
-    this.exprIsModified = false;
-    this.editorValue = [
+    this.isDirty = false;
+    this.isTruncated = false;
+    this.slateValue = [
       {
         type: 'paragraph', // https://github.com/ianstormtaylor/slate/issues/3421
         children: [{text: this.editorText}],
@@ -148,7 +150,7 @@ export class WeaveExpressionState {
       this.editorText
     );
 
-    this.set('editorValue', newValue);
+    this.set('slateValue', newValue);
 
     const newText = newValue.reduce(
       (textFragment: string, line: SlateNode) =>
@@ -202,7 +204,7 @@ export class WeaveExpressionState {
       this.trace('🐸 applyPendingExpr', this.pendingExpr);
       this.setExpression(this.pendingExpr as NodeOrVoidNode);
     }
-    this.set('exprIsModified', false);
+    this.set('isDirty', false);
     this.postUpdate('flushed changes');
   }
 
@@ -340,7 +342,7 @@ export class WeaveExpressionState {
     if (ReactEditor.isFocused(this.editor)) {
       this.trace(`...update pending expression`, newText);
       this.pendingExpr = newExpr;
-      this.set('exprIsModified', true);
+      this.set('isDirty', true);
       this.postUpdate('expr is modified');
     } else {
       this.trace(`...not focused, done updating`);

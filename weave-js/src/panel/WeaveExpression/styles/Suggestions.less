@@ -1,0 +1,99 @@
+@import '@wandb/weave/common/css/globals.less';
+
+// TODO: move somewhere else, get actual colors from globals
+@padding: 4px 12px;
+@color: black;
+@border-radius: 4px;
+@suggestion-pane-bg: #fff;
+@type-display-bg: #fff;
+
+.weave-root {
+  .suggestions {
+    position: absolute;
+    top: -10000px;
+    left: -10000px;
+    z-index: 2147483647;
+
+    transition: opacity 0.3s;
+    opacity: 0;
+
+    .suggestion-pane {
+      //background-color: rgba(0, 0, 0, 0.9);
+      background-color: @suggestion-pane-bg;
+      color: @color;
+      display: inline-block;
+      border: 1px solid @gray300;
+      //padding: 10px;
+      border-bottom-right-radius: @border-radius;
+      border-bottom-left-radius: @border-radius;
+      width: 250px;
+
+      & div.type-display {
+        font-weight: 600;
+        //padding-bottom: 10px;
+        //margin-bottom: 10px;
+        border-top: 1px solid @gray300;
+        padding: @padding;
+        background: @type-display-bg;
+        color: @color;
+        border-bottom-right-radius: @border-radius;
+        border-bottom-left-radius: @border-radius;
+      }
+
+      & ul.items-list {
+        margin: 0;
+        padding: 0; // TODO: do we really not have a css reset?
+        list-style: none;
+        max-height: 250px;
+        overflow-y: scroll;
+        overflow-x: hidden;
+
+        &::-webkit-scrollbar {
+          width: 6px;
+        }
+
+        &::-webkit-scrollbar-track,
+        &::-webkit-scrollbar-track:hover {
+          //background-color: transparent;
+          background-color: #eee;
+        }
+
+        &::-webkit-scrollbar-thumb {
+          background-color: #ccc;
+          border-radius: @border-radius;
+        }
+      }
+
+      & ul.items-list li.suggestion-option {
+        white-space: nowrap;
+        cursor: pointer;
+        text-overflow: ellipsis;
+        overflow: hidden;
+        //padding-left: 5px;
+        padding: @padding;
+
+        &.default-suggestion {
+          //background-color: rgba(255, 255, 255, 0.8);
+          background-color: @gray500;
+          padding-right: 30px;
+        }
+
+        &.default-suggestion:before {
+          //color: ${props => (props.isBusy ? globals.gray500 : globals.primary)};
+          text-align: right;
+          content: '⇥';
+          float: right;
+          margin-right: -25px;
+
+          &.isBusy {
+            color: @gray500;
+          }
+        }
+
+        &:hover {
+          background-color: rgba(255, 255, 255, 0.2);
+        }
+      }
+    }
+  }
+}

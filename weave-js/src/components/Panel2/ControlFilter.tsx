@@ -9,7 +9,10 @@ import React, {useCallback, useMemo, useState} from 'react';
 import {Button} from 'semantic-ui-react';
 
 import {useWeaveContext} from '../../context';
-import {focusEditor, WeaveExpression} from '../../panel/WeaveExpression';
+import {
+  focusEditor,
+  WeaveExpression,
+} from '../../panel/WeaveExpression/WeaveExpression';
 import * as S from './ControlFilter.styles';
 
 interface ControlFilterProps {
