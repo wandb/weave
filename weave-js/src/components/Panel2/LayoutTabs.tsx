@@ -57,6 +57,7 @@ const Container = styled.div`
 const Content = styled.div`
   flex: 1 1 auto;
   overflow: hidden;
+  padding-top: 24px;
 `;
 
 const TabsContainer = styled.div`
