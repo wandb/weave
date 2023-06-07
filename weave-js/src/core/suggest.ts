@@ -533,12 +533,14 @@ async function autosuggestNodes(
       }
     } else {
       const availOps = availableOpsForChain(node, client.opStore);
-      result = availOps.flatMap(opDef => {
-        return callOpVeryUnsafe(opDef.name, {
-          lhs: node,
-          rhs: getPlaceholderArg(opDef, 'rhs') ?? voidNode(),
-        });
-      });
+      result = result.concat(
+        availOps.flatMap(opDef => {
+          return callOpVeryUnsafe(opDef.name, {
+            lhs: node,
+            rhs: getPlaceholderArg(opDef, 'rhs') ?? voidNode(),
+          });
+        })
+      );
     }
   } else if (node.nodeType === 'var' || node.nodeType === 'output') {
     if (node.type === 'any') {
@@ -695,6 +697,30 @@ export async function autosuggest(
   }
 
   result.sort((a, b) => {
+    // Constants first
+    const aIsConst = a.newNodeOrOp.nodeType === 'const';
+    const bIsConst = b.newNodeOrOp.nodeType === 'const';
+
+    if (aIsConst && !bIsConst) {
+      return -1;
+    } else if (!aIsConst && bIsConst) {
+      return 1;
+    }
+
+    // Picks second
+    const aIsPick =
+      a.newNodeOrOp.nodeType === 'output' &&
+      a.newNodeOrOp.fromOp.name === 'pick';
+    const bIsPick =
+      b.newNodeOrOp.nodeType === 'output' &&
+      b.newNodeOrOp.fromOp.name === 'pick';
+
+    if (aIsPick && !bIsPick) {
+      return -1;
+    } else if (!aIsPick && bIsPick) {
+      return 1;
+    }
+
     const aIsTagGetter = isTagGetterNodeOrOp(a.newNodeOrOp, client.opStore);
     const bIsTagGetter = isTagGetterNodeOrOp(b.newNodeOrOp, client.opStore);
 
@@ -786,8 +812,14 @@ export async function autosuggest(
       // result = result.filter(item => item.suggestionString.includes(query));
       result = result.sort((a, b) => {
         return (
-          (b.suggestionString.includes(query!) ? 1 : -1) -
-          (a.suggestionString.includes(query!) ? 1 : -1)
+          (b.suggestionString.includes(query!) ||
+          b.suggestionString.startsWith('"')
+            ? 1
+            : -1) -
+          (a.suggestionString.includes(query!) ||
+          a.suggestionString.startsWith('"')
+            ? 1
+            : -1)
         );
       });
     }
