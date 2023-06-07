@@ -57,7 +57,6 @@ const Container = styled.div`
 const Content = styled.div`
   flex: 1 1 auto;
   overflow: hidden;
-  padding-top: 24px;
 `;
 
 const TabsContainer = styled.div`
@@ -66,6 +65,7 @@ const TabsContainer = styled.div`
   width: 100%;
   overflow-x: auto;
   flex: 0 0 auto;
+  margin-bottom: 12px;
 
   &:after {
     content: '';
@@ -86,8 +86,8 @@ const Tab = styled.div<{active: boolean}>`
   max-width: 100px;
   line-height: 32px;
   padding-bottom: 6px;
-  display: flex;
-  justify-content: center;
+  text-align: center;
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   cursor: pointer;
