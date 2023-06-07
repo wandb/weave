@@ -23,5 +23,4 @@ Demo notebooks can be found in `/examples.` Simply run `jupyter notebook` or `ju
 
 - [BertViz: Visualize attention in transformers](../examples/bert_viz.ipynb)
 - [Browse HuggingFace datasets](../examples/huggingface_datasets.ipynb)
-- [Generate images with Replicate](../examples/image_gen_replicate.ipynb)
-
+- [Generate images with Replicate](../examples/experimental/skip_test/image_gen_replicate.ipynb)
