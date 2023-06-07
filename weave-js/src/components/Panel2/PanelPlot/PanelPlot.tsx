@@ -375,7 +375,7 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
   const labelConfigDom = useMemo(() => {
     return (
       <>
-        {['X Axis Label', 'Y Axis Label', 'Color Legend Label'].map(name => {
+        {['X axis label', 'Y axis label', 'Color legend label'].map(name => {
           const dimName = name.split(' ')[0].toLowerCase() as
             | 'x'
             | 'y'
@@ -398,7 +398,7 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
           );
         })}
         {config.series.map((series, i) => {
-          const seriesName = `Series ${i + 1} Name`;
+          const seriesName = `Series ${i + 1} name`;
           return (
             <ConfigPanel.ConfigOption
               key={seriesName}
@@ -573,7 +573,7 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
     () => (
       <>
         <Button size="mini" onClick={resetConfig}>
-          {'Reset & Automate Plot'}
+          {'Reset & automate plot'}
         </Button>
         <Button size="mini" onClick={condense}>
           {'Condense'}
@@ -680,7 +680,7 @@ const ScaleConfigOptionComp: FC<ScaleConfigOptionProps> = ({
 
   return (
     <>
-      <ConfigPanel.ConfigOption label={`${axis.toUpperCase()} Axis Scale`}>
+      <ConfigPanel.ConfigOption label={`${axis.toUpperCase()} axis scale`}>
         <ConfigPanel.ModifiedDropdownConfigField
           options={SCALE_TYPE_OPTIONS}
           value={currentScaleType}
@@ -998,7 +998,7 @@ const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
           },
         },
         {
-          text: 'Enter a Weave Expression',
+          text: 'Enter a Weave expression',
           icon: !enableDashUi ? (
             'wbic-ic-xaxis'
           ) : dimension.mode() === `expression` ? (
