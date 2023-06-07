@@ -135,7 +135,7 @@ def show(obj=None, height=400):
     panel_url = show_url(obj)
 
     if util.is_colab():
-        port = int(re.match(panel_url, r":\d+/").group(0)[1:-1])
+        port = int(re.search(r":(\d+)/", panel_url).group(1))
         shell = """
         (async () => {
                 const url = await google.colab.kernel.proxyPort(%PORT%, {"cache": true});

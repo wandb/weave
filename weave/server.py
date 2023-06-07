@@ -179,6 +179,8 @@ class HttpServer(threading.Thread):
     def __init__(self, port=0, host="localhost"):
         from . import weave_server
 
+        global gport
+
         self.host = host
 
         app = weave_server.app
@@ -186,14 +188,10 @@ class HttpServer(threading.Thread):
         self.srv = make_server(host, port, app, threaded=False)
 
         # if the passed port is zero then a randomly allocated port will be used. this
-        # gets the value of the port that was assigned.  We use portpicker in colab or
-        # if it's available to ensure it's forwarding magic works.
-        try:
-            import portpicker
-
-            self.port = portpicker.pick_unused_port()
-        except ImportError:
-            self.port = self.srv.socket.getsockname()[1]
+        # gets the value of the port that was assigned.
+        if gport is None:
+            gport = port or self.srv.socket.getsockname()[1]
+        self.port = gport
 
     def run(self):
         if _REQUESTED_SERVER_LOG_LEVEL is None:
