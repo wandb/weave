@@ -138,7 +138,7 @@ def show(obj=None, height=400):
         port = int(re.search(r":(\d+)/", panel_url).group(1))
         shell = """
         (async () => {
-                const url = await google.colab.kernel.proxyPort(%PORT%, {"cache": true});
+                const url = await google.colab.kernel.proxyPort(%PORT%, {"cache": false});
                 const iframe = document.createElement('iframe');
                 iframe.src = url;
                 iframe.setAttribute('width', '100%');
