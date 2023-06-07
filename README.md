@@ -42,7 +42,7 @@ For example:
 Weave has example notebooks demonstrating common usage patterns. To use the notebooks, clone this repository and install the examples' dependencies:
 
 ```
-pip install .[examples]
+pip install '.[examples]'
 ```
 
 then run through the notebooks in `./examples`.
