@@ -33,6 +33,8 @@ def main():
     integration_dir = os.path.join(git_root, "integration_test")
     test_dir = os.path.join(integration_dir, "cypress", "e2e", "notebooks")
     for root, dirs, files in os.walk(examples_dir):
+        if root.split("/")[-1] == "skip_test":
+            continue
         for file in files:
             if "ipynb_checkpoints" in root:
                 continue
