@@ -25,6 +25,12 @@ class ColumnDef(typing.TypedDict):
     columnSelectFunction: weave.graph.Node
 
 
+@dataclasses.dataclass
+class TableColumn:
+    select: typing.Callable
+    name: str
+
+
 @weave.type("tablePanel")
 class Table(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
     id = "table"
@@ -42,7 +48,13 @@ class Table(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
 
             if "columns" in options:
                 for col_ndx, column_expr in enumerate(options["columns"]):
-                    table.add_column(column_expr)
+                    if isinstance(column_expr, TableColumn):
+                        table.add_column(
+                            column_expr.select,
+                            column_expr.name,
+                        )
+                    else:
+                        table.add_column(column_expr)
 
     def get_final_named_select_functions(self) -> dict[str, ColumnDef]:
         if not self.config:
@@ -117,6 +129,9 @@ class Table(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
                 ",".join([f_name + "=" + f_val for f_name, f_val in field_vals]) + ","
             )
         return f"""weave.panels.panel_table.Table({codify.object_to_code_no_format(self.input_node)}, {param_str})"""
+
+    def add_column(self, select_expr, name=None):
+        self.config.tableState.add_column(select_expr, name)
 
 
 def _get_composite_group_key(self: typing.Union[Table, Query]) -> str:

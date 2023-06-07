@@ -99,16 +99,15 @@ After installation, check out our [Quick Start Guide](./docs/QUICKSTART.md) to g
 
 ---
 
-<!--
 ## 👩‍💻 Contribution
 
-Are you passionate about data exploration and open-source projects? Awesome! Weave's community is always looking for contributors. Check out our [Contribution Guide](./CONTRIBUTING.md) to learn how you can make Weave even better!
+Are you passionate about data exploration and open-source projects? Awesome! Weave's community is always looking for contributors. Check out our [Contribution Guide](./docs/CONTRIBUTING.md) to learn how you can make Weave even better!
 
 
 ## 📢 Community
 
-Join our thriving community [Discord](discord_link). It's the perfect place to ask questions, share your projects, or just chat about data exploration.
--->
+Join our thriving community [Discord](https://discord.gg/nNcvfX9GZ4). It's the perfect place to ask questions, share your projects, or just chat about data exploration.
+
 
 ## 💖 Thanks
 

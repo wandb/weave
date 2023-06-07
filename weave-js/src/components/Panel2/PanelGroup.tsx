@@ -29,23 +29,23 @@ import {
   mutateEnsureItemIsFullChildPanel,
 } from './ChildPanel';
 import * as ConfigPanel from './ConfigPanel';
+import {IconAddNew as IconAddNewUnstyled} from './Icons';
 import {LayoutSections} from './LayoutSections';
 import {LayoutTabs} from './LayoutTabs';
 import * as Panel2 from './panel';
-import {ExpressionEvent, PanelContextProvider} from './PanelContext';
-import {usePanelContext} from './PanelContext';
+import {
+  ExpressionEvent,
+  PanelContextProvider,
+  usePanelContext,
+} from './PanelContext';
 import {
   useSetInspectingPanel,
   useSetPanelInputExprIsHighlighted,
 } from './PanelInteractContext';
 import {isGroupNode, nextPanelName} from './panelTree';
-import {IconButton} from '../IconButton';
-import {IconAddNew as IconAddNewUnstyled, IconPencilEdit} from './Icons';
-import {WBButton} from '../../common/components/elements/WBButtonNew';
-import {Tooltip} from '../Tooltip';
 // import {VarBar} from '../Sidebar/VarBar';
-import {inJupyterCell} from '../PagePanelComponents/util';
 import {GRAY_350, GRAY_500, GRAY_800} from '../../common/css/globals.styles';
+import {inJupyterCell} from '../PagePanelComponents/util';
 
 const LAYOUT_MODES = [
   'horizontal' as const,
@@ -167,25 +167,6 @@ export const GroupItem = styled.div<{
           width: 100%;
           margin-bottom: 12px;
         `}
-`;
-
-const ActionBar = styled.div`
-  height: 48px;
-  padding: 0 32px;
-  flex: 0 0 48px;
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-`;
-
-const IconAddNew = styled(IconAddNewUnstyled)`
-  width: 18px;
-  height: 18px;
-  margin-right: 6px;
-`;
-
-const PBContainer = styled.div<{fullHeight: boolean}>`
-  height: ${p => (p.fullHeight ? `100%` : `calc(100% - 48px)`)};
 `;
 
 // This is a mapping from JS PanelIDs to their corresponding Python type name
@@ -787,7 +768,6 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
   const config = props.config ?? PANEL_GROUP_DEFAULT_CONFIG();
   const {stack, path: groupPath} = usePanelContext();
   const {updateConfig, updateConfig2} = props;
-  const setInspectingPanel = useSetInspectingPanel();
 
   if (updateConfig2 == null) {
     // For dev only
@@ -930,36 +910,15 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
 
   if (config.layoutMode === 'grid' || config.layoutMode === 'flow') {
     return (
-      <>
-        {!inJupyter && (
-          <ActionBar>
-            <Tooltip
-              position="bottom right"
-              trigger={
-                <IconButton onClick={() => setInspectingPanel(groupPath)}>
-                  <IconPencilEdit />
-                </IconButton>
-              }>
-              Open panel editor
-            </Tooltip>
-            {config.enableAddPanel && (
-              <WBButton onClick={handleAddPanel}>
-                <IconAddNew />
-                New panel
-              </WBButton>
-            )}
-          </ActionBar>
-        )}
-        <PBContainer fullHeight={inJupyter}>
-          <PBSection
-            mode={config.layoutMode}
-            config={gridConfig}
-            updateConfig2={updateGridConfig2}
-            renderPanel={renderSectionPanel}
-            handleAddPanel={config.enableAddPanel ? handleAddPanel : undefined}
-          />
-        </PBContainer>
-      </>
+      <PBSection
+        mode={config.layoutMode}
+        config={gridConfig}
+        groupPath={groupPath}
+        enableAddPanel={config.enableAddPanel}
+        updateConfig2={updateGridConfig2}
+        renderPanel={renderSectionPanel}
+        handleAddPanel={config.enableAddPanel ? handleAddPanel : undefined}
+      />
     );
   }
 
@@ -1057,4 +1016,9 @@ const AddVarButton = styled.div`
     width: 18px;
     height: 18px;
   }
+`;
+
+const IconAddNew = styled(IconAddNewUnstyled)`
+  width: 18px;
+  height: 18px;
 `;

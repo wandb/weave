@@ -15,6 +15,7 @@ import {ReactComponent as ImportIconClose} from '../../assets/icon-close.svg';
 import {ReactComponent as ImportIconColumnAlt} from '../../assets/icon-column-alt.svg';
 import {ReactComponent as ImportIconCopy} from '../../assets/icon-copy.svg';
 import {ReactComponent as ImportIconFullScreenModeExpand} from '../../assets/icon-full-screen-mode-expand.svg';
+import {ReactComponent as ImportIconMinimizeMode} from '../../assets/icon-minimize-mode.svg';
 import {ReactComponent as ImportIconOverflowHorizontal} from '../../assets/icon-overflow-horizontal.svg';
 import {ReactComponent as ImportIconRedo} from '../../assets/icon-redo.svg';
 import {ReactComponent as ImportIconRetry} from '../../assets/icon-retry.svg';
@@ -65,6 +66,9 @@ export const IconCopy = (props: SVGIconProps) => (
 );
 export const IconFullScreenModeExpand = (props: SVGIconProps) => (
   <ImportIconFullScreenModeExpand {...updateIconProps(props)} />
+);
+export const IconMinimizeMode = (props: SVGIconProps) => (
+  <ImportIconMinimizeMode {...updateIconProps(props)} />
 );
 export const IconOverflowHorizontal = (props: SVGIconProps) => (
   <ImportIconOverflowHorizontal {...updateIconProps(props)} />
