@@ -56,7 +56,7 @@ After installation, check out our [Quick Start Guide](./docs/QUICKSTART.md) to g
 
 ## 🎁 Feature Statuses
 
-**Important:** Weave is newly open sourced and the APIs are subject to change. Please report any issues to [https://github.com/wandb/weave-internal/issues](https://github.com/wandb/weave-internal/issues).
+**Important:** Weave is newly open sourced and the APIs are subject to change. Please report any issues to [https://github.com/wandb/weave/issues](https://github.com/wandb/weave/issues).
 
 **Statuses**:
 
