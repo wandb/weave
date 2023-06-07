@@ -721,7 +721,7 @@ const HeaderLogoControls: React.FC<{
           <MenuItem
             onClick={() => {
               setAnchorHomeEl(null);
-              window.open('https://github.com/wandb/weave-internal', '_blank');
+              window.open('https://github.com/wandb/weave', '_blank');
             }}>
             <MenuIcon>
               <IconDocs />
