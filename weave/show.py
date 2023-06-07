@@ -121,9 +121,17 @@ def show_url(obj=None):
 
 def show(obj=None, height=400):
     if not util.is_notebook():
+        usage_analytics.show_called({"error": True})
         raise RuntimeError(
             "`weave.show()` can only be called within notebooks. To extract the value of "
             "a weave node, try `weave.use()`."
+        )
+
+    if util.is_colab():
+        usage_analytics.show_called({"colab": True, "error": True})
+        raise RuntimeError(
+            "`weave.show()` is currently not supported in Google Colab.  We're working on it!  Follow "
+            "progress here: https://github.com/wandb/weave/pull/15"
         )
 
     if util.is_pandas_dataframe(obj):
