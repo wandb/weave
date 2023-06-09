@@ -1,4 +1,17 @@
-import {generateHTML, isMarkdown} from './markdown';
+import {defaultSchema as gh} from 'hast-util-sanitize/lib/schema';
+
+import {buildSanitizationSchema, generateHTML, isMarkdown} from './markdown';
+
+describe('buildSanitizationSchema', () => {
+  it('built schema allows scoped styles with `allowScopedStyles` rule', () => {
+    expect(gh.tagNames?.includes('style')).toBe(false);
+    expect(gh.attributes.style).toBe(undefined);
+
+    const builtSchema = buildSanitizationSchema(['allowScopedStyles'], gh);
+    expect(builtSchema.tagNames?.includes('style')).toBe(true);
+    expect(builtSchema.attributes.style.includes('scoped')).toBe(true);
+  });
+});
 
 describe('generateHTML', () => {
   it('does not allow basic script tags', () => {

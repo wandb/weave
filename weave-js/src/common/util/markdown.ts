@@ -1,3 +1,5 @@
+import {UIConfigOptions} from '@wandb/weave/components/Panel2/panellib/libpanel';
+import {Schema} from 'hast-util-sanitize';
 import {defaultSchema as gh} from 'hast-util-sanitize/lib/schema';
 import {produce} from 'immer';
 import * as _ from 'lodash';
@@ -29,7 +31,43 @@ export function markdownToText(markdown: string) {
   return text;
 }
 
-export function generateHTML(markdown: string) {
+type SanitizationRules = UIConfigOptions['html'];
+export function buildSanitizationSchema(
+  rules: SanitizationRules,
+  schema: Schema = sanitizeRules
+) {
+  /**
+   * These are all the known transformations that can be triggered through
+   * declarative rules passed in from outside weave
+   */
+  const rulesToSchemaMap: Record<SanitizationRules[number], Schema> = {
+    allowScopedStyles: {
+      attributes: {
+        style: ['scoped'],
+      },
+      tagNames: ['style'],
+    },
+  };
+
+  // recursively build up the sanitization object merging in the transformations
+  // coupled to each rule
+  // NOTE: this assumes rules relax strictness. I'm not sure this model would work for
+  // additional strictness on the schema. If we get that scenario we'll need to test
+  const newSchema = rules.reduce(
+    (schema: Schema, rule: SanitizationRules[number]) => {
+      return _.merge(schema, rulesToSchemaMap[rule]);
+    },
+    schema
+  );
+
+  return newSchema;
+}
+
+export function generateHTML(
+  markdown: string,
+  rules: UIConfigOptions['html'] = []
+) {
+  const sanitizationSchema = buildSanitizationSchema(rules);
   // IMPORTANT: We must sanitize as the final step of the pipeline to prevent XSS
   const vfile = (
     unified()
@@ -44,9 +82,9 @@ export function generateHTML(markdown: string) {
     // that the rehype plugins we pass in afterwards will work.
     .use(katex)
     .use(rehypeRaw)
-    .use(sanitize, sanitizeRules)
+    .use(sanitize, sanitizationSchema)
     .use(stringify)
-    .use(sanitize, sanitizeRules)
+    .use(sanitize, sanitizationSchema)
     .processSync(markdown);
   if (typeof vfile.value === 'string') {
     vfile.value = blankifyLinks(vfile.value);

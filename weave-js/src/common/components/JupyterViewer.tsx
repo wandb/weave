@@ -1,3 +1,4 @@
+import {UIConfigOptions} from '@wandb/weave/components/Panel2/panellib/libpanel';
 import AU from 'ansi_up';
 import classnames from 'classnames';
 import * as Prism from 'prismjs';
@@ -175,8 +176,13 @@ function processOutputs(
   return outputs;
 }
 
-const JupyterViewerFromRun: React.FC<JupyterProps> = props => {
-  const {useLoadFile, file} = props;
+type JupyterUIConfig = {
+  rules: UIConfigOptions['html'];
+};
+const JupyterViewerFromRun: React.FC<
+  JupyterProps & JupyterUIConfig
+> = props => {
+  const {useLoadFile, file, rules} = props;
   const [raw, setRaw] = useState<any>();
   const [error, setErrorVal] = useState(false);
   const setError = useCallback(() => setErrorVal(true), [setErrorVal]);
@@ -196,7 +202,7 @@ const JupyterViewerFromRun: React.FC<JupyterProps> = props => {
     return <WandbLoader name="jupyter-vewier" />;
   }
 
-  return <JupyterViewer raw={raw} />;
+  return <JupyterViewer raw={raw} rules={rules} />;
 };
 
 export const JupyterCell: React.FC<{
@@ -205,7 +211,8 @@ export const JupyterCell: React.FC<{
   saveCode?: (code: string) => void;
   id: string;
   readonly: boolean;
-}> = ({cell, id, runCode, saveCode, readonly}) => {
+  rules: UIConfigOptions['html'];
+}> = ({cell, id, runCode, saveCode, readonly, rules = []}) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   // This effect resizes the iframe so we don't have extra space / scrollbars
@@ -288,7 +295,8 @@ export const JupyterCell: React.FC<{
           className="output"
           dangerouslySetInnerHTML={{
             __html: generateHTML(
-              sourceAsArray(cell.source).join('')
+              sourceAsArray(cell.source).join(''),
+              rules
             ).toString(),
           }}
         />
@@ -301,8 +309,8 @@ export const JupyterCell: React.FC<{
 
 export const JupyterViewer: React.FC<{
   raw: string;
-}> = props => {
-  const {raw} = props;
+  rules: UIConfigOptions['html'];
+}> = ({raw, rules}) => {
   const idRef = useRef(ID());
   useEffect(() => {
     Prism.highlightAll();
@@ -333,6 +341,7 @@ export const JupyterViewer: React.FC<{
       {notebook.cells.map((cell, i) => (
         <JupyterCell
           readonly={true}
+          rules={rules}
           cell={cell}
           id={`${idRef.current}-cell-${i}`}
           key={`${idRef.current}-cell-${i}`}
