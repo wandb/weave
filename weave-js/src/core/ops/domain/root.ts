@@ -508,7 +508,7 @@ export const opRootAuditLogs = makeOp({
         report_asset: 'number' as const,
         response_code: 'number' as const,
         cli_version: 'string' as const,
-        actor_ip: 'string' as const
+        actor_ip: 'string' as const,
         
         
                 artifact_asset: 'number' as const,
