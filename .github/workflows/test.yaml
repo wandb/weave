@@ -59,7 +59,14 @@ jobs:
       - uses: actions/setup-node@v1
         with:
           node-version: "16.x"
-      - run: cd weave-js && yarn install --frozen-lockfile && yarn eslint && yarn tslint && yarn prettier && yarn run tsc
+      - run: |
+            set -e
+            cd weave-js
+            yarn install --frozen-lockfile
+            yarn eslint
+            yarn tslint
+            yarn prettier
+            yarn run tsc
 
   test:
     name: Python unit tests
