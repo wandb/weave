@@ -507,11 +507,11 @@ export const opRootAuditLogs = makeOp({
         response_code: 'number' as const,
         cli_version: 'string' as const,
         actor_ip: 'string' as const,
-        
+
         // AuditLog but less prominent
         actor_user_id: 'number' as const,
         audit_log_error: 'string' as const,
-        
+
         // StaticContext but deanonymized
         entity_asset: 'number' as const,
         user_asset: 'number' as const,
