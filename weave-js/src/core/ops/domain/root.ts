@@ -494,10 +494,10 @@ export const opRootAuditLogs = makeOp({
         actor_user_id: 'number' as const,
         audit_log_error: 'string' as const,
         action: 'string' as const,
-
+    
         // DeanomizedContext
         actor_email: 'string' as const,
-        user_email: 'string' as const,
+        user_email: 'string'   as const,
         entity_name: 'string' as const,
         project_name: 'string' as const,
         report_name: 'string' as const,
@@ -505,12 +505,15 @@ export const opRootAuditLogs = makeOp({
         // StaticContext
         entity_asset: 'number' as const,
         user_asset: 'number' as const,
-        artifact_asset: 'number' as const,
-        project_asset: 'number' as const,
         report_asset: 'number' as const,
         response_code: 'number' as const,
         cli_version: 'string' as const,
-        actor_ip: 'string' as const,
+        actor_ip: 'string' as const
+        
+        
+                artifact_asset: 'number' as const,
+        project_asset: 'number' as const,
+
       })
     ),
     error: 'string' as const,
