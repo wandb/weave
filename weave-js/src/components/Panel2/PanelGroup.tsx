@@ -36,9 +36,7 @@ import {
   PanelContextProvider,
   usePanelContext,
 } from './PanelContext';
-import {
-  useSetPanelInputExprIsHighlighted,
-} from './PanelInteractContext';
+import {useSetPanelInputExprIsHighlighted} from './PanelInteractContext';
 import {isGroupNode, nextPanelName} from './panelTree';
 import {toWeaveType} from './toWeaveType';
 // import {VarBar} from '../Sidebar/VarBar';

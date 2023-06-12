@@ -133,7 +133,6 @@ import {PopupMenu, Section} from '../../Sidebar/PopupMenu';
 
 const recordEvent = makeEventRecorder('Plot');
 
-
 // const PANELPLOT_MAX_DATAPOINTS = 2000;
 
 const defaultFontStyleDict = {
