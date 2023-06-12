@@ -16,7 +16,7 @@ export function toWeaveType(o: any): any {
       _is_object: true,
       domain: {
         ..._.mapValues(o.domain, toWeaveType),
-        type: 'AxisSelections',
+        type: 'LazyAxisSelections',
         _is_object: true,
       },
       selection: {
