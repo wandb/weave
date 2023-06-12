@@ -293,13 +293,19 @@ LazySelection = typing.Union[Selection, SelectFunction]
 # TODO: split this into 2 - one for lazy, one eager
 @weave.type()
 class AxisSelections:
-    x: typing.Optional[LazySelection] = None
-    y: typing.Optional[LazySelection] = None
+    x: typing.Optional[Selection] = None
+    y: typing.Optional[Selection] = None
+
+
+@weave.type()
+class LazyAxisSelections:
+    x: SelectFunction = graph.ConstNode(weave.types.optional(weave.types.Any()), None)
+    y: SelectFunction = graph.ConstNode(weave.types.optional(weave.types.Any()), None)
 
 
 @weave.type()
 class Signals:
-    domain: AxisSelections
+    domain: LazyAxisSelections
     selection: AxisSelections
 
 
@@ -439,7 +445,7 @@ class Plot(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
                         select_functions = {}
                     select_functions[typing.cast(DimName, field.name)] = maybe_dim
 
-            signals = Signals(domain=AxisSelections(), selection=AxisSelections())
+            signals = Signals(domain=LazyAxisSelections(), selection=AxisSelections())
             if domain_x is not None:
                 signals.domain.x = domain_x
 
@@ -490,9 +496,7 @@ class Plot(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
             )
 
             for path in LAZY_PATHS:
-                ensure_node(
-                    self.config, path.split(".")
-                )  # , type=LAZY_PATH_TYPES[path])
+                ensure_node(self.config, path.split("."), type=LAZY_PATH_TYPES[path])
 
             if no_axes:
                 self.set_no_axes()
@@ -542,7 +546,7 @@ class Plot(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
     def to_code(self) -> typing.Optional[str]:
         field_vals: list[tuple[str, str]] = []
         default_signals = Signals(
-            domain=AxisSelections(x=None, y=None),
+            domain=LazyAxisSelections(),
             selection=AxisSelections(x=None, y=None),
         )
         default_axisSettings = AxisSettings(
