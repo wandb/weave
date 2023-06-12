@@ -4,7 +4,7 @@ import React, {useEffect, useMemo, useRef} from 'react';
 
 import {useNodeValue} from '../../../react';
 import * as Panel2 from '../panel';
-import {toWeaveType} from '../PanelGroup';
+import {toWeaveType} from '../toWeaveType';
 
 export const inputType = {type: 'Plotly'} as any;
 

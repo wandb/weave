@@ -8,6 +8,19 @@ from weave.panels.panel_plot import Plot, Series, PlotConstants
 from .test_run_segment import create_experiment
 from .. import storage
 
+from contextlib import contextmanager
+
+
+@contextmanager
+def const_nodes_equal():
+    graph.ConstNode.__eq__ = (
+        lambda self, other: isinstance(other, graph.ConstNode)
+        and self.val == other.val
+        and self.type == other.type
+    )
+    yield
+    del graph.ConstNode.__eq__
+
 
 def test_run_segment_plot_config():
     last_segment = create_experiment(1000, 3, 0.8)
@@ -77,7 +90,9 @@ def test_multi_series_grouping():
     # compare plot-level grouping to series by series grouping
     for series in plot2.config.series:
         series.groupby_x()
-    assert plot.config == plot2.config
+
+    with const_nodes_equal():
+        assert plot.config == plot2.config
 
 
 def test_overspecification_of_plot_config_raises_exception():
@@ -121,7 +136,9 @@ def test_multi_series_setting():
     plot.set_x(lambda row: row["step"])
     for series in plot2.config.series:
         series.set_x(lambda row: row["step"])
-    assert plot.config == plot2.config
+
+    with const_nodes_equal():
+        assert plot.config == plot2.config
 
 
 def test_constructor():
@@ -136,9 +153,13 @@ def test_constructor():
     )
     plot = Plot(series=series)
     plot2 = Plot(series=[series])
-    assert plot.config == plot2.config
+
+    with const_nodes_equal():
+        assert plot.config == plot2.config
     assert series.constants == PlotConstants(
-        mark=None, label="series", pointShape="circle", lineStyle="solid"
+        label="series",
+        pointShape="circle",
+        lineStyle="solid",
     )
 
 

@@ -62,22 +62,26 @@ LineStyleOption = typing.Literal[
     "series",
 ]
 
+LAZY_PATHS = [
+    "signals.domain.x",
+    "signals.domain.y",
+]
+
+LAZY_PATH_TYPES = {
+    "signals.domain.x": weave.types.optional(weave.types.List(weave.types.Any())),
+    "signals.domain.y": weave.types.optional(weave.types.List(weave.types.Any())),
+}
+
+
 SelectFunction = typing.Union[graph.Node, typing.Callable[[typing.Any], typing.Any]]
 
 
 @weave.type()
 class PlotConstants:
-    mark: MarkOption
-    pointShape: PointShapeOption
-    label: LabelOption
-    lineStyle: LineStyleOption
-
-    def __init__(self, **kwargs):
-        # set defaults
-        self.mark = kwargs.get("mark", None)
-        self.pointShape = kwargs.get("pointShape", "circle")
-        self.label = kwargs.get("label", "series")
-        self.lineStyle = kwargs.get("lineStyle", "solid")
+    mark: typing.Optional[MarkOption] = None
+    pointShape: PointShapeOption = "circle"
+    label: LabelOption = "series"
+    lineStyle: LineStyleOption = "solid"
 
 
 class PlotConstantsInputDict(typing.TypedDict):
@@ -246,6 +250,7 @@ class AxisSetting:
     noLabels: bool
     noTitle: bool
     noTicks: bool
+    title: typing.Optional[str] = None
     scale: typing.Optional[Scale] = None
 
 
@@ -282,11 +287,14 @@ DiscreteSelection = typing.List[str]
 ContinuousSelection = typing.Tuple[float, float]
 Selection = typing.Optional[typing.Union[ContinuousSelection, DiscreteSelection]]
 
+LazySelection = typing.Union[Selection, SelectFunction]
 
+
+# TODO: split this into 2 - one for lazy, one eager
 @weave.type()
 class AxisSelections:
-    x: typing.Optional[Selection] = None
-    y: typing.Optional[Selection] = None
+    x: typing.Optional[LazySelection] = None
+    y: typing.Optional[LazySelection] = None
 
 
 @weave.type()
@@ -302,7 +310,88 @@ class PlotConfig:
     legendSettings: typing.Optional[LegendSettings]
     configOptionsExpanded: typing.Optional[ConfigOptionsExpanded]
     signals: Signals
-    configVersion: int = 11
+    configVersion: int = 12
+
+
+def set_through_array(
+    obj: typing.Any, path: typing.List[str], value: typing.Any
+) -> None:
+    if len(path) == 0:
+        return
+
+    first, *rest = path
+
+    if first == "#":
+        if isinstance(obj, list):
+            for i, item in enumerate(obj):
+                set_through_array(
+                    item, rest, (value[i] if isinstance(value, list) else value)
+                )
+    elif len(rest) == 0:
+        if isinstance(obj, dict):
+            obj[first] = value
+        else:
+            setattr(obj, first, value)
+    elif hasattr(obj, first):
+        set_through_array(getattr(obj, first), rest, value)
+    else:
+        raise ValueError(f"Could not set {path} in {obj} to {value}")
+
+
+def get_through_array(
+    obj: typing.Any, path: typing.List[str], coerce_list_of_nodes_to_node=False
+) -> typing.Any:
+    if len(path) == 0:
+        return obj
+
+    first, *rest = path
+
+    if first == "#":
+        if isinstance(obj, list):
+            result = [
+                get_through_array(
+                    item,
+                    rest,
+                    coerce_list_of_nodes_to_node=coerce_list_of_nodes_to_node,
+                )
+                for item in obj
+            ]
+            if coerce_list_of_nodes_to_node and all(
+                isinstance(item, graph.Node) for item in result
+            ):
+                result = list_.make_list({i: item for i, item in enumerate(result)})
+            return result
+        else:
+            raise ValueError(f"Could not get {path} in {obj}: not a list")
+    elif hasattr(obj, first):
+        return get_through_array(
+            getattr(obj, first),
+            rest,
+            coerce_list_of_nodes_to_node=coerce_list_of_nodes_to_node,
+        )
+    elif len(rest) == 0:
+        if isinstance(obj, dict):
+            return obj[first]
+        else:
+            return getattr(obj, first, None)
+    else:
+        raise ValueError(f"Could not get {path} in {obj}")
+
+
+def ensure_node(
+    obj: typing.Any,
+    path: typing.List[str],
+    type: typing.Optional[weave.types.Type] = None,
+) -> None:
+    value = get_through_array(obj, path)
+    if isinstance(value, list):
+        if not all(item == value[0] for item in value):
+            raise ValueError(f"Cannot ensure node for {path}: not all values are equal")
+        value = value[0]
+    if not isinstance(value, graph.Node):
+        if type is None:
+            type = weave.types.TypeRegistry.type_of(value)
+        set_through_array(obj, path, graph.ConstNode(type, value))
 
 
 @weave.type("plot")
@@ -328,16 +417,17 @@ class Plot(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
         series: typing.Optional[typing.Union[Series, typing.List[Series]]] = None,
         no_axes: bool = False,
         no_legend: bool = False,
-        signals: typing.Optional[Signals] = None,
+        x_title: typing.Optional[str] = None,
+        y_title: typing.Optional[str] = None,
+        color_title: typing.Optional[str] = None,
+        domain_x: typing.Optional[SelectFunction] = None,
+        domain_y: typing.Optional[SelectFunction] = None,
     ):
         super().__init__(input_node=input_node, vars=vars)
         self.config = config
 
         if self.config is None:
-            if mark is not None:
-                constants = PlotConstants(mark=mark)
-            else:
-                constants = PlotConstants()
+            constants = PlotConstants(mark=mark)
 
             select_functions: typing.Optional[dict[DimName, SelectFunction]] = None
             for field, maybe_dim in zip(
@@ -348,6 +438,13 @@ class Plot(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
                     if select_functions is None:
                         select_functions = {}
                     select_functions[typing.cast(DimName, field.name)] = maybe_dim
+
+            signals = Signals(domain=AxisSelections(), selection=AxisSelections())
+            if domain_x is not None:
+                signals.domain.x = domain_x
+
+            if domain_y is not None:
+                signals.domain.y = domain_y
 
             if not (
                 (series is not None)
@@ -376,15 +473,13 @@ class Plot(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
                 x=default_axis(), y=default_axis(), color=default_axis()
             )
 
+            config_axisSettings.x.title = x_title
+            config_axisSettings.y.title = y_title
+            config_axisSettings.color.title = color_title
+
             config_legendSettings = LegendSettings(
                 x=LegendSetting(), y=LegendSetting(), color=LegendSetting()
             )
-
-            if signals is None:
-                signals = Signals(
-                    domain=AxisSelections(x=None, y=None),
-                    selection=AxisSelections(x=None, y=None),
-                )
 
             self.config = PlotConfig(
                 series=config_series,
@@ -393,6 +488,11 @@ class Plot(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
                 configOptionsExpanded=ConfigOptionsExpanded(),
                 signals=signals,
             )
+
+            for path in LAZY_PATHS:
+                ensure_node(
+                    self.config, path.split(".")
+                )  # , type=LAZY_PATH_TYPES[path])
 
             if no_axes:
                 self.set_no_axes()
@@ -613,15 +713,31 @@ def selection_is_discrete(selection: Selection) -> bool:
 
 # TODO: keep in arrow
 def filter_node_to_selection(
-    node: graph.Node, selection: Selection, key: str
+    node: graph.Node, selection: LazySelection, key: str
 ) -> graph.Node:
+    if isinstance(selection, graph.Node):
+        selection = weave_internal.call_fn(selection, {})
+
+    selection = typing.cast(Selection, selection)
+
     if selection_is_continuous(selection):
         selection = typing.cast(ContinuousSelection, selection)
 
         def predicate(row: graph.Node[types.TypedDict]):
             target = dict_.TypedDict.pick(row, key)
+
+            selection_min = selection[0]  # type: ignore
+            selection_max = selection[1]  # type: ignore
+
+            if (
+                weave.types.Timestamp().assign_type(target.type)
+                and isinstance(selection_min, (int, float))
+                and isinstance(selection_max, (int, float))
+            ):
+                target = target.toNumber() * 1000
+
             return boolean.Boolean.bool_and(
-                target >= selection[0], target <= selection[1]  # type: ignore
+                target >= selection_min, target <= selection_max
             )
 
     else:
