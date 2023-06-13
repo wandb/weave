@@ -311,11 +311,6 @@ def _refine_history_type(
             ]
         )
 
-        if history_version == 2 and not types.optional(types.BasicType()).assign_type(
-            wt
-        ):
-            continue
-
         if wt == types.UnknownType():
             util.capture_exception_with_sentry_if_available(
                 errors.WeaveTypeWarning(
