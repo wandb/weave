@@ -14,7 +14,6 @@ import * as _ from 'lodash';
 import React, {FC, useEffect, useMemo, useRef, useState} from 'react';
 import styled from 'styled-components';
 
-import {compare} from '../../compare';
 import * as Controls from './controlsImage';
 import {ClassSetControls, ClassSetState, ClassState} from './controlsImage';
 import {useSignedUrlWithExpiration} from './useAssetFromArtifact';
@@ -412,6 +411,16 @@ const isBoundingBoxHidden = (
     return !compare(slider.comparator ?? 'gte', boxScore, slider.value);
   });
 };
+
+export type CompareOp = 'gte' | 'lte';
+
+function compare(op: CompareOp, x: number, y: number) {
+  if (op === 'gte') {
+    return x >= y;
+  } else {
+    return x <= y;
+  }
+}
 
 export const BoundingBoxesCanvas: FC<BoundingBoxCanvasProps> = ({
   mediaSize,
