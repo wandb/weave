@@ -572,6 +572,23 @@ def _get_history2(run: wdt.Run, columns=None):
                     fields.index(field), field, new_col
                 )
 
+        # handle non-basic types
+        with tracer.trace("process_run_dict_item_for_history2"):
+            for column in columns:
+                if not _object_type.property_types[column].assign_type(  # type: ignore
+                    types.BasicType()
+                ):
+                    pq_col = parquet_history[column].to_pylist()
+                    for i, item in enumerate(pq_col):
+                        if item is not None:
+                            pq_col[i] = wb_util._process_run_dict_item_for_history2(
+                                item
+                            )
+                    new_col = pa.chunked_array([pq_col])
+                    parquet_history = parquet_history.set_column(
+                        fields.index(column), column, new_col
+                    )
+
     if parquet_history is not None and len(parquet_history) > 0:
         with tracer.trace("parquet_history_to_arrow"):
             parquet_history = ArrowWeaveList(parquet_history, _object_type)
