@@ -48,6 +48,7 @@ from .wandb_domain_gql import (
     gql_connection_op,
     _make_alias,
 )
+from .. import artifact_mem
 from . import wb_util
 from . import history as history_util
 from ..ops_primitives import _dict_utils, make_list
@@ -538,16 +539,21 @@ def _get_history2(run: wdt.Run, columns=None):
         for colname in columns:
             if colname not in row:
                 row[colname] = None
+            else:
+                row[colname] = wb_util._process_run_dict_item_for_history2(row[colname])
+
+    artifact = artifact_mem.MemArtifact()
 
     # turn live data into arrow
     if live_data is not None and len(live_data) > 0:
         with tracer.trace("live_data_to_arrow"):
-            live_data = ArrowWeaveList(pa.array(live_data), _object_type)
+            live_data = ArrowWeaveList(pa.array(live_data), _object_type, artifact)
     else:
         live_data = []
 
     # get binary fields from history schema - these are serialized json
     if parquet_history is not None:
+        fields = [field.name for field in parquet_history.schema]
         binary_fields = [
             field.name
             for field in parquet_history.schema
@@ -560,18 +566,22 @@ def _get_history2(run: wdt.Run, columns=None):
                 pq_col = parquet_history[field].to_pylist()
                 for i, item in enumerate(pq_col):
                     if item is not None:
-                        pq_col[i] = json.loads(row[field])
+                        pq_col[i] = wb_util._process_run_dict_item_for_history2(
+                            json.loads(item)
+                        )
                 new_col = pa.chunked_array([pq_col])
-                parquet_history = parquet_history.set_column(field, new_col)
+                parquet_history = parquet_history.set_column(
+                    fields.index(field), field, new_col
+                )
 
     if parquet_history is not None and len(parquet_history) > 0:
         with tracer.trace("parquet_history_to_arrow"):
-            parquet_history = ArrowWeaveList(parquet_history, _object_type)
+            parquet_history = ArrowWeaveList(parquet_history, _object_type, artifact)
     else:
         parquet_history = []
 
     if len(live_data) == 0 and len(parquet_history) == 0:
-        return ArrowWeaveList(pa.array([]), _object_type)
+        return ArrowWeaveList(pa.array([]), _object_type, artifact)
     elif len(live_data) == 0:
         return parquet_history
     elif len(parquet_history) == 0:

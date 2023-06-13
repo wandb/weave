@@ -1228,6 +1228,11 @@ def test_run_history_2(fake_wandb):
                 # we no longer send back system metrics
                 # "system/gpu.0.powerWatts": types.optional(types.Number()),
                 "epoch": types.optional(types.Number()),
+                "predictions_10K": types.optional(
+                    artifact_fs.FilesystemArtifactFileType(
+                        types.Const(types.String(), "json"), table.TableType()
+                    ),
+                ),
             }
         )
     ).assign_type(node.type.value)
@@ -1253,19 +1258,24 @@ def test_run_history_2(fake_wandb):
         None,
     ]
 
-    # now we'll create a graph that fetches two columns and execute it
+    # now we'll create a graph that fetches all three columns and execute it
     epoch_node = node["epoch"]
     pred_node = node["_runtime"]
+    table_node = node["predictions_10K"]
     assert types.List(types.optional(types.Number())).assign_type(pred_node.type.value)
 
     # simulates what a table call would do, selecting multiple columns
-    result = weave.use([epoch_node, pred_node])
-    assert len(result) == 2
+    result = weave.use([epoch_node, pred_node, table_node])
+    assert len(result) == 3
 
     # check the types, result lengths
     assert all(len(r) == 10 for r in result)
     assert all(r == None or isinstance(r, (int, float)) for r in result[0])
     assert all(r == None or isinstance(r, (int, float)) for r in result[1])
+    assert all(
+        r == None or isinstance(r, artifact_fs.FilesystemArtifactFile)
+        for r in result[2]
+    )
 
 
 def run_history_as_of_mocker(q, ndx):

@@ -78,6 +78,13 @@ def escape_artifact_path(artifact_path: str) -> str:
     return artifact_path
 
 
+def _process_run_dict_item_for_history2(val, run_path: typing.Optional[RunPath] = None):
+    try:
+        return str(_process_run_dict_item(val, run_path)._ref)
+    except AttributeError:
+        return val
+
+
 def _process_run_dict_item(val, run_path: typing.Optional[RunPath] = None):
     if isinstance(val, dict) and "_type" in val:
         if val["_type"] == "histogram":
