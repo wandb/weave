@@ -546,6 +546,24 @@ def _get_history2(run: wdt.Run, columns=None):
     else:
         live_data = []
 
+    # get binary fields from history schema - these are serialized json
+    if parquet_history is not None:
+        binary_fields = [
+            field.name
+            for field in parquet_history.schema
+            if pa.types.is_binary(field.type)
+        ]
+
+        # deserialize json if any is present
+        with tracer.trace("json.loads"):
+            for field in binary_fields:
+                pq_col = parquet_history[field].to_pylist()
+                for i, item in enumerate(pq_col):
+                    if item is not None:
+                        pq_col[i] = json.loads(row[field])
+                new_col = pa.chunked_array([pq_col])
+                parquet_history = parquet_history.set_column(field, new_col)
+
     if parquet_history is not None and len(parquet_history) > 0:
         with tracer.trace("parquet_history_to_arrow"):
             parquet_history = ArrowWeaveList(parquet_history, _object_type)
