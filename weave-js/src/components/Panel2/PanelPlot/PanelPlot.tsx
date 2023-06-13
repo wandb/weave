@@ -2887,22 +2887,20 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
                   currConcreteConfig.signals.domain[dimName];
 
                 if (!_.isEqual(currentSetting, axisSignal)) {
-                  ['x' as const, 'y' as const].forEach(dimName => {
-                    if (isConstNode(currConfig.signals.domain[dimName])) {
-                      currMutateDomain[dimName]({
-                        val: constNode(toWeaveType(axisSignal), axisSignal),
+                  if (!isConstNode(currConfig.signals.domain[dimName])) {
+                    currMutateDomain[dimName]({
+                      val: constNode(toWeaveType(axisSignal), axisSignal),
+                    });
+                  } else {
+                    currUpdateConfig2((oldConfig: PlotConfig) => {
+                      return produce(oldConfig, draft => {
+                        draft.signals.domain[dimName] = constNode(
+                          toWeaveType(axisSignal),
+                          axisSignal
+                        );
                       });
-                    } else {
-                      currUpdateConfig2((oldConfig: PlotConfig) => {
-                        return produce(oldConfig, draft => {
-                          draft.signals.domain[dimName] = constNode(
-                            toWeaveType(axisSignal),
-                            axisSignal
-                          );
-                        });
-                      });
-                    }
-                  });
+                    });
+                  }
                 }
 
                 // need to clear out the old selection, if there is one
