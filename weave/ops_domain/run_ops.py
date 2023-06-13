@@ -542,12 +542,10 @@ def _get_history2(run: wdt.Run, columns=None):
             else:
                 row[colname] = wb_util._process_run_dict_item_for_history2(row[colname])
 
-    artifact = artifact_mem.MemArtifact()
-
     # turn live data into arrow
     if live_data is not None and len(live_data) > 0:
         with tracer.trace("live_data_to_arrow"):
-            live_data = ArrowWeaveList(pa.array(live_data), _object_type, artifact)
+            live_data = ArrowWeaveList(pa.array(live_data), _object_type)
     else:
         live_data = []
 
@@ -576,12 +574,12 @@ def _get_history2(run: wdt.Run, columns=None):
 
     if parquet_history is not None and len(parquet_history) > 0:
         with tracer.trace("parquet_history_to_arrow"):
-            parquet_history = ArrowWeaveList(parquet_history, _object_type, artifact)
+            parquet_history = ArrowWeaveList(parquet_history, _object_type)
     else:
         parquet_history = []
 
     if len(live_data) == 0 and len(parquet_history) == 0:
-        return ArrowWeaveList(pa.array([]), _object_type, artifact)
+        return ArrowWeaveList(pa.array([]), _object_type)
     elif len(live_data) == 0:
         return parquet_history
     elif len(parquet_history) == 0:
