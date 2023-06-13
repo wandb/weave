@@ -1695,6 +1695,9 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
   const updateConfig2Ref = useRef<typeof updateConfig2>(updateConfig2);
   updateConfig2Ref.current = updateConfig2;
 
+  const updateConfigRef = useRef<typeof updateConfig>(updateConfig);
+  updateConfigRef.current = updateConfig;
+
   // side effect
   useEffect(() => {
     if (config.configVersion !== props.config?.configVersion) {
@@ -1790,13 +1793,15 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
       return (newVal: Node) => {
         const currDomain = configRef.current.signals.domain[dimName];
         if (weave.expToString(newVal) !== weave.expToString(currDomain)) {
-          updateConfig2((oldConfig: PlotConfig) => ({
-            ...oldConfig,
-            signals: {
-              ...oldConfig.signals,
-              domain: {...oldConfig.signals.domain, [dimName]: newVal as any},
-            },
-          }));
+          updateConfig2((oldConfig: PlotConfig) => {
+            return {
+              ...oldConfig,
+              signals: {
+                ...oldConfig.signals,
+                domain: {...oldConfig.signals.domain, [dimName]: newVal as any},
+              },
+            };
+          });
         }
       };
     },
@@ -2824,11 +2829,11 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
       vegaView.addEventListener('mouseup', async () => {
         const currBrushMode = brushModeRef.current;
         const currUpdateConfig2 = updateConfig2Ref.current;
+        const currUpdateConfig = updateConfigRef.current;
         const currConfig = configRef.current;
         const currMutateDomain = mutateDomainRef.current;
         const currConcreteConfig = concreteConfigRef.current;
         const currSetToolTipsEnabled = setToolTipsEnabledRef.current;
-        const currHandleRootUpdate = handleRootUpdateRef.current;
         const signalName = `brush`;
         const dataName = `brush_store`;
 
@@ -2844,19 +2849,48 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
           const settingName = currBrushMode === 'zoom' ? 'domain' : 'selection';
 
           if (settingName === 'domain') {
-            ['x' as const, 'y' as const].forEach(dimName => {
-              const axisSignal: [number, number] | string[] = signal[dimName];
-              const currentSetting = currConcreteConfig.signals.domain[dimName];
-              const currentSettingNode = currConfig.signals.domain[dimName];
+            const settingNodesAreConst = ['x' as const, 'y' as const].every(
+              dimName => {
+                const currentSettingNode = currConfig.signals.domain[dimName];
+                return isConstNode(currentSettingNode);
+              }
+            );
 
-              if (!_.isEqual(currentSetting, axisSignal)) {
-                if (isConstNode(currentSettingNode)) {
-                  currHandleRootUpdate[dimName](
-                    constNode(toWeaveType(axisSignal), axisSignal)
-                  );
-                } else {
-                  currMutateDomain[dimName]({
-                    val: constNode(toWeaveType(axisSignal), axisSignal),
+            if (settingNodesAreConst) {
+              // we can use updateConfig
+              let newConfig = currConfig;
+              ['x' as const, 'y' as const].forEach(dimName => {
+                const axisSignal: [number, number] | string[] = signal[dimName];
+                const currentSetting =
+                  currConcreteConfig.signals.domain[dimName];
+
+                if (!_.isEqual(currentSetting, axisSignal)) {
+                  newConfig = produce(newConfig, draft => {
+                    draft.signals.domain[dimName] = constNode(
+                      toWeaveType(axisSignal),
+                      axisSignal
+                    );
+                  });
+                }
+
+                // need to clear out the old selection, if there is one
+                newConfig = produce(newConfig, draft => {
+                  draft.signals.selection[dimName] = undefined;
+                });
+
+                currUpdateConfig(newConfig);
+              });
+            } else {
+              ['x' as const, 'y' as const].forEach(dimName => {
+                const axisSignal: [number, number] | string[] = signal[dimName];
+                const currentSetting =
+                  currConcreteConfig.signals.domain[dimName];
+
+                if (!_.isEqual(currentSetting, axisSignal)) {
+                  ['x' as const, 'y' as const].forEach(dimName => {
+                    currMutateDomain[dimName]({
+                      val: constNode(toWeaveType(axisSignal), axisSignal),
+                    });
                   });
                 }
 
@@ -2866,21 +2900,21 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
                     draft.signals.selection[dimName] = undefined;
                   });
                 });
-              }
-            });
+              });
+            }
           } else {
+            let newConfig = currConfig;
             ['x' as const, 'y' as const].forEach(dimName => {
               const axisSignal: [number, number] | string[] = signal[dimName];
               const currentSetting =
                 currConcreteConfig.signals.selection[dimName];
               if (!_.isEqual(currentSetting, axisSignal)) {
-                currUpdateConfig2((oldConfig: PlotConfig) => {
-                  return produce(oldConfig, draft => {
-                    draft.signals.selection[dimName] = axisSignal;
-                  });
+                newConfig = produce(currConfig, draft => {
+                  draft.signals.selection[dimName] = axisSignal;
                 });
               }
             });
+            currUpdateConfig(newConfig);
           }
         } else if (
           _.isEmpty(data) &&
@@ -2889,13 +2923,13 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
             _.isEmpty(currConcreteConfig.signals.selection.y)
           )
         ) {
-          currUpdateConfig2((oldConfig: PlotConfig) => {
-            return produce(oldConfig, draft => {
+          currUpdateConfig(
+            produce(currConfig, draft => {
               ['x' as const, 'y' as const].forEach(axisName => {
                 draft.signals.selection[axisName] = undefined;
               });
-            });
-          });
+            })
+          );
         }
 
         setTimeout(() => {
@@ -2906,21 +2940,43 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
       vegaView.addEventListener('dblclick', async () => {
         const currConfig = configRef.current;
         const currMutateDomain = mutateDomainRef.current;
-        const currHandleRootUpdate = handleRootUpdateRef.current;
+        const currUpdateConfig = updateConfigRef.current;
 
-        if (!_.isEmpty(currConfig.signals.domain)) {
-          ['x' as const, 'y' as const].forEach(dimName => {
-            if (isConstNode(currConfig.signals.domain[dimName])) {
-              currHandleRootUpdate[dimName](constNone());
-            } else {
+        const settingNodesAreConst = ['x' as const, 'y' as const].every(
+          dimName => {
+            const currentSettingNode = currConfig.signals.domain[dimName];
+            return isConstNode(currentSettingNode);
+          }
+        );
+
+        if (
+          ['x' as const, 'y' as const].some(dimName => {
+            const currentSettingNode = currConfig.signals.domain[dimName];
+            return !(
+              isConstNode(currentSettingNode) &&
+              currentSettingNode.type === 'none'
+            );
+          })
+        ) {
+          if (settingNodesAreConst) {
+            // we can use updateConfig
+            let newConfig = currConfig;
+            ['x' as const, 'y' as const].forEach(dimName => {
+              newConfig = produce(newConfig, draft => {
+                // @ts-ignore
+                draft.signals.domain[dimName] = constNone();
+              });
+            });
+            currUpdateConfig(newConfig);
+          } else {
+            ['x' as const, 'y' as const].forEach(dimName => {
               currMutateDomain[dimName]({
                 val: constNode('none', null),
               });
-            }
-          });
+            });
+          }
         }
       });
-
       vegaView.addEventListener('mousedown', async () => {
         const currSetToolTipsEnabled = setToolTipsEnabledRef.current;
         currSetToolTipsEnabled(false);
