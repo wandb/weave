@@ -19,7 +19,7 @@ from flask_cors import CORS
 from flask import send_from_directory
 import wandb
 
-from weave import server, value_or_error
+from weave import graph, server, value_or_error
 from weave import storage
 from weave import registry_mem
 from weave import errors
@@ -146,7 +146,9 @@ def list_ops():
 
 class ErrorDetailsDict(typing.TypedDict):
     message: str
+    error_type: str
     traceback: list[str]
+    # sentry_id: typing.Union[str, None]
 
 
 class ResponseDict(typing.TypedDict):
@@ -155,17 +157,21 @@ class ResponseDict(typing.TypedDict):
     node_to_error: dict[int, int]
 
 
-def _exception_to_error_details(e: Exception) -> ErrorDetailsDict:
+def _exception_to_error_details(
+    e: Exception, sentry_id: typing.Union[str, None]
+) -> ErrorDetailsDict:
     return {
+        "error_type": type(e).__name__,
         "message": str(e),
         "traceback": traceback.format_tb(e.__traceback__),
+        # "sentry_id": sentry_id,
     }
 
 
 def _value_or_errors_to_response(
     vore: value_or_error.ValueOrErrors,
 ) -> ResponseDict:
-    error_lookup: dict[Exception, int] = {}
+    error_lookup: dict[Exception, typing.Tuple[int, typing.Union[str, None]]] = {}
     node_errors: dict[int, int] = {}
     data: list[typing.Any] = []
     for val, error in vore.iter_items():
@@ -173,18 +179,52 @@ def _value_or_errors_to_response(
             error = typing.cast(Exception, error)
             data.append(None)
             if error in error_lookup:
-                error_ndx = error_lookup[error]
+                error_ndx = error_lookup[error][0]
             else:
+                sentry_id = util.capture_exception_with_sentry_if_available(error, ())
                 error_ndx = len(error_lookup)
-                error_lookup[error] = error_ndx
+                error_lookup[error] = (error_ndx, sentry_id)
             node_errors[len(data) - 1] = error_ndx
         else:
             data.append(val)
     return {
         "data": data,
-        "errors": [_exception_to_error_details(k) for k in error_lookup.keys()],
+        "errors": [
+            _exception_to_error_details(k, e_sentry_id)
+            for k, (e_ndx, e_sentry_id) in error_lookup.items()
+        ],
         "node_to_error": node_errors,
     }
+
+
+def _log_errors(
+    processed_response: ResponseDict, nodes: value_or_error.ValueOrErrors[graph.Node]
+):
+    errors: list[dict] = []
+
+    for error in processed_response["errors"]:
+        errors.append(
+            {
+                "message": error["message"],
+                "error_type": error["error_type"],
+                "traceback": error["traceback"],
+                "error_tag": "node_execution_error",
+                "node_strs": [],
+                # "sentry_id": error["sentry_id"],
+            }
+        )
+
+    for node_ndx, error_ndx in processed_response["node_to_error"].items():
+        try:
+            node_str = graph.node_expr_str(graph.map_const_nodes_to_x(nodes[node_ndx]))
+            errors[error_ndx]["node_strs"].append(node_str)
+        except Exception:
+            pass
+
+    for error_dict in errors:
+        # This should be logged to DD, but 1 log per error
+        # class, not 1 log per error.
+        logging.error(error_dict)
 
 
 @blueprint.route("/__weave/execute", methods=["POST"])
@@ -239,14 +279,16 @@ def execute():
                     "http://localhost:8080/snakeviz/"
                     + urllib.parse.quote(profile_filename),
                 )
-    fixed_response = response.safe_map(weavejs_fixes.fixup_data)
+    fixed_response = response.results.safe_map(weavejs_fixes.fixup_data)
 
-    response = _value_or_errors_to_response(fixed_response)
+    response_payload = _value_or_errors_to_response(fixed_response)
+
+    _log_errors(response_payload, response.nodes)
 
     if request.headers.get("x-weave-include-execution-time"):
-        response["execution_time"] = (elapsed) * 1000
+        response_payload["execution_time"] = (elapsed) * 1000
 
-    return response
+    return response_payload
 
 
 @blueprint.route("/__weave/execute/v2", methods=["POST"])
@@ -258,7 +300,7 @@ def execute_v2():
     response = server.handle_request(request.json, deref=True)
     # print("RESPONSE BEFORE SERI", response)
 
-    return {"data": response.unwrap()}
+    return {"data": response.results.unwrap()}
 
 
 @blueprint.route("/__weave/file/<path:path>")

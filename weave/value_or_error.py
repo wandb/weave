@@ -37,7 +37,7 @@ class Value(_ValueOrErrorInterface[ValueType]):
         try:
             return Value(fn(self._value))
         except Exception as e:
-            logging.error(e, exc_info=True)
+            # logging.error(e, exc_info=True)
             if DEBUG:
                 raise e
             return Error(e)
@@ -49,7 +49,7 @@ class Value(_ValueOrErrorInterface[ValueType]):
             fn(self._value)
             return self
         except Exception as e:
-            logging.error(e, exc_info=True)
+            # logging.error(e, exc_info=True)
             if DEBUG:
                 raise e
             return Error(e)

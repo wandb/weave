@@ -8,7 +8,7 @@ import json
 def test_graph_playback():
     for payload in execute_payloads:
         res = handle_request(payload, True, storage.make_js_serializer())
-        assert "err" not in res
+        res.results.unwrap()
 
 
 def test_zlib_playback():
@@ -37,7 +37,7 @@ def test_zlib_playback():
     }
 
     response = handle_request(**execute_args)
-    assert "err" not in response
+    response.results.unwrap()
 
 
 # (Only used in zlib test) - if you are testing a `WeaveNullishResponseException`, you can
