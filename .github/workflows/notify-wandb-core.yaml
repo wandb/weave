@@ -5,6 +5,7 @@ name: Notify wandb/core
 
 on:
   push:
+    branches: **
 
 jobs:
   notify-wandb-core:
