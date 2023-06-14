@@ -194,18 +194,23 @@ def _log_errors(
     errors: list[dict] = []
 
     for error in processed_response["errors"]:
+        last_traceback_line = ""
+        if len(error["traceback"]) > 0:
+            last_traceback_line = error["traceback"][-1]
         errors.append(
             {
-                "error": "node_execution_error",
                 "message": error["message"],
-                "node_str": [],
+                "traceback": error["traceback"],
+                "last_traceback_line": last_traceback_line,
+                "error_type": "node_execution_error",
+                "node_strs": [],
             }
         )
 
     for node_ndx, error_ndx in processed_response["node_to_error"].items():
         try:
             node_str = graph.node_expr_str(graph.map_const_nodes_to_x(nodes[node_ndx]))
-            errors[error_ndx]["node_str"].append(node_str)
+            errors[error_ndx]["node_strs"].append(node_str)
         except Exception:
             pass
 
