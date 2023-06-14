@@ -146,6 +146,8 @@ def list_ops():
 
 class ErrorDetailsDict(typing.TypedDict):
     message: str
+    error_type: str
+    sentry_id: typing.Union[str, None]
     traceback: list[str]
 
 
