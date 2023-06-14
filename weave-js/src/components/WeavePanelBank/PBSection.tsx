@@ -148,6 +148,8 @@ export const PBSection: React.FC<PBSectionProps> = props => {
                             : isHovered
                             ? GRAY_400
                             : GRAY_350,
+                          borderWidth: isHoveredInOutline ? 2 : 1,
+                          padding: isHoveredInOutline ? 7 : 8,
                         }}
                         className="editable-panel"
                         onMouseEnter={
