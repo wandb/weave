@@ -171,11 +171,11 @@ def _value_or_errors_to_response(
     for val, error in vore.iter_items():
         if error != None:
             error = typing.cast(Exception, error)
-            util.capture_exception_with_sentry_if_available(error, ())
             data.append(None)
             if error in error_lookup:
                 error_ndx = error_lookup[error]
             else:
+                util.capture_exception_with_sentry_if_available(error, ())
                 error_ndx = len(error_lookup)
                 error_lookup[error] = error_ndx
             node_errors[len(data) - 1] = error_ndx
