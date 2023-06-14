@@ -20,6 +20,8 @@ import {
   GRAY_25,
   GRAY_500,
   SCROLLBAR_STYLES,
+  TEAL_LIGHT_2,
+  hexToRGB,
 } from '../../common/css/globals.styles';
 import {
   IconAddNew as IconAddNewUnstyled,
@@ -30,7 +32,11 @@ import {useScrollbarVisibility} from '../../core/util/scrollbar';
 import {Tooltip} from '../Tooltip';
 import {IconButton} from '../IconButton';
 import {WBButton} from '../../common/components/elements/WBButtonNew';
-import {useSetInspectingPanel} from '../Panel2/PanelInteractContext';
+import {
+  usePanelInteractContext,
+  useSetInspectingPanel,
+  useSetPanelIsHovered,
+} from '../Panel2/PanelInteractContext';
 
 interface PBSectionProps {
   mode: 'grid' | 'flow';
@@ -48,6 +54,10 @@ export const PBSection: React.FC<PBSectionProps> = props => {
   const {config, groupPath, enableAddPanel, updateConfig2, handleAddPanel} =
     props;
   const setInspectingPanel = useSetInspectingPanel();
+  const {
+    state: {panelState},
+  } = usePanelInteractContext();
+  const setPanelIsHovered = useSetPanelIsHovered();
   const [panelBankWidth, setPanelBankWidth] = useState(0);
   const [panelBankHeight, setPanelBankHeight] = useState(0);
   const PanelBankSectionComponent =
@@ -114,25 +124,53 @@ export const PBSection: React.FC<PBSectionProps> = props => {
                   updateConfig={updateConfig2}
                   activePanelRefs={config.panels}
                   inactivePanelRefs={[]}
-                  renderPanel={panelRef => (
-                    <div
-                      style={{
-                        backgroundColor: '#fff',
-                        width: '100%',
-                        height: '100%',
-                      }}
-                      className="editable-panel">
-                      {props.mode === 'grid' && (
-                        <DragHandle
-                          key={`draghandle-${panelRef.id}`}
-                          className="draggable-handle"
-                          partRef={panelRef}>
-                          <LegacyWBIcon title="" name="handle" />
-                        </DragHandle>
-                      )}
-                      {props.renderPanel(panelRef)}
-                    </div>
-                  )}
+                  renderPanel={panelRef => {
+                    const isHovered =
+                      (groupPath != null &&
+                        panelState[[...groupPath, panelRef.id].join(`.`)]
+                          ?.hovered) ??
+                      false;
+                    const path =
+                      groupPath != null ? [...groupPath, panelRef.id] : null;
+
+                    return (
+                      <div
+                        style={{
+                          backgroundColor: '#fff',
+                          width: '100%',
+                          height: '100%',
+                          border: isHovered
+                            ? `2px solid ${hexToRGB(TEAL_LIGHT_2, 0.6)}`
+                            : undefined,
+                          padding: isHovered ? 7 : 8,
+                        }}
+                        className="editable-panel"
+                        onMouseEnter={
+                          path != null
+                            ? () => {
+                                setPanelIsHovered(path, true);
+                              }
+                            : undefined
+                        }
+                        onMouseLeave={
+                          path != null
+                            ? () => {
+                                setPanelIsHovered(path, false);
+                              }
+                            : undefined
+                        }>
+                        {props.mode === 'grid' && (
+                          <DragHandle
+                            key={`draghandle-${panelRef.id}`}
+                            className="draggable-handle"
+                            partRef={panelRef}>
+                            <LegacyWBIcon title="" name="handle" />
+                          </DragHandle>
+                        )}
+                        {props.renderPanel(panelRef)}
+                      </div>
+                    );
+                  }}
                   movePanelBetweenSections={() => {
                     console.log('MOVE BETWEEN SECTIONS');
                   }}

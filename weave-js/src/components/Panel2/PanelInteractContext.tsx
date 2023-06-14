@@ -5,6 +5,7 @@ import React, {useCallback, useContext, useState} from 'react';
 import {usePanelContext} from './PanelContext';
 
 interface PanelInteractState {
+  hovered?: boolean;
   highlightInputExpr?: boolean;
 }
 
@@ -45,7 +46,7 @@ export const PanelInteractContextProvider: React.FC<{}> = React.memo(
 );
 PanelInteractContextProvider.displayName = 'PanelInteractContextProvider';
 
-const usePanelInteractContext = () => {
+export const usePanelInteractContext = () => {
   const context = useContext(PanelInteractContext);
   if (context == null) {
     throw new Error(
@@ -96,6 +97,21 @@ export const useSetPanelInputExprIsHighlighted = () => {
         return {
           ...prevState,
           highlightInputExpr: highlight,
+        };
+      });
+    },
+    [setPanelState]
+  );
+};
+
+export const useSetPanelIsHovered = () => {
+  const setPanelState = useSetPanelStateByPath();
+  return useCallback(
+    (path: string[], hovered: boolean) => {
+      setPanelState(path, prevState => {
+        return {
+          ...prevState,
+          hovered,
         };
       });
     },
