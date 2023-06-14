@@ -1135,21 +1135,21 @@ history_keys_with_media = {
     "sets": [],
     "keys": {
         "metric2": {
-            "typeCounts": [{"type": "number", "count": 1000}],
+            "typeCounts": [{"type": "number", "count": 1001}],
             "previousValue": 1.6397776348651e06,
         },
         "_step": {
-            "typeCounts": [{"type": "number", "count": 1000}],
+            "typeCounts": [{"type": "number", "count": 1001}],
             "monotonic": True,
-            "previousValue": 999,
+            "previousValue": 1000,
         },
         "_runtime": {
-            "typeCounts": [{"type": "number", "count": 1000}],
+            "typeCounts": [{"type": "number", "count": 1001}],
             "monotonic": True,
             "previousValue": 791.536298751831,
         },
         "_timestamp": {
-            "typeCounts": [{"type": "number", "count": 1000}],
+            "typeCounts": [{"type": "number", "count": 1001}],
             "monotonic": True,
             "previousValue": 1.68322130708908e09,
         },
@@ -1157,7 +1157,7 @@ history_keys_with_media = {
             "typeCounts": [
                 {
                     "type": "image-file",
-                    "count": 1000,
+                    "count": 1001,
                     "keys": {
                         "boxes": [
                             {
@@ -1185,7 +1185,7 @@ history_keys_with_media = {
             "previousValue": -1.7976931348623157e308,
         },
     },
-    "lastStep": 999,
+    "lastStep": 1000,
 }
 
 
@@ -1237,7 +1237,7 @@ def run_history_mocker_with_pq_media(q, ndx):
                 {
                     "metric2": 1639777.6348651,
                     "_timestamp": 1683221307.0890799,
-                    "_step": 999.0,
+                    "_step": 1000.0,
                     "_runtime": 791.536298751831,
                     "img": {
                         "size": 3151148.0,
@@ -1402,7 +1402,13 @@ def test_run_history2_media_types(fake_wandb, cache_mode_minimal):
     )
     assert types.List(types.optional(types.Number())).assign_type(metric2_node.type)
     assert len(result) == 2
+    assert len(result[0]) == 1001
+
+    # check that parquet data is converted properly
     assert isinstance(result[0][0], wbmedia.ImageArtifactFileRef)
+
+    # check that live data is converted properly
+    assert isinstance(result[0][len(result[0]) - 1], wbmedia.ImageArtifactFileRef)
 
 
 def run_history_as_of_mocker(q, ndx):
