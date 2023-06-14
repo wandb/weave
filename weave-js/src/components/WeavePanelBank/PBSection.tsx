@@ -15,15 +15,16 @@ import {IdObj, PANEL_BANK_PADDING, PanelBankSectionConfig} from './panelbank';
 import {PanelBankFlowSection} from './PanelBankFlowSection';
 import {getNewGridItemLayout} from './panelbankGrid';
 import {PanelBankGridSection} from './PanelBankGridSection';
-import styled from 'styled-components';
+import styled, {css} from 'styled-components';
 import {
+  BORDER_COLOR_FOCUSED,
   GRAY_25,
   GRAY_350,
   GRAY_400,
   GRAY_500,
+  PANEL_HOVERED_SHADOW,
   SCROLLBAR_STYLES,
-  TEAL_LIGHT_2,
-  hexToRGB,
+  WHITE,
 } from '../../common/css/globals.styles';
 import {
   IconAddNew as IconAddNewUnstyled,
@@ -36,6 +37,7 @@ import {IconButton} from '../IconButton';
 import {WBButton} from '../../common/components/elements/WBButtonNew';
 import {
   usePanelInteractContext,
+  useSelectedPath,
   useSetInspectingPanel,
   useSetPanelIsHovered,
 } from '../Panel2/PanelInteractContext';
@@ -55,6 +57,7 @@ interface PBSectionProps {
 export const PBSection: React.FC<PBSectionProps> = props => {
   const {config, groupPath, enableAddPanel, updateConfig2, handleAddPanel} =
     props;
+  const selectedPath = useSelectedPath();
   const setInspectingPanel = useSetInspectingPanel();
   const {
     state: {panelState},
@@ -129,6 +132,8 @@ export const PBSection: React.FC<PBSectionProps> = props => {
                   renderPanel={panelRef => {
                     const path =
                       groupPath != null ? [...groupPath, panelRef.id] : null;
+                    const isSelected =
+                      path != null && _.isEqual(path, selectedPath);
                     const isHovered =
                       (path != null && panelState[path.join(`.`)]?.hovered) ??
                       false;
@@ -136,21 +141,12 @@ export const PBSection: React.FC<PBSectionProps> = props => {
                       (path != null &&
                         panelState[path.join(`.`)]?.hoveredInOutline) ??
                       false;
+                    const isFocused = isSelected || isHoveredInOutline;
 
                     return (
-                      <div
-                        style={{
-                          backgroundColor: '#fff',
-                          width: '100%',
-                          height: '100%',
-                          borderColor: isHoveredInOutline
-                            ? hexToRGB(TEAL_LIGHT_2, 0.6)
-                            : isHovered
-                            ? GRAY_400
-                            : GRAY_350,
-                          borderWidth: isHoveredInOutline ? 2 : 1,
-                          padding: isHoveredInOutline ? 7 : 8,
-                        }}
+                      <EditablePanel
+                        isHovered={isHovered}
+                        isFocused={isFocused}
                         className="editable-panel"
                         onMouseEnter={
                           path != null
@@ -175,7 +171,7 @@ export const PBSection: React.FC<PBSectionProps> = props => {
                           </DragHandle>
                         )}
                         {props.renderPanel(panelRef)}
-                      </div>
+                      </EditablePanel>
                     );
                   }}
                   movePanelBetweenSections={() => {
@@ -273,4 +269,28 @@ const IconAddNew = styled(IconAddNewUnstyled)<{marginRight?: number}>`
   width: 18px;
   height: 18px;
   margin-right: ${p => p.marginRight ?? 8}px;
+`;
+
+const EditablePanel = styled.div<{isFocused: boolean; isHovered: boolean}>`
+  &&&&& {
+    background-color: ${WHITE};
+    width: 100%;
+    height: 100%;
+
+    padding: 8px;
+    border: 1px solid ${GRAY_350};
+    ${p =>
+      p.isHovered &&
+      css`
+        border-color: ${GRAY_400};
+        box-shadow: ${PANEL_HOVERED_SHADOW};
+      `}
+    ${p =>
+      p.isFocused &&
+      css`
+        padding: 7px;
+        border-width: 2px;
+        border-color: ${BORDER_COLOR_FOCUSED};
+      `}
+  }
 `;

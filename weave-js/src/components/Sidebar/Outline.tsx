@@ -150,6 +150,7 @@ const OutlinePanel: React.FC<OutlinePanelProps> = props => {
         onClick={() => {
           const isRoot = _.isEqual(path, []);
           isRoot ? setInspectingRoot(true) : setSelected(path);
+          setPanelIsHoveredInOutline(path, false);
         }}
         onMouseEnter={() => {
           setPanelIsHoveredInOutline(path, true);
