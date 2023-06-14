@@ -19,7 +19,7 @@ from flask_cors import CORS
 from flask import send_from_directory
 import wandb
 
-from weave import server, value_or_error
+from weave import graph, server, value_or_error
 from weave import storage
 from weave import registry_mem
 from weave import errors
@@ -187,6 +187,31 @@ def _value_or_errors_to_response(
     }
 
 
+def _log_errors(
+    response: ResponseDict, nodes: value_or_error.ValueOrErrors[graph.Node]
+):
+    errors: list[dict] = []
+
+    for error in response["errors"]:
+        errors.append(
+            {
+                "error": "node_execution_error",
+                "message": error["message"],
+                "node_str": [],
+            }
+        )
+    
+     for node_ndx, error_ndx in response["node_to_error"].items():
+        try:
+            node_str = graph.node_expr_str(graph.map_const_nodes_to_x(nodes[node_ndx]))
+            errors[error_ndx]["node_str"].append(node_str)
+        except Exception:
+            pass
+
+    for error_dict in errors:
+        logging.error(error_dict)
+
+
 @blueprint.route("/__weave/execute", methods=["POST"])
 def execute():
     """Execute endpoint used by WeaveJS."""
@@ -239,14 +264,16 @@ def execute():
                     "http://localhost:8080/snakeviz/"
                     + urllib.parse.quote(profile_filename),
                 )
-    fixed_response = response.safe_map(weavejs_fixes.fixup_data)
+    fixed_response = response.results.safe_map(weavejs_fixes.fixup_data)
 
-    response = _value_or_errors_to_response(fixed_response)
+    response_payload = _value_or_errors_to_response(fixed_response)
+
+    _log_errors(response_payload, response.nodes)
 
     if request.headers.get("x-weave-include-execution-time"):
-        response["execution_time"] = (elapsed) * 1000
+        response_payload["execution_time"] = (elapsed) * 1000
 
-    return response
+    return response_payload
 
 
 @blueprint.route("/__weave/execute/v2", methods=["POST"])
@@ -258,7 +285,7 @@ def execute_v2():
     response = server.handle_request(request.json, deref=True)
     # print("RESPONSE BEFORE SERI", response)
 
-    return {"data": response.unwrap()}
+    return {"data": response.results.unwrap()}
 
 
 @blueprint.route("/__weave/file/<path:path>")
