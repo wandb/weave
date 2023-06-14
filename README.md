@@ -19,8 +19,11 @@ Then start exploring your existing datasets with 1 line of code!:
 
 ```
 import weave
-# ... use any existing dataframe
-weave.show(pandas_df)
+# ... use any existing dataframe, here we load the iris dataframe
+from sklearn.datasets import load_iris
+df = load_iris(as_frame=True).data
+
+weave.show(df)
 ```
 
 For example:
