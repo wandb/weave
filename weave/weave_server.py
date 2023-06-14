@@ -171,6 +171,7 @@ def _value_or_errors_to_response(
     for val, error in vore.iter_items():
         if error != None:
             error = typing.cast(Exception, error)
+            util.capture_exception_with_sentry_if_available(error, ())
             data.append(None)
             if error in error_lookup:
                 error_ndx = error_lookup[error]
@@ -188,11 +189,12 @@ def _value_or_errors_to_response(
 
 
 def _log_errors(
-    response: ResponseDict, nodes: value_or_error.ValueOrErrors[graph.Node]
+    processed_response: ResponseDict, request_response: server.HandleRequestResponse
 ):
     errors: list[dict] = []
+    nodes: value_or_error.ValueOrErrors[graph.Node] = request_response.nodes
 
-    for error in response["errors"]:
+    for error in processed_response["errors"]:
         errors.append(
             {
                 "error": "node_execution_error",
@@ -201,7 +203,7 @@ def _log_errors(
             }
         )
     
-     for node_ndx, error_ndx in response["node_to_error"].items():
+     for node_ndx, error_ndx in processed_response["node_to_error"].items():
         try:
             node_str = graph.node_expr_str(graph.map_const_nodes_to_x(nodes[node_ndx]))
             errors[error_ndx]["node_str"].append(node_str)
@@ -209,8 +211,9 @@ def _log_errors(
             pass
 
     for error_dict in errors:
+        # This should be logged to DD, but 1 log per error
+        # class, not 1 log per error.
         logging.error(error_dict)
-
 
 @blueprint.route("/__weave/execute", methods=["POST"])
 def execute():
@@ -268,7 +271,7 @@ def execute():
 
     response_payload = _value_or_errors_to_response(fixed_response)
 
-    _log_errors(response_payload, response.nodes)
+    _log_errors(response_payload, fixed_response)
 
     if request.headers.get("x-weave-include-execution-time"):
         response_payload["execution_time"] = (elapsed) * 1000
