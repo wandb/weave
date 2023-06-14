@@ -33,7 +33,7 @@ import {Spec as SelectEditorSpec} from './PanelSelectEditor';
 import {ExpressionView} from './ExpressionView';
 import {updatePreFilter} from './PanelTable/tableState';
 
-// Dummy Comment
+// Dummy Comment 2
 
 interface Condition {
   expression: NodeOrVoidNode;
