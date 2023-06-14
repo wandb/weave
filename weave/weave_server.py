@@ -147,8 +147,8 @@ def list_ops():
 class ErrorDetailsDict(typing.TypedDict):
     message: str
     error_type: str
-    sentry_id: typing.Union[str, None]
     traceback: list[str]
+    # sentry_id: typing.Union[str, None]
 
 
 class ResponseDict(typing.TypedDict):
@@ -164,7 +164,7 @@ def _exception_to_error_details(
         "error_type": type(e).__name__,
         "message": str(e),
         "traceback": traceback.format_tb(e.__traceback__),
-        "sentry_id": sentry_id,
+        # "sentry_id": sentry_id,
     }
 
 
@@ -208,9 +208,9 @@ def _log_errors(
                 "message": error["message"],
                 "error_type": error["error_type"],
                 "traceback": error["traceback"],
-                "sentry_id": error["sentry_id"],
                 "error_tag": "node_execution_error",
                 "node_strs": [],
+                # "sentry_id": error["sentry_id"],
             }
         )
 
