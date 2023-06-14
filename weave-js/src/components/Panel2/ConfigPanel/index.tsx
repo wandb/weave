@@ -148,8 +148,10 @@ const ConfigOptionNew: React.FC<
     }
     return (
       <Tooltip
-        position="left top"
-        trigger={<SN.ConfigOptionLabel>{label}</SN.ConfigOptionLabel>}>
+        position="left center"
+        trigger={
+          <SN.ConfigOptionLabel withTooltip>{label}</SN.ConfigOptionLabel>
+        }>
         {tooltip}
       </Tooltip>
     );
