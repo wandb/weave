@@ -206,9 +206,10 @@ def _log_errors(
         errors.append(
             {
                 "message": error["message"],
-                "error_type": error["message"],
+                "error_type": error["error_type"],
                 "traceback": error["traceback"],
-                "error_type": "node_execution_error",
+                "sentry_id": error["sentry_id"],
+                "error_tag": "node_execution_error",
                 "node_strs": [],
             }
         )
