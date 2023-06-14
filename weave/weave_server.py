@@ -189,10 +189,9 @@ def _value_or_errors_to_response(
 
 
 def _log_errors(
-    processed_response: ResponseDict, request_response: server.HandleRequestResponse
+    processed_response: ResponseDict, nodes: value_or_error.ValueOrErrors[graph.Node]
 ):
     errors: list[dict] = []
-    nodes: value_or_error.ValueOrErrors[graph.Node] = request_response.nodes
 
     for error in processed_response["errors"]:
         errors.append(
@@ -272,7 +271,7 @@ def execute():
 
     response_payload = _value_or_errors_to_response(fixed_response)
 
-    _log_errors(response_payload, fixed_response)
+    _log_errors(response_payload, response.nodes)
 
     if request.headers.get("x-weave-include-execution-time"):
         response_payload["execution_time"] = (elapsed) * 1000
