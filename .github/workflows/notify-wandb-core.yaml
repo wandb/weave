@@ -5,7 +5,7 @@ name: Notify wandb/core
 
 on:
   push:
-    branches: **
+    branches: "**"
   workflow_dispatch:
 
 jobs:
