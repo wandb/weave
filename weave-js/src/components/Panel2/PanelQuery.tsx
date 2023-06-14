@@ -330,7 +330,13 @@ export const PanelQuery: React.FC<PanelQueryProps> = props => {
   const config = props.config!;
 
   return (
-    <div style={{height: '100%', paddingLeft: 16}}>
+    <div
+      style={{
+        height: '100%',
+        paddingLeft: 16,
+        display: 'flex',
+        flexDirection: 'column',
+      }}>
       {config.conditions.map((condition, i) => (
         <PanelQueryConditionComponent
           key={i}
@@ -339,7 +345,6 @@ export const PanelQuery: React.FC<PanelQueryProps> = props => {
           index={i}
         />
       ))}
-      <Button>Update Query</Button>
     </div>
   );
 };
