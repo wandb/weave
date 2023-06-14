@@ -53,7 +53,7 @@ from . import wb_util
 from . import history as history_util
 from ..ops_primitives import _dict_utils, make_list
 from ..ops_arrow.list_ops import concat
-from ..ops_arrow import ArrowWeaveList, ArrowWeaveListType
+from ..ops_arrow import ArrowWeaveList, ArrowWeaveListType, convert
 from .. import util
 from .. import errors
 from .. import io_service
@@ -530,8 +530,14 @@ def _get_history2(run: wdt.Run, columns=None):
     parquet_history = read_history_parquet(run, 2, columns=columns)
 
     _object_type = typing.cast(
-        types.List, _refine_history_type(run, 2, columns=columns)
-    ).object_type
+        types.TypedDict,
+        typing.cast(
+            types.List,
+            _refine_history_type(run, 2, columns=columns),
+        ).object_type,
+    )
+
+    _history_type = types.List(_object_type)
 
     run_path = wb_util.RunPath(
         run.gql["project"]["entity"]["name"],
@@ -546,67 +552,63 @@ def _get_history2(run: wdt.Run, columns=None):
             if colname not in row:
                 row[colname] = None
             else:
-                row[colname] = wb_util._process_run_dict_item_for_history2(
-                    row[colname], run_path
-                )
+                row[colname] = wb_util._process_run_dict_item(row[colname], run_path)
 
     artifact = artifact_mem.MemArtifact()
-
     # turn live data into arrow
     if live_data is not None and len(live_data) > 0:
         with tracer.trace("live_data_to_arrow"):
-            live_data = ArrowWeaveList(pa.array(live_data), _object_type, artifact)
+            live_data = convert.to_arrow(live_data, _history_type, artifact=artifact)
     else:
         live_data = []
 
     # get binary fields from history schema - these are serialized json
     if parquet_history is not None:
         fields = [field.name for field in parquet_history.schema]
-        binary_fields = [
+        binary_fields = {
             field.name
             for field in parquet_history.schema
             if pa.types.is_binary(field.type)
-        ]
+        }
 
         # deserialize json if any is present
-        with tracer.trace("json.loads"):
-            for field in binary_fields:
-                pq_col = parquet_history[field].to_pylist()
-                for i, item in enumerate(pq_col):
-                    if item is not None:
-                        pq_col[i] = wb_util._process_run_dict_item_for_history2(
-                            json.loads(item)
-                        )
-                new_col = pa.chunked_array([pq_col])
-                parquet_history = parquet_history.set_column(
-                    fields.index(field), field, new_col
-                )
-
-        # handle non-basic types
-        with tracer.trace("process_run_dict_item_for_history2"):
-            for column in columns:
-                if not _object_type.property_types[column].assign_type(  # type: ignore
+        with tracer.trace("process_non_basic_fields"):
+            for field in columns:
+                if field in binary_fields or not types.optional(
                     types.BasicType()
+                ).assign_type(
+                    _object_type.property_types[field]  # type: ignore
                 ):
-                    pq_col = parquet_history[column].to_pylist()
+                    pq_col = parquet_history[field].to_pylist()
                     for i, item in enumerate(pq_col):
                         if item is not None:
-                            pq_col[i] = wb_util._process_run_dict_item_for_history2(
-                                item, run_path
+                            pq_col[i] = wb_util._process_run_dict_item(
+                                json.loads(item) if field in binary_fields else item,
+                                run_path,
                             )
-                    new_col = pa.chunked_array([pq_col])
+
+                    awl = convert.to_arrow(
+                        pq_col,
+                        types.List(_object_type.property_types[field]),
+                        artifact=artifact,
+                    )
+                    new_col = pa.chunked_array([awl._arrow_data])
                     parquet_history = parquet_history.set_column(
-                        fields.index(column), column, new_col
+                        fields.index(field), field, new_col
                     )
 
     if parquet_history is not None and len(parquet_history) > 0:
         with tracer.trace("parquet_history_to_arrow"):
-            parquet_history = ArrowWeaveList(parquet_history, _object_type, artifact)
+            parquet_history = ArrowWeaveList(
+                parquet_history,
+                _object_type,
+                artifact=artifact,
+            )
     else:
         parquet_history = []
 
     if len(live_data) == 0 and len(parquet_history) == 0:
-        return ArrowWeaveList(pa.array([]), _object_type, artifact)
+        return ArrowWeaveList(pa.array([]), _object_type, artifact=artifact)
     elif len(live_data) == 0:
         return parquet_history
     elif len(parquet_history) == 0:
