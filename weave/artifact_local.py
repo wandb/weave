@@ -448,13 +448,11 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
             link_name = os.path.join(self._root, dirname)
             safe_os_symlink(commit_hash, link_name)
 
-        if branch is not None:
-            make_link(branch)
-        else:
-            make_link("latest")
+        self._branch = branch
+        if self._branch is None:
+            self._branch = "latest"
 
-        if branch is not None:
-            self._branch = branch
+        make_link(self._branch)
 
     def _path_info(
         self, path: str

@@ -693,7 +693,8 @@ export async function refineEditingNode(
       const resolvedNode = await opDef.refineNode(
         nodeWithRefinedInputs,
         executableNode,
-        client
+        client,
+        stack
       );
 
       if (nodesEqual(node, resolvedNode)) {

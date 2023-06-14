@@ -59,6 +59,8 @@ panels = [
     LPanel("tracer", "PanelTracer"),
     LPanel("projection.plot", "projection.plot"),
     LPanel("RootBrowser", "RootBrowser"),
+    LPanel("row.runs-table.row.projection.plot", "row.runs-table.row.projection.plot"),
+    LPanel("maybe.plot", "maybe.plot"),
 ]
 
 did_define = False
