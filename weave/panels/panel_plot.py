@@ -322,6 +322,24 @@ class PlotConfig:
 def set_through_array(
     obj: typing.Any, path: typing.List[str], value: typing.Any
 ) -> None:
+    """
+    Recursively sets an attribute, key or index specified by a path in a nested object structure to a given value
+    (consisting of dictionaries, lists or custom objects). The path is a list of strings, with the special value '#'
+    used to denote all items in a list.
+
+    Parameters:
+    obj (Any): The object that will be traversed and modified.
+    path (List[str]): The list of strings, where each string is a key or attribute name in the path to the location
+    in the nested object structure to be modified. If a string is '#', it indicates that all items in the list at
+    that level should be modified.
+    value (Any): The value to set at the location specified by the path.
+
+    Raises:
+    ValueError: If the path cannot be followed in the object, it raises a ValueError.
+
+    Returns:
+    None: The function modifies the object in-place and does not return any value.
+    """
     if len(path) == 0:
         return
 
@@ -347,6 +365,25 @@ def set_through_array(
 def get_through_array(
     obj: typing.Any, path: typing.List[str], coerce_list_of_nodes_to_node=False
 ) -> typing.Any:
+    """
+    Recursively retrieves a value from an attribute, key or index specified by a path in a nested object structure
+    (consisting of dictionaries, lists or custom objects). The path is a list of strings, with the special value '#'
+    used to denote all items in a list.
+
+    Parameters:
+    obj (Any): The object that will be traversed.
+    path (List[str]): The list of strings, where each string is a key or attribute name in the path to the location
+    in the nested object structure to retrieve. If a string is '#', it indicates that values from all items in the
+    list at that level should be retrieved.
+    coerce_list_of_nodes_to_node (bool): This flag controls how lists of 'graph.Node' objects are handled. If set to
+    True, lists of 'graph.Node' objects are turned into a single 'list_.make_list' object with nodes as its items.
+
+    Raises:
+    ValueError: If the path cannot be followed in the object, it raises a ValueError.
+
+    Returns:
+    Any: The value or list of values retrieved from the object at the location specified by the path.
+    """
     if len(path) == 0:
         return obj
 
