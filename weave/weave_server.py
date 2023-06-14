@@ -155,17 +155,21 @@ class ResponseDict(typing.TypedDict):
     node_to_error: dict[int, int]
 
 
-def _exception_to_error_details(e: Exception) -> ErrorDetailsDict:
+def _exception_to_error_details(
+    e: Exception, sentry_id: typing.Union[str, None]
+) -> ErrorDetailsDict:
     return {
+        "error_type": type(e).__name__,
         "message": str(e),
         "traceback": traceback.format_tb(e.__traceback__),
+        "sentry_id": sentry_id,
     }
 
 
 def _value_or_errors_to_response(
     vore: value_or_error.ValueOrErrors,
 ) -> ResponseDict:
-    error_lookup: dict[Exception, int] = {}
+    error_lookup: dict[Exception, typing.Tuple[int, typing.Union[str, None]]] = {}
     node_errors: dict[int, int] = {}
     data: list[typing.Any] = []
     for val, error in vore.iter_items():
@@ -173,17 +177,20 @@ def _value_or_errors_to_response(
             error = typing.cast(Exception, error)
             data.append(None)
             if error in error_lookup:
-                error_ndx = error_lookup[error]
+                error_ndx = error_lookup[error][0]
             else:
-                util.capture_exception_with_sentry_if_available(error, ())
+                sentry_id = util.capture_exception_with_sentry_if_available(error, ())
                 error_ndx = len(error_lookup)
-                error_lookup[error] = error_ndx
+                error_lookup[error] = (error_ndx, sentry_id)
             node_errors[len(data) - 1] = error_ndx
         else:
             data.append(val)
     return {
         "data": data,
-        "errors": [_exception_to_error_details(k) for k in error_lookup.keys()],
+        "errors": [
+            _exception_to_error_details(k, e_sentry_id)
+            for k, (e_ndx, e_sentry_id) in error_lookup.items()
+        ],
         "node_to_error": node_errors,
     }
 
@@ -194,14 +201,11 @@ def _log_errors(
     errors: list[dict] = []
 
     for error in processed_response["errors"]:
-        last_traceback_line = ""
-        if len(error["traceback"]) > 0:
-            last_traceback_line = error["traceback"][-1]
         errors.append(
             {
                 "message": error["message"],
+                "error_type": error["message"],
                 "traceback": error["traceback"],
-                "last_traceback_line": last_traceback_line,
                 "error_type": "node_execution_error",
                 "node_strs": [],
             }
