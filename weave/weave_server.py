@@ -202,8 +202,8 @@ def _log_errors(
                 "node_str": [],
             }
         )
-    
-     for node_ndx, error_ndx in processed_response["node_to_error"].items():
+
+    for node_ndx, error_ndx in processed_response["node_to_error"].items():
         try:
             node_str = graph.node_expr_str(graph.map_const_nodes_to_x(nodes[node_ndx]))
             errors[error_ndx]["node_str"].append(node_str)
@@ -214,6 +214,7 @@ def _log_errors(
         # This should be logged to DD, but 1 log per error
         # class, not 1 log per error.
         logging.error(error_dict)
+
 
 @blueprint.route("/__weave/execute", methods=["POST"])
 def execute():
