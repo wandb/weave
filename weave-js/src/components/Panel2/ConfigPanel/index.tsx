@@ -9,7 +9,7 @@ import ModifiedDropdown from '@wandb/weave/common/components/elements/ModifiedDr
 import NumberInput from '@wandb/weave/common/components/elements/NumberInput';
 import {TextInput} from '@wandb/weave/common/components/elements/TextInput';
 import * as _ from 'lodash';
-import React, {FC, ReactNode, useCallback, useState} from 'react';
+import React, {FC, ReactNode, useCallback, useMemo, useState} from 'react';
 import styled, {ThemeProvider, css} from 'styled-components';
 
 import {useWeaveDashUiEnable} from '../../../context';
@@ -139,20 +139,25 @@ const ConfigOptionNew: React.FC<
     ...restProps
   } = props;
 
-  const wrapInTooltip = useCallback(
-    (node: ReactNode) => {
-      if (!tooltip) {
-        return node;
-      }
-      return <Tooltip trigger={node}>{tooltip}</Tooltip>;
-    },
-    [tooltip]
-  );
+  const labelNode = useMemo(() => {
+    if (!label) {
+      return null;
+    }
+    if (!tooltip) {
+      return <SN.ConfigOptionLabel>{label}</SN.ConfigOptionLabel>;
+    }
+    return (
+      <Tooltip
+        position="left top"
+        trigger={<SN.ConfigOptionLabel>{label}</SN.ConfigOptionLabel>}>
+        {tooltip}
+      </Tooltip>
+    );
+  }, [label, tooltip]);
 
   return (
     <SN.ConfigOption multiline={multiline} {...restProps}>
-      {label &&
-        wrapInTooltip(<SN.ConfigOptionLabel>{label}</SN.ConfigOptionLabel>)}
+      {labelNode}
       {actions != null && (
         <SN.ConfigOptionActions>{actions}</SN.ConfigOptionActions>
       )}

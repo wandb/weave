@@ -1,7 +1,7 @@
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import styled, {css} from 'styled-components';
 
-export const ConfigOptionLabel = styled.div`
+export const ConfigOptionLabel = styled.div<{withTooltip?: boolean}>`
   width: 92px;
   margin-right: 8px;
   flex-shrink: 0;
@@ -10,6 +10,13 @@ export const ConfigOptionLabel = styled.div`
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+
+  ${p =>
+    p.withTooltip &&
+    css`
+      text-decoration-line: underline;
+      text-decoration-style: dotted;
+    `}
 `;
 
 export const ConfigOptionActions = styled.div`
