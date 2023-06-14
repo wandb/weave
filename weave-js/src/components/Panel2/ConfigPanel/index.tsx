@@ -19,6 +19,7 @@ import * as S from './styles';
 import * as SN from './stylesNew';
 import {IconCaret} from '../Icons';
 import {IconDown as IconDownUnstyled} from '../Icons';
+import {Tooltip} from '../../Tooltip';
 
 export const ChildConfigContainer = styled.div`
   position: relative;
@@ -119,6 +120,7 @@ export const ConfigOption: React.FC<
 const ConfigOptionNew: React.FC<
   {
     label: string;
+    tooltip?: ReactNode;
     actions?: ReactNode;
     multiline?: boolean;
     // component to append after the the config component, on the same line, such as
@@ -129,15 +131,28 @@ const ConfigOptionNew: React.FC<
 > = props => {
   const {
     label,
+    tooltip,
     actions,
     multiline = false,
     postfixComponent,
     children,
     ...restProps
   } = props;
+
+  const wrapInTooltip = useCallback(
+    (node: ReactNode) => {
+      if (!tooltip) {
+        return node;
+      }
+      return <Tooltip trigger={node}>{tooltip}</Tooltip>;
+    },
+    [tooltip]
+  );
+
   return (
     <SN.ConfigOption multiline={multiline} {...restProps}>
-      {label && <SN.ConfigOptionLabel>{label}</SN.ConfigOptionLabel>}
+      {label &&
+        wrapInTooltip(<SN.ConfigOptionLabel>{label}</SN.ConfigOptionLabel>)}
       {actions != null && (
         <SN.ConfigOptionActions>{actions}</SN.ConfigOptionActions>
       )}
