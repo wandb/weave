@@ -13,6 +13,10 @@ import {
 } from '../Panel2/Icons';
 import {panelChildren} from '../Panel2/panelTree';
 import {OutlineItemPopupMenu} from './OutlineItemPopupMenu';
+import {
+  usePanelInteractContext,
+  useSetPanelIsHoveredInOutline,
+} from '../Panel2/PanelInteractContext';
 
 const OutlineItem = styled.div``;
 
@@ -21,7 +25,7 @@ const OutlineItemMenuButton = styled(IconButton).attrs({small: true})`
   margin: 0 8px 0 4px;
 `;
 
-const OutlineItemTitle = styled.div<{level: number}>`
+const OutlineItemTitle = styled.div<{level: number; panelIsHovered: boolean}>`
   display: flex;
   align-items: center;
   cursor: pointer;
@@ -34,6 +38,11 @@ const OutlineItemTitle = styled.div<{level: number}>`
   &:hover {
     background-color: ${globals.GRAY_50};
   }
+  ${p =>
+    p.panelIsHovered &&
+    css`
+      background-color: ${globals.GRAY_50};
+    `}
 
   &:not(:hover) ${OutlineItemMenuButton} {
     visibility: hidden;
@@ -112,6 +121,13 @@ const OutlinePanel: React.FC<OutlinePanelProps> = props => {
     level = 0,
     setInspectingRoot,
   } = props;
+
+  const {
+    state: {panelState},
+  } = usePanelInteractContext();
+  const setPanelIsHoveredInOutline = useSetPanelIsHoveredInOutline();
+  const panelIsHovered = panelState[path.join(`.`)]?.hovered ?? false;
+
   const curPanelId = getPanelStacksForType(
     localConfig?.input_node?.type ?? 'invalid',
     localConfig?.id
@@ -130,9 +146,16 @@ const OutlinePanel: React.FC<OutlinePanelProps> = props => {
     <OutlineItem>
       <OutlineItemTitle
         level={level}
+        panelIsHovered={panelIsHovered}
         onClick={() => {
           const isRoot = _.isEqual(path, []);
           isRoot ? setInspectingRoot(true) : setSelected(path);
+        }}
+        onMouseEnter={() => {
+          setPanelIsHoveredInOutline(path, true);
+        }}
+        onMouseLeave={() => {
+          setPanelIsHoveredInOutline(path, false);
         }}>
         <OutlineItemToggle
           expanded={expanded}
