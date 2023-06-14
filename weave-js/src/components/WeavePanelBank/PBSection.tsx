@@ -127,18 +127,15 @@ export const PBSection: React.FC<PBSectionProps> = props => {
                   activePanelRefs={config.panels}
                   inactivePanelRefs={[]}
                   renderPanel={panelRef => {
-                    const isHovered =
-                      (groupPath != null &&
-                        panelState[[...groupPath, panelRef.id].join(`.`)]
-                          ?.hovered) ??
-                      false;
-                    const isHoveredInOutline =
-                      (groupPath != null &&
-                        panelState[[...groupPath, panelRef.id].join(`.`)]
-                          ?.hoveredInOutline) ??
-                      false;
                     const path =
                       groupPath != null ? [...groupPath, panelRef.id] : null;
+                    const isHovered =
+                      (path != null && panelState[path.join(`.`)]?.hovered) ??
+                      false;
+                    const isHoveredInOutline =
+                      (path != null &&
+                        panelState[path.join(`.`)]?.hoveredInOutline) ??
+                      false;
 
                     return (
                       <div
