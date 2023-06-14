@@ -1,12 +1,10 @@
-# When we push commits to master, fire off a `weave-package-updated`
+# When we push commits, fire off a `weave-package-updated`
 # repository dispatch event to wandb/core
 
 name: Notify wandb/core
 
 on:
   push:
-    branches: [master]
-  workflow_dispatch:
 
 jobs:
   notify-wandb-core:
@@ -18,3 +16,4 @@ jobs:
           token: ${{ secrets.WANDB_CORE_ACCESS_TOKEN }}
           repository: wandb/core
           event-type: weave-package-updated
+          client-payload: '{"ref_name": "${{ github.ref_name }}", "sha": "${{ github.sha }}"}'
