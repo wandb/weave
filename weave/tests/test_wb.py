@@ -1131,471 +1131,498 @@ example_history_keys = {
 }
 
 history_keys_with_media = {
-    "metric96": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 0.1787422765622399,
-    },
-    "metric89": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 0.07349574752819477,
-    },
-    "metric75": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 0.0986766693862854,
-    },
-    "metric78": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 0.8477573371064511,
-    },
-    "metric11": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 31.32389824185267,
-    },
-    "metric90": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 936.3519044500642,
-    },
-    "metric38": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 785.593511550434,
-    },
-    "metric73": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 0.6707386723563288,
-    },
-    "metric76": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 0.9928879370442634,
-    },
-    "metric30": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 0.10846343966028768,
-    },
-    "metric55": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 48.35167002369853,
-    },
-    "metric26": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 737.6498760123316,
-    },
-    "metric2": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 1.6397776348651e06,
-    },
-    "system/cpu.0.cpu_percent": {"typeCounts": [{"type": "number", "count": 26}]},
-    "metric97": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 0.654439827026763,
-    },
-    "metric70": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 503.7868269065638,
-    },
-    "metric28": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 0.09030816474917788,
-    },
-    "metric10": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 1174.0908497559344,
-    },
-    "score": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 0.9574628337266888,
-    },
-    "metric0": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 0.10215635878980288,
-    },
-    "metric85": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 0.07633164940758841,
-    },
-    "metric82": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 0.06524411121590452,
-    },
-    "metric69": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 863347.3900486354,
-    },
-    "metric9": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 0.09969610221891916,
-    },
-    "metric65": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 901301.0472199152,
-    },
-    "metric48": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 673.7880911518733,
-    },
-    "metric33": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 1.0894018397250338,
-    },
-    "metric63": {"typeCounts": [{"type": "number", "count": 1000}], "previousValue": 0},
-    "metric87": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 0.016717857479823475,
-    },
-    "pred_cls_str": {
-        "typeCounts": [{"type": "string", "count": 1000}],
-        "monotonic": True,
-        "previousValue": -1.7976931348623157e308,
-    },
-    "metric14": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 0.07284497770528833,
-    },
-    "metric84": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 0.7828218179380725,
-    },
-    "metric35": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 0.09718174469563404,
-    },
-    "metric83": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 1.043603875524265,
-    },
-    "metric50": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 0.06846530499282945,
-    },
-    "metric91": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 0.09956117071724532,
-    },
-    "metric3": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 1.1314335017923363e06,
-    },
-    "metric62": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 0.07580536915376594,
-    },
-    "system/proc.cpu.threads": {"typeCounts": [{"type": "number", "count": 26}]},
-    "system/cpu.1.cpu_percent": {"typeCounts": [{"type": "number", "count": 26}]},
-    "metric49": {"typeCounts": [{"type": "number", "count": 1000}], "previousValue": 0},
-    "system/cpu.5.cpu_percent": {"typeCounts": [{"type": "number", "count": 26}]},
-    "metric4": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 0.09966522358095078,
-    },
-    "metric18": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 0.4246895131301275,
-    },
-    "metric92": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 6.389340711853557,
-    },
-    "metric31": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 0.10769713868100536,
-    },
-    "metric58": {"typeCounts": [{"type": "number", "count": 1000}], "previousValue": 0},
-    "metric6": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 0.055481611667985126,
-    },
-    "system/proc.memory.rssMB": {"typeCounts": [{"type": "number", "count": 26}]},
-    "metric13": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 0.00019661385028855104,
-    },
-    "metric17": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 0.537054958526606,
-    },
-    "metric44": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 988921.0042670006,
-    },
-    "metric16": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 0.7636767546139532,
-    },
-    "metric27": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 0.7700715563685407,
-    },
-    "metric93": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": -0.523202656860401,
-    },
-    "metric66": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 0.07312695317746425,
-    },
-    "metric72": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 1443.340886967269,
-    },
-    "metric67": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 742819.2879756667,
-    },
-    "metric99": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 908.4061894975374,
-    },
-    "metric81": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 1034.8904792998549,
-    },
-    "metric22": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 974536.1108182984,
-    },
-    "system/cpu.6.cpu_percent": {"typeCounts": [{"type": "number", "count": 26}]},
-    "metric12": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 0.08730298787443275,
-    },
-    "metric53": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 0.683211577562499,
-    },
-    "_step": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "monotonic": True,
-        "previousValue": 999,
-    },
-    "metric79": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 894060.714062376,
-    },
-    "system/cpu.7.cpu_percent": {"typeCounts": [{"type": "number", "count": 26}]},
-    "metric7": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": -0.5390992868457061,
-    },
-    "pred_cls": {"typeCounts": [{"type": "number", "count": 1000}], "previousValue": 3},
-    "metric47": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 0.03576384840199004,
-    },
-    "metric57": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 0.11459477904021892,
-    },
-    "metric19": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 0.936067781201183,
-    },
-    "metric39": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 931.6133314055628,
-    },
-    "metric51": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 31.6253529702323,
-    },
-    "metric56": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 7.013212429121573,
-    },
-    "metric5": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 0.7080705375246764,
-    },
-    "metric36": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 6.198846708143549,
-    },
-    "metric25": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 1.0076695477366358e06,
-    },
-    "metric94": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 0.10121767340492233,
-    },
-    "metric59": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 0.07357656000298882,
-    },
-    "metric74": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 0.07695543999405488,
-    },
-    "metric45": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 0.10646576944665231,
-    },
-    "metric23": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 0.07812276912569666,
-    },
-    "metric88": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 0.09956894287546512,
-    },
-    "metric32": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 31.528766609567093,
-    },
-    "metric86": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 0.020513399519397263,
-    },
-    "metric68": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 0.05222559102692824,
-    },
-    "system/cpu.3.cpu_percent": {"typeCounts": [{"type": "number", "count": 26}]},
-    "metric24": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": -0.500504282377675,
-    },
-    "metric71": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 0.07210037042777426,
-    },
-    "system/network.sent": {"typeCounts": [{"type": "number", "count": 26}]},
-    "metric20": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 2.48189734789924,
-    },
-    "metric43": {"typeCounts": [{"type": "number", "count": 1000}], "previousValue": 0},
-    "metric42": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 6.429064978191331,
-    },
-    "metric34": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 6.949362972245708,
-    },
-    "metric21": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 1.2518633183521437,
-    },
-    "_runtime": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "monotonic": True,
-        "previousValue": 791.536298751831,
-    },
-    "system/disk": {"typeCounts": [{"type": "number", "count": 26}]},
-    "metric98": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 0.7666380426527991,
-    },
-    "metric95": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 31.56565856537801,
-    },
-    "system/network.recv": {"typeCounts": [{"type": "number", "count": 26}]},
-    "metric77": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": -0.47234829170506953,
-    },
-    "_timestamp": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "monotonic": True,
-        "previousValue": 1.68322130708908e09,
-    },
-    "img": {
-        "typeCounts": [
-            {
-                "type": "image-file",
-                "count": 1000,
-                "keys": {
-                    "boxes": [
-                        {
-                            "type": "map",
-                            "keys": {
-                                "predictions": [
-                                    {
-                                        "type": "boxes2D",
-                                        "keys": {
-                                            "size": [{"type": "number"}],
-                                            "_type": [{"type": "string"}],
-                                            "sha256": [{"type": "string"}],
-                                            "path": [{"type": "string"}],
-                                        },
-                                    }
-                                ]
-                            },
-                        }
-                    ]
-                },
-                "nestedTypes": ["default"],
-            }
-        ],
-        "monotonic": True,
-        "previousValue": -1.7976931348623157e308,
-    },
-    "metric40": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 0.008787379461016882,
-    },
-    "system/cpu.4.cpu_percent": {"typeCounts": [{"type": "number", "count": 26}]},
-    "metric15": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 5.460466938023219,
-    },
-    "system/memory": {"typeCounts": [{"type": "number", "count": 26}]},
-    "system/proc.memory.percent": {"typeCounts": [{"type": "number", "count": 26}]},
-    "metric80": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": -0.4836106275992632,
-    },
-    "metric60": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 0.09713512892742876,
-    },
-    "metric37": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 0.03904798230594032,
-    },
-    "metric61": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 6.6516791867078595,
-    },
-    "metric41": {"typeCounts": [{"type": "number", "count": 1000}], "previousValue": 0},
-    "metric8": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": -0.590767395858568,
-    },
-    "metric29": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 7.5387453065114,
-    },
-    "metric64": {"typeCounts": [{"type": "number", "count": 1000}], "previousValue": 0},
-    "metric52": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 0.09269922202486708,
-    },
-    "system/cpu": {"typeCounts": [{"type": "number", "count": 26}]},
-    "metric46": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 0.1266750965434084,
-    },
-    "metric1": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 0.09934295482813522,
-    },
-    "response": {
-        "typeCounts": [{"type": "string", "count": 1000}],
-        "monotonic": True,
-        "previousValue": -1.7976931348623157e308,
-    },
-    "system/proc.memory.availableMB": {"typeCounts": [{"type": "number", "count": 26}]},
-    "prompt": {
-        "typeCounts": [{"type": "string", "count": 1000}],
-        "monotonic": True,
-        "previousValue": -1.7976931348623157e308,
-    },
-    "system/cpu.2.cpu_percent": {"typeCounts": [{"type": "number", "count": 26}]},
-    "metric54": {
-        "typeCounts": [{"type": "number", "count": 1000}],
-        "previousValue": 0.12816392845619362,
-    },
+    "sets": [],
+    "keys": {
+        "metric96": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0.1787422765622399,
+        },
+        "metric89": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0.07349574752819477,
+        },
+        "metric75": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0.0986766693862854,
+        },
+        "metric78": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0.8477573371064511,
+        },
+        "metric11": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 31.32389824185267,
+        },
+        "metric90": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 936.3519044500642,
+        },
+        "metric38": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 785.593511550434,
+        },
+        "metric73": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0.6707386723563288,
+        },
+        "metric76": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0.9928879370442634,
+        },
+        "metric30": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0.10846343966028768,
+        },
+        "metric55": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 48.35167002369853,
+        },
+        "metric26": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 737.6498760123316,
+        },
+        "metric2": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 1.6397776348651e06,
+        },
+        "system/cpu.0.cpu_percent": {"typeCounts": [{"type": "number", "count": 26}]},
+        "metric97": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0.654439827026763,
+        },
+        "metric70": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 503.7868269065638,
+        },
+        "metric28": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0.09030816474917788,
+        },
+        "metric10": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 1174.0908497559344,
+        },
+        "score": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0.9574628337266888,
+        },
+        "metric0": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0.10215635878980288,
+        },
+        "metric85": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0.07633164940758841,
+        },
+        "metric82": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0.06524411121590452,
+        },
+        "metric69": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 863347.3900486354,
+        },
+        "metric9": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0.09969610221891916,
+        },
+        "metric65": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 901301.0472199152,
+        },
+        "metric48": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 673.7880911518733,
+        },
+        "metric33": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 1.0894018397250338,
+        },
+        "metric63": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0,
+        },
+        "metric87": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0.016717857479823475,
+        },
+        "pred_cls_str": {
+            "typeCounts": [{"type": "string", "count": 1000}],
+            "monotonic": True,
+            "previousValue": -1.7976931348623157e308,
+        },
+        "metric14": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0.07284497770528833,
+        },
+        "metric84": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0.7828218179380725,
+        },
+        "metric35": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0.09718174469563404,
+        },
+        "metric83": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 1.043603875524265,
+        },
+        "metric50": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0.06846530499282945,
+        },
+        "metric91": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0.09956117071724532,
+        },
+        "metric3": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 1.1314335017923363e06,
+        },
+        "metric62": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0.07580536915376594,
+        },
+        "system/proc.cpu.threads": {"typeCounts": [{"type": "number", "count": 26}]},
+        "system/cpu.1.cpu_percent": {"typeCounts": [{"type": "number", "count": 26}]},
+        "metric49": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0,
+        },
+        "system/cpu.5.cpu_percent": {"typeCounts": [{"type": "number", "count": 26}]},
+        "metric4": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0.09966522358095078,
+        },
+        "metric18": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0.4246895131301275,
+        },
+        "metric92": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 6.389340711853557,
+        },
+        "metric31": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0.10769713868100536,
+        },
+        "metric58": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0,
+        },
+        "metric6": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0.055481611667985126,
+        },
+        "system/proc.memory.rssMB": {"typeCounts": [{"type": "number", "count": 26}]},
+        "metric13": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0.00019661385028855104,
+        },
+        "metric17": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0.537054958526606,
+        },
+        "metric44": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 988921.0042670006,
+        },
+        "metric16": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0.7636767546139532,
+        },
+        "metric27": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0.7700715563685407,
+        },
+        "metric93": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": -0.523202656860401,
+        },
+        "metric66": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0.07312695317746425,
+        },
+        "metric72": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 1443.340886967269,
+        },
+        "metric67": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 742819.2879756667,
+        },
+        "metric99": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 908.4061894975374,
+        },
+        "metric81": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 1034.8904792998549,
+        },
+        "metric22": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 974536.1108182984,
+        },
+        "system/cpu.6.cpu_percent": {"typeCounts": [{"type": "number", "count": 26}]},
+        "metric12": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0.08730298787443275,
+        },
+        "metric53": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0.683211577562499,
+        },
+        "_step": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "monotonic": True,
+            "previousValue": 999,
+        },
+        "metric79": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 894060.714062376,
+        },
+        "system/cpu.7.cpu_percent": {"typeCounts": [{"type": "number", "count": 26}]},
+        "metric7": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": -0.5390992868457061,
+        },
+        "pred_cls": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 3,
+        },
+        "metric47": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0.03576384840199004,
+        },
+        "metric57": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0.11459477904021892,
+        },
+        "metric19": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0.936067781201183,
+        },
+        "metric39": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 931.6133314055628,
+        },
+        "metric51": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 31.6253529702323,
+        },
+        "metric56": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 7.013212429121573,
+        },
+        "metric5": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0.7080705375246764,
+        },
+        "metric36": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 6.198846708143549,
+        },
+        "metric25": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 1.0076695477366358e06,
+        },
+        "metric94": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0.10121767340492233,
+        },
+        "metric59": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0.07357656000298882,
+        },
+        "metric74": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0.07695543999405488,
+        },
+        "metric45": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0.10646576944665231,
+        },
+        "metric23": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0.07812276912569666,
+        },
+        "metric88": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0.09956894287546512,
+        },
+        "metric32": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 31.528766609567093,
+        },
+        "metric86": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0.020513399519397263,
+        },
+        "metric68": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0.05222559102692824,
+        },
+        "system/cpu.3.cpu_percent": {"typeCounts": [{"type": "number", "count": 26}]},
+        "metric24": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": -0.500504282377675,
+        },
+        "metric71": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0.07210037042777426,
+        },
+        "system/network.sent": {"typeCounts": [{"type": "number", "count": 26}]},
+        "metric20": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 2.48189734789924,
+        },
+        "metric43": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0,
+        },
+        "metric42": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 6.429064978191331,
+        },
+        "metric34": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 6.949362972245708,
+        },
+        "metric21": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 1.2518633183521437,
+        },
+        "_runtime": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "monotonic": True,
+            "previousValue": 791.536298751831,
+        },
+        "system/disk": {"typeCounts": [{"type": "number", "count": 26}]},
+        "metric98": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0.7666380426527991,
+        },
+        "metric95": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 31.56565856537801,
+        },
+        "system/network.recv": {"typeCounts": [{"type": "number", "count": 26}]},
+        "metric77": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": -0.47234829170506953,
+        },
+        "_timestamp": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "monotonic": True,
+            "previousValue": 1.68322130708908e09,
+        },
+        "img": {
+            "typeCounts": [
+                {
+                    "type": "image-file",
+                    "count": 1000,
+                    "keys": {
+                        "boxes": [
+                            {
+                                "type": "map",
+                                "keys": {
+                                    "predictions": [
+                                        {
+                                            "type": "boxes2D",
+                                            "keys": {
+                                                "size": [{"type": "number"}],
+                                                "_type": [{"type": "string"}],
+                                                "sha256": [{"type": "string"}],
+                                                "path": [{"type": "string"}],
+                                            },
+                                        }
+                                    ]
+                                },
+                            }
+                        ]
+                    },
+                    "nestedTypes": ["default"],
+                }
+            ],
+            "monotonic": True,
+            "previousValue": -1.7976931348623157e308,
+        },
+        "metric40": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0.008787379461016882,
+        },
+        "system/cpu.4.cpu_percent": {"typeCounts": [{"type": "number", "count": 26}]},
+        "metric15": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 5.460466938023219,
+        },
+        "system/memory": {"typeCounts": [{"type": "number", "count": 26}]},
+        "system/proc.memory.percent": {"typeCounts": [{"type": "number", "count": 26}]},
+        "metric80": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": -0.4836106275992632,
+        },
+        "metric60": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0.09713512892742876,
+        },
+        "metric37": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0.03904798230594032,
+        },
+        "metric61": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 6.6516791867078595,
+        },
+        "metric41": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0,
+        },
+        "metric8": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": -0.590767395858568,
+        },
+        "metric29": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 7.5387453065114,
+        },
+        "metric64": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0,
+        },
+        "metric52": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0.09269922202486708,
+        },
+        "system/cpu": {"typeCounts": [{"type": "number", "count": 26}]},
+        "metric46": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0.1266750965434084,
+        },
+        "metric1": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0.09934295482813522,
+        },
+        "response": {
+            "typeCounts": [{"type": "string", "count": 1000}],
+            "monotonic": True,
+            "previousValue": -1.7976931348623157e308,
+        },
+        "system/proc.memory.availableMB": {
+            "typeCounts": [{"type": "number", "count": 26}]
+        },
+        "prompt": {
+            "typeCounts": [{"type": "string", "count": 1000}],
+            "monotonic": True,
+            "previousValue": -1.7976931348623157e308,
+        },
+        "system/cpu.2.cpu_percent": {"typeCounts": [{"type": "number", "count": 26}]},
+        "metric54": {
+            "typeCounts": [{"type": "number", "count": 1000}],
+            "previousValue": 0.12816392845619362,
+        },
+    },
+    "lastStep": 999,
 }
 
 
@@ -1901,7 +1928,36 @@ def test_run_history_2(fake_wandb):
 
 
 def test_run_history2_media_types(fake_wandb):
-    pass
+    fake_wandb.fake_api.add_mock(run_history_mocker_with_pq_media)
+
+    # this is actually from the launch-test/prodmon project, but mocked here as stacey/mendeleev
+    node = ops.project("stacey", "mendeleev").runs()[0].history2()
+
+    assert isinstance(node.type, TaggedValueType)
+    """
+    assert ArrowWeaveListType(
+        types.TypedDict(
+            {
+                "_step": types.Number(),
+                # we no longer send back system metrics
+                # "system/gpu.0.powerWatts": types.optional(types.Number()),
+                "epoch": types.optional(types.Number()),
+                "predictions_10K": types.optional(
+                    artifact_fs.FilesystemArtifactFileType(
+                        types.Const(types.String(), "json"), table.TableType()
+                    ),
+                ),
+            }
+        )
+    ).assign_type(node.type.value)
+    """
+
+    image_node = node["img"]
+    metric2_node = node["metric2"]
+
+    # simulates what a table call would do, selecting multiple columns
+    result = weave.use([image_node, metric2_node])
+    assert len(result) == 2
 
 
 def run_history_as_of_mocker(q, ndx):

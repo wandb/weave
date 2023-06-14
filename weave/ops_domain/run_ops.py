@@ -533,6 +533,12 @@ def _get_history2(run: wdt.Run, columns=None):
         types.List, _refine_history_type(run, 2, columns=columns)
     ).object_type
 
+    run_path = wb_util.RunPath(
+        run.gql["project"]["entity"]["name"],
+        run.gql["project"]["name"],
+        run.gql["name"],
+    )
+
     # turn the liveset into an arrow table. the liveset is a list of dictionaries
     live_data = run.gql["parquetHistory"]["liveData"]
     for row in live_data:
@@ -540,7 +546,9 @@ def _get_history2(run: wdt.Run, columns=None):
             if colname not in row:
                 row[colname] = None
             else:
-                row[colname] = wb_util._process_run_dict_item_for_history2(row[colname])
+                row[colname] = wb_util._process_run_dict_item_for_history2(
+                    row[colname], run_path
+                )
 
     artifact = artifact_mem.MemArtifact()
 
@@ -584,7 +592,7 @@ def _get_history2(run: wdt.Run, columns=None):
                     for i, item in enumerate(pq_col):
                         if item is not None:
                             pq_col[i] = wb_util._process_run_dict_item_for_history2(
-                                item
+                                item, run_path
                             )
                     new_col = pa.chunked_array([pq_col])
                     parquet_history = parquet_history.set_column(
