@@ -18,6 +18,8 @@ import {PanelBankGridSection} from './PanelBankGridSection';
 import styled from 'styled-components';
 import {
   GRAY_25,
+  GRAY_350,
+  GRAY_400,
   GRAY_500,
   SCROLLBAR_STYLES,
   TEAL_LIGHT_2,
@@ -130,6 +132,11 @@ export const PBSection: React.FC<PBSectionProps> = props => {
                         panelState[[...groupPath, panelRef.id].join(`.`)]
                           ?.hovered) ??
                       false;
+                    const isHoveredInOutline =
+                      (groupPath != null &&
+                        panelState[[...groupPath, panelRef.id].join(`.`)]
+                          ?.hoveredInOutline) ??
+                      false;
                     const path =
                       groupPath != null ? [...groupPath, panelRef.id] : null;
 
@@ -139,10 +146,11 @@ export const PBSection: React.FC<PBSectionProps> = props => {
                           backgroundColor: '#fff',
                           width: '100%',
                           height: '100%',
-                          border: isHovered
-                            ? `2px solid ${hexToRGB(TEAL_LIGHT_2, 0.6)}`
-                            : undefined,
-                          padding: isHovered ? 7 : 8,
+                          borderColor: isHoveredInOutline
+                            ? hexToRGB(TEAL_LIGHT_2, 0.6)
+                            : isHovered
+                            ? GRAY_400
+                            : GRAY_350,
                         }}
                         className="editable-panel"
                         onMouseEnter={

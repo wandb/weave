@@ -6,6 +6,7 @@ import {usePanelContext} from './PanelContext';
 
 interface PanelInteractState {
   hovered?: boolean;
+  hoveredInOutline?: boolean;
   highlightInputExpr?: boolean;
 }
 
@@ -112,6 +113,21 @@ export const useSetPanelIsHovered = () => {
         return {
           ...prevState,
           hovered,
+        };
+      });
+    },
+    [setPanelState]
+  );
+};
+
+export const useSetPanelIsHoveredInOutline = () => {
+  const setPanelState = useSetPanelStateByPath();
+  return useCallback(
+    (path: string[], hoveredInOutline: boolean) => {
+      setPanelState(path, prevState => {
+        return {
+          ...prevState,
+          hoveredInOutline,
         };
       });
     },
