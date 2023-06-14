@@ -36,7 +36,8 @@ import {Tooltip} from '../Tooltip';
 import {IconButton} from '../IconButton';
 import {WBButton} from '../../common/components/elements/WBButtonNew';
 import {
-  usePanelInteractContext,
+  useGetPanelIsHoveredByGroupPath,
+  useGetPanelIsHoveredInOutlineByGroupPath,
   useSelectedPath,
   useSetInspectingPanel,
   useSetPanelIsHovered,
@@ -59,9 +60,10 @@ export const PBSection: React.FC<PBSectionProps> = props => {
     props;
   const selectedPath = useSelectedPath();
   const setInspectingPanel = useSetInspectingPanel();
-  const {
-    state: {panelState},
-  } = usePanelInteractContext();
+  const getPanelIsHovered = useGetPanelIsHoveredByGroupPath(groupPath ?? []);
+  const getPanelIsHoveredInOutline = useGetPanelIsHoveredInOutlineByGroupPath(
+    groupPath ?? []
+  );
   const setPanelIsHovered = useSetPanelIsHovered();
   const [panelBankWidth, setPanelBankWidth] = useState(0);
   const [panelBankHeight, setPanelBankHeight] = useState(0);
@@ -135,12 +137,10 @@ export const PBSection: React.FC<PBSectionProps> = props => {
                     const isSelected =
                       path != null && _.isEqual(path, selectedPath);
                     const isHovered =
-                      (path != null && panelState[path.join(`.`)]?.hovered) ??
-                      false;
+                      groupPath != null && getPanelIsHovered(panelRef.id);
                     const isHoveredInOutline =
-                      (path != null &&
-                        panelState[path.join(`.`)]?.hoveredInOutline) ??
-                      false;
+                      groupPath != null &&
+                      getPanelIsHoveredInOutline(panelRef.id);
                     const isFocused = isSelected || isHoveredInOutline;
 
                     return (

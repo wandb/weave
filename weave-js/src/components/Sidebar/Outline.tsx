@@ -14,7 +14,7 @@ import {
 import {panelChildren} from '../Panel2/panelTree';
 import {OutlineItemPopupMenu} from './OutlineItemPopupMenu';
 import {
-  usePanelInteractContext,
+  usePanelIsHoveredByPath,
   useSetPanelIsHoveredInOutline,
 } from '../Panel2/PanelInteractContext';
 
@@ -122,11 +122,8 @@ const OutlinePanel: React.FC<OutlinePanelProps> = props => {
     setInspectingRoot,
   } = props;
 
-  const {
-    state: {panelState},
-  } = usePanelInteractContext();
+  const panelIsHovered = usePanelIsHoveredByPath(path);
   const setPanelIsHoveredInOutline = useSetPanelIsHoveredInOutline();
-  const panelIsHovered = panelState[path.join(`.`)]?.hovered ?? false;
 
   const curPanelId = getPanelStacksForType(
     localConfig?.input_node?.type ?? 'invalid',

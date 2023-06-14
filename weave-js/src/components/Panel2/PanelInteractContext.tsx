@@ -67,6 +67,28 @@ export const usePanelInputExprIsHighlightedByPath = (path: string[]) => {
   return usePanelInteractStateByPath(path)?.highlightInputExpr === true;
 };
 
+export const usePanelIsHoveredByPath = (path: string[]) => {
+  return usePanelInteractStateByPath(path)?.hovered === true;
+};
+
+export const useGetPanelIsHoveredByGroupPath = (groupPath: string[]) => {
+  const {state} = usePanelInteractContext();
+  return (panelPath: string) => {
+    const pathString = [...groupPath, panelPath].join('.');
+    return state.panelState[pathString]?.hovered === true;
+  };
+};
+
+export const useGetPanelIsHoveredInOutlineByGroupPath = (
+  groupPath: string[]
+) => {
+  const {state} = usePanelInteractContext();
+  return (panelPath: string) => {
+    const pathString = [...groupPath, panelPath].join('.');
+    return state.panelState[pathString]?.hoveredInOutline === true;
+  };
+};
+
 const useSetPanelStateByPath = () => {
   const {setState} = usePanelInteractContext();
 
