@@ -20,7 +20,8 @@ import {IconBack, IconClose, IconOverflowHorizontal} from './Icons';
 import * as Panel2 from './panel';
 import {Panel2Loader} from './PanelComp';
 import {PanelContextProvider, usePanelContext} from './PanelContext';
-import {fixChildData, toWeaveType} from './PanelGroup';
+import {fixChildData} from './PanelGroup';
+import {toWeaveType} from './toWeaveType';
 import {
   useCloseEditor,
   useSelectedPath,
