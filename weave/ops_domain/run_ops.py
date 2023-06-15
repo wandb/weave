@@ -52,6 +52,7 @@ from .. import artifact_mem
 from . import wb_util
 from . import history as history_util
 from ..ops_primitives import _dict_utils, make_list
+from ..ops_domain import wbmedia
 from ..ops_arrow.list_ops import concat
 from ..ops_arrow import ArrowWeaveList, ArrowWeaveListType, convert
 from .. import util
@@ -574,10 +575,13 @@ def _get_history2(run: wdt.Run, columns=None):
         # deserialize json if any is present
         with tracer.trace("process_non_basic_fields"):
             for field in columns:
-                if field in binary_fields or not types.optional(
-                    types.BasicType()
-                ).assign_type(
-                    _object_type.property_types[field]  # type: ignore
+                if field in binary_fields or not (
+                    types.optional(types.BasicType()).assign_type(
+                        _object_type.property_types[field]  # type: ignore
+                    )
+                    or wbmedia.ImageArtifactFileRefType().assign_type(
+                        _object_type.property_types[field]  # type: ignore
+                    )
                 ):
                     pq_col = parquet_history[field].to_pylist()
                     for i, item in enumerate(pq_col):
