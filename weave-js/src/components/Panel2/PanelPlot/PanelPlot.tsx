@@ -325,7 +325,7 @@ const useConcreteConfig = (
 
   const concreteConfigLoading = concreteConfigUse.loading;
 
-  const loadable = useMemo(() => {
+  return useMemo(() => {
     let loading: boolean = false;
     let newConfig: ConcretePlotConfig;
     if (concreteConfigLoading) {
@@ -353,13 +353,6 @@ const useConcreteConfig = (
     input,
     stack,
   ]);
-
-  return useMemo(() => {
-    return {
-      config: ensureValidSignals(loadable.config),
-      loading: loadable.loading,
-    };
-  }, [loadable]);
 };
 
 const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
@@ -1787,8 +1780,13 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
   flatResultNodeRef.current = flatResultNode;
   const result = LLReact.useNodeValue(flatResultNode);
 
-  const {config: concreteConfig, loading: concreteConfigLoading} =
+  const {config: unvalidatedConcreteConfig, loading: concreteConfigLoading} =
     useConcreteConfig(config, input, stack);
+
+  const concreteConfig = useMemo(
+    () => ensureValidSignals(unvalidatedConcreteConfig),
+    [unvalidatedConcreteConfig]
+  );
 
   const configRef = useRef<PlotConfig>(config);
   configRef.current = config;
