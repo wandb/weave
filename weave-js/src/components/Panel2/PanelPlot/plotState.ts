@@ -1542,7 +1542,7 @@ export function getThroughArray(
   object: any,
   path: Array<string | number>
 ): any {
-  if (path.length === 0) {
+  if (path.length === 0 || object == null) {
     return object;
   }
 
@@ -1554,11 +1554,6 @@ export function getThroughArray(
     } else {
       return undefined;
     }
-  } else if (typeof object[first] === 'object' && object[first] !== null) {
-    return getThroughArray(object[first], rest);
-  } else if (rest.length === 0) {
-    return object[first];
-  } else {
-    return undefined;
   }
+  return getThroughArray(object[first], rest);
 }
