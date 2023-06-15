@@ -5,6 +5,8 @@ import React, {useCallback, useContext, useState} from 'react';
 import {usePanelContext} from './PanelContext';
 
 interface PanelInteractState {
+  hovered?: boolean;
+  hoveredInOutline?: boolean;
   highlightInputExpr?: boolean;
 }
 
@@ -45,7 +47,7 @@ export const PanelInteractContextProvider: React.FC<{}> = React.memo(
 );
 PanelInteractContextProvider.displayName = 'PanelInteractContextProvider';
 
-const usePanelInteractContext = () => {
+export const usePanelInteractContext = () => {
   const context = useContext(PanelInteractContext);
   if (context == null) {
     throw new Error(
@@ -63,6 +65,28 @@ const usePanelInteractStateByPath = (path: string[]) => {
 
 export const usePanelInputExprIsHighlightedByPath = (path: string[]) => {
   return usePanelInteractStateByPath(path)?.highlightInputExpr === true;
+};
+
+export const usePanelIsHoveredByPath = (path: string[]) => {
+  return usePanelInteractStateByPath(path)?.hovered === true;
+};
+
+export const useGetPanelIsHoveredByGroupPath = (groupPath: string[]) => {
+  const {state} = usePanelInteractContext();
+  return (panelPath: string) => {
+    const pathString = [...groupPath, panelPath].join('.');
+    return state.panelState[pathString]?.hovered === true;
+  };
+};
+
+export const useGetPanelIsHoveredInOutlineByGroupPath = (
+  groupPath: string[]
+) => {
+  const {state} = usePanelInteractContext();
+  return (panelPath: string) => {
+    const pathString = [...groupPath, panelPath].join('.');
+    return state.panelState[pathString]?.hoveredInOutline === true;
+  };
 };
 
 const useSetPanelStateByPath = () => {
@@ -96,6 +120,36 @@ export const useSetPanelInputExprIsHighlighted = () => {
         return {
           ...prevState,
           highlightInputExpr: highlight,
+        };
+      });
+    },
+    [setPanelState]
+  );
+};
+
+export const useSetPanelIsHovered = () => {
+  const setPanelState = useSetPanelStateByPath();
+  return useCallback(
+    (path: string[], hovered: boolean) => {
+      setPanelState(path, prevState => {
+        return {
+          ...prevState,
+          hovered,
+        };
+      });
+    },
+    [setPanelState]
+  );
+};
+
+export const useSetPanelIsHoveredInOutline = () => {
+  const setPanelState = useSetPanelStateByPath();
+  return useCallback(
+    (path: string[], hoveredInOutline: boolean) => {
+      setPanelState(path, prevState => {
+        return {
+          ...prevState,
+          hoveredInOutline,
         };
       });
     },

@@ -682,7 +682,7 @@ def _get_history(run: wdt.Run, columns=None):
     # download the files from the urls
 
     with tracer.trace("read_history_parquet"):
-        parquet_history = read_history_parquet(run, 1, columns=columns)
+        parquet_history = read_history_parquet(run, 1, columns=columns) or pa.table([])
 
     # turn the liveset into an arrow table. the liveset is a list of dictionaries
     live_data = run.gql["parquetHistory"]["liveData"]
@@ -692,9 +692,6 @@ def _get_history(run: wdt.Run, columns=None):
             for colname in columns:
                 if colname not in row:
                     row[colname] = None
-
-    if parquet_history is None:
-        return live_data
 
     # get binary fields from history schema - these are serialized json
     binary_fields = [
@@ -715,7 +712,7 @@ def _get_history(run: wdt.Run, columns=None):
     for row in parquet_history:
         row["_step"] = int(row["_step"])
 
-    parquet_history.extend(live_data)
+    history = parquet_history + live_data
 
     with tracer.trace("process_run_dict_obj"):
         return [
@@ -727,7 +724,7 @@ def _get_history(run: wdt.Run, columns=None):
                     run.gql["name"],
                 ),
             )
-            for row in parquet_history
+            for row in history
         ]
 
 

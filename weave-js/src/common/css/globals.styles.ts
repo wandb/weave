@@ -253,6 +253,7 @@ export const MOBILE_WIDTH = 600;
 
 /* Borders */
 export const BORDER_RADIUS_STANDARD = '4px';
+export const BORDER_COLOR_FOCUSED = hexToRGB(TEAL_LIGHT2, 0.6);
 
 /* Typography */
 export const FONT_WEIGHT_STANDARD = 100;
@@ -268,6 +269,10 @@ export const MODAL_SHADOW_LIGHT_MODE = `0px 24px 48px 0px ${hexToRGB(
 export const MODAL_SHADOW_NIGHT_MODE = `0px 24px 48px 0px ${hexToRGB(
   OBLIVION,
   0.48
+)}`;
+export const PANEL_HOVERED_SHADOW = `0px 4px 8px 0px ${hexToRGB(
+  OBLIVION,
+  0.04
 )}`;
 
 /* Scrollbars */

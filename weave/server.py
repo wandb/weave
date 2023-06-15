@@ -27,7 +27,7 @@ from . import engine_trace
 from . import logs
 from . import wandb_api
 from . import util
-
+from . import graph
 
 # A function to monkeypatch the request post method
 # def patch_request_post():
@@ -54,9 +54,15 @@ OptionalAuthType = typing.Optional[
 logger = logging.getLogger("root")
 
 
+@dataclasses.dataclass
+class HandleRequestResponse:
+    results: value_or_error.ValueOrErrors[dict[str, typing.Any]]
+    nodes: value_or_error.ValueOrErrors[graph.Node]
+
+
 def handle_request(
     request, deref=False, serialize_fn=storage.to_python
-) -> value_or_error.ValueOrErrors[dict[str, typing.Any]]:
+) -> HandleRequestResponse:
     start_time = time.time()
     tracer = engine_trace.tracer()
     # nodes = [graph.Node.node_from_json(n) for n in request["graphs"]]
@@ -87,7 +93,7 @@ def handle_request(
                 result = result.safe_map(serialize_fn)
 
     logger.info("Server request done in: %ss" % (time.time() - start_time))
-    return result
+    return HandleRequestResponse(result, nodes)
 
 
 class SubprocessServer(multiprocessing.Process):
@@ -100,7 +106,7 @@ class SubprocessServer(multiprocessing.Process):
         while True:
             req = self.req_queue.get()
             try:
-                resp = handle_request(req).unwrap()
+                resp = handle_request(req).results.unwrap()
                 self.resp_queue.put(resp)
             except:
                 print("Weave subprocess server error")

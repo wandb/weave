@@ -6,7 +6,7 @@ def test_playback():
 
     for payload in [execute_payloads[-1]]:
         res = handle_request(payload, True)
-        res.unwrap()
+        res.results.unwrap()
 
 
 execute_payloads = [

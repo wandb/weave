@@ -31,7 +31,7 @@ import _ from 'lodash';
 import {useCallback, useMemo} from 'react';
 
 import {usePanelContext} from '../PanelContext';
-import {toWeaveType} from '../PanelGroup';
+import {toWeaveType} from '../toWeaveType';
 import {
   ensureDashboard,
   ensureDashboardFromItems,
