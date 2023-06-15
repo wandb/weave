@@ -272,6 +272,24 @@ const stringHashCode = (str: string) => {
   return hash;
 };
 
+const ensureValidSignals = (config: ConcretePlotConfig): ConcretePlotConfig => {
+  // ensure that the domain is valid for the axis type
+  return produce(config, draft =>
+    ['x' as const, 'y' as const].forEach(axisName => {
+      ['domain' as const, 'selection' as const].forEach(signalName => {
+        if (
+          !PlotState.isValidDomainForAxisType(
+            draft.signals[signalName][axisName],
+            PlotState.getAxisType(draft.series[0], axisName)
+          )
+        ) {
+          draft.signals[signalName][axisName] = undefined;
+        }
+      });
+    })
+  );
+};
+
 const useConcreteConfig = (
   config: PlotConfig,
   input: Node,
@@ -307,9 +325,9 @@ const useConcreteConfig = (
 
   const concreteConfigLoading = concreteConfigUse.loading;
 
-  return useMemo(() => {
+  const loadable = useMemo(() => {
     let loading: boolean = false;
-    let newConfig: any;
+    let newConfig: ConcretePlotConfig;
     if (concreteConfigLoading) {
       newConfig = PlotState.defaultConcretePlot(input, stack);
       loading = true;
@@ -324,23 +342,8 @@ const useConcreteConfig = (
             false
           );
         });
-      });
+      }) as any;
     }
-    // ensure that the domain is valid for the axis type
-    ['x' as const, 'y' as const].forEach(axisName => {
-      ['domain' as const, 'selection' as const].forEach(signalName => {
-        if (
-          !PlotState.isValidDomainForAxisType(
-            newConfig.signals[signalName][axisName],
-            PlotState.getAxisType(newConfig.series[0], axisName)
-          )
-        ) {
-          newConfig = produce(newConfig, (draft: any) => {
-            draft.signals[signalName][axisName] = undefined;
-          });
-        }
-      });
-    });
 
     return {config: newConfig, loading};
   }, [
@@ -350,6 +353,13 @@ const useConcreteConfig = (
     input,
     stack,
   ]);
+
+  return useMemo(() => {
+    return {
+      config: ensureValidSignals(loadable.config),
+      loading: loadable.loading,
+    };
+  }, [loadable]);
 };
 
 const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
