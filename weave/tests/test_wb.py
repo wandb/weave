@@ -1408,7 +1408,19 @@ def test_run_history2_media_types(fake_wandb, cache_mode_minimal):
     assert isinstance(result[0][0], wbmedia.ImageArtifactFileRef)
 
     # check that live data is converted properly
-    assert isinstance(result[0][len(result[0]) - 1], wbmedia.ImageArtifactFileRef)
+    last_img = result[0][len(result[0]) - 1]
+    assert isinstance(last_img, wbmedia.ImageArtifactFileRef)
+    assert last_img.boxes == {}
+    assert last_img.masks == {}
+    assert last_img.classes is None
+    assert last_img.path == "media/images/img_999_051320f86e77a481d041.png"
+    assert last_img.format == "png"
+    assert last_img.width == 1024
+    assert last_img.height == 1024
+    assert (
+        last_img.sha256
+        == "051320f86e77a481d041cd317fd2ab66925a2db8218c5e0c6fb61d740f24e8b5"
+    )
 
 
 def run_history_as_of_mocker(q, ndx):
