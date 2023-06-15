@@ -1555,5 +1555,9 @@ export function getThroughArray(
       return undefined;
     }
   }
-  return getThroughArray(object[first], rest);
+  try {
+    return getThroughArray(object[first], rest);
+  } catch (e) {
+    return undefined;
+  }
 }
