@@ -306,7 +306,7 @@ describe('autosuggest', () => {
 
     expectOnlyNodes(result);
     const autosuggestNames = suggestResultNames(result);
-    expect(autosuggestNames).toEqual(['x.isNone', 'x["a"]', 'x["b"]', 'x[]']);
+    expect(autosuggestNames).toEqual(['x["a"]', 'x["b"]', 'x[]', 'x.isNone']);
   });
 
   it('suggest for void node with var in frame', async () => {

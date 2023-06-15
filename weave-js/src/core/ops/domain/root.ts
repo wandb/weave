@@ -491,8 +491,6 @@ export const opRootAuditLogs = makeOp({
       typedDict({
         // AuditLog
         timestamp: 'string' as const,
-        actor_user_id: 'number' as const,
-        audit_log_error: 'string' as const,
         action: 'string' as const,
 
         // DeanomizedContext
@@ -501,16 +499,26 @@ export const opRootAuditLogs = makeOp({
         entity_name: 'string' as const,
         project_name: 'string' as const,
         report_name: 'string' as const,
+        artifact_digest: 'string' as const,
+        artifact_sequence_name: 'string' as const,
+        artifact_version_index: 'number' as const,
 
         // StaticContext
-        entity_asset: 'number' as const,
-        user_asset: 'number' as const,
-        artifact_asset: 'number' as const,
-        project_asset: 'number' as const,
-        report_asset: 'number' as const,
         response_code: 'number' as const,
         cli_version: 'string' as const,
         actor_ip: 'string' as const,
+
+        // AuditLog but less prominent
+        actor_user_id: 'number' as const,
+        audit_log_error: 'string' as const,
+
+        // StaticContext but deanonymized
+        entity_asset: 'number' as const,
+        user_asset: 'number' as const,
+        artifact_asset: 'number' as const,
+        artifact_sequence_asset: 'number' as const,
+        project_asset: 'number' as const,
+        report_asset: 'number' as const,
       })
     ),
     error: 'string' as const,

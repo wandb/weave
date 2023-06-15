@@ -19,8 +19,11 @@ Then start exploring your existing datasets with 1 line of code!:
 
 ```
 import weave
-# ... use any existing dataframe
-weave.show(pandas_df)
+# ... use any existing dataframe, here we load the iris dataframe
+from sklearn.datasets import load_iris
+df = load_iris(as_frame=True).data
+
+weave.show(df)
 ```
 
 For example:
@@ -36,6 +39,16 @@ For example:
 **3. Create and share dashboards**
 
 ![configured_iris_panel](./docs/assets/configured_iris_panel.png)
+
+## 👩‍🏫 Example Notebooks
+
+Weave has example notebooks demonstrating common usage patterns. To use the notebooks, clone this repository and install the examples' dependencies:
+
+```
+pip install '.[examples]'
+```
+
+then run through the notebooks in `./examples`.
 
 ## 🎉 Why Weave?
 
@@ -103,11 +116,9 @@ After installation, check out our [Quick Start Guide](./docs/QUICKSTART.md) to g
 
 Are you passionate about data exploration and open-source projects? Awesome! Weave's community is always looking for contributors. Check out our [Contribution Guide](./docs/CONTRIBUTING.md) to learn how you can make Weave even better!
 
-
 ## 📢 Community
 
 Join our thriving community [Discord](https://discord.gg/nNcvfX9GZ4). It's the perfect place to ask questions, share your projects, or just chat about data exploration.
-
 
 ## 💖 Thanks
 
