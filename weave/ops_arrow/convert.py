@@ -312,7 +312,9 @@ def to_arrow(
         pyarrow_type = arrow_util.arrow_type(mapper.result_type())
 
         arrow_obj = recursively_build_pyarrow_array(obj, pyarrow_type, mapper)
-        weave_obj = ArrowWeaveList(arrow_obj, merged_object_type, artifact)
+        weave_obj: ArrowWeaveList = ArrowWeaveList(
+            arrow_obj, merged_object_type, artifact
+        )
 
         # Save the weave object to the artifact
         # ref = storage.save(weave_obj, artifact=artifact)
