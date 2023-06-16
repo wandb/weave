@@ -835,6 +835,49 @@
     },
     "parameters": {
       "$ref": "#/definitions/parameters"
+    },
+    "scheduler": {
+      "type": "object",
+      "description": "Scheduler params to manage launch sweeps",
+      "properties": {
+        "num_workers": {
+          "type": "integer",
+          "description": "Number of workers in the scheduler manages the number of concurrent sweep runs. -1 for unlimited",
+          "minimum": -1
+        },
+        "resource": {
+          "type": "string",
+          "description": "Resource to use for the scheduler",
+          "enum": [
+            "local-process",
+            "local-container",
+            "kubernetes",
+            "sagemaker",
+            "gcp-vertex"
+          ]
+        },
+        "resource_args": {
+          "type": "object",
+          "description": "Override queue resource arguments for sweep scheduler"
+        },
+        "job": {
+          "type": "string",
+          "description": "Scheduler job to use for sweep"
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the scheduler wandb run"
+        },
+        "docker_image": {
+          "type": "string",
+          "description": "Docker image to use for the scheduler"
+        },
+        "settings": {
+          "type": "object",
+          "description": "Configurable settings for the scheduler"
+        }
+      },
+      "additionalProperties": true
     }
   }
 }
