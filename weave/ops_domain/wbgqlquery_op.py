@@ -29,6 +29,7 @@ def wbgqlquery(query_str, alias_list):
     with tracer.trace("wbgqlquery:public_api"):
         logging.info("Executing GQL query: %s", query_str)
         gql_payload = wandb_gql_query(query_str)
+        logging.info("GQL query result: %s", gql_payload)
     for alias in alias_list:
         if alias not in gql_payload:
             raise errors.WeaveGQLExecuteMissingAliasError(
