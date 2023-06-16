@@ -784,6 +784,7 @@ class List(Type):
         if not obj:
             return cls(UnknownType())
         list_obj_type = TypeRegistry.type_of(obj[0])
+        # for item in obj[1:100]:
         for item in obj[1:]:
             obj_type = TypeRegistry.type_of(item)
             if obj_type is None:

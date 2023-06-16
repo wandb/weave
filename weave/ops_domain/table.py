@@ -3,6 +3,7 @@ import json
 import datetime
 import logging
 import typing
+import asyncio
 
 
 from ..api import op, weave_class
@@ -16,6 +17,7 @@ from .. import weave_internal
 from .. import engine_trace
 from . import wbmedia
 from .. import timestamp as weave_timestamp
+from .. import io_service
 
 
 @dataclasses.dataclass(frozen=True)
@@ -157,6 +159,10 @@ def _data_is_weave_file_format(data):
 
 def _sample_rows(data: list, max_rows: int = 1000) -> list:
     data_len = len(data)
+
+    if data_len > max_rows and max_rows == 2:
+        return [data[0],  data[-1]]
+
     if data_len > max_rows:
         split_size = max_rows // 3
         gap_size = (data_len - max_rows) // 2
@@ -371,7 +377,7 @@ def _table_data_to_weave1_objects(
             )
 
     def _process_cell_value(cell: typing.Any, cell_type: types.Type) -> typing.Any:
-        if isinstance(cell, list) and isinstance(cell_type, types.List):
+        if isinstance(cell, list) and isinstance(cell_type, types.List) and not isinstance(cell_type.object_type, types.BasicType):
             cell = [_process_cell_value(c, cell_type.object_type) for c in cell]
         elif isinstance(cell, dict) and isinstance(cell_type, types.TypedDict):
             cell = {
@@ -536,7 +542,7 @@ def should_infer_type_from_data(col_type: types.Type) -> bool:
 
 
 def _get_rows_and_object_type_from_weave_format(
-    data: typing.Any, file: artifact_fs.FilesystemArtifactFile
+    data: typing.Any, file: artifact_fs.FilesystemArtifactFile, num_parts: int = 1
 ) -> tuple[list, types.TypedDict]:
     rows = []
     artifact = file.artifact
@@ -572,7 +578,8 @@ def _get_rows_and_object_type_from_weave_format(
             # can be very expensive. This could cause down-stream crashes,
             # for example if we don't realize that a column is union of string
             # and int, saving to arrow will crash.
-            unknown_col_example_data = [row[i] for row in _sample_rows(row_data)]
+            sample_max_rows = max(1000 // num_parts, 1)
+            unknown_col_example_data = [row[i] for row in _sample_rows(row_data, sample_max_rows)]
             obj_prop_types[key] = _infer_type_from_col_list(unknown_col_example_data)
             logging.warning(
                 f"Column {key} had type {col_type} requiring data-inferred type. Inferred type as {obj_prop_types[key]}. This may be incorrect due to data sampling"
@@ -616,6 +623,7 @@ def _get_table_like_awl_from_file(
     file: typing.Union[
         artifact_fs.FilesystemArtifactFile, artifact_fs.FilesystemArtifactDir, None
     ],
+    num_parts: int = 1
 ) -> _TableLikeAWLFromFileResult:
     tracer = engine_trace.tracer()
     if file is None or isinstance(file, artifact_fs.FilesystemArtifactDir):
@@ -629,7 +637,7 @@ def _get_table_like_awl_from_file(
     elif file.path.endswith(".partitioned-table.json"):
         awl = _get_partitioned_table_awl_from_file(data, file)
     elif file.path.endswith(".table.json"):
-        awl = _get_table_awl_from_file(data, file)
+        awl = _get_table_awl_from_file(data, file, num_parts)
     else:
         raise errors.WeaveInternalError(
             f"Unknown table file format for path: {file.path}"
@@ -638,14 +646,14 @@ def _get_table_like_awl_from_file(
 
 
 def _get_table_awl_from_file(
-    data: dict, file: artifact_fs.FilesystemArtifactFile
+    data: dict, file: artifact_fs.FilesystemArtifactFile, num_parts: int = 1
 ) -> "ops_arrow.ArrowWeaveList":
     tracer = engine_trace.tracer()
     rows: list = []
     object_type = None
     with tracer.trace("get_table:get_rows_and_object_type"):
         if _data_is_weave_file_format(data):
-            rows, object_type = _get_rows_and_object_type_from_weave_format(data, file)
+            rows, object_type = _get_rows_and_object_type_from_weave_format(data, file, num_parts)
         elif _data_is_legacy_run_file_format(data):
             rows, object_type = _get_rows_and_object_type_from_legacy_format(data, file)
         else:
@@ -665,11 +673,25 @@ def _get_partitioned_table_awl_from_file(
     all_aws: list[ops_arrow.ArrowWeaveList] = []
     part_dir = file.artifact.path_info(parts_path_root)
     if isinstance(part_dir, artifact_fs.FilesystemArtifactDir):
+        asyncio.run(ensure_files(part_dir.files))
+        num_parts = len(part_dir.files)
         for file in part_dir.files.values():
-            all_aws.append(_get_table_like_awl_from_file(file).awl)
+            all_aws.append(_get_table_like_awl_from_file(file, num_parts).awl)
     arrow_weave_list = ops_arrow.ops.concat.raw_resolve_fn(all_aws)
     return arrow_weave_list
 
+async def ensure_files(files: dict[str, artifact_fs.FilesystemArtifactFile]):
+    client = io_service.get_async_client()
+
+    loop = asyncio.get_running_loop()
+
+    tasks = set()
+    async with client.connect() as conn:
+        for file in files.values():
+            uri = file.artifact._read_artifact_uri.with_path(file.path)
+            task = loop.create_task(conn.ensure_file(uri))
+            tasks.add(task)
+        await asyncio.wait(tasks)
 
 def _get_joined_table_awl_from_file(
     data: dict, file: artifact_fs.FilesystemArtifactFile

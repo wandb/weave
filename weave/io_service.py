@@ -497,6 +497,27 @@ class AsyncConnection:
             )
 
         return server_resp.value
+    
+    def manifest(
+        self, artifact_uri: artifact_wandb.WeaveWBArtifactURI
+    ) -> typing.Optional[artifact_wandb.WandbArtifactManifest]:
+        manifest: typing.Optional[artifact_wandb.WandbArtifactManifest] = self.request(
+            "ensure_manifest", str(artifact_uri)
+        )
+        return manifest
+
+    def ensure_file(
+        self, artifact_uri: artifact_wandb.WeaveWBArtifactURI
+    ) -> typing.Optional[str]:
+        return self.request("ensure_file", str(artifact_uri))
+
+    def ensure_file_downloaded(self, download_url: str) -> typing.Optional[str]:
+        return self.request("ensure_file_downloaded", download_url)
+
+    def direct_url(
+        self, artifact_uri: artifact_wandb.WeaveWBArtifactURI
+    ) -> typing.Optional[str]:
+        return self.request("direct_url", str(artifact_uri))
 
     async def sleep(self, seconds: float) -> float:
         return await self.request("sleep", seconds)
@@ -622,3 +643,6 @@ def get_sync_client() -> typing.Union[SyncClient, ServerlessClient]:
     # uncomment this for local debugging
     # return ServerlessClient(filesystem.get_filesystem())
     return SyncClient(get_server(), filesystem.get_filesystem())
+
+def get_async_client() -> AsyncClient:
+    return AsyncClient(get_server())
