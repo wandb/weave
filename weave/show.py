@@ -100,6 +100,11 @@ def _show_params(obj):
     # convert panel_ref to a a get expression.
     show_node = ops.get(panel_ref.branch_uri)
 
+    # This fixes an issue with giant types causing the cell to take forever
+    # for initial render (at least when using the dev server). The UI
+    # will refine the type anyway.
+    show_node.type = types.Any()
+
     return {"weave_node": weavejs_fixes.fixup_node(show_node)}
 
 

@@ -12,4 +12,6 @@ def test_node_to_ref():
     assert ref.extra == ["0", "a"]
 
     node2 = node_ref.ref_to_node(ref)
-    assert graph.nodes_equal(node2, node)
+    assert (
+        str(node2) == 'get("local-artifact:///my-l:fc48d97f6600ff9162ca/obj")[0]["a"]'
+    )

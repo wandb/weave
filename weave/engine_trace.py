@@ -12,13 +12,13 @@ class DummySpan:
         self.log_indent_token = None
 
     def __enter__(self):
-        logging.info("-> %s", self.args[0])
+        logging.debug("-> %s", self.args[0])
         self.log_indent_token = logs.increment_indent()
         return self
 
     def __exit__(self, *args, **kwargs):
         logs.reset_indent(self.log_indent_token)
-        logging.info("<- %s", self.args[0])
+        logging.debug("<- %s", self.args[0])
 
     def set_tag(self, *args, **kwargs):
         pass

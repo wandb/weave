@@ -16,6 +16,7 @@ import {
   OpRenderInfo,
   OpResolverInputTypes,
   OutputNode,
+  Stack,
   Type,
   TypeProcessingConfig,
 } from '../model';
@@ -72,7 +73,8 @@ type ResolveOutputTypeFn<InputType extends InputTypes> = (
   inputTypes: InputType,
   node: OutputNode,
   executableNode: OutputNode,
-  client: Client
+  client: Client,
+  stack: Stack
 ) => Promise<Type>;
 
 type MakeOpInputType<InputType extends InputTypes> = {
@@ -178,7 +180,12 @@ const makeBasicOpResolver =
 
 const makeBasicOpResolveOutputType =
   <InputType extends InputTypes>(refine: ResolveOutputTypeFn<InputType>) =>
-  async (node: OutputNode, executableNode: OutputNode, client: Client) => {
+  async (
+    node: OutputNode,
+    executableNode: OutputNode,
+    client: Client,
+    stack: Stack
+  ) => {
     const inputNodes = node.fromOp.inputs;
     const arg0Name = Object.keys(inputNodes)[0];
     return {
@@ -196,7 +203,8 @@ const makeBasicOpResolveOutputType =
           } as any,
           node,
           executableNode,
-          client
+          client,
+          stack
         )
       ),
     };
@@ -279,7 +287,12 @@ const makeStandardOpResolver =
 
 const makeStandardOpResolveOutputType =
   <InputType extends InputTypes>(refine: ResolveOutputTypeFn<InputType>) =>
-  async (node: OutputNode, executableNode: OutputNode, client: Client) => {
+  async (
+    node: OutputNode,
+    executableNode: OutputNode,
+    client: Client,
+    stack: Stack
+  ) => {
     const inputNodes = node.fromOp.inputs;
     const arg0Name = Object.keys(inputNodes)[0];
     return {
@@ -297,7 +310,8 @@ const makeStandardOpResolveOutputType =
           } as any,
           node,
           executableNode,
-          client
+          client,
+          stack
         )
       ),
     };
@@ -395,7 +409,12 @@ const makeConfigurableStandardOpResolveOutputType =
     refine: ResolveOutputTypeFn<InputType>,
     typeConfig?: TypeProcessingConfig
   ) =>
-  async (node: OutputNode, executableNode: OutputNode, client: Client) => {
+  async (
+    node: OutputNode,
+    executableNode: OutputNode,
+    client: Client,
+    stack: Stack
+  ) => {
     const inputNodes = node.fromOp.inputs;
     const arg0Name = Object.keys(inputNodes)[0];
     return {
@@ -415,7 +434,8 @@ const makeConfigurableStandardOpResolveOutputType =
             } as any,
             node,
             executableNode,
-            client
+            client,
+            stack
           ),
         typeConfig
       ),
@@ -811,14 +831,15 @@ export const makeTaggingStandardOp = <I extends InputTypes>({
     resolveOutputType:
       resolveOutputType != null
         ? makeStandardOpResolveOutputType<I>(
-            async (inputTypes, node, executableNode, context) =>
+            async (inputTypes, node, executableNode, context, stack) =>
               taggedValue(
                 typedDict(inputTypes),
                 await resolveOutputType(
                   inputTypes,
                   node,
                   executableNode,
-                  context
+                  context,
+                  stack
                 )
               )
           )

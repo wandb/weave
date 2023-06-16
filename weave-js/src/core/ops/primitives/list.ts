@@ -19,7 +19,6 @@ import {
   constNodeUnsafe,
   constNumber,
   constString,
-  emptyStack,
   Frame,
   getTagFromTaggedValue,
   getValueFromTaggedValue,
@@ -494,10 +493,15 @@ export const opMap = makeListOp({
       false
     );
   },
-  resolveOutputType: async (inputTypes, node, executableNode, client) => {
+  resolveOutputType: async (
+    inputTypes,
+    node,
+    executableNode,
+    client,
+    stack
+  ) => {
     // Warning: This assumes that all members in array have the same type!
     // Not a particularly good assumption. We're not really using opMap
-    // right now.
     const inputs = node.fromOp.inputs;
     const mapFn = inputs.mapFn;
     const arrType = inputTypes.arr as ListType;
@@ -522,7 +526,7 @@ export const opMap = makeListOp({
       HL.refineNode(
         client,
         mapFn.val,
-        pushFrame(emptyStack(), {
+        pushFrame(stack, {
           row: opIndex({arr: runnableNode, index: constNumber(i)}),
         })
       )
@@ -711,7 +715,13 @@ export const opGroupby = makeListOp({
     // console.timeEnd('opGroupBy-final');
     return Object.values(result);
   },
-  resolveOutputType: async (inputTypes, node, executableNode, context) => {
+  resolveOutputType: async (
+    inputTypes,
+    node,
+    executableNode,
+    context,
+    stack
+  ) => {
     // Warning: This assumes that all members in array have the same type!
     // Not a particularly good assumption. We're not really using opMap
     // right now.
@@ -727,7 +737,7 @@ export const opGroupby = makeListOp({
     const refined = await HL.refineNode(
       context,
       groupByFn.val,
-      pushFrame(emptyStack(), {
+      pushFrame(stack, {
         row: opIndex({arr, index: constNumber(0)}),
       })
     );
@@ -894,7 +904,7 @@ export const opJoin = makeOp({
     }
     return result;
   },
-  resolveOutputType: async (node, executableNode, context) => {
+  resolveOutputType: async (node, executableNode, context, stack) => {
     const {arr1, arr2, alias1, alias2, join1Fn, join2Fn} = node.fromOp.inputs;
     if (
       alias1.nodeType !== 'const' ||
@@ -912,14 +922,14 @@ export const opJoin = makeOp({
     const join1FnValRefined = await HL.refineNode(
       context,
       join1Fn.val,
-      pushFrame(emptyStack(), {
+      pushFrame(stack, {
         row: opIndex({arr: arr1Refined, index: constNumber(0)}),
       })
     );
     const join2FnValRefined = await HL.refineNode(
       context,
       join2Fn.val,
-      pushFrame(emptyStack(), {
+      pushFrame(stack, {
         row: opIndex({arr: arr2Refined, index: constNumber(0)}),
       })
     );
