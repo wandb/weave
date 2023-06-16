@@ -27,6 +27,8 @@ df = iris.data.assign(target=iris.target_names[iris.target])
 weave.show(df)
 ```
 
+![quickstart_gif](./docs/assets/quickstart_table_plot.gif)
+
 For example:
 
 **1. View a dataframe (in this case the Iris dataset)**
