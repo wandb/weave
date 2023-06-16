@@ -94,7 +94,7 @@ export type RefineNodeFn = (
   // An executable version of node (all variables have been derefferenced)
   executableNode: OutputNode,
   client: Client,
-  stack?: Stack
+  stack: Stack
 ) => Promise<OutputNode<Type>>;
 
 /** An op whose body can be generated via a javascript function */

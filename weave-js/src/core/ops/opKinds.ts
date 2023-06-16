@@ -831,14 +831,15 @@ export const makeTaggingStandardOp = <I extends InputTypes>({
     resolveOutputType:
       resolveOutputType != null
         ? makeStandardOpResolveOutputType<I>(
-            async (inputTypes, node, executableNode, context) =>
+            async (inputTypes, node, executableNode, context, stack) =>
               taggedValue(
                 typedDict(inputTypes),
                 await resolveOutputType(
                   inputTypes,
                   node,
                   executableNode,
-                  context
+                  context,
+                  stack
                 )
               )
           )
