@@ -11,3 +11,4 @@ soundfile>=0.11.0
 pytest-asyncio>=0.20.3
 hypothesis>=6.68.3
 numpy<1.24  # shap uses np.bool which is removed in 1.24
+Faker>=16.0  # used for synthetic data generation
