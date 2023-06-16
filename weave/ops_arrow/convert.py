@@ -288,12 +288,14 @@ def to_arrow_from_list_and_artifact(
     return ArrowWeaveList(arrow_obj, merged_object_type, artifact)
 
 
-def to_arrow(obj, wb_type=None):
+def to_arrow(
+    obj, wb_type=None, artifact: typing.Optional[artifact_base.Artifact] = None
+):
     if isinstance(obj, ArrowWeaveList):
         return obj
     if wb_type is None:
         wb_type = types.TypeRegistry.type_of(obj)
-    artifact = artifact_mem.MemArtifact()
+    artifact = artifact or artifact_mem.MemArtifact()
     outer_tags: typing.Optional[dict[str, typing.Any]] = None
     if isinstance(wb_type, tagged_value_type.TaggedValueType):
         outer_tags = tag_store.get_tags(obj)
@@ -310,7 +312,9 @@ def to_arrow(obj, wb_type=None):
         pyarrow_type = arrow_util.arrow_type(mapper.result_type())
 
         arrow_obj = recursively_build_pyarrow_array(obj, pyarrow_type, mapper)
-        weave_obj = ArrowWeaveList(arrow_obj, merged_object_type, artifact)
+        weave_obj: ArrowWeaveList = ArrowWeaveList(
+            arrow_obj, merged_object_type, artifact
+        )
 
         # Save the weave object to the artifact
         # ref = storage.save(weave_obj, artifact=artifact)
