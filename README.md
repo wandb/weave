@@ -19,12 +19,15 @@ Then start exploring your existing datasets with 1 line of code!:
 
 ```
 import weave
-# ... use any existing dataframe, here we load the iris dataframe
+# use any existing dataframe, here we load the iris data and visualize the labels
 from sklearn.datasets import load_iris
-df = load_iris(as_frame=True).data
+iris = load_iris(as_frame=True)
+df = iris.data.assign(target=iris.target_names[iris.target])
 
 weave.show(df)
 ```
+
+![quickstart_gif](./docs/assets/quickstart_notebook_plot.gif)
 
 For example:
 
