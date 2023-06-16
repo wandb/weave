@@ -11,7 +11,7 @@ def test_print_save_val():
     ]
     ref = weave.save(data, name="my-data")
     # converting to string should give us an expression
-    assert str(ref) == 'get("local-artifact:///my-data:0ede263a967353f0ddb2/obj")'
+    assert str(ref) == 'get("local-artifact:///my-data:latest/obj")'
 
     # show should use the same expression
     show_params = _show_params(ref)
@@ -22,7 +22,7 @@ def test_print_save_val():
     panel = weave.use(show_params["weave_node"])
     assert (
         str(panel.config.items["my-data"])
-        == 'get("local-artifact:///my-data:0ede263a967353f0ddb2/obj")'
+        == 'get("local-artifact:///my-data:latest/obj")'
     )
 
     versions = weave.versions(ref)
@@ -36,7 +36,7 @@ def test_print_save_val():
     ]
     ref = weave.save(data, name="my-data")
 
-    assert str(ref) == 'get("local-artifact:///my-data:e29ccef26ed48b2b59ca/obj")'
+    assert str(ref) == 'get("local-artifact:///my-data:latest/obj")'
     show_params = _show_params(ref)
     assert (
         str(show_params["weave_node"])
@@ -45,7 +45,7 @@ def test_print_save_val():
     panel = weave.use(show_params["weave_node"])
     assert (
         str(panel.config.items["my-data"])
-        == 'get("local-artifact:///my-data:e29ccef26ed48b2b59ca/obj")'
+        == 'get("local-artifact:///my-data:latest/obj")'
     )
 
     versions = weave.versions(ref)
@@ -59,6 +59,4 @@ def test_print_save_val():
 def test_save_val_ops():
     ref = weave.save(5, "my-num")
     result = (ref + 2) * 3
-    assert (
-        str(result)
-    ) == 'get("local-artifact:///my-num:a40302fe175f87a66254/obj").add(2).mult(3)'
+    assert (str(result)) == 'get("local-artifact:///my-num:latest/obj").add(2).mult(3)'
