@@ -13,12 +13,11 @@ Whether you are a seasoned data scientist, an aspiring ML practitioner, or just 
 
 ## Quickstart
 
-Install `weave` using `pip install weave`.
+Install `weave` using `pip install weave` and `import weave` in your notebook.
 
 Then start exploring your existing datasets with 1 line of code!:
 
 ```
-import weave
 # use any existing dataframe, here we load the iris data and visualize the labels
 from sklearn.datasets import load_iris
 iris = load_iris(as_frame=True)
