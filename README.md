@@ -27,7 +27,9 @@ df = iris.data.assign(target=iris.target_names[iris.target])
 weave.show(df)
 ```
 
-![quickstart_gif](./docs/assets/quickstart_notebook_plot.gif)
+<img src="./docs/assets/qs_table_plot.gif" width="100%">
+
+[Try this in a Jupyter notebook ->](./examples/experimental/skip_test/weave_demo_quickstart.ipynb)
 
 For example:
 
