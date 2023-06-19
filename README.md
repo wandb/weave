@@ -11,11 +11,13 @@ Our mission is to equip Machine Learning practitioners with the best tools to tu
 
 Whether you are a seasoned data scientist, an aspiring ML practitioner, or just a tech enthusiast eager to play with data, Weave is for you.
 
-## Quickstart
+## Weave Quickstart
 
-Install `weave` using `pip install weave` and `import weave` in your notebook.
+[Run in a Jupyter notebook ->](./examples/experimental/skip_test/weave_demo_quickstart.ipynb)
 
-Then start exploring your existing datasets with 1 line of code!:
+Install via `pip install weave`, `import weave` in your notebook, and start exploring your datasets with one line of code!
+
+**1. View a dataframe**
 
 ```
 # use any existing dataframe, here we load the iris data and visualize the labels
@@ -26,19 +28,11 @@ df = iris.data.assign(target=iris.target_names[iris.target])
 weave.show(df)
 ```
 
-<img src="./docs/assets/qs_table_plot.gif" width="100%">
-
-[Try this in a Jupyter notebook ->](./examples/experimental/skip_test/weave_demo_quickstart.ipynb)
-
-For example:
-
-**1. View a dataframe (in this case the Iris dataset)**
-
 ![first_show](./docs/assets/first_show.png)
 
-**2. Interactively derive insights**
+**2. Add a plot**
 
-![beginning_exploration](./docs/assets/beginning_exploration.png)
+<img src="./docs/assets/qs_table_plot.gif" width="100%">
 
 **3. Create and share dashboards**
 
