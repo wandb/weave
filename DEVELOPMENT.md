@@ -54,8 +54,7 @@ export PATH="$HOME/.cargo/bin:$PATH"
 Install frontend deps (on osx):
 
 ```
-# TODO: I think this is missing some needed stuff, but I don't have a fresh machine for testing.
-brew install n yarn jq
+brew install n yarn jq pixman cairo pango
 cd weave-js
 yarn install
 ```
