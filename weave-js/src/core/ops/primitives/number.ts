@@ -511,7 +511,15 @@ export const opNumberBinsFixed = OpKinds.makeStandardOp({
 export const opNumbersBinEqual = OpKinds.makeBasicOp({
   hidden: true,
   name: 'numbers-binsequal',
-  argTypes: {arr: {type: 'list', objectType: 'number'}, bins: 'number'},
+  // More null type hacking for beautiful charts example
+  // TODO: fix
+  argTypes: {
+    arr: {
+      type: 'list',
+      objectType: {type: 'union', members: ['none', 'number']},
+    },
+    bins: 'number',
+  },
   description: '', // TODO: Add description if unhidden
   argDescriptions: {
     arr: '', // TODO: Add description if unhidden

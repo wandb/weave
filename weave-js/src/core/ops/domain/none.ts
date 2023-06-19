@@ -70,6 +70,10 @@ export const opNoneCoalesce = makeOp({
   returnValueDescription:
     'The second value if the first is null, otherwise the first value',
   returnType: inputs => {
+    // Major hacking, just getting beautiful charts notebook example working.
+    // TODO: Fix
+    return union([inputs.lhs.type, inputs.rhs.type]);
+    NS, CLC;
     /*
     type options: CS, NS, CLC, CLN, NLC, NLN
     nullable? (nullable is either none or maybe)
@@ -115,9 +119,14 @@ export const opNoneCoalesce = makeOp({
               NLC   union<nonnull<lhs>, rhs>
               NLN   union<rhs, list<union<nonnull<nonnull<lhs>.objtype>, nonnull<rhs>.objtype>>>
     */
-    const lhs = isTaggedValue(inputs.lhs.type)
-      ? inputs.lhs.type.value
-      : inputs.lhs.type;
+    let lhs;
+    try {
+      lhs = isTaggedValue(inputs.lhs.type)
+        ? inputs.lhs.type.value
+        : inputs.lhs.type;
+    } catch (e) {
+      console.log('CAUGHT NONE', e);
+    }
     const lhsTagged = (type: Type) => {
       return isTaggedValue(inputs.lhs.type)
         ? taggedValue(inputs.lhs.type.tag, type)

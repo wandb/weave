@@ -581,19 +581,22 @@ export async function refineEditingNode(
 
       // TODO: BIG Weave Python hacks here.
       const inputType = inputsRefined[name].type;
-      if (isFunctionType(inputType)) {
-        if (!isFunctionType(opDef.inputTypes[name])) {
-          // inputsRefined[name].type = inputType.outputType;
-          inputsRefined[name] = {
-            nodeType: 'output',
-            type: inputType.outputType,
-            fromOp: {
-              name: 'execute',
-              inputs: {node: inputsRefined[name]},
-            },
-          };
-        }
-      }
+      // Due to null type hacking in this PR, this was breaking stuff
+      // (overly inserting execute because of the null stuff).
+      // TODO: fix.
+      // if (isFunctionType(inputType)) {
+      //   if (!isFunctionType(opDef.inputTypes[name])) {
+      //     // inputsRefined[name].type = inputType.outputType;
+      //     inputsRefined[name] = {
+      //       nodeType: 'output',
+      //       type: inputType.outputType,
+      //       fromOp: {
+      //         name: 'execute',
+      //         inputs: {node: inputsRefined[name]},
+      //       },
+      //     };
+      //   }
+      // }
     });
 
     const hasValidInput = opInputsAreValid(inputsRefined, opDef);

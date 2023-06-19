@@ -31,7 +31,10 @@ def number_bins_fixed(step):
 
 @op(
     name="numbers-binsequal",
-    input_type={"arr": types.List(types.Number()), "bins": types.Number()},
+    # Type hacking. TODO: These should not be committed in this PR
+    # There was an issue with how coalesce works and I did a bunch of hacking
+    # to just get the notebook to run
+    input_type={"arr": types.List(types.optional(types.Number())), "bins": types.Number()},
     output_type=Function(
         input_types={"row": types.Number()}, output_type=NumberBinType  # type: ignore
     ),
@@ -48,9 +51,12 @@ def numbers_bins_equal(arr, bins):
     name="number-bin",
     input_type={
         "in_": types.Number(),
-        "bin_fn": Function(
+        # Type hacking. TODO: These should not be committed in this PR
+        # There was an issue with how coalesce works and I did a bunch of hacking
+        # to just get the notebook to run
+        "bin_fn": types.optional(Function(
             input_types={"row": types.Number()}, output_type=NumberBinType  # type: ignore
-        ),
+        )),
     },
     output_type=NumberBinType,  # type: ignore
 )
