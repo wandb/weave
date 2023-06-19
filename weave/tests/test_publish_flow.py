@@ -336,7 +336,8 @@ def _perform_post_persist_assertions(
     else:
         assert p_art.version == expected_commit_hash
 
-    assert p_ref.branch == p_art.branch == branch_name
+    assert p_ref.branch == p_art.branch
+    assert p_art.branch == branch_name
 
     # Branchpoint Assertions
     assert p_ref.branch_point == p_art.branch_point == expected_branchpoint

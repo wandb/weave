@@ -84,6 +84,13 @@ def pre_post_each_test(test_artifact_dir, caplog):
 
 
 @pytest.fixture()
+def cache_mode_minimal():
+    os.environ["WEAVE_NO_CACHE"] = "true"
+    yield
+    del os.environ["WEAVE_NO_CACHE"]
+
+
+@pytest.fixture()
 def fresh_server_logfile():
     def _clearlog():
         try:

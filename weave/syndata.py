@@ -5,6 +5,8 @@ import pyarrow as pa
 from .ops_arrow import ArrowWeaveList
 from scipy.signal import butter, filtfilt
 
+from . import util
+
 value_fns: list[typing.Any] = [
     lambda steps: steps**2,
     lambda steps: np.cos(steps * 0.0001),
@@ -87,3 +89,21 @@ def random_metrics(
         data[f"metric{j}"] = values + noise_fraction * values * noise
 
     return ArrowWeaveList(pa.table(data))
+
+
+def random_runs(n_runs: int, n_steps: int, n_metrics: int) -> ArrowWeaveList:
+    runs = []
+    for i in range(n_runs):
+        history = random_metrics(n_steps, n_metrics)._arrow_data
+        hist_array = pa.ListArray.from_arrays([0, len(history)], history)
+        config_array = pa.StructArray.from_arrays(
+            [[random.choice(["a", "b", "c"])], [random.choice(["x", "y"])]],
+            ["a", "b"],
+        )
+        run_id = util.rand_string_n(8)
+        run = pa.StructArray.from_arrays(
+            [[run_id], config_array, hist_array], ["id", "config", "history"]
+        )
+        runs.append(run)
+    runs_array = pa.concat_arrays(runs)
+    return ArrowWeaveList(runs_array)

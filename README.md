@@ -13,18 +13,22 @@ Whether you are a seasoned data scientist, an aspiring ML practitioner, or just 
 
 ## Quickstart
 
-Install `weave` using `pip install weave`.
+Install `weave` using `pip install weave` and `import weave` in your notebook.
 
 Then start exploring your existing datasets with 1 line of code!:
 
 ```
-import weave
-# ... use any existing dataframe, here we load the iris dataframe
+# use any existing dataframe, here we load the iris data and visualize the labels
 from sklearn.datasets import load_iris
-df = load_iris(as_frame=True).data
+iris = load_iris(as_frame=True)
+df = iris.data.assign(target=iris.target_names[iris.target])
 
 weave.show(df)
 ```
+
+<img src="./docs/assets/qs_table_plot.gif" width="100%">
+
+[Try this in a Jupyter notebook ->](./examples/experimental/skip_test/weave_demo_quickstart.ipynb)
 
 For example:
 
