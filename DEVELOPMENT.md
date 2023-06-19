@@ -24,8 +24,8 @@ This sets up a virtualenv using pyenv. Other systems that provide
 python environments should work, but they are untested.
 
 ```
-pyenv virtualenv 3.9.7 weave2
-pyenv local weave2
+pyenv virtualenv 3.9.7 weave
+pyenv local weave
 ```
 
 Upgrade pip, otherwise you may end up using a broken version
@@ -87,3 +87,7 @@ weave.use_frontend_devmode()
 This tells the weave API to load the frontend from the development server on port :3000. The dev frontend will talk to your running backdend server on port :9994.
 
 You can tell everything is working if the weave UI renders and you see your server print out some logs whenever you interact with weave.
+
+## Environment variables
+
+Some ops require environment variables to be set, like OPENAI_API_KEY. You need to set these for the server environment and your Jupyter notebook.
