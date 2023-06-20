@@ -22,6 +22,8 @@ from . import parallelism
 
 from .language_features.tagging import tag_store
 
+USE_PARALLEL_DOWNLOAD = True
+
 
 class DeriveOpHandler:
     """
@@ -249,7 +251,10 @@ class MappedDeriveOpHandler(DeriveOpHandler):
                     res = storage.deref(res)
                     return res
 
-                res = list(parallelism.do_in_parallel(do_one, list_))
+                if USE_PARALLEL_DOWNLOAD:
+                    res = list(parallelism.do_in_parallel(do_one, list_))
+                else:
+                    res = list(map(do_one, list_))
 
                 # file-table needs to flow tags, but we lose them going across the
                 # thread boundary.
