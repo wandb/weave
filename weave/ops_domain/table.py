@@ -18,6 +18,7 @@ from .. import engine_trace
 from . import wbmedia
 from .. import timestamp as weave_timestamp
 from .. import io_service
+from .. import util
 
 
 @dataclasses.dataclass(frozen=True)
@@ -155,24 +156,6 @@ def _data_is_legacy_run_file_format(data):
 
 def _data_is_weave_file_format(data):
     return "columns" in data and "data" in data and "column_types" in data
-
-
-def _sample_rows(data: list, max_rows: int = 1000) -> list:
-    data_len = len(data)
-
-    if data_len > max_rows and max_rows == 2:
-        return [data[0],  data[-1]]
-
-    if data_len > max_rows:
-        split_size = max_rows // 3
-        gap_size = (data_len - max_rows) // 2
-        start_split = data[:split_size]
-        middle_start = split_size + gap_size
-        middle_split = data[middle_start : middle_start + split_size]
-        end_split = data[-split_size:]
-        return start_split + middle_split + end_split
-    return data
-
 
 def _infer_type_from_cell(cell: typing.Any) -> types.Type:
     if isinstance(cell, dict) and "_type" in cell and isinstance(cell["_type"], str):
@@ -579,7 +562,7 @@ def _get_rows_and_object_type_from_weave_format(
             # for example if we don't realize that a column is union of string
             # and int, saving to arrow will crash.
             sample_max_rows = max(1000 // num_parts, 1)
-            unknown_col_example_data = [row[i] for row in _sample_rows(row_data, sample_max_rows)]
+            unknown_col_example_data = [row[i] for row in util.sample_rows(row_data, sample_max_rows)]
             obj_prop_types[key] = _infer_type_from_col_list(unknown_col_example_data)
             logging.warning(
                 f"Column {key} had type {col_type} requiring data-inferred type. Inferred type as {obj_prop_types[key]}. This may be incorrect due to data sampling"
@@ -605,7 +588,7 @@ def _get_rows_and_object_type_from_legacy_format(
     # W&B dataframe columns are ints, we always want strings
     data["columns"] = [str(c) for c in data["columns"]]
     raw_rows = [dict(zip(data["columns"], row)) for row in data["data"]]
-    object_type = _infer_type_from_row_dicts(_sample_rows(raw_rows))
+    object_type = _infer_type_from_row_dicts(util.sample_rows(raw_rows))
 
     rows = _table_data_to_weave1_objects(raw_rows, file, object_type)
     object_type = _patch_legacy_image_file_types(rows, object_type, file, True)

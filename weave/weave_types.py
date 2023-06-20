@@ -11,6 +11,7 @@ from . import box
 from . import errors
 from . import mappers_python
 from . import timestamp as weave_timestamp
+from . import util
 
 
 if typing.TYPE_CHECKING:
@@ -784,7 +785,7 @@ class List(Type):
         if not obj:
             return cls(UnknownType())
         list_obj_type = TypeRegistry.type_of(obj[0])
-        for item in obj[1:100]:
+        for item in util.sample_rows(obj[1:], 99):
             obj_type = TypeRegistry.type_of(item)
             if obj_type is None:
                 raise Exception("can't detect type for object: %s" % item)
