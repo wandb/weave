@@ -9,13 +9,13 @@ import CustomPanelRenderer, {
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import {
   constNode,
-  // constFunction,
+  constFunction,
   ConstNode,
   constNodeUnsafe,
   constNone,
   constNumber,
   constString,
-  // constStringList,
+  constStringList,
   escapeDots,
   Frame,
   isAssignableTo,
@@ -28,26 +28,25 @@ import {
   Node,
   numberBin,
   oneOrMany,
-  // opAnd,
+  opAnd,
   opArray,
   opDict,
-  // opContains,
-  // opDateToNumber,
-  // opDict,
-  // opFilter,
+  opContains,
+  opDateToNumber,
+  opFilter,
   opIndex,
   // opMap,
   // opMerge,
-  // opNumberGreaterEqual,
-  // opNumberLessEqual,
-  // opNumberMult,
+  opNumberGreaterEqual,
+  opNumberLessEqual,
+  opNumberMult,
   opPick,
   // opRandomlyDownsample,
   opRunId,
   opRunName,
   OpStore,
   opUnnest,
-  // OutputNode,
+  OutputNode,
   Stack,
   Type,
   typedDict,
@@ -100,11 +99,11 @@ import {PanelPlotRadioButtons} from './RadioButtons';
 import {
   AnyPlotConfig,
   ConcretePlotConfig,
-  // AxisSelections,
-  // ContinuousSelection,
+  AxisSelections,
+  ContinuousSelection,
   DEFAULT_SCALE_TYPE,
   DIM_NAME_MAP,
-  // DiscreteSelection,
+  DiscreteSelection,
   LAZY_PATHS,
   LINE_SHAPES,
   MarkOption,
@@ -1401,8 +1400,6 @@ function fixKeyForVegaTable(
   );
 }
 
-/*
-
 function filterTableNodeToContinuousSelection(
   node: Node,
   colId: string,
@@ -1446,6 +1443,7 @@ function filterTableNodeToContinuousSelection(
     }),
   });
 }
+/*
 
 async function mergeRealizedTableData(
   oldTable: _.Dictionary<any>[],
@@ -1455,6 +1453,7 @@ async function mergeRealizedTableData(
   const uniqueArray = _.uniqBy(flatArray, '_rowIndex');
   return _.sortBy(uniqueArray, '_rowIndex');
 }
+*/
 
 function filterTableNodeToDiscreteSelection(
   node: Node,
@@ -1511,7 +1510,6 @@ function filterTableNodeToSelection(
   }
   return node;
 }
-*/
 
 function getMark(
   series: SeriesConfig,
@@ -1701,6 +1699,20 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
   const updateConfigRef = useRef<typeof updateConfig>(updateConfig);
   updateConfigRef.current = updateConfig;
 
+  const {config: unvalidatedConcreteConfig, loading: concreteConfigLoading} =
+    useConcreteConfig(config, input, stack);
+
+  const concreteConfig = useMemo(
+    () => ensureValidSignals(unvalidatedConcreteConfig),
+    [unvalidatedConcreteConfig]
+  );
+
+  const configRef = useRef<PlotConfig>(config);
+  configRef.current = config;
+
+  const concreteConfigRef = useRef<ConcretePlotConfig>(concreteConfig);
+  concreteConfigRef.current = concreteConfig;
+
   // side effect
   useEffect(() => {
     if (config.configVersion !== props.config?.configVersion) {
@@ -1737,26 +1749,27 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     } = {};
 
     const reduced = vegaReadyTables.reduce((acc, val, i) => {
-      const node: Node = listOfTableNodes[i];
-      /*
+      let node: Node = listOfTableNodes[i];
 
-      const series = config.series[i];
+      if (isDash) {
+        const series = config.series[i];
 
-      const mark = getMark(series, node, series.table);
-      if (['line', 'point'].includes(mark)) {
-        ['x' as const, 'y' as const]
-          .filter(axisName => mark === 'point' || axisName === 'x')
-          .forEach(axisName => {
-            node = filterTableNodeToSelection(
-              node,
-              config.signals.domain,
-              series,
-              axisName,
-              weave.client.opStore
-            );
-          });
+        const mark = getMark(series, node, series.table);
+        if (['line', 'point', 'area'].includes(mark)) {
+          ['x' as const, 'y' as const]
+            .filter(axisName => axisName === 'x')
+            .forEach(axisName => {
+              node = filterTableNodeToSelection(
+                node,
+                concreteConfig.signals.domain,
+                series,
+                axisName,
+                weave.client.opStore
+              );
+            });
+        }
       }
-      */
+
       /*
       if (isDash) {
         node = opRandomlyDownsample({
@@ -1771,7 +1784,14 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
       return acc;
     }, arrayArg);
     return opArray(reduced as any);
-  }, [vegaReadyTables, listOfTableNodes]); // , isDash]);
+  }, [
+    vegaReadyTables,
+    listOfTableNodes,
+    isDash,
+    config.series,
+    concreteConfig.signals.domain,
+    weave.client.opStore,
+  ]); // , isDash]);
 
   const flatResultNodeRef = useRef(flatResultNode);
 
@@ -1779,20 +1799,6 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
 
   flatResultNodeRef.current = flatResultNode;
   const result = LLReact.useNodeValue(flatResultNode);
-
-  const {config: unvalidatedConcreteConfig, loading: concreteConfigLoading} =
-    useConcreteConfig(config, input, stack);
-
-  const concreteConfig = useMemo(
-    () => ensureValidSignals(unvalidatedConcreteConfig),
-    [unvalidatedConcreteConfig]
-  );
-
-  const configRef = useRef<PlotConfig>(config);
-  configRef.current = config;
-
-  const concreteConfigRef = useRef<ConcretePlotConfig>(concreteConfig);
-  concreteConfigRef.current = concreteConfig;
 
   // enables domain sharing
 
