@@ -46,6 +46,7 @@ def do_in_parallel(
     if parallel_budget <= 1:
         return map(do_one, items)
 
+    # Contexts aren't automatically propagated to threads, so we have to do so manually for every context
     memo_ctx = memo._memo_storage.get()
     remaining_budget_per_thread = get_remaining_budget_per_thread(len(items))
     wandb_api_ctx = wandb_api.get_wandb_api_context()
