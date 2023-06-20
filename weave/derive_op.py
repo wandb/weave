@@ -1,7 +1,6 @@
 import copy
 import inspect
 import typing
-from concurrent.futures import ThreadPoolExecutor
 
 
 from . import weave_types as types
