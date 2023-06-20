@@ -21,6 +21,7 @@ from ..ops_arrow import ArrowWeaveListType
 from ..ops_primitives import list_, dict_
 from .. import weave_types as types
 from ..ops_primitives.file import _as_w0_dict_
+from ..ops_domain import wbmedia
 
 from .. import ops_arrow as arrow
 import cProfile
@@ -1130,6 +1131,63 @@ example_history_keys = {
     "lastStep": 9,
 }
 
+history_keys_with_media = {
+    "sets": [],
+    "keys": {
+        "metric2": {
+            "typeCounts": [{"type": "number", "count": 1001}],
+            "previousValue": 1.6397776348651e06,
+        },
+        "_step": {
+            "typeCounts": [{"type": "number", "count": 1001}],
+            "monotonic": True,
+            "previousValue": 1000,
+        },
+        "_runtime": {
+            "typeCounts": [{"type": "number", "count": 1001}],
+            "monotonic": True,
+            "previousValue": 791.536298751831,
+        },
+        "_timestamp": {
+            "typeCounts": [{"type": "number", "count": 1001}],
+            "monotonic": True,
+            "previousValue": 1.68322130708908e09,
+        },
+        "img": {
+            "typeCounts": [
+                {
+                    "type": "image-file",
+                    "count": 1001,
+                    "keys": {
+                        "boxes": [
+                            {
+                                "type": "map",
+                                "keys": {
+                                    "predictions": [
+                                        {
+                                            "type": "boxes2D",
+                                            "keys": {
+                                                "size": [{"type": "number"}],
+                                                "_type": [{"type": "string"}],
+                                                "sha256": [{"type": "string"}],
+                                                "path": [{"type": "string"}],
+                                            },
+                                        }
+                                    ]
+                                },
+                            }
+                        ]
+                    },
+                    "nestedTypes": ["default"],
+                }
+            ],
+            "monotonic": True,
+            "previousValue": -1.7976931348623157e308,
+        },
+    },
+    "lastStep": 1000,
+}
+
 
 def run_history_mocker(q, ndx):
     query_str = q["gql"].loc.source.body
@@ -1154,6 +1212,56 @@ def run_history_mocker(q, ndx):
 
     if "historyKeys" in query_str:
         node["historyKeys"] = example_history_keys
+
+    return {
+        "project_518fa79465d8ffaeb91015dce87e092f": {
+            **fwb.project_payload,  # type: ignore
+            "runs_c1233b7003317090ab5e2a75db4ad965": {"edges": [{"node": node}]},
+        }
+    }
+
+
+def run_history_mocker_with_pq_media(q, ndx):
+    query_str = q["gql"].loc.source.body
+    if "artifact" in query_str:
+        return artifact_version_sdk_response
+
+    node = {
+        **fwb.run_payload,  # type: ignore
+    }
+
+    if "parquetHistory" in query_str:
+        node["parquetHistory"] = {
+            "parquetUrls": ["https://api.wandb.test/test_media.parquet"],
+            "liveData": [
+                {
+                    "metric2": 1639777.6348651,
+                    "_timestamp": 1683221307.0890799,
+                    "_step": 1000.0,
+                    "_runtime": 791.536298751831,
+                    "img": {
+                        "size": 3151148.0,
+                        "height": 1024.0,
+                        "width": 1024.0,
+                        "_type": "image-file",
+                        "format": "png",
+                        "boxes": {
+                            "predictions": {
+                                "path": "media/metadata/boxes2D/img_999_7d232aa991dca7a6e3c5.boxes2D.json",
+                                "size": 551.0,
+                                "_type": "boxes2D",
+                                "sha256": "7d232aa991dca7a6e3c5cd18acc3d3c7da1a865eb6b135f6c9f7af966b9fdfdb",
+                            }
+                        },
+                        "path": "media/images/img_999_051320f86e77a481d041.png",
+                        "sha256": "051320f86e77a481d041cd317fd2ab66925a2db8218c5e0c6fb61d740f24e8b5",
+                    },
+                }
+            ],
+        }
+
+    if "historyKeys" in query_str:
+        node["historyKeys"] = history_keys_with_media
 
     return {
         "project_518fa79465d8ffaeb91015dce87e092f": {
@@ -1228,6 +1336,11 @@ def test_run_history_2(fake_wandb):
                 # we no longer send back system metrics
                 # "system/gpu.0.powerWatts": types.optional(types.Number()),
                 "epoch": types.optional(types.Number()),
+                "predictions_10K": types.optional(
+                    artifact_fs.FilesystemArtifactFileType(
+                        types.Const(types.String(), "json"), table.TableType()
+                    ),
+                ),
             }
         )
     ).assign_type(node.type.value)
@@ -1253,19 +1366,61 @@ def test_run_history_2(fake_wandb):
         None,
     ]
 
-    # now we'll create a graph that fetches two columns and execute it
+    # now we'll create a graph that fetches all three columns and execute it
     epoch_node = node["epoch"]
     pred_node = node["_runtime"]
+    table_node = node["predictions_10K"]
     assert types.List(types.optional(types.Number())).assign_type(pred_node.type.value)
 
     # simulates what a table call would do, selecting multiple columns
-    result = weave.use([epoch_node, pred_node])
-    assert len(result) == 2
+    result = weave.use([epoch_node, pred_node, table_node])
+    assert len(result) == 3
 
     # check the types, result lengths
     assert all(len(r) == 10 for r in result)
     assert all(r == None or isinstance(r, (int, float)) for r in result[0])
     assert all(r == None or isinstance(r, (int, float)) for r in result[1])
+    assert all(
+        r == None or isinstance(r, artifact_fs.FilesystemArtifactFile)
+        for r in result[2]
+    )
+
+
+def test_run_history2_media_types(fake_wandb, cache_mode_minimal):
+    fake_wandb.fake_api.add_mock(run_history_mocker_with_pq_media)
+
+    # this is actually from the launch-test/prodmon project, but mocked here as stacey/mendeleev
+    node = ops.project("stacey", "mendeleev").runs()[0].history2()
+    image_node = node["img"]
+    metric2_node = node["metric2"]
+
+    # simulates what a table call would do, selecting multiple columns
+    result = weave.use([image_node, metric2_node])
+
+    assert types.List(types.optional(wbmedia.ImageArtifactFileRefType())).assign_type(
+        image_node.type
+    )
+    assert types.List(types.optional(types.Number())).assign_type(metric2_node.type)
+    assert len(result) == 2
+    assert len(result[0]) == 1001
+
+    # check that parquet data is converted properly
+    assert isinstance(result[0][0], wbmedia.ImageArtifactFileRef)
+
+    # check that live data is converted properly
+    last_img = result[0][len(result[0]) - 1]
+    assert isinstance(last_img, wbmedia.ImageArtifactFileRef)
+    assert last_img.boxes == {}
+    assert last_img.masks == {}
+    assert last_img.classes is None
+    assert last_img.path == "media/images/img_999_051320f86e77a481d041.png"
+    assert last_img.format == "png"
+    assert last_img.width == 1024
+    assert last_img.height == 1024
+    assert (
+        last_img.sha256
+        == "051320f86e77a481d041cd317fd2ab66925a2db8218c5e0c6fb61d740f24e8b5"
+    )
 
 
 def run_history_as_of_mocker(q, ndx):
