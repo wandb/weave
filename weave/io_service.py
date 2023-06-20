@@ -498,26 +498,29 @@ class AsyncConnection:
 
         return server_resp.value
     
-    def manifest(
+    async def manifest(
         self, artifact_uri: artifact_wandb.WeaveWBArtifactURI
     ) -> typing.Optional[artifact_wandb.WandbArtifactManifest]:
-        manifest: typing.Optional[artifact_wandb.WandbArtifactManifest] = self.request(
+        manifest: typing.Optional[artifact_wandb.WandbArtifactManifest] = await self.request(
             "ensure_manifest", str(artifact_uri)
         )
         return manifest
 
-    def ensure_file(
+    async def ensure_file(
         self, artifact_uri: artifact_wandb.WeaveWBArtifactURI
     ) -> typing.Optional[str]:
-        return self.request("ensure_file", str(artifact_uri))
+        res = await self.request("ensure_file", str(artifact_uri))
+        return res
 
-    def ensure_file_downloaded(self, download_url: str) -> typing.Optional[str]:
-        return self.request("ensure_file_downloaded", download_url)
+    async def ensure_file_downloaded(self, download_url: str) -> typing.Optional[str]:
+        res = await self.request("ensure_file_downloaded", download_url)
+        return res
 
-    def direct_url(
+    async def direct_url(
         self, artifact_uri: artifact_wandb.WeaveWBArtifactURI
     ) -> typing.Optional[str]:
-        return self.request("direct_url", str(artifact_uri))
+        res = await self.request("direct_url", str(artifact_uri))
+        return res
 
     async def sleep(self, seconds: float) -> float:
         return await self.request("sleep", seconds)

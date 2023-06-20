@@ -663,6 +663,8 @@ def _get_partitioned_table_awl_from_file(
     arrow_weave_list = ops_arrow.ops.concat.raw_resolve_fn(all_aws)
     return arrow_weave_list
 
+# Download files in a `FilesystemArtifactDir` in parallel.
+# This only downloads files that are `WandbArtifact`s and have a resolved `_read_artifact_uri`.
 async def ensure_files(files: dict[str, artifact_fs.FilesystemArtifactFile]):
     client = io_service.get_async_client()
 
@@ -671,9 +673,10 @@ async def ensure_files(files: dict[str, artifact_fs.FilesystemArtifactFile]):
     tasks = set()
     async with client.connect() as conn:
         for file in files.values():
-            uri = file.artifact._read_artifact_uri.with_path(file.path)
-            task = loop.create_task(conn.ensure_file(uri))
-            tasks.add(task)
+            if isinstance(file.artifact, artifact_wandb.WandbArtifact) and file.artifact._read_artifact_uri:
+                uri = file.artifact._read_artifact_uri.with_path(file.path)
+                task = loop.create_task(conn.ensure_file(uri))
+                tasks.add(task)
         await asyncio.wait(tasks)
 
 def _get_joined_table_awl_from_file(
