@@ -265,9 +265,7 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
             op_def = registry_mem.memory_registry.get_op(op_name)
             if parallel_budget != 1 and op_policy.should_run_in_parallel(op_name):
                 # Parallel threaded case
-                wandb_api_ctx = wandb_api.get_wandb_api_context()
                 result_store = forward_graph.get_node_result_store()
-                outer_tls = get_top_level_stats()
 
                 num_threads = min(len(group), parallel_budget)
                 remaining_budget_per_thread = (
@@ -280,34 +278,22 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
                     forward_graph.ForwardNode,
                     NodeExecutionReport,
                     float,
-                    forward_graph.NodeResultStore,
-                    ExecuteStats,
                 ]:
                     # TODO: I don't think this handles tags correctly.
-                    with wandb_api.wandb_api_context(wandb_api_ctx):
-                        with context.execution_client():
-                            with forward_graph.node_result_store(
-                                result_store
-                            ) as thread_result_store:
-                                with top_level_stats() as tls:
-                                    start_time = time.time()
-                                    try:
-                                        result_report = execute_forward_node(
-                                            fg, x, no_cache
-                                        )
-                                    except Exception as e:
-                                        x.set_result(forward_graph.ErrorResult(e))
-                                        result_report = {
-                                            "cache_used": False,
-                                            "already_executed": False,
-                                        }
-                                    return (
-                                        x,
-                                        result_report,
-                                        time.time() - start_time,
-                                        thread_result_store,
-                                        tls,
-                                    )
+                    start_time = time.time()
+                    try:
+                        result_report = execute_forward_node(fg, x, no_cache)
+                    except Exception as e:
+                        x.set_result(forward_graph.ErrorResult(e))
+                        result_report = {
+                            "cache_used": False,
+                            "already_executed": False,
+                        }
+                    return (
+                        x,
+                        result_report,
+                        time.time() - start_time,
+                    )
 
                 logging.info(
                     "Running %s on %s threads with %s remaining parallel budget each"
@@ -318,8 +304,6 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
                     fn,
                     report,
                     duration,
-                    item_result_store,
-                    item_stats,
                 ) in parallelism.do_in_parallel(do_one, group):
                     stats.add_node(
                         fn.node,
@@ -328,9 +312,6 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
                         report.get("already_executed") or False,
                     )
 
-                    result_store.merge(item_result_store)
-                    if outer_tls is not None:
-                        outer_tls.merge(item_stats)
             else:
                 # Sequential in process case
                 for forward_node in group:

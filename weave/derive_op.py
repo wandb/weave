@@ -239,17 +239,14 @@ class MappedDeriveOpHandler(DeriveOpHandler):
                 or orig_op.name.endswith("run-history")
                 or orig_op.name.endswith("run-history2")
             ):
-                wandb_api_ctx = wandb_api.get_wandb_api_context()
 
                 def do_one(x):
                     if x == None or types.is_optional(first_arg.type):
                         return None
                     called = orig_op(x, **new_inputs)
-                    with wandb_api.wandb_api_context(wandb_api_ctx):
-                        with context.execution_client():
-                            # Use the use path to get caching.
-                            res = weave_internal.use(called)
-                            res = storage.deref(res)
+                    # Use the use path to get caching.
+                    res = weave_internal.use(called)
+                    res = storage.deref(res)
                     return res
 
                 res = list(parallelism.do_in_parallel(do_one, list_))
