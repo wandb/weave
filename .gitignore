@@ -1,5 +1,6 @@
 .python-version
 .ipynb_checkpoints
+.DS_Store
 dist/
 /wandb/
 .wandb_core/

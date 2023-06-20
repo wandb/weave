@@ -193,10 +193,7 @@ class HttpServer(threading.Thread):
 
         # if the passed port is zero then a randomly allocated port will be used. this
         # gets the value of the port that was assigned.
-        global gport
-        if "gport" not in globals():
-            gport = port or self.srv.socket.getsockname()[1]
-        self.port = gport
+        self.port = self.srv.socket.getsockname()[1]
 
     def run(self):
         if _REQUESTED_SERVER_LOG_LEVEL is None:

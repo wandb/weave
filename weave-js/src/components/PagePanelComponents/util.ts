@@ -66,7 +66,8 @@ export const useIsAuthenticated = () => {
 };
 
 export const isServedLocally = () => {
-  return window.location.hostname === 'localhost';
+  return window.location.hostname === 'localhost' ||
+    window.location.hostname.endsWith('colab.googleusercontent.com');
 };
 
 export const uriFromNode = (node: NodeOrVoidNode): string | null => {

@@ -1,13 +1,9 @@
 import json
-import random
-import re
-import string
 import urllib
 import typing
 
 from IPython.display import display
 from IPython.display import IFrame
-from IPython.display import Javascript
 
 from . import context
 from . import graph
@@ -140,31 +136,11 @@ def show(obj=None, height=400):
     panel_url = show_url(obj)
 
     if util.is_colab():
-        usage_analytics.show_called({"colab": True})
-        parsed = re.search(r":(\d+)/(.+)", panel_url)
-        port = int(parsed.group(1))
-        path = parsed.group(2)
-        shell = """
-        (async () => {
-                const url = await google.colab.kernel.proxyPort(%PORT%, {"cache": true});
-                const iframe = document.createElement('iframe');
-                iframe.src = url + '%PATH%';
-                iframe.setAttribute('width', '100%');
-                iframe.setAttribute('height', '%HEIGHT%');
-                iframe.setAttribute('frameborder', 0);
-                iframe.setAttribute('allow', 'clipboard-write');
-                document.body.appendChild(iframe);
-            })();
-        """
-        replacements = [
-            ("%PORT%", "%d" % port),
-            ("%HEIGHT%", "%d" % height),
-            ("%PATH%", path),
-        ]
-        for (k, v) in replacements:
-            shell = shell.replace(k, v)
+        from google.colab.output import serve_kernel_port_as_iframe
 
-        display(Javascript(shell))
+        url = urllib.parse.urlparse(panel_url)
+        usage_analytics.show_called({"colab": True})
+        serve_kernel_port_as_iframe(url.port, path=url.path + "?" + url.query)
     else:
         usage_analytics.show_called()
         iframe = IFrame(panel_url, "100%", "%spx" % height, ['allow="clipboard-write"'])

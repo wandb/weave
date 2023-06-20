@@ -124,12 +124,6 @@ def make_app():
 
     CORS(app, supports_credentials=True)
 
-    @app.after_request
-    def add_header(response):
-        # TODO: maybe make this dynamic
-        # response.headers["x-colab-notebook-cache-control"] = "no-cache"
-        return response
-
     return app
 
 
