@@ -28,14 +28,12 @@ class Boolean:
 
 types.Boolean.instance_class = Boolean
 
-# Sort of made this work, but nowhere near the complexity of the js
-# implementation.
-# TODO: improve more?
-def none_coalesce_output_type(input_types):
-    return types.union(input_types['lhs'], input_types['rhs'])
 
-@op(name="none-coalesce",
-    output_type=none_coalesce_output_type)
+def none_coalesce_output_type(input_types):
+    return types.union(input_types["lhs"], input_types["rhs"])
+
+
+@op(name="none-coalesce", output_type=none_coalesce_output_type)
 def none_coalesce(lhs: typing.Any, rhs: typing.Any):
     # TODO: This logic is really complicated in Weave0.
     return lhs or rhs

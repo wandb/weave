@@ -511,8 +511,6 @@ export const opNumberBinsFixed = OpKinds.makeStandardOp({
 export const opNumbersBinEqual = OpKinds.makeBasicOp({
   hidden: true,
   name: 'numbers-binsequal',
-  // More null type hacking for beautiful charts example
-  // TODO: fix
   argTypes: {
     arr: {
       type: 'list',
