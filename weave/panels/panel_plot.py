@@ -488,16 +488,10 @@ class Plot(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
                         select_functions = {}
                     select_functions[typing.cast(DimName, field.name)] = maybe_dim
 
-            # This doesn't work with the series formulation I used in the
-            # notebook. TODO: Fix.
-
-            # if not (
-            #     (series is not None)
-            #     ^ (select_functions is not None or input_node is not None)
-            # ):
-            #     raise ValueError(
-            #         "Must provide either series or input_node/select_functions/constants, but not both"
-            #     )
+            if not ((series is not None) ^ (select_functions is not None)):
+                raise ValueError(
+                    "Must provide either series or input_node/select_functions/constants, but not both"
+                )
 
             config_series: typing.List[Series]
             if series is not None:
