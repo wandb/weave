@@ -679,6 +679,7 @@ def concat(arr):
     tagged = list(builtin_map(lambda x: arrow_tags.pushdown_list_tags(x), arr))
     return merge_concat(tagged)
 
+
 def merge_concat(arr: list[ArrowWeaveList]) -> ArrowWeaveList:
     if len(arr) == 0:
         raise ValueError("arr must not be empty")
@@ -687,11 +688,15 @@ def merge_concat(arr: list[ArrowWeaveList]) -> ArrowWeaveList:
     left, right = merge_concat_split(arr)
     return merge_concat(left).concat(merge_concat(right))
 
-def merge_concat_split(arr: list[ArrowWeaveList]) -> tuple[list[ArrowWeaveList], list[ArrowWeaveList]]:
+
+def merge_concat_split(
+    arr: list[ArrowWeaveList],
+) -> tuple[list[ArrowWeaveList], list[ArrowWeaveList]]:
     if len(arr) < 2:
         raise ValueError("arr must have length of at least 2")
     middle_index = len(arr) // 2
     return arr[:middle_index], arr[middle_index:]
+
 
 # # Putting this here instead of in number b/c it is just a map function
 # bin_type = types.TypedDict({"start": types.Number(), "stop": types.Number()})

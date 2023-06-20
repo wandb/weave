@@ -421,7 +421,6 @@ class AsyncConnection:
         client_id: str,
         server: Server,
     ) -> None:
-
         self.client_id = client_id
         self.server = server
         response_queue = server.client_response_queues[client_id]
@@ -497,13 +496,13 @@ class AsyncConnection:
             )
 
         return server_resp.value
-    
+
     async def manifest(
         self, artifact_uri: artifact_wandb.WeaveWBArtifactURI
     ) -> typing.Optional[artifact_wandb.WandbArtifactManifest]:
-        manifest: typing.Optional[artifact_wandb.WandbArtifactManifest] = await self.request(
-            "ensure_manifest", str(artifact_uri)
-        )
+        manifest: typing.Optional[
+            artifact_wandb.WandbArtifactManifest
+        ] = await self.request("ensure_manifest", str(artifact_uri))
         return manifest
 
     async def ensure_file(
@@ -646,6 +645,7 @@ def get_sync_client() -> typing.Union[SyncClient, ServerlessClient]:
     # uncomment this for local debugging
     # return ServerlessClient(filesystem.get_filesystem())
     return SyncClient(get_server(), filesystem.get_filesystem())
+
 
 def get_async_client() -> AsyncClient:
     return AsyncClient(get_server())

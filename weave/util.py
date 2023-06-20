@@ -161,12 +161,13 @@ def relpath_no_syscalls(
     ]
     return os.path.sep.join(relative_parts)
 
+
 def sample_rows(data: list, max_rows: int) -> list:
     data_len = len(data)
 
     if data_len <= max_rows:
         return data
-    
+
     if max_rows <= 0:
         return []
     if max_rows == 1:

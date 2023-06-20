@@ -157,6 +157,7 @@ def _data_is_legacy_run_file_format(data):
 def _data_is_weave_file_format(data):
     return "columns" in data and "data" in data and "column_types" in data
 
+
 def _infer_type_from_cell(cell: typing.Any) -> types.Type:
     if isinstance(cell, dict) and "_type" in cell and isinstance(cell["_type"], str):
         maybe_type = types.type_name_to_type(cell["_type"])
@@ -360,7 +361,11 @@ def _table_data_to_weave1_objects(
             )
 
     def _process_cell_value(cell: typing.Any, cell_type: types.Type) -> typing.Any:
-        if isinstance(cell, list) and isinstance(cell_type, types.List) and not isinstance(cell_type.object_type, types.BasicType):
+        if (
+            isinstance(cell, list)
+            and isinstance(cell_type, types.List)
+            and not isinstance(cell_type.object_type, types.BasicType)
+        ):
             cell = [_process_cell_value(c, cell_type.object_type) for c in cell]
         elif isinstance(cell, dict) and isinstance(cell_type, types.TypedDict):
             cell = {
@@ -525,7 +530,9 @@ def should_infer_type_from_data(col_type: types.Type) -> bool:
 
 
 def _get_rows_and_object_type_from_weave_format(
-    data: typing.Any, file: artifact_fs.FilesystemArtifactFile, sample_max_rows: int = 1000
+    data: typing.Any,
+    file: artifact_fs.FilesystemArtifactFile,
+    sample_max_rows: int = 1000,
 ) -> tuple[list, types.TypedDict]:
     rows = []
     artifact = file.artifact
@@ -561,7 +568,9 @@ def _get_rows_and_object_type_from_weave_format(
             # can be very expensive. This could cause down-stream crashes,
             # for example if we don't realize that a column is union of string
             # and int, saving to arrow will crash.
-            unknown_col_example_data = [row[i] for row in util.sample_rows(row_data, sample_max_rows)]
+            unknown_col_example_data = [
+                row[i] for row in util.sample_rows(row_data, sample_max_rows)
+            ]
             obj_prop_types[key] = _infer_type_from_col_list(unknown_col_example_data)
             logging.warning(
                 f"Column {key} had type {col_type} requiring data-inferred type. Inferred type as {obj_prop_types[key]}. This may be incorrect due to data sampling"
@@ -587,7 +596,9 @@ def _get_rows_and_object_type_from_legacy_format(
     # W&B dataframe columns are ints, we always want strings
     data["columns"] = [str(c) for c in data["columns"]]
     raw_rows = [dict(zip(data["columns"], row)) for row in data["data"]]
-    object_type = _infer_type_from_row_dicts(util.sample_rows(raw_rows, sample_max_rows))
+    object_type = _infer_type_from_row_dicts(
+        util.sample_rows(raw_rows, sample_max_rows)
+    )
 
     rows = _table_data_to_weave1_objects(raw_rows, file, object_type)
     object_type = _patch_legacy_image_file_types(rows, object_type, file, True)
@@ -605,7 +616,7 @@ def _get_table_like_awl_from_file(
     file: typing.Union[
         artifact_fs.FilesystemArtifactFile, artifact_fs.FilesystemArtifactDir, None
     ],
-    num_parts: int = 1
+    num_parts: int = 1,
 ) -> _TableLikeAWLFromFileResult:
     tracer = engine_trace.tracer()
     if file is None or isinstance(file, artifact_fs.FilesystemArtifactDir):
@@ -636,9 +647,13 @@ def _get_table_awl_from_file(
     with tracer.trace("get_table:get_rows_and_object_type"):
         sample_max_rows = max(1000 // num_parts, 1)
         if _data_is_weave_file_format(data):
-            rows, object_type = _get_rows_and_object_type_from_weave_format(data, file, sample_max_rows)
+            rows, object_type = _get_rows_and_object_type_from_weave_format(
+                data, file, sample_max_rows
+            )
         elif _data_is_legacy_run_file_format(data):
-            rows, object_type = _get_rows_and_object_type_from_legacy_format(data, file, sample_max_rows)
+            rows, object_type = _get_rows_and_object_type_from_legacy_format(
+                data, file, sample_max_rows
+            )
         else:
             raise errors.WeaveInternalError("Unknown table file format for data")
 
@@ -663,6 +678,7 @@ def _get_partitioned_table_awl_from_file(
     arrow_weave_list = ops_arrow.ops.concat.raw_resolve_fn(all_aws)
     return arrow_weave_list
 
+
 # Download files in a `FilesystemArtifactDir` in parallel.
 # This only downloads files that are `WandbArtifact`s and have a resolved `_read_artifact_uri`.
 async def ensure_files(files: dict[str, artifact_fs.FilesystemArtifactFile]):
@@ -673,11 +689,15 @@ async def ensure_files(files: dict[str, artifact_fs.FilesystemArtifactFile]):
     tasks = set()
     async with client.connect() as conn:
         for file in files.values():
-            if isinstance(file.artifact, artifact_wandb.WandbArtifact) and file.artifact._read_artifact_uri:
+            if (
+                isinstance(file.artifact, artifact_wandb.WandbArtifact)
+                and file.artifact._read_artifact_uri
+            ):
                 uri = file.artifact._read_artifact_uri.with_path(file.path)
                 task = loop.create_task(conn.ensure_file(uri))
                 tasks.add(task)
         await asyncio.wait(tasks)
+
 
 def _get_joined_table_awl_from_file(
     data: dict, file: artifact_fs.FilesystemArtifactFile
