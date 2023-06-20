@@ -265,8 +265,6 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
             op_def = registry_mem.memory_registry.get_op(op_name)
             if parallel_budget != 1 and op_policy.should_run_in_parallel(op_name):
                 # Parallel threaded case
-                result_store = forward_graph.get_node_result_store()
-
                 num_threads = min(len(group), parallel_budget)
                 remaining_budget_per_thread = (
                     parallelism.get_remaining_budget_per_thread(len(group))
