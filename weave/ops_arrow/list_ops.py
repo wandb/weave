@@ -684,17 +684,14 @@ def merge_concat(arr: list[ArrowWeaveList]) -> ArrowWeaveList:
         raise ValueError("arr must not be empty")
     if len(arr) == 1:
         return arr[0]
-    left, right = split(arr)
-    return merge(merge_concat(left), merge_concat(right))
+    left, right = merge_concat_split(arr)
+    return merge_concat(left).concat(merge_concat(right))
 
-def split(arr: list[ArrowWeaveList]) -> tuple[list[ArrowWeaveList], list[ArrowWeaveList]]:
+def merge_concat_split(arr: list[ArrowWeaveList]) -> tuple[list[ArrowWeaveList], list[ArrowWeaveList]]:
     if len(arr) < 2:
         raise ValueError("arr must have length of at least 2")
     middle_index = len(arr) // 2
     return arr[:middle_index], arr[middle_index:]
-
-def merge(left: ArrowWeaveList, right: ArrowWeaveList) -> ArrowWeaveList:
-    return left.concat(right)
 
 # # Putting this here instead of in number b/c it is just a map function
 # bin_type = types.TypedDict({"start": types.Number(), "stop": types.Number()})
