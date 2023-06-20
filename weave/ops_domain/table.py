@@ -525,7 +525,7 @@ def should_infer_type_from_data(col_type: types.Type) -> bool:
 
 
 def _get_rows_and_object_type_from_weave_format(
-    data: typing.Any, file: artifact_fs.FilesystemArtifactFile, num_parts: int = 1
+    data: typing.Any, file: artifact_fs.FilesystemArtifactFile, sample_max_rows: int = 1000
 ) -> tuple[list, types.TypedDict]:
     rows = []
     artifact = file.artifact
@@ -561,7 +561,6 @@ def _get_rows_and_object_type_from_weave_format(
             # can be very expensive. This could cause down-stream crashes,
             # for example if we don't realize that a column is union of string
             # and int, saving to arrow will crash.
-            sample_max_rows = max(1000 // num_parts, 1)
             unknown_col_example_data = [row[i] for row in util.sample_rows(row_data, sample_max_rows)]
             obj_prop_types[key] = _infer_type_from_col_list(unknown_col_example_data)
             logging.warning(
@@ -583,12 +582,12 @@ def _get_rows_and_object_type_from_weave_format(
 
 
 def _get_rows_and_object_type_from_legacy_format(
-    data: dict, file: artifact_fs.FilesystemArtifactFile
+    data: dict, file: artifact_fs.FilesystemArtifactFile, sample_max_rows: int = 1000
 ) -> tuple[list, types.TypedDict]:
     # W&B dataframe columns are ints, we always want strings
     data["columns"] = [str(c) for c in data["columns"]]
     raw_rows = [dict(zip(data["columns"], row)) for row in data["data"]]
-    object_type = _infer_type_from_row_dicts(util.sample_rows(raw_rows))
+    object_type = _infer_type_from_row_dicts(util.sample_rows(raw_rows, sample_max_rows))
 
     rows = _table_data_to_weave1_objects(raw_rows, file, object_type)
     object_type = _patch_legacy_image_file_types(rows, object_type, file, True)
@@ -635,10 +634,11 @@ def _get_table_awl_from_file(
     rows: list = []
     object_type = None
     with tracer.trace("get_table:get_rows_and_object_type"):
+        sample_max_rows = max(1000 // num_parts, 1)
         if _data_is_weave_file_format(data):
-            rows, object_type = _get_rows_and_object_type_from_weave_format(data, file, num_parts)
+            rows, object_type = _get_rows_and_object_type_from_weave_format(data, file, sample_max_rows)
         elif _data_is_legacy_run_file_format(data):
-            rows, object_type = _get_rows_and_object_type_from_legacy_format(data, file)
+            rows, object_type = _get_rows_and_object_type_from_legacy_format(data, file, sample_max_rows)
         else:
             raise errors.WeaveInternalError("Unknown table file format for data")
 
