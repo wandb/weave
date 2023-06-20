@@ -253,7 +253,7 @@ class MappedDeriveOpHandler(DeriveOpHandler):
                             res = storage.deref(res)
                     return res
 
-                res = parallelism.do_in_parallel(do_one, list_)
+                res = list(parallelism.do_in_parallel(do_one, list_))
 
                 # file-table needs to flow tags, but we lose them going across the
                 # thread boundary.
