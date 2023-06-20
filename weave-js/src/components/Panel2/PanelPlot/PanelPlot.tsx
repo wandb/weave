@@ -133,6 +133,7 @@ import {PopupMenu, Section} from '../../Sidebar/PopupMenu';
 const recordEvent = makeEventRecorder('Plot');
 
 // const PANELPLOT_MAX_DATAPOINTS = 2000;
+const DOMAIN_DATAFETCH_EXTRA_EXTENT = 2;
 
 const defaultFontStyleDict = {
   titleFont: 'Source Sans Pro',
@@ -1430,14 +1431,20 @@ function filterTableNodeToContinuousSelection(
         });
       }
 
+      const domainDiff = domain[1] - domain[0];
+
       return opAnd({
         lhs: opNumberGreaterEqual({
           lhs: colNode,
-          rhs: constNumber(domain[0]),
+          rhs: constNumber(
+            domain[0] + DOMAIN_DATAFETCH_EXTRA_EXTENT * domainDiff
+          ),
         }),
         rhs: opNumberLessEqual({
           lhs: colNode,
-          rhs: constNumber(domain[1]),
+          rhs: constNumber(
+            domain[1] - DOMAIN_DATAFETCH_EXTRA_EXTENT * domainDiff
+          ),
         }),
       });
     }),
@@ -1756,17 +1763,15 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
 
         const mark = getMark(series, node, series.table);
         if (['line', 'point', 'area'].includes(mark)) {
-          ['x' as const, 'y' as const]
-            .filter(axisName => axisName === 'x')
-            .forEach(axisName => {
-              node = filterTableNodeToSelection(
-                node,
-                concreteConfig.signals.domain,
-                series,
-                axisName,
-                weave.client.opStore
-              );
-            });
+          ['x' as const].forEach(axisName => {
+            node = filterTableNodeToSelection(
+              node,
+              concreteConfig.signals.domain,
+              series,
+              axisName,
+              weave.client.opStore
+            );
+          });
         }
       }
 
