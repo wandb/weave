@@ -1,7 +1,7 @@
 from concurrent.futures import ThreadPoolExecutor
 import contextlib
 import contextvars
-from typing import Optional, Callable, TypeVar, Iterator
+from typing import Optional, Callable, TypeVar, Iterator, Generator
 
 from . import context
 from . import execute
@@ -18,7 +18,7 @@ _parallel_budget_ctx: contextvars.ContextVar[Optional[int]] = contextvars.Contex
 )
 
 
-def get_parallel_budget():
+def get_parallel_budget() -> int:
     budget = _parallel_budget_ctx.get()
     if budget is None:
         return MAX_PARALLELISM
@@ -26,7 +26,7 @@ def get_parallel_budget():
 
 
 @contextlib.contextmanager
-def parallel_budget_ctx(budget: Optional[int]):
+def parallel_budget_ctx(budget: Optional[int]) -> Generator[None, None, None]:
     token = _parallel_budget_ctx.set(budget)
     try:
         yield
@@ -53,7 +53,7 @@ def do_in_parallel(
     result_store = forward_graph.get_node_result_store()
     top_level_stats = execute.get_top_level_stats()
 
-    def do_one_with_memo_and_parallel_budget(x):
+    def do_one_with_memo_and_parallel_budget(x: ItemType) -> ResultType:
         memo_token = memo._memo_storage.set(memo_ctx)
         thread_result_store = None
         thread_top_level_stats = None
