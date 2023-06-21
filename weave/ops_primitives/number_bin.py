@@ -3,7 +3,7 @@ import math
 from ..api import op, use
 from ..weave_types import Function, NumberBinType, TimeBinType
 from .. import weave_types as types
-from .. import context
+from .. import graph
 from .dict import dict_
 from . import date
 
@@ -31,7 +31,10 @@ def number_bins_fixed(step):
 
 @op(
     name="numbers-binsequal",
-    input_type={"arr": types.List(types.Number()), "bins": types.Number()},
+    input_type={
+        "arr": types.List(types.optional(types.Number())),
+        "bins": types.Number(),
+    },
     output_type=Function(
         input_types={"row": types.Number()}, output_type=NumberBinType  # type: ignore
     ),
@@ -48,11 +51,15 @@ def numbers_bins_equal(arr, bins):
     name="number-bin",
     input_type={
         "in_": types.Number(),
-        "bin_fn": Function(
-            input_types={"row": types.Number()}, output_type=NumberBinType  # type: ignore
+        "bin_fn": types.optional(
+            Function(
+                input_types={"row": types.Number()}, output_type=NumberBinType  # type: ignore
+            )
         ),
     },
     output_type=NumberBinType,  # type: ignore
 )
 def number_bin(in_, bin_fn):
+    if not isinstance(bin_fn, graph.Node) and bin_fn == None:
+        return None
     return use(call_fn(bin_fn, {"row": make_const_node(types.Number(), in_)}))
