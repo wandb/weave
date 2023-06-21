@@ -1411,7 +1411,15 @@ function filterTableNodeToContinuousSelection(
   return opFilter({
     arr: node,
     filterFn: constFunction({row: listObjectType(node.type)}, ({row}) => {
-      const colName = fixKeyForVegaTable(colId, table, opStore);
+      const colName = escapeDots(
+        TableState.getTableColumnName(
+          table.columnNames,
+          table.columnSelectFunctions,
+          colId,
+          opStore
+        )
+      );
+
       let colNode = opPick({obj: row, key: constString(colName)});
 
       // TODO: make this more general and make use of the type system and config to
@@ -1437,13 +1445,13 @@ function filterTableNodeToContinuousSelection(
         lhs: opNumberGreaterEqual({
           lhs: colNode,
           rhs: constNumber(
-            domain[0] + DOMAIN_DATAFETCH_EXTRA_EXTENT * domainDiff
+            domain[0] - DOMAIN_DATAFETCH_EXTRA_EXTENT * domainDiff
           ),
         }),
         rhs: opNumberLessEqual({
           lhs: colNode,
           rhs: constNumber(
-            domain[1] - DOMAIN_DATAFETCH_EXTRA_EXTENT * domainDiff
+            domain[1] + DOMAIN_DATAFETCH_EXTRA_EXTENT * domainDiff
           ),
         }),
       });
@@ -1472,7 +1480,15 @@ function filterTableNodeToDiscreteSelection(
   return opFilter({
     arr: node,
     filterFn: constFunction({row: listObjectType(node.type)}, ({row}) => {
-      const colName = fixKeyForVegaTable(colId, table, opStore);
+      const colName = escapeDots(
+        TableState.getTableColumnName(
+          table.columnNames,
+          table.columnSelectFunctions,
+          colId,
+          opStore
+        )
+      );
+
       const colNode = opPick({obj: row, key: constString(colName)});
       const permittedValues = constStringList(domain);
 
