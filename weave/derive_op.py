@@ -1,7 +1,6 @@
 import copy
 import inspect
 import typing
-from concurrent.futures import ThreadPoolExecutor
 
 
 from . import weave_types as types
@@ -15,11 +14,11 @@ from . import box
 from . import weave_internal
 from . import wandb_api
 from . import box
-from . import memo
 from . import storage
 from . import weave_internal
 from . import execute_fast
 from . import op_policy
+from . import parallelism
 
 from .language_features.tagging import tag_store
 
@@ -242,26 +241,18 @@ class MappedDeriveOpHandler(DeriveOpHandler):
                 or orig_op.name.endswith("run-history")
                 or orig_op.name.endswith("run-history2")
             ):
-                wandb_api_ctx = wandb_api.get_wandb_api_context()
-                memo_ctx = memo._memo_storage.get()
 
                 def do_one(x):
                     if x == None or types.is_optional(first_arg.type):
                         return None
-                    memo_token = memo._memo_storage.set(memo_ctx)
-                    try:
-                        called = orig_op(x, **new_inputs)
-                        with wandb_api.wandb_api_context(wandb_api_ctx):
-                            with context.execution_client():
-                                # Use the use path to get caching.
-                                res = weave_internal.use(called)
-                                res = storage.deref(res)
-                    finally:
-                        memo._memo_storage.reset(memo_token)
+                    called = orig_op(x, **new_inputs)
+                    # Use the use path to get caching.
+                    res = weave_internal.use(called)
+                    res = storage.deref(res)
                     return res
 
                 if USE_PARALLEL_DOWNLOAD:
-                    res = list(ThreadPoolExecutor(max_workers=10).map(do_one, list_))
+                    res = list(parallelism.do_in_parallel(do_one, list_))
                 else:
                     res = list(map(do_one, list_))
 
