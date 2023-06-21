@@ -147,7 +147,7 @@ jobs:
 
   cypress-run:
     name: Notebook and UI tests
-    timeout-minutes: 15
+    timeout-minutes: 25 # 15 minute timeout routinely trips on rerun
     needs:
       - build-container
       # - lint
