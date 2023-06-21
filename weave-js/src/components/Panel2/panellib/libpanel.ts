@@ -53,14 +53,6 @@ interface Dimensions {
   height: number | undefined;
 }
 
-const htmlRules = ['allowScopedStyles'] as const;
-type HTMLRules = (typeof htmlRules)[number];
-
-export type UIConfigOptions = {
-  // allowScopedStyles: in Jupyter panels, allow <style scoped> tags in output html
-  html: HTMLRules[];
-};
-
 export interface PanelSpec<X, C, T extends Type> {
   id: string;
   hidden?: boolean;
@@ -75,12 +67,6 @@ export interface PanelSpec<X, C, T extends Type> {
   ConfigComponent?: React.ComponentType<PanelPropsInternal<any, C, X>>;
   Component: React.ComponentType<PanelPropsInternal<any, C, X>>;
   inputType: T;
-  /**
-   * UI rules are declarative way to toggle behavior in Weave panels
-   *
-   * Downstream code with configuration options will
-   */
-  uiConfig?: UIConfigOptions;
 
   outputType?: (inputType: T) => Type;
 

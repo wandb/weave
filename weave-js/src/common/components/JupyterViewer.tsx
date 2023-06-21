@@ -1,4 +1,3 @@
-import {UIConfigOptions} from '@wandb/weave/components/Panel2/panellib/libpanel';
 import AU from 'ansi_up';
 import classnames from 'classnames';
 import * as Prism from 'prismjs';
@@ -12,11 +11,16 @@ import BasicNoMatchComponent from './BasicNoMatchComponent';
 import {UseLoadFile} from './FileBrowser';
 import MonacoEditor from './Monaco/Editor';
 import WandbLoader from './WandbLoader';
+import {usePanelSettings} from '@wandb/weave/context';
 
 interface JupyterProps {
   file: File;
   useLoadFile: UseLoadFile;
 }
+
+export type JupyterViewPanelSettings = {
+  allowScopedStyles?: boolean;
+};
 
 function sourceAsArray(source: string | string[]): string[] {
   if (typeof source === 'string') {
@@ -176,13 +180,8 @@ function processOutputs(
   return outputs;
 }
 
-type JupyterUIConfig = {
-  rules: UIConfigOptions['html'];
-};
-const JupyterViewerFromRun: React.FC<
-  JupyterProps & JupyterUIConfig
-> = props => {
-  const {useLoadFile, file, rules} = props;
+const JupyterViewerFromRun: React.FC<JupyterProps> = props => {
+  const {useLoadFile, file} = props;
   const [raw, setRaw] = useState<any>();
   const [error, setErrorVal] = useState(false);
   const setError = useCallback(() => setErrorVal(true), [setErrorVal]);
@@ -202,7 +201,7 @@ const JupyterViewerFromRun: React.FC<
     return <WandbLoader name="jupyter-vewier" />;
   }
 
-  return <JupyterViewer raw={raw} rules={rules} />;
+  return <JupyterViewer raw={raw} />;
 };
 
 export const JupyterCell: React.FC<{
@@ -211,8 +210,10 @@ export const JupyterCell: React.FC<{
   saveCode?: (code: string) => void;
   id: string;
   readonly: boolean;
-  rules: UIConfigOptions['html'];
-}> = ({cell, id, runCode, saveCode, readonly, rules = []}) => {
+}> = ({cell, id, runCode, saveCode, readonly}) => {
+  const {allowScopedStyles} = usePanelSettings(
+    'JupyterViewer'
+  ) as JupyterViewPanelSettings;
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   // This effect resizes the iframe so we don't have extra space / scrollbars
@@ -294,10 +295,9 @@ export const JupyterCell: React.FC<{
         <div
           className="output"
           dangerouslySetInnerHTML={{
-            __html: generateHTML(
-              sourceAsArray(cell.source).join(''),
-              rules
-            ).toString(),
+            __html: generateHTML(sourceAsArray(cell.source).join(''), {
+              allowScopedStyles,
+            }).toString(),
           }}
         />
       ) : (
@@ -309,8 +309,7 @@ export const JupyterCell: React.FC<{
 
 export const JupyterViewer: React.FC<{
   raw: string;
-  rules: UIConfigOptions['html'];
-}> = ({raw, rules}) => {
+}> = ({raw}) => {
   const idRef = useRef(ID());
   useEffect(() => {
     Prism.highlightAll();
@@ -341,7 +340,6 @@ export const JupyterViewer: React.FC<{
       {notebook.cells.map((cell, i) => (
         <JupyterCell
           readonly={true}
-          rules={rules}
           cell={cell}
           id={`${idRef.current}-cell-${i}`}
           key={`${idRef.current}-cell-${i}`}

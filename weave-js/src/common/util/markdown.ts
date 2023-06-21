@@ -1,4 +1,3 @@
-import {UIConfigOptions} from '@wandb/weave/components/Panel2/panellib/libpanel';
 import {Schema} from 'hast-util-sanitize';
 import {defaultSchema as gh} from 'hast-util-sanitize/lib/schema';
 import {produce} from 'immer';
@@ -18,29 +17,13 @@ import visit from 'unist-util-visit';
 
 import {blankifyLinks, shiftHeadings} from './html';
 
-const sanitizeRules = _.merge(gh, {
+// exported only for tests
+export const DEFAULT_SANITIZATION_SCHEMA = _.merge(gh, {
   attributes: {'*': ['className', 'style']},
 });
 
-// Hackily convert markdown to text
-export function markdownToText(markdown: string) {
-  const html = generateHTML(markdown);
-  const tempDiv = document.createElement('div');
-  tempDiv.innerHTML = html.toString();
-  const text = tempDiv.textContent || tempDiv.innerText;
-  return text;
-}
-
-type SanitizationRules = UIConfigOptions['html'];
-export function buildSanitizationSchema(
-  rules: SanitizationRules,
-  schema: Schema = sanitizeRules
-) {
-  /**
-   * These are all the known transformations that can be triggered through
-   * declarative rules passed in from outside weave
-   */
-  const rulesToSchemaMap: Record<SanitizationRules[number], Schema> = {
+const SANITIZATION_SCHEMAS_FOR_RULES: Record<keyof SanitizationRules, Schema> =
+  {
     allowScopedStyles: {
       attributes: {
         style: ['scoped'],
@@ -49,24 +32,27 @@ export function buildSanitizationSchema(
     },
   };
 
-  // recursively build up the sanitization object merging in the transformations
-  // coupled to each rule
-  // NOTE: this assumes rules relax strictness. I'm not sure this model would work for
-  // additional strictness on the schema. If we get that scenario we'll need to test
-  const newSchema = rules.reduce(
-    (schema: Schema, rule: SanitizationRules[number]) => {
-      return _.merge(schema, rulesToSchemaMap[rule]);
-    },
-    schema
-  );
+export function markdownToText(markdown: string, rules: SanitizationRules) {
+  const html = generateHTML(markdown, rules);
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = html.toString();
+  const text = tempDiv.textContent || tempDiv.innerText;
+  return text;
+}
+
+type SanitizationRules = {allowScopedStyles?: boolean};
+export function buildSanitizationSchema(rules?: SanitizationRules) {
+  // Since this function deals with security, it is deliberately written in a simple
+  // and understandable manner
+  const newSchema = {...DEFAULT_SANITIZATION_SCHEMA};
+  if (rules?.allowScopedStyles) {
+    Object.assign(newSchema, SANITIZATION_SCHEMAS_FOR_RULES.allowScopedStyles);
+  }
 
   return newSchema;
 }
 
-export function generateHTML(
-  markdown: string,
-  rules: UIConfigOptions['html'] = []
-) {
+export function generateHTML(markdown: string, rules?: SanitizationRules) {
   const sanitizationSchema = buildSanitizationSchema(rules);
   // IMPORTANT: We must sanitize as the final step of the pipeline to prevent XSS
   const vfile = (
@@ -93,7 +79,7 @@ export function generateHTML(
   return vfile;
 }
 
-export function sanitizeHTML(html: string) {
+export function sanitizeHTML(html: string, sanitizeRules?: SanitizationRules) {
   return unified()
     .use(parseHTML)
     .use(stringify as any)

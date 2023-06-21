@@ -4,7 +4,6 @@ import React from 'react';
 
 import * as CGReact from '../../../react';
 import * as Panel2 from '../panel';
-import {UIConfigOptions} from '../panellib/libpanel';
 import {inputType} from './common';
 
 type PanelJupyterProps = Panel2.PanelProps<typeof inputType>;
@@ -29,11 +28,7 @@ const PanelJupyter: React.FC<PanelJupyterProps> = props => {
         flex: '1 1 auto',
         overflow: 'auto',
       }}>
-      <JupyterViewer
-        raw={content}
-        // @ts-ignore Not sure why panelSpec isn't on props, it should be!
-        rules={props.panelSpec.uiConfig.html as UIConfigOptions['html']}
-      />
+      <JupyterViewer raw={content} />
     </div>
   );
 };

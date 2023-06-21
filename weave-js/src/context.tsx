@@ -13,11 +13,14 @@ export type WeaveWBBetaFeatures = {
   'weave-devpopup'?: boolean;
 };
 
+export type PanelSettingPanel = 'JupyterViewer';
+
 export interface WeaveFeatures {
   actions?: boolean;
   fullscreenMode?: boolean;
   dashUi?: boolean;
   betaFeatures: WeaveWBBetaFeatures;
+  panelSettings?: Record<PanelSettingPanel, any>;
 }
 
 export const ClientContext = React.createContext<ClientState>({
@@ -50,4 +53,8 @@ export const useWeaveFeaturesContext = () => {
 
 export const useWeaveDashUiEnable = () => {
   return useContext(WeaveFeaturesContext).dashUi;
+};
+
+export const usePanelSettings = (type: PanelSettingPanel) => {
+  return useWeaveFeaturesContext().panelSettings?.[type];
 };
