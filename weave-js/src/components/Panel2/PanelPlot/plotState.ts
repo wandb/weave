@@ -30,16 +30,20 @@ import {
   withNamedTag,
 } from '@wandb/weave/core';
 import {immerable, produce} from 'immer';
-import * as _ from 'lodash';
+import _ from 'lodash';
 
 import * as TableState from '../PanelTable/tableState';
 import {
   AnyPlotConfig,
   AxisSelections,
+  ConcretePlotConfig,
+  ConcreteSeriesConfig,
   ContinuousSelection,
+  DEFAULT_LAZY_PATH_VALUES,
   DEFAULT_POINT_SIZE,
   DIM_NAME_MAP,
   DiscreteSelection,
+  LAZY_PATHS,
   LINE_SHAPES,
   MARK_OPTIONS,
   migrate,
@@ -617,7 +621,7 @@ export function addSeriesFromSeries(
 ) {
   const dimConstructor = dimConstructors[blankDimName];
   const dim = dimConstructor(series, weave);
-  const newSeries: SeriesConfig = dim.imputeThisSeriesWithDefaultState();
+  const newSeries = dim.imputeThisSeriesWithDefaultState();
   return produce(config, draft => {
     draft.series.push(newSeries);
     draft.configOptionsExpanded[blankDimName] = true;
@@ -937,7 +941,7 @@ export function isValidConfig(config: PlotConfig): {
   return {valid: true, reason: ''};
 }
 
-export function defaultPlot(inputNode: Node, stack: Stack): PlotConfig {
+function defaultPlotCommon(inputNode: Node, stack: Stack): v1.PlotConfig {
   const exampleRow = TableState.getExampleRow(inputNode);
 
   let tableState = TableState.emptyTable();
@@ -956,7 +960,7 @@ export function defaultPlot(inputNode: Node, stack: Stack): PlotConfig {
   tableState = TableState.appendEmptyColumn(tableState);
   const pointShapeColId = tableState.order[tableState.order.length - 1];
 
-  const axisSettings: PlotConfig['axisSettings'] = {
+  const axisSettings: v1.PlotConfig['axisSettings'] = {
     x: {},
     y: {},
     color: {},
@@ -1250,14 +1254,21 @@ export function defaultPlot(inputNode: Node, stack: Stack): PlotConfig {
     pointShape: pointShapeColId,
   };
 
-  const migrated = migrate({
+  return {
     configVersion: 1,
     axisSettings,
     legendSettings,
     dims,
     table: tableState,
-  });
+  };
+}
 
+export function defaultPlot(inputNode: Node, stack: Stack): PlotConfig {
+  // We know this wont be lazy since we are migrating it from a v1 config. So we can
+  // safely type it as a concrete config.
+
+  const v1config = defaultPlotCommon(inputNode, stack);
+  const migrated = migrate(v1config);
   return produce(migrated, draft => {
     draft.series.forEach(s => {
       s.uiState.pointShape = 'dropdown';
@@ -1265,8 +1276,24 @@ export function defaultPlot(inputNode: Node, stack: Stack): PlotConfig {
   });
 }
 
+export function defaultConcretePlot(
+  inputNode: Node,
+  stack: Stack
+): ConcretePlotConfig {
+  const lazyConfig: any = migrate(defaultPlotCommon(inputNode, stack));
+  LAZY_PATHS.forEach(path => {
+    setThroughArray(
+      lazyConfig,
+      path.split('.'),
+      DEFAULT_LAZY_PATH_VALUES[path],
+      true
+    );
+  });
+  return lazyConfig;
+}
+
 export function defaultSeriesName(
-  series: SeriesConfig,
+  series: SeriesConfig | ConcreteSeriesConfig,
   weave: WeaveInterface
 ): string {
   if (series.seriesName != null) {
@@ -1291,7 +1318,7 @@ export function defaultSeriesName(
 
 // defaultAxisLabel returns the default label for a given encodable axis
 export const defaultAxisLabel = (
-  series: SeriesConfig[],
+  series: ConcreteSeriesConfig[],
   axisName: ExpressionDimName,
   weave: WeaveInterface
 ): string => {
@@ -1374,9 +1401,9 @@ export function getDimTypes(
   );
 }
 
-export function getAxisType(
-  firstSeriesInConfig: SeriesConfig,
-  axisName: keyof SeriesConfig['dims'],
+export function getAxisType<T extends ConcreteSeriesConfig | SeriesConfig>(
+  firstSeriesInConfig: T,
+  axisName: keyof T['dims'],
   overrideTable?: TableState.TableState
 ): VegaAxisType | null {
   let {table} = firstSeriesInConfig;
@@ -1413,10 +1440,10 @@ export function getAxisType(
 }
 
 export function clearSelection(
-  config: PlotConfig,
-  selection: keyof PlotConfig['signals'],
+  config: ConcretePlotConfig,
+  selection: keyof ConcretePlotConfig['signals'],
   axis?: keyof AxisSelections
-): PlotConfig {
+): ConcretePlotConfig {
   let keys: Array<keyof AxisSelections> = Object.keys(
     config.signals[selection]
   ) as Array<keyof AxisSelections>;
@@ -1476,5 +1503,61 @@ export function selectionContainsValue(
     return value <= selection[1] && value >= selection[0];
   } else {
     return selection.includes(value);
+  }
+}
+
+export function setThroughArray(
+  object: any,
+  path: Array<string | number>,
+  value: any,
+  broadcast: boolean = true
+): any {
+  if (path.length === 0) {
+    return object;
+  }
+
+  const [first, ...rest] = path;
+
+  if (first === '#') {
+    if (Array.isArray(object)) {
+      object.forEach((item: any, index: number) => {
+        setThroughArray(
+          item,
+          rest,
+          broadcast ? value : value[index],
+          broadcast
+        );
+      });
+    }
+  } else if (rest.length === 0) {
+    object[first] = value;
+  } else if (typeof object[first] === 'object' && object[first] !== null) {
+    setThroughArray(object[first], rest, value, broadcast);
+  }
+
+  return object;
+}
+
+export function getThroughArray(
+  object: any,
+  path: Array<string | number>
+): any {
+  if (path.length === 0 || object == null) {
+    return object;
+  }
+
+  const [first, ...rest] = path;
+
+  if (first === '#') {
+    if (Array.isArray(object)) {
+      return object.map((item: any) => getThroughArray(item, rest));
+    } else {
+      return undefined;
+    }
+  }
+  try {
+    return getThroughArray(object[first], rest);
+  } catch (e) {
+    return undefined;
   }
 }

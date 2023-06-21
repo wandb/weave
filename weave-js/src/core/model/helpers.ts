@@ -62,7 +62,7 @@ export function allObjPaths(objectType: Type, depth = Infinity): PathType[] {
       }
       paths = [...paths, ...childPaths];
     }
-  } else if (isObjectTypeLike(objectType)) {
+  } else if (isObjectTypeLike(objectType) && !isMediaType(objectType)) {
     for (const [key, valType] of Object.entries(
       unionObjectTypeAttrTypes(objectType)
     )) {

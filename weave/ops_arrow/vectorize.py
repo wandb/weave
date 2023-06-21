@@ -430,13 +430,13 @@ def vectorize(
         elif node_name.endswith("count"):
             inputs_as_awl = _vectorized_inputs_as_awl(node_inputs, vectorized_keys)
             return arraylist_ops.list_numbers_count(*inputs_as_awl.values())
-        elif node_name.endswith("numbers-max"):
+        elif node_name.endswith("max"):
             inputs_as_awl = _vectorized_inputs_as_awl(node_inputs, vectorized_keys)
             return arraylist_ops.list_numbers_max(*inputs_as_awl.values())
-        elif node_name.endswith("numbers-min"):
+        elif node_name.endswith("min"):
             inputs_as_awl = _vectorized_inputs_as_awl(node_inputs, vectorized_keys)
             return arraylist_ops.list_numbers_min(*inputs_as_awl.values())
-        elif node_name.endswith("numbers-avg"):
+        elif node_name.endswith("avg"):
             inputs_as_awl = _vectorized_inputs_as_awl(node_inputs, vectorized_keys)
             return arraylist_ops.list_numbers_avg(*inputs_as_awl.values())
         elif node_name.endswith("sum"):
@@ -514,7 +514,7 @@ def vectorize(
             return map_each_op(
                 input_vals[0], lambda x: node_op.derived_from(x, *input_vals[1:])
             )
-        # If an op is already an arrow version, we may still need to use op pick
+        # If an op is already an arrow version, we may still need to use mapeach
         # to lift it to another dimension. This needs to be generalized I think.
         # Added for now for timeseries plot.
         if node_op.name == "ArrowWeaveListTypedDict-pick":

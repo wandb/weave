@@ -122,6 +122,8 @@ class UnionToPyUnion(mappers_weave.UnionMapper):
 
 class PyUnionToUnion(mappers_weave.UnionMapper):
     def apply(self, obj):
+        if self.is_single_object_nullable and obj is None:
+            return None
         member_index = obj["_union_id"]
         if "_val" in obj:
             obj = obj["_val"]

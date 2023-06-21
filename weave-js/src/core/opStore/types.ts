@@ -17,6 +17,7 @@ import type {
   OpResolverInputTypes,
   OutputNode,
   OutputTypeGeneric,
+  Stack,
   SupportedEnginesType,
 } from '../model/graph/types';
 import type {Type} from '../model/types';
@@ -92,7 +93,8 @@ export type RefineNodeFn = (
   node: OutputNode,
   // An executable version of node (all variables have been derefferenced)
   executableNode: OutputNode,
-  client: Client
+  client: Client,
+  stack: Stack
 ) => Promise<OutputNode<Type>>;
 
 /** An op whose body can be generated via a javascript function */

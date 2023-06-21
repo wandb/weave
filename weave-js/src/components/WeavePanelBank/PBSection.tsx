@@ -15,11 +15,16 @@ import {IdObj, PANEL_BANK_PADDING, PanelBankSectionConfig} from './panelbank';
 import {PanelBankFlowSection} from './PanelBankFlowSection';
 import {getNewGridItemLayout} from './panelbankGrid';
 import {PanelBankGridSection} from './PanelBankGridSection';
-import styled from 'styled-components';
+import styled, {css} from 'styled-components';
 import {
+  BORDER_COLOR_FOCUSED,
   GRAY_25,
+  GRAY_350,
+  GRAY_400,
   GRAY_500,
+  PANEL_HOVERED_SHADOW,
   SCROLLBAR_STYLES,
+  WHITE,
 } from '../../common/css/globals.styles';
 import {
   IconAddNew as IconAddNewUnstyled,
@@ -30,7 +35,13 @@ import {useScrollbarVisibility} from '../../core/util/scrollbar';
 import {Tooltip} from '../Tooltip';
 import {IconButton} from '../IconButton';
 import {WBButton} from '../../common/components/elements/WBButtonNew';
-import {useSetInspectingPanel} from '../Panel2/PanelInteractContext';
+import {
+  useGetPanelIsHoveredByGroupPath,
+  useGetPanelIsHoveredInOutlineByGroupPath,
+  useSelectedPath,
+  useSetInspectingPanel,
+  useSetPanelIsHovered,
+} from '../Panel2/PanelInteractContext';
 
 interface PBSectionProps {
   mode: 'grid' | 'flow';
@@ -47,7 +58,13 @@ interface PBSectionProps {
 export const PBSection: React.FC<PBSectionProps> = props => {
   const {config, groupPath, enableAddPanel, updateConfig2, handleAddPanel} =
     props;
+  const selectedPath = useSelectedPath();
   const setInspectingPanel = useSetInspectingPanel();
+  const getPanelIsHovered = useGetPanelIsHoveredByGroupPath(groupPath ?? []);
+  const getPanelIsHoveredInOutline = useGetPanelIsHoveredInOutlineByGroupPath(
+    groupPath ?? []
+  );
+  const setPanelIsHovered = useSetPanelIsHovered();
   const [panelBankWidth, setPanelBankWidth] = useState(0);
   const [panelBankHeight, setPanelBankHeight] = useState(0);
   const PanelBankSectionComponent =
@@ -114,25 +131,49 @@ export const PBSection: React.FC<PBSectionProps> = props => {
                   updateConfig={updateConfig2}
                   activePanelRefs={config.panels}
                   inactivePanelRefs={[]}
-                  renderPanel={panelRef => (
-                    <div
-                      style={{
-                        backgroundColor: '#fff',
-                        width: '100%',
-                        height: '100%',
-                      }}
-                      className="editable-panel">
-                      {props.mode === 'grid' && (
-                        <DragHandle
-                          key={`draghandle-${panelRef.id}`}
-                          className="draggable-handle"
-                          partRef={panelRef}>
-                          <LegacyWBIcon title="" name="handle" />
-                        </DragHandle>
-                      )}
-                      {props.renderPanel(panelRef)}
-                    </div>
-                  )}
+                  renderPanel={panelRef => {
+                    const path =
+                      groupPath != null ? [...groupPath, panelRef.id] : null;
+                    const isSelected =
+                      path != null && _.isEqual(path, selectedPath);
+                    const isHovered =
+                      groupPath != null && getPanelIsHovered(panelRef.id);
+                    const isHoveredInOutline =
+                      groupPath != null &&
+                      getPanelIsHoveredInOutline(panelRef.id);
+                    const isFocused = isSelected || isHoveredInOutline;
+
+                    return (
+                      <EditablePanel
+                        isHovered={isHovered}
+                        isFocused={isFocused}
+                        className="editable-panel"
+                        onMouseEnter={
+                          path != null
+                            ? () => {
+                                setPanelIsHovered(path, true);
+                              }
+                            : undefined
+                        }
+                        onMouseLeave={
+                          path != null
+                            ? () => {
+                                setPanelIsHovered(path, false);
+                              }
+                            : undefined
+                        }>
+                        {props.mode === 'grid' && (
+                          <DragHandle
+                            key={`draghandle-${panelRef.id}`}
+                            className="draggable-handle"
+                            partRef={panelRef}>
+                            <LegacyWBIcon title="" name="handle" />
+                          </DragHandle>
+                        )}
+                        {props.renderPanel(panelRef)}
+                      </EditablePanel>
+                    );
+                  }}
                   movePanelBetweenSections={() => {
                     console.log('MOVE BETWEEN SECTIONS');
                   }}
@@ -228,4 +269,28 @@ const IconAddNew = styled(IconAddNewUnstyled)<{marginRight?: number}>`
   width: 18px;
   height: 18px;
   margin-right: ${p => p.marginRight ?? 8}px;
+`;
+
+const EditablePanel = styled.div<{isFocused: boolean; isHovered: boolean}>`
+  &&&&& {
+    background-color: ${WHITE};
+    width: 100%;
+    height: 100%;
+
+    padding: 8px;
+    border: 1px solid ${GRAY_350};
+    ${p =>
+      p.isHovered &&
+      css`
+        border-color: ${GRAY_400};
+        box-shadow: ${PANEL_HOVERED_SHADOW};
+      `}
+    ${p =>
+      p.isFocused &&
+      css`
+        padding: 7px;
+        border-width: 2px;
+        border-color: ${BORDER_COLOR_FOCUSED};
+      `}
+  }
 `;

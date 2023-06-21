@@ -36,8 +36,22 @@ def save(node_or_obj, name=None):
     if isinstance(node_or_obj, _graph.Node):
         return _ops.save(node_or_obj, name=name)
     else:
-        ref = _storage.save(node_or_obj, name=name)
-        return _ops.get(str(ref))
+        # If the user does not provide a branch, then we explicitly set it to
+        # the default branch, "latest".
+        branch = None
+        name_contains_branch = name is not None and ":" in name
+        if not name_contains_branch:
+            branch = "latest"
+        ref = _storage.save(node_or_obj, name=name, branch=branch)
+        if name is None:
+            # if the user didn't provide a name, the returned reference
+            # will be to the specific version
+            uri = ref.uri
+        else:
+            # otherwise the reference will be to whatever branch was provided
+            # or the "latest" branch if only a name was provided.
+            uri = ref.branch_uri
+        return _ops.get(str(uri))
 
 
 def publish(node_or_obj, name=None):

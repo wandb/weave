@@ -100,6 +100,11 @@ def _show_params(obj):
     # convert panel_ref to a a get expression.
     show_node = ops.get(panel_ref.branch_uri)
 
+    # This fixes an issue with giant types causing the cell to take forever
+    # for initial render (at least when using the dev server). The UI
+    # will refine the type anyway.
+    show_node.type = types.Any()
+
     return {"weave_node": weavejs_fixes.fixup_node(show_node)}
 
 
@@ -121,9 +126,17 @@ def show_url(obj=None):
 
 def show(obj=None, height=400):
     if not util.is_notebook():
+        usage_analytics.show_called({"error": True})
         raise RuntimeError(
             "`weave.show()` can only be called within notebooks. To extract the value of "
             "a weave node, try `weave.use()`."
+        )
+
+    if util.is_colab():
+        usage_analytics.show_called({"colab": True, "error": True})
+        raise RuntimeError(
+            "`weave.show()` is currently not supported in Google Colab.  We're working on it!  Follow "
+            "progress here: https://github.com/wandb/weave/pull/15"
         )
 
     if util.is_pandas_dataframe(obj):

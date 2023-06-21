@@ -55,11 +55,25 @@ jobs:
     name: WeaveJS Lint and Compile
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/setup-node@v1
         with:
           node-version: "16.x"
-      - run: cd weave-js && yarn install --frozen-lockfile && yarn eslint && yarn tslint && yarn prettier && yarn run tsc
+      - run: |
+            set -e
+            cd weave-js
+            yarn install --frozen-lockfile
+            yarn eslint
+            yarn tslint
+            yarn prettier-fix
+            git config --local user.email "action@github.com"
+            git config --local user.name "GitHub Action"
+            git diff --quiet && git diff --staged --quiet || (git commit -am "Format code" && git push)
+            yarn prettier
+            yarn run tsc
 
   test:
     name: Python unit tests

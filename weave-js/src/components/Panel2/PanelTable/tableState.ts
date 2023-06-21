@@ -206,7 +206,7 @@ export function autoTableColumnExpressions(
     .map(pt => pt.path.map(escapeDots))
     .map(path => {
       let expr: Node = varNode(tableRowType, 'row');
-      const pathStr: string[] = [];
+      let pathStr: string[] = [];
       for (const p of path) {
         if (!p.startsWith('__object__')) {
           pathStr.push(p);
@@ -216,6 +216,8 @@ export function autoTableColumnExpressions(
               obj: expr,
               key: constString(pathStr.join('.')),
             });
+            // We have to reset the pathStr after collapsing it into an opPick!
+            pathStr = [];
           }
           expr = opObjGetAttr({
             self: expr,

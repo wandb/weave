@@ -44,7 +44,7 @@ def raise_exception_with_sentry_if_available(
 
 def capture_exception_with_sentry_if_available(
     err: Exception, fingerprint: typing.Any
-) -> None:
+) -> typing.Union[None, str]:
     init_sentry()
     try:
         import sentry_sdk
@@ -53,7 +53,8 @@ def capture_exception_with_sentry_if_available(
     else:
         with sentry_sdk.push_scope() as scope:
             scope.fingerprint = fingerprint
-            sentry_sdk.capture_exception(err)
+            return sentry_sdk.capture_exception(err)
+    return None
 
 
 def get_notebook_name():
@@ -93,22 +94,29 @@ def find_names(obj):
     return obj_names
 
 
-def is_notebook():
+def is_colab():
     try:
         import google.colab
     except ImportError:
-        try:
-            from IPython import get_ipython
-        except ImportError:
+        return False
+    return True
+
+
+def is_notebook():
+    if is_colab():
+        return True
+    try:
+        from IPython import get_ipython
+    except ImportError:
+        return False
+    else:
+        ip = get_ipython()
+        if ip is None:
             return False
-        else:
-            ip = get_ipython()
-            if ip is None:
-                return False
-            if "IPKernelApp" not in ip.config:
-                return False
-            # if "VSCODE_PID" in os.environ:
-            #     return False
+        if "IPKernelApp" not in ip.config:
+            return False
+        # if "VSCODE_PID" in os.environ:
+        #     return False
     return True
 
 
@@ -136,7 +144,6 @@ def _resolve_path(path: str, current_working_directory: str) -> list[str]:
 def relpath_no_syscalls(
     target_path: str, start_path: str, current_working_directory: str
 ) -> str:
-
     target_parts = _resolve_path(target_path, current_working_directory)
     start_parts = _resolve_path(start_path, current_working_directory)
 

@@ -26,7 +26,8 @@ from . import weave_types
 from . import engine_trace
 from . import logs
 from . import wandb_api
-
+from . import util
+from . import graph
 
 # A function to monkeypatch the request post method
 # def patch_request_post():
@@ -53,9 +54,15 @@ OptionalAuthType = typing.Optional[
 logger = logging.getLogger("root")
 
 
+@dataclasses.dataclass
+class HandleRequestResponse:
+    results: value_or_error.ValueOrErrors[dict[str, typing.Any]]
+    nodes: value_or_error.ValueOrErrors[graph.Node]
+
+
 def handle_request(
     request, deref=False, serialize_fn=storage.to_python
-) -> value_or_error.ValueOrErrors[dict[str, typing.Any]]:
+) -> HandleRequestResponse:
     start_time = time.time()
     tracer = engine_trace.tracer()
     # nodes = [graph.Node.node_from_json(n) for n in request["graphs"]]
@@ -86,7 +93,7 @@ def handle_request(
                 result = result.safe_map(serialize_fn)
 
     logger.info("Server request done in: %ss" % (time.time() - start_time))
-    return result
+    return HandleRequestResponse(result, nodes)
 
 
 class SubprocessServer(multiprocessing.Process):
@@ -99,7 +106,7 @@ class SubprocessServer(multiprocessing.Process):
         while True:
             req = self.req_queue.get()
             try:
-                resp = handle_request(req).unwrap()
+                resp = handle_request(req).results.unwrap()
                 self.resp_queue.put(resp)
             except:
                 print("Weave subprocess server error")
@@ -185,8 +192,14 @@ class HttpServer(threading.Thread):
         self.srv = make_server(host, port, app, threaded=False)
 
         # if the passed port is zero then a randomly allocated port will be used. this
-        # gets the value of the port that was assigned
-        self.port = self.srv.socket.getsockname()[1]
+        # gets the value of the port that was assigned.  We use portpicker in colab or
+        # if it's available to ensure it's forwarding magic works.
+        try:
+            import portpicker
+
+            self.port = portpicker.pick_unused_port()
+        except ImportError:
+            self.port = self.srv.socket.getsockname()[1]
 
     def run(self):
         if _REQUESTED_SERVER_LOG_LEVEL is None:
@@ -207,7 +220,10 @@ class HttpServer(threading.Thread):
 
     @property
     def url(self):
-        url = f"http://{self.host}"
+        if util.is_colab():
+            url = f"https://{self.host}"
+        else:
+            url = f"http://{self.host}"
         if self.port is not None:
             url = f"{url}:{self.port}"
         return url

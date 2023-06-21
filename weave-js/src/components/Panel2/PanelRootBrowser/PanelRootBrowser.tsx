@@ -20,6 +20,7 @@ import {FrameVariablesTable} from './FrameVariablesTable';
 import {LocalDashboardsTable} from './LocalDashboardsTable';
 import {LocalObjectsTable, useLocalObjectsExist} from './LocalObjectsTable';
 import {ViewerProjectsTable} from './ViewerProjectsTable';
+import styled from 'styled-components';
 
 const HIDE_VARIABLES_TAB = true;
 
@@ -180,22 +181,9 @@ export const PanelRootBrowser: React.FC<
   }
 
   return (
-    <div
-      style={{
-        width: '100%',
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-      }}>
+    <Container>
       {props.isRoot && (
-        <div
-          style={{
-            padding: 10,
-            fontSize: 20,
-            fontWeight: 'bold',
-          }}>
-          {servedLocally ? 'Local Weave Data' : 'Weave Data'}
-        </div>
+        <Header>{servedLocally ? 'Local Weave Data' : 'Weave Data'}</Header>
       )}
       <LayoutTabs
         tabNames={tabNames}
@@ -273,7 +261,7 @@ export const PanelRootBrowser: React.FC<
           return <></>;
         }}
       />
-    </div>
+    </Container>
   );
 };
 
@@ -282,3 +270,16 @@ export const Spec: Panel2.PanelSpec = {
   Component: PanelRootBrowser,
   inputType,
 };
+
+const Container = styled.div`
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+`;
+
+const Header = styled.div`
+  margin-bottom: 24px;
+  font-size: 20px;
+  font-weight: 600;
+`;

@@ -268,6 +268,15 @@ def ceil(self):
 
 
 @arrow_op(
+    name="ArrowWeaveListNumber-round",
+    input_type=unary_input_type,
+    output_type=self_type_output_type_fn,
+)
+def round(self):
+    return ArrowWeaveList(pc.round(self._arrow_data), types.Number(), self._artifact)
+
+
+@arrow_op(
     name="ArrowWeaveListNumber-abs",
     input_type={"self": ArrowWeaveListType(types.optional(types.Number()))},
     output_type=self_type_output_type_fn,
