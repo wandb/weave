@@ -515,7 +515,6 @@ export function findNextPanelLoc(
       columnBottoms[x] = Math.max(columnBottoms[x], panelBottom);
     }
   }
-  console.log('COLUMN BOTTOMS', columnBottoms);
   const candidates = [];
   for (let x = 0; x < gridWidth - panelWidth + 1; x++) {
     candidates.push(max(columnBottoms.slice(x, x + panelWidth)));
