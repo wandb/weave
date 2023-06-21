@@ -80,4 +80,6 @@ def do_in_parallel(
 
 def get_remaining_budget_per_thread(item_count: int) -> int:
     parallel_budget = get_parallel_budget()
+    if item_count <= 0:
+        return parallel_budget
     return max(parallel_budget // item_count, 1)
