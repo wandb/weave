@@ -301,7 +301,7 @@ _await_run_outputs_map_fn = _make_auto_op_map_fn(
 )
 
 _execute_nodes_map_fn = _make_auto_op_map_fn(
-    lambda t: isinstance(t, types.Function), _call_execute
+    lambda t: isinstance(types.split_none(t)[1], types.Function), _call_execute
 )
 
 _quote_nodes_map_fn = _make_inverse_auto_op_map_fn(types.Function, _quote_node)
