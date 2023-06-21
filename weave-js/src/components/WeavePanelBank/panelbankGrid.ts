@@ -9,7 +9,7 @@ export const GRID_COLUMN_COUNT = 24; // number of grid columns
 export const GRID_ROW_HEIGHT = 32; // height of grid row in px
 export const GRID_CONTAINER_PADDING = [32, 0]; // padding of grid container
 export const GRID_ITEM_MARGIN = [16, 16]; // margin around each grid item
-export const GRID_ITEM_DEFAULT_WIDTH = 8;
+export const GRID_ITEM_DEFAULT_WIDTH = 12;
 export const GRID_ITEM_DEFAULT_HEIGHT = 6;
 export const FAT_GRID_ITEM_DEFAULT_WIDTH = 16;
 
@@ -515,6 +515,7 @@ export function findNextPanelLoc(
       columnBottoms[x] = Math.max(columnBottoms[x], panelBottom);
     }
   }
+  console.log('COLUMN BOTTOMS', columnBottoms);
   const candidates = [];
   for (let x = 0; x < gridWidth - panelWidth + 1; x++) {
     candidates.push(max(columnBottoms.slice(x, x + panelWidth)));
