@@ -1721,7 +1721,8 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
   const inputNode = useMemo(
     () =>
       isRefining || concreteConfigLoading
-        ? constNode(list(listObjectType(input.type)), [])
+        ? // this line ensures that a regular list is used (not arrowweavelist)
+          constNode(list(listObjectType(input.type)), [])
         : input,
     [concreteConfigLoading, input, isRefining]
   );
