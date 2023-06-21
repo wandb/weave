@@ -1,8 +1,10 @@
 import copy
 
 import pytest
+import wandb
 
 import weave
+from weave.ecosystem.wandb.panel_time_series import TimeSeries
 from .. import graph
 from weave.panels.panel_plot import Plot, Series, PlotConstants
 from .test_run_segment import create_experiment
@@ -1777,3 +1779,30 @@ def test_actual_config_value(fixed_random_seed):
             "configVersion": 7,
         },
     }
+
+
+def test_plotting_wandb_data(user_by_api_key_in_env):
+    run = wandb.init()
+    n_rows = 15
+    local_history = []
+    for i in range(n_rows):
+        row = {"user_id": str(i // 3)}
+        run.log(row)
+        local_history.append(
+            {
+                "_step": i,
+                #   **row # This does not work correctly with the current implementation of history - we only fetch keys when we know what to fetch
+            }
+        )
+    run.finish()
+    history_node = weave.ops.project(run.entity, run.project).run(run.id).history()
+    assert weave.use(history_node) == local_history
+
+    ts_plot = TimeSeries(input_node=history_node)
+    ts_plot.config = weave.use(ts_plot.initialize())
+
+    rendered = ts_plot.render()
+
+    rendered_results = weave.use(rendered)
+
+    assert rendered_results == "tim"
