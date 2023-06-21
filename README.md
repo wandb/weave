@@ -15,7 +15,7 @@ Whether you are a seasoned data scientist, an aspiring ML practitioner, or just 
 
 [Run in a Jupyter notebook ->](./examples/experimental/skip_test/weave_demo_quickstart.ipynb)
 
-Install via `pip install weave`, `import weave` in your notebook, and start exploring your datasets with one line of code!
+Install via `pip install weave`, `import weave` in your notebook, and explore your data  with one line of code!
 
 **1. View a dataframe**
 
@@ -25,7 +25,7 @@ from sklearn.datasets import load_iris
 iris = load_iris(as_frame=True)
 df = iris.data.assign(target=iris.target_names[iris.target])
 
-weave.show(df)
+**weave.show(df)**
 ```
 
 ![first_show](./docs/assets/first_show.png)
