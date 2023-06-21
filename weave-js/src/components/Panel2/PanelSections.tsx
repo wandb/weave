@@ -19,6 +19,7 @@ import {
 import * as ConfigPanel from './ConfigPanel';
 import * as Panel2 from './panel';
 import {PanelContextProvider, usePanelContext} from './PanelContext';
+import {useUpdateConfig2} from './PanelComp';
 
 type PanelSectionsConfig = {
   section: NodeOrVoidNode;
@@ -50,10 +51,7 @@ const usePanelSectionsCommon = (props: PanelSectionsProps) => {
   const itemType = useMemo(() => {
     return listObjectType(props.input.type);
   }, [props.input.type]);
-  const {updateConfig2} = props;
-  if (updateConfig2 == null) {
-    throw new Error('PanelSections requires updateConfig2');
-  }
+  const updateConfig2 = useUpdateConfig2(props);
   const updateSectionExpr = useCallback(
     newExpr => {
       updateConfig2(oldConfig => {
