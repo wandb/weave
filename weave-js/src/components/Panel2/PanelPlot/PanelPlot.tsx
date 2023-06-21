@@ -329,7 +329,12 @@ const useConcreteConfig = (
     let loading: boolean = false;
     let newConfig: ConcretePlotConfig;
     if (concreteConfigLoading) {
-      newConfig = PlotState.defaultConcretePlot(input, stack);
+      newConfig = PlotState.defaultConcretePlot(
+        // IMPORTANT: use an empty list here so we dont inadvertently
+        // fetch all data, including data beyond current domain
+        constNode(input.type, []),
+        stack
+      );
       loading = true;
     } else {
       // generate the new config with the concrete values obtained from the execution of the lazy paths
