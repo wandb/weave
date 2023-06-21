@@ -32,6 +32,7 @@ import {
 import {Spec as SelectEditorSpec} from './PanelSelectEditor';
 import {ExpressionView} from './ExpressionView';
 import {updatePreFilter} from './PanelTable/tableState';
+import {useUpdateConfig2} from './PanelComp';
 
 interface Condition {
   expression: NodeOrVoidNode;
@@ -152,17 +153,16 @@ type PanelQueryConditionProps = PanelQueryProps & {
 };
 
 const usePanelQueryConditionCommon = (props: PanelQueryConditionProps) => {
-  const {condition, updateConfig2, input} = props;
+  const {condition, input} = props;
   const weave = useWeaveContext();
+
+  const updateConfig2 = useUpdateConfig2(props);
 
   const newVars = useMemo(() => {
     return {
       queryInput: varNode(props.input.type, 'input'),
     };
   }, [props.input.type]);
-  if (updateConfig2 == null) {
-    throw new Error('PanelQuery requires updateConfig2');
-  }
   const updateCondition = useCallback(
     (newCondition: Partial<Condition>) => {
       updateConfig2(oldConfig => {
@@ -283,10 +283,7 @@ export const PanelQueryConditionComponent: React.FC<
 };
 
 export const PanelQueryConfigComponent: React.FC<PanelQueryProps> = props => {
-  const {updateConfig2} = props;
-  if (updateConfig2 == null) {
-    throw new Error('PanelQuery requires updateConfig2');
-  }
+  const updateConfig2 = useUpdateConfig2(props);
   const config = props.config!;
 
   const addCondition = useCallback(() => {

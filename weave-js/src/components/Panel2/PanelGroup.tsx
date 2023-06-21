@@ -42,6 +42,7 @@ import {toWeaveType} from './toWeaveType';
 // import {VarBar} from '../Sidebar/VarBar';
 import {GRAY_350, GRAY_500, GRAY_800} from '../../common/css/globals.styles';
 import {inJupyterCell} from '../PagePanelComponents/util';
+import {useUpdateConfig2} from './PanelComp';
 
 const LAYOUT_MODES = [
   'horizontal' as const,
@@ -351,10 +352,7 @@ export const addPanelToGroupConfig = (
 };
 
 const usePanelGroupCommon = (props: PanelGroupProps) => {
-  const {updateConfig2} = props;
-  if (updateConfig2 == null) {
-    throw new Error('updateConfig2 is required');
-  }
+  const updateConfig2 = useUpdateConfig2(props);
 
   const handleAddPanel = useCallback(() => {
     updateConfig2(currentConfig => {
@@ -639,12 +637,8 @@ const useSectionConfig = (
 export const PanelGroup: React.FC<PanelGroupProps> = props => {
   const config = props.config ?? PANEL_GROUP_DEFAULT_CONFIG();
   const {stack, path: groupPath} = usePanelContext();
-  const {updateConfig, updateConfig2} = props;
-
-  if (updateConfig2 == null) {
-    // For dev only
-    throw new Error('PanelGroup requires updateConfig2');
-  }
+  const {updateConfig} = props;
+  const updateConfig2 = useUpdateConfig2(props);
   const {handleAddPanel} = usePanelGroupCommon(props);
 
   const mutateItem = useCallback(
