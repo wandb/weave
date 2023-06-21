@@ -142,6 +142,7 @@ class Series:
         dims: typing.Optional[DimConfig] = None,
         constants: typing.Optional[PlotConstants] = None,
         select_functions: typing.Optional[typing.Dict[DimName, SelectFunction]] = None,
+        groupby_dims: typing.Optional[list[DimName]] = None,
     ):
         if input_node is not None:
             table = table_state.TableState(input_node)
@@ -159,6 +160,10 @@ class Series:
         if select_functions:
             for dimname in select_functions:
                 table.update_col(getattr(dims, dimname), select_functions[dimname])
+                if groupby_dims and dimname in groupby_dims:
+                    table.enable_groupby(getattr(dims, dimname))
+                    if dimname == "label":
+                        table.enable_groupby(dims.color)
 
         uiState = PlotUIState(pointShape="expression", label="expression")
 
@@ -453,6 +458,7 @@ class Plot(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
         y: typing.Optional[SelectFunction] = None,
         color: typing.Optional[SelectFunction] = None,
         label: typing.Optional[SelectFunction] = None,
+        groupby_dims: typing.Optional[typing.List[DimName]] = None,
         tooltip: typing.Optional[SelectFunction] = None,
         pointShape: typing.Optional[SelectFunction] = None,
         lineStyle: typing.Optional[SelectFunction] = None,
@@ -482,21 +488,6 @@ class Plot(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
                         select_functions = {}
                     select_functions[typing.cast(DimName, field.name)] = maybe_dim
 
-            signals = Signals(domain=LazyAxisSelections(), selection=AxisSelections())
-            if domain_x is not None:
-                signals.domain.x = domain_x
-
-            if domain_y is not None:
-                signals.domain.y = domain_y
-
-            if not (
-                (series is not None)
-                ^ (select_functions is not None or input_node is not None)
-            ):
-                raise ValueError(
-                    "Must provide either series or input_node/select_functions/constants, but not both"
-                )
-
             config_series: typing.List[Series]
             if series is not None:
                 if isinstance(series, Series):
@@ -509,8 +500,18 @@ class Plot(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
                         typing.cast(graph.Node, self.input_node),
                         constants=constants,
                         select_functions=select_functions,
+                        groupby_dims=groupby_dims,
                     )
                 ]
+
+            # Just moved these down so all series creation stuff is clustered
+            # in the top.
+            signals = Signals(domain=LazyAxisSelections(), selection=AxisSelections())
+            if domain_x is not None:
+                signals.domain.x = domain_x
+
+            if domain_y is not None:
+                signals.domain.y = domain_y
 
             config_axisSettings = AxisSettings(
                 x=default_axis(), y=default_axis(), color=default_axis()
