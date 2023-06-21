@@ -3,7 +3,7 @@ import math
 from ..api import op, use
 from ..weave_types import Function, NumberBinType, TimeBinType
 from .. import weave_types as types
-from .. import context
+from .. import graph
 from .dict import dict_
 from . import date
 
@@ -60,6 +60,6 @@ def numbers_bins_equal(arr, bins):
     output_type=NumberBinType,  # type: ignore
 )
 def number_bin(in_, bin_fn):
-    if bin_fn == None:
+    if not isinstance(bin_fn, graph.Node) and bin_fn == None:
         return None
     return use(call_fn(bin_fn, {"row": make_const_node(types.Number(), in_)}))
