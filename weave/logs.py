@@ -26,7 +26,7 @@ class LogFormat(enum.Enum):
 @dataclasses.dataclass
 class LogSettings:
     format: LogFormat
-    level: int
+    level: typing.Optional[int]
 
 
 _log_indent: contextvars.ContextVar[int] = contextvars.ContextVar(
@@ -156,7 +156,7 @@ class WeaveJSONEncoder(jsonlogger.JsonEncoder):
         return super().default(obj)  # type: ignore[no-untyped-call]
 
 
-def setup_handler(hander: logging.Handler, settings: LogSettings) -> None:
+def setup_handler(handler: logging.Handler, settings: LogSettings) -> None:
     formatter = logging.Formatter(default_log_format)
     if settings.format == LogFormat.DATADOG:
         formatter = jsonlogger.JsonFormatter(
@@ -165,9 +165,10 @@ def setup_handler(hander: logging.Handler, settings: LogSettings) -> None:
             timestamp=True,
             json_encoder=WeaveJSONEncoder,
         )  # type: ignore[no-untyped-call]
-    hander.addFilter(IndentFilter())
-    hander.setFormatter(formatter)
-    hander.setLevel(settings.level)
+    handler.addFilter(IndentFilter())
+    handler.setFormatter(formatter)
+    if settings.level is not None:
+        handler.setLevel(settings.level)
 
 
 _LOGGING_CONFIGURED = False
@@ -231,7 +232,7 @@ def configure_logger() -> None:
             # terminal, you get the logs.
             enable_stream_logging(
                 logger,
-                wsgi_stream_settings=LogSettings(LogFormat.PRETTY, env_log_level()),
+                wsgi_stream_settings=LogSettings(LogFormat.PRETTY, level=None),
                 pid_logfile_settings=LogSettings(LogFormat.PRETTY, logging.INFO),
             )
         else:
@@ -255,7 +256,7 @@ def configure_logger() -> None:
             # Only log in the datadog format to the wsgi stream
             enable_stream_logging(
                 logger,
-                wsgi_stream_settings=LogSettings(LogFormat.DATADOG, logging.DEBUG),
+                wsgi_stream_settings=LogSettings(LogFormat.DATADOG, level=None),
             )
         else:
             # Otherwise this is dev mode with datadog logging turned on.
@@ -263,6 +264,6 @@ def configure_logger() -> None:
             # agent can watch.
             enable_stream_logging(
                 logger,
-                wsgi_stream_settings=LogSettings(LogFormat.PRETTY, logging.DEBUG),
-                server_logfile_settings=LogSettings(LogFormat.DATADOG, logging.DEBUG),
+                wsgi_stream_settings=LogSettings(LogFormat.PRETTY, level=None),
+                server_logfile_settings=LogSettings(LogFormat.DATADOG, level=None),
             )

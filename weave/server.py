@@ -178,7 +178,7 @@ class HttpServerClient(object):
         return [storage.deref(r) for r in deserialized]
 
 
-_REQUESTED_SERVER_LOG_LEVEL: typing.Union[int, None] = None
+_REQUESTED_SERVER_LOG_LEVEL: typing.Optional[int] = None
 
 
 class HttpServer(threading.Thread):
@@ -239,6 +239,6 @@ def capture_weave_server_logs(log_level: int = logging.INFO):
 
     logs.enable_stream_logging(
         root_logger,
-        wsgi_stream_settings=logs.LogSettings(logs.LogFormat.PRETTY, log_level),
+        wsgi_stream_settings=logs.LogSettings(logs.LogFormat.PRETTY, level=None),
         pid_logfile_settings=logs.LogSettings(logs.LogFormat.PRETTY, logging.INFO),
     )
