@@ -26,7 +26,7 @@ class LogFormat(enum.Enum):
 @dataclasses.dataclass
 class LogSettings:
     format: LogFormat
-    level: str
+    level: int
 
 
 _log_indent: contextvars.ContextVar[int] = contextvars.ContextVar(
@@ -102,13 +102,16 @@ def default_log_filename() -> typing.Optional[str]:
     return get_logfile_path(f"{pid}.log")
 
 
-def env_log_level() -> typing.Any:
-    # Default to only showing ERROR logs, unless otherwise specified
-    default_level = "ERROR"
+def env_log_level() -> int:
+    level_str_from_env = os.environ.get("WEAVE_LOG_LEVEL")
+    if level_str_from_env:
+        return logging.getLevelName(level_str_from_env)
+
     if os.environ.get("WEAVE_SERVER_ENABLE_LOGGING"):
-        default_level = "INFO"
-    level = os.environ.get("WEAVE_LOG_LEVEL", default_level)
-    return logging.getLevelName(level)
+        return logging.INFO
+
+    # Default to only showing ERROR logs
+    return logging.ERROR
 
 
 def silence_mpl() -> None:
@@ -152,7 +155,6 @@ class WeaveJSONEncoder(jsonlogger.JsonEncoder):
 
 
 def setup_handler(hander: logging.Handler, settings: LogSettings) -> None:
-    level = logging.getLevelName(settings.level)
     formatter = logging.Formatter(default_log_format)
     if settings.format == LogFormat.DATADOG:
         formatter = jsonlogger.JsonFormatter(
@@ -163,7 +165,7 @@ def setup_handler(hander: logging.Handler, settings: LogSettings) -> None:
         )  # type: ignore[no-untyped-call]
     hander.addFilter(IndentFilter())
     hander.setFormatter(formatter)
-    hander.setLevel(level)
+    hander.setLevel(settings.level)
 
 
 _LOGGING_CONFIGURED = False
@@ -227,8 +229,8 @@ def configure_logger() -> None:
             # terminal, you get the logs.
             enable_stream_logging(
                 logger,
-                wsgi_stream_settings=LogSettings(LogFormat.PRETTY, "INFO"),
-                pid_logfile_settings=LogSettings(LogFormat.PRETTY, "INFO"),
+                wsgi_stream_settings=LogSettings(LogFormat.PRETTY, env_log_level()),
+                pid_logfile_settings=LogSettings(LogFormat.PRETTY, logging.INFO),
             )
         else:
             # This is the default case. Log to a file for this process, but
@@ -237,21 +239,21 @@ def configure_logger() -> None:
             # we don't want the logs to show up in the notebook.
             enable_stream_logging(
                 logger,
-                pid_logfile_settings=LogSettings(LogFormat.PRETTY, "INFO"),
+                pid_logfile_settings=LogSettings(LogFormat.PRETTY, logging.INFO),
             )
     else:
         if dd_env == "ci":
             # CI expects logs in the pid logfile
             enable_stream_logging(
                 logger,
-                wsgi_stream_settings=LogSettings(LogFormat.PRETTY, "INFO"),
-                pid_logfile_settings=LogSettings(LogFormat.PRETTY, "INFO"),
+                wsgi_stream_settings=LogSettings(LogFormat.PRETTY, logging.INFO),
+                pid_logfile_settings=LogSettings(LogFormat.PRETTY, logging.INFO),
             )
         elif environment.wandb_production():
             # Only log in the datadog format to the wsgi stream
             enable_stream_logging(
                 logger,
-                wsgi_stream_settings=LogSettings(LogFormat.DATADOG, "DEBUG"),
+                wsgi_stream_settings=LogSettings(LogFormat.DATADOG, logging.DEBUG),
             )
         else:
             # Otherwise this is dev mode with datadog logging turned on.
@@ -259,6 +261,6 @@ def configure_logger() -> None:
             # agent can watch.
             enable_stream_logging(
                 logger,
-                wsgi_stream_settings=LogSettings(LogFormat.PRETTY, "DEBUG"),
-                server_logfile_settings=LogSettings(LogFormat.DATADOG, "DEBUG"),
+                wsgi_stream_settings=LogSettings(LogFormat.PRETTY, logging.DEBUG),
+                server_logfile_settings=LogSettings(LogFormat.DATADOG, logging.DEBUG),
             )
