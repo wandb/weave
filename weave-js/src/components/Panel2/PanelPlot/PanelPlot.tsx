@@ -332,7 +332,7 @@ const useConcreteConfig = (
       newConfig = PlotState.defaultConcretePlot(
         // IMPORTANT: use an empty list here so we dont inadvertently
         // fetch all data, including data beyond current domain
-        constNode(input.type, []),
+        constNode(list(listObjectType(input.type)), []),
         stack
       );
       loading = true;
@@ -1695,9 +1695,11 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
   // TODO(np): Hack to detect when we are on an activity dashboard
   const isDashboard = useIsDashboard();
 
-  const inputNode = input;
   const {frame, stack} = usePanelContext();
-  const {config, isRefining} = useConfig(inputNode, props.config);
+  const {config, isRefining} = useConfig(input, props.config);
+
+  const {config: unvalidatedConcreteConfig, loading: concreteConfigLoading} =
+    useConcreteConfig(config, input, stack);
 
   const updateConfig = useCallback(
     (newConfig?: Partial<PlotConfig>) => {
@@ -1714,6 +1716,14 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     [config, propsUpdateConfig, input, stack]
   );
 
+  const inputNode = useMemo(
+    () =>
+      isRefining || concreteConfigLoading
+        ? constNode(list(listObjectType(input.type)), [])
+        : input,
+    [concreteConfigLoading, input, isRefining]
+  );
+
   const updateConfig2 = useCallback(
     (change: (oldConfig: PlotConfig) => PlotConfig) => {
       return propsUpdateConfig2!(change as any);
@@ -1726,9 +1736,6 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
 
   const updateConfigRef = useRef<typeof updateConfig>(updateConfig);
   updateConfigRef.current = updateConfig;
-
-  const {config: unvalidatedConcreteConfig, loading: concreteConfigLoading} =
-    useConcreteConfig(config, input, stack);
 
   const concreteConfig = useMemo(
     () => ensureValidSignals(unvalidatedConcreteConfig),
