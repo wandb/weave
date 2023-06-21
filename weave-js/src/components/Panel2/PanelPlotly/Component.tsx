@@ -5,6 +5,7 @@ import React, {useEffect, useMemo, useRef} from 'react';
 import {useNodeValue} from '../../../react';
 import * as Panel2 from '../panel';
 import {toWeaveType} from '../toWeaveType';
+import {useUpdateConfig2} from '../PanelComp';
 
 export const inputType = {type: 'Plotly'} as any;
 
@@ -22,11 +23,7 @@ interface PanelPlotlyConfig {
 type PanelPlotlyProps = Panel2.PanelProps<typeof inputType, PanelPlotlyConfig>;
 
 export const PanelPlotly: React.FC<PanelPlotlyProps> = props => {
-  const {updateConfig2} = props;
-
-  if (updateConfig2 == null) {
-    throw new Error('PanelPlotly requires updateConfig2');
-  }
+  const updateConfig2 = useUpdateConfig2(props);
   const jsonStringNode = useMemo(() => {
     return callOpVeryUnsafe('Plotly-contents', {self: props.input});
   }, [props.input]);

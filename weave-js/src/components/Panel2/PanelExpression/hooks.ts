@@ -40,7 +40,7 @@ import {useWeaveContext} from '../../../context';
 import {usePrevious} from '../../../hookUtils';
 import {useExpandedNode} from '../../../react';
 import {PanelStack, usePanelStacksForType} from '../availablePanels';
-import {useUpdateConfig2} from '../libchildpanel';
+import {useChildUpdateConfig2} from '../libchildpanel';
 import {
   isPanelOpName,
   PanelConvertSpec,
@@ -177,7 +177,7 @@ export function usePanelExpressionState(props: PanelExpressionProps) {
     [config, unprotectedUpdateConfig]
   );
   const {updateConfig2: parentUpdateConfig2} = props;
-  const updateConfig2 = useUpdateConfig2(
+  const updateConfig2 = useChildUpdateConfig2(
     'panel-expression',
     parentUpdateConfig2 as any
   );
