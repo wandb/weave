@@ -330,8 +330,6 @@ const useConcreteConfig = (
     let newConfig: ConcretePlotConfig;
     if (concreteConfigLoading) {
       newConfig = PlotState.defaultConcretePlot(
-        // IMPORTANT: use an empty list here so we dont inadvertently
-        // fetch all data, including data beyond current domain
         constNode(list(listObjectType(input.type)), []),
         stack
       );
@@ -1716,6 +1714,10 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     [config, propsUpdateConfig, input, stack]
   );
 
+  // IMPORTANT: use an empty list here so we dont inadvertently
+  // fetch all data, including data beyond current domain.
+  // That is what would happen if we used `input` below
+  // while concreteConfig is in the loading state
   const inputNode = useMemo(
     () =>
       isRefining || concreteConfigLoading
