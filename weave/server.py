@@ -178,7 +178,7 @@ class HttpServerClient(object):
         return [storage.deref(r) for r in deserialized]
 
 
-_REQUESTED_SERVER_LOG_LEVEL = None
+_REQUESTED_SERVER_LOG_LEVEL: typing.Optional[int] = None
 
 
 class HttpServer(threading.Thread):
@@ -203,7 +203,7 @@ class HttpServer(threading.Thread):
 
     def run(self):
         if _REQUESTED_SERVER_LOG_LEVEL is None:
-            capture_weave_server_logs("ERROR")
+            capture_weave_server_logs(logging.ERROR)
 
         # The werkzeug logger does not exist at import time, so we can't just
         # iterate through all existing loggers and set their levels. Fetching it
@@ -211,7 +211,8 @@ class HttpServer(threading.Thread):
         # Without these two lines, request logs will always be printend. But by
         # default we don't want that.
         log = logging.getLogger("werkzeug")
-        log.setLevel(_REQUESTED_SERVER_LOG_LEVEL)
+        if _REQUESTED_SERVER_LOG_LEVEL is not None:
+            log.setLevel(_REQUESTED_SERVER_LOG_LEVEL)
 
         self.srv.serve_forever()
 
@@ -229,10 +230,8 @@ class HttpServer(threading.Thread):
         return url
 
 
-def capture_weave_server_logs(log_level_s: str = "INFO"):
+def capture_weave_server_logs(log_level: int = logging.INFO):
     global _REQUESTED_SERVER_LOG_LEVEL
-    log_level = logging.getLevelName(log_level_s)
-
     _REQUESTED_SERVER_LOG_LEVEL = log_level
 
     root_logger = logging.getLogger()
@@ -240,6 +239,6 @@ def capture_weave_server_logs(log_level_s: str = "INFO"):
 
     logs.enable_stream_logging(
         root_logger,
-        wsgi_stream_settings=logs.LogSettings(logs.LogFormat.PRETTY, log_level),
-        pid_logfile_settings=logs.LogSettings(logs.LogFormat.PRETTY, "INFO"),
+        wsgi_stream_settings=logs.LogSettings(logs.LogFormat.PRETTY, level=None),
+        pid_logfile_settings=logs.LogSettings(logs.LogFormat.PRETTY, logging.INFO),
     )
