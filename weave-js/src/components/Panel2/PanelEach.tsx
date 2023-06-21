@@ -14,6 +14,7 @@ import {
 import * as Panel2 from './panel';
 import {PanelContextProvider, usePanelContext} from './PanelContext';
 import {ChildConfigContainer, ConfigSection} from './ConfigPanel';
+import {useUpdateConfig2} from './PanelComp';
 
 type PanelEachConfig = {
   pbConfig: PanelBankSectionConfig;
@@ -133,10 +134,8 @@ const PanelEachItem: React.FC<PanelEachProps & {itemIndex: number}> = props => {
 };
 
 export const PanelEach: React.FC<PanelEachProps> = props => {
-  const {config, updateConfig2} = props;
-  if (updateConfig2 == null) {
-    throw new Error('updateConfig2 is required');
-  }
+  const {config} = props;
+  const updateConfig2 = useUpdateConfig2(props);
 
   const countNode = useMemo(() => {
     return opCount({arr: props.input});

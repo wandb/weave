@@ -177,10 +177,38 @@ const PanelComp2Component = (props: PanelComp2Props) => {
 
 export const PanelComp2 = React.memo(PanelComp2Component);
 
+export function useUpdateConfig2<C>(props: {
+  // config?: PanelComp2Props['config'];
+  // updateConfig: PanelComp2Props['updateConfig'];
+  // updateConfig2?: PanelComp2Props['updateConfig2'] | undefined;
+  config?: C;
+  updateConfig(partialConfig: Partial<C>): void;
+  updateConfig2?(change: (oldConfig: C) => Partial<C>): void;
+}) {
+  const {config, updateConfig} = props;
+  let {updateConfig2} = props;
+  if (updateConfig2 == null) {
+    // We selectively add this hook. This is safe to do since updateConfig2 will
+    // always either be present or not, for this component.
+    // Its important to do it this way, so that if updateConfig2 does exist, we
+    // just use it directly. The value of updateConfig2 is it doesn't close over
+    // config, so it doesn't change when config changes.
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    updateConfig2 = useCallback(
+      (change: (oldConfig: any) => any) => {
+        updateConfig(change(config));
+      },
+      [config, updateConfig]
+    );
+  }
+  return updateConfig2!;
+}
+
 // PanelComp2 is the primary proxy for rendering all Weave Panels.
 export const PanelComp2Inner = (props: PanelComp2Props) => {
   const dashUiEnabled = useWeaveDashUiEnable();
-  const {panelSpec, configMode, updateConfig2} = props;
+  const {panelSpec, configMode} = props;
+  const updateConfig2 = useUpdateConfig2(props);
   let unboundedContent = useMemo(() => {
     if (panelSpec == null) {
       return <></>;
@@ -191,10 +219,15 @@ export const PanelComp2Inner = (props: PanelComp2Props) => {
       !PanelLib.isWithChild<Panel2.PanelContext, any, Type>(panelSpec)
     ) {
       if (!configMode) {
-        return <panelSpec.Component {...props} updateConfig2={updateConfig2} />;
+        return (
+          <panelSpec.Component {...props} updateConfig2={updateConfig2!} />
+        );
       } else if (panelSpec.ConfigComponent != null) {
         return (
-          <panelSpec.ConfigComponent {...props} updateConfig2={updateConfig2} />
+          <panelSpec.ConfigComponent
+            {...props}
+            updateConfig2={updateConfig2!}
+          />
         );
       } else {
         return <></>;
@@ -213,9 +246,21 @@ export const PanelComp2Inner = (props: PanelComp2Props) => {
       }
     } else {
       if (!configMode) {
-        return <panelSpec.Component {...props} child={panelSpec.child} />;
+        return (
+          <panelSpec.Component
+            {...props}
+            child={panelSpec.child}
+            updateConfig2={updateConfig2!}
+          />
+        );
       } else if (panelSpec.ConfigComponent != null) {
-        return <panelSpec.ConfigComponent {...props} child={panelSpec.child} />;
+        return (
+          <panelSpec.ConfigComponent
+            {...props}
+            child={panelSpec.child}
+            updateConfig2={updateConfig2!}
+          />
+        );
       } else {
         return <PanelComp2 {...props} panelSpec={panelSpec.child} />;
       }
@@ -317,6 +362,7 @@ const useTransformerChild = (
 
 export const ConfigTransformerComp = (props: PanelTransformerCompProps) => {
   const {panelSpec, updateConfig, config} = props;
+  const updateConfig2 = useUpdateConfig2(props);
   const {baseConfig, updateBaseConfig, childConfig, updateChildConfig} =
     useSplitTransformerConfigs(config, updateConfig);
   const {loading, childInputNode, childPanelSpec} = useTransformerChild(
@@ -333,6 +379,7 @@ export const ConfigTransformerComp = (props: PanelTransformerCompProps) => {
           config={baseConfig}
           child={childPanelSpec}
           updateConfig={updateBaseConfig}
+          updateConfig2={updateConfig2}
         />
       )}
       <PanelComp2
@@ -804,9 +851,9 @@ export const Panel2Loader: React.FC = () => {
 export const Panel: React.FC<{
   panelSpec: Panel2.PanelSpecNode | string;
   input: Panel2.PanelInput | NodeOrVoidNode;
-  config: any;
+  config?: any;
   updateConfig(partialConfig: Partial<any>): void;
-  updateConfig2(change: (oldConfig: any) => any): void;
+  updateConfig2?(change: (oldConfig: any) => any): void;
   updateInput?(partialInput: Partial<Panel2.PanelInput>): void;
 }> = props => {
   const panelSpec = useMemo(

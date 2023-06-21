@@ -18,7 +18,7 @@ import {
 } from './ChildPanel';
 import {IconBack, IconClose, IconOverflowHorizontal} from './Icons';
 import * as Panel2 from './panel';
-import {Panel2Loader} from './PanelComp';
+import {Panel2Loader, useUpdateConfig2} from './PanelComp';
 import {PanelContextProvider, usePanelContext} from './PanelContext';
 import {fixChildData} from './PanelGroup';
 import {toWeaveType} from './toWeaveType';
@@ -76,10 +76,8 @@ export const useUpdateConfigForPanelNode = (
 
 const usePanelPanelCommon = (props: PanelPanelProps) => {
   const weave = useWeaveContext();
-  const {updateConfig2, updateInput} = props;
-  if (updateConfig2 == null) {
-    throw new Error('updateConfig2 is required');
-  }
+  const {updateInput} = props;
+  const updateConfig2 = useUpdateConfig2(props);
   const panelQuery = CGReact.useNodeValue(props.input);
   const selectedPanel = useSelectedPath();
   const setSelectedPanel = useSetInspectingPanel();
