@@ -519,6 +519,8 @@ export const opRootAuditLogs = makeOp({
         artifact_sequence_asset: 'number' as const,
         project_asset: 'number' as const,
         report_asset: 'number' as const,
+
+    my_new_asset: 'number' as const
       })
     ),
     error: 'string' as const,
