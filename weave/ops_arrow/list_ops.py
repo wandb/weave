@@ -677,6 +677,9 @@ def concat(arr):
         return arrow_tags.pushdown_list_tags(arr[0])
 
     tagged = list(builtin_map(lambda x: arrow_tags.pushdown_list_tags(x), arr))
+
+    # We merge the lists mergesort-style, which is `O(n*log(n))`
+    # DO NOT merge the lists reduce-style, which is `O(n^2)`
     return merge_concat(tagged)
 
 

@@ -364,9 +364,12 @@ def _table_data_to_weave1_objects(
         if (
             isinstance(cell, list)
             and isinstance(cell_type, types.List)
+            # We want to avoid recursing into the list if the list element type is basic,
+            # since it will be a relatively expensive `O(n)` no-op.
             and not isinstance(cell_type.object_type, types.BasicType)
         ):
             cell = [_process_cell_value(c, cell_type.object_type) for c in cell]
+
         elif isinstance(cell, dict) and isinstance(cell_type, types.TypedDict):
             cell = {
                 k: _process_cell_value(v, cell_type.property_types[str(k)])
@@ -671,7 +674,12 @@ def _get_partitioned_table_awl_from_file(
     all_aws: list[ops_arrow.ArrowWeaveList] = []
     part_dir = file.artifact.path_info(parts_path_root)
     if isinstance(part_dir, artifact_fs.FilesystemArtifactDir):
+        # Pre-download all the files in parallel.
+        # We do this because we currently only have a synchronous pattern
+        # available for resolving artifact-backed files.
+        # TODO: Remove pre-download once artifact-backed files can be resolved asynchronously
         asyncio.run(ensure_files(part_dir.files))
+
         num_parts = len(part_dir.files)
         for file in part_dir.files.values():
             all_aws.append(_get_table_like_awl_from_file(file, num_parts).awl)
