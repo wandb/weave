@@ -1669,25 +1669,7 @@ const useLatestData = (
 };
 */
 
-const PanelPlot2Inner: React.FC<
-  Omit<PanelPlotProps, 'config'> & {
-    config: PlotConfig;
-    concreteConfig: ConcretePlotConfig;
-    brushMode: BrushMode;
-    setBrushMode: React.Dispatch<React.SetStateAction<BrushMode>>;
-  }
-> = props => {
-  // since this is always called from the PanelPlot2 component, we assume here that
-  // propsConfig is the result of useConfig, i.e. we dont need to (and shouldnt) call
-  // useConfig in here.
-
-  const {
-    config,
-    concreteConfig,
-    input: inputNode,
-    brushMode,
-    setBrushMode,
-  } = props;
+const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
   const weave = useWeaveContext();
   const {
     input,
@@ -1695,11 +1677,27 @@ const PanelPlot2Inner: React.FC<
     updateConfig2: propsUpdateConfig2,
   } = props;
 
-  const {frame, stack} = usePanelContext();
+  const [brushMode, setBrushMode] = useState<BrushMode>('zoom');
+
+  // for use in vega callbacks, to ensure we get the latest value
+  const brushModeRef = useRef<BrushMode>(brushMode);
+  brushModeRef.current = brushMode;
+
+  const isOrgDashboard = useIsOrgDashboard();
+  // const isRepoInsightsDashboard = useIsRepoInsightsDashboard();
+
+  useEffect(() => {
+    recordEvent('VIEW');
+  }, []);
 
   // TODO(np): Hack to detect when we are on an activity dashboard
   const isDashboard = useIsDashboard();
-  const isOrgDashboard = useIsOrgDashboard();
+
+  const {frame, stack} = usePanelContext();
+  const {config, isRefining} = useConfig(input, props.config);
+
+  const {config: unvalidatedConcreteConfig, loading: concreteConfigLoading} =
+    useConcreteConfig(config, input, stack);
 
   const updateConfig = useCallback(
     (newConfig?: Partial<PlotConfig>) => {
@@ -1720,6 +1718,14 @@ const PanelPlot2Inner: React.FC<
   // fetch all data, including data beyond current domain.
   // That is what would happen if we used `input` below
   // while concreteConfig is in the loading state
+  const inputNode = useMemo(
+    () =>
+      isRefining || concreteConfigLoading
+        ? // this line ensures that a regular list is used (not arrowweavelist)
+          constNode(list(listObjectType(input.type)), [])
+        : input,
+    [concreteConfigLoading, input, isRefining]
+  );
 
   const updateConfig2 = useCallback(
     (change: (oldConfig: PlotConfig) => PlotConfig) => {
@@ -1734,12 +1740,13 @@ const PanelPlot2Inner: React.FC<
   const updateConfigRef = useRef<typeof updateConfig>(updateConfig);
   updateConfigRef.current = updateConfig;
 
+  const concreteConfig = useMemo(
+    () => ensureValidSignals(unvalidatedConcreteConfig),
+    [unvalidatedConcreteConfig]
+  );
+
   const configRef = useRef<PlotConfig>(config);
   configRef.current = config;
-
-  // for use in vega callbacks, to ensure we get the latest value
-  const brushModeRef = useRef<BrushMode>(brushMode);
-  brushModeRef.current = brushMode;
 
   const concreteConfigRef = useRef<ConcretePlotConfig>(concreteConfig);
   concreteConfigRef.current = concreteConfig;
@@ -1827,7 +1834,6 @@ const PanelPlot2Inner: React.FC<
   const flatResultNodeDidChange = flatResultNode !== flatResultNodeRef.current;
 
   flatResultNodeRef.current = flatResultNode;
-
   const result = LLReact.useNodeValue(flatResultNode);
 
   // enables domain sharing
@@ -1894,7 +1900,10 @@ const PanelPlot2Inner: React.FC<
   const mutateDomainRef = useRef(mutateDomain);
   mutateDomainRef.current = mutateDomain;
 
-  const loading = result.loading;
+  const loading = useMemo(
+    () => result.loading || concreteConfigLoading || isRefining,
+    [result.loading, concreteConfigLoading, isRefining]
+  );
 
   const plotTables = useMemo(
     () => (loading ? [] : (result.result as any[][])),
@@ -3273,54 +3282,23 @@ const PanelPlot2: React.FC<PanelPlotProps> = props => {
 
   const inputNode = useMemo(() => TableType.normalizeTableLike(input), [input]);
   const typedInputNodeUse = LLReact.useNodeWithServerType(inputNode);
-
-  const loaderComp = useLoader();
-
-  // this needs to live in here so that the brush mode can persist between loads when
-  // PanelPlot2Inner unmounts
-  const [brushMode, setBrushMode] = useState<BrushMode>('zoom');
-
-  useEffect(() => {
-    recordEvent('VIEW');
-  }, []);
-
-  const {stack} = usePanelContext();
-  const {config, isRefining} = useConfig(input, props.config);
-
-  const {config: unvalidatedConcreteConfig, loading: concreteConfigLoading} =
-    useConcreteConfig(config, input, stack);
-
-  const concreteConfig = useMemo(
-    () => ensureValidSignals(unvalidatedConcreteConfig),
-    [unvalidatedConcreteConfig]
-  );
-
-  const loading = useMemo(
-    () => typedInputNodeUse.loading || concreteConfigLoading || isRefining,
-    [typedInputNodeUse.loading, concreteConfigLoading, isRefining]
-  );
-
   const newProps = useMemo(() => {
     return {
       ...props,
       input: typedInputNodeUse.result as any,
-      config,
     };
-  }, [props, typedInputNodeUse.result, config]);
+  }, [props, typedInputNodeUse.result]);
 
-  if (loading) {
+  const loaderComp = useLoader();
+
+  if (typedInputNodeUse.loading) {
     return <div style={{height: '100%', width: '100%'}}>{loaderComp}</div>;
   } else if (typedInputNodeUse.result.nodeType === 'void') {
     return <div style={{height: '100%', width: '100'}}></div>;
   } else {
     return (
       <div style={{height: '100%', width: '100%'}}>
-        <PanelPlot2Inner
-          {...newProps}
-          concreteConfig={concreteConfig}
-          brushMode={brushMode}
-          setBrushMode={setBrushMode}
-        />
+        <PanelPlot2Inner {...newProps} />
       </div>
     );
   }
