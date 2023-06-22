@@ -4,6 +4,7 @@ import os
 import random
 import shutil
 import pathlib
+import tempfile
 import typing
 
 from . import uris
@@ -75,6 +76,7 @@ class WandbRunFiles(artifact_fs.FilesystemArtifact):
 
     @property
     def is_saved(self) -> bool:
+        # TODO: This is not always true
         return True
 
     @property
@@ -127,6 +129,23 @@ class WandbRunFiles(artifact_fs.FilesystemArtifact):
         p = self.path(path)
         with file_util.safe_open(p, mode) as f:
             yield f
+
+    @contextlib.contextmanager
+    def new_file(
+        self, path: str, binary: bool = False
+    ) -> typing.Generator[typing.IO, None, None]:
+        # Generate a temporary file that can be returned to the caller
+        # and then moved into place when the context manager exits.
+        # Create a temporary directory to hold the file
+        with tempfile.TemporaryDirectory() as dir_path:
+            file_path = os.path.join(dir_path, path)
+            with file_util.safe_open(file_path, "wb" if binary else "w") as file:
+                yield file
+                # TODO: don't rely on wandb!! This might be slower than is needed
+                self.run.upload_file(file_path, dir_path)  # type: ignore[no-untyped-call]
+
+    def save(self) -> None:
+        pass
 
 
 class WandbRunFilesType(artifact_fs.FilesystemArtifactType):
@@ -196,7 +215,14 @@ class WeaveWBRunFilesURI(uris.WeaveURI):
         else:
             project_name, run_name = path.split("/", 1)
             path = ""
-        return cls(netloc, None, entity_name, project_name, run_name, path or None)
+        return cls(
+            f"{entity_name}/{project_name}/{run_name}",
+            None,
+            entity_name,
+            project_name,
+            run_name,
+            path or None,
+        )
 
     def to_ref(self) -> WandbRunFilesRef:
         return WandbRunFilesRef.from_uri(self)

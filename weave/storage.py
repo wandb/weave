@@ -3,6 +3,7 @@ import re
 import typing
 import pathlib
 import functools
+import uuid
 
 from . import errors
 from . import ref_base
@@ -271,7 +272,13 @@ def recursively_unwrap_arrow(obj):
     return obj
 
 
-def to_python(obj: typing.Any, wb_type: typing.Optional[types.Type] = None) -> dict:
+def to_python(
+    obj: typing.Any,
+    wb_type: typing.Optional[types.Type] = None,
+    ref_art_constructor: typing.Optional[
+        typing.Callable[[str, str], artifact_base.Artifact]
+    ] = None,
+) -> dict:
     if wb_type is None:
         wb_type = types.TypeRegistry.type_of(obj)
 
@@ -282,11 +289,16 @@ def to_python(obj: typing.Any, wb_type: typing.Optional[types.Type] = None) -> d
 
     if art.ref_count() > 0:
         # There are custom objects, create a local artifact to persist them.
-        fs_art = artifact_local.LocalArtifact(wb_type.name, "latest")
+        if ref_art_constructor is None:
+            ref_art_constructor = artifact_local.LocalArtifact
+        fs_art = ref_art_constructor(wb_type.name, "latest")
         # Save all the reffed objects into the new artifact.
         for mem_ref in art.refs():
             if mem_ref.path is not None and mem_ref._type is not None:
-                fs_art.set(mem_ref.path, mem_ref._type, mem_ref._obj)
+                # Hack: add a random salt to the end (i really want content addressing here)
+                # but this is a quick fix to avoid collisions
+                path = mem_ref.path + "-" + str(uuid.uuid4())
+                fs_art.set(path, mem_ref._type, mem_ref._obj)
         fs_art.save()
         # now map the original object again. Because there are now existing refs
         # to the local artifact for any custom objects, this new value will contain
