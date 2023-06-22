@@ -17,8 +17,6 @@ import wandb
 
 from urllib import parse
 
-from wandb.sdk.artifacts.public_artifact import Artifact
-
 # Note: We're mocking out the whole io_service right now. This is too
 # high level and doesn't test the actual io implementation. We should
 # mock wandb_api instead probably.
@@ -359,6 +357,9 @@ class PatchedSDKArtifact(wandb.Artifact):
         return self._commit_hash
 
 
+OriginalArtifactSymbol = wandb.Artifact
+
+
 def setup():
     # Set user id to random string, its used as the cache namepsace and we want
     # each test to use a fresh one.
@@ -397,7 +398,7 @@ def teardown(setup_response: SetupResponse):
     setup_response.fake_io.cleanup()
     wandb_client_api.wandb_public_api = setup_response.old_wandb_api_wandb_public_api
     io_service.get_sync_client = setup_response.orig_io_service_client  # type: ignore
-    wandb.Artifact = Artifact
+    wandb.Artifact = OriginalArtifactSymbol
 
 
 entity_payload = {

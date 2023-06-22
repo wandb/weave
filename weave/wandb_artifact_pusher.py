@@ -96,7 +96,9 @@ def write_artifact_to_wandb(
     pusher.join()
 
     if res is not None:
-        commit_hash = Artifact.from_id(res["id"], p_api.client).commit_hash
+        art = Artifact.from_id(res["id"], p_api.client)
+        if art is not None:
+            commit_hash = art.commit_hash
 
     # Return the URI of the artifact
     return WeaveWBArtifactURIComponents(

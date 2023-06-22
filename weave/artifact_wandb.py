@@ -6,7 +6,6 @@ import functools
 import tempfile
 import typing
 
-import wandb
 from wandb.apis import public as wb_public
 from wandb.sdk.artifacts.local_artifact import Artifact as LocalArtifact
 from wandb.sdk.lib.hashutil import hex_to_b64_id, b64_to_hex_id
@@ -24,9 +23,6 @@ from . import filesystem
 from . import wandb_artifact_pusher
 
 from urllib import parse
-
-if typing.TYPE_CHECKING:
-    from wandb.sdk.interface import artifacts
 
 quote_slashes = functools.partial(parse.quote, safe="")
 
