@@ -32,7 +32,7 @@ const SANITIZATION_SCHEMAS_FOR_RULES: Record<keyof SanitizationRules, Schema> =
     },
   };
 
-export function markdownToText(markdown: string, rules: SanitizationRules) {
+export function markdownToText(markdown: string, rules?: SanitizationRules) {
   const html = generateHTML(markdown, rules);
   const tempDiv = document.createElement('div');
   tempDiv.innerHTML = html.toString();
