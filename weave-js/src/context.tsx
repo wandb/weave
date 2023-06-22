@@ -50,7 +50,7 @@ WeaveFeaturesContext.displayName = 'WeaveFeaturesContext';
 
 // This custom provider for this context allows us to have nested instances of this
 // context in a given react app. The weave team wants to allow both high level features
-// that are set at a global app-wide basis, and more local features that are set in 
+// that are set at a global app-wide basis, and more local features that are set in
 // a specific subtree of a react app.
 export const WeaveFeaturesContextProvider: FC<{features: WeaveFeatures}> =
   React.memo(props => {
