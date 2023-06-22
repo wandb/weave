@@ -1,5 +1,6 @@
 import {Client} from '@wandb/weave/core';
-import React, {createContext, useContext, useMemo} from 'react';
+import React, {FC, createContext, useContext, useMemo} from 'react';
+import _ from 'lodash';
 
 import {WeaveApp} from './weave';
 
@@ -46,6 +47,23 @@ export const WeaveFeaturesContext = createContext<WeaveFeatures>({
   betaFeatures: {},
 });
 WeaveFeaturesContext.displayName = 'WeaveFeaturesContext';
+
+export const WeaveFeaturesContextProvider: FC<{features: WeaveFeatures}> =
+  React.memo(props => {
+    const prevFeatures = {...useWeaveFeaturesContext()};
+
+    // for panelSettings, we can't do a simple spread operator combine, since we
+    // need to retain values from both panelSettings if they exist. Spread operator
+    // will only retain the props.features copy of panelSettings, ignoring any panelSettings
+    // in prevFeatures.
+    const newFeatures = _.merge(prevFeatures, props.features);
+
+    return (
+      <WeaveFeaturesContext.Provider value={newFeatures}>
+        {props.children}
+      </WeaveFeaturesContext.Provider>
+    );
+  });
 
 export const useWeaveFeaturesContext = () => {
   return useContext(WeaveFeaturesContext);

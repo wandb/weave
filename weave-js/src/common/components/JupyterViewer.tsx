@@ -211,7 +211,7 @@ export const JupyterCell: React.FC<{
   id: string;
   readonly: boolean;
 }> = ({cell, id, runCode, saveCode, readonly}) => {
-  const {allowScopedStyles} = usePanelSettings(
+  const panelSettings = usePanelSettings(
     'JupyterViewer'
   ) as JupyterViewPanelSettings;
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -296,7 +296,7 @@ export const JupyterCell: React.FC<{
           className="output"
           dangerouslySetInnerHTML={{
             __html: generateHTML(sourceAsArray(cell.source).join(''), {
-              allowScopedStyles,
+              allowScopedStyles: panelSettings?.allowScopedStyles ?? false,
             }).toString(),
           }}
         />

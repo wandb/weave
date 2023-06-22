@@ -42,11 +42,9 @@ export function markdownToText(markdown: string, rules: SanitizationRules) {
 
 type SanitizationRules = {allowScopedStyles?: boolean};
 export function buildSanitizationSchema(rules?: SanitizationRules) {
-  // Since this function deals with security, it is deliberately written in a simple
-  // and understandable manner
   const newSchema = {...DEFAULT_SANITIZATION_SCHEMA};
   if (rules?.allowScopedStyles) {
-    Object.assign(newSchema, SANITIZATION_SCHEMAS_FOR_RULES.allowScopedStyles);
+    _.merge(newSchema, SANITIZATION_SCHEMAS_FOR_RULES.allowScopedStyles);
   }
 
   return newSchema;
