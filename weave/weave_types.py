@@ -730,7 +730,9 @@ class UnionType(Type):
     #     raise Exception('invalid')
     @classmethod
     def from_dict(cls, d):
-        return union(*[TypeRegistry.type_from_dict(mem) for mem in d["members"]])
+        return merge_many_types(
+            [TypeRegistry.type_from_dict(mem) for mem in d["members"]]
+        )
 
     def _to_dict(self):
         return {"members": [mem.to_dict() for mem in self.members]}
