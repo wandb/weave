@@ -21,7 +21,7 @@ export interface WeaveFeatures {
   fullscreenMode?: boolean;
   dashUi?: boolean;
   betaFeatures: WeaveWBBetaFeatures;
-  panelSettings?: Record<PanelSettingPanel, any>;
+  panelSettings?: Record<PanelSettingPanel, unknown>;
 }
 
 export const ClientContext = React.createContext<ClientState>({
