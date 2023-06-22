@@ -203,7 +203,7 @@ type ErrorStateType = {message: string; traceback: string[]};
 
 const errorToText = (e: any) => {
   if (e instanceof Error) {
-    return '' + e;
+    return e.message + '\n\nStack:\n' + e.stack;
   } else if (typeof e === 'string') {
     return e;
   } else if (
@@ -214,6 +214,13 @@ const errorToText = (e: any) => {
     _.isArray(e.traceback)
   ) {
     return e.message + '\n\nTraceback:\n' + e.traceback.join('\n');
+  } else if (
+    typeof e === 'object' &&
+    e != null &&
+    e.message != null &&
+    e.stack != null
+  ) {
+    return e.message + '\n\nStack:\n' + e.stack;
   } else {
     return '';
   }

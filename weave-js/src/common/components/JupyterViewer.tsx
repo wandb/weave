@@ -11,11 +11,16 @@ import BasicNoMatchComponent from './BasicNoMatchComponent';
 import {UseLoadFile} from './FileBrowser';
 import MonacoEditor from './Monaco/Editor';
 import WandbLoader from './WandbLoader';
+import {usePanelSettings} from '@wandb/weave/context';
 
 interface JupyterProps {
   file: File;
   useLoadFile: UseLoadFile;
 }
+
+export type JupyterViewPanelSettings = {
+  allowScopedStyles?: boolean;
+};
 
 function sourceAsArray(source: string | string[]): string[] {
   if (typeof source === 'string') {
@@ -206,6 +211,9 @@ export const JupyterCell: React.FC<{
   id: string;
   readonly: boolean;
 }> = ({cell, id, runCode, saveCode, readonly}) => {
+  const panelSettings = usePanelSettings(
+    'JupyterViewer'
+  ) as JupyterViewPanelSettings;
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   // This effect resizes the iframe so we don't have extra space / scrollbars
@@ -287,9 +295,9 @@ export const JupyterCell: React.FC<{
         <div
           className="output"
           dangerouslySetInnerHTML={{
-            __html: generateHTML(
-              sourceAsArray(cell.source).join('')
-            ).toString(),
+            __html: generateHTML(sourceAsArray(cell.source).join(''), {
+              allowScopedStyles: panelSettings?.allowScopedStyles ?? false,
+            }).toString(),
           }}
         />
       ) : (
@@ -301,8 +309,7 @@ export const JupyterCell: React.FC<{
 
 export const JupyterViewer: React.FC<{
   raw: string;
-}> = props => {
-  const {raw} = props;
+}> = ({raw}) => {
   const idRef = useRef(ID());
   useEffect(() => {
     Prism.highlightAll();
