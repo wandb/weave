@@ -1,5 +1,7 @@
 import typing
 from urllib import parse
+
+from .. import storage
 from .. import weave_types as types
 from .. import decorator_type
 
@@ -123,6 +125,14 @@ def _process_run_dict_item(val, run_path: typing.Optional[RunPath] = None):
                 model_dict_dumps=val.get("model_dict_dumps"),
                 model_hash=val.get("model_hash"),
             )
+
+        if "_weave_type" in val and "_val" in val:
+            # we have a weave-encoded history cell!!
+            weave_json = {
+                "_type": val["_weave_type"],
+                "_val": val["_val"],
+            }
+            return storage.from_python(weave_json)
 
     return val
 

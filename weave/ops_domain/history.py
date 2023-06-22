@@ -1,3 +1,4 @@
+import logging
 import typing
 
 from . import wb_util
@@ -61,4 +62,14 @@ def history_key_type_count_to_weave_type(tc: TypeCount) -> types.Type:
         return ImageArtifactFileRefType()
     elif tc_type == "wb_trace_tree":
         return WBTraceTree.WeaveType()  # type: ignore
+    else:
+        possible_type = types.type_name_to_type(tc_type)
+        if possible_type is not None:
+            try:
+                return possible_type()
+            except Exception:
+                logging.warning(
+                    f"Could not instantiate type {tc_type} from history",
+                )
+                pass
     return types.UnknownType()

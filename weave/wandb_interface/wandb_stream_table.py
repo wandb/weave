@@ -8,7 +8,7 @@ from .. import storage
 
 
 # TODO: Move this into a mapper that can do the storage for files too
-def obj_to_weave(obj: typing.Any) -> dict:
+def obj_to_weave(obj: typing.Any) -> typing.Any:
     if isinstance(obj, dict):
         return {key: obj_to_weave(value) for key, value in obj.items()}
     elif isinstance(obj, list):
@@ -23,7 +23,13 @@ def obj_to_weave(obj: typing.Any) -> dict:
     elif isinstance(obj, (int, float, str, bool, type(None))):
         return obj
     else:
-        return storage.to_python(obj)
+        res = storage.to_python(obj)
+        type_name = res.get("_type", {}).get("type")
+        if type_name is None:
+            raise ValueError(f"Could not serialize object of type {type(obj)}")
+
+        # Ugg - gorilla only know how to handle plain string types
+        return {"_type": type_name, "_weave_type": res["_type"], "_val": res["_val"]}
 
 
 class StreamTable:
