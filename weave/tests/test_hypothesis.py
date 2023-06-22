@@ -279,14 +279,14 @@ def test_concat(l1, l2, weave_no_cache):
 )
 @settings(max_examples=EXAMPLES_PER_TEST, database=None)
 def test_join2(list_lambda1, list_lambda2, leftOuter, rightOuter, weave_no_cache):
-    l1, joinFn1 = list_lambda1
-    l2, joinFn2 = list_lambda2
+    l1, join1Fn = list_lambda1
+    l2, join2Fn = list_lambda2
     # Call your join2_impl function
     alias1 = "alias1"
     alias2 = "alias2"
     l_result = weave.use(
         ops_primitives.join_2(
-            l1, l2, joinFn1, joinFn2, alias1, alias2, leftOuter, rightOuter
+            l1, l2, join1Fn, join2Fn, alias1, alias2, leftOuter, rightOuter
         )
     )
     # print("L1", l1)
@@ -297,8 +297,8 @@ def test_join2(list_lambda1, list_lambda2, leftOuter, rightOuter, weave_no_cache
     a2 = ops_arrow.to_arrow(l2)
     arr_result = a1.join2(
         a2,
-        joinFn1,
-        joinFn2,
+        join1Fn,
+        join2Fn,
         alias1,
         alias2,
         leftOuter,

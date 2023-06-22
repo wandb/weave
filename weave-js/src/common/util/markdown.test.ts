@@ -1,15 +1,46 @@
-import {generateHTML, isMarkdown} from './markdown';
+import {
+  DEFAULT_SANITIZATION_SCHEMA,
+  buildSanitizationSchema,
+  generateHTML,
+  isMarkdown,
+} from './markdown';
+
+describe('buildSanitizationSchema', () => {
+  it('built schema allows scoped styles with `allowScopedStyles` rule', () => {
+    // preconditions
+    expect(DEFAULT_SANITIZATION_SCHEMA.tagNames?.includes('style')).toBe(false);
+    expect(DEFAULT_SANITIZATION_SCHEMA.attributes?.style).toBe(undefined);
+
+    // actual test
+    const builtSchema = buildSanitizationSchema({allowScopedStyles: true});
+    expect(builtSchema.tagNames?.includes('style')).toBe(true);
+    expect(builtSchema.attributes?.style?.includes('scoped')).toBe(true);
+  });
+  it('built schema works correclty without `allowScopedStyles`', () => {
+    // preconditions
+    expect(DEFAULT_SANITIZATION_SCHEMA.tagNames?.includes('style')).toBe(false);
+    expect(DEFAULT_SANITIZATION_SCHEMA.attributes?.style).toBe(undefined);
+
+    // actual test
+    const falseCaseSchema = buildSanitizationSchema({allowScopedStyles: false});
+    expect(falseCaseSchema.tagNames?.includes('style')).toBeFalsy();
+    expect(falseCaseSchema.attributes?.style?.includes('scoped')).toBeFalsy();
+    const undefinedCaseSchema = buildSanitizationSchema();
+    expect(undefinedCaseSchema.tagNames?.includes('style')).toBeFalsy();
+    expect(
+      undefinedCaseSchema.attributes?.style?.includes('scoped')
+    ).toBeFalsy();
+  });
+});
 
 describe('generateHTML', () => {
   it('does not allow basic script tags', () => {
     const someHTML = '<script>alert(123)</script>';
-    console.log(generateHTML(someHTML).value);
     expect(generateHTML(someHTML).value.indexOf('script')).toEqual(-1);
   });
 
   it('does not allow basic script tags in tag params', () => {
     const someHTML = '<a href=<script>alert(123)</script>> link </a>';
-    console.log(generateHTML(someHTML).value);
     expect(generateHTML(someHTML).value.indexOf('script')).toEqual(-1);
   });
 });

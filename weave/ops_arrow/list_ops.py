@@ -3,6 +3,7 @@ import pyarrow as pa
 import pyarrow.compute as pc
 import numpy as np
 import typing
+from builtins import map as builtin_map
 
 from ..api import op, type_of
 from ..decorator_arrow_op import arrow_op
@@ -675,14 +676,29 @@ def concat(arr):
     elif len(arr) == 1:
         return arrow_tags.pushdown_list_tags(arr[0])
 
-    res = arr[0]
-    res = typing.cast(ArrowWeaveList, res)
-    res = arrow_tags.pushdown_list_tags(res)
+    tagged = list(builtin_map(lambda x: arrow_tags.pushdown_list_tags(x), arr))
 
-    for i in range(1, len(arr)):
-        tagged = arrow_tags.pushdown_list_tags(arr[i])
-        res = res.concat(tagged)
-    return res
+    # We merge the lists mergesort-style, which is `O(n*log(n))`
+    # DO NOT merge the lists reduce-style, which is `O(n^2)`
+    return merge_concat(tagged)
+
+
+def merge_concat(arr: list[ArrowWeaveList]) -> ArrowWeaveList:
+    if len(arr) == 0:
+        raise ValueError("arr must not be empty")
+    if len(arr) == 1:
+        return arr[0]
+    left, right = merge_concat_split(arr)
+    return merge_concat(left).concat(merge_concat(right))
+
+
+def merge_concat_split(
+    arr: list[ArrowWeaveList],
+) -> tuple[list[ArrowWeaveList], list[ArrowWeaveList]]:
+    if len(arr) < 2:
+        raise ValueError("arr must have length of at least 2")
+    middle_index = len(arr) // 2
+    return arr[:middle_index], arr[middle_index:]
 
 
 # # Putting this here instead of in number b/c it is just a map function

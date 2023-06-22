@@ -299,7 +299,7 @@ def to_python(
                 # but this is a quick fix to avoid collisions
                 path = mem_ref.path + "-" + str(uuid.uuid4())
                 fs_art.set(path, mem_ref._type, mem_ref._obj)
-        fs_art.save()
+        fs_art.save()  # type: ignore
         # now map the original object again. Because there are now existing refs
         # to the local artifact for any custom objects, this new value will contain
         # those existing refs as absolute refs. We provide None for artifact because
