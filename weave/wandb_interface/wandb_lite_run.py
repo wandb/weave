@@ -36,7 +36,6 @@ class InMemoryLazyLiteRun:
 
         entity_name = entity_name or p_api.default_entity
 
-        assert project_name is not None
         assert entity_name is not None
 
         self._entity_name = entity_name
@@ -118,15 +117,14 @@ class InMemoryLazyLiteRun:
         self.stream.push("wandb-history.jsonl", json.dumps(row_dict))
 
     def finish(self) -> None:
-        if self._run is None:
-            raise ValueError("Cannot finish a run that has not been started")
+        if self._stream is not None:
+            # Finalize the run
+            self.stream.finish(0)
 
-        # Finalize the run
-        self.stream.finish(0)
-
-        # Wait for the FilePusher and FileStream to finish
-        self.pusher.finish()
-        self.pusher.join()
+        if self._pusher is not None:
+            # Wait for the FilePusher and FileStream to finish
+            self.pusher.finish()
+            self.pusher.join()
 
         # Reset fields
         self._stream = None
@@ -136,5 +134,4 @@ class InMemoryLazyLiteRun:
         self._step = 0
 
     def __del__(self) -> None:
-        if self._run is not None:
-            self.finish()
+        self.finish()

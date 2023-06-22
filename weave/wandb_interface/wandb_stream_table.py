@@ -1,17 +1,29 @@
 import typing
 
 from .wandb_lite_run import InMemoryLazyLiteRun
-from ..weave_types import TypeRegistry
+
+from .. import storage
+
+# from ..weave_types import TypeRegistry
 
 
-def obj_to_media_type(obj: typing.Any) -> dict:
-    obj_type = TypeRegistry.type_of(obj)
-    obj_dict = obj_type.instance_to_dict(obj)
-    type_dict = obj_type.to_dict()
-    return {
-        "_type": type_dict,
-        **obj_dict,
-    }
+# TODO: Move this into a mapper that can do the storage for files too
+def obj_to_weave(obj: typing.Any) -> dict:
+    if isinstance(obj, dict):
+        return {key: obj_to_weave(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [obj_to_weave(value) for value in obj]
+    elif isinstance(obj, tuple):
+        return [obj_to_weave(value) for value in obj]
+    elif isinstance(obj, set):
+        return [obj_to_weave(value) for value in obj]
+    elif isinstance(obj, frozenset):
+        return [obj_to_weave(value) for value in obj]
+    # all primitives
+    elif isinstance(obj, (int, float, str, bool, type(None))):
+        return obj
+    else:
+        return storage.to_python(obj)
 
 
 class StreamTable:
@@ -22,7 +34,7 @@ class StreamTable:
         entity_name: typing.Optional[str] = None,
     ):
         self._lite_run = InMemoryLazyLiteRun(
-            entity_name, project_name, table_name, "stream_table"
+            entity_name, project_name or "stream-tables", table_name, "stream_table"
         )
 
     def log(self, row_or_rows: typing.Union[dict, list[dict]]) -> None:
@@ -33,8 +45,7 @@ class StreamTable:
             self._log_row(row)
 
     def _log_row(self, row: dict) -> None:
-        weave_row = {key: obj_to_media_type(value) for key, value in row.items()}
-        self._lite_run.log(weave_row)
+        self._lite_run.log(obj_to_weave(row))
 
     def finish(self) -> None:
         self._lite_run.finish()
