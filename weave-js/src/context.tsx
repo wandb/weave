@@ -74,5 +74,5 @@ export const useWeaveDashUiEnable = () => {
 };
 
 export const usePanelSettings = (type: PanelSettingPanel) => {
-  return useWeaveFeaturesContext().panelSettings?.[type];
+  return useWeaveFeaturesContext().panelSettings?.[type] ?? {};
 };
