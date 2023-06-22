@@ -1,3 +1,4 @@
+import {Schema} from 'hast-util-sanitize';
 import {defaultSchema as gh} from 'hast-util-sanitize/lib/schema';
 import {produce} from 'immer';
 import * as _ from 'lodash';
@@ -16,20 +17,41 @@ import visit from 'unist-util-visit';
 
 import {blankifyLinks, shiftHeadings} from './html';
 
-const sanitizeRules = _.merge(gh, {
+// exported only for tests
+export const DEFAULT_SANITIZATION_SCHEMA = _.merge(gh, {
   attributes: {'*': ['className', 'style']},
 });
 
-// Hackily convert markdown to text
-export function markdownToText(markdown: string) {
-  const html = generateHTML(markdown);
+const SANITIZATION_SCHEMAS_FOR_RULES: Record<keyof SanitizationRules, Schema> =
+  {
+    allowScopedStyles: {
+      attributes: {
+        style: ['scoped'],
+      },
+      tagNames: ['style'],
+    },
+  };
+
+export function markdownToText(markdown: string, rules: SanitizationRules) {
+  const html = generateHTML(markdown, rules);
   const tempDiv = document.createElement('div');
   tempDiv.innerHTML = html.toString();
   const text = tempDiv.textContent || tempDiv.innerText;
   return text;
 }
 
-export function generateHTML(markdown: string) {
+type SanitizationRules = {allowScopedStyles?: boolean};
+export function buildSanitizationSchema(rules?: SanitizationRules) {
+  const newSchema = {...DEFAULT_SANITIZATION_SCHEMA};
+  if (rules?.allowScopedStyles) {
+    _.merge(newSchema, SANITIZATION_SCHEMAS_FOR_RULES.allowScopedStyles);
+  }
+
+  return newSchema;
+}
+
+export function generateHTML(markdown: string, rules?: SanitizationRules) {
+  const sanitizationSchema = buildSanitizationSchema(rules);
   // IMPORTANT: We must sanitize as the final step of the pipeline to prevent XSS
   const vfile = (
     unified()
@@ -44,9 +66,9 @@ export function generateHTML(markdown: string) {
     // that the rehype plugins we pass in afterwards will work.
     .use(katex)
     .use(rehypeRaw)
-    .use(sanitize, sanitizeRules)
+    .use(sanitize, sanitizationSchema)
     .use(stringify)
-    .use(sanitize, sanitizeRules)
+    .use(sanitize, sanitizationSchema)
     .processSync(markdown);
   if (typeof vfile.value === 'string') {
     vfile.value = blankifyLinks(vfile.value);
@@ -55,7 +77,7 @@ export function generateHTML(markdown: string) {
   return vfile;
 }
 
-export function sanitizeHTML(html: string) {
+export function sanitizeHTML(html: string, sanitizeRules?: SanitizationRules) {
   return unified()
     .use(parseHTML)
     .use(stringify as any)
