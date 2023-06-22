@@ -1,3 +1,4 @@
+import logging
 import typing
 
 
@@ -5,8 +6,8 @@ from .wandb_lite_run import InMemoryLazyLiteRun
 
 from ..ops_domain import wb_util
 from .. import runfiles_wandb
-from .. import artifact_mem
 from .. import storage
+from .. import weave_types
 
 
 def obj_to_weave(obj: typing.Any, artifact: runfiles_wandb.WandbRunFiles) -> typing.Any:
@@ -72,3 +73,15 @@ class StreamTable:
 
     def __del__(self) -> None:
         self.finish()
+
+
+def maybe_history_type_to_weave_type(tc_type: str) -> typing.Optional[weave_types.Type]:
+    possible_type = weave_types.type_name_to_type(tc_type)
+    if possible_type is not None:
+        try:
+            return possible_type()
+        except Exception as e:
+            logging.warning(
+                f"StreamTable Type Error: Found type for {tc_type}, but blind construction failed: {e}",
+            )
+    return None

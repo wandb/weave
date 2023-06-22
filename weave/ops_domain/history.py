@@ -1,10 +1,12 @@
 import logging
 import typing
 
+
 from . import wb_util
 from . import table
 from .. import weave_types as types
 from .. import artifact_fs
+from ..wandb_interface import wandb_stream_table
 
 
 class TypeCount(typing.TypedDict):
@@ -63,13 +65,7 @@ def history_key_type_count_to_weave_type(tc: TypeCount) -> types.Type:
     elif tc_type == "wb_trace_tree":
         return WBTraceTree.WeaveType()  # type: ignore
     else:
-        possible_type = types.type_name_to_type(tc_type)
+        possible_type = wandb_stream_table.maybe_history_type_to_weave_type(tc_type)
         if possible_type is not None:
-            try:
-                return possible_type()
-            except Exception:
-                logging.warning(
-                    f"Could not instantiate type {tc_type} from history",
-                )
-                pass
+            return possible_type
     return types.UnknownType()
