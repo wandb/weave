@@ -1,4 +1,4 @@
-wandb>=0.15.4
+wandb==0.15.4 # Pinning as 0.15.5 will contain the huge artifact refactor.
 python-json-logger>=2.0.4
 numpy>=1.21
 pandas>=1.5.3  # current Colab version
