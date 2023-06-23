@@ -21,15 +21,19 @@ def test_stream_logging(user_by_api_key_in_env):
     hist_node = (
         weave.ops.project(user_by_api_key_in_env.username, "stream-tables")
         .run("test_table")
-        .history()
+        .history2()
     )
 
     exp_type = weave_types.TypedDict({"a": weave_types.List(weave_types.Int())})
     nested_type = hist_node.type.value.object_type.property_types["nested"].members[1]
     assert exp_type.assign_type(nested_type)
-    assert weave.use(hist_node["hello"]) == [f"world_{i}" for i in range(10)]
-    assert weave.use(hist_node["index"]) == [i for i in range(10)]
-    assert weave.use(hist_node["nested"]) == [{"a": [i]} for i in range(10)]
+    assert weave.use(hist_node["hello"]).to_pylist_tagged() == [
+        f"world_{i}" for i in range(10)
+    ]
+    assert weave.use(hist_node["index"]).to_pylist_tagged() == [i for i in range(10)]
+    assert weave.use(hist_node["nested"]).to_pylist_tagged() == [
+        {"a": [i]} for i in range(10)
+    ]
 
 
 def test_stream_logging_image(user_by_api_key_in_env):
@@ -54,10 +58,10 @@ def test_stream_logging_image(user_by_api_key_in_env):
     hist_node = (
         weave.ops.project(user_by_api_key_in_env.username, "stream-tables")
         .run("test_table-8")
-        .history()
+        .history2()
     )
 
-    images = weave.use(hist_node["image"])
+    images = weave.use(hist_node["image"]).to_pylist_tagged()
     assert len(images) == 3
     assert (np.array(images[0]) != np.array(images[1])).any()
     assert isinstance(images[0], Image.Image)
@@ -82,16 +86,18 @@ def test_multi_writers_sequential(user_by_api_key_in_env):
         st.log({"index": 10 + i, "writer": "b"})
     st.finish()
 
+    time.sleep(3)
+
     hist_node = (
         weave.ops.project(user_by_api_key_in_env.username, "stream-tables")
         .run("test_table")
-        .history()
+        .history2()
     )
-    assert weave.use(hist_node["index"]) == [i for i in range(20)]
-    assert weave.use(hist_node["writer"]) == ["a" for i in range(10)] + [
-        "b" for i in range(10)
-    ]
-    assert weave.use(hist_node["_step"]) == [i for i in range(20)]
+    assert weave.use(hist_node["index"]).to_pylist_tagged() == [i for i in range(20)]
+    assert weave.use(hist_node["writer"]).to_pylist_tagged() == [
+        "a" for i in range(10)
+    ] + ["b" for i in range(10)]
+    assert weave.use(hist_node["_step"]).to_pylist_tagged() == [i for i in range(20)]
 
 
 @pytest.mark.skip(reason="This is expected to fail until W&B updates step management")
@@ -123,7 +129,7 @@ def test_multi_writers_parallel(user_by_api_key_in_env):
     hist_node = (
         weave.ops.project(user_by_api_key_in_env.username, "stream-tables")
         .run("test_table")
-        .history()
+        .history2()
     )
     assert weave.use(hist_node["index"]) == indexes
     assert weave.use(hist_node["writer"]) == writers
