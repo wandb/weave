@@ -280,7 +280,7 @@ def _default_ref_persister_artifact(
     for mem_ref in refs:
         if mem_ref.path is not None and mem_ref._type is not None:
             fs_art.set(mem_ref.path, mem_ref._type, mem_ref._obj)
-    fs_art.save()  # type: ignore
+    fs_art.save()
     return fs_art
 
 
