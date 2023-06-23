@@ -77,7 +77,7 @@ class StreamTable:
             uri = runfiles_wandb.WeaveWBRunFilesURI.from_run_identifiers(
                 self._lite_run._entity_name,
                 self._lite_run._project_name,
-                self._lite_run._run_name,
+                self._lite_run.run.id,
             )
             self._artifact = runfiles_wandb.WandbRunFiles(name=uri.name, uri=uri)
         self._lite_run.log(row_to_weave(row, self._artifact))  # type: ignore
@@ -179,4 +179,6 @@ def leaf_to_weave(
     w_type = res["_type"]
     type_name = w_type_to_type_name(w_type)
 
+    # Optimization: If we have ENCODE_ENTIRE_TYPE=True, then we can
+    # avoid re-saving the type info in _weave_type
     return {"_type": type_name, "_weave_type": res["_type"], "_val": res["_val"]}
