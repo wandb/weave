@@ -1,5 +1,6 @@
 import pytest
 import weave
+from weave import weave_types
 from weave.wandb_interface.wandb_stream_table import StreamTable
 import numpy
 from PIL import Image
@@ -21,6 +22,10 @@ def test_stream_logging(user_by_api_key_in_env):
         .run("test_table")
         .history()
     )
+
+    exp_type = weave_types.TypedDict({"a": weave_types.List(weave_types.Int())})
+    nested_type = hist_node.type.value.object_type.property_types["nested"].members[1]
+    assert exp_type.assign_type(nested_type)
     assert weave.use(hist_node["hello"]) == [f"world_{i}" for i in range(10)]
     assert weave.use(hist_node["index"]) == [i for i in range(10)]
     assert weave.use(hist_node["nested"]) == [{"a": [i]} for i in range(10)]

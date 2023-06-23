@@ -1,3 +1,4 @@
+import json
 import logging
 import typing
 import uuid
@@ -9,45 +10,17 @@ from .. import storage
 from .. import weave_types
 from .. import artifact_base
 
+# Shawn recommended we only encode leafs, but in my testing, nested structures
+# are not handled as well in in gorilla and we can do better using just weave.
+# Uncomment the below to use gorilla for nested structures.
+TRUST_GORILLA_FOR_NESTED_STRUCTURES = False
 
-def obj_to_weave(obj: typing.Any, artifact: runfiles_wandb.WandbRunFiles) -> typing.Any:
-    def recurse(obj: typing.Any) -> typing.Any:
-        return obj_to_weave(obj, artifact)
-
-    if isinstance(obj, dict):
-        return {key: recurse(value) for key, value in obj.items()}
-    elif isinstance(obj, list):
-        return [recurse(value) for value in obj]
-    elif isinstance(obj, tuple):
-        return [recurse(value) for value in obj]
-    elif isinstance(obj, set):
-        return [recurse(value) for value in obj]
-    elif isinstance(obj, frozenset):
-        return [recurse(value) for value in obj]
-    # all primitives
-    elif isinstance(obj, (int, float, str, bool, type(None))):
-        return obj
-    else:
-
-        def ref_persister_artifact(
-            type: weave_types.Type, refs: typing.Iterable[artifact_base.ArtifactRef]
-        ) -> artifact_base.Artifact:
-            # Save all the reffed objects into the new artifact.
-            for mem_ref in refs:
-                if mem_ref.path is not None and mem_ref._type is not None:
-                    # Hack: add a random salt to the end (i really want content addressing here)
-                    # but this is a quick fix to avoid collisions
-                    path = mem_ref.path + "-" + str(uuid.uuid4())
-                    artifact.set(path, mem_ref._type, mem_ref._obj)
-            return artifact
-
-        res = storage.to_python(obj, None, ref_persister_artifact)
-        type_name = res.get("_type", {}).get("type")
-        if type_name is None:
-            raise ValueError(f"Could not serialize object of type {type(obj)}")
-
-        # Ugg - gorilla only know how to handle plain string types
-        return {"_type": type_name, "_weave_type": res["_type"], "_val": res["_val"]}
+# Weave types are parametrized, but gorilla expects just simple strings. We could
+# send the top-level string over the wire, but this fails to encode type specifics
+# and therefore loses information. With this flag, we instead stringify the JSON type
+# and send that over the wire. This is a bit of a hack, but it works.
+ENCODE_ENTIRE_TYPE = True
+TYPE_ENCODE_PREFIX = "_wt_::"
 
 
 class StreamTable:
@@ -107,7 +80,7 @@ class StreamTable:
                 self._lite_run._run_name,
             )
             self._artifact = runfiles_wandb.WandbRunFiles(name=uri.name, uri=uri)
-        self._lite_run.log(obj_to_weave(row, self._artifact))  # type: ignore
+        self._lite_run.log(row_to_weave(row, self._artifact))  # type: ignore
 
     def finish(self) -> None:
         self._lite_run.finish()
@@ -117,14 +90,18 @@ class StreamTable:
 
 
 def maybe_history_type_to_weave_type(tc_type: str) -> typing.Optional[weave_types.Type]:
-    possible_type = weave_types.type_name_to_type(tc_type)
-    if possible_type is not None:
-        try:
-            return possible_type()
-        except Exception as e:
-            logging.warning(
-                f"StreamTable Type Error: Found type for {tc_type}, but blind construction failed: {e}",
-            )
+    if tc_type.startswith(TYPE_ENCODE_PREFIX):
+        w_type = json.loads(tc_type[len(TYPE_ENCODE_PREFIX) :])
+        return weave_types.TypeRegistry.type_from_dict(w_type)
+    else:
+        possible_type = weave_types.type_name_to_type(tc_type)
+        if possible_type is not None:
+            try:
+                return possible_type()
+            except Exception as e:
+                logging.warning(
+                    f"StreamTable Type Error: Found type for {tc_type}, but blind construction failed: {e}",
+                )
     return None
 
 
@@ -140,3 +117,66 @@ def from_weave_encoded_history_cell(cell: dict) -> typing.Any:
         "_val": cell["_val"],
     }
     return storage.from_python(weave_json)
+
+
+def row_to_weave(
+    row: typing.Dict[str, typing.Any], artifact: runfiles_wandb.WandbRunFiles
+) -> typing.Dict[str, typing.Any]:
+    return {key: obj_to_weave(value, artifact) for key, value in row.items()}
+
+
+def obj_to_weave(obj: typing.Any, artifact: runfiles_wandb.WandbRunFiles) -> typing.Any:
+    def recurse(obj: typing.Any) -> typing.Any:
+        return obj_to_weave(obj, artifact)
+
+    # all primitives
+    if isinstance(obj, (int, float, str, bool, type(None))):
+        return obj
+    else:
+        if TRUST_GORILLA_FOR_NESTED_STRUCTURES:
+            if isinstance(obj, dict):
+                return {key: recurse(value) for key, value in obj.items()}
+            elif isinstance(obj, list):
+                return [recurse(value) for value in obj]
+            elif isinstance(obj, tuple):
+                return [recurse(value) for value in obj]
+            elif isinstance(obj, set):
+                return [recurse(value) for value in obj]
+            elif isinstance(obj, frozenset):
+                return [recurse(value) for value in obj]
+            else:
+                return leaf_to_weave(obj, artifact)
+        else:
+            return leaf_to_weave(obj, artifact)
+
+
+def w_type_to_type_name(w_type: typing.Union[str, dict]) -> str:
+    if isinstance(w_type, str):
+        return w_type
+    if ENCODE_ENTIRE_TYPE:
+        return TYPE_ENCODE_PREFIX + json.dumps(w_type)
+    else:
+        return w_type["type"]
+
+
+def leaf_to_weave(
+    leaf: typing.Any, artifact: runfiles_wandb.WandbRunFiles
+) -> typing.Any:
+    def ref_persister_artifact(
+        type: weave_types.Type, refs: typing.Iterable[artifact_base.ArtifactRef]
+    ) -> artifact_base.Artifact:
+        # Save all the reffed objects into the new artifact.
+        for mem_ref in refs:
+            if mem_ref.path is not None and mem_ref._type is not None:
+                # Hack: add a random salt to the end (i really want content addressing here)
+                # but this is a quick fix to avoid collisions
+                path = mem_ref.path + "-" + str(uuid.uuid4())
+                artifact.set(path, mem_ref._type, mem_ref._obj)
+        return artifact
+
+    res = storage.to_python(leaf, None, ref_persister_artifact)
+
+    w_type = res["_type"]
+    type_name = w_type_to_type_name(w_type)
+
+    return {"_type": type_name, "_weave_type": res["_type"], "_val": res["_val"]}
