@@ -27,7 +27,7 @@ from sklearn.datasets import load_iris
 iris = load_iris(as_frame=True)
 df = iris.data.assign(target=iris.target_names[iris.target])
 
-**weave.show(df)**
+weave.show(df)
 ```
 
 <img src="/docs/assets/first_load.gif" width="100%">
