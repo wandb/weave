@@ -1,8 +1,8 @@
 import {
-  NodeOrVoidNode,
   constNodeUnsafe,
   isNullable,
   listObjectType,
+  NodeOrVoidNode,
   opUnique,
   voidNode,
 } from '@wandb/weave/core';
@@ -53,7 +53,7 @@ export const PanelSelectEditorConfigComponent: React.FC<
     <ConfigSection label={`Properties`}>
       <ConfigOption label={`choices`}>
         <ExpressionConfigField
-          expr={config.choices}
+          expression={config.choices}
           setExpression={updateChoicesExpr}
         />
       </ConfigOption>

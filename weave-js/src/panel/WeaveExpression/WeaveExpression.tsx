@@ -1,35 +1,25 @@
-import {ID} from '@wandb/weave/core';
-import React, {
-  createContext,
-  FC,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
-import {Button, Ref} from 'semantic-ui-react';
-import {createEditor, Editor, Transforms} from 'slate';
-import {withHistory} from 'slate-history';
-import {Editable, ReactEditor, Slate, withReact} from 'slate-react';
+import React, {useState} from 'react';
+import {Editor, Transforms} from 'slate';
+import {Editable, ReactEditor, Slate} from 'slate-react';
 
-import {usePanelContext} from '../../components/Panel2/PanelContext';
-import {useWeaveContext} from '../../context';
-import {useSuggestionTaker, useWeaveDecorate} from './hooks';
-import {Leaf} from './leaf';
-// import * as S from './styles';
-import {Suggestions} from './Suggestions';
-import {WeaveExpressionProps} from './types';
-import {trace} from './util';
-import styled from 'styled-components';
-import {fuzzyMatchHighlight} from '@wandb/weave/common/util/fuzzyMatch';
-import {useToggle} from '@wandb/weave/hookUtils';
 import classNames from 'classnames';
-import {
-  useWeaveExpressionContext,
-  WeaveExpressionContextProvider,
-} from '@wandb/weave/panel/WeaveExpression/contexts/WeaveExpressionContext';
 
 import './styles/WeaveExpression.less';
+import {EditingNode, NodeOrVoidNode} from '@wandb/weave/core';
+import {RunExpressionButton} from '@wandb/weave/panel/WeaveExpression/RunExpressionButton';
+import {
+  SlateEditorProvider,
+  useSlateEditorContext,
+} from '@wandb/weave/panel/WeaveExpression/contexts/SlateEditorProvider';
+import {ExpressionSuggestionsProvider} from '@wandb/weave/panel/WeaveExpression/contexts/ExpressionSuggestionsProvider';
+import {PropsProvider} from '@wandb/weave/panel/WeaveExpression/contexts/PropsProvider';
+import {usePropsEditable} from '@wandb/weave/panel/WeaveExpression/hooks/usePropsEditable';
+import {usePropsSlate} from '@wandb/weave/panel/WeaveExpression/hooks/usePropsSlate';
+import {
+  DomRefProvider,
+  useDomRefContext,
+} from '@wandb/weave/panel/WeaveExpression/contexts/DomRefProvider';
+import {Suggestions} from '@wandb/weave/panel/WeaveExpression/suggestions';
 
 // We attach some stuff to the window for test automation (see automation.ts)
 declare global {
@@ -49,37 +39,52 @@ declare global {
   }
 }
 
+// TODO: move this somewhere else or get rid of it
 window.SlateLibs = {Transforms, Editor, ReactEditor};
 window.weaveExpressionEditors = {};
 
+export interface WeaveExpressionProps {
+  expression?: EditingNode;
+  setExpression?: (expr: NodeOrVoidNode) => void;
+
+  noBox?: boolean;
+
+  onMount?: (editor: Editor) => void;
+  onFocus?: () => void;
+  onBlur?: () => void;
+
+  isLiveUpdateEnabled?: boolean;
+  isTruncated?: boolean; // TODO: search for instances of this variable (previously named 'truncate')
+}
+
 export const WeaveExpression = (props: WeaveExpressionProps) => {
+  console.log('CONTEXT ===');
   return (
-    <WeaveExpressionContextProvider {...props}>
-      <WeaveExpressionComp />
-    </WeaveExpressionContextProvider>
+    <PropsProvider value={props}>
+      <DomRefProvider>
+        <SlateEditorProvider>
+          <ExpressionSuggestionsProvider>
+            <WeaveExpressionComp />
+          </ExpressionSuggestionsProvider>
+        </SlateEditorProvider>
+      </DomRefProvider>
+    </PropsProvider>
   );
 };
-export const WeaveExpressionComp: React.FC<WeaveExpressionProps> = props => {
+
+export const WeaveExpressionComp: React.FC = () => {
   // const weave = useWeaveContext();
   // const {stack} = usePanelContext();
-  const {editor, slateDecorator, toggleIsDocsPanelVisible} =
-    useWeaveExpressionContext();
-  const {noBox} = props; // TODO: this seems wrong
-  // const {
-  //   onChange,
-  //   slateValue,
-  //   suggestions,
-  //   tsRoot,
-  //   isValid,
-  //   isBusy,
-  //   applyPendingExpr,
-  //   exprIsModified,
-  //   suppressSuggestions,
-  //   hideSuggestions,
-  //   isFocused,
-  //   onFocus,
-  //   onBlur,
-  // } = useWeaveExpressionState(props, editor, weave);
+  console.log('==== weave expression comp ====');
+  const {slateEditor, slateEditorId} = useSlateEditorContext();
+  const editableComponentProps = usePropsEditable();
+  const slateComponentProps = usePropsSlate();
+  const {expressionEditorDomRef} = useDomRefContext();
+
+  // TODO: figure out what noBox was for and re-enable it
+  // const {noBox} = props;
+  const noBox = true;
+  // TODO: figure out what forceRender was for and re-enable it
   const [, forceRender] = useState({});
   // const {containerRef, applyButtonRef} = useRunButtonVisualState(
   //   editor,
@@ -89,116 +94,85 @@ export const WeaveExpressionComp: React.FC<WeaveExpressionProps> = props => {
   //   props.isTruncated
   // );
 
-  // Wrap onChange so that we reset suggestion index back to top
-  // on any interaction
-  const onChangeResetSuggestion = React.useCallback(
-    newValue => {
-      setSuggestionIndex(0);
-      onChange(newValue, stack);
-    },
-    [setSuggestionIndex, onChange, stack]
-  );
+  // TODO: i don't think we need this
+  // // Wrap onChange so that we reset suggestion index back to top
+  // // on any interaction
+  // const onChangeResetSuggestion = React.useCallback(
+  //   newValue => {
+  //     setSuggestionIndex(0);
+  //     onChange(newValue, stack);
+  //   },
+  //   [setSuggestionIndex, onChange, stack]
+  // );
 
-  // Override default copy handler to make sure we're getting
-  // the contents we want
-  const copyHandler = React.useCallback(
-    ev => {
-      const selectedText = Editor.string(editor, editor!.selection!);
-      ev.clipboardData.setData('text/plain', selectedText);
-      ev.preventDefault();
-    },
-    [editor]
-  );
+  // trace(
+  //   `Render WeaveExpression ${editorId}`,
+  //   props.expr,
+  //   `editor`,
+  //   editor,
+  //   `slateValue`,
+  //   slateValue,
+  //   `exprIsModified`,
+  //   exprIsModified,
+  //   `suggestions`,
+  //   suggestions,
+  //   `isBusy`,
+  //   isBusy,
+  //   `suppressSuggestions`,
+  //   suppressSuggestions
+  // );
 
-  trace(
-    `Render WeaveExpression ${editorId}`,
-    props.expr,
-    `editor`,
-    editor,
-    `slateValue`,
-    slateValue,
-    `exprIsModified`,
-    exprIsModified,
-    `suggestions`,
-    suggestions,
-    `isBusy`,
-    isBusy,
-    `suppressSuggestions`,
-    suppressSuggestions
-  );
-
-  // Run button placement
   return (
-    <Container spellCheck="false">
+    <div spellCheck="false">
+      {/* TODO: ^ move this spellcheck thing elsewhere */}
       <Slate
-        editor={editor}
-        value={slateValue}
-        onChange={onChangeResetSuggestion}>
+        editor={slateEditor}
+        {...slateComponentProps}
+        // TODO: need to get actual slateValue!!
+        // value={slateValue}
+        // onChange={onChangeResetSuggestion}
+      >
+        {/* TODO: do we need this random div? */}
         <div
           className={classNames('weaveExpression', {hasBox: !noBox})}
-          ref={containerRef}
+          ref={expressionEditorDomRef}
           data-test="expression-editor-container"
-          data-test-ee-id={editorId}
+          data-test-ee-id={slateEditorId}
           // noBox={props.noBox}
         >
           <Editable
-            // LastPass will mess up typing experience.  Tell it to ignore this input
-            data-lpignore
-            // This causes the page to jump around due to a slate issue...
-            // TODO: fix
-            // placeholder={<div>"Weave expression"</div>}
-            className={classNames('weaveExpressionSlateEditable', {
-              isValid,
-              isTruncated,
-            })}
-            onCopy={copyHandler}
-            onKeyDown={keyDownHandler}
-            onBlur={onBlur}
-            onFocus={onFocus}
-            decorate={slateDecorator}
-            renderLeaf={leafProps => <Leaf {...leafProps} />}
-            style={{overflowWrap: 'anywhere'}}
-            scrollSelectionIntoView={() => {}} // no-op to disable Slate's default scroll behavior when dragging an overflowed element
+            {...editableComponentProps}
+
+            // className={classNames('weaveExpressionSlateEditable', {
+            //   isValid,
+            //   isTruncated,
+            // })}
+            // decorate={slateDecorator}
+            // onCopy={copyHandler}
+            // onKeyDown={keyDownHandler}
+            // onBlur={onBlur}
+            // onFocus={onFocus}
+            // renderLeaf={leafProps => (
+            //   <Leaf {...leafProps} children={undefined} />
+            // )}
+            // style={{overflowWrap: 'anywhere'}}
           />
-          {!props.liveUpdate && (
-            // <Ref
-            //   innerRef={element =>
-            //     (applyButtonRef.current = element?.ref?.current)
-            //   }>
-            <Button
-              ref={r => applyButtonRef}
-              className="runButton"
-              primary
-              size="tiny"
-              disabled={!exprIsModified || !isValid || isBusy}
-              onMouseDown={(ev: any) => {
-                // Prevent this element from taking focus
-                // otherwise it disappears before the onClick
-                // can register!
-                ev.preventDefault();
-              }}
-              onClick={applyPendingExpr}>
-              Run {isBusy ? '⧗' : '⏎'}
-            </Button>
-            // </Ref>
-          )}
+          <RunExpressionButton />
         </div>
         <Suggestions
-          forceHidden={suppressSuggestions || isBusy}
-          {...suggestions}
-          suggestionIndex={suggestionIndex}
+
+        // TODO: re-enable forceHidden?
+        // forceHidden={suppressSuggestions || isBusy}
+        // {...suggestions}
+        // suggestionIndex={suggestionIndex}
         />
       </Slate>
-    </Container>
+    </div>
   );
 };
 
+// TODO: move this somewhere else
 export const focusEditor = (editor: Editor): void => {
   ReactEditor.focus(editor);
   Transforms.select(editor, Editor.end(editor, []));
 };
-
-const Container = styled.div`
-  width: 100%;
-`;
-Container.displayName = 'Container';

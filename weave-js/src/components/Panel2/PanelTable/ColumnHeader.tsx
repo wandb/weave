@@ -490,10 +490,10 @@ export const ColumnHeader: React.FC<{
                     <div style={{width: '100%'}}>
                       <PanelContextProvider newVars={cellFrame}>
                         <WeaveExpression
-                          expr={workingSelectFunction}
+                          expression={workingSelectFunction}
                           setExpression={setWorkingSelectFunction}
                           onMount={focusEditor}
-                          liveUpdate
+                          isLiveUpdateEnabled={true}
                         />
                       </PanelContextProvider>
                     </div>

@@ -86,7 +86,7 @@ export const PanelCardConfigEditor: React.FC<PanelCardProps> = props => {
   return (
     <ConfigPanel.ConfigOption label="Title">
       <ConfigPanel.ExpressionConfigField
-        expr={config.title}
+        expression={config.title}
         setExpression={newNode =>
           updateConfig({...config, title: newNode as any})
         }

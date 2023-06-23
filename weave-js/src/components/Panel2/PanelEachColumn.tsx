@@ -260,7 +260,7 @@ export const PanelEachColumn: React.FC<PanelEachColumnProps> = props => {
 
   return (
     <div>
-      <WeaveExpression expr={searchExpr} setExpression={setSearchExpr} />
+      <WeaveExpression expression={searchExpr} setExpression={setSearchExpr} />
       <PBSection
         mode="flow"
         config={pbLayoutConfig}

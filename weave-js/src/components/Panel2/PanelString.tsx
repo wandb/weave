@@ -117,7 +117,7 @@ export const PanelStringConfig: React.FC<PanelStringProps> = props => {
           <ConfigPanel.ConfigOption label="Compare To">
             <S.ConfigExpressionWrap>
               <ConfigPanel.ExpressionConfigField
-                expr={props.config?.diffComparand ?? defaultComparand}
+                expression={props.config?.diffComparand ?? defaultComparand}
                 setExpression={setComparand}
               />
             </S.ConfigExpressionWrap>

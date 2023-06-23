@@ -6,19 +6,19 @@ import {
 } from '@wandb/weave/common/css/globals.styles';
 import {ValidatingTextInput} from '@wandb/weave/components/ValidatingTextInput';
 import {
-  Frame,
-  ID,
-  Node,
-  NodeOrVoidNode,
-  Stack,
-  Weave,
   defaultLanguageBinding,
   filterNodes,
+  Frame,
+  ID,
   isAssignableTo,
   isNodeOrVoidNode,
+  Node,
+  NodeOrVoidNode,
   replaceChainRoot,
+  Stack,
   varNode,
   voidNode,
+  Weave,
 } from '@wandb/weave/core';
 import {isValidVarName} from '@wandb/weave/core/util/var';
 import * as _ from 'lodash';
@@ -561,7 +561,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
             )}
             <EditorExpression data-test="panel-expression-expression">
               <WeaveExpression
-                expr={panelInputExpr}
+                expression={panelInputExpr}
                 setExpression={updateExpression}
                 noBox
                 isTruncated={!expressionFocused}
@@ -695,7 +695,7 @@ export const ChildPanelConfigComp: React.FC<ChildPanelProps> = props => {
             newVars={config.vars}
             handleVarEvent={handleVarEvent}>
             <ConfigPanel.ExpressionConfigField
-              expr={panelInputExpr}
+              expression={panelInputExpr}
               setExpression={updateExpression}
             />
           </PanelContextProvider>
@@ -782,11 +782,11 @@ export const VariableEditor: React.FC<{
                   updateConfig({...config, vars: newVars});
                 }}
               />
-              <div style={{marginRight: 4, marginLeft: 4}}>= </div>
+              <div style={{marginRight: 4, marginLeft: 4}}>=</div>
               <div style={{flexGrow: 1}}>
                 <PanelContextProvider newVars={{...nextFrame}}>
                   <WeaveExpression
-                    expr={value}
+                    expression={value}
                     noBox
                     // liveUpdate
                     setExpression={val =>
@@ -907,6 +907,7 @@ const EditorExpression = styled.div`
   flex-grow: 1;
   margin-left: 4px;
   overflow: hidden;
+
   &:hover {
     background-color: ${GRAY_50};
   }

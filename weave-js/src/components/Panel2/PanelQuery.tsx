@@ -3,6 +3,7 @@ import React, {useCallback, useMemo} from 'react';
 import * as Panel from './panel';
 import {PanelContextProvider} from './PanelContext';
 import * as Table from './PanelTable/tableState';
+import {updatePreFilter} from './PanelTable/tableState';
 import {useWeaveContext} from '@wandb/weave/context';
 import {TableState} from '../..';
 import * as ConfigPanel from './ConfigPanel';
@@ -13,8 +14,6 @@ import {
   ChildPanelFullConfig,
 } from './ChildPanel';
 import {
-  NodeOrVoidNode,
-  Type,
   constNodeUnsafe,
   constString,
   isAssignableTo,
@@ -22,16 +21,17 @@ import {
   listObjectType,
   mapNodes,
   maybe,
+  Node,
+  NodeOrVoidNode,
   opOr,
   opStringEqual,
-  Node,
+  Type,
   varNode,
   voidNode,
   Weave,
 } from '@wandb/weave/core';
 import {Spec as SelectEditorSpec} from './PanelSelectEditor';
 import {ExpressionView} from './ExpressionView';
-import {updatePreFilter} from './PanelTable/tableState';
 
 interface Condition {
   expression: NodeOrVoidNode;
@@ -39,6 +39,7 @@ interface Condition {
 }
 
 const inputType = {type: 'list' as const, objectType: 'any' as const};
+
 interface PanelQueryConfig {
   tableState: Table.TableState;
   pinnedRows: {[groupKey: string]: number[]};
@@ -47,6 +48,7 @@ interface PanelQueryConfig {
     text: TableState.ColumnId;
   };
 }
+
 type PanelQueryProps = Panel.PanelProps<typeof inputType, PanelQueryConfig>;
 
 export function defaultPanelQuery(): PanelQueryConfig {
@@ -244,7 +246,7 @@ export const PanelQueryConditionConfigComponent: React.FC<
       <PanelContextProvider newVars={newVars}>
         <ConfigPanel.ConfigOption label={`expr`}>
           <ConfigPanel.ExpressionConfigField
-            expr={condition.expression}
+            expression={condition.expression}
             setExpression={updateConditionExpr}
           />
         </ConfigPanel.ConfigOption>

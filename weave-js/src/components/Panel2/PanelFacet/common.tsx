@@ -136,7 +136,7 @@ export const DimConfig: React.FC<{
   return (
     <PanelContextProvider newVars={cellFrame}>
       <ConfigPanel.ExpressionConfigField
-        expr={tableConfig.columnSelectFunctions[colId]}
+        expression={tableConfig.columnSelectFunctions[colId]}
         setExpression={updateDim as any}
       />
     </PanelContextProvider>

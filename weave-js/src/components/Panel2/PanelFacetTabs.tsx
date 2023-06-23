@@ -147,7 +147,7 @@ export const PanelFacetTabsConfigComp: React.FC<
       <ConfigPanel.ConfigOption label={'tab'}>
         <PanelContextProvider newVars={tabVars}>
           <ConfigPanel.ExpressionConfigField
-            expr={config.tab}
+            expression={config.tab}
             setExpression={updateTabExpr}
           />
         </PanelContextProvider>

@@ -9,11 +9,13 @@ import * as ConfigPanel from './ConfigPanel';
 import * as Panel2 from './panel';
 
 const inputType = 'number' as const;
+
 interface PanelSliderConfig {
   min: NodeOrVoidNode<'number'>;
   max: NodeOrVoidNode<'number'>;
   step: NodeOrVoidNode<'number'>;
 }
+
 type PanelSliderProps = Panel2.PanelProps<typeof inputType, PanelSliderConfig>;
 
 const useConfig = (config?: PanelSliderConfig): PanelSliderConfig => {
@@ -49,7 +51,7 @@ export const PanelSliderConfig2: React.FC<PanelSliderProps> = props => {
     <div style={{width: '100%', height: '100%'}}>
       <ConfigPanel.ConfigOption label="min">
         <WeaveExpression
-          expr={config?.min ?? voidNode()}
+          expression={config?.min ?? voidNode()}
           setExpression={newVal => {
             if (!weave.typeIsAssignableTo(newVal.type, 'number')) {
               return;
@@ -63,7 +65,7 @@ export const PanelSliderConfig2: React.FC<PanelSliderProps> = props => {
       </ConfigPanel.ConfigOption>
       <ConfigPanel.ConfigOption label="max">
         <WeaveExpression
-          expr={config?.max ?? voidNode()}
+          expression={config?.max ?? voidNode()}
           setExpression={newVal => {
             if (!weave.typeIsAssignableTo(newVal.type, 'number')) {
               return;
@@ -77,7 +79,7 @@ export const PanelSliderConfig2: React.FC<PanelSliderProps> = props => {
       </ConfigPanel.ConfigOption>
       <ConfigPanel.ConfigOption label="step">
         <WeaveExpression
-          expr={config?.step ?? voidNode()}
+          expression={config?.step ?? voidNode()}
           setExpression={newVal => {
             if (!weave.typeIsAssignableTo(newVal.type, 'number')) {
               return;

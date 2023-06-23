@@ -9,13 +9,11 @@ import CustomPanelRenderer, {
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import {
   constNode,
-  // constFunction,
   ConstNode,
   constNodeUnsafe,
   constNone,
   constNumber,
   constString,
-  // constStringList,
   escapeDots,
   Frame,
   isAssignableTo,
@@ -28,26 +26,14 @@ import {
   Node,
   numberBin,
   oneOrMany,
-  // opAnd,
   opArray,
   opDict,
-  // opContains,
-  // opDateToNumber,
-  // opDict,
-  // opFilter,
   opIndex,
-  // opMap,
-  // opMerge,
-  // opNumberGreaterEqual,
-  // opNumberLessEqual,
-  // opNumberMult,
   opPick,
-  // opRandomlyDownsample,
   opRunId,
   opRunName,
   OpStore,
   opUnnest,
-  // OutputNode,
   Stack,
   Type,
   typedDict,
@@ -80,6 +66,7 @@ import * as LLReact from '../../../react';
 import {getPanelStackDims, getPanelStacksForType} from '../availablePanels';
 import {VariableView} from '../ChildPanel';
 import * as ConfigPanel from '../ConfigPanel';
+import {ConfigSection} from '../ConfigPanel';
 import {LayoutTabs} from '../LayoutTabs';
 import * as Panel2 from '../panel';
 import {Panel2Loader, PanelComp2} from '../PanelComp';
@@ -100,11 +87,8 @@ import {PanelPlotRadioButtons} from './RadioButtons';
 import {
   AnyPlotConfig,
   ConcretePlotConfig,
-  // AxisSelections,
-  // ContinuousSelection,
   DEFAULT_SCALE_TYPE,
   DIM_NAME_MAP,
-  // DiscreteSelection,
   LAZY_PATHS,
   LINE_SHAPES,
   MarkOption,
@@ -117,7 +101,6 @@ import {
   SeriesConfig,
 } from './versions';
 import {toWeaveType} from '../toWeaveType';
-import {ConfigSection} from '../ConfigPanel';
 import {IconButton} from '../../IconButton';
 import {
   IconAddNew,
@@ -911,7 +894,7 @@ const WeaveExpressionDimConfig: React.FC<{
   return (
     <PanelContextProvider newVars={cellFrames[0]}>
       <ConfigPanel.ExpressionConfigField
-        expr={tableConfigs[0].columnSelectFunctions[colIds[0]]}
+        expression={tableConfigs[0].columnSelectFunctions[colIds[0]]}
         setExpression={updateDims as any}
       />
     </PanelContextProvider>
@@ -1595,6 +1578,7 @@ function getColorAxisType(
 function getAxisTimeUnit(isDashboard: boolean): VegaTimeUnit {
   return isDashboard ? 'yearweek' : 'yearmonth';
 }
+
 /*
 const useMergeTables = makePromiseUsable(
   (
@@ -1739,32 +1723,32 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     const reduced = vegaReadyTables.reduce((acc, val, i) => {
       const node: Node = listOfTableNodes[i];
       /*
-
-      const series = config.series[i];
-
-      const mark = getMark(series, node, series.table);
-      if (['line', 'point'].includes(mark)) {
-        ['x' as const, 'y' as const]
-          .filter(axisName => mark === 'point' || axisName === 'x')
-          .forEach(axisName => {
-            node = filterTableNodeToSelection(
-              node,
-              config.signals.domain,
-              series,
-              axisName,
-              weave.client.opStore
-            );
-          });
-      }
-      */
+      
+            const series = config.series[i];
+      
+            const mark = getMark(series, node, series.table);
+            if (['line', 'point'].includes(mark)) {
+              ['x' as const, 'y' as const]
+                .filter(axisName => mark === 'point' || axisName === 'x')
+                .forEach(axisName => {
+                  node = filterTableNodeToSelection(
+                    node,
+                    config.signals.domain,
+                    series,
+                    axisName,
+                    weave.client.opStore
+                  );
+                });
+            }
+            */
       /*
-      if (isDash) {
-        node = opRandomlyDownsample({
-          arr: node,
-          n: constNumber(PANELPLOT_MAX_DATAPOINTS),
-        });
-      }
-      */
+            if (isDash) {
+              node = opRandomlyDownsample({
+                arr: node,
+                n: constNumber(PANELPLOT_MAX_DATAPOINTS),
+              });
+            }
+            */
 
       acc[i] = node;
 
@@ -1897,12 +1881,12 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
   );
 
   /* TODO: fix
-  const {latestData: flatPlotTables} = useLatestData(
-    newFlatPlotTables,
-    isRefining || result.loading,
-    config.series
-  );
-  */
+    const {latestData: flatPlotTables} = useLatestData(
+      newFlatPlotTables,
+      isRefining || result.loading,
+      config.series
+    );
+    */
 
   type DiscreteMappingScale = {domain: string[]; range: number[][]};
   const lineStyleScale: DiscreteMappingScale = useMemo(() => {

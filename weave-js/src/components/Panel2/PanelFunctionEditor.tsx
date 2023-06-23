@@ -21,9 +21,11 @@ const inputType = {
   inputTypes: {},
   outputType: 'any' as const,
 };
+
 interface PanelFunctionEditorConfig {
   expr: ConstNode<FunctionTypeSpecific<{[key: string]: Type}, 'any'>>;
 }
+
 type PanelFunctionEditorProps = Panel2.PanelProps<
   typeof inputType,
   PanelFunctionEditorConfig
@@ -86,7 +88,11 @@ export const PanelFunctionEditor: React.FC<
   return (
     <div style={{width: '100%', height: '100%'}}>
       <PanelContextProvider newVars={paramVars}>
-        <WeaveExpression expr={value.val} setExpression={updateVal} noBox />
+        <WeaveExpression
+          expression={value.val}
+          setExpression={updateVal}
+          noBox
+        />
       </PanelContextProvider>
     </div>
   );

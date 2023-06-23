@@ -10,15 +10,14 @@ import NumberInput from '@wandb/weave/common/components/elements/NumberInput';
 import {TextInput} from '@wandb/weave/common/components/elements/TextInput';
 import * as _ from 'lodash';
 import React, {FC, ReactNode, useCallback, useState} from 'react';
-import styled, {ThemeProvider, css} from 'styled-components';
+import styled, {css, ThemeProvider} from 'styled-components';
 
 import {useWeaveDashUiEnable} from '../../../context';
 import {WeaveExpression} from '../../../panel/WeaveExpression/WeaveExpression';
 import {themes} from '../Editor.styles';
 import * as S from './styles';
 import * as SN from './stylesNew';
-import {IconCaret} from '../Icons';
-import {IconDown as IconDownUnstyled} from '../Icons';
+import {IconCaret, IconDown as IconDownUnstyled} from '../Icons';
 
 export const ChildConfigContainer = styled.div`
   position: relative;
@@ -37,6 +36,7 @@ export const ChildConfigContainer = styled.div`
 
 export const ConfigSectionContainer = styled.div`
   padding: 12px;
+
   &:not(:first-child) {
     border-top: 1px solid ${globals.GRAY_350};
   }
@@ -199,8 +199,8 @@ export const ExpressionConfigField: React.FC<
       <WeaveExpression
         noBox={true}
         setExpression={props.setExpression}
-        expr={props.expr}
-        liveUpdate={!dashEnabled}
+        expression={props.expression}
+        isLiveUpdateEnabled={!dashEnabled}
       />
     </ThemeProvider>
   );
@@ -233,11 +233,14 @@ const ConfigFieldWrapper = styled.div<{withIcon?: boolean}>`
     `}
 
   background-color: ${globals.GRAY_25};
+
   svg {
     color: ${globals.GRAY_500};
   }
+
   &:hover {
     background-color: ${globals.GRAY_50};
+
     svg {
       color: ${globals.GRAY_800};
     }
