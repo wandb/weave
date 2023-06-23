@@ -1,6 +1,6 @@
 import wandb
 import weave
-from weave.wandb_artifact_pusher import write_artifact_to_wandb
+from weave.wandb_interface.wandb_artifact_pusher import write_artifact_to_wandb
 from .. import artifact_local
 from .. import artifact_wandb
 

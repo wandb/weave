@@ -271,7 +271,25 @@ def recursively_unwrap_arrow(obj):
     return obj
 
 
-def to_python(obj: typing.Any, wb_type: typing.Optional[types.Type] = None) -> dict:
+def _default_ref_persister_artifact(
+    type: types.Type, refs: typing.Iterable[artifact_base.ArtifactRef]
+) -> artifact_base.Artifact:
+    fs_art = artifact_local.LocalArtifact(type.name, "latest")
+    # Save all the reffed objects into the new artifact.
+    for mem_ref in refs:
+        if mem_ref.path is not None and mem_ref._type is not None:
+            fs_art.set(mem_ref.path, mem_ref._type, mem_ref._obj)
+    fs_art.save()
+    return fs_art
+
+
+def to_python(
+    obj: typing.Any,
+    wb_type: typing.Optional[types.Type] = None,
+    ref_persister: typing.Callable[
+        [types.Type, typing.Iterable[artifact_base.ArtifactRef]], artifact_base.Artifact
+    ] = _default_ref_persister_artifact,
+) -> dict:
     if wb_type is None:
         wb_type = types.TypeRegistry.type_of(obj)
 
@@ -282,12 +300,7 @@ def to_python(obj: typing.Any, wb_type: typing.Optional[types.Type] = None) -> d
 
     if art.ref_count() > 0:
         # There are custom objects, create a local artifact to persist them.
-        fs_art = artifact_local.LocalArtifact(wb_type.name, "latest")
-        # Save all the reffed objects into the new artifact.
-        for mem_ref in art.refs():
-            if mem_ref.path is not None and mem_ref._type is not None:
-                fs_art.set(mem_ref.path, mem_ref._type, mem_ref._obj)
-        fs_art.save()
+        fs_art = ref_persister(wb_type, art.refs())
         # now map the original object again. Because there are now existing refs
         # to the local artifact for any custom objects, this new value will contain
         # those existing refs as absolute refs. We provide None for artifact because
