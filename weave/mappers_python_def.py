@@ -122,8 +122,24 @@ class UnionToPyUnion(mappers_weave.UnionMapper):
 
 class PyUnionToUnion(mappers_weave.UnionMapper):
     def apply(self, obj):
-        if self.is_single_object_nullable and obj is None:
-            return None
+        try:
+            has_union_id = "_union_id" in obj
+        except TypeError:
+            has_union_id = False
+
+        # hack for deserializing instances of optional types from JS
+        # todo: update JS to handle union_id so this is not needed
+        if self.is_single_object_nullable and not has_union_id:
+            if obj is None:
+                return None
+            else:
+                non_null_mapper = next(
+                    filter(
+                        lambda m: not types.NoneType().assign_type(m.type),
+                        self._member_mappers,
+                    )
+                )
+                return non_null_mapper.apply(obj)
         member_index = obj["_union_id"]
         if "_val" in obj:
             obj = obj["_val"]
