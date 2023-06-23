@@ -1,14 +1,18 @@
-import React from 'react';
+import React, {KeyboardEventHandler} from 'react';
 import {ReactEditor} from 'slate-react';
 import {useWeaveExpressionContext} from '@wandb/weave/panel/WeaveExpression/contexts/WeaveExpressionContext';
-import {useSuggestionTaker} from '@wandb/weave/panel/WeaveExpression/hooks';
+import {useExpressionSuggestions} from '@wandb/weave/panel/WeaveExpression/contexts/ExpressionSuggestionsProvider';
 
-const useWeaveExpressionHotkeys = () => {
+export const useWeaveExpressionHotkeys = () => {
   const {toggleIsDocsPanelVisible} = useWeaveExpressionContext();
-  const {takeSuggestion, suggestionIndex, setSuggestionIndex} =
-    useSuggestionTaker();
+  const {
+    acceptSelectedSuggestion,
+    selectPreviousSuggestion,
+    selectNextSuggestion,
+    isEmpty: noSuggestions,
+  } = useExpressionSuggestions();
 
-  const keyDownHandler = React.useCallback(
+  const onKeyDown: KeyboardEventHandler<HTMLDivElement> = React.useCallback(
     ev => {
       ev.preventDefault();
       ev.stopPropagation();
@@ -19,7 +23,7 @@ const useWeaveExpressionHotkeys = () => {
         // disable enter key if liveUpdate is enabled
         (isKey('Enter') && liveUpdate) ||
         // disable all other keys if there are no suggestions
-        (!isKey('Enter') && suggestions.items.length === 0)
+        (!isKey('Enter') && noSuggestions)
       ) {
         return;
       }
@@ -32,7 +36,8 @@ const useWeaveExpressionHotkeys = () => {
       switch (ev.key) {
         case 'Enter':
           // Apply outstanding changes to expression
-          if (isDirty && isValid && !isBusy) {
+          if (!isBusy && isValid && isDirty) {
+            // get your mind out of the gutter.
             applyPendingExpr();
             forceRender({});
           }
@@ -40,7 +45,8 @@ const useWeaveExpressionHotkeys = () => {
           break;
         case 'Tab':
           // Apply selected suggestion
-          takeSuggestion(suggestions.items[suggestionIndex]);
+          acceptSelectedSuggestion();
+          // takeSuggestion(suggestions.items[suggestionIndex]);
           break;
         case 'Escape':
           // Blur the editor, hiding suggestions
@@ -50,15 +56,12 @@ const useWeaveExpressionHotkeys = () => {
         // case 'j': // for vim users :)
         case 'ArrowDown':
           // Select next suggestion
-          setSuggestionIndex((suggestionIndex + 1) % suggestions.items.length);
+          selectNextSuggestion();
           break;
         // case 'k':
         case 'ArrowUp':
           // Select previous suggestion
-          setSuggestionIndex(
-            (suggestions.items.length + suggestionIndex - 1) %
-              suggestions.items.length
-          );
+          selectPreviousSuggestion();
           break;
         case 'ArrowRight':
           toggleIsDocsPanelVisible(true);
@@ -110,18 +113,12 @@ const useWeaveExpressionHotkeys = () => {
       // }
     },
     [
-      props.liveUpdate,
-      suggestions.items,
-      exprIsModified,
-      isValid,
-      isBusy,
-      hideSuggestions,
-      takeSuggestion,
-      suggestionIndex,
-      editor,
-      setSuggestionIndex,
+      acceptSelectedSuggestion,
+      noSuggestions,
+      selectNextSuggestion,
+      selectPreviousSuggestion,
       toggleIsDocsPanelVisible,
-      applyPendingExpr,
     ]
   );
+  return {onKeyDown};
 };
