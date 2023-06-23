@@ -20,6 +20,7 @@ import {
   isFunctionType,
   isVoidNode,
   isWeaveDebugEnabled,
+  linearize,
   Node,
   NodeOrVoidNode,
   Op,
@@ -27,6 +28,7 @@ import {
   opDefIsLowLevel,
   opIndex,
   OpInputs,
+  OutputNode,
   pushFrame,
   resolveVar,
   simplify,
@@ -188,7 +190,11 @@ const clientEval = (node: NodeOrVoidNode, env: Stack): NodeOrVoidNode => {
           },
         },
       };
-    } else if (name === 'Object-__getattr__' || name === 'pick') {
+    } else if (
+      name === 'Object-__getattr__' ||
+      name === 'pick' ||
+      name === 'index'
+    ) {
       let resolvedVal = callResolverSimple(name, inputs, node.fromOp);
       if (resolvedVal.nodeType != null) {
         resolvedVal = clientEval(resolvedVal, env);
@@ -203,7 +209,7 @@ type ErrorStateType = {message: string; traceback: string[]};
 
 const errorToText = (e: any) => {
   if (e instanceof Error) {
-    return '' + e;
+    return e.message + '\n\nStack:\n' + e.stack;
   } else if (typeof e === 'string') {
     return e;
   } else if (
@@ -214,15 +220,38 @@ const errorToText = (e: any) => {
     _.isArray(e.traceback)
   ) {
     return e.message + '\n\nTraceback:\n' + e.traceback.join('\n');
+  } else if (
+    typeof e === 'object' &&
+    e != null &&
+    e.message != null &&
+    e.stack != null
+  ) {
+    return e.message + '\n\nStack:\n' + e.stack;
   } else {
     return '';
   }
 };
 
+let useNodeValueId = 0;
+
+// Construct an id, once per mounted component. Use this to help in
+// debugging.
+export const useId = () => {
+  const callSiteId = useRef(useNodeValueId++);
+  return callSiteId.current;
+};
+
 export const useNodeValue = <T extends Type>(
   node: NodeOrVoidNode<T>,
-  memoCacheId: number = 0
+  options?: {
+    memoCacheId?: number;
+    callSite?: string;
+    skip?: boolean;
+  }
 ): {loading: boolean; result: TypeToTSTypeInner<T>} => {
+  const memoCacheId = options?.memoCacheId ?? 0;
+  const callSite = options?.callSite;
+  const skip = options?.skip;
   const dashUiEnabled = useWeaveDashUiEnable();
   const weave = useWeaveContext();
   const panelCompCtx = useContext(PanelCompContext);
@@ -267,6 +296,9 @@ export const useNodeValue = <T extends Type>(
   }, []);
 
   useEffect(() => {
+    if (skip) {
+      return;
+    }
     if (isConstNode(node)) {
       // See the "Mixing functions and expression" comment above.
       setResult({node, value: node.val});
@@ -287,9 +319,15 @@ export const useNodeValue = <T extends Type>(
       if (client == null) {
         throw new Error('client not initialized!');
       }
+      // if (callSite != null) {
+      //   console.log('useNodeValue subscribe', callSite, node);
+      // }
       const obs = client.subscribe(node);
       const sub = obs.subscribe(
         nodeRes => {
+          // if (callSite != null) {
+          //   console.log('useNodeValue resolve', callSite, node);
+          // }
           setResult({node, value: nodeRes});
         },
         caughtError => {
@@ -300,7 +338,13 @@ export const useNodeValue = <T extends Type>(
     } else {
       return;
     }
-  }, [client, node, memoCacheId]);
+  }, [client, node, memoCacheId, callSite, skip]);
+  // useTraceUpdate('useNodeValue' + callSite, {
+  //   client,
+  //   node,
+  //   memoCacheId,
+  //   callSite,
+  // });
 
   const finalResult = useMemo(() => {
     // Just rethrow the error in the render thread so it can be caught
@@ -389,7 +433,7 @@ export const useValue = <T extends Type>(
     setMemoTrigger(t => t + 1);
   }, [refreshAllNodes, setMemoTrigger]);
 
-  const res = useNodeValue(node, memoTrigger);
+  const res = useNodeValue(node, {memoCacheId: memoTrigger});
 
   return useMemo(
     () => ({
@@ -435,6 +479,63 @@ export const parseRef = (ref: string): ArtifactURI => {
     artifactVersion,
     artifactPath,
   };
+};
+
+// True if we can do a client-side set mutation
+const canClientSet = (linearNodes: OutputNode[] | undefined) => {
+  if (linearNodes == null) {
+    return true;
+  }
+  return linearNodes.every(n => {
+    // Must be allowed ops
+    if (!['pick', 'Object-__getattr__', 'index'].includes(n.fromOp.name)) {
+      return false;
+    }
+    // non arg0 must be const
+    if (
+      Object.values(n.fromOp.inputs)
+        .slice(1)
+        .some(i => !isConstNode(i))
+    ) {
+      return false;
+    }
+    return true;
+  });
+};
+
+// Perform a client side set mutation, returning the new value.
+// Should be equivalent to the server side set mutation (but handles fewer ops).
+const clientSet = (linearNodes: OutputNode[] | undefined, value: any) => {
+  if (linearNodes == null) {
+    return value;
+  }
+  let arg0 = Object.values(linearNodes[0].fromOp.inputs)[0];
+  const results: any[] = [];
+  const opInputs: Array<{[key: string]: any}> = [];
+  // Execute forward
+  for (const node of linearNodes) {
+    const inputs = {...node.fromOp.inputs};
+    inputs[Object.keys(inputs)[0]] = arg0;
+    arg0 = callResolverSimple(node.fromOp.name, inputs, node.fromOp);
+    opInputs.push(inputs);
+    results.push(arg0);
+  }
+
+  let res = value;
+
+  for (let i = linearNodes.length - 1; i >= 0; i--) {
+    const node = linearNodes[i];
+    const inputs = Object.values(opInputs[i]);
+    if (node.fromOp.name === 'pick') {
+      inputs[0][inputs[1].val] = res;
+    } else if (node.fromOp.name === 'Object-__getattr__') {
+      inputs[0][inputs[1].val] = res;
+    } else if (node.fromOp.name === 'index') {
+      inputs[0][inputs[1].val] = res;
+    }
+    res = inputs[0];
+  }
+  return res;
 };
 
 export const absoluteTargetMutation = (absoluteTarget: NodeOrVoidNode) => {
@@ -505,7 +606,8 @@ export const makeCallAction = (
       ...inputs,
       root_args: rootArgsNode,
     });
-    return client.action(calledNode as any).then(final => {
+
+    const onDone = (final: any) => {
       if (final == null && ignoreNullResult) {
         // pass
       } else if (mutationStyle === 'clientRef') {
@@ -574,7 +676,20 @@ export const makeCallAction = (
       // how to apply the mutation results back to some user-held state
       // (unlike in graphql).
       return true;
-    });
+    };
+
+    const linearNodes = linearize(absoluteTarget);
+
+    if (
+      inputs.val.nodeType === 'const' &&
+      actionName === 'set' &&
+      canClientSet(linearNodes)
+    ) {
+      const final = clientSet(linearNodes, inputs.val.val);
+      return onDone(final);
+    } else {
+      return client.action(calledNode as any).then(onDone);
+    }
   };
 };
 

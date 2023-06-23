@@ -26,6 +26,7 @@ import {
 import * as Panel2 from './panel';
 import {PanelContextProvider, usePanelContext} from './PanelContext';
 import {ChildConfigContainer, ConfigSection} from './ConfigPanel';
+import {useUpdateConfig2} from './PanelComp';
 
 interface PanelEachColumnConfig {
   layoutMode: 'absolute' | 'flow';
@@ -106,10 +107,7 @@ const usePbLayoutConfig = (
 };
 
 const usePanelEachColumnCommon = (props: PanelEachColumnProps) => {
-  const {updateConfig2} = props;
-  if (updateConfig2 == null) {
-    throw new Error('PanelEachColumn requires updateConfig2');
-  }
+  const updateConfig2 = useUpdateConfig2(props);
   const updateChildPanelConfig = useCallback(
     newItemConfig =>
       updateConfig2(oldConfig => ({

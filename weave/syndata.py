@@ -93,8 +93,9 @@ def random_metrics(
 
 def random_runs(n_runs: int, n_steps: int, n_metrics: int) -> ArrowWeaveList:
     runs = []
+    template = random_metrics_template(n_metrics)
     for i in range(n_runs):
-        history = random_metrics(n_steps, n_metrics)._arrow_data
+        history = random_metrics(n_steps, n_metrics, template=template)._arrow_data
         hist_array = pa.ListArray.from_arrays([0, len(history)], history)
         config_array = pa.StructArray.from_arrays(
             [[random.choice(["a", "b", "c"])], [random.choice(["x", "y"])]],

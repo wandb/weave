@@ -43,6 +43,7 @@ export type WbIconsId =
   | 'ic-download'
   | 'ic-duration'
   | 'ic-edit'
+  | 'ic-ema'
   | 'ic-email-at'
   | 'ic-example'
   | 'ic-expand'
@@ -95,6 +96,7 @@ export type WbIconsId =
   | 'ic-list'
   | 'ic-lock-open'
   | 'ic-lock'
+  | 'ic-loess'
   | 'ic-log'
   | 'ic-markdown'
   | 'ic-metadata'
@@ -186,6 +188,7 @@ export type WbIconsId =
   | 'ic-terminal'
   | 'ic-tex-block'
   | 'ic-tex'
+  | 'ic-time-weighted-ema'
   | 'ic-twitter'
   | 'ic-undo'
   | 'ic-unified-diff'
@@ -207,6 +210,8 @@ export type WbIconsId =
   | 'icon-bell-notifications'
   | 'icon-benchmark-square'
   | 'icon-blog-report'
+  | 'icon-boolean'
+  | 'icon-bug'
   | 'icon-category-multimodal'
   | 'icon-chart-horizontal-bars'
   | 'icon-chart-pie'
@@ -219,6 +224,8 @@ export type WbIconsId =
   | 'icon-chevron-up'
   | 'icon-close'
   | 'icon-code-alt'
+  | 'icon-collapse'
+  | 'icon-color'
   | 'icon-content-full-width'
   | 'icon-content-narrow'
   | 'icon-content-wide'
@@ -237,6 +244,7 @@ export type WbIconsId =
   | 'icon-email-at'
   | 'icon-email-envelope'
   | 'icon-expand-right'
+  | 'icon-expand-uncollapse'
   | 'icon-facebook-social'
   | 'icon-failed-error-deleted'
   | 'icon-failed'
@@ -256,10 +264,12 @@ export type WbIconsId =
   | 'icon-heart'
   | 'icon-help-alt'
   | 'icon-hide-hidden'
+  | 'icon-history'
   | 'icon-home'
   | 'icon-idle'
   | 'icon-ignore-outliers'
   | 'icon-impersonate-mask-alt'
+  | 'icon-import-insert'
   | 'icon-info'
   | 'icon-job-automation'
   | 'icon-job-calculator'
@@ -272,6 +282,10 @@ export type WbIconsId =
   | 'icon-kubernetes'
   | 'icon-languages'
   | 'icon-laptop-local-computer'
+  | 'icon-layout-grid'
+  | 'icon-layout-horizontal'
+  | 'icon-layout-tabs'
+  | 'icon-layout-vertical'
   | 'icon-lightbulb-info'
   | 'icon-link-alt'
   | 'icon-linkedin-social'
@@ -280,6 +294,7 @@ export type WbIconsId =
   | 'icon-loading'
   | 'icon-lock-closed'
   | 'icon-lock-open'
+  | 'icon-locked-constrained'
   | 'icon-log-out'
   | 'icon-logo-colab'
   | 'icon-magic-wand-star'
@@ -288,11 +303,14 @@ export type WbIconsId =
   | 'icon-minimize-mode'
   | 'icon-model'
   | 'icon-music-audio'
+  | 'icon-number'
   | 'icon-open-new-tab'
   | 'icon-orchestration-launch'
   | 'icon-organization-corporate'
   | 'icon-overflow-horizontal'
+  | 'icon-pan-tool-1'
   | 'icon-pan-tool'
+  | 'icon-panel'
   | 'icon-pause'
   | 'icon-paused'
   | 'icon-pencil-edit'
@@ -307,6 +325,7 @@ export type WbIconsId =
   | 'icon-randomize-alt'
   | 'icon-recent-clock'
   | 'icon-reddit-social'
+  | 'icon-redo'
   | 'icon-report'
   | 'icon-retry'
   | 'icon-robot-service-member'
@@ -326,6 +345,7 @@ export type WbIconsId =
   | 'icon-sort-ascending'
   | 'icon-sort-descending'
   | 'icon-sort'
+  | 'icon-split'
   | 'icon-star-filled'
   | 'icon-star'
   | 'icon-stop'
@@ -347,7 +367,10 @@ export type WbIconsId =
   | 'icon-trigger-alt'
   | 'icon-twitter'
   | 'icon-undeterminate-visibility'
+  | 'icon-undo'
+  | 'icon-unlocked-unconstrained'
   | 'icon-user-profile-personal'
+  | 'icon-users-team'
   | 'icon-versions-layers'
   | 'icon-vertex-gcp'
   | 'icon-video-play'
@@ -403,6 +426,7 @@ export type WbIconsKey =
   | 'IcDownload'
   | 'IcDuration'
   | 'IcEdit'
+  | 'IcEma'
   | 'IcEmailAt'
   | 'IcExample'
   | 'IcExpand'
@@ -455,6 +479,7 @@ export type WbIconsKey =
   | 'IcList'
   | 'IcLockOpen'
   | 'IcLock'
+  | 'IcLoess'
   | 'IcLog'
   | 'IcMarkdown'
   | 'IcMetadata'
@@ -546,6 +571,7 @@ export type WbIconsKey =
   | 'IcTerminal'
   | 'IcTexBlock'
   | 'IcTex'
+  | 'IcTimeWeightedEma'
   | 'IcTwitter'
   | 'IcUndo'
   | 'IcUnifiedDiff'
@@ -567,6 +593,8 @@ export type WbIconsKey =
   | 'IconBellNotifications'
   | 'IconBenchmarkSquare'
   | 'IconBlogReport'
+  | 'IconBoolean'
+  | 'IconBug'
   | 'IconCategoryMultimodal'
   | 'IconChartHorizontalBars'
   | 'IconChartPie'
@@ -579,6 +607,8 @@ export type WbIconsKey =
   | 'IconChevronUp'
   | 'IconClose'
   | 'IconCodeAlt'
+  | 'IconCollapse'
+  | 'IconColor'
   | 'IconContentFullWidth'
   | 'IconContentNarrow'
   | 'IconContentWide'
@@ -597,6 +627,7 @@ export type WbIconsKey =
   | 'IconEmailAt'
   | 'IconEmailEnvelope'
   | 'IconExpandRight'
+  | 'IconExpandUncollapse'
   | 'IconFacebookSocial'
   | 'IconFailedErrorDeleted'
   | 'IconFailed'
@@ -616,10 +647,12 @@ export type WbIconsKey =
   | 'IconHeart'
   | 'IconHelpAlt'
   | 'IconHideHidden'
+  | 'IconHistory'
   | 'IconHome'
   | 'IconIdle'
   | 'IconIgnoreOutliers'
   | 'IconImpersonateMaskAlt'
+  | 'IconImportInsert'
   | 'IconInfo'
   | 'IconJobAutomation'
   | 'IconJobCalculator'
@@ -632,6 +665,10 @@ export type WbIconsKey =
   | 'IconKubernetes'
   | 'IconLanguages'
   | 'IconLaptopLocalComputer'
+  | 'IconLayoutGrid'
+  | 'IconLayoutHorizontal'
+  | 'IconLayoutTabs'
+  | 'IconLayoutVertical'
   | 'IconLightbulbInfo'
   | 'IconLinkAlt'
   | 'IconLinkedinSocial'
@@ -640,6 +677,7 @@ export type WbIconsKey =
   | 'IconLoading'
   | 'IconLockClosed'
   | 'IconLockOpen'
+  | 'IconLockedConstrained'
   | 'IconLogOut'
   | 'IconLogoColab'
   | 'IconMagicWandStar'
@@ -648,11 +686,14 @@ export type WbIconsKey =
   | 'IconMinimizeMode'
   | 'IconModel'
   | 'IconMusicAudio'
+  | 'IconNumber'
   | 'IconOpenNewTab'
   | 'IconOrchestrationLaunch'
   | 'IconOrganizationCorporate'
   | 'IconOverflowHorizontal'
+  | 'IconPanTool_1'
   | 'IconPanTool'
+  | 'IconPanel'
   | 'IconPause'
   | 'IconPaused'
   | 'IconPencilEdit'
@@ -667,6 +708,7 @@ export type WbIconsKey =
   | 'IconRandomizeAlt'
   | 'IconRecentClock'
   | 'IconRedditSocial'
+  | 'IconRedo'
   | 'IconReport'
   | 'IconRetry'
   | 'IconRobotServiceMember'
@@ -686,6 +728,7 @@ export type WbIconsKey =
   | 'IconSortAscending'
   | 'IconSortDescending'
   | 'IconSort'
+  | 'IconSplit'
   | 'IconStarFilled'
   | 'IconStar'
   | 'IconStop'
@@ -707,7 +750,10 @@ export type WbIconsKey =
   | 'IconTriggerAlt'
   | 'IconTwitter'
   | 'IconUndeterminateVisibility'
+  | 'IconUndo'
+  | 'IconUnlockedUnconstrained'
   | 'IconUserProfilePersonal'
+  | 'IconUsersTeam'
   | 'IconVersionsLayers'
   | 'IconVertexGcp'
   | 'IconVideoPlay'
@@ -763,6 +809,7 @@ export enum WbIcons {
   IcDownload = 'ic-download',
   IcDuration = 'ic-duration',
   IcEdit = 'ic-edit',
+  IcEma = 'ic-ema',
   IcEmailAt = 'ic-email-at',
   IcExample = 'ic-example',
   IcExpand = 'ic-expand',
@@ -815,6 +862,7 @@ export enum WbIcons {
   IcList = 'ic-list',
   IcLockOpen = 'ic-lock-open',
   IcLock = 'ic-lock',
+  IcLoess = 'ic-loess',
   IcLog = 'ic-log',
   IcMarkdown = 'ic-markdown',
   IcMetadata = 'ic-metadata',
@@ -906,6 +954,7 @@ export enum WbIcons {
   IcTerminal = 'ic-terminal',
   IcTexBlock = 'ic-tex-block',
   IcTex = 'ic-tex',
+  IcTimeWeightedEma = 'ic-time-weighted-ema',
   IcTwitter = 'ic-twitter',
   IcUndo = 'ic-undo',
   IcUnifiedDiff = 'ic-unified-diff',
@@ -927,6 +976,8 @@ export enum WbIcons {
   IconBellNotifications = 'icon-bell-notifications',
   IconBenchmarkSquare = 'icon-benchmark-square',
   IconBlogReport = 'icon-blog-report',
+  IconBoolean = 'icon-boolean',
+  IconBug = 'icon-bug',
   IconCategoryMultimodal = 'icon-category-multimodal',
   IconChartHorizontalBars = 'icon-chart-horizontal-bars',
   IconChartPie = 'icon-chart-pie',
@@ -939,6 +990,8 @@ export enum WbIcons {
   IconChevronUp = 'icon-chevron-up',
   IconClose = 'icon-close',
   IconCodeAlt = 'icon-code-alt',
+  IconCollapse = 'icon-collapse',
+  IconColor = 'icon-color',
   IconContentFullWidth = 'icon-content-full-width',
   IconContentNarrow = 'icon-content-narrow',
   IconContentWide = 'icon-content-wide',
@@ -957,6 +1010,7 @@ export enum WbIcons {
   IconEmailAt = 'icon-email-at',
   IconEmailEnvelope = 'icon-email-envelope',
   IconExpandRight = 'icon-expand-right',
+  IconExpandUncollapse = 'icon-expand-uncollapse',
   IconFacebookSocial = 'icon-facebook-social',
   IconFailedErrorDeleted = 'icon-failed-error-deleted',
   IconFailed = 'icon-failed',
@@ -976,10 +1030,12 @@ export enum WbIcons {
   IconHeart = 'icon-heart',
   IconHelpAlt = 'icon-help-alt',
   IconHideHidden = 'icon-hide-hidden',
+  IconHistory = 'icon-history',
   IconHome = 'icon-home',
   IconIdle = 'icon-idle',
   IconIgnoreOutliers = 'icon-ignore-outliers',
   IconImpersonateMaskAlt = 'icon-impersonate-mask-alt',
+  IconImportInsert = 'icon-import-insert',
   IconInfo = 'icon-info',
   IconJobAutomation = 'icon-job-automation',
   IconJobCalculator = 'icon-job-calculator',
@@ -992,6 +1048,10 @@ export enum WbIcons {
   IconKubernetes = 'icon-kubernetes',
   IconLanguages = 'icon-languages',
   IconLaptopLocalComputer = 'icon-laptop-local-computer',
+  IconLayoutGrid = 'icon-layout-grid',
+  IconLayoutHorizontal = 'icon-layout-horizontal',
+  IconLayoutTabs = 'icon-layout-tabs',
+  IconLayoutVertical = 'icon-layout-vertical',
   IconLightbulbInfo = 'icon-lightbulb-info',
   IconLinkAlt = 'icon-link-alt',
   IconLinkedinSocial = 'icon-linkedin-social',
@@ -1000,6 +1060,7 @@ export enum WbIcons {
   IconLoading = 'icon-loading',
   IconLockClosed = 'icon-lock-closed',
   IconLockOpen = 'icon-lock-open',
+  IconLockedConstrained = 'icon-locked-constrained',
   IconLogOut = 'icon-log-out',
   IconLogoColab = 'icon-logo-colab',
   IconMagicWandStar = 'icon-magic-wand-star',
@@ -1008,11 +1069,14 @@ export enum WbIcons {
   IconMinimizeMode = 'icon-minimize-mode',
   IconModel = 'icon-model',
   IconMusicAudio = 'icon-music-audio',
+  IconNumber = 'icon-number',
   IconOpenNewTab = 'icon-open-new-tab',
   IconOrchestrationLaunch = 'icon-orchestration-launch',
   IconOrganizationCorporate = 'icon-organization-corporate',
   IconOverflowHorizontal = 'icon-overflow-horizontal',
+  IconPanTool_1 = 'icon-pan-tool-1',
   IconPanTool = 'icon-pan-tool',
+  IconPanel = 'icon-panel',
   IconPause = 'icon-pause',
   IconPaused = 'icon-paused',
   IconPencilEdit = 'icon-pencil-edit',
@@ -1027,6 +1091,7 @@ export enum WbIcons {
   IconRandomizeAlt = 'icon-randomize-alt',
   IconRecentClock = 'icon-recent-clock',
   IconRedditSocial = 'icon-reddit-social',
+  IconRedo = 'icon-redo',
   IconReport = 'icon-report',
   IconRetry = 'icon-retry',
   IconRobotServiceMember = 'icon-robot-service-member',
@@ -1046,6 +1111,7 @@ export enum WbIcons {
   IconSortAscending = 'icon-sort-ascending',
   IconSortDescending = 'icon-sort-descending',
   IconSort = 'icon-sort',
+  IconSplit = 'icon-split',
   IconStarFilled = 'icon-star-filled',
   IconStar = 'icon-star',
   IconStop = 'icon-stop',
@@ -1067,7 +1133,10 @@ export enum WbIcons {
   IconTriggerAlt = 'icon-trigger-alt',
   IconTwitter = 'icon-twitter',
   IconUndeterminateVisibility = 'icon-undeterminate-visibility',
+  IconUndo = 'icon-undo',
+  IconUnlockedUnconstrained = 'icon-unlocked-unconstrained',
   IconUserProfilePersonal = 'icon-user-profile-personal',
+  IconUsersTeam = 'icon-users-team',
   IconVersionsLayers = 'icon-versions-layers',
   IconVertexGcp = 'icon-vertex-gcp',
   IconVideoPlay = 'icon-video-play',
@@ -1124,318 +1193,341 @@ export const WB_ICONS_CODEPOINTS: {[key in WbIcons]: string} = {
   [WbIcons.IcDownload]: '61736',
   [WbIcons.IcDuration]: '61737',
   [WbIcons.IcEdit]: '61738',
-  [WbIcons.IcEmailAt]: '61739',
-  [WbIcons.IcExample]: '61740',
-  [WbIcons.IcExpand]: '61741',
-  [WbIcons.IcExponential]: '61742',
-  [WbIcons.IcFileCode]: '61743',
-  [WbIcons.IcFileImage]: '61744',
-  [WbIcons.IcFileMarkdown]: '61745',
-  [WbIcons.IcFileModel]: '61746',
-  [WbIcons.IcFilePython]: '61747',
-  [WbIcons.IcFileYaml]: '61748',
-  [WbIcons.IcFile]: '61749',
-  [WbIcons.IcFilter]: '61750',
-  [WbIcons.IcFire]: '61751',
-  [WbIcons.IcFluidWidth]: '61752',
-  [WbIcons.IcFolder]: '61753',
-  [WbIcons.IcFork]: '61754',
-  [WbIcons.IcFullWidth]: '61755',
-  [WbIcons.IcFullscreen]: '61756',
-  [WbIcons.IcGallery]: '61757',
-  [WbIcons.IcGaussian]: '61758',
-  [WbIcons.IcGift]: '61759',
-  [WbIcons.IcGithub]: '61760',
-  [WbIcons.IcGlobe]: '61761',
-  [WbIcons.IcGroupRuns]: '61762',
-  [WbIcons.IcGroup]: '61763',
-  [WbIcons.IcH1]: '61764',
-  [WbIcons.IcH2]: '61765',
-  [WbIcons.IcH3]: '61766',
-  [WbIcons.IcHandle]: '61767',
-  [WbIcons.IcHeartOutline]: '61768',
-  [WbIcons.IcHeart]: '61769',
-  [WbIcons.IcHeavyCheckmark]: '61770',
-  [WbIcons.IcHelpCircleOutline]: '61771',
-  [WbIcons.IcHelp]: '61772',
-  [WbIcons.IcHide]: '61773',
-  [WbIcons.IcImage]: '61774',
-  [WbIcons.IcInfo]: '61775',
-  [WbIcons.IcItalic]: '61776',
-  [WbIcons.IcLaunch]: '61777',
-  [WbIcons.IcLeftArrow]: '61778',
-  [WbIcons.IcLightbulb]: '61779',
-  [WbIcons.IcLineDashDotDot]: '61780',
-  [WbIcons.IcLineDashDot]: '61781',
-  [WbIcons.IcLineDash]: '61782',
-  [WbIcons.IcLineDisconnected]: '61783',
-  [WbIcons.IcLineDot]: '61784',
-  [WbIcons.IcLineGraph]: '61785',
-  [WbIcons.IcLineSolid]: '61786',
-  [WbIcons.IcLink]: '61787',
-  [WbIcons.IcList]: '61788',
-  [WbIcons.IcLockOpen]: '61789',
-  [WbIcons.IcLock]: '61790',
-  [WbIcons.IcLog]: '61791',
-  [WbIcons.IcMarkdown]: '61792',
-  [WbIcons.IcMetadata]: '61793',
-  [WbIcons.IcModel]: '61794',
-  [WbIcons.IcMoveRuns]: '61795',
-  [WbIcons.IcMove]: '61796',
-  [WbIcons.IcNewProject]: '61797',
-  [WbIcons.IcNext]: '61798',
-  [WbIcons.IcNoSmooth]: '61799',
-  [WbIcons.IcNumberedList]: '61800',
-  [WbIcons.IcNumero]: '61801',
-  [WbIcons.IcOffice]: '61802',
-  [WbIcons.IcOpenProject]: '61803',
-  [WbIcons.IcOrganization]: '61804',
-  [WbIcons.IcOutlier]: '61805',
-  [WbIcons.IcOverflowOutline]: '61806',
-  [WbIcons.IcOverflow]: '61807',
-  [WbIcons.IcOverlay_2Column]: '61808',
-  [WbIcons.IcOverlay_3Column]: '61809',
-  [WbIcons.IcOverlayStack]: '61810',
-  [WbIcons.IcPageBreak]: '61811',
-  [WbIcons.IcPanel_3d]: '61812',
-  [WbIcons.IcPanelAudio]: '61813',
-  [WbIcons.IcPanelBarChart]: '61814',
-  [WbIcons.IcPanelGrid]: '61815',
-  [WbIcons.IcPanelHtml]: '61816',
-  [WbIcons.IcPanelImages]: '61817',
-  [WbIcons.IcPanelImportance]: '61818',
-  [WbIcons.IcPanelLinePlot]: '61819',
-  [WbIcons.IcPanelNumber]: '61820',
-  [WbIcons.IcPanelParallel]: '61821',
-  [WbIcons.IcPanelPlotly]: '61822',
-  [WbIcons.IcPanelRunComparer]: '61823',
-  [WbIcons.IcPanelScatterPlot]: '61824',
-  [WbIcons.IcPanelTextTable]: '61825',
-  [WbIcons.IcPanelText]: '61826',
-  [WbIcons.IcPanelVideo]: '61827',
-  [WbIcons.IcPartial]: '61828',
-  [WbIcons.IcPencil]: '61829',
-  [WbIcons.IcPercentLinePlot]: '61830',
-  [WbIcons.IcPersonal]: '61831',
-  [WbIcons.IcPin]: '61832',
-  [WbIcons.IcPlace]: '61833',
-  [WbIcons.IcPlot]: '61834',
-  [WbIcons.IcPlus]: '61835',
-  [WbIcons.IcPrevious]: '61836',
-  [WbIcons.IcProjector]: '61837',
-  [WbIcons.IcQuote]: '61838',
-  [WbIcons.IcRedo]: '61839',
-  [WbIcons.IcRefresh]: '61840',
-  [WbIcons.IcRegex]: '61841',
-  [WbIcons.IcRemoveCircleFill]: '61842',
-  [WbIcons.IcRemoveCircleOutline]: '61843',
-  [WbIcons.IcReport]: '61844',
-  [WbIcons.IcResize]: '61845',
-  [WbIcons.IcRetry]: '61846',
-  [WbIcons.IcRightArrow]: '61847',
-  [WbIcons.IcRocket]: '61848',
-  [WbIcons.IcRows]: '61849',
-  [WbIcons.IcRunningAverage]: '61850',
-  [WbIcons.IcSave]: '61851',
-  [WbIcons.IcSearch]: '61852',
-  [WbIcons.IcShare]: '61853',
-  [WbIcons.IcShow]: '61854',
-  [WbIcons.IcSmallWidth]: '61855',
-  [WbIcons.IcSmoothGray]: '61856',
-  [WbIcons.IcSnowflake]: '61857',
-  [WbIcons.IcSortDown]: '61858',
-  [WbIcons.IcSortUp]: '61859',
-  [WbIcons.IcSort]: '61860',
-  [WbIcons.IcSparkles]: '61861',
-  [WbIcons.IcSplitDiff]: '61862',
-  [WbIcons.IcStandardLayout]: '61863',
-  [WbIcons.IcStandardLinePlot]: '61864',
-  [WbIcons.IcStarOutline]: '61865',
-  [WbIcons.IcStar]: '61866',
-  [WbIcons.IcState]: '61867',
-  [WbIcons.IcStop]: '61868',
-  [WbIcons.IcStrikethrough]: '61869',
-  [WbIcons.IcSummary]: '61870',
-  [WbIcons.IcSweep]: '61871',
-  [WbIcons.IcTableCollapsed]: '61872',
-  [WbIcons.IcTable]: '61873',
-  [WbIcons.IcTagGray]: '61874',
-  [WbIcons.IcTagLatest]: '61875',
-  [WbIcons.IcTag]: '61876',
-  [WbIcons.IcTeam]: '61877',
-  [WbIcons.IcTensorflow]: '61878',
-  [WbIcons.IcTerminal]: '61879',
-  [WbIcons.IcTexBlock]: '61880',
-  [WbIcons.IcTex]: '61881',
-  [WbIcons.IcTwitter]: '61882',
-  [WbIcons.IcUndo]: '61883',
-  [WbIcons.IcUnifiedDiff]: '61884',
-  [WbIcons.IcUpArrow]: '61885',
-  [WbIcons.IcUsername]: '61886',
-  [WbIcons.IcVerticalHandle]: '61887',
-  [WbIcons.IcVideo]: '61888',
-  [WbIcons.IcViewOnly]: '61889',
-  [WbIcons.IcWandb]: '61890',
-  [WbIcons.IcWarning]: '61891',
-  [WbIcons.IcWorld]: '61892',
-  [WbIcons.IcXaxis]: '61893',
-  [WbIcons.IconAddNew]: '61894',
-  [WbIcons.IconAdminShieldSafe]: '61895',
-  [WbIcons.IconAmazonSagemaker]: '61896',
-  [WbIcons.IconAudioVolume]: '61897',
-  [WbIcons.IconAutomationRobotArm]: '61898',
-  [WbIcons.IconBack]: '61899',
-  [WbIcons.IconBellNotifications]: '61900',
-  [WbIcons.IconBenchmarkSquare]: '61901',
-  [WbIcons.IconBlogReport]: '61902',
-  [WbIcons.IconCategoryMultimodal]: '61903',
-  [WbIcons.IconChartHorizontalBars]: '61904',
-  [WbIcons.IconChartPie]: '61905',
-  [WbIcons.IconChartVerticalBars]: '61906',
-  [WbIcons.IconCheckmarkCircle]: '61907',
-  [WbIcons.IconCheckmark]: '61908',
-  [WbIcons.IconChevronBack]: '61909',
-  [WbIcons.IconChevronDown]: '61910',
-  [WbIcons.IconChevronNext]: '61911',
-  [WbIcons.IconChevronUp]: '61912',
-  [WbIcons.IconClose]: '61913',
-  [WbIcons.IconCodeAlt]: '61914',
-  [WbIcons.IconContentFullWidth]: '61915',
-  [WbIcons.IconContentNarrow]: '61916',
-  [WbIcons.IconContentWide]: '61917',
-  [WbIcons.IconContractLeft]: '61918',
-  [WbIcons.IconCopy]: '61919',
-  [WbIcons.IconCreditCardPayment]: '61920',
-  [WbIcons.IconCubeContainer]: '61921',
-  [WbIcons.IconDashboardBlackboard]: '61922',
-  [WbIcons.IconDelete]: '61923',
-  [WbIcons.IconDiscordSocial]: '61924',
-  [WbIcons.IconDockerWhale]: '61925',
-  [WbIcons.IconDocument]: '61926',
-  [WbIcons.IconDocumentation]: '61927',
-  [WbIcons.IconDownload]: '61928',
-  [WbIcons.IconEducationAcademic]: '61929',
-  [WbIcons.IconEmailAt]: '61930',
-  [WbIcons.IconEmailEnvelope]: '61931',
-  [WbIcons.IconExpandRight]: '61932',
-  [WbIcons.IconFacebookSocial]: '61933',
-  [WbIcons.IconFailedErrorDeleted]: '61934',
-  [WbIcons.IconFailed]: '61935',
-  [WbIcons.IconFlashBolt]: '61936',
-  [WbIcons.IconFolderAlt]: '61937',
-  [WbIcons.IconFolderProjectMove]: '61938',
-  [WbIcons.IconFolderProject]: '61939',
-  [WbIcons.IconForumChatBubble]: '61940',
-  [WbIcons.IconForwardNext]: '61941',
-  [WbIcons.IconFullScreenModeExpand]: '61942',
-  [WbIcons.IconGhostAgent]: '61943',
-  [WbIcons.IconGit]: '61944',
-  [WbIcons.IconGithub]: '61945',
-  [WbIcons.IconGroup]: '61946',
-  [WbIcons.IconHeadset]: '61947',
-  [WbIcons.IconHeartFilled]: '61948',
-  [WbIcons.IconHeart]: '61949',
-  [WbIcons.IconHelpAlt]: '61950',
-  [WbIcons.IconHideHidden]: '61951',
-  [WbIcons.IconHome]: '61952',
-  [WbIcons.IconIdle]: '61953',
-  [WbIcons.IconIgnoreOutliers]: '61954',
-  [WbIcons.IconImpersonateMaskAlt]: '61955',
-  [WbIcons.IconInfo]: '61956',
-  [WbIcons.IconJobAutomation]: '61957',
-  [WbIcons.IconJobCalculator]: '61958',
-  [WbIcons.IconJobProgramCode]: '61959',
-  [WbIcons.IconJoyceTransformersLogo]: '61960',
-  [WbIcons.IconJoyceXgboostLogo]: '61961',
-  [WbIcons.IconKerasLogo]: '61962',
-  [WbIcons.IconKeyAdminPrivate]: '61963',
-  [WbIcons.IconKeyAdmin]: '61964',
-  [WbIcons.IconKubernetes]: '61965',
-  [WbIcons.IconLanguages]: '61966',
-  [WbIcons.IconLaptopLocalComputer]: '61967',
-  [WbIcons.IconLightbulbInfo]: '61968',
-  [WbIcons.IconLinkAlt]: '61969',
-  [WbIcons.IconLinkedinSocial]: '61970',
-  [WbIcons.IconListBullets]: '61971',
-  [WbIcons.IconList]: '61972',
-  [WbIcons.IconLoading]: '61973',
-  [WbIcons.IconLockClosed]: '61974',
-  [WbIcons.IconLockOpen]: '61975',
-  [WbIcons.IconLogOut]: '61976',
-  [WbIcons.IconLogoColab]: '61977',
-  [WbIcons.IconMagicWandStar]: '61978',
-  [WbIcons.IconMagicWandStick]: '61979',
-  [WbIcons.IconMicrophoneAudio]: '61980',
-  [WbIcons.IconMinimizeMode]: '61981',
-  [WbIcons.IconModel]: '61982',
-  [WbIcons.IconMusicAudio]: '61983',
-  [WbIcons.IconOpenNewTab]: '61984',
-  [WbIcons.IconOrchestrationLaunch]: '61985',
-  [WbIcons.IconOrganizationCorporate]: '61986',
-  [WbIcons.IconOverflowHorizontal]: '61987',
-  [WbIcons.IconPanTool]: '61988',
-  [WbIcons.IconPause]: '61989',
-  [WbIcons.IconPaused]: '61990',
-  [WbIcons.IconPencilEdit]: '61991',
-  [WbIcons.IconPhoto]: '61992',
-  [WbIcons.IconPlay]: '61993',
-  [WbIcons.IconPrivacyOpen]: '61994',
-  [WbIcons.IconPythonLogo]: '61995',
-  [WbIcons.IconPytorchLightningLogo]: '61996',
-  [WbIcons.IconPytorchLogo]: '61997',
-  [WbIcons.IconQueue]: '61998',
-  [WbIcons.IconQueued]: '61999',
-  [WbIcons.IconRandomizeAlt]: '62000',
-  [WbIcons.IconRecentClock]: '62001',
-  [WbIcons.IconRedditSocial]: '62002',
-  [WbIcons.IconReport]: '62003',
-  [WbIcons.IconRetry]: '62004',
-  [WbIcons.IconRobotServiceMember]: '62005',
-  [WbIcons.IconRocketLaunch]: '62006',
-  [WbIcons.IconRun]: '62007',
-  [WbIcons.IconRunningRepeat]: '62008',
-  [WbIcons.IconScikitLogo]: '62009',
-  [WbIcons.IconSearch]: '62010',
-  [WbIcons.IconSelectMoveTool]: '62011',
-  [WbIcons.IconSettingsParameters]: '62012',
-  [WbIcons.IconSettings]: '62013',
-  [WbIcons.IconShareExport]: '62014',
-  [WbIcons.IconShareWith]: '62015',
-  [WbIcons.IconShieldRemove]: '62016',
-  [WbIcons.IconShowVisible]: '62017',
-  [WbIcons.IconSmoothing]: '62018',
-  [WbIcons.IconSortAscending]: '62019',
-  [WbIcons.IconSortDescending]: '62020',
-  [WbIcons.IconSort]: '62021',
-  [WbIcons.IconStarFilled]: '62022',
-  [WbIcons.IconStar]: '62023',
-  [WbIcons.IconStop]: '62024',
-  [WbIcons.IconStopped]: '62025',
-  [WbIcons.IconSweepBayes]: '62026',
-  [WbIcons.IconSweepGrid]: '62027',
-  [WbIcons.IconSweepRandomSearch]: '62028',
-  [WbIcons.IconSweepsAlt]: '62029',
-  [WbIcons.IconSweepsBroomAlt]: '62030',
-  [WbIcons.IconSweepsBroom]: '62031',
-  [WbIcons.IconSystemChipAlt]: '62032',
-  [WbIcons.IconSystemChip]: '62033',
-  [WbIcons.IconSystem]: '62034',
-  [WbIcons.IconTable]: '62035',
-  [WbIcons.IconTag]: '62036',
-  [WbIcons.IconTensorflowLogo]: '62037',
-  [WbIcons.IconTextLanguageAlt]: '62038',
-  [WbIcons.IconTextLanguage]: '62039',
-  [WbIcons.IconTriggerAlt]: '62040',
-  [WbIcons.IconTwitter]: '62041',
-  [WbIcons.IconUndeterminateVisibility]: '62042',
-  [WbIcons.IconUserProfilePersonal]: '62043',
-  [WbIcons.IconVersionsLayers]: '62044',
-  [WbIcons.IconVertexGcp]: '62045',
-  [WbIcons.IconVideoPlay]: '62046',
-  [WbIcons.IconWandb]: '62047',
-  [WbIcons.IconWarning]: '62048',
-  [WbIcons.IconXAxis]: '62049',
-  [WbIcons.IconYoutubeSocial]: '62050',
-  [WbIcons.IconZoomInTool]: '62051',
-  [WbIcons.LogoColab]: '62052',
+  [WbIcons.IcEma]: '61739',
+  [WbIcons.IcEmailAt]: '61740',
+  [WbIcons.IcExample]: '61741',
+  [WbIcons.IcExpand]: '61742',
+  [WbIcons.IcExponential]: '61743',
+  [WbIcons.IcFileCode]: '61744',
+  [WbIcons.IcFileImage]: '61745',
+  [WbIcons.IcFileMarkdown]: '61746',
+  [WbIcons.IcFileModel]: '61747',
+  [WbIcons.IcFilePython]: '61748',
+  [WbIcons.IcFileYaml]: '61749',
+  [WbIcons.IcFile]: '61750',
+  [WbIcons.IcFilter]: '61751',
+  [WbIcons.IcFire]: '61752',
+  [WbIcons.IcFluidWidth]: '61753',
+  [WbIcons.IcFolder]: '61754',
+  [WbIcons.IcFork]: '61755',
+  [WbIcons.IcFullWidth]: '61756',
+  [WbIcons.IcFullscreen]: '61757',
+  [WbIcons.IcGallery]: '61758',
+  [WbIcons.IcGaussian]: '61759',
+  [WbIcons.IcGift]: '61760',
+  [WbIcons.IcGithub]: '61761',
+  [WbIcons.IcGlobe]: '61762',
+  [WbIcons.IcGroupRuns]: '61763',
+  [WbIcons.IcGroup]: '61764',
+  [WbIcons.IcH1]: '61765',
+  [WbIcons.IcH2]: '61766',
+  [WbIcons.IcH3]: '61767',
+  [WbIcons.IcHandle]: '61768',
+  [WbIcons.IcHeartOutline]: '61769',
+  [WbIcons.IcHeart]: '61770',
+  [WbIcons.IcHeavyCheckmark]: '61771',
+  [WbIcons.IcHelpCircleOutline]: '61772',
+  [WbIcons.IcHelp]: '61773',
+  [WbIcons.IcHide]: '61774',
+  [WbIcons.IcImage]: '61775',
+  [WbIcons.IcInfo]: '61776',
+  [WbIcons.IcItalic]: '61777',
+  [WbIcons.IcLaunch]: '61778',
+  [WbIcons.IcLeftArrow]: '61779',
+  [WbIcons.IcLightbulb]: '61780',
+  [WbIcons.IcLineDashDotDot]: '61781',
+  [WbIcons.IcLineDashDot]: '61782',
+  [WbIcons.IcLineDash]: '61783',
+  [WbIcons.IcLineDisconnected]: '61784',
+  [WbIcons.IcLineDot]: '61785',
+  [WbIcons.IcLineGraph]: '61786',
+  [WbIcons.IcLineSolid]: '61787',
+  [WbIcons.IcLink]: '61788',
+  [WbIcons.IcList]: '61789',
+  [WbIcons.IcLockOpen]: '61790',
+  [WbIcons.IcLock]: '61791',
+  [WbIcons.IcLoess]: '61792',
+  [WbIcons.IcLog]: '61793',
+  [WbIcons.IcMarkdown]: '61794',
+  [WbIcons.IcMetadata]: '61795',
+  [WbIcons.IcModel]: '61796',
+  [WbIcons.IcMoveRuns]: '61797',
+  [WbIcons.IcMove]: '61798',
+  [WbIcons.IcNewProject]: '61799',
+  [WbIcons.IcNext]: '61800',
+  [WbIcons.IcNoSmooth]: '61801',
+  [WbIcons.IcNumberedList]: '61802',
+  [WbIcons.IcNumero]: '61803',
+  [WbIcons.IcOffice]: '61804',
+  [WbIcons.IcOpenProject]: '61805',
+  [WbIcons.IcOrganization]: '61806',
+  [WbIcons.IcOutlier]: '61807',
+  [WbIcons.IcOverflowOutline]: '61808',
+  [WbIcons.IcOverflow]: '61809',
+  [WbIcons.IcOverlay_2Column]: '61810',
+  [WbIcons.IcOverlay_3Column]: '61811',
+  [WbIcons.IcOverlayStack]: '61812',
+  [WbIcons.IcPageBreak]: '61813',
+  [WbIcons.IcPanel_3d]: '61814',
+  [WbIcons.IcPanelAudio]: '61815',
+  [WbIcons.IcPanelBarChart]: '61816',
+  [WbIcons.IcPanelGrid]: '61817',
+  [WbIcons.IcPanelHtml]: '61818',
+  [WbIcons.IcPanelImages]: '61819',
+  [WbIcons.IcPanelImportance]: '61820',
+  [WbIcons.IcPanelLinePlot]: '61821',
+  [WbIcons.IcPanelNumber]: '61822',
+  [WbIcons.IcPanelParallel]: '61823',
+  [WbIcons.IcPanelPlotly]: '61824',
+  [WbIcons.IcPanelRunComparer]: '61825',
+  [WbIcons.IcPanelScatterPlot]: '61826',
+  [WbIcons.IcPanelTextTable]: '61827',
+  [WbIcons.IcPanelText]: '61828',
+  [WbIcons.IcPanelVideo]: '61829',
+  [WbIcons.IcPartial]: '61830',
+  [WbIcons.IcPencil]: '61831',
+  [WbIcons.IcPercentLinePlot]: '61832',
+  [WbIcons.IcPersonal]: '61833',
+  [WbIcons.IcPin]: '61834',
+  [WbIcons.IcPlace]: '61835',
+  [WbIcons.IcPlot]: '61836',
+  [WbIcons.IcPlus]: '61837',
+  [WbIcons.IcPrevious]: '61838',
+  [WbIcons.IcProjector]: '61839',
+  [WbIcons.IcQuote]: '61840',
+  [WbIcons.IcRedo]: '61841',
+  [WbIcons.IcRefresh]: '61842',
+  [WbIcons.IcRegex]: '61843',
+  [WbIcons.IcRemoveCircleFill]: '61844',
+  [WbIcons.IcRemoveCircleOutline]: '61845',
+  [WbIcons.IcReport]: '61846',
+  [WbIcons.IcResize]: '61847',
+  [WbIcons.IcRetry]: '61848',
+  [WbIcons.IcRightArrow]: '61849',
+  [WbIcons.IcRocket]: '61850',
+  [WbIcons.IcRows]: '61851',
+  [WbIcons.IcRunningAverage]: '61852',
+  [WbIcons.IcSave]: '61853',
+  [WbIcons.IcSearch]: '61854',
+  [WbIcons.IcShare]: '61855',
+  [WbIcons.IcShow]: '61856',
+  [WbIcons.IcSmallWidth]: '61857',
+  [WbIcons.IcSmoothGray]: '61858',
+  [WbIcons.IcSnowflake]: '61859',
+  [WbIcons.IcSortDown]: '61860',
+  [WbIcons.IcSortUp]: '61861',
+  [WbIcons.IcSort]: '61862',
+  [WbIcons.IcSparkles]: '61863',
+  [WbIcons.IcSplitDiff]: '61864',
+  [WbIcons.IcStandardLayout]: '61865',
+  [WbIcons.IcStandardLinePlot]: '61866',
+  [WbIcons.IcStarOutline]: '61867',
+  [WbIcons.IcStar]: '61868',
+  [WbIcons.IcState]: '61869',
+  [WbIcons.IcStop]: '61870',
+  [WbIcons.IcStrikethrough]: '61871',
+  [WbIcons.IcSummary]: '61872',
+  [WbIcons.IcSweep]: '61873',
+  [WbIcons.IcTableCollapsed]: '61874',
+  [WbIcons.IcTable]: '61875',
+  [WbIcons.IcTagGray]: '61876',
+  [WbIcons.IcTagLatest]: '61877',
+  [WbIcons.IcTag]: '61878',
+  [WbIcons.IcTeam]: '61879',
+  [WbIcons.IcTensorflow]: '61880',
+  [WbIcons.IcTerminal]: '61881',
+  [WbIcons.IcTexBlock]: '61882',
+  [WbIcons.IcTex]: '61883',
+  [WbIcons.IcTimeWeightedEma]: '61884',
+  [WbIcons.IcTwitter]: '61885',
+  [WbIcons.IcUndo]: '61886',
+  [WbIcons.IcUnifiedDiff]: '61887',
+  [WbIcons.IcUpArrow]: '61888',
+  [WbIcons.IcUsername]: '61889',
+  [WbIcons.IcVerticalHandle]: '61890',
+  [WbIcons.IcVideo]: '61891',
+  [WbIcons.IcViewOnly]: '61892',
+  [WbIcons.IcWandb]: '61893',
+  [WbIcons.IcWarning]: '61894',
+  [WbIcons.IcWorld]: '61895',
+  [WbIcons.IcXaxis]: '61896',
+  [WbIcons.IconAddNew]: '61897',
+  [WbIcons.IconAdminShieldSafe]: '61898',
+  [WbIcons.IconAmazonSagemaker]: '61899',
+  [WbIcons.IconAudioVolume]: '61900',
+  [WbIcons.IconAutomationRobotArm]: '61901',
+  [WbIcons.IconBack]: '61902',
+  [WbIcons.IconBellNotifications]: '61903',
+  [WbIcons.IconBenchmarkSquare]: '61904',
+  [WbIcons.IconBlogReport]: '61905',
+  [WbIcons.IconBoolean]: '61906',
+  [WbIcons.IconBug]: '61907',
+  [WbIcons.IconCategoryMultimodal]: '61908',
+  [WbIcons.IconChartHorizontalBars]: '61909',
+  [WbIcons.IconChartPie]: '61910',
+  [WbIcons.IconChartVerticalBars]: '61911',
+  [WbIcons.IconCheckmarkCircle]: '61912',
+  [WbIcons.IconCheckmark]: '61913',
+  [WbIcons.IconChevronBack]: '61914',
+  [WbIcons.IconChevronDown]: '61915',
+  [WbIcons.IconChevronNext]: '61916',
+  [WbIcons.IconChevronUp]: '61917',
+  [WbIcons.IconClose]: '61918',
+  [WbIcons.IconCodeAlt]: '61919',
+  [WbIcons.IconCollapse]: '61920',
+  [WbIcons.IconColor]: '61921',
+  [WbIcons.IconContentFullWidth]: '61922',
+  [WbIcons.IconContentNarrow]: '61923',
+  [WbIcons.IconContentWide]: '61924',
+  [WbIcons.IconContractLeft]: '61925',
+  [WbIcons.IconCopy]: '61926',
+  [WbIcons.IconCreditCardPayment]: '61927',
+  [WbIcons.IconCubeContainer]: '61928',
+  [WbIcons.IconDashboardBlackboard]: '61929',
+  [WbIcons.IconDelete]: '61930',
+  [WbIcons.IconDiscordSocial]: '61931',
+  [WbIcons.IconDockerWhale]: '61932',
+  [WbIcons.IconDocument]: '61933',
+  [WbIcons.IconDocumentation]: '61934',
+  [WbIcons.IconDownload]: '61935',
+  [WbIcons.IconEducationAcademic]: '61936',
+  [WbIcons.IconEmailAt]: '61937',
+  [WbIcons.IconEmailEnvelope]: '61938',
+  [WbIcons.IconExpandRight]: '61939',
+  [WbIcons.IconExpandUncollapse]: '61940',
+  [WbIcons.IconFacebookSocial]: '61941',
+  [WbIcons.IconFailedErrorDeleted]: '61942',
+  [WbIcons.IconFailed]: '61943',
+  [WbIcons.IconFlashBolt]: '61944',
+  [WbIcons.IconFolderAlt]: '61945',
+  [WbIcons.IconFolderProjectMove]: '61946',
+  [WbIcons.IconFolderProject]: '61947',
+  [WbIcons.IconForumChatBubble]: '61948',
+  [WbIcons.IconForwardNext]: '61949',
+  [WbIcons.IconFullScreenModeExpand]: '61950',
+  [WbIcons.IconGhostAgent]: '61951',
+  [WbIcons.IconGit]: '61952',
+  [WbIcons.IconGithub]: '61953',
+  [WbIcons.IconGroup]: '61954',
+  [WbIcons.IconHeadset]: '61955',
+  [WbIcons.IconHeartFilled]: '61956',
+  [WbIcons.IconHeart]: '61957',
+  [WbIcons.IconHelpAlt]: '61958',
+  [WbIcons.IconHideHidden]: '61959',
+  [WbIcons.IconHistory]: '61960',
+  [WbIcons.IconHome]: '61961',
+  [WbIcons.IconIdle]: '61962',
+  [WbIcons.IconIgnoreOutliers]: '61963',
+  [WbIcons.IconImpersonateMaskAlt]: '61964',
+  [WbIcons.IconImportInsert]: '61965',
+  [WbIcons.IconInfo]: '61966',
+  [WbIcons.IconJobAutomation]: '61967',
+  [WbIcons.IconJobCalculator]: '61968',
+  [WbIcons.IconJobProgramCode]: '61969',
+  [WbIcons.IconJoyceTransformersLogo]: '61970',
+  [WbIcons.IconJoyceXgboostLogo]: '61971',
+  [WbIcons.IconKerasLogo]: '61972',
+  [WbIcons.IconKeyAdminPrivate]: '61973',
+  [WbIcons.IconKeyAdmin]: '61974',
+  [WbIcons.IconKubernetes]: '61975',
+  [WbIcons.IconLanguages]: '61976',
+  [WbIcons.IconLaptopLocalComputer]: '61977',
+  [WbIcons.IconLayoutGrid]: '61978',
+  [WbIcons.IconLayoutHorizontal]: '61979',
+  [WbIcons.IconLayoutTabs]: '61980',
+  [WbIcons.IconLayoutVertical]: '61981',
+  [WbIcons.IconLightbulbInfo]: '61982',
+  [WbIcons.IconLinkAlt]: '61983',
+  [WbIcons.IconLinkedinSocial]: '61984',
+  [WbIcons.IconListBullets]: '61985',
+  [WbIcons.IconList]: '61986',
+  [WbIcons.IconLoading]: '61987',
+  [WbIcons.IconLockClosed]: '61988',
+  [WbIcons.IconLockOpen]: '61989',
+  [WbIcons.IconLockedConstrained]: '61990',
+  [WbIcons.IconLogOut]: '61991',
+  [WbIcons.IconLogoColab]: '61992',
+  [WbIcons.IconMagicWandStar]: '61993',
+  [WbIcons.IconMagicWandStick]: '61994',
+  [WbIcons.IconMicrophoneAudio]: '61995',
+  [WbIcons.IconMinimizeMode]: '61996',
+  [WbIcons.IconModel]: '61997',
+  [WbIcons.IconMusicAudio]: '61998',
+  [WbIcons.IconNumber]: '61999',
+  [WbIcons.IconOpenNewTab]: '62000',
+  [WbIcons.IconOrchestrationLaunch]: '62001',
+  [WbIcons.IconOrganizationCorporate]: '62002',
+  [WbIcons.IconOverflowHorizontal]: '62003',
+  [WbIcons.IconPanTool_1]: '62004',
+  [WbIcons.IconPanTool]: '62005',
+  [WbIcons.IconPanel]: '62006',
+  [WbIcons.IconPause]: '62007',
+  [WbIcons.IconPaused]: '62008',
+  [WbIcons.IconPencilEdit]: '62009',
+  [WbIcons.IconPhoto]: '62010',
+  [WbIcons.IconPlay]: '62011',
+  [WbIcons.IconPrivacyOpen]: '62012',
+  [WbIcons.IconPythonLogo]: '62013',
+  [WbIcons.IconPytorchLightningLogo]: '62014',
+  [WbIcons.IconPytorchLogo]: '62015',
+  [WbIcons.IconQueue]: '62016',
+  [WbIcons.IconQueued]: '62017',
+  [WbIcons.IconRandomizeAlt]: '62018',
+  [WbIcons.IconRecentClock]: '62019',
+  [WbIcons.IconRedditSocial]: '62020',
+  [WbIcons.IconRedo]: '62021',
+  [WbIcons.IconReport]: '62022',
+  [WbIcons.IconRetry]: '62023',
+  [WbIcons.IconRobotServiceMember]: '62024',
+  [WbIcons.IconRocketLaunch]: '62025',
+  [WbIcons.IconRun]: '62026',
+  [WbIcons.IconRunningRepeat]: '62027',
+  [WbIcons.IconScikitLogo]: '62028',
+  [WbIcons.IconSearch]: '62029',
+  [WbIcons.IconSelectMoveTool]: '62030',
+  [WbIcons.IconSettingsParameters]: '62031',
+  [WbIcons.IconSettings]: '62032',
+  [WbIcons.IconShareExport]: '62033',
+  [WbIcons.IconShareWith]: '62034',
+  [WbIcons.IconShieldRemove]: '62035',
+  [WbIcons.IconShowVisible]: '62036',
+  [WbIcons.IconSmoothing]: '62037',
+  [WbIcons.IconSortAscending]: '62038',
+  [WbIcons.IconSortDescending]: '62039',
+  [WbIcons.IconSort]: '62040',
+  [WbIcons.IconSplit]: '62041',
+  [WbIcons.IconStarFilled]: '62042',
+  [WbIcons.IconStar]: '62043',
+  [WbIcons.IconStop]: '62044',
+  [WbIcons.IconStopped]: '62045',
+  [WbIcons.IconSweepBayes]: '62046',
+  [WbIcons.IconSweepGrid]: '62047',
+  [WbIcons.IconSweepRandomSearch]: '62048',
+  [WbIcons.IconSweepsAlt]: '62049',
+  [WbIcons.IconSweepsBroomAlt]: '62050',
+  [WbIcons.IconSweepsBroom]: '62051',
+  [WbIcons.IconSystemChipAlt]: '62052',
+  [WbIcons.IconSystemChip]: '62053',
+  [WbIcons.IconSystem]: '62054',
+  [WbIcons.IconTable]: '62055',
+  [WbIcons.IconTag]: '62056',
+  [WbIcons.IconTensorflowLogo]: '62057',
+  [WbIcons.IconTextLanguageAlt]: '62058',
+  [WbIcons.IconTextLanguage]: '62059',
+  [WbIcons.IconTriggerAlt]: '62060',
+  [WbIcons.IconTwitter]: '62061',
+  [WbIcons.IconUndeterminateVisibility]: '62062',
+  [WbIcons.IconUndo]: '62063',
+  [WbIcons.IconUnlockedUnconstrained]: '62064',
+  [WbIcons.IconUserProfilePersonal]: '62065',
+  [WbIcons.IconUsersTeam]: '62066',
+  [WbIcons.IconVersionsLayers]: '62067',
+  [WbIcons.IconVertexGcp]: '62068',
+  [WbIcons.IconVideoPlay]: '62069',
+  [WbIcons.IconWandb]: '62070',
+  [WbIcons.IconWarning]: '62071',
+  [WbIcons.IconXAxis]: '62072',
+  [WbIcons.IconYoutubeSocial]: '62073',
+  [WbIcons.IconZoomInTool]: '62074',
+  [WbIcons.LogoColab]: '62075',
 };

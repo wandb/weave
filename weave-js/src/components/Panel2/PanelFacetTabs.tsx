@@ -26,6 +26,7 @@ import * as ConfigPanel from './ConfigPanel';
 import {Tabs} from './LayoutTabs';
 import * as Panel2 from './panel';
 import {PanelContextProvider, usePanelContext} from './PanelContext';
+import {useUpdateConfig2} from './PanelComp';
 
 type PanelFacetTabsConfig = {
   tab: NodeOrVoidNode;
@@ -58,10 +59,7 @@ const usePanelFacetTabsCommon = (props: PanelFacetTabsProps) => {
     console.log('LIST OBJECT TYPE', props.input.type);
     return listObjectType(props.input.type);
   }, [props.input.type]);
-  const {updateConfig2} = props;
-  if (updateConfig2 == null) {
-    throw new Error('PanelFacetTabs requires updateConfig2');
-  }
+  const updateConfig2 = useUpdateConfig2(props);
   const updateTabExpr = useCallback(
     newExpr =>
       updateConfig2(oldConfig => {

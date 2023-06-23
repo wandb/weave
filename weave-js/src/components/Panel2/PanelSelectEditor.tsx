@@ -16,6 +16,7 @@ import {
   ExpressionConfigField,
 } from './ConfigPanel';
 import {Checkbox} from 'semantic-ui-react';
+import {useUpdateConfig2} from './PanelComp';
 
 const inputType = {
   type: 'list' as const,
@@ -38,10 +39,7 @@ export const PanelSelectEditorConfigComponent: React.FC<
   PanelSelectEditorProps
 > = props => {
   const config = props.config!;
-  const {updateConfig2} = props;
-  if (updateConfig2 == null) {
-    throw new Error('updateConfig2 not defined');
-  }
+  const updateConfig2 = useUpdateConfig2(props);
   const updateChoicesExpr = useCallback(
     (newExpr: NodeOrVoidNode) => {
       updateConfig2(currentConfig => ({...currentConfig, choices: newExpr}));

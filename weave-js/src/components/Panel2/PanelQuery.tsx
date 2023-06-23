@@ -3,7 +3,6 @@ import React, {useCallback, useMemo} from 'react';
 import * as Panel from './panel';
 import {PanelContextProvider} from './PanelContext';
 import * as Table from './PanelTable/tableState';
-import {updatePreFilter} from './PanelTable/tableState';
 import {useWeaveContext} from '@wandb/weave/context';
 import {TableState} from '../..';
 import * as ConfigPanel from './ConfigPanel';
@@ -14,6 +13,8 @@ import {
   ChildPanelFullConfig,
 } from './ChildPanel';
 import {
+  NodeOrVoidNode,
+  Type,
   constNodeUnsafe,
   constString,
   isAssignableTo,
@@ -21,17 +22,17 @@ import {
   listObjectType,
   mapNodes,
   maybe,
-  Node,
-  NodeOrVoidNode,
   opOr,
   opStringEqual,
-  Type,
+  Node,
   varNode,
   voidNode,
   Weave,
 } from '@wandb/weave/core';
 import {Spec as SelectEditorSpec} from './PanelSelectEditor';
 import {ExpressionView} from './ExpressionView';
+import {updatePreFilter} from './PanelTable/tableState';
+import {useUpdateConfig2} from './PanelComp';
 
 interface Condition {
   expression: NodeOrVoidNode;
@@ -39,7 +40,6 @@ interface Condition {
 }
 
 const inputType = {type: 'list' as const, objectType: 'any' as const};
-
 interface PanelQueryConfig {
   tableState: Table.TableState;
   pinnedRows: {[groupKey: string]: number[]};
@@ -48,7 +48,6 @@ interface PanelQueryConfig {
     text: TableState.ColumnId;
   };
 }
-
 type PanelQueryProps = Panel.PanelProps<typeof inputType, PanelQueryConfig>;
 
 export function defaultPanelQuery(): PanelQueryConfig {
@@ -154,17 +153,16 @@ type PanelQueryConditionProps = PanelQueryProps & {
 };
 
 const usePanelQueryConditionCommon = (props: PanelQueryConditionProps) => {
-  const {condition, updateConfig2, input} = props;
+  const {condition, input} = props;
   const weave = useWeaveContext();
+
+  const updateConfig2 = useUpdateConfig2(props);
 
   const newVars = useMemo(() => {
     return {
       queryInput: varNode(props.input.type, 'input'),
     };
   }, [props.input.type]);
-  if (updateConfig2 == null) {
-    throw new Error('PanelQuery requires updateConfig2');
-  }
   const updateCondition = useCallback(
     (newCondition: Partial<Condition>) => {
       updateConfig2(oldConfig => {
@@ -285,10 +283,7 @@ export const PanelQueryConditionComponent: React.FC<
 };
 
 export const PanelQueryConfigComponent: React.FC<PanelQueryProps> = props => {
-  const {updateConfig2} = props;
-  if (updateConfig2 == null) {
-    throw new Error('PanelQuery requires updateConfig2');
-  }
+  const updateConfig2 = useUpdateConfig2(props);
   const config = props.config!;
 
   const addCondition = useCallback(() => {

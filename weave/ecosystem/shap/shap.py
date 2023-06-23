@@ -1,3 +1,8 @@
+# Disable warning spew.
+import warnings
+
+warnings.filterwarnings("ignore", message=".*The 'nopython' keyword.*")
+
 import shap
 import random
 import typing

@@ -1,3 +1,9 @@
+// Critical performance note: We must not depend on config/updateConfig
+// in the callbacks we construct here. The stack that we construct in PanelContext
+// depends on the callbacks, and we don't want to depend on current config state.
+// If we do depend on current config state, everything in the UI will re-render
+// all the time, because everything depends on stack.
+
 import EditableField from '@wandb/weave/common/components/EditableField';
 import {
   GRAY_350,
@@ -34,7 +40,7 @@ import {Tooltip} from '../Tooltip';
 import * as ConfigPanel from './ConfigPanel';
 import {ConfigSection} from './ConfigPanel';
 import {IconPencilEdit} from './Icons';
-import {Panel, PanelConfigEditor} from './PanelComp';
+import {Panel, PanelConfigEditor, useUpdateConfig2} from './PanelComp';
 import {
   ExpressionEvent,
   PanelContextProvider,
@@ -193,7 +199,8 @@ interface ChildPanelProps {
 }
 
 const useChildPanelCommon = (props: ChildPanelProps) => {
-  const {updateConfig, updateConfig2} = props;
+  const {updateConfig} = props;
+  const updateConfig2 = useUpdateConfig2(props);
   const config = useChildPanelConfig(props.config);
   const {id: panelId, config: panelConfig} = config;
   let {input_node: panelInputExpr} = config;
@@ -251,21 +258,20 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
         props.allowedPanels,
         stack
       );
-      updateConfig({
-        ...config,
+      updateConfig2(curConfig => ({
+        ...curConfig,
         input_node: newExpression,
         id,
         config: newPanelConfig,
-      });
+      }));
     },
-    [config, props.allowedPanels, stack, updateConfig, weave]
+    [props.allowedPanels, stack, updateConfig2, weave]
   );
 
   const updateExpression = useCallback(
     (newExpression: NodeOrVoidNode) => {
       if (
-        weave.expToString(newExpression) ===
-        weave.expToString(config.input_node)
+        weave.expToString(newExpression) === weave.expToString(panelInputExpr)
       ) {
         // If expression strings match, no update. This prevents glitching
         // when types change (which I think happens in panel composition
@@ -275,23 +281,23 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
         return;
       }
 
-      if (isAssignableTo(newExpression.type, config.input_node.type)) {
+      if (isAssignableTo(newExpression.type, panelInputExpr.type)) {
         // If type didn't change, keep current settings
-        updateConfig({...config, input_node: newExpression});
+        updateConfig2(curConfig => ({...curConfig, input_node: newExpression}));
       } else if (curPanelId === 'Each') {
         // "stick" to each
-        updateConfig({...config, input_node: newExpression});
-      } else if (props.allowedPanels != null && config.id === 'Expression') {
+        updateConfig2(curConfig => ({...curConfig, input_node: newExpression}));
+      } else if (props.allowedPanels != null && curPanelId === 'Expression') {
         // Major hacks here. allowedPanels is currently only set in the sidebar,
         // so use that to detect if we're there.
         // Expression ends up being the default panel for new panels. So we "stick"
         // to Expression if we're in the sidebar.
-        updateConfig({
-          ...config,
+        updateConfig2(curConfig => ({
+          ...curConfig,
           input_node: newExpression,
           id: 'Expression',
           config: undefined,
-        });
+        }));
       } else {
         // Auto panel behavior.
         initPanelForInput(newExpression);
@@ -299,10 +305,10 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
     },
     [
       weave,
+      panelInputExpr,
       curPanelId,
-      config,
       props.allowedPanels,
-      updateConfig,
+      updateConfig2,
       initPanelForInput,
     ]
   );
@@ -345,15 +351,15 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
   }
   const updateAssignment = useCallback(
     (key: string, val: NodeOrVoidNode) => {
-      updateConfig({
-        ...config,
+      updateConfig2(curConfig => ({
+        ...curConfig,
         vars: {
-          ...config.vars,
+          ...curConfig.vars,
           [key]: val,
         },
-      });
+      }));
     },
-    [config, updateConfig]
+    [updateConfig2]
   );
 
   const updatePanelConfig2 = useCallback(

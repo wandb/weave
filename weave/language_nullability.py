@@ -16,7 +16,7 @@ def should_force_none_result(
     # as its second argument. Function is the op we want to execute if non-null.
     # TODO: fix
     # TODO: not implemented for async ops
-    if inputs:
+    if inputs and not op_def.name.endswith("coalesce"):
         input0 = list(inputs.values())[0]
         named_args = op_def.input_type.named_args()
         return (

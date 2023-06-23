@@ -224,7 +224,7 @@ export const getSectionConfig = (
       draft.panels.push({
         id: name,
         layout: getNewGridItemLayout(
-          gridConfig.panels.map(p => p.layout),
+          draft.panels.map(p => p.layout),
           false
         ),
       });

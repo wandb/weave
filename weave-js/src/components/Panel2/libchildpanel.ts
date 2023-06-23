@@ -1,7 +1,7 @@
 import produce from 'immer';
 import {useCallback} from 'react';
 
-export const useUpdateConfig2 = (
+export const useChildUpdateConfig2 = (
   panelId: string,
   parentUpdateConfig2?: <P>(change: (oldConfig: P) => Partial<P>) => void
 ) => {
