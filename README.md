@@ -19,9 +19,11 @@ Install via `pip install weave`, `import weave` in your notebook, and explore yo
 
 **1. View a dataframe**
 
-```
-# use any existing dataframe, here we load the iris data and visualize the labels
+```python
+import weave
 from sklearn.datasets import load_iris
+
+# use any existing dataframe, here we load the iris data and visualize the labels
 iris = load_iris(as_frame=True)
 df = iris.data.assign(target=iris.target_names[iris.target])
 
