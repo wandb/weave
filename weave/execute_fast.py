@@ -77,7 +77,9 @@ def _resolve_static_branches(map_fn):
                 return _resolve_static_branches(fixed)
 
         if all(isinstance(v, graph.ConstNode) for v in inputs.values()):
-            res = weave_internal.use(map_fn)
+            call_node = graph.OutputNode(map_fn.type, map_fn.from_op.name, inputs)
+            res = weave_internal.use(call_node)
+            result_store[map_fn] = res
             return graph.ConstNode(map_fn.type, res)
         return graph.OutputNode(map_fn.type, map_fn.from_op.name, inputs)
     elif isinstance(map_fn, graph.ConstNode):

@@ -1,3 +1,9 @@
+// Critical performance note: We must not depend on config/updateConfig
+// in the callbacks we construct here. The stack that we construct in PanelContext
+// depends on the callbacks, and we don't want to depend on current config state.
+// If we do depend on current config state, everything in the UI will re-render
+// all the time, because everything depends on stack.
+
 import {
   constNodeUnsafe,
   dereferenceAllVars,
@@ -41,7 +47,7 @@ import {isGroupNode, nextPanelName} from './panelTree';
 import {toWeaveType} from './toWeaveType';
 // import {VarBar} from '../Sidebar/VarBar';
 import {GRAY_350, GRAY_500, GRAY_800} from '../../common/css/globals.styles';
-import {inJupyterCell} from '../PagePanelComponents/util';
+// import {inJupyterCell} from '../PagePanelComponents/util';
 import {useUpdateConfig2} from './PanelComp';
 
 const LAYOUT_MODES = [
@@ -694,11 +700,18 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
   const setPanelIsHighlightedByPath = useSetPanelInputExprIsHighlighted();
   const setItemIsHighlighted = useCallback(
     (name: string, isHighlighted: boolean) => {
-      // console.log('SET ITEM IS HIGHLIGHTED', name, isHighlighted, config);
-      const itemPath = groupPath.concat(findItemPath(config, name));
-      setPanelIsHighlightedByPath(itemPath, isHighlighted);
+      // NOTE: this uses updateConfig2, even though we don't intend to update
+      // the config (we just return it from the updateConfig2 callback). This
+      // let's us get access to the current config, without depending on it
+      // in our closure. This is critical for performance.
+      updateConfig2(currentConfig => {
+        // console.log('SET ITEM IS HIGHLIGHTED', name, isHighlighted, config);
+        const itemPath = groupPath.concat(findItemPath(currentConfig, name));
+        setPanelIsHighlightedByPath(itemPath, isHighlighted);
+        return currentConfig;
+      });
     },
-    [config, groupPath, setPanelIsHighlightedByPath]
+    [groupPath, setPanelIsHighlightedByPath, updateConfig2]
   );
 
   const handleSiblingVarEvent = useCallback(
@@ -706,10 +719,8 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
       console.log('PG2 handleSiblingVarEvent', varName, target, event);
       if (event.id === 'hover') {
         setItemIsHighlighted(varName, true);
-        // mutateItem(varName, item => (item.highlight = true));
       } else if (event.id === 'unhover') {
         setItemIsHighlighted(varName, false);
-        // mutateItem(varName, item => (item.highlight = false));
       } else if (event.id === 'mutate') {
         mutateItem(varName, item => {
           console.log('PG2 mutate input expr');
@@ -759,7 +770,7 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
     [childPanelsByKey]
   );
 
-  const inJupyter = inJupyterCell();
+  // const inJupyter = inJupyterCell();
   // TODO: This special-case rendering is insane
   const isVarBar = _.isEqual(groupPath, [`sidebar`]);
   // if (isVarBar) {
