@@ -1126,15 +1126,15 @@ function simpleOpString(op: EditingOp, opStore: OpStore): string {
 // Return a list where each element is a node that is the first input to the next
 // element. The last element is the node itself.
 export function linearize(node: NodeOrVoidNode) {
-  function _linearize(node: OutputNode): OutputNode[] {
-    const firstArg = Object.values(node.fromOp.inputs)[0];
+  function _linearize(n: OutputNode): OutputNode[] {
+    const firstArg = Object.values(n.fromOp.inputs)[0];
     if (firstArg == null) {
-      return [node];
+      return [n];
     }
     if (firstArg.nodeType !== 'output') {
-      return [node];
+      return [n];
     }
-    return [..._linearize(firstArg), node];
+    return [..._linearize(firstArg), n];
   }
 
   if (node.nodeType !== 'output') {
