@@ -691,6 +691,7 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
             {seriesConfigDom}
           </ConfigSection>
           <ConfigSection label={`Labels`}>{labelConfigDom}</ConfigSection>
+          <ConfigSection label={`Scale`}>{scaleConfigDom}</ConfigSection>
         </>
       ) : (
         <>
@@ -704,6 +705,7 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
       cellFrame,
       seriesConfigDom,
       labelConfigDom,
+      scaleConfigDom,
       configTabs,
       activeTabIndex,
       seriesButtons,
