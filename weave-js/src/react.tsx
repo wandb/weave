@@ -57,7 +57,6 @@ import {ClientContext, useWeaveContext, useWeaveDashUiEnable} from './context';
 import {getUnresolvedVarNodes} from './core/callers';
 import {useDeepMemo} from './hookUtils';
 import {consoleLog} from './util';
-import {useTraceUpdate} from './common/util/hooks';
 
 /**
  * React hook-style function to get the
@@ -235,6 +234,8 @@ const errorToText = (e: any) => {
 
 let useNodeValueId = 0;
 
+// Construct an id, once per mounted component. Use this to help in
+// debugging.
 export const useId = () => {
   const callSiteId = useRef(useNodeValueId++);
   return callSiteId.current;
@@ -318,15 +319,15 @@ export const useNodeValue = <T extends Type>(
       if (client == null) {
         throw new Error('client not initialized!');
       }
-      if (callSite != null) {
-        console.log('useNodeValue subscribe', callSite, node);
-      }
+      // if (callSite != null) {
+      //   console.log('useNodeValue subscribe', callSite, node);
+      // }
       const obs = client.subscribe(node);
       const sub = obs.subscribe(
         nodeRes => {
-          if (callSite != null) {
-            console.log('useNodeValue resolve', callSite, node);
-          }
+          // if (callSite != null) {
+          //   console.log('useNodeValue resolve', callSite, node);
+          // }
           setResult({node, value: nodeRes});
         },
         caughtError => {
@@ -338,12 +339,12 @@ export const useNodeValue = <T extends Type>(
       return;
     }
   }, [client, node, memoCacheId, callSite, skip]);
-  useTraceUpdate('useNodeValue' + callSite, {
-    client,
-    node,
-    memoCacheId,
-    callSite,
-  });
+  // useTraceUpdate('useNodeValue' + callSite, {
+  //   client,
+  //   node,
+  //   memoCacheId,
+  //   callSite,
+  // });
 
   const finalResult = useMemo(() => {
     // Just rethrow the error in the render thread so it can be caught

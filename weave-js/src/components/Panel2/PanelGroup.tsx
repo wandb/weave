@@ -47,9 +47,8 @@ import {isGroupNode, nextPanelName} from './panelTree';
 import {toWeaveType} from './toWeaveType';
 // import {VarBar} from '../Sidebar/VarBar';
 import {GRAY_350, GRAY_500, GRAY_800} from '../../common/css/globals.styles';
-import {inJupyterCell} from '../PagePanelComponents/util';
+// import {inJupyterCell} from '../PagePanelComponents/util';
 import {useUpdateConfig2} from './PanelComp';
-import {useTraceUpdate} from '@wandb/weave/common/util/hooks';
 
 const LAYOUT_MODES = [
   'horizontal' as const,
@@ -701,7 +700,7 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
   const setPanelIsHighlightedByPath = useSetPanelInputExprIsHighlighted();
   const setItemIsHighlighted = useCallback(
     (name: string, isHighlighted: boolean) => {
-      // NOTE: this is uses updateConfig2, even though we don't intend to update
+      // NOTE: this uses updateConfig2, even though we don't intend to update
       // the config (we just return it from the updateConfig2 callback). This
       // let's us get access to the current config, without depending on it
       // in our closure. This is critical for performance.
@@ -734,10 +733,6 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
     },
     [mutateItem, setItemIsHighlighted]
   );
-  useTraceUpdate('PG handleSiblingVarEvent', {
-    mutateItem,
-    setItemIsHighlighted,
-  });
 
   const childPanelsByKey = useMemo(() => {
     let newVars: {[name: string]: NodeOrVoidNode} = {};
@@ -775,7 +770,7 @@ export const PanelGroup: React.FC<PanelGroupProps> = props => {
     [childPanelsByKey]
   );
 
-  const inJupyter = inJupyterCell();
+  // const inJupyter = inJupyterCell();
   // TODO: This special-case rendering is insane
   const isVarBar = _.isEqual(groupPath, [`sidebar`]);
   // if (isVarBar) {

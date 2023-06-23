@@ -134,7 +134,7 @@ import {useTraceUpdate} from '@wandb/weave/common/util/hooks';
 const recordEvent = makeEventRecorder('Plot');
 
 // const PANELPLOT_MAX_DATAPOINTS = 2000;
-const DOMAIN_DATAFETCH_EXTRA_EXTENT = 0.5;
+const DOMAIN_DATAFETCH_EXTRA_EXTENT = 2;
 
 const defaultFontStyleDict = {
   titleFont: 'Source Sans Pro',
@@ -1777,7 +1777,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
 
   const isDash = useWeaveDashUiEnable();
 
-  let flatResultNode = useMemo(() => {
+  const flatResultNode = useMemo(() => {
     const arrayArg: {
       [key: number]: ReturnType<
         typeof TableState.tableGetResultTableNode
@@ -2879,7 +2879,6 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
       }
 
       vegaView.addEventListener('mouseup', async () => {
-        console.log('MOUSEUP');
         const currBrushMode = brushModeRef.current;
         const currUpdateConfig2 = updateConfig2Ref.current;
         const currUpdateConfig = updateConfigRef.current;
@@ -2902,7 +2901,6 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
           const settingName = currBrushMode === 'zoom' ? 'domain' : 'selection';
 
           if (settingName === 'domain') {
-            console.log('MOUSEUP DOMAIN');
             const settingNodesAreConst = ['x' as const, 'y' as const].every(
               dimName => {
                 const currentSettingNode = currConfig.signals.domain[dimName];
@@ -2935,8 +2933,6 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
                 currUpdateConfig(newConfig);
               });
             } else {
-              console.log('MOUSEUP NONCONST');
-              // ['x' as const, 'y' as const].forEach(dimName => {
               ['x' as const, 'y' as const].forEach(dimName => {
                 const axisSignal: [number, number] | string[] = signal[dimName];
                 const currentSetting =
@@ -2944,7 +2940,6 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
 
                 if (!_.isEqual(currentSetting, axisSignal)) {
                   if (!isConstNode(currConfig.signals.domain[dimName])) {
-                    console.log('MOUSEUP MUTATE');
                     currMutateDomain[dimName]({
                       val: constNode(toWeaveType(axisSignal), axisSignal),
                     });
@@ -2960,7 +2955,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
                   }
                 }
 
-                // // need to clear out the old selection, if there is one
+                // need to clear out the old selection, if there is one
                 currUpdateConfig2((oldConfig: PlotConfig) => {
                   return produce(oldConfig, draft => {
                     draft.signals.selection[dimName] = undefined;
