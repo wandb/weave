@@ -3,7 +3,6 @@ import re
 import typing
 import pathlib
 import functools
-import uuid
 
 from . import errors
 from . import ref_base

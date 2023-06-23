@@ -76,7 +76,9 @@ class WandbRunFiles(artifact_fs.FilesystemArtifact):
 
     @property
     def is_saved(self) -> bool:
-        # TODO: This is not always true
+        # Note: I think this is OK to always be true, since run files are
+        # effectively always saved. But conceptually, the run could still be
+        # "open" which might warrant returning `False`.
         return True
 
     @property
@@ -134,18 +136,14 @@ class WandbRunFiles(artifact_fs.FilesystemArtifact):
     def new_file(
         self, path: str, binary: bool = False
     ) -> typing.Generator[typing.IO, None, None]:
-        # Generate a temporary file that can be returned to the caller
-        # and then moved into place when the context manager exits.
-        # Create a temporary directory to hold the file
         with tempfile.TemporaryDirectory() as dir_path:
             file_path = os.path.join(dir_path, path)
             with file_util.safe_open(file_path, "wb" if binary else "w") as file:
                 yield file
-                # TODO: don't rely on wandb!! This might be slower than is needed
+                # TODO: We may want to roll out own file uploader here rather
+                # than relying on W&B's. Need to do perf testing to see if this
+                # is necessary.
                 self.run.upload_file(file_path, dir_path)  # type: ignore[no-untyped-call]
-
-    def save(self) -> None:
-        pass
 
 
 class WandbRunFilesType(artifact_fs.FilesystemArtifactType):
