@@ -20,7 +20,7 @@ from . import file_util
 from . import weave_types as types
 from . import artifact_fs
 from . import filesystem
-from . import wandb_artifact_pusher
+from .wandb_interface import wandb_artifact_pusher
 
 from urllib import parse
 
