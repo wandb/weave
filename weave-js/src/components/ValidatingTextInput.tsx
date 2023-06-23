@@ -10,8 +10,16 @@ import React, {
 } from 'react';
 import styled from 'styled-components';
 
+const Wrapper = styled.div`
+  position: relative;
+  display: inline-block;
+  min-width: 20px;
+  height: 20px;
+`;
+
 const Input = styled.input`
-  width: 5em;
+  position: absolute;
+  width: 100%;
   border: none;
   border-radius: 2px;
 
@@ -22,6 +30,12 @@ const Input = styled.input`
   &.invalid:focus {
     outline: 1px solid ${globals.RED};
   }
+`;
+
+const InvisibleSizerSpan = styled.span`
+  visibility: hidden;
+  display: inline-block;
+  padding: 0 2px;
 `;
 
 interface TextInputProps {
@@ -69,14 +83,17 @@ export const ValidatingTextInput: FC<TextInputProps> = ({
   };
 
   return (
-    <Input
-      ref={inputRef}
-      className={isValid ? '' : 'invalid'}
-      data-test={dataTest}
-      value={internalValue}
-      onChange={handleChange}
-      onBlur={handleBlur}
-      onKeyDown={handleKeyDown}
-    />
+    <Wrapper>
+      <Input
+        ref={inputRef}
+        className={isValid ? '' : 'invalid'}
+        data-test={dataTest}
+        value={internalValue}
+        onChange={handleChange}
+        onBlur={handleBlur}
+        onKeyDown={handleKeyDown}
+      />
+      <InvisibleSizerSpan>{internalValue}</InvisibleSizerSpan>
+    </Wrapper>
   );
 };
