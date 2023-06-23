@@ -10,6 +10,8 @@ import React, {
 } from 'react';
 import styled from 'styled-components';
 
+const WIDTH_CHAR_LIMIT = 32;
+
 const Wrapper = styled.div`
   position: relative;
   display: inline-block;
@@ -93,7 +95,9 @@ export const ValidatingTextInput: FC<TextInputProps> = ({
         onBlur={handleBlur}
         onKeyDown={handleKeyDown}
       />
-      <InvisibleSizerSpan>{internalValue}</InvisibleSizerSpan>
+      <InvisibleSizerSpan>
+        {internalValue.slice(0, WIDTH_CHAR_LIMIT)}
+      </InvisibleSizerSpan>
     </Wrapper>
   );
 };
