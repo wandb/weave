@@ -20,6 +20,7 @@ import {
   isFunctionType,
   isVoidNode,
   isWeaveDebugEnabled,
+  linearize,
   Node,
   NodeOrVoidNode,
   Op,
@@ -27,6 +28,7 @@ import {
   opDefIsLowLevel,
   opIndex,
   OpInputs,
+  OutputNode,
   pushFrame,
   resolveVar,
   simplify,
@@ -189,7 +191,11 @@ const clientEval = (node: NodeOrVoidNode, env: Stack): NodeOrVoidNode => {
           },
         },
       };
-    } else if (name === 'Object-__getattr__' || name === 'pick') {
+    } else if (
+      name === 'Object-__getattr__' ||
+      name === 'pick' ||
+      name === 'index'
+    ) {
       let resolvedVal = callResolverSimple(name, inputs, node.fromOp);
       if (resolvedVal.nodeType != null) {
         resolvedVal = clientEval(resolvedVal, env);
@@ -474,6 +480,63 @@ export const parseRef = (ref: string): ArtifactURI => {
   };
 };
 
+// True if we can do a client-side set mutation
+const canClientSet = (linearNodes: OutputNode[] | undefined) => {
+  if (linearNodes == null) {
+    return true;
+  }
+  return linearNodes.every(n => {
+    // Must be allowed ops
+    if (!['pick', 'Object-__getattr__', 'index'].includes(n.fromOp.name)) {
+      return false;
+    }
+    // non arg0 must be const
+    if (
+      Object.values(n.fromOp.inputs)
+        .slice(1)
+        .some(i => !isConstNode(i))
+    ) {
+      return false;
+    }
+    return true;
+  });
+};
+
+// Perform a client side set mutation, returning the new value.
+// Should be equivalent to the server side set mutation (but handles fewer ops).
+const clientSet = (linearNodes: OutputNode[] | undefined, value: any) => {
+  if (linearNodes == null) {
+    return value;
+  }
+  let arg0 = Object.values(linearNodes[0].fromOp.inputs)[0];
+  const results: any[] = [];
+  const opInputs: Array<{[key: string]: any}> = [];
+  // Execute forward
+  for (const node of linearNodes) {
+    const inputs = {...node.fromOp.inputs};
+    inputs[Object.keys(inputs)[0]] = arg0;
+    arg0 = callResolverSimple(node.fromOp.name, inputs, node.fromOp);
+    opInputs.push(inputs);
+    results.push(arg0);
+  }
+
+  let res = value;
+
+  for (let i = linearNodes.length - 1; i >= 0; i--) {
+    const node = linearNodes[i];
+    const inputs = Object.values(opInputs[i]);
+    if (node.fromOp.name === 'pick') {
+      inputs[0][inputs[1].val] = res;
+    } else if (node.fromOp.name === 'Object-__getattr__') {
+      inputs[0][inputs[1].val] = res;
+    } else if (node.fromOp.name === 'index') {
+      inputs[0][inputs[1].val] = res;
+    }
+    res = inputs[0];
+  }
+  return res;
+};
+
 export const absoluteTargetMutation = (absoluteTarget: NodeOrVoidNode) => {
   const rootOutputNode = getChainRootOutputNode(absoluteTarget);
   const rootConstNode = getChainRootConst(absoluteTarget);
@@ -542,7 +605,8 @@ export const makeCallAction = (
       ...inputs,
       root_args: rootArgsNode,
     });
-    return client.action(calledNode as any).then(final => {
+
+    const onDone = (final: any) => {
       if (final == null && ignoreNullResult) {
         // pass
       } else if (mutationStyle === 'clientRef') {
@@ -611,7 +675,20 @@ export const makeCallAction = (
       // how to apply the mutation results back to some user-held state
       // (unlike in graphql).
       return true;
-    });
+    };
+
+    const linearNodes = linearize(absoluteTarget);
+
+    if (
+      inputs.val.nodeType === 'const' &&
+      actionName === 'set' &&
+      canClientSet(linearNodes)
+    ) {
+      const final = clientSet(linearNodes, inputs.val.val);
+      return onDone(final);
+    } else {
+      return client.action(calledNode as any).then(onDone);
+    }
   };
 };
 

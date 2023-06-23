@@ -2937,7 +2937,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
             } else {
               console.log('MOUSEUP NONCONST');
               // ['x' as const, 'y' as const].forEach(dimName => {
-              ['x' as const].forEach(dimName => {
+              ['x' as const, 'y' as const].forEach(dimName => {
                 const axisSignal: [number, number] | string[] = signal[dimName];
                 const currentSetting =
                   currConcreteConfig.signals.domain[dimName];

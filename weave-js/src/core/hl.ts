@@ -1122,3 +1122,23 @@ function simpleOpString(op: EditingOp, opStore: OpStore): string {
     opStore
   )} `;
 }
+
+// Return a list where each element is a node that is the first input to the next
+// element. The last element is the node itself.
+export function linearize(node: NodeOrVoidNode) {
+  function _linearize(node: OutputNode): OutputNode[] {
+    const firstArg = Object.values(node.fromOp.inputs)[0];
+    if (firstArg == null) {
+      return [node];
+    }
+    if (firstArg.nodeType !== 'output') {
+      return [node];
+    }
+    return [..._linearize(firstArg), node];
+  }
+
+  if (node.nodeType !== 'output') {
+    return undefined;
+  }
+  return _linearize(node);
+}
