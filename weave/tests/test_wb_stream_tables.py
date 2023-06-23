@@ -73,8 +73,29 @@ def test_multi_writers_sequential(user_by_api_key_in_env):
         project_name="stream-tables",
         entity_name=user_by_api_key_in_env.username,
     )
+    indexes = []
+    writers = []
+
+    def do_asserts():
+        time.sleep(3)
+
+        hist_node = (
+            weave.ops.project(user_by_api_key_in_env.username, "stream-tables")
+            .run("test_table")
+            .history2()
+        )
+        assert weave.use(hist_node["index"]).to_pylist_tagged() == indexes
+        assert weave.use(hist_node["writer"]).to_pylist_tagged() == writers
+        assert weave.use(hist_node["_step"]).to_pylist_tagged() == indexes
+
     for i in range(10):
+        indexes.append(i)
+        writers.append("a")
         st.log({"index": i, "writer": "a"})
+
+    # Notably before finish
+    do_asserts()
+
     st.finish()
 
     st = StreamTable(
@@ -83,21 +104,12 @@ def test_multi_writers_sequential(user_by_api_key_in_env):
         entity_name=user_by_api_key_in_env.username,
     )
     for i in range(10):
+        indexes.append(10 + i)
+        writers.append("b")
         st.log({"index": 10 + i, "writer": "b"})
     st.finish()
 
-    time.sleep(3)
-
-    hist_node = (
-        weave.ops.project(user_by_api_key_in_env.username, "stream-tables")
-        .run("test_table")
-        .history2()
-    )
-    assert weave.use(hist_node["index"]).to_pylist_tagged() == [i for i in range(20)]
-    assert weave.use(hist_node["writer"]).to_pylist_tagged() == [
-        "a" for i in range(10)
-    ] + ["b" for i in range(10)]
-    assert weave.use(hist_node["_step"]).to_pylist_tagged() == [i for i in range(20)]
+    do_asserts()
 
 
 @pytest.mark.skip(reason="This is expected to fail until W&B updates step management")
