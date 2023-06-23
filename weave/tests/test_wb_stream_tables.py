@@ -7,7 +7,11 @@ from PIL import Image
 
 # Example of end to end integration test
 def test_stream_logging(user_by_api_key_in_env):
-    st = StreamTable("test_table")
+    st = StreamTable(
+        "test_table",
+        project_name="stream-tables",
+        entity_name=user_by_api_key_in_env.username,
+    )
     for i in range(10):
         st.log({"hello": f"world_{i}", "index": i, "nested": {"a": [i]}})
     st.finish()
@@ -27,7 +31,11 @@ def test_stream_logging_image(user_by_api_key_in_env):
         imarray = numpy.random.rand(100, 100, 3) * 255
         return Image.fromarray(imarray.astype("uint8")).convert("RGBA")
 
-    st = StreamTable("test_table-8")
+    st = StreamTable(
+        "test_table-8",
+        project_name="stream-tables",
+        entity_name=user_by_api_key_in_env.username,
+    )
     for i in range(3):
         st.log({"image": image()})
     st.finish()
@@ -42,12 +50,20 @@ def test_stream_logging_image(user_by_api_key_in_env):
 
 
 def test_multi_writers_sequential(user_by_api_key_in_env):
-    st = StreamTable("test_table")
+    st = StreamTable(
+        "test_table",
+        project_name="stream-tables",
+        entity_name=user_by_api_key_in_env.username,
+    )
     for i in range(10):
         st.log({"index": i, "writer": "a"})
     st.finish()
 
-    st = StreamTable("test_table")
+    st = StreamTable(
+        "test_table",
+        project_name="stream-tables",
+        entity_name=user_by_api_key_in_env.username,
+    )
     for i in range(10):
         st.log({"index": 10 + i, "writer": "b"})
     st.finish()
@@ -66,8 +82,16 @@ def test_multi_writers_sequential(user_by_api_key_in_env):
 
 @pytest.mark.skip(reason="This is expected to fail until W&B updates step management")
 def test_multi_writers_parallel(user_by_api_key_in_env):
-    st_1 = StreamTable("test_table")
-    st_2 = StreamTable("test_table")
+    st_1 = StreamTable(
+        "test_table",
+        project_name="stream-tables",
+        entity_name=user_by_api_key_in_env.username,
+    )
+    st_2 = StreamTable(
+        "test_table",
+        project_name="stream-tables",
+        entity_name=user_by_api_key_in_env.username,
+    )
 
     indexes = []
     writers = []

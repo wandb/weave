@@ -59,8 +59,37 @@ class StreamTable:
         project_name: typing.Optional[str] = None,
         entity_name: typing.Optional[str] = None,
     ):
+        splits = table_name.split("/")
+        if len(splits) == 1:
+            pass
+        elif len(splits) == 2:
+            if project_name is not None:
+                raise ValueError(
+                    f"Cannot specify project_name and table_name with '/' in it: {table_name}"
+                )
+            project_name = splits[0]
+            table_name = splits[1]
+        elif len(splits) == 3:
+            if project_name is not None or entity_name is not None:
+                raise ValueError(
+                    f"Cannot specify project_name or entity_name and table_name with 2 '/'s in it: {table_name}"
+                )
+            entity_name = splits[0]
+            project_name = splits[1]
+            table_name = splits[2]
+
+        # For now, we force the user to specify the entity and project
+        # technically, we could infer the entity from the API key, but
+        # that tends to confuse users.
+        if entity_name is None or entity_name == "":
+            raise ValueError(f"Must specify entity_name")
+        elif project_name is None or project_name == "":
+            raise ValueError(f"Must specify project_name")
+        elif table_name is None or table_name == "":
+            raise ValueError(f"Must specify table_name")
+
         self._lite_run = InMemoryLazyLiteRun(
-            entity_name, project_name or "stream-tables", table_name, "stream_table"
+            entity_name, project_name, table_name, "wb_stream_table"
         )
 
     def log(self, row_or_rows: typing.Union[dict, list[dict]]) -> None:

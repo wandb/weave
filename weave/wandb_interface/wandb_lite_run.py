@@ -32,14 +32,14 @@ class InMemoryLazyLiteRun:
         run_name: typing.Optional[str] = None,
         job_type: typing.Optional[str] = None,
     ):
-        p_api = wandb_public_api()
-
-        entity_name = entity_name or p_api.default_entity
+        entity_name = entity_name or wandb_public_api().default_entity
+        project_name = project_name or "uncategorized"
 
         assert entity_name is not None
+        assert project_name is not None
 
         self._entity_name = entity_name
-        self._project_name = project_name or "uncategorized"
+        self._project_name = project_name
         self._run_name = run_name or runid.generate_id()
         self._job_type = job_type
 
@@ -85,6 +85,7 @@ class InMemoryLazyLiteRun:
             )
 
             self.i_api.set_current_run_id(self._run.id)
+            # self._step = self._run.lastHistoryStep + 1
 
         return self._run
 
@@ -110,6 +111,8 @@ class InMemoryLazyLiteRun:
         row_dict = {
             **row_dict,
             # Required by gorilla
+            # NOTE: This should be changed after gorilla is updated
+            # to support parallel runs
             "_step": self._step,
             "_timestamp": datetime.datetime.utcnow().timestamp(),
         }
