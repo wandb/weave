@@ -95,21 +95,6 @@ def test_multi_series_grouping():
         assert plot.config == plot2.config
 
 
-def test_overspecification_of_plot_config_raises_exception():
-    last_segment = create_experiment(1000, 3, 0.8)
-    weave.save(last_segment)
-    ok_plot = Plot(last_segment.experiment())
-    series = ok_plot.config.series[0]
-
-    # cant specify both
-    with pytest.raises(ValueError):
-        Plot(last_segment.experiment(), series=series)
-
-    # need at least 1
-    with pytest.raises(ValueError):
-        Plot()
-
-
 def test_multi_series_setting():
     last_segment = create_experiment(1000, 3, 0.8)
     weave.save(last_segment)

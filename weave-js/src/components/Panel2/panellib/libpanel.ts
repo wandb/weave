@@ -52,6 +52,7 @@ interface Dimensions {
   width: number | undefined;
   height: number | undefined;
 }
+
 export interface PanelSpec<X, C, T extends Type> {
   id: string;
   hidden?: boolean;
@@ -65,7 +66,6 @@ export interface PanelSpec<X, C, T extends Type> {
   ) => Promise<C> | C;
   ConfigComponent?: React.ComponentType<PanelPropsInternal<any, C, X>>;
   Component: React.ComponentType<PanelPropsInternal<any, C, X>>;
-
   inputType: T;
 
   outputType?: (inputType: T) => Type;

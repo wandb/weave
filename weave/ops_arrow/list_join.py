@@ -137,8 +137,8 @@ Obj2Type = typing.TypeVar("Obj2Type")
 def join2_impl(
     arr1: ArrowWeaveList,
     arr2: ArrowWeaveList,
-    joinFn1: graph.OutputNode,
-    joinFn2: graph.OutputNode,
+    join1Fn: graph.OutputNode,
+    join2Fn: graph.OutputNode,
     alias1: typing.Optional[str] = None,
     alias2: typing.Optional[str] = None,
     leftOuter: bool = False,
@@ -149,8 +149,8 @@ def join2_impl(
     if alias2 == None:
         alias2 = "a2"
 
-    arr1_raw_join_col = arr1.apply(joinFn1).untagged()
-    arr2_raw_join_col = arr2.apply(joinFn2).untagged()
+    arr1_raw_join_col = arr1.apply(join1Fn).untagged()
+    arr2_raw_join_col = arr2.apply(join2Fn).untagged()
 
     if leftOuter and rightOuter:
         join_type = "full outer"
@@ -230,10 +230,10 @@ def _join_2_output_type(input_types):
     input_type={
         "arr1": ArrowWeaveListType(types.TypedDict({})),
         "arr2": ArrowWeaveListType(types.TypedDict({})),
-        "joinFn1": lambda input_types: types.Function(
+        "join1Fn": lambda input_types: types.Function(
             {"row": input_types["arr1"].object_type}, types.Any()
         ),
-        "joinFn2": lambda input_types: types.Function(
+        "join2Fn": lambda input_types: types.Function(
             {"row": input_types["arr2"].object_type}, types.Any()
         ),
         "alias1": types.String(),
@@ -243,7 +243,7 @@ def _join_2_output_type(input_types):
     },
     output_type=_join_2_output_type,
 )
-def join_2(arr1, arr2, joinFn1, joinFn2, alias1, alias2, leftOuter, rightOuter):
+def join_2(arr1, arr2, join1Fn, join2Fn, alias1, alias2, leftOuter, rightOuter):
     return join2_impl(
-        arr1, arr2, joinFn1, joinFn2, alias1, alias2, leftOuter, rightOuter
+        arr1, arr2, join1Fn, join2Fn, alias1, alias2, leftOuter, rightOuter
     )

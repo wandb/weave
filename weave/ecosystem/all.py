@@ -3,6 +3,8 @@ from weave import context_state
 loading_builtins_token = context_state.set_loading_built_ins()
 
 try:
+    from . import example
+
     from . import bertviz
 
     from . import xgboost

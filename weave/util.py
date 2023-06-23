@@ -160,3 +160,25 @@ def relpath_no_syscalls(
         common_length:
     ]
     return os.path.sep.join(relative_parts)
+
+
+def sample_rows(data: list, max_rows: int) -> list:
+    data_len = len(data)
+
+    if data_len <= max_rows:
+        return data
+
+    if max_rows <= 0:
+        return []
+    if max_rows == 1:
+        return [data[0]]
+    if max_rows == 2:
+        return [data[0], data[-1]]
+
+    split_size = max_rows // 3
+    gap_size = (data_len - max_rows) // 2
+    start_split = data[:split_size]
+    middle_start = split_size + gap_size
+    middle_split = data[middle_start : middle_start + split_size]
+    end_split = data[-split_size:]
+    return start_split + middle_split + end_split

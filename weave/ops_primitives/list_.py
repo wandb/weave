@@ -569,8 +569,8 @@ def _join_2_output_row_type(input_types):
 
     join_obj_type = types.optional(
         types.union(
-            input_types["joinFn1"].output_type,
-            input_types["joinFn2"].output_type,
+            input_types["join1Fn"].output_type,
+            input_types["join2Fn"].output_type,
         )
     )
     row_tag_type = types.TypedDict({"joinObj": join_obj_type})
@@ -587,10 +587,10 @@ def _join_2_output_type(input_types):
     input_type={
         "arr1": types.List(),
         "arr2": types.List(),
-        "joinFn1": lambda input_types: types.Function(
+        "join1Fn": lambda input_types: types.Function(
             {"row": input_types["arr1"].object_type}, types.Any()
         ),
-        "joinFn2": lambda input_types: types.Function(
+        "join2Fn": lambda input_types: types.Function(
             {"row": input_types["arr2"].object_type}, types.Any()
         ),
         "alias1": types.String(),
@@ -600,9 +600,9 @@ def _join_2_output_type(input_types):
     },
     output_type=_join_2_output_type,
 )
-def join_2(arr1, arr2, joinFn1, joinFn2, alias1, alias2, leftOuter, rightOuter):
-    table1_join_keys = execute_fast.fast_map_fn(arr1, joinFn1)
-    table2_join_keys = execute_fast.fast_map_fn(arr2, joinFn2)
+def join_2(arr1, arr2, join1Fn, join2Fn, alias1, alias2, leftOuter, rightOuter):
+    table1_join_keys = execute_fast.fast_map_fn(arr1, join1Fn)
+    table2_join_keys = execute_fast.fast_map_fn(arr2, join2Fn)
 
     jk_to_idx: dict[str, typing.Tuple[list[int], list[int], typing.Any]] = {}
     for i, jk in enumerate(table1_join_keys):

@@ -73,7 +73,7 @@ def node_result_store(store: typing.Optional[NodeResultStore] = None):
             _node_result_store.reset(token)
 
 
-def get_node_result_store():
+def get_node_result_store() -> NodeResultStore:
     store = _node_result_store.get()
     if store is None:
         return NodeResultStore()

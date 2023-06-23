@@ -18,7 +18,7 @@ class BoxedNone:
         self.val = val
 
     def __bool__(self):
-        return self.val
+        return bool(self.val)
 
     def __eq__(self, other):
         return self.val == other

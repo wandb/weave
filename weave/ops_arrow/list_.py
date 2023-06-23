@@ -1248,19 +1248,19 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
     def join2(
         self: "ArrowWeaveList",
         other: "ArrowWeaveList",
-        joinFn1: graph.OutputNode,
-        joinFn2: graph.OutputNode,
+        join1Fn: graph.OutputNode,
+        join2Fn: graph.OutputNode,
         alias1: typing.Optional[str] = None,
         alias2: typing.Optional[str] = None,
         leftOuter: bool = False,
         rightOuter: bool = False,
     ):
-        joinFn1 = self._make_lambda_node(joinFn1)
-        joinFn2 = other._make_lambda_node(joinFn2)
+        join1Fn = self._make_lambda_node(join1Fn)
+        join2Fn = other._make_lambda_node(join2Fn)
         from . import list_join
 
         return list_join.join2_impl(
-            self, other, joinFn1, joinFn2, alias1, alias2, leftOuter, rightOuter
+            self, other, join1Fn, join2Fn, alias1, alias2, leftOuter, rightOuter
         )
 
     def _limit(self, limit: int):
