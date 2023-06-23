@@ -55,6 +55,7 @@ import {ClientContext, useWeaveContext, useWeaveDashUiEnable} from './context';
 import {getUnresolvedVarNodes} from './core/callers';
 import {useDeepMemo} from './hookUtils';
 import {consoleLog} from './util';
+import {useTraceUpdate} from './common/util/hooks';
 
 /**
  * React hook-style function to get the
@@ -226,10 +227,24 @@ const errorToText = (e: any) => {
   }
 };
 
+let useNodeValueId = 0;
+
+export const useId = () => {
+  const callSiteId = useRef(useNodeValueId++);
+  return callSiteId.current;
+};
+
 export const useNodeValue = <T extends Type>(
   node: NodeOrVoidNode<T>,
-  memoCacheId: number = 0
+  options?: {
+    memoCacheId?: number;
+    callSite?: string;
+    skip?: boolean;
+  }
 ): {loading: boolean; result: TypeToTSTypeInner<T>} => {
+  const memoCacheId = options?.memoCacheId ?? 0;
+  const callSite = options?.callSite;
+  const skip = options?.skip;
   const dashUiEnabled = useWeaveDashUiEnable();
   const weave = useWeaveContext();
   const panelCompCtx = useContext(PanelCompContext);
@@ -274,6 +289,9 @@ export const useNodeValue = <T extends Type>(
   }, []);
 
   useEffect(() => {
+    if (skip) {
+      return;
+    }
     if (isConstNode(node)) {
       // See the "Mixing functions and expression" comment above.
       setResult({node, value: node.val});
@@ -294,9 +312,15 @@ export const useNodeValue = <T extends Type>(
       if (client == null) {
         throw new Error('client not initialized!');
       }
+      if (callSite != null) {
+        console.log('useNodeValue subscribe', callSite, node);
+      }
       const obs = client.subscribe(node);
       const sub = obs.subscribe(
         nodeRes => {
+          if (callSite != null) {
+            console.log('useNodeValue resolve', callSite, node);
+          }
           setResult({node, value: nodeRes});
         },
         caughtError => {
@@ -307,7 +331,13 @@ export const useNodeValue = <T extends Type>(
     } else {
       return;
     }
-  }, [client, node, memoCacheId]);
+  }, [client, node, memoCacheId, callSite, skip]);
+  useTraceUpdate('useNodeValue' + callSite, {
+    client,
+    node,
+    memoCacheId,
+    callSite,
+  });
 
   const finalResult = useMemo(() => {
     // Just rethrow the error in the render thread so it can be caught
@@ -396,7 +426,7 @@ export const useValue = <T extends Type>(
     setMemoTrigger(t => t + 1);
   }, [refreshAllNodes, setMemoTrigger]);
 
-  const res = useNodeValue(node, memoTrigger);
+  const res = useNodeValue(node, {memoCacheId: memoTrigger});
 
   return useMemo(
     () => ({

@@ -129,11 +129,12 @@ import {
 } from '../Icons';
 import styled from 'styled-components';
 import {PopupMenu, Section} from '../../Sidebar/PopupMenu';
+import {useTraceUpdate} from '@wandb/weave/common/util/hooks';
 
 const recordEvent = makeEventRecorder('Plot');
 
 // const PANELPLOT_MAX_DATAPOINTS = 2000;
-const DOMAIN_DATAFETCH_EXTRA_EXTENT = 2;
+const DOMAIN_DATAFETCH_EXTRA_EXTENT = 0.5;
 
 const defaultFontStyleDict = {
   titleFont: 'Source Sans Pro',
@@ -211,6 +212,7 @@ const useConfig = (
     stack,
     weave
   );
+  useTraceUpdate('pp refined', {tableStates, inputNode, stack, weave});
 
   const configWithRefinedExpressions = useMemo(() => {
     return loadable.loading
@@ -293,7 +295,8 @@ const ensureValidSignals = (config: ConcretePlotConfig): ConcretePlotConfig => {
 const useConcreteConfig = (
   config: PlotConfig,
   input: Node,
-  stack: Stack
+  stack: Stack,
+  panelId: string
 ): {config: ConcretePlotConfig; loading: boolean} => {
   const lazyConfigElementsNode = useMemo(
     () =>
@@ -318,7 +321,9 @@ const useConcreteConfig = (
     [config]
   );
 
-  const concreteConfigUse = LLReact.useNodeValue(lazyConfigElementsNode);
+  const concreteConfigUse = LLReact.useNodeValue(lazyConfigElementsNode, {
+    callSite: 'PanelPlot.concreteConfig.' + panelId,
+  });
   const concreteConfigEvaluationResult = concreteConfigUse.result as
     | {[K in (typeof LAZY_PATHS)[number]]: any}
     | undefined;
@@ -1698,8 +1703,10 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
   const {frame, stack} = usePanelContext();
   const {config, isRefining} = useConfig(input, props.config);
 
+  const panelId = LLReact.useId();
+
   const {config: unvalidatedConcreteConfig, loading: concreteConfigLoading} =
-    useConcreteConfig(config, input, stack);
+    useConcreteConfig(config, input, stack, panelId.toString());
 
   const updateConfig = useCallback(
     (newConfig?: Partial<PlotConfig>) => {
@@ -1716,18 +1723,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     [config, propsUpdateConfig, input, stack]
   );
 
-  // IMPORTANT: use an empty list here so we dont inadvertently
-  // fetch all data, including data beyond current domain.
-  // That is what would happen if we used `input` below
-  // while concreteConfig is in the loading state
-  const inputNode = useMemo(
-    () =>
-      isRefining || concreteConfigLoading
-        ? // this line ensures that a regular list is used (not arrowweavelist)
-          constNode(list(listObjectType(input.type)), [])
-        : input,
-    [concreteConfigLoading, input, isRefining]
-  );
+  const inputNode = input;
 
   const updateConfig2 = useCallback(
     (change: (oldConfig: PlotConfig) => PlotConfig) => {
@@ -1781,7 +1777,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
 
   const isDash = useWeaveDashUiEnable();
 
-  const flatResultNode = useMemo(() => {
+  let flatResultNode = useMemo(() => {
     const arrayArg: {
       [key: number]: ReturnType<
         typeof TableState.tableGetResultTableNode
@@ -1836,7 +1832,11 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
   const flatResultNodeDidChange = flatResultNode !== flatResultNodeRef.current;
 
   flatResultNodeRef.current = flatResultNode;
-  const result = LLReact.useNodeValue(flatResultNode);
+
+  const result = LLReact.useNodeValue(flatResultNode, {
+    callSite: 'PanelPlot.flatResultNode.' + panelId,
+    skip: isRefining || concreteConfigLoading,
+  });
 
   // enables domain sharing
 
@@ -2879,6 +2879,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
       }
 
       vegaView.addEventListener('mouseup', async () => {
+        console.log('MOUSEUP');
         const currBrushMode = brushModeRef.current;
         const currUpdateConfig2 = updateConfig2Ref.current;
         const currUpdateConfig = updateConfigRef.current;
@@ -2901,6 +2902,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
           const settingName = currBrushMode === 'zoom' ? 'domain' : 'selection';
 
           if (settingName === 'domain') {
+            console.log('MOUSEUP DOMAIN');
             const settingNodesAreConst = ['x' as const, 'y' as const].every(
               dimName => {
                 const currentSettingNode = currConfig.signals.domain[dimName];
@@ -2933,13 +2935,16 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
                 currUpdateConfig(newConfig);
               });
             } else {
-              ['x' as const, 'y' as const].forEach(dimName => {
+              console.log('MOUSEUP NONCONST');
+              // ['x' as const, 'y' as const].forEach(dimName => {
+              ['x' as const].forEach(dimName => {
                 const axisSignal: [number, number] | string[] = signal[dimName];
                 const currentSetting =
                   currConcreteConfig.signals.domain[dimName];
 
                 if (!_.isEqual(currentSetting, axisSignal)) {
                   if (!isConstNode(currConfig.signals.domain[dimName])) {
+                    console.log('MOUSEUP MUTATE');
                     currMutateDomain[dimName]({
                       val: constNode(toWeaveType(axisSignal), axisSignal),
                     });
@@ -2955,7 +2960,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
                   }
                 }
 
-                // need to clear out the old selection, if there is one
+                // // need to clear out the old selection, if there is one
                 currUpdateConfig2((oldConfig: PlotConfig) => {
                   return produce(oldConfig, draft => {
                     draft.signals.selection[dimName] = undefined;
