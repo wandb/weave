@@ -129,7 +129,6 @@ import {
 } from '../Icons';
 import styled from 'styled-components';
 import {PopupMenu, Section} from '../../Sidebar/PopupMenu';
-import {useTraceUpdate} from '@wandb/weave/common/util/hooks';
 
 const recordEvent = makeEventRecorder('Plot');
 
@@ -212,7 +211,6 @@ const useConfig = (
     stack,
     weave
   );
-  useTraceUpdate('pp refined', {tableStates, inputNode, stack, weave});
 
   const configWithRefinedExpressions = useMemo(() => {
     return loadable.loading
