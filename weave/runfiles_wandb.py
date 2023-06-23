@@ -224,6 +224,18 @@ class WeaveWBRunFilesURI(uris.WeaveURI):
             path or None,
         )
 
+    @classmethod
+    def from_run_identifiers(
+        cls, entity_name: str, project_name: str, run_name: str
+    ) -> "WeaveWBRunFilesURI":
+        return cls(
+            f"{entity_name}/{project_name}/{run_name}",
+            None,
+            entity_name,
+            project_name,
+            run_name,
+        )
+
     def to_ref(self) -> WandbRunFilesRef:
         return WandbRunFilesRef.from_uri(self)
 

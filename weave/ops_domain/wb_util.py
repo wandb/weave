@@ -1,9 +1,9 @@
 import typing
 from urllib import parse
 
-from .. import storage
 from .. import weave_types as types
 from .. import decorator_type
+from ..wandb_interface import wandb_stream_table
 
 
 from . import table
@@ -44,19 +44,13 @@ def filesystem_artifact_file_from_artifact_path(artifact_path: str):
     return artifact_fs.FilesystemArtifactFile(artifact, file_path)
 
 
-def filesystem_runfiles_from_run_path(run_path: RunPath):
-    uri = WeaveWBRunFilesURI(
-        f"{run_path.entity_name}/{run_path.project_name}/{run_path.run_name}",
-        None,
+def filesystem_runfiles_from_run_path(run_path: RunPath, file_path: str):
+    uri = WeaveWBRunFilesURI.from_run_identifiers(
         run_path.entity_name,
         run_path.project_name,
         run_path.run_name,
     )
-    return WandbRunFiles(name=uri.name, uri=uri)
-
-
-def filesystem_runfiles_path_info_from_run_path(run_path: RunPath, file_path: str):
-    runfiles = filesystem_runfiles_from_run_path(run_path)
+    runfiles = WandbRunFiles(name=uri.name, uri=uri)
     return runfiles.path_info(file_path)
 
 
@@ -104,9 +98,7 @@ def _process_run_dict_item(val, run_path: typing.Optional[RunPath] = None):
                 artifact_path = escape_artifact_path(val["artifact_path"])
                 return filesystem_artifact_file_from_artifact_path(artifact_path)
             elif "path" in val and run_path is not None:
-                return filesystem_runfiles_path_info_from_run_path(
-                    run_path, val["path"]
-                )
+                return filesystem_runfiles_from_run_path(run_path, val["path"])
 
         if val["_type"] in ["joined-table", "partitioned-table"]:
             return filesystem_artifact_file_from_artifact_path(val["artifact_path"])
@@ -114,9 +106,7 @@ def _process_run_dict_item(val, run_path: typing.Optional[RunPath] = None):
         if val["_type"] == "image-file" and run_path is not None:
             from . import ImageArtifactFileRef
 
-            fs_artifact_file = filesystem_runfiles_path_info_from_run_path(
-                run_path, val["path"]
-            )
+            fs_artifact_file = filesystem_runfiles_from_run_path(run_path, val["path"])
             return ImageArtifactFileRef(
                 fs_artifact_file.artifact,
                 fs_artifact_file.path,
@@ -134,13 +124,8 @@ def _process_run_dict_item(val, run_path: typing.Optional[RunPath] = None):
                 model_hash=val.get("model_hash"),
             )
 
-        if "_weave_type" in val and "_val" in val:
-            # we have a weave-encoded history cell!!
-            weave_json = {
-                "_type": val["_weave_type"],
-                "_val": val["_val"],
-            }
-            return storage.from_python(weave_json)
+        if wandb_stream_table.is_weave_encoded_history_cell(val):
+            return wandb_stream_table.from_weave_encoded_history_cell(val)
 
     return val
 

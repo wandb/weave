@@ -4,7 +4,6 @@ import typing
 
 from .wandb_lite_run import InMemoryLazyLiteRun
 
-from ..ops_domain import wb_util
 from .. import runfiles_wandb
 from .. import storage
 from .. import weave_types
@@ -59,13 +58,12 @@ class StreamTable:
 
     def _log_row(self, row: dict) -> None:
         if self._artifact is None:
-            self._artifact = wb_util.filesystem_runfiles_from_run_path(
-                wb_util.RunPath(
-                    entity_name=self._lite_run._entity_name,
-                    project_name=self._lite_run._project_name,
-                    run_name=self._lite_run.run.id,
-                )
+            uri = runfiles_wandb.WeaveWBRunFilesURI.from_run_identifiers(
+                self._lite_run._entity_name,
+                self._lite_run._project_name,
+                self._lite_run._run_name,
             )
+            self._artifact = runfiles_wandb.WandbRunFiles(name=uri.name, uri=uri)
         self._lite_run.log(obj_to_weave(row, self._artifact))  # type: ignore
 
     def finish(self) -> None:
@@ -85,3 +83,17 @@ def maybe_history_type_to_weave_type(tc_type: str) -> typing.Optional[weave_type
                 f"StreamTable Type Error: Found type for {tc_type}, but blind construction failed: {e}",
             )
     return None
+
+
+def is_weave_encoded_history_cell(cell: dict) -> bool:
+    return "_weave_type" in cell and "_val" in cell
+
+
+def from_weave_encoded_history_cell(cell: dict) -> typing.Any:
+    if not is_weave_encoded_history_cell(cell):
+        raise ValueError(f"Expected weave encoded history cell, got {cell}")
+    weave_json = {
+        "_type": cell["_weave_type"],
+        "_val": cell["_val"],
+    }
+    return storage.from_python(weave_json)

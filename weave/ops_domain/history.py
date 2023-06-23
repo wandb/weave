@@ -1,6 +1,4 @@
-import logging
 import typing
-
 
 from . import wb_util
 from . import table
