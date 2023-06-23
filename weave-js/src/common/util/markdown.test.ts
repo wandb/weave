@@ -16,7 +16,7 @@ describe('buildSanitizationSchema', () => {
     expect(builtSchema.tagNames?.includes('style')).toBe(true);
     expect(builtSchema.attributes?.style?.includes('scoped')).toBe(true);
   });
-  it('built schema works correclty without `allowScopedStyles`', () => {
+  it('built schema works correctly without `allowScopedStyles`', () => {
     // preconditions
     expect(DEFAULT_SANITIZATION_SCHEMA.tagNames?.includes('style')).toBe(false);
     expect(DEFAULT_SANITIZATION_SCHEMA.attributes?.style).toBe(undefined);

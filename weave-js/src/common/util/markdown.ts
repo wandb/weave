@@ -42,7 +42,7 @@ export function markdownToText(markdown: string, rules?: SanitizationRules) {
 
 type SanitizationRules = {allowScopedStyles?: boolean};
 export function buildSanitizationSchema(rules?: SanitizationRules) {
-  const newSchema = {...DEFAULT_SANITIZATION_SCHEMA};
+  const newSchema = _.cloneDeep(DEFAULT_SANITIZATION_SCHEMA);
   if (rules?.allowScopedStyles) {
     _.merge(newSchema, SANITIZATION_SCHEMAS_FOR_RULES.allowScopedStyles);
   }
