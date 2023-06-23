@@ -1,4 +1,4 @@
-import {isFunctionType, Type} from '@wandb/weave/core';
+import {isFunctionType, Type, union} from '@wandb/weave/core';
 import * as _ from 'lodash';
 import {panelIdAlternativeMapping} from './PanelGroup';
 
@@ -102,7 +102,7 @@ export function toWeaveType(o: any): any {
   } else if (_.isArray(o)) {
     return {
       type: 'list',
-      objectType: o.length === 0 ? 'unknown' : toWeaveType(o[0]),
+      objectType: o.length === 0 ? 'unknown' : union(o.map(toWeaveType)),
     };
   } else if (_.isObject(o)) {
     if ('_type' in o) {

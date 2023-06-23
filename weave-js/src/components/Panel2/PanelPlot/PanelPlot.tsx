@@ -9,13 +9,13 @@ import CustomPanelRenderer, {
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import {
   constNode,
-  // constFunction,
+  constFunction,
   ConstNode,
   constNodeUnsafe,
   constNone,
   constNumber,
   constString,
-  // constStringList,
+  constStringList,
   escapeDots,
   Frame,
   isAssignableTo,
@@ -28,26 +28,25 @@ import {
   Node,
   numberBin,
   oneOrMany,
-  // opAnd,
+  opAnd,
   opArray,
   opDict,
-  // opContains,
-  // opDateToNumber,
-  // opDict,
-  // opFilter,
+  opContains,
+  opDateToNumber,
+  opFilter,
   opIndex,
   // opMap,
   // opMerge,
-  // opNumberGreaterEqual,
-  // opNumberLessEqual,
-  // opNumberMult,
+  opNumberGreaterEqual,
+  opNumberLessEqual,
+  opNumberMult,
   opPick,
   // opRandomlyDownsample,
   opRunId,
   opRunName,
   OpStore,
   opUnnest,
-  // OutputNode,
+  OutputNode,
   Stack,
   Type,
   typedDict,
@@ -100,11 +99,11 @@ import {PanelPlotRadioButtons} from './RadioButtons';
 import {
   AnyPlotConfig,
   ConcretePlotConfig,
-  // AxisSelections,
-  // ContinuousSelection,
+  AxisSelections,
+  ContinuousSelection,
   DEFAULT_SCALE_TYPE,
   DIM_NAME_MAP,
-  // DiscreteSelection,
+  DiscreteSelection,
   LAZY_PATHS,
   LINE_SHAPES,
   MarkOption,
@@ -134,6 +133,7 @@ import {PopupMenu, Section} from '../../Sidebar/PopupMenu';
 const recordEvent = makeEventRecorder('Plot');
 
 // const PANELPLOT_MAX_DATAPOINTS = 2000;
+const DOMAIN_DATAFETCH_EXTRA_EXTENT = 2;
 
 const defaultFontStyleDict = {
   titleFont: 'Source Sans Pro',
@@ -329,7 +329,10 @@ const useConcreteConfig = (
     let loading: boolean = false;
     let newConfig: ConcretePlotConfig;
     if (concreteConfigLoading) {
-      newConfig = PlotState.defaultConcretePlot(input, stack);
+      newConfig = PlotState.defaultConcretePlot(
+        constNode(list(listObjectType(input.type)), []),
+        stack
+      );
       loading = true;
     } else {
       // generate the new config with the concrete values obtained from the execution of the lazy paths
@@ -1403,8 +1406,6 @@ function fixKeyForVegaTable(
   );
 }
 
-/*
-
 function filterTableNodeToContinuousSelection(
   node: Node,
   colId: string,
@@ -1415,7 +1416,15 @@ function filterTableNodeToContinuousSelection(
   return opFilter({
     arr: node,
     filterFn: constFunction({row: listObjectType(node.type)}, ({row}) => {
-      const colName = fixKeyForVegaTable(colId, table, opStore);
+      const colName = escapeDots(
+        TableState.getTableColumnName(
+          table.columnNames,
+          table.columnSelectFunctions,
+          colId,
+          opStore
+        )
+      );
+
       let colNode = opPick({obj: row, key: constString(colName)});
 
       // TODO: make this more general and make use of the type system and config to
@@ -1435,19 +1444,26 @@ function filterTableNodeToContinuousSelection(
         });
       }
 
+      const domainDiff = domain[1] - domain[0];
+
       return opAnd({
         lhs: opNumberGreaterEqual({
           lhs: colNode,
-          rhs: constNumber(domain[0]),
+          rhs: constNumber(
+            domain[0] - DOMAIN_DATAFETCH_EXTRA_EXTENT * domainDiff
+          ),
         }),
         rhs: opNumberLessEqual({
           lhs: colNode,
-          rhs: constNumber(domain[1]),
+          rhs: constNumber(
+            domain[1] + DOMAIN_DATAFETCH_EXTRA_EXTENT * domainDiff
+          ),
         }),
       });
     }),
   });
 }
+/*
 
 async function mergeRealizedTableData(
   oldTable: _.Dictionary<any>[],
@@ -1457,6 +1473,7 @@ async function mergeRealizedTableData(
   const uniqueArray = _.uniqBy(flatArray, '_rowIndex');
   return _.sortBy(uniqueArray, '_rowIndex');
 }
+*/
 
 function filterTableNodeToDiscreteSelection(
   node: Node,
@@ -1468,7 +1485,15 @@ function filterTableNodeToDiscreteSelection(
   return opFilter({
     arr: node,
     filterFn: constFunction({row: listObjectType(node.type)}, ({row}) => {
-      const colName = fixKeyForVegaTable(colId, table, opStore);
+      const colName = escapeDots(
+        TableState.getTableColumnName(
+          table.columnNames,
+          table.columnSelectFunctions,
+          colId,
+          opStore
+        )
+      );
+
       const colNode = opPick({obj: row, key: constString(colName)});
       const permittedValues = constStringList(domain);
 
@@ -1513,7 +1538,6 @@ function filterTableNodeToSelection(
   }
   return node;
 }
-*/
 
 function getMark(
   series: SeriesConfig,
@@ -1671,9 +1695,11 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
   // TODO(np): Hack to detect when we are on an activity dashboard
   const isDashboard = useIsDashboard();
 
-  const inputNode = input;
   const {frame, stack} = usePanelContext();
-  const {config, isRefining} = useConfig(inputNode, props.config);
+  const {config, isRefining} = useConfig(input, props.config);
+
+  const {config: unvalidatedConcreteConfig, loading: concreteConfigLoading} =
+    useConcreteConfig(config, input, stack);
 
   const updateConfig = useCallback(
     (newConfig?: Partial<PlotConfig>) => {
@@ -1690,6 +1716,19 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     [config, propsUpdateConfig, input, stack]
   );
 
+  // IMPORTANT: use an empty list here so we dont inadvertently
+  // fetch all data, including data beyond current domain.
+  // That is what would happen if we used `input` below
+  // while concreteConfig is in the loading state
+  const inputNode = useMemo(
+    () =>
+      isRefining || concreteConfigLoading
+        ? // this line ensures that a regular list is used (not arrowweavelist)
+          constNode(list(listObjectType(input.type)), [])
+        : input,
+    [concreteConfigLoading, input, isRefining]
+  );
+
   const updateConfig2 = useCallback(
     (change: (oldConfig: PlotConfig) => PlotConfig) => {
       return propsUpdateConfig2!(change as any);
@@ -1702,6 +1741,17 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
 
   const updateConfigRef = useRef<typeof updateConfig>(updateConfig);
   updateConfigRef.current = updateConfig;
+
+  const concreteConfig = useMemo(
+    () => ensureValidSignals(unvalidatedConcreteConfig),
+    [unvalidatedConcreteConfig]
+  );
+
+  const configRef = useRef<PlotConfig>(config);
+  configRef.current = config;
+
+  const concreteConfigRef = useRef<ConcretePlotConfig>(concreteConfig);
+  concreteConfigRef.current = concreteConfig;
 
   // side effect
   useEffect(() => {
@@ -1739,26 +1789,25 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     } = {};
 
     const reduced = vegaReadyTables.reduce((acc, val, i) => {
-      const node: Node = listOfTableNodes[i];
-      /*
+      let node: Node = listOfTableNodes[i];
 
-      const series = config.series[i];
+      if (isDash) {
+        const series = config.series[i];
 
-      const mark = getMark(series, node, series.table);
-      if (['line', 'point'].includes(mark)) {
-        ['x' as const, 'y' as const]
-          .filter(axisName => mark === 'point' || axisName === 'x')
-          .forEach(axisName => {
+        const mark = getMark(series, node, series.table);
+        if (['line', 'point', 'area'].includes(mark)) {
+          ['x' as const].forEach(axisName => {
             node = filterTableNodeToSelection(
               node,
-              config.signals.domain,
+              concreteConfig.signals.domain,
               series,
               axisName,
               weave.client.opStore
             );
           });
+        }
       }
-      */
+
       /*
       if (isDash) {
         node = opRandomlyDownsample({
@@ -1773,7 +1822,14 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
       return acc;
     }, arrayArg);
     return opArray(reduced as any);
-  }, [vegaReadyTables, listOfTableNodes]); // , isDash]);
+  }, [
+    vegaReadyTables,
+    listOfTableNodes,
+    isDash,
+    config.series,
+    concreteConfig.signals.domain,
+    weave.client.opStore,
+  ]); // , isDash]);
 
   const flatResultNodeRef = useRef(flatResultNode);
 
@@ -1781,20 +1837,6 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
 
   flatResultNodeRef.current = flatResultNode;
   const result = LLReact.useNodeValue(flatResultNode);
-
-  const {config: unvalidatedConcreteConfig, loading: concreteConfigLoading} =
-    useConcreteConfig(config, input, stack);
-
-  const concreteConfig = useMemo(
-    () => ensureValidSignals(unvalidatedConcreteConfig),
-    [unvalidatedConcreteConfig]
-  );
-
-  const configRef = useRef<PlotConfig>(config);
-  configRef.current = config;
-
-  const concreteConfigRef = useRef<ConcretePlotConfig>(concreteConfig);
-  concreteConfigRef.current = concreteConfig;
 
   // enables domain sharing
 
