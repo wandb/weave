@@ -5,6 +5,7 @@ import random
 import shutil
 import pathlib
 import tempfile
+import time
 import typing
 
 from . import uris
@@ -18,8 +19,11 @@ from . import weave_types as types
 from . import artifact_fs
 from . import filesystem
 
+from wandb.sdk.lib.paths import LogicalPath
+
 if typing.TYPE_CHECKING:
     from wandb.apis.public import Run as WBRun
+    from wandb.sdk.internal.file_pusher import FilePusher
 
 
 @memo.memo
@@ -56,6 +60,8 @@ def _isolated_download_and_atomic_mover(
 
 
 class WandbRunFiles(artifact_fs.FilesystemArtifact):
+    _file_pusher: typing.Optional["FilePusher"] = None
+
     def __init__(
         self,
         name: str,
@@ -132,18 +138,27 @@ class WandbRunFiles(artifact_fs.FilesystemArtifact):
         with file_util.safe_open(p, mode) as f:
             yield f
 
+    def set_file_pusher(self, pusher: "FilePusher") -> None:
+        # It is the responsibility of the caller to ensure this file pusher is
+        # correctly associated with the corresponding run.
+        self._file_pusher = pusher
+
     @contextlib.contextmanager
     def new_file(
         self, path: str, binary: bool = False
     ) -> typing.Generator[typing.IO, None, None]:
-        with tempfile.TemporaryDirectory() as dir_path:
-            file_path = os.path.join(dir_path, path)
-            with file_util.safe_open(file_path, "wb" if binary else "w") as file:
-                yield file
-                # TODO: We may want to roll out own file uploader here rather
-                # than relying on W&B's. Need to do perf testing to see if this
-                # is necessary.
+        # TODO: Remove the coupling here and just manage this stuff in the stream_table util.
+        # with tempfile.TemporaryDirectory() as dir_path:
+        rand_part = "".join(random.choice("0123456789ABCDEF") for _ in range(16))
+        dir_path = os.path.join(wandb_run_dir(), "upload_cache", f"tmp_{rand_part}")
+        os.makedirs(dir_path, exist_ok=True)
+        file_path = os.path.join(dir_path, path)
+        with file_util.safe_open(file_path, "wb" if binary else "w") as file:
+            yield file
+            if self._file_pusher is None:
                 self.run.upload_file(file_path, dir_path)  # type: ignore[no-untyped-call]
+            else:
+                self._file_pusher.file_changed(LogicalPath(path), file_path)
 
 
 class WandbRunFilesType(artifact_fs.FilesystemArtifactType):

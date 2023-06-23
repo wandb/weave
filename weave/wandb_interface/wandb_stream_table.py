@@ -90,6 +90,7 @@ class StreamTable:
                 self._table_name,
             )
             self._artifact = runfiles_wandb.WandbRunFiles(name=uri.name, uri=uri)
+            self._artifact.set_file_pusher(self._lite_run.pusher)
         payload = row_to_weave(row, self._artifact)
         self._lite_run.log(payload)
 

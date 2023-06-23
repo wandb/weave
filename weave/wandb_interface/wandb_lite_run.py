@@ -68,7 +68,6 @@ class InMemoryLazyLiteRun:
                 job_type=self._job_type,
                 project=self._project_name,
                 entity=self._entity_name,
-                state="running",
             )
 
             self._run = Run(
