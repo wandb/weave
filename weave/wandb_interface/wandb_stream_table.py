@@ -1,12 +1,13 @@
 import logging
 import typing
-
+import uuid
 
 from .wandb_lite_run import InMemoryLazyLiteRun
 
 from .. import runfiles_wandb
 from .. import storage
 from .. import weave_types
+from .. import artifact_base
 
 
 def obj_to_weave(obj: typing.Any, artifact: runfiles_wandb.WandbRunFiles) -> typing.Any:
@@ -27,7 +28,20 @@ def obj_to_weave(obj: typing.Any, artifact: runfiles_wandb.WandbRunFiles) -> typ
     elif isinstance(obj, (int, float, str, bool, type(None))):
         return obj
     else:
-        res = storage.to_python(obj, ref_art_constructor=lambda x, y: artifact)
+
+        def ref_persister_artifact(
+            type: weave_types.Type, refs: typing.Iterable[artifact_base.ArtifactRef]
+        ) -> artifact_base.Artifact:
+            # Save all the reffed objects into the new artifact.
+            for mem_ref in refs:
+                if mem_ref.path is not None and mem_ref._type is not None:
+                    # Hack: add a random salt to the end (i really want content addressing here)
+                    # but this is a quick fix to avoid collisions
+                    path = mem_ref.path + "-" + str(uuid.uuid4())
+                    artifact.set(path, mem_ref._type, mem_ref._obj)
+            return artifact
+
+        res = storage.to_python(obj, None, ref_persister_artifact)
         type_name = res.get("_type", {}).get("type")
         if type_name is None:
             raise ValueError(f"Could not serialize object of type {type(obj)}")
