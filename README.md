@@ -30,7 +30,7 @@ df = iris.data.assign(target=iris.target_names[iris.target])
 **weave.show(df)**
 ```
 
-![first_show](./docs/assets/first_show.png)
+<img src="/docs/assets/first_load.gif" width="100%">
 
 **2. Add a plot**
 
