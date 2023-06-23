@@ -38,7 +38,7 @@ df = iris.data.assign(target=iris.target_names[iris.target])
 
 **3. Create and share dashboards**
 
-![configured_iris_panel](./docs/assets/configured_iris_panel.png)
+<img src="./docs/assets/make_quick_board.gif" width="100%">
 
 ## 👩‍🏫 Example Notebooks
 
