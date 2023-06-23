@@ -1,9 +1,7 @@
 import typing
 from urllib import parse
-
 from .. import weave_types as types
 from .. import decorator_type
-from ..wandb_interface import wandb_stream_table
 
 
 from . import table
@@ -45,7 +43,9 @@ def filesystem_artifact_file_from_artifact_path(artifact_path: str):
 
 
 def filesystem_runfiles_from_run_path(run_path: RunPath, file_path: str):
-    uri = WeaveWBRunFilesURI.from_run_identifiers(
+    uri = WeaveWBRunFilesURI(
+        f"{run_path.entity_name}/{run_path.project_name}/{run_path.run_name}",
+        None,
         run_path.entity_name,
         run_path.project_name,
         run_path.run_name,
@@ -123,9 +123,6 @@ def _process_run_dict_item(val, run_path: typing.Optional[RunPath] = None):
                 model_dict_dumps=val.get("model_dict_dumps"),
                 model_hash=val.get("model_hash"),
             )
-
-        if wandb_stream_table.is_weave_encoded_history_cell(val):
-            return wandb_stream_table.from_weave_encoded_history_cell(val)
 
     return val
 

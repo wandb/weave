@@ -1,4 +1,5 @@
 import dataclasses
+import datetime
 import typing
 import wandb
 from wandb.sdk.artifacts.artifact_saver import ArtifactSaver
@@ -7,10 +8,12 @@ from wandb.sdk.internal.sender import _manifest_json_from_proto
 
 # from wandb.sdk.internal.artifact_saver import ArtifactSaver # This symbol moved after our pinned version
 # from wandb.sdk.internal.sender import _manifest_json_from_proto # This symbol moved after our pinned version
+from wandb.sdk.internal.file_pusher import FilePusher
+from wandb.sdk.internal.file_stream import FileStreamApi
 from wandb.sdk.interface.interface import InterfaceBase
+from wandb.sdk.internal.internal_api import Api as InternalApi
 
 from weave.wandb_client_api import wandb_public_api
-from weave.wandb_interface.wandb_lite_run import InMemoryLazyLiteRun
 
 
 @dataclasses.dataclass
@@ -27,21 +30,38 @@ def write_artifact_to_wandb(
     entity_name: typing.Optional[str] = None,
     additional_aliases: list = [],
 ) -> WeaveWBArtifactURIComponents:
+    # Get handles to the public and internal APIs
+    p_api = wandb_public_api()
+    entity_name = entity_name or p_api.default_entity
+    i_api = InternalApi({"project": project_name, "entity": entity_name})
+
     # Extract Artifact Attributes
     artifact_name = artifact.name
     artifact_type_name = artifact.type
 
+    assert entity_name is not None
+    assert project_name is not None
     assert artifact_name is not None
     assert artifact_type_name is not None
 
-    lite_run = InMemoryLazyLiteRun(entity_name, project_name)
+    # Ensure project exists
+    p_api.create_project(name=project_name, entity=entity_name)
 
     # Ensure the artifact type exists
-    lite_run.i_api.create_artifact_type(
+    i_api.create_artifact_type(
         artifact_type_name=artifact_type_name,
-        entity_name=lite_run.run.entity,
-        project_name=lite_run.run.project,
+        entity_name=entity_name,
+        project_name=project_name,
     )
+
+    # Produce a run to log the artifact to
+    new_run = p_api.create_run(project=project_name, entity=entity_name)  # type: ignore[no-untyped-call]
+    i_api.set_current_run_id(new_run.id)
+
+    # Setup the FileStream and FilePusher
+    stream = FileStreamApi(i_api, new_run.id, datetime.datetime.utcnow().timestamp())
+    stream.start()
+    pusher = FilePusher(i_api, stream)
 
     # Finalize the artifact and construct the manifest.
     artifact.finalize()
@@ -51,10 +71,10 @@ def write_artifact_to_wandb(
 
     # Save the Artifact and the associated files
     saver = ArtifactSaver(
-        api=lite_run.i_api,
+        api=i_api,
         digest=artifact.digest,
         manifest_json=manifest_dict,
-        file_pusher=lite_run.pusher,
+        file_pusher=pusher,
         is_user_created=False,
     )
     res = saver.save(
@@ -68,17 +88,22 @@ def write_artifact_to_wandb(
         use_after_commit=False,
     )
 
-    lite_run.finish()
+    # Mark the run as complete
+    stream.finish(0)
+
+    # Wait for the FilePusher and FileStream to finish
+    pusher.finish()
+    pusher.join()
 
     if res is not None:
-        art = Artifact.from_id(res["id"], wandb_public_api().client)
+        art = Artifact.from_id(res["id"], p_api.client)
         if art is not None:
             commit_hash = art.commit_hash
 
     # Return the URI of the artifact
     return WeaveWBArtifactURIComponents(
-        entity_name=lite_run.run.entity,
-        project_name=lite_run.run.project,
+        entity_name=entity_name,
+        project_name=project_name,
         artifact_name=artifact_name,
         version_str=commit_hash,
     )
