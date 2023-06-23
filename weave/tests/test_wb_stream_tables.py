@@ -1,8 +1,9 @@
+import time
 import pytest
 import weave
 from weave import weave_types
 from weave.wandb_interface.wandb_stream_table import StreamTable
-import numpy
+import numpy as np
 from PIL import Image
 
 
@@ -33,7 +34,7 @@ def test_stream_logging(user_by_api_key_in_env):
 
 def test_stream_logging_image(user_by_api_key_in_env):
     def image():
-        imarray = numpy.random.rand(100, 100, 3) * 255
+        imarray = np.random.rand(100, 100, 3) * 255
         return Image.fromarray(imarray.astype("uint8")).convert("RGBA")
 
     st = StreamTable(
@@ -45,13 +46,21 @@ def test_stream_logging_image(user_by_api_key_in_env):
         st.log({"image": image()})
     st.finish()
 
+    # There is a race case here. For some reason, there is a lag between file uploading
+    # and the W&B server being able to properly authenticate the file download request.
+    # In lieu of a proper polling/waiting mechanism, we just sleep for a bit. UGLY!
+    time.sleep(5)
+
     hist_node = (
         weave.ops.project(user_by_api_key_in_env.username, "stream-tables")
         .run("test_table-8")
         .history()
     )
 
-    assert isinstance(weave.use(hist_node["image"][0]), Image.Image)
+    images = weave.use(hist_node["image"])
+    assert len(images) == 3
+    assert (np.array(images[0]) != np.array(images[1])).any()
+    assert isinstance(images[0], Image.Image)
 
 
 def test_multi_writers_sequential(user_by_api_key_in_env):
