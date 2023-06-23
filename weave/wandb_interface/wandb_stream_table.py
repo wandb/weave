@@ -24,6 +24,11 @@ TYPE_ENCODE_PREFIX = "_wt_::"
 
 
 class StreamTable:
+    _lite_run: InMemoryLazyLiteRun
+    _table_name: str
+    _project_name: str
+    _entity_name: str
+
     _artifact: typing.Optional[runfiles_wandb.WandbRunFiles] = None
 
     def __init__(
@@ -61,9 +66,13 @@ class StreamTable:
         elif table_name is None or table_name == "":
             raise ValueError(f"Must specify table_name")
 
+        job_type = "wb_stream_table"
         self._lite_run = InMemoryLazyLiteRun(
-            entity_name, project_name, table_name, "wb_stream_table"
+            entity_name, project_name, table_name, job_type
         )
+        self._table_name = table_name
+        self._project_name = project_name
+        self._entity_name = entity_name
 
     def log(self, row_or_rows: typing.Union[dict, list[dict]]) -> None:
         if isinstance(row_or_rows, dict):
@@ -73,14 +82,16 @@ class StreamTable:
             self._log_row(row)
 
     def _log_row(self, row: dict) -> None:
+        self._lite_run.ensure_run()
         if self._artifact is None:
             uri = runfiles_wandb.WeaveWBRunFilesURI.from_run_identifiers(
-                self._lite_run._entity_name,
-                self._lite_run._project_name,
-                self._lite_run.run.id,
+                self._entity_name,
+                self._project_name,
+                self._table_name,
             )
             self._artifact = runfiles_wandb.WandbRunFiles(name=uri.name, uri=uri)
-        self._lite_run.log(row_to_weave(row, self._artifact))  # type: ignore
+        payload = row_to_weave(row, self._artifact)
+        self._lite_run.log(payload)
 
     def finish(self) -> None:
         self._lite_run.finish()
