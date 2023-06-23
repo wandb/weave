@@ -1,7 +1,13 @@
+import contextlib
 import json
 import logging
+import os
+import random
+import shutil
 import typing
 import uuid
+
+from wandb.sdk.lib.paths import LogicalPath
 
 from .wandb_lite_run import InMemoryLazyLiteRun
 
@@ -9,6 +15,10 @@ from .. import runfiles_wandb
 from .. import storage
 from .. import weave_types
 from .. import artifact_base
+from .. import file_util
+
+if typing.TYPE_CHECKING:
+    from wandb.sdk.internal.file_pusher import FilePusher
 
 # Shawn recommended we only encode leafs, but in my testing, nested structures
 # are not handled as well in in gorilla and we can do better using just weave.
@@ -23,13 +33,55 @@ ENCODE_ENTIRE_TYPE = True
 TYPE_ENCODE_PREFIX = "_wt_::"
 
 
+class WandbLiveRunFiles(runfiles_wandb.WandbRunFiles):
+    _file_pusher: typing.Optional["FilePusher"] = None
+    _temp_dir: typing.Optional[str] = None
+
+    def set_file_pusher(self, pusher: "FilePusher") -> None:
+        # It is the responsibility of the caller to ensure this file pusher is
+        # correctly associated with the corresponding run.
+        self._file_pusher = pusher
+
+    def temp_dir(self) -> str:
+        if self._temp_dir is None:
+            rand_part = "".join(random.choice("0123456789ABCDEF") for _ in range(16))
+            self._temp_dir = os.path.join(
+                runfiles_wandb.wandb_run_dir(), "upload_cache", f"tmp_{rand_part}"
+            )
+            os.makedirs(self._temp_dir, exist_ok=True)
+        return self._temp_dir
+
+    def cleanup(self) -> None:
+        if self._temp_dir is not None:
+            shutil.rmtree(self._temp_dir)
+            self._temp_dir = None
+
+    def __del__(self) -> None:
+        self.cleanup()
+
+    @contextlib.contextmanager
+    def new_file(
+        self, path: str, binary: bool = False
+    ) -> typing.Generator[typing.IO, None, None]:
+        if self._file_pusher is None:
+            raise ValueError(
+                "WandbLiveRunFiles must be associated with a file pusher to use new_file"
+            )
+
+        dir_path = self.temp_dir()
+        file_path = os.path.join(dir_path, path)
+        with file_util.safe_open(file_path, "wb" if binary else "w") as file:
+            yield file
+            self._file_pusher.file_changed(LogicalPath(path), file_path)
+
+
 class StreamTable:
     _lite_run: InMemoryLazyLiteRun
     _table_name: str
     _project_name: str
     _entity_name: str
 
-    _artifact: typing.Optional[runfiles_wandb.WandbRunFiles] = None
+    _artifact: typing.Optional[WandbLiveRunFiles] = None
 
     def __init__(
         self,
@@ -89,12 +141,15 @@ class StreamTable:
                 self._project_name,
                 self._table_name,
             )
-            self._artifact = runfiles_wandb.WandbRunFiles(name=uri.name, uri=uri)
+            self._artifact = WandbLiveRunFiles(name=uri.name, uri=uri)
             self._artifact.set_file_pusher(self._lite_run.pusher)
         payload = row_to_weave(row, self._artifact)
         self._lite_run.log(payload)
 
     def finish(self) -> None:
+        if self._artifact is not None:
+            self._artifact.cleanup()
+            self._artifact = None
         self._lite_run.finish()
 
     def __del__(self) -> None:
@@ -132,12 +187,12 @@ def from_weave_encoded_history_cell(cell: dict) -> typing.Any:
 
 
 def row_to_weave(
-    row: typing.Dict[str, typing.Any], artifact: runfiles_wandb.WandbRunFiles
+    row: typing.Dict[str, typing.Any], artifact: WandbLiveRunFiles
 ) -> typing.Dict[str, typing.Any]:
     return {key: obj_to_weave(value, artifact) for key, value in row.items()}
 
 
-def obj_to_weave(obj: typing.Any, artifact: runfiles_wandb.WandbRunFiles) -> typing.Any:
+def obj_to_weave(obj: typing.Any, artifact: WandbLiveRunFiles) -> typing.Any:
     def recurse(obj: typing.Any) -> typing.Any:
         return obj_to_weave(obj, artifact)
 
@@ -171,9 +226,7 @@ def w_type_to_type_name(w_type: typing.Union[str, dict]) -> str:
         return w_type["type"]
 
 
-def leaf_to_weave(
-    leaf: typing.Any, artifact: runfiles_wandb.WandbRunFiles
-) -> typing.Any:
+def leaf_to_weave(leaf: typing.Any, artifact: WandbLiveRunFiles) -> typing.Any:
     def ref_persister_artifact(
         type: weave_types.Type, refs: typing.Iterable[artifact_base.ArtifactRef]
     ) -> artifact_base.Artifact:
