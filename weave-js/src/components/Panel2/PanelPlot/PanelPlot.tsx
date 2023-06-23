@@ -293,7 +293,8 @@ const ensureValidSignals = (config: ConcretePlotConfig): ConcretePlotConfig => {
 const useConcreteConfig = (
   config: PlotConfig,
   input: Node,
-  stack: Stack
+  stack: Stack,
+  panelId: string
 ): {config: ConcretePlotConfig; loading: boolean} => {
   const lazyConfigElementsNode = useMemo(
     () =>
@@ -318,7 +319,9 @@ const useConcreteConfig = (
     [config]
   );
 
-  const concreteConfigUse = LLReact.useNodeValue(lazyConfigElementsNode);
+  const concreteConfigUse = LLReact.useNodeValue(lazyConfigElementsNode, {
+    callSite: 'PanelPlot.concreteConfig.' + panelId,
+  });
   const concreteConfigEvaluationResult = concreteConfigUse.result as
     | {[K in (typeof LAZY_PATHS)[number]]: any}
     | undefined;
@@ -1698,8 +1701,10 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
   const {frame, stack} = usePanelContext();
   const {config, isRefining} = useConfig(input, props.config);
 
+  const panelId = LLReact.useId();
+
   const {config: unvalidatedConcreteConfig, loading: concreteConfigLoading} =
-    useConcreteConfig(config, input, stack);
+    useConcreteConfig(config, input, stack, panelId.toString());
 
   const updateConfig = useCallback(
     (newConfig?: Partial<PlotConfig>) => {
@@ -1716,18 +1721,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     [config, propsUpdateConfig, input, stack]
   );
 
-  // IMPORTANT: use an empty list here so we dont inadvertently
-  // fetch all data, including data beyond current domain.
-  // That is what would happen if we used `input` below
-  // while concreteConfig is in the loading state
-  const inputNode = useMemo(
-    () =>
-      isRefining || concreteConfigLoading
-        ? // this line ensures that a regular list is used (not arrowweavelist)
-          constNode(list(listObjectType(input.type)), [])
-        : input,
-    [concreteConfigLoading, input, isRefining]
-  );
+  const inputNode = input;
 
   const updateConfig2 = useCallback(
     (change: (oldConfig: PlotConfig) => PlotConfig) => {
@@ -1836,7 +1830,11 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
   const flatResultNodeDidChange = flatResultNode !== flatResultNodeRef.current;
 
   flatResultNodeRef.current = flatResultNode;
-  const result = LLReact.useNodeValue(flatResultNode);
+
+  const result = LLReact.useNodeValue(flatResultNode, {
+    callSite: 'PanelPlot.flatResultNode.' + panelId,
+    skip: isRefining || concreteConfigLoading,
+  });
 
   // enables domain sharing
 
