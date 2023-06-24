@@ -125,6 +125,10 @@ def show_url(obj=None):
 
 
 def show(obj=None, height=400):
+
+    if not isinstance(height, int):
+        raise errors.WeaveApiError("height (second argument) must be an integer")
+
     if not util.is_notebook():
         usage_analytics.show_called({"error": True})
         raise RuntimeError(
