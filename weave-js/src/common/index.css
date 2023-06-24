@@ -43,11 +43,11 @@
 
 @font-face {
   font-family: 'panel-icons';
-  src: url('./fonts/panel-icons.eot?61676432');
-  src: url('./fonts/panel-icons.eot?61676432#iefix') format('embedded-opentype'),
-    url('./fonts/panel-icons.woff?61676432') format('woff'),
-    url('./fonts/panel-icons.ttf?61676432') format('truetype'),
-    url('./fonts/panel-icons.svg?61676432#panel-icons') format('svg');
+  src: url('./fonts/panel-icons.eot');
+  src: url('./fonts/panel-icons.eot') format('embedded-opentype'),
+    url('./fonts/panel-icons.woff') format('woff'),
+    url('./fonts/panel-icons.ttf') format('truetype'),
+    url('./fonts/panel-icons.svg') format('svg');
   font-weight: normal;
   font-style: normal;
 }

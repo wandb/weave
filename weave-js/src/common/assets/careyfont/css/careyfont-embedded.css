@@ -1,8 +1,8 @@
 @font-face {
   font-family: 'careyfont';
-  src: url('../font/careyfont.eot?53868773');
-  src: url('../font/careyfont.eot?53868773#iefix') format('embedded-opentype'),
-       url('../font/careyfont.svg?53868773#careyfont') format('svg');
+  src: url('../font/careyfont.eot');
+  src: url('../font/careyfont.eot') format('embedded-opentype'),
+       url('../font/careyfont.svg') format('svg');
   font-weight: normal;
   font-style: normal;
 }
@@ -17,7 +17,7 @@
 @media screen and (-webkit-min-device-pixel-ratio:0) {
   @font-face {
     font-family: 'careyfont';
-    src: url('../font/careyfont.svg?53868773#careyfont') format('svg');
+    src: url('../font/careyfont.svg') format('svg');
   }
 }
 */

@@ -1,10 +1,10 @@
 @font-face {
     font-family: "wb-icons";
-    src: url("./wb-icons.ttf?81cb1dac7610187d7db1fe0306ca7329") format("truetype"),
-url("./wb-icons.svg?81cb1dac7610187d7db1fe0306ca7329#wb-icons") format("svg"),
-url("./wb-icons.woff?81cb1dac7610187d7db1fe0306ca7329") format("woff"),
-url("./wb-icons.eot?81cb1dac7610187d7db1fe0306ca7329#iefix") format("embedded-opentype"),
-url("./wb-icons.woff2?81cb1dac7610187d7db1fe0306ca7329") format("woff2");
+    src: url("./wb-icons.ttf") format("truetype"),
+url("./wb-icons.svg") format("svg"),
+url("./wb-icons.woff") format("woff"),
+url("./wb-icons.eot") format("embedded-opentype"),
+url("./wb-icons.woff2") format("woff2");
 }
 
 [class^="wbic-"]:before, [class*=" wbic-"]:before {
