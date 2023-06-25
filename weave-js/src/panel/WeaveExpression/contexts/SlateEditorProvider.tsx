@@ -1,9 +1,9 @@
 // This creates and manages the Slate editor for the WeaveExpression component.
-import React, {FC, useEffect, useMemo, useRef} from 'react';
-import {createEditor, Editor} from 'slate';
+import React, {FC, useEffect, useMemo, useRef, useState} from 'react';
+import {createEditor, Editor, Node as SlateNode} from 'slate';
 import {ReactEditor, withReact} from 'slate-react';
 import {withHistory} from 'slate-history';
-import {ID} from '@wandb/weave/core';
+import {ID, voidNode} from '@wandb/weave/core';
 import {
   GenericProvider,
   useGenericContext,
@@ -11,6 +11,7 @@ import {
 import {WeaveExpressionProps} from '@wandb/weave/panel/WeaveExpression/WeaveExpression';
 import {usePropsContext} from '@wandb/weave/panel/WeaveExpression/contexts/PropsProvider';
 import {CustomRange} from '../../../../custom-slate';
+import {useWeaveContext} from '@wandb/weave/context';
 
 export type SlateEditorProviderInput = Pick<WeaveExpressionProps, 'onMount'>;
 
@@ -21,6 +22,9 @@ interface SlateEditorProviderOutput {
   activeNodeRange: CustomRange | null | undefined;
   slateEditorId: string;
   slateEditor: Editor;
+  slateValue: SlateNode[];
+
+  setSlateValue(value: SlateNode[]): void;
 }
 
 export const SlateEditorProvider: FC = ({children}) => {
@@ -42,20 +46,31 @@ export const useSlateEditorContext = () =>
     displayName: 'SlateEditorContext',
   });
 
-const useSlateEditor = (input?: SlateEditorProviderInput) => {
+const useSlateEditor = (
+  input?: SlateEditorProviderInput
+): SlateEditorProviderOutput => {
   const {onMount} = input || {};
   // const {stack} = usePanelContext();
 
   // Create a new Slate editor instance
   const editor = withReact(withHistory(createEditor())); // as any))
+  // TODO: not sure if useRef is the right thing. maybe useSlateStatic or useSlateWithV
+  // TODO: ok actually i think this is wrong. we need to pass slate editor into the <Slate> component
+  // and then just useSlate to get the editor. don't need to store editor here.
   const slateEditor = useRef(editor).current;
-  // TODO: do we still need IDs? probably
   const slateEditorId = useRef(ID()).current;
+  const editorText = useSlateEditorText();
+  const [slateValue, setSlateValue] = useState<SlateNode[]>([
+    {
+      type: 'paragraph',
+      children: [{text: editorText}],
+    },
+  ]);
 
   useEffect(() => {
-    console.log('useSlateEditor onMount');
     onMount?.(slateEditor);
   }, [onMount, slateEditor]);
+  // TODO: what's all this stuff? do we need to force normalize?
   // const point = {path: [0, 0], offset: 0};
   // slateEditor.selection = {anchor: point, focus: point};
   Editor.normalize(editor, {force: true});
@@ -86,8 +101,39 @@ const useSlateEditor = (input?: SlateEditorProviderInput) => {
   //   };
   // }, [slateEditor, slateEditorId]);
 
+  // TODO: split up this memo
   return useMemo(
-    () => ({isFocused, isEmpty, activeNodeRange, slateEditorId, slateEditor}),
-    [activeNodeRange, isEmpty, isFocused, slateEditor, slateEditorId]
+    () => ({
+      isFocused,
+      isEmpty,
+      activeNodeRange,
+      slateEditorId,
+      slateEditor,
+      slateValue,
+      setSlateValue,
+    }),
+    [
+      activeNodeRange,
+      isEmpty,
+      isFocused,
+      slateEditor,
+      slateEditorId,
+      slateValue,
+    ]
   );
+};
+
+// TODO: is this dumb? or maybe move elsewhere?
+export const useSlateEditorText = () => {
+  // const {expToString} = useWeaveContext(); // should exptostring even be in weavecontext?
+  const weave = useWeaveContext();
+  const {expression} = usePropsContext();
+  // const {expToString} = weave;
+
+  // TODO: working on this, expTostring not working.
+  // hypothesis: maybe because before we were passing in an already-constructed weave object into useWeaveExpressionContext and that no longer is the case?
+  // console.log({expression});
+  // TODO: probably move editorText to context
+  // TODO: is this the editor text? looks like we're getting it from props expr, not editor
+  return weave.expToString(expression ?? voidNode(), null);
 };

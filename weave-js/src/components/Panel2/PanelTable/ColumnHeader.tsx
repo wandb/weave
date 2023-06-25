@@ -22,6 +22,7 @@ import {
   focusEditor,
   WeaveExpression,
 } from '../../../panel/WeaveExpression/WeaveExpression';
+// TODO: remove SUGGESTION_OPTION_CLASS
 import {SUGGESTION_OPTION_CLASS} from '../../../panel/WeaveExpression/Suggestions';
 import {usePanelStacksForType} from '../availablePanels';
 import * as ExpressionView from '../ExpressionView';
@@ -271,9 +272,9 @@ export const ColumnHeader: React.FC<{
   let columnTypeForGroupByChecks = stripTag(workingSelectFunction.type);
   if (!isGroupCol) {
     /* 
-      Once one column is grouped, the other non-grouped columns are all typed as 
-      lists. So we need to figure out the inner types of the non-grouped columns.
-      */
+                          Once one column is grouped, the other non-grouped columns are all typed as 
+                          lists. So we need to figure out the inner types of the non-grouped columns.
+                          */
     columnTypeForGroupByChecks = isListLike(columnTypeForGroupByChecks)
       ? stripTag(listObjectType(workingSelectFunction.type))
       : columnTypeForGroupByChecks;

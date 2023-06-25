@@ -49,43 +49,46 @@ export const usePropsEditableDecorate = () =>
       [activeNodeRange, isFocused]
     );
 
-    const pushRangesForNode = ({
-      parseNode,
-      typeStack,
-      path,
-      baseOffset,
-    }: {
-      parseNode: SyntaxNode;
-      typeStack: string[];
-      path: number[];
-      baseOffset: number;
-    }): void => {
-      if (['"', "'", '(', ')', '[', ']', '.'].includes(parseNode.type)) {
-        return;
-      }
-
-      // Recursively push ranges for this node or its named children.
-      if (parseNode.namedChildCount > 0) {
-        for (const childNode of parseNode.namedChildren) {
-          pushRangesForNode({
-            parseNode: childNode,
-            typeStack: [...typeStack, parseNode.type],
-            path: [...path, childNode.startIndex], // TODO: is this right or is copilot wrong
-            baseOffset,
-          });
+    const pushRangesForNode = useCallback(
+      ({
+        parseNode,
+        typeStack,
+        path,
+        baseOffset,
+      }: {
+        parseNode: SyntaxNode;
+        typeStack: string[];
+        path: number[];
+        baseOffset: number;
+      }): void => {
+        if (['"', "'", '(', ')', '[', ']', '.'].includes(parseNode.type)) {
+          return;
         }
-        return;
-      }
-      // TODO: wtf is going on here
-      const typesToApply = Object.fromEntries(
-        typeStack.concat(parseNode.type).map(t => [t, true])
-      );
-      pushRange({
-        ...typesToApply,
-        anchor: {path, offset: parseNode.startIndex - baseOffset},
-        focus: {path, offset: parseNode.endIndex - baseOffset},
-      });
-    };
+
+        // Recursively push ranges for this node or its named children.
+        if (parseNode.namedChildCount > 0) {
+          for (const childNode of parseNode.namedChildren) {
+            pushRangesForNode({
+              parseNode: childNode,
+              typeStack: [...typeStack, parseNode.type],
+              path: [...path, childNode.startIndex], // TODO: is this right or is copilot wrong
+              baseOffset,
+            });
+          }
+          return;
+        }
+        // TODO: wtf is going on here
+        const typesToApply = Object.fromEntries(
+          typeStack.concat(parseNode.type).map(t => [t, true])
+        );
+        pushRange({
+          ...typesToApply,
+          anchor: {path, offset: parseNode.startIndex - baseOffset},
+          focus: {path, offset: parseNode.endIndex - baseOffset},
+        });
+      },
+      [pushRange]
+    );
 
     // Each line is passed separately, so we pass the parse tree
     // separately and apply some arithmetic to get to the right
@@ -120,7 +123,7 @@ export const usePropsEditableDecorate = () =>
 
         return ranges;
       },
-      [slateEditor, rootNode]
+      [rootNode, slateEditor, ranges, pushRangesForNode]
     );
 
     return decorateCallback;

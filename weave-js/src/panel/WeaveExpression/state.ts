@@ -149,6 +149,7 @@ export {};
 //   //
 //   //   this.set('slateValue', newValue);
 //   //
+// TODO we lost this textFragment stuff i think
 //   //   const newText = newValue.reduce(
 //   //     (textFragment: string, line: SlateNode) =>
 //   //       textFragment + SlateNode.string(line),

@@ -64,16 +64,16 @@ export function useGenericContext<T = unknown>({
   const {allowUndefined = false, value} = contextValue;
   // findOrCreateGenericContext<T>(displayName);
   // TODO: change console.log to trace
-  console.log(
-    'GENERIC',
-    displayName,
-    contextValue
-    // useContext(
-    //   // TODO: is there a smarter way to type this?
-    //   // TODO: bug, we overwrite the same context
-    //   GenericContext as React.Context<GenericProviderProps<T>>
-    // )
-  );
+  // console.log(
+  //   'GENERIC',
+  //   displayName,
+  //   contextValue
+  //   // useContext(
+  //   //   // TODO: is there a smarter way to type this?
+  //   //   // TODO: bug, we overwrite the same context
+  //   //   GenericContext as React.Context<GenericProviderProps<T>>
+  //   // )
+  // );
   // TODO: make error message not generic
   if (value == null && !allowUndefined) {
     throw new Error(

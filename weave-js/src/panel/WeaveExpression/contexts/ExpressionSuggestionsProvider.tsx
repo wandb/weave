@@ -1,5 +1,4 @@
 import {Editor, Location, Point, Range, Transforms} from 'slate';
-import {useWeaveContext} from '@wandb/weave/context.js';
 import {FC, useCallback, useEffect, useMemo, useState} from 'react';
 import {
   AutosuggestResult,
@@ -17,13 +16,17 @@ import {
   AutosuggestResultAny,
   useSuggestionsDropdown,
 } from '@wandb/weave/panel/WeaveExpression/hooks/useSuggestionsDropdown';
-import {useSlateEditorContext} from '@wandb/weave/panel/WeaveExpression/contexts/SlateEditorProvider';
+import {
+  useSlateEditorContext,
+  useSlateEditorText,
+} from '@wandb/weave/panel/WeaveExpression/contexts/SlateEditorProvider';
 import {
   GenericProvider,
   useGenericContext,
 } from '@wandb/weave/panel/WeaveExpression/contexts/GenericProvider';
 import {WeaveExpressionProps} from '@wandb/weave/panel/WeaveExpression/WeaveExpression';
 import {usePropsContext} from '@wandb/weave/panel/WeaveExpression/contexts/PropsProvider';
+import {useWeaveContext} from '@wandb/weave/context';
 
 // TODO: figure out why this is necessary. what are the two different cases?
 // revive it if necessary
@@ -90,7 +93,7 @@ const useExpressionSuggestions = (options?: {
       expression,
       setExpression,
       isLiveUpdateEnabled = false,
-    } = {},
+    } = {}, // TODO: this seems like the wrong place to set this default
   } = usePropsContext();
 
   // necessary props?
@@ -99,7 +102,6 @@ const useExpressionSuggestions = (options?: {
   // - props.slateStaticEditor - maybe?
   // - props.isLiveUpdateEnabled
 
-  const {expToString} = useWeaveContext(); // should exptostring be in weavecontext?
   const {slateEditor} = useSlateEditorContext();
   // If we are passed a slateStaticEditor, use that, otherwise use the one from context
   // TODO: figure out why this is necessary. what are the two different cases?
@@ -109,15 +111,12 @@ const useExpressionSuggestions = (options?: {
   const [isValid, setIsValid] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
 
-  // TODO: working on this, expTostring not working.
-  //  hypothesis: maybe because before we were passing in a weave object into useWeaveExpressionContext and that no longer is the case?
-  console.log({expression, expToString});
-  // TODO: probably move editorText to context
-  // TODO: is this the editor text? looks like we're getting it from props expr, not editor
-  const editorText = expression == null ? '' : expToString(expression, null);
+  const convertExpressionToString = useConvertExpressionToString();
+  const editorText = useSlateEditorText();
+  console.log({editorText, expression});
 
   // TODO: we have the expression from the props, but also from parseResult. reconcile them.
-  // i think the way it's supposed to work is that parseResult contains a pending expression, which
+  // ah i think maybe the parseResult should be a pending expression. when it's accepted, the props.expression changes
   const {isParsingText, parseResult} = useParsedText({editorText});
 
   // TODO: better naming
@@ -279,7 +278,10 @@ const useExpressionSuggestions = (options?: {
       }
 
       ReactEditor.focus(editor);
-      const suggestionString = expToString(sugg.newNodeOrOp, null);
+      const suggestionString = convertExpressionToString(
+        sugg.newNodeOrOp,
+        null
+      );
       // const [suggestion, insertPoint] = applyHacks(sugg);
       const insertPoint = getInsertPoint();
       const prevSelection = {...editor.selection}; // TODO: should be a usePrevious hook?
@@ -289,7 +291,7 @@ const useExpressionSuggestions = (options?: {
       Transforms.select(editor, prevSelection as Location);
       moveToNextMissingArg(editor);
     },
-    [isLoading, editor, expToString, getInsertPoint]
+    [isLoading, editor, convertExpressionToString, getInsertPoint]
   );
 
   const suggestionItems = suggestions.items;
@@ -337,4 +339,10 @@ const useExpressionSuggestions = (options?: {
       suggestions,
     ]
   );
+};
+
+// TODO: is this dumb? move elsewhere?
+export const useConvertExpressionToString = () => {
+  const weave = useWeaveContext();
+  return weave.expToString;
 };

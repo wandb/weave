@@ -18,6 +18,7 @@ interface PropsProviderOutput {
   expressionSuggestionsProviderInput: ExpressionSuggestionsProviderInput;
   propsEditableInput: PropsEditableInput;
   propsRunButtonInput: PropsRunButtonInput;
+  expression: PropsProviderInput['value']['expression'];
 }
 
 // This provider takes in all of the top-level props (via the `value` prop),
@@ -68,12 +69,14 @@ export const PropsProvider: FC<PropsWithChildren<PropsProviderInput>> = ({
       expressionSuggestionsProviderInput,
       propsEditableInput,
       propsRunButtonInput,
+      expression,
     }),
     [
       slateEditorProviderInput,
       expressionSuggestionsProviderInput,
       propsEditableInput,
       propsRunButtonInput,
+      expression,
     ]
   );
   return (

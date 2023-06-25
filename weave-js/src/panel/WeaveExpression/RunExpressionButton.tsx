@@ -1,6 +1,6 @@
-import {FC, useCallback, useMemo} from 'react';
+import {FC, useCallback, useEffect, useMemo} from 'react';
 import {Button} from 'semantic-ui-react';
-import {Editor} from 'slate';
+import {Editor, Element} from 'slate';
 import {ReactEditor} from 'slate-react';
 import {useSlateEditorContext} from '@wandb/weave/panel/WeaveExpression/contexts/SlateEditorProvider';
 import {usePropsContext} from '@wandb/weave/panel/WeaveExpression/contexts/PropsProvider';
@@ -8,6 +8,7 @@ import {WeaveExpressionProps} from '@wandb/weave/panel/WeaveExpression/WeaveExpr
 import {useExpressionSuggestionsContext} from '@wandb/weave/panel/WeaveExpression/contexts/ExpressionSuggestionsProvider';
 import {useDomRefContext} from '@wandb/weave/panel/WeaveExpression/contexts/DomRefProvider';
 
+// TODO: maybe shouldn't use 'Run' in the name, could be confusing.
 export const RunExpressionButton: FC = () => {
   const {isDisabled, onClick, onMouseDown} = useRunButton();
   const {isLoading} = useExpressionSuggestionsContext();
@@ -82,15 +83,43 @@ export const useRunButton = () => {
   };
 };
 
+// (window as any).Ed = Editor;
 export const useRunButtonPosition = () => {
   const {slateEditor} = useSlateEditorContext();
   const {expressionEditorDomRef, runButtonDomRef} = useDomRefContext();
 
-  // TODO: this should probably live somewhere else. editor context?
-  const endNode = ReactEditor.toDOMNode(
-    slateEditor,
-    Editor.last(slateEditor, [])[0]
-  );
+  // (window as any).ed = slateEditor;
+
+  // const lastBlock = Editor.above(slateEditor, {
+  //   match: n => Element.isElement(n) && Editor.isBlock(slateEditor, n),
+  //   at: Editor.end(slateEditor, [0]),
+  // });
+  // console.log({lastBlock});
+
+  useEffect(() => {
+    const lastBlock = Editor.above(slateEditor, {
+      match: n => Element.isElement(n) && Editor.isBlock(slateEditor, n),
+      at: Editor.end(slateEditor, [0]),
+    });
+
+    if (lastBlock) {
+      const [node, path] = lastBlock;
+      const domNode = ReactEditor.toDOMNode(slateEditor, node);
+      // Now you can work with domNode
+      // TODO: working on this. re-enable all the calculations below.
+      console.log(domNode);
+    }
+  }, [slateEditor]);
+
+  // // TODO: this should probably live somewhere else. editor context?
+  // const endNode =
+  //   lastBlock == null
+  //     ? 'hi'
+  //     : ReactEditor.toDOMNode(
+  //         slateEditor,
+  //         lastBlock[0]
+  //         // Editor.last(slateEditor, [0])[0]
+  //       );
 
   const expressionEditorDomNode = expressionEditorDomRef.current;
   const runButtonDomNode = runButtonDomRef.current as unknown as HTMLDivElement; // TODO: fix type or drop semantic
@@ -101,35 +130,37 @@ export const useRunButtonPosition = () => {
   //     grandOffset: 0,
   //   };
   // }
+  // console.log({endNode});
+  return {maxLeft: 0, naturalLeft: 0, grandOffset: 0};
 
-  // TODO: review this logic. we should have a reusable hook for getting dimensions+offsets
-  let grandOffset = 0; // better name. what dimension??
-  for (let n = endNode; !n?.dataset.slateEditor; n = n?.parentNode as any) {
-    if (n?.dataset.slateNode === 'element') {
-      grandOffset += n!.offsetHeight;
-    }
-    grandOffset += n!.offsetTop;
-  }
-
-  // TODO: rename
-  const maxLeft =
-    expressionEditorDomNode == null || runButtonDomNode == null
-      ? 0
-      : expressionEditorDomNode.offsetWidth - runButtonDomNode.offsetWidth - 5;
-
-  // TODO: rename
-  const naturalLeft = endNode.offsetLeft + endNode.offsetWidth + 10;
-
-  return useMemo(
-    () => ({
-      // weaveExpressionDomRef,
-      // runButtonDomRef,
-      maxLeft,
-      naturalLeft,
-      grandOffset,
-    }),
-    [grandOffset, maxLeft, naturalLeft]
-  );
+  // // TODO: review this logic. we should have a reusable hook for getting dimensions+offsets
+  // let grandOffset = 0; // better name. what dimension??
+  // for (let n = endNode; !n?.dataset.slateEditor; n = n?.parentNode as any) {
+  //   if (n?.dataset.slateNode === 'element') {
+  //     grandOffset += n!.offsetHeight;
+  //   }
+  //   grandOffset += n!.offsetTop;
+  // }
+  //
+  // // TODO: rename
+  // const maxLeft =
+  //   expressionEditorDomNode == null || runButtonDomNode == null
+  //     ? 0
+  //     : expressionEditorDomNode.offsetWidth - runButtonDomNode.offsetWidth - 5;
+  //
+  // // TODO: rename
+  // const naturalLeft = endNode.offsetLeft + endNode.offsetWidth + 10;
+  //
+  // return useMemo(
+  //   () => ({
+  //     // weaveExpressionDomRef,
+  //     // runButtonDomRef,
+  //     maxLeft,
+  //     naturalLeft,
+  //     grandOffset,
+  //   }),
+  //   [grandOffset, maxLeft, naturalLeft]
+  // );
 
   // // Using setProperty because we need the !important priority on these
   // // since semantic-ui also sets it.

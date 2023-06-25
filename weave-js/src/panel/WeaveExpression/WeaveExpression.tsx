@@ -6,7 +6,6 @@ import classNames from 'classnames';
 
 import './styles/WeaveExpression.less';
 import {EditingNode, NodeOrVoidNode} from '@wandb/weave/core';
-import {RunExpressionButton} from '@wandb/weave/panel/WeaveExpression/RunExpressionButton';
 import {
   SlateEditorProvider,
   useSlateEditorContext,
@@ -58,7 +57,8 @@ export interface WeaveExpressionProps {
 }
 
 export const WeaveExpression = (props: WeaveExpressionProps) => {
-  console.log('CONTEXT ===');
+  // TODO: working on this
+  // <Slate> needs to move outside of <SlateEditorProvider>
   return (
     <PropsProvider value={props}>
       <DomRefProvider>
@@ -75,7 +75,6 @@ export const WeaveExpression = (props: WeaveExpressionProps) => {
 export const WeaveExpressionComp: React.FC = () => {
   // const weave = useWeaveContext();
   // const {stack} = usePanelContext();
-  console.log('==== weave expression comp ====');
   const {slateEditor, slateEditorId} = useSlateEditorContext();
   const editableComponentProps = usePropsEditable();
   const slateComponentProps = usePropsSlate();
@@ -157,7 +156,8 @@ export const WeaveExpressionComp: React.FC = () => {
             // )}
             // style={{overflowWrap: 'anywhere'}}
           />
-          <RunExpressionButton />
+          {/* TODO: re-enable this button */}
+          {/*<RunExpressionButton />*/}
         </div>
         <Suggestions
 

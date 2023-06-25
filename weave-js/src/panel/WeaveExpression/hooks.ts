@@ -77,18 +77,24 @@ export const useSuggestionVisualState = () => {
     const naturalLeftPosition = rect.right + window.pageXOffset;
     element.style.left = `${Math.min(maxLeftPosition, naturalLeftPosition)}px`;
 
-    rect = element.getBoundingClientRect();
-    if (
-      rect.top >= 0 &&
-      rect.left >= 0 &&
-      rect.bottom <=
-        (window.innerHeight || document.documentElement.clientHeight) &&
-      rect.right <= (window.innerWidth || document.documentElement.clientWidth)
-    ) {
-      element
-        .querySelector('ul.items-list li.default-suggestion')!
-        .scrollIntoView({block: 'nearest', inline: 'nearest'});
-    }
+    // TODO: re-enable this scrollIntoView thing
+    // crashes because element is undefined (because classNames are now wrong)
+    // but also, don't use querySelector
+    // rect = element.getBoundingClientRect();
+    // if (
+    //   rect.top >= 0 &&
+    //   rect.left >= 0 &&
+    //   rect.bottom <=
+    //     (window.innerHeight || document.documentElement.clientHeight) &&
+    //   rect.right <= (window.innerWidth || document.documentElement.clientWidth)
+    // ) {
+    //   element
+    //     .querySelector('ul.items-list li.default-suggestion')!
+    //     .scrollIntoView({
+    //       block: 'nearest',
+    //       inline: 'nearest',
+    //     }); // TODO: re-enable
+    // }
   });
 
   const showType = React.useMemo(() => {
