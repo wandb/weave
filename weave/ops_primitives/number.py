@@ -235,6 +235,14 @@ class Number(object):
         return abs(val)
 
     @op(
+        name="number-log",
+        input_type={"val": types.Number()},
+        output_type=types.Number(),
+    )
+    def log(val):
+        return math.log(val)
+
+    @op(
         name="number-toByteString",
         input_type={"number": types.Number()},
         output_type=types.String(),

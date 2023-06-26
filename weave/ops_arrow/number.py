@@ -284,6 +284,13 @@ def round(self):
 def abs(self):
     return ArrowWeaveList(pc.abs(self._arrow_data), types.Number(), self._artifact)
 
+@arrow_op(
+    name="ArrowWeaveListNumber-log",
+    input_type={"self": ArrowWeaveListType(types.optional(types.Number()))},
+    output_type=self_type_output_type_fn,
+)
+def log(self):
+    return ArrowWeaveList(pc.log1p(self._arrow_data - 1), types.Number(), self._artifact)
 
 @arrow_op(
     name="ArrowWeaveListNumber-toFixed",
