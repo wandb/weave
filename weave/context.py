@@ -54,8 +54,19 @@ def use_frontend_devmode():
     context_state.set_frontend_url("http://localhost:3000")
 
 
+def stop_server():
+    global serv
+    if serv:
+        serv.shutdown()
+        serv = None
+
+
 def _make_default_client():
     if util.is_notebook():
+        global serv
+        if "serv" in globals() and serv and context_state.get_server() is None:
+            print("restarting server")
+            stop_server()
         serv = context_state.get_server()
         if serv is None:
             serv = server.HttpServer()
