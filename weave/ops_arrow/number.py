@@ -293,6 +293,14 @@ def log(self):
     return ArrowWeaveList(pc.log1p(self._arrow_data - 1), types.Number(), self._artifact)
 
 @arrow_op(
+    name="ArrowWeaveListNumber-log10",
+    input_type={"self": ArrowWeaveListType(types.optional(types.Number()))},
+    output_type=self_type_output_type_fn,
+)
+def log10(self):
+    return ArrowWeaveList(pc.log10(self._arrow_data), types.Number(), self._artifact)
+
+@arrow_op(
     name="ArrowWeaveListNumber-toFixed",
     input_type={
         "self": ArrowWeaveListType(types.optional(types.Number())),
