@@ -1,6 +1,6 @@
 import {useTraceUpdate} from '@wandb/weave/common/util/hooks';
 import {constNodeUnsafe, Node, NodeOrVoidNode} from '@wandb/weave/core';
-import produce from 'immer';
+import {produce} from 'immer';
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 
 import _ from 'lodash';
