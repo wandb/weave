@@ -16,6 +16,8 @@ from .. import storage
 from .. import weave_types
 from .. import artifact_base
 from .. import file_util
+from .. import graph
+from .. import ops_domain
 
 if typing.TYPE_CHECKING:
     from wandb.sdk.internal.file_pusher import FilePusher
@@ -132,6 +134,16 @@ class StreamTable:
 
         for row in row_or_rows:
             self._log_row(row)
+
+    def _ipython_display_(self) -> graph.Node:
+        from .. import show
+
+        node = (
+            ops_domain.project(self._entity_name, self._project_name)
+            .run(self._table_name)
+            .history2()
+        )
+        return show(node)
 
     def _log_row(self, row: dict) -> None:
         self._lite_run.ensure_run()

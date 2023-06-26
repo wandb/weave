@@ -124,7 +124,7 @@ def show_url(obj=None):
     return panel_url
 
 
-def show(obj=None, height=400):
+def show(obj: typing.Any = None, height: int = 400) -> typing.Any:
     if not util.is_notebook():
         usage_analytics.show_called({"error": True})
         raise RuntimeError(
