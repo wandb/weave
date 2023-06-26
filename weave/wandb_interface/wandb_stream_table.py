@@ -173,14 +173,23 @@ def maybe_history_type_to_weave_type(tc_type: str) -> typing.Optional[weave_type
 
 
 def is_weave_encoded_history_cell(cell: dict) -> bool:
-    return "_weave_type" in cell and "_val" in cell
+    return "_val" in cell and (
+        "_weave_type" in cell
+        or ("_type" in cell and cell["_type"].startswith(TYPE_ENCODE_PREFIX))
+    )
 
 
 def from_weave_encoded_history_cell(cell: dict) -> typing.Any:
     if not is_weave_encoded_history_cell(cell):
         raise ValueError(f"Expected weave encoded history cell, got {cell}")
+    if "_weave_type" in cell:
+        weave_type = cell["_weave_type"]
+    elif cell["_type"].startswith(TYPE_ENCODE_PREFIX):
+        weave_type = cell["_type"][len(TYPE_ENCODE_PREFIX) :]
+    else:
+        raise ValueError(f"Expected weave encoded history cell, got {cell}")
     weave_json = {
-        "_type": cell["_weave_type"],
+        "_type": weave_type,
         "_val": cell["_val"],
     }
     return storage.from_python(weave_json)
@@ -244,6 +253,11 @@ def leaf_to_weave(leaf: typing.Any, artifact: WandbLiveRunFiles) -> typing.Any:
     w_type = res["_type"]
     type_name = w_type_to_type_name(w_type)
 
-    # Optimization: If we have ENCODE_ENTIRE_TYPE=True, then we can
-    # avoid re-saving the type info in _weave_type
-    return {"_type": type_name, "_weave_type": res["_type"], "_val": res["_val"]}
+    if ENCODE_ENTIRE_TYPE:
+        return {"_type": type_name, "_val": res["_val"]}
+    else:
+        return {
+            "_type": type_name,
+            "_weave_type": w_type,
+            "_val": res["_val"],
+        }
