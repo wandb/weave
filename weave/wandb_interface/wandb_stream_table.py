@@ -185,7 +185,7 @@ def from_weave_encoded_history_cell(cell: dict) -> typing.Any:
     if "_weave_type" in cell:
         weave_type = cell["_weave_type"]
     elif cell["_type"].startswith(TYPE_ENCODE_PREFIX):
-        weave_type = cell["_type"][len(TYPE_ENCODE_PREFIX) :]
+        weave_type = json.loads(cell["_type"][len(TYPE_ENCODE_PREFIX) :])
     else:
         raise ValueError(f"Expected weave encoded history cell, got {cell}")
     weave_json = {
