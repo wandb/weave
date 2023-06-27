@@ -85,10 +85,13 @@ def server(server: server_interface.BaseServer):
 
 
 def get_server() -> typing.Optional[server_interface.BaseServer]:
+    global _http_server
     return _http_server.get()
 
 
 def set_server(server: server_interface.BaseServer):
+    global _http_server
+    print("setting server")
     _http_server.set(server)
 
 
