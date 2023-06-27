@@ -1022,7 +1022,7 @@ const PanelTableInner: React.FC<
           />
         </PanelContextProvider>
       )}
-      {unpinnedData.length === 0 && (
+      {unpinnedData.length === 0 ? (
         <div
           style={{
             textAlign: 'center',
@@ -1061,8 +1061,7 @@ const PanelTableInner: React.FC<
             </div>
           )}
         </div>
-      )}
-      {props.config.simpleTable ? (
+      ) : props.config.simpleTable ? (
         ConfiguredTable
       ) : (
         <WeaveActionContextProvider newActions={actions}>
