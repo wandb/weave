@@ -55,6 +55,7 @@ export const ValidatingTextInput: FC<TextInputProps> = ({
 }) => {
   const [initialValue, setInitialValue] = useState(initialValueProp || '');
   const [internalValue, setInternalValue] = useState(initialValue);
+  const [focused, setFocused] = useState(false);
   const [isValid, setIsValid] = useState(true);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -66,7 +67,12 @@ export const ValidatingTextInput: FC<TextInputProps> = ({
     setIsValid(validateInput(internalValue));
   }, [internalValue, validateInput]);
 
+  const handleFocus = useCallback(() => {
+    setFocused(true);
+  }, []);
+
   const handleBlur = useCallback(() => {
+    setFocused(false);
     if (internalValue !== initialValue) {
       if (isValid) {
         setInitialValue(internalValue);
@@ -90,8 +96,9 @@ export const ValidatingTextInput: FC<TextInputProps> = ({
         ref={inputRef}
         className={isValid ? '' : 'invalid'}
         data-test={dataTest}
-        value={internalValue}
+        value={focused ? internalValue : toDisplayValue(internalValue)}
         onChange={handleChange}
+        onFocus={handleFocus}
         onBlur={handleBlur}
         onKeyDown={handleKeyDown}
       />
@@ -101,3 +108,10 @@ export const ValidatingTextInput: FC<TextInputProps> = ({
     </Wrapper>
   );
 };
+
+function toDisplayValue(v: string): string {
+  if (v.length <= WIDTH_CHAR_LIMIT) {
+    return v;
+  }
+  return v.slice(0, WIDTH_CHAR_LIMIT - 3) + `...`;
+}
