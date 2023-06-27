@@ -1,4 +1,5 @@
 import {EditingNode, Parser, Type} from '@wandb/weave/core';
+import {UpdateConfig2} from './components/Panel2/panellib/libpanel';
 
 export interface ExpressionResult {
   expr: EditingNode;
@@ -35,5 +36,5 @@ export interface PanelProps<I, C> {
   input: I;
   config: C;
   updateInput?(newInput: Partial<I>): void;
-  updateConfig(partialConfig: Partial<C>): void;
+  updateConfig2: UpdateConfig2<C>;
 }

@@ -9,6 +9,8 @@ import * as React from 'react';
 import {ClassSetControls} from './controlsImage';
 import * as PanelLib from './panellib/libpanel';
 import * as TSTypeWithPath from './tsTypeWithPath';
+import {UpdateConfig2} from './panellib/libpanel';
+import produce from 'immer';
 
 export interface PanelContext {
   classSets?: ClassSetControls;
@@ -143,25 +145,29 @@ export function panelOpNameToPanelId(opName: string): string {
 
 export function useConfig<T extends {}>(
   initialConfig: T = {} as T
-): [T, (update: Partial<T>) => void] {
+): [T, (change: (oldConfig: T) => T) => void] {
   const [config, setConfig] = React.useState<T>(initialConfig);
-  const updateConfig = React.useCallback(
-    (update: Partial<T>) => {
-      setConfig(curConfig => ({
-        ...curConfig,
-        ...update,
-      }));
+  // Ensure that it's being called with a function arg.
+  const safeSetConfig = React.useCallback(
+    maybeCallback => {
+      if (typeof maybeCallback === 'function') {
+        setConfig(maybeCallback);
+      } else {
+        throw new Error('setConfig must be called with a function');
+      }
     },
     [setConfig]
   );
-
-  return [config, updateConfig];
+  return [config, safeSetConfig];
 }
 
-export function useConfigChild<T extends {[key: string]: any}>(
+export function useConfigChild<
+  T extends {[key: string]: any},
+  CT extends {[key: string]: any}
+>(
   key: string,
   config: T | undefined,
-  updateConfig: (update: Partial<T>) => void,
+  updateConfig2: UpdateConfig2<T>,
   defaultValue?: any
 ) {
   const childConfig = React.useMemo(
@@ -169,14 +175,15 @@ export function useConfigChild<T extends {[key: string]: any}>(
     [key, defaultValue, config]
   );
   const updateChildConfig = React.useCallback(
-    (update: Partial<typeof childConfig>) => {
-      const newChild = {
-        ...childConfig,
-        ...update,
-      };
-      updateConfig({[key]: newChild} as any);
+    (change: (oldConfig: CT) => CT) => {
+      const newChild = change(childConfig);
+      updateConfig2(oldConfig => {
+        return produce<T>(oldConfig, draft => {
+          (draft as any)[key] = newChild; // TODO(np): fix draft type
+        });
+      });
     },
-    [childConfig, key, updateConfig]
+    [childConfig, key, updateConfig2]
   );
 
   return React.useMemo(

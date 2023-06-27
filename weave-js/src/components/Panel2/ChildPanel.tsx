@@ -55,7 +55,8 @@ import {
   usePanelStacksForType,
 } from './availablePanels';
 import {PanelInput, PanelProps} from './panel';
-import {getStackIdAndName} from './panellib/libpanel';
+import {UpdateConfig2, getStackIdAndName} from './panellib/libpanel';
+import produce from 'immer';
 
 // This could be rendered as a code block with assignments, like
 // so.
@@ -186,14 +187,13 @@ interface ChildPanelProps {
   prefixButtons?: JSX.Element;
   allowedPanels?: string[];
   config: ChildPanelConfig | undefined;
-  updateConfig: (newConfig: ChildPanelFullConfig) => void;
-  updateConfig2?: (change: (oldConfig: any) => any) => void;
+  updateConfig2: UpdateConfig2<ChildPanelFullConfig>;
   updateInput?: (partialInput: PanelInput) => void;
   updateName?: (newName: string) => void;
 }
 
 const useChildPanelCommon = (props: ChildPanelProps) => {
-  const {updateConfig, updateConfig2} = props;
+  const {updateConfig2} = props;
   const config = useChildPanelConfig(props.config);
   const {id: panelId, config: panelConfig} = config;
   let {input_node: panelInputExpr} = config;
@@ -237,9 +237,14 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
         props.allowedPanels,
         stack
       );
-      updateConfig({...config, id, config: newPanelConfig});
+      updateConfig2(oldConfig => {
+        return produce(oldConfig, draft => {
+          draft.id = id;
+          draft.config = newPanelConfig;
+        });
+      });
     },
-    [config, props.allowedPanels, stack, updateConfig, weave]
+    [config, props.allowedPanels, stack, updateConfig2, weave]
   );
 
   const initPanelForInput = useCallback(
@@ -251,14 +256,15 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
         props.allowedPanels,
         stack
       );
-      updateConfig({
-        ...config,
-        input_node: newExpression,
-        id,
-        config: newPanelConfig,
+      updateConfig2(oldConfig => {
+        return produce(oldConfig, draft => {
+          draft.input_node = newExpression;
+          draft.id = id;
+          draft.config = newPanelConfig;
+        });
       });
     },
-    [config, props.allowedPanels, stack, updateConfig, weave]
+    [props.allowedPanels, stack, updateConfig2, weave]
   );
 
   const updateExpression = useCallback(
@@ -277,20 +283,29 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
 
       if (isAssignableTo(newExpression.type, config.input_node.type)) {
         // If type didn't change, keep current settings
-        updateConfig({...config, input_node: newExpression});
+        updateConfig2(oldConfig => {
+          return produce(oldConfig, draft => {
+            draft.input_node = newExpression;
+          });
+        });
       } else if (curPanelId === 'Each') {
         // "stick" to each
-        updateConfig({...config, input_node: newExpression});
+        updateConfig2(oldConfig => {
+          return produce(oldConfig, draft => {
+            draft.input_node = newExpression;
+          });
+        });
       } else if (props.allowedPanels != null && config.id === 'Expression') {
         // Major hacks here. allowedPanels is currently only set in the sidebar,
         // so use that to detect if we're there.
         // Expression ends up being the default panel for new panels. So we "stick"
         // to Expression if we're in the sidebar.
-        updateConfig({
-          ...config,
-          input_node: newExpression,
-          id: 'Expression',
-          config: undefined,
+        updateConfig2(oldConfig => {
+          return produce(oldConfig, draft => {
+            draft.input_node = newExpression;
+            draft.id = 'Expression';
+            delete draft.config;
+          });
         });
       } else {
         // Auto panel behavior.
@@ -302,7 +317,7 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
       curPanelId,
       config,
       props.allowedPanels,
-      updateConfig,
+      updateConfig2,
       initPanelForInput,
     ]
   );
@@ -345,29 +360,23 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
   }
   const updateAssignment = useCallback(
     (key: string, val: NodeOrVoidNode) => {
-      updateConfig({
-        ...config,
-        vars: {
-          ...config.vars,
-          [key]: val,
-        },
+      updateConfig2(oldConfig => {
+        return produce(oldConfig, draft => {
+          draft.vars[key] = val;
+        });
       });
     },
-    [config, updateConfig]
+    [updateConfig2]
   );
 
   const updatePanelConfig2 = useCallback(
     (change: <T>(oldConfig: T) => Partial<T>) => {
-      if (updateConfig2 == null) {
-        return;
-      }
       updateConfig2(oldConfig => {
         oldConfig = getFullChildPanel(oldConfig);
-        return {
-          ...oldConfig,
-          id: curPanelId ?? '',
-          config: {...oldConfig.config, ...change(oldConfig.config)},
-        };
+        return produce(oldConfig, draft => {
+          draft.id = curPanelId ?? '';
+          draft.config = {...draft.config, ...change(draft.config)};
+        });
       });
     },
     // Added depenedency on curPanelId which depends on current
@@ -378,13 +387,14 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
 
   const updatePanelConfig = useCallback(
     newPanelConfig =>
-      updateConfig({
-        ...config,
-        id: curPanelId ?? '',
-        config: {...config.config, ...newPanelConfig},
+      updateConfig2(oldConfig => {
+        return produce(oldConfig, draft => {
+          draft.id = curPanelId ?? '';
+          draft.config = {...draft.config, ...newPanelConfig};
+        });
       }),
 
-    [config, updateConfig, curPanelId]
+    [updateConfig2, curPanelId]
   );
 
   const newVars = useMemo(

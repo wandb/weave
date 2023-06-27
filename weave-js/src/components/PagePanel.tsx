@@ -112,7 +112,7 @@ const JupyterControlsIcon = styled.div`
   }
 `;
 
-const PagePanel: React.FC = props => {
+const PagePanel: React.FC = () => {
   const weave = useWeaveContext();
   const urlParams = new URLSearchParams(window.location.search);
   const fullScreen = urlParams.get('fullScreen') != null;
@@ -331,7 +331,7 @@ type PageContentProps = {
 };
 
 export const PageContent: FC<PageContentProps> = props => {
-  const {config, updateConfig, updateConfig2, goHome} = props;
+  const {config, updateConfig2, goHome} = props;
   const weave = useWeaveContext();
   const editorIsOpen = useEditorIsOpen();
   const inJupyter = inJupyterCell();
@@ -422,7 +422,6 @@ export const PageContent: FC<PageContentProps> = props => {
             </>
           }
           config={config}
-          updateConfig={updateConfig}
           updateConfig2={updateConfig2}
         />
       </div>
@@ -430,7 +429,6 @@ export const PageContent: FC<PageContentProps> = props => {
         <ChildPanelConfigComp
           // pathEl={CHILD_NAME}
           config={config}
-          updateConfig={updateConfig}
           updateConfig2={updateConfig2}
         />
       </Inspector>

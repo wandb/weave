@@ -26,12 +26,11 @@ type PanelPreviewDirProps = Panel2.PanelProps<typeof inputType>;
 
 interface DirViewProps {
   dir: DirMetadata;
-  path: string[];
   setFilePath(path: string[]): void;
 }
 
 const DirView: React.FC<DirViewProps> = props => {
-  const {dir, path, setFilePath} = props;
+  const {dir, setFilePath} = props;
   // TODO: make this use config?
   const [displayOffset, setDisplayOffset] = useState(0);
 
@@ -39,6 +38,8 @@ const DirView: React.FC<DirViewProps> = props => {
   const dirNames = Object.keys(dir.dirs).sort();
   const fileNames = Object.keys(dir.files).sort();
   const dirsAndFiles = [...dirNames, ...fileNames];
+
+  const path = React.useMemo(() => dir.fullPath.split('/'), [dir.fullPath]);
 
   return (
     <div
@@ -63,7 +64,6 @@ const DirView: React.FC<DirViewProps> = props => {
                     setFilePath={setFilePath}
                   />
                 );
-                // return this.renderSubFolder(currentFolder, folderOrFile, i);
               } else {
                 const file = dir.files[dirOrFile];
                 return (
@@ -241,7 +241,6 @@ const PanelPreviewDir: React.FC<PanelPreviewDirProps> = props => {
   return (
     <DirView
       dir={dir}
-      path={props.context.path!}
       setFilePath={path => {
         if (props.updateInput != null) {
           props.updateInput(
@@ -255,7 +254,7 @@ const PanelPreviewDir: React.FC<PanelPreviewDirProps> = props => {
             ).val as any
           );
         } else {
-          props.updateContext({path});
+          throw new Error('updateInput is null, but required by PanelDir');
         }
       }}
     />

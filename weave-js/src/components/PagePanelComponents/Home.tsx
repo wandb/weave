@@ -1,16 +1,16 @@
 import {Node, voidNode} from '@wandb/weave/core';
 import moment from 'moment';
 import React, {FC, memo, useCallback, useState} from 'react';
-import getConfig from '../../config';
-
 import styled from 'styled-components';
+
 import {WBButton} from '../../common/components/elements/WBButtonNew';
+import getConfig from '../../config';
 import {useWeaveContext} from '../../context';
 import {ChildPanelFullConfig} from '../Panel2/ChildPanel';
 import {IconAddNew as IconAddNewUnstyled, IconWeaveLogo} from '../Panel2/Icons';
 import {PanelRootBrowser} from '../Panel2/PanelRootBrowser/PanelRootBrowser';
 import {useNewPanelFromRootQueryCallback} from '../Panel2/PanelRootBrowser/util';
-import {dummyProps, useConfig} from '../Panel2/panel';
+import {useConfig} from '../Panel2/panel';
 
 type HomeProps = {
   updateConfig: (newConfig: ChildPanelFullConfig) => void;
@@ -79,9 +79,7 @@ const HomeComp: FC<HomeProps> = props => {
           updateInput={updateInput as any}
           isRoot={true}
           config={rootConfig}
-          updateConfig={updateRootConfig}
-          context={dummyProps.context}
-          updateContext={dummyProps.updateContext}
+          updateConfig2={updateRootConfig}
         />
       </BrowserContainer>
     </>

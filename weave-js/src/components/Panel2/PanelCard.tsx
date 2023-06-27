@@ -5,7 +5,7 @@ import React, {useState} from 'react';
 import styled, {css} from 'styled-components';
 
 import * as CGReact from '../../react';
-import {ChildPanel, ChildPanelConfig} from './ChildPanel';
+import {ChildPanel, ChildPanelConfig, ChildPanelFullConfig} from './ChildPanel';
 import * as ConfigPanel from './ConfigPanel';
 import * as Panel2 from './panel';
 
@@ -82,13 +82,18 @@ const CardContent = styled.div`
 
 export const PanelCardConfigEditor: React.FC<PanelCardProps> = props => {
   const config = props.config ?? PANEL_CARD_DEFAULT_CONFIG;
-  const {updateConfig} = props;
+  const {updateConfig2} = props;
   return (
     <ConfigPanel.ConfigOption label="Title">
       <ConfigPanel.ExpressionConfigField
         expr={config.title}
         setExpression={newNode =>
-          updateConfig({...config, title: newNode as any})
+          updateConfig2(oldConfig => {
+            return {
+              ...oldConfig,
+              title: newNode as any,
+            };
+          })
         }
       />
     </ConfigPanel.ConfigOption>
@@ -97,7 +102,7 @@ export const PanelCardConfigEditor: React.FC<PanelCardProps> = props => {
 
 export const PanelCard: React.FC<PanelCardProps> = props => {
   const config = props.config ?? PANEL_CARD_DEFAULT_CONFIG;
-  const {updateConfig} = props;
+  const {updateConfig2} = props;
   const firstTab = config.content[0];
   const [currentTabName, setCurrentTabName] = useState(firstTab.name);
   const currentTabIndex = config.content.findIndex(
@@ -136,13 +141,20 @@ export const PanelCard: React.FC<PanelCardProps> = props => {
         <ChildPanel
           passthroughUpdate={true}
           config={currentTab.content}
-          updateConfig={newItemConfig =>
-            updateConfig(
-              produce(config, draft => {
+          updateConfig2={(
+            change: (
+              oldItemConfig: ChildPanelFullConfig
+            ) => ChildPanelFullConfig
+          ) => {
+            updateConfig2(oldConfig => {
+              const newItemConfig = change(
+                config.content[currentTabIndex].content ?? ({} as any) // TODO(np): as any
+              );
+              return produce(oldConfig, draft => {
                 draft.content[currentTabIndex].content = newItemConfig;
-              })
-            )
-          }
+              });
+            });
+          }}
           updateInput={props.updateInput as any}
         />
       </CardContent>

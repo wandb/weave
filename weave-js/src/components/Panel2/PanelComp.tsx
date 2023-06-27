@@ -103,15 +103,12 @@ interface PanelComp2Props {
   panelSpec: Panel2.PanelSpecNode;
   input: Panel2.PanelInput | NodeOrVoidNode;
   inputType: Type;
-  context: Panel2.PanelContext;
   config: any;
-  loading?: boolean;
-  configMode: boolean;
-  noPanelControls?: boolean;
-  updateConfig(partialConfig: Partial<any>): void;
-  updateConfig2?(change: (oldConfig: any) => Partial<any>): void;
-  updateContext(partialConfig: Partial<Panel2.PanelContext>): void;
+  updateConfig2(change: (oldConfig: any) => Partial<any>): void;
   updateInput?(partialInput: Partial<Panel2.PanelInput>): void;
+  configMode: boolean;
+  loading?: boolean;
+  noPanelControls?: boolean;
 }
 
 interface PanelCompProps extends PanelComp2Props {
@@ -256,7 +253,7 @@ export const PanelComp2Inner = (props: PanelComp2Props) => {
 
 const useSplitTransformerConfigs = (
   config: PanelTransformerCompProps['config'],
-  updateConfig: PanelTransformerCompProps['updateConfig']
+  updateConfig2: PanelTransformerCompProps['updateConfig2']
 ) => {
   config = useMemo(() => config ?? {}, [config]);
   const baseConfig = useDeepMemo(_.omit(config, 'childConfig'));
@@ -267,23 +264,23 @@ const useSplitTransformerConfigs = (
 
   const updateBaseConfig = useCallback(
     newConfig =>
-      updateConfig({
-        ...newConfig,
-        childConfig,
-      }),
-    [updateConfig, childConfig]
+      updateConfig2(oldConfig => ({
+        ...oldConfig,
+        ..._.omit(newConfig, 'childConfig'),
+      })),
+    [updateConfig2]
   );
 
   const updateChildConfig = useCallback(
     newConfig =>
-      updateConfig({
-        ...config,
+      updateConfig2(oldConfig => ({
+        ...oldConfig,
         childConfig: {
-          ...childConfig,
+          ...oldConfig.childConfig,
           ...newConfig,
         },
-      }),
-    [updateConfig, config, childConfig]
+      })),
+    [updateConfig2]
   );
   return {baseConfig, updateBaseConfig, childConfig, updateChildConfig};
 };
@@ -316,9 +313,9 @@ const useTransformerChild = (
 };
 
 export const ConfigTransformerComp = (props: PanelTransformerCompProps) => {
-  const {panelSpec, updateConfig, config} = props;
+  const {panelSpec, updateConfig2, config} = props;
   const {baseConfig, updateBaseConfig, childConfig, updateChildConfig} =
-    useSplitTransformerConfigs(config, updateConfig);
+    useSplitTransformerConfigs(config, updateConfig2);
   const {loading, childInputNode, childPanelSpec} = useTransformerChild(
     props.input,
     panelSpec,
@@ -332,7 +329,7 @@ export const ConfigTransformerComp = (props: PanelTransformerCompProps) => {
           {...props}
           config={baseConfig}
           child={childPanelSpec}
-          updateConfig={updateBaseConfig}
+          updateConfig2={updateBaseConfig}
         />
       )}
       <PanelComp2
@@ -341,7 +338,7 @@ export const ConfigTransformerComp = (props: PanelTransformerCompProps) => {
         loading={loading}
         inputType={childInputNode.type}
         config={childConfig}
-        updateConfig={updateChildConfig}
+        updateConfig2={updateChildConfig}
         panelSpec={childPanelSpec}
       />
     </>
@@ -349,9 +346,9 @@ export const ConfigTransformerComp = (props: PanelTransformerCompProps) => {
 };
 
 export const RenderTransformerComp = (props: PanelTransformerCompProps) => {
-  const {panelSpec, updateConfig, config} = props;
+  const {panelSpec, updateConfig2, config} = props;
   const {baseConfig, childConfig, updateChildConfig} =
-    useSplitTransformerConfigs(config, updateConfig);
+    useSplitTransformerConfigs(config, updateConfig2);
   const {loading, childInputNode, childPanelSpec} = useTransformerChild(
     props.input,
     panelSpec,
@@ -364,7 +361,7 @@ export const RenderTransformerComp = (props: PanelTransformerCompProps) => {
       loading={loading}
       inputType={childInputNode.type}
       config={childConfig}
-      updateConfig={updateChildConfig}
+      updateConfig2={updateChildConfig}
       panelSpec={childPanelSpec}
     />
   );
@@ -461,7 +458,9 @@ const ControlWrapper: React.FC<ControlWrapperProps> = ({
   );
   const onClose = useCallback(() => {
     if (tempConfig !== panelProps.config) {
-      panelProps.updateConfig(tempConfig);
+      panelProps.updateConfig2(oldConfig => {
+        return {...oldConfig, ...tempConfig};
+      });
     }
     setFullscreen(false);
   }, [tempConfig, panelProps]);
@@ -525,7 +524,7 @@ const ControlWrapper: React.FC<ControlWrapperProps> = ({
                   {...panelProps}
                   noPanelControls
                   config={tempConfig}
-                  updateConfig={updateTempConfig}
+                  updateConfig2={updateTempConfig}
                 />
               </PanelFullscreenContext.Provider>
             </div>
@@ -539,7 +538,7 @@ const ControlWrapper: React.FC<ControlWrapperProps> = ({
                   noPanelControls
                   configMode
                   config={tempConfig}
-                  updateConfig={updateTempConfig}
+                  updateConfig2={updateTempConfig}
                 />
               </div>
             )}

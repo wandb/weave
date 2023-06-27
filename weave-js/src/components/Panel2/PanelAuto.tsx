@@ -24,11 +24,7 @@ export const PanelAuto: React.FC<PanelAutoProps> = props => {
   //   </div>
   // );
   return (
-    <ChildPanel
-      config={props.input}
-      updateConfig={props.updateConfig}
-      updateConfig2={props.updateConfig2}
-    />
+    <ChildPanel config={props.input} updateConfig2={props.updateConfig2} />
   );
 };
 

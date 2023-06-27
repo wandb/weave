@@ -16,22 +16,19 @@ import {ConfiguredTransform} from '../panel';
 //   C: config type
 //   I: input type
 
+export interface UpdateConfig2<C> {
+  (change: (oldConfig: C) => C): void;
+}
+
 interface PanelPropsInternal<I, C, X> {
   input: I;
 
   // No longer needed. TODO: remove
   loading?: boolean;
-  context: X;
   config?: C;
   configMode?: boolean;
-  updateContext(partialContext: Partial<X>): void;
 
-  // lazily-imported components with no config make ts complain if we don't do
-  // this
-  updateConfig(
-    partialConfig?: C extends undefined ? undefined : Partial<C>
-  ): void;
-  updateConfig2?(change: (oldConfig: C) => Partial<C>): void;
+  updateConfig2: UpdateConfig2<C>;
 
   // For newInput, child can pass either:
   //
@@ -43,7 +40,7 @@ interface PanelPropsInternal<I, C, X> {
   //
   // Shawn: I am not positive these are the exact patterns we want for achieving this, but
   //   lets go with it and adjust later.
-  updateInput?(newInput: Partial<I>): void;
+  updateInput(newInput: Partial<I>): void;
 }
 
 export type PanelProps<I, C, X> = PanelPropsInternal<I, C, X>;
