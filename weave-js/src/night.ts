@@ -7,6 +7,12 @@ export function nightOn() {
   NIGHT_ON = true;
   const styleElement = document.createElement('style');
 
+  (window as any).WebFont.load({
+    google: {
+      families: ['Orbitron', 'Major Mono Display'],
+    },
+  });
+
   //  https://chat.openai.com/share/6f712e32-d2b7-4445-bf14-70466f59de58
   styleElement.textContent = `body::before {
         content: "";
@@ -24,6 +30,8 @@ export function nightOn() {
     body {
         /* invert colors, increase saturation and apply a hue rotation for a different color scheme */
         filter: invert(1) saturate(2) hue-rotate(200deg);
+        font-family: 'Orbitron';
+        font-size: 80%;
     }`;
   document.head.appendChild(styleElement);
 }
