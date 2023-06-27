@@ -55,7 +55,6 @@ import {
   varNode,
   voidNode,
   withoutTags,
-  unwrapTaggedValues,
   taggedValueValueType,
   isTaggedValue,
 } from '@wandb/weave/core';
@@ -132,7 +131,6 @@ import {
 } from '../Icons';
 import styled from 'styled-components';
 import {PopupMenu, Section} from '../../Sidebar/PopupMenu';
-import {types} from '@babel/core';
 
 const recordEvent = makeEventRecorder('Plot');
 
