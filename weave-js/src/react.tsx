@@ -3,6 +3,7 @@ import {
   Client,
   ConstNode,
   constNodeUnsafe,
+  constNone,
   constNumber,
   constString,
   dereferenceAllVars,
@@ -177,6 +178,9 @@ const clientEval = (node: NodeOrVoidNode, env: Stack): NodeOrVoidNode => {
       name === 'index'
     ) {
       let resolvedVal = callResolverSimple(name, inputs, node.fromOp);
+      if (resolvedVal == null) {
+        return constNone();
+      }
       if (resolvedVal.nodeType != null) {
         resolvedVal = clientEval(resolvedVal, env);
       }
@@ -246,6 +250,7 @@ export const useNodeValue = <T extends Type>(
     return dereferenceAllVars(node, stack).node as NodeOrVoidNode<T>;
   }, [node, stack]);
 
+  console.log('CLIENT EVAL', node);
   node = useMemo(
     () => (dashUiEnabled ? clientEval(node, stack) : node),
     [dashUiEnabled, node, stack]
@@ -830,6 +835,43 @@ export const useRefEqualExpr = (node: NodeOrVoidNode, stack: Stack) => {
   );
 };
 
+export const useRefEqualWithoutTypes = (node: NodeOrVoidNode) => {
+  return useDeepMemo(node, (a, b) => {
+    if (b == null) {
+      return false;
+    }
+    if (a.nodeType === 'void' && b.nodeType === 'void') {
+      return true;
+    } else if (a.nodeType === 'var' && b.nodeType === 'var') {
+      if (a.varName !== b.varName) {
+        return false;
+      }
+      return true;
+    } else if (a.nodeType === 'const' && b.nodeType === 'const') {
+      if (a.val !== b.val) {
+        return false;
+      }
+      return true;
+    } else if (a.nodeType === 'output' && b.nodeType === 'output') {
+      if (a.fromOp.name !== b.fromOp.name) {
+        return false;
+      }
+      const aKeys = Object.keys(a.fromOp.inputs);
+      const bKeys = Object.keys(b.fromOp.inputs);
+      if (aKeys.length !== bKeys.length) {
+        return false;
+      }
+      for (const key of aKeys) {
+        if (a.fromOp.inputs[key] !== b.fromOp.inputs[key]) {
+          return false;
+        }
+      }
+      return true;
+    }
+    return false;
+  });
+};
+
 export const useNodeWithServerType = (
   node: NodeOrVoidNode,
   paramFrame?: Frame
@@ -843,6 +885,14 @@ export const useNodeWithServerType = (
   const [error, setError] = useState();
   let dereffedNode: NodeOrVoidNode;
   ({node, dereffedNode} = useRefEqualExpr(node, stack));
+
+  // This fixes the fact that PanelPlot mounts, unmounts, remounts
+  // during initial load... not strictly necessary for the perf fixes
+  // in this PR, and needs to be tested to ensure there are no downstream
+  // problems. But I generally like this change and want to do the same
+  // in useNodeValue.
+  node = useRefEqualWithoutTypes(node);
+  dereffedNode = useRefEqualWithoutTypes(dereffedNode);
 
   const [result, setResult] = useState<{
     node: NodeOrVoidNode;
@@ -876,6 +926,7 @@ export const useNodeWithServerType = (
       isMounted = false;
     };
   }, [weave, node, dereffedNode]);
+  // useTraceUpdate('useNodeWithServerType', {weave, node, dereffedNode});
 
   const finalResult = useMemo(() => {
     if (error != null) {

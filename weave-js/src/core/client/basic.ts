@@ -225,12 +225,6 @@ export class BasicClient implements Client {
       l => !l.hasResult || this.resolveRefreshRequest != null
     );
     if (notDoneObservables.length > 0) {
-      // console.log(
-      //   'CLIENT BATCH START',
-      //   notDoneObservables,
-      //   Array.from(this.observables.entries()).map(([k, l]) => [k, l.hasResult])
-      // );
-
       const rejectObservable = (observable: ObservableNode<any>, e: any) => {
         observable.hasResult = true;
         for (const observer of observable.observers) {

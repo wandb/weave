@@ -215,6 +215,7 @@ export const opIndex = makeListOp({
   },
   returnType: ({arr}) => listObjectType(arr),
   resolver: ({arr, index}) => arr[index],
+  resolverIsSync: true,
 });
 
 export const opOffset = makeListOp({

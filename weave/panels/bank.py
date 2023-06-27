@@ -20,3 +20,11 @@ def default_panel_bank_flow_section_config():
         type="grid",
         sorted=0,
     )
+
+
+# TODO: temporary state, need a better way to declare this.
+def flow_nxn(rows: int, columns: int):
+    conf = default_panel_bank_flow_section_config()
+    conf["flowConfig"]["columnsPerPage"] = columns
+    conf["flowConfig"]["rowsPerPage"] = rows
+    return conf

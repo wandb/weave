@@ -333,8 +333,11 @@ const useConcreteConfig = (
     let loading: boolean = false;
     let newConfig: ConcretePlotConfig;
     if (concreteConfigLoading) {
+      // Don't compute the default on our real input node, only to throw
+      // it away. Computing the default is expensive when we have a large
+      // input type (many input columns).
       newConfig = PlotState.defaultConcretePlot(
-        constNode(list(listObjectType(input.type)), []),
+        constNode(list(typedDict({})), []),
         stack
       );
       loading = true;
@@ -353,13 +356,7 @@ const useConcreteConfig = (
     }
 
     return {config: newConfig, loading};
-  }, [
-    concreteConfigEvaluationResult,
-    concreteConfigLoading,
-    config,
-    input,
-    stack,
-  ]);
+  }, [concreteConfigEvaluationResult, concreteConfigLoading, config, stack]);
 };
 
 const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
