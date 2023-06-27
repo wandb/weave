@@ -12,6 +12,8 @@ TIME_SERIES_BIN_SIZES_SEC = [
     1e-9,  # ns
     1e-6,  # microsec
     1e-3,  # ms
+    0.01,  # 10ms
+    0.1,  # 100ms
     1,
     2.5,
     5,
@@ -197,6 +199,11 @@ class TimeSeries(weave.Panel):
             input_node.type, weave.types.optional(weave.types.Timestamp())
         )
 
+        item_fn = weave_internal.const(
+            item_fn.val,
+            item_fn.type,
+        )
+
         min_x_called = weave_internal.better_call_fn(col_fn, input_node).min()  # type: ignore
         min_x = weave_internal.const(
             min_x_called,
@@ -211,21 +218,35 @@ class TimeSeries(weave.Panel):
 
         mark = weave_internal.const("bar")
 
+        label_node = first_column_of_type(
+            input_node.type,
+            weave.types.optional(
+                weave.types.union(
+                    weave.types.String(),
+                    weave.types.Boolean(),
+                )
+            ),
+        )[1]
+
+        label_node = weave_internal.const(
+            label_node.val,
+            label_node.type,
+        )
+
+        agg_node = weave_internal.define_fn(
+            {"group": input_node.type},  # type: ignore
+            lambda group: group.count(),
+        )
+
+        agg = weave_internal.const(
+            agg_node.val,
+            agg_node.type,
+        )
+
         config = TimeSeriesConfig(
             x=item_fn,
-            label=first_column_of_type(
-                input_node.type,
-                weave.types.optional(
-                    weave.types.union(
-                        weave.types.String(),
-                        weave.types.Boolean(),
-                    )
-                ),
-            )[1],
-            agg=weave_internal.define_fn(
-                {"group": input_node.type},  # type: ignore
-                lambda group: group.count(),
-            ),
+            label=label_node,
+            agg=agg,
             min_x=min_x,
             max_x=max_x,
             mark=mark,
@@ -291,7 +312,11 @@ class TimeSeries(weave.Panel):
 
         exact_bin_size = ((max_x - min_x) / N_BINS).totalSeconds()  # type: ignore
         bin_size_index = TIME_SERIES_BIN_SIZES_SEC_NODE.map(  # type: ignore
-            lambda x: (x / exact_bin_size - 1).abs()
+            lambda x: (
+                (x - exact_bin_size).abs()
+                / weave.ops.make_list(a=x, b=exact_bin_size).min()
+            )
+            # lambda x: (x / exact_bin_size - 1).abs() # original
         ).argmin()
 
         bin_size = TIME_SERIES_BIN_SIZES_SEC_NODE[bin_size_index]  # type: ignore
