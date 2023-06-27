@@ -12,8 +12,6 @@ TIME_SERIES_BIN_SIZES_SEC = [
     1e-9,  # ns
     1e-6,  # microsec
     1e-3,  # ms
-    0.01,  # 10ms
-    0.1,  # 100ms
     1,
     2.5,
     5,
