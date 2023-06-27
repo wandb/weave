@@ -197,13 +197,13 @@ class TimeSeries(weave.Panel):
             input_node.type, weave.types.optional(weave.types.Timestamp())
         )
 
-        min_x_called = col_fn.val.min()
+        min_x_called = weave_internal.better_call_fn(col_fn, input_node).min()  # type: ignore
         min_x = weave_internal.const(
             min_x_called,
             weave.types.Function(col_fn.type.input_types, min_x_called.type),  # type: ignore
         )
 
-        max_x_called = col_fn.val.max()
+        max_x_called = weave_internal.better_call_fn(col_fn, input_node).max()  # type: ignore
         max_x = weave_internal.const(
             max_x_called,
             weave.types.Function(col_fn.type.input_types, max_x_called.type),  # type: ignore
