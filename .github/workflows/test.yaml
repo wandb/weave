@@ -39,6 +39,18 @@ jobs:
       - name: Build integration test image
         run: python3 docker_build.py build weave-integration-test . Dockerfile.test
 
+  TestContainerStatusReport:
+    name: Test Container Status Report
+    timeout-minutes: 5
+    needs:
+      - build-container
+    # runs-on: [self-hosted, runner]
+    runs-on: ubuntu-latest
+    container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v2
+      - run: source /root/venv/bin/activate &&  pip freeze
+
   lint:
     name: Python lint
     timeout-minutes: 5
@@ -63,17 +75,17 @@ jobs:
         with:
           node-version: "16.x"
       - run: |
-            set -e
-            cd weave-js
-            yarn install --frozen-lockfile
-            yarn eslint
-            yarn tslint
-            yarn prettier-fix
-            git config --local user.email "action@github.com"
-            git config --local user.name "GitHub Action"
-            git diff --quiet && git diff --staged --quiet || (git commit -am "Format code" && git push)
-            yarn prettier
-            yarn run tsc
+          set -e
+          cd weave-js
+          yarn install --frozen-lockfile
+          yarn eslint
+          yarn tslint
+          yarn prettier-fix
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git diff --quiet && git diff --staged --quiet || (git commit -am "Format code" && git push)
+          yarn prettier
+          yarn run tsc
 
   test:
     name: Python unit tests
