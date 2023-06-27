@@ -21,6 +21,7 @@ import {
   resolveVar,
   Stack,
   taggedValue,
+  timestampBin,
   Type,
   typedDict,
   union,
@@ -1431,7 +1432,8 @@ export function getAxisType<T extends ConcreteSeriesConfig | SeriesConfig>(
     isAssignableTo(
       dimTypes[axisName],
       oneOrMany(maybe({type: 'timestamp', unit: 'ms'}))
-    )
+    ) ||
+    isAssignableTo(dimTypes[axisName], maybe(timestampBin))
   ) {
     return 'temporal';
   }

@@ -27,6 +27,7 @@ import {
   maybe,
   Node,
   numberBin,
+  timestampBin,
   oneOrMany,
   opAnd,
   opArray,
@@ -39,7 +40,6 @@ import {
   // opMerge,
   opNumberGreaterEqual,
   opNumberLessEqual,
-  opNumberMult,
   opPick,
   // opRandomlyDownsample,
   opRunId,
@@ -55,6 +55,7 @@ import {
   varNode,
   voidNode,
   withoutTags,
+  filterNodes,
 } from '@wandb/weave/core';
 import {produce} from 'immer';
 import _ from 'lodash';
@@ -1441,10 +1442,7 @@ function filterTableNodeToContinuousSelection(
           })
         )
       ) {
-        colNode = opNumberMult({
-          lhs: opDateToNumber({date: colNode}),
-          rhs: constNumber(1000),
-        });
+        colNode = opDateToNumber({date: colNode});
       }
 
       const domainDiff = domain[1] - domain[0];
@@ -1566,7 +1564,7 @@ function getMark(
     } else if (
       isAssignableTo(
         dimTypes.x,
-        union(['none', 'string', 'date', numberBin])
+        union(['none', 'string', 'date', numberBin, timestampBin])
       ) &&
       isAssignableTo(dimTypes.y, maybe('number'))
     ) {
@@ -2150,60 +2148,98 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
     concreteConfig.signals.domain,
   ]);
 
-  const brushableAxes = useMemo(
-    () =>
-      ['x' as const, 'y' as const].filter(axisName => {
-        const seriesTypes = listOfTableNodes.reduce((acc, node, i) => {
-          const dimName = PlotState.dimNamesRaw(
-            config.series[i].table,
-            config.series[i].dims,
-            weave
-          )[axisName];
-          const rowType = withoutTags(
-            listObjectType(node.type)
-          ) as TypedDictType;
-          const dimType = rowType.propertyTypes[dimName];
-          if (dimType != null) {
-            acc.push(dimType);
-          }
-          return acc;
-        }, [] as Type[]);
-
-        const uniqueTypes = _.uniqBy(seriesTypes, JSON.stringify);
-
-        let axisType: Type | undefined = 'invalid';
-        if (uniqueTypes.length > 2) {
-          return false;
-        } else if (
-          uniqueTypes.length === 2 &&
-          !uniqueTypes.includes('invalid')
-        ) {
-          return false;
-        } else if (uniqueTypes.length === 2) {
-          uniqueTypes.forEach(type => {
-            if (type !== 'invalid') {
-              axisType = type;
-            }
-          });
-        } else {
-          axisType = uniqueTypes.values().next().value;
-        }
-
-        if (axisType == null) {
-          return false;
-        }
-
+  const brushableAxes = useMemo(() => {
+    const brushTypes = ['x' as const, 'y' as const].map(axisName => {
+      // Sum and count operations are "extensive" properties meaning
+      // they depend on the size of the sample, while other operations
+      // like min/max/avg are "intensive" properties meaning they do not.
+      // (thanks gpt-4 for these definitions!)
+      // We like to configure the plot such that it rebins
+      // along the groupby axis (e.g. time) after zooming, which means
+      // the amount of points falling in each bin will change. The result
+      // of extensive operations will differ given the new bin size in
+      // these cases, and the data ends up "below" where it was when
+      // the user initiated the zoom. So we just disable brushing on
+      // extensive axes, and let the plot figure out the new extent
+      // automatically.
+      const seriesHasUnstableAggs = listOfTableNodes.map((n, i) => {
+        const series = config.series[i];
+        const seriesSelectFn =
+          series.table.columnSelectFunctions[series.dims[axisName]];
         return (
-          isAssignableTo(axisType, oneOrMany(maybe('number'))) ||
-          isAssignableTo(
-            axisType,
-            oneOrMany(maybe({type: 'timestamp', unit: 'ms'}))
-          ) ||
-          isAssignableTo(axisType, 'invalid') // TODO: check
+          filterNodes(
+            seriesSelectFn,
+            selFn =>
+              selFn.nodeType === 'output' &&
+              (selFn.fromOp.name === 'count' ||
+                selFn.fromOp.name.endsWith('sum'))
+          ).length > 0
         );
-      }),
-    [listOfTableNodes, config.series, weave]
-  );
+      });
+      if (seriesHasUnstableAggs.includes(true)) {
+        return undefined;
+      }
+      const seriesTypes = listOfTableNodes.reduce((acc, node, i) => {
+        const dimName = PlotState.dimNamesRaw(
+          config.series[i].table,
+          config.series[i].dims,
+          weave
+        )[axisName];
+        const rowType = withoutTags(listObjectType(node.type)) as TypedDictType;
+        const dimType = rowType.propertyTypes[dimName];
+        if (dimType != null) {
+          acc.push(dimType);
+        }
+        return acc;
+      }, [] as Type[]);
+
+      const uniqueTypes = _.uniqBy(seriesTypes, JSON.stringify);
+
+      let axisType: Type | undefined = 'invalid';
+      if (uniqueTypes.length > 2) {
+        return undefined;
+      } else if (uniqueTypes.length === 2 && !uniqueTypes.includes('invalid')) {
+        return undefined;
+      } else if (uniqueTypes.length === 2) {
+        uniqueTypes.forEach(type => {
+          if (type !== 'invalid') {
+            axisType = type;
+          }
+        });
+      } else {
+        axisType = uniqueTypes.values().next().value;
+      }
+
+      if (axisType == null) {
+        return undefined;
+      }
+
+      if (
+        isAssignableTo(axisType, oneOrMany(maybe('number'))) ||
+        isAssignableTo(axisType, oneOrMany(maybe(numberBin)))
+      ) {
+        return 'quantitative';
+      }
+
+      if (
+        isAssignableTo(axisType, oneOrMany(maybe({type: 'timestamp'}))) ||
+        isAssignableTo(axisType, oneOrMany(maybe(timestampBin)))
+      ) {
+        return 'temporal';
+      }
+
+      return undefined;
+    });
+    type BrushType = 'temporal' | 'quantitative';
+    const brushTypesResult: {x?: BrushType; y?: BrushType} = {};
+    if (brushTypes[0] != null) {
+      brushTypesResult.x = brushTypes[0];
+    }
+    if (brushTypes[1] != null) {
+      brushTypesResult.y = brushTypes[1];
+    }
+    return brushTypesResult;
+  }, [listOfTableNodes, config.series, weave]);
 
   const xScaleAndDomain = useMemo(
     () =>
@@ -2277,7 +2313,10 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
 
       if (xAxisType != null) {
         const fixedXKey = fixKeyForVega(dims.x);
-        if (isAssignableTo(dimTypes.x, maybe(numberBin))) {
+        if (
+          isAssignableTo(dimTypes.x, maybe(numberBin)) ||
+          isAssignableTo(dimTypes.x, maybe(timestampBin))
+        ) {
           if (mark === 'bar') {
             newSpec.encoding.x = {
               field: fixedXKey + '.start',
@@ -2476,6 +2515,20 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
         };
       }
 
+      if (newSpec.mark.type === 'bar') {
+        // If we have start and end for an x or y dimension, but only
+        // center for the other dimension, tell vega to aggregate the
+        // other dimension. Since we always provide pre-computed to
+        // vega, the aggregation has no effect on the actual data. But
+        // This fixes an issue where Vega will only draw the "top" of
+        // the bar.
+        if (newSpec.encoding.x2 != null && newSpec.encoding.y2 == null) {
+          newSpec.encoding.y.aggregate = 'sum';
+        } else if (newSpec.encoding.y2 != null && newSpec.encoding.x2 == null) {
+          newSpec.encoding.x.aggregate = 'sum';
+        }
+      }
+
       if (!newSpec.encoding.tooltip) {
         newSpec.transform = [
           {
@@ -2603,7 +2656,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
               name: 'brush',
               select: {
                 type: 'interval',
-                encodings: brushableAxes,
+                encodings: Object.keys(brushableAxes),
               },
             },
           ],
@@ -2899,68 +2952,34 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
           const settingName = currBrushMode === 'zoom' ? 'domain' : 'selection';
 
           if (settingName === 'domain') {
-            const settingNodesAreConst = ['x' as const, 'y' as const].every(
-              dimName => {
-                const currentSettingNode = currConfig.signals.domain[dimName];
-                return isConstNode(currentSettingNode);
+            ['x' as const, 'y' as const].forEach(dimName => {
+              const axisSignal: [number, number] | string[] = signal[dimName];
+              const currentSetting = currConcreteConfig.signals.domain[dimName];
+
+              let newDomain: Node;
+              if (brushableAxes[dimName] === 'temporal') {
+                newDomain = constNode(
+                  {type: 'list', objectType: {type: 'timestamp'}},
+                  axisSignal as number[]
+                );
+              } else {
+                newDomain = constNode(toWeaveType(axisSignal), axisSignal);
               }
-            );
+              console.log('NEW DOMAIN', newDomain);
 
-            if (settingNodesAreConst) {
-              // we can use updateConfig
-              let newConfig = currConfig;
-              ['x' as const, 'y' as const].forEach(dimName => {
-                const axisSignal: [number, number] | string[] = signal[dimName];
-                const currentSetting =
-                  currConcreteConfig.signals.domain[dimName];
+              if (!_.isEqual(currentSetting, axisSignal)) {
+                currMutateDomain[dimName]({
+                  val: newDomain,
+                });
+              }
 
-                if (!_.isEqual(currentSetting, axisSignal)) {
-                  newConfig = produce(newConfig, draft => {
-                    draft.signals.domain[dimName] = constNode(
-                      toWeaveType(axisSignal),
-                      axisSignal
-                    );
-                  });
-                }
-
-                // need to clear out the old selection, if there is one
-                newConfig = produce(newConfig, draft => {
+              // need to clear out the old selection, if there is one
+              currUpdateConfig2((oldConfig: PlotConfig) => {
+                return produce(oldConfig, draft => {
                   draft.signals.selection[dimName] = undefined;
                 });
-
-                currUpdateConfig(newConfig);
               });
-            } else {
-              ['x' as const, 'y' as const].forEach(dimName => {
-                const axisSignal: [number, number] | string[] = signal[dimName];
-                const currentSetting =
-                  currConcreteConfig.signals.domain[dimName];
-
-                if (!_.isEqual(currentSetting, axisSignal)) {
-                  if (!isConstNode(currConfig.signals.domain[dimName])) {
-                    currMutateDomain[dimName]({
-                      val: constNode(toWeaveType(axisSignal), axisSignal),
-                    });
-                  } else {
-                    currUpdateConfig2((oldConfig: PlotConfig) => {
-                      return produce(oldConfig, draft => {
-                        draft.signals.domain[dimName] = constNode(
-                          toWeaveType(axisSignal),
-                          axisSignal
-                        );
-                      });
-                    });
-                  }
-                }
-
-                // need to clear out the old selection, if there is one
-                currUpdateConfig2((oldConfig: PlotConfig) => {
-                  return produce(oldConfig, draft => {
-                    draft.signals.selection[dimName] = undefined;
-                  });
-                });
-              });
-            }
+            });
           } else {
             let newConfig = currConfig;
             ['x' as const, 'y' as const].forEach(dimName => {
@@ -2999,14 +3018,6 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
       vegaView.addEventListener('dblclick', async () => {
         const currConfig = configRef.current;
         const currMutateDomain = mutateDomainRef.current;
-        const currUpdateConfig = updateConfigRef.current;
-
-        const settingNodesAreConst = ['x' as const, 'y' as const].every(
-          dimName => {
-            const currentSettingNode = currConfig.signals.domain[dimName];
-            return isConstNode(currentSettingNode);
-          }
-        );
 
         if (
           ['x' as const, 'y' as const].some(dimName => {
@@ -3017,23 +3028,11 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
             );
           })
         ) {
-          if (settingNodesAreConst) {
-            // we can use updateConfig
-            let newConfig = currConfig;
-            ['x' as const, 'y' as const].forEach(dimName => {
-              newConfig = produce(newConfig, draft => {
-                // @ts-ignore
-                draft.signals.domain[dimName] = constNone();
-              });
+          ['x' as const, 'y' as const].forEach(dimName => {
+            currMutateDomain[dimName]({
+              val: constNode('none', null),
             });
-            currUpdateConfig(newConfig);
-          } else {
-            ['x' as const, 'y' as const].forEach(dimName => {
-              currMutateDomain[dimName]({
-                val: constNode('none', null),
-              });
-            });
-          }
+          });
         }
       });
       vegaView.addEventListener('mousedown', async () => {
@@ -3041,7 +3040,12 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
         currSetToolTipsEnabled(false);
       });
     },
-    [concreteConfig.signals.selection, concreteConfig.series.length, hasLine]
+    [
+      concreteConfig.series.length,
+      concreteConfig.signals.selection,
+      hasLine,
+      brushableAxes,
+    ]
   );
 
   const [toolTipPos, setTooltipPos] = useState<{
