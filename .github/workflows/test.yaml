@@ -49,7 +49,7 @@ jobs:
     container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:${{ github.sha }}
     steps:
       - uses: actions/checkout@v2
-      - run: pip freeze
+      - run: source /root/venv/bin/activate &&  pip freeze
 
   lint:
     name: Python lint
