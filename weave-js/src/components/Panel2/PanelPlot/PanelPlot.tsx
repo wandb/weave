@@ -2965,7 +2965,6 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
               } else {
                 newDomain = constNode(toWeaveType(axisSignal), axisSignal);
               }
-              console.log('NEW DOMAIN', newDomain);
 
               if (!_.isEqual(currentSetting, axisSignal)) {
                 currMutateDomain[dimName]({
