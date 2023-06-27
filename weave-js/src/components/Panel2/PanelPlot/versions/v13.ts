@@ -28,17 +28,6 @@ export type ConcretePlotConfig = Omit<
 export const migrate = (config: v12.PlotConfig): PlotConfig => {
   // if we have const nodes for x or y, we need to narrow the type by looking at the values
 
-  const newTypeFromValue = (value: any): weave.Type => {
-    const weaveType: weave.Type = toWeaveType(value);
-    if (weave.isAssignableTo(weaveType, weave.list('number'))) {
-      return weave.list('number');
-    } else if (weave.isAssignableTo(weaveType, weave.list('string'))) {
-      return weave.list('string');
-    } else {
-      return 'none';
-    }
-  };
-
   return {
     ...config,
     configVersion: 13,
@@ -47,13 +36,13 @@ export const migrate = (config: v12.PlotConfig): PlotConfig => {
       domain: {
         x: weave.isConstNode(config.signals.domain.x)
           ? weave.constNode(
-              newTypeFromValue(config.signals.domain.x.val),
+              toWeaveType(config.signals.domain.x.val),
               config.signals.domain.x.val
             )
           : config.signals.domain.x,
         y: weave.isConstNode(config.signals.domain.y)
           ? weave.constNode(
-              newTypeFromValue(config.signals.domain.y.val),
+              toWeaveType(config.signals.domain.y.val),
               config.signals.domain.y.val
             )
           : config.signals.domain.y,
