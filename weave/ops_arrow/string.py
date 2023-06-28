@@ -441,3 +441,14 @@ def join_to_str(arr, sep):
     return ArrowWeaveList(
         pc.binary_join(filled_arr, sep), types.String(), arr._artifact
     )
+
+
+@arrow_op(
+    name="ArrowWeaveListString-toInt",
+    input_type={"self": ArrowWeaveListType(types.String())},
+    output_type=ArrowWeaveListType(types.Int()),
+)
+def to_int(self):
+    arrow_data = self._arrow_data
+    new_data = arrow_data.cast(pa.int64())
+    return ArrowWeaveList(new_data, types.Int(), self._artifact)
