@@ -146,6 +146,7 @@ export const BASIC_MEDIA_TYPES: MediaType[] = [
   {type: 'table', columnTypes: {}},
   {type: 'joined-table', columnTypes: {}},
   {type: 'partitioned-table', columnTypes: {}},
+  {type: 'wb_trace_tree'},
 ];
 // TODO: make this systematic -- we should use some kind of registry
 // to ensure that every type is included
@@ -304,7 +305,8 @@ export type MediaType =
   | PytorchSavedModelType
   | TableType
   | JoinedTableType
-  | PartitionedTableType;
+  | PartitionedTableType
+  | WBTraceTreeType;
 
 export type MediaTypesWithoutPath = WBTraceTreeType;
 

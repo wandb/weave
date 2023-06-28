@@ -62,6 +62,8 @@ def history_key_type_count_to_weave_type(tc: TypeCount) -> types.Type:
         return ImageArtifactFileRefType()
     elif tc_type == "wb_trace_tree":
         return WBTraceTree.WeaveType()  # type: ignore
+    elif tc_type == "images/separated":
+        return types.List(ImageArtifactFileRefType())
     else:
         possible_type = wandb_stream_table.maybe_history_type_to_weave_type(tc_type)
         if possible_type is not None:

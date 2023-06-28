@@ -56,6 +56,8 @@ import {
   voidNode,
   withoutTags,
   filterNodes,
+  taggedValueValueType,
+  isTaggedValue,
 } from '@wandb/weave/core';
 import {produce} from 'immer';
 import _ from 'lodash';
@@ -2076,8 +2078,11 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
             if (!isTypedDict(rowType)) {
               throw new Error('expected typed dict');
             }
-            const mappedPropTypes = _.mapKeys(rowType.propertyTypes, (v, k) =>
-              PlotState.fixKeyForVega(k)
+            const mappedPropTypes = _.mapValues(
+              _.mapKeys(rowType.propertyTypes, (v, k) =>
+                PlotState.fixKeyForVega(k)
+              ),
+              (v, k) => (v && isTaggedValue(v) ? taggedValueValueType(v) : v)
             );
             const series = concreteConfig.series[row._seriesIndex];
             const seriesName = PlotState.defaultSeriesName(series, weave);
@@ -2135,6 +2140,7 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
           },
           {nodeValue, nodeType}
         );
+
         return constNodeUnsafe(typedDict(type), value);
       }
     );
