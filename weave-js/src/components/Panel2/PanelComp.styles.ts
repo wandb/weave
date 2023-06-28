@@ -78,7 +78,7 @@ export const DevQueryPopupLabel = styled.span`
 `;
 
 const gradient = keyframes`
-  { 
+  {
     0%   { background-position: 0 0; }
     100% { background-position: -200% 0; }
   }
@@ -125,6 +125,7 @@ export const GrowToParent = styled.div`
   width: 100%;
   height: 100%;
 `;
+GrowToParent.displayName = 'GrowToParent';
 
 export const FullScreenModal = styled(Modal.Content)`
   height: calc(90vh - 73px);
