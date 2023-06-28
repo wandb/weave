@@ -51,3 +51,5 @@ from .panel_legacy import *
 
 # top level board
 from .panel_board import Board, BoardPanel, BoardPanelLayout
+
+from .panel_stream_table import StreamTablePanel

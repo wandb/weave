@@ -17,10 +17,10 @@ from .. import weave_types
 from .. import artifact_base
 from .. import file_util
 from .. import graph
+from ..types.stream_table_type import StreamTableType
 
 if typing.TYPE_CHECKING:
     from wandb.sdk.internal.file_pusher import FilePusher
-    from ..ops_domain.stream_table_ops import StreamTableType
 
 
 # Shawn recommended we only encode leafs, but in my testing, nested structures
@@ -139,8 +139,6 @@ class StreamTable:
             self._log_row(row)
 
     def _ensure_weave_stream_table(self) -> "StreamTableType":
-        from ..ops_domain.stream_table_ops import StreamTableType
-
         if self._weave_stream_table is None:
             self._weave_stream_table = storage._direct_publish(
                 StreamTableType(
