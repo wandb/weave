@@ -37,9 +37,6 @@ class Value(_ValueOrErrorInterface[ValueType]):
         try:
             return Value(fn(self._value))
         except Exception as e:
-            # logging.error(e, exc_info=True)
-            if DEBUG:
-                raise e
             return Error(e)
 
     def apply_and_catch(
@@ -49,15 +46,16 @@ class Value(_ValueOrErrorInterface[ValueType]):
             fn(self._value)
             return self
         except Exception as e:
-            # logging.error(e, exc_info=True)
-            if DEBUG:
-                raise e
             return Error(e)
 
 
 @dataclasses.dataclass
 class Error(_ValueOrErrorInterface[typing.Any]):
     _error: Exception
+
+    def __post_init__(self) -> None:
+        if DEBUG:
+            raise self._error
 
     def unwrap(self) -> typing.Any:
         raise self._error

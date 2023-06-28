@@ -197,18 +197,13 @@ class TimeSeries(weave.Panel):
             input_node.type, weave.types.optional(weave.types.Timestamp())
         )
 
-        item_fn = weave_internal.const(
-            item_fn.val,
-            item_fn.type,
-        )
-
-        min_x_called = weave_internal.better_call_fn(col_fn, input_node).min()  # type: ignore
+        min_x_called = col_fn(input_node).min()  # type: ignore
         min_x = weave_internal.const(
             min_x_called,
             weave.types.Function(col_fn.type.input_types, min_x_called.type),  # type: ignore
         )
 
-        max_x_called = weave_internal.better_call_fn(col_fn, input_node).max()  # type: ignore
+        max_x_called = col_fn(input_node).max()  # type: ignore
         max_x = weave_internal.const(
             max_x_called,
             weave.types.Function(col_fn.type.input_types, max_x_called.type),  # type: ignore
@@ -216,35 +211,21 @@ class TimeSeries(weave.Panel):
 
         mark = weave_internal.const("bar")
 
-        label_node = first_column_of_type(
-            input_node.type,
-            weave.types.optional(
-                weave.types.union(
-                    weave.types.String(),
-                    weave.types.Boolean(),
-                )
-            ),
-        )[1]
-
-        label_node = weave_internal.const(
-            label_node.val,
-            label_node.type,
-        )
-
-        agg_node = weave_internal.define_fn(
-            {"group": input_node.type},  # type: ignore
-            lambda group: group.count(),
-        )
-
-        agg = weave_internal.const(
-            agg_node.val,
-            agg_node.type,
-        )
-
         config = TimeSeriesConfig(
             x=item_fn,
-            label=label_node,
-            agg=agg,
+            label=first_column_of_type(
+                input_node.type,
+                weave.types.optional(
+                    weave.types.union(
+                        weave.types.String(),
+                        weave.types.Boolean(),
+                    )
+                ),
+            )[1],
+            agg=weave_internal.define_fn(
+                {"group": input_node.type},  # type: ignore
+                lambda group: group.count(),
+            ),
             min_x=min_x,
             max_x=max_x,
             mark=mark,

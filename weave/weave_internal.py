@@ -122,7 +122,7 @@ def define_fn(
         raise errors.WeaveMakeFunctionError("function body expected const node.")
     if not isinstance(fnNode, graph.Node):
         raise errors.WeaveMakeFunctionError("output_type function must return a node.")
-    return graph.ConstNode(types.Function(parameters, fnNode.type), fnNode)
+    return const(fnNode, types.Function(parameters, fnNode.type))
 
 
 ENVType = typing.Union[graph.Node, typing.Callable[..., graph.Node]]
