@@ -4,6 +4,7 @@ import typing
 from . import weave_types as types
 from . import errors
 from . import ops
+from . import ops_domain
 
 
 class Weave0TypeJson(typing.TypedDict):
@@ -171,6 +172,10 @@ def _convert_type(old_type: Weave0TypeJson) -> types.Type:
         return types.Number()  # type: ignore
     elif is_python_object_type and old_type["params"].get("class_name") == "Molecule":
         return ops.MoleculeArtifactFileRef.WeaveType()  # type: ignore
+
+    elif old_type_name == "wb_trace_tree":
+        return ops_domain.trace_tree.WBTraceTree.WeaveType()  # type: ignore
+
     #
     # Table Types
     #
