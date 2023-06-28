@@ -1,7 +1,8 @@
 import pytest
+import wandb
 
 import weave
-from weave.weave_internal import define_fn, make_const_node
+from weave.weave_internal import define_fn, make_const_node, const
 from ..api import use
 from .. import graph
 from .. import weave_types as types
@@ -196,3 +197,45 @@ def test_compile_lambda_uniqueness():
     # a total of 15 nodes
     compiled = compile.compile([concatted])[0]
     assert count_nodes(compiled) == 15
+
+
+def test_compile_through_execution(user_by_api_key_in_env):
+    run = wandb.init(
+        project="project_exists", settings={"api_key": user_by_api_key_in_env.username}
+    )
+    for i in range(10):
+        run.log({"val": i, "cat": i % 2})
+    run.finish()
+
+    """
+    This test demonstrates successful execution when there is an explicit
+    const function instead of a direct node (resulting in an intermediate execution op)
+    """
+    history_node = weave.ops.project(run.entity, run.project).run(run.id).history2()
+    pick = const(history_node).pick("val")
+    res = weave.use(pick)
+    assert res.to_pylist_notags() == list(range(10))
+
+
+def test_compile_through_function_call(user_by_api_key_in_env):
+    run = wandb.init(
+        project="project_exists", settings={"api_key": user_by_api_key_in_env.username}
+    )
+    for i in range(10):
+        run.log({"val": i, "cat": i % 2})
+    run.finish()
+
+    """
+    This test demonstrates successful execution when there is an explicit
+    function-__call__ in the graph)
+    """
+    const_node = define_fn(
+        {"entity_name": types.String()},
+        lambda entity_name: (
+            weave.ops.project(entity_name, run.project).run(run.id).history2()
+        ),
+    )
+    (run.entity)
+    pick = const_node.pick("val")
+    res = weave.use(pick)
+    assert res.to_pylist_notags() == list(range(10))
