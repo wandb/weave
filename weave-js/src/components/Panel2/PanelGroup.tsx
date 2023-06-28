@@ -172,53 +172,6 @@ export const GroupItem = styled.div<{
         `}
 `;
 
-// This is a mapping from JS PanelIDs to their corresponding Python type name
-export const panelIdAlternativeMapping: {[jsId: string]: string} = {
-  // These are manually defined in Weave1 python panel module.
-  table: 'tablePanel',
-  number: 'PanelNumber',
-  string: 'PanelString',
-  boolean: 'PanelBoolean',
-  date: 'PanelDate',
-  // Below are defined in `panel_legacy.py`
-  barchart: 'PanelBarchart',
-  'web-viz': 'PanelWebViz',
-  'video-file': 'PanelVideoFile',
-  'model-file': 'PanelModelFile',
-  'id-count': 'PanelIdCount',
-  link: 'PanelLink',
-  'run-overview': 'PanelRunOverview',
-  none: 'PanelNone',
-  artifactVersionAliases: 'PanelArtifactVersionAliases',
-  netron: 'PanelNetron',
-  object: 'PanelObject',
-  'audio-file': 'PanelAudioFile',
-  'string-histogram': 'PanelStringHistogram',
-  rawimage: 'PanelRawimage',
-  'precomputed-histogram': 'PanelPrecomputedHistogram',
-  'image-file-compare': 'PanelImageFileCompare',
-  'molecule-file': 'PanelMoleculeFile',
-  'multi-histogram': 'PanelMultiHistogram',
-  'object3D-file': 'PanelObject3DFile',
-  'run-color': 'PanelRunColor',
-  'multi-string-histogram': 'PanelMultiStringHistogram',
-  dir: 'PanelDir',
-  'id-compare-count': 'PanelIdCompareCount',
-  jupyter: 'PanelJupyter',
-  'bokeh-file': 'PanelBokehFile',
-  ndarray: 'PanelNdarray',
-  'id-compare': 'PanelIdCompare',
-  unknown: 'PanelUnknown',
-  'image-file': 'PanelImageFile',
-  'project-overview': 'PanelProjectOverview',
-  textdiff: 'PanelTextdiff',
-  type: 'PanelType',
-  text: 'PanelText',
-  'string-compare': 'PanelStringCompare',
-  'debug-expression-graph': 'PanelDebugExpressionGraph',
-  tracer: 'PanelTracer',
-};
-
 export const fixChildData = (
   fullItem: ChildPanelFullConfig
 ): ChildPanelFullConfig => {

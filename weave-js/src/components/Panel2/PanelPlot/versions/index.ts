@@ -10,6 +10,7 @@ import * as v9 from './v9';
 import * as v10 from './v10';
 import * as v11 from './v11';
 import * as v12 from './v12';
+import * as v13 from './v13';
 
 export type {Scale, ScaleType} from './v10';
 export type {Signals} from './v12';
@@ -25,7 +26,7 @@ export const DEFAULT_SCALE_TYPE = v10.DEFAULT_SCALE_TYPE;
 export const LAZY_PATHS = v12.LAZY_PATHS;
 export const DEFAULT_LAZY_PATH_VALUES = v12.DEFAULT_LAZY_PATH_VALUES;
 
-const migrateCommon = migrator
+export const {migrate} = migrator
   .makeMigrator(v2.migrate)
   .add(v3.migrate)
   .add(v4.migrate)
@@ -35,9 +36,9 @@ const migrateCommon = migrator
   .add(v8.migrate)
   .add(v9.migrate)
   .add(v10.migrate)
-  .add(v11.migrate);
-
-export const {migrate} = migrateCommon.add(v12.migrate);
+  .add(v11.migrate)
+  .add(v12.migrate)
+  .add(v13.migrate);
 
 export type AnyPlotConfig = Parameters<typeof migrate>[number];
 export type PlotConfig = ReturnType<typeof migrate>;
@@ -52,5 +53,5 @@ export type ContinuousSelection = v11.ContinuousSelection;
 export type DiscreteSelection = v11.DiscreteSelection;
 export type AxisSelections = v11.AxisSelections;
 
-export type ConcretePlotConfig = v12.ConcretePlotConfig;
+export type ConcretePlotConfig = v13.ConcretePlotConfig;
 export type ConcreteSeriesConfig = ConcretePlotConfig['series'][number];
