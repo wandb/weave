@@ -174,7 +174,7 @@ def _convert_type(old_type: Weave0TypeJson) -> types.Type:
         return ops.MoleculeArtifactFileRef.WeaveType()  # type: ignore
 
     elif old_type_name == "wb_trace_tree":
-        return ops_domain.trace_tree.WBTraceTree.WeaveType()
+        return ops_domain.trace_tree.WBTraceTree.WeaveType()  # type: ignore
 
     #
     # Table Types
