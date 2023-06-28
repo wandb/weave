@@ -200,9 +200,7 @@ def test_compile_lambda_uniqueness():
 
 
 def test_compile_through_execution(user_by_api_key_in_env):
-    run = wandb.init(
-        project="project_exists", settings={"api_key": user_by_api_key_in_env.username}
-    )
+    run = wandb.init(project="project_exists")
     for i in range(10):
         run.log({"val": i, "cat": i % 2})
     run.finish()
@@ -218,9 +216,7 @@ def test_compile_through_execution(user_by_api_key_in_env):
 
 
 def test_compile_through_function_call(user_by_api_key_in_env):
-    run = wandb.init(
-        project="project_exists", settings={"api_key": user_by_api_key_in_env.username}
-    )
+    run = wandb.init(project="project_exists")
     for i in range(10):
         run.log({"val": i, "cat": i % 2})
     run.finish()

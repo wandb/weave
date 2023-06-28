@@ -5,9 +5,7 @@ from weave.ecosystem.wandb.panel_time_series import TimeSeries
 
 
 def test_panel_timeseries(user_by_api_key_in_env):
-    run = wandb.init(
-        project="project_exists", settings={"api_key": user_by_api_key_in_env.username}
-    )
+    run = wandb.init(project="project_exists")
     for i in range(10):
         time.sleep(0.2)
         run.log({"val": i, "cat": str(i % 2)})
