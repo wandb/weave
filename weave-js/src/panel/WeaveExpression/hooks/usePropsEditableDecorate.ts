@@ -1,9 +1,9 @@
 import {NodeEntry, Range, Text} from 'slate';
 import {getIndexForPoint} from '@wandb/weave/panel/WeaveExpression/util';
 import {SyntaxNode} from 'web-tree-sitter';
-import {useSlateEditorContext} from '@wandb/weave/panel/WeaveExpression/contexts/SlateEditorProvider';
-import {useCallback, useState} from 'react';
+import {useCallback, useRef} from 'react';
 import {useExpressionSuggestionsContext} from '@wandb/weave/panel/WeaveExpression/contexts/ExpressionSuggestionsProvider';
+import {useExpressionEditorContext} from '@wandb/weave/panel/WeaveExpression/contexts/ExpressionEditorProvider';
 
 // Provides the decorate callback to pass to Slate's Editable
 // component and implements syntax highlighting and styling
@@ -13,18 +13,20 @@ import {useExpressionSuggestionsContext} from '@wandb/weave/panel/WeaveExpressio
 export const usePropsEditableDecorate = () =>
   // rootNode?: SyntaxNode // TODO: confirm this is importing the right thing from the right place
   {
-    const {isFocused, activeNodeRange} = useSlateEditorContext();
+    console.log('run usePropsEditableDecorate');
+    const {slateEditor, isEditorFocused} = useExpressionEditorContext();
     // TODO: maybe ranges should be ref not state?
-    const [ranges, setRanges] = useState<Range[]>([]);
-    const {slateEditor} = useSlateEditorContext();
+    const ranges = useRef<Range[]>([]);
 
     const {
       parseResult: {parseTree: rootNode},
     } = useExpressionSuggestionsContext();
 
+    const {activeNodeRange} = slateEditor;
     const pushRange = useCallback(
       (r: Range) => {
-        if (!isFocused || activeNodeRange == null) {
+        // if (!isEditorFocused || activeNodeRange == null) {
+        if (activeNodeRange == null) {
           return;
         }
         // The active node range may lie across several ranges.  Any
@@ -39,14 +41,18 @@ export const usePropsEditableDecorate = () =>
         //   r.ACTIVE_NODE = true;
         // }
         // }
-        // TODO: rename ACTIVE_NODE to isActive
-        setRanges(prevRanges => [
-          ...prevRanges,
+        ranges.current = [
+          ...ranges.current,
           {...r, ACTIVE_NODE: activeNodeIntersect != null},
-        ]);
+        ];
+        // setRanges(prevRanges => [
+        //   ...prevRanges,
+        //   // TODO: rename ACTIVE_NODE to isActive
+        //   {...r, ACTIVE_NODE: activeNodeIntersect != null},
+        // ]);
         // ranges.push(r);
       },
-      [activeNodeRange, isFocused]
+      [activeNodeRange]
     );
 
     const pushRangesForNode = useCallback(
@@ -93,17 +99,28 @@ export const usePropsEditableDecorate = () =>
     // Each line is passed separately, so we pass the parse tree
     // separately and apply some arithmetic to get to the right
     // offset(s)
+    // decorate returns an array of ranges with marks applied
     const decorateCallback = useCallback(
-      ([node, path]: NodeEntry) => {
-        // decorate returns an array of ranges with marks applied
+      ([node, path]: NodeEntry): Range[] => {
         // const ranges: Range[] = [];
 
         // const editorIsFocused = ReactEditor.isFocused(editor);
+        console.log('run decorateCallback', {
+          rootNode,
+          slateEditor,
+          node,
+          path,
+        });
 
         if (rootNode == null || !Text.isText(node)) {
+          console.log(
+            'decorate: returning empty ranges',
+            rootNode == null,
+            !Text.isText(node)
+          );
           // Can't do highlighting if there's no parse tree and ignore non-text nodes
           // TODO: this should probably return []?
-          return ranges;
+          return ranges.current;
         }
 
         // baseOffset is relative to the editor's entire contents, not just this node.
@@ -121,9 +138,12 @@ export const usePropsEditableDecorate = () =>
           pushRangesForNode({parseNode, typeStack: [], path, baseOffset});
         }
 
-        return ranges;
+        return ranges.current;
       },
-      [rootNode, slateEditor, ranges, pushRangesForNode]
+      // [rootNode, slateEditor, ranges, pushRangesForNode]
+      // [rootNode, ranges, pushRangesForNode]
+        TODO: working on this infinite loop
+      [rootNode, slateEditor]
     );
 
     return decorateCallback;

@@ -16,7 +16,7 @@ import {
 } from '@wandb/weave/panel/WeaveExpression/util';
 import * as Sentry from '@sentry/react';
 import {SuggestionsProps} from '@wandb/weave/panel/WeaveExpression/contexts/ExpressionSuggestionsProvider';
-import {useSlateEditorContext} from '@wandb/weave/panel/WeaveExpression/contexts/SlateEditorProvider';
+import {useExpressionEditorContext} from '@wandb/weave/panel/WeaveExpression/contexts/ExpressionEditorProvider';
 
 const DEFAULT_SUGGESTIONS: SuggestionsProps = {
   node: voidNode(),
@@ -33,7 +33,7 @@ export const useSuggestionsForParsedExpression = ({
   const weave = useWeaveContext();
   const {stack} = usePanelContext();
   const {expr, extraText, parseTree, nodeMap} = expressionResult;
-  const {slateEditor} = useSlateEditorContext();
+  const {slateEditor} = useExpressionEditorContext();
 
   // TODO: this is just to get it compiling, but why do we need target, separate from expr?
   const target = expr;

@@ -6,11 +6,12 @@ import {useCallback, useEffect, useState} from 'react';
 import {ExpressionResult, voidNode} from '@wandb/weave/core';
 import {trace} from '@wandb/weave/panel/WeaveExpression/util';
 import * as Sentry from '@sentry/react';
+import {useExpressionEditorText} from '@wandb/weave/panel/WeaveExpression/contexts/ExpressionEditorProvider';
 
 const DEFAULT_PARSED_TEXT: ExpressionResult = {
   expr: voidNode(),
 };
-export const useParsedText = ({editorText}: {editorText: string}) => {
+export const useParsedText = () => {
   // TODO: maybe grab editortext from context instead of props?
   const weave = useWeaveContext();
   const {stack} = usePanelContext();
@@ -22,6 +23,9 @@ export const useParsedText = ({editorText}: {editorText: string}) => {
   // // TODO: is this the right place for tsRoot? and why is it called tsRoot??
   // const [tsRoot, setTsRoot] = useState<SyntaxNode | undefined>(undefined);
 
+  const editorText = useExpressionEditorText();
+
+  // TODO: don't pass weave into here, i think.
   const parseText = useCallback(
     async (text: string) => {
       setIsParsingText(true);

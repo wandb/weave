@@ -48,10 +48,15 @@ export function useGenericContext<T = unknown>({
   displayName: string;
 }) {
   // TODO: we're skipping a null check here...
-  const context = registeredContexts.get(displayName) as React.Context<
-    GenericProviderProps<T>
-  >;
-  // const {allowUndefined = false, value} = useContext(
+  const context = registeredContexts.get(displayName);
+  if (context == null) {
+    console.log(registeredContexts);
+    throw new Error(`ProviderError: Can't find ${displayName}`);
+  }
+  // as React.Context<
+  //   GenericProviderProps<T>
+  // >;
+  // const {allowUndefined = false, value} = useContext
   //   // TODO: is there a smarter way to type this?
   //   GenericContext as React.Context<GenericProviderProps<T>>
   // );
@@ -60,7 +65,9 @@ export function useGenericContext<T = unknown>({
   //   return;
   // }
   // TODO: better name. contextValue.value is stupid
-  const contextValue = useContext(context);
+  const contextValue = useContext(
+    context as React.Context<GenericProviderProps<T>>
+  );
   const {allowUndefined = false, value} = contextValue;
   // findOrCreateGenericContext<T>(displayName);
   // TODO: change console.log to trace
@@ -74,10 +81,9 @@ export function useGenericContext<T = unknown>({
   //   //   GenericContext as React.Context<GenericProviderProps<T>>
   //   // )
   // );
-  // TODO: make error message not generic
   if (value == null && !allowUndefined) {
     throw new Error(
-      'useGenericContext must be used inside of a <GenericContextProvider>'
+      `GenericProvider: use${displayName} must be used inside of a <${displayName}Provider>`
     );
   }
   return value;

@@ -2,7 +2,7 @@ import {FC, useCallback, useEffect, useMemo} from 'react';
 import {Button} from 'semantic-ui-react';
 import {Editor, Element} from 'slate';
 import {ReactEditor} from 'slate-react';
-import {useSlateEditorContext} from '@wandb/weave/panel/WeaveExpression/contexts/SlateEditorProvider';
+import {useExpressionEditorContext} from '@wandb/weave/panel/WeaveExpression/contexts/ExpressionEditorProvider';
 import {usePropsContext} from '@wandb/weave/panel/WeaveExpression/contexts/PropsProvider';
 import {WeaveExpressionProps} from '@wandb/weave/panel/WeaveExpression/WeaveExpression';
 import {useExpressionSuggestionsContext} from '@wandb/weave/panel/WeaveExpression/contexts/ExpressionSuggestionsProvider';
@@ -41,7 +41,7 @@ export const useRunButton = () => {
   } = usePropsContext();
   const {isValid, isDirty, isLoading, acceptSelectedSuggestion} =
     useExpressionSuggestionsContext();
-  const {isFocused, isEmpty} = useSlateEditorContext();
+  const {isEditorFocused, isEditorEmpty} = useExpressionEditorContext();
   // const {
   //   isFocused,
   //   weaveExpressionState: {isBusy, isDirty, isValid, applyPendingExpr},
@@ -51,9 +51,9 @@ export const useRunButton = () => {
   const isHidden =
     isLiveUpdateEnabled ||
     !isValid ||
-    (isTruncated && !isFocused) ||
+    (isTruncated && !isEditorFocused) ||
     // TODO: move the editor check to slate hook
-    (!isDirty && (!isFocused || isEmpty)); // Editor.string(slateEditor, []).trim() === ''));
+    (!isDirty && (!isEditorFocused || isEditorEmpty)); // Editor.string(slateEditor, []).trim() === ''));
 
   const {naturalLeft, maxLeft, grandOffset} = useRunButtonPosition();
 
@@ -85,7 +85,7 @@ export const useRunButton = () => {
 
 // (window as any).Ed = Editor;
 export const useRunButtonPosition = () => {
-  const {slateEditor} = useSlateEditorContext();
+  const {slateEditor} = useExpressionEditorContext();
   const {expressionEditorDomRef, runButtonDomRef} = useDomRefContext();
 
   // (window as any).ed = slateEditor;

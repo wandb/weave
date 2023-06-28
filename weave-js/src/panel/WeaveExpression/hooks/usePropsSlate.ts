@@ -1,10 +1,9 @@
-import {Slate} from 'slate-react';
+import {Slate, withReact} from 'slate-react';
 import React, {useMemo} from 'react';
-import {useExpressionSuggestionsContext} from '@wandb/weave/panel/WeaveExpression/contexts/ExpressionSuggestionsProvider';
-import {usePropsContext} from '@wandb/weave/panel/WeaveExpression/contexts/PropsProvider';
-import {useSlateEditorContext} from '@wandb/weave/panel/WeaveExpression/contexts/SlateEditorProvider';
+import {withHistory} from 'slate-history';
+import {createEditor} from 'slate';
 
-type PropsSlate = Omit<Parameters<typeof Slate>[0], 'children' | 'editor'>;
+type PropsSlate = Omit<Parameters<typeof Slate>[0], 'children'>;
 
 const DEFAULT_SLATEVALUE = [
   {
@@ -15,30 +14,29 @@ const DEFAULT_SLATEVALUE = [
 
 // Returns props to pass to slate-react's <Slate> component
 export const usePropsSlate = (): PropsSlate => {
+  const slateEditor = withReact(withHistory(createEditor())); // as any))
   // const {clearSelectedSuggestion} = useExpressionSuggestionsContext();
   // TODO: we might actually just want clearSelectedSuggestion. that won't reset suggestions, just the dropdown selection
-  const {expression} = usePropsContext();
-  const {clearSuggestions} = useExpressionSuggestionsContext();
-  const {slateValue, setSlateValue} = useSlateEditorContext();
+  // const {expression} = usePropsContext();
+  // TODO: re-enable clearSuggestions and setSlateValue? or maybe we don't need slate value, just get it from editor
+  // const {clearSuggestions} = useExpressionSuggestionsContext();
+  // const {setSlateValue} = useExpressionEditorContext();
   // Wrap onChange so that we reset suggestion index back to top
   // on any interaction
-  const onChange = React.useCallback(
-    newValue => {
-      // setSuggestionIndex(0);
-      // clearSelectedSuggestion();
-      clearSuggestions();
-      setSlateValue(newValue);
-      // propsOnChange?.(newValue, stack); // TODO: do we need to pass stack in? look at onchange props
-    },
-    [clearSuggestions, setSlateValue]
-  );
-  console.log({expression, slateValue});
+  const onChange = React.useCallback(newValue => {
+    // setSuggestionIndex(0);
+    // clearSelectedSuggestion();
+    // clearSuggestions();
+    // setSlateValue(newValue);
+    // propsOnChange?.(newValue, stack); // TODO: do we need to pass stack in? look at onchange props
+  }, []);
+  // console.log({expression, slateValue});
 
   // These are the props passed to slate-react's <Slate> component
   return useMemo(
     () =>
       ({
-        // initialValue: {text: ''},
+        editor: slateEditor,
         initialValue: DEFAULT_SLATEVALUE,
         // initialValue: [
         //   {
@@ -48,6 +46,6 @@ export const usePropsSlate = (): PropsSlate => {
         // ], // TODO: get an actual value
         onChange,
       } as PropsSlate),
-    [onChange]
+    [onChange, slateEditor]
   );
 };

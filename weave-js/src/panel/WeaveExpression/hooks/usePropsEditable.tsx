@@ -5,11 +5,11 @@ import {Editor} from 'slate';
 import {RenderLeafProps} from 'slate-react';
 import {Leaf} from '@wandb/weave/panel/WeaveExpression/leaf';
 import {EditableProps} from 'slate-react/dist/components/editable';
-import {useSlateEditorContext} from '@wandb/weave/panel/WeaveExpression/contexts/SlateEditorProvider';
 import {WeaveExpressionProps} from '@wandb/weave/panel/WeaveExpression/WeaveExpression';
 import {useExpressionSuggestionsContext} from '@wandb/weave/panel/WeaveExpression/contexts/ExpressionSuggestionsProvider';
 import {usePropsContext} from '@wandb/weave/panel/WeaveExpression/contexts/PropsProvider';
 import {usePropsEditableDecorate} from '@wandb/weave/panel/WeaveExpression/hooks/usePropsEditableDecorate';
+import {useExpressionEditorContext} from '@wandb/weave/panel/WeaveExpression/contexts/ExpressionEditorProvider';
 
 export type PropsEditableInput = Pick<
   WeaveExpressionProps,
@@ -19,7 +19,7 @@ export type PropsEditableInput = Pick<
 // Returns props to be passed to the <Editable> component
 export const usePropsEditable = () => {
   // const {onBlur: propsOnBlur, onFocus: propsOnFocus} = usePropsContext();
-  const {slateEditor} = useSlateEditorContext();
+  const {slateEditor} = useExpressionEditorContext();
   const x = usePropsContext();
   console.log('=== props context', x);
 
@@ -31,10 +31,14 @@ export const usePropsEditable = () => {
     },
   } = usePropsContext() || {};
   const {isValid} = useExpressionSuggestionsContext();
-  const className = classNames('weaveExpressionSlateEditable', {
-    isValid,
-    isTruncated,
-  });
+  const className = useMemo(
+    () =>
+      classNames('weaveExpressionSlateEditable', {
+        // isValid,
+        // isTruncated,
+      }),
+    []
+  );
   const decorate = usePropsEditableDecorate();
   // TODO: get this working again!!
   // const {onKeyDown} = useWeaveExpressionHotkeys();
@@ -54,7 +58,7 @@ export const usePropsEditable = () => {
   );
 
   // TODO: move to visibility context, probably
-  // TODO: this is def wrong. there's an isFocused somewhere else too
+  // TODO: this is def wrong. there's an isFocused in ExpressionEditorProvider
   const [isFocused, setIsFocused] = useState(false);
 
   const onBlur = useCallback(

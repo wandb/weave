@@ -1,4 +1,4 @@
-import {SlateEditorProviderInput} from '@wandb/weave/panel/WeaveExpression/contexts/SlateEditorProvider';
+import {ExpressionEditorProviderInput} from '@wandb/weave/panel/WeaveExpression/contexts/ExpressionEditorProvider';
 import {ExpressionSuggestionsProviderInput} from '@wandb/weave/panel/WeaveExpression/contexts/ExpressionSuggestionsProvider';
 import {PropsEditableInput} from '@wandb/weave/panel/WeaveExpression/hooks/usePropsEditable';
 import React, {FC, PropsWithChildren, useMemo} from 'react';
@@ -14,7 +14,7 @@ interface PropsProviderInput {
 }
 
 interface PropsProviderOutput {
-  slateEditorProviderInput: SlateEditorProviderInput;
+  expressionEditorProviderInput: ExpressionEditorProviderInput;
   expressionSuggestionsProviderInput: ExpressionSuggestionsProviderInput;
   propsEditableInput: PropsEditableInput;
   propsRunButtonInput: PropsRunButtonInput;
@@ -36,7 +36,7 @@ export const PropsProvider: FC<PropsWithChildren<PropsProviderInput>> = ({
   },
   children,
 }) => {
-  const slateEditorProviderInput: SlateEditorProviderInput = useMemo(
+  const expressionEditorProviderInput: ExpressionEditorProviderInput = useMemo(
     () => ({
       onMount,
     }),
@@ -65,14 +65,14 @@ export const PropsProvider: FC<PropsWithChildren<PropsProviderInput>> = ({
 
   const contextValue: PropsProviderOutput = useMemo(
     () => ({
-      slateEditorProviderInput,
+      expressionEditorProviderInput,
       expressionSuggestionsProviderInput,
       propsEditableInput,
       propsRunButtonInput,
       expression,
     }),
     [
-      slateEditorProviderInput,
+      expressionEditorProviderInput,
       expressionSuggestionsProviderInput,
       propsEditableInput,
       propsRunButtonInput,

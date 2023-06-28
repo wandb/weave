@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {FC, useState} from 'react';
 import {Editor, Transforms} from 'slate';
 import {Editable, ReactEditor, Slate} from 'slate-react';
 
@@ -6,10 +6,6 @@ import classNames from 'classnames';
 
 import './styles/WeaveExpression.less';
 import {EditingNode, NodeOrVoidNode} from '@wandb/weave/core';
-import {
-  SlateEditorProvider,
-  useSlateEditorContext,
-} from '@wandb/weave/panel/WeaveExpression/contexts/SlateEditorProvider';
 import {ExpressionSuggestionsProvider} from '@wandb/weave/panel/WeaveExpression/contexts/ExpressionSuggestionsProvider';
 import {PropsProvider} from '@wandb/weave/panel/WeaveExpression/contexts/PropsProvider';
 import {usePropsEditable} from '@wandb/weave/panel/WeaveExpression/hooks/usePropsEditable';
@@ -19,6 +15,10 @@ import {
   useDomRefContext,
 } from '@wandb/weave/panel/WeaveExpression/contexts/DomRefProvider';
 import {Suggestions} from '@wandb/weave/panel/WeaveExpression/suggestions';
+import {
+  ExpressionEditorProvider,
+  useExpressionEditorContext,
+} from '@wandb/weave/panel/WeaveExpression/contexts/ExpressionEditorProvider';
 
 // We attach some stuff to the window for test automation (see automation.ts)
 declare global {
@@ -57,27 +57,38 @@ export interface WeaveExpressionProps {
 }
 
 export const WeaveExpression = (props: WeaveExpressionProps) => {
-  // TODO: working on this
-  // <Slate> needs to move outside of <SlateEditorProvider>
   return (
     <PropsProvider value={props}>
       <DomRefProvider>
-        <SlateEditorProvider>
-          <ExpressionSuggestionsProvider>
-            <WeaveExpressionComp />
-          </ExpressionSuggestionsProvider>
-        </SlateEditorProvider>
+        <SlateEditor>
+          <ExpressionEditorProvider>
+            <ExpressionSuggestionsProvider>
+              <WeaveExpressionComp />
+            </ExpressionSuggestionsProvider>
+          </ExpressionEditorProvider>
+        </SlateEditor>
       </DomRefProvider>
     </PropsProvider>
   );
 };
 
+// TODO: move this
+const SlateEditor: FC = ({children}) => {
+  const slateComponentProps = usePropsSlate();
+  return (
+    <div spellCheck="false">
+      {/* TODO: ^ move this spellcheck thing elsewhere */}
+      <Slate {...slateComponentProps}>{children}</Slate>
+    </div>
+  );
+};
+
+// TODO: rename to ExpressionEditor?
 export const WeaveExpressionComp: React.FC = () => {
   // const weave = useWeaveContext();
   // const {stack} = usePanelContext();
-  const {slateEditor, slateEditorId} = useSlateEditorContext();
+  const {slateEditorId} = useExpressionEditorContext();
   const editableComponentProps = usePropsEditable();
-  const slateComponentProps = usePropsSlate();
   const {expressionEditorDomRef} = useDomRefContext();
 
   // TODO: figure out what noBox was for and re-enable it
@@ -120,54 +131,49 @@ export const WeaveExpressionComp: React.FC = () => {
   //   `suppressSuggestions`,
   //   suppressSuggestions
   // );
+  console.log(
+    '******** editableComponentProps',
+    JSON.stringify(editableComponentProps)
+  );
 
   return (
-    <div spellCheck="false">
-      {/* TODO: ^ move this spellcheck thing elsewhere */}
-      <Slate
-        editor={slateEditor}
-        {...slateComponentProps}
-        // TODO: need to get actual slateValue!!
-        // value={slateValue}
-        // onChange={onChangeResetSuggestion}
+    <>
+      {/* TODO: do we need this random div? */}
+      <div
+        className={classNames('weaveExpression', {hasBox: !noBox})}
+        ref={expressionEditorDomRef}
+        data-test="expression-editor-container"
+        data-test-ee-id={slateEditorId}
+        // noBox={props.noBox}
       >
-        {/* TODO: do we need this random div? */}
-        <div
-          className={classNames('weaveExpression', {hasBox: !noBox})}
-          ref={expressionEditorDomRef}
-          data-test="expression-editor-container"
-          data-test-ee-id={slateEditorId}
-          // noBox={props.noBox}
-        >
-          <Editable
-            {...editableComponentProps}
+        <Editable
+          {...editableComponentProps}
 
-            // className={classNames('weaveExpressionSlateEditable', {
-            //   isValid,
-            //   isTruncated,
-            // })}
-            // decorate={slateDecorator}
-            // onCopy={copyHandler}
-            // onKeyDown={keyDownHandler}
-            // onBlur={onBlur}
-            // onFocus={onFocus}
-            // renderLeaf={leafProps => (
-            //   <Leaf {...leafProps} children={undefined} />
-            // )}
-            // style={{overflowWrap: 'anywhere'}}
-          />
-          {/* TODO: re-enable this button */}
-          {/*<RunExpressionButton />*/}
-        </div>
-        <Suggestions
-
-        // TODO: re-enable forceHidden?
-        // forceHidden={suppressSuggestions || isBusy}
-        // {...suggestions}
-        // suggestionIndex={suggestionIndex}
+          // className={classNames('weaveExpressionSlateEditable', {
+          //   isValid,
+          //   isTruncated,
+          // })}
+          // decorate={slateDecorator}
+          // onCopy={copyHandler}
+          // onKeyDown={keyDownHandler}
+          // onBlur={onBlur}
+          // onFocus={onFocus}
+          // renderLeaf={leafProps => (
+          //   <Leaf {...leafProps} children={undefined} />
+          // )}
+          // style={{overflowWrap: 'anywhere'}}
         />
-      </Slate>
-    </div>
+        {/* TODO: re-enable this button */}
+        {/*<RunExpressionButton />*/}
+      </div>
+      <Suggestions
+
+      // TODO: re-enable forceHidden?
+      // forceHidden={suppressSuggestions || isBusy}
+      // {...suggestions}
+      // suggestionIndex={suggestionIndex}
+      />
+    </>
   );
 };
 

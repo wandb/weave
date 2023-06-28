@@ -1,7 +1,7 @@
 // This creates and manages the Slate editor for the WeaveExpression component.
 import React, {FC, useEffect, useMemo, useRef, useState} from 'react';
 import {createEditor, Editor, Node as SlateNode} from 'slate';
-import {ReactEditor, withReact} from 'slate-react';
+import {ReactEditor, useSlate, withReact} from 'slate-react';
 import {withHistory} from 'slate-history';
 import {ID, voidNode} from '@wandb/weave/core';
 import {
@@ -13,11 +13,15 @@ import {usePropsContext} from '@wandb/weave/panel/WeaveExpression/contexts/Props
 import {CustomRange} from '../../../../custom-slate';
 import {useWeaveContext} from '@wandb/weave/context';
 
-export type SlateEditorProviderInput = Pick<WeaveExpressionProps, 'onMount'>;
+export type ExpressionEditorProviderInput = Pick<
+  WeaveExpressionProps,
+  'onMount'
+>;
 
-interface SlateEditorProviderOutput {
-  isFocused: boolean;
-  isEmpty: boolean;
+interface ExpressionEditorProviderOutput {
+  isEditorFocused: boolean;
+  isEditorEmpty: boolean;
+  // TODO: do we need to export activeNodeRange? can we get it from a slate hook?
   // TODO: revisit the CustomRange type. import is weird, what's ../../../../custom-slate?
   activeNodeRange: CustomRange | null | undefined;
   slateEditorId: string;
@@ -27,28 +31,28 @@ interface SlateEditorProviderOutput {
   setSlateValue(value: SlateNode[]): void;
 }
 
-export const SlateEditorProvider: FC = ({children}) => {
-  const {slateEditorProviderInput} = usePropsContext();
-  const contextValue: SlateEditorProviderOutput = useSlateEditor(
-    slateEditorProviderInput
+export const ExpressionEditorProvider: FC = ({children}) => {
+  const {expressionEditorProviderInput} = usePropsContext();
+  const contextValue: ExpressionEditorProviderOutput = useExpressionEditor(
+    expressionEditorProviderInput
   );
   return (
-    <GenericProvider<SlateEditorProviderOutput>
+    <GenericProvider<ExpressionEditorProviderOutput>
       value={contextValue}
-      displayName="SlateEditorContext">
+      displayName="ExpressionEditorContext">
       {children}
     </GenericProvider>
   );
 };
 
-export const useSlateEditorContext = () =>
-  useGenericContext<SlateEditorProviderOutput>({
-    displayName: 'SlateEditorContext',
+export const useExpressionEditorContext = () =>
+  useGenericContext<ExpressionEditorProviderOutput>({
+    displayName: 'ExpressionEditorContext',
   });
 
-const useSlateEditor = (
-  input?: SlateEditorProviderInput
-): SlateEditorProviderOutput => {
+const useExpressionEditor = (
+  input?: ExpressionEditorProviderInput
+): ExpressionEditorProviderOutput => {
   const {onMount} = input || {};
   // const {stack} = usePanelContext();
 
@@ -57,13 +61,15 @@ const useSlateEditor = (
   // TODO: not sure if useRef is the right thing. maybe useSlateStatic or useSlateWithV
   // TODO: ok actually i think this is wrong. we need to pass slate editor into the <Slate> component
   // and then just useSlate to get the editor. don't need to store editor here.
-  const slateEditor = useRef(editor).current;
+  // const slateEditor = useRef(editor).current;
+  const slateEditor = useSlate();
   const slateEditorId = useRef(ID()).current;
-  const editorText = useSlateEditorText();
+  const slateEditorText = useExpressionEditorText();
+  // TODO: this slatevalue thing is wrong i think. we should get value from useSlate?
   const [slateValue, setSlateValue] = useState<SlateNode[]>([
     {
       type: 'paragraph',
-      children: [{text: editorText}],
+      children: [{text: slateEditorText}],
     },
   ]);
 
@@ -79,11 +85,13 @@ const useSlateEditor = (
   //   props,
   //   slateEditor, // TODO: do we need to pass this in?
   // });
-  const isFocused = ReactEditor.isFocused(slateEditor);
+  const isEditorFocused = ReactEditor.isFocused(slateEditor);
   const {activeNodeRange} = slateEditor;
 
+  console.log('Ed.string', Editor.string(slateEditor, []).trim() === '');
+  console.log('slateEditorText', slateEditorText.trim() === '');
   // TODO: fix this
-  const isEmpty = true; // Editor.string(slateEditor, []).trim() === '';
+  const isEditorEmpty = Editor.string(slateEditor, []).trim() === '';
   // TODO: revive this, to get tests passing? or figure out a better way to test
   // Store the editor on the window, so we can modify its state
   // from automation.ts (test automation)
@@ -104,9 +112,9 @@ const useSlateEditor = (
   // TODO: split up this memo
   return useMemo(
     () => ({
-      isFocused,
-      isEmpty,
-      activeNodeRange,
+      isEditorFocused,
+      isEditorEmpty,
+      activeNodeRange, // TODO: does this need to be exported?
       slateEditorId,
       slateEditor,
       slateValue,
@@ -114,8 +122,8 @@ const useSlateEditor = (
     }),
     [
       activeNodeRange,
-      isEmpty,
-      isFocused,
+      isEditorEmpty,
+      isEditorFocused,
       slateEditor,
       slateEditorId,
       slateValue,
@@ -124,7 +132,8 @@ const useSlateEditor = (
 };
 
 // TODO: is this dumb? or maybe move elsewhere?
-export const useSlateEditorText = () => {
+// TODO: q: how is editorText different from Editor.string(slateEditor, [])?
+export const useExpressionEditorText = () => {
   // const {expToString} = useWeaveContext(); // should exptostring even be in weavecontext?
   const weave = useWeaveContext();
   const {expression} = usePropsContext();

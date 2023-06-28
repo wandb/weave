@@ -31,7 +31,6 @@ export class Weave implements WeaveInterface {
   private readonly languageBinding: LanguageBinding;
 
   constructor(readonly client: Client) {
-    console.log('Weave constructor', this);
     this.languageBinding = new JSLanguageBinding(this);
   }
 
@@ -98,7 +97,6 @@ export class Weave implements WeaveInterface {
   }
 
   expToString(node: EditingNode, indent: number | null = 0): string {
-    console.log('expToString', this, this.languageBinding);
     return this.languageBinding.printGraph(node, indent);
   }
 

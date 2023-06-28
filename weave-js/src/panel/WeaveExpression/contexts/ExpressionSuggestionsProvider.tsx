@@ -17,16 +17,13 @@ import {
   useSuggestionsDropdown,
 } from '@wandb/weave/panel/WeaveExpression/hooks/useSuggestionsDropdown';
 import {
-  useSlateEditorContext,
-  useSlateEditorText,
-} from '@wandb/weave/panel/WeaveExpression/contexts/SlateEditorProvider';
-import {
   GenericProvider,
   useGenericContext,
 } from '@wandb/weave/panel/WeaveExpression/contexts/GenericProvider';
 import {WeaveExpressionProps} from '@wandb/weave/panel/WeaveExpression/WeaveExpression';
 import {usePropsContext} from '@wandb/weave/panel/WeaveExpression/contexts/PropsProvider';
 import {useWeaveContext} from '@wandb/weave/context';
+import {useExpressionEditorContext} from '@wandb/weave/panel/WeaveExpression/contexts/ExpressionEditorProvider';
 
 // TODO: figure out why this is necessary. what are the two different cases?
 // revive it if necessary
@@ -51,7 +48,7 @@ export interface SuggestionsProps {
 
 export type ExpressionSuggestionsProviderInput = Pick<
   WeaveExpressionProps,
-  'expression' | 'setExpression' | 'isLiveUpdateEnabled'
+  'setExpression' | 'isLiveUpdateEnabled'
 >;
 
 interface ExpressionSuggestionsProviderOutput {
@@ -90,7 +87,7 @@ const useExpressionSuggestions = (options?: {
 }): ExpressionSuggestionsProviderOutput => {
   const {
     expressionSuggestionsProviderInput: {
-      expression,
+      // expression,
       setExpression,
       isLiveUpdateEnabled = false,
     } = {}, // TODO: this seems like the wrong place to set this default
@@ -102,7 +99,7 @@ const useExpressionSuggestions = (options?: {
   // - props.slateStaticEditor - maybe?
   // - props.isLiveUpdateEnabled
 
-  const {slateEditor} = useSlateEditorContext();
+  const {slateEditor, isEditorEmpty} = useExpressionEditorContext();
   // If we are passed a slateStaticEditor, use that, otherwise use the one from context
   // TODO: figure out why this is necessary. what are the two different cases?
   const editor = options?.slateStaticEditor || slateEditor;
@@ -112,12 +109,11 @@ const useExpressionSuggestions = (options?: {
   const [isDirty, setIsDirty] = useState(false);
 
   const convertExpressionToString = useConvertExpressionToString();
-  const editorText = useSlateEditorText();
-  console.log({editorText, expression});
+  // console.log({editorText, expression});
 
   // TODO: we have the expression from the props, but also from parseResult. reconcile them.
   // ah i think maybe the parseResult should be a pending expression. when it's accepted, the props.expression changes
-  const {isParsingText, parseResult} = useParsedText({editorText});
+  const {isParsingText, parseResult} = useParsedText();
 
   // TODO: better naming
   const {expr: pendingExpression, extraText: pendingExpressionExtraText} =
@@ -127,7 +123,8 @@ const useExpressionSuggestions = (options?: {
   // validate the parsed expression
   useEffect(() => {
     const expressionIsValid =
-      editorText.length > 0 && // TODO: we might not need this check... shouldn't pendingExpressionType be invalid if the text is empty?
+      !isEditorEmpty &&
+      // editorText.length > 0 && // TODO: we might not need this check... shouldn't pendingExpressionType be invalid if the text is empty?
       pendingExpressionType !== 'invalid' &&
       pendingExpressionExtraText == null;
     // TODO: compare to old validation below -- editor children?
@@ -140,7 +137,7 @@ const useExpressionSuggestions = (options?: {
     //         !isVoidNode(this.parseState.expr as NodeOrVoidNode))
     // );
     setIsValid(expressionIsValid);
-  }, [editorText, pendingExpressionExtraText, pendingExpressionType]);
+  }, [isEditorEmpty, pendingExpressionExtraText, pendingExpressionType]);
 
   // TODO: rename this
   const updateExpression = useCallback(
