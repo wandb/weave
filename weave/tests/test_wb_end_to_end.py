@@ -62,7 +62,7 @@ def _test_basic_publish(user_fixture):
     assert weave.ref_base.Ref.from_str(uri).get() == [1, 2, 3]
 
 
-def test_compile_through_execution(user_by_api_key_in_env):
+def test_compile_through_execution(user_by_api_key_netrc):
     run = wandb.init(project="project_exists")
     for i in range(10):
         run.log({"val": i, "cat": i % 2})
