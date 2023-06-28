@@ -1,3 +1,6 @@
+/**
+ * Keep these colors in sync with what is in tailwind.config.js
+ */
 export const WHITE = '#FFFFFF';
 export const MOONBEAM = '#EDE8FF';
 export const OBLIVION = '#15181F';
