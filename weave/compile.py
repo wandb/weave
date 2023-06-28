@@ -429,17 +429,16 @@ def _resolve_function_calls(node: graph.Node) -> typing.Optional[graph.Node]:
 
     inputs = list(node.from_op.inputs.values())
     fn_node = inputs[0]
-    if not isinstance(fn_node, graph.ConstNode):
+    if not (
+        isinstance(fn_node, graph.ConstNode)
+        and isinstance(fn_node.type, types.Function)
+    ):
         return node
 
-    if isinstance(fn_node, graph.ConstNode) and isinstance(
+    while isinstance(fn_node.val, graph.ConstNode) and isinstance(
         fn_node.type, types.Function
     ):
         fn_node = fn_node.val
-
-    fn_type = fn_node.type
-    if not isinstance(fn_type, types.Function):
-        return node
 
     return weave_internal.better_call_fn(fn_node, *inputs[1:])
 
