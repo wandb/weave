@@ -193,6 +193,10 @@ class String:
             raise ValueError("Expected a list")
         return res
 
+    @op(name="string-toInt")
+    def to_int(self) -> int:
+        return int(self)  # type: ignore
+
 
 types.String.instance_class = String
 
