@@ -64,7 +64,9 @@ ignore = "E714"
 
 [tool.ruff]
 line-length = 180
-ignore = ["E711"]
+show-fixes = true
+select = [
+]
 
 [tool.flake8]
 max-line-length = 180
