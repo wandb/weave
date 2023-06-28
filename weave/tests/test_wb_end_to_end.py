@@ -2,7 +2,7 @@ import time
 import weave
 import wandb
 from weave import weave_internal
-
+from weave import weave_types as types
 from weave.ecosystem.wandb.panel_time_series import TimeSeries
 
 
@@ -63,32 +63,24 @@ def _test_basic_publish(user_fixture):
 
 
 def test_compile_through_execution(user_by_api_key_in_env):
-    """
-    This test demonstrates successful execution when there is an explicit
-    const function instead of a direct node (resulting in an intermediate execution op)
-    """
     run = wandb.init(project="project_exists")
     for i in range(10):
         run.log({"val": i, "cat": i % 2})
     run.finish()
 
+    """
+    This test demonstrates successful execution when there is an explicit
+    const function instead of a direct node (resulting in an intermediate execution op)
+    """
     history_node = weave.ops.project(run.entity, run.project).run(run.id).history2()
     pick = weave_internal.const(history_node).pick("val")
     res = weave.use(pick)
     assert res.to_pylist_notags() == list(range(10))
 
-
-def test_compile_through_function_call(user_by_api_key_in_env):
     """
     This test demonstrates successful execution when there is an explicit
     function-__call__ in the graph)
     """
-
-    run = wandb.init(project="project_exists")
-    for i in range(10):
-        run.log({"val": i, "cat": i % 2})
-    run.finish()
-
     const_node = weave_internal.const(
         weave_internal.define_fn(
             {"entity_name": types.String()},
