@@ -9,6 +9,7 @@ import {
   opFileContents,
   opFileDirectUrlAsOf,
   OutputNode,
+  WBTraceTreeType,
   TableType,
   Type,
   VoidNode,
@@ -19,7 +20,7 @@ import {useEffect, useMemo, useRef, useState} from 'react';
 import * as CGReact from '../../react';
 
 export const useAssetURLFromArtifact = <
-  InputNodeInternalType extends Exclude<MediaType, TableType>
+  InputNodeInternalType extends Exclude<MediaType, TableType | WBTraceTreeType>
 >(
   inputNode: Node<InputNodeInternalType>,
   ignoreExpiration?: boolean
@@ -49,7 +50,7 @@ export const useAssetURLFromArtifact = <
 };
 
 export const useAssetContentFromArtifact = <
-  InputNodeInternalType extends Exclude<MediaType, TableType>
+  InputNodeInternalType extends Exclude<MediaType, TableType | WBTraceTreeType>
 >(
   inputNode: Node<InputNodeInternalType>
 ) => {
