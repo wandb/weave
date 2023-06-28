@@ -10,8 +10,6 @@ import React, {
 } from 'react';
 import styled from 'styled-components';
 
-const WIDTH_CHAR_LIMIT = 32;
-
 const Wrapper = styled.div`
   position: relative;
   display: inline-block;
@@ -19,8 +17,14 @@ const Wrapper = styled.div`
   height: 20px;
 `;
 
-const Input = styled.input`
+const InputWrapper = styled.div`
   position: absolute;
+  width: 100%;
+  display: flex;
+  align-items: center;
+`;
+
+const Input = styled.input`
   width: 100%;
   border: none;
   border-radius: 2px;
@@ -34,30 +38,39 @@ const Input = styled.input`
   }
 `;
 
+const Ellipsis = styled.span`
+  flex-shrink: 0;
+`;
+
 const InvisibleSizerSpan = styled.span`
   visibility: hidden;
   display: inline-block;
   padding: 0 2px;
 `;
 
-interface TextInputProps {
+type ValidatingTextInputProps = {
   dataTest: string;
   onCommit: (newValue: string) => void;
   validateInput: (value: string) => boolean;
   initialValue?: string;
-}
+  maxWidth?: number;
+};
 
-export const ValidatingTextInput: FC<TextInputProps> = ({
+export const ValidatingTextInput: FC<ValidatingTextInputProps> = ({
   dataTest,
   onCommit,
   validateInput,
   initialValue: initialValueProp,
+  maxWidth,
 }) => {
-  const [initialValue, setInitialValue] = useState(initialValueProp || '');
+  const [initialValue, setInitialValue] = useState(initialValueProp ?? '');
   const [internalValue, setInternalValue] = useState(initialValue);
-  const [focused, setFocused] = useState(false);
   const [isValid, setIsValid] = useState(true);
+  const wrapperRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const sizerRef = useRef<HTMLSpanElement>(null);
+  const [focused, setFocused] = useState(false);
+  const [shouldTruncate, setShouldTruncate] = useState(false);
 
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     setInternalValue(e.target.value);
@@ -90,28 +103,36 @@ export const ValidatingTextInput: FC<TextInputProps> = ({
     }
   };
 
+  useEffect(() => {
+    // For some reason, this needs the `setTimeout` to work.
+    // Otherwise, the wrapper width is not reported correctly.
+    setTimeout(() => {
+      if (wrapperRef.current == null || sizerRef.current == null) {
+        return;
+      }
+
+      setShouldTruncate(
+        sizerRef.current.offsetWidth > wrapperRef.current.offsetWidth
+      );
+    });
+  });
+
   return (
-    <Wrapper>
-      <Input
-        ref={inputRef}
-        className={isValid ? '' : 'invalid'}
-        data-test={dataTest}
-        value={focused ? internalValue : toDisplayValue(internalValue)}
-        onChange={handleChange}
-        onFocus={handleFocus}
-        onBlur={handleBlur}
-        onKeyDown={handleKeyDown}
-      />
-      <InvisibleSizerSpan>
-        {internalValue.slice(0, WIDTH_CHAR_LIMIT)}
-      </InvisibleSizerSpan>
+    <Wrapper style={{maxWidth}} ref={wrapperRef}>
+      <InputWrapper>
+        <Input
+          ref={inputRef}
+          className={isValid ? '' : 'invalid'}
+          data-test={dataTest}
+          value={internalValue}
+          onChange={handleChange}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
+          onKeyDown={handleKeyDown}
+        />
+        {!focused && shouldTruncate && <Ellipsis>...</Ellipsis>}
+      </InputWrapper>
+      <InvisibleSizerSpan ref={sizerRef}>{internalValue}</InvisibleSizerSpan>
     </Wrapper>
   );
 };
-
-function toDisplayValue(v: string): string {
-  if (v.length <= WIDTH_CHAR_LIMIT) {
-    return v;
-  }
-  return v.slice(0, WIDTH_CHAR_LIMIT - 3) + `...`;
-}
