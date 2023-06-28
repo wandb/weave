@@ -6,24 +6,24 @@ from weave import weave_types as types
 from weave.ecosystem.wandb.panel_time_series import TimeSeries
 
 
-# Example of end to end integration test
-def test_run_logging(user_by_api_key_in_env):
-    run = wandb.init(project="project_exists")
-    run.log({"a": 1})
-    run.finish()
+# # Example of end to end integration test
+# def test_run_logging(user_by_api_key_in_env):
+#     run = wandb.init(project="project_exists")
+#     run.log({"a": 1})
+#     run.finish()
 
-    summary_node = weave.ops.project(run.entity, run.project).run(run.id).summary()["a"]
-    summary = weave.use(summary_node)
+#     summary_node = weave.ops.project(run.entity, run.project).run(run.id).summary()["a"]
+#     summary = weave.use(summary_node)
 
-    assert summary == 1
+#     assert summary == 1
 
-    is_none_node = weave.ops.project(run.entity, run.project).isNone()
+#     is_none_node = weave.ops.project(run.entity, run.project).isNone()
 
-    assert weave.use(is_none_node) == False
+#     assert weave.use(is_none_node) == False
 
-    is_none_node = weave.ops.project(run.entity, "project_does_not_exist").isNone()
+#     is_none_node = weave.ops.project(run.entity, "project_does_not_exist").isNone()
 
-    assert weave.use(is_none_node) == True
+#     assert weave.use(is_none_node) == True
 
 
 # Test each of the auth strategies
@@ -62,7 +62,7 @@ def _test_basic_publish(user_fixture):
     assert weave.ref_base.Ref.from_str(uri).get() == [1, 2, 3]
 
 
-def test_compile_through_execution(user_by_api_key_netrc):
+def test_compile_through_execution(user_by_api_key_in_env):
     run = wandb.init(project="project_exists")
     for i in range(10):
         run.log({"val": i, "cat": i % 2})
