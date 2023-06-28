@@ -115,6 +115,25 @@ def _process_run_dict_item(val, run_path: typing.Optional[RunPath] = None):
                 height=val["height"],
                 sha256=val["sha256"],
             )
+        if val["_type"] == "images/separated" and run_path is not None:
+            from . import ImageArtifactFileRef
+
+            image_list: list[ImageArtifactFileRef] = []
+
+            for path in val["filenames"]:
+                fs_artifact_file = filesystem_runfiles_from_run_path(run_path, path)
+                image_list.append(
+                    ImageArtifactFileRef(
+                        fs_artifact_file.artifact,
+                        fs_artifact_file.path,
+                        format=val["format"],
+                        width=val["width"],
+                        height=val["height"],
+                        sha256=val.get("sha256", path),
+                    )
+                )
+
+            return image_list
         if val["_type"] == "wb_trace_tree":
             from .trace_tree import WBTraceTree
 
