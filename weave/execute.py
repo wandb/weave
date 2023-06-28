@@ -353,7 +353,8 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
                                 traceback.format_exc(),
                             )
                         )
-
+                        if value_or_error.DEBUG:
+                            raise
                         forward_node.set_result(forward_graph.ErrorResult(e))
                         report = {"cache_used": False, "already_executed": False}
                     finally:

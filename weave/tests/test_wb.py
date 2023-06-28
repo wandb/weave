@@ -1198,8 +1198,8 @@ def run_history_mocker(q, ndx):
         **fwb.run_payload,  # type: ignore
     }
 
-    if "parquetHistory" in query_str:
-        node["parquetHistory"] = {
+    if "sampledParquetHistory" in query_str:
+        node["sampledParquetHistory"] = {
             "parquetUrls": ["https://api.wandb.test/test.parquet"],
             "liveData": [
                 json.loads(s)
@@ -1230,8 +1230,8 @@ def run_history_mocker_with_pq_media(q, ndx):
         **fwb.run_payload,  # type: ignore
     }
 
-    if "parquetHistory" in query_str:
-        node["parquetHistory"] = {
+    if "sampledParquetHistory" in query_str:
+        node["sampledParquetHistory"] = {
             "parquetUrls": ["https://api.wandb.test/test_media.parquet"],
             "liveData": [
                 {
