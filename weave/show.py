@@ -132,21 +132,21 @@ def show(obj: typing.Any = None, height: int = 400) -> typing.Any:
             "a weave node, try `weave.use()`."
         )
 
-    if util.is_colab():
-        usage_analytics.show_called({"colab": True, "error": True})
-        raise RuntimeError(
-            "`weave.show()` is currently not supported in Google Colab.  We're working on it!  Follow "
-            "progress here: https://github.com/wandb/weave/pull/15"
-        )
-
     if util.is_pandas_dataframe(obj):
         obj = ops.dataframe_to_arrow(obj)
 
-    usage_analytics.show_called()
     panel_url = show_url(obj)
 
-    iframe = IFrame(panel_url, "100%", "%spx" % height, ['allow="clipboard-write"'])
-    display(iframe)
+    if util.is_colab():
+        from google.colab.output import serve_kernel_port_as_iframe
+
+        url = urllib.parse.urlparse(panel_url)
+        usage_analytics.show_called({"colab": True})
+        serve_kernel_port_as_iframe(url.port, path=url.path + "?" + url.query)
+    else:
+        usage_analytics.show_called()
+        iframe = IFrame(panel_url, "100%", "%spx" % height, ['allow="clipboard-write"'])
+        display(iframe)
 
 
 def _ipython_display_method_(self):

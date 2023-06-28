@@ -65,7 +65,6 @@ def _make_default_client():
     if util.is_notebook():
         global serv
         if "serv" in globals() and serv and context_state.get_server() is None:
-            print("restarting server")
             stop_server()
         serv = context_state.get_server()
         if serv is None:
@@ -75,7 +74,9 @@ def _make_default_client():
         # Falling through here means the notebook kernel uses
         # InprocessServer, but the frontend uses HttpServer.
         # versions() doesn't work when we use the HttpServer currently.
-        # return server.HttpServerClient(serv.url)
+        # TODO: shot in the dark to get colab working
+        if util.is_colab():
+            return server.HttpServerClient(serv.url)
 
     return client.Client(server.InProcessServer())
 
