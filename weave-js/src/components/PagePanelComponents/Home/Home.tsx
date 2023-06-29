@@ -11,6 +11,7 @@ import {
   IconAddNew as IconAddNewUnstyled,
   IconDashboardBlackboard,
   IconLaptopLocalComputer,
+  IconOverflowHorizontal,
   IconTable,
   IconUsersTeam,
   IconWeaveLogo,
@@ -18,6 +19,46 @@ import {
 import {useNewPanelFromRootQueryCallback} from '../../Panel2/PanelRootBrowser/util';
 import {useConfig} from '../../Panel2/panel';
 import {Dropdown, Input} from 'semantic-ui-react';
+
+const CenterTable = styled.table`
+  width: 100%;
+  border: none;
+  border-collapse: collapse;
+
+  td:first-child {
+    padding-left: 12px;
+  }
+
+  tr {
+    border-top: 1px solid #dadee3;
+    border-bottom: 1px solid #dadee3;
+    color: #2b3038;
+  }
+
+  thead {
+    tr {
+      text-transform: uppercase;
+      height: 48px;
+      background-color: #f5f6f7;
+      color: #8e949e;
+      font-size: 14px;
+      font-weight: 600;
+    }
+  }
+  tbody {
+    font-size: 16px;
+    tr {
+      height: 64px;
+
+      &:hover {
+        background-color: #f8f9fa;
+      }
+    }
+    tr > td:first-child {
+      font-weight: 600;
+    }
+  }
+`;
 
 const STYLE_DEBUG = false;
 
@@ -112,6 +153,23 @@ const CenterSpace = styled(VSpace)`
   border-top-right-radius: 12px;
   border-top-left-radius: 12px;
   margin-right: 12px;
+`;
+
+const CenterTableActionCellContents = styled(VStack)`
+  align-items: center;
+  justify-content: center;
+`;
+
+const CenterTableActionCellIcon = styled(VStack)`
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  width: 32px;
+  border-radius: 4px;
+  &:hover {
+    background-color: #a9edf252;
+    color: #038194;
+  }
 `;
 
 type HomeProps = {
@@ -299,9 +357,50 @@ const HomeComp: FC<HomeProps> = props => {
           </VBlock>
           <Space
             style={{
-              borderTop: '1px solid #dadee3',
+              overflow: 'auto',
             }}>
-            TABLE
+            <CenterTable>
+              <thead>
+                <tr>
+                  <td>Board</td>
+                  <td>Entity</td>
+                  <td>Project</td>
+                  <td>Last Edited</td>
+                  <td
+                    style={{
+                      width: '64px',
+                    }}></td>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Board 1</td>
+                  <td>timssweeney</td>
+                  <td>weave</td>
+                  <td>Just now</td>
+                  <td>
+                    <CenterTableActionCellContents>
+                      <CenterTableActionCellIcon>
+                        <IconOverflowHorizontal />
+                      </CenterTableActionCellIcon>
+                    </CenterTableActionCellContents>
+                  </td>
+                </tr>
+                <tr>
+                  <td>Board 2</td>
+                  <td>timssweeney</td>
+                  <td>weave</td>
+                  <td>June 21, 2023</td>
+                  <td>
+                    <CenterTableActionCellContents>
+                      <CenterTableActionCellIcon>
+                        <IconOverflowHorizontal />
+                      </CenterTableActionCellIcon>
+                    </CenterTableActionCellContents>
+                  </td>
+                </tr>
+              </tbody>
+            </CenterTable>
           </Space>
         </CenterSpace>
         {/* Right Bar */}
@@ -325,7 +424,7 @@ const LeftNav: React.FC<{
     <VBlock
       style={{
         width: '300px',
-        paddingTop: '24 px',
+        paddingTop: '0px', // Cecile's design has spacing here, but i kind of like it without
       }}>
       {props.sections.map((section, i) => (
         <LeftNavSection key={i} {...section} />
@@ -388,7 +487,7 @@ const LeftNavItem: React.FC<LeftNavItemProps> = props => {
 export const Home = memo(HomeComp);
 
 const TopBar = styled.div`
-  height: 48px;
+  height: 64px;
   padding: 0 12px;
   display: flex;
   align-items: center;
@@ -405,14 +504,6 @@ const TopBarLeft = styled.div`
 const TopBarRight = styled.div`
   display: flex;
   align-items: center;
-`;
-
-const BrowserSpace = styled.div`
-  height: calc(100% - 48px);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 32px 56px;
 `;
 
 const WeaveLogo = styled(IconWeaveLogo)`
