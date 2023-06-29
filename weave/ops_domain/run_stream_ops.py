@@ -9,7 +9,7 @@ from .. import compile
 def _get_history_node(steam_table: RunStreamType):
     return (
         project(steam_table.entity_name, steam_table.project_name)
-        .run(steam_table.table_name)
+        .run(steam_table.run_name)
         .history2()
     )
 
