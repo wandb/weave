@@ -4,6 +4,7 @@
  */
 
 import {css} from 'styled-components';
+import {MOONBEAM, OBLIVION, WHITE} from './color.styles';
 import {hexToRGB} from './utils';
 
 /************
@@ -15,10 +16,7 @@ export const SEARCH_NAV_HEIGHT = '60px';
 
 /* Colors */
 
-export const WHITE = '#ffffff';
 export const BLACK = '#000000';
-export const MOONBEAM = '#eaeaff';
-export const OBLIVION = '#0e1014';
 export const TRANSPARENT = 'rgba(255, 255, 255, 0)';
 
 export const GRAY_25 = '#fafafa';
