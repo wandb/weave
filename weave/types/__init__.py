@@ -1,1 +1,1 @@
-from .stream_table_type import StreamTableType
+from .run_stream_type import RunStreamType

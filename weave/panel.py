@@ -121,17 +121,7 @@ class Panel(typing.Generic[InputNodeType, VarsType]):
 
         self.config = config
         if config is None and self.__init__.__func__ == Panel.__init__:
-            # Auto initialize if the child doesn't override __init__
-            config_anno = self.__annotations__.get("config")
-            if config_anno is not None:
-                if hasattr(self, "initialize"):
-                    self.config = weave.use(self.initialize())
-                else:
-                    if typing.get_origin(config_anno) is typing.Union:
-                        config_class = typing.get_args(config_anno)[0]
-                    else:
-                        config_class = config_anno
-                    self.config = config_class()
+            self._do_auto_init()
 
         for k, v in options.items():
             config_val = getattr(self.config, k)
@@ -157,6 +147,18 @@ class Panel(typing.Generic[InputNodeType, VarsType]):
                 else:
                     render_as_panel_class = rendered_panel_anno
                 self._renderAsPanel = render_as_panel_class()
+
+    def _do_auto_init(self):
+        config_anno = self.__annotations__.get("config")
+        if config_anno is not None:
+            if hasattr(self, "initialize"):
+                self.config = weave.use(self.initialize())
+            else:
+                if typing.get_origin(config_anno) is typing.Union:
+                    config_class = typing.get_args(config_anno)[0]
+                else:
+                    config_class = config_anno
+                self.config = config_class()
 
     def _normalize(self, frame=None):
         pass

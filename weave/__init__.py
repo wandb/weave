@@ -4,7 +4,6 @@ from . import logs as _logging
 _loading_builtins_token = _context.set_loading_built_ins()
 
 from . import weave_types as types
-from .types import *
 
 # this patches the `Type` class to enable the make method - needed due to circular references
 from . import make_type as _make_type
@@ -23,6 +22,8 @@ from .errors import *
 from .panel_util import make_node
 
 from . import wandb_api as _wandb_api
+
+from .types import *
 
 _wandb_api.init()
 

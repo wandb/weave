@@ -2,14 +2,14 @@ import time
 import pytest
 import weave
 from weave import weave_types
-from weave.wandb_interface.wandb_stream_table import StreamTable
+from weave.wandb_interface.wandb_run_stream import RunStream
 import numpy as np
 from PIL import Image
 
 
 # Example of end to end integration test
 def test_stream_logging(user_by_api_key_in_env):
-    st = StreamTable(
+    st = RunStream(
         "test_table",
         project_name="stream-tables",
         entity_name=user_by_api_key_in_env.username,
@@ -41,7 +41,7 @@ def test_stream_logging_image(user_by_api_key_in_env):
         imarray = np.random.rand(100, 100, 3) * 255
         return Image.fromarray(imarray.astype("uint8")).convert("RGBA")
 
-    st = StreamTable(
+    st = RunStream(
         "test_table-8",
         project_name="stream-tables",
         entity_name=user_by_api_key_in_env.username,
@@ -68,7 +68,7 @@ def test_stream_logging_image(user_by_api_key_in_env):
 
 
 def test_multi_writers_sequential(user_by_api_key_in_env):
-    st = StreamTable(
+    st = RunStream(
         "test_table",
         project_name="stream-tables",
         entity_name=user_by_api_key_in_env.username,
@@ -98,7 +98,7 @@ def test_multi_writers_sequential(user_by_api_key_in_env):
 
     st.finish()
 
-    st = StreamTable(
+    st = RunStream(
         "test_table",
         project_name="stream-tables",
         entity_name=user_by_api_key_in_env.username,
@@ -114,12 +114,12 @@ def test_multi_writers_sequential(user_by_api_key_in_env):
 
 @pytest.mark.skip(reason="This is expected to fail until W&B updates step management")
 def test_multi_writers_parallel(user_by_api_key_in_env):
-    st_1 = StreamTable(
+    st_1 = RunStream(
         "test_table",
         project_name="stream-tables",
         entity_name=user_by_api_key_in_env.username,
     )
-    st_2 = StreamTable(
+    st_2 = RunStream(
         "test_table",
         project_name="stream-tables",
         entity_name=user_by_api_key_in_env.username,
