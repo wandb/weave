@@ -19,6 +19,7 @@ from . import wbmedia
 from .. import timestamp as weave_timestamp
 from .. import io_service
 from .. import util
+from ..ops_domain import trace_tree
 
 
 @dataclasses.dataclass(frozen=True)
@@ -383,10 +384,13 @@ def _table_data_to_weave1_objects(
                 cell = weave_timestamp.ms_to_python_datetime(
                     weave_timestamp.unitless_int_to_inferred_ms(cell)
                 )
-        elif isinstance(cell, dict) and isinstance(
-            cell_type, possible_media_type_classes
-        ):
-            cell = _create_media_type_for_cell(cell)
+        elif isinstance(cell, dict):
+            if isinstance(cell_type, possible_media_type_classes):
+                cell = _create_media_type_for_cell(cell)
+            elif isinstance(cell_type, trace_tree.WBTraceTree.WeaveType):  # type: ignore
+                copy = {**cell}
+                copy.pop("_type")
+                cell = trace_tree.WBTraceTree(**copy)
 
         return cell
 
