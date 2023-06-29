@@ -9,6 +9,8 @@ from . import uris
 # colab currently runs ipykernel < 6.0.  This resets context on every
 # execution, see: https://github.com/ipython/ipykernel/pull/632.  We
 # maintain a global context to work around this.
+# NOTE: This logic assumes all ContextVars will exist as globals
+# in this module with a leading underscore.
 patch_context = False
 try:
     import ipykernel
