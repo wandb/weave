@@ -444,11 +444,14 @@ def join_to_str(arr, sep):
 
 
 @arrow_op(
-    name="ArrowWeaveListString-toInt",
+    name="ArrowWeaveListString-toNumber",
     input_type={"self": ArrowWeaveListType(types.String())},
-    output_type=ArrowWeaveListType(types.Int()),
+    output_type=ArrowWeaveListType(types.Number()),
 )
-def to_int(self):
+def to_number(self):
     arrow_data = self._arrow_data
-    new_data = arrow_data.cast(pa.int64())
-    return ArrowWeaveList(new_data, types.Int(), self._artifact)
+    mask = pc.not_(pc.utf8_is_numeric(arrow_data))
+    new_data = pc.replace_with_mask(
+        arrow_data, mask, [None] * pc.sum(mask.cast(pa.int8()))
+    ).cast(pa.float64())
+    return ArrowWeaveList(new_data, types.optional(types.Number()), self._artifact)
