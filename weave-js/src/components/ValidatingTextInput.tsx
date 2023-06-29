@@ -54,6 +54,7 @@ type ValidatingTextInputProps = {
   validateInput: (value: string) => boolean;
   initialValue?: string;
   maxWidth?: number;
+  maxLength?: number;
 };
 
 export const ValidatingTextInput: FC<ValidatingTextInputProps> = ({
@@ -62,6 +63,7 @@ export const ValidatingTextInput: FC<ValidatingTextInputProps> = ({
   validateInput,
   initialValue: initialValueProp,
   maxWidth,
+  maxLength,
 }) => {
   const [initialValue, setInitialValue] = useState(initialValueProp ?? '');
   const [internalValue, setInternalValue] = useState(initialValue);
@@ -73,7 +75,11 @@ export const ValidatingTextInput: FC<ValidatingTextInputProps> = ({
   const [shouldTruncate, setShouldTruncate] = useState(false);
 
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
-    setInternalValue(e.target.value);
+    if (maxLength == null) {
+      setInternalValue(e.target.value);
+      return;
+    }
+    setInternalValue(e.target.value.slice(0, maxLength));
   };
 
   useEffect(() => {

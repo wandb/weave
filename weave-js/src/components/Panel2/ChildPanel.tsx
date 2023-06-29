@@ -567,6 +567,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
                   maxWidth={
                     editorBarWidth != null ? editorBarWidth / 3 : undefined
                   }
+                  maxLength={24}
                 />{' '}
                 ={' '}
               </EditorPath>
