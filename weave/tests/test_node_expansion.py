@@ -6,12 +6,16 @@ from .. import context_state as _context
 _loading_builtins_token = _context.set_loading_built_ins()
 
 
-@weave.op()
+@weave.op(
+    returns_expansion_node=True,
+)
 def lazy_add(a: int, b: int) -> int:
     return const(a) + const(b)  # type: ignore
 
 
-@weave.op()
+@weave.op(
+    returns_expansion_node=True,
+)
 def lazy_history(entity_name: str, project_name: str, run_name: str) -> list[dict]:
     return weave.ops.project(entity_name, project_name).run(run_name).history2()
 

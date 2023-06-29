@@ -23,6 +23,7 @@ def _rows_type(steam_table: RunStreamType) -> weave_types.Type:
 @op(
     output_type=ArrowWeaveListType(weave_types.TypedDict({})),
     refine_output_type=_rows_type,
+    returns_expansion_node=True,
 )
 def rows(steam_table: RunStreamType):
     return _get_history_node(steam_table)

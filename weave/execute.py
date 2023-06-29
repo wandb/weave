@@ -54,6 +54,8 @@ TRACE_LOCAL = trace_local.TraceLocal()
 # Set this to true when debugging for costly, but detailed storyline of execution
 PRINT_DEBUG = False
 
+USE_EXECUTION_TIME_NODE_EXPANSION = True
+
 
 class OpExecuteStats(typing.TypedDict):
     cache_used: int
@@ -564,8 +566,9 @@ def execute_forward_node(
                     )
             else:
                 result = execute_sync_op(op_def, inputs)
-                if _should_evaluate_result(op_def, result):
-                    result = _evaluate_node_result(result, forward_node, fg)
+                if USE_EXECUTION_TIME_NODE_EXPANSION:
+                    if _should_expand_result(op_def, result):
+                        result = _expand_node_result(result, forward_node, fg)
 
         with tracer.trace("execute-write-cache"):
             ref = ref_base.get_ref(result)
@@ -602,13 +605,11 @@ def execute_forward_node(
     return {"cache_used": False, "already_executed": False}
 
 
-def _should_evaluate_result(op_def: op_def.OpDef, result: typing.Any) -> bool:
-    return isinstance(result, graph.Node) and not isinstance(
-        op_def.output_type, types.Function
-    )
+def _should_expand_result(op_def: op_def.OpDef, result: typing.Any) -> bool:
+    return op_def.returns_expansion_node
 
 
-def _evaluate_node_result(
+def _expand_node_result(
     result_node: graph.Node,
     forward_node: forward_graph.ForwardNode,
     fg: forward_graph.ForwardGraph,
