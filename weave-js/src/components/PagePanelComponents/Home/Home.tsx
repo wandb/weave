@@ -10,9 +10,7 @@ import {ChildPanelFullConfig} from '../../Panel2/ChildPanel';
 import {
   IconAddNew as IconAddNewUnstyled,
   IconDashboardBlackboard,
-  IconInfo,
   IconLaptopLocalComputer,
-  IconOpenNewTab,
   IconTable,
   IconUserProfilePersonal,
   IconUsersTeam,
@@ -22,22 +20,9 @@ import {
 import {useNewPanelFromRootQueryCallback} from '../../Panel2/PanelRootBrowser/util';
 import {useConfig} from '../../Panel2/panel';
 import * as query from './query';
-import {CenterBrowser, CenterBrowserActionType} from './HomeCenterBrowser';
 import * as LayoutElements from './LayoutElements';
-
-const LeftNavItemBlock = styled(LayoutElements.HBlock)`
-  margin: 0px 12px;
-  padding: 0px 12px;
-  border-radius: 4px;
-  height: 36px;
-  align-items: center;
-  gap: 8px;
-  font-size: 16px;
-  cursor: pointer;
-  &:hover {
-    background-color: #f5f6f7;
-  }
-`;
+import {CenterEntityBrowser} from './HomeCenterEntityBrowser';
+import {LeftNav} from './HomeLeftNav';
 
 const CenterSpace = styled(LayoutElements.VSpace)`
   border: 1px solid #dadee3;
@@ -268,90 +253,6 @@ const HomeComp: FC<HomeProps> = props => {
   );
 };
 
-const CenterEntityBrowser: React.FC<{
-  entityName: string;
-}> = props => {
-  const browserTitle = props.entityName;
-  const [selectedProjectName, setSelectedProjectName] = useState<
-    string | undefined
-  >();
-
-  const projectNames = query.useProjectsForEntityWithWeaveObject(
-    props.entityName
-  );
-
-  const browserData = useMemo(() => {
-    return projectNames.result.map(projectName => ({
-      _id: projectName,
-      project: projectName,
-      // TODO: get these from the server
-      // runs: 20,
-      // tables: 10,
-      // dashboards: 5,
-      // 'last edited': 'yesterday',
-    }));
-  }, [projectNames.result]);
-
-  const browserActions: Array<
-    CenterBrowserActionType<(typeof browserData)[number]>
-  > = useMemo(() => {
-    return [
-      [
-        {
-          icon: IconInfo,
-          label: 'Browse project',
-          onClick: row => {
-            setSelectedProjectName(row._id);
-          },
-        },
-      ],
-      [
-        {
-          icon: IconOpenNewTab,
-          label: 'View in Weights and Biases',
-          onClick: row => {
-            // Open a new tab with the W&B project URL
-            // TODO: make this work for local. Probably need to bring over `urlPrefixed`
-            const url = `https://wandb.ai/${props.entityName}/${row.project}/overview`;
-            // eslint-disable-next-line wandb/no-unprefixed-urls
-            window.open(url, '_blank');
-          },
-        },
-      ],
-    ];
-  }, [props.entityName]);
-
-  const loading = projectNames.loading;
-
-  return (
-    <CenterBrowser
-      allowSearch
-      columns={['project']}
-      loading={loading}
-      title={browserTitle}
-      data={browserData}
-      actions={browserActions}
-    />
-  );
-};
-
-const LeftNav: React.FC<{
-  sections: Array<LeftNavSectionProps>;
-}> = props => {
-  return (
-    <LayoutElements.VBlock
-      style={{
-        width: '300px',
-        paddingTop: '0px', // Cecile's design has spacing here, but i kind of like it without
-        overflowY: 'auto',
-      }}>
-      {props.sections.map((section, i) => (
-        <LeftNavSection key={i} {...section} />
-      ))}
-    </LayoutElements.VBlock>
-  );
-};
-
 // const browserFilters = [
 //   {
 //     placeholder: 'All entities',
@@ -416,60 +317,6 @@ const LeftNav: React.FC<{
 //     },
 //   ],
 // ];
-
-type LeftNavSectionProps = {
-  title: string;
-  items: Array<LeftNavItemProps>;
-};
-
-const LeftNavSection: React.FC<LeftNavSectionProps> = props => {
-  return (
-    <LayoutElements.VBlock
-      style={{
-        marginBottom: '16px',
-      }}>
-      {/* Header */}
-      <LayoutElements.HBlock
-        style={{
-          textTransform: 'uppercase',
-          padding: '10px 24px',
-          fontSize: '14px',
-          position: 'sticky',
-          backgroundColor: '#fff',
-          top: 0,
-        }}>
-        {props.title}
-      </LayoutElements.HBlock>
-      {/* Items */}
-      <LayoutElements.VBlock>
-        {props.items.map((item, i) => (
-          <LeftNavItem key={i} {...item} />
-        ))}
-      </LayoutElements.VBlock>
-    </LayoutElements.VBlock>
-  );
-};
-
-type LeftNavItemProps = {
-  icon: React.FC;
-  label: string;
-  active?: boolean;
-  onClick?: () => void;
-};
-const LeftNavItem: React.FC<LeftNavItemProps> = props => {
-  return (
-    <LeftNavItemBlock
-      style={{
-        backgroundColor: props.active ? '#A9EDF252' : '',
-        color: props.active ? '#038194' : '',
-        fontWeight: props.active ? 600 : '',
-      }}
-      onClick={props.onClick}>
-      <props.icon />
-      {props.label}
-    </LeftNavItemBlock>
-  );
-};
 
 export const Home = memo(HomeComp);
 
