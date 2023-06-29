@@ -36,3 +36,7 @@ class Each(panel.Panel):
         if self.config is None:
             self.config = EachConfig()
             self.config.panel = self.item_var()
+        if "layout" in options:
+            self.config.pbConfig = options["layout"]
+        if "panel" in options:
+            self.config.panel = options["panel"](self.item_var())

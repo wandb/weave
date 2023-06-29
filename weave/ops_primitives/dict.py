@@ -83,14 +83,19 @@ class TypedDict:
         return tag_aware_dict_val_for_escaped_key(self, key)
 
     @op(
-        output_type=lambda input_type: types.List(
-            types.UnionType(
-                *(
-                    types.Const(types.String(), k)
-                    for k in input_type["self"].property_types.keys()
-                )
-            )
-        )
+        output_type=lambda input_type: types.List(types.String())
+        # This causes a huge problem. We do have an awful complexity blow
+        # up in the way we deserialize union types in weave_types.py
+        # You can probably trigger by just generating a large union, then
+        # to_dict it and type_from_dict the result.
+        # TODO: fix!
+        #     types.UnionType(
+        #         *(
+        #             types.Const(types.String(), k)
+        #             for k in input_type["self"].property_types.keys()
+        #         )
+        #     )
+        # )
     )
     def keys(self):
         return list(self.keys())

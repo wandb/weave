@@ -21,7 +21,7 @@ export const callResolverSimple = (
   if (!opDefIsLowLevel(opDef)) {
     throw new Error('opDef is not low level ' + opDef.name);
   }
-  return opDef.resolver(
+  const res = opDef.resolver(
     inputs,
     null as any,
     // Passing this in because opKinds uses it. null is invalid for the type.
@@ -30,6 +30,13 @@ export const callResolverSimple = (
     null as any,
     null as any
   );
+  if (res && typeof res.then === 'function') {
+    // The resolver returned a promise, its async!
+    // Client resolution shouldn't be used for expensive async stuff.
+    // If this happens, you may need to set resolverIsSync on the op.
+    throw new Error('resolver returned a promise for op ' + opName);
+  }
+  return res;
 };
 
 interface SetResultOK {

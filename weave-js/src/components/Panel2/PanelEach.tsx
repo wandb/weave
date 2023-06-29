@@ -1,5 +1,12 @@
-import {constNumber, opCount, opIndex, varNode} from '@wandb/weave/core';
-import React, {useCallback, useMemo} from 'react';
+import {
+  constNodeUnsafe,
+  constNumber,
+  opCount,
+  opIndex,
+  varNode,
+  voidNode,
+} from '@wandb/weave/core';
+import React, {useCallback, useEffect, useMemo} from 'react';
 
 import * as CGReact from '../../react';
 import {PanelBankSectionConfig} from '../WeavePanelBank/panelbank';
@@ -116,13 +123,26 @@ const PanelEachItem: React.FC<PanelEachProps & {itemIndex: number}> = props => {
     index: constNumber(itemIndex),
   });
 
+  // I changed this PanelEach to fetch its itemNode value for now.
+  // Note, this is not what we actually want, because these can be very
+  // large items! But this gets around the type issue we encounter
+  // otherwise (PanelPlot needs a concrete key to use to index into
+  // the history metrics, otherwise types are wrong and we nothing works)
+  // TODO: don't merge
+
+  const itemValue = CGReact.useNodeValue(itemNode);
+
   const newVars = useMemo(() => {
     return {
-      item: itemNode,
+      item: itemValue.loading
+        ? voidNode()
+        : constNodeUnsafe(itemNode.type, itemValue.result),
     };
-  }, [itemNode]);
+  }, [itemNode.type, itemValue.loading, itemValue.result]);
 
-  return (
+  return itemValue.loading ? (
+    <div>loading</div>
+  ) : (
     <PanelContextProvider newVars={newVars}>
       <ChildPanel
         {...childPanelPanelProps}
