@@ -10,7 +10,7 @@ import getConfig from '../config';
 import {useWeaveContext} from '../context';
 import {useNodeWithServerType} from '../react';
 import {consoleLog} from '../util';
-import {Home} from './PagePanelComponents/Home';
+import {Home} from './PagePanelComponents/Home/Home';
 import {PersistenceManager} from './PagePanelComponents/PersistenceManager';
 import {useCopyCodeFromURI} from './PagePanelComponents/hooks';
 import {
