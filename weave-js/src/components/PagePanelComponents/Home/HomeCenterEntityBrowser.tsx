@@ -4,6 +4,7 @@ import {IconDown, IconOpenNewTab} from '../../Panel2/Icons';
 import * as query from './query';
 import {CenterBrowser, CenterBrowserActionType} from './HomeCenterBrowser';
 import {useResettingState} from '@wandb/weave/common/util/hooks';
+import moment from 'moment';
 
 export const CenterEntityBrowser: React.FC<{
   entityName: string;
@@ -109,16 +110,17 @@ const CenterProjectBrowser: React.FC<{
         setSelectedAssetType={setSelectedAssetType}
       />
     );
-  } else {
+  } else if (selectedAssetType === 'boards') {
     return (
-      <CenterProjectAssetBrowser
+      <CenterProjectBoardBrowser
         entityName={props.entityName}
         projectName={props.projectName}
-        assetName={selectedAssetType}
         setSelectedProjectName={props.setSelectedProjectName}
         setSelectedAssetType={setSelectedAssetType}
       />
     );
+  } else {
+    return <>Not implemented</>;
   }
 };
 
@@ -179,43 +181,27 @@ const CenterProjectBrowserInner: React.FC<{
   );
 };
 
-const CenterProjectAssetBrowser: React.FC<{
+const CenterProjectBoardBrowser: React.FC<{
   entityName: string;
   projectName: string;
-  assetName: string;
   setSelectedProjectName: (name: string | undefined) => void;
   setSelectedAssetType: (name: string | undefined) => void;
 }> = props => {
   const browserTitle =
-    props.entityName + '/' + props.projectName + '/' + props.assetName;
+    props.entityName + '/' + props.projectName + '/' + 'Boards';
 
   const boards = query.useProjectBoards(props.entityName, props.projectName);
-  console.log(boards);
+  const browserData = useMemo(() => {
+    return boards.result.map(b => ({
+      _id: b.name,
+      name: b.name,
+      'updated at': moment(b.updatedAt).calendar(),
+      'created at': moment(b.createdAt).calendar(),
+      'created by': b.createdByUserName,
+    }));
+  }, [boards]);
 
-  const browserData = [
-    {
-      _id: 'boards',
-      'asset type': 'Boards',
-      // TODO: get these from the server
-      // 'count': 5,
-      // 'last edited': 'yesterday',
-    },
-    {
-      _id: 'tables',
-      'asset type': 'Tables',
-      // TODO: get these from the server
-      // 'count': 5,
-      // 'last edited': 'yesterday',
-    },
-    // TODO: Let's skip objects for the MVP
-    // {
-    //   _id: 'objects',
-    //   'asset type': 'Objects',
-    //   // TODO: get these from the server
-    //   // 'count': 5,
-    //   // 'last edited': 'yesterday',
-    // },
-  ];
+  // Next up: preview board and edit board
 
   const browserActions: Array<
     CenterBrowserActionType<(typeof browserData)[number]>
@@ -236,6 +222,8 @@ const CenterProjectAssetBrowser: React.FC<{
   return (
     <CenterBrowser
       title={browserTitle}
+      loading={boards.loading}
+      columns={['name', 'updated at', 'created at', 'created by']}
       data={browserData}
       actions={browserActions}
     />

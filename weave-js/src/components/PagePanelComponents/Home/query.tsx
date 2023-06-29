@@ -86,13 +86,7 @@ export const useProjectsForEntityWithWeaveObject = (
   );
 };
 
-export const useProjectBoards = (
-  entityName: string,
-  projectName: string
-): {
-  result: string[];
-  loading: boolean;
-} => {
+const projectBoardsNode = (entityName: string, projectName: string) => {
   const projectNode = w.opRootProject({
     entityName: w.constString(entityName),
     projectName: w.constString(projectName),
@@ -118,19 +112,56 @@ export const useProjectBoards = (
     });
   }
 
-  const filteredArtifactsNode = opFilterArtifactsToWeaveObjects(
-    artifactsNode,
-    true
-  );
-  const artifactNamesNode = w.opArtifactName({
-    artifact: filteredArtifactsNode,
+  return opFilterArtifactsToWeaveObjects(artifactsNode, true);
+};
+
+// Bad Weave-form... just materializing the data
+export const useProjectBoards = (
+  entityName: string,
+  projectName: string
+): {
+  result: {
+    name: string;
+    createdByUserName: string;
+    createdAt: number;
+    updatedAt: number;
+  }[];
+  loading: boolean;
+} => {
+  const filteredArtifactsNode = projectBoardsNode(entityName, projectName);
+  const boardDetailsNode = w.opMap({
+    arr: filteredArtifactsNode,
+    mapFn: w.constFunction({row: 'artifact' as const}, ({row}) => {
+      const latestVersionNode = w.opArtifactMembershipArtifactVersion({
+        artifactMembership: w.opArtifactMembershipForAlias({
+          artifact: row,
+          aliasName: w.constString('latest'),
+        }),
+      });
+      return w.opDict({
+        name: w.opArtifactName({
+          artifact: row,
+        }),
+        createdByUserName: w.opUserName({
+          user: w.opRunUser({
+            run: w.opArtifactVersionCreatedBy({
+              artifactVersion: latestVersionNode,
+            }),
+          }),
+        }),
+        createdAt: w.opArtifactCreatedAt({artifact: row}),
+        updatedAt: w.opArtifactVersionCreatedAt({
+          artifactVersion: latestVersionNode,
+        }),
+      } as any);
+    }),
   });
-  const artifactNamesValue = useNodeValue(artifactNamesNode);
+  const artifactDetailsValue = useNodeValue(boardDetailsNode);
   return useMemo(
     () => ({
-      result: artifactNamesValue.result ?? [],
-      loading: artifactNamesValue.loading,
+      result: artifactDetailsValue.result ?? [],
+      loading: artifactDetailsValue.loading,
     }),
-    [artifactNamesValue.loading, artifactNamesValue.result]
+    [artifactDetailsValue.loading, artifactDetailsValue.result]
   );
 };
