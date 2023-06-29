@@ -1,6 +1,6 @@
-import {Node, voidNode} from '@wandb/weave/core';
+import {voidNode} from '@wandb/weave/core';
 import moment from 'moment';
-import React, {FC, Props, memo, useCallback, useMemo, useState} from 'react';
+import React, {FC, memo, useCallback, useMemo, useState} from 'react';
 import getConfig from '../../../config';
 
 import styled from 'styled-components';
@@ -9,12 +9,10 @@ import {useWeaveContext} from '../../../context';
 import {ChildPanelFullConfig} from '../../Panel2/ChildPanel';
 import {
   IconAddNew as IconAddNewUnstyled,
-  IconCopy,
   IconDashboardBlackboard,
   IconInfo,
   IconLaptopLocalComputer,
   IconOpenNewTab,
-  IconOverflowHorizontal,
   IconTable,
   IconUserProfilePersonal,
   IconUsersTeam,
@@ -23,151 +21,11 @@ import {
 } from '../../Panel2/Icons';
 import {useNewPanelFromRootQueryCallback} from '../../Panel2/PanelRootBrowser/util';
 import {useConfig} from '../../Panel2/panel';
-import {Divider, Dropdown, Input, Loader, Popup} from 'semantic-ui-react';
 import * as query from './query';
-import WandbLoader from '@wandb/weave/common/components/WandbLoader';
+import {CenterBrowser, CenterBrowserActionType} from './HomeCenterBrowser';
+import * as LayoutElements from './LayoutElements';
 
-const CenterTable = styled.table`
-  width: 100%;
-  border: none;
-  border-collapse: collapse;
-
-  td:first-child {
-    padding-left: 12px;
-  }
-
-  tr {
-    border-bottom: 1px solid #dadee3;
-    color: #2b3038;
-  }
-
-  /* This whole bit is to keep borders with sticky! */
-  thead {
-    position: sticky;
-    top: 0;
-
-    tr {
-      border-top: none;
-      border-bottom: none;
-    }
-    &:after,
-    &:before {
-      content: '';
-      position: absolute;
-      left: 0;
-      width: 100%;
-    }
-    &:before {
-      top: 0;
-      border-top: 1px solid #dadee3;
-    }
-    &:after {
-      bottom: 0;
-      border-bottom: 1px solid #dadee3;
-    }
-  }
-  /*End sticky with border fix  */
-
-  thead {
-    tr {
-      text-transform: uppercase;
-      height: 48px;
-      background-color: #f5f6f7;
-      color: #8e949e;
-      font-size: 14px;
-      font-weight: 600;
-    }
-  }
-  tbody {
-    font-size: 16px;
-    tr {
-      height: 64px;
-
-      &:hover {
-        cursor: pointer;
-        background-color: #f8f9fa;
-      }
-    }
-    tr > td:first-child {
-      font-weight: 600;
-    }
-  }
-`;
-
-const STYLE_DEBUG = false;
-
-const debug_style = `
-  ${
-    STYLE_DEBUG
-      ? 'background-color: rgba(0,0,0,0.1); border: 1px solid red;'
-      : ''
-  }
-`;
-
-const VStack = styled.div`
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  ${debug_style}
-`;
-
-const HStack = styled.div`
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: row;
-  ${debug_style}
-`;
-
-const Space = styled.div`
-  height: 100%;
-  width: 100%;
-  overflow: hidden;
-  flex: 1 1 auto;
-  ${debug_style}
-`;
-
-const Block = styled.div`
-  flex: 0 0 auto;
-  ${debug_style}
-`;
-
-const VSpace = styled.div`
-  height: 100%;
-  width: 100%;
-  overflow: hidden;
-  flex: 1 1 auto;
-  display: flex;
-  flex-direction: column;
-  ${debug_style}
-`;
-
-const HSpace = styled.div`
-  height: 100%;
-  width: 100%;
-  overflow: hidden;
-  flex: 1 1 auto;
-  display: flex;
-  flex-direction: row;
-  ${debug_style}
-`;
-
-const VBlock = styled.div`
-  flex: 0 0 auto;
-  display: flex;
-  flex-direction: column;
-  ${debug_style}
-`;
-
-const HBlock = styled.div`
-  flex: 0 0 auto;
-  display: flex;
-  flex-direction: row;
-  ${debug_style}
-`;
-
-const LeftNavItemBlock = styled(HBlock)`
+const LeftNavItemBlock = styled(LayoutElements.HBlock)`
   margin: 0px 12px;
   padding: 0px 12px;
   border-radius: 4px;
@@ -181,61 +39,12 @@ const LeftNavItemBlock = styled(HBlock)`
   }
 `;
 
-const CenterTableActionCellAction = styled(HBlock)`
-  padding: 0px 12px;
-  border-radius: 4px;
-  height: 36px;
-  align-items: center;
-  gap: 8px;
-  font-size: 16px;
-  cursor: pointer;
-  &:hover {
-    background-color: #f5f6f7;
-  }
-`;
-
-const CenterSpace = styled(VSpace)`
+const CenterSpace = styled(LayoutElements.VSpace)`
   border: 1px solid #dadee3;
   box-shadow: 0px 8px 16px 0px #0e10140a;
   border-top-right-radius: 12px;
   border-top-left-radius: 12px;
   margin-right: 12px;
-`;
-
-const CenterTableActionCellContents = styled(VStack)`
-  align-items: center;
-  justify-content: center;
-`;
-
-const CenterTableActionCellIcon = styled(VStack)`
-  align-items: center;
-  justify-content: center;
-  height: 32px;
-  width: 32px;
-  border-radius: 4px;
-  &:hover {
-    background-color: #a9edf252;
-    color: #038194;
-  }
-`;
-
-const CenterSpaceTableSpace = styled(Space)`
-  overflow: auto;
-`;
-
-const CenterSpaceControls = styled(HBlock)`
-  gap: 8px;
-`;
-
-const CenterSpaceTitle = styled(HBlock)`
-  font-size: 24px;
-  font-weight: 600;
-  padding: 12px 8px;
-`;
-
-const CenterSpaceHeader = styled(VBlock)`
-  padding: 12px 16px;
-  gap: 12px;
 `;
 
 type HomeProps = {
@@ -274,17 +83,6 @@ const HomeComp: FC<HomeProps> = props => {
     });
   }, [inJupyter, makeNewDashboard, name, props, urlPrefixed, weave]);
   const [rootConfig, updateRootConfig] = useConfig();
-  const updateInput = useCallback(
-    (newInput: Node) => {
-      props.updateConfig({
-        vars: {},
-        input_node: newInput,
-        id: '',
-        config: undefined,
-      });
-    },
-    [props]
-  );
 
   const [activeBrowserRoot, setActiveBrowserRoot] = useState<{
     browserType: 'recent' | 'wandb' | 'drafts';
@@ -355,7 +153,7 @@ const HomeComp: FC<HomeProps> = props => {
                 }
                 return 0;
               })
-              .map((entity, i) => ({
+              .map(entity => ({
                 icon:
                   entity === userName.result
                     ? IconUserProfilePersonal
@@ -423,8 +221,8 @@ const HomeComp: FC<HomeProps> = props => {
   const [previewNode, setPreviewNode] = useState<any>(undefined);
 
   return (
-    <VStack>
-      <Block>
+    <LayoutElements.VStack>
+      <LayoutElements.Block>
         <TopBar>
           <TopBarLeft>
             <WeaveLogo />
@@ -437,9 +235,9 @@ const HomeComp: FC<HomeProps> = props => {
             </WBButton>
           </TopBarRight>
         </TopBar>
-      </Block>
+      </LayoutElements.Block>
       {/* Main Region */}
-      <HSpace>
+      <LayoutElements.HSpace>
         {/* Left Bar */}
         <LeftNav sections={navSections} />
         {/* Center Content */}
@@ -456,17 +254,17 @@ const HomeComp: FC<HomeProps> = props => {
         </CenterSpace>
         {/* Right Bar */}
         {previewNode != null && (
-          <Block>
+          <LayoutElements.Block>
             <div
               style={{
                 width: '300px',
               }}>
               c
             </div>
-          </Block>
+          </LayoutElements.Block>
         )}
-      </HSpace>
-    </VStack>
+      </LayoutElements.HSpace>
+    </LayoutElements.VStack>
   );
 };
 
@@ -502,7 +300,7 @@ const CenterEntityBrowser: React.FC<{
         {
           icon: IconInfo,
           label: 'Browse project',
-          onClick: (row, index) => {
+          onClick: row => {
             setSelectedProjectName(row._id);
           },
         },
@@ -511,7 +309,7 @@ const CenterEntityBrowser: React.FC<{
         {
           icon: IconOpenNewTab,
           label: 'View in Weights and Biases',
-          onClick: (row, index) => {
+          onClick: row => {
             // Open a new tab with the W&B project URL
             // TODO: make this work for local. Probably need to bring over `urlPrefixed`
             const url = `https://wandb.ai/${props.entityName}/${row.project}/overview`;
@@ -541,7 +339,7 @@ const LeftNav: React.FC<{
   sections: Array<LeftNavSectionProps>;
 }> = props => {
   return (
-    <VBlock
+    <LayoutElements.VBlock
       style={{
         width: '300px',
         paddingTop: '0px', // Cecile's design has spacing here, but i kind of like it without
@@ -550,7 +348,7 @@ const LeftNav: React.FC<{
       {props.sections.map((section, i) => (
         <LeftNavSection key={i} {...section} />
       ))}
-    </VBlock>
+    </LayoutElements.VBlock>
   );
 };
 
@@ -626,12 +424,12 @@ type LeftNavSectionProps = {
 
 const LeftNavSection: React.FC<LeftNavSectionProps> = props => {
   return (
-    <VBlock
+    <LayoutElements.VBlock
       style={{
         marginBottom: '16px',
       }}>
       {/* Header */}
-      <HBlock
+      <LayoutElements.HBlock
         style={{
           textTransform: 'uppercase',
           padding: '10px 24px',
@@ -641,14 +439,14 @@ const LeftNavSection: React.FC<LeftNavSectionProps> = props => {
           top: 0,
         }}>
         {props.title}
-      </HBlock>
+      </LayoutElements.HBlock>
       {/* Items */}
-      <VBlock>
+      <LayoutElements.VBlock>
         {props.items.map((item, i) => (
           <LeftNavItem key={i} {...item} />
         ))}
-      </VBlock>
-    </VBlock>
+      </LayoutElements.VBlock>
+    </LayoutElements.VBlock>
   );
 };
 
@@ -670,195 +468,6 @@ const LeftNavItem: React.FC<LeftNavItemProps> = props => {
       <props.icon />
       {props.label}
     </LeftNavItemBlock>
-  );
-};
-
-type CenterBrowserDataType<E extends {[key: string]: string | number} = {}> = {
-  _id: string;
-} & E;
-
-type CenterBrowserActionType<RT extends CenterBrowserDataType> = Array<{
-  icon: React.FC;
-  label: string;
-  onClick: (row: RT, index: number) => void;
-}>;
-
-type CenterBrowserProps<RT extends CenterBrowserDataType> = {
-  title: string;
-  data: Array<RT>;
-  loading?: boolean;
-  columns?: string[];
-  // TODO: Actions might be a callback that returns an array of actions for a row
-  actions?: Array<CenterBrowserActionType<RT>>;
-  allowSearch?: boolean;
-  filters?: Array<{
-    placeholder: string;
-    options: Array<{
-      key: string | number;
-      text: string;
-      value: string | number;
-    }>;
-    onChange: (value: string) => void;
-  }>;
-};
-
-const CenterBrowser = <RT extends CenterBrowserDataType>(
-  props: CenterBrowserProps<RT>
-) => {
-  const [searchText, setSearchText] = useState('');
-  const filteredData = useMemo(() => {
-    if (!props.allowSearch || searchText === '' || searchText == null) {
-      return props.data;
-    }
-    return props.data.filter(d => {
-      return Object.values(d).some(v => {
-        return v.toString().toLowerCase().includes(searchText.toLowerCase());
-      });
-    });
-  }, [props.allowSearch, props.data, searchText]);
-  const showControls = props.allowSearch || (props.filters?.length ?? 0) > 0;
-  const allActions = (props.actions ?? []).flatMap(a => a);
-  const primaryAction = allActions.length > 0 ? allActions[0] : undefined;
-  const columns = useMemo(() => {
-    if (props.columns != null) {
-      return props.columns;
-    }
-    return Object.keys(props.data[0] ?? {}).filter(k => !k.startsWith('_'));
-  }, [props.columns, props.data]);
-  const hasActions = allActions.length > 0;
-  return (
-    <>
-      <CenterSpaceHeader>
-        <CenterSpaceTitle>{props.title}</CenterSpaceTitle>
-        {showControls && (
-          <CenterSpaceControls>
-            {props.allowSearch && (
-              <Input
-                style={{
-                  width: '100%',
-                }}
-                icon="search"
-                iconPosition="left"
-                placeholder="Search"
-                onChange={e => {
-                  setSearchText(e.target.value);
-                }}
-              />
-            )}
-            {props.filters?.map((filter, i) => (
-              <Dropdown
-                key={i}
-                style={{
-                  boxShadow: 'none',
-                }}
-                selection
-                clearable
-                placeholder={filter.placeholder}
-                options={filter.options}
-                onChange={(e, data) => {
-                  filter.onChange(data.value as string);
-                }}
-              />
-            ))}
-          </CenterSpaceControls>
-        )}
-      </CenterSpaceHeader>
-      <CenterSpaceTableSpace>
-        <CenterTable
-          style={{
-            height: props.loading ? '100%' : '',
-          }}>
-          <thead>
-            <tr>
-              {columns.map((c, i) => (
-                <td key={c}>{c}</td>
-              ))}
-              {hasActions && (
-                <td
-                  style={{
-                    width: '64px',
-                  }}></td>
-              )}
-            </tr>
-          </thead>
-          {props.loading ? (
-            <tr style={{height: '100%'}}>
-              <td colSpan={columns.length + (hasActions ? 1 : 0)}>
-                <VStack
-                  style={{
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}>
-                  <WandbLoader inline />
-                </VStack>
-              </td>
-            </tr>
-          ) : (
-            <tbody>
-              {filteredData.map((row, i) => (
-                <tr
-                  key={row._id}
-                  onClick={() => primaryAction?.onClick(row, i)}>
-                  {columns.map((c, i) => (
-                    <td key={c}>{(row as any)[c]}</td>
-                  ))}
-                  {hasActions && (
-                    <td>
-                      <CenterTableActionCellContents>
-                        <Popup
-                          style={{
-                            padding: '6px 6px',
-                          }}
-                          content={
-                            <VStack
-                              onClick={e => {
-                                e.stopPropagation();
-                              }}>
-                              {props.actions?.flatMap((action, i) => {
-                                const actions = action.map((a, j) => (
-                                  <CenterTableActionCellAction
-                                    key={'' + i + '_' + j}
-                                    onClick={e => {
-                                      e.stopPropagation();
-                                      a.onClick(row, i);
-                                    }}>
-                                    <a.icon />
-                                    {a.label}
-                                  </CenterTableActionCellAction>
-                                ));
-                                if (i < props.actions!.length - 1) {
-                                  actions.push(
-                                    <Divider
-                                      key={'d' + i}
-                                      style={{margin: '6px 0px'}}
-                                    />
-                                  );
-                                }
-                                return actions;
-                              })}
-                            </VStack>
-                          }
-                          basic
-                          on="click"
-                          trigger={
-                            <CenterTableActionCellIcon
-                              onClick={e => {
-                                e.stopPropagation();
-                              }}>
-                              <IconOverflowHorizontal />
-                            </CenterTableActionCellIcon>
-                          }
-                        />
-                      </CenterTableActionCellContents>
-                    </td>
-                  )}
-                </tr>
-              ))}
-            </tbody>
-          )}
-        </CenterTable>
-      </CenterSpaceTableSpace>
-    </>
   );
 };
 

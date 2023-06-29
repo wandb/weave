@@ -1,0 +1,312 @@
+import React, {useMemo, useState} from 'react';
+
+import styled from 'styled-components';
+import {IconOverflowHorizontal} from '../../Panel2/Icons';
+import {Divider, Dropdown, Input, Popup} from 'semantic-ui-react';
+import WandbLoader from '@wandb/weave/common/components/WandbLoader';
+import * as LayoutElements from './LayoutElements';
+
+const CenterTable = styled.table`
+  width: 100%;
+  border: none;
+  border-collapse: collapse;
+
+  td:first-child {
+    padding-left: 12px;
+  }
+
+  tr {
+    border-bottom: 1px solid #dadee3;
+    color: #2b3038;
+  }
+
+  /* This whole bit is to keep borders with sticky! */
+  thead {
+    position: sticky;
+    top: 0;
+
+    tr {
+      border-top: none;
+      border-bottom: none;
+    }
+    &:after,
+    &:before {
+      content: '';
+      position: absolute;
+      left: 0;
+      width: 100%;
+    }
+    &:before {
+      top: 0;
+      border-top: 1px solid #dadee3;
+    }
+    &:after {
+      bottom: 0;
+      border-bottom: 1px solid #dadee3;
+    }
+  }
+  /*End sticky with border fix  */
+
+  thead {
+    tr {
+      text-transform: uppercase;
+      height: 48px;
+      background-color: #f5f6f7;
+      color: #8e949e;
+      font-size: 14px;
+      font-weight: 600;
+    }
+  }
+  tbody {
+    font-size: 16px;
+    tr {
+      height: 64px;
+
+      &:hover {
+        cursor: pointer;
+        background-color: #f8f9fa;
+      }
+    }
+    tr > td:first-child {
+      font-weight: 600;
+    }
+  }
+`;
+
+const CenterTableActionCellAction = styled(LayoutElements.HBlock)`
+  padding: 0px 12px;
+  border-radius: 4px;
+  height: 36px;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  cursor: pointer;
+  &:hover {
+    background-color: #f5f6f7;
+  }
+`;
+
+const CenterTableActionCellContents = styled(LayoutElements.VStack)`
+  align-items: center;
+  justify-content: center;
+`;
+
+const CenterTableActionCellIcon = styled(LayoutElements.VStack)`
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  width: 32px;
+  border-radius: 4px;
+  &:hover {
+    background-color: #a9edf252;
+    color: #038194;
+  }
+`;
+
+const CenterSpaceTableSpace = styled(LayoutElements.Space)`
+  overflow: auto;
+`;
+
+const CenterSpaceControls = styled(LayoutElements.HBlock)`
+  gap: 8px;
+`;
+
+const CenterSpaceTitle = styled(LayoutElements.HBlock)`
+  font-size: 24px;
+  font-weight: 600;
+  padding: 12px 8px;
+`;
+
+const CenterSpaceHeader = styled(LayoutElements.VBlock)`
+  padding: 12px 16px;
+  gap: 12px;
+`;
+
+type CenterBrowserDataType<E extends {[key: string]: string | number} = {}> = {
+  _id: string;
+} & E;
+
+export type CenterBrowserActionType<RT extends CenterBrowserDataType> = Array<{
+  icon: React.FC;
+  label: string;
+  onClick: (row: RT, index: number) => void;
+}>;
+
+type CenterBrowserProps<RT extends CenterBrowserDataType> = {
+  title: string;
+  data: Array<RT>;
+  loading?: boolean;
+  columns?: string[];
+  // TODO: Actions might be a callback that returns an array of actions for a row
+  actions?: Array<CenterBrowserActionType<RT>>;
+  allowSearch?: boolean;
+  filters?: Array<{
+    placeholder: string;
+    options: Array<{
+      key: string | number;
+      text: string;
+      value: string | number;
+    }>;
+    onChange: (value: string) => void;
+  }>;
+};
+
+export const CenterBrowser = <RT extends CenterBrowserDataType>(
+  props: CenterBrowserProps<RT>
+) => {
+  const [searchText, setSearchText] = useState('');
+  const filteredData = useMemo(() => {
+    if (!props.allowSearch || searchText === '' || searchText == null) {
+      return props.data;
+    }
+    return props.data.filter(d => {
+      return Object.values(d).some(v => {
+        return v.toString().toLowerCase().includes(searchText.toLowerCase());
+      });
+    });
+  }, [props.allowSearch, props.data, searchText]);
+  const showControls = props.allowSearch || (props.filters?.length ?? 0) > 0;
+  const allActions = (props.actions ?? []).flatMap(a => a);
+  const primaryAction = allActions.length > 0 ? allActions[0] : undefined;
+  const columns = useMemo(() => {
+    if (props.columns != null) {
+      return props.columns;
+    }
+    return Object.keys(props.data[0] ?? {}).filter(k => !k.startsWith('_'));
+  }, [props.columns, props.data]);
+  const hasActions = allActions.length > 0;
+  return (
+    <>
+      <CenterSpaceHeader>
+        <CenterSpaceTitle>{props.title}</CenterSpaceTitle>
+        {showControls && (
+          <CenterSpaceControls>
+            {props.allowSearch && (
+              <Input
+                style={{
+                  width: '100%',
+                }}
+                icon="search"
+                iconPosition="left"
+                placeholder="Search"
+                onChange={e => {
+                  setSearchText(e.target.value);
+                }}
+              />
+            )}
+            {props.filters?.map((filter, i) => (
+              <Dropdown
+                key={i}
+                style={{
+                  boxShadow: 'none',
+                }}
+                selection
+                clearable
+                placeholder={filter.placeholder}
+                options={filter.options}
+                onChange={(e, data) => {
+                  filter.onChange(data.value as string);
+                }}
+              />
+            ))}
+          </CenterSpaceControls>
+        )}
+      </CenterSpaceHeader>
+      <CenterSpaceTableSpace>
+        <CenterTable
+          style={{
+            height: props.loading ? '100%' : '',
+          }}>
+          <thead>
+            <tr>
+              {columns.map(c => (
+                <td key={c}>{c}</td>
+              ))}
+              {hasActions && (
+                <td
+                  style={{
+                    width: '64px',
+                  }}></td>
+              )}
+            </tr>
+          </thead>
+          {props.loading ? (
+            <tr style={{height: '100%'}}>
+              <td colSpan={columns.length + (hasActions ? 1 : 0)}>
+                <LayoutElements.VStack
+                  style={{
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                  <WandbLoader inline />
+                </LayoutElements.VStack>
+              </td>
+            </tr>
+          ) : (
+            <tbody>
+              {filteredData.map((row, i) => (
+                <tr
+                  key={row._id}
+                  onClick={() => primaryAction?.onClick(row, i)}>
+                  {columns.map(c => (
+                    <td key={c}>{(row as any)[c]}</td>
+                  ))}
+                  {hasActions && (
+                    <td>
+                      <CenterTableActionCellContents>
+                        <Popup
+                          style={{
+                            padding: '6px 6px',
+                          }}
+                          content={
+                            <LayoutElements.VStack
+                              onClick={e => {
+                                e.stopPropagation();
+                              }}>
+                              {props.actions?.flatMap((action, i) => {
+                                const actions = action.map((a, j) => (
+                                  <CenterTableActionCellAction
+                                    key={'' + i + '_' + j}
+                                    onClick={e => {
+                                      e.stopPropagation();
+                                      a.onClick(row, i);
+                                    }}>
+                                    <a.icon />
+                                    {a.label}
+                                  </CenterTableActionCellAction>
+                                ));
+                                if (i < props.actions!.length - 1) {
+                                  actions.push(
+                                    <Divider
+                                      key={'d' + i}
+                                      style={{margin: '6px 0px'}}
+                                    />
+                                  );
+                                }
+                                return actions;
+                              })}
+                            </LayoutElements.VStack>
+                          }
+                          basic
+                          on="click"
+                          trigger={
+                            <CenterTableActionCellIcon
+                              onClick={e => {
+                                e.stopPropagation();
+                              }}>
+                              <IconOverflowHorizontal />
+                            </CenterTableActionCellIcon>
+                          }
+                        />
+                      </CenterTableActionCellContents>
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          )}
+        </CenterTable>
+      </CenterSpaceTableSpace>
+    </>
+  );
+};
