@@ -15,6 +15,7 @@ import {
 import {isFunction} from 'lodash';
 import {Editor, Node, Path, Point, Range, Text, Transforms} from 'slate';
 
+// TODO: move this somewhere else
 export const trace = (...args: any[]) => {
   if (isWeaveDebugEnabled()) {
     console.log(...args.map(a => (isFunction(a) ? a() : a)));

@@ -14,7 +14,7 @@ import produce from 'immer';
 import React, {useCallback, useMemo, useState} from 'react';
 import styled from 'styled-components';
 
-import {WeaveExpression} from '../../panel/WeaveExpression';
+import {WeaveExpression} from '../../panel/WeaveExpression/WeaveExpression';
 import {PanelBankSectionConfig} from '../WeavePanelBank/panelbank';
 import {getSectionConfig, PBSection} from '../WeavePanelBank/PBSection';
 import {
@@ -258,7 +258,7 @@ export const PanelEachColumn: React.FC<PanelEachColumnProps> = props => {
 
   return (
     <div>
-      <WeaveExpression expr={searchExpr} setExpression={setSearchExpr} />
+      <WeaveExpression expression={searchExpr} setExpression={setSearchExpr} />
       <PBSection
         mode="flow"
         config={pbLayoutConfig}

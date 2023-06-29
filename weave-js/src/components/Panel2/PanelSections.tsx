@@ -136,7 +136,7 @@ export const PanelSectionsConfigComp: React.FC<PanelSectionsProps> = props => {
       <ConfigPanel.ConfigOption label={'section'}>
         <PanelContextProvider newVars={tabVars}>
           <ConfigPanel.ExpressionConfigField
-            expr={config.section}
+            expression={config.section}
             setExpression={updateSectionExpr}
           />
         </PanelContextProvider>

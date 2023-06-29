@@ -1,11 +1,4 @@
-import {EditingNode, Parser, Type} from '@wandb/weave/core';
-
-export interface ExpressionResult {
-  expr: EditingNode;
-  parseTree?: Parser.SyntaxNode;
-  nodeMap?: Map<number, EditingNode>;
-  extraText?: string;
-}
+import {Type} from '@wandb/weave/core';
 
 export interface PanelSpec<I extends Type = Type, C = any> {
   id: string;
@@ -34,6 +27,8 @@ export interface Dimensions {
 export interface PanelProps<I, C> {
   input: I;
   config: C;
+
   updateInput?(newInput: Partial<I>): void;
+
   updateConfig(partialConfig: Partial<C>): void;
 }

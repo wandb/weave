@@ -18,8 +18,12 @@ import React, {useCallback, useMemo, useState} from 'react';
 import {Popup} from 'semantic-ui-react';
 
 import {useWeaveContext} from '../../../context';
-import {focusEditor, WeaveExpression} from '../../../panel/WeaveExpression';
-import {SUGGESTION_OPTION_CLASS} from '../../../panel/WeaveExpression/styles';
+import {
+  focusEditor,
+  WeaveExpression,
+} from '../../../panel/WeaveExpression/WeaveExpression';
+// TODO: remove SUGGESTION_OPTION_CLASS
+import {SUGGESTION_OPTION_CLASS} from '../../../panel/WeaveExpression/Suggestions';
 import {usePanelStacksForType} from '../availablePanels';
 import * as ExpressionView from '../ExpressionView';
 import {PanelComp2} from '../PanelComp';
@@ -268,9 +272,9 @@ export const ColumnHeader: React.FC<{
   let columnTypeForGroupByChecks = stripTag(workingSelectFunction.type);
   if (!isGroupCol) {
     /* 
-      Once one column is grouped, the other non-grouped columns are all typed as 
-      lists. So we need to figure out the inner types of the non-grouped columns.
-      */
+                          Once one column is grouped, the other non-grouped columns are all typed as 
+                          lists. So we need to figure out the inner types of the non-grouped columns.
+                          */
     columnTypeForGroupByChecks = isListLike(columnTypeForGroupByChecks)
       ? stripTag(listObjectType(workingSelectFunction.type))
       : columnTypeForGroupByChecks;
@@ -487,10 +491,10 @@ export const ColumnHeader: React.FC<{
                     <div style={{width: '100%'}}>
                       <PanelContextProvider newVars={cellFrame}>
                         <WeaveExpression
-                          expr={workingSelectFunction}
+                          expression={workingSelectFunction}
                           setExpression={setWorkingSelectFunction}
                           onMount={focusEditor}
-                          liveUpdate
+                          isLiveUpdateEnabled={true}
                         />
                       </PanelContextProvider>
                     </div>

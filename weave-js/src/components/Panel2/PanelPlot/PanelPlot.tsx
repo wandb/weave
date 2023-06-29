@@ -921,7 +921,7 @@ const WeaveExpressionDimConfig: React.FC<{
   return (
     <PanelContextProvider newVars={cellFrames[0]}>
       <ConfigPanel.ExpressionConfigField
-        expr={tableConfigs[0].columnSelectFunctions[colIds[0]]}
+        expression={tableConfigs[0].columnSelectFunctions[colIds[0]]}
         setExpression={updateDims as any}
       />
     </PanelContextProvider>
@@ -1626,6 +1626,7 @@ function getColorAxisType(
 function getAxisTimeUnit(isDashboard: boolean): VegaTimeUnit {
   return isDashboard ? 'yearweek' : 'yearmonth';
 }
+
 /*
 const useMergeTables = makePromiseUsable(
   (
@@ -1805,13 +1806,13 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
       }
 
       /*
-      if (isDash) {
-        node = opRandomlyDownsample({
-          arr: node,
-          n: constNumber(PANELPLOT_MAX_DATAPOINTS),
-        });
-      }
-      */
+            if (isDash) {
+              node = opRandomlyDownsample({
+                arr: node,
+                n: constNumber(PANELPLOT_MAX_DATAPOINTS),
+              });
+            }
+            */
 
       acc[i] = node;
 

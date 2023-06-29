@@ -152,3 +152,19 @@ export function useWhenOnScreenAfterNewValueDebounced(
   ]);
   return [ref, ready] as const;
 }
+
+// like useState<boolean> but also returns a toggle function
+// from https://usehooks-ts.com/react-hook/use-toggle
+export function useToggle(
+  defaultValue?: boolean
+): [boolean, (newVal?: boolean) => void, Dispatch<SetStateAction<boolean>>] {
+  const [value, setValue] = useState(!!defaultValue);
+
+  // if you pass in newVal, it sets that value, otherwise it toggles currentVal
+  const setOrToggleValue = useCallback(
+    (newVal?: boolean) => setValue(currentVal => newVal ?? !currentVal),
+    []
+  );
+
+  return [value, setOrToggleValue, setValue];
+}

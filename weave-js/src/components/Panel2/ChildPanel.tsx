@@ -12,19 +12,19 @@ import {
 } from '@wandb/weave/common/css/globals.styles';
 import {ValidatingTextInput} from '@wandb/weave/components/ValidatingTextInput';
 import {
-  Frame,
-  ID,
-  Node,
-  NodeOrVoidNode,
-  Stack,
-  Weave,
   defaultLanguageBinding,
   filterNodes,
+  Frame,
+  ID,
   isAssignableTo,
   isNodeOrVoidNode,
+  Node,
+  NodeOrVoidNode,
   replaceChainRoot,
+  Stack,
   varNode,
   voidNode,
+  Weave,
 } from '@wandb/weave/core';
 import {isValidVarName} from '@wandb/weave/core/util/var';
 import * as _ from 'lodash';
@@ -32,7 +32,7 @@ import React, {useCallback, useMemo, useState} from 'react';
 import styled from 'styled-components';
 
 import {useWeaveContext} from '../../context';
-import {WeaveExpression} from '../../panel/WeaveExpression';
+import {WeaveExpression} from '../../panel/WeaveExpression/WeaveExpression';
 import {useNodeWithServerType} from '../../react';
 import {consoleLog} from '../../util';
 import {IconButton} from '../IconButton';
@@ -567,10 +567,10 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
             )}
             <EditorExpression data-test="panel-expression-expression">
               <WeaveExpression
-                expr={panelInputExpr}
+                expression={panelInputExpr}
                 setExpression={updateExpression}
                 noBox
-                truncate={!expressionFocused}
+                isTruncated={!expressionFocused}
                 onFocus={onFocusExpression}
                 onBlur={onBlurExpression}
               />
@@ -701,7 +701,7 @@ export const ChildPanelConfigComp: React.FC<ChildPanelProps> = props => {
             newVars={config.vars}
             handleVarEvent={handleVarEvent}>
             <ConfigPanel.ExpressionConfigField
-              expr={panelInputExpr}
+              expression={panelInputExpr}
               setExpression={updateExpression}
             />
           </PanelContextProvider>
@@ -788,11 +788,11 @@ export const VariableEditor: React.FC<{
                   updateConfig({...config, vars: newVars});
                 }}
               />
-              <div style={{marginRight: 4, marginLeft: 4}}>= </div>
+              <div style={{marginRight: 4, marginLeft: 4}}>=</div>
               <div style={{flexGrow: 1}}>
                 <PanelContextProvider newVars={{...nextFrame}}>
                   <WeaveExpression
-                    expr={value}
+                    expression={value}
                     noBox
                     // liveUpdate
                     setExpression={val =>
@@ -913,6 +913,7 @@ const EditorExpression = styled.div`
   flex-grow: 1;
   margin-left: 4px;
   overflow: hidden;
+
   &:hover {
     background-color: ${GRAY_50};
   }

@@ -5,6 +5,7 @@
 import {BaseEditor, Descendant, Point, Range} from 'slate';
 import {ReactEditor} from 'slate-react';
 import {HistoryEditor} from 'slate-history';
+
 type CustomEditor = {
   type?: string;
   text?: string;
@@ -17,6 +18,7 @@ type CustomText = {
   text: string;
 };
 
+// TODO: revisit and rename this type? should be with expression editor
 type CustomRange = {
   anchor: Point;
   focus: Point;

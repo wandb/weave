@@ -229,7 +229,7 @@ const VarComp: FC<VarProps> = ({
         newVars={siblingVars}
         handleVarEvent={handleSiblingVarEvent}>
         <ConfigPanel.ExpressionConfigField
-          expr={panelInputExpr}
+          expression={panelInputExpr}
           setExpression={updateExpression}
         />
       </PanelContextProvider>

@@ -9,11 +9,15 @@ import React, {useCallback, useMemo, useState} from 'react';
 import {Button} from 'semantic-ui-react';
 
 import {useWeaveContext} from '../../context';
-import {focusEditor, WeaveExpression} from '../../panel/WeaveExpression';
+import {
+  focusEditor,
+  WeaveExpression,
+} from '../../panel/WeaveExpression/WeaveExpression';
 import * as S from './ControlFilter.styles';
 
 interface ControlFilterProps {
   filterFunction: NodeOrVoidNode;
+
   setFilterFunction(newNode: NodeOrVoidNode): void;
 }
 
@@ -59,10 +63,10 @@ export const ControlFilter: React.FC<ControlFilterProps> = React.memo(
       <S.FilterControls>
         <div style={{flex: '1 1 auto', paddingBottom: '5px'}}>
           <WeaveExpression
-            expr={filterFunction}
+            expression={filterFunction}
             setExpression={setFilterFunction}
             onMount={focusEditor}
-            liveUpdate
+            isLiveUpdateEnabled={true}
           />
         </div>
         <div

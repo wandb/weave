@@ -11,7 +11,7 @@ import {
 import * as _ from 'lodash';
 import React, {useCallback, useMemo} from 'react';
 
-import {WeaveExpression} from '../../panel/WeaveExpression';
+import {WeaveExpression} from '../../panel/WeaveExpression/WeaveExpression';
 import {useMutation, useNodeValue} from '../../react';
 import * as Panel2 from './panel';
 import {PanelContextProvider} from './PanelContext';
@@ -21,9 +21,11 @@ const inputType = {
   inputTypes: {},
   outputType: 'any' as const,
 };
+
 interface PanelFunctionEditorConfig {
   expr: ConstNode<FunctionTypeSpecific<{[key: string]: Type}, 'any'>>;
 }
+
 type PanelFunctionEditorProps = Panel2.PanelProps<
   typeof inputType,
   PanelFunctionEditorConfig
@@ -86,7 +88,11 @@ export const PanelFunctionEditor: React.FC<
   return (
     <div style={{width: '100%', height: '100%'}}>
       <PanelContextProvider newVars={paramVars}>
-        <WeaveExpression expr={value.val} setExpression={updateVal} noBox />
+        <WeaveExpression
+          expression={value.val}
+          setExpression={updateVal}
+          noBox
+        />
       </PanelContextProvider>
     </div>
   );

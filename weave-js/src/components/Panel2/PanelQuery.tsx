@@ -244,7 +244,7 @@ export const PanelQueryConditionConfigComponent: React.FC<
       <PanelContextProvider newVars={newVars}>
         <ConfigPanel.ConfigOption label={`expr`}>
           <ConfigPanel.ExpressionConfigField
-            expr={condition.expression}
+            expression={condition.expression}
             setExpression={updateConditionExpr}
           />
         </ConfigPanel.ConfigOption>
