@@ -18,7 +18,7 @@ from .. import weave_types
 from .. import artifact_base
 from .. import file_util
 from .. import graph
-from ..types.run_stream_type import RunStreamType
+from ..core_types.run_stream_type import RunStreamType
 from ..ops_domain import run_stream_ops
 from ..ops_primitives import weave_api
 

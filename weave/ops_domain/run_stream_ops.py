@@ -1,6 +1,6 @@
 from weave import weave_types
 from ..ops_arrow.arrow import ArrowWeaveListType
-from ..types import RunStreamType
+from ..core_types import RunStreamType
 from ..api import op
 from .project_ops import project
 from .. import compile

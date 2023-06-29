@@ -23,7 +23,7 @@ from .panel_util import make_node
 
 from . import wandb_api as _wandb_api
 
-from .types import *
+from .core_types import *
 
 _wandb_api.init()
 
