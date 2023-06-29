@@ -21,7 +21,7 @@ const HomeComp: FC<HomeProps> = props => {
   const now = moment().format('YY_MM_DD_hh_mm_ss');
   const inJupyter = props.inJupyter;
   const defaultName = now;
-  const [newName, setNewName] = useState('');
+  const [newName] = useState('');
   const weave = useWeaveContext();
   const name = 'dashboard-' + (newName === '' ? defaultName : newName);
   const makeNewDashboard = useNewPanelFromRootQueryCallback();

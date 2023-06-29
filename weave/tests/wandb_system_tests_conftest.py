@@ -13,6 +13,7 @@ from typing import Any, Generator, Optional, Union, Literal
 
 import pytest
 import requests
+import wandb
 
 from weave.wandb_api import from_environment, wandb_api_context, WandbApiContext
 
@@ -48,6 +49,7 @@ def bootstrap_user(
             "WANDB_BASE_URL": base_url,
         },
     ):
+        wandb.teardown()  # type: ignore
         yield LocalBackendFixturePayload(
             username=username,
             password=username,
@@ -55,6 +57,7 @@ def bootstrap_user(
             base_url=base_url,
             cookie="NOT-IMPLEMENTED",
         )
+        wandb.teardown()  # type: ignore
 
     if not wandb_debug:
         command = UserFixtureCommand(command="down", username=username)
