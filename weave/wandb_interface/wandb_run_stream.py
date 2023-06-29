@@ -161,6 +161,8 @@ class RunStream:
         from .. import show
 
         self._ensure_weave_run_stream()
+        if self._weave_run_stream_ref is None:
+            return show(None)
         return show(
             run_stream_ops.rows(weave_api.get(str(self._weave_run_stream_ref.uri)))
         )
