@@ -1,6 +1,6 @@
 import {Node, voidNode} from '@wandb/weave/core';
 import moment from 'moment';
-import React, {FC, memo, useCallback, useMemo, useState} from 'react';
+import React, {FC, Props, memo, useCallback, useMemo, useState} from 'react';
 import getConfig from '../../../config';
 
 import styled from 'styled-components';
@@ -13,6 +13,7 @@ import {
   IconDashboardBlackboard,
   IconInfo,
   IconLaptopLocalComputer,
+  IconOpenNewTab,
   IconOverflowHorizontal,
   IconTable,
   IconUserProfilePersonal,
@@ -22,8 +23,9 @@ import {
 } from '../../Panel2/Icons';
 import {useNewPanelFromRootQueryCallback} from '../../Panel2/PanelRootBrowser/util';
 import {useConfig} from '../../Panel2/panel';
-import {Divider, Dropdown, Input, Popup} from 'semantic-ui-react';
+import {Divider, Dropdown, Input, Loader, Popup} from 'semantic-ui-react';
 import * as query from './query';
+import WandbLoader from '@wandb/weave/common/components/WandbLoader';
 
 const CenterTable = styled.table`
   width: 100%;
@@ -35,10 +37,36 @@ const CenterTable = styled.table`
   }
 
   tr {
-    border-top: 1px solid #dadee3;
     border-bottom: 1px solid #dadee3;
     color: #2b3038;
   }
+
+  /* This whole bit is to keep borders with sticky! */
+  thead {
+    position: sticky;
+    top: 0;
+
+    tr {
+      border-top: none;
+      border-bottom: none;
+    }
+    &:after,
+    &:before {
+      content: '';
+      position: absolute;
+      left: 0;
+      width: 100%;
+    }
+    &:before {
+      top: 0;
+      border-top: 1px solid #dadee3;
+    }
+    &:after {
+      bottom: 0;
+      border-bottom: 1px solid #dadee3;
+    }
+  }
+  /*End sticky with border fix  */
 
   thead {
     tr {
@@ -392,6 +420,8 @@ const HomeComp: FC<HomeProps> = props => {
     return [...recentSection, ...wandbSection, ...draftsSection];
   }, [draftsSection, recentSection, wandbSection]);
 
+  const [previewNode, setPreviewNode] = useState<any>(undefined);
+
   return (
     <VStack>
       <Block>
@@ -413,16 +443,28 @@ const HomeComp: FC<HomeProps> = props => {
         {/* Left Bar */}
         <LeftNav sections={navSections} />
         {/* Center Content */}
-        <CenterEntityBrowser entityName="timssweeney" />
+        <CenterSpace>
+          {activeBrowserRoot.browserType === 'recent' ? (
+            <>RECENT</>
+          ) : activeBrowserRoot.browserType === 'wandb' ? (
+            <CenterEntityBrowser entityName={activeBrowserRoot.rootId} />
+          ) : activeBrowserRoot.browserType === 'drafts' ? (
+            <>DRAFTS</>
+          ) : (
+            <>Invalid Selection</>
+          )}
+        </CenterSpace>
         {/* Right Bar */}
-        {/* <Block>
-          <div
-            style={{
-              width: '300px',
-            }}>
-            c
-          </div>
-        </Block> */}
+        {previewNode != null && (
+          <Block>
+            <div
+              style={{
+                width: '300px',
+              }}>
+              c
+            </div>
+          </Block>
+        )}
       </HSpace>
     </VStack>
   );
@@ -432,82 +474,65 @@ const CenterEntityBrowser: React.FC<{
   entityName: string;
 }> = props => {
   const browserTitle = props.entityName;
+  const [selectedProjectName, setSelectedProjectName] = useState<
+    string | undefined
+  >();
 
-  console.log(query.useProjectsForEntityWithWeaveObject(props.entityName));
+  const projectNames = query.useProjectsForEntityWithWeaveObject(
+    props.entityName
+  );
 
-  const onSearch = useCallback(() => {}, []);
+  const browserData = useMemo(() => {
+    return projectNames.result.map(projectName => ({
+      _id: projectName,
+      project: projectName,
+      // TODO: get these from the server
+      // runs: 20,
+      // tables: 10,
+      // dashboards: 5,
+      // 'last edited': 'yesterday',
+    }));
+  }, [projectNames.result]);
 
-  const browserFilters = [
-    {
-      placeholder: 'All entities',
-      options: [
-        {key: 1, text: 'Choice 1', value: 1},
-        {key: 2, text: 'Choice 2', value: 2},
-        {key: 3, text: 'Choice 3', value: 3},
+  const browserActions: Array<
+    CenterBrowserActionType<(typeof browserData)[number]>
+  > = useMemo(() => {
+    return [
+      [
+        {
+          icon: IconInfo,
+          label: 'Browse project',
+          onClick: (row, index) => {
+            setSelectedProjectName(row._id);
+          },
+        },
       ],
-      onChange: () => {},
-    },
-    {
-      placeholder: 'All projects',
-      options: [
-        {key: 1, text: 'Choice 1', value: 1},
-        {key: 2, text: 'Choice 2', value: 2},
-        {key: 3, text: 'Choice 3', value: 3},
+      [
+        {
+          icon: IconOpenNewTab,
+          label: 'View in Weights and Biases',
+          onClick: (row, index) => {
+            // Open a new tab with the W&B project URL
+            // TODO: make this work for local. Probably need to bring over `urlPrefixed`
+            const url = `https://wandb.ai/${props.entityName}/${row.project}/overview`;
+            // eslint-disable-next-line wandb/no-unprefixed-urls
+            window.open(url, '_blank');
+          },
+        },
       ],
-      onChange: () => {},
-    },
-  ];
+    ];
+  }, [props.entityName]);
 
-  const browserData: Array<CenterBrowserDataType> = [
-    {
-      _id: 0,
-      Board: 'Board 1',
-      Entity: 'timssweeney',
-      Project: 'weave',
-      'Last modified': '2 days ago',
-    },
-    {
-      _id: 1,
-      Board: 'Board 2',
-      Entity: 'timssweeney',
-      Project: 'weave',
-      'Last modified': 'June 21, 2023',
-    },
-  ];
-  const browserActions: Array<CenterBrowserActionType> = [
-    [
-      {
-        icon: IconInfo,
-        label: 'Object details',
-        onClick: (row: CenterBrowserDataType, index: number) => {
-          console.log('DETAILS', row, index);
-        },
-      },
-      {
-        icon: IconAddNew,
-        label: 'Seed new board',
-        onClick: (row: CenterBrowserDataType, index: number) => {
-          console.log('SEED', row, index);
-        },
-      },
-    ],
-    [
-      {
-        icon: IconCopy,
-        label: 'Copy Weave expression',
-        onClick: (row: CenterBrowserDataType, index: number) => {
-          console.log('COPY', row, index);
-        },
-      },
-    ],
-  ];
+  const loading = projectNames.loading;
+
   return (
     <CenterBrowser
+      allowSearch
+      columns={['project']}
+      loading={loading}
+      title={browserTitle}
       data={browserData}
       actions={browserActions}
-      title={browserTitle}
-      onSearch={onSearch}
-      filters={browserFilters}
     />
   );
 };
@@ -528,6 +553,71 @@ const LeftNav: React.FC<{
     </VBlock>
   );
 };
+
+// const browserFilters = [
+//   {
+//     placeholder: 'All entities',
+//     options: [
+//       {key: 1, text: 'Choice 1', value: 1},
+//       {key: 2, text: 'Choice 2', value: 2},
+//       {key: 3, text: 'Choice 3', value: 3},
+//     ],
+//     onChange: () => {},
+//   },
+//   {
+//     placeholder: 'All projects',
+//     options: [
+//       {key: 1, text: 'Choice 1', value: 1},
+//       {key: 2, text: 'Choice 2', value: 2},
+//       {key: 3, text: 'Choice 3', value: 3},
+//     ],
+//     onChange: () => {},
+//   },
+// ];
+
+// const browserData: Array<CenterBrowserDataType> = [
+//   {
+//     _id: 0,
+//     Board: 'Board 1',
+//     Entity: 'timssweeney',
+//     Project: 'weave',
+//     'Last modified': '2 days ago',
+//   },
+//   {
+//     _id: 1,
+//     Board: 'Board 2',
+//     Entity: 'timssweeney',
+//     Project: 'weave',
+//     'Last modified': 'June 21, 2023',
+//   },
+// ];
+// const browserActions: Array<CenterBrowserActionType> = [
+//   [
+//     {
+//       icon: IconInfo,
+//       label: 'Object details',
+//       onClick: (row: CenterBrowserDataType, index: number) => {
+//         console.log('DETAILS', row, index);
+//       },
+//     },
+//     {
+//       icon: IconAddNew,
+//       label: 'Seed new board',
+//       onClick: (row: CenterBrowserDataType, index: number) => {
+//         console.log('SEED', row, index);
+//       },
+//     },
+//   ],
+//   [
+//     {
+//       icon: IconCopy,
+//       label: 'Copy Weave expression',
+//       onClick: (row: CenterBrowserDataType, index: number) => {
+//         console.log('COPY', row, index);
+//       },
+//     },
+//   ],
+// ];
 
 type LeftNavSectionProps = {
   title: string;
@@ -583,23 +673,24 @@ const LeftNavItem: React.FC<LeftNavItemProps> = props => {
   );
 };
 
-type CenterBrowserDataType = {
-  _id: string | number;
-  [key: string]: string | number;
-};
+type CenterBrowserDataType<E extends {[key: string]: string | number} = {}> = {
+  _id: string;
+} & E;
 
-type CenterBrowserActionType = Array<{
+type CenterBrowserActionType<RT extends CenterBrowserDataType> = Array<{
   icon: React.FC;
   label: string;
-  onClick: (row: CenterBrowserDataType, index: number) => void;
+  onClick: (row: RT, index: number) => void;
 }>;
 
-type CenterBrowserProps = {
+type CenterBrowserProps<RT extends CenterBrowserDataType> = {
   title: string;
-  data: Array<CenterBrowserDataType>;
+  data: Array<RT>;
+  loading?: boolean;
+  columns?: string[];
   // TODO: Actions might be a callback that returns an array of actions for a row
-  actions?: Array<CenterBrowserActionType>;
-  onSearch?: (query: string) => void;
+  actions?: Array<CenterBrowserActionType<RT>>;
+  allowSearch?: boolean;
   filters?: Array<{
     placeholder: string;
     options: Array<{
@@ -611,21 +702,37 @@ type CenterBrowserProps = {
   }>;
 };
 
-const CenterBrowser: React.FC<CenterBrowserProps> = props => {
-  const showControls = props.onSearch || (props.filters?.length ?? 0) > 0;
+const CenterBrowser = <RT extends CenterBrowserDataType>(
+  props: CenterBrowserProps<RT>
+) => {
+  const [searchText, setSearchText] = useState('');
+  const filteredData = useMemo(() => {
+    if (!props.allowSearch || searchText === '' || searchText == null) {
+      return props.data;
+    }
+    return props.data.filter(d => {
+      return Object.values(d).some(v => {
+        return v.toString().toLowerCase().includes(searchText.toLowerCase());
+      });
+    });
+  }, [props.allowSearch, props.data, searchText]);
+  const showControls = props.allowSearch || (props.filters?.length ?? 0) > 0;
   const allActions = (props.actions ?? []).flatMap(a => a);
   const primaryAction = allActions.length > 0 ? allActions[0] : undefined;
-  const columns = Object.keys(props.data[0] ?? {}).filter(
-    k => !k.startsWith('_')
-  );
+  const columns = useMemo(() => {
+    if (props.columns != null) {
+      return props.columns;
+    }
+    return Object.keys(props.data[0] ?? {}).filter(k => !k.startsWith('_'));
+  }, [props.columns, props.data]);
   const hasActions = allActions.length > 0;
   return (
-    <CenterSpace>
+    <>
       <CenterSpaceHeader>
         <CenterSpaceTitle>{props.title}</CenterSpaceTitle>
         {showControls && (
           <CenterSpaceControls>
-            {props.onSearch && (
+            {props.allowSearch && (
               <Input
                 style={{
                   width: '100%',
@@ -634,7 +741,7 @@ const CenterBrowser: React.FC<CenterBrowserProps> = props => {
                 iconPosition="left"
                 placeholder="Search"
                 onChange={e => {
-                  props.onSearch?.(e.target.value);
+                  setSearchText(e.target.value);
                 }}
               />
             )}
@@ -657,7 +764,10 @@ const CenterBrowser: React.FC<CenterBrowserProps> = props => {
         )}
       </CenterSpaceHeader>
       <CenterSpaceTableSpace>
-        <CenterTable>
+        <CenterTable
+          style={{
+            height: props.loading ? '100%' : '',
+          }}>
           <thead>
             <tr>
               {columns.map((c, i) => (
@@ -671,68 +781,84 @@ const CenterBrowser: React.FC<CenterBrowserProps> = props => {
               )}
             </tr>
           </thead>
-          <tbody>
-            {props.data.map((row, i) => (
-              <tr key={row._id} onClick={() => primaryAction?.onClick(row, i)}>
-                {columns.map((c, i) => (
-                  <td key={c}>{row[c]}</td>
-                ))}
-                {hasActions && (
-                  <td>
-                    <CenterTableActionCellContents>
-                      <Popup
-                        style={{
-                          padding: '6px 6px',
-                        }}
-                        content={
-                          <VStack
-                            onClick={e => {
-                              e.stopPropagation();
-                            }}>
-                            {props.actions?.flatMap((action, i) => {
-                              const actions = action.map((a, j) => (
-                                <CenterTableActionCellAction
-                                  key={'' + i + '_' + j}
-                                  onClick={e => {
-                                    e.stopPropagation();
-                                    a.onClick(row, i);
-                                  }}>
-                                  <a.icon />
-                                  {a.label}
-                                </CenterTableActionCellAction>
-                              ));
-                              if (i < props.actions!.length - 1) {
-                                actions.push(
-                                  <Divider
-                                    key={'d' + i}
-                                    style={{margin: '6px 0px'}}
-                                  />
-                                );
-                              }
-                              return actions;
-                            })}
-                          </VStack>
-                        }
-                        basic
-                        on="click"
-                        trigger={
-                          <CenterTableActionCellIcon
-                            onClick={e => {
-                              e.stopPropagation();
-                            }}>
-                            <IconOverflowHorizontal />
-                          </CenterTableActionCellIcon>
-                        }
-                      />
-                    </CenterTableActionCellContents>
-                  </td>
-                )}
-              </tr>
-            ))}
-          </tbody>
+          {props.loading ? (
+            <tr style={{height: '100%'}}>
+              <td colSpan={columns.length + (hasActions ? 1 : 0)}>
+                <VStack
+                  style={{
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                  <WandbLoader inline />
+                </VStack>
+              </td>
+            </tr>
+          ) : (
+            <tbody>
+              {filteredData.map((row, i) => (
+                <tr
+                  key={row._id}
+                  onClick={() => primaryAction?.onClick(row, i)}>
+                  {columns.map((c, i) => (
+                    <td key={c}>{(row as any)[c]}</td>
+                  ))}
+                  {hasActions && (
+                    <td>
+                      <CenterTableActionCellContents>
+                        <Popup
+                          style={{
+                            padding: '6px 6px',
+                          }}
+                          content={
+                            <VStack
+                              onClick={e => {
+                                e.stopPropagation();
+                              }}>
+                              {props.actions?.flatMap((action, i) => {
+                                const actions = action.map((a, j) => (
+                                  <CenterTableActionCellAction
+                                    key={'' + i + '_' + j}
+                                    onClick={e => {
+                                      e.stopPropagation();
+                                      a.onClick(row, i);
+                                    }}>
+                                    <a.icon />
+                                    {a.label}
+                                  </CenterTableActionCellAction>
+                                ));
+                                if (i < props.actions!.length - 1) {
+                                  actions.push(
+                                    <Divider
+                                      key={'d' + i}
+                                      style={{margin: '6px 0px'}}
+                                    />
+                                  );
+                                }
+                                return actions;
+                              })}
+                            </VStack>
+                          }
+                          basic
+                          on="click"
+                          trigger={
+                            <CenterTableActionCellIcon
+                              onClick={e => {
+                                e.stopPropagation();
+                              }}>
+                              <IconOverflowHorizontal />
+                            </CenterTableActionCellIcon>
+                          }
+                        />
+                      </CenterTableActionCellContents>
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          )}
         </CenterTable>
       </CenterSpaceTableSpace>
-    </CenterSpace>
+    </>
   );
 };
 

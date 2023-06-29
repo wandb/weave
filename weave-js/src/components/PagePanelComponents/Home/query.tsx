@@ -62,7 +62,7 @@ export const useUserEntities = (): {
 export const useProjectsForEntityWithWeaveObject = (
   entityName: string
 ): {
-  result: string | undefined;
+  result: string[];
   loading: boolean;
 } => {
   const projectsNode = w.opEntityProjects({
@@ -75,5 +75,11 @@ export const useProjectsForEntityWithWeaveObject = (
     project: projectsNode,
   });
   const entityProjectNamesValue = useNodeValue(entityProjectNamesNode);
-  return entityProjectNamesValue;
+  return useMemo(
+    () => ({
+      result: entityProjectNamesValue.result ?? [],
+      loading: entityProjectNamesValue.loading,
+    }),
+    [entityProjectNamesValue.loading, entityProjectNamesValue.result]
+  );
 };
