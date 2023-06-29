@@ -1,28 +1,21 @@
-import {voidNode} from '@wandb/weave/core';
-import moment from 'moment';
-import React, {FC, memo, useCallback, useMemo, useState} from 'react';
-import getConfig from '../../../config';
+import React, {FC, memo, useMemo, useState} from 'react';
 
 import styled from 'styled-components';
-import {WBButton} from '../../../common/components/elements/WBButtonNew';
-import {useWeaveContext} from '../../../context';
 import {ChildPanelFullConfig} from '../../Panel2/ChildPanel';
 import {
-  IconAddNew as IconAddNewUnstyled,
   IconDashboardBlackboard,
   IconLaptopLocalComputer,
   IconTable,
   IconUserProfilePersonal,
   IconUsersTeam,
   IconWandb,
-  IconWeaveLogo,
 } from '../../Panel2/Icons';
-import {useNewPanelFromRootQueryCallback} from '../../Panel2/PanelRootBrowser/util';
 import {useConfig} from '../../Panel2/panel';
 import * as query from './query';
 import * as LayoutElements from './LayoutElements';
 import {CenterEntityBrowser} from './HomeCenterEntityBrowser';
 import {LeftNav} from './HomeLeftNav';
+import {HomeTopBar} from './HomeTopBar';
 
 const CenterSpace = styled(LayoutElements.VSpace)`
   border: 1px solid #dadee3;
@@ -38,35 +31,6 @@ type HomeProps = {
 };
 
 const HomeComp: FC<HomeProps> = props => {
-  const now = moment().format('YY_MM_DD_hh_mm_ss');
-  const inJupyter = props.inJupyter;
-  const defaultName = now;
-  const [newName] = useState('');
-  const weave = useWeaveContext();
-  const name = 'dashboard-' + (newName === '' ? defaultName : newName);
-  const makeNewDashboard = useNewPanelFromRootQueryCallback();
-  const {urlPrefixed} = getConfig();
-  const newDashboard = useCallback(() => {
-    makeNewDashboard(name, voidNode(), true, newDashExpr => {
-      if (inJupyter) {
-        const expStr = weave
-          .expToString(newDashExpr)
-          .replace(/\n+/g, '')
-          .replace(/\s+/g, '');
-        window.open(
-          urlPrefixed(`?exp=${encodeURIComponent(expStr)}`),
-          '_blank'
-        );
-      } else {
-        props.updateConfig({
-          vars: {},
-          input_node: newDashExpr,
-          id: '',
-          config: undefined,
-        });
-      }
-    });
-  }, [inJupyter, makeNewDashboard, name, props, urlPrefixed, weave]);
   const [rootConfig, updateRootConfig] = useConfig();
 
   const [activeBrowserRoot, setActiveBrowserRoot] = useState<{
@@ -208,18 +172,10 @@ const HomeComp: FC<HomeProps> = props => {
   return (
     <LayoutElements.VStack>
       <LayoutElements.Block>
-        <TopBar>
-          <TopBarLeft>
-            <WeaveLogo />
-            Weave
-          </TopBarLeft>
-          <TopBarRight>
-            <WBButton variant={`confirm`} onClick={newDashboard}>
-              <IconAddNew />
-              New board
-            </WBButton>
-          </TopBarRight>
-        </TopBar>
+        <HomeTopBar
+          inJupyter={props.inJupyter}
+          updateConfig={props.updateConfig}
+        />
       </LayoutElements.Block>
       {/* Main Region */}
       <LayoutElements.HSpace>
@@ -253,101 +209,4 @@ const HomeComp: FC<HomeProps> = props => {
   );
 };
 
-// const browserFilters = [
-//   {
-//     placeholder: 'All entities',
-//     options: [
-//       {key: 1, text: 'Choice 1', value: 1},
-//       {key: 2, text: 'Choice 2', value: 2},
-//       {key: 3, text: 'Choice 3', value: 3},
-//     ],
-//     onChange: () => {},
-//   },
-//   {
-//     placeholder: 'All projects',
-//     options: [
-//       {key: 1, text: 'Choice 1', value: 1},
-//       {key: 2, text: 'Choice 2', value: 2},
-//       {key: 3, text: 'Choice 3', value: 3},
-//     ],
-//     onChange: () => {},
-//   },
-// ];
-
-// const browserData: Array<CenterBrowserDataType> = [
-//   {
-//     _id: 0,
-//     Board: 'Board 1',
-//     Entity: 'timssweeney',
-//     Project: 'weave',
-//     'Last modified': '2 days ago',
-//   },
-//   {
-//     _id: 1,
-//     Board: 'Board 2',
-//     Entity: 'timssweeney',
-//     Project: 'weave',
-//     'Last modified': 'June 21, 2023',
-//   },
-// ];
-// const browserActions: Array<CenterBrowserActionType> = [
-//   [
-//     {
-//       icon: IconInfo,
-//       label: 'Object details',
-//       onClick: (row: CenterBrowserDataType, index: number) => {
-//         console.log('DETAILS', row, index);
-//       },
-//     },
-//     {
-//       icon: IconAddNew,
-//       label: 'Seed new board',
-//       onClick: (row: CenterBrowserDataType, index: number) => {
-//         console.log('SEED', row, index);
-//       },
-//     },
-//   ],
-//   [
-//     {
-//       icon: IconCopy,
-//       label: 'Copy Weave expression',
-//       onClick: (row: CenterBrowserDataType, index: number) => {
-//         console.log('COPY', row, index);
-//       },
-//     },
-//   ],
-// ];
-
 export const Home = memo(HomeComp);
-
-const TopBar = styled.div`
-  height: 64px;
-  padding: 0 12px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-`;
-
-const TopBarLeft = styled.div`
-  display: flex;
-  align-items: center;
-  font-size: 18px;
-  font-weight: 600;
-`;
-
-const TopBarRight = styled.div`
-  display: flex;
-  align-items: center;
-`;
-
-const WeaveLogo = styled(IconWeaveLogo)`
-  width: 32px;
-  height: 32px;
-  margin-right: 12px;
-`;
-
-const IconAddNew = styled(IconAddNewUnstyled)`
-  width: 18px;
-  height: 18px;
-  margin-right: 6px;
-`;

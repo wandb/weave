@@ -310,3 +310,68 @@ export const CenterBrowser = <RT extends CenterBrowserDataType>(
     </>
   );
 };
+
+// const browserFilters = [
+//   {
+//     placeholder: 'All entities',
+//     options: [
+//       {key: 1, text: 'Choice 1', value: 1},
+//       {key: 2, text: 'Choice 2', value: 2},
+//       {key: 3, text: 'Choice 3', value: 3},
+//     ],
+//     onChange: () => {},
+//   },
+//   {
+//     placeholder: 'All projects',
+//     options: [
+//       {key: 1, text: 'Choice 1', value: 1},
+//       {key: 2, text: 'Choice 2', value: 2},
+//       {key: 3, text: 'Choice 3', value: 3},
+//     ],
+//     onChange: () => {},
+//   },
+// ];
+
+// const browserData: Array<CenterBrowserDataType> = [
+//   {
+//     _id: 0,
+//     Board: 'Board 1',
+//     Entity: 'timssweeney',
+//     Project: 'weave',
+//     'Last modified': '2 days ago',
+//   },
+//   {
+//     _id: 1,
+//     Board: 'Board 2',
+//     Entity: 'timssweeney',
+//     Project: 'weave',
+//     'Last modified': 'June 21, 2023',
+//   },
+// ];
+// const browserActions: Array<CenterBrowserActionType> = [
+//   [
+//     {
+//       icon: IconInfo,
+//       label: 'Object details',
+//       onClick: (row: CenterBrowserDataType, index: number) => {
+//         console.log('DETAILS', row, index);
+//       },
+//     },
+//     {
+//       icon: IconAddNew,
+//       label: 'Seed new board',
+//       onClick: (row: CenterBrowserDataType, index: number) => {
+//         console.log('SEED', row, index);
+//       },
+//     },
+//   ],
+//   [
+//     {
+//       icon: IconCopy,
+//       label: 'Copy Weave expression',
+//       onClick: (row: CenterBrowserDataType, index: number) => {
+//         console.log('COPY', row, index);
+//       },
+//     },
+//   ],
+// ];
