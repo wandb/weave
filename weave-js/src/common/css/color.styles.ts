@@ -1,185 +1,235 @@
-export const MOON = {
-  MOON_0: '#FFFFFF', // white
-  MOON_50: '#FAFAFA',
-  MOON_100: '#F5F5F5',
-  MOON_150: '#F0F0F0',
-  MOON_200: '#E6E6E6',
-  MOON_250: '#DDDDDD',
-  MOON_300: '#D1D1D1',
-  MOON_350: '#C2C2C4',
-  MOON_400: '#AFB0B2',
-  MOON_450: '#949699',
-  MOON_500: '#84868A',
-  MOON_550: '#74777A',
-  MOON_600: '#5D6063',
-  MOON_650: '#4D5154',
-  MOON_700: '#43474A',
-  MOON_750: '#3B3E42',
-  MOON_800: '#303438',
-  MOON_850: '#212529',
-  MOON_900: '#1D1F24',
-  MOON_950: '#171A1F',
-  MOON_1000: '#0E1014', // oblivion
+/**
+ * Keep these colors in sync with what is in tailwind.config.js
+ */
+export const WHITE = '#FFFFFF';
+export const MOONBEAM = '#EDE8FF';
+export const OBLIVION = '#15181F';
+
+export const MOON_50 = '#FAFAFA';
+export const MOON_100 = '#F5F6F7';
+export const MOON_150 = '#EDEFF2';
+export const MOON_200 = '#E4E6EB';
+export const MOON_250 = '#DADEE3';
+export const MOON_300 = '#D3D7DE';
+export const MOON_350 = '#C2C6CF';
+export const MOON_400 = '#AEB3BD';
+export const MOON_450 = '#8E949E';
+export const MOON_500 = '#79808A';
+export const MOON_550 = '#676D78';
+export const MOON_600 = '#565C66';
+export const MOON_650 = '#4B535C';
+export const MOON_700 = '#3F464F';
+export const MOON_750 = '#343A42';
+export const MOON_800 = '#2B3038';
+export const MOON_850 = '#20242B';
+export const MOON_900 = '#1A1D24';
+export const MOON_950 = '#171A1F';
+export const MOONS = {
+  MOON_50,
+  MOON_100,
+  MOON_150,
+  MOON_200,
+  MOON_250,
+  MOON_300,
+  MOON_350,
+  MOON_400,
+  MOON_450,
+  MOON_500,
+  MOON_550,
+  MOON_600,
+  MOON_650,
+  MOON_700,
+  MOON_750,
+  MOON_800,
+  MOON_850,
+  MOON_900,
+  MOON_950,
 };
 
-export const NEW_TEAL = {
-  TEAL_200: '#E1F7FA',
-  TEAL_250: '#CDF4F7',
-  TEAL_300: '#A9EDF2',
-  TEAL_350: '#83E4EB',
-  TEAL_400: '#58D3DB',
-  TEAL_450: '#10BFCC',
-  TEAL_500: '#13A9BA',
-  TEAL_550: '#0097AB',
-  TEAL_600: '#038194',
-  TEAL_650: '#096A7A',
-  TEAL_700: '#155B69',
-  TEAL_750: '#18464F',
-  TEAL_800: '#1B3B42',
+export const TEAL_300 = '#A9EDF2';
+export const TEAL_350 = '#88E4EB';
+export const TEAL_400 = '#58D3DB';
+export const TEAL_450 = '#10BFCC';
+export const TEAL_500 = '#13A9BA';
+export const TEAL_550 = '#0097AB';
+export const TEAL_600 = '#038194';
+export const TEAL_650 = '#096A7A';
+export const TEAL_700 = '#155B69';
+export const NEW_TEALS = {
+  TEAL_300,
+  TEAL_350,
+  TEAL_400,
+  TEAL_450,
+  TEAL_500,
+  TEAL_550,
+  TEAL_600,
+  TEAL_650,
+  TEAL_700,
+};
+export const GREEN_300 = '#A1F0CB';
+export const GREEN_350 = '#85E5BC';
+export const GREEN_400 = '#5ED6A4';
+export const GREEN_450 = '#28C787';
+export const GREEN_500 = '#28C787';
+export const GREEN_550 = '#28C787';
+export const GREEN_600 = '#28C787';
+export const GREEN_650 = '#28C787';
+export const GREEN_700 = '#28C787';
+export const NEW_GREENS = {
+  GREEN_300,
+  GREEN_350,
+  GREEN_400,
+  GREEN_450,
+  GREEN_500,
+  GREEN_550,
+  GREEN_600,
+  GREEN_650,
+  GREEN_700,
 };
 
-export const NEW_GREEN = {
-  GREEN_200: '#E4F7EE',
-  GREEN_250: '#C9F5E0',
-  GREEN_300: '#A1F0CB',
-  GREEN_350: '#85E5BC',
-  GREEN_400: '#5ED6A4',
-  GREEN_450: '#28C787',
-  GREEN_500: '#00B26E',
-  GREEN_550: '#009962',
-  GREEN_600: '#00875A',
-  GREEN_650: '#0B7052',
-  GREEN_700: '#165745',
-  GREEN_750: '#19473B',
-  GREEN_800: '#193831',
+export const CACTUS_300 = '#D0ED9D';
+export const CACTUS_350 = '#C6EB83';
+export const CACTUS_400 = '#BBE06B';
+export const CACTUS_450 = '#A5D154';
+export const CACTUS_500 = '#92C23A';
+export const CACTUS_550 = '#7AA638';
+export const CACTUS_600 = '#5F8A2D';
+export const CACTUS_650 = '#496B22';
+export const CACTUS_700 = '#3D541D';
+export const NEW_CACTUSES = {
+  CACTUS_300,
+  CACTUS_350,
+  CACTUS_400,
+  CACTUS_450,
+  CACTUS_500,
+  CACTUS_550,
+  CACTUS_600,
+  CACTUS_650,
+  CACTUS_700,
 };
 
-export const NEW_CACTUS = {
-  CACTUS_200: '#EFF7DF',
-  CACTUS_250: '#E0F5BA',
-  CACTUS_300: '#D0ED9D',
-  CACTUS_350: '#C6EB83',
-  CACTUS_400: '#BBE06B',
-  CACTUS_450: '#A5D154',
-  CACTUS_500: '#92C23A',
-  CACTUS_550: '#7AA638',
-  CACTUS_600: '#5F8A2D',
-  CACTUS_650: '#496B22',
-  CACTUS_700: '#3D541D',
-  CACTUS_750: '#34451C',
-  CACTUS_800: '#2B3819',
+export const GOLD_300 = '#FFE49E';
+export const GOLD_350 = '#FFDD80';
+export const GOLD_400 = '#FFCF4D';
+export const GOLD_450 = '#FAC13C';
+export const GOLD_500 = '#F5A822';
+export const GOLD_550 = '#D4870D';
+export const GOLD_600 = '#B8740F';
+export const GOLD_650 = '#8F5E14';
+export const GOLD_700 = '#694919';
+export const NEW_GOLDS = {
+  GOLD_300,
+  GOLD_350,
+  GOLD_400,
+  GOLD_450,
+  GOLD_500,
+  GOLD_550,
+  GOLD_600,
+  GOLD_650,
+  GOLD_700,
 };
 
-export const NEW_GOLD = {
-  GOLD_200: '#FEF1D8',
-  GOLD_250: '#FEECC1',
-  GOLD_300: '#FFE49E',
-  GOLD_350: '#FFDD80',
-  GOLD_400: '#FFCF4D',
-  GOLD_450: '#FAC13C',
-  GOLD_500: '#F5A822',
-  GOLD_550: '#D4870D',
-  GOLD_600: '#B8740F',
-  GOLD_650: '#8F5E14',
-  GOLD_700: '#694919',
-  GOLD_750: '#4D391C',
-  GOLD_800: '#3C2F1A',
+export const SIENNA_300 = '#FFCFB2';
+export const SIENNA_350 = '#FFBA91';
+export const SIENNA_400 = '#FCA36F';
+export const SIENNA_450 = '#FC8F58';
+export const SIENNA_500 = '#F27641';
+export const SIENNA_550 = '#D96534';
+export const SIENNA_600 = '#C2562F';
+export const SIENNA_650 = '#994228';
+export const SIENNA_700 = '#703726';
+export const NEW_SIENNAS = {
+  SIENNA_300,
+  SIENNA_350,
+  SIENNA_400,
+  SIENNA_450,
+  SIENNA_500,
+  SIENNA_550,
+  SIENNA_600,
+  SIENNA_650,
+  SIENNA_700,
 };
 
-export const NEW_SIENNA = {
-  SIENNA_200: '#FFEDE0',
-  SIENNA_250: '#FFE0CC',
-  SIENNA_300: '#FFCFB2',
-  SIENNA_350: '#FFBA91',
-  SIENNA_400: '#FCA36F',
-  SIENNA_450: '#FC8F58',
-  SIENNA_500: '#F27641',
-  SIENNA_550: '#D96534',
-  SIENNA_600: '#C2562F',
-  SIENNA_650: '#994228',
-  SIENNA_700: '#703726',
-  SIENNA_750: '#523026',
-  SIENNA_800: '#452B21',
+export const RED_300 = '#FFC7CA';
+export const RED_350 = '#FFA8B0';
+export const RED_400 = '#FF7A88';
+export const RED_450 = '#FF596D';
+export const RED_500 = '#FF3D5A';
+export const RED_550 = '#E3324F';
+export const RED_600 = '#CC2944';
+export const RED_650 = '#A32740';
+export const RED_700 = '#782637';
+export const NEW_REDS = {
+  RED_300,
+  RED_350,
+  RED_400,
+  RED_450,
+  RED_500,
+  RED_550,
+  RED_600,
+  RED_650,
+  RED_700,
 };
 
-export const NEW_RED = {
-  RED_200: '#FFE6E6',
-  RED_250: '#FFDBDC',
-  RED_300: '#FFC7CA',
-  RED_350: '#FFA8B0',
-  RED_400: '#FF7A88',
-  RED_450: '#FF596D',
-  RED_500: '#FF3D5A',
-  RED_550: '#E3324F',
-  RED_600: '#CC2944',
-  RED_650: '#A32740',
-  RED_700: '#782637',
-  RED_750: '#52212B',
-  RED_800: '#47222A',
+export const MAGENTA_300 = '#EFC2FC';
+export const MAGENTA_350 = '#E7A7FC';
+export const MAGENTA_400 = '#E180FF';
+export const MAGENTA_450 = '#D869FA';
+export const MAGENTA_500 = '#CB51F0';
+export const MAGENTA_550 = '#BC45E5';
+export const MAGENTA_600 = '#9E36C2';
+export const MAGENTA_650 = '#7A2C94';
+export const MAGENTA_700 = '#602973';
+export const NEW_MAGENTAS = {
+  MAGENTA_300,
+  MAGENTA_350,
+  MAGENTA_400,
+  MAGENTA_450,
+  MAGENTA_500,
+  MAGENTA_550,
+  MAGENTA_600,
+  MAGENTA_650,
+  MAGENTA_700,
 };
 
-export const NEW_MAGENTA = {
-  MAGENTA_200: '#F7E5FD',
-  MAGENTA_250: '#F3D5FD',
-  MAGENTA_300: '#EFC2FC',
-  MAGENTA_350: '#E7A7FC',
-  MAGENTA_400: '#E180FF',
-  MAGENTA_450: '#D869FA',
-  MAGENTA_500: '#CB51F0',
-  MAGENTA_550: '#BC45E5',
-  MAGENTA_600: '#9E36C2',
-  MAGENTA_650: '#7A2C94',
-  MAGENTA_700: '#602973',
-  MAGENTA_750: '#522761',
-  MAGENTA_800: '#42224D',
+export const PURPLE_300 = '#D6C9FF';
+export const PURPLE_350 = '#C2B1FC';
+export const PURPLE_400 = '#B199FF';
+export const PURPLE_450 = '#9D80FF';
+export const PURPLE_500 = '#8465F0';
+export const PURPLE_550 = '#7251E0';
+export const PURPLE_600 = '#6645D1';
+export const PURPLE_650 = '#5539B2';
+export const PURPLE_700 = '#4B3791';
+export const NEW_PURPLES = {
+  PURPLE_300,
+  PURPLE_350,
+  PURPLE_400,
+  PURPLE_450,
+  PURPLE_500,
+  PURPLE_550,
+  PURPLE_600,
+  PURPLE_650,
+  PURPLE_700,
 };
 
-export const NEW_PURPLE = {
-  PURPLE_200: '#EDE8FF',
-  PURPLE_250: '#E4DBFF',
-  PURPLE_300: '#D6C9FF',
-  PURPLE_350: '#C2B1FC',
-  PURPLE_400: '#B199FF',
-  PURPLE_450: '#9D80FF',
-  PURPLE_500: '#8465F0',
-  PURPLE_550: '#7251E0',
-  PURPLE_600: '#6645D1',
-  PURPLE_650: '#5539B2',
-  PURPLE_700: '#4B3791',
-  PURPLE_750: '#3C2F6B',
-  PURPLE_800: '#352B59',
+export const BLUE_300 = '#BDD9FF';
+export const BLUE_350 = '#A4C9FC';
+export const BLUE_400 = '#7DB1FA';
+export const BLUE_450 = '#629DF5';
+export const BLUE_500 = '#397EED';
+export const BLUE_550 = '#286CE0';
+export const BLUE_600 = '#1F59C4';
+export const BLUE_650 = '#19469E';
+export const BLUE_700 = '#193C80';
+export const NEW_BLUES = {
+  BLUE_300,
+  BLUE_350,
+  BLUE_400,
+  BLUE_450,
+  BLUE_500,
+  BLUE_550,
+  BLUE_600,
+  BLUE_650,
+  BLUE_700,
 };
-
-export const NEW_BLUE = {
-  BLUE_200: '#E0EDFE',
-  BLUE_250: '#D0E4FE',
-  BLUE_300: '#BDD9FF',
-  BLUE_350: '#A4C9FC',
-  BLUE_400: '#7DB1FA',
-  BLUE_450: '#629DF5',
-  BLUE_500: '#397EED',
-  BLUE_550: '#286CE0',
-  BLUE_600: '#1F59C4',
-  BLUE_650: '#19469E',
-  BLUE_700: '#193C80',
-  BLUE_750: '#1E376B',
-  BLUE_800: '#1D3157',
-};
-
-export const NEW_SLATE = {
-  SLATE_200: '#EFF3F9',
-  SLATE_250: '#E1E8F2',
-  SLATE_300: '#D5DFEB',
-  SLATE_350: '#C5CFDE',
-  SLATE_400: '#B8C1D1',
-  SLATE_450: '#A3ADC2',
-  SLATE_500: '#818EA3',
-  SLATE_550: '#677389',
-  SLATE_600: '#596375',
-  SLATE_650: '#464E5C',
-  SLATE_700: '#3A404D',
-  SLATE_750: '#323742',
-  SLATE_800: '#2B2E38',
-};
-
-export const COLORS = {};
