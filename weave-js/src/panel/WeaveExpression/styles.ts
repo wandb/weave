@@ -31,7 +31,7 @@ export const WeaveEditable = styled(Editable)<{truncate?: boolean}>`
   min-height: 20px;
   line-height: 20px;
 
-  font-family: Inconsolata;
+  font-family: Major Mono Display, monospace;
   cursor: text;
 
   // Req'd to make editor selectable in Safari

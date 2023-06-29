@@ -62,6 +62,7 @@ import {
 } from './availablePanels';
 import {PanelInput, PanelProps} from './panel';
 import {getStackIdAndName} from './panellib/libpanel';
+import {nightOn} from '@wandb/weave/night';
 
 // This could be rendered as a code block with assignments, like
 // so.
@@ -533,6 +534,14 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
   const onBlurExpression = useCallback(() => {
     setExpressionFocused(false);
   }, []);
+
+  if (
+    props.editable &&
+    panelInputExpr.nodeType === 'const' &&
+    panelInputExpr.val === 'scifi'
+  ) {
+    nightOn();
+  }
 
   return curPanelId == null || handler == null ? (
     <div>
