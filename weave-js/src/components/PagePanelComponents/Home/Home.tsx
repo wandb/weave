@@ -9,10 +9,101 @@ import {useWeaveContext} from '../../../context';
 import {ChildPanelFullConfig} from '../../Panel2/ChildPanel';
 import {
   IconAddNew as IconAddNewUnstyled,
+  IconDashboardBlackboard,
+  IconLaptopLocalComputer,
+  IconTable,
+  IconUsersTeam,
   IconWeaveLogo,
 } from '../../Panel2/Icons';
 import {useNewPanelFromRootQueryCallback} from '../../Panel2/PanelRootBrowser/util';
 import {useConfig} from '../../Panel2/panel';
+
+const STYLE_DEBUG = false;
+
+const debug_style = `
+  ${
+    STYLE_DEBUG
+      ? 'background-color: rgba(0,0,0,0.1); border: 1px solid red;'
+      : ''
+  }
+`;
+
+const VStack = styled.div`
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  ${debug_style}
+`;
+
+const HStack = styled.div`
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: row;
+  ${debug_style}
+`;
+
+const Space = styled.div`
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  flex: 1 1 auto;
+  ${debug_style}
+`;
+
+const Block = styled.div`
+  flex: 0 0 auto;
+  ${debug_style}
+`;
+
+const VSpace = styled.div`
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  ${debug_style}
+`;
+
+const HSpace = styled.div`
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: row;
+  ${debug_style}
+`;
+
+const VBlock = styled.div`
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  ${debug_style}
+`;
+
+const HBlock = styled.div`
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: row;
+  ${debug_style}
+`;
+
+const LeftNavItemBlock = styled(HBlock)`
+  margin: 0px 12px;
+  padding: 0px 12px;
+  border-radius: 4px;
+  height: 36px;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  cursor: pointer;
+  &:hover {
+    background-color: #f5f6f7;
+  }
+`;
 
 type HomeProps = {
   updateConfig: (newConfig: ChildPanelFullConfig) => void;
@@ -61,24 +152,167 @@ const HomeComp: FC<HomeProps> = props => {
     },
     [props]
   );
+  const [activeItem, setActiveItem] = useState(0);
+  const numRecent = 2;
+  const numWandb = 2;
   return (
-    <>
-      <TopBar>
-        <TopBarLeft>
-          <WeaveLogo />
-          Weave
-        </TopBarLeft>
-        <TopBarRight>
-          <WBButton variant={`confirm`} onClick={newDashboard}>
-            <IconAddNew />
-            New board
-          </WBButton>
-        </TopBarRight>
-      </TopBar>
-      <BrowserContainer>
-        <>Hi</>
-      </BrowserContainer>
-    </>
+    <VStack>
+      <Block>
+        <TopBar>
+          <TopBarLeft>
+            <WeaveLogo />
+            Weave
+          </TopBarLeft>
+          <TopBarRight>
+            <WBButton variant={`confirm`} onClick={newDashboard}>
+              <IconAddNew />
+              New board
+            </WBButton>
+          </TopBarRight>
+        </TopBar>
+      </Block>
+      {/* Main Region */}
+      <HSpace>
+        {/* Left Bar */}
+        <LeftNav
+          sections={[
+            {
+              title: `Recent`,
+              items: [
+                {
+                  icon: IconDashboardBlackboard,
+                  label: `Board`,
+                  active: activeItem === 0,
+                  onClick: () => {
+                    setActiveItem(0);
+                  },
+                },
+                {
+                  icon: IconTable,
+                  label: `Tables`,
+                  active: activeItem === 1,
+                  onClick: () => {
+                    setActiveItem(1);
+                  },
+                },
+              ],
+            },
+            {
+              title: `Weights & Biases`,
+              items: [
+                {
+                  icon: IconUsersTeam,
+                  label: `wandb`,
+                  active: activeItem === 0 + numRecent,
+                  onClick: () => {
+                    setActiveItem(0 + numRecent);
+                  },
+                },
+                {
+                  icon: IconUsersTeam,
+                  label: `timssweeney`,
+                  active: activeItem === 1 + numRecent,
+                  onClick: () => {
+                    setActiveItem(1 + numRecent);
+                  },
+                },
+              ],
+            },
+            {
+              title: `Local`,
+              items: [
+                {
+                  icon: IconLaptopLocalComputer,
+                  label: `On this machine`,
+                  active: activeItem === 0 + numRecent + numWandb,
+                  onClick: () => {
+                    setActiveItem(0 + numRecent + numWandb);
+                  },
+                },
+              ],
+            },
+          ]}
+        />
+        {/* Center Content */}
+        <Space>b</Space>
+        {/* Right Bar */}
+        <Block>
+          <div
+            style={{
+              width: '300px',
+            }}>
+            c
+          </div>
+        </Block>
+      </HSpace>
+    </VStack>
+  );
+};
+
+const LeftNav: React.FC<{
+  sections: Array<LeftNavSectionProps>;
+}> = props => {
+  return (
+    <VBlock
+      style={{
+        width: '300px',
+        paddingTop: '35px',
+      }}>
+      {props.sections.map((section, i) => (
+        <LeftNavSection key={i} {...section} />
+      ))}
+    </VBlock>
+  );
+};
+
+type LeftNavSectionProps = {
+  title: string;
+  items: Array<LeftNavItemProps>;
+};
+
+const LeftNavSection: React.FC<LeftNavSectionProps> = props => {
+  return (
+    <VBlock
+      style={{
+        marginBottom: '16px',
+      }}>
+      {/* Header */}
+      <HBlock
+        style={{
+          textTransform: 'uppercase',
+          padding: '10px 24px',
+          fontSize: '14px',
+        }}>
+        {props.title}
+      </HBlock>
+      {/* Items */}
+      <VBlock>
+        {props.items.map((item, i) => (
+          <LeftNavItem key={i} {...item} />
+        ))}
+      </VBlock>
+    </VBlock>
+  );
+};
+
+type LeftNavItemProps = {
+  icon: React.FC;
+  label: string;
+  active?: boolean;
+  onClick?: () => void;
+};
+const LeftNavItem: React.FC<LeftNavItemProps> = props => {
+  return (
+    <LeftNavItemBlock
+      style={{
+        backgroundColor: props.active ? '#A9EDF252' : '',
+        color: props.active ? '#038194' : '',
+        fontWeight: props.active ? 600 : '',
+      }}
+      onClick={props.onClick}>
+      <props.icon />
+      {props.label}
+    </LeftNavItemBlock>
   );
 };
 
@@ -104,7 +338,7 @@ const TopBarRight = styled.div`
   align-items: center;
 `;
 
-const BrowserContainer = styled.div`
+const BrowserSpace = styled.div`
   height: calc(100% - 48px);
   display: flex;
   justify-content: center;

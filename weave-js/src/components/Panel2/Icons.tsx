@@ -37,6 +37,14 @@ import {ReactComponent as Home} from '../../assets/icon-home.svg';
 import {ReactComponent as Checkmark} from '../../assets/icon-checkmark.svg';
 import {ReactComponent as Loading} from '../../assets/icon-loading.svg';
 
+import {ReactComponent as ChevronBack} from '../../assets/icon-chevron-back.svg';
+import {ReactComponent as DashboardBlackboard} from '../../assets/icon-dashboard-blackboard.svg';
+import {ReactComponent as Info} from '../../assets/icon-info.svg';
+import {ReactComponent as LaptopLocalComputer} from '../../assets/icon-laptop-local-computer.svg';
+import {ReactComponent as SortAscending} from '../../assets/icon-sort-ascending.svg';
+import {ReactComponent as SortDescending} from '../../assets/icon-sort-descending.svg';
+import {ReactComponent as UsersTeam} from '../../assets/icon-users-team.svg';
+
 type SVGIconProps = SVGProps<SVGElement>;
 const updateIconProps = (props: SVGIconProps) => {
   return {
@@ -138,6 +146,28 @@ export const IconCheckmark = (props: SVGIconProps) => (
 );
 export const IconLoading = (props: SVGIconProps) => (
   <Loading {...updateIconProps(props)} />
+);
+
+export const IconChevronBack = (props: SVGIconProps) => (
+  <ChevronBack {...updateIconProps(props)} />
+);
+export const IconDashboardBlackboard = (props: SVGIconProps) => (
+  <DashboardBlackboard {...updateIconProps(props)} />
+);
+export const IconInfo = (props: SVGIconProps) => (
+  <Info {...updateIconProps(props)} />
+);
+export const IconLaptopLocalComputer = (props: SVGIconProps) => (
+  <LaptopLocalComputer {...updateIconProps(props)} />
+);
+export const IconSortAscending = (props: SVGIconProps) => (
+  <SortAscending {...updateIconProps(props)} />
+);
+export const IconSortDescending = (props: SVGIconProps) => (
+  <SortDescending {...updateIconProps(props)} />
+);
+export const IconUsersTeam = (props: SVGIconProps) => (
+  <UsersTeam {...updateIconProps(props)} />
 );
 
 const style = {
