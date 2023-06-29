@@ -70,11 +70,11 @@ export const GREEN_300 = '#A1F0CB';
 export const GREEN_350 = '#85E5BC';
 export const GREEN_400 = '#5ED6A4';
 export const GREEN_450 = '#28C787';
-export const GREEN_500 = '#28C787';
-export const GREEN_550 = '#28C787';
-export const GREEN_600 = '#28C787';
-export const GREEN_650 = '#28C787';
-export const GREEN_700 = '#28C787';
+export const GREEN_500 = '#00B26E';
+export const GREEN_550 = '#009962';
+export const GREEN_600 = '#00875A';
+export const GREEN_650 = '#0B7052';
+export const GREEN_700 = '#165745';
 export const NEW_GREENS = {
   GREEN_300,
   GREEN_350,
