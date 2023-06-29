@@ -44,6 +44,8 @@ import {ReactComponent as LaptopLocalComputer} from '../../assets/icon-laptop-lo
 import {ReactComponent as SortAscending} from '../../assets/icon-sort-ascending.svg';
 import {ReactComponent as SortDescending} from '../../assets/icon-sort-descending.svg';
 import {ReactComponent as UsersTeam} from '../../assets/icon-users-team.svg';
+import {ReactComponent as Wandb} from '../../assets/icon-wandb.svg';
+import {ReactComponent as UserProfilePersonal} from '../../assets/icon-user-profile-personal.svg';
 
 type SVGIconProps = SVGProps<SVGElement>;
 const updateIconProps = (props: SVGIconProps) => {
@@ -168,6 +170,12 @@ export const IconSortDescending = (props: SVGIconProps) => (
 );
 export const IconUsersTeam = (props: SVGIconProps) => (
   <UsersTeam {...updateIconProps(props)} />
+);
+export const IconWandb = (props: SVGIconProps) => (
+  <Wandb {...updateIconProps(props)} />
+);
+export const IconUserProfilePersonal = (props: SVGIconProps) => (
+  <UserProfilePersonal {...updateIconProps(props)} />
 );
 
 const style = {

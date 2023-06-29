@@ -1,6 +1,6 @@
 import {Node, voidNode} from '@wandb/weave/core';
 import moment from 'moment';
-import React, {FC, memo, useCallback, useState} from 'react';
+import React, {FC, memo, useCallback, useMemo, useState} from 'react';
 import getConfig from '../../../config';
 
 import styled from 'styled-components';
@@ -15,12 +15,15 @@ import {
   IconLaptopLocalComputer,
   IconOverflowHorizontal,
   IconTable,
+  IconUserProfilePersonal,
   IconUsersTeam,
+  IconWandb,
   IconWeaveLogo,
 } from '../../Panel2/Icons';
 import {useNewPanelFromRootQueryCallback} from '../../Panel2/PanelRootBrowser/util';
 import {useConfig} from '../../Panel2/panel';
 import {Divider, Dropdown, Input, Popup} from 'semantic-ui-react';
+import * as query from './query';
 
 const CenterTable = styled.table`
   width: 100%;
@@ -254,68 +257,183 @@ const HomeComp: FC<HomeProps> = props => {
     },
     [props]
   );
-  const [activeItem, setActiveItem] = useState(0);
-  const numRecent = 2;
-  const numWandb = 2;
-  const navSections = [
-    {
-      title: `Recent`,
-      items: [
-        {
-          icon: IconDashboardBlackboard,
-          label: `Boards`,
-          active: activeItem === 0,
-          onClick: () => {
-            setActiveItem(0);
+
+  const [activeBrowserRoot, setActiveBrowserRoot] = useState<{
+    browserType: 'recent' | 'wandb' | 'drafts';
+    rootId: string;
+  }>({
+    browserType: 'recent',
+    rootId: 'boards',
+  });
+
+  const userEntities = query.useUserEntities();
+  const userName = query.useUserName();
+
+  const recentSection = useMemo(() => {
+    return [
+      {
+        title: `Recent`,
+        items: [
+          {
+            icon: IconDashboardBlackboard,
+            label: `Boards`,
+            active:
+              activeBrowserRoot.browserType === 'recent' &&
+              activeBrowserRoot.rootId === 'boards',
+            onClick: () => {
+              setActiveBrowserRoot({
+                browserType: 'recent',
+                rootId: 'boards',
+              });
+            },
           },
-        },
-        {
-          icon: IconTable,
-          label: `Tables`,
-          active: activeItem === 1,
-          onClick: () => {
-            setActiveItem(1);
+          {
+            icon: IconTable,
+            label: `Tables`,
+            active:
+              activeBrowserRoot.browserType === 'recent' &&
+              activeBrowserRoot.rootId === 'tables',
+            onClick: () => {
+              setActiveBrowserRoot({
+                browserType: 'recent',
+                rootId: 'tables',
+              });
+            },
           },
-        },
-      ],
-    },
-    {
-      title: `Weights & Biases`,
-      items: [
-        {
-          icon: IconUsersTeam,
-          label: `wandb`,
-          active: activeItem === 0 + numRecent,
-          onClick: () => {
-            setActiveItem(0 + numRecent);
+        ],
+      },
+    ];
+  }, [activeBrowserRoot.browserType, activeBrowserRoot.rootId]);
+
+  const wandbSection = useMemo(() => {
+    return userEntities.result.length === 0
+      ? ([] as any)
+      : [
+          {
+            title: `Weights & Biases`,
+            items: userEntities.result
+              .sort((a, b) => {
+                if (a === userName.result) {
+                  return -1;
+                }
+                if (b === userName.result) {
+                  return 1;
+                }
+                if (a < b) {
+                  return -1;
+                }
+                if (a > b) {
+                  return 1;
+                }
+                return 0;
+              })
+              .map((entity, i) => ({
+                icon:
+                  entity === userName.result
+                    ? IconUserProfilePersonal
+                    : IconUsersTeam,
+                label: entity,
+                active:
+                  activeBrowserRoot.browserType === 'wandb' &&
+                  activeBrowserRoot.rootId === entity,
+                onClick: () => {
+                  setActiveBrowserRoot({
+                    browserType: 'wandb',
+                    rootId: entity,
+                  });
+                },
+              })),
           },
-        },
-        {
-          icon: IconUsersTeam,
-          label: `timssweeney`,
-          active: activeItem === 1 + numRecent,
-          onClick: () => {
-            setActiveItem(1 + numRecent);
+        ];
+  }, [
+    activeBrowserRoot.browserType,
+    activeBrowserRoot.rootId,
+    userEntities.result,
+    userName.result,
+  ]);
+
+  const draftsSection = useMemo(() => {
+    return [
+      {
+        title: `Drafts`,
+        items: [
+          {
+            icon: IconWandb,
+            label: `W&B hosted workspace`,
+            active:
+              activeBrowserRoot.browserType === 'drafts' &&
+              activeBrowserRoot.rootId === 'wb_hosted',
+            onClick: () => {
+              setActiveBrowserRoot({
+                browserType: 'wandb',
+                rootId: 'wb_hosted',
+              });
+            },
           },
-        },
-      ],
-    },
-    {
-      title: `Local`,
-      items: [
-        {
-          icon: IconLaptopLocalComputer,
-          label: `On this machine`,
-          active: activeItem === 0 + numRecent + numWandb,
-          onClick: () => {
-            setActiveItem(0 + numRecent + numWandb);
+          {
+            icon: IconLaptopLocalComputer,
+            label: `On this machine`,
+            active:
+              activeBrowserRoot.browserType === 'drafts' &&
+              activeBrowserRoot.rootId === 'local',
+            onClick: () => {
+              setActiveBrowserRoot({
+                browserType: 'wandb',
+                rootId: 'local',
+              });
+            },
           },
-        },
-      ],
-    },
-  ];
-  const browserTitle =
-    navSections.flatMap(s => s.items).find(i => i.active)?.label ?? '';
+        ],
+      },
+    ];
+  }, [activeBrowserRoot.browserType, activeBrowserRoot.rootId]);
+
+  const navSections = useMemo(() => {
+    return [...recentSection, ...wandbSection, ...draftsSection];
+  }, [draftsSection, recentSection, wandbSection]);
+
+  return (
+    <VStack>
+      <Block>
+        <TopBar>
+          <TopBarLeft>
+            <WeaveLogo />
+            Weave
+          </TopBarLeft>
+          <TopBarRight>
+            <WBButton variant={`confirm`} onClick={newDashboard}>
+              <IconAddNew />
+              New board
+            </WBButton>
+          </TopBarRight>
+        </TopBar>
+      </Block>
+      {/* Main Region */}
+      <HSpace>
+        {/* Left Bar */}
+        <LeftNav sections={navSections} />
+        {/* Center Content */}
+        <CenterEntityBrowser entityName="timssweeney" />
+        {/* Right Bar */}
+        {/* <Block>
+          <div
+            style={{
+              width: '300px',
+            }}>
+            c
+          </div>
+        </Block> */}
+      </HSpace>
+    </VStack>
+  );
+};
+
+const CenterEntityBrowser: React.FC<{
+  entityName: string;
+}> = props => {
+  const browserTitle = props.entityName;
+
+  console.log(query.useProjectsForEntityWithWeaveObject(props.entityName));
 
   const onSearch = useCallback(() => {}, []);
 
@@ -384,44 +502,13 @@ const HomeComp: FC<HomeProps> = props => {
     ],
   ];
   return (
-    <VStack>
-      <Block>
-        <TopBar>
-          <TopBarLeft>
-            <WeaveLogo />
-            Weave
-          </TopBarLeft>
-          <TopBarRight>
-            <WBButton variant={`confirm`} onClick={newDashboard}>
-              <IconAddNew />
-              New board
-            </WBButton>
-          </TopBarRight>
-        </TopBar>
-      </Block>
-      {/* Main Region */}
-      <HSpace>
-        {/* Left Bar */}
-        <LeftNav sections={navSections} />
-        {/* Center Content */}
-        <CenterBrowser
-          data={browserData}
-          actions={browserActions}
-          title={browserTitle}
-          onSearch={onSearch}
-          filters={browserFilters}
-        />
-        {/* Right Bar */}
-        {/* <Block>
-          <div
-            style={{
-              width: '300px',
-            }}>
-            c
-          </div>
-        </Block> */}
-      </HSpace>
-    </VStack>
+    <CenterBrowser
+      data={browserData}
+      actions={browserActions}
+      title={browserTitle}
+      onSearch={onSearch}
+      filters={browserFilters}
+    />
   );
 };
 
@@ -433,6 +520,7 @@ const LeftNav: React.FC<{
       style={{
         width: '300px',
         paddingTop: '0px', // Cecile's design has spacing here, but i kind of like it without
+        overflowY: 'auto',
       }}>
       {props.sections.map((section, i) => (
         <LeftNavSection key={i} {...section} />
@@ -458,6 +546,9 @@ const LeftNavSection: React.FC<LeftNavSectionProps> = props => {
           textTransform: 'uppercase',
           padding: '10px 24px',
           fontSize: '14px',
+          position: 'sticky',
+          backgroundColor: '#fff',
+          top: 0,
         }}>
         {props.title}
       </HBlock>
