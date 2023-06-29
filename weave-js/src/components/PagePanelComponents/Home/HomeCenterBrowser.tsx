@@ -134,7 +134,7 @@ export type CenterBrowserActionType<RT extends CenterBrowserDataType> = Array<{
 
 type CenterBrowserProps<RT extends CenterBrowserDataType> = {
   title: string;
-  data: Array<RT>;
+  data: RT[];
   loading?: boolean;
   columns?: string[];
   // TODO: Actions might be a callback that returns an array of actions for a row
@@ -263,22 +263,22 @@ export const CenterBrowser = <RT extends CenterBrowserDataType>(
                               onClick={e => {
                                 e.stopPropagation();
                               }}>
-                              {props.actions?.flatMap((action, i) => {
-                                const actions = action.map((a, j) => (
+                              {props.actions?.flatMap((action, j) => {
+                                const actions = action.map((a, k) => (
                                   <CenterTableActionCellAction
-                                    key={'' + i + '_' + j}
+                                    key={'' + j + '_' + k}
                                     onClick={e => {
                                       e.stopPropagation();
-                                      a.onClick(row, i);
+                                      a.onClick(row, j);
                                     }}>
                                     <a.icon />
                                     {a.label}
                                   </CenterTableActionCellAction>
                                 ));
-                                if (i < props.actions!.length - 1) {
+                                if (j < props.actions!.length - 1) {
                                   actions.push(
                                     <Divider
-                                      key={'d' + i}
+                                      key={'d' + j}
                                       style={{margin: '6px 0px'}}
                                     />
                                   );

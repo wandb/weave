@@ -2,7 +2,7 @@ import styled from 'styled-components';
 
 const STYLE_DEBUG = false;
 
-const debug_style = `
+const debugStyle = `
   ${
     STYLE_DEBUG
       ? 'background-color: rgba(0,0,0,0.1); border: 1px solid red;'
@@ -15,7 +15,7 @@ export const VStack = styled.div`
   height: 100%;
   display: flex;
   flex-direction: column;
-  ${debug_style}
+  ${debugStyle}
 `;
 
 export const HStack = styled.div`
@@ -23,7 +23,7 @@ export const HStack = styled.div`
   height: 100%;
   display: flex;
   flex-direction: row;
-  ${debug_style}
+  ${debugStyle}
 `;
 
 export const Space = styled.div`
@@ -31,12 +31,12 @@ export const Space = styled.div`
   width: 100%;
   overflow: hidden;
   flex: 1 1 auto;
-  ${debug_style}
+  ${debugStyle}
 `;
 
 export const Block = styled.div`
   flex: 0 0 auto;
-  ${debug_style}
+  ${debugStyle}
 `;
 
 export const VSpace = styled.div`
@@ -46,7 +46,7 @@ export const VSpace = styled.div`
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
-  ${debug_style}
+  ${debugStyle}
 `;
 
 export const HSpace = styled.div`
@@ -56,19 +56,19 @@ export const HSpace = styled.div`
   flex: 1 1 auto;
   display: flex;
   flex-direction: row;
-  ${debug_style}
+  ${debugStyle}
 `;
 
 export const VBlock = styled.div`
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
-  ${debug_style}
+  ${debugStyle}
 `;
 
 export const HBlock = styled.div`
   flex: 0 0 auto;
   display: flex;
   flex-direction: row;
-  ${debug_style}
+  ${debugStyle}
 `;

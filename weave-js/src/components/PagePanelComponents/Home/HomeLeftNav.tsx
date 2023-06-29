@@ -18,7 +18,7 @@ const LeftNavItemBlock = styled(LayoutElements.HBlock)`
 `;
 
 export const LeftNav: React.FC<{
-  sections: Array<LeftNavSectionProps>;
+  sections: LeftNavSectionProps[];
 }> = props => {
   return (
     <LayoutElements.VBlock
@@ -36,7 +36,7 @@ export const LeftNav: React.FC<{
 
 type LeftNavSectionProps = {
   title: string;
-  items: Array<LeftNavItemProps>;
+  items: LeftNavItemProps[];
 };
 
 const LeftNavSection: React.FC<LeftNavSectionProps> = props => {
