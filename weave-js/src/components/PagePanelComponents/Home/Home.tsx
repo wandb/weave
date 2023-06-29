@@ -9,7 +9,9 @@ import {useWeaveContext} from '../../../context';
 import {ChildPanelFullConfig} from '../../Panel2/ChildPanel';
 import {
   IconAddNew as IconAddNewUnstyled,
+  IconCopy,
   IconDashboardBlackboard,
+  IconInfo,
   IconLaptopLocalComputer,
   IconOverflowHorizontal,
   IconTable,
@@ -18,7 +20,7 @@ import {
 } from '../../Panel2/Icons';
 import {useNewPanelFromRootQueryCallback} from '../../Panel2/PanelRootBrowser/util';
 import {useConfig} from '../../Panel2/panel';
-import {Dropdown, Input} from 'semantic-ui-react';
+import {Divider, Dropdown, Input, Popup} from 'semantic-ui-react';
 
 const CenterTable = styled.table`
   width: 100%;
@@ -51,6 +53,7 @@ const CenterTable = styled.table`
       height: 64px;
 
       &:hover {
+        cursor: pointer;
         background-color: #f8f9fa;
       }
     }
@@ -147,6 +150,19 @@ const LeftNavItemBlock = styled(HBlock)`
   }
 `;
 
+const CenterTableActionCellAction = styled(HBlock)`
+  padding: 0px 12px;
+  border-radius: 4px;
+  height: 36px;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  cursor: pointer;
+  &:hover {
+    background-color: #f5f6f7;
+  }
+`;
+
 const CenterSpace = styled(VSpace)`
   border: 1px solid #dadee3;
   box-shadow: 0px 8px 16px 0px #0e10140a;
@@ -170,6 +186,25 @@ const CenterTableActionCellIcon = styled(VStack)`
     background-color: #a9edf252;
     color: #038194;
   }
+`;
+
+const CenterSpaceTableSpace = styled(Space)`
+  overflow: auto;
+`;
+
+const CenterSpaceControls = styled(HBlock)`
+  gap: 8px;
+`;
+
+const CenterSpaceTitle = styled(HBlock)`
+  font-size: 24px;
+  font-weight: 600;
+  padding: 12px 8px;
+`;
+
+const CenterSpaceHeader = styled(VBlock)`
+  padding: 12px 16px;
+  gap: 12px;
 `;
 
 type HomeProps = {
@@ -222,6 +257,132 @@ const HomeComp: FC<HomeProps> = props => {
   const [activeItem, setActiveItem] = useState(0);
   const numRecent = 2;
   const numWandb = 2;
+  const navSections = [
+    {
+      title: `Recent`,
+      items: [
+        {
+          icon: IconDashboardBlackboard,
+          label: `Boards`,
+          active: activeItem === 0,
+          onClick: () => {
+            setActiveItem(0);
+          },
+        },
+        {
+          icon: IconTable,
+          label: `Tables`,
+          active: activeItem === 1,
+          onClick: () => {
+            setActiveItem(1);
+          },
+        },
+      ],
+    },
+    {
+      title: `Weights & Biases`,
+      items: [
+        {
+          icon: IconUsersTeam,
+          label: `wandb`,
+          active: activeItem === 0 + numRecent,
+          onClick: () => {
+            setActiveItem(0 + numRecent);
+          },
+        },
+        {
+          icon: IconUsersTeam,
+          label: `timssweeney`,
+          active: activeItem === 1 + numRecent,
+          onClick: () => {
+            setActiveItem(1 + numRecent);
+          },
+        },
+      ],
+    },
+    {
+      title: `Local`,
+      items: [
+        {
+          icon: IconLaptopLocalComputer,
+          label: `On this machine`,
+          active: activeItem === 0 + numRecent + numWandb,
+          onClick: () => {
+            setActiveItem(0 + numRecent + numWandb);
+          },
+        },
+      ],
+    },
+  ];
+  const browserTitle =
+    navSections.flatMap(s => s.items).find(i => i.active)?.label ?? '';
+
+  const onSearch = useCallback(() => {}, []);
+
+  const browserFilters = [
+    {
+      placeholder: 'All entities',
+      options: [
+        {key: 1, text: 'Choice 1', value: 1},
+        {key: 2, text: 'Choice 2', value: 2},
+        {key: 3, text: 'Choice 3', value: 3},
+      ],
+      onChange: () => {},
+    },
+    {
+      placeholder: 'All projects',
+      options: [
+        {key: 1, text: 'Choice 1', value: 1},
+        {key: 2, text: 'Choice 2', value: 2},
+        {key: 3, text: 'Choice 3', value: 3},
+      ],
+      onChange: () => {},
+    },
+  ];
+
+  const browserData: Array<CenterBrowserDataType> = [
+    {
+      _id: 0,
+      Board: 'Board 1',
+      Entity: 'timssweeney',
+      Project: 'weave',
+      'Last modified': '2 days ago',
+    },
+    {
+      _id: 1,
+      Board: 'Board 2',
+      Entity: 'timssweeney',
+      Project: 'weave',
+      'Last modified': 'June 21, 2023',
+    },
+  ];
+  const browserActions: Array<CenterBrowserActionType> = [
+    [
+      {
+        icon: IconInfo,
+        label: 'Object details',
+        onClick: (row: CenterBrowserDataType, index: number) => {
+          console.log('DETAILS', row, index);
+        },
+      },
+      {
+        icon: IconAddNew,
+        label: 'Seed new board',
+        onClick: (row: CenterBrowserDataType, index: number) => {
+          console.log('SEED', row, index);
+        },
+      },
+    ],
+    [
+      {
+        icon: IconCopy,
+        label: 'Copy Weave expression',
+        onClick: (row: CenterBrowserDataType, index: number) => {
+          console.log('COPY', row, index);
+        },
+      },
+    ],
+  ];
   return (
     <VStack>
       <Block>
@@ -241,168 +402,15 @@ const HomeComp: FC<HomeProps> = props => {
       {/* Main Region */}
       <HSpace>
         {/* Left Bar */}
-        <LeftNav
-          sections={[
-            {
-              title: `Recent`,
-              items: [
-                {
-                  icon: IconDashboardBlackboard,
-                  label: `Boards`,
-                  active: activeItem === 0,
-                  onClick: () => {
-                    setActiveItem(0);
-                  },
-                },
-                {
-                  icon: IconTable,
-                  label: `Tables`,
-                  active: activeItem === 1,
-                  onClick: () => {
-                    setActiveItem(1);
-                  },
-                },
-              ],
-            },
-            {
-              title: `Weights & Biases`,
-              items: [
-                {
-                  icon: IconUsersTeam,
-                  label: `wandb`,
-                  active: activeItem === 0 + numRecent,
-                  onClick: () => {
-                    setActiveItem(0 + numRecent);
-                  },
-                },
-                {
-                  icon: IconUsersTeam,
-                  label: `timssweeney`,
-                  active: activeItem === 1 + numRecent,
-                  onClick: () => {
-                    setActiveItem(1 + numRecent);
-                  },
-                },
-              ],
-            },
-            {
-              title: `Local`,
-              items: [
-                {
-                  icon: IconLaptopLocalComputer,
-                  label: `On this machine`,
-                  active: activeItem === 0 + numRecent + numWandb,
-                  onClick: () => {
-                    setActiveItem(0 + numRecent + numWandb);
-                  },
-                },
-              ],
-            },
-          ]}
-        />
+        <LeftNav sections={navSections} />
         {/* Center Content */}
-        <CenterSpace>
-          <VBlock
-            style={{
-              padding: '12px 16px',
-              gap: '12px',
-            }}>
-            <HBlock
-              style={{
-                fontSize: '24px',
-                fontWeight: 600,
-                padding: '12px 8px',
-              }}>
-              Boards
-            </HBlock>
-            <HBlock
-              style={{
-                gap: '8px',
-              }}>
-              <Input
-                style={{
-                  width: '100%',
-                }}
-                icon="search"
-                iconPosition="left"
-                placeholder="Search"
-              />
-              <Dropdown
-                style={{
-                  boxShadow: 'none',
-                }}
-                placeholder="All entities"
-                clearable
-                options={[
-                  {key: 1, text: 'Choice 1', value: 1},
-                  {key: 2, text: 'Choice 2', value: 2},
-                  {key: 3, text: 'Choice 3', value: 3},
-                ]}
-                selection
-              />
-              <Dropdown
-                style={{
-                  boxShadow: 'none',
-                }}
-                placeholder="All projects"
-                clearable
-                options={[
-                  {key: 1, text: 'Choice 1', value: 1},
-                  {key: 2, text: 'Choice 2', value: 2},
-                  {key: 3, text: 'Choice 3', value: 3},
-                ]}
-                selection
-              />
-            </HBlock>
-          </VBlock>
-          <Space
-            style={{
-              overflow: 'auto',
-            }}>
-            <CenterTable>
-              <thead>
-                <tr>
-                  <td>Board</td>
-                  <td>Entity</td>
-                  <td>Project</td>
-                  <td>Last Edited</td>
-                  <td
-                    style={{
-                      width: '64px',
-                    }}></td>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>Board 1</td>
-                  <td>timssweeney</td>
-                  <td>weave</td>
-                  <td>Just now</td>
-                  <td>
-                    <CenterTableActionCellContents>
-                      <CenterTableActionCellIcon>
-                        <IconOverflowHorizontal />
-                      </CenterTableActionCellIcon>
-                    </CenterTableActionCellContents>
-                  </td>
-                </tr>
-                <tr>
-                  <td>Board 2</td>
-                  <td>timssweeney</td>
-                  <td>weave</td>
-                  <td>June 21, 2023</td>
-                  <td>
-                    <CenterTableActionCellContents>
-                      <CenterTableActionCellIcon>
-                        <IconOverflowHorizontal />
-                      </CenterTableActionCellIcon>
-                    </CenterTableActionCellContents>
-                  </td>
-                </tr>
-              </tbody>
-            </CenterTable>
-          </Space>
-        </CenterSpace>
+        <CenterBrowser
+          data={browserData}
+          actions={browserActions}
+          title={browserTitle}
+          onSearch={onSearch}
+          filters={browserFilters}
+        />
         {/* Right Bar */}
         {/* <Block>
           <div
@@ -481,6 +489,159 @@ const LeftNavItem: React.FC<LeftNavItemProps> = props => {
       <props.icon />
       {props.label}
     </LeftNavItemBlock>
+  );
+};
+
+type CenterBrowserDataType = {
+  _id: string | number;
+  [key: string]: string | number;
+};
+
+type CenterBrowserActionType = Array<{
+  icon: React.FC;
+  label: string;
+  onClick: (row: CenterBrowserDataType, index: number) => void;
+}>;
+
+type CenterBrowserProps = {
+  title: string;
+  data: Array<CenterBrowserDataType>;
+  // TODO: Actions might be a callback that returns an array of actions for a row
+  actions?: Array<CenterBrowserActionType>;
+  onSearch?: (query: string) => void;
+  filters?: Array<{
+    placeholder: string;
+    options: Array<{
+      key: string | number;
+      text: string;
+      value: string | number;
+    }>;
+    onChange: (value: string) => void;
+  }>;
+};
+
+const CenterBrowser: React.FC<CenterBrowserProps> = props => {
+  const showControls = props.onSearch || (props.filters?.length ?? 0) > 0;
+  const allActions = (props.actions ?? []).flatMap(a => a);
+  const primaryAction = allActions.length > 0 ? allActions[0] : undefined;
+  const columns = Object.keys(props.data[0] ?? {}).filter(
+    k => !k.startsWith('_')
+  );
+  const hasActions = allActions.length > 0;
+  return (
+    <CenterSpace>
+      <CenterSpaceHeader>
+        <CenterSpaceTitle>{props.title}</CenterSpaceTitle>
+        {showControls && (
+          <CenterSpaceControls>
+            {props.onSearch && (
+              <Input
+                style={{
+                  width: '100%',
+                }}
+                icon="search"
+                iconPosition="left"
+                placeholder="Search"
+                onChange={e => {
+                  props.onSearch?.(e.target.value);
+                }}
+              />
+            )}
+            {props.filters?.map((filter, i) => (
+              <Dropdown
+                key={i}
+                style={{
+                  boxShadow: 'none',
+                }}
+                selection
+                clearable
+                placeholder={filter.placeholder}
+                options={filter.options}
+                onChange={(e, data) => {
+                  filter.onChange(data.value as string);
+                }}
+              />
+            ))}
+          </CenterSpaceControls>
+        )}
+      </CenterSpaceHeader>
+      <CenterSpaceTableSpace>
+        <CenterTable>
+          <thead>
+            <tr>
+              {columns.map((c, i) => (
+                <td key={c}>{c}</td>
+              ))}
+              {hasActions && (
+                <td
+                  style={{
+                    width: '64px',
+                  }}></td>
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            {props.data.map((row, i) => (
+              <tr key={row._id} onClick={() => primaryAction?.onClick(row, i)}>
+                {columns.map((c, i) => (
+                  <td key={c}>{row[c]}</td>
+                ))}
+                {hasActions && (
+                  <td>
+                    <CenterTableActionCellContents>
+                      <Popup
+                        style={{
+                          padding: '6px 6px',
+                        }}
+                        content={
+                          <VStack
+                            onClick={e => {
+                              e.stopPropagation();
+                            }}>
+                            {props.actions?.flatMap((action, i) => {
+                              const actions = action.map((a, j) => (
+                                <CenterTableActionCellAction
+                                  key={'' + i + '_' + j}
+                                  onClick={e => {
+                                    e.stopPropagation();
+                                    a.onClick(row, i);
+                                  }}>
+                                  <a.icon />
+                                  {a.label}
+                                </CenterTableActionCellAction>
+                              ));
+                              if (i < props.actions!.length - 1) {
+                                actions.push(
+                                  <Divider
+                                    key={'d' + i}
+                                    style={{margin: '6px 0px'}}
+                                  />
+                                );
+                              }
+                              return actions;
+                            })}
+                          </VStack>
+                        }
+                        basic
+                        on="click"
+                        trigger={
+                          <CenterTableActionCellIcon
+                            onClick={e => {
+                              e.stopPropagation();
+                            }}>
+                            <IconOverflowHorizontal />
+                          </CenterTableActionCellIcon>
+                        }
+                      />
+                    </CenterTableActionCellContents>
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </CenterTable>
+      </CenterSpaceTableSpace>
+    </CenterSpace>
   );
 };
 
