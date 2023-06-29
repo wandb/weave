@@ -337,8 +337,8 @@ def _refine_history_type(
 def _history_keys(run: wdt.Run, history_version: int) -> list[str]:
     if "historyKeys" not in run.gql:
         raise ValueError("historyKeys not in run gql")
-    if "parquetHistory" not in run.gql:
-        raise ValueError("parquetHistory not in run gql")
+    if "sampledParquetHistory" not in run.gql:
+        raise ValueError("sampledParquetHistory not in run gql")
     history_type: types.Type = _refine_history_type(run, history_version)
     object_type = typing.cast(
         types.TypedDict, typing.cast(types.List, history_type).object_type
@@ -396,7 +396,7 @@ def _make_run_history_gql_field(inputs: InputAndStitchProvider, inner: str):
 
     return f"""
     historyKeys
-    parquetHistory(liveKeys: {json.dumps(top_level_keys)}) {{
+    sampledParquetHistory: parquetHistory(liveKeys: {json.dumps(top_level_keys)}) {{
         liveData
         parquetUrls
     }}
@@ -547,7 +547,7 @@ def _get_history2(run: wdt.Run, columns=None):
     )
 
     # turn the liveset into an arrow table. the liveset is a list of dictionaries
-    live_data = run.gql["parquetHistory"]["liveData"]
+    live_data = run.gql["sampledParquetHistory"]["liveData"]
     for row in live_data:
         for colname in columns:
             if colname not in row:
@@ -637,7 +637,7 @@ def read_history_parquet(run: wdt.Run, history_version: int, columns=None):
         types.List, _refine_history_type(run, history_version, columns=columns)
     ).object_type
     tables = []
-    for url in run.gql["parquetHistory"]["parquetUrls"]:
+    for url in run.gql["sampledParquetHistory"]["parquetUrls"]:
         local_path = io.ensure_file_downloaded(url)
         if local_path is not None:
             path = io.fs.path(local_path)
@@ -685,7 +685,7 @@ def _get_history(run: wdt.Run, columns=None):
         parquet_history = read_history_parquet(run, 1, columns=columns) or pa.table([])
 
     # turn the liveset into an arrow table. the liveset is a list of dictionaries
-    live_data = run.gql["parquetHistory"]["liveData"]
+    live_data = run.gql["sampledParquetHistory"]["liveData"]
 
     with tracer.trace("liveSet.impute"):
         for row in live_data:

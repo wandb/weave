@@ -28,9 +28,13 @@ def call_fn(
     return dereference_variables(weave_fn, inputs)
 
 
-def better_call_fn(weave_fn: graph.ConstNode, *inputs: graph.Frame) -> graph.Node:
+def better_call_fn(weave_fn: graph.ConstNode, *inputs: graph.Node) -> graph.Node:
     call_inputs = {}
-    for input_name, input in zip(weave_fn.type.input_types.keys(), inputs):  # type: ignore
+    if not isinstance(weave_fn.type, types.Function):
+        raise errors.WeaveInternalError(
+            "Expected function type, got %s" % weave_fn.type
+        )
+    for input_name, input in zip(weave_fn.type.input_types.keys(), inputs):
         call_inputs[input_name] = input
     res = call_fn(weave_fn.val, call_inputs)  # type: ignore
     # Convert to Runtime nodes so dispatch works.
@@ -118,7 +122,7 @@ def define_fn(
         raise errors.WeaveMakeFunctionError("function body expected const node.")
     if not isinstance(fnNode, graph.Node):
         raise errors.WeaveMakeFunctionError("output_type function must return a node.")
-    return graph.ConstNode(types.Function(parameters, fnNode.type), fnNode)
+    return const(fnNode, types.Function(parameters, fnNode.type))
 
 
 ENVType = typing.Union[graph.Node, typing.Callable[..., graph.Node]]

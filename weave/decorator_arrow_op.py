@@ -58,7 +58,6 @@ def adjust_input_types_for_nullability(
 def _handle_arrow_tags(
     old_output_type: ArrowWeaveListType, first_input_type: ArrowWeaveListType
 ) -> types.Type:
-
     if isinstance(first_input_type.object_type, tagged_value_type.TaggedValueType):
         return ArrowWeaveListType(
             tagged_value_type.TaggedValueType(
@@ -74,7 +73,6 @@ def _make_new_vector_output_type_callable(
     def new_callable_nullable_awl_type(
         non_callable_input_types: dict[str, types.Type]
     ) -> types.Type:
-
         first_input_type_name = next(k for k in non_callable_input_types)
         first_input_type = non_callable_input_types[first_input_type_name]
         assert ArrowWeaveListType().assign_type(first_input_type)
