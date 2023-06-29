@@ -7,6 +7,7 @@ import logging
 from flask import current_app
 from werkzeug.serving import make_server
 import multiprocessing
+import socket
 import threading
 import time
 import requests
@@ -188,12 +189,15 @@ class HttpServer(threading.Thread):
         self.host = host
 
         app = weave_server.app
-        threading.Thread.__init__(self, name="weave_server", daemon=True)
-        self.srv = make_server(host, port, app, threaded=False)
-
-        # if the passed port is zero then a randomly allocated port will be used. this
-        # gets the value of the port that was assigned.
-        self.port = self.srv.socket.getsockname()[1]
+        if port == 0:
+            # TODO: handle possible race
+            with socket.socket() as s:
+                s.bind(("", 0))
+                self.port = s.getsockname()[1]
+        else:
+            self.port = port
+        threading.Thread.__init__(self, name=f"Weave Port: {self.port}", daemon=True)
+        self.srv = make_server(host, self.port, app, threaded=False)
 
     def run(self):
         if _REQUESTED_SERVER_LOG_LEVEL is None:
