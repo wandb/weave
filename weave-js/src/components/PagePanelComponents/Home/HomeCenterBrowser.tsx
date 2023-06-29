@@ -1,3 +1,11 @@
+/* 
+TODO:
+  * Clickable header parts
+  * hide menu after clicking
+  * automated filter columns
+
+*/
+
 import React, {useMemo, useState} from 'react';
 
 import styled from 'styled-components';
@@ -137,7 +145,7 @@ type CenterBrowserProps<RT extends CenterBrowserDataType> = {
   data: RT[];
   loading?: boolean;
   columns?: string[];
-  // TODO: Actions might be a callback that returns an array of actions for a row
+  // Consider: Actions might be a callback that returns an array of actions for a row
   actions?: Array<CenterBrowserActionType<RT>>;
   allowSearch?: boolean;
   filters?: Array<{
@@ -174,7 +182,7 @@ export const CenterBrowser = <RT extends CenterBrowserDataType>(
     }
     return Object.keys(props.data[0] ?? {}).filter(k => !k.startsWith('_'));
   }, [props.columns, props.data]);
-  const hasActions = allActions.length > 0;
+  const hasOverflowActions = allActions.length > 1;
   return (
     <>
       <CenterSpaceHeader>
@@ -222,7 +230,7 @@ export const CenterBrowser = <RT extends CenterBrowserDataType>(
               {columns.map(c => (
                 <td key={c}>{c}</td>
               ))}
-              {hasActions && (
+              {hasOverflowActions && (
                 <td
                   style={{
                     width: '64px',
@@ -232,7 +240,7 @@ export const CenterBrowser = <RT extends CenterBrowserDataType>(
           </thead>
           {props.loading ? (
             <tr style={{height: '100%'}}>
-              <td colSpan={columns.length + (hasActions ? 1 : 0)}>
+              <td colSpan={columns.length + (hasOverflowActions ? 1 : 0)}>
                 <LayoutElements.VStack
                   style={{
                     alignItems: 'center',
@@ -251,7 +259,7 @@ export const CenterBrowser = <RT extends CenterBrowserDataType>(
                   {columns.map(c => (
                     <td key={c}>{(row as any)[c]}</td>
                   ))}
-                  {hasActions && (
+                  {hasOverflowActions && (
                     <td>
                       <CenterTableActionCellContents>
                         <Popup

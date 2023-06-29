@@ -3,28 +3,30 @@
 import * as w from '@wandb/weave/core';
 import {useNodeValue} from '@wandb/weave/react';
 import {useMemo} from 'react';
+import {opFilterArtifactsToWeaveObjects} from '../../Panel2/PanelRootBrowser/util';
+import {ASSUME_ALL_BOARDS_ARE_GROUP_ART_TYPE} from './dataModelAssumptions';
 
-type EngineEnvironmentType = 'wandb' | 'local' | 'colab';
-/**
- *
- */
-const getEngineEnvironment = (): EngineEnvironmentType => {
-  return 'wandb';
-};
+// type EngineEnvironmentType = 'wandb' | 'local' | 'colab';
+// /**
+//  *
+//  */
+// const getEngineEnvironment = (): EngineEnvironmentType => {
+//   return 'wandb';
+// };
 
-/**
- * Fetches the recent boards for the current user.
- */
-const getRecentBoards = () => {
-  return [];
-};
+// /**
+//  * Fetches the recent boards for the current user.
+//  */
+// const getRecentBoards = () => {
+//   return [];
+// };
 
-/**
- * Fetches the recent tables for the current user.
- */
-const getRecentTables = () => {
-  return [];
-};
+// /**
+//  * Fetches the recent tables for the current user.
+//  */
+// const getRecentTables = () => {
+//   return [];
+// };
 
 /**
  * Fetches the user entities.
@@ -81,5 +83,54 @@ export const useProjectsForEntityWithWeaveObject = (
       loading: entityProjectNamesValue.loading,
     }),
     [entityProjectNamesValue.loading, entityProjectNamesValue.result]
+  );
+};
+
+export const useProjectBoards = (
+  entityName: string,
+  projectName: string
+): {
+  result: string[];
+  loading: boolean;
+} => {
+  const projectNode = w.opRootProject({
+    entityName: w.constString(entityName),
+    projectName: w.constString(projectName),
+  });
+
+  let artifactsNode;
+  if (ASSUME_ALL_BOARDS_ARE_GROUP_ART_TYPE) {
+    const artifactTypesNode = w.opProjectArtifactType({
+      project: projectNode,
+      artifactType: w.constString('Group'),
+    });
+    artifactsNode = w.opArtifactTypeArtifacts({
+      artifactType: artifactTypesNode,
+    });
+  } else {
+    const artifactTypesNode = w.opProjectArtifactTypes({
+      project: projectNode,
+    });
+    artifactsNode = w.opFlatten({
+      arr: w.opArtifactTypeArtifacts({
+        artifactType: artifactTypesNode,
+      }) as any,
+    });
+  }
+
+  const filteredArtifactsNode = opFilterArtifactsToWeaveObjects(
+    artifactsNode,
+    true
+  );
+  const artifactNamesNode = w.opArtifactName({
+    artifact: filteredArtifactsNode,
+  });
+  const artifactNamesValue = useNodeValue(artifactNamesNode);
+  return useMemo(
+    () => ({
+      result: artifactNamesValue.result ?? [],
+      loading: artifactNamesValue.loading,
+    }),
+    [artifactNamesValue.loading, artifactNamesValue.result]
   );
 };

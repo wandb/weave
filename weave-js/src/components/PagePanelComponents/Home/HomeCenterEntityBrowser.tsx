@@ -1,17 +1,38 @@
 import React, {useMemo, useState} from 'react';
 
-import {IconInfo, IconOpenNewTab} from '../../Panel2/Icons';
+import {IconDown, IconOpenNewTab} from '../../Panel2/Icons';
 import * as query from './query';
 import {CenterBrowser, CenterBrowserActionType} from './HomeCenterBrowser';
+import {useResettingState} from '@wandb/weave/common/util/hooks';
 
 export const CenterEntityBrowser: React.FC<{
   entityName: string;
 }> = props => {
-  const browserTitle = props.entityName;
-  const [selectedProjectName, setSelectedProjectName] = useState<
+  const [selectedProjectName, setSelectedProjectName] = useResettingState<
     string | undefined
-  >();
-
+  >(undefined, [props]);
+  if (selectedProjectName == null) {
+    return (
+      <CenterEntityBrowserInner
+        entityName={props.entityName}
+        setSelectedProjectName={setSelectedProjectName}
+      />
+    );
+  } else {
+    return (
+      <CenterProjectBrowser
+        entityName={props.entityName}
+        projectName={selectedProjectName}
+        setSelectedProjectName={setSelectedProjectName}
+      />
+    );
+  }
+};
+export const CenterEntityBrowserInner: React.FC<{
+  entityName: string;
+  setSelectedProjectName: (name: string | undefined) => void;
+}> = props => {
+  const browserTitle = props.entityName;
   const projectNames = query.useProjectsForEntityWithWeaveObject(
     props.entityName
   );
@@ -34,10 +55,10 @@ export const CenterEntityBrowser: React.FC<{
     return [
       [
         {
-          icon: IconInfo,
+          icon: IconDown,
           label: 'Browse project',
           onClick: row => {
-            setSelectedProjectName(row._id);
+            props.setSelectedProjectName(row._id);
           },
         },
       ],
@@ -55,7 +76,7 @@ export const CenterEntityBrowser: React.FC<{
         },
       ],
     ];
-  }, [props.entityName]);
+  }, [props]);
 
   const loading = projectNames.loading;
 
@@ -64,6 +85,156 @@ export const CenterEntityBrowser: React.FC<{
       allowSearch
       columns={['project']}
       loading={loading}
+      title={browserTitle}
+      data={browserData}
+      actions={browserActions}
+    />
+  );
+};
+
+const CenterProjectBrowser: React.FC<{
+  entityName: string;
+  projectName: string;
+  setSelectedProjectName: (name: string | undefined) => void;
+}> = props => {
+  const [selectedAssetType, setSelectedAssetType] = useState<
+    string | undefined
+  >();
+  if (selectedAssetType == null) {
+    return (
+      <CenterProjectBrowserInner
+        entityName={props.entityName}
+        projectName={props.projectName}
+        setSelectedProjectName={props.setSelectedProjectName}
+        setSelectedAssetType={setSelectedAssetType}
+      />
+    );
+  } else {
+    return (
+      <CenterProjectAssetBrowser
+        entityName={props.entityName}
+        projectName={props.projectName}
+        assetName={selectedAssetType}
+        setSelectedProjectName={props.setSelectedProjectName}
+        setSelectedAssetType={setSelectedAssetType}
+      />
+    );
+  }
+};
+
+const CenterProjectBrowserInner: React.FC<{
+  entityName: string;
+  projectName: string;
+  setSelectedProjectName: (name: string | undefined) => void;
+  setSelectedAssetType: (name: string | undefined) => void;
+}> = props => {
+  const browserTitle = props.entityName + '/' + props.projectName;
+  const browserData = [
+    {
+      _id: 'boards',
+      'asset type': 'Boards',
+      // TODO: get these from the server
+      // 'count': 5,
+      // 'last edited': 'yesterday',
+    },
+    {
+      _id: 'tables',
+      'asset type': 'Tables',
+      // TODO: get these from the server
+      // 'count': 5,
+      // 'last edited': 'yesterday',
+    },
+    // TODO: Let's skip objects for the MVP
+    // {
+    //   _id: 'objects',
+    //   'asset type': 'Objects',
+    //   // TODO: get these from the server
+    //   // 'count': 5,
+    //   // 'last edited': 'yesterday',
+    // },
+  ];
+
+  const browserActions: Array<
+    CenterBrowserActionType<(typeof browserData)[number]>
+  > = useMemo(() => {
+    return [
+      [
+        {
+          icon: IconDown,
+          label: 'Browse asset type',
+          onClick: row => {
+            props.setSelectedAssetType(row._id);
+          },
+        },
+      ],
+    ];
+  }, [props]);
+
+  return (
+    <CenterBrowser
+      title={browserTitle}
+      data={browserData}
+      actions={browserActions}
+    />
+  );
+};
+
+const CenterProjectAssetBrowser: React.FC<{
+  entityName: string;
+  projectName: string;
+  assetName: string;
+  setSelectedProjectName: (name: string | undefined) => void;
+  setSelectedAssetType: (name: string | undefined) => void;
+}> = props => {
+  const browserTitle =
+    props.entityName + '/' + props.projectName + '/' + props.assetName;
+
+  const boards = query.useProjectBoards(props.entityName, props.projectName);
+  console.log(boards);
+
+  const browserData = [
+    {
+      _id: 'boards',
+      'asset type': 'Boards',
+      // TODO: get these from the server
+      // 'count': 5,
+      // 'last edited': 'yesterday',
+    },
+    {
+      _id: 'tables',
+      'asset type': 'Tables',
+      // TODO: get these from the server
+      // 'count': 5,
+      // 'last edited': 'yesterday',
+    },
+    // TODO: Let's skip objects for the MVP
+    // {
+    //   _id: 'objects',
+    //   'asset type': 'Objects',
+    //   // TODO: get these from the server
+    //   // 'count': 5,
+    //   // 'last edited': 'yesterday',
+    // },
+  ];
+
+  const browserActions: Array<
+    CenterBrowserActionType<(typeof browserData)[number]>
+  > = useMemo(() => {
+    return [
+      [
+        {
+          icon: IconDown,
+          label: 'Browse asset type',
+          onClick: row => {
+            props.setSelectedAssetType(row._id);
+          },
+        },
+      ],
+    ];
+  }, [props]);
+
+  return (
+    <CenterBrowser
       title={browserTitle}
       data={browserData}
       actions={browserActions}
