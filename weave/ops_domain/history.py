@@ -8,7 +8,7 @@ from ..wandb_interface import wandb_stream_table
 
 
 class TypeCount(typing.TypedDict):
-    type: str
+    type: typing.Optional[str]
     count: int
     keys: dict[str, list["TypeCount"]]  # type: ignore
     items: list["TypeCount"]  # type: ignore
@@ -64,7 +64,7 @@ def history_key_type_count_to_weave_type(tc: TypeCount) -> types.Type:
         return WBTraceTree.WeaveType()  # type: ignore
     elif tc_type == "images/separated":
         return types.List(ImageArtifactFileRefType())
-    else:
+    elif isinstance(tc_type, str):
         possible_type = wandb_stream_table.maybe_history_type_to_weave_type(tc_type)
         if possible_type is not None:
             return possible_type
