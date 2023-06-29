@@ -17,6 +17,7 @@ import {
 } from '../../Panel2/Icons';
 import {useNewPanelFromRootQueryCallback} from '../../Panel2/PanelRootBrowser/util';
 import {useConfig} from '../../Panel2/panel';
+import {Dropdown, Input} from 'semantic-ui-react';
 
 const STYLE_DEBUG = false;
 
@@ -105,6 +106,14 @@ const LeftNavItemBlock = styled(HBlock)`
   }
 `;
 
+const CenterSpace = styled(VSpace)`
+  border: 1px solid #dadee3;
+  box-shadow: 0px 8px 16px 0px #0e10140a;
+  border-top-right-radius: 12px;
+  border-top-left-radius: 12px;
+  margin-right: 12px;
+`;
+
 type HomeProps = {
   updateConfig: (newConfig: ChildPanelFullConfig) => void;
   inJupyter: boolean;
@@ -181,7 +190,7 @@ const HomeComp: FC<HomeProps> = props => {
               items: [
                 {
                   icon: IconDashboardBlackboard,
-                  label: `Board`,
+                  label: `Boards`,
                   active: activeItem === 0,
                   onClick: () => {
                     setActiveItem(0);
@@ -234,16 +243,76 @@ const HomeComp: FC<HomeProps> = props => {
           ]}
         />
         {/* Center Content */}
-        <Space>b</Space>
+        <CenterSpace>
+          <VBlock
+            style={{
+              padding: '12px 16px',
+              gap: '12px',
+            }}>
+            <HBlock
+              style={{
+                fontSize: '24px',
+                fontWeight: 600,
+                padding: '12px 8px',
+              }}>
+              Boards
+            </HBlock>
+            <HBlock
+              style={{
+                gap: '8px',
+              }}>
+              <Input
+                style={{
+                  width: '100%',
+                }}
+                icon="search"
+                iconPosition="left"
+                placeholder="Search"
+              />
+              <Dropdown
+                style={{
+                  boxShadow: 'none',
+                }}
+                placeholder="All entities"
+                clearable
+                options={[
+                  {key: 1, text: 'Choice 1', value: 1},
+                  {key: 2, text: 'Choice 2', value: 2},
+                  {key: 3, text: 'Choice 3', value: 3},
+                ]}
+                selection
+              />
+              <Dropdown
+                style={{
+                  boxShadow: 'none',
+                }}
+                placeholder="All projects"
+                clearable
+                options={[
+                  {key: 1, text: 'Choice 1', value: 1},
+                  {key: 2, text: 'Choice 2', value: 2},
+                  {key: 3, text: 'Choice 3', value: 3},
+                ]}
+                selection
+              />
+            </HBlock>
+          </VBlock>
+          <Space
+            style={{
+              borderTop: '1px solid #dadee3',
+            }}>
+            TABLE
+          </Space>
+        </CenterSpace>
         {/* Right Bar */}
-        <Block>
+        {/* <Block>
           <div
             style={{
               width: '300px',
             }}>
             c
           </div>
-        </Block>
+        </Block> */}
       </HSpace>
     </VStack>
   );
@@ -256,7 +325,7 @@ const LeftNav: React.FC<{
     <VBlock
       style={{
         width: '300px',
-        paddingTop: '35px',
+        paddingTop: '24 px',
       }}>
       {props.sections.map((section, i) => (
         <LeftNavSection key={i} {...section} />
