@@ -35,7 +35,7 @@ class Span:
     status_code: typing.Optional[str] = None
     status_message: typing.Optional[str] = None
     attributes: typing.Optional[typing.Dict[str, typing.Any]] = None
-    results: typing.Optional[typing.List[Result]] = dataclasses.field(
+    results: typing.Optional[typing.List[typing.Optional[Result]]] = dataclasses.field(
         default_factory=lambda: None
     )
     child_spans: typing.Optional[typing.List[dict]] = dataclasses.field(
@@ -53,7 +53,14 @@ class Span:
             if key == "name":
                 setattr(root_span, "_name", dump_dict[key])
             elif key == "results":
-                setattr(root_span, key, [Result(**r) for r in dump_dict[key]])
+                results = dump_dict[key]
+                setattr(
+                    root_span,
+                    key,
+                    [Result(**r) if r is not None else None for r in results]
+                    if results is not None
+                    else None,
+                )
             else:
                 setattr(root_span, key, dump_dict[key])
 
@@ -89,7 +96,9 @@ def get_trace_input_str(span: Span) -> str:
             "\n\n".join(
                 [
                     f"**{ndx}.{eKey}:** {eValue}"
-                    for eKey, eValue in (result.inputs or {}).items()
+                    for eKey, eValue in (
+                        (result.inputs or {}) if result is not None else {}
+                    ).items()
                 ]
             )
             for ndx, result in enumerate(span.results or [])
@@ -103,7 +112,9 @@ def get_trace_output_str(span: Span) -> str:
             "\n\n".join(
                 [
                     f"**{ndx}.{eKey}:** {eValue}"
-                    for eKey, eValue in (result.outputs or {}).items()
+                    for eKey, eValue in (
+                        (result.outputs or {}) if result is not None else {}
+                    ).items()
                 ]
             )
             for ndx, result in enumerate(span.results or [])
