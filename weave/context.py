@@ -74,9 +74,7 @@ def _make_default_client():
         # Falling through here means the notebook kernel uses
         # InprocessServer, but the frontend uses HttpServer.
         # versions() doesn't work when we use the HttpServer currently.
-        # TODO: shot in the dark to get colab working
-        if util.is_colab():
-            return server.HttpServerClient(serv.url)
+        # return server.HttpServerClient(serv.url)
 
     return client.Client(server.InProcessServer())
 

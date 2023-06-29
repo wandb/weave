@@ -35,15 +35,16 @@ if patch_context:
             _context[k.name] = v
 
     ipython = get_ipython()
-    # Incase this module is loaded multiple times
-    for h in ipython.events.callbacks["pre_run_cell"]:
-        if h.__name__ == "weave_pre_run":
-            ipython.events.unregister("pre_run_cell", h)
-    for h in ipython.events.callbacks["post_run_cell"]:
-        if h.__name__ == "weave_post_run":
-            ipython.events.unregister("post_run_cell", h)
-    ipython.events.register("pre_run_cell", weave_pre_run)
-    ipython.events.register("post_run_cell", weave_post_run)
+    if ipython is not None:
+        # Incase this module is loaded multiple times
+        for h in ipython.events.callbacks["pre_run_cell"]:
+            if h.__name__ == "weave_pre_run":
+                ipython.events.unregister("pre_run_cell", h)
+        for h in ipython.events.callbacks["post_run_cell"]:
+            if h.__name__ == "weave_post_run":
+                ipython.events.unregister("post_run_cell", h)
+        ipython.events.register("pre_run_cell", weave_pre_run)
+        ipython.events.register("post_run_cell", weave_post_run)
 
 
 # Set to the op uri if we're in the process of loading
