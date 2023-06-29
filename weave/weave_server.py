@@ -280,10 +280,6 @@ def execute():
                     + urllib.parse.quote(profile_filename),
                 )
     fixed_response = response.results.safe_map(weavejs_fixes.fixup_data)
-    logging.info(
-        "Execute request (zlib): %s",
-        req_b64,
-    )
 
     response_payload = _value_or_errors_to_response(fixed_response)
 
