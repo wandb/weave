@@ -9,6 +9,7 @@ import tarfile
 import tempfile
 from typing import Union
 import urllib.request
+from urllib.error import HTTPError
 
 ROOT = Path(__file__).resolve().parent
 SKIP_BUILD = os.environ.get("WEAVE_SKIP_BUILD", False)
@@ -61,6 +62,7 @@ def download_and_extract_tarball(
             if tarfile.is_tarfile(temp_path):
                 with tarfile.open(temp_path, "r:gz") as tar:
                     tar.extractall(path=extract_path)
+                # TODO: detect when the extracted assets are out of sync with git
             else:
                 raise RuntimeError(f"{file_name} is not a tarball file.")
         except tarfile.TarError as e:
@@ -70,7 +72,10 @@ def download_and_extract_tarball(
 def download_frontend() -> None:
     sha = open(ROOT / "weave" / "frontend" / "sha1.txt").read().strip()
     url = f"https://storage.googleapis.com/wandb-cdn-prod/weave/{sha}.tar.gz"
-    download_and_extract_tarball(url, extract_path=ROOT / "weave")
+    try:
+        download_and_extract_tarball(url, extract_path=ROOT / "weave")
+    except HTTPError:
+        print(f"Warning: Failed to download frontend for sha {sha}")
 
 
 class Build(build):  # type: ignore
