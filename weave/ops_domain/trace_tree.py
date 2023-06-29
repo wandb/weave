@@ -57,9 +57,9 @@ class Span:
                 setattr(
                     root_span,
                     key,
-                    [Result(**r) if r is not None else r for r in results]
+                    [Result(**r) if r is not None else None for r in results]
                     if results is not None
-                    else results,
+                    else None,
                 )
             else:
                 setattr(root_span, key, dump_dict[key])
