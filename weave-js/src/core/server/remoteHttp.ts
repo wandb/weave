@@ -3,7 +3,7 @@ import _ from 'lodash';
 import {performance} from 'universal-perf-hooks';
 
 import {GlobalCGEventTracker} from '../analytics/tracker';
-import {Node, serialize, serializeMulti} from '../model';
+import {Node, serialize, serializeMulti, serialize2} from '../model';
 import type {OpStore} from '../opStore';
 import {batchIntervalOverride, isWeaveDebugEnabled} from '../util/debug';
 import type {Server} from './types';
@@ -253,6 +253,16 @@ export class RemoteHttpServer implements Server {
     const [payloads, originalIndexes] = this.opts.contiguousBatchesOnly
       ? serializeMulti(nodes)
       : [[serialize(nodes)], [_.range(nodes.length)]];
+
+    // const payload2 = serialize2(nodes);
+    // for (let i = 0; i < payloads.length; i++) {
+    //   const p = payloads[i];
+    //   if (i > 0) {
+    //     throw new Error(`MORE THAN 1 PAYLOAD`);
+    //   }
+
+    //   console.log(JSON.stringify(p).length, JSON.stringify(payload2).length);
+    // }
 
     for (
       let reqIdx = 0;
