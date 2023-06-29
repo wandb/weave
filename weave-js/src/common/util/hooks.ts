@@ -276,7 +276,7 @@ export const useResettingState = <T extends any>(
 
   useEffect(() => {
     setState(initialValue);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [...deps, initialValue]);
 
   return [state, setState] as const;
