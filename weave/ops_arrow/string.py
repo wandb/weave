@@ -450,8 +450,10 @@ def join_to_str(arr, sep):
 )
 def to_number(self):
     arrow_data = self._arrow_data
-    mask = pc.not_(pc.utf8_is_numeric(arrow_data))
-    new_data = pc.replace_with_mask(
-        arrow_data, mask, [None] * pc.sum(mask.cast(pa.int8()))
-    ).cast(pa.float64())
+    is_not_numeric = pc.invert(pc.utf8_is_numeric(arrow_data))
+
+    # need to use kleene logic here for masking
+    mask = pc.and_kleene(is_not_numeric, pa.nulls(len(self)).cast(pa.bool_()))
+
+    new_data = pc.replace_with_mask(arrow_data, mask, arrow_data).cast(pa.float64())
     return ArrowWeaveList(new_data, types.optional(types.Number()), self._artifact)
