@@ -2950,8 +2950,6 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
       vegaView.addEventListener('mouseup', async () => {
         const currBrushMode = brushModeRef.current;
         const currUpdateConfig2 = updateConfig2Ref.current;
-        const currUpdateConfig = updateConfigRef.current;
-        const currConfig = configRef.current;
         const currMutateDomain = mutateDomainRef.current;
         const currConcreteConfig = concreteConfigRef.current;
         const currSetToolTipsEnabled = setToolTipsEnabledRef.current;
@@ -2998,18 +2996,15 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
               });
             });
           } else {
-            let newConfig = currConfig;
-            ['x' as const, 'y' as const].forEach(dimName => {
-              const axisSignal: [number, number] | string[] = signal[dimName];
-              const currentSetting =
-                currConcreteConfig.signals.selection[dimName];
-              if (!_.isEqual(currentSetting, axisSignal)) {
-                newConfig = produce(currConfig, draft => {
+            currUpdateConfig2((oldConfig: PlotConfig) => {
+              return produce(oldConfig, draft => {
+                ['x' as const, 'y' as const].forEach(dimName => {
+                  const axisSignal: [number, number] | string[] =
+                    signal[dimName];
                   draft.signals.selection[dimName] = axisSignal;
                 });
-              }
+              });
             });
-            currUpdateConfig(newConfig);
           }
         } else if (
           _.isEmpty(data) &&
@@ -3018,13 +3013,13 @@ const PanelPlot2Inner: React.FC<PanelPlotProps> = props => {
             _.isEmpty(currConcreteConfig.signals.selection.y)
           )
         ) {
-          currUpdateConfig(
-            produce(currConfig, draft => {
-              ['x' as const, 'y' as const].forEach(axisName => {
-                draft.signals.selection[axisName] = undefined;
+          currUpdateConfig2((oldConfig: PlotConfig) => {
+            return produce(oldConfig, draft => {
+              ['x' as const, 'y' as const].forEach(dimName => {
+                draft.signals.selection[dimName] = undefined;
               });
-            })
-          );
+            });
+          });
         }
 
         setTimeout(() => {
