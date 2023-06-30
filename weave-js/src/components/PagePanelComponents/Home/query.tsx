@@ -6,31 +6,6 @@ import {useMemo} from 'react';
 import {opFilterArtifactsToWeaveObjects} from '../../Panel2/PanelRootBrowser/util';
 import {ASSUME_ALL_BOARDS_ARE_GROUP_ART_TYPE} from './dataModelAssumptions';
 
-// type EngineEnvironmentType = 'wandb' | 'local' | 'colab';
-// /**
-//  *
-//  */
-// const getEngineEnvironment = (): EngineEnvironmentType => {
-//   return 'wandb';
-// };
-
-// /**
-//  * Fetches the recent boards for the current user.
-//  */
-// const getRecentBoards = () => {
-//   return [];
-// };
-
-// /**
-//  * Fetches the recent tables for the current user.
-//  */
-// const getRecentTables = () => {
-//   return [];
-// };
-
-/**
- * Fetches the user entities.
- */
 export const useUserName = (
   isAuthenticated?: boolean
 ): {
@@ -77,31 +52,6 @@ export const useUserEntities = (
   );
 };
 
-// export const useProjectsForEntityWithWeaveObject = (
-//   entityName: string
-// ): {
-//   result: string[];
-//   loading: boolean;
-// } => {
-//   const projectsNode = w.opEntityProjects({
-//     entity: w.opRootEntity({
-//       entityName: w.constString(entityName),
-//     }),
-//   });
-//   // TODO: filter to just projects that have weave objects
-//   const entityProjectNamesNode = w.opProjectName({
-//     project: projectsNode,
-//   });
-//   const entityProjectNamesValue = useNodeValue(entityProjectNamesNode);
-//   return useMemo(
-//     () => ({
-//       result: entityProjectNamesValue.result ?? [],
-//       loading: entityProjectNamesValue.loading,
-//     }),
-//     [entityProjectNamesValue.loading, entityProjectNamesValue.result]
-//   );
-// };
-
 export const useProjectsForEntityWithWeaveObject = (
   entityName: string
 ): {
@@ -127,13 +77,9 @@ export const useProjectsForEntityWithWeaveObject = (
       return w.opDict({
         name: w.opProjectName({project: row}),
         updatedAt: w.opProjectUpdatedAt({project: row}),
-        num_boards: w.opCount({arr: opProjectBoardArtifacts({project: row})}),
-        num_run_streams: w.opCount({
-          arr: opProjectRunStreamArtifacts({project: row}),
-        }),
-        num_logged_tables: w.opCount({
-          arr: opProjectRunLoggedTableArtifacts({project: row}),
-        }),
+        num_boards: opProjectBoardCount({project: row}),
+        num_run_streams: opProjectRunStreamCount({project: row}),
+        num_logged_tables: opProjectLoggedTableCount({project: row}),
       } as any);
     }),
   });
@@ -157,6 +103,60 @@ export const useProjectsForEntityWithWeaveObject = (
       loading: entityProjectNamesValue.loading,
     };
   }, [entityProjectNamesValue.loading, entityProjectNamesValue.result]);
+};
+
+export const useProjectAssetCount = (
+  entityName: string,
+  projectName: string
+): {
+  result: {
+    boardCount: number;
+    runStreamCount: number;
+    loggedTableCount: number;
+  };
+  loading: boolean;
+} => {
+  const projectNode = w.opRootProject({
+    entityName: w.constString(entityName),
+    projectName: w.constString(projectName),
+  });
+  const compositeNode = w.opDict({
+    boardCount: opProjectBoardCount({project: projectNode}),
+    runStreamCount: opProjectRunStreamCount({project: projectNode}),
+    loggedTableCount: opProjectLoggedTableCount({project: projectNode}),
+  } as any);
+  const compositeValue = useNodeValue(compositeNode);
+
+  return useMemo(
+    () => ({
+      result: compositeValue.result ?? {
+        boardCount: 0,
+        runStreamCount: 0,
+        loggedTableCount: 0,
+      },
+      loading: compositeValue.loading,
+    }),
+    [compositeValue.loading, compositeValue.result]
+  ) as {
+    result: {
+      boardCount: number;
+      runStreamCount: number;
+      loggedTableCount: number;
+    };
+    loading: boolean;
+  };
+};
+
+const opProjectBoardCount = ({project}: {project: w.Node}) => {
+  return w.opCount({arr: opProjectBoardArtifacts({project: project})});
+};
+
+const opProjectRunStreamCount = ({project}: {project: w.Node}) => {
+  return w.opCount({arr: opProjectRunStreamArtifacts({project: project})});
+};
+
+const opProjectLoggedTableCount = ({project}: {project: w.Node}) => {
+  return w.opCount({arr: opProjectRunLoggedTableArtifacts({project: project})});
 };
 
 const projectBoardsNode = (entityName: string, projectName: string) => {

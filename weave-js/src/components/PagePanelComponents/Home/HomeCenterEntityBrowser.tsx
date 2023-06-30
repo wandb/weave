@@ -195,30 +195,38 @@ const CenterProjectBrowserInner: React.FC<
   CenterProjectBrowserInnerPropsType
 > = props => {
   const browserTitle = props.projectName;
-  const browserData = [
-    {
-      _id: 'boards',
-      'asset type': 'Boards',
-      // TODO: get these from the server
-      // 'count': 5,
-      // 'last edited': 'yesterday',
-    },
-    {
-      _id: 'tables',
-      'asset type': 'Tables',
-      // TODO: get these from the server
-      // 'count': 5,
-      // 'last edited': 'yesterday',
-    },
-    // TODO: Let's skip objects for the MVP
-    // {
-    //   _id: 'objects',
-    //   'asset type': 'Objects',
-    //   // TODO: get these from the server
-    //   // 'count': 5,
-    //   // 'last edited': 'yesterday',
-    // },
-  ];
+  const assetCounts = query.useProjectAssetCount(
+    props.entityName,
+    props.projectName
+  );
+  const browserData = useMemo(() => {
+    return [
+      {
+        _id: 'boards',
+        'asset type': 'Boards',
+        count: assetCounts.result.boardCount ?? 0,
+      },
+      {
+        _id: 'tables',
+        'asset type': 'Tables',
+        count:
+          (assetCounts.result.loggedTableCount ?? 0) +
+          (assetCounts.result.runStreamCount ?? 0),
+      },
+      // TODO: Let's skip objects for the MVP
+      // {
+      //   _id: 'objects',
+      //   'asset type': 'Objects',
+      //   // TODO: get these from the server
+      //   // 'count': 5,
+      //   // 'last edited': 'yesterday',
+      // },
+    ];
+  }, [
+    assetCounts.result.boardCount,
+    assetCounts.result.loggedTableCount,
+    assetCounts.result.runStreamCount,
+  ]);
 
   const browserActions: Array<
     CenterBrowserActionType<(typeof browserData)[number]>
@@ -239,6 +247,7 @@ const CenterProjectBrowserInner: React.FC<
   return (
     <CenterBrowser
       title={browserTitle}
+      loading={assetCounts.loading}
       breadcrumbs={[
         {
           text: props.entityName,
@@ -249,6 +258,7 @@ const CenterProjectBrowserInner: React.FC<
       ]}
       data={browserData}
       actions={browserActions}
+      columns={['asset type', 'count']}
     />
   );
 };
