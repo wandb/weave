@@ -21,6 +21,7 @@ def _rows_type(steam_table: RunStreamType) -> weave_types.Type:
 
 
 @op(
+    name="run_stream-rows",
     output_type=ArrowWeaveListType(weave_types.TypedDict({})),
     refine_output_type=_rows_type,
     returns_expansion_node=True,
