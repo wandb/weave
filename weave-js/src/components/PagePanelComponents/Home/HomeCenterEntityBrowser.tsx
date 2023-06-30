@@ -373,8 +373,10 @@ const tableRowToNode = (
   if (kind === 'Run Stream') {
     const uri = `wandb-artifact:///${entityName}/${projectName}/${artName}:latest/obj`;
     // TODO Sync this up with the new runs stream code
+    const node = opGet({uri: constString(uri)});
+    node.type = {type: 'run_stream'} as any;
     newExpr = callOpVeryUnsafe('run_stream-rows', {
-      self: opGet({uri: constString(uri)}),
+      self: node,
     }) as any;
   } else {
     // This is a  hacky here. Would be nice to have better mapping
