@@ -464,6 +464,22 @@ def compile_refine(
     return graph.map_nodes_full(nodes, _dispatch_map_fn_refining, on_error)
 
 
+def _node_ops(node: graph.Node) -> typing.Optional[graph.Node]:
+    if not isinstance(node, graph.OutputNode):
+        return None
+    if node.from_op.name != "RunChain-history":
+        return None
+    new_node = weave_internal.use(node)
+    return typing.cast(graph.Node, new_node)
+
+
+def compile_node_ops(
+    nodes: typing.List[graph.Node],
+    on_error: graph.OnErrorFnType = None,
+) -> typing.List[graph.Node]:
+    return graph.map_nodes_full(nodes, _node_ops, on_error)
+
+
 # This compile pass using the `top_level` mapper since we recurse manually. We can't use
 # the full mapper, because we need to traverse when encountering the lambda op itself,
 # rather than the const node since we need uniqueness based on the lambda op.
@@ -574,6 +590,9 @@ def _compile(
     # Only gql ops require this for now.
     with tracer.trace("compile:resolve_required_consts"):
         results = results.batch_map(_track_errors(compile_resolve_required_consts))
+
+    with tracer.trace("compile:node_ops"):
+        results = results.batch_map(_track_errors(compile_node_ops))
 
     # Now that we have the correct calls, we can do our forward-looking pushdown
     # optimizations. These do not depend on having correct types in the graph.
