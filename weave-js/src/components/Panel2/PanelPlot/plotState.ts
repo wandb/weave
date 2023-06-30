@@ -1502,6 +1502,11 @@ export function selectionContainsValue(
   value: any
 ): boolean {
   if (selectionIsContinuous(selection)) {
+    if (typeof value === 'string') {
+      // When we have continuous selection, but string value, we have
+      // a date and need to parse it to milliseconds since epoch.
+      value = Date.parse(value);
+    }
     return value <= selection[1] && value >= selection[0];
   } else {
     return selection.includes(value);
