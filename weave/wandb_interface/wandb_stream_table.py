@@ -83,7 +83,7 @@ class WandbLiveRunFiles(runfiles_wandb.WandbRunFiles):
 
 class StreamTable:
     _lite_run: InMemoryLazyLiteRun
-    _run_name: str
+    _table_name: str
     _project_name: str
     _entity_name: str
 
@@ -94,28 +94,28 @@ class StreamTable:
 
     def __init__(
         self,
-        run_name: str,
+        table_name: str,
         project_name: typing.Optional[str] = None,
         entity_name: typing.Optional[str] = None,
     ):
-        splits = run_name.split("/")
+        splits = table_name.split("/")
         if len(splits) == 1:
             pass
         elif len(splits) == 2:
             if project_name is not None:
                 raise ValueError(
-                    f"Cannot specify project_name and run_name with '/' in it: {run_name}"
+                    f"Cannot specify project_name and table_name with '/' in it: {table_name}"
                 )
             project_name = splits[0]
-            run_name = splits[1]
+            table_name = splits[1]
         elif len(splits) == 3:
             if project_name is not None or entity_name is not None:
                 raise ValueError(
-                    f"Cannot specify project_name or entity_name and run_name with 2 '/'s in it: {run_name}"
+                    f"Cannot specify project_name or entity_name and table_name with 2 '/'s in it: {table_name}"
                 )
             entity_name = splits[0]
             project_name = splits[1]
-            run_name = splits[2]
+            table_name = splits[2]
 
         # For now, we force the user to specify the entity and project
         # technically, we could infer the entity from the API key, but
@@ -124,14 +124,14 @@ class StreamTable:
             raise ValueError(f"Must specify entity_name")
         elif project_name is None or project_name == "":
             raise ValueError(f"Must specify project_name")
-        elif run_name is None or run_name == "":
-            raise ValueError(f"Must specify run_name")
+        elif table_name is None or table_name == "":
+            raise ValueError(f"Must specify table_name")
 
         job_type = "wb_stream_table"
         self._lite_run = InMemoryLazyLiteRun(
-            entity_name, project_name, run_name, job_type
+            entity_name, project_name, table_name, job_type
         )
-        self._run_name = run_name
+        self._table_name = table_name
         self._project_name = project_name
         self._entity_name = entity_name
 
@@ -145,13 +145,13 @@ class StreamTable:
     def _ensure_weave_stream_table(self) -> StreamTableType:
         if self._weave_stream_table is None:
             self._weave_stream_table = StreamTableType(
-                table_name=self._run_name,
+                table_name=self._table_name,
                 project_name=self._project_name,
                 entity_name=self._entity_name,
             )
             self._weave_stream_table_ref = storage._direct_publish(
                 self._weave_stream_table,
-                name=self._run_name,
+                name=self._table_name,
                 wb_project_name=self._project_name,
                 wb_entity_name=self._entity_name,
             )
@@ -174,7 +174,7 @@ class StreamTable:
             uri = runfiles_wandb.WeaveWBRunFilesURI.from_run_identifiers(
                 self._entity_name,
                 self._project_name,
-                self._run_name,
+                self._table_name,
             )
             self._artifact = WandbLiveRunFiles(name=uri.name, uri=uri)
             self._artifact.set_file_pusher(self._lite_run.pusher)
