@@ -201,7 +201,10 @@ export const CenterBrowser = <RT extends CenterBrowserDataType>(
       const passesSearch =
         !canApplySearch ||
         Object.values(d).some(v => {
-          return v.toString().toLowerCase().includes(searchText.toLowerCase());
+          return (v ?? '')
+            .toString()
+            .toLowerCase()
+            .includes(searchText.toLowerCase());
         });
       const passesFilters =
         !canApplyFilters ||
