@@ -77,10 +77,41 @@ export const useUserEntities = (
   );
 };
 
+// export const useProjectsForEntityWithWeaveObject = (
+//   entityName: string
+// ): {
+//   result: string[];
+//   loading: boolean;
+// } => {
+//   const projectsNode = w.opEntityProjects({
+//     entity: w.opRootEntity({
+//       entityName: w.constString(entityName),
+//     }),
+//   });
+//   // TODO: filter to just projects that have weave objects
+//   const entityProjectNamesNode = w.opProjectName({
+//     project: projectsNode,
+//   });
+//   const entityProjectNamesValue = useNodeValue(entityProjectNamesNode);
+//   return useMemo(
+//     () => ({
+//       result: entityProjectNamesValue.result ?? [],
+//       loading: entityProjectNamesValue.loading,
+//     }),
+//     [entityProjectNamesValue.loading, entityProjectNamesValue.result]
+//   );
+// };
+
 export const useProjectsForEntityWithWeaveObject = (
   entityName: string
 ): {
-  result: string[];
+  result: {
+    name: string;
+    updatedAt: number;
+    num_boards: number;
+    num_run_streams: number;
+    num_logged_tables: number;
+  }[];
   loading: boolean;
 } => {
   const projectsNode = w.opEntityProjects({
@@ -88,18 +119,44 @@ export const useProjectsForEntityWithWeaveObject = (
       entityName: w.constString(entityName),
     }),
   });
-  // TODO: filter to just projects that have weave objects
-  const entityProjectNamesNode = w.opProjectName({
-    project: projectsNode,
-  });
-  const entityProjectNamesValue = useNodeValue(entityProjectNamesNode);
-  return useMemo(
-    () => ({
-      result: entityProjectNamesValue.result ?? [],
-      loading: entityProjectNamesValue.loading,
+
+  // Warning... this is going to be hella expensive.
+  const projectMetaNode = w.opMap({
+    arr: projectsNode,
+    mapFn: w.constFunction({row: 'project'}, ({row}) => {
+      return w.opDict({
+        name: w.opProjectName({project: row}),
+        updatedAt: w.opProjectUpdatedAt({project: row}),
+        num_boards: w.opCount({arr: opProjectBoardArtifacts({project: row})}),
+        num_run_streams: w.opCount({
+          arr: opProjectRunStreamArtifacts({project: row}),
+        }),
+        num_logged_tables: w.opCount({
+          arr: opProjectRunLoggedTableArtifacts({project: row}),
+        }),
+      } as any);
     }),
-    [entityProjectNamesValue.loading, entityProjectNamesValue.result]
-  );
+  });
+
+  const entityProjectNamesValue = useNodeValue(projectMetaNode);
+
+  return useMemo(() => {
+    // this filter step is done client side - very bad!
+    const result: {
+      name: string;
+      updatedAt: number;
+      num_boards: number;
+      num_run_streams: number;
+      num_logged_tables: number;
+    }[] = entityProjectNamesValue.result ?? [];
+
+    return {
+      result: result.filter(
+        res => res.num_boards + res.num_logged_tables + res.num_run_streams > 0
+      ),
+      loading: entityProjectNamesValue.loading,
+    };
+  }, [entityProjectNamesValue.loading, entityProjectNamesValue.result]);
 };
 
 const projectBoardsNode = (entityName: string, projectName: string) => {

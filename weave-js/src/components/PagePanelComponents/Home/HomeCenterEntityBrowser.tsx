@@ -19,6 +19,7 @@ import {
 } from '@wandb/weave/core';
 import {NavigateToExpressionType, SetPreviewNodeType} from './common';
 import {useNodeValue} from '@wandb/weave/react';
+import getConfig from '@wandb/weave/config';
 
 type CenterEntityBrowserPropsType = {
   entityName: string;
@@ -58,21 +59,26 @@ export const CenterEntityBrowserInner: React.FC<
   CenterEntityBrowserInnerPropsType
 > = props => {
   const browserTitle = props.entityName;
-  const projectNames = query.useProjectsForEntityWithWeaveObject(
+  const projectsMeta = query.useProjectsForEntityWithWeaveObject(
     props.entityName
   );
 
   const browserData = useMemo(() => {
-    return projectNames.result.map(projectName => ({
-      _id: projectName,
-      project: projectName,
-      // TODO: get these from the server
-      // runs: 20,
-      // tables: 10,
-      // dashboards: 5,
-      // 'last edited': 'yesterday',
+    // TODO: make sorting more customizable and awesome
+    const sortedMeta = [...projectsMeta.result].sort(
+      (a, b) => b.updatedAt - a.updatedAt
+    );
+    return sortedMeta.map(meta => ({
+      _id: meta.name,
+      project: meta.name,
+      boards: (meta.num_boards ?? 0) > 0 ? meta.num_boards : null,
+      tables:
+        (meta.num_run_streams + meta.num_logged_tables ?? 0) > 0
+          ? meta.num_run_streams + meta.num_logged_tables
+          : null,
+      'updated at': moment.utc(meta.updatedAt).calendar(),
     }));
-  }, [projectNames.result]);
+  }, [projectsMeta.result]);
 
   const browserActions: Array<
     CenterBrowserActionType<(typeof browserData)[number]>
@@ -103,12 +109,12 @@ export const CenterEntityBrowserInner: React.FC<
     ];
   }, [props]);
 
-  const loading = projectNames.loading;
+  const loading = projectsMeta.loading;
 
   return (
     <CenterBrowser
       allowSearch
-      columns={['project']}
+      columns={['project', 'boards', 'tables', 'updated at']}
       loading={loading}
       title={browserTitle}
       data={browserData}
