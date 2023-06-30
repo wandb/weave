@@ -13,6 +13,7 @@ import {IconOverflowHorizontal} from '../../Panel2/Icons';
 import {Divider, Dropdown, Input, Popup} from 'semantic-ui-react';
 import WandbLoader from '@wandb/weave/common/components/WandbLoader';
 import * as LayoutElements from './LayoutElements';
+import _ from 'lodash';
 
 const CenterTable = styled.table`
   width: 100%;
@@ -148,32 +149,77 @@ type CenterBrowserProps<RT extends CenterBrowserDataType> = {
   // Consider: Actions might be a callback that returns an array of actions for a row
   actions?: Array<CenterBrowserActionType<RT>>;
   allowSearch?: boolean;
-  filters?: Array<{
-    placeholder: string;
-    options: Array<{
-      key: string | number;
-      text: string;
-      value: string | number;
-    }>;
-    onChange: (value: string) => void;
-  }>;
+  filters?: {
+    [key: string]: {
+      placeholder: string;
+    };
+  };
+  // filters?: Array<{
+  //   placeholder: string;
+  //   options: Array<{
+  //     key: string | number;
+  //     text: string;
+  //     value: string | number;
+  //   }>;
+  //   onChange: (value: string) => void;
+  // }>;
 };
 
 export const CenterBrowser = <RT extends CenterBrowserDataType>(
   props: CenterBrowserProps<RT>
 ) => {
   const [searchText, setSearchText] = useState('');
+  const [filters, setFilters] = useState<{
+    [key: string]: string | null | undefined;
+  }>({});
+
   const filteredData = useMemo(() => {
-    if (!props.allowSearch || searchText === '' || searchText == null) {
+    const canApplySearch =
+      props.allowSearch || searchText === '' || searchText == null;
+    const canApplyFilters = Object.values(filters).filter(
+      v => v != null && v !== ''
+    );
+    if (!canApplySearch && !canApplyFilters) {
       return props.data;
     }
     return props.data.filter(d => {
-      return Object.values(d).some(v => {
-        return v.toString().toLowerCase().includes(searchText.toLowerCase());
-      });
+      const passesSearch =
+        !canApplySearch ||
+        Object.values(d).some(v => {
+          return v.toString().toLowerCase().includes(searchText.toLowerCase());
+        });
+      const passesFilters =
+        !canApplyFilters ||
+        _.every(
+          Object.entries(filters).map(([k, v], i) => {
+            return v == null || v === '' || (k in d && (d as any)[k] === v);
+          })
+        );
+      return passesSearch && passesFilters;
     });
-  }, [props.allowSearch, props.data, searchText]);
-  const showControls = props.allowSearch || (props.filters?.length ?? 0) > 0;
+  }, [filters, props.allowSearch, props.data, searchText]);
+
+  const filterSpec = useMemo(() => {
+    return Object.entries(props.filters ?? {}).map(([k, v], i) => {
+      const options = _.uniq(props.data.map(d => (d as any)[k]));
+      return {
+        placeholder: v.placeholder,
+        options: options.map(o => {
+          return {key: o, text: o, value: o};
+        }),
+        onChange: (v: string) => {
+          setFilters(f => {
+            const copy = {...f};
+            copy[k] = v;
+            return copy;
+          });
+        },
+      };
+    });
+  }, [props.data, props.filters]);
+
+  const showControls =
+    props.allowSearch || Object.keys(props.filters ?? {}).length > 0;
   const allActions = (props.actions ?? []).flatMap(a => a);
   const primaryAction = allActions.length > 0 ? allActions[0] : undefined;
   const columns = useMemo(() => {
@@ -202,7 +248,7 @@ export const CenterBrowser = <RT extends CenterBrowserDataType>(
                 }}
               />
             )}
-            {props.filters?.map((filter, i) => (
+            {filterSpec.map((filter, i) => (
               <Dropdown
                 key={i}
                 style={{

@@ -366,6 +366,7 @@ const CenterProjectTablesBrowser: React.FC<
       allowSearch
       title={browserTitle}
       loading={isLoading}
+      filters={{kind: {placeholder: 'All table kinds'}}}
       columns={['name', 'kind', 'updated at', 'created at', 'created by']}
       data={browserData}
       actions={browserActions}
