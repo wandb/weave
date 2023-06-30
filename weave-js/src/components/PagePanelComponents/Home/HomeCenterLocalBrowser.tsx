@@ -39,8 +39,9 @@ export const CenterLocalBrowser: React.FC<
       [
         {
           icon: IconInfo,
-          label: 'Board details ',
+          label: 'Board details',
           onClick: row => {
+            const expr = rowToExpression(row);
             const node = (
               <HomePreviewSidebarTemplate
                 title={row.name}
@@ -49,10 +50,10 @@ export const CenterLocalBrowser: React.FC<
                   icon: IconOpenNewTab,
                   label: 'Open Board',
                   onClick: () => {
-                    props.navigateToExpression(rowToExpression(row));
+                    props.navigateToExpression(expr);
                   },
                 }}>
-                <PreviewNode inputNode={rowToExpression(row)} />
+                <PreviewNode inputNode={expr} />
               </HomePreviewSidebarTemplate>
             );
             props.setPreviewNode(node);

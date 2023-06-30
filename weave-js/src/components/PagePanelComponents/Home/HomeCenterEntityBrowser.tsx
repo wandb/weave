@@ -30,6 +30,8 @@ import {useNodeValue} from '@wandb/weave/react';
 import {useNewDashFromItems} from '../../Panel2/PanelRootBrowser/util';
 import {getFullChildPanel} from '../../Panel2/ChildPanel';
 import {useWeaveContext} from '@wandb/weave/context';
+import {HomePreviewSidebarTemplate} from './HomePreviewSidebar';
+import {PreviewNode} from './PreviewNode';
 
 type CenterEntityBrowserPropsType = {
   entityName: string;
@@ -263,6 +265,15 @@ const CenterProjectBrowserInner: React.FC<
   );
 };
 
+const rowToExpression = (
+  entityName: string,
+  projectName: string,
+  artName: string
+) => {
+  const uri = `wandb-artifact:///${entityName}/${projectName}/${artName}:latest/obj`;
+  return opGet({uri: constString(uri)});
+};
+
 const CenterProjectBoardsBrowser: React.FC<
   CenterProjectBrowserInnerPropsType
 > = props => {
@@ -286,9 +297,28 @@ const CenterProjectBoardsBrowser: React.FC<
       [
         {
           icon: IconInfo,
-          label: 'Board details ',
+          label: 'Board details',
           onClick: row => {
-            props.setPreviewNode(<>HI MOM</>);
+            const expr = rowToExpression(
+              props.entityName,
+              props.projectName,
+              row._id
+            );
+            const node = (
+              <HomePreviewSidebarTemplate
+                title={row.name}
+                setPreviewNode={props.setPreviewNode}
+                primaryAction={{
+                  icon: IconOpenNewTab,
+                  label: 'Open Board',
+                  onClick: () => {
+                    props.navigateToExpression(expr);
+                  },
+                }}>
+                <PreviewNode inputNode={expr} />
+              </HomePreviewSidebarTemplate>
+            );
+            props.setPreviewNode(node);
           },
         },
       ],
@@ -297,9 +327,9 @@ const CenterProjectBoardsBrowser: React.FC<
           icon: IconOpenNewTab,
           label: 'Open Board',
           onClick: row => {
-            const uri = `wandb-artifact:///${props.entityName}/${props.projectName}/${row._id}:latest/obj`;
-            const newExpr = opGet({uri: constString(uri)});
-            props.navigateToExpression(newExpr);
+            props.navigateToExpression(
+              rowToExpression(props.entityName, props.projectName, row._id)
+            );
           },
         },
       ],
@@ -426,7 +456,50 @@ const CenterProjectTablesBrowser: React.FC<
           icon: IconInfo,
           label: 'Board details ',
           onClick: row => {
-            props.setPreviewNode(<>HI MOM</>);
+            const expr = tableRowToNode(
+              row.kind,
+              props.entityName,
+              props.projectName,
+              row._id
+            );
+            const node = (
+              <HomePreviewSidebarTemplate
+                title={row.name}
+                setPreviewNode={props.setPreviewNode}
+                // TODO: These actions are literally copy/paste from below - rework this pattern to be more generic
+                primaryAction={{
+                  icon: IconAddNew,
+                  label: 'Seed new board',
+                  onClick: () => {
+                    const node = tableRowToNode(
+                      row.kind,
+                      props.entityName,
+                      props.projectName,
+                      row._id
+                    );
+                    const name =
+                      'dashboard-' + moment().format('YY_MM_DD_hh_mm_ss');
+                    makeNewDashboard(
+                      name,
+                      {panel0: getFullChildPanel(varNode(node.type, 'var0'))},
+                      {var0: node},
+                      newDashExpr => {
+                        props.navigateToExpression(newDashExpr);
+                      }
+                    );
+                  },
+                }}
+                secondaryAction={{
+                  icon: IconOpenNewTab,
+                  label: 'Open Table',
+                  onClick: () => {
+                    props.navigateToExpression(expr);
+                  },
+                }}>
+                <PreviewNode inputNode={expr} />
+              </HomePreviewSidebarTemplate>
+            );
+            props.setPreviewNode(node);
           },
         },
       ],
