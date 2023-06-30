@@ -1,7 +1,7 @@
 import math
 
 from ..api import op, use
-from ..weave_types import Function, NumberBinType, TimeBinType
+from ..weave_types import Function, NumberBinType
 from .. import weave_types as types
 from .. import graph
 from .dict import dict_

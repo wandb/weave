@@ -78,7 +78,7 @@ def test_log_2_app_instances_different_threads(fresh_server_logfile):
     assert "500" in content
 
     # check that there are two threads logged
-    threads = set(re.findall(r"\(Thread (.+?)\)", content))
+    threads = set(re.findall(r"Weave Port: (.+?)\)", content))
     assert len(threads) == 2
 
 

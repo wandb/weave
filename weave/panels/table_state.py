@@ -107,6 +107,8 @@ class TableState:
                     weave_types.List(object_type), "domain"
                 )
             }
+        if "index" in sig.parameters:
+            kwargs["index"] = weave_internal.make_var_node(weave_types.Int(), "index")
         return fn(weave_internal.make_var_node(object_type, "row"), **kwargs)
 
     def add_column(

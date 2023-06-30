@@ -1013,6 +1013,10 @@ export function isJoinedTable(t: Type): t is TableType {
   return !isSimpleTypeShape(t) && t?.type === 'joined-table';
 }
 
+export function isTimestamp(t: Type): t is ListType {
+  return !isSimpleTypeShape(t) && t.type === 'timestamp';
+}
+
 export function functionType(
   inputTypes: FunctionInputTypes,
   outputType: Type
@@ -1035,6 +1039,10 @@ export const canGroupType = (type?: Type): boolean => {
 };
 
 export const numberBin = typedDict({start: 'number', stop: 'number'});
+export const timestampBin = typedDict({
+  start: {type: 'timestamp'},
+  stop: {type: 'timestamp'},
+});
 
 /// // Functions to unwrap inner types
 

@@ -150,7 +150,7 @@ def timedelta_total_seconds(td):
     output_type=types.Number(),
 )
 def to_number(date):
-    return int(date.timestamp())
+    return int(date.timestamp()) * 1000
 
 
 @op(
@@ -167,8 +167,10 @@ def from_number(number):
     input_type={"date": types.union(types.Timestamp(), types.LegacyDate())},
     output_type=types.Timestamp(),
 )
-def floor(date, multiple_ms: int):
-    raise NotImplementedError("floor not implemented")
+def floor(date, multiple_s: int):
+    seconds = (date.replace(tzinfo=None) - date.min).seconds
+    rounding = (seconds // multiple_s) * multiple_s
+    return date + datetime.timedelta(0, rounding - seconds, -date.microsecond)
 
 
 @op(
@@ -176,8 +178,12 @@ def floor(date, multiple_ms: int):
     input_type={"date": types.union(types.Timestamp(), types.LegacyDate())},
     output_type=types.Timestamp(),
 )
-def ceil(date, multiple_ms: int):
-    raise NotImplementedError("ceil not implemented")
+def ceil(date, multiple_s: int):
+    seconds = (date.replace(tzinfo=None) - date.min).seconds
+    rounding = (seconds // multiple_s) * multiple_s
+    return date + datetime.timedelta(
+        0, rounding - seconds + multiple_s, -date.microsecond
+    )
 
 
 @op(

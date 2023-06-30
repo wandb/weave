@@ -1545,7 +1545,7 @@ def type_is_variable(t: Type) -> bool:
 
 
 NumberBinType = TypedDict({"start": Float(), "stop": Float()})
-TimeBinType = TypedDict({"start": Timestamp(), "stop": Timestamp()})
+TimestampBinType = TypedDict({"start": Timestamp(), "stop": Timestamp()})
 
 
 def map_leaf_types(t: Type, fn: typing.Callable[[Type], typing.Optional[Type]]) -> Type:

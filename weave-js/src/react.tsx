@@ -9,31 +9,26 @@ import {
   EditingNode,
   expandAll,
   Frame,
-  getChainRootConst,
-  getChainRootOutputNode,
-  getChainRootVar,
   GlobalCGEventTracker,
   isAssignableTo,
   isConstNode,
   isFunction,
   isFunctionLiteral,
   isFunctionType,
+  isList,
+  isTimestamp,
   isVoidNode,
   isWeaveDebugEnabled,
-  linearize,
   Node,
   NodeOrVoidNode,
-  Op,
   opCount,
-  opDefIsLowLevel,
   opIndex,
   OpInputs,
-  OutputNode,
+  opList,
   pushFrame,
   resolveVar,
   simplify,
   Stack,
-  StaticOpStore,
   Type,
   TypeToTSTypeInner,
   varNode,
@@ -57,6 +52,13 @@ import {ClientContext, useWeaveContext, useWeaveDashUiEnable} from './context';
 import {getUnresolvedVarNodes} from './core/callers';
 import {useDeepMemo} from './hookUtils';
 import {consoleLog} from './util';
+import {
+  callResolverSimple,
+  clientSet,
+  getChainRootConstructor,
+  getChainRootVar,
+  isConstructor,
+} from './core/mutate';
 
 /**
  * React hook-style function to get the
@@ -116,27 +118,6 @@ export class NullResult {
 export class InvalidGraph {
   constructor(public message: string, public node: NodeOrVoidNode) {}
 }
-
-const callResolverSimple = (
-  opName: string,
-  inputs: {[key: string]: any},
-  fromOp: Op
-): any => {
-  const tsOps = StaticOpStore.getInstance();
-  const opDef = tsOps.getOpDef(opName);
-  if (!opDefIsLowLevel(opDef)) {
-    throw new Error('opDef is not low level ' + opDef.name);
-  }
-  return opDef.resolver(
-    inputs,
-    null as any,
-    // Passing this in because opKinds uses it. null is invalid for the type.
-    // But we don't expect it to be used.
-    {op: fromOp, outputNode: null as any},
-    null as any,
-    null as any
-  );
-};
 
 const clientEval = (node: NodeOrVoidNode, env: Stack): NodeOrVoidNode => {
   if (node.nodeType === 'var') {
@@ -481,71 +462,14 @@ export const parseRef = (ref: string): ArtifactURI => {
   };
 };
 
-// True if we can do a client-side set mutation
-const canClientSet = (linearNodes: OutputNode[] | undefined) => {
-  if (linearNodes == null) {
-    return true;
-  }
-  return linearNodes.every(n => {
-    // Must be allowed ops
-    if (!['pick', 'Object-__getattr__', 'index'].includes(n.fromOp.name)) {
-      return false;
-    }
-    // non arg0 must be const
-    if (
-      Object.values(n.fromOp.inputs)
-        .slice(1)
-        .some(i => !isConstNode(i))
-    ) {
-      return false;
-    }
-    return true;
-  });
-};
-
-// Perform a client side set mutation, returning the new value.
-// Should be equivalent to the server side set mutation (but handles fewer ops).
-const clientSet = (linearNodes: OutputNode[] | undefined, value: any) => {
-  if (linearNodes == null) {
-    return value;
-  }
-  let arg0 = Object.values(linearNodes[0].fromOp.inputs)[0];
-  const results: any[] = [];
-  const opInputs: Array<{[key: string]: any}> = [];
-  // Execute forward
-  for (const node of linearNodes) {
-    const inputs = {...node.fromOp.inputs};
-    inputs[Object.keys(inputs)[0]] = arg0;
-    arg0 = callResolverSimple(node.fromOp.name, inputs, node.fromOp);
-    opInputs.push(inputs);
-    results.push(arg0);
-  }
-
-  let res = value;
-
-  for (let i = linearNodes.length - 1; i >= 0; i--) {
-    const node = linearNodes[i];
-    const inputs = Object.values(opInputs[i]);
-    if (node.fromOp.name === 'pick') {
-      inputs[0][inputs[1].val] = res;
-    } else if (node.fromOp.name === 'Object-__getattr__') {
-      inputs[0][inputs[1].val] = res;
-    } else if (node.fromOp.name === 'index') {
-      inputs[0][inputs[1].val] = res;
-    }
-    res = inputs[0];
-  }
-  return res;
-};
-
 export const absoluteTargetMutation = (absoluteTarget: NodeOrVoidNode) => {
-  const rootOutputNode = getChainRootOutputNode(absoluteTarget);
-  const rootConstNode = getChainRootConst(absoluteTarget);
+  const rootConstructorNode = getChainRootConstructor(absoluteTarget);
   const rootArgsInner: {[key: string]: any} = {};
   if (
-    rootOutputNode != null &&
-    rootOutputNode.fromOp.name === 'get' &&
-    isConstNode(rootOutputNode.fromOp.inputs.uri)
+    rootConstructorNode != null &&
+    rootConstructorNode.nodeType === 'output' &&
+    rootConstructorNode.fromOp.name === 'get' &&
+    isConstNode(rootConstructorNode.fromOp.inputs.uri)
   ) {
     return {
       rootArgs: rootArgsInner,
@@ -553,20 +477,13 @@ export const absoluteTargetMutation = (absoluteTarget: NodeOrVoidNode) => {
       // TODO: we rely on the original root type here for the new type!
       // This is not quite right. The mutation resolver could return the actual
       // new type.
-      rootType: rootOutputNode.type,
-    };
-  } else if (rootConstNode) {
-    return {
-      rootArgs: rootArgsInner,
-      mutationStyle: 'clientRef' as const,
-      rootType: rootConstNode.type,
+      rootType: rootConstructorNode.type,
     };
   }
-  console.warn("Can't create mutation for this target", absoluteTarget);
   return {
     rootArgs: rootArgsInner,
-    mutationStyle: 'invalid' as const,
-    rootType: 'invalid' as const,
+    mutationStyle: 'clientRef' as const,
+    rootType: absoluteTarget.type,
   };
 };
 
@@ -593,31 +510,40 @@ export const makeCallAction = (
       return;
     }
 
-    // The first argument to any mutation is the target node. We need
-    // to put it inside a const node so that it doesn't get
-    // execute by the engine.
-    const constTarget = constNodeUnsafe(
-      toWeaveType(absoluteTarget),
-      absoluteTarget
-    );
-    const rootArgsNode = constNodeUnsafe(toWeaveType(rootArgs), rootArgs);
-    const calledNode = callOpVeryUnsafe(actionName, {
-      self: constTarget,
-      ...inputs,
-      root_args: rootArgsNode,
-    });
-
     const onDone = (final: any) => {
       if (final == null && ignoreNullResult) {
         // pass
       } else if (mutationStyle === 'clientRef') {
-        // if (final._weaveStateId != null) {
-        //   weaveStateCallbacks[final._weaveStateId](final.value);
-        // } else {
-        //   throw new Error('Unexpected mutation result');
-        // }
         consoleLog('clientRef useAction result', final);
-        const newRootNode = constNodeUnsafe(toWeaveType(final), final);
+        let newRootNode: Node = constNodeUnsafe(toWeaveType(final), final);
+
+        // This is a gnarly hack. final is a json value, we don't know its True
+        // Weave type. This generally works for basic json types, but in particular
+        // it doesn't work for timestamps. This special cases when we have a simple
+        // set that sets a const node target to a list of timestamps, as is the
+        // case for PanelPlot zoom domain syncing. We set the result to
+        // a list of date constructor ops instead.
+        // TODO: fix this generally. This issue is certainly broader than just the
+        //   hack here. We need to know the correct type of mutation results, and we
+        //   need a general way of converting objects to constructors op calls.
+        if (
+          actionName === 'set' &&
+          isConstructor(absoluteTarget) &&
+          isList(inputs.val.type) &&
+          isTimestamp(inputs.val.type.objectType)
+        ) {
+          const t = newRootNode.type;
+          newRootNode = opList({
+            a: callOpVeryUnsafe('op-date_parse', {
+              dt_s: constString(new Date(newRootNode.val[0]).toISOString()),
+            } as any),
+            b: callOpVeryUnsafe('op-date_parse', {
+              dt_s: constString(new Date(newRootNode.val[1]).toISOString()),
+            } as any),
+          } as any);
+          newRootNode.type = t;
+        }
+
         if (getChainRootVar(target) != null) {
           consoleLog('CLIENT REF VAR CHAIN ROOT STARTING');
           triggerExpressionEvent(
@@ -678,18 +604,32 @@ export const makeCallAction = (
       return true;
     };
 
-    const linearNodes = linearize(absoluteTarget);
-
     if (
-      inputs.val.nodeType === 'const' &&
       actionName === 'set' &&
-      canClientSet(linearNodes)
+      mutationStyle === 'clientRef' &&
+      inputs.val.nodeType === 'const'
     ) {
-      const final = clientSet(linearNodes, inputs.val.val);
-      return onDone(final);
-    } else {
-      return client.action(calledNode as any).then(onDone);
+      const clientSetResult = clientSet(absoluteTarget, inputs.val.val);
+      if (clientSetResult.ok) {
+        return onDone(clientSetResult.value);
+      }
     }
+
+    // The first argument to any mutation is the target node. We need
+    // to put it inside a const node so that it doesn't get
+    // execute by the engine.
+    const constTarget = constNodeUnsafe(
+      toWeaveType(absoluteTarget),
+      absoluteTarget
+    );
+    const rootArgsNode = constNodeUnsafe(toWeaveType(rootArgs), rootArgs);
+    const calledNode = callOpVeryUnsafe(actionName, {
+      self: constTarget,
+      ...inputs,
+      root_args: rootArgsNode,
+    });
+
+    return client.action(calledNode as any).then(onDone);
   };
 };
 
