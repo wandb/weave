@@ -148,15 +148,15 @@ export const useProjectAssetCount = (
 };
 
 const opProjectBoardCount = ({project}: {project: w.Node}) => {
-  return w.opCount({arr: opProjectBoardArtifacts({project: project})});
+  return w.opCount({arr: opProjectBoardArtifacts({project})});
 };
 
 const opProjectRunStreamCount = ({project}: {project: w.Node}) => {
-  return w.opCount({arr: opProjectRunStreamArtifacts({project: project})});
+  return w.opCount({arr: opProjectRunStreamArtifacts({project})});
 };
 
 const opProjectLoggedTableCount = ({project}: {project: w.Node}) => {
-  return w.opCount({arr: opProjectRunLoggedTableArtifacts({project: project})});
+  return w.opCount({arr: opProjectRunLoggedTableArtifacts({project})});
 };
 
 const projectBoardsNode = (entityName: string, projectName: string) => {
