@@ -12,9 +12,10 @@ import {
   IconWeaveLogo,
 } from '../../Panel2/Icons';
 import {useNewPanelFromRootQueryCallback} from '../../Panel2/PanelRootBrowser/util';
+import {NavigateToExpressionType} from './common';
 
 export const HomeTopBar: React.FC<{
-  updateConfig: (newConfig: ChildPanelFullConfig) => void;
+  navigateToExpression: NavigateToExpressionType;
   inJupyter: boolean;
 }> = props => {
   const now = moment().format('YY_MM_DD_hh_mm_ss');
@@ -37,12 +38,7 @@ export const HomeTopBar: React.FC<{
           '_blank'
         );
       } else {
-        props.updateConfig({
-          vars: {},
-          input_node: newDashExpr,
-          id: '',
-          config: undefined,
-        });
+        props.navigateToExpression(newDashExpr);
       }
     });
   }, [inJupyter, makeNewDashboard, name, props, urlPrefixed, weave]);

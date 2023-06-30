@@ -5,9 +5,12 @@ import * as query from './query';
 import {CenterBrowser, CenterBrowserActionType} from './HomeCenterBrowser';
 import {useResettingState} from '@wandb/weave/common/util/hooks';
 import moment from 'moment';
+import {constString, opGet} from '@wandb/weave/core';
+import {NavigateToExpressionType} from './common';
 
 export const CenterEntityBrowser: React.FC<{
   entityName: string;
+  navigateToExpression: NavigateToExpressionType;
 }> = props => {
   const [selectedProjectName, setSelectedProjectName] = useResettingState<
     string | undefined
@@ -16,6 +19,7 @@ export const CenterEntityBrowser: React.FC<{
     return (
       <CenterEntityBrowserInner
         entityName={props.entityName}
+        navigateToExpression={props.navigateToExpression}
         setSelectedProjectName={setSelectedProjectName}
       />
     );
@@ -24,6 +28,7 @@ export const CenterEntityBrowser: React.FC<{
       <CenterProjectBrowser
         entityName={props.entityName}
         projectName={selectedProjectName}
+        navigateToExpression={props.navigateToExpression}
         setSelectedProjectName={setSelectedProjectName}
       />
     );
@@ -31,6 +36,7 @@ export const CenterEntityBrowser: React.FC<{
 };
 export const CenterEntityBrowserInner: React.FC<{
   entityName: string;
+  navigateToExpression: NavigateToExpressionType;
   setSelectedProjectName: (name: string | undefined) => void;
 }> = props => {
   const browserTitle = props.entityName;
@@ -96,6 +102,7 @@ export const CenterEntityBrowserInner: React.FC<{
 const CenterProjectBrowser: React.FC<{
   entityName: string;
   projectName: string;
+  navigateToExpression: NavigateToExpressionType;
   setSelectedProjectName: (name: string | undefined) => void;
 }> = props => {
   const [selectedAssetType, setSelectedAssetType] = useState<
@@ -106,6 +113,7 @@ const CenterProjectBrowser: React.FC<{
       <CenterProjectBrowserInner
         entityName={props.entityName}
         projectName={props.projectName}
+        navigateToExpression={props.navigateToExpression}
         setSelectedProjectName={props.setSelectedProjectName}
         setSelectedAssetType={setSelectedAssetType}
       />
@@ -115,6 +123,7 @@ const CenterProjectBrowser: React.FC<{
       <CenterProjectBoardBrowser
         entityName={props.entityName}
         projectName={props.projectName}
+        navigateToExpression={props.navigateToExpression}
         setSelectedProjectName={props.setSelectedProjectName}
         setSelectedAssetType={setSelectedAssetType}
       />
@@ -127,6 +136,7 @@ const CenterProjectBrowser: React.FC<{
 const CenterProjectBrowserInner: React.FC<{
   entityName: string;
   projectName: string;
+  navigateToExpression: NavigateToExpressionType;
   setSelectedProjectName: (name: string | undefined) => void;
   setSelectedAssetType: (name: string | undefined) => void;
 }> = props => {
@@ -184,6 +194,7 @@ const CenterProjectBrowserInner: React.FC<{
 const CenterProjectBoardBrowser: React.FC<{
   entityName: string;
   projectName: string;
+  navigateToExpression: NavigateToExpressionType;
   setSelectedProjectName: (name: string | undefined) => void;
   setSelectedAssetType: (name: string | undefined) => void;
 }> = props => {
@@ -209,10 +220,12 @@ const CenterProjectBoardBrowser: React.FC<{
     return [
       [
         {
-          icon: IconDown,
-          label: 'Browse asset type',
+          icon: IconOpenNewTab,
+          label: 'Open Board',
           onClick: row => {
-            props.setSelectedAssetType(row._id);
+            const uri = `wandb-artifact:///${props.entityName}/${props.projectName}/${row._id}:latest/obj`;
+            const newExpr = opGet({uri: constString(uri)});
+            props.navigateToExpression(newExpr);
           },
         },
       ],

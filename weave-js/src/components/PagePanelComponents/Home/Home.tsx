@@ -1,4 +1,13 @@
-import React, {FC, memo, useMemo, useState} from 'react';
+/*
+Scope cutting:
+  * Recent Section can be a future add-on: for now just navigate to `viewer/weave` if remote or `local` if local
+  * Remove Cloud section
+  * No Preview
+  * No filtering projects
+  * No extra fields
+*/
+
+import React, {FC, memo, useCallback, useMemo, useState} from 'react';
 
 import styled from 'styled-components';
 import {ChildPanelFullConfig} from '../../Panel2/ChildPanel';
@@ -10,12 +19,12 @@ import {
   IconUsersTeam,
   IconWandb,
 } from '../../Panel2/Icons';
-import {useConfig} from '../../Panel2/panel';
 import * as query from './query';
 import * as LayoutElements from './LayoutElements';
 import {CenterEntityBrowser} from './HomeCenterEntityBrowser';
 import {LeftNav} from './HomeLeftNav';
 import {HomeTopBar} from './HomeTopBar';
+import {NavigateToExpressionType} from './common';
 
 const CenterSpace = styled(LayoutElements.VSpace)`
   border: 1px solid #dadee3;
@@ -31,8 +40,17 @@ type HomeProps = {
 };
 
 const HomeComp: FC<HomeProps> = props => {
-  const [rootConfig, updateRootConfig] = useConfig();
-
+  const navigateToExpression: NavigateToExpressionType = useCallback(
+    newDashExpr => {
+      props.updateConfig({
+        vars: {},
+        input_node: newDashExpr,
+        id: '',
+        config: undefined,
+      });
+    },
+    [props]
+  );
   const [activeBrowserRoot, setActiveBrowserRoot] = useState<{
     browserType: 'recent' | 'wandb' | 'drafts';
     rootId: string;
@@ -174,7 +192,7 @@ const HomeComp: FC<HomeProps> = props => {
       <LayoutElements.Block>
         <HomeTopBar
           inJupyter={props.inJupyter}
-          updateConfig={props.updateConfig}
+          navigateToExpression={navigateToExpression}
         />
       </LayoutElements.Block>
       {/* Main Region */}
@@ -186,7 +204,10 @@ const HomeComp: FC<HomeProps> = props => {
           {activeBrowserRoot.browserType === 'recent' ? (
             <>RECENT</>
           ) : activeBrowserRoot.browserType === 'wandb' ? (
-            <CenterEntityBrowser entityName={activeBrowserRoot.rootId} />
+            <CenterEntityBrowser
+              navigateToExpression={navigateToExpression}
+              entityName={activeBrowserRoot.rootId}
+            />
           ) : activeBrowserRoot.browserType === 'drafts' ? (
             <>DRAFTS</>
           ) : (
