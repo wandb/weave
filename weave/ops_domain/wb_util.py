@@ -3,7 +3,7 @@ from urllib import parse
 
 from .. import weave_types as types
 from .. import decorator_type
-from ..wandb_interface import wandb_run_stream
+from ..wandb_interface import wandb_stream_table
 
 
 from . import table
@@ -143,8 +143,8 @@ def _process_run_dict_item(val, run_path: typing.Optional[RunPath] = None):
                 model_hash=val.get("model_hash"),
             )
 
-        if wandb_run_stream.is_weave_encoded_history_cell(val):
-            return wandb_run_stream.from_weave_encoded_history_cell(val)
+        if wandb_stream_table.is_weave_encoded_history_cell(val):
+            return wandb_stream_table.from_weave_encoded_history_cell(val)
 
     return val
 
