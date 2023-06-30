@@ -31,26 +31,42 @@ import {ASSUME_ALL_BOARDS_ARE_GROUP_ART_TYPE} from './dataModelAssumptions';
 /**
  * Fetches the user entities.
  */
-export const useUserName = (): {
+export const useUserName = (
+  isAuthenticated?: boolean
+): {
   result: string | undefined;
   loading: boolean;
 } => {
-  const entityNameNode = w.opUserUsername({
-    user: w.opRootViewer({}),
-  });
+  const entityNameNode = useMemo(
+    () =>
+      isAuthenticated
+        ? w.opUserUsername({
+            user: w.opRootViewer({}),
+          })
+        : w.constNone(),
+    [isAuthenticated]
+  );
   return useNodeValue(entityNameNode);
 };
 
 /**
  * Fetches the user's entities.
  */
-export const useUserEntities = (): {
+export const useUserEntities = (
+  isAuthenticated?: boolean
+): {
   result: string[];
   loading: boolean;
 } => {
-  const entityNamesNode = w.opEntityName({
-    entity: w.opUserEntities({entity: w.opRootViewer({})}),
-  });
+  const entityNamesNode = useMemo(
+    () =>
+      isAuthenticated
+        ? w.opEntityName({
+            entity: w.opUserEntities({entity: w.opRootViewer({})}),
+          })
+        : w.constNode(w.list('string'), []),
+    [isAuthenticated]
+  );
   const entityNameValue = useNodeValue(entityNamesNode);
   return useMemo(
     () => ({

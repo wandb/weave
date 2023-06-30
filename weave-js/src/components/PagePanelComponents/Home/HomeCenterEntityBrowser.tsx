@@ -1,44 +1,50 @@
 import React, {useMemo, useState} from 'react';
 
-import {IconDown, IconOpenNewTab} from '../../Panel2/Icons';
+import {IconDown, IconInfo, IconOpenNewTab} from '../../Panel2/Icons';
 import * as query from './query';
 import {CenterBrowser, CenterBrowserActionType} from './HomeCenterBrowser';
 import {useResettingState} from '@wandb/weave/common/util/hooks';
 import moment from 'moment';
 import {constString, opGet} from '@wandb/weave/core';
-import {NavigateToExpressionType} from './common';
+import {NavigateToExpressionType, SetPreviewNodeType} from './common';
 
-export const CenterEntityBrowser: React.FC<{
+type CenterEntityBrowserPropsType = {
   entityName: string;
+  setPreviewNode: SetPreviewNodeType;
   navigateToExpression: NavigateToExpressionType;
-}> = props => {
+};
+
+export const CenterEntityBrowser: React.FC<
+  CenterEntityBrowserPropsType
+> = props => {
   const [selectedProjectName, setSelectedProjectName] = useResettingState<
     string | undefined
   >(undefined, [props]);
   if (selectedProjectName == null) {
     return (
       <CenterEntityBrowserInner
-        entityName={props.entityName}
-        navigateToExpression={props.navigateToExpression}
+        {...props}
         setSelectedProjectName={setSelectedProjectName}
       />
     );
   } else {
     return (
       <CenterProjectBrowser
-        entityName={props.entityName}
+        {...props}
         projectName={selectedProjectName}
-        navigateToExpression={props.navigateToExpression}
         setSelectedProjectName={setSelectedProjectName}
       />
     );
   }
 };
-export const CenterEntityBrowserInner: React.FC<{
-  entityName: string;
-  navigateToExpression: NavigateToExpressionType;
+
+type CenterEntityBrowserInnerPropsType = CenterEntityBrowserPropsType & {
   setSelectedProjectName: (name: string | undefined) => void;
-}> = props => {
+};
+
+export const CenterEntityBrowserInner: React.FC<
+  CenterEntityBrowserInnerPropsType
+> = props => {
   const browserTitle = props.entityName;
   const projectNames = query.useProjectsForEntityWithWeaveObject(
     props.entityName
@@ -99,32 +105,24 @@ export const CenterEntityBrowserInner: React.FC<{
   );
 };
 
-const CenterProjectBrowser: React.FC<{
-  entityName: string;
+type CenterProjectBrowserPropsType = CenterEntityBrowserInnerPropsType & {
   projectName: string;
-  navigateToExpression: NavigateToExpressionType;
-  setSelectedProjectName: (name: string | undefined) => void;
-}> = props => {
+};
+const CenterProjectBrowser: React.FC<CenterProjectBrowserPropsType> = props => {
   const [selectedAssetType, setSelectedAssetType] = useState<
     string | undefined
   >();
   if (selectedAssetType == null) {
     return (
       <CenterProjectBrowserInner
-        entityName={props.entityName}
-        projectName={props.projectName}
-        navigateToExpression={props.navigateToExpression}
-        setSelectedProjectName={props.setSelectedProjectName}
+        {...props}
         setSelectedAssetType={setSelectedAssetType}
       />
     );
   } else if (selectedAssetType === 'boards') {
     return (
       <CenterProjectBoardBrowser
-        entityName={props.entityName}
-        projectName={props.projectName}
-        navigateToExpression={props.navigateToExpression}
-        setSelectedProjectName={props.setSelectedProjectName}
+        {...props}
         setSelectedAssetType={setSelectedAssetType}
       />
     );
@@ -133,13 +131,18 @@ const CenterProjectBrowser: React.FC<{
   }
 };
 
-const CenterProjectBrowserInner: React.FC<{
+type CenterProjectBrowserInnerPropsType = {
   entityName: string;
   projectName: string;
+  setPreviewNode: SetPreviewNodeType;
   navigateToExpression: NavigateToExpressionType;
   setSelectedProjectName: (name: string | undefined) => void;
   setSelectedAssetType: (name: string | undefined) => void;
-}> = props => {
+};
+
+const CenterProjectBrowserInner: React.FC<
+  CenterProjectBrowserInnerPropsType
+> = props => {
   const browserTitle = props.entityName + '/' + props.projectName;
   const browserData = [
     {
@@ -191,15 +194,10 @@ const CenterProjectBrowserInner: React.FC<{
   );
 };
 
-const CenterProjectBoardBrowser: React.FC<{
-  entityName: string;
-  projectName: string;
-  navigateToExpression: NavigateToExpressionType;
-  setSelectedProjectName: (name: string | undefined) => void;
-  setSelectedAssetType: (name: string | undefined) => void;
-}> = props => {
-  const browserTitle =
-    props.entityName + '/' + props.projectName + '/' + 'Boards';
+const CenterProjectBoardBrowser: React.FC<
+  CenterProjectBrowserInnerPropsType
+> = props => {
+  const browserTitle = props.entityName + '/' + props.projectName + '/Boards';
 
   const boards = query.useProjectBoards(props.entityName, props.projectName);
   const browserData = useMemo(() => {
@@ -219,6 +217,13 @@ const CenterProjectBoardBrowser: React.FC<{
   > = useMemo(() => {
     return [
       [
+        {
+          icon: IconInfo,
+          label: 'Board details ',
+          onClick: row => {
+            props.setPreviewNode(<>HI MOM</>);
+          },
+        },
         {
           icon: IconOpenNewTab,
           label: 'Open Board',
