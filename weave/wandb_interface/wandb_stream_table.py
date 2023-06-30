@@ -9,6 +9,7 @@ import uuid
 
 from wandb.sdk.lib.paths import LogicalPath
 
+
 from .wandb_lite_run import InMemoryLazyLiteRun
 
 from .. import runfiles_wandb
@@ -17,10 +18,13 @@ from .. import weave_types
 from .. import artifact_base
 from .. import file_util
 from .. import graph
-from .. import ops_domain
+from ..core_types.stream_table_type import StreamTableType
+from ..ops_domain import stream_table_ops
+from ..ops_primitives import weave_api
 
 if typing.TYPE_CHECKING:
     from wandb.sdk.internal.file_pusher import FilePusher
+
 
 # Shawn recommended we only encode leafs, but in my testing, nested structures
 # are not handled as well in in gorilla and we can do better using just weave.
@@ -85,6 +89,9 @@ class StreamTable:
 
     _artifact: typing.Optional[WandbLiveRunFiles] = None
 
+    _weave_stream_table: typing.Optional[StreamTableType] = None
+    _weave_stream_table_ref: typing.Optional[artifact_base.ArtifactRef] = None
+
     def __init__(
         self,
         table_name: str,
@@ -135,18 +142,34 @@ class StreamTable:
         for row in row_or_rows:
             self._log_row(row)
 
+    def _ensure_weave_stream_table(self) -> StreamTableType:
+        if self._weave_stream_table is None:
+            self._weave_stream_table = StreamTableType(
+                table_name=self._table_name,
+                project_name=self._project_name,
+                entity_name=self._entity_name,
+            )
+            self._weave_stream_table_ref = storage._direct_publish(
+                self._weave_stream_table,
+                name=self._table_name,
+                wb_project_name=self._project_name,
+                wb_entity_name=self._entity_name,
+            )
+        return self._weave_stream_table
+
     def _ipython_display_(self) -> graph.Node:
         from .. import show
 
-        node = (
-            ops_domain.project(self._entity_name, self._project_name)
-            .run(self._table_name)
-            .history2()
+        self._ensure_weave_stream_table()
+        if self._weave_stream_table_ref is None:
+            return show(None)
+        return show(
+            stream_table_ops.rows(weave_api.get(str(self._weave_stream_table_ref.uri)))
         )
-        return show(node)
 
     def _log_row(self, row: dict) -> None:
         self._lite_run.ensure_run()
+        self._ensure_weave_stream_table()
         if self._artifact is None:
             uri = runfiles_wandb.WeaveWBRunFilesURI.from_run_identifiers(
                 self._entity_name,
