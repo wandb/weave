@@ -233,7 +233,7 @@ const PagePanel: React.FC = props => {
   useWeaveAutomation(automationId);
 
   useEffect(() => {
-    console.log('PAGE PANEL MOUNT');
+    consoleLog('PAGE PANEL MOUNT');
     setLoading(true);
     if (expString != null) {
       weave.expression(expString, []).then(res => {

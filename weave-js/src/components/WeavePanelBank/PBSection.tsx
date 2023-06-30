@@ -118,7 +118,7 @@ export const PBSection: React.FC<PBSectionProps> = props => {
                     </Tooltip>
                     {enableAddPanel && (
                       <WBButton onClick={handleAddPanel}>
-                        <IconAddNew marginRight={6} />
+                        <IconAddNew $marginRight={6} />
                         New panel
                       </WBButton>
                     )}
@@ -265,10 +265,10 @@ const AddPanelBarContainer = styled.div`
   }
 `;
 
-const IconAddNew = styled(IconAddNewUnstyled)<{marginRight?: number}>`
+const IconAddNew = styled(IconAddNewUnstyled)<{$marginRight?: number}>`
   width: 18px;
   height: 18px;
-  margin-right: ${p => p.marginRight ?? 8}px;
+  margin-right: ${p => p.$marginRight ?? 8}px;
 `;
 
 const EditablePanel = styled.div<{isFocused: boolean; isHovered: boolean}>`

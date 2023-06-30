@@ -1235,7 +1235,7 @@ export const unionObjectTypeAttrTypes = (type: Type): {[key: string]: Type} => {
     }, {});
   }
   if (!isObjectType(type)) {
-    console.log('GOT TYPE', type);
+    // console.log('GOT TYPE', type);
     throw new Error('unionObjectTypeAttrTypes: expected an ObjectType');
   }
   return objectTypeAttrTypes(type) as {[key: string]: Type};

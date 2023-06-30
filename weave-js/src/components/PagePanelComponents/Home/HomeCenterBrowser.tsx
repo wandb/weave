@@ -238,21 +238,21 @@ export const CenterBrowser = <RT extends CenterBrowserDataType>(
               )}
             </tr>
           </thead>
-          {props.loading ? (
-            <tr style={{height: '100%'}}>
-              <td colSpan={columns.length + (hasOverflowActions ? 1 : 0)}>
-                <LayoutElements.VStack
-                  style={{
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}>
-                  <WandbLoader inline />
-                </LayoutElements.VStack>
-              </td>
-            </tr>
-          ) : (
-            <tbody>
-              {filteredData.map((row, i) => (
+          <tbody>
+            {props.loading ? (
+              <tr style={{height: '100%'}}>
+                <td colSpan={columns.length + (hasOverflowActions ? 1 : 0)}>
+                  <LayoutElements.VStack
+                    style={{
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                    <WandbLoader inline />
+                  </LayoutElements.VStack>
+                </td>
+              </tr>
+            ) : (
+              filteredData.map((row, i) => (
                 <tr
                   key={row._id}
                   onClick={() => primaryAction?.onClick(row, i)}>
@@ -310,9 +310,9 @@ export const CenterBrowser = <RT extends CenterBrowserDataType>(
                     </td>
                   )}
                 </tr>
-              ))}
-            </tbody>
-          )}
+              ))
+            )}
+          </tbody>
         </CenterTable>
       </CenterSpaceTableSpace>
     </>

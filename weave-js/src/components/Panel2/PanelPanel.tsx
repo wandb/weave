@@ -136,10 +136,10 @@ const usePanelPanelCommon = (props: PanelPanelProps) => {
     stack,
     weave,
   ]);
-  useTraceUpdate('panelQuery', {
-    loading: panelQuery.loading,
-    result: panelQuery.result,
-  });
+  // useTraceUpdate('panelQuery', {
+  //   loading: panelQuery.loading,
+  //   result: panelQuery.result,
+  // });
 
   useSetPanelRenderedConfig(panelConfig);
 
