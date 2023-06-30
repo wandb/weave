@@ -1,11 +1,18 @@
 import React, {useEffect, useMemo, useState} from 'react';
 
-import {IconDown, IconInfo, IconOpenNewTab} from '../../Panel2/Icons';
+import {
+  IconAddNew,
+  IconCopy,
+  IconDown,
+  IconInfo,
+  IconOpenNewTab,
+} from '../../Panel2/Icons';
 import * as query from './query';
 import {CenterBrowser, CenterBrowserActionType} from './HomeCenterBrowser';
 import moment from 'moment';
 import {
   Node,
+  callOpVeryUnsafe,
   constString,
   opArtifactMembershipArtifactVersion,
   opArtifactMembershipForAlias,
@@ -16,9 +23,13 @@ import {
   opProjectArtifact,
   opRootProject,
   opTableRows,
+  varNode,
 } from '@wandb/weave/core';
 import {NavigateToExpressionType, SetPreviewNodeType} from './common';
 import {useNodeValue} from '@wandb/weave/react';
+import {useNewDashFromItems} from '../../Panel2/PanelRootBrowser/util';
+import {getFullChildPanel} from '../../Panel2/ChildPanel';
+import {useWeaveContext} from '@wandb/weave/context';
 
 type CenterEntityBrowserPropsType = {
   entityName: string;
@@ -270,6 +281,8 @@ const CenterProjectBoardsBrowser: React.FC<
             props.setPreviewNode(<>HI MOM</>);
           },
         },
+      ],
+      [
         {
           icon: IconOpenNewTab,
           label: 'Open Board',
@@ -310,9 +323,50 @@ const CenterProjectBoardsBrowser: React.FC<
   );
 };
 
+const tableRowToNode = (
+  kind: string,
+  entityName: string,
+  projectName: string,
+  artName: string
+) => {
+  let newExpr: Node;
+  if (kind === 'Run Stream') {
+    const uri = `wandb-artifact:///${entityName}/${projectName}/${artName}:latest/obj`;
+    // TODO Sync this up with the new runs stream code
+    newExpr = callOpVeryUnsafe('run_stream-rows', {
+      self: opGet({uri: constString(uri)}),
+    }) as any;
+  } else {
+    // This is a  hacky here. Would be nice to have better mapping
+    const artNameParts = artName.split('-', 3);
+    const tableName = artNameParts[artNameParts.length - 1] + '.table.json';
+    newExpr = opTableRows({
+      table: opFileTable({
+        file: opArtifactVersionFile({
+          artifactVersion: opArtifactMembershipArtifactVersion({
+            artifactMembership: opArtifactMembershipForAlias({
+              artifact: opProjectArtifact({
+                project: opRootProject({
+                  entityName: constString(entityName),
+                  projectName: constString(projectName),
+                }),
+                artifactName: constString(artName),
+              }),
+              aliasName: constString('latest'),
+            }),
+          }),
+          path: constString(tableName),
+        }),
+      }),
+    });
+  }
+  return newExpr;
+};
+
 const CenterProjectTablesBrowser: React.FC<
   CenterProjectBrowserInnerPropsType
 > = props => {
+  const weave = useWeaveContext();
   const browserTitle = 'Tables';
 
   const runStreams = query.useProjectRunStreams(
@@ -351,59 +405,76 @@ const CenterProjectTablesBrowser: React.FC<
     return combined;
   }, [isLoading, loggedTables.result, runStreams.result]);
 
+  const makeNewDashboard = useNewDashFromItems();
   const browserActions: Array<
     CenterBrowserActionType<(typeof browserData)[number]>
   > = useMemo(() => {
     return [
       [
         // Home Page TODO: Enable awesome previews
-        // {
-        //   icon: IconInfo,
-        //   label: 'Board details ',
-        //   onClick: row => {
-        //     props.setPreviewNode(<>HI MOM</>);
-        //   },
-        // },
+        {
+          icon: IconInfo,
+          label: 'Board details ',
+          onClick: row => {
+            props.setPreviewNode(<>HI MOM</>);
+          },
+        },
+      ],
+      [
+        {
+          icon: IconAddNew,
+          label: 'Seed new board',
+          onClick: row => {
+            const node = tableRowToNode(
+              row.kind,
+              props.entityName,
+              props.projectName,
+              row._id
+            );
+            const name = 'dashboard-' + moment().format('YY_MM_DD_hh_mm_ss');
+            makeNewDashboard(
+              name,
+              {panel0: getFullChildPanel(varNode(node.type, 'var0'))},
+              {var0: node},
+              newDashExpr => {
+                props.navigateToExpression(newDashExpr);
+              }
+            );
+          },
+        },
         {
           icon: IconOpenNewTab,
           label: 'Open Table',
           onClick: row => {
-            let newExpr: Node;
-            if (row.kind === 'Run Stream') {
-              const uri = `wandb-artifact:///${props.entityName}/${props.projectName}/${row._id}:latest/obj`;
-              newExpr = opGet({uri: constString(uri)});
-            } else {
-              // This is a  hacky here. Would be nice to have better mapping
-              const artName = row._id;
-              const artNameParts = artName.split('-', 3);
-              const tableName =
-                artNameParts[artNameParts.length - 1] + '.table.json';
-              newExpr = opTableRows({
-                table: opFileTable({
-                  file: opArtifactVersionFile({
-                    artifactVersion: opArtifactMembershipArtifactVersion({
-                      artifactMembership: opArtifactMembershipForAlias({
-                        artifact: opProjectArtifact({
-                          project: opRootProject({
-                            entityName: constString(props.entityName),
-                            projectName: constString(props.projectName),
-                          }),
-                          artifactName: constString(artName),
-                        }),
-                        aliasName: constString('latest'),
-                      }),
-                    }),
-                    path: constString(tableName),
-                  }),
-                }),
-              });
-            }
-            props.navigateToExpression(newExpr);
+            props.navigateToExpression(
+              tableRowToNode(
+                row.kind,
+                props.entityName,
+                props.projectName,
+                row._id
+              )
+            );
+          },
+        },
+        {
+          icon: IconCopy,
+          label: 'Copy Weave expression',
+          onClick: row => {
+            const node = tableRowToNode(
+              row.kind,
+              props.entityName,
+              props.projectName,
+              row._id
+            );
+            const copyText = weave.expToString(node);
+            navigator.clipboard.writeText(copyText).then(() => {
+              // give user feedback
+            });
           },
         },
       ],
     ];
-  }, [props]);
+  }, [makeNewDashboard, props, weave]);
 
   return (
     <CenterBrowser

@@ -344,52 +344,7 @@ export const CenterBrowser = <RT extends CenterBrowserDataType>(
                   ))}
                   {hasOverflowActions && (
                     <td>
-                      <CenterTableActionCellContents>
-                        <Popup
-                          style={{
-                            padding: '6px 6px',
-                          }}
-                          content={
-                            <LayoutElements.VStack
-                              onClick={e => {
-                                e.stopPropagation();
-                              }}>
-                              {props.actions?.flatMap((action, j) => {
-                                const actions = action.map((a, k) => (
-                                  <CenterTableActionCellAction
-                                    key={'' + j + '_' + k}
-                                    onClick={e => {
-                                      e.stopPropagation();
-                                      a.onClick(row, j);
-                                    }}>
-                                    <a.icon />
-                                    {a.label}
-                                  </CenterTableActionCellAction>
-                                ));
-                                if (j < props.actions!.length - 1) {
-                                  actions.push(
-                                    <Divider
-                                      key={'d' + j}
-                                      style={{margin: '6px 0px'}}
-                                    />
-                                  );
-                                }
-                                return actions;
-                              })}
-                            </LayoutElements.VStack>
-                          }
-                          basic
-                          on="click"
-                          trigger={
-                            <CenterTableActionCellIcon
-                              onClick={e => {
-                                e.stopPropagation();
-                              }}>
-                              <IconOverflowHorizontal />
-                            </CenterTableActionCellIcon>
-                          }
-                        />
-                      </CenterTableActionCellContents>
+                      <ActionCell row={row} actions={props.actions} />
                     </td>
                   )}
                 </tr>
@@ -402,67 +357,58 @@ export const CenterBrowser = <RT extends CenterBrowserDataType>(
   );
 };
 
-// const browserFilters = [
-//   {
-//     placeholder: 'All entities',
-//     options: [
-//       {key: 1, text: 'Choice 1', value: 1},
-//       {key: 2, text: 'Choice 2', value: 2},
-//       {key: 3, text: 'Choice 3', value: 3},
-//     ],
-//     onChange: () => {},
-//   },
-//   {
-//     placeholder: 'All projects',
-//     options: [
-//       {key: 1, text: 'Choice 1', value: 1},
-//       {key: 2, text: 'Choice 2', value: 2},
-//       {key: 3, text: 'Choice 3', value: 3},
-//     ],
-//     onChange: () => {},
-//   },
-// ];
-
-// const browserData: Array<CenterBrowserDataType> = [
-//   {
-//     _id: 0,
-//     Board: 'Board 1',
-//     Entity: 'timssweeney',
-//     Project: 'weave',
-//     'Last modified': '2 days ago',
-//   },
-//   {
-//     _id: 1,
-//     Board: 'Board 2',
-//     Entity: 'timssweeney',
-//     Project: 'weave',
-//     'Last modified': 'June 21, 2023',
-//   },
-// ];
-// const browserActions: Array<CenterBrowserActionType> = [
-//   [
-//     {
-//       icon: IconInfo,
-//       label: 'Object details',
-//       onClick: (row: CenterBrowserDataType, index: number) => {
-//         console.log('DETAILS', row, index);
-//       },
-//     },
-//     {
-//       icon: IconAddNew,
-//       label: 'Seed new board',
-//       onClick: (row: CenterBrowserDataType, index: number) => {
-//         console.log('SEED', row, index);
-//       },
-//     },
-//   ],
-//   [
-//     {
-//       icon: IconCopy,
-//       label: 'Copy Weave expression',
-//       onClick: (row: CenterBrowserDataType, index: number) => {
-//         console.log('COPY', row, index);
-//       },
-//     },
-//   ],
-// ];
+export const ActionCell = <RT extends CenterBrowserDataType>(props: {
+  row: RT;
+  actions?: Array<CenterBrowserActionType<RT>>;
+}) => {
+  const [popupOpen, setPopupOpen] = useState(false);
+  return (
+    <CenterTableActionCellContents>
+      <Popup
+        onClose={() => setPopupOpen(false)}
+        onOpen={() => setPopupOpen(true)}
+        open={popupOpen}
+        style={{
+          padding: '6px 6px',
+        }}
+        content={
+          <LayoutElements.VStack
+            onClick={e => {
+              e.stopPropagation();
+            }}>
+            {props.actions?.flatMap((action, j) => {
+              const actions = action.map((a, k) => (
+                <CenterTableActionCellAction
+                  key={'' + j + '_' + k}
+                  onClick={e => {
+                    setPopupOpen(false);
+                    e.stopPropagation();
+                    a.onClick(props.row, j);
+                  }}>
+                  <a.icon />
+                  {a.label}
+                </CenterTableActionCellAction>
+              ));
+              if (j < props.actions!.length - 1) {
+                actions.push(
+                  <Divider key={'d' + j} style={{margin: '6px 0px'}} />
+                );
+              }
+              return actions;
+            })}
+          </LayoutElements.VStack>
+        }
+        basic
+        on="click"
+        trigger={
+          <CenterTableActionCellIcon
+            onClick={e => {
+              e.stopPropagation();
+            }}>
+            <IconOverflowHorizontal />
+          </CenterTableActionCellIcon>
+        }
+      />
+    </CenterTableActionCellContents>
+  );
+};
