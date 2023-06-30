@@ -6,7 +6,6 @@ import getConfig from '../../../config';
 import styled from 'styled-components';
 import {WBButton} from '../../../common/components/elements/WBButtonNew';
 import {useWeaveContext} from '../../../context';
-import {ChildPanelFullConfig} from '../../Panel2/ChildPanel';
 import {
   IconAddNew as IconAddNewUnstyled,
   IconWeaveLogo,

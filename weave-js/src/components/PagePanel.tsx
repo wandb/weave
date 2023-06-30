@@ -53,7 +53,6 @@ import {useUpdateConfigForPanelNode} from './Panel2/PanelPanel';
 import {PanelRenderedConfigContextProvider} from './Panel2/PanelRenderedConfigContext';
 import Inspector from './Sidebar/Inspector';
 import {useWeaveAutomation} from './automation';
-import {useHistory} from 'react-router-dom';
 
 const JupyterControlsHelpText = styled.div<{active: boolean}>`
   width: max-content;

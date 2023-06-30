@@ -19,7 +19,6 @@ import {
 } from '@wandb/weave/core';
 import {NavigateToExpressionType, SetPreviewNodeType} from './common';
 import {useNodeValue} from '@wandb/weave/react';
-import getConfig from '@wandb/weave/config';
 
 type CenterEntityBrowserPropsType = {
   entityName: string;

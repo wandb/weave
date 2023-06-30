@@ -211,10 +211,10 @@ export const CenterBrowser = <RT extends CenterBrowserDataType>(
         options: options.map(o => {
           return {key: o, text: o, value: o};
         }),
-        onChange: (v: string) => {
+        onChange: (val: string) => {
           setFilters(f => {
             const copy = {...f};
-            copy[k] = v;
+            copy[k] = val;
             return copy;
           });
         },
@@ -251,7 +251,7 @@ export const CenterBrowser = <RT extends CenterBrowserDataType>(
             {(props.breadcrumbs ?? []).map((comp, ndx) => {
               const style: any = {};
               if (comp.onClick) {
-                style['cursor'] = 'pointer';
+                style.cursor = 'pointer';
               }
               return (
                 <>

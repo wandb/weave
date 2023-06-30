@@ -105,13 +105,13 @@ export const useUserEntities = (
 export const useProjectsForEntityWithWeaveObject = (
   entityName: string
 ): {
-  result: {
+  result: Array<{
     name: string;
     updatedAt: number;
     num_boards: number;
     num_run_streams: number;
     num_logged_tables: number;
-  }[];
+  }>;
   loading: boolean;
 } => {
   const projectsNode = w.opEntityProjects({
@@ -142,13 +142,13 @@ export const useProjectsForEntityWithWeaveObject = (
 
   return useMemo(() => {
     // this filter step is done client side - very bad!
-    const result: {
+    const result: Array<{
       name: string;
       updatedAt: number;
       num_boards: number;
       num_run_streams: number;
       num_logged_tables: number;
-    }[] = entityProjectNamesValue.result ?? [];
+    }> = entityProjectNamesValue.result ?? [];
 
     return {
       result: result.filter(
