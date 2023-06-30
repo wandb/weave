@@ -20,6 +20,12 @@ const CenterTable = styled.table`
   border: none;
   border-collapse: collapse;
 
+  td {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
   td:first-child {
     padding-left: 12px;
   }

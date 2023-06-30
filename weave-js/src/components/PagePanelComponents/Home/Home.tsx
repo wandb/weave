@@ -15,6 +15,7 @@ import {
   IconTable,
   IconUserProfilePersonal,
   IconUsersTeam,
+  IconWeaveLogo,
 } from '../../Panel2/Icons';
 import * as query from './query';
 import * as LayoutElements from './LayoutElements';
@@ -23,6 +24,7 @@ import {LeftNav} from './HomeLeftNav';
 import {HomeTopBar} from './HomeTopBar';
 import {NavigateToExpressionType} from './common';
 import {isServedLocally, useIsAuthenticated} from '../util';
+import {CenterLocalBrowser} from './HomeCenterLocalBrowser';
 
 const CenterSpace = styled(LayoutElements.VSpace)`
   border: 1px solid #dadee3;
@@ -152,6 +154,9 @@ const HomeComp: FC<HomeProps> = props => {
   ]);
 
   const draftsSection = useMemo(() => {
+    if (!isLocallyServed) {
+      return [];
+    }
     return [
       {
         title: `Drafts`,
@@ -186,7 +191,11 @@ const HomeComp: FC<HomeProps> = props => {
         ],
       },
     ];
-  }, [activeBrowserRoot?.browserType, activeBrowserRoot?.rootId]);
+  }, [
+    activeBrowserRoot?.browserType,
+    activeBrowserRoot?.rootId,
+    isLocallyServed,
+  ]);
 
   const navSections = useMemo(() => {
     return [...recentSection, ...wandbSection, ...draftsSection];
@@ -194,9 +203,9 @@ const HomeComp: FC<HomeProps> = props => {
 
   const [previewNode, setPreviewNode] = useState<React.ReactNode>();
 
+  const loading = userName.loading || isAuthenticated === undefined;
   useEffect(() => {
     // Create default root.
-    const loading = userName.loading || isAuthenticated === undefined;
     if (!loading && activeBrowserRoot == null) {
       // If we have Recent enabled, go for that!
       if (RECENTS_SUPPORTED) {
@@ -225,6 +234,7 @@ const HomeComp: FC<HomeProps> = props => {
     activeBrowserRoot,
     isAuthenticated,
     isLocallyServed,
+    loading,
     userName.loading,
     userName.result,
   ]);
@@ -242,29 +252,59 @@ const HomeComp: FC<HomeProps> = props => {
         {/* Left Bar */}
         <LeftNav sections={navSections} />
         {/* Center Content */}
-        <CenterSpace>
-          {activeBrowserRoot?.browserType === 'recent' ? (
-            <>RECENT</>
-          ) : activeBrowserRoot?.browserType === 'wandb' ? (
-            <CenterEntityBrowser
-              navigateToExpression={navigateToExpression}
-              setPreviewNode={setPreviewNode}
-              entityName={activeBrowserRoot?.rootId}
-            />
-          ) : activeBrowserRoot?.browserType === 'drafts' ? (
-            <>DRAFTS</>
-          ) : (
-            <>Invalid Selection</>
-          )}
-        </CenterSpace>
+        {!loading && (
+          <CenterSpace>
+            {activeBrowserRoot?.browserType === 'recent' ? (
+              // This should never come up
+              <Placeholder />
+            ) : activeBrowserRoot?.browserType === 'wandb' ? (
+              <CenterEntityBrowser
+                navigateToExpression={navigateToExpression}
+                setPreviewNode={setPreviewNode}
+                entityName={activeBrowserRoot?.rootId}
+              />
+            ) : activeBrowserRoot?.browserType === 'drafts' ? (
+              activeBrowserRoot?.rootId === 'local' ? (
+                <CenterLocalBrowser
+                  navigateToExpression={navigateToExpression}
+                  setPreviewNode={setPreviewNode}
+                />
+              ) : (
+                // This should never come up
+                <Placeholder />
+              )
+            ) : (
+              // This should never come up
+              <Placeholder />
+            )}
+          </CenterSpace>
+        )}
         {/* Right Bar */}
         <LayoutElements.Block
           style={{
-            width: previewNode != null ? '300px' : '0px',
+            width: previewNode != null ? '450px' : '0px',
           }}>
           {previewNode}
         </LayoutElements.Block>
       </LayoutElements.HSpace>
+    </LayoutElements.VStack>
+  );
+};
+
+const Placeholder: React.FC = props => {
+  return (
+    <LayoutElements.VStack
+      style={{
+        alignContent: 'center',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}>
+      <IconWeaveLogo
+        style={{
+          width: '200px',
+          height: '200px',
+        }}
+      />
     </LayoutElements.VStack>
   );
 };

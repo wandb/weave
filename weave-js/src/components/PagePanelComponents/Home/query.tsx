@@ -3,7 +3,10 @@
 import * as w from '@wandb/weave/core';
 import {useNodeValue} from '@wandb/weave/react';
 import {useMemo} from 'react';
-import {opFilterArtifactsToWeaveObjects} from '../../Panel2/PanelRootBrowser/util';
+import {
+  getLocalArtifactDataNode,
+  opFilterArtifactsToWeaveObjects,
+} from '../../Panel2/PanelRootBrowser/util';
 import {ASSUME_ALL_BOARDS_ARE_GROUP_ART_TYPE} from './dataModelAssumptions';
 
 export const useUserName = (
@@ -347,4 +350,50 @@ export const useProjectRunLoggedTables = (
     }),
     [artifactDetailsValue.loading, artifactDetailsValue.result]
   );
+};
+
+export const useLocalDashboards = (): {
+  result: Array<{
+    name: string;
+    version: string;
+  }>;
+  loading: boolean;
+} => {
+  const localPanelArtifacts = getLocalArtifactDataNode(true);
+
+  const detailsNode = w.opMap({
+    arr: localPanelArtifacts,
+    mapFn: w.constFunction(
+      {row: {type: 'FilesystemArtifact' as any}},
+      ({row}) => {
+        const nameNode = w.callOpVeryUnsafe(
+          'FilesystemArtifact-artifactName',
+          {
+            artifact: row,
+          },
+          'string'
+        ) as any;
+        const versionNode = w.callOpVeryUnsafe(
+          'FilesystemArtifact-artifactVersion',
+          {
+            artifact: row,
+          },
+          'string'
+        ) as any;
+        return w.opDict({
+          name: nameNode,
+          version: versionNode,
+        } as any);
+      }
+    ),
+  });
+
+  const detailsValue = useNodeValue(detailsNode);
+
+  return useMemo(() => {
+    return {
+      result: detailsValue.result ?? [],
+      loading: detailsValue.loading,
+    };
+  }, [detailsValue.loading, detailsValue.result]);
 };
