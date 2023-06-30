@@ -4,7 +4,6 @@ import {IconInfo, IconOpenNewTab} from '../../Panel2/Icons';
 import {CenterBrowserActionType, CenterBrowser} from './HomeCenterBrowser';
 import {SetPreviewNodeType, NavigateToExpressionType} from './common';
 import * as query from './query';
-import {ChildPanel} from '../../Panel2/ChildPanel';
 import {PreviewNode} from './PreviewNode';
 import {HomePreviewSidebarTemplate} from './HomePreviewSidebar';
 

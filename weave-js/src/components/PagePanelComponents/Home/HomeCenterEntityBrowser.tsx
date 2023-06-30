@@ -471,18 +471,12 @@ const CenterProjectTablesBrowser: React.FC<
                   icon: IconAddNew,
                   label: 'Seed new board',
                   onClick: () => {
-                    const node = tableRowToNode(
-                      row.kind,
-                      props.entityName,
-                      props.projectName,
-                      row._id
-                    );
                     const name =
                       'dashboard-' + moment().format('YY_MM_DD_hh_mm_ss');
                     makeNewDashboard(
                       name,
-                      {panel0: getFullChildPanel(varNode(node.type, 'var0'))},
-                      {var0: node},
+                      {panel0: getFullChildPanel(varNode(expr.type, 'var0'))},
+                      {var0: expr},
                       newDashExpr => {
                         props.navigateToExpression(newDashExpr);
                       }
