@@ -336,7 +336,9 @@ const useConcreteConfig = (
     let newConfig: ConcretePlotConfig;
     if (concreteConfigLoading) {
       newConfig = PlotState.defaultConcretePlot(
-        constNode(list(listObjectType(input.type)), []),
+        // Don't use the actual input.type here, defaultConcretePlot is expensive!
+        // but we don't need a hydrated config in the loading case.
+        constNode(list(typedDict({})), []),
         stack
       );
       loading = true;
@@ -355,13 +357,7 @@ const useConcreteConfig = (
     }
 
     return {config: newConfig, loading};
-  }, [
-    concreteConfigEvaluationResult,
-    concreteConfigLoading,
-    config,
-    input,
-    stack,
-  ]);
+  }, [concreteConfigEvaluationResult, concreteConfigLoading, config, stack]);
 };
 
 const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
