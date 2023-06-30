@@ -4,8 +4,8 @@ import styled from 'styled-components';
 import * as LayoutElements from './LayoutElements';
 
 const LeftNavItemBlock = styled(LayoutElements.HBlock)`
-  margin: 0px 12px;
-  padding: 0px 12px;
+  margin: 0px 0px 0px 12px;
+  padding: 0px 0px 0px 12px;
   border-radius: 4px;
   height: 36px;
   align-items: center;

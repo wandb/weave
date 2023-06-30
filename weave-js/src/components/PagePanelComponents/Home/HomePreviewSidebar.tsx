@@ -1,0 +1,119 @@
+import React from 'react';
+import * as LayoutElements from './LayoutElements';
+import styled from 'styled-components';
+import {IconClose} from '../../Panel2/Icons';
+import {SetPreviewNodeType} from './common';
+import {WBButton} from '@wandb/weave/common/components/elements/WBButtonNew';
+
+const CenterSpace = styled(LayoutElements.VSpace)`
+  border: 1px solid #dadee3;
+  box-shadow: 0px 8px 16px 0px #0e10140a;
+  border-top-left-radius: 12px;
+`;
+
+const CenterTableActionCellIcon = styled(LayoutElements.VStack)`
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  width: 32px;
+  border-radius: 4px;
+  &:hover {
+    background-color: #a9edf252;
+    color: #038194;
+  }
+`;
+
+export const HomePreviewSidebarTemplate: React.FC<{
+  title: string;
+  setPreviewNode: SetPreviewNodeType;
+  children?: React.ReactNode;
+  primaryAction?: {
+    icon: React.FC;
+    label: string;
+    onClick: () => void;
+  };
+  secondaryAction?: {
+    icon: React.FC;
+    label: string;
+    onClick: () => void;
+  };
+}> = props => {
+  return (
+    <CenterSpace>
+      <LayoutElements.HBlock
+        style={{
+          height: '70px',
+          alignContent: 'center',
+          justifyContent: 'center',
+          alignItems: 'center',
+          gap: '12px',
+          padding: '0px 24px',
+        }}>
+        <LayoutElements.VSpace
+          style={{justifyContent: 'center', fontSize: '20px', fontWeight: 600}}>
+          {props.title}
+        </LayoutElements.VSpace>
+        {/* <LayoutElements.Block>
+          <IconOverflowHorizontal />
+        </LayoutElements.Block> */}
+        <CenterTableActionCellIcon>
+          <IconClose
+            style={{
+              cursor: 'pointer',
+            }}
+            onClick={e => {
+              e.stopPropagation();
+              props.setPreviewNode(undefined);
+            }}
+          />
+        </CenterTableActionCellIcon>
+      </LayoutElements.HBlock>
+      <LayoutElements.VSpace
+        style={{
+          overflow: 'auto',
+          padding: '0px 24px',
+        }}>
+        {props.children}
+      </LayoutElements.VSpace>
+      {(props.primaryAction || props.secondaryAction) && (
+        <LayoutElements.HBlock
+          style={{
+            // height: '72px',
+            borderTop: '1px solid #dadee3',
+            padding: '12px',
+            gap: '12px',
+          }}>
+          {props.primaryAction && (
+            <WBButton
+              variant={`confirm`}
+              onClick={props.primaryAction.onClick}
+              fluid>
+              <LayoutElements.HStack
+                style={{
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                }}>
+                {props.primaryAction.icon}
+                {props.primaryAction.label}
+              </LayoutElements.HStack>
+            </WBButton>
+          )}
+          {props.secondaryAction && (
+            <WBButton onClick={props.secondaryAction.onClick} fluid>
+              <LayoutElements.HStack
+                style={{
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                }}>
+                {props.secondaryAction.icon}
+                {props.secondaryAction.label}
+              </LayoutElements.HStack>
+            </WBButton>
+          )}
+        </LayoutElements.HBlock>
+      )}
+    </CenterSpace>
+  );
+};

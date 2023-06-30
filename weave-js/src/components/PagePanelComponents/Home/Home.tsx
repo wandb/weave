@@ -31,7 +31,6 @@ const CenterSpace = styled(LayoutElements.VSpace)`
   box-shadow: 0px 8px 16px 0px #0e10140a;
   border-top-right-radius: 12px;
   border-top-left-radius: 12px;
-  margin-right: 12px;
 `;
 
 type HomeProps = {
@@ -248,7 +247,10 @@ const HomeComp: FC<HomeProps> = props => {
         />
       </LayoutElements.Block>
       {/* Main Region */}
-      <LayoutElements.HSpace>
+      <LayoutElements.HSpace
+        style={{
+          gap: '12px',
+        }}>
         {/* Left Bar */}
         <LeftNav sections={navSections} />
         {/* Center Content */}

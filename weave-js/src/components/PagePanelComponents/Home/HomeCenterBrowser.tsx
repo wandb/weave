@@ -141,11 +141,16 @@ type CenterBrowserDataType<E extends {[key: string]: string | number} = {}> = {
   _id: string;
 } & E;
 
-export type CenterBrowserActionType<RT extends CenterBrowserDataType> = Array<{
-  icon: React.FC;
-  label: string;
-  onClick: (row: RT, index: number) => void;
-}>;
+export type CenterBrowserActionSingularType<RT extends CenterBrowserDataType> =
+  {
+    icon: React.FC;
+    label: string;
+    onClick: (row: RT, index: number) => void;
+  };
+
+export type CenterBrowserActionType<RT extends CenterBrowserDataType> = Array<
+  CenterBrowserActionSingularType<RT>
+>;
 
 type CenterBrowserProps<RT extends CenterBrowserDataType> = {
   title: string;
