@@ -144,6 +144,10 @@ export type CenterBrowserActionType<RT extends CenterBrowserDataType> = Array<{
 type CenterBrowserProps<RT extends CenterBrowserDataType> = {
   title: string;
   data: RT[];
+  breadcrumbs?: Array<{
+    text: string;
+    onClick?: () => void;
+  }>;
   loading?: boolean;
   columns?: string[];
   // Consider: Actions might be a callback that returns an array of actions for a row
@@ -229,10 +233,43 @@ export const CenterBrowser = <RT extends CenterBrowserDataType>(
     return Object.keys(props.data[0] ?? {}).filter(k => !k.startsWith('_'));
   }, [props.columns, props.data]);
   const hasOverflowActions = allActions.length > 1;
+  // const titleComponents = useMemo(() => {
+  //   if (_.isArray(props.title)) {
+  //     return props.title;
+  //   } else {
+  //     return [{text: props.title, onClick: undefined}];
+  //   }
+  // }, [props.title]);
   return (
     <>
       <CenterSpaceHeader>
-        <CenterSpaceTitle>{props.title}</CenterSpaceTitle>
+        <CenterSpaceTitle>
+          <span
+            style={{
+              color: '#8E949E',
+            }}>
+            {(props.breadcrumbs ?? []).map((comp, ndx) => {
+              const style: any = {};
+              if (comp.onClick) {
+                style['cursor'] = 'pointer';
+              }
+              return (
+                <>
+                  <span style={style} onClick={comp.onClick}>
+                    {comp.text}
+                  </span>
+                  <span
+                    style={{
+                      margin: '0px 10px',
+                    }}>
+                    /
+                  </span>
+                </>
+              );
+            })}
+          </span>
+          {props.title}
+        </CenterSpaceTitle>
         {showControls && (
           <CenterSpaceControls>
             {props.allowSearch && (

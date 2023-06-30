@@ -1,24 +1,24 @@
-import React, {useMemo, useState} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 
 import {IconDown, IconInfo, IconOpenNewTab} from '../../Panel2/Icons';
 import * as query from './query';
 import {CenterBrowser, CenterBrowserActionType} from './HomeCenterBrowser';
-import {useResettingState} from '@wandb/weave/common/util/hooks';
 import moment from 'moment';
 import {
   Node,
   constString,
   opArtifactMembershipArtifactVersion,
   opArtifactMembershipForAlias,
-  opArtifactVersionDefaultFile,
   opArtifactVersionFile,
   opFileTable,
   opGet,
+  opIsNone,
   opProjectArtifact,
   opRootProject,
   opTableRows,
 } from '@wandb/weave/core';
 import {NavigateToExpressionType, SetPreviewNodeType} from './common';
+import {useNodeValue} from '@wandb/weave/react';
 
 type CenterEntityBrowserPropsType = {
   entityName: string;
@@ -29,9 +29,9 @@ type CenterEntityBrowserPropsType = {
 export const CenterEntityBrowser: React.FC<
   CenterEntityBrowserPropsType
 > = props => {
-  const [selectedProjectName, setSelectedProjectName] = useResettingState<
+  const [selectedProjectName, setSelectedProjectName] = useState<
     string | undefined
-  >(undefined, [props]);
+  >(undefined);
   if (selectedProjectName == null) {
     return (
       <CenterEntityBrowserInner
@@ -124,6 +124,22 @@ const CenterProjectBrowser: React.FC<CenterProjectBrowserPropsType> = props => {
   const [selectedAssetType, setSelectedAssetType] = useState<
     string | undefined
   >();
+  const noAccessNode = opIsNone({
+    val: opRootProject({
+      entityName: constString(props.entityName),
+      projectName: constString(props.projectName),
+    }),
+  });
+  const noAccessValueNode = useNodeValue(noAccessNode);
+
+  // This effect automatically kicks back to the root if the project is not
+  // accessible - which occurs when you change states.
+  useEffect(() => {
+    if (!noAccessValueNode.loading && noAccessValueNode.result) {
+      props.setSelectedProjectName(undefined);
+    }
+  }, [noAccessValueNode.loading, noAccessValueNode.result, props]);
+
   if (selectedAssetType == null) {
     return (
       <CenterProjectBrowserInner
@@ -162,7 +178,7 @@ type CenterProjectBrowserInnerPropsType = {
 const CenterProjectBrowserInner: React.FC<
   CenterProjectBrowserInnerPropsType
 > = props => {
-  const browserTitle = props.entityName + '/' + props.projectName;
+  const browserTitle = props.projectName;
   const browserData = [
     {
       _id: 'boards',
@@ -207,6 +223,14 @@ const CenterProjectBrowserInner: React.FC<
   return (
     <CenterBrowser
       title={browserTitle}
+      breadcrumbs={[
+        {
+          text: props.entityName,
+          onClick: () => {
+            props.setSelectedProjectName(undefined);
+          },
+        },
+      ]}
       data={browserData}
       actions={browserActions}
     />
@@ -216,7 +240,7 @@ const CenterProjectBrowserInner: React.FC<
 const CenterProjectBoardsBrowser: React.FC<
   CenterProjectBrowserInnerPropsType
 > = props => {
-  const browserTitle = props.entityName + '/' + props.projectName + '/Boards';
+  const browserTitle = 'Boards';
 
   const boards = query.useProjectBoards(props.entityName, props.projectName);
   const browserData = useMemo(() => {
@@ -258,6 +282,21 @@ const CenterProjectBoardsBrowser: React.FC<
     <CenterBrowser
       allowSearch
       title={browserTitle}
+      breadcrumbs={[
+        {
+          text: props.entityName,
+          onClick: () => {
+            props.setSelectedProjectName(undefined);
+            props.setSelectedAssetType(undefined);
+          },
+        },
+        {
+          text: props.projectName,
+          onClick: () => {
+            props.setSelectedAssetType(undefined);
+          },
+        },
+      ]}
       loading={boards.loading}
       columns={['name', 'updated at', 'created at', 'created by']}
       data={browserData}
@@ -269,7 +308,7 @@ const CenterProjectBoardsBrowser: React.FC<
 const CenterProjectTablesBrowser: React.FC<
   CenterProjectBrowserInnerPropsType
 > = props => {
-  const browserTitle = props.entityName + '/' + props.projectName + '/Tables';
+  const browserTitle = 'Tables';
 
   const runStreams = query.useProjectRunStreams(
     props.entityName,
@@ -365,6 +404,21 @@ const CenterProjectTablesBrowser: React.FC<
     <CenterBrowser
       allowSearch
       title={browserTitle}
+      breadcrumbs={[
+        {
+          text: props.entityName,
+          onClick: () => {
+            props.setSelectedProjectName(undefined);
+            props.setSelectedAssetType(undefined);
+          },
+        },
+        {
+          text: props.projectName,
+          onClick: () => {
+            props.setSelectedAssetType(undefined);
+          },
+        },
+      ]}
       loading={isLoading}
       filters={{kind: {placeholder: 'All table kinds'}}}
       columns={['name', 'kind', 'updated at', 'created at', 'created by']}

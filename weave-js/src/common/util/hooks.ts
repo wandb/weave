@@ -267,17 +267,3 @@ export const useUpdatingState = <T extends any>(initialValue: T) => {
 
   return [state, setState] as const;
 };
-
-export const useResettingState = <T extends any>(
-  initialValue: T,
-  deps: any[]
-) => {
-  const [state, setState] = useState(initialValue);
-
-  useEffect(() => {
-    setState(initialValue);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [...deps, initialValue]);
-
-  return [state, setState] as const;
-};
