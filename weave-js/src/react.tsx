@@ -16,6 +16,7 @@ import {
   isFunctionLiteral,
   isFunctionType,
   isList,
+  isNodeOrVoidNode,
   isTimestamp,
   isVoidNode,
   isWeaveDebugEnabled,
@@ -59,6 +60,7 @@ import {
   getChainRootVar,
   isConstructor,
 } from './core/mutate';
+// import {useTraceUpdate} from './common/util/hooks';
 
 /**
  * React hook-style function to get the
@@ -246,6 +248,8 @@ export const useNodeValue = <T extends Type>(
     return dereferenceAllVars(node, stack).node as NodeOrVoidNode<T>;
   }, [node, stack]);
 
+  node = useRefEqualWithoutTypes(node) as NodeOrVoidNode<T>;
+
   node = useMemo(
     () => (dashUiEnabled ? clientEval(node, stack) : node),
     [dashUiEnabled, node, stack]
@@ -300,15 +304,15 @@ export const useNodeValue = <T extends Type>(
       if (client == null) {
         throw new Error('client not initialized!');
       }
-      // if (callSite != null) {
-      //   console.log('useNodeValue subscribe', callSite, node);
-      // }
+      if (callSite != null) {
+        console.log('useNodeValue subscribe', callSite, node);
+      }
       const obs = client.subscribe(node);
       const sub = obs.subscribe(
         nodeRes => {
-          // if (callSite != null) {
-          //   console.log('useNodeValue resolve', callSite, node);
-          // }
+          if (callSite != null) {
+            console.log('useNodeValue resolve', callSite, node);
+          }
           setResult({node, value: nodeRes});
         },
         caughtError => {
@@ -830,6 +834,52 @@ export const useRefEqualExpr = (node: NodeOrVoidNode, stack: Stack) => {
   );
 };
 
+export const useRefEqualWithoutTypes = (node: NodeOrVoidNode) => {
+  const compareNodesWithoutTypes = (
+    a: NodeOrVoidNode,
+    b: NodeOrVoidNode | undefined
+  ): boolean => {
+    if (b == null) {
+      return false;
+    }
+    if (a.nodeType === 'void' && b.nodeType === 'void') {
+      return true;
+    } else if (a.nodeType === 'var' && b.nodeType === 'var') {
+      if (a.varName !== b.varName) {
+        return false;
+      }
+      return true;
+    } else if (a.nodeType === 'const' && b.nodeType === 'const') {
+      if (isNodeOrVoidNode(a.val) && isNodeOrVoidNode(b.val)) {
+        return compareNodesWithoutTypes(a.val, b.val);
+      }
+      if (a.val !== b.val) {
+        return false;
+      }
+      return true;
+    } else if (a.nodeType === 'output' && b.nodeType === 'output') {
+      if (a.fromOp.name !== b.fromOp.name) {
+        return false;
+      }
+      const aKeys = Object.keys(a.fromOp.inputs);
+      const bKeys = Object.keys(b.fromOp.inputs);
+      if (aKeys.length !== bKeys.length) {
+        return false;
+      }
+      for (const key of aKeys) {
+        if (
+          !compareNodesWithoutTypes(a.fromOp.inputs[key], b.fromOp.inputs[key])
+        ) {
+          return false;
+        }
+      }
+      return true;
+    }
+    return false;
+  };
+  return useDeepMemo(node, compareNodesWithoutTypes);
+};
+
 export const useNodeWithServerType = (
   node: NodeOrVoidNode,
   paramFrame?: Frame
@@ -843,6 +893,9 @@ export const useNodeWithServerType = (
   const [error, setError] = useState();
   let dereffedNode: NodeOrVoidNode;
   ({node, dereffedNode} = useRefEqualExpr(node, stack));
+
+  node = useRefEqualWithoutTypes(node);
+  dereffedNode = useRefEqualWithoutTypes(dereffedNode);
 
   const [result, setResult] = useState<{
     node: NodeOrVoidNode;
