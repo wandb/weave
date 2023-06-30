@@ -5,7 +5,19 @@ import * as query from './query';
 import {CenterBrowser, CenterBrowserActionType} from './HomeCenterBrowser';
 import {useResettingState} from '@wandb/weave/common/util/hooks';
 import moment from 'moment';
-import {constString, opGet} from '@wandb/weave/core';
+import {
+  Node,
+  constString,
+  opArtifactMembershipArtifactVersion,
+  opArtifactMembershipForAlias,
+  opArtifactVersionDefaultFile,
+  opArtifactVersionFile,
+  opFileTable,
+  opGet,
+  opProjectArtifact,
+  opRootProject,
+  opTableRows,
+} from '@wandb/weave/core';
 import {NavigateToExpressionType, SetPreviewNodeType} from './common';
 
 type CenterEntityBrowserPropsType = {
@@ -121,7 +133,14 @@ const CenterProjectBrowser: React.FC<CenterProjectBrowserPropsType> = props => {
     );
   } else if (selectedAssetType === 'boards') {
     return (
-      <CenterProjectBoardBrowser
+      <CenterProjectBoardsBrowser
+        {...props}
+        setSelectedAssetType={setSelectedAssetType}
+      />
+    );
+  } else if (selectedAssetType === 'tables') {
+    return (
+      <CenterProjectTablesBrowser
         {...props}
         setSelectedAssetType={setSelectedAssetType}
       />
@@ -194,7 +213,7 @@ const CenterProjectBrowserInner: React.FC<
   );
 };
 
-const CenterProjectBoardBrowser: React.FC<
+const CenterProjectBoardsBrowser: React.FC<
   CenterProjectBrowserInnerPropsType
 > = props => {
   const browserTitle = props.entityName + '/' + props.projectName + '/Boards';
@@ -204,13 +223,11 @@ const CenterProjectBoardBrowser: React.FC<
     return boards.result.map(b => ({
       _id: b.name,
       name: b.name,
-      'updated at': moment(b.updatedAt).calendar(),
-      'created at': moment(b.createdAt).calendar(),
+      'updated at': moment.utc(b.updatedAt).calendar(),
+      'created at': moment.utc(b.createdAt).calendar(),
       'created by': b.createdByUserName,
     }));
   }, [boards]);
-
-  // Next up: preview board and edit board
 
   const browserActions: Array<
     CenterBrowserActionType<(typeof browserData)[number]>
@@ -239,9 +256,117 @@ const CenterProjectBoardBrowser: React.FC<
 
   return (
     <CenterBrowser
+      allowSearch
       title={browserTitle}
       loading={boards.loading}
       columns={['name', 'updated at', 'created at', 'created by']}
+      data={browserData}
+      actions={browserActions}
+    />
+  );
+};
+
+const CenterProjectTablesBrowser: React.FC<
+  CenterProjectBrowserInnerPropsType
+> = props => {
+  const browserTitle = props.entityName + '/' + props.projectName + '/Tables';
+
+  const runStreams = query.useProjectRunStreams(
+    props.entityName,
+    props.projectName
+  );
+  const loggedTables = query.useProjectRunLoggedTables(
+    props.entityName,
+    props.projectName
+  );
+  const isLoading = runStreams.loading || loggedTables.loading;
+  const browserData = useMemo(() => {
+    if (isLoading) {
+      return [];
+    }
+    const streams = runStreams.result.map(b => ({
+      _id: b.name,
+      _updatedAt: b.updatedAt,
+      name: b.name,
+      kind: 'Run Stream',
+      'updated at': moment.utc(b.updatedAt).calendar(),
+      'created at': moment.utc(b.createdAt).calendar(),
+      'created by': b.createdByUserName,
+    }));
+    const logged = loggedTables.result.map(b => ({
+      _id: b.name,
+      _updatedAt: b.updatedAt,
+      name: b.name,
+      kind: 'Logged Table',
+      'updated at': moment.utc(b.updatedAt).calendar(),
+      'created at': moment.utc(b.createdAt).calendar(),
+      'created by': b.createdByUserName,
+    }));
+    const combined = [...streams, ...logged];
+    combined.sort((a, b) => b._updatedAt - a._updatedAt);
+    return combined;
+  }, [isLoading, loggedTables.result, runStreams.result]);
+
+  const browserActions: Array<
+    CenterBrowserActionType<(typeof browserData)[number]>
+  > = useMemo(() => {
+    return [
+      [
+        // Home Page TODO: Enable awesome previews
+        // {
+        //   icon: IconInfo,
+        //   label: 'Board details ',
+        //   onClick: row => {
+        //     props.setPreviewNode(<>HI MOM</>);
+        //   },
+        // },
+        {
+          icon: IconOpenNewTab,
+          label: 'Open Table',
+          onClick: row => {
+            let newExpr: Node;
+            if (row.kind === 'Run Stream') {
+              const uri = `wandb-artifact:///${props.entityName}/${props.projectName}/${row._id}:latest/obj`;
+              newExpr = opGet({uri: constString(uri)});
+            } else {
+              // This is a  hacky here. Would be nice to have better mapping
+              const artName = row._id;
+              const artNameParts = artName.split('-', 3);
+              const tableName =
+                artNameParts[artNameParts.length - 1] + '.table.json';
+              newExpr = opTableRows({
+                table: opFileTable({
+                  file: opArtifactVersionFile({
+                    artifactVersion: opArtifactMembershipArtifactVersion({
+                      artifactMembership: opArtifactMembershipForAlias({
+                        artifact: opProjectArtifact({
+                          project: opRootProject({
+                            entityName: constString(props.entityName),
+                            projectName: constString(props.projectName),
+                          }),
+                          artifactName: constString(artName),
+                        }),
+                        aliasName: constString('latest'),
+                      }),
+                    }),
+                    path: constString(tableName),
+                  }),
+                }),
+              });
+            }
+            props.navigateToExpression(newExpr);
+          },
+        },
+      ],
+    ];
+  }, [props]);
+
+  return (
+    <CenterBrowser
+      allowSearch
+      title={browserTitle}
+      loading={isLoading}
+      columns={['name', 'kind', 'updated at', 'created at', 'created by']}
       data={browserData}
       actions={browserActions}
     />

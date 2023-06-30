@@ -108,10 +108,14 @@ const projectBoardsNode = (entityName: string, projectName: string) => {
     projectName: w.constString(projectName),
   });
 
+  return opProjectBoardArtifacts({project: projectNode});
+};
+
+const opProjectBoardArtifacts = ({project}: {project: w.Node}) => {
   let artifactsNode;
   if (ASSUME_ALL_BOARDS_ARE_GROUP_ART_TYPE) {
     const artifactTypesNode = w.opProjectArtifactType({
-      project: projectNode,
+      project,
       artifactType: w.constString('Group'),
     });
     artifactsNode = w.opArtifactTypeArtifacts({
@@ -119,7 +123,7 @@ const projectBoardsNode = (entityName: string, projectName: string) => {
     });
   } else {
     const artifactTypesNode = w.opProjectArtifactTypes({
-      project: projectNode,
+      project,
     });
     artifactsNode = w.opFlatten({
       arr: w.opArtifactTypeArtifacts({
@@ -131,22 +135,55 @@ const projectBoardsNode = (entityName: string, projectName: string) => {
   return opFilterArtifactsToWeaveObjects(artifactsNode, true);
 };
 
-// Bad Weave-form... just materializing the data
-export const useProjectBoards = (
+const projectTablesNode = (entityName: string, projectName: string) => {
+  const projectNode = w.opRootProject({
+    entityName: w.constString(entityName),
+    projectName: w.constString(projectName),
+  });
+
+  return opProjectRunStreamArtifacts({project: projectNode});
+};
+
+const opProjectRunStreamArtifacts = ({project}: {project: w.Node}) => {
+  const artifactTypesNode = w.opProjectArtifactType({
+    project,
+    artifactType: w.constString('run_stream'),
+  });
+  const artifactsNode = w.opArtifactTypeArtifacts({
+    artifactType: artifactTypesNode,
+  });
+
+  return opFilterArtifactsToWeaveObjects(artifactsNode, false);
+};
+
+const projectRunLoggedTablesNode = (
   entityName: string,
   projectName: string
-): {
-  result: {
-    name: string;
-    createdByUserName: string;
-    createdAt: number;
-    updatedAt: number;
-  }[];
-  loading: boolean;
-} => {
-  const filteredArtifactsNode = projectBoardsNode(entityName, projectName);
-  const boardDetailsNode = w.opMap({
-    arr: filteredArtifactsNode,
+) => {
+  const projectNode = w.opRootProject({
+    entityName: w.constString(entityName),
+    projectName: w.constString(projectName),
+  });
+
+  return opProjectRunLoggedTableArtifacts({project: projectNode});
+};
+
+const opProjectRunLoggedTableArtifacts = ({project}: {project: w.Node}) => {
+  const artifactTypesNode = w.opProjectArtifactType({
+    project,
+    artifactType: w.constString('run_table'),
+  });
+  const artifactsNode = w.opArtifactTypeArtifacts({
+    artifactType: artifactTypesNode,
+  });
+
+  return artifactsNode;
+};
+
+// Bad Weave-form... just materializing the data
+const opArtifactsBasicMetadata = ({artifacts}: {artifacts: w.Node}) => {
+  return w.opMap({
+    arr: artifacts,
     mapFn: w.constFunction({row: 'artifact' as const}, ({row}) => {
       const latestVersionNode = w.opArtifactMembershipArtifactVersion({
         artifactMembership: w.opArtifactMembershipForAlias({
@@ -171,6 +208,79 @@ export const useProjectBoards = (
         }),
       } as any);
     }),
+  });
+};
+
+export const useProjectBoards = (
+  entityName: string,
+  projectName: string
+): {
+  result: Array<{
+    name: string;
+    createdByUserName: string;
+    createdAt: number;
+    updatedAt: number;
+  }>;
+  loading: boolean;
+} => {
+  const filteredArtifactsNode = projectBoardsNode(entityName, projectName);
+  const boardDetailsNode = opArtifactsBasicMetadata({
+    artifacts: filteredArtifactsNode,
+  });
+  const artifactDetailsValue = useNodeValue(boardDetailsNode);
+  return useMemo(
+    () => ({
+      result: artifactDetailsValue.result ?? [],
+      loading: artifactDetailsValue.loading,
+    }),
+    [artifactDetailsValue.loading, artifactDetailsValue.result]
+  );
+};
+
+export const useProjectRunStreams = (
+  entityName: string,
+  projectName: string
+): {
+  result: Array<{
+    name: string;
+    createdByUserName: string;
+    createdAt: number;
+    updatedAt: number;
+  }>;
+  loading: boolean;
+} => {
+  const filteredArtifactsNode = projectTablesNode(entityName, projectName);
+  const boardDetailsNode = opArtifactsBasicMetadata({
+    artifacts: filteredArtifactsNode,
+  });
+  const artifactDetailsValue = useNodeValue(boardDetailsNode);
+  return useMemo(
+    () => ({
+      result: artifactDetailsValue.result ?? [],
+      loading: artifactDetailsValue.loading,
+    }),
+    [artifactDetailsValue.loading, artifactDetailsValue.result]
+  );
+};
+
+export const useProjectRunLoggedTables = (
+  entityName: string,
+  projectName: string
+): {
+  result: Array<{
+    name: string;
+    createdByUserName: string;
+    createdAt: number;
+    updatedAt: number;
+  }>;
+  loading: boolean;
+} => {
+  const filteredArtifactsNode = projectRunLoggedTablesNode(
+    entityName,
+    projectName
+  );
+  const boardDetailsNode = opArtifactsBasicMetadata({
+    artifacts: filteredArtifactsNode,
   });
   const artifactDetailsValue = useNodeValue(boardDetailsNode);
   return useMemo(
