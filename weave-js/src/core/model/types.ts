@@ -378,7 +378,7 @@ export interface NDArrayType {
 export interface TimestampType {
   type: 'timestamp';
   // TODO: support additional units in the future.
-  unit: 'ms';
+  unit?: 'ms';
 }
 
 export type QueryPath = ObjectId;

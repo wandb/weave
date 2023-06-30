@@ -22,7 +22,6 @@ import {
   filterNodes,
   isAssignableTo,
   isNodeOrVoidNode,
-  replaceChainRoot,
   varNode,
   voidNode,
 } from '@wandb/weave/core';
@@ -62,6 +61,7 @@ import {
 } from './availablePanels';
 import {PanelInput, PanelProps} from './panel';
 import {getStackIdAndName} from './panellib/libpanel';
+import {replaceChainRoot} from '@wandb/weave/core/mutate';
 
 // This could be rendered as a code block with assignments, like
 // so.
@@ -281,7 +281,7 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
         return;
       }
 
-      if (isAssignableTo(newExpression.type, panelInputExpr.type)) {
+      if (isAssignableTo(newExpression.type, handler?.inputType ?? 'invalid')) {
         // If type didn't change, keep current settings
         updateConfig2(curConfig => ({...curConfig, input_node: newExpression}));
       } else if (curPanelId === 'Each') {
@@ -306,6 +306,7 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
     [
       weave,
       panelInputExpr,
+      handler?.inputType,
       curPanelId,
       props.allowedPanels,
       updateConfig2,

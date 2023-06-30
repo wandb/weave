@@ -25,7 +25,9 @@ binary_input_type = {
 )
 def to_number(self):
     return ArrowWeaveList(
-        pc.milliseconds_between(pa.timestamp("ms", 0), self._arrow_data),
+        pc.milliseconds_between(
+            pa.scalar(0, pa.timestamp("us", "UTC")), self._arrow_data
+        ),
         types.optional(types.Timestamp()),
         self._artifact,
     )

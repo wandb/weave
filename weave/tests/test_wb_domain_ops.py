@@ -369,10 +369,10 @@ def test_multi_root_merging(fake_wandb):
 
     assert weave.use([p_0_name, p_0_ca, p_1_a_runs, r_p_a_name, r_p_b_ca]) == [
         "p_0",
-        1577836800,
+        1577836800000,
         1,
         ["p_0", "p_1"],
-        [1609459200, 1640995200],
+        [1609459200000, 1640995200000],
     ]
 
     log = fake_wandb.fake_api.execute_log()
