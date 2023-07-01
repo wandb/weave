@@ -17,6 +17,7 @@ class InMemoryLazyLiteRun:
     _step: int = 0
 
     # Optional
+    _display_name: typing.Optional[str] = None
     _job_type: typing.Optional[str] = None
 
     # Property Cache
@@ -24,6 +25,7 @@ class InMemoryLazyLiteRun:
     _run: typing.Optional[Run] = None
     _stream: typing.Optional[file_stream.FileStreamApi] = None
     _pusher: typing.Optional[FilePusher] = None
+    _use_async_file_stream: bool = False
 
     def __init__(
         self,
@@ -31,6 +33,7 @@ class InMemoryLazyLiteRun:
         project_name: typing.Optional[str] = None,
         run_name: typing.Optional[str] = None,
         job_type: typing.Optional[str] = None,
+        _use_async_file_stream: bool = False,
     ):
         entity_name = entity_name or wandb_public_api().default_entity
         project_name = project_name or "uncategorized"
@@ -40,8 +43,11 @@ class InMemoryLazyLiteRun:
 
         self._entity_name = entity_name
         self._project_name = project_name
+        self._display_name = run_name
         self._run_name = run_name or runid.generate_id()
         self._job_type = job_type
+
+        self._use_async_file_stream = _use_async_file_stream
 
     def ensure_run(self) -> Run:
         return self.run
@@ -65,6 +71,7 @@ class InMemoryLazyLiteRun:
             # Produce a run
             run_res, _, _ = self.i_api.upsert_run(
                 name=self._run_name,
+                display_name=self._display_name,
                 job_type=self._job_type,
                 project=self._project_name,
                 entity=self._entity_name,
@@ -88,8 +95,6 @@ class InMemoryLazyLiteRun:
             )
 
             self.i_api.set_current_run_id(self._run.id)
-            # TODO: After gorilla is updated to support parallel runs
-            # we can drop this completely
             self._step = self._run.lastHistoryStep + 1
 
         return self._run
@@ -101,6 +106,10 @@ class InMemoryLazyLiteRun:
             self._stream = file_stream.FileStreamApi(
                 self.i_api, self.run.id, datetime.datetime.utcnow().timestamp()
             )
+            if self._use_async_file_stream:
+                self._stream._client.headers.update(
+                    {"X-WANDB-USE-ASYNC-FILESTREAM": "true"}
+                )
             self._stream.set_file_policy(
                 "wandb-history.jsonl",
                 file_stream.JsonlFilePolicy(start_chunk_id=self._step),
@@ -120,12 +129,10 @@ class InMemoryLazyLiteRun:
         stream = self.stream
         row_dict = {
             **row_dict,
-            # Required by gorilla
-            # NOTE: This should be changed after gorilla is updated
-            # to support parallel runs
-            "_step": self._step,
             "_timestamp": datetime.datetime.utcnow().timestamp(),
         }
+        if not self._use_async_file_stream:
+            row_dict["_step"] = self._step
         self._step += 1
         stream.push("wandb-history.jsonl", json.dumps(row_dict))
 
