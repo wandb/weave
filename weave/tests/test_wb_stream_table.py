@@ -112,7 +112,6 @@ def test_multi_writers_sequential(user_by_api_key_in_env):
     do_asserts()
 
 
-@pytest.mark.skip(reason="This is expected to fail until W&B updates step management")
 def test_multi_writers_parallel(user_by_api_key_in_env):
     st_1 = StreamTable(
         "test_table",
