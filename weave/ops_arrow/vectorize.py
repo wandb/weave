@@ -347,6 +347,10 @@ def vectorize(
                 bin_fn = weave_internal.use(inputs["bin_fn"])
                 in_ = inputs["in_"]
                 return weave_internal.call_fn(bin_fn, {"row": in_})  # type: ignore
+            if node.from_op.name == "timestamp-bin":
+                in_ = inputs["in_"]
+                res = weave_internal.better_call_fn(inputs["bin_fn"].val, in_)  # type: ignore
+                return res
         return node
 
     def vectorize_output_node(node: graph.OutputNode, vectorized_keys: set[str]):

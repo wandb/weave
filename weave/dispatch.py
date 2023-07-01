@@ -144,7 +144,7 @@ def _apply_ambiguity_rules(
     for rule_name, rule in rules:
         reduced_candidates = rule(candidates, first_arg_type)
         if len(reduced_candidates) < len(candidates):
-            logging.warning(
+            logging.debug(
                 f"Dispatch Ambiguity Resolution - {rule_name} Rule reduced set from {len(candidates)} to {len(reduced_candidates)}"
             )
         candidates = reduced_candidates

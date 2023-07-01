@@ -157,13 +157,22 @@ class Series:
         if constants is None:
             constants = PlotConstants()
 
+        groupby_dims = groupby_dims or []
+
         if select_functions:
-            for dimname in select_functions:
+            for dimname in groupby_dims:
+                if dimname not in select_functions:
+                    raise ValueError(
+                        f"select_functions must contain a function for groupby dim {dimname}"
+                    )
                 table.update_col(getattr(dims, dimname), select_functions[dimname])
-                if groupby_dims and dimname in groupby_dims:
-                    table.enable_groupby(getattr(dims, dimname))
-                    if dimname == "label":
-                        table.enable_groupby(dims.color)
+                table.enable_groupby(getattr(dims, dimname))
+                if dimname == "label":
+                    table.enable_groupby(dims.color)
+
+            for dimname in select_functions:
+                if dimname not in groupby_dims:
+                    table.update_col(getattr(dims, dimname), select_functions[dimname])
 
         uiState = PlotUIState(pointShape="expression", label="expression")
 

@@ -22,7 +22,7 @@ const inputType = {
   type: 'list' as const,
   objectType: {
     type: 'union' as const,
-    members: ['string' as const, 'none' as const],
+    members: ['unknown' as const, 'string' as const, 'none' as const],
   },
 };
 
@@ -82,23 +82,23 @@ export const PanelSelectEditor: React.FC<PanelSelectEditorProps> = props => {
         let newVal = chosen.filter(v => v !== val);
         // TODO: This is a major hack, backend expects a union here
         // But its been removed by the time we have it.
-        if (isNullable(listObjectType(props.input.type))) {
+        if (isNullable(listObjectType(config.choices.type))) {
           newVal = newVal.map(v => ({_val: v, _union_id: 1})) as any;
         }
-        setVal({val: constNodeUnsafe(props.input.type, newVal)});
+        setVal({val: constNodeUnsafe(config.choices.type, newVal)});
         return;
       } else {
         let newVal = [...chosen, val];
         // TODO: This is a major hack, backend expects a union here
         // But its been removed by the time we have it.
-        if (isNullable(listObjectType(props.input.type))) {
+        if (isNullable(listObjectType(config.choices.type))) {
           newVal = newVal.map(v => ({_val: v, _union_id: 1})) as any;
         }
-        setVal({val: constNodeUnsafe(props.input.type, newVal)});
+        setVal({val: constNodeUnsafe(config.choices.type, newVal)});
         return;
       }
     },
-    [chosen, props.input.type, setVal]
+    [chosen, config.choices.type, setVal]
   );
 
   // if (valueQuery.loading) {

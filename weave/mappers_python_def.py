@@ -122,6 +122,10 @@ class UnionToPyUnion(mappers_weave.UnionMapper):
 
 class PyUnionToUnion(mappers_weave.UnionMapper):
     def apply(self, obj):
+        # Another hack for dealing with lack of union support in weavejs.
+        if self.is_single_object_nullable and obj is None:
+            return None
+
         try:
             has_union_id = "_union_id" in obj
         except TypeError:

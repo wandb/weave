@@ -10,7 +10,6 @@ import {
   isNodeOrVoidNode,
   NodeOrVoidNode,
   pushFrame,
-  replaceChainRoot,
   Stack,
   voidNode,
 } from '@wandb/weave/core';
@@ -49,6 +48,7 @@ import {toWeaveType} from './toWeaveType';
 import {GRAY_350, GRAY_500, GRAY_800} from '../../common/css/globals.styles';
 // import {inJupyterCell} from '../PagePanelComponents/util';
 import {useUpdateConfig2} from './PanelComp';
+import {replaceChainRoot} from '@wandb/weave/core/mutate';
 
 const LAYOUT_MODES = [
   'horizontal' as const,
