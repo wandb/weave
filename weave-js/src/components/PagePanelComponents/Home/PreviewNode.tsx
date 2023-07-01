@@ -28,6 +28,39 @@ export const Scaler: React.FC<{
   );
 };
 
+export const Unclickable: React.FC<{
+  style?: React.CSSProperties;
+  children: React.ReactNode;
+}> = props => {
+  return (
+    <div
+      style={{
+        height: '100%',
+        width: '100%',
+        position: 'relative',
+      }}
+      onClick={e => {
+        e.preventDefault();
+        e.stopPropagation();
+      }}>
+      <div
+        style={{
+          position: 'absolute',
+          width: '100%',
+          height: '100%',
+          zIndex: 999,
+          ...(props.style ?? {}),
+        }}
+        onClick={e => {
+          e.preventDefault();
+          e.stopPropagation();
+        }}
+      />
+      {props.children}
+    </div>
+  );
+};
+
 export const PreviewNode: React.FC<{
   inputNode: w.Node;
 }> = props => {
@@ -43,27 +76,18 @@ export const PreviewNode: React.FC<{
         height: '200px',
         border: '2px solid #DADEE3',
         borderRadius: '6px',
-        position: 'relative',
       }}>
-      <div
+      <Unclickable
         style={{
-          position: 'absolute',
-          width: '100%',
-          height: '100%',
-          zIndex: 999,
           backgroundColor: '#d2d2d21a',
-        }}
-        onClick={e => {
-          e.preventDefault();
-          e.stopPropagation();
-        }}
-      />
-      <Scaler scale={0.4}>
-        <ChildPanel
-          config={childConfig as any}
-          updateConfig={updateConfig as any}
-        />
-      </Scaler>
+        }}>
+        <Scaler scale={0.4}>
+          <ChildPanel
+            config={childConfig as any}
+            updateConfig={updateConfig as any}
+          />
+        </Scaler>
+      </Unclickable>
     </div>
   );
 };

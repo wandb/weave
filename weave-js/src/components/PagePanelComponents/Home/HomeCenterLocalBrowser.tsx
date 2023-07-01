@@ -4,8 +4,15 @@ import {IconInfo, IconOpenNewTab} from '../../Panel2/Icons';
 import {CenterBrowserActionType, CenterBrowser} from './HomeCenterBrowser';
 import {SetPreviewNodeType, NavigateToExpressionType} from './common';
 import * as query from './query';
-import {PreviewNode} from './PreviewNode';
-import {HomePreviewSidebarTemplate} from './HomePreviewSidebar';
+import {PreviewNode, Unclickable} from './PreviewNode';
+import {
+  HomePreviewSidebarTemplate,
+  HomeBoardPreview,
+} from './HomePreviewSidebar';
+import {useWeaveContext} from '@wandb/weave/context';
+import {ExpressionView, NodeView} from '../../Panel2/ExpressionView';
+import {WeaveExpression} from '@wandb/weave/panel/WeaveExpression';
+import {Block, VBlock, VStack} from './LayoutElements';
 
 type CenterLocalBrowserPropsType = {
   setPreviewNode: SetPreviewNodeType;
@@ -42,18 +49,49 @@ export const CenterLocalBrowser: React.FC<
           onClick: row => {
             const expr = rowToExpression(row);
             const node = (
-              <HomePreviewSidebarTemplate
-                title={row.name}
+              <HomeBoardPreview
+                expr={expr}
+                name={row.name}
                 setPreviewNode={props.setPreviewNode}
-                primaryAction={{
-                  icon: IconOpenNewTab,
-                  label: 'Open Board',
-                  onClick: () => {
-                    props.navigateToExpression(expr);
-                  },
-                }}>
-                <PreviewNode inputNode={expr} />
-              </HomePreviewSidebarTemplate>
+                navigateToExpression={props.navigateToExpression}
+              />
+              // <HomePreviewSidebarTemplate
+              //   title={row.name}
+              //   setPreviewNode={props.setPreviewNode}
+              //   primaryAction={{
+              //     icon: IconOpenNewTab,
+              //     label: 'Open Board',
+              //     onClick: () => {
+              //       props.navigateToExpression(expr);
+              //     },
+              //   }}>
+              //   <VStack style={{gap: '16px'}}>
+              //     <VBlock style={{gap: '8px'}}>
+              //       <span style={{color: '#2B3038', fontWeight: 600}}>
+              //         Preview
+              //       </span>
+              //       <Block>
+              //         <PreviewNode key={key} inputNode={expr} />
+              //       </Block>
+              //     </VBlock>
+              //     <VBlock style={{gap: '8px'}}>
+              //       <span style={{color: '#2B3038', fontWeight: 600}}>
+              //         Expression
+              //       </span>
+              //       <Block>
+              //         {/* <Unclickable style={{}}> */}
+              //         <WeaveExpression
+              //           expr={expr}
+              //           onMount={() => {}}
+              //           onFocus={() => {}}
+              //           onBlur={() => {}}
+              //           frozen
+              //         />
+              //         {/* </Unclickable> */}
+              //       </Block>
+              //     </VBlock>
+              //   </VStack>
+              // </HomePreviewSidebarTemplate>
             );
             props.setPreviewNode(node);
           },

@@ -1,9 +1,14 @@
 import React from 'react';
 import * as LayoutElements from './LayoutElements';
 import styled from 'styled-components';
-import {IconClose} from '../../Panel2/Icons';
-import {SetPreviewNodeType} from './common';
+import {IconClose, IconOpenNewTab} from '../../Panel2/Icons';
+import {NavigateToExpressionType, SetPreviewNodeType} from './common';
 import {WBButton} from '@wandb/weave/common/components/elements/WBButtonNew';
+import {Node} from '@wandb/weave/core';
+import {WeaveExpression} from '@wandb/weave/panel/WeaveExpression';
+import {key} from 'vega';
+import {PreviewNode} from './PreviewNode';
+import {useWeaveContext} from '@wandb/weave/context';
 
 const CenterSpace = styled(LayoutElements.VSpace)`
   border: 1px solid #dadee3;
@@ -115,5 +120,58 @@ export const HomePreviewSidebarTemplate: React.FC<{
         </LayoutElements.HBlock>
       )}
     </CenterSpace>
+  );
+};
+
+export const HomeExpressionPreviewParts: React.FC<{
+  expr: Node;
+}> = ({expr}) => {
+  const weave = useWeaveContext();
+  const key = weave.expToString(expr);
+  return (
+    <LayoutElements.VStack style={{gap: '16px'}}>
+      <LayoutElements.VBlock style={{gap: '8px'}}>
+        <span style={{color: '#2B3038', fontWeight: 600}}>Preview</span>
+        <LayoutElements.Block>
+          <PreviewNode key={key} inputNode={expr} />
+        </LayoutElements.Block>
+      </LayoutElements.VBlock>
+      <LayoutElements.VBlock style={{gap: '8px'}}>
+        <span style={{color: '#2B3038', fontWeight: 600}}>Expression</span>
+        <LayoutElements.Block>
+          {/* <Unclickable style={{}}> */}
+          <WeaveExpression
+            expr={expr}
+            onMount={() => {}}
+            onFocus={() => {}}
+            onBlur={() => {}}
+            frozen
+          />
+          {/* </Unclickable> */}
+        </LayoutElements.Block>
+      </LayoutElements.VBlock>
+    </LayoutElements.VStack>
+  );
+};
+
+export const HomeBoardPreview: React.FC<{
+  expr: Node;
+  name: string;
+  setPreviewNode: SetPreviewNodeType;
+  navigateToExpression: NavigateToExpressionType;
+}> = ({expr, name, setPreviewNode, navigateToExpression}) => {
+  return (
+    <HomePreviewSidebarTemplate
+      title={name}
+      setPreviewNode={setPreviewNode}
+      primaryAction={{
+        icon: IconOpenNewTab,
+        label: `Open board`,
+        onClick: () => {
+          navigateToExpression(expr);
+        },
+      }}>
+      <HomeExpressionPreviewParts expr={expr} />
+    </HomePreviewSidebarTemplate>
   );
 };

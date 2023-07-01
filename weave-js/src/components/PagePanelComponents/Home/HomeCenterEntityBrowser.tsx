@@ -30,7 +30,11 @@ import {useNodeValue} from '@wandb/weave/react';
 import {useNewDashFromItems} from '../../Panel2/PanelRootBrowser/util';
 import {getFullChildPanel} from '../../Panel2/ChildPanel';
 import {useWeaveContext} from '@wandb/weave/context';
-import {HomePreviewSidebarTemplate} from './HomePreviewSidebar';
+import {
+  HomePreviewSidebarTemplate,
+  HomeBoardPreview,
+  HomeExpressionPreviewParts,
+} from './HomePreviewSidebar';
 import {PreviewNode} from './PreviewNode';
 
 type CenterEntityBrowserPropsType = {
@@ -305,18 +309,12 @@ const CenterProjectBoardsBrowser: React.FC<
               row._id
             );
             const node = (
-              <HomePreviewSidebarTemplate
-                title={row.name}
+              <HomeBoardPreview
+                expr={expr}
+                name={row.name}
                 setPreviewNode={props.setPreviewNode}
-                primaryAction={{
-                  icon: IconOpenNewTab,
-                  label: 'Open Board',
-                  onClick: () => {
-                    props.navigateToExpression(expr);
-                  },
-                }}>
-                <PreviewNode inputNode={expr} />
-              </HomePreviewSidebarTemplate>
+                navigateToExpression={props.navigateToExpression}
+              />
             );
             props.setPreviewNode(node);
           },
@@ -492,7 +490,7 @@ const CenterProjectTablesBrowser: React.FC<
                     props.navigateToExpression(expr);
                   },
                 }}>
-                <PreviewNode inputNode={expr} />
+                <HomeExpressionPreviewParts expr={expr} />
               </HomePreviewSidebarTemplate>
             );
             props.setPreviewNode(node);

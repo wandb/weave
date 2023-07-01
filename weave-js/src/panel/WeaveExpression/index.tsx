@@ -220,7 +220,7 @@ export const WeaveExpression: React.FC<WeaveExpressionProps> = props => {
             scrollSelectionIntoView={() => {}} // no-op to disable Slate's default scroll behavior when dragging an overflowed element
             $truncate={props.truncate}
           />
-          {!props.liveUpdate && (
+          {!props.liveUpdate && !props.frozen && (
             <Ref
               innerRef={element =>
                 (applyButtonRef.current = element?.ref?.current)
@@ -241,11 +241,13 @@ export const WeaveExpression: React.FC<WeaveExpressionProps> = props => {
             </Ref>
           )}
         </S.EditableContainer>
-        <Suggestions
-          forceHidden={suppressSuggestions || isBusy}
-          {...suggestions}
-          suggestionIndex={suggestionIndex}
-        />
+        {!props.frozen && (
+          <Suggestions
+            forceHidden={suppressSuggestions || isBusy}
+            {...suggestions}
+            suggestionIndex={suggestionIndex}
+          />
+        )}
       </Slate>
     </Container>
   );
