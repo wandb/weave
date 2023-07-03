@@ -9,11 +9,11 @@ TODO:
 import React, {useMemo, useState} from 'react';
 
 import styled from 'styled-components';
-import {IconOverflowHorizontal} from '../../Panel2/Icons';
+import {IconOverflowHorizontal, IconWeaveLogoGray} from '../../Panel2/Icons';
 import {Divider, Dropdown, Input, Popup} from 'semantic-ui-react';
-import WandbLoader from '@wandb/weave/common/components/WandbLoader';
 import * as LayoutElements from './LayoutElements';
 import _ from 'lodash';
+import {WeaveAnimatedLoader} from '../../Panel2/WeaveAnimatedLoader';
 
 const CenterTable = styled.table`
   width: 100%;
@@ -50,10 +50,6 @@ const CenterTable = styled.table`
       position: absolute;
       left: 0;
       width: 100%;
-    }
-    &:before {
-      top: 0;
-      border-top: 1px solid #dadee3;
     }
     &:after {
       bottom: 0;
@@ -135,6 +131,7 @@ const CenterSpaceTitle = styled(LayoutElements.HBlock)`
 const CenterSpaceHeader = styled(LayoutElements.VBlock)`
   padding: 12px 16px;
   gap: 12px;
+  border-bottom: 1px solid #dadee3;
 `;
 
 type CenterBrowserDataType<E extends {[key: string]: string | number} = {}> = {
@@ -155,13 +152,13 @@ export type CenterBrowserActionType<RT extends CenterBrowserDataType> = Array<
 type CenterBrowserProps<RT extends CenterBrowserDataType> = {
   title: string;
   data: RT[];
+  noDataCTA?: string;
   breadcrumbs?: Array<{
     text: string;
     onClick?: () => void;
   }>;
   loading?: boolean;
   columns?: string[];
-  // Consider: Actions might be a callback that returns an array of actions for a row
   actions?: Array<CenterBrowserActionType<RT>>;
   allowSearch?: boolean;
   filters?: {
@@ -169,15 +166,6 @@ type CenterBrowserProps<RT extends CenterBrowserDataType> = {
       placeholder: string;
     };
   };
-  // filters?: Array<{
-  //   placeholder: string;
-  //   options: Array<{
-  //     key: string | number;
-  //     text: string;
-  //     value: string | number;
-  //   }>;
-  //   onChange: (value: string) => void;
-  // }>;
 };
 
 export const CenterBrowser = <RT extends CenterBrowserDataType>(
@@ -247,13 +235,6 @@ export const CenterBrowser = <RT extends CenterBrowserDataType>(
     return Object.keys(props.data[0] ?? {}).filter(k => !k.startsWith('_'));
   }, [props.columns, props.data]);
   const hasOverflowActions = allActions.length > 1;
-  // const titleComponents = useMemo(() => {
-  //   if (_.isArray(props.title)) {
-  //     return props.title;
-  //   } else {
-  //     return [{text: props.title, onClick: undefined}];
-  //   }
-  // }, [props.title]);
   return (
     <>
       <CenterSpaceHeader>
@@ -318,10 +299,7 @@ export const CenterBrowser = <RT extends CenterBrowserDataType>(
         )}
       </CenterSpaceHeader>
       <CenterSpaceTableSpace>
-        <CenterTable
-          style={{
-            height: props.loading ? '100%' : '',
-          }}>
+        <CenterTable>
           <thead>
             <tr>
               {columns.map(c => (
@@ -336,36 +314,41 @@ export const CenterBrowser = <RT extends CenterBrowserDataType>(
             </tr>
           </thead>
           <tbody>
-            {props.loading ? (
-              <tr style={{height: '100%'}}>
-                <td colSpan={columns.length + (hasOverflowActions ? 1 : 0)}>
-                  <LayoutElements.VStack
-                    style={{
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}>
-                    <WandbLoader inline />
-                  </LayoutElements.VStack>
-                </td>
+            {filteredData.map((row, i) => (
+              <tr key={row._id} onClick={() => primaryAction?.onClick(row, i)}>
+                {columns.map(c => (
+                  <td key={c}>{(row as any)[c]}</td>
+                ))}
+                {hasOverflowActions && (
+                  <td>
+                    <ActionCell row={row} actions={props.actions} />
+                  </td>
+                )}
               </tr>
-            ) : (
-              filteredData.map((row, i) => (
-                <tr
-                  key={row._id}
-                  onClick={() => primaryAction?.onClick(row, i)}>
-                  {columns.map(c => (
-                    <td key={c}>{(row as any)[c]}</td>
-                  ))}
-                  {hasOverflowActions && (
-                    <td>
-                      <ActionCell row={row} actions={props.actions} />
-                    </td>
-                  )}
-                </tr>
-              ))
-            )}
+            ))}
           </tbody>
         </CenterTable>
+        {(props.data.length === 0 || props.loading) && (
+          <LayoutElements.VStack
+            style={{
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '16px',
+              color: '#8e949e',
+            }}>
+            {props.loading ? (
+              <WeaveAnimatedLoader style={{height: '64px', width: '64px'}} />
+            ) : (
+              <IconWeaveLogoGray
+                style={{
+                  height: '64px',
+                  width: '64px',
+                }}
+              />
+            )}
+            <div>{props.loading ? '' : props.noDataCTA}</div>
+          </LayoutElements.VStack>
+        )}
       </CenterSpaceTableSpace>
     </>
   );

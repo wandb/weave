@@ -1,18 +1,11 @@
 import {opGet, constString} from '@wandb/weave/core';
 import {useMemo} from 'react';
-import {IconInfo, IconOpenNewTab} from '../../Panel2/Icons';
+import {IconInfo, IconOpenNewTab, IconWeaveLogoGray} from '../../Panel2/Icons';
 import {CenterBrowserActionType, CenterBrowser} from './HomeCenterBrowser';
 import {SetPreviewNodeType, NavigateToExpressionType} from './common';
 import * as query from './query';
-import {PreviewNode, Unclickable} from './PreviewNode';
-import {
-  HomePreviewSidebarTemplate,
-  HomeBoardPreview,
-} from './HomePreviewSidebar';
-import {useWeaveContext} from '@wandb/weave/context';
-import {ExpressionView, NodeView} from '../../Panel2/ExpressionView';
-import {WeaveExpression} from '@wandb/weave/panel/WeaveExpression';
-import {Block, VBlock, VStack} from './LayoutElements';
+import {HomeBoardPreview} from './HomePreviewSidebar';
+import {HBlock, VStack} from './LayoutElements';
 
 type CenterLocalBrowserPropsType = {
   setPreviewNode: SetPreviewNodeType;
@@ -113,6 +106,7 @@ export const CenterLocalBrowser: React.FC<
     <CenterBrowser
       allowSearch
       title={'Local Boards'}
+      noDataCTA={`No Local Weave boards found.`}
       loading={localDashboards.loading}
       columns={['name', 'latest version id']}
       data={browserData}

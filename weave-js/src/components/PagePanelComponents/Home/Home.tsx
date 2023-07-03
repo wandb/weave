@@ -42,8 +42,10 @@ type HomeProps = {
 const RECENTS_SUPPORTED = false;
 
 const HomeComp: FC<HomeProps> = props => {
+  const [previewNode, setPreviewNode] = useState<React.ReactNode>();
   const navigateToExpression: NavigateToExpressionType = useCallback(
     newDashExpr => {
+      setPreviewNode(undefined);
       props.updateConfig({
         vars: {},
         input_node: newDashExpr,
@@ -199,8 +201,6 @@ const HomeComp: FC<HomeProps> = props => {
   const navSections = useMemo(() => {
     return [...recentSection, ...wandbSection, ...draftsSection];
   }, [draftsSection, recentSection, wandbSection]);
-
-  const [previewNode, setPreviewNode] = useState<React.ReactNode>();
 
   const loading = userName.loading || isAuthenticated === undefined;
   useEffect(() => {

@@ -1,4 +1,4 @@
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 
 import {
   IconAddNew,
@@ -35,7 +35,6 @@ import {
   HomeBoardPreview,
   HomeExpressionPreviewParts,
 } from './HomePreviewSidebar';
-import {PreviewNode} from './PreviewNode';
 
 type CenterEntityBrowserPropsType = {
   entityName: string;
@@ -46,9 +45,18 @@ type CenterEntityBrowserPropsType = {
 export const CenterEntityBrowser: React.FC<
   CenterEntityBrowserPropsType
 > = props => {
-  const [selectedProjectName, setSelectedProjectName] = useState<
+  const [selectedProjectName, setSelectedProjectNameRaw] = useState<
     string | undefined
-  >(undefined);
+  >();
+
+  const setSelectedProjectName = useCallback(
+    (projectName?: string) => {
+      setSelectedProjectNameRaw(projectName);
+      props.setPreviewNode(undefined);
+    },
+    [props, setSelectedProjectNameRaw]
+  );
+
   if (selectedProjectName == null) {
     return (
       <CenterEntityBrowserInner
@@ -130,6 +138,7 @@ export const CenterEntityBrowserInner: React.FC<
   return (
     <CenterBrowser
       allowSearch
+      noDataCTA={`No projects with Weave assets found for entity: ${props.entityName}`}
       columns={['project', 'boards', 'tables', 'updated at']}
       loading={loading}
       title={browserTitle}
@@ -143,9 +152,18 @@ type CenterProjectBrowserPropsType = CenterEntityBrowserInnerPropsType & {
   projectName: string;
 };
 const CenterProjectBrowser: React.FC<CenterProjectBrowserPropsType> = props => {
-  const [selectedAssetType, setSelectedAssetType] = useState<
+  const [selectedAssetType, setSelectedAssetTypeRaw] = useState<
     string | undefined
   >();
+
+  const setSelectedAssetType = useCallback(
+    (projectName?: string) => {
+      setSelectedAssetTypeRaw(projectName);
+      props.setPreviewNode(undefined);
+    },
+    [props, setSelectedAssetTypeRaw]
+  );
+
   const noAccessNode = opIsNone({
     val: opRootProject({
       entityName: constString(props.entityName),
@@ -338,6 +356,7 @@ const CenterProjectBoardsBrowser: React.FC<
     <CenterBrowser
       allowSearch
       title={browserTitle}
+      noDataCTA={`No Weave boards found for project: ${props.entityName}/${props.projectName}`}
       breadcrumbs={[
         {
           text: props.entityName,
@@ -557,6 +576,7 @@ const CenterProjectTablesBrowser: React.FC<
     <CenterBrowser
       allowSearch
       title={browserTitle}
+      noDataCTA={`No Weave tables found for project: ${props.entityName}/${props.projectName}`}
       breadcrumbs={[
         {
           text: props.entityName,

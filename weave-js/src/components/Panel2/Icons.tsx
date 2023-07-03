@@ -25,6 +25,7 @@ import {ReactComponent as ImportIconTextLanguageAlt} from '../../assets/icon-tex
 import {ReactComponent as ImportIconUndo} from '../../assets/icon-undo.svg';
 import {ReactComponent as ImportIconWeave} from '../../assets/icon-weave.svg';
 import {ReactComponent as WeaveLogo} from '../../assets/icon-weave-logo.svg';
+import {ReactComponent as WeaveLogoGray} from '../../assets/icon-weave-logo-gray.svg';
 import {ReactComponent as Docs} from '../../assets/icon-docs.svg';
 import {ReactComponent as Stack} from '../../assets/icon-stack.svg';
 import {ReactComponent as Delete} from '../../assets/icon-delete.svg';
@@ -107,6 +108,10 @@ export const IconWeave = (props: SVGIconProps) => (
 
 export const IconWeaveLogo = (props: SVGIconProps) => (
   <WeaveLogo {...updateIconProps(props)} />
+);
+
+export const IconWeaveLogoGray = (props: SVGIconProps) => (
+  <WeaveLogoGray {...updateIconProps(props)} />
 );
 
 export const IconUp = (props: SVGIconProps) => (
