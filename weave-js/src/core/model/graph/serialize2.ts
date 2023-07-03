@@ -23,6 +23,15 @@ function createSerializer(): Serializer {
 }
 
 function hash(v: any): string {
+  // When hashing an object, we must keep the keys in a consistent order.
+  // Otherwise, identical objects may be hashed into different key orders.
+  const isObject = v != null && typeof v === `object` && !Array.isArray(v);
+  if (isObject) {
+    // This does not properly stringify nested objects, but that's ok because
+    // the object values should already be replaced with serialized refs.
+    return JSON.stringify(v, Object.keys(v).sort());
+  }
+
   return JSON.stringify(v);
 }
 

@@ -252,7 +252,7 @@ export class RemoteHttpServer implements Server {
     const nodes = nodeEntries.map(e => e.node);
     const [payloads, originalIndexes] = this.opts.contiguousBatchesOnly
       ? serializeMulti(nodes)
-      : [[serialize(nodes)], [_.range(nodes.length)]];
+      : [[serialize2(nodes)], [_.range(nodes.length)]];
 
     // const payload2 = serialize2(nodes);
     // for (let i = 0; i < payloads.length; i++) {
@@ -312,6 +312,7 @@ export class RemoteHttpServer implements Server {
       const p = new Promise(async resolve => {
         const payloadJSON = {
           graphs: payload,
+          serialize2: !this.opts.contiguousBatchesOnly,
         };
         const body = JSON.stringify(payloadJSON);
 
