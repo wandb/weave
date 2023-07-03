@@ -254,16 +254,6 @@ export class RemoteHttpServer implements Server {
       ? serializeMulti(nodes)
       : [[serialize2(nodes)], [_.range(nodes.length)]];
 
-    // const payload2 = serialize2(nodes);
-    // for (let i = 0; i < payloads.length; i++) {
-    //   const p = payloads[i];
-    //   if (i > 0) {
-    //     throw new Error(`MORE THAN 1 PAYLOAD`);
-    //   }
-
-    //   console.log(JSON.stringify(p).length, JSON.stringify(payload2).length);
-    // }
-
     for (
       let reqIdx = 0;
       reqIdx < Math.min(availableRequests, payloads.length);
