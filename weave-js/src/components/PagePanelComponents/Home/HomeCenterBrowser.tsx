@@ -1,11 +1,3 @@
-/* 
-TODO:
-  * Clickable header parts
-  * hide menu after clicking
-  * automated filter columns
-
-*/
-
 import React, {useMemo, useState} from 'react';
 
 import styled from 'styled-components';
@@ -211,7 +203,7 @@ export const CenterBrowser = <RT extends CenterBrowserDataType>(
         );
       return passesSearch && passesFilters;
     });
-  }, [filters, props.allowSearch, props.data, searchText]);
+  }, [filters, props.allowSearch, props.data, props.loading, searchText]);
 
   const filterSpec = useMemo(() => {
     return Object.entries(props.filters ?? {}).map(([k, v], i) => {

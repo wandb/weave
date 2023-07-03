@@ -392,7 +392,6 @@ const tableRowToNode = (
   let newExpr: Node;
   if (kind === 'Stream Table') {
     const uri = `wandb-artifact:///${entityName}/${projectName}/${artName}:latest/obj`;
-    // TODO Sync this up with the new runs stream code
     const node = opGet({uri: constString(uri)});
     node.type = {type: 'stream_table'} as any;
     newExpr = callOpVeryUnsafe('stream_table-rows', {
