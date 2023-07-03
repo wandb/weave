@@ -94,6 +94,9 @@ def type_name_to_type(type_name):
     return mapping.get(js_to_py_typename(type_name))
 
 
+type_from_dict_cache = {}
+
+
 class TypeRegistry:
     @staticmethod
     def has_type(obj):
@@ -143,6 +146,22 @@ class TypeRegistry:
         if type_ is None:
             raise errors.WeaveSerializeError("Can't deserialize type from: %s" % d)
         return type_.from_dict(d)
+
+    @staticmethod
+    def type_from_dict_use_cache(d: typing.Union[str, dict]) -> "Type":
+        cache_key = id(d)
+        if cache_key in type_from_dict_cache:
+            return type_from_dict_cache[cache_key]
+
+        # The javascript code sends simple types as just strings
+        # instead of {'type': 'string'} for example
+        type_name = d["type"] if isinstance(d, dict) else d
+        type_ = type_name_to_type(type_name)
+        if type_ is None:
+            raise errors.WeaveSerializeError("Can't deserialize type from: %s" % d)
+        res = type_.from_dict(d)
+        type_from_dict_cache[cache_key] = res
+        return res
 
 
 def _clear_global_type_class_cache():
