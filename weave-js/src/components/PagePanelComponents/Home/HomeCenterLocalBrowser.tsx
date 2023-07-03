@@ -1,11 +1,10 @@
 import {opGet, constString} from '@wandb/weave/core';
-import {useMemo} from 'react';
-import {IconInfo, IconOpenNewTab, IconWeaveLogoGray} from '../../Panel2/Icons';
+import {useMemo, useState} from 'react';
+import {IconInfo, IconOpenNewTab} from '../../Panel2/Icons';
 import {CenterBrowserActionType, CenterBrowser} from './HomeCenterBrowser';
 import {SetPreviewNodeType, NavigateToExpressionType} from './common';
 import * as query from './query';
 import {HomeBoardPreview} from './HomePreviewSidebar';
-import {HBlock, VStack} from './LayoutElements';
 
 type CenterLocalBrowserPropsType = {
   setPreviewNode: SetPreviewNodeType;
@@ -22,6 +21,7 @@ export const CenterLocalBrowser: React.FC<
   CenterLocalBrowserPropsType
 > = props => {
   const localDashboards = query.useLocalDashboards();
+  const [selectedRowId, setSelectedRowId] = useState<string | undefined>();
 
   const browserData = useMemo(() => {
     return localDashboards.result.map(b => ({
@@ -40,6 +40,7 @@ export const CenterLocalBrowser: React.FC<
           icon: IconInfo,
           label: 'Board details',
           onClick: row => {
+            setSelectedRowId(row._id);
             const expr = rowToExpression(row);
             const node = (
               <HomeBoardPreview
@@ -48,43 +49,6 @@ export const CenterLocalBrowser: React.FC<
                 setPreviewNode={props.setPreviewNode}
                 navigateToExpression={props.navigateToExpression}
               />
-              // <HomePreviewSidebarTemplate
-              //   title={row.name}
-              //   setPreviewNode={props.setPreviewNode}
-              //   primaryAction={{
-              //     icon: IconOpenNewTab,
-              //     label: 'Open Board',
-              //     onClick: () => {
-              //       props.navigateToExpression(expr);
-              //     },
-              //   }}>
-              //   <VStack style={{gap: '16px'}}>
-              //     <VBlock style={{gap: '8px'}}>
-              //       <span style={{color: '#2B3038', fontWeight: 600}}>
-              //         Preview
-              //       </span>
-              //       <Block>
-              //         <PreviewNode key={key} inputNode={expr} />
-              //       </Block>
-              //     </VBlock>
-              //     <VBlock style={{gap: '8px'}}>
-              //       <span style={{color: '#2B3038', fontWeight: 600}}>
-              //         Expression
-              //       </span>
-              //       <Block>
-              //         {/* <Unclickable style={{}}> */}
-              //         <WeaveExpression
-              //           expr={expr}
-              //           onMount={() => {}}
-              //           onFocus={() => {}}
-              //           onBlur={() => {}}
-              //           frozen
-              //         />
-              //         {/* </Unclickable> */}
-              //       </Block>
-              //     </VBlock>
-              //   </VStack>
-              // </HomePreviewSidebarTemplate>
             );
             props.setPreviewNode(node);
           },
@@ -106,6 +70,7 @@ export const CenterLocalBrowser: React.FC<
     <CenterBrowser
       allowSearch
       title={'Local Boards'}
+      selectedRowId={selectedRowId}
       noDataCTA={`No Local Weave boards found.`}
       loading={localDashboards.loading}
       columns={['name', 'latest version id']}

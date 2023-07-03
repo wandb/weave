@@ -300,6 +300,7 @@ const CenterProjectBoardsBrowser: React.FC<
   CenterProjectBrowserInnerPropsType
 > = props => {
   const browserTitle = 'Boards';
+  const [selectedRowId, setSelectedRowId] = useState<string | undefined>();
 
   const boards = query.useProjectBoards(props.entityName, props.projectName);
   const browserData = useMemo(() => {
@@ -321,6 +322,7 @@ const CenterProjectBoardsBrowser: React.FC<
           icon: IconInfo,
           label: 'Board details',
           onClick: row => {
+            setSelectedRowId(row._id);
             const expr = rowToExpression(
               props.entityName,
               props.projectName,
@@ -350,12 +352,13 @@ const CenterProjectBoardsBrowser: React.FC<
         },
       ],
     ];
-  }, [props]);
+  }, [props, setSelectedRowId]);
 
   return (
     <CenterBrowser
       allowSearch
       title={browserTitle}
+      selectedRowId={selectedRowId}
       noDataCTA={`No Weave boards found for project: ${props.entityName}/${props.projectName}`}
       breadcrumbs={[
         {
@@ -427,6 +430,7 @@ const CenterProjectTablesBrowser: React.FC<
 > = props => {
   const weave = useWeaveContext();
   const browserTitle = 'Tables';
+  const [selectedRowId, setSelectedRowId] = useState<string | undefined>();
 
   const runStreams = query.useProjectRunStreams(
     props.entityName,
@@ -475,6 +479,7 @@ const CenterProjectTablesBrowser: React.FC<
           icon: IconInfo,
           label: 'Board details ',
           onClick: row => {
+            setSelectedRowId(row._id);
             const expr = tableRowToNode(
               row.kind,
               props.entityName,
@@ -576,6 +581,7 @@ const CenterProjectTablesBrowser: React.FC<
     <CenterBrowser
       allowSearch
       title={browserTitle}
+      selectedRowId={selectedRowId}
       noDataCTA={`No Weave tables found for project: ${props.entityName}/${props.projectName}`}
       breadcrumbs={[
         {

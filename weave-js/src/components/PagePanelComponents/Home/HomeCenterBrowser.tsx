@@ -15,6 +15,10 @@ import * as LayoutElements from './LayoutElements';
 import _ from 'lodash';
 import {WeaveAnimatedLoader} from '../../Panel2/WeaveAnimatedLoader';
 
+const TableRow = styled.tr<{$highlighted?: boolean}>`
+  background-color: ${props => (props.$highlighted ? '#f8f9fa' : '')};
+`;
+
 const CenterTable = styled.table`
   width: 100%;
   border: none;
@@ -152,6 +156,7 @@ export type CenterBrowserActionType<RT extends CenterBrowserDataType> = Array<
 type CenterBrowserProps<RT extends CenterBrowserDataType> = {
   title: string;
   data: RT[];
+  selectedRowId?: string;
   noDataCTA?: string;
   breadcrumbs?: Array<{
     text: string;
@@ -315,7 +320,10 @@ export const CenterBrowser = <RT extends CenterBrowserDataType>(
           </thead>
           <tbody>
             {filteredData.map((row, i) => (
-              <tr key={row._id} onClick={() => primaryAction?.onClick(row, i)}>
+              <TableRow
+                key={row._id}
+                onClick={() => primaryAction?.onClick(row, i)}
+                $highlighted={props.selectedRowId === row._id}>
                 {columns.map(c => (
                   <td key={c}>{(row as any)[c]}</td>
                 ))}
@@ -324,7 +332,7 @@ export const CenterBrowser = <RT extends CenterBrowserDataType>(
                     <ActionCell row={row} actions={props.actions} />
                   </td>
                 )}
-              </tr>
+              </TableRow>
             ))}
           </tbody>
         </CenterTable>
