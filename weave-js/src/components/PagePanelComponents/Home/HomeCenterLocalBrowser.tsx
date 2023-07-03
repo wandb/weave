@@ -5,6 +5,7 @@ import {CenterBrowserActionType, CenterBrowser} from './HomeCenterBrowser';
 import {SetPreviewNodeType, NavigateToExpressionType} from './common';
 import * as query from './query';
 import {HomeBoardPreview} from './HomePreviewSidebar';
+import moment from 'moment';
 
 type CenterLocalBrowserPropsType = {
   setPreviewNode: SetPreviewNodeType;
@@ -24,11 +25,18 @@ export const CenterLocalBrowser: React.FC<
   const [selectedRowId, setSelectedRowId] = useState<string | undefined>();
 
   const browserData = useMemo(() => {
-    return localDashboards.result.map(b => ({
-      _id: b.name,
-      name: b.name,
-      'latest version id': b.version,
-    }));
+    return localDashboards.result
+      .sort(a => -a.createdAt)
+      .map(b => ({
+        _id: b.name,
+        name: b.name,
+        'latest version id': b.version,
+        // Note: even though this is `createdAt`, it is interpreted by the user
+        // as `updatedAt` since it is the `created at` date for the latest
+        // version.
+        // TODO: Why is this date not utc??? Seems like a bug in the artifact writing code?
+        'updated at': moment(b.createdAt).calendar(),
+      }));
   }, [localDashboards]);
 
   const browserActions: Array<
@@ -73,7 +81,7 @@ export const CenterLocalBrowser: React.FC<
       selectedRowId={selectedRowId}
       noDataCTA={`No Local Weave boards found.`}
       loading={localDashboards.loading}
-      columns={['name', 'latest version id']}
+      columns={['name', 'latest version id', 'updated at']}
       data={browserData}
       actions={browserActions}
     />

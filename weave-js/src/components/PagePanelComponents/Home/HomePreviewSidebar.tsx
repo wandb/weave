@@ -6,7 +6,6 @@ import {NavigateToExpressionType, SetPreviewNodeType} from './common';
 import {WBButton} from '@wandb/weave/common/components/elements/WBButtonNew';
 import {Node} from '@wandb/weave/core';
 import {WeaveExpression} from '@wandb/weave/panel/WeaveExpression';
-import {key} from 'vega';
 import {PreviewNode} from './PreviewNode';
 import {useWeaveContext} from '@wandb/weave/context';
 

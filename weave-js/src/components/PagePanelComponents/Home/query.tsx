@@ -357,6 +357,7 @@ export const useLocalDashboards = (): {
   result: Array<{
     name: string;
     version: string;
+    createdAt: number;
   }>;
   loading: boolean;
 } => {
@@ -381,9 +382,17 @@ export const useLocalDashboards = (): {
           },
           'string'
         ) as any;
+        const createdAtNode = w.callOpVeryUnsafe(
+          'FilesystemArtifact-createdAt',
+          {
+            artifact: row,
+          },
+          'string'
+        ) as any;
         return w.opDict({
           name: nameNode,
           version: versionNode,
+          createdAt: createdAtNode,
         } as any);
       }
     ),
