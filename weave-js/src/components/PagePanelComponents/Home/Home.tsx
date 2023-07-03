@@ -83,6 +83,7 @@ const HomeComp: FC<HomeProps> = props => {
                   browserType: 'recent',
                   rootId: 'boards',
                 });
+                setPreviewNode(undefined);
               },
             },
             {
@@ -96,6 +97,7 @@ const HomeComp: FC<HomeProps> = props => {
                   browserType: 'recent',
                   rootId: 'tables',
                 });
+                setPreviewNode(undefined);
               },
             },
           ],
@@ -143,6 +145,7 @@ const HomeComp: FC<HomeProps> = props => {
                     browserType: 'wandb',
                     rootId: entity,
                   });
+                  setPreviewNode(undefined);
                 },
               })),
           },
@@ -187,6 +190,7 @@ const HomeComp: FC<HomeProps> = props => {
                 browserType: 'drafts',
                 rootId: 'local',
               });
+              setPreviewNode(undefined);
             },
           },
         ],

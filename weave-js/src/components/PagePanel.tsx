@@ -331,6 +331,7 @@ const PagePanel: React.FC = props => {
                 )}
                 <PageContent
                   config={config}
+                  previewMode={previewMode}
                   updateConfig={updateConfig}
                   updateConfig2={updateConfig2}
                   goHome={goHome}
@@ -359,6 +360,7 @@ export default PagePanel;
 
 type PageContentProps = {
   config: ChildPanelFullConfig;
+  previewMode?: boolean;
   updateConfig: (newConfig: ChildPanelFullConfig) => void;
   updateConfig2: (change: (oldConfig: any) => any) => void;
   goHome: () => void;
@@ -424,7 +426,7 @@ export const PageContent: FC<PageContentProps> = props => {
           overflow: 'hidden',
         }}>
         <ChildPanel
-          editable={!isPanel}
+          editable={!isPanel && !props.previewMode}
           prefixHeader={
             inJupyter ? (
               <Icon

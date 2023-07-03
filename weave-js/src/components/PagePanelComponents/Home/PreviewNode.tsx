@@ -1,6 +1,3 @@
-import * as w from '@wandb/weave/core';
-import {useConfig} from '../../Panel2/panel';
-import {ChildPanel} from '../../Panel2/ChildPanel';
 import {useMemo} from 'react';
 
 export const Scaler: React.FC<{
@@ -78,6 +75,7 @@ export const PreviewNode: React.FC<{
         height: '200px',
         border: '2px solid #DADEE3',
         borderRadius: '6px',
+        overflow: 'hidden',
       }}>
       <Unclickable
         style={{
@@ -90,6 +88,7 @@ export const PreviewNode: React.FC<{
             style={{
               width: '100%',
               height: '100%',
+              border: 'none',
             }}
           />
         </Scaler>
