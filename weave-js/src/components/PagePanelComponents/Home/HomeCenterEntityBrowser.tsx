@@ -97,8 +97,8 @@ export const CenterEntityBrowserInner: React.FC<
       project: meta.name,
       boards: (meta.num_boards ?? 0) > 0 ? meta.num_boards : null,
       tables:
-        (meta.num_run_streams + meta.num_logged_tables ?? 0) > 0
-          ? meta.num_run_streams + meta.num_logged_tables
+        (meta.num_stream_tables + meta.num_logged_tables ?? 0) > 0
+          ? meta.num_stream_tables + meta.num_logged_tables
           : null,
       'updated at': moment.utc(meta.updatedAt).calendar(),
     }));
@@ -390,12 +390,12 @@ const tableRowToNode = (
   artName: string
 ) => {
   let newExpr: Node;
-  if (kind === 'Run Stream') {
+  if (kind === 'Stream Table') {
     const uri = `wandb-artifact:///${entityName}/${projectName}/${artName}:latest/obj`;
     // TODO Sync this up with the new runs stream code
     const node = opGet({uri: constString(uri)});
-    node.type = {type: 'run_stream'} as any;
-    newExpr = callOpVeryUnsafe('run_stream-rows', {
+    node.type = {type: 'stream_table'} as any;
+    newExpr = callOpVeryUnsafe('stream_table-rows', {
       self: node,
     }) as any;
   } else {
@@ -449,7 +449,7 @@ const CenterProjectTablesBrowser: React.FC<
       _id: b.name,
       _updatedAt: b.updatedAt,
       name: b.name,
-      kind: 'Run Stream',
+      kind: 'Stream Table',
       'updated at': moment.utc(b.updatedAt).calendar(),
       'created at': moment.utc(b.createdAt).calendar(),
       'created by': b.createdByUserName,

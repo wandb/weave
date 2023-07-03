@@ -62,7 +62,7 @@ export const useProjectsForEntityWithWeaveObject = (
     name: string;
     updatedAt: number;
     num_boards: number;
-    num_run_streams: number;
+    num_stream_tables: number;
     num_logged_tables: number;
   }>;
   loading: boolean;
@@ -81,7 +81,7 @@ export const useProjectsForEntityWithWeaveObject = (
         name: w.opProjectName({project: row}),
         updatedAt: w.opProjectUpdatedAt({project: row}),
         num_boards: opProjectBoardCount({project: row}),
-        num_run_streams: opProjectRunStreamCount({project: row}),
+        num_stream_tables: opProjectRunStreamCount({project: row}),
         num_logged_tables: opProjectLoggedTableCount({project: row}),
       } as any);
     }),
@@ -95,13 +95,14 @@ export const useProjectsForEntityWithWeaveObject = (
       name: string;
       updatedAt: number;
       num_boards: number;
-      num_run_streams: number;
+      num_stream_tables: number;
       num_logged_tables: number;
     }> = entityProjectNamesValue.result ?? [];
 
     return {
       result: result.filter(
-        res => res.num_boards + res.num_logged_tables + res.num_run_streams > 0
+        res =>
+          res.num_boards + res.num_logged_tables + res.num_stream_tables > 0
       ),
       loading: entityProjectNamesValue.loading,
     };
@@ -207,7 +208,7 @@ const projectTablesNode = (entityName: string, projectName: string) => {
 const opProjectRunStreamArtifacts = ({project}: {project: w.Node}) => {
   const artifactTypesNode = w.opProjectArtifactType({
     project,
-    artifactType: w.constString('run_stream'),
+    artifactType: w.constString('stream_table'),
   });
   const artifactsNode = w.opArtifactTypeArtifacts({
     artifactType: artifactTypesNode,
