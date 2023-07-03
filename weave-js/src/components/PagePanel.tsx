@@ -136,6 +136,7 @@ const PagePanel: React.FC = props => {
   const urlParams = new URLSearchParams(location.search);
   const fullScreen = urlParams.get('fullScreen') != null;
   const moarfullScreen = urlParams.get('moarFullScreen') != null;
+  const previewMode = urlParams.get('previewMode') != null;
   const expString = urlParams.get('exp');
   const expNode = urlParams.get('expNode');
   const panelId = urlParams.get('panelId') ?? '';
@@ -320,7 +321,7 @@ const PagePanel: React.FC = props => {
                   display: 'flex',
                   flexDirection: 'column',
                 }}>
-                {(!inJupyter || moarfullScreen) && (
+                {(!inJupyter || moarfullScreen) && !previewMode && (
                   <PersistenceManager
                     inputNode={config.input_node}
                     inputConfig={config.config}

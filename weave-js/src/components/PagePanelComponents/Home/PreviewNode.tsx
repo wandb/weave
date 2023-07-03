@@ -1,6 +1,7 @@
 import * as w from '@wandb/weave/core';
 import {useConfig} from '../../Panel2/panel';
 import {ChildPanel} from '../../Panel2/ChildPanel';
+import {useMemo} from 'react';
 
 export const Scaler: React.FC<{
   scale: number;
@@ -62,12 +63,13 @@ export const Unclickable: React.FC<{
 };
 
 export const PreviewNode: React.FC<{
-  inputNode: w.Node;
+  inputExpr: string;
 }> = props => {
-  const [childConfig, updateConfig] = useConfig({
-    id: '',
-    input_node: props.inputNode,
-  });
+  const url = useMemo(() => {
+    return `${
+      window.location.origin
+    }/?previewMode=true&exp=${encodeURIComponent(props.inputExpr)}`;
+  }, [props.inputExpr]);
 
   return (
     <div
@@ -82,9 +84,13 @@ export const PreviewNode: React.FC<{
           backgroundColor: '#d2d2d21a',
         }}>
         <Scaler scale={0.4}>
-          <ChildPanel
-            config={childConfig as any}
-            updateConfig={updateConfig as any}
+          <iframe
+            title="Asset Preview"
+            src={url}
+            style={{
+              width: '100%',
+              height: '100%',
+            }}
           />
         </Scaler>
       </Unclickable>

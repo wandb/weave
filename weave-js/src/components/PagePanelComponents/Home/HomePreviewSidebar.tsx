@@ -126,13 +126,13 @@ export const HomeExpressionPreviewParts: React.FC<{
   expr: Node;
 }> = ({expr}) => {
   const weave = useWeaveContext();
-  const key = weave.expToString(expr);
+  const inputExpr = weave.expToString(expr);
   return (
     <LayoutElements.VStack style={{gap: '16px'}}>
       <LayoutElements.VBlock style={{gap: '8px'}}>
         <span style={{color: '#2B3038', fontWeight: 600}}>Preview</span>
         <LayoutElements.Block>
-          <PreviewNode key={key} inputNode={expr} />
+          <PreviewNode inputExpr={inputExpr} />
         </LayoutElements.Block>
       </LayoutElements.VBlock>
       <LayoutElements.VBlock style={{gap: '8px'}}>
