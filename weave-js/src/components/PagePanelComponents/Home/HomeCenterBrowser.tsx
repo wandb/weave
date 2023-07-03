@@ -182,6 +182,9 @@ export const CenterBrowser = <RT extends CenterBrowserDataType>(
   }>({});
 
   const filteredData = useMemo(() => {
+    if (props.loading) {
+      return [];
+    }
     const canApplySearch =
       props.allowSearch || searchText === '' || searchText == null;
     const canApplyFilters = Object.values(filters).filter(
