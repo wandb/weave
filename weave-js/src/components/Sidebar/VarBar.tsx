@@ -1,7 +1,7 @@
 import {NodeOrVoidNode} from '@wandb/weave/core';
 import produce from 'immer';
 import _ from 'lodash';
-import {FC, memo, ReactNode, useCallback, useMemo} from 'react';
+import React, {FC, memo, ReactNode, useCallback, useMemo} from 'react';
 import {StrictMenuItemProps} from 'semantic-ui-react';
 import styled from 'styled-components';
 import {GRAY_350} from '../../common/css/globals.styles';
