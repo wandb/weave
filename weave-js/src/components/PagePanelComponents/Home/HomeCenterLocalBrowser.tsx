@@ -1,5 +1,5 @@
 import {opGet, constString} from '@wandb/weave/core';
-import {useMemo, useState} from 'react';
+import React, {useMemo, useState} from 'react';
 import {IconInfo, IconOpenNewTab} from '../../Panel2/Icons';
 import {CenterBrowserActionType, CenterBrowser} from './HomeCenterBrowser';
 import {SetPreviewNodeType, NavigateToExpressionType} from './common';
