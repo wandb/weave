@@ -9,6 +9,7 @@ type ResultType = {
 export type SpanType = {
   span_id?: string;
   name?: string;
+  _name?: string; // need in Weave1 where we can't use name because of collision
   start_time_ms?: number;
   end_time_ms?: number;
   status_code?: StatusCodeType;

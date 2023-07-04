@@ -28,7 +28,8 @@ class ColumnDef(typing.TypedDict):
 @dataclasses.dataclass
 class TableColumn:
     select: typing.Callable
-    name: str
+    groupby: bool = dataclasses.field(default=False)
+    name: str = dataclasses.field(default_factory=lambda: "")
 
 
 @weave.type("tablePanel")
@@ -43,15 +44,15 @@ class Table(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
         super().__init__(input_node=input_node, vars=vars)
         self.config = config
         if self.config is None:
-            table = table_state.TableState(self.input_node)
-            self.config = TableConfig(table)
-
             if "columns" in options:
+                table = table_state.TableState(self.input_node)
+                self.config = TableConfig(table)
                 for col_ndx, column_expr in enumerate(options["columns"]):
                     if isinstance(column_expr, TableColumn):
                         table.add_column(
                             column_expr.select,
                             column_expr.name,
+                            groupby=column_expr.groupby,
                         )
                     else:
                         table.add_column(column_expr)
@@ -176,7 +177,7 @@ def _get_active_node(self: Table, data_or_rows_node: Node) -> Node:
 
     return OutputNode(
         data_or_rows_node.type,
-        "index",
+        "list-__getitem__",
         {
             "arr": data_or_rows_node,
             "index": ConstNode(weave.types.Int(), active_index),
@@ -358,7 +359,7 @@ def pinned_rows(self: Table):
 )
 def active_data(self: Table) -> typing.Optional[typing.Any]:
     data_node = _get_active_node(self, self.input_node)
-    return weave.use(data_node)
+    return data_node
 
 
 @weave.op(

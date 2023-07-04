@@ -301,8 +301,7 @@ export const TraceDetail = styled.div`
 
 export const TraceTimeline = styled.div`
   height: 100%;
-  display: flex;
-  flex-direction: column;
+  position: relative;
   overflow: auto;
 `;
 

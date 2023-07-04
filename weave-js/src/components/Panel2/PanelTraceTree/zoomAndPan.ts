@@ -3,6 +3,7 @@ import {
   MutableRefObject,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
 } from 'react';
@@ -116,7 +117,7 @@ export function useTimelineZoomAndPan({
   }, [setScale, scaleRef, updateCursor, onHittingMinZoom]);
 
   // Scroll to "focused" X coordinate after zoom
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (zoomScrollToRef.current == null) {
       return;
     }

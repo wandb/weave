@@ -135,15 +135,17 @@ class StreamTable:
         for row in row_or_rows:
             self._log_row(row)
 
-    def _ipython_display_(self) -> graph.Node:
-        from .. import show
-
-        node = (
+    def rows(self):
+        return (
             ops_domain.project(self._entity_name, self._project_name)
             .run(self._table_name)
             .history2()
         )
-        return show(node)
+
+    def _ipython_display_(self) -> graph.Node:
+        from .. import show
+
+        return show(self.rows())
 
     def _log_row(self, row: dict) -> None:
         self._lite_run.ensure_run()
