@@ -10,7 +10,7 @@ import getConfig from '../config';
 import {useWeaveContext} from '../context';
 import {useNodeWithServerType} from '../react';
 import {consoleLog} from '../util';
-import {Home} from './PagePanelComponents/Home';
+import {Home} from './PagePanelComponents/Home/Home';
 import {PersistenceManager} from './PagePanelComponents/PersistenceManager';
 import {useCopyCodeFromURI} from './PagePanelComponents/hooks';
 import {
@@ -57,7 +57,7 @@ import {useWeaveAutomation} from './automation';
 const JupyterControlsHelpText = styled.div<{active: boolean}>`
   width: max-content;
   position: absolute;
-  top: 50px
+  top: 50px;
   border-radius: 4px;
   right: 48px;
   // transform: translate(-50%, 0);
@@ -112,11 +112,31 @@ const JupyterControlsIcon = styled.div`
   }
 `;
 
+// Simple function that forces rerender when URL changes.
+const usePoorMansLocation = () => {
+  const [location, setLocation] = useState(window.location.toString());
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (window.location.toString() !== location) {
+        setLocation(window.location.toString());
+      }
+    }, 250);
+    return () => {
+      clearInterval(interval);
+    };
+  }, [location]);
+
+  return window.location;
+};
+
 const PagePanel: React.FC = props => {
   const weave = useWeaveContext();
-  const urlParams = new URLSearchParams(window.location.search);
+  const location = usePoorMansLocation();
+  const urlParams = new URLSearchParams(location.search);
   const fullScreen = urlParams.get('fullScreen') != null;
   const moarfullScreen = urlParams.get('moarFullScreen') != null;
+  const previewMode = urlParams.get('previewMode') != null;
   const expString = urlParams.get('exp');
   const expNode = urlParams.get('expNode');
   const panelId = urlParams.get('panelId') ?? '';
@@ -136,13 +156,27 @@ const PagePanel: React.FC = props => {
       if (newExpStr === expString) {
         return;
       }
+
       const searchParams = new URLSearchParams(window.location.search);
       searchParams.set('exp', newExpStr);
-      window.history.replaceState(
-        null,
-        '',
-        `${window.location.pathname}?${searchParams}`
-      );
+
+      if (newExpStr.startsWith('get') && expString?.startsWith('get')) {
+        // In the specific case that we are updating a get with another get
+        // which happens when we transition between published and local states,
+        // then don't retain the history. We used to always do a replace and
+        // it was super confusing
+        window.history.replaceState(
+          null,
+          '',
+          `${window.location.pathname}?${searchParams}`
+        );
+      } else {
+        window.history.pushState(
+          null,
+          '',
+          `${window.location.pathname}?${searchParams}`
+        );
+      }
     },
     [expString, weave]
   );
@@ -287,7 +321,7 @@ const PagePanel: React.FC = props => {
                   display: 'flex',
                   flexDirection: 'column',
                 }}>
-                {(!inJupyter || moarfullScreen) && (
+                {(!inJupyter || moarfullScreen) && !previewMode && (
                   <PersistenceManager
                     inputNode={config.input_node}
                     inputConfig={config.config}
@@ -297,6 +331,7 @@ const PagePanel: React.FC = props => {
                 )}
                 <PageContent
                   config={config}
+                  previewMode={previewMode}
                   updateConfig={updateConfig}
                   updateConfig2={updateConfig2}
                   goHome={goHome}
@@ -325,6 +360,7 @@ export default PagePanel;
 
 type PageContentProps = {
   config: ChildPanelFullConfig;
+  previewMode?: boolean;
   updateConfig: (newConfig: ChildPanelFullConfig) => void;
   updateConfig2: (change: (oldConfig: any) => any) => void;
   goHome: () => void;
@@ -390,7 +426,7 @@ export const PageContent: FC<PageContentProps> = props => {
           overflow: 'hidden',
         }}>
         <ChildPanel
-          editable={!isPanel}
+          editable={!isPanel && !props.previewMode}
           prefixHeader={
             inJupyter ? (
               <Icon

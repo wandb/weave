@@ -17,6 +17,7 @@ export interface WeaveExpressionProps {
 
   liveUpdate?: boolean;
   truncate?: boolean;
+  frozen?: boolean;
 }
 
 export interface SuggestionProps {
