@@ -21,7 +21,7 @@ class SpanKind:
 
 @weave.type()
 class Result:
-    inputs: typing.Optional[typing.Dict[str, typing.Any]]
+    inputs: typing.Optional[typing.Union[typing.Dict[str, typing.Any], list[str]]]
     outputs: typing.Optional[typing.Dict[str, typing.Any]]
 
 
@@ -90,15 +90,25 @@ def get_first_error(span: Span) -> typing.Optional[str]:
     return None
 
 
+def standarize_result_inputs(result: typing.Optional[Result]) -> typing.Dict[str, str]:
+    if result is None:
+        return {}
+    if isinstance(result.inputs, dict):
+        return result.inputs
+    if result.inputs is None:
+        return {}
+    if isinstance(result.inputs, list):
+        return {str(i): v for i, v in enumerate(result.inputs)}
+    raise ValueError(f"Unexpected result inputs type: {type(result.inputs)}")
+
+
 def get_trace_input_str(span: Span) -> str:
     return "\n\n".join(
         [
             "\n\n".join(
                 [
                     f"**{ndx}.{eKey}:** {eValue}"
-                    for eKey, eValue in (
-                        (result.inputs or {}) if result is not None else {}
-                    ).items()
+                    for eKey, eValue in standarize_result_inputs(result).items()
                 ]
             )
             for ndx, result in enumerate(span.results or [])
