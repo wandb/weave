@@ -9,7 +9,7 @@ export interface PanelPanelContextValue {
   ) => void;
 }
 /**
- * This context is used by PanelPanel to provide all child panels with the 
+ * This context is used by PanelPanel to provide all child panels with the
  * correct functions to update the config through the overflow menu(ie OutlineItemPopupMenu).
  */
 export const PanelPanelContext = React.createContext<PanelPanelContextValue>({
