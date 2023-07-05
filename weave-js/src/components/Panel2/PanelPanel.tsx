@@ -1,6 +1,5 @@
-import {useTraceUpdate} from '@wandb/weave/common/util/hooks';
 import {constNodeUnsafe, Node, NodeOrVoidNode} from '@wandb/weave/core';
-import produce from 'immer';
+import {produce} from 'immer';
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 
 import _ from 'lodash';
@@ -136,10 +135,10 @@ const usePanelPanelCommon = (props: PanelPanelProps) => {
     stack,
     weave,
   ]);
-  useTraceUpdate('panelQuery', {
-    loading: panelQuery.loading,
-    result: panelQuery.result,
-  });
+  // useTraceUpdate('panelQuery', {
+  //   loading: panelQuery.loading,
+  //   result: panelQuery.result,
+  // });
 
   useSetPanelRenderedConfig(panelConfig);
 

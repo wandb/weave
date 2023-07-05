@@ -13,7 +13,7 @@ import {
   Stack,
   voidNode,
 } from '@wandb/weave/core';
-import produce, {Draft} from 'immer';
+import {Draft, produce} from 'immer';
 import * as _ from 'lodash';
 import React, {useCallback, useMemo} from 'react';
 import {Button} from 'semantic-ui-react';
