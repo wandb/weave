@@ -18,7 +18,7 @@ import {
   Stack,
   voidNode,
 } from '@wandb/weave/core';
-import produce from 'immer';
+import {produce} from 'immer';
 import * as _ from 'lodash';
 
 import {
