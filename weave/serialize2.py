@@ -1,8 +1,4 @@
-# Deserialize and serialize have to match the javascript implementation, which
-# needlessly adds an entry for nodes and ops. It'd be simpler to just encode
-# nodes and inline the ops in their respective output nodes.
-
-from typing import Any, Dict, Tuple, List, Union, TypedDict, MutableMapping
+from typing import Any, Dict, Tuple, Union, TypedDict, MutableMapping
 import hashlib
 import json
 import random
@@ -24,15 +20,15 @@ MapNodeOrOpToSerialized = Dict[NodeOrOp, Tuple[SerializedNode, int]]
 
 
 class SerializedReturnType(TypedDict):
-    nodes: List[SerializedNode]
-    targetNodes: List[int]
+    nodes: list[SerializedNode]
+    targetNodes: list[int]
 
 
 def deserialize(
     serialized: SerializedReturnType,
 ) -> value_or_error.ValueOrErrors[graph.Node]:
     nodes = serialized["nodes"]
-    target_nodes = serialized.get("targetNodes")
+    target_nodes = serialized["targetNodes"]
 
     deserialized_values: dict[int, Any] = {}
     deserialized_target_nodes = list(
@@ -55,7 +51,7 @@ def deserialize(
 
 
 def _deserialize_value(
-    nodes: List[SerializedNode], deserialized_values: dict[int, Any], i: int
+    nodes: list[SerializedNode], deserialized_values: dict[int, Any], i: int
 ) -> Any:
     if i in deserialized_values:
         return deserialized_values[i]
@@ -66,15 +62,15 @@ def _deserialize_value(
         deserialized_values[i] = v
         return v
     if isinstance(v, list):
-        res = [_deserialize_value(nodes, deserialized_values, i) for i in v]
-        deserialized_values[i] = res
-        return res
+        arr = [_deserialize_value(nodes, deserialized_values, i) for i in v]
+        deserialized_values[i] = arr
+        return arr
     if isinstance(v, dict):
-        res = {
+        dct = {
             k: _deserialize_value(nodes, deserialized_values, i) for k, i in v.items()
         }
-        deserialized_values[i] = res
-        return res
+        deserialized_values[i] = dct
+        return dct
 
 
 def _parse_node(
@@ -87,6 +83,7 @@ def _parse_node(
         return parsed_nodes[id(node_dict)]
 
     # Parse node according to its type
+    parsed_node: graph.Node
     if node_dict["nodeType"] == "const":
         parsed_node = _parse_const_node(node_dict, parsed_nodes, hashed_nodes)
     elif node_dict["nodeType"] == "output":
@@ -114,7 +111,7 @@ def _parse_const_node(
     node_dict: Any,
     parsed_nodes: MutableMapping[int, graph.Node],
     hashed_nodes: MutableMapping[str, graph.Node],
-) -> graph.ConstNode:
+) -> graph.Node:
     is_function_node = (
         isinstance(node_dict["type"], dict) and node_dict["type"]["type"] == "function"
     )
@@ -124,6 +121,7 @@ def _parse_const_node(
 
     # Parse function node body according to its type
     fn_body_node_dict = node_dict["val"]
+    parsed_fn_body_node: graph.Node
     if fn_body_node_dict["nodeType"] == "var":
         parsed_fn_body_node = _parse_fn_body_var_node(fn_body_node_dict)
     elif fn_body_node_dict["nodeType"] == "const":
@@ -201,7 +199,7 @@ def _parse_var_node(node_dict: Any) -> graph.VarNode:
 
 
 @memo.memo
-def node_id(node: graph.Node):
+def node_id(node: graph.Node) -> str:
     hashable = {"type": node.type.to_dict()}
     if isinstance(node, graph.OutputNode):
         hashable["op_name"] = node.from_op.name
@@ -229,7 +227,7 @@ def node_id(node: graph.Node):
     return hash.hexdigest()
 
 
-def _is_lambda(node: graph.Node):
+def _is_lambda(node: graph.Node) -> bool:
     return isinstance(node, graph.ConstNode) and (
         isinstance(node.val, graph.OutputNode) or isinstance(node.val, graph.VarNode)
     )

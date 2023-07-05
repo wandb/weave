@@ -94,7 +94,7 @@ def type_name_to_type(type_name):
     return mapping.get(js_to_py_typename(type_name))
 
 
-type_from_dict_cache = {}
+type_from_dict_cache: dict[int, "Type"] = {}
 
 
 class TypeRegistry:

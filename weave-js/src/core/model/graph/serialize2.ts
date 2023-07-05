@@ -71,17 +71,17 @@ function valueToRef(serializer: Serializer, v: any): SerializedRef {
   return ref;
 }
 
-function serializeArray(serializer: Serializer, v: any[]): SerializedRef {
-  const withSerializedValues = v.map(v => serializeValue(serializer, v));
+function serializeArray(serializer: Serializer, arr: any[]): SerializedRef {
+  const withSerializedValues = arr.map(v => serializeValue(serializer, v));
   return valueToRef(serializer, withSerializedValues);
 }
 
 function serializeObject(
   serializer: Serializer,
-  v: {[key: string]: any}
+  obj: {[key: string]: any}
 ): SerializedRef {
   const withSerializedValues = Object.fromEntries(
-    Object.entries(v).map(([k, v]) => [k, serializeValue(serializer, v)])
+    Object.entries(obj).map(([k, v]) => [k, serializeValue(serializer, v)])
   );
   return valueToRef(serializer, withSerializedValues);
 }
