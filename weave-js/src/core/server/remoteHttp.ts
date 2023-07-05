@@ -3,7 +3,7 @@ import _ from 'lodash';
 import {performance} from 'universal-perf-hooks';
 
 import {GlobalCGEventTracker} from '../analytics/tracker';
-import {Node, serialize, serializeMulti, serialize2} from '../model';
+import {Node, serializeMulti, serialize2} from '../model';
 import type {OpStore} from '../opStore';
 import {batchIntervalOverride, isWeaveDebugEnabled} from '../util/debug';
 import type {Server} from './types';
