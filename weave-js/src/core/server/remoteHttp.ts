@@ -250,6 +250,11 @@ export class RemoteHttpServer implements Server {
     this.trace(`Flushing ${nodeEntries.length} nodes`);
 
     const nodes = nodeEntries.map(e => e.node);
+
+    // Currently, `serializeMulti` still uses the old serialization format.
+    // `contiguousBatchesOnly` should always be `false` so we effectively always use the new serialization.
+    // If we have to support `contiguousBatchesOnly = true`,
+    // then we should make a `serializeMulti` for the new serialization format.
     const usingSerialize2 = !this.opts.contiguousBatchesOnly;
     const [payloads, originalIndexes] = this.opts.contiguousBatchesOnly
       ? serializeMulti(nodes)
