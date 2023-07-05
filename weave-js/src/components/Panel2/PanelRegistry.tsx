@@ -54,6 +54,7 @@ import {Spec as TraceSpec} from './PanelTrace';
 import {Spec as TraceTreeModelSpec} from './PanelTraceTree/PanelTraceTreeModel';
 import {Spec as PanelTraceTreeTraceTableViewerSpec} from './PanelTraceTree/PanelTraceTreeTableViewer';
 import {Spec as TraceTreeTraceSpec} from './PanelTraceTree/PanelTraceTreeTrace';
+import {Spec as PanelTraceSpec} from './PanelTraceTree/PanelTrace';
 import {Spec as TypeSpec} from './PanelType';
 import {Spec as UnknownSpec} from './PanelUnknown';
 import {Spec as VideoSpec} from './PanelVideo';
@@ -153,6 +154,7 @@ const initSpecs = () => {
       PanelTraceTreeTraceTableViewerSpec,
       TraceTreeTraceSpec,
       TraceTreeModelSpec,
+      PanelTraceSpec,
 
       // Organizational
       // LayoutContainerSpec,

@@ -293,19 +293,17 @@ export const TraceWrapper = styled.div<SplitProps>`
   justify-content: space-between;
 `;
 
-const traceWrapperChildStyle = css<SplitProps>`
-  ${p => (p.split === `vertical` ? `width` : `height`)}: calc(50% - 0.4em);
-`;
-
 export const TraceTimelineWrapper = styled.div`
+  height: 100%;
+  width: 100%;
   position: relative;
-  ${traceWrapperChildStyle}
 `;
 
 export const TraceDetail = styled.div`
   display: flex;
   flex-direction: column;
-  ${traceWrapperChildStyle}
+  height: 100%;
+  width: 100%;
 `;
 
 export const TraceTimeline = styled.div`

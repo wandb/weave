@@ -187,12 +187,10 @@ class WeaveTrace:
 
 
 def dd_span_to_weave_span(dd_span):
-    from weave.ops_domain import trace_tree
-
     return {
         "name": dd_span.name,
-        "start_time_ns": dd_span.start_ns,
-        "duration_ns": dd_span.duration_ns,
+        "start_time_ms": dd_span.start_ns / 1e6,
+        "end_time_ms": (dd_span.start_ns + dd_span.duration_ns) / 1e6,
         "attributes": dd_span.get_tags(),
         "trace_id": str(dd_span.trace_id),
         "span_id": str(dd_span.span_id),

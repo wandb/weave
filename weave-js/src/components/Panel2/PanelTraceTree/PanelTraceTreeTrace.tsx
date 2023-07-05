@@ -1,6 +1,5 @@
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import {SpanKindType, SpanType} from '@wandb/weave/core/model/media/traceTree';
-import _ from 'lodash';
 import React, {ReactNode, useMemo} from 'react';
 import {Loader} from 'semantic-ui-react';
 import styled from 'styled-components';
@@ -117,7 +116,7 @@ const PanelTraceTreeTrace: React.FC<PanelTraceTreeTraceProps> = props => {
   return <TraceTreeSpanViewer span={traceSpan} />;
 };
 
-const TraceTreeSpanViewer: React.FC<{
+export const TraceTreeSpanViewer: React.FC<{
   span: SpanType;
 }> = props => {
   const {isFullscreen} = React.useContext(PanelFullscreenContext);
@@ -136,11 +135,11 @@ const TraceTreeSpanViewer: React.FC<{
     onHittingMinZoom: showTipOverlay,
   });
   const [selectedSpan, setSelectedSpan] =
-    useUpdatingState<LayedOutSpanType>(layedOutSpan);
+    useUpdatingState<LayedOutSpanType | null>(layedOutSpan);
 
   return (
     <S.TraceWrapper split={split}>
-      <S.TraceTimelineWrapper split={split}>
+      <S.TraceTimelineWrapper>
         <S.TraceTimeline
           ref={timelineRef}
           style={{
@@ -163,7 +162,7 @@ const TraceTreeSpanViewer: React.FC<{
         {tipOverlay}
       </S.TraceTimelineWrapper>
       {selectedSpan && (
-        <S.TraceDetail split={split}>
+        <S.TraceDetail>
           <SpanTreeDetail span={selectedSpan} />
         </S.TraceDetail>
       )}
@@ -218,17 +217,13 @@ const TooltipLine = styled.div<{bold?: boolean; red?: boolean}>`
 export const SpanElement: React.FC<{
   span: LayedOutSpanWithParentYLevel;
   selectedSpan: LayedOutSpanType | null;
-  setSelectedSpan: (trace: LayedOutSpanType) => void;
-}> = ({
-  span,
-  selectedSpan: selectedTrace,
-  setSelectedSpan: setSelectedTrace,
-}) => {
+  setSelectedSpan: (trace: LayedOutSpanType | null) => void;
+}> = ({span, selectedSpan, setSelectedSpan}) => {
   const identifier = getSpanIdentifier(span);
   const trueDuration = getSpanDuration(span);
 
   const hasError = span.status_code === 'ERROR';
-  const isSelected = selectedTrace === span;
+  const isSelected = selectedSpan === span;
   const kindStyle = getSpanKindStyle(span.span_kind);
   const executionOrder = span.attributes?.execution_order ?? null;
 
@@ -277,7 +272,7 @@ export const SpanElement: React.FC<{
             color={kindStyle.textColor}
             onClick={e => {
               e.stopPropagation();
-              setSelectedTrace(span);
+              setSelectedSpan(isSelected ? null : span);
             }}>
             <S.SpanElementInner>
               <div>
@@ -317,20 +312,16 @@ export const SpanElement: React.FC<{
 export const SpanElementsInner: React.FC<{
   spans: LayedOutSpanWithParentYLevel[];
   selectedSpan: LayedOutSpanType | null;
-  setSelectedSpan: (trace: LayedOutSpanType) => void;
-}> = ({
-  spans,
-  selectedSpan: selectedTrace,
-  setSelectedSpan: setSelectedTrace,
-}) => {
+  setSelectedSpan: (trace: LayedOutSpanType | null) => void;
+}> = ({spans, selectedSpan, setSelectedSpan}) => {
   return (
     <>
       {spans.map((span, i) => (
         <SpanElement
           key={i}
           span={span}
-          setSelectedSpan={setSelectedTrace}
-          selectedSpan={selectedTrace}
+          setSelectedSpan={setSelectedSpan}
+          selectedSpan={selectedSpan}
         />
       ))}
     </>
@@ -450,7 +441,7 @@ const SpanTreeDetail: React.FC<{
             )}
             {span.end_time_ms != null && (
               <DetailKeyValueRow
-                label="Duration"
+                label="End Time"
                 value={'' + new Date(span.end_time_ms)}
               />
             )}

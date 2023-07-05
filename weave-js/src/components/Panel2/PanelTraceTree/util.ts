@@ -1,24 +1,15 @@
-import {SpanType} from '@wandb/weave/core/model/media/traceTree';
+import * as _ from 'lodash';
+import {FlatSpan, SpanType} from '@wandb/weave/core/model/media/traceTree';
 
-export interface Span {
-  name: string;
-  start_time_ns: number;
-  duration_ns: number;
-  attributes: any;
-  trace_id: string;
-  span_id: string;
-  parent_id: string;
-}
-
-export const flatToTrees = (flat: Span[]): SpanType[] => {
+export const flatToTrees = (flat: FlatSpan[]): SpanType[] => {
   const roots: SpanType[] = [];
   const unrooted: SpanType[] = [];
   const map: {[id: string]: SpanType} = {};
   flat.forEach(span => {
     map[span.span_id] = {
       name: span.name,
-      start_time_ms: span.start_time_ns / 1000000,
-      end_time_ms: (span.start_time_ns + span.duration_ns) / 1000000,
+      start_time_ms: span.start_time_ms,
+      end_time_ms: span.end_time_ms,
       attributes: span.attributes,
       child_spans: [],
     };
@@ -47,4 +38,17 @@ export const treesToFlat = <S extends SpanType>(trees: S[]): S[] => {
     i++;
   }
   return flat;
+};
+
+export const unifyRoots = (roots: SpanType[]): SpanType => {
+  const traceStartTime = _.min(roots.map(r => r.start_time_ms ?? 0)) ?? 0;
+  const traceEndTime =
+    _.max(roots.map(r => r.end_time_ms ?? r.start_time_ms ?? 0)) ??
+    traceStartTime + 1;
+  return {
+    name: 'root',
+    start_time_ms: traceStartTime,
+    end_time_ms: traceEndTime,
+    child_spans: roots,
+  };
 };
