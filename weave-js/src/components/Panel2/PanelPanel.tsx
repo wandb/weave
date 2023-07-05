@@ -33,6 +33,7 @@ import {getConfigForPath} from './panelTree';
 import {IconButton} from '../IconButton';
 import * as SidebarConfig from '../Sidebar/Config';
 import {useScrollbarVisibility} from '../../core/util/scrollbar';
+import { PanelPanelContextProvider } from './PanelPanelContextProvider';
 
 const inputType = {type: 'Panel' as const};
 type PanelPanelProps = Panel2.PanelProps<
@@ -332,11 +333,17 @@ export const PanelPanel: React.FC<PanelPanelProps> = props => {
         alignContent: 'space-around',
         justifyContent: 'space-around',
       }}>
-      <ChildPanel
+      <PanelPanelContextProvider 
         config={panelConfig}
         updateConfig={panelUpdateConfig}
         updateConfig2={panelUpdateConfig2}
-      />
+      >
+        <ChildPanel
+          config={panelConfig}
+          updateConfig={panelUpdateConfig}
+          updateConfig2={panelUpdateConfig2}
+        />
+      </PanelPanelContextProvider>
     </div>
   );
 };

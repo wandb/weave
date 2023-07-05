@@ -63,6 +63,11 @@ import {PanelInput, PanelProps} from './panel';
 import {getStackIdAndName} from './panellib/libpanel';
 import {replaceChainRoot} from '@wandb/weave/core/mutate';
 
+import {OutlineItemPopupMenu} from '../Sidebar/OutlineItemPopupMenu';
+import {IconOverflowHorizontal} from './Icons';
+import {getConfigForPath} from './panelTree';
+import { usePanelPanelContext } from './PanelPanelContextProvider';
+
 // This could be rendered as a code block with assignments, like
 // so.
 // ```
@@ -535,6 +540,10 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
     setExpressionFocused(false);
   }, []);
 
+  const {config: fullConfig, updateConfig, updateConfig2} = usePanelPanelContext();
+  const {path} = usePanelContext();
+  const fullPath = [...path, props.pathEl ?? ''].filter(el => el != null && el !== '');
+
   return curPanelId == null || handler == null ? (
     <div>
       No panel for type {defaultLanguageBinding.printType(panelInput.type)}
@@ -590,6 +599,18 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
                 }>
                 Open panel editor
               </Tooltip>
+              {fullConfig && <OutlineItemPopupMenu
+                config={fullConfig}
+                localConfig={getConfigForPath(fullConfig, fullPath)}
+                path={fullPath}
+                updateConfig={updateConfig}
+                updateConfig2={updateConfig2}
+                trigger={
+                  <IconButton>
+                    <IconOverflowHorizontal />
+                  </IconButton>
+                }
+              />}
             </EditorIcons>
           </EditorBarContent>
         </Styles.EditorBar>
