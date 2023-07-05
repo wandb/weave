@@ -688,7 +688,7 @@ export const ChildPanelConfigComp: React.FC<ChildPanelProps> = props => {
 
   const selectedPath = useSelectedPath();
   const {path} = usePanelContext();
-  
+
   const pathStr = useMemo(() => {
     const fullPath = ['<root>', ...path, props.pathEl].filter(el => el != null);
     return fullPath.join('.');
