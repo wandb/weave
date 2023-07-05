@@ -202,19 +202,28 @@ export const SpanElementHeader = styled.div<SpanElementHeaderProps>`
   font-weight: bold;
   line-height: 26px;
   text-align: left;
-  padding: 2px 8px;
   border-radius: 4px;
-  margin: 2px 0;
   font-size: 14px;
+`;
+
+export const SpanElementInner = styled.div`
+  padding: 2px 8px;
   display: flex;
   justify-content: space-between;
+`;
+
+type SpanParentConnectorProps = {
+  backgroundColor: string;
+};
+export const SpanParentConnector = styled.div<SpanParentConnectorProps>`
+  background-color: ${props => props.backgroundColor};
 `;
 
 export const SpanDetailTable = styled.table`
   width: 100%;
 `;
 
-export const DurationLabel = styled.span`
+export const DurationLabel = styled.div`
   color: #8f8f8fa6;
 `;
 
@@ -303,6 +312,11 @@ export const TraceTimeline = styled.div`
   height: 100%;
   position: relative;
   overflow: auto;
+`;
+
+export const TraceTimelineScale = styled.div`
+  height: 100%;
+  position: relative;
 `;
 
 export const SpanDetailIOSectionHeaderTd = styled.td`
