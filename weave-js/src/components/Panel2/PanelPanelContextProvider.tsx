@@ -1,8 +1,5 @@
 import React, {useContext} from 'react';
-import {
-  ChildPanelConfig,
-  ChildPanelFullConfig,
-} from './ChildPanel';
+import {ChildPanelConfig, ChildPanelFullConfig} from './ChildPanel';
 
 export interface PanelPanelContextValue {
   config: ChildPanelFullConfig;
