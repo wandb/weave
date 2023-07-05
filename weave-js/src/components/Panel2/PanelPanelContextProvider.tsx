@@ -11,7 +11,10 @@ export interface PanelPanelContextValue {
     change: (oldConfig: ChildPanelConfig) => ChildPanelFullConfig
   ) => void;
 }
-
+/**
+ * This context is used by PanelPanel to provide all child panels with the 
+ * correct functions to update the config through the overflow menu(ie OutlineItemPopupMenu).
+ */
 export const PanelPanelContext = React.createContext<PanelPanelContextValue>({
   // this is equivalent to CHILD_PANEL_DEFAULT_CONFIG
   // cant import this as it gives the error that CHILD_PANEL_DEFAULT_CONFIG is not defined yet
