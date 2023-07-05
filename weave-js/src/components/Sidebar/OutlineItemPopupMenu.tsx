@@ -1,4 +1,4 @@
-import { MOON_250 } from '@wandb/weave/common/css/color.styles';
+import {MOON_250} from '@wandb/weave/common/css/color.styles';
 import {callOpVeryUnsafe, NodeOrVoidNode, varNode} from '@wandb/weave/core';
 import produce from 'immer';
 import React, {memo, useCallback, useMemo} from 'react';
@@ -26,7 +26,7 @@ import {PopupMenu} from './PopupMenu';
 
 const Divider = styled.div`
   margin: 0 -15px;
-  border: .5px solid ${MOON_250};
+  border: 0.5px solid ${MOON_250};
   width: 200%;
 `;
 
