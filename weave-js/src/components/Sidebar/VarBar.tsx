@@ -1,5 +1,5 @@
 import {NodeOrVoidNode} from '@wandb/weave/core';
-import produce from 'immer';
+import {produce} from 'immer';
 import _ from 'lodash';
 import React, {FC, memo, ReactNode, useCallback, useMemo} from 'react';
 import {StrictMenuItemProps} from 'semantic-ui-react';

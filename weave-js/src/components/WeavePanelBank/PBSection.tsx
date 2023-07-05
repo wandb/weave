@@ -6,7 +6,7 @@ import {
   DragDropProvider,
   DragHandle,
 } from '@wandb/weave/common/containers/DragDropContainer';
-import produce from 'immer';
+import {produce} from 'immer';
 import * as _ from 'lodash';
 import React, {useRef, useState} from 'react';
 import Measure from 'react-measure';

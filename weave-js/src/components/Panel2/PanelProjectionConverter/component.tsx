@@ -1,4 +1,4 @@
-import produce from 'immer';
+import {produce} from 'immer';
 import React, {useCallback, useMemo} from 'react';
 
 import {useNodeWithServerType} from '../../../react';
