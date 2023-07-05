@@ -1,8 +1,8 @@
 """
-This file contains a single exported function `process_opdef_resolve_fn`. Techncailly,
+This file contains a single exported function `process_opdef_resolve_fn`. Technically,
 this could have been implemented in `op_def.py`, but we want to keep all the tagging-related
 logic in one place. Therefore, in op_def.py we import this function and call it to post-process
-the result of the op_def's resolve_fn. 
+the result of the op_def's resolve_fn.
 """
 
 import typing

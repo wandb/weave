@@ -62,7 +62,7 @@ import {Spec as WebVizSpec} from './PanelWebViz';
 
 // TODO: Wrap Panel components with makeSpec calls
 
-// These are the all the registered panels. To register a new one, just add
+// These are all the registered panels. To register a new one, just add
 // its spec here.
 // The order of this array determines the default panel recommendation order.
 // See scoreHandlerStack in availablePanels.ts for the function that
