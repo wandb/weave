@@ -45,9 +45,10 @@ def deserialize(
     )
 
     with memo.memo_storage():
-        return deserialized_target_node_values.safe_map(
-            lambda node: _parse_node(node, parsed_nodes, hashed_nodes)
-        )
+        with types.type_from_dict_cache():
+            return deserialized_target_node_values.safe_map(
+                lambda node: _parse_node(node, parsed_nodes, hashed_nodes)
+            )
 
 
 def _deserialize_value(

@@ -5,6 +5,8 @@ import inspect
 import functools
 import json
 from collections.abc import Iterable
+from contextvars import ContextVar
+from contextlib import contextmanager
 
 
 from . import box
@@ -94,7 +96,22 @@ def type_name_to_type(type_name):
     return mapping.get(js_to_py_typename(type_name))
 
 
-type_from_dict_cache: dict[int, "Type"] = {}
+_type_from_dict_cache_ctx: ContextVar[typing.Optional[dict]] = ContextVar(
+    "type_from_dict_cache", default=None
+)
+
+
+@contextmanager
+def type_from_dict_cache() -> typing.Generator[None, None, None]:
+    token = _type_from_dict_cache_ctx.set({})
+    try:
+        yield
+    finally:
+        _type_from_dict_cache_ctx.reset(token)
+
+
+def get_type_from_dict_cache() -> typing.Optional[dict]:
+    return _type_from_dict_cache_ctx.get()
 
 
 class TypeRegistry:
@@ -149,12 +166,14 @@ class TypeRegistry:
 
     @staticmethod
     def type_from_dict_use_cache(d: typing.Union[str, dict]) -> "Type":
+        type_from_dict_cache = get_type_from_dict_cache()
         cache_key = id(d)
-        if cache_key in type_from_dict_cache:
+        if type_from_dict_cache is not None and cache_key in type_from_dict_cache:
             return type_from_dict_cache[cache_key]
 
         res = TypeRegistry.type_from_dict(d)
-        type_from_dict_cache[cache_key] = res
+        if type_from_dict_cache is not None:
+            type_from_dict_cache[cache_key] = res
         return res
 
 
