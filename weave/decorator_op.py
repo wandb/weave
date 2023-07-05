@@ -17,6 +17,7 @@ def op(
     render_info=None,
     hidden=False,
     pure=True,
+    returns_expansion_node=False,
     _op_def_class=op_def.OpDef,
     *,  # Marks the rest of the arguments as keyword-only.
     plugins=None,
@@ -29,7 +30,6 @@ def op(
     """
 
     def wrap(f):
-
         weave_input_type = pyfunc_type_util.determine_input_type(f, input_type)
         weave_output_type = pyfunc_type_util.determine_output_type(f, output_type)
 
@@ -62,6 +62,7 @@ def op(
             pure=pure,
             plugins=plugins,
             mutation=mutation,
+            returns_expansion_node=returns_expansion_node,
             _decl_locals=inspect.currentframe().f_back.f_locals,
         )
 

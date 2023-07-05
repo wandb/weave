@@ -1,5 +1,5 @@
 import {callOpVeryUnsafe, NodeOrVoidNode, varNode} from '@wandb/weave/core';
-import produce from 'immer';
+import {produce} from 'immer';
 import React, {memo, useCallback, useMemo} from 'react';
 
 import {getFullChildPanel} from '../Panel2/ChildPanel';

@@ -52,7 +52,7 @@ import {
   voidNode,
   WeaveInterface,
 } from '@wandb/weave/core';
-import produce from 'immer';
+import {produce} from 'immer';
 import _ from 'lodash';
 
 export type ColumnId = string;
