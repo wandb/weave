@@ -1,4 +1,38 @@
 // Handle serialization/deserialization of CG, for remote execution
+
+// Compared to serialize.ts, which only converts nodes to references,
+// this version replaces every single value with a reference.
+// Values which are identical (including arrays and objects)
+// are always deduplicated when serialized.
+
+// Unserialized:
+// {
+//   num: 1,
+//   str: "asdf",
+//   arr: [1, "asdf"],
+//   obj: {
+//     a: 1,
+//     b: "asdf"
+//   }
+// }
+
+// Serialized:
+// {
+//   nodes: [
+//     1,
+//     "asdf",
+//     [0, 1],
+//     {a: 0, b: 1},
+//     {
+//       num: 0,
+//       str: 1,
+//       arr: 2,
+//       obj: 3
+//     }
+//   ],
+//   targetNodes: [4]
+// }
+
 import type {EditingNode} from './editing';
 
 type SerializedRef = number;
