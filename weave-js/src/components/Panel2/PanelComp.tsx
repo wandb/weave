@@ -27,8 +27,8 @@ import {usePanelContext} from './PanelContext';
 import {PanelExportUpdaterContext} from './PanelExportContext';
 import * as PanelLib from './panellib/libpanel';
 import * as TSTypeWithPath from './tsTypeWithPath';
-import {WeaveMessage} from './WeaveMessage';
 import {HOVER_DELAY_MS} from './Tooltip';
+import {ErrorPanel} from '../ErrorPanel';
 
 class PanelCompErrorBoundary extends React.Component<
   {
@@ -79,12 +79,7 @@ class PanelCompErrorBoundary extends React.Component<
 
   render() {
     if (this.state.hasError) {
-      return (
-        <WeaveMessage>
-          {this.state.customMessage ||
-            'Something went wrong. Check the javascript console.'}
-        </WeaveMessage>
-      );
+      return <ErrorPanel title={this.state.customMessage} />;
     }
 
     return this.props.children;
