@@ -70,7 +70,7 @@ function hash(v: any): string {
 }
 
 // Array of CG -> Normalized Graph -> Serializable Graph + Roots -> Flat Serializable Graph
-export function serialize2(graphs: EditingNode[]): BatchedGraphs {
+export function serializeAllValues(graphs: EditingNode[]): BatchedGraphs {
   const serializer = createSerializer();
 
   const targetNodes = graphs.map(graph => serializeValue(serializer, graph));
@@ -120,7 +120,7 @@ function serializeObject(
   return valueToRef(serializer, withSerializedValues);
 }
 
-export function deserialize2({
+export function deserializeAllValues({
   nodes,
   targetNodes,
 }: BatchedGraphs): EditingNode[] {

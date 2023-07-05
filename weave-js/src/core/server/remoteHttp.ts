@@ -3,7 +3,7 @@ import _ from 'lodash';
 import {performance} from 'universal-perf-hooks';
 
 import {GlobalCGEventTracker} from '../analytics/tracker';
-import {Node, serializeMulti, serialize2} from '../model';
+import {Node, serializeMulti, serializeAllValues} from '../model';
 import type {OpStore} from '../opStore';
 import {batchIntervalOverride, isWeaveDebugEnabled} from '../util/debug';
 import type {Server} from './types';
@@ -255,10 +255,10 @@ export class RemoteHttpServer implements Server {
     // `contiguousBatchesOnly` should always be `false` so we effectively always use the new serialization.
     // If we have to support `contiguousBatchesOnly = true`,
     // then we should make a `serializeMulti` for the new serialization format.
-    const usingSerialize2 = !this.opts.contiguousBatchesOnly;
+    const usingSerializeAllValues = !this.opts.contiguousBatchesOnly;
     const [payloads, originalIndexes] = this.opts.contiguousBatchesOnly
       ? serializeMulti(nodes)
-      : [[serialize2(nodes)], [_.range(nodes.length)]];
+      : [[serializeAllValues(nodes)], [_.range(nodes.length)]];
 
     for (
       let reqIdx = 0;
@@ -308,7 +308,7 @@ export class RemoteHttpServer implements Server {
       const p = new Promise(async resolve => {
         const payloadJSON = {
           graphs: payload,
-          serialize2: usingSerialize2,
+          serializeAllValues: usingSerializeAllValues,
         };
         const body = JSON.stringify(payloadJSON);
 

@@ -31,7 +31,7 @@ class SerializedReturnType(TypedDict):
     targetNodes: list[int]
 
 
-def deserialize(
+def deserialize_all_values(
     serialized: SerializedReturnType,
 ) -> value_or_error.ValueOrErrors[graph.Node]:
     nodes = serialized["nodes"]
