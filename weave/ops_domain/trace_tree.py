@@ -21,6 +21,11 @@ class SpanKind:
 
 @weave.type()
 class Result:
+    # NOTE: In principle this type should be typing.Optional[typing.Dict[str, typing.Any]],
+    # but due to a bug in our langchain integration, we have some cases where
+    # inputs was logged as a list[str] instead of a dict[str, Any]. The more flexible type
+    # below allows our PanelTraceViewer to work in both cases, but were it not for that bug,
+    # this extra flexible type wouldn't be needed.
     inputs: typing.Optional[typing.Union[typing.Dict[str, typing.Any], list[str]]]
     outputs: typing.Optional[typing.Dict[str, typing.Any]]
 
@@ -98,6 +103,10 @@ def standarize_result_inputs(result: typing.Optional[Result]) -> typing.Dict[str
     if result.inputs is None:
         return {}
     if isinstance(result.inputs, list):
+        # NOTE: In principle this block should not be needed, but due to a bug in our
+        # langchain integration, we have some cases where inputs was logged as a list[str]
+        # instead of a dict[str, Any]. This block allows PanelTraceViewer to work in both cases,
+        # but were it not for that bug, this block wouldn't be needed.
         return {str(i): v for i, v in enumerate(result.inputs)}
     raise ValueError(f"Unexpected result inputs type: {type(result.inputs)}")
 
