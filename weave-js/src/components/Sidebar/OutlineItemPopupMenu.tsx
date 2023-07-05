@@ -231,7 +231,7 @@ const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
   ]);
 
   return (
-    <PopupMenu trigger={trigger} position={`bottom left`} items={menuItems} />
+    <PopupMenu trigger={trigger} position={`bottom right`} items={menuItems} />
   );
 };
 

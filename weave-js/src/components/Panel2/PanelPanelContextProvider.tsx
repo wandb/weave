@@ -2,7 +2,6 @@ import React, {useContext} from 'react';
 import {
   ChildPanelConfig,
   ChildPanelFullConfig,
-  CHILD_PANEL_DEFAULT_CONFIG,
 } from './ChildPanel';
 
 export interface PanelPanelContextValue {
@@ -14,6 +13,8 @@ export interface PanelPanelContextValue {
 }
 
 export const PanelPanelContext = React.createContext<PanelPanelContextValue>({
+  // this is equivalent to CHILD_PANEL_DEFAULT_CONFIG
+  // cant import this as it gives the error that CHILD_PANEL_DEFAULT_CONFIG is not defined yet
   config: {
     vars: {},
     input_node: {nodeType: 'void', type: 'invalid'},
