@@ -1,3 +1,10 @@
+# This is the same as serialize.py, with a few differences:
+# 1. Handles the new serialized format, which transforms every value into a reference.
+# 2. Instead of resolving serialized refs and parsing them in one go, we first replace all refs
+#    with their respective values, then parse the resulting nested structure.
+# 3. We use an instantiated type cache so that we don't spend cycles instantiating duplicate types.
+#    This greatly improves performance when deserializing large graphs with many duplicate types.
+
 from typing import Any, Dict, Tuple, Union, TypedDict, MutableMapping
 import hashlib
 import json
