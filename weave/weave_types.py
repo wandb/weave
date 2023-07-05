@@ -153,13 +153,7 @@ class TypeRegistry:
         if cache_key in type_from_dict_cache:
             return type_from_dict_cache[cache_key]
 
-        # The javascript code sends simple types as just strings
-        # instead of {'type': 'string'} for example
-        type_name = d["type"] if isinstance(d, dict) else d
-        type_ = type_name_to_type(type_name)
-        if type_ is None:
-            raise errors.WeaveSerializeError("Can't deserialize type from: %s" % d)
-        res = type_.from_dict(d)
+        res = TypeRegistry.type_from_dict(d)
         type_from_dict_cache[cache_key] = res
         return res
 
