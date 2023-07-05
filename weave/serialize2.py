@@ -137,14 +137,14 @@ def _parse_const_node(
             "invalid function node encountered in deserialize"
         )
     return graph.ConstNode(
-        types.TypeRegistry.type_from_dict(node_dict["type"]),
+        types.TypeRegistry.type_from_dict_use_cache(node_dict["type"]),
         parsed_fn_body_node,
     )
 
 
 def _parse_fn_body_var_node(fn_body_node_dict: Any) -> graph.VarNode:
     return weave_internal.make_var_node(
-        types.TypeRegistry.type_from_dict(fn_body_node_dict["type"]),
+        types.TypeRegistry.type_from_dict_use_cache(fn_body_node_dict["type"]),
         fn_body_node_dict["varName"],
     )
 
@@ -155,7 +155,7 @@ def _parse_fn_body_const_node(fn_body_node_dict: Any) -> graph.ConstNode:
         # This case happens when we have a quoted function.
         fn_body_const_val = graph.Node.node_from_json(fn_body_const_val)
     return weave_internal.make_const_node(
-        types.TypeRegistry.type_from_dict(fn_body_node_dict["type"]),
+        types.TypeRegistry.type_from_dict_use_cache(fn_body_node_dict["type"]),
         fn_body_const_val,
     )
 
@@ -170,7 +170,7 @@ def _parse_fn_body_output_node(
     params = {}
     for param_name, param_value in op["inputs"].items():
         params[param_name] = _parse_node(param_value, parsed_nodes, hashed_nodes)
-    node_type = types.TypeRegistry.type_from_dict(node_dict["type"])
+    node_type = types.TypeRegistry.type_from_dict_use_cache(node_dict["type"])
     if not isinstance(node_type, types.Function):
         raise errors.WeaveInternalError("expected function type, got %s" % node_type)
     return weave_internal.make_output_node(
@@ -190,7 +190,9 @@ def _parse_output_node(
     for param_name, param_value in op["inputs"].items():
         params[param_name] = _parse_node(param_value, parsed_nodes, hashed_nodes)
     return graph.OutputNode(
-        types.TypeRegistry.type_from_dict(node_dict["type"]), op["name"], params
+        types.TypeRegistry.type_from_dict_use_cache(node_dict["type"]),
+        op["name"],
+        params,
     )
 
 
