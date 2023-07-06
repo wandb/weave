@@ -538,6 +538,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
   );
 
   const [hoverPanel, setHoverPanel] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const [expressionFocused, setExpressionFocused] = useState(false);
   const onFocusExpression = useCallback(() => {
@@ -604,7 +605,7 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
                 onBlur={onBlurExpression}
               />
             </EditorExpression>
-            <EditorIcons visible={hoverPanel}>
+            <EditorIcons visible={hoverPanel || isMenuOpen}>
               {props.prefixButtons}
               <Tooltip
                 position="top center"
@@ -630,6 +631,8 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
                       <IconOverflowHorizontal />
                     </IconButton>
                   }
+                  onOpen={() => setIsMenuOpen(true)}
+                  onClose={() => setIsMenuOpen(false)}
                 />
               )}
             </EditorIcons>
