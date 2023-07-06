@@ -44,9 +44,10 @@ class Table(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
         super().__init__(input_node=input_node, vars=vars)
         self.config = config
         if self.config is None:
+            table = table_state.TableState(self.input_node)
+            self.config = TableConfig(table)
+
             if "columns" in options:
-                table = table_state.TableState(self.input_node)
-                self.config = TableConfig(table)
                 for col_ndx, column_expr in enumerate(options["columns"]):
                     if isinstance(column_expr, TableColumn):
                         table.add_column(
