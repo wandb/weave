@@ -354,8 +354,8 @@ def wb_viewer():
     return {"authenticated": authenticated}
 
 
-DEBUG_MEM = False
-if not environment.wandb_production() and DEBUG_MEM:
+DEBUG_MEM = True
+if DEBUG_MEM:
     # To use, hit /objgraph_getnewids to set a baseline, then do some requests.
     # Then hit /pdb to drop the server into pdb and do
     # import objgraph
