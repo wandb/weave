@@ -1,8 +1,154 @@
 import datetime
 import time
+import typing
 import weave
+from weave.ops_domain.run_history.history_op_common import TypeCount
 from weave.wandb_interface.wandb_lite_run import InMemoryLazyLiteRun
 from weave.wandb_client_api import wandb_gql_query, wandb_public_api
+
+# from pyarrow import parquet as pq
+import dataclasses
+import json
+
+
+class SimpleTypeCount(typing.TypedDict):
+    type: typing.Literal["string", "number", "bool", "nil"]
+
+
+class CustomTypeCount(typing.TypedDict):
+    type: str
+    keys: dict[str, list["TypeCount"]]
+
+
+class MapTypeCount(typing.TypedDict):
+    type: typing.Literal["map"]
+    keys: dict[str, list["TypeCount"]]
+
+
+class ListTypeCount(typing.TypedDict):
+    type: typing.Literal["list"]
+    items: list["TypeCount"]
+
+
+TypeCount = typing.Union[SimpleTypeCount, CustomTypeCount, MapTypeCount, ListTypeCount]
+
+
+class MockedGorillaHistoryTypeCount(typing.TypedDict):
+    typeCounts: list[TypeCount]
+
+
+@dataclasses.dataclass
+class MockedGorillaHistory:
+    history_keys: dict[str, MockedGorillaHistoryTypeCount]
+    live_set_dict_rows: list[dict]
+    parquet_arrow_rows: typing.Any  # pq
+
+
+# def merge_typecount(a: TypeCount, b: TypeCount) -> list[TypeCount]:
+# if a['type'] != b['type']:
+#     return [a, b]
+# else:
+
+
+def typecount_of_val(val: typing.Any) -> TypeCount:
+    if isinstance(val, (int, float)):
+        return SimpleTypeCount(type="number")
+    elif isinstance(val, (str)):
+        return SimpleTypeCount(type="string")
+    elif isinstance(val, (bool)):
+        return SimpleTypeCount(type="bool")
+    elif val == None:
+        return SimpleTypeCount(type="nil")
+    elif isinstance(val, (list)):
+        types = {}
+        for item in val:
+            tc = typecount_of_val(item)
+            tc_typename = tc["type"]
+            if tc_typename not in types:
+                types[tc_typename] = tc
+            elif "keys" in tc_typename:
+                # merge keys
+                pass
+        return ListTypeCount(type="list", items=list(types.values()))
+    elif isinstance(val, (dict)):
+        keys = {}
+        for key, item in val.items():
+            keys[key] = typecount_of_val(item)
+        if "_type" in val:
+            return CustomTypeCount(type=val["_type"], keys=keys)
+        else:
+            return MapTypeCount(type="map", keys=keys)
+    else:
+        raise Exception(f"Not supported: {type(val)}")
+
+
+def mock_gorilla_history(history_rows: list[dict]) -> MockedGorillaHistory:
+    # Step 1: apply flattening pre-processor
+    processed_rows = []
+    history_keys: dict[str, MockedGorillaHistoryTypeCount] = {}
+    for row in history_rows:
+        processed_row = {}
+        for key, val in row.items():
+            if not isinstance(val, dict) or "_type" in val:
+                processed_row[key] = val
+            else:
+                # flatten keys
+                queue = [([key], val)]
+                while queue:
+                    path, item = queue.pop()
+                    if not isinstance(item, dict) or "_type" in item:
+                        processed_row[".".join(path)] = item
+                    else:
+                        for subkey, subitem in item.items():
+                            queue.append(([*path, subkey], subitem))
+        processed_rows.append(processed_row)
+        # Handle the typing
+        history_keys_set: dict[str, set[str]] = {}
+        for key, val in processed_row.items():
+            if isinstance(val, dict) and "_type" not in val:
+                raise Exception("Programming error")
+            if key not in history_keys_set:
+                history_keys_set[key] = set()
+                history_keys[key] = MockedGorillaHistoryTypeCount(typeCounts=[])
+            tc = typecount_of_val(val)
+            tc_id = json.dumps(tc)
+            if tc_id not in history_keys_set[key]:
+                history_keys_set[key].add(tc_id)
+                history_keys[key]["typeCounts"].append(tc)
+
+    split = int(len(processed_rows) / 5)
+    live_set_rows = processed_rows[:split]
+    parquet_rows = processed_rows[split:]
+
+    return MockedGorillaHistory(history_keys, live_set_rows, None)
+
+
+def test_history_mock():
+    res = mock_gorilla_history(
+        [
+            {
+                "str": "hello_world",
+                "int": 42,
+                "float": 3.14,
+                "bool": True,
+                "list_of_int": [1, 2, 3],
+                "list_of_mixed": ["a", 1, "b", 2, None, True],
+                "dict_of_int": {"a": 1},
+                "dict_of_mixed": {"a": 1, "b": "hi", "c": None},
+                "list_of_dict": [{"a": 1}, {"a": 2}],
+                "list_of_dict_mixed": [
+                    1,
+                    [1, {"a": 1}],
+                    {"a": {"b": {"_type": "thing", "nested": "other"}}},
+                    {"a": [{"b": {"c": [1]}}]},
+                    {"a": [{"b": {"c": [2]}, "d": 3}]},
+                    {"a": [{"b": {"c": "hi"}, "d": 3}]},
+                ],
+                "things_with_types": [{"_type": "thing", "nested": "other"}],
+            }
+        ]
+    )
+    assert res == None
 
 
 # def test_history_logging(user_by_api_key_in_env):
