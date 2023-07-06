@@ -70,6 +70,11 @@ import {PanelInput, PanelProps} from './panel';
 import {getStackIdAndName} from './panellib/libpanel';
 import {replaceChainRoot} from '@wandb/weave/core/mutate';
 
+import {OutlineItemPopupMenu} from '../Sidebar/OutlineItemPopupMenu';
+import {IconOverflowHorizontal} from './Icons';
+import {getConfigForPath} from './panelTree';
+import {usePanelPanelContext} from './PanelPanelContextProvider';
+
 // This could be rendered as a code block with assignments, like
 // so.
 // ```
@@ -212,7 +217,7 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
   const {id: panelId, config: panelConfig} = config;
   let {input_node: panelInputExpr} = config;
   const weave = useWeaveContext();
-  const {stack} = usePanelContext();
+  const {stack, path: parentPath} = usePanelContext();
 
   panelInputExpr = useNodeWithServerType(panelInputExpr).result;
   const {curPanelId, stackIds, handler} = usePanelStacksForType(
@@ -405,7 +410,7 @@ const useChildPanelCommon = (props: ChildPanelProps) => {
     () => ({...config.vars, input: panelInputExpr}),
     [config.vars, panelInputExpr]
   );
-  const {path: parentPath} = usePanelContext();
+
   // TODO: we shouldn't need this but pathEl is not always set currently.
   const path = useMemo(
     () =>
@@ -542,6 +547,15 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
     setExpressionFocused(false);
   }, []);
 
+  const {
+    config: fullConfig,
+    updateConfig,
+    updateConfig2,
+  } = usePanelPanelContext();
+  const {path} = usePanelContext();
+  const fullPath = [...path, props.pathEl ?? ''].filter(
+    el => el != null && el !== ''
+  );
   const {ref: editorBarRef, width: editorBarWidth} =
     useElementWidth<HTMLDivElement>();
 
@@ -604,6 +618,20 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
                 }>
                 Open panel editor
               </Tooltip>
+              {fullConfig && (
+                <OutlineItemPopupMenu
+                  config={fullConfig}
+                  localConfig={getConfigForPath(fullConfig, fullPath)}
+                  path={fullPath}
+                  updateConfig={updateConfig}
+                  updateConfig2={updateConfig2}
+                  trigger={
+                    <IconButton>
+                      <IconOverflowHorizontal />
+                    </IconButton>
+                  }
+                />
+              )}
             </EditorIcons>
           </EditorBarContent>
         </Styles.EditorBar>
