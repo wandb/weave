@@ -23,18 +23,25 @@ describe('serializeAllValues', () => {
   it.each([
     // These graphs were taken from `serialize.test.ts`
     [
+      // simple query with var
       opRunName({
         run: varNode('run', 'x'),
       }),
+
+      // simple query with void
       opRunName({
         run: voidNode() as any,
       }),
+
+      // basic consts
       opProjectName({
         project: opRootProject({
           entityName: constString('entity'),
           projectName: constString('project'),
         }),
       }),
+
+      // complex single result
       opMap({
         arr: opProjectRuns({
           project: opRootProject({
@@ -48,6 +55,8 @@ describe('serializeAllValues', () => {
           })
         ) as any,
       }),
+
+      // date
       opNumberEqual({
         lhs: opDateToNumber({
           date: opProjectCreatedAt({
@@ -68,5 +77,13 @@ describe('serializeAllValues', () => {
     const serialized = serializeAllValues([graph]);
     const deserialized = deserializeAllValues(serialized);
     expect(deserialized).toStrictEqual([graph]);
+
+    // Check that we retain duplicate nodes in input array.
+    // Otherwise, we lose context of what was originally requested by caller.
+    const serializedWithDuplicates = serializeAllValues([graph, graph, graph]);
+    const deserializedWithDuplicates = deserializeAllValues(
+      serializedWithDuplicates
+    );
+    expect(deserializedWithDuplicates).toStrictEqual([graph, graph, graph]);
   });
 });
