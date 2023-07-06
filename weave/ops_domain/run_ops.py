@@ -55,7 +55,9 @@ from .. import engine_trace
 from .run_history import history_util
 
 
+# Important to re-export ops
 from .run_history import run_history_v1_legacy_ops
+from .run_history import run_history_v2_parquet_media
 
 tracer = engine_trace.tracer()
 
