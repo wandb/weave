@@ -1,6 +1,8 @@
+import {MOON_250} from '@wandb/weave/common/css/color.styles';
 import {callOpVeryUnsafe, NodeOrVoidNode, varNode} from '@wandb/weave/core';
 import {produce} from 'immer';
 import React, {memo, useCallback, useMemo} from 'react';
+import styled from 'styled-components';
 
 import {getFullChildPanel} from '../Panel2/ChildPanel';
 import {emptyTable} from '../Panel2/PanelTable/tableState';
@@ -21,6 +23,12 @@ import {
   IconSplit,
 } from '../Panel2/Icons';
 import {PopupMenu} from './PopupMenu';
+
+const Divider = styled.div`
+  margin: 0 -15px;
+  border: 0.5px solid ${MOON_250};
+  width: 200%;
+`;
 
 export type OutlineItemPopupMenuProps = Pick<
   OutlinePanelProps,
@@ -171,14 +179,7 @@ const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
     [updateConfig2]
   );
   const menuItems = useMemo(() => {
-    const items = [
-      {
-        key: 'delete',
-        content: 'Delete',
-        icon: <IconDelete />,
-        onClick: handleDelete,
-      },
-    ];
+    const items = [];
     if (localConfig.id === 'Group') {
       items.push({
         key: 'unnest',
@@ -207,6 +208,17 @@ const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
         onClick: () => handleAddToQueryBar(path),
       });
     }
+    items.push({
+      key: 'divider',
+      content: <Divider />,
+      disabled: true,
+    });
+    items.push({
+      key: 'delete',
+      content: 'Delete',
+      icon: <IconDelete />,
+      onClick: handleDelete,
+    });
     return items;
   }, [
     handleAddToQueryBar,
@@ -219,7 +231,7 @@ const OutlineItemPopupMenuComp: React.FC<OutlineItemPopupMenuProps> = ({
   ]);
 
   return (
-    <PopupMenu trigger={trigger} position={`bottom left`} items={menuItems} />
+    <PopupMenu trigger={trigger} position={`bottom right`} items={menuItems} />
   );
 };
 
