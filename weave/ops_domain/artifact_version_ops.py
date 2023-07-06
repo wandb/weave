@@ -14,7 +14,6 @@ from .wandb_domain_gql import (
 
 import typing
 from . import wb_util
-from .run_history import history_op_common
 from urllib.parse import quote
 from .. import artifact_fs
 from .. import artifact_wandb
