@@ -36,7 +36,9 @@ def refine_history_type(run: wdt.Run) -> types.Type:
     output_type=types.List(types.TypedDict({})),
 )
 def history(run: wdt.Run):
-    return history_op_common.history_body(run, 1, _get_history)
+    # We return mock data here since we will be replaced with the `_with_columns`
+    # version in a compile pass if specific columns are needed
+    return history_op_common.mock_history_rows(run, False)
 
 
 @op(
@@ -62,9 +64,7 @@ def refine_history_with_columns_type(
     hidden=True,
 )
 def history_with_columns(run: wdt.Run, history_cols: list[str]):
-    return history_op_common.history_body(
-        run, 1, _get_history, columns=history_op_common.get_full_columns(history_cols)
-    )
+    return _get_history(run, history_op_common.get_full_columns(history_cols))
 
 
 def _get_history(run: wdt.Run, columns=None):

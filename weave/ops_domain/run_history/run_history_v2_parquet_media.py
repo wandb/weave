@@ -53,9 +53,7 @@ def refine_history2_with_columns_type(
     hidden=True,
 )
 def history2_with_columns(run: wdt.Run, history_cols: list[str]):
-    return history_op_common.history_body(
-        run, 2, _get_history2, columns=history_op_common.get_full_columns(history_cols)
-    )
+    _get_history2(run, history_op_common.get_full_columns(history_cols))
 
 
 @op(
@@ -66,7 +64,9 @@ def history2_with_columns(run: wdt.Run, history_cols: list[str]):
     hidden=True,
 )
 def history2(run: wdt.Run):
-    return history_op_common.history_body(run, 2, _get_history2)
+    # We return mock data here since we will be replaced with the `_with_columns`
+    # version in a compile pass if specific columns are needed
+    return history_op_common.mock_history_rows(run)
 
 
 def _get_history2(run: wdt.Run, columns=None):

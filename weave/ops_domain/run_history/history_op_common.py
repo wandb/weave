@@ -5,7 +5,7 @@ from .. import wb_domain_types as wdt
 from . import history_util
 from ...ops_primitives import make_list
 from ...ops_arrow.list_ops import concat
-from ...ops_arrow import ArrowWeaveList, ArrowWeaveListType
+from ...ops_arrow import ArrowWeaveList
 from ... import util
 from ... import errors
 from ... import io_service
@@ -159,53 +159,31 @@ def read_history_parquet(run: wdt.Run, columns=None):
         return parquet_history.take(table_sorted_indices)
 
 
-def _make_history_result(
-    result: typing.Optional[typing.Union[pa.Array, list]],
-    history_version: int,
-    object_type: types.Type,
+def mock_history_rows(
+    run: wdt.Run, use_arrow: bool = True
 ) -> typing.Union[ArrowWeaveList, list]:
-    if history_version == 1:
-        if isinstance(result, (list, ArrowWeaveList)):
-            return result
-        raise ValueError(
-            f"Invalid history result for history version {history_version}"
-        )
-    elif history_version == 2:
-        if isinstance(result, list):
-            mapper = map_to_arrow(object_type, None, [])
-            result = pa.array(result, type=mapper.result_type())
-        return ArrowWeaveList(result, object_type)
-    else:
-        raise ValueError(f"Invalid history version {history_version}")
-
-
-def history_body(
-    run: wdt.Run,
-    history_version: int,
-    get_history_fn: typing.Callable[[wdt.Run, typing.Optional[list[str]]], typing.Any],
-    columns: typing.Optional[list[str]] = None,
-):
-    # first check and see if we have actually fetched any history rows. if we have not,
     # we are in the case where we have blindly requested the entire history object.
     # we refuse to fetch that, so instead we will just inspect the historyKeys and return
     # a dummy history object that can bte used as a proxy for downstream ops (e.g., count).
 
-    if columns is None:
-        step_type = types.TypedDict({"_step": types.Int()})
-        last_step = run.gql["historyKeys"]["lastStep"]
-        history_keys = run.gql["historyKeys"]["keys"]
-        for key, key_details in history_keys.items():
-            if key == "_step":
-                type_counts: list[history_util.TypeCount] = key_details["typeCounts"]
-                count = type_counts[0]["count"]
-                break
-        else:
-            return _make_history_result([], history_version, step_type)
+    step_type = types.TypedDict({"_step": types.Int()})
+    steps: typing.Union[ArrowWeaveList, list] = []
 
-        # generate fake steps
-        steps = [{"_step": i} for i in range(count)]
-        steps[-1]["_step"] = last_step
-        assert len(steps) == count
-        return _make_history_result(steps, history_version, step_type)
+    last_step = run.gql["historyKeys"]["lastStep"]
+    history_keys = run.gql["historyKeys"]["keys"]
+    for key, key_details in history_keys.items():
+        if key == "_step":
+            type_counts: list[history_util.TypeCount] = key_details["typeCounts"]
+            count = type_counts[0]["count"]
+            # generate fake steps
+            steps = [{"_step": i} for i in range(count)]
+            steps[-1]["_step"] = last_step
+            assert len(steps) == count
+            break
 
-    return get_history_fn(run, columns)
+    if use_arrow:
+        mapper = map_to_arrow(step_type, None, [])
+        result = pa.array(steps, type=mapper.result_type())
+        steps = ArrowWeaveList(result, step_type)
+
+    return steps
