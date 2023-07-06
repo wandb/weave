@@ -1,4 +1,5 @@
 import contextlib
+import datetime
 import json
 import logging
 import os
@@ -92,12 +93,16 @@ class StreamTable:
     _weave_stream_table: typing.Optional[StreamTableType] = None
     _weave_stream_table_ref: typing.Optional[artifact_base.ArtifactRef] = None
 
+    _client_id: str
+
     def __init__(
         self,
         table_name: str,
         project_name: typing.Optional[str] = None,
         entity_name: typing.Optional[str] = None,
+        _disable_async_logging: bool = False,
     ):
+        self._client_id = str(uuid.uuid1())
         splits = table_name.split("/")
         if len(splits) == 1:
             pass
@@ -129,7 +134,11 @@ class StreamTable:
 
         job_type = "wb_stream_table"
         self._lite_run = InMemoryLazyLiteRun(
-            entity_name, project_name, table_name, job_type
+            entity_name,
+            project_name,
+            table_name,
+            job_type,
+            _use_async_file_stream=not _disable_async_logging,
         )
         self._table_name = table_name
         self._project_name = project_name
@@ -149,6 +158,8 @@ class StreamTable:
                 project_name=self._project_name,
                 entity_name=self._entity_name,
             )
+            # TODO: this generates a second run to save the artifact. Would
+            # be nice if we could just use the current run.
             self._weave_stream_table_ref = storage._direct_publish(
                 self._weave_stream_table,
                 name=self._table_name,
@@ -178,7 +189,10 @@ class StreamTable:
             )
             self._artifact = WandbLiveRunFiles(name=uri.name, uri=uri)
             self._artifact.set_file_pusher(self._lite_run.pusher)
-        payload = row_to_weave(row, self._artifact)
+        row_copy = {**row}
+        row_copy["_client_id"] = self._client_id
+        row_copy["timestamp"] = datetime.datetime.now()
+        payload = row_to_weave(row_copy, self._artifact)
         self._lite_run.log(payload)
 
     def finish(self) -> None:
