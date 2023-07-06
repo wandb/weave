@@ -1,10 +1,12 @@
 import typing
 
-from . import wb_util
-from . import table
-from .. import weave_types as types
-from .. import artifact_fs
-from ..wandb_interface import wandb_stream_table
+from .. import wb_util
+from .. import table
+from ... import weave_types as types
+from ... import artifact_fs
+from ...wandb_interface import wandb_stream_table
+from ...compile_table import KeyTree
+from ...ops_primitives import _dict_utils
 
 
 class TypeCount(typing.TypedDict):
@@ -16,8 +18,8 @@ class TypeCount(typing.TypedDict):
 
 
 def history_key_type_count_to_weave_type(tc: TypeCount) -> types.Type:
-    from .wbmedia import ImageArtifactFileRefType
-    from .trace_tree import WBTraceTree
+    from ..wbmedia import ImageArtifactFileRefType
+    from ..trace_tree import WBTraceTree
 
     tc_type = tc["type"]
     if tc_type == "string":
@@ -69,3 +71,16 @@ def history_key_type_count_to_weave_type(tc: TypeCount) -> types.Type:
         if possible_type is not None:
             return possible_type
     return types.UnknownType()
+
+
+def get_top_level_keys(key_tree: KeyTree) -> list[str]:
+    top_level_keys = list(
+        map(
+            _dict_utils.unescape_dots,
+            set(
+                next(iter(_dict_utils.split_escaped_string(key)))
+                for key in key_tree.keys()
+            ),
+        )
+    )
+    return top_level_keys
