@@ -7,9 +7,14 @@ import numpy as np
 from PIL import Image
 
 
+def make_stream_table(*args, **kwargs):
+    # Unit test backend does not support async logging
+    return StreamTable(*args, **kwargs, _disable_async_logging=True)
+
+
 # Example of end to end integration test
 def test_stream_logging(user_by_api_key_in_env):
-    st = StreamTable(
+    st = make_stream_table(
         "test_table",
         project_name="stream-tables",
         entity_name=user_by_api_key_in_env.username,
@@ -41,7 +46,7 @@ def test_stream_logging_image(user_by_api_key_in_env):
         imarray = np.random.rand(100, 100, 3) * 255
         return Image.fromarray(imarray.astype("uint8")).convert("RGBA")
 
-    st = StreamTable(
+    st = make_stream_table(
         "test_table-8",
         project_name="stream-tables",
         entity_name=user_by_api_key_in_env.username,
@@ -68,7 +73,7 @@ def test_stream_logging_image(user_by_api_key_in_env):
 
 
 def test_multi_writers_sequential(user_by_api_key_in_env):
-    st = StreamTable(
+    st = make_stream_table(
         "test_table",
         project_name="stream-tables",
         entity_name=user_by_api_key_in_env.username,
@@ -98,7 +103,7 @@ def test_multi_writers_sequential(user_by_api_key_in_env):
 
     st.finish()
 
-    st = StreamTable(
+    st = make_stream_table(
         "test_table",
         project_name="stream-tables",
         entity_name=user_by_api_key_in_env.username,
@@ -116,12 +121,12 @@ def test_multi_writers_sequential(user_by_api_key_in_env):
 def test_multi_writers_parallel(user_by_api_key_in_env):
     entity_name = user_by_api_key_in_env.username
     table_name = "test_table_" + str(int(time.time()))
-    st_1 = StreamTable(
+    st_1 = make_stream_table(
         table_name,
         project_name="stream-tables",
         entity_name=entity_name,
     )
-    st_2 = StreamTable(
+    st_2 = make_stream_table(
         table_name,
         project_name="stream-tables",
         entity_name=entity_name,

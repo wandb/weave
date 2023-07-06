@@ -100,6 +100,7 @@ class StreamTable:
         table_name: str,
         project_name: typing.Optional[str] = None,
         entity_name: typing.Optional[str] = None,
+        _disable_async_logging: bool = False,
     ):
         self._client_id = str(uuid.uuid1())
         splits = table_name.split("/")
@@ -137,7 +138,7 @@ class StreamTable:
             project_name,
             table_name,
             job_type,
-            _use_async_file_stream=True,
+            _use_async_file_stream=not _disable_async_logging,
         )
         self._table_name = table_name
         self._project_name = project_name
