@@ -89,7 +89,6 @@ describe('serializeAllValues', () => {
   ])('correctly deserializes back serialized object', graph => {
     const serialized = serializeAllValues([graph]);
     const deserialized = deserializeAllValues(serialized);
-    // console.log({serialized, deserialized});
     expect(deserialized).toStrictEqual([graph]);
 
     // Check that we retain duplicate nodes in input array.
