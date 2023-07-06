@@ -91,12 +91,14 @@ def test_string_ops():
     assert weave.use(foo_space.lStrip()) == "Foo  "
     assert weave.use(foo_space.rStrip()) == "  Foo"
 
+    assert weave.use(num_string.toNumber()) == 123
+    assert weave.use(alpha_string.toNumber()) == None
+
     # assert weave.use(foo in foobar) == True # Broken
     # assert weave.use(foobar in foo) == False # Broken
 
 
 def test_null_consuming_numbers_ops():
-
     data = [box.box(1), box.box(None), box.box(2)]
 
     assert weave.use(number.numbers_sum(data)) == 3
