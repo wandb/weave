@@ -1,7 +1,7 @@
 import {LegacyWBIcon} from '@wandb/weave/common/components/elements/LegacyWBIcon';
 import {DropTarget} from '@wandb/weave/common/containers/DragDropContainer';
 import classNames from 'classnames';
-import produce from 'immer';
+import {produce} from 'immer';
 import _ from 'lodash';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {Resizable, ResizeCallbackData} from 'react-resizable';

@@ -26,7 +26,7 @@ export const EditableContainer = styled.div<{
     `}
 `;
 
-export const WeaveEditable = styled(Editable)<{truncate?: boolean}>`
+export const WeaveEditable = styled(Editable)<{$truncate?: boolean}>`
   width: 100%;
   min-height: 20px;
   line-height: 20px;
@@ -77,7 +77,7 @@ export const WeaveEditable = styled(Editable)<{truncate?: boolean}>`
   */
 
   ${p =>
-    p.truncate &&
+    p.$truncate &&
     css`
       & > div {
         white-space: nowrap;

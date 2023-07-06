@@ -85,12 +85,12 @@ const PanelProjectOverviewNew: React.FC<
     return names;
   }, [projectDashboardExist, projectObjectsExist, props.isRoot]);
 
-  const runsRenderSpec = usePanelById('op-runs_render');
+  const runsRenderSpec = usePanelById('ProjectRunsTable');
   const runsNode = useMemo(() => {
     return opProjectRuns({project: props.input}) as any;
   }, [props.input]);
 
-  const artifactsRenderSpec = usePanelById('op-artifacts_render');
+  const artifactsRenderSpec = usePanelById('ProjectArtifactsTable');
   const artifactsNode = useMemo(() => {
     return opProjectArtifacts({project: props.input}) as any;
   }, [props.input]);

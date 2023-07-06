@@ -716,7 +716,7 @@ const HeaderLogoControls: React.FC<{
             <MenuIcon>
               <IconBack />
             </MenuIcon>
-            <MenuText>Back to boards</MenuText>
+            <MenuText>Back to home</MenuText>
           </MenuItem>
           <MenuItem
             onClick={() => {

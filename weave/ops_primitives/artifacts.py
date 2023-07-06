@@ -1,3 +1,4 @@
+import datetime
 import os
 import pathlib
 import typing
@@ -142,6 +143,15 @@ def previous_uri(
     artifact: artifact_fs.FilesystemArtifact,
 ) -> typing.Optional[str]:
     return artifact.previous_uri()
+
+
+@op(
+    name="FilesystemArtifact-createdAt",
+)
+def created_at(
+    artifact: artifact_fs.FilesystemArtifact,
+) -> datetime.datetime:
+    return artifact.created_at
 
 
 @op(

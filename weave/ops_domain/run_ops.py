@@ -348,6 +348,7 @@ def _history_keys(run: wdt.Run, history_version: int) -> list[str]:
 
 
 @op(
+    name="run-refine_history_type",
     render_info={"type": "function"},
     hidden=True,
     plugins=wb_gql_op_plugin(lambda inputs, inner: "historyKeys"),

@@ -1,6 +1,11 @@
 {
-  "extends": ["react-app"],
-  "plugins": ["node", "wandb"],
+  "extends": [
+    "react-app"
+  ],
+  "plugins": [
+    "node",
+    "wandb"
+  ],
   "rules": {
     "node/no-process-env": "error",
     "wandb/no-a-tags": "error",
@@ -12,11 +17,15 @@
         "paths": [
           {
             "name": "immer",
-            "importNames": ["produceWithPatches", "applyPatches"],
+            "importNames": [
+              "produceWithPatches",
+              "applyPatches"
+            ],
             "message": "Don't use Immer's patches feature until we upgrade Immer to >= v9.x. See https://wandb.atlassian.net/browse/WB-7737."
           }
         ]
       }
-    ]
+    ],
+    "react/react-in-jsx-scope": "error"
   }
 }

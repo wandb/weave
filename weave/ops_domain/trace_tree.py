@@ -21,7 +21,12 @@ class SpanKind:
 
 @weave.type()
 class Result:
-    inputs: typing.Optional[typing.Dict[str, typing.Any]]
+    # NOTE: In principle this type should be typing.Optional[typing.Dict[str, typing.Any]],
+    # but due to a bug in our langchain integration, we have some cases where
+    # inputs was logged as a list[str] instead of a dict[str, Any]. The more flexible type
+    # below allows our PanelTraceViewer to work in both cases, but were it not for that bug,
+    # this extra flexible type wouldn't be needed.
+    inputs: typing.Optional[typing.Union[typing.Dict[str, typing.Any], list[str]]]
     outputs: typing.Optional[typing.Dict[str, typing.Any]]
 
 
@@ -90,15 +95,29 @@ def get_first_error(span: Span) -> typing.Optional[str]:
     return None
 
 
+def standarize_result_inputs(result: typing.Optional[Result]) -> typing.Dict[str, str]:
+    if result is None:
+        return {}
+    if isinstance(result.inputs, dict):
+        return result.inputs
+    if result.inputs is None:
+        return {}
+    if isinstance(result.inputs, list):
+        # NOTE: In principle this block should not be needed, but due to a bug in our
+        # langchain integration, we have some cases where inputs was logged as a list[str]
+        # instead of a dict[str, Any]. This block allows PanelTraceViewer to work in both cases,
+        # but were it not for that bug, this block wouldn't be needed.
+        return {str(i): v for i, v in enumerate(result.inputs)}
+    raise ValueError(f"Unexpected result inputs type: {type(result.inputs)}")
+
+
 def get_trace_input_str(span: Span) -> str:
     return "\n\n".join(
         [
             "\n\n".join(
                 [
                     f"**{ndx}.{eKey}:** {eValue}"
-                    for eKey, eValue in (
-                        (result.inputs or {}) if result is not None else {}
-                    ).items()
+                    for eKey, eValue in standarize_result_inputs(result).items()
                 ]
             )
             for ndx, result in enumerate(span.results or [])
