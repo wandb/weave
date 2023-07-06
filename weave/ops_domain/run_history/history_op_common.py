@@ -63,8 +63,9 @@ def make_run_history_gql_field(inputs: InputAndStitchProvider, inner: str):
 
 
 def refine_history_type(
-    run: wdt.Run, history_version: int, columns: typing.Optional[list[str]] = None
-) -> types.Type:
+    run: wdt.Run,
+    columns: typing.Optional[list[str]] = None,
+) -> types.TypedDict:
     prop_types: dict[str, types.Type] = {}
 
     if "historyKeys" not in run.gql:
@@ -101,29 +102,22 @@ def refine_history_type(
         else:
             prop_types[key] = types.optional(wt)
 
-    ListType = ArrowWeaveListType if history_version == 2 else types.List
-
-    return ListType(types.TypedDict(prop_types))
+    return types.TypedDict(prop_types)
 
 
-def history_keys(run: wdt.Run, history_version: int) -> list[str]:
+def history_keys(run: wdt.Run) -> list[str]:
     if "historyKeys" not in run.gql:
         raise ValueError("historyKeys not in run gql")
     if "sampledParquetHistory" not in run.gql:
         raise ValueError("sampledParquetHistory not in run gql")
-    history_type: types.Type = refine_history_type(run, history_version)
-    object_type = typing.cast(
-        types.TypedDict, typing.cast(types.List, history_type).object_type
-    )
+    object_type = refine_history_type(run)
 
     return list(object_type.property_types.keys())
 
 
-def read_history_parquet(run: wdt.Run, history_version: int, columns=None):
+def read_history_parquet(run: wdt.Run, columns=None):
     io = io_service.get_sync_client()
-    object_type = typing.cast(
-        types.List, refine_history_type(run, history_version, columns=columns)
-    ).object_type
+    object_type = refine_history_type(run, columns=columns)
     tables = []
     for url in run.gql["sampledParquetHistory"]["parquetUrls"]:
         local_path = io.ensure_file_downloaded(url)

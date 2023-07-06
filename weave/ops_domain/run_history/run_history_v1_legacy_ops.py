@@ -26,7 +26,7 @@ tracer = engine_trace.tracer()
     plugins=wb_gql_op_plugin(lambda inputs, inner: "historyKeys"),
 )
 def refine_history_type(run: wdt.Run) -> types.Type:
-    return history_op_common.refine_history_type(run, 1)
+    return types.List(history_op_common.refine_history_type(run))
 
 
 @op(
@@ -47,8 +47,10 @@ def history(run: wdt.Run):
 def refine_history_with_columns_type(
     run: wdt.Run, history_cols: list[str]
 ) -> types.Type:
-    return history_op_common.refine_history_type(
-        run, 1, columns=history_op_common.get_full_columns(history_cols)
+    return types.List(
+        history_op_common.refine_history_type(
+            run, columns=history_op_common.get_full_columns(history_cols)
+        )
     )
 
 
@@ -73,7 +75,7 @@ def _get_history(run: wdt.Run, columns=None):
 
     with tracer.trace("read_history_parquet"):
         parquet_history = history_op_common.read_history_parquet(
-            run, 1, columns=columns
+            run, columns=columns
         ) or pa.table([])
 
     # turn the liveset into an arrow table. the liveset is a list of dictionaries

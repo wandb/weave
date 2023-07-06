@@ -27,7 +27,7 @@ tracer = engine_trace.tracer()
     hidden=True,
 )
 def refine_history2_type(run: wdt.Run) -> types.Type:
-    return history_op_common.refine_history_type(run, 2)
+    return ArrowWeaveListType(history_op_common.refine_history_type(run))
 
 
 @op(
@@ -38,8 +38,10 @@ def refine_history2_type(run: wdt.Run) -> types.Type:
 def refine_history2_with_columns_type(
     run: wdt.Run, history_cols: list[str]
 ) -> types.Type:
-    return history_op_common.refine_history_type(
-        run, 2, columns=history_op_common.get_full_columns(history_cols)
+    return ArrowWeaveListType(
+        history_op_common.refine_history_type(
+            run, columns=history_op_common.get_full_columns(history_cols)
+        )
     )
 
 
@@ -71,17 +73,11 @@ def _get_history2(run: wdt.Run, columns=None):
     with tracer.trace("get_history") as span:
         span.set_tag("history_version", 2)
     """Dont read binary columns. Keep everything in arrow. Faster, but not as full featured as get_history"""
-    scalar_keys = history_op_common.history_keys(run, 2)
+    scalar_keys = history_op_common.history_keys(run)
     columns = [c for c in columns if c in scalar_keys]
-    parquet_history = history_op_common.read_history_parquet(run, 2, columns=columns)
+    parquet_history = history_op_common.read_history_parquet(run, columns=columns)
 
-    _object_type = typing.cast(
-        types.TypedDict,
-        typing.cast(
-            types.List,
-            history_op_common.refine_history_type(run, 2, columns=columns),
-        ).object_type,
-    )
+    _object_type = history_op_common.refine_history_type(run, columns=columns)
 
     _history_type = types.List(_object_type)
 
