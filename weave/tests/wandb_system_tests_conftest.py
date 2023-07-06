@@ -315,7 +315,7 @@ class UserFixtureCommand:
     command: Literal["up", "down", "down_all", "logout", "login", "password"]
     username: Optional[str] = None
     password: Optional[str] = None
-    admin: bool = False
+    admin: bool = True
     endpoint: str = "db/user"
     port: str = FIXTURE_SERVICE_PORT
     method: Literal["post"] = "post"
