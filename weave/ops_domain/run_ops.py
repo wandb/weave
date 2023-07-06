@@ -528,6 +528,12 @@ def history_with_columns(run: wdt.Run, history_cols: list[str]):
 def _get_history2(run: wdt.Run, columns=None):
     """Dont read binary columns. Keep everything in arrow. Faster, but not as full featured as get_history"""
     scalar_keys = _history_keys(run, 2)
+
+    # Need to only consider first part of column name since we currently only pushdown
+    # the first part.
+    # TODO: fix, we need to pushdown all the way
+    columns = list(set([c.split(".")[0] for c in columns]))
+
     columns = [c for c in columns if c in scalar_keys]
     parquet_history = read_history_parquet(run, 2, columns=columns)
 
