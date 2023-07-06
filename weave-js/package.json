@@ -90,7 +90,7 @@
     "remark-rehype": "^10.1.0",
     "safe-json-stringify": "^1.2.0",
     "semantic-ui-react": "^0.88.2",
-    "slate": "0.87.0",
+    "slate": "0.88.1",
     "slate-history": "0.66.0",
     "slate-react": "0.82.0",
     "styled-components": "5.3.5",
