@@ -17,7 +17,10 @@ export type Section = {
   items: StrictMenuItemProps[];
 };
 
-export type PopupMenuProps = Pick<StrictPopupProps, `trigger` | `position` | `onClose` | `onOpen`> &
+export type PopupMenuProps = Pick<
+  StrictPopupProps,
+  `trigger` | `position` | `onClose` | `onOpen`
+> &
   Pick<StrictMenuProps, `items`> & {sections?: Section[]};
 
 const PopupMenuComp: React.FC<PopupMenuProps> = ({
