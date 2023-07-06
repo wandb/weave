@@ -33,14 +33,15 @@
 //   targetNodes: [4]
 // }
 
+import _ from 'lodash';
 import type {EditingNode} from './editing';
 
 type SerializedRef = number;
 
-interface BatchedGraphs {
+type BatchedGraphs = {
   nodes: any[];
   targetNodes: SerializedRef[];
-}
+};
 
 type Serializer = {
   nextID: SerializedRef;
@@ -56,26 +57,40 @@ function createSerializer(): Serializer {
   };
 }
 
+function valueToRef(serializer: Serializer, v: any): SerializedRef {
+  const h = hash(v);
+
+  const existingRef = serializer.refByHash.get(h);
+  if (existingRef != null) {
+    return existingRef;
+  }
+
+  const ref = serializer.nextID++;
+  serializer.refByHash.set(h, ref);
+  serializer.values.push(v);
+  return ref;
+}
+
 function hash(v: any): string {
   // When hashing an object/map/set, we must keep the keys in a consistent order.
   // Otherwise, identical objects/maps/sets may be hashed into different key orders.
   // While maps and sets retain insertion order and are therefore unique based on their
   // key orders, we do not care about that. We only care about which key/values are present.
-  const isSet = v instanceof Set;
-  if (isSet) {
-    const sortedValues = [...v].sort();
+  // TODO: We'll remove this special handling of `Map`s and `Set`s once we properly
+  // handle them in `convertSpecialValues`.
+  if (v instanceof Set) {
+    const sortedValues = _.sortBy([...v]);
     return `__WEAVE_SERIALIZER_SET(${JSON.stringify(sortedValues)})`;
   }
-  const isMap = v instanceof Map;
-  if (isMap) {
-    const sortedEntries = [...v.entries()].sort();
+  if (v instanceof Map) {
+    const sortedEntries = _.sortBy([...v.entries()], ([key, value]) => key);
     return `__WEAVE_SERIALIZER_MAP(${JSON.stringify(sortedEntries)})`;
   }
   const isObject = v != null && typeof v === `object` && !Array.isArray(v);
   if (isObject) {
     // This does not properly stringify nested objects, but that's ok because
     // the object values should already be replaced with serialized refs.
-    return JSON.stringify(v, Object.keys(v).sort());
+    return JSON.stringify(v, _.sortBy(Object.keys(v)));
   }
 
   return JSON.stringify(v);
@@ -95,29 +110,17 @@ export function serializeAllValues(graphs: EditingNode[]): BatchedGraphs {
 
 // TODO: Handle `Map`s and `Set`s.
 // Note that `JSON.stringify`ing any map/set does not work and will always result in `'{}'`.
-// If we actually want to suport maps/sets, we'll need to serialize them into a custom format.
+// If we actually want to suport maps/sets, we'll need to convert them
+// into a custom structure in `convertSpecialValues`.
 function serializeValue(serializer: Serializer, v: any): SerializedRef {
-  if (v == null || typeof v !== 'object') {
-    return valueToRef(serializer, v);
+  const converted = convertSpecialValues(v);
+  if (converted == null || typeof converted !== 'object') {
+    return valueToRef(serializer, converted);
   }
-  if (Array.isArray(v)) {
-    return serializeArray(serializer, v);
+  if (Array.isArray(converted)) {
+    return serializeArray(serializer, converted);
   }
-  return serializeObject(serializer, v);
-}
-
-function valueToRef(serializer: Serializer, v: any): SerializedRef {
-  const h = hash(v);
-
-  const existingRef = serializer.refByHash.get(h);
-  if (existingRef != null) {
-    return existingRef;
-  }
-
-  const ref = serializer.nextID++;
-  serializer.refByHash.set(h, ref);
-  serializer.values.push(v);
-  return ref;
+  return serializeObject(serializer, converted);
 }
 
 function serializeArray(serializer: Serializer, arr: any[]): SerializedRef {
@@ -150,7 +153,7 @@ function deserializeValue(nodes: any[], nodeIndex: number): any {
   if (Array.isArray(v)) {
     return deserializeArray(nodes, v);
   }
-  return deserializeObject(nodes, v);
+  return revertSpecialValues(deserializeObject(nodes, v));
 }
 
 function deserializeArray(nodes: any[], nodeIndices: number[]): any {
@@ -166,5 +169,48 @@ function deserializeObject(
       k,
       deserializeValue(nodes, nodeIndex),
     ])
+  );
+}
+
+// Values that are not serializable by `JSON.stringify` without losing context.
+// Currently only includes `Date` objects.
+// TODO: We'll want to include `Map`s and `Set`s here as well.
+type SpecialValue = Date;
+
+function isSpecialValue(v: any): v is SpecialValue {
+  return v instanceof Date;
+}
+
+function convertSpecialValues(v: any): any {
+  if (!isSpecialValue(v)) {
+    return v;
+  }
+  if (v instanceof Date) {
+    return {
+      type: `date`,
+      val: v.toJSON(),
+    };
+  }
+  throw new Error(`Unexpected special value: ${v}`);
+}
+
+function revertSpecialValues(v: any): any {
+  if (isSerializedDate(v)) {
+    return new Date(v.val);
+  }
+  return v;
+}
+
+type SerializedDate = {
+  type: `date`;
+  val: string;
+};
+
+function isSerializedDate(v: any): v is SerializedDate {
+  return (
+    v != null &&
+    typeof v === `object` &&
+    v.type === `date` &&
+    typeof v.val === `string`
   );
 }

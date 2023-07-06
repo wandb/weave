@@ -22,26 +22,33 @@ import {serializeAllValues, deserializeAllValues} from './serializeAllValues';
 describe('serializeAllValues', () => {
   it.each([
     // These graphs were taken from `serialize.test.ts`
+
+    // simple query with var
     [
-      // simple query with var
       opRunName({
         run: varNode('run', 'x'),
       }),
+    ],
 
-      // simple query with void
+    // simple query with void
+    [
       opRunName({
         run: voidNode() as any,
       }),
+    ],
 
-      // basic consts
+    // basic consts
+    [
       opProjectName({
         project: opRootProject({
           entityName: constString('entity'),
           projectName: constString('project'),
         }),
       }),
+    ],
 
-      // complex single result
+    // complex single result
+    [
       opMap({
         arr: opProjectRuns({
           project: opRootProject({
@@ -55,8 +62,10 @@ describe('serializeAllValues', () => {
           })
         ) as any,
       }),
+    ],
 
-      // date
+    // date
+    [
       opNumberEqual({
         lhs: opDateToNumber({
           date: opProjectCreatedAt({
@@ -68,6 +77,10 @@ describe('serializeAllValues', () => {
         }),
         rhs: constDate(new Date(0)),
       }),
+    ],
+
+    // TODO: determine what this graph is supposed to test
+    [
       opPick({
         obj: opRunSummary({run: varNode('run', 'row')}),
         key: constString('x'),
@@ -76,6 +89,7 @@ describe('serializeAllValues', () => {
   ])('correctly deserializes back serialized object', graph => {
     const serialized = serializeAllValues([graph]);
     const deserialized = deserializeAllValues(serialized);
+    // console.log({serialized, deserialized});
     expect(deserialized).toStrictEqual([graph]);
 
     // Check that we retain duplicate nodes in input array.
@@ -85,5 +99,25 @@ describe('serializeAllValues', () => {
       serializedWithDuplicates
     );
     expect(deserializedWithDuplicates).toStrictEqual([graph, graph, graph]);
+  });
+
+  it(`correctly serializes dates`, () => {
+    const graph = opNumberEqual({
+      lhs: opDateToNumber({
+        date: opProjectCreatedAt({
+          project: opRootProject({
+            entityName: constString('entity'),
+            projectName: constString('project'),
+          }),
+        }),
+      }),
+      // `new Date(0)` should be serialized as `{type: 'date', val: '1970-01-01T00:00:00.000Z'}`
+      rhs: constDate(new Date(0)),
+    });
+
+    const serialized = serializeAllValues([graph]);
+    expect(serialized.nodes[16]).toBe(`date`);
+    expect(serialized.nodes[34]).toBe(`1970-01-01T00:00:00.000Z`);
+    expect(serialized.nodes[35]).toStrictEqual({type: 16, val: 34});
   });
 });
