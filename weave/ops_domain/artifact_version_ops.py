@@ -474,6 +474,7 @@ def history_metrics(
 
 # Special bridge functions to lower level local artifacts
 
+
 # TODO: Move all this to helper functions off the artifactVersion object
 def _artifact_version_to_wb_artifact(artifactVersion: wdt.ArtifactVersion):
     entity_name = artifactVersion.gql["artifactSequence"]["defaultArtifactType"][

@@ -1,0 +1,271 @@
+import json
+import typing
+from ... import weave_types as types
+from .. import wb_domain_types as wdt
+from ...ops_primitives import make_list
+from ...ops_arrow.list_ops import concat
+from ...ops_arrow import ArrowWeaveList
+from ... import util
+from ... import errors
+from ... import io_service
+from ...mappers_arrow import map_to_arrow
+from ... import engine_trace
+from ...compile_domain import InputAndStitchProvider
+from ... import compile_table
+
+from ...api import use
+
+import pyarrow as pa
+from pyarrow import parquet as pq
+
+
+from .. import wb_util
+from .. import table
+
+from ... import artifact_fs
+from ...wandb_interface import wandb_stream_table
+from ...compile_table import KeyTree
+from ...ops_primitives import _dict_utils
+
+tracer = engine_trace.tracer()
+
+
+class TypeCount(typing.TypedDict):
+    type: typing.Optional[str]
+    count: int
+    keys: dict[str, list["TypeCount"]]  # type: ignore
+    items: list["TypeCount"]  # type: ignore
+    nested_types: list[str]
+
+
+def history_key_type_count_to_weave_type(tc: TypeCount) -> types.Type:
+    from ..wbmedia import ImageArtifactFileRefType
+    from ..trace_tree import WBTraceTree
+
+    tc_type = tc["type"]
+    if tc_type == "string":
+        return types.String()
+    elif tc_type == "number":
+        return types.Number()
+    elif tc_type == "nil":
+        return types.NoneType()
+    elif tc_type == "bool":
+        return types.Boolean()
+    elif tc_type == "map":
+        return types.TypedDict(
+            {
+                key: types.union(
+                    *[history_key_type_count_to_weave_type(vv) for vv in val]
+                )
+                for key, val in tc["keys"].items()
+            }
+        )
+    elif tc_type == "list":
+        if "items" not in tc:
+            return types.List(types.UnknownType())
+        return types.List(
+            types.union(*[history_key_type_count_to_weave_type(v) for v in tc["items"]])
+        )
+    elif tc_type == "histogram":
+        return wb_util.WbHistogram.WeaveType()  # type: ignore
+    elif tc_type == "table-file":
+        extension = types.Const(types.String(), "json")
+        return artifact_fs.FilesystemArtifactFileType(extension, table.TableType())
+    elif tc_type == "joined-table":
+        extension = types.Const(types.String(), "json")
+        return artifact_fs.FilesystemArtifactFileType(
+            extension, table.JoinedTableType()
+        )
+    elif tc_type == "partitioned-table":
+        extension = types.Const(types.String(), "json")
+        return artifact_fs.FilesystemArtifactFileType(
+            extension, table.PartitionedTableType()
+        )
+    elif tc_type == "image-file":
+        return ImageArtifactFileRefType()
+    elif tc_type == "wb_trace_tree":
+        return WBTraceTree.WeaveType()  # type: ignore
+    elif tc_type == "images/separated":
+        return types.List(ImageArtifactFileRefType())
+    elif isinstance(tc_type, str):
+        possible_type = wandb_stream_table.maybe_history_type_to_weave_type(tc_type)
+        if possible_type is not None:
+            return possible_type
+    return types.UnknownType()
+
+
+def get_top_level_keys(key_tree: KeyTree) -> list[str]:
+    top_level_keys = list(
+        map(
+            _dict_utils.unescape_dots,
+            set(
+                next(iter(_dict_utils.split_escaped_string(key)))
+                for key in key_tree.keys()
+            ),
+        )
+    )
+    return top_level_keys
+
+
+def get_full_columns(columns: typing.Optional[list[str]]):
+    if columns is None:
+        return None
+    return list(set([*columns, "_step", "_runtime", "_timestamp"]))
+
+
+def make_run_history_gql_field(inputs: InputAndStitchProvider, inner: str):
+    # Must be kept in sync with compile_domain:_field_selections_hardcode_merge
+
+    stitch_obj = inputs.stitched_obj
+    key_tree = compile_table.get_projection(stitch_obj)
+
+    # we only pushdown the top level keys for now.
+    top_level_keys = get_top_level_keys(key_tree)
+
+    if not top_level_keys:
+        # If no keys, then we cowardly refuse to blindly fetch entire history table
+        return "historyKeys"
+
+    project_fragment = """
+        project {
+        id
+        name
+        entity {
+            id
+            name
+        }
+    }
+    """
+
+    return f"""
+    historyKeys
+    sampledParquetHistory: parquetHistory(liveKeys: {json.dumps(top_level_keys)}) {{
+        liveData
+        parquetUrls
+    }}
+    {project_fragment}
+    """
+
+
+def refine_history_type(
+    run: wdt.Run,
+    columns: typing.Optional[list[str]] = None,
+) -> types.TypedDict:
+    prop_types: dict[str, types.Type] = {}
+
+    if "historyKeys" not in run.gql:
+        raise ValueError("historyKeys not in run gql")
+
+    historyKeys = run.gql["historyKeys"]["keys"]
+
+    for key, key_details in historyKeys.items():
+        if key.startswith("system/") or (columns is not None and key not in columns):
+            # skip system metrics for now
+            continue
+
+        type_counts: list[TypeCount] = key_details["typeCounts"]
+        wt = types.union(
+            *[history_key_type_count_to_weave_type(tc) for tc in type_counts]
+        )
+
+        if wt == types.UnknownType():
+            util.capture_exception_with_sentry_if_available(
+                errors.WeaveTypeWarning(
+                    f"Unable to determine history key type for key {key} with types {type_counts}"
+                ),
+                (str([tc["type"] for tc in type_counts]),),
+            )
+            wt = types.NoneType()
+
+        # _step is a special key that is always guaranteed to be a nonnull number.
+        # other keys may be undefined at particular steps so we make them optional.
+        if key in ["_step", "_runtime", "_timestamp"]:
+            prop_types[key] = wt
+        else:
+            prop_types[key] = types.optional(wt)
+
+    return types.TypedDict(prop_types)
+
+
+def history_keys(run: wdt.Run) -> list[str]:
+    if "historyKeys" not in run.gql:
+        raise ValueError("historyKeys not in run gql")
+    if "sampledParquetHistory" not in run.gql:
+        raise ValueError("sampledParquetHistory not in run gql")
+    object_type = refine_history_type(run)
+
+    return list(object_type.property_types.keys())
+
+
+def read_history_parquet(run: wdt.Run, columns=None):
+    io = io_service.get_sync_client()
+    object_type = refine_history_type(run, columns=columns)
+    tables = []
+    for url in run.gql["sampledParquetHistory"]["parquetUrls"]:
+        local_path = io.ensure_file_downloaded(url)
+        if local_path is not None:
+            path = io.fs.path(local_path)
+            with tracer.trace("pq.read_metadata") as span:
+                span.set_tag("path", path)
+                meta = pq.read_metadata(path)
+            file_schema = meta.schema
+            columns_to_read = [
+                c for c in columns if c in file_schema.to_arrow_schema().names
+            ]
+            with tracer.trace("pq.read_table") as span:
+                span.set_tag("path", path)
+                table = pq.read_table(path, columns=columns_to_read)
+
+            # convert table to ArrowWeaveList
+            with tracer.trace("make_awl") as span:
+                awl: ArrowWeaveList = ArrowWeaveList(table, object_type=object_type)
+            tables.append(awl)
+    list = make_list(**{str(i): table for i, table in enumerate(tables)})
+    concatted = use(concat(list))
+    if isinstance(concatted, ArrowWeaveList):
+        rb = pa.RecordBatch.from_struct_array(
+            concatted._arrow_data
+        )  # this pivots to columnar layout
+        parquet_history = pa.Table.from_batches([rb])
+    else:
+        # empty table
+        return None
+
+    # sort the history by step
+    with tracer.trace("pq.sort"):
+        table_sorted_indices = pa.compute.bottom_k_unstable(
+            parquet_history, sort_keys=["_step"], k=len(parquet_history)
+        )
+
+    with tracer.trace("pq.take"):
+        return parquet_history.take(table_sorted_indices)
+
+
+def mock_history_rows(
+    run: wdt.Run, use_arrow: bool = True
+) -> typing.Union[ArrowWeaveList, list]:
+    # we are in the case where we have blindly requested the entire history object.
+    # we refuse to fetch that, so instead we will just inspect the historyKeys and return
+    # a dummy history object that can bte used as a proxy for downstream ops (e.g., count).
+
+    step_type = types.TypedDict({"_step": types.Int()})
+    steps: typing.Union[ArrowWeaveList, list] = []
+
+    last_step = run.gql["historyKeys"]["lastStep"]
+    history_keys = run.gql["historyKeys"]["keys"]
+    for key, key_details in history_keys.items():
+        if key == "_step":
+            type_counts: list[TypeCount] = key_details["typeCounts"]
+            count = type_counts[0]["count"]
+            # generate fake steps
+            steps = [{"_step": i} for i in range(count)]
+            steps[-1]["_step"] = last_step
+            assert len(steps) == count
+            break
+
+    if use_arrow:
+        mapper = map_to_arrow(step_type, None, [])
+        result = pa.array(steps, type=mapper.result_type())
+        steps = ArrowWeaveList(result, step_type)
+
+    return steps
