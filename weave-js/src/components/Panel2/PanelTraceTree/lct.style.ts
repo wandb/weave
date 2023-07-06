@@ -1,6 +1,6 @@
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import {Tab} from 'semantic-ui-react';
-import styled, {css} from 'styled-components';
+import styled from 'styled-components';
 
 export const LCTDetailView = styled.div`
   flex: 1 1 auto;

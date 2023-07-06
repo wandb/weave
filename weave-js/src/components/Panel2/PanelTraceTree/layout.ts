@@ -46,8 +46,8 @@ function layoutSpan(
   let level = 0;
   let lastStartTime = Number.MAX_VALUE;
   let lastHeight = 1;
-  const sortedChildSpans = _.sortBy(childSpans, s => {
-    return s.start_time_ms ?? 0;
+  const sortedChildSpans = _.sortBy(childSpans, cs => {
+    return cs.start_time_ms ?? 0;
   });
   // walk backwards ordered by start time
   const childSpansLayout = sortedChildSpans.reverse().map(childSpan => {
