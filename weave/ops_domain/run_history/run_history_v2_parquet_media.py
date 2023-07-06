@@ -53,7 +53,7 @@ def refine_history2_with_columns_type(
     hidden=True,
 )
 def history2_with_columns(run: wdt.Run, history_cols: list[str]):
-    _get_history2(run, history_op_common.get_full_columns(history_cols))
+    return _get_history2(run, history_op_common.get_full_columns(history_cols))
 
 
 @op(
