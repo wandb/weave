@@ -57,8 +57,20 @@ function createSerializer(): Serializer {
 }
 
 function hash(v: any): string {
-  // When hashing an object, we must keep the keys in a consistent order.
-  // Otherwise, identical objects may be hashed into different key orders.
+  // When hashing an object/map/set, we must keep the keys in a consistent order.
+  // Otherwise, identical objects/maps/sets may be hashed into different key orders.
+  // While maps and sets retain insertion order and are therefore unique based on their
+  // key orders, we do not care about that. We only care about which key/values are present.
+  const isSet = v instanceof Set;
+  if (isSet) {
+    const sortedValues = [...v].sort();
+    return `__WEAVE_SERIALIZER_SET(${JSON.stringify(sortedValues)})`;
+  }
+  const isMap = v instanceof Map;
+  if (isMap) {
+    const sortedEntries = [...v.entries()].sort();
+    return `__WEAVE_SERIALIZER_MAP(${JSON.stringify(sortedEntries)})`;
+  }
   const isObject = v != null && typeof v === `object` && !Array.isArray(v);
   if (isObject) {
     // This does not properly stringify nested objects, but that's ok because
@@ -81,6 +93,9 @@ export function serializeAllValues(graphs: EditingNode[]): BatchedGraphs {
   };
 }
 
+// TODO: Handle `Map`s and `Set`s.
+// Note that `JSON.stringify`ing any map/set does not work and will always result in `'{}'`.
+// If we actually want to suport maps/sets, we'll need to serialize them into a custom format.
 function serializeValue(serializer: Serializer, v: any): SerializedRef {
   if (v == null || typeof v !== 'object') {
     return valueToRef(serializer, v);
