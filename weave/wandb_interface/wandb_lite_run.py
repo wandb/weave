@@ -1,3 +1,4 @@
+import re
 import datetime
 import json
 import typing
@@ -119,7 +120,7 @@ class InMemoryLazyLiteRun:
     def log(self, row_dict: dict) -> None:
         stream = self.stream
         row_dict = {
-            **row_dict,
+            **{_sanitize_run_key(key): val for key, val in row_dict.items()},
             # Required by gorilla
             # NOTE: This should be changed after gorilla is updated
             # to support parallel runs
@@ -148,3 +149,10 @@ class InMemoryLazyLiteRun:
 
     def __del__(self) -> None:
         self.finish()
+
+
+def _sanitize_run_key(key: str) -> str:
+    sanitized_key = re.sub(
+        r"\W+", "_", key
+    )  # Substitute all non-alphanumeric characters with underscores
+    return sanitized_key
