@@ -134,13 +134,19 @@ def _refine_history_type(
     run: wdt.Run,
     columns: typing.Optional[list[str]] = None,
 ) -> HistoryToWeaveFinalResult:
-    prop_types: dict[str, types.Type] = {}
-
     if "historyKeys" not in run.gql:
         raise ValueError("historyKeys not in run gql")
 
     historyKeys = run.gql["historyKeys"]["keys"]
+    return _refine_history_type_inner(historyKeys, columns=columns)
 
+
+# split out for testing
+def _refine_history_type_inner(
+    historyKeys: dict[str, history_op_common.TypeCount],
+    columns: typing.Optional[list[str]] = None,
+) -> HistoryToWeaveFinalResult:
+    prop_types: dict[str, types.Type] = {}
     encoded_paths: set[list[str]] = set([])
 
     for key, key_details in historyKeys.items():
@@ -153,7 +159,7 @@ def _refine_history_type(
         for tc in type_counts:
             res = _history_key_type_count_to_weave_type(tc, key)
             type_members.append(res.weave_type)
-            encoded_paths.update(encoded_paths)
+            encoded_paths.update(res.encoded_paths)
         wt = types.union(*type_members)
 
         if wt == types.UnknownType():
@@ -230,18 +236,27 @@ def _process_run_dict_item(val, run_path: typing.Optional[wb_util.RunPath] = Non
 
 
 def _get_weave_history(run: wdt.Run, columns=None):
+    final_object_type = _refine_history_type(run, columns=columns)
+    parquet_history = history_op_common.read_history_parquet(run, columns=columns)
+    live_data = run.gql["sampledParquetHistory"]["liveData"]
+    return _get_weave_history_inner(final_object_type, parquet_history, live_data)
+
+
+def _get_weave_history_inner(
+    final_type: HistoryToWeaveFinalResult,
+    live_data: list[dict],
+    parquet_history: typing.Any,
+    # columns=None,
+):
     with tracer.trace("get_history") as span:
         span.set_tag("history_version", 3)
     """Dont read binary columns. Keep everything in arrow. Faster, but not as full featured as get_history"""
-    final_object_type = _refine_history_type(run, columns=columns)
+    object_type = final_type.weave_type
+    scalar_keys = list(object_type.property_types.keys())
 
-    scalar_keys = list(final_object_type.weave_type.property_types.keys())
-
-    columns = [c for c in columns if c in scalar_keys]
-    parquet_history = history_op_common.read_history_parquet(run, columns=columns)
+    columns = scalar_keys  # [c for c in columns if c in scalar_keys]
 
     # turn the liveset into an arrow table. the liveset is a list of dictionaries
-    live_data = run.gql["sampledParquetHistory"]["liveData"]
     for row in live_data:
         for colname in columns:
             if colname not in row:
@@ -255,7 +270,7 @@ def _get_weave_history(run: wdt.Run, columns=None):
         with tracer.trace("live_data_to_arrow"):
             live_data = convert.to_arrow(
                 live_data,
-                types.List(final_object_type.weave_type),
+                types.List(object_type),
                 artifact=artifact,
             )
     else:
@@ -277,10 +292,10 @@ def _get_weave_history(run: wdt.Run, columns=None):
     #         for field in columns:
     #             if field in binary_fields or not (
     #                 types.optional(types.BasicType()).assign_type(
-    #                     final_object_type.weave_type.property_types[field]  # type: ignore
+    #                     object_type.property_types[field]  # type: ignore
     #                 )
     #                 or wbmedia.ImageArtifactFileRefType().assign_type(
-    #                     final_object_type.weave_type.property_types[field]  # type: ignore
+    #                     object_type.property_types[field]  # type: ignore
     #                 )
     #             ):
     #                 pq_col = parquet_history[field].to_pylist()
@@ -293,7 +308,7 @@ def _get_weave_history(run: wdt.Run, columns=None):
 
     #                 awl = convert.to_arrow(
     #                     pq_col,
-    #                     types.List(final_object_type.weave_type.property_types[field]),
+    #                     types.List(object_type.property_types[field]),
     #                     artifact=artifact,
     #                 )
     #                 new_col = pa.chunked_array([awl._arrow_data])
@@ -305,16 +320,14 @@ def _get_weave_history(run: wdt.Run, columns=None):
         with tracer.trace("parquet_history_to_arrow"):
             parquet_history = ArrowWeaveList(
                 parquet_history,
-                final_object_type.weave_type,
+                object_type,
                 artifact=artifact,
             )
     else:
         parquet_history = []
 
     if len(live_data) == 0 and len(parquet_history) == 0:
-        return ArrowWeaveList(
-            pa.array([]), final_object_type.weave_type, artifact=artifact
-        )
+        return ArrowWeaveList(pa.array([]), object_type, artifact=artifact)
     elif len(live_data) == 0:
         return parquet_history
     elif len(parquet_history) == 0:
