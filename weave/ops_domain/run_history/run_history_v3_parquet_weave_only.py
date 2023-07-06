@@ -1,5 +1,4 @@
 import dataclasses
-import json
 import typing
 from ...compile_domain import wb_gql_op_plugin
 from ...api import op
@@ -7,7 +6,6 @@ from ... import weave_types as types
 from .. import wb_domain_types as wdt
 from ... import artifact_mem
 from .. import wb_util
-from ...ops_domain import wbmedia
 from ...ops_arrow.list_ops import concat
 from ...ops_arrow import ArrowWeaveList, ArrowWeaveListType, convert
 from ... import engine_trace
@@ -57,7 +55,7 @@ def refine_weave_history_with_columns_type(
     hidden=True,
 )
 def weave_history_with_columns(run: wdt.Run, history_cols: list[str]):
-    _get_weave_history(run, list(set([*history_cols, "_step"])))
+    return _get_weave_history(run, list(set([*history_cols, "_step"])))
 
 
 @op(
@@ -141,9 +139,13 @@ def _refine_history_type(
     return _refine_history_type_inner(historyKeys, columns=columns)
 
 
+class TopLevelTypeCount(typing.TypedDict):
+    typeCounts: list[history_op_common.TypeCount]
+
+
 # split out for testing
 def _refine_history_type_inner(
-    historyKeys: dict[str, history_op_common.TypeCount],
+    historyKeys: dict[str, TopLevelTypeCount],
     columns: typing.Optional[list[str]] = None,
 ) -> HistoryToWeaveFinalResult:
     prop_types: dict[str, types.Type] = {}
