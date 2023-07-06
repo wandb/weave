@@ -2,7 +2,6 @@ import json
 import typing
 from ... import weave_types as types
 from .. import wb_domain_types as wdt
-from . import history_util
 from ...ops_primitives import make_list
 from ...ops_arrow.list_ops import concat
 from ...ops_arrow import ArrowWeaveList
@@ -19,7 +18,93 @@ from ...api import use
 import pyarrow as pa
 from pyarrow import parquet as pq
 
+
+from .. import wb_util
+from .. import table
+
+from ... import artifact_fs
+from ...wandb_interface import wandb_stream_table
+from ...compile_table import KeyTree
+from ...ops_primitives import _dict_utils
+
 tracer = engine_trace.tracer()
+
+
+class TypeCount(typing.TypedDict):
+    type: typing.Optional[str]
+    count: int
+    keys: dict[str, list["TypeCount"]]  # type: ignore
+    items: list["TypeCount"]  # type: ignore
+    nested_types: list[str]
+
+
+def history_key_type_count_to_weave_type(tc: TypeCount) -> types.Type:
+    from ..wbmedia import ImageArtifactFileRefType
+    from ..trace_tree import WBTraceTree
+
+    tc_type = tc["type"]
+    if tc_type == "string":
+        return types.String()
+    elif tc_type == "number":
+        return types.Number()
+    elif tc_type == "nil":
+        return types.NoneType()
+    elif tc_type == "bool":
+        return types.Boolean()
+    elif tc_type == "map":
+        return types.TypedDict(
+            {
+                key: types.union(
+                    *[history_key_type_count_to_weave_type(vv) for vv in val]
+                )
+                for key, val in tc["keys"].items()
+            }
+        )
+    elif tc_type == "list":
+        if "items" not in tc:
+            return types.List(types.UnknownType())
+        return types.List(
+            types.union(*[history_key_type_count_to_weave_type(v) for v in tc["items"]])
+        )
+    elif tc_type == "histogram":
+        return wb_util.WbHistogram.WeaveType()  # type: ignore
+    elif tc_type == "table-file":
+        extension = types.Const(types.String(), "json")
+        return artifact_fs.FilesystemArtifactFileType(extension, table.TableType())
+    elif tc_type == "joined-table":
+        extension = types.Const(types.String(), "json")
+        return artifact_fs.FilesystemArtifactFileType(
+            extension, table.JoinedTableType()
+        )
+    elif tc_type == "partitioned-table":
+        extension = types.Const(types.String(), "json")
+        return artifact_fs.FilesystemArtifactFileType(
+            extension, table.PartitionedTableType()
+        )
+    elif tc_type == "image-file":
+        return ImageArtifactFileRefType()
+    elif tc_type == "wb_trace_tree":
+        return WBTraceTree.WeaveType()  # type: ignore
+    elif tc_type == "images/separated":
+        return types.List(ImageArtifactFileRefType())
+    elif isinstance(tc_type, str):
+        possible_type = wandb_stream_table.maybe_history_type_to_weave_type(tc_type)
+        if possible_type is not None:
+            return possible_type
+    return types.UnknownType()
+
+
+def get_top_level_keys(key_tree: KeyTree) -> list[str]:
+    top_level_keys = list(
+        map(
+            _dict_utils.unescape_dots,
+            set(
+                next(iter(_dict_utils.split_escaped_string(key)))
+                for key in key_tree.keys()
+            ),
+        )
+    )
+    return top_level_keys
 
 
 def get_full_columns(columns: typing.Optional[list[str]]):
@@ -35,7 +120,7 @@ def make_run_history_gql_field(inputs: InputAndStitchProvider, inner: str):
     key_tree = compile_table.get_projection(stitch_obj)
 
     # we only pushdown the top level keys for now.
-    top_level_keys = history_util.get_top_level_keys(key_tree)
+    top_level_keys = get_top_level_keys(key_tree)
 
     if not top_level_keys:
         # If no keys, then we cowardly refuse to blindly fetch entire history table
@@ -78,12 +163,9 @@ def refine_history_type(
             # skip system metrics for now
             continue
 
-        type_counts: list[history_util.TypeCount] = key_details["typeCounts"]
+        type_counts: list[TypeCount] = key_details["typeCounts"]
         wt = types.union(
-            *[
-                history_util.history_key_type_count_to_weave_type(tc)
-                for tc in type_counts
-            ]
+            *[history_key_type_count_to_weave_type(tc) for tc in type_counts]
         )
 
         if wt == types.UnknownType():
@@ -173,7 +255,7 @@ def mock_history_rows(
     history_keys = run.gql["historyKeys"]["keys"]
     for key, key_details in history_keys.items():
         if key == "_step":
-            type_counts: list[history_util.TypeCount] = key_details["typeCounts"]
+            type_counts: list[TypeCount] = key_details["typeCounts"]
             count = type_counts[0]["count"]
             # generate fake steps
             steps = [{"_step": i} for i in range(count)]

@@ -14,6 +14,7 @@ from .wandb_domain_gql import (
 
 import typing
 from . import wb_util
+from .run_history import history_op_common
 from urllib.parse import quote
 from .. import artifact_fs
 from .. import artifact_wandb
@@ -473,6 +474,7 @@ def history_metrics(
 
 
 # Special bridge functions to lower level local artifacts
+
 
 # TODO: Move all this to helper functions off the artifactVersion object
 def _artifact_version_to_wb_artifact(artifactVersion: wdt.ArtifactVersion):

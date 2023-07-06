@@ -52,7 +52,7 @@ from .wandb_domain_gql import (
 )
 from . import wb_util
 from .. import engine_trace
-from .run_history import history_util
+from .run_history import history_op_common
 
 
 # Important to re-export ops
@@ -171,7 +171,7 @@ def _make_run_config_gql_field(inputs: InputAndStitchProvider, inner: str):
     key_tree = compile_table.get_projection(stitch_obj)
     # we only pushdown the top level keys for now.
 
-    top_level_keys = history_util.get_top_level_keys(key_tree)
+    top_level_keys = history_op_common.get_top_level_keys(key_tree)
     if not top_level_keys:
         # If no keys, then we must select the whole object
         return "configSubset: config"
@@ -240,7 +240,7 @@ def _make_run_summary_gql_field(inputs: InputAndStitchProvider, inner: str):
     key_tree = compile_table.get_projection(stitch_obj)
 
     # we only pushdown the top level keys for now.
-    top_level_keys = history_util.get_top_level_keys(key_tree)
+    top_level_keys = history_op_common.get_top_level_keys(key_tree)
     if not top_level_keys:
         # If no keys, then we must select the whole object
         return "summaryMetricsSubset: summaryMetrics"
@@ -266,6 +266,49 @@ def summary(run: wdt.Run) -> dict[str, typing.Any]:
             run.gql["name"],
         ),
     )
+
+
+def _history_as_of_plugin(inputs, inner):
+    min_step = (
+        inputs.raw["asOfStep"]
+        if "asOfStep" in inputs.raw and inputs.raw["asOfStep"] != None
+        else 0
+    )
+    max_step = min_step + 1
+    alias = _make_alias(str(inputs.raw["asOfStep"]), prefix="history")
+    return f"{alias}: history(minStep: {min_step}, maxStep: {max_step})"
+
+
+def _get_history_as_of_step(run: wdt.Run, asOfStep: int):
+    alias = _make_alias(str(asOfStep), prefix="history")
+
+    data = run.gql[alias]
+    if isinstance(data, list):
+        if len(data) > 0:
+            data = data[0]
+        else:
+            data = None
+    if data is None:
+        return {}
+    return json.loads(data)
+
+
+@op(
+    render_info={"type": "function"},
+    plugins=wb_gql_op_plugin(_history_as_of_plugin),
+    hidden=True,
+)
+def _refine_history_as_of_type(run: wdt.Run, asOfStep: int) -> types.Type:
+    return wb_util.process_run_dict_type(_get_history_as_of_step(run, asOfStep))
+
+
+@op(
+    name="run-historyAsOf",
+    refine_output_type=_refine_history_as_of_type,
+    plugins=wb_gql_op_plugin(_history_as_of_plugin),
+)
+def history_as_of(run: wdt.Run, asOfStep: int) -> dict[str, typing.Any]:
+    return _get_history_as_of_step(run, asOfStep)
 
 
 # Section 4/6: Direct Relationship Ops
