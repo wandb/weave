@@ -7,9 +7,14 @@ import numpy as np
 from PIL import Image
 
 
+def make_stream_table(*args, **kwargs):
+    # Unit test backend does not support async logging
+    return StreamTable(*args, **kwargs, _disable_async_logging=True)
+
+
 # Example of end to end integration test
 def test_stream_logging(user_by_api_key_in_env):
-    st = StreamTable(
+    st = make_stream_table(
         "test_table",
         project_name="stream-tables",
         entity_name=user_by_api_key_in_env.username,
@@ -41,7 +46,7 @@ def test_stream_logging_image(user_by_api_key_in_env):
         imarray = np.random.rand(100, 100, 3) * 255
         return Image.fromarray(imarray.astype("uint8")).convert("RGBA")
 
-    st = StreamTable(
+    st = make_stream_table(
         "test_table-8",
         project_name="stream-tables",
         entity_name=user_by_api_key_in_env.username,
@@ -68,7 +73,7 @@ def test_stream_logging_image(user_by_api_key_in_env):
 
 
 def test_multi_writers_sequential(user_by_api_key_in_env):
-    st = StreamTable(
+    st = make_stream_table(
         "test_table",
         project_name="stream-tables",
         entity_name=user_by_api_key_in_env.username,
@@ -98,7 +103,7 @@ def test_multi_writers_sequential(user_by_api_key_in_env):
 
     st.finish()
 
-    st = StreamTable(
+    st = make_stream_table(
         "test_table",
         project_name="stream-tables",
         entity_name=user_by_api_key_in_env.username,
@@ -112,37 +117,38 @@ def test_multi_writers_sequential(user_by_api_key_in_env):
     do_asserts()
 
 
-@pytest.mark.skip(reason="This is expected to fail until W&B updates step management")
+@pytest.mark.skip(reason="Multi-writer not yet supported in local container")
 def test_multi_writers_parallel(user_by_api_key_in_env):
-    st_1 = StreamTable(
-        "test_table",
+    entity_name = user_by_api_key_in_env.username
+    table_name = "test_table_" + str(int(time.time()))
+    st_1 = make_stream_table(
+        table_name,
         project_name="stream-tables",
-        entity_name=user_by_api_key_in_env.username,
+        entity_name=entity_name,
     )
-    st_2 = StreamTable(
-        "test_table",
+    st_2 = make_stream_table(
+        table_name,
         project_name="stream-tables",
-        entity_name=user_by_api_key_in_env.username,
+        entity_name=entity_name,
     )
 
     indexes = []
     writers = []
 
-    for i in range(5):
+    for i in range(100):
         st_1.log({"index": i * 2, "writer": "a"})
         st_2.log({"index": i * 2 + 1, "writer": "b"})
         indexes.append(i * 2)
         indexes.append(i * 2 + 1)
         writers.append("a")
         writers.append("b")
+        time.sleep(0.025)
     st_1.finish()
     st_2.finish()
 
     hist_node = (
-        weave.ops.project(user_by_api_key_in_env.username, "stream-tables")
-        .run("test_table")
-        .history2()
+        weave.ops.project(entity_name, "stream-tables").run(table_name).history2()
     )
-    assert weave.use(hist_node["index"]) == indexes
-    assert weave.use(hist_node["writer"]) == writers
-    assert weave.use(hist_node["_step"]) == [i for i in range(20)]
+    assert weave.use(hist_node["index"]).to_pylist_raw() == indexes
+    assert weave.use(hist_node["writer"]).to_pylist_raw() == writers
+    assert weave.use(hist_node["_step"]).to_pylist_raw() == [i for i in range(20)]
