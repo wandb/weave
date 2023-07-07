@@ -1,5 +1,7 @@
 import {typeToString} from '../../language/js/print';
 import {
+  Type,
+  constNode,
   constNumberList,
   functionType,
   list,
@@ -8,9 +10,11 @@ import {
   typedDict,
 } from '../../model';
 import {constFunction, constNone, constNumber, constString} from '../../model';
+import {OpDefWeave} from '../../opStore';
 import {normalizeType, testClient, testNode} from '../../testUtil';
 import {randomlyDownsample} from '../util';
 import {
+  opDropNa,
   opJoinAll,
   opJoinAllReturnType,
   opRandomGaussian,
@@ -220,6 +224,29 @@ describe('List Ops', () => {
     console.log(typeToString(returnType, false));
     console.log(typeToString(expType, false));
     expect(normalizeType(returnType)).toEqual(normalizeType(expType));
+  });
+
+  it('opDropna - no effect', async () => {
+    const type: Type = typedDict({col_a: 'number', col_b: maybe('string')});
+
+    const input = [
+      {col_a: 1, col_b: 'hello'},
+      {col_a: 2, col_b: null},
+      {col_a: 3, col_b: 'world'},
+    ];
+
+    const elemNodes = input.map(elem => constNode(type, elem));
+
+    await testNode(
+      opDropNa({
+        arr: opArray({
+          '0': elemNodes[0],
+          '1': elemNodes[1],
+          '2': elemNodes[2],
+        } as any),
+      }),
+      {type: list(type, 0, 3), resolvedType: list(type, 0, 3), value: input}
+    );
   });
 });
 
